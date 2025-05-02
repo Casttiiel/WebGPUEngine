@@ -1,3 +1,4 @@
+import { NameComponent } from "../../components/core/NameComponent";
 import { Component } from "./Component";
 
 export class Entity {
@@ -35,5 +36,10 @@ export class Entity {
 
     public setParent(parent: Entity): void {
       this.parent = parent;
+    }
+
+    public getName(): string {
+      const nameComponent = this.getComponent("name") as NameComponent;
+      return nameComponent?.getName() || "";
     }
   }

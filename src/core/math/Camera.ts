@@ -1,4 +1,5 @@
 import { mat4, vec3 } from "gl-matrix";
+import { Render } from "../../renderer/core/render";
 
 export class Camera {
     private view: mat4 = mat4.create();
@@ -16,7 +17,6 @@ export class Camera {
     private zNear: number = 0.1;
     private zFar: number = 1000.0;
     private fovRadians: number = (60 * Math.PI) / 180; // 60 degrees in radians
-    private aspectRatio: number = 1.0;
     private isOrtho: boolean = false;
 
     // Ortho parameters
@@ -30,9 +30,11 @@ export class Camera {
     private viewport = {
         x0: 0,
         y0: 0,
-        width: 640,
-        height: 480,
+        width: Render.width,
+        height: Render.height,
     };
+    private aspectRatio: number = Math.abs(this.viewport.width / this.viewport.height);
+
 
     constructor() {
         this.updateProjection();
@@ -121,9 +123,7 @@ export class Camera {
         this.updateViewProjection();
     }
 
-    public setViewport(x0: number, y0: number, width: number, height: number): void {
-        this.viewport.x0 = x0;
-        this.viewport.y0 = y0;
+    public setViewport(width: number, height: number): void {
         this.viewport.width = width;
         this.viewport.height = height;
 
@@ -168,12 +168,27 @@ export class Camera {
         return this.viewProjection;
     }
 
+    public setNearPlane(near: number): void {
+        this.zNear = near;
+        this.updateProjection();
+    }
+
     public getNear(): number {
         return this.zNear;
     }
 
+    public setFarPlane(far: number): void {
+        this.zFar = far;
+        this.updateProjection();
+    }
+
     public getFar(): number {
         return this.zFar;
+    }
+
+    public setFov(fov: number): void {
+        this.fovRadians = fov * (Math.PI / 180); // Convert degrees to radians
+        this.updateProjection();
     }
 
     public getFov(): number {

@@ -1,5 +1,6 @@
 import { NameComponent } from "../../components/core/NameComponent";
 import { TransformComponent } from "../../components/core/TransformComponent";
+import { CameraComponent } from "../../components/render/CameraComponent";
 import { RenderComponent } from "../../components/render/RenderComponent";
 import { SceneDataType, EntityDataType } from "../../types/SceneData.type";
 import { Component } from "../ecs/Component";
@@ -39,14 +40,17 @@ export class Loader {
 
   public static createComponentFromJSON(type: string): Component {
     switch (type) {
+      case 'name':
+        return new NameComponent();
+        break;
       case 'transform':
         return new TransformComponent();
         break;
       case 'render':
         return new RenderComponent();
         break;
-      case 'name':
-        return new NameComponent();
+      case 'camera':
+        return new CameraComponent();
         break;
       /*case 'autoAlignedBoundingBox':
         entity.addComponent(type, new AABBComponent());

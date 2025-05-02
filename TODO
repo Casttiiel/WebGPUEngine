@@ -1,11 +1,8 @@
 NPM RUN DEV
 -------------------------------------------
-GIT
-Camera Component Loader/Camera Class
-Use correct Camera on Render
-Input
-Test Camera Mixer
-Resize Canvas
+Resize Canvas/Resolution
+Input/Controls
+Test Camera Mixer/Use Correct camera again
 Children
 Deferred
 Skybox

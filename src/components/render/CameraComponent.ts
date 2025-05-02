@@ -1,5 +1,6 @@
 import { Camera } from "../../core/math/Camera";
 import { Component } from "../../core/ecs/Component";
+import { CameraComponentDataType } from "../../types/CameraComponentData.type";
 
 export class CameraComponent extends Component {
     private camera: Camera;
@@ -9,15 +10,7 @@ export class CameraComponent extends Component {
         this.camera = new Camera();
     }
 
-    public async load(data: unknown): Promise<void> {
-        if (data.fov) {
-            this.camera.setFov(data.fov);
-        }
-
-        if (data.aspect) {
-            this.camera.setAspectRatio(data.aspect);
-        }
-
+    public async load(data: CameraComponentDataType): Promise<void> {
         if (data.near) {
             this.camera.setNearPlane(data.near);
         }
@@ -26,10 +19,18 @@ export class CameraComponent extends Component {
             this.camera.setFarPlane(data.far);
         }
 
-        if (data.position && data.target) {
-            const up = data.up || [0, 1, 0];
-            this.camera.lookAt(data.position, data.target, up);
+        if (data.fov) {
+            this.camera.setFov(data.fov);
         }
+
+        if (data.viewport) {
+            this.camera.setViewport(data.viewport.width, data.viewport.height);
+        }
+
+        const position = data.position || [0, 5, 10];
+        const target = data.target || [0, 0, 0];
+        const up = data.up || [0, 1, 0];
+        this.camera.lookAt(position, target, up);
     }
 
     public setCamera(camera: Camera): void {

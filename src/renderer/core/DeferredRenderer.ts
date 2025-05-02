@@ -1,6 +1,7 @@
 import { Camera } from "../../core/math/Camera";
-import { RenderToTexture } from "../../modules/game/ModuleRender";
+import { RenderCategory } from "../../types/RenderCategory.enum";
 import { RenderManager } from "./RenderManager";
+import { RenderToTexture } from "./RenderToTexture";
 
 export class DeferredRenderer {
   private width!: number;
@@ -57,7 +58,7 @@ export class DeferredRenderer {
 
   public renderGBuffer() {
     //CLEAR TEXTURE COLORS
-    RenderManager.getInstance().render("solids");//TODO ENUMS
+    RenderManager.getInstance().render(RenderCategory.SOLIDS);
   }
 
 }

@@ -73,7 +73,7 @@ export class ModuleEntities extends Module {
   }
 
   public renderInMenu(): void {
-    
+
   }
 
   public renderDebug(): void {
@@ -94,7 +94,16 @@ export class ModuleEntities extends Module {
     this.omToUpdate.get(managerName)?.addComponent(component);
   }
 
-  stop(): void {
+  public getEntityByName(name: string): Entity | null {
+    for (const entity of this.omEntities) {
+      if (entity.getName() === name) {
+        return entity;
+      }
+    }
+    return null;
+  }
+
+  public stop(): void {
     throw new Error("Method not implemented.");
   }
 }

@@ -1,46 +1,22 @@
-import { Camera } from "../../core/math/Camera";
+import { CameraComponent } from "../../components/render/CameraComponent";
+import { Engine } from "../../core/engine/Engine";
 import { DeferredRenderer } from "../../renderer/core/DeferredRenderer";
 import { Render } from "../../renderer/core/render";
 import { RenderManager } from "../../renderer/core/RenderManager";
+import { RenderToTexture } from "../../renderer/core/RenderToTexture";
 import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Module } from "../core/Module";
-
-
-export class RenderToTexture {
-  private xRes: number = 0;
-  private yRes: number = 0;
-
-  public createRT(name: string, width: number, height: number, colorFormat: string, depthFormat = "", usesDepthOfBackbuffer = false): void {
-    this.destroy();
-
-    this.xRes = width;
-    this.yRes = height;
-  }
-
-  public getWidth(): number {
-    return this.xRes;
-  }
-
-  public getHeight(): number {
-    return this.yRes;
-  }
-
-  public destroy(): void { }
-}
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private deferredOutput: RenderToTexture;
   private shineOutput: RenderToTexture;
-  private camera: Camera;
 
   constructor(name: string) {
     super(name);
     this.deferred = new DeferredRenderer();
     this.deferredOutput = new RenderToTexture();
     this.shineOutput = new RenderToTexture();
-    this.camera = new Camera();
-    this.camera.lookAt([0, 5, 10], [0, 0, 0], [0, 1, 0]);
   }
 
   public async start(): Promise<boolean> {
@@ -70,7 +46,10 @@ export class ModuleRender extends Module {
     const res = Render.getInstance().startRenderingBackBuffer(commandEncoder, { r: 0.2, g: 0.3, b: 0.4, a: 1 });
     if (!res) return;
 
-    RenderManager.getInstance().setCamera(this.camera);
+    const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
+    if(!mainCamera) return;
+    const cameraComponent = mainCamera.getComponent("camera") as CameraComponent;
+    RenderManager.getInstance().setCamera(cameraComponent.getCamera());
     RenderManager.getInstance().render(RenderCategory.SOLIDS);
 
     const pass = Render.getInstance().getPass();

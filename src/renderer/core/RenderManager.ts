@@ -24,8 +24,7 @@ export class RenderManager {
   private static instance: RenderManager | null = null;
   private normalKeys: RenderKey[] = [];
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
-  private camera: Camera | null = null;
-  private viewProjectionMatrix: mat4 = mat4.create();
+  private camera!: Camera;
 
   private constructor() { }
 
@@ -38,9 +37,6 @@ export class RenderManager {
 
   public setCamera(camera: Camera): void {
     this.camera = camera;
-    if (camera) {
-      this.viewProjectionMatrix = camera.getViewProjection();
-    }
   }
 
   public addKey(
@@ -109,7 +105,7 @@ export class RenderManager {
       // Calculate MVP matrix
       const modelMatrix = key.transform.asMatrix();
       const mvpMatrix = mat4.create();
-      mat4.multiply(mvpMatrix, this.viewProjectionMatrix, modelMatrix);
+      mat4.multiply(mvpMatrix, this.camera.getViewProjection(), modelMatrix);
 
       // Update uniforms with MVP matrix
       key.material.getTechnique().updateUniforms(new Float32Array(mvpMatrix));
