@@ -18,6 +18,7 @@ interface RenderKey {
   instancedGroupId: number;
   isInstanced: boolean;
   usesCustomBuffers: boolean;
+  objectId?: number;
 }
 
 export class RenderManager {
@@ -87,7 +88,6 @@ export class RenderManager {
   public render(category: RenderCategory): void {
     if (!this.camera) return;
 
-    // Sort keys if required
     this.normalKeys.sort((k1, k2) => this.sortKeys(k1, k2));
 
     let numDrawCalls = 0;
@@ -107,8 +107,12 @@ export class RenderManager {
       const mvpMatrix = mat4.create();
       mat4.multiply(mvpMatrix, this.camera.getViewProjection(), modelMatrix);
 
+      // Activate technique and get/create object ID if needed
+      const technique = key.material.getTechnique();
+      key.objectId = technique.activate(key.objectId);
+
       // Update uniforms with MVP matrix
-      key.material.getTechnique().updateUniforms(new Float32Array(mvpMatrix));
+      technique.updateUniforms(key.objectId, new Float32Array(mvpMatrix));
 
       // Render the mesh
       key.mesh.activate(Render.getInstance().getPass()!);

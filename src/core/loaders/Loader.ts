@@ -15,15 +15,17 @@ export class Loader {
     }
   }
 
-  public static async loadEntityFromJSON(json: EntityDataType): Promise<Entity> {
+  public static async loadEntityFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
     const entity = new Entity();
+    if(parent) {
+      parent.addChildren(entity);
+    }
 
     Engine.getEntities().addEntity(entity);
     await this.loadComponentFromJSON(json, entity);
 
     for (const children_json of json.children || []) {
-      const children = await this.loadEntityFromJSON(children_json);
-      entity.addChildren(children);
+      await this.loadEntityFromJSON(children_json, entity);
     }
 
     return entity;

@@ -5,7 +5,7 @@ import { TransformComponent } from "../core/TransformComponent";
 import { RenderComponentDataType, RenderComponentMeshDataType } from "../../types/RenderComponentData.type";
 import { MeshPartType } from "../../types/MeshPart.type";
 import { RenderManager } from "../../renderer/core/RenderManager";
-
+import { Transform } from "../../core/math/Transform";
 
 export class RenderComponent extends Component {
     private isVisible: boolean = true;
@@ -54,13 +54,31 @@ export class RenderComponent extends Component {
         this.updateRenderManager();
     }
 
+    private getWorldTransform(): Transform {
+        const entity = this.getOwner();
+        const transformComponent = entity.getComponent("transform") as TransformComponent;
+        if (!transformComponent) {
+            throw new Error("Transform component not found");
+        }
+
+        let worldTransform = transformComponent.getTransform();
+        let parent = entity.getParent();
+        
+        // Combinar con las transformaciones de los padres
+        if (parent) {
+            const parentTransform = parent.getComponent("transform") as TransformComponent;
+            if (parentTransform) {
+                worldTransform = parentTransform.getTransform().combineWith(worldTransform);
+            }
+            parent = parent.getParent();
+        }
+
+        return worldTransform;
+    }
+
     private updateRenderManager(): void {
         const renderManager = RenderManager.getInstance();
-        const transformComponent = this.getOwner().getComponent("transform") as TransformComponent;
-        const transform = transformComponent.getTransform();
-        if (!transform) {
-            throw new Error("Transform component not found or not initialized.");
-        }
+        const worldTransform = this.getWorldTransform();
 
         renderManager.delKeys(this);
 
@@ -70,7 +88,7 @@ export class RenderComponent extends Component {
                 this,
                 part.mesh,
                 part.material,
-                transform,
+                worldTransform,
                 part.meshGroup,
                 part.meshInstancesGroup
             );

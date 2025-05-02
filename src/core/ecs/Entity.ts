@@ -38,6 +38,10 @@ export class Entity {
       this.parent = parent;
     }
 
+    public getParent(): Entity | null {
+      return this.parent;
+    }
+
     public getName(): string {
       const nameComponent = this.getComponent("name") as NameComponent;
       return nameComponent?.getName() || "";

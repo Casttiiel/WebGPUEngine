@@ -8,8 +8,9 @@ export class Technique {
   private blendMode!: string;
   private rasterizationMode!: string;
   private depthMode!: string;
-  private uniformBuffer!: GPUBuffer;
-  private uniformBindGroup!: GPUBindGroup;
+  private uniformBuffers: Map<number, { buffer: GPUBuffer, bindGroup: GPUBindGroup }> = new Map();
+  private bindGroupLayout!: GPUBindGroupLayout;
+  private static nextId = 0;
 
   constructor(name: string) {
     this.name = name;
@@ -29,7 +30,7 @@ export class Technique {
   public async load(): Promise<void> {
     const techniqueData = await ResourceManager.loadTechniqueData(this.name);
 
-    this.blendMode = techniqueData.blendMode || "default";
+    this.blendMode = techniqueData.blend || "default";
     this.rasterizationMode = techniqueData.rs || "default";
     this.depthMode = techniqueData.z || "default";
 
@@ -38,14 +39,8 @@ export class Technique {
 
     const device = Render.getInstance().getDevice();
 
-    // Create uniform buffer
-    this.uniformBuffer = device.createBuffer({
-      size: 4 * 16, // size of mat4x4f
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
     // Create bind group layout
-    const bindGroupLayout = device.createBindGroupLayout({
+    this.bindGroupLayout = device.createBindGroupLayout({
       entries: [{
         binding: 0,
         visibility: GPUShaderStage.VERTEX,
@@ -55,16 +50,7 @@ export class Technique {
 
     // Create pipeline layout
     const pipelineLayout = device.createPipelineLayout({
-      bindGroupLayouts: [bindGroupLayout]
-    });
-
-    // Create bind group
-    this.uniformBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{
-        binding: 0,
-        resource: { buffer: this.uniformBuffer }
-      }]
+      bindGroupLayouts: [this.bindGroupLayout]
     });
 
     this.module = device.createShaderModule({
@@ -130,17 +116,57 @@ export class Technique {
     });
   }
 
-  public activate(): void {
-    const pass = Render.getInstance().getPass();
-    if (!pass) return;
+  private createUniformBufferForObject(): number {
+    const device = Render.getInstance().getDevice();
+    const id = Technique.nextId++;
 
-    pass.setPipeline(this.pipeline);
-    pass.setBindGroup(0, this.uniformBindGroup);
+    // Create uniform buffer
+    const uniformBuffer = device.createBuffer({
+      size: 4 * 16, // size of mat4x4f
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    // Create bind group
+    const bindGroup = device.createBindGroup({
+      layout: this.bindGroupLayout,
+      entries: [{
+        binding: 0,
+        resource: { buffer: uniformBuffer }
+      }]
+    });
+
+    this.uniformBuffers.set(id, { buffer: uniformBuffer, bindGroup });
+    return id;
   }
 
-  public updateUniforms(mvp: Float32Array): void {
+  public activate(objectId?: number): number {
+    const pass = Render.getInstance().getPass();
+    if (!pass) return -1;
+
+    pass.setPipeline(this.pipeline);
+
+    // If no ID is provided, create a new buffer
+    if (objectId === undefined) {
+      objectId = this.createUniformBufferForObject();
+    }
+
+    const bufferData = this.uniformBuffers.get(objectId);
+    if (!bufferData) {
+      throw new Error(`No uniform buffer found for object ID ${objectId}`);
+    }
+
+    pass.setBindGroup(0, bufferData.bindGroup);
+    return objectId;
+  }
+
+  public updateUniforms(objectId: number, mvp: Float32Array): void {
+    const bufferData = this.uniformBuffers.get(objectId);
+    if (!bufferData) {
+      throw new Error(`No uniform buffer found for object ID ${objectId}`);
+    }
+
     Render.getInstance().getDevice().queue.writeBuffer(
-      this.uniformBuffer,
+      bufferData.buffer,
       0,
       mvp.buffer,
       mvp.byteOffset,

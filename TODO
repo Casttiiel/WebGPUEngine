@@ -1,19 +1,18 @@
 NPM RUN DEV
 -------------------------------------------
-Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-Children
-Performance numbers
 Deferred
 Skybox
+ToneMapping/HDR
+Antialiasing
+Performance numbers
+Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 PointLight
 Prefab
 
-ToneMapping/HDR
-Antialiasing
 Blur
 Bloom
-Mesh LOD
 Culling on camera
+Mesh LOD
 
 
 PBR LIGHTS
@@ -26,8 +25,8 @@ PBR LIGHTS
     renderDirectionalLightsWithShadows
     RenderPointLighstWithShadows
 Culling of lights
-Ambient Occlusion
 Decals
+Ambient Occlusion
 
 
 Camera Lens Dirt
