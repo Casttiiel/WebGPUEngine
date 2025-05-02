@@ -1,0 +1,6 @@
+{
+	"start" : "gs_playground",
+	"gamestates" : {
+		"gs_playground"      : []
+	}
+}

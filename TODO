@@ -1,0 +1,57 @@
+NPM RUN DEV
+-------------------------------------------
+GIT
+Camera Component Loader/Camera Class
+Use correct Camera on Render
+Input
+Test Camera Mixer
+Resize Canvas
+Children
+Deferred
+Skybox
+PointLight
+Prefab
+
+ToneMapping/HDR
+Antialiasing
+Blur
+Bloom
+Mesh LOD
+Culling on camera
+
+
+PBR LIGHTS
+    Dir Light
+    renderDirectionalLightsWithoutShadows
+        Do not use Camera Component/Use transform
+        Render In Menu
+        Light movement with its front
+        Render In Debug -> Camera/Dir Light
+    renderDirectionalLightsWithShadows
+    RenderPointLighstWithShadows
+Performance
+Culling of lights
+Ambient Occlusion
+Decals
+
+
+Camera Lens Dirt
+Lens Flare
+Light Exposure
+Instancing
+Particles
+
+
+Volumetric Lights/God Rays
+Terrain with perlin noise
+Weighted terrain
+Cascaded Shadow Maps
+Animations
+Computing Shaders
+GAME-----------------------------------
+Physics
+Music
+Grass
+Skybox with Day/Night Cycle
+Day/Night Cycle
+Physics Grass

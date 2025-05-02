@@ -1,0 +1,90 @@
+import { Component } from "../../core/ecs/Component";
+import { Mesh } from "../../renderer/resources/mesh";
+import { Material } from "../../renderer/resources/material";
+import { TransformComponent } from "../core/TransformComponent";
+import { RenderComponentDataType, RenderComponentMeshDataType } from "../../types/RenderComponentData.type";
+import { MeshPartType } from "../../types/MeshPart.type";
+import { RenderManager } from "../../renderer/core/RenderManager";
+
+
+export class RenderComponent extends Component {
+    private isVisible: boolean = true;
+    private parts: MeshPartType[] = [];
+    private currentState: number = 0;
+
+    constructor() {
+        super();
+    }
+
+    public async load(data: RenderComponentDataType): Promise<void> {
+        for (const meshData of data.meshes) {
+            await this.readMesh(meshData);
+        }
+
+        this.updateRenderManager();
+    }
+
+    private async readMesh(data: RenderComponentMeshDataType): Promise<void> {
+        if (!data.mesh) {
+            throw new Error(`Missing attribute 'mesh' in input JSON: ${JSON.stringify(data)}`);
+        }
+
+        const mesh = await Mesh.get(data.mesh);
+
+        const materialName = data.material || "default_material";
+        const material = await Material.get(materialName);
+
+        const meshPart: MeshPartType = {
+            mesh,
+            material,
+            meshGroup: 0,
+            meshInstancesGroup: data.instances_group || 0,
+            isVisible: data.visible !== undefined ? data.visible : true,
+            state: data.state || 0,
+        };
+
+        this.parts.push(meshPart);
+    }
+
+    public showMeshesWithState(newState: number): void {
+        this.currentState = newState;
+        for (const part of this.parts) {
+            part.isVisible = part.state === newState;
+        }
+        this.updateRenderManager();
+    }
+
+    private updateRenderManager(): void {
+        const renderManager = RenderManager.getInstance();
+        const transformComponent = this.getOwner().getComponent("transform") as TransformComponent;
+        const transform = transformComponent.getTransform();
+        if (!transform) {
+            throw new Error("Transform component not found or not initialized.");
+        }
+
+        renderManager.delKeys(this);
+
+        for (const part of this.parts) {
+            if (!part.isVisible || !this.isVisible) continue;
+            renderManager.addKey(
+                this,
+                part.mesh,
+                part.material,
+                transform,
+                part.meshGroup,
+                part.meshInstancesGroup
+            );
+        }
+    }
+
+    public update(dt: number): void {
+        throw new Error("Method not implemented.");
+    }
+
+    public renderInMenu(): void {
+    }
+
+    public renderDebug(): void {
+        throw new Error("Method not implemented.");
+    }
+}
