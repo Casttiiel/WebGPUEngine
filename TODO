@@ -1,9 +1,8 @@
 NPM RUN DEV
 -------------------------------------------
-Resize Canvas/Resolution
-Input/Controls
-Test Camera Mixer/Use Correct camera again
+Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Children
+Performance numbers
 Deferred
 Skybox
 PointLight
@@ -26,7 +25,6 @@ PBR LIGHTS
         Render In Debug -> Camera/Dir Light
     renderDirectionalLightsWithShadows
     RenderPointLighstWithShadows
-Performance
 Culling of lights
 Ambient Occlusion
 Decals

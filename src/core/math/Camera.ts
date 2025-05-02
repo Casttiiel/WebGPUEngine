@@ -155,6 +155,40 @@ export class Camera {
         return { screenCoords: posInScreenSpace, isInsideFrustum };
     }
 
+    public move(delta: number[]): void {
+        vec3.add(this.eye, this.eye, delta as vec3);
+        vec3.add(this.target, this.target, delta as vec3);
+        this.lookAt(this.eye, this.target, this.upAux);
+    }
+
+    public rotate(yaw: number, pitch: number): void {
+        // Aplicar rotación yaw (alrededor del eje Y)
+        const rotMat = mat4.create();
+        mat4.rotate(rotMat, rotMat, yaw, this.upAux);
+        vec3.transformMat4(this.front, this.front, rotMat);
+
+        // Aplicar rotación pitch (alrededor del eje local X)
+        const right = vec3.cross(vec3.create(), this.front, this.upAux);
+        vec3.normalize(right, right);
+        mat4.rotate(rotMat, mat4.create(), pitch, right);
+        vec3.transformMat4(this.front, this.front, rotMat);
+        vec3.normalize(this.front, this.front);
+
+        // Calcular nueva posición del target
+        vec3.add(this.target, this.eye, this.front);
+        
+        // Actualizar la cámara
+        this.lookAt(this.eye, this.target, this.upAux);
+    }
+
+    public getLocalVector(vec: number[]): vec3 {
+        const result = vec3.create();
+        vec3.scale(result, this.left, vec[0]);
+        vec3.scaleAndAdd(result, result, this.up, vec[1]);
+        vec3.scaleAndAdd(result, result, this.front, vec[2]);
+        return result;
+    }
+
     // Getters
     public getView(): mat4 {
         return this.view;

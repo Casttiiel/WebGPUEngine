@@ -70,4 +70,8 @@ export class Engine {
     public static getEntities(): ModuleEntities {
         return this._entities;
     }
+
+    public static getInput(): ModuleInput {
+        return this._input;
+    }
 }

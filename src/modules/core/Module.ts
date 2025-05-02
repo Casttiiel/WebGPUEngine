@@ -19,9 +19,9 @@ export abstract class Module {
     }
 
     // Helper para añadir controles al debug UI
-    protected addDebugControl(propertyKey: string, object: any, options?: any): void {
+    protected addDebugControl(object: unknown, propertyKey: string, label?: string): void {
         const moduleManager = Engine.getModules();
-        moduleManager.addDebugControl(this.name, object, propertyKey, options);
+        moduleManager.addDebugControl(this.name, object, propertyKey, label);
     }
 
     public getName(): string {

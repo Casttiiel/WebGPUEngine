@@ -1,6 +1,7 @@
 {
     "update": [
-      "transform"
+      "transform",
+      "camera"
     ],
     "render_debug": [
 

@@ -1,8 +1,8 @@
 {
     "update": [
-      "entities"
+      "entities",
+      "input"
     ],
     "render_debug": [
-
     ]
   }

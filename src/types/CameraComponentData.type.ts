@@ -11,4 +11,5 @@ export type CameraComponentDataType = Readonly<{
     position: vec3;
     target: vec3;
     up: vec3;
+    controllable: boolean;
 }>;

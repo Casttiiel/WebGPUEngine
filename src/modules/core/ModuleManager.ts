@@ -1,5 +1,5 @@
 import { Gamestate } from "../../core/engine/Gamestate";
-import { Pane } from 'tweakpane';
+import { FolderApi, Pane } from 'tweakpane';
 import { Module } from "./Module";
 
 export class ModuleManager {
@@ -14,7 +14,6 @@ export class ModuleManager {
     private requestedGamestate: Gamestate | null = null;
     private debugPane: Pane | null = null;
     private debugFolders: Map<string, any> = new Map();
-    private folderStates: Map<string, boolean> = new Map();
     private engineControlsAdded: boolean = false;
 
     public async start(): Promise<void> {
@@ -41,11 +40,7 @@ export class ModuleManager {
         if (this.engineControlsAdded || !this.debugPane) return;
 
         // Control global de timeScale
-        this.addDebugControl('Engine', { timeScale: this.timeScale }, 'timeScale', {
-            min: 0,
-            max: 2,
-            step: 0.1
-        });
+        this.addDebugControl('Engine', { timeScale: this.timeScale }, 'timeScale');
 
         this.engineControlsAdded = true;
     }
@@ -171,31 +166,19 @@ export class ModuleManager {
         this.startGamestate = jsonData["start"];
     }
 
-    private getOrCreateFolder(path: string, expanded: boolean = true): any {
-        if (!this.debugPane) return null;
+    public addDebugControl(moduleName: string, object: unknown, propertyKey: string, label?: string): void {
+        if (!this.debugPane) return;
 
-        // Ahora solo creamos un nivel de folders
-        const parts = path.split('/');
-        const folderName = parts[0]; // Solo usamos el primer nivel
-
-        if (!this.debugFolders.has(folderName)) {
-            const wasExpanded = this.folderStates.get(folderName) ?? expanded;
-            
-            const newFolder = this.debugPane.addFolder({
-                title: folderName,
-                expanded: wasExpanded
-            });
-
-            this.debugFolders.set(folderName, newFolder);
-            
-            newFolder.on('fold', (ev: {expanded: boolean}) => {
-                this.folderStates.set(folderName, ev.expanded);
-            });
-            
-            return newFolder;
+        let folder = this.debugFolders.get(moduleName);
+        if (!folder) {
+            folder = this.debugPane.addFolder({ title: moduleName });
+            this.debugFolders.set(moduleName, folder);
         }
 
-        return this.debugFolders.get(folderName);
+        folder.addBinding(object, propertyKey, {
+            label: label || propertyKey,
+            readonly: true
+        });
     }
 
     public renderInMenu(): void {
@@ -205,28 +188,6 @@ export class ModuleManager {
         for (const module of this.allModules) {
             if (!module.isActive()) continue;
             module.renderInMenu();
-        }
-    }
-
-    public addDebugControl(folderPath: string, object: any, propertyKey: string, options?: any): void {
-        const folder = this.getOrCreateFolder(folderPath);
-        if (!folder) return;
-
-        try {
-            // Si es un objeto con valor y las opciones indican que es de solo lectura
-            if (object && typeof object === 'object' && 'value' in object && options?.disabled) {
-                folder.addBinding(object, 'value', {
-                    ...options,
-                    label: options?.label || propertyKey,
-                    readonly: true
-                });
-            }
-            // Para cualquier otro caso
-            else {
-                folder.addBinding(object, propertyKey, options);
-            }
-        } catch (error) {
-            console.warn(`Failed to add debug control for ${propertyKey}:`, error);
         }
     }
 
