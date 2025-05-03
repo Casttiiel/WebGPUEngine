@@ -1,5 +1,5 @@
 import { Component } from "../../core/ecs/Component";
-import { Mesh } from "../../renderer/resources/mesh";
+import { Mesh } from "../../renderer/resources/Mesh";
 import { Material } from "../../renderer/resources/material";
 import { TransformComponent } from "../core/TransformComponent";
 import { RenderComponentDataType, RenderComponentMeshDataType } from "../../types/RenderComponentData.type";
@@ -33,6 +33,7 @@ export class RenderComponent extends Component {
 
         const materialName = data.material || "default_material";
         const material = await Material.get(materialName);
+        material.getTechnique().createRenderPipeline(mesh);
 
         const meshPart: MeshPartType = {
             mesh,
@@ -64,8 +65,8 @@ export class RenderComponent extends Component {
         let worldTransform = transformComponent.getTransform();
         let parent = entity.getParent();
         
-        // Combinar con las transformaciones de los padres
-        if (parent) {
+        // Combinar con las transformaciones de los padres en orden desde el más cercano al más lejano
+        while (parent) {
             const parentTransform = parent.getComponent("transform") as TransformComponent;
             if (parentTransform) {
                 worldTransform = parentTransform.getTransform().combineWith(worldTransform);

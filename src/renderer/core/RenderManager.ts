@@ -1,12 +1,10 @@
-import { mat4 } from "gl-matrix";
 import { RenderComponent } from "../../components/render/RenderComponent";
 import { Camera } from "../../core/math/Camera";
 import { Transform } from "../../core/math/Transform";
 import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Material } from "../resources/material";
-import { Mesh } from "../resources/mesh";
+import { Mesh } from "../resources/Mesh";
 import { Render } from "./render";
-
 
 interface RenderKey {
   mesh: Mesh;
@@ -18,7 +16,6 @@ interface RenderKey {
   instancedGroupId: number;
   isInstanced: boolean;
   usesCustomBuffers: boolean;
-  objectId?: number;
 }
 
 export class RenderManager {
@@ -70,15 +67,6 @@ export class RenderManager {
       };
       this.normalKeys.push(shadowKey);
     }
-
-    // If the material casts shadows, add a shadow key
-    if (material.getCastsShadows()) {
-      const shadowKey: RenderKey = {
-        ...key,
-        material: material.getShadowsMaterial(),
-      };
-      this.normalKeys.push(shadowKey);
-    }
   }
 
   public delKeys(owner: RenderComponent): void {
@@ -91,33 +79,29 @@ export class RenderManager {
     this.normalKeys.sort((k1, k2) => this.sortKeys(k1, k2));
 
     let numDrawCalls = 0;
-    let currentMaterial: Material | null = null;
 
     for (const key of this.normalKeys) {
       if (!key.material || !key.mesh || !key.transform) continue;
 
-      // Only activate material if it changes
-      if (currentMaterial !== key.material) {
-        key.material.activate();
-        currentMaterial = key.material;
-      }
+      const pass = Render.getInstance().getPass();
+      if (!pass) continue;
 
-      // Calculate MVP matrix
-      const modelMatrix = key.transform.asMatrix();
-      const mvpMatrix = mat4.create();
-      mat4.multiply(mvpMatrix, this.camera.getViewProjection(), modelMatrix);
-
-      // Activate technique and get/create object ID if needed
+      // 1. Activate material and technique
+      key.material.activate();
       const technique = key.material.getTechnique();
-      key.objectId = technique.activate(key.objectId);
 
-      // Update uniforms with MVP matrix
-      technique.updateUniforms(key.objectId, new Float32Array(mvpMatrix));
+      // 2. Update model matrix through the technique
+      const modelMatrix = key.transform.asMatrix();
+      technique.updateModelMatrix(new Float32Array(modelMatrix));
 
-      // Render the mesh
-      key.mesh.activate(Render.getInstance().getPass()!);
+      technique.activate();
+
+      // 3. Activate mesh data
+      key.mesh.activate(pass);
+
+      // 4. Draw the mesh
       if (key.isInstanced) {
-        key.mesh.renderInstanced(key.submeshId, key.instancedGroupId);
+        //key.mesh.renderInstanced(key.submeshId, key.instancedGroupId);
       } else {
         key.mesh.renderGroup();
       }

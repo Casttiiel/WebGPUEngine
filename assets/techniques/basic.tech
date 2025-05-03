@@ -1,6 +1,6 @@
 {
-    "vs": "decal.vs",
-    "fs": "decal.fs",
+    "vs": "basic.vs",
+    "fs": "basic.fs",
     "blend": "combinative_gbuffer",
     "rs": "reverse_culling",
     "z": "inverse_test_no_write"

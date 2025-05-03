@@ -1,22 +1,22 @@
 import { ResourceManager } from "../../core/engine/ResourceManager";
 import { Render } from "../core/render";
 
-
 export class Mesh {
     private name: string;
-    private vertices!: Float32Array;
-    private normals!: Float32Array;
-    private uvs!: Float32Array;
-    private indices!: Uint16Array;
-    private tangents!: Float32Array;
-    private indexCount!: number;
+    // Datos de la geometría en CPU
+    private vertices!: Float32Array;    // Posiciones de los vértices
+    private normals!: Float32Array;     // Normales de los vértices
+    private uvs!: Float32Array;         // Coordenadas de textura
+    private indices!: Uint16Array;      // Índices para formar triángulos
+    private tangents!: Float32Array;    // Vectores tangentes para normal mapping
+    private indexCount!: number;        // Número total de índices
 
-    // WebGPU buffers
-    private vertexBuffer!: GPUBuffer;
-    private normalBuffer!: GPUBuffer;
-    private uvBuffer!: GPUBuffer;
-    private tangentBuffer!: GPUBuffer;
-    private indexBuffer!: GPUBuffer;
+    // Buffers en GPU
+    private vertexBuffer!: GPUBuffer;   // Buffer de vértices
+    private normalBuffer!: GPUBuffer;   // Buffer de normales
+    private uvBuffer!: GPUBuffer;       // Buffer de UVs
+    private tangentBuffer!: GPUBuffer;  // Buffer de tangentes
+    private indexBuffer!: GPUBuffer;    // Buffer de índices
 
     constructor(name: string) {
         this.name = name;
@@ -47,13 +47,15 @@ export class Mesh {
         const indicesArray: number[] = [];
         const tangentsArray: number[] = [];
 
-        const tempVertices: number[] = [];
-        const tempNormals: number[] = [];
-        const tempUVs: number[] = [];
-        const tempIndices: { [key: string]: number } = {};
-        const tangentAccum: { [key: number]: number[] } = {};
+        // Arrays temporales para datos del archivo OBJ
+        const tempVertices: number[] = [];    // Posiciones del archivo
+        const tempNormals: number[] = [];     // Normales del archivo
+        const tempUVs: number[] = [];         // UVs del archivo
+        const tempIndices: { [key: string]: number } = {};  // Mapa de índices únicos
+        const tangentAccum: { [key: number]: number[] } = {};  // Acumulador de tangentes
         let indexCount = 0;
 
+        // Procesar el archivo OBJ línea por línea
         const lines = data.split('\n');
         for (let line of lines) {
             line = line.trim();
@@ -66,7 +68,7 @@ export class Mesh {
             const keyword = parts[0];
 
             switch (keyword) {
-                case 'v': // Vértices
+                case 'v':  // Vértice
                     tempVertices.push(
                         parseFloat(parts[1]),
                         parseFloat(parts[2]),
@@ -74,7 +76,7 @@ export class Mesh {
                     );
                     break;
 
-                case 'vn': // Normales
+                case 'vn': // Normal
                     tempNormals.push(
                         parseFloat(parts[1]),
                         parseFloat(parts[2]),
@@ -82,30 +84,29 @@ export class Mesh {
                     );
                     break;
 
-                case 'vt': // Coordenadas de textura
+                case 'vt': // Coordenada de textura
                     tempUVs.push(
                         parseFloat(parts[1]),
                         parseFloat(parts[2])
                     );
                     break;
 
-                case 'f': // Caras
+                case 'f': // Cara (triángulo)
                     const faceVertices = [];
                     const faceUVs = [];
                     const faceIndices = [];
-                    let v;
-                    let vt;
-                    let vn;
 
+                    // Procesar cada vértice de la cara
                     for (let i = 1; i < parts.length; i++) {
                         const vertex = parts[i];
                         if (!(vertex in tempIndices)) {
+                            // Formato del OBJ: v/vt/vn
                             const indices = vertex.split('/').map(index => parseInt(index) - 1);
-                            v = indices[0];
-                            vt = indices[1];
-                            vn = indices[2];
+                            const v = indices[0];  // índice de vértice
+                            const vt = indices[1]; // índice de UV
+                            const vn = indices[2]; // índice de normal
 
-                            // Agregar atributos a los arrays temporales
+                            // Añadir atributos a los arrays finales
                             verticesArray.push(
                                 tempVertices[v * 3],
                                 tempVertices[v * 3 + 1],
@@ -132,9 +133,11 @@ export class Mesh {
 
                         const idx = tempIndices[vertex];
                         indicesArray.push(idx);
-
                         faceVertices.push(idx);
 
+                        // Extraer índices de UV nuevamente para el cálculo de tangentes
+                        const indices = vertex.split('/').map(index => parseInt(index) - 1);
+                        const vt = indices[1]; // índice de UV
                         if (vertex.includes('/') && vt !== undefined && !isNaN(vt)) {
                             faceUVs.push([tempUVs[vt * 2], tempUVs[vt * 2 + 1]]);
                         }
@@ -142,7 +145,7 @@ export class Mesh {
                         faceIndices.push(idx);
                     }
 
-                    // Calcular tangentes para la cara
+                    // Calcular tangentes para normal mapping
                     if (faceVertices.length === 3 && faceUVs.length === 3) {
                         const idx0 = faceIndices[0];
                         const idx1 = faceIndices[1];
@@ -156,18 +159,19 @@ export class Mesh {
                         const uv1 = faceUVs[1];
                         const uv2 = faceUVs[2];
 
+                        // Calcular tangente para este triángulo
                         const tangentData = this.computeTangent(p0, p1, p2, uv0, uv1, uv2);
 
                         const tangent = tangentData.tangent;
                         const w = tangentData.w;
 
+                        // Almacenar tangente para cada vértice del triángulo
                         faceIndices.forEach(idx => {
                             if (!tangentAccum[idx]) tangentAccum[idx] = [0, 0, 0];
                             tangentAccum[idx][0] += tangent[0];
                             tangentAccum[idx][1] += tangent[1];
                             tangentAccum[idx][2] += tangent[2];
 
-                            // Almacenar la componente W en la misma posición del array de tangentes
                             while (tangentsArray.length < idx * 4 + 4) {
                                 tangentsArray.push(0);
                             }
@@ -178,13 +182,10 @@ export class Mesh {
                         });
                     }
                     break;
-
-                default:
-                    break;
             }
         }
 
-        // Crear los TypedArrays finales con los datos acumulados
+        // Crear los TypedArrays finales con los datos procesados
         this.vertices = new Float32Array(verticesArray);
         this.normals = new Float32Array(normalsArray);
         this.uvs = new Float32Array(uvsArray);
@@ -231,17 +232,19 @@ export class Mesh {
     }
 
     private initBuffers(): void {
-        // Create vertex buffer
+        // Crear buffer de vértices en GPU
         this.vertexBuffer = Render.getInstance().getDevice().createBuffer({
+            label: `${this.name}_vertexBuffer`,
             size: this.vertices.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-            mappedAtCreation: true
+            mappedAtCreation: true  // Permitir escribir datos durante la creación
         });
         new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertices);
         this.vertexBuffer.unmap();
 
-        // Create normal buffer
+        // Crear buffer de normales en GPU
         this.normalBuffer = Render.getInstance().getDevice().createBuffer({
+            label: `${this.name}_normalBuffer`,
             size: this.normals.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true
@@ -249,8 +252,9 @@ export class Mesh {
         new Float32Array(this.normalBuffer.getMappedRange()).set(this.normals);
         this.normalBuffer.unmap();
 
-        // Create UV buffer
+        // Crear buffer de UVs en GPU
         this.uvBuffer = Render.getInstance().getDevice().createBuffer({
+            label: `${this.name}_uvBuffer`,
             size: this.uvs.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true
@@ -258,8 +262,9 @@ export class Mesh {
         new Float32Array(this.uvBuffer.getMappedRange()).set(this.uvs);
         this.uvBuffer.unmap();
 
-        // Create tangent buffer
+        // Crear buffer de tangentes en GPU
         this.tangentBuffer = Render.getInstance().getDevice().createBuffer({
+            label: `${this.name}_tangentBuffer`,
             size: this.tangents.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true
@@ -267,8 +272,9 @@ export class Mesh {
         new Float32Array(this.tangentBuffer.getMappedRange()).set(this.tangents);
         this.tangentBuffer.unmap();
 
-        // Create index buffer
+        // Crear buffer de índices en GPU
         this.indexBuffer = Render.getInstance().getDevice().createBuffer({
+            label: `${this.name}_indexBuffer`,
             size: this.indices.byteLength,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true
@@ -317,7 +323,8 @@ export class Mesh {
             }
         ];
     }
-
+    
+    // Activar esta malla para renderizado
     public activate(passEncoder: GPURenderPassEncoder): void {
         passEncoder.setVertexBuffer(0, this.vertexBuffer);
         passEncoder.setVertexBuffer(1, this.normalBuffer);
@@ -326,10 +333,7 @@ export class Mesh {
         passEncoder.setIndexBuffer(this.indexBuffer, 'uint16');
     }
 
-    public renderInstanced(a: unknown, b: unknown): void {
-        // Logic to render the mesh with instancing
-    }
-
+    // Renderizar la malla completa
     public renderGroup(): void {
         const pass = Render.getInstance().getPass();
         pass?.drawIndexed(this.indexCount, 1, 0, 0, 0);

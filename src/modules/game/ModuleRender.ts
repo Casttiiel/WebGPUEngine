@@ -49,7 +49,15 @@ export class ModuleRender extends Module {
     const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
     if(!mainCamera) return;
     const cameraComponent = mainCamera.getComponent("camera") as CameraComponent;
-    RenderManager.getInstance().setCamera(cameraComponent.getCamera());
+    
+    // Actualizar buffer uniforme global solo con view y projection
+    const camera = cameraComponent.getCamera();
+    Render.getInstance().updateGlobalUniforms(
+      new Float32Array(camera.getView()),
+      new Float32Array(camera.getProjection())
+    );
+    
+    RenderManager.getInstance().setCamera(camera);
     RenderManager.getInstance().render(RenderCategory.SOLIDS);
 
     const pass = Render.getInstance().getPass();

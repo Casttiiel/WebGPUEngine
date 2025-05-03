@@ -1,6 +1,6 @@
 import { ResourceManager } from "../../core/engine/ResourceManager";
-import { Technique } from "./technique";
-import { Texture } from "./texture";
+import { Technique } from "./Technique";
+import { Texture } from "./Texture";
 
 
 export class Material {

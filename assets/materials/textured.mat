@@ -1,5 +1,5 @@
 {
-    "technique": "decals.tech",
+    "technique": "basic.tech",
     "textures":[
         {"txAlbedo": "lee.jpg"},
         {"txNormal": "lee_normal.jpg"},
