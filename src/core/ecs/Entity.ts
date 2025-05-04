@@ -30,12 +30,18 @@ export class Entity {
     }
 
     public addChildren(child: Entity): void {
+      console.log(`Adding child ${child.getName()} to parent ${this.getName()}`);
       this.children.push(child);
       child.setParent(this);
     }
 
+    public getChildren(): Entity[] {
+      return this.children;
+    }
+
     public setParent(parent: Entity): void {
       this.parent = parent;
+      console.log(`Setting parent of ${this.getName()} to ${parent.getName()}`);
     }
 
     public getParent(): Entity | null {
@@ -44,6 +50,10 @@ export class Entity {
 
     public getName(): string {
       const nameComponent = this.getComponent("name") as NameComponent;
-      return nameComponent?.getName() || "";
+      return nameComponent?.getName() || `Entity_${this.id}`;
     }
-  }
+
+    public toString(): string {
+      return `Entity(${this.getName()}, id=${this.id})`;
+    }
+}

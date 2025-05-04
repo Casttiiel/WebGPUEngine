@@ -65,11 +65,18 @@ export class RenderComponent extends Component {
         let worldTransform = transformComponent.getTransform();
         let parent = entity.getParent();
         
+        console.log("Entity:", entity.getName());
+        console.log("Local transform matrix:", worldTransform.asMatrix());
+        
         // Combinar con las transformaciones de los padres en orden desde el más cercano al más lejano
         while (parent) {
+            console.log("Parent:", parent.getName());
             const parentTransform = parent.getComponent("transform") as TransformComponent;
             if (parentTransform) {
+                const parentMatrix = parentTransform.getTransform().asMatrix();
+                console.log("Parent transform matrix:", parentMatrix);
                 worldTransform = parentTransform.getTransform().combineWith(worldTransform);
+                console.log("Combined transform matrix:", worldTransform.asMatrix());
             }
             parent = parent.getParent();
         }

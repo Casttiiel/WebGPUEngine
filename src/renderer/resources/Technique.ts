@@ -10,7 +10,7 @@ export class Technique {
   private rasterizationMode!: string;
   private depthMode!: string;
 
-  private objectUniformBuffer!: GPUBuffer;
+  private uniformBuffer!: GPUBuffer;
   private bindGroup!: GPUBindGroup;
   private bindGroupLayout!: GPUBindGroupLayout;
 
@@ -49,15 +49,46 @@ export class Technique {
     this.initializeBuffers();
   }
 
+  private initializeBuffers(): void {
+    const device = Render.getInstance().getDevice();
+
+    // Crear buffer uniforme para todas las matrices (view, projection, model)
+    this.uniformBuffer = device.createBuffer({
+      label: `${this.name}_uniformBuffer`,
+      size: 3 * 16 * 4, // 3 matrices 4x4 (view, projection, model)
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    // Crear layout para el bind group
+    this.bindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: 'uniform' }
+        }
+      ]
+    });
+
+    // Crear el bind group
+    this.bindGroup = device.createBindGroup({
+      label: `${this.name}_bindGroup`,
+      layout: this.bindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: this.uniformBuffer }
+        }
+      ]
+    });
+  }
+
   public createRenderPipeline(mesh: Mesh): void {
     const device = Render.getInstance().getDevice();
     const render = Render.getInstance();
 
     const pipelineLayout = device.createPipelineLayout({
-      bindGroupLayouts: [
-        this.bindGroupLayout,  // group 0: model matrix
-        render.getGlobalBindGroupLayout()  // group 1: view/projection matrices
-      ]
+      bindGroupLayouts: [this.bindGroupLayout]
     });
 
     this.pipeline = device.createRenderPipeline({
@@ -72,64 +103,56 @@ export class Technique {
         module: this.module,
         entryPoint: 'fs',
         targets: [{
-          format: render.getFormat()
+          format: render.getFormat(),
+          blend: {
+            color: {
+              srcFactor: 'one',
+              dstFactor: 'zero',
+              operation: 'add',
+            },
+            alpha: {
+              srcFactor: 'one',
+              dstFactor: 'zero',
+              operation: 'add',
+            }
+          }
         }]
       },
       primitive: {
         topology: 'triangle-list',
-        cullMode: 'back'//TODO use cullmode data
+        cullMode: 'back'
       },
       depthStencil: {
-        depthWriteEnabled: true, //TODO use depthMode
-        depthCompare: 'less', //TODO use depthMode
-        format: 'depth24plus-stencil8'
+        format: 'depth24plus-stencil8',
+        depthWriteEnabled: true,
+        depthCompare: 'less'
       }
     });
   }
 
-  private initializeBuffers(): void {
-    const device = Render.getInstance().getDevice();
-
-    // Crear buffer uniforme para la matriz model
-    this.objectUniformBuffer = device.createBuffer({
-      label: `${this.name}_objectUniformBuffer`,
-      size: 16 * 4, // 1 matriz 4x4 (model)
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    // Crear layout para el bind group específico del objeto
-    this.bindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          // Model matrix
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' }
-        }
-      ]
-    });
-
-    // Crear el bind group que solo contiene la matriz del modelo
-    this.bindGroup = device.createBindGroup({
-      label: `${this.name}_bindGroup`,
-      layout: this.bindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this.objectUniformBuffer }
-        }
-      ]
-    });
-  }
-
-  public updateModelMatrix(modelMatrix: Float32Array): void {
-    if (!this.objectUniformBuffer) return;
+  public updateMatrices(viewMatrix: Float32Array, projectionMatrix: Float32Array, modelMatrix: Float32Array): void {
+    if (!this.uniformBuffer) return;
 
     const device = Render.getInstance().getDevice();
-    // Update modelMatrix uniform
+    
+    // Update viewMatrix
     device.queue.writeBuffer(
-      this.objectUniformBuffer,
-      0,
+      this.uniformBuffer,
+      0,  // viewMatrix offset
+      viewMatrix.buffer
+    );
+
+    // Update projectionMatrix
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      16 * 4,  // projectionMatrix offset
+      projectionMatrix.buffer
+    );
+
+    // Update modelMatrix
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      32 * 4,  // modelMatrix offset
       modelMatrix.buffer
     );
   }
@@ -137,9 +160,8 @@ export class Technique {
   public activate(): void {
     const pass = Render.getInstance().getPass();
     if (!pass) return;
-
+    console.log("Activating technique:", this.name);
     pass.setPipeline(this.pipeline);
-    pass.setBindGroup(0, this.bindGroup);  // Model matrix
-    pass.setBindGroup(1, Render.getInstance().getGlobalBindGroup());  // View/projection matrices
+    pass.setBindGroup(0, this.bindGroup);
   }
 }

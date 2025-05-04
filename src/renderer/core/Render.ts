@@ -162,7 +162,7 @@ export class Render {
 
   public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {
     if (!this.device || !this.globalUniformBuffer) return;
-
+console.log("Updating global uniforms");
     // Escribir la matriz de vista con el nombre correcto viewMatrix
     this.device.queue.writeBuffer(
       this.globalUniformBuffer,
@@ -255,9 +255,9 @@ export class Render {
       }],
       depthStencilAttachment: {
         view: this.depthView,
-        depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
+        depthClearValue: 1.0,        // Valor máximo de profundidad
+        depthLoadOp: 'clear',        // Limpiar el buffer de profundidad al inicio
+        depthStoreOp: 'store',       // Guardar los valores de profundidad
         stencilClearValue: 0,
         stencilLoadOp: 'clear',
         stencilStoreOp: 'store'
@@ -268,6 +268,20 @@ export class Render {
       this.currentPass = null;
       return false;
     }
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0, 0,                          // Offset X,Y
+      this.canvas.width,             // Width
+      this.canvas.height,            // Height
+      0.0, 1.0                       // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0, 0,                          // Offset X,Y
+      this.canvas.width,             // Width
+      this.canvas.height             // Height
+    );
 
     this.currentPass = pass;
     return true;

@@ -10,6 +10,7 @@ import { Engine } from "../engine/Engine";
 
 export class Loader {
   public static async loadSceneFromJSON(json: SceneDataType): Promise<void> {
+    console.log("Loading scene with", json.length, "root entities");
     for (const e of json) {
       await this.loadEntityFromJSON(e);
     }
@@ -17,13 +18,20 @@ export class Loader {
 
   public static async loadEntityFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
     const entity = new Entity();
+    
+    // Set parent relationship first
     if(parent) {
+      console.log(`Adding ${json.components.name} as child of ${parent.getName()}`);
       parent.addChildren(entity);
+    } else {
+      console.log(`Loading root entity ${json.components.name}`);
     }
 
     Engine.getEntities().addEntity(entity);
     await this.loadComponentFromJSON(json, entity);
 
+    // Load children after parent is fully setup
+    console.log(`Loading ${json.children?.length || 0} children for ${entity.getName()}`);
     for (const children_json of json.children || []) {
       await this.loadEntityFromJSON(children_json, entity);
     }
@@ -32,7 +40,17 @@ export class Loader {
   }
 
   public static async loadComponentFromJSON(json: EntityDataType, entity: Entity): Promise<void> {
+    // Cargar primero el componente name para que los logs tengan el nombre correcto
+    if (json.components.name) {
+      const nameComp = this.createComponentFromJSON('name');
+      entity.addComponent('name', nameComp);
+      await nameComp.load(json.components.name);
+      Engine.getEntities().addComponentToManager(nameComp, 'name');
+    }
+
+    // Luego cargar el resto de componentes
     for (const [type, compData] of Object.entries(json.components)) {
+      if (type === 'name') continue; // Ya cargado
       const comp = this.createComponentFromJSON(type);
       entity.addComponent(type, comp);
       await comp.load(compData);

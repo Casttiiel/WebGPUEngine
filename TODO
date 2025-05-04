@@ -1,6 +1,8 @@
 NPM RUN DEV
 -------------------------------------------
 Shader con textura
+AABB/Culling on camera
+Buen Order de set bind groups
 Deferred
 Skybox
 ToneMapping/HDR
@@ -12,7 +14,6 @@ Prefab
 
 Blur
 Bloom
-Culling on camera
 Mesh LOD
 
 

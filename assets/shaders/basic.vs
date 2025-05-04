@@ -1,14 +1,10 @@
-struct GlobalUniforms {
+struct CameraAndObjectUniforms {
     viewMatrix: mat4x4<f32>,
     projectionMatrix: mat4x4<f32>,
-}
-
-struct ObjectUniforms {
     modelMatrix: mat4x4<f32>,
 }
 
-@group(0) @binding(0) var<uniform> objectUniforms: ObjectUniforms;
-@group(1) @binding(0) var<uniform> globals: GlobalUniforms;
+@group(0) @binding(0) var<uniform> uniforms: CameraAndObjectUniforms;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -34,11 +30,11 @@ fn vs(
     @location(3) tangent: vec4<f32>
 ) -> VertexOutput {
     var output: VertexOutput;
-    let worldPos = objectUniforms.modelMatrix * vec4<f32>(position, 1.0);
+    let worldPos = uniforms.modelMatrix * vec4<f32>(position, 1.0);
     output.WorldPos = worldPos.xyz;
-    output.position = globals.projectionMatrix * globals.viewMatrix * worldPos;
+    output.position = uniforms.projectionMatrix * uniforms.viewMatrix * worldPos;
     
-    let model3x3 = get3x3From4x4(objectUniforms.modelMatrix);
+    let model3x3 = get3x3From4x4(uniforms.modelMatrix);
     output.N = model3x3 * normal;
     output.T = vec4<f32>(model3x3 * tangent.xyz, tangent.w);
     output.Uv = uv;

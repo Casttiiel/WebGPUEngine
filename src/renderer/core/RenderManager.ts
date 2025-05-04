@@ -1,3 +1,4 @@
+import { mat4, vec3 } from "gl-matrix";
 import { RenderComponent } from "../../components/render/RenderComponent";
 import { Camera } from "../../core/math/Camera";
 import { Transform } from "../../core/math/Transform";
@@ -45,6 +46,9 @@ export class RenderManager {
     submeshId: number,
     instancedGroupId: number = 0
   ): void {
+    console.log(`Adding render key for entity: ${owner.getOwner().getName()}`);
+    console.log(`Current transform matrix:`, transform.asMatrix());
+
     const key: RenderKey = {
       mesh,
       material,
@@ -58,48 +62,78 @@ export class RenderManager {
     };
 
     this.normalKeys.push(key);
-
-    // If the material casts shadows, add a shadow key
-    if (material.getCastsShadows()) {
-      const shadowKey: RenderKey = {
-        ...key,
-        material: material.getShadowsMaterial(),
-      };
-      this.normalKeys.push(shadowKey);
-    }
+    console.log(`Total render keys after adding: ${this.normalKeys.length}`);
   }
 
   public delKeys(owner: RenderComponent): void {
+    const beforeCount = this.normalKeys.length;
     this.normalKeys = this.normalKeys.filter((key) => key.owner !== owner);
+    const afterCount = this.normalKeys.length;
+    console.log(`Removed ${beforeCount - afterCount} keys for entity: ${owner.getOwner().getName()}`);
   }
 
   public render(category: RenderCategory): void {
     if (!this.camera) return;
 
-    this.normalKeys.sort((k1, k2) => this.sortKeys(k1, k2));
+    // Ordenar las keys por material y distancia a la cámara
+    this.normalKeys.sort((k1, k2) => {
+      // Primero ordenar por material
+      if (k1.material !== k2.material) {
+        if (k1.material.getCategory() !== k2.material.getCategory()) {
+          return k1.material.getCategory().localeCompare(k2.material.getCategory());
+        }
+        if (k1.material.getPriority() !== k2.material.getPriority()) {
+          return k1.material.getPriority() - k2.material.getPriority();
+        }
+        return k1.material.getName().localeCompare(k2.material.getName());
+      }
 
+      // Luego ordenar por distancia a la cámara (back-to-front para objetos transparentes, front-to-back para opacos)
+      const pos1 = k1.transform.getPosition();
+      const pos2 = k2.transform.getPosition();
+      const dist1 = vec3.sqrDist(pos1, this.camera.getPosition());
+      const dist2 = vec3.sqrDist(pos2, this.camera.getPosition());
+      
+      if (k1.material.getCategory() === 'transparent') {
+        return dist2 - dist1; // Back-to-front para transparentes
+      }
+      return dist1 - dist2; // Front-to-back para opacos
+    });
+
+    console.log(`\n=== Starting Render Pass ===`);
+    console.log(`Number of objects to render: ${this.normalKeys.length}`);
     let numDrawCalls = 0;
+    let currentMaterial: Material | null = null;
+
+    const viewMatrix = new Float32Array(this.camera.getView());
+    const projectionMatrix = new Float32Array(this.camera.getProjection());
 
     for (const key of this.normalKeys) {
-      if (!key.material || !key.mesh || !key.transform) continue;
+      if (!key.material || !key.mesh || !key.transform) {
+        console.warn("Invalid render key - missing components");
+        continue;
+      }
+
+      console.log(`\nRendering entity: ${key.owner.getOwner().getName()}`);
+      console.log(`Position in world space:`, key.transform.getPosition());
 
       const pass = Render.getInstance().getPass();
       if (!pass) continue;
 
-      // 1. Activate material and technique
-      key.material.activate();
-      const technique = key.material.getTechnique();
+      // Solo activar el material si es diferente al anterior
+      if (currentMaterial !== key.material) {
+        key.material.activate();
+        currentMaterial = key.material;
+      }
 
-      // 2. Update model matrix through the technique
-      const modelMatrix = key.transform.asMatrix();
-      technique.updateModelMatrix(new Float32Array(modelMatrix));
+      // Actualizar todas las matrices
+      const modelMatrix = new Float32Array(key.transform.asMatrix());
+      key.material.getTechnique().updateMatrices(viewMatrix, projectionMatrix, modelMatrix);
 
-      technique.activate();
-
-      // 3. Activate mesh data
+      // Activar mesh data
       key.mesh.activate(pass);
 
-      // 4. Draw the mesh
+      // Dibujar la malla
       if (key.isInstanced) {
         //key.mesh.renderInstanced(key.submeshId, key.instancedGroupId);
       } else {
@@ -109,22 +143,8 @@ export class RenderManager {
       numDrawCalls++;
     }
 
+    console.log(`\nTotal draw calls executed: ${numDrawCalls}`);
+    console.log(`=== Render Pass Complete ===\n`);
     this.drawCallsPerCategory.set(category, numDrawCalls);
-  }
-
-  private sortKeys(k1: RenderKey, k2: RenderKey): number {
-    if (k1.material !== k2.material) {
-      if (k1.material.getCategory() !== k2.material.getCategory()) {
-        return k1.material.getCategory().localeCompare(k2.material.getCategory());
-      }
-      if (k1.material.getPriority() !== k2.material.getPriority()) {
-        return k1.material.getPriority() - k2.material.getPriority();
-      }
-      return k1.material.getName().localeCompare(k2.material.getName());
-    }
-    if (k1.mesh !== k2.mesh) {
-      return k1.mesh.getName().localeCompare(k2.mesh.getName());
-    }
-    return k1.submeshId - k2.submeshId;
   }
 }
