@@ -2,7 +2,6 @@ NPM RUN DEV
 -------------------------------------------
 Shader con textura
 AABB/Culling on camera
-Buen Order de set bind groups
 Deferred
 Skybox
 ToneMapping/HDR
@@ -12,9 +11,10 @@ Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 PointLight
 Prefab
 
+
+Mesh LOD
 Blur
 Bloom
-Mesh LOD
 
 
 PBR LIGHTS

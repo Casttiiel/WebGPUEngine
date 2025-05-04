@@ -326,7 +326,6 @@ export class Mesh {
     
     // Activar esta malla para renderizado
     public activate(passEncoder: GPURenderPassEncoder): void {
-        console.log("Activando malla:", this.name);
         passEncoder.setVertexBuffer(0, this.vertexBuffer);
         passEncoder.setVertexBuffer(1, this.normalBuffer);
         passEncoder.setVertexBuffer(2, this.uvBuffer);
@@ -337,8 +336,9 @@ export class Mesh {
     // Renderizar la malla completa
     public renderGroup(): void {
         const pass = Render.getInstance().getPass();
-        pass?.drawIndexed(this.indexCount, 1, 0, 0, 0);
-        console.log("Renderizando malla completa:", this.name);
+        if (!pass) return;
+        pass.drawIndexed(this.indexCount);
+        console.log("Renderizando malla completa:", this.name, "con", this.indexCount, "índices");
     }
 
     public getName(): string {

@@ -17,7 +17,7 @@ export class Material {
 
     public static async get(materialPath: string): Promise<Material> {
         if (ResourceManager.hasResource(materialPath)) {
-            return ResourceManager.getResource<Material>(materialPath);
+            //return ResourceManager.getResource<Material>(materialPath);
         }
 
         const material = new Material(materialPath);
@@ -38,10 +38,6 @@ export class Material {
         this.castsShadows = data.casts_shadows ?? false;
         this.category = data.category || "solid";
         this.shadows = data.shadows;
-    }
-
-    public activate(): void {
-        this.technique.activate();
     }
 
     public getCategory(): string {

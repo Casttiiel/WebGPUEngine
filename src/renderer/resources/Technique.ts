@@ -20,7 +20,7 @@ export class Technique {
 
   public static async get(techniquePath: string): Promise<Technique> {
     if (ResourceManager.hasResource(techniquePath)) {
-      return ResourceManager.getResource<Technique>(techniquePath);
+      //return ResourceManager.getResource<Technique>(techniquePath);
     }
 
     const technique = new Technique(techniquePath);
@@ -52,10 +52,10 @@ export class Technique {
   private initializeBuffers(): void {
     const device = Render.getInstance().getDevice();
 
-    // Crear buffer uniforme para todas las matrices (view, projection, model)
+    // Crear buffer uniforme para la model matrix
     this.uniformBuffer = device.createBuffer({
       label: `${this.name}_uniformBuffer`,
-      size: 3 * 16 * 4, // 3 matrices 4x4 (view, projection, model)
+      size: 16 * 4, // 1 matriz 4x4 (model)
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -88,7 +88,11 @@ export class Technique {
     const render = Render.getInstance();
 
     const pipelineLayout = device.createPipelineLayout({
-      bindGroupLayouts: [this.bindGroupLayout]
+      label: `${this.name}_pipelineLayout`,
+      bindGroupLayouts: [
+        render.getGlobalBindGroupLayout(),
+        this.bindGroupLayout
+      ]
     });
 
     this.pipeline = device.createRenderPipeline({
@@ -130,38 +134,30 @@ export class Technique {
     });
   }
 
-  public updateMatrices(viewMatrix: Float32Array, projectionMatrix: Float32Array, modelMatrix: Float32Array): void {
+  public updateMatrices(modelMatrix: Float32Array): void {
     if (!this.uniformBuffer) return;
 
     const device = Render.getInstance().getDevice();
-    
-    // Update viewMatrix
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,  // viewMatrix offset
-      viewMatrix.buffer
-    );
-
-    // Update projectionMatrix
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      16 * 4,  // projectionMatrix offset
-      projectionMatrix.buffer
-    );
 
     // Update modelMatrix
     device.queue.writeBuffer(
       this.uniformBuffer,
-      32 * 4,  // modelMatrix offset
+      0,  // modelMatrix offset
       modelMatrix.buffer
     );
+  }
+
+  public activatePipeline(): void {
+    const pass = Render.getInstance().getPass();
+    if (!pass) return;
+    pass.setPipeline(this.pipeline);
   }
 
   public activate(): void {
     const pass = Render.getInstance().getPass();
     if (!pass) return;
     console.log("Activating technique:", this.name);
-    pass.setPipeline(this.pipeline);
-    pass.setBindGroup(0, this.bindGroup);
+    pass.setBindGroup(0, Render.getInstance().getGlobalBindGroup());
+    pass.setBindGroup(1, this.bindGroup);
   }
 }
