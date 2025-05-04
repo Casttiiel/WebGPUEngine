@@ -9,5 +9,6 @@ export type EntityDataType = Readonly<{
     components: Readonly<{
         transform?: TransformComponentDataType;
         render?: RenderComponentDataType;
+        name?: string;
     }>;
 }>;

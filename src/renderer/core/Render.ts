@@ -162,7 +162,6 @@ export class Render {
 
   public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {
     if (!this.device || !this.globalUniformBuffer) return;
-console.log("Updating global uniforms");
     // Escribir la matriz de vista con el nombre correcto viewMatrix
     this.device.queue.writeBuffer(
       this.globalUniformBuffer,

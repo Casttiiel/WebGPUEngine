@@ -10,7 +10,6 @@ import { Engine } from "../engine/Engine";
 
 export class Loader {
   public static async loadSceneFromJSON(json: SceneDataType): Promise<void> {
-    console.log("Loading scene with", json.length, "root entities");
     for (const e of json) {
       await this.loadEntityFromJSON(e);
     }
@@ -21,17 +20,13 @@ export class Loader {
     
     // Set parent relationship first
     if(parent) {
-      console.log(`Adding ${json.components.name} as child of ${parent.getName()}`);
       parent.addChildren(entity);
-    } else {
-      console.log(`Loading root entity ${json.components.name}`);
     }
 
     Engine.getEntities().addEntity(entity);
     await this.loadComponentFromJSON(json, entity);
 
     // Load children after parent is fully setup
-    console.log(`Loading ${json.children?.length || 0} children for ${entity.getName()}`);
     for (const children_json of json.children || []) {
       await this.loadEntityFromJSON(children_json, entity);
     }

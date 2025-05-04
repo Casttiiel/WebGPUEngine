@@ -338,7 +338,6 @@ export class Mesh {
         const pass = Render.getInstance().getPass();
         if (!pass) return;
         pass.drawIndexed(this.indexCount);
-        console.log("Renderizando malla completa:", this.name, "con", this.indexCount, "índices");
     }
 
     public getName(): string {

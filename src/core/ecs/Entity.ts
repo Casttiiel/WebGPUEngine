@@ -30,7 +30,6 @@ export class Entity {
     }
 
     public addChildren(child: Entity): void {
-      console.log(`Adding child ${child.getName()} to parent ${this.getName()}`);
       this.children.push(child);
       child.setParent(this);
     }
@@ -41,7 +40,6 @@ export class Entity {
 
     public setParent(parent: Entity): void {
       this.parent = parent;
-      console.log(`Setting parent of ${this.getName()} to ${parent.getName()}`);
     }
 
     public getParent(): Entity | null {

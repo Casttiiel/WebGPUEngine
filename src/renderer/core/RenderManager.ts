@@ -100,7 +100,7 @@ export class RenderManager {
       key.material.getTechnique().updateMatrices(modelMatrix);
 
       // 4. Activar bind groups
-      key.material.getTechnique().activate();
+      key.material.getTechnique().activate(key.material.getTextureBindGroup());
 
       // 5. Dibujar la mesh
       if (key.isInstanced) {

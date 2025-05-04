@@ -10,6 +10,7 @@ export class Material {
     private castsShadows!: boolean;
     private category!: string;
     private shadows!: boolean;
+    private textureBindGroup!: GPUBindGroup;
 
     constructor(name: string) {
         this.name = name;
@@ -29,12 +30,20 @@ export class Material {
     public async load(): Promise<void> {
         const data = await ResourceManager.loadMaterialData(this.name);
 
-        for (const [key, value] of Object.entries(data.textures) as [string, string][]) {
-            const texture = await Texture.get(value);
-            this.textures.set(key, texture);
-        }
-        
+        // Cargar la técnica primero para tener acceso al layout
         this.technique = await Technique.get(data.technique);
+
+        // Cargar la textura principal (por ahora solo usaremos txAlbedo)
+        for (const texData of data.textures) {
+            if ('txAlbedo' in texData) {
+                const texture = await Texture.get(texData.txAlbedo);
+                this.textures.set('albedo', texture);
+                // Crear el bind group para esta textura
+                this.textureBindGroup = this.technique.createTextureBindGroup(texture);
+                break;
+            }
+        }
+
         this.castsShadows = data.casts_shadows ?? false;
         this.category = data.category || "solid";
         this.shadows = data.shadows;
@@ -63,4 +72,9 @@ export class Material {
     public getName(): string {
         return this.name;
     }
+
+    public getTextureBindGroup(): GPUBindGroup {
+        return this.textureBindGroup;
+    }
+
 }

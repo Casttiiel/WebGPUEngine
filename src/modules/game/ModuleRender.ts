@@ -46,22 +46,13 @@ export class ModuleRender extends Module {
     const res = Render.getInstance().startRenderingBackBuffer(commandEncoder, { r: 0.2, g: 0.3, b: 0.4, a: 1 });
     if (!res) return;
 
-    console.log("\n=== Frame Start ===");
     const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
     if(!mainCamera) {
       console.error("Main camera not found!");
       return;
     }
     const cameraComponent = mainCamera.getComponent("camera") as CameraComponent;
-    if(!cameraComponent) {
-      console.error("Camera component not found!");
-      return;
-    }
-    
     const camera = cameraComponent.getCamera();
-    console.log("Camera position:", camera.getPosition());
-    console.log("Camera view matrix:", camera.getView());
-    console.log("Camera projection matrix:", camera.getProjection());
     
     // Actualizar buffer uniforme global solo con view y projection
     Render.getInstance().updateGlobalUniforms(
@@ -78,7 +69,6 @@ export class ModuleRender extends Module {
     }
 
     Render.getInstance().endFrame(commandEncoder);
-    console.log("=== Frame End ===\n");
   }
 
   public stop(): void {

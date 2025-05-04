@@ -1,6 +1,7 @@
 import { ResourceManager } from "../../core/engine/ResourceManager";
 import { Render } from "../core/render";
 import { Mesh } from "./Mesh";
+import { Texture } from "./Texture";
 
 export class Technique {
   private name!: string;
@@ -11,8 +12,9 @@ export class Technique {
   private depthMode!: string;
 
   private uniformBuffer!: GPUBuffer;
-  private bindGroup!: GPUBindGroup;
-  private bindGroupLayout!: GPUBindGroupLayout;
+  private textureBindGroupLayout!: GPUBindGroupLayout;
+  private modelBindGroupLayout!: GPUBindGroupLayout;
+  private modelBindGroup!: GPUBindGroup;
 
   constructor(name: string) {
     this.name = name;
@@ -59,8 +61,24 @@ export class Technique {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Crear layout para el bind group
-    this.bindGroupLayout = device.createBindGroupLayout({
+    // Layout para texturas
+    this.textureBindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' }
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' }
+        }
+      ]
+    });
+
+    // Layout para la matriz de modelo
+    this.modelBindGroupLayout = device.createBindGroupLayout({
       entries: [
         {
           binding: 0,
@@ -70,14 +88,30 @@ export class Technique {
       ]
     });
 
-    // Crear el bind group
-    this.bindGroup = device.createBindGroup({
-      label: `${this.name}_bindGroup`,
-      layout: this.bindGroupLayout,
+    // Bind group para la matriz de modelo
+    this.modelBindGroup = device.createBindGroup({
+      label: `${this.name}_modelBindGroup`,
+      layout: this.modelBindGroupLayout,
       entries: [
         {
           binding: 0,
           resource: { buffer: this.uniformBuffer }
+        }
+      ]
+    });
+  }
+
+  public createTextureBindGroup(texture: Texture): GPUBindGroup {
+    return Render.getInstance().getDevice().createBindGroup({
+      layout: this.textureBindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: texture.getTextureView()
+        },
+        {
+          binding: 1,
+          resource: texture.getSampler()
         }
       ]
     });
@@ -91,7 +125,8 @@ export class Technique {
       label: `${this.name}_pipelineLayout`,
       bindGroupLayouts: [
         render.getGlobalBindGroupLayout(),
-        this.bindGroupLayout
+        this.modelBindGroupLayout,
+        this.textureBindGroupLayout
       ]
     });
 
@@ -153,11 +188,11 @@ export class Technique {
     pass.setPipeline(this.pipeline);
   }
 
-  public activate(): void {
+  public activate(textureBindGroup: GPUBindGroup): void {
     const pass = Render.getInstance().getPass();
     if (!pass) return;
-    console.log("Activating technique:", this.name);
     pass.setBindGroup(0, Render.getInstance().getGlobalBindGroup());
-    pass.setBindGroup(1, this.bindGroup);
+    pass.setBindGroup(1, this.modelBindGroup);
+    pass.setBindGroup(2, textureBindGroup);
   }
 }
