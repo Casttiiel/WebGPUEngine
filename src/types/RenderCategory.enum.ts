@@ -1,3 +1,4 @@
 export enum RenderCategory {
-    SOLIDS= 'solids'
+    SOLIDS= 'solids',
+    TRANSPARENT= 'transparent',
 }

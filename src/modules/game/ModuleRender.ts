@@ -11,6 +11,15 @@ export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private deferredOutput: RenderToTexture;
   private shineOutput: RenderToTexture;
+  private debugControlsAdded: boolean = false;
+
+  // Debug values para Tweakpane
+  private debugValues = {
+    drawCallsSolids: { name: 'Draw Calls (Solids)', value: 0 },
+    drawCallsTransparent: { name: 'Draw Calls (Transparent)', value: 0 },
+    totalDrawCalls: { name: 'Total Draw Calls', value: 0 },
+    resolution: { name: 'Resolution', value: '0x0' }
+  };
 
   constructor(name: string) {
     super(name);
@@ -74,9 +83,28 @@ export class ModuleRender extends Module {
   public stop(): void {
     throw new Error("Method not implemented.");
   }
+
   public update(dt: number): void {
-    throw new Error("Method not implemented.");
+    // Actualizar valores de debug
+    const renderManager = RenderManager.getInstance();
+    this.debugValues.drawCallsSolids.value = renderManager.getDrawCallsForCategory(RenderCategory.SOLIDS);
+    this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(RenderCategory.TRANSPARENT);
+    this.debugValues.totalDrawCalls.value = this.debugValues.drawCallsSolids.value + this.debugValues.drawCallsTransparent.value;
+    this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
   }
+
+  public renderInMenu(): void {
+    if (this.debugControlsAdded) return;
+
+    // Render Stats
+    this.addDebugControl(this.debugValues.drawCallsSolids, 'value', this.debugValues.drawCallsSolids.name);
+    this.addDebugControl(this.debugValues.drawCallsTransparent, 'value', this.debugValues.drawCallsTransparent.name);
+    this.addDebugControl(this.debugValues.totalDrawCalls, 'value', this.debugValues.totalDrawCalls.name);
+    this.addDebugControl(this.debugValues.resolution, 'value', this.debugValues.resolution.name);
+
+    this.debugControlsAdded = true;
+  }
+
   public renderDebug(): void {
     throw new Error("Method not implemented.");
   }

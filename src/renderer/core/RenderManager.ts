@@ -114,4 +114,8 @@ export class RenderManager {
 
     this.drawCallsPerCategory.set(category, numDrawCalls);
   }
+
+  public getDrawCallsForCategory(category: RenderCategory): number {
+    return this.drawCallsPerCategory.get(category) || 0;
+  }
 }
