@@ -1,0 +1,4 @@
+{
+    "vs": "gbuffer.vs",
+    "fs": "gbuffer.fs"
+}

@@ -1,4 +1,5 @@
 import { ResourceManager } from "../../core/engine/ResourceManager";
+import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Technique } from "./Technique";
 import { Texture } from "./Texture";
 
@@ -8,7 +9,7 @@ export class Material {
     private textures = new Map<string, Texture>();
     private technique!: Technique;
     private castsShadows!: boolean;
-    private category!: string;
+    private category!: RenderCategory;
     private shadows!: boolean;
     private textureBindGroup!: GPUBindGroup;
 
@@ -45,11 +46,11 @@ export class Material {
         }
 
         this.castsShadows = data.casts_shadows ?? false;
-        this.category = data.category || "solid";
+        this.category = data.category || RenderCategory.SOLIDS;
         this.shadows = data.shadows;
     }
 
-    public getCategory(): string {
+    public getCategory(): RenderCategory {
         return this.category;
     }
 

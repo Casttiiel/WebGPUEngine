@@ -1,4 +1,6 @@
+import { Engine } from "../../core/engine/Engine";
 import { ResourceManager } from "../../core/engine/ResourceManager";
+import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Render } from "../core/render";
 import { Mesh } from "./Mesh";
 import { Texture } from "./Texture";
@@ -117,14 +119,13 @@ export class Technique {
     });
   }
 
-  public createRenderPipeline(mesh: Mesh): void {
+  public createRenderPipeline(mesh: Mesh, category: RenderCategory): void {
     const device = Render.getInstance().getDevice();
-    const render = Render.getInstance();
 
     const pipelineLayout = device.createPipelineLayout({
       label: `${this.name}_pipelineLayout`,
       bindGroupLayouts: [
-        render.getGlobalBindGroupLayout(),
+        Engine.getRender().getGlobalBindGroupLayout(),
         this.modelBindGroupLayout,
         this.textureBindGroupLayout
       ]
@@ -141,8 +142,42 @@ export class Technique {
       fragment: {
         module: this.module,
         entryPoint: 'fs',
-        targets: [{
-          format: render.getFormat(),
+        targets: this.getFragmentShaderTargetsBasedOnCategory(category)
+      },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'back'
+      },
+      depthStencil: {
+        format: 'depth32float-stencil8',
+        depthWriteEnabled: true,
+        depthCompare: 'less'
+      }
+    });
+  }
+
+  private getFragmentShaderTargetsBasedOnCategory(category: RenderCategory): GPUColorTargetState[] {
+    //TODO this should have logic based on the category
+
+    switch (category) {
+      case RenderCategory.SOLIDS: {
+        return [{
+          format: 'rgba16float',
+        },
+        {
+          format: 'rgba16float',
+        },
+        {
+          format: 'rgba16float',
+        },
+        {
+          format: 'r16float',
+        }];
+        break;
+      }
+      default: {
+        return [{
+          format: Render.getInstance().getFormat(),
           blend: {
             color: {
               srcFactor: 'one',
@@ -156,18 +191,11 @@ export class Technique {
             }
           }
         }]
-      },
-      primitive: {
-        topology: 'triangle-list',
-        cullMode: 'back'
-      },
-      depthStencil: {
-        format: 'depth24plus-stencil8',
-        depthWriteEnabled: true,
-        depthCompare: 'less'
+        break;
       }
-    });
+    }
   }
+
 
   public updateMatrices(modelMatrix: Float32Array): void {
     if (!this.uniformBuffer) return;
@@ -182,16 +210,12 @@ export class Technique {
     );
   }
 
-  public activatePipeline(): void {
-    const pass = Render.getInstance().getPass();
-    if (!pass) return;
+  public activatePipeline(pass: GPURenderPassEncoder): void {
     pass.setPipeline(this.pipeline);
   }
 
-  public activate(textureBindGroup: GPUBindGroup): void {
-    const pass = Render.getInstance().getPass();
-    if (!pass) return;
-    pass.setBindGroup(0, Render.getInstance().getGlobalBindGroup());
+  public activate(pass: GPURenderPassEncoder, textureBindGroup: GPUBindGroup): void {
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
     pass.setBindGroup(1, this.modelBindGroup);
     pass.setBindGroup(2, textureBindGroup);
   }

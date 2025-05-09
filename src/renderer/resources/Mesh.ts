@@ -325,18 +325,16 @@ export class Mesh {
     }
     
     // Activar esta malla para renderizado
-    public activate(passEncoder: GPURenderPassEncoder): void {
-        passEncoder.setVertexBuffer(0, this.vertexBuffer);
-        passEncoder.setVertexBuffer(1, this.normalBuffer);
-        passEncoder.setVertexBuffer(2, this.uvBuffer);
-        passEncoder.setVertexBuffer(3, this.tangentBuffer);
-        passEncoder.setIndexBuffer(this.indexBuffer, 'uint16');
+    public activate(pass: GPURenderPassEncoder): void {
+        pass.setVertexBuffer(0, this.vertexBuffer);
+        pass.setVertexBuffer(1, this.normalBuffer);
+        pass.setVertexBuffer(2, this.uvBuffer);
+        pass.setVertexBuffer(3, this.tangentBuffer);
+        pass.setIndexBuffer(this.indexBuffer, 'uint16');
     }
 
     // Renderizar la malla completa
-    public renderGroup(): void {
-        const pass = Render.getInstance().getPass();
-        if (!pass) return;
+    public renderGroup(pass: GPURenderPassEncoder): void {
         pass.drawIndexed(this.indexCount);
     }
 

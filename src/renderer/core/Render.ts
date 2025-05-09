@@ -8,20 +8,15 @@ export class Render {
   private adapter!: GPUAdapter;           // Adaptador que representa el hardware gráfico
   private device!: GPUDevice;             // Dispositivo lógico para crear recursos y ejecutar comandos
   private context!: GPUCanvasContext;     // Contexto del canvas para presentar los frames
-  private currentPass: GPURenderPassEncoder | null = null;  // Codificador del pase de render actual
+  private currentCommandEncoder!: GPUCommandEncoder; // Codificador de comandos actual
   private format: GPUTextureFormat = 'bgra8unorm';         // Formato de color (BGRA 8 bits por canal)
 
-  // Buffer global para datos de cámara
-  private globalUniformBuffer: GPUBuffer | null = null;
-  private globalBindGroupLayout: GPUBindGroupLayout | null = null;
-  private globalBindGroup: GPUBindGroup | null = null;
-
   // Buffers de la pantalla
-  private depthTexture: GPUTexture | null = null;          // Textura para el buffer de profundidad
+  /*private depthTexture: GPUTexture | null = null;          // Textura para el buffer de profundidad
   private depthView: GPUTextureView | null = null;         // Vista de la textura de profundidad
   private currentTexture: GPUTexture | null = null;        // Textura del frame actual
   private currentView: GPUTextureView | null = null;       // Vista de la textura del frame actual
-
+*/
   // Dimensiones del canvas
   private static screenWidth: number = 800;
   private static screenHeight: number = 600;
@@ -59,7 +54,7 @@ export class Render {
 
       // 2. Crear el dispositivo lógico con las características requeridas
       this.device = await this.adapter.requestDevice({
-        requiredFeatures: ['texture-compression-bc'],  // Soporte para compresión de texturas
+        requiredFeatures: ['texture-compression-bc', 'depth32float-stencil8'],  // Soporte para compresión de texturas
         requiredLimits: {
           maxStorageBufferBindingSize: 1024 * 1024 * 1024, // 1GB de buffer máximo
         }
@@ -105,18 +100,12 @@ export class Render {
           await this.resizeBackBuffer(width, height);
           const entity = Engine.getEntities().getEntityByName("MainCamera");
           if(!entity) return;
-          const component = entity?.getComponent("camera") as CameraComponent;
+          const component = entity.getComponent("camera") as CameraComponent;
           if (!component) return;
           component.getCamera().setViewport(width, height);
         }
       });
       observer.observe(canvas);
-
-      // Crear el buffer de profundidad inicial
-      await this.createDepthBuffer();
-      
-      // Inicializar buffers uniformes
-      this.initializeUniformBuffers();
       
       return true;
 
@@ -124,80 +113,6 @@ export class Render {
       console.error('Error al inicializar WebGPU:', error);
       return false;
     }
-  }
-
-  private initializeUniformBuffers(): void {
-    if (!this.device) return;
-
-    // Crear buffer uniforme global para las matrices de la cámara
-    this.globalUniformBuffer = this.device.createBuffer({
-      label: `global uniform buffer`,
-      size: 2 * 16 * 4, // 2 matrices 4x4 (view, projection)
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    // Crear el layout para el bind group global
-    this.globalBindGroupLayout = this.device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' }
-        }
-      ]
-    });
-
-    // Crear el bind group global
-    this.globalBindGroup = this.device.createBindGroup({
-      label: `global uniform bind group`,
-      layout: this.globalBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this.globalUniformBuffer }
-        }
-      ]
-    });
-  }
-
-  public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {
-    if (!this.device || !this.globalUniformBuffer) return;
-    // Escribir la matriz de vista con el nombre correcto viewMatrix
-    this.device.queue.writeBuffer(
-      this.globalUniformBuffer,
-      0,  // viewMatrix offset
-      viewMatrix.buffer
-    );
-
-    // Escribir la matriz de proyección con el nombre correcto projectionMatrix
-    this.device.queue.writeBuffer(
-      this.globalUniformBuffer,
-      16 * 4,  // projectionMatrix offset
-      projectionMatrix.buffer
-    );
-  }
-
-  // Crear el buffer de profundidad con las dimensiones actuales
-  private async createDepthBuffer(): Promise<void> {
-    if (!this.device) return;
-
-    // Limpiar la textura de profundidad existente si existe
-    if (this.depthTexture) {
-      this.depthTexture.destroy();
-    }
-
-    // Crear textura de profundidad con las dimensiones actuales del canvas
-    this.depthTexture = this.device.createTexture({
-      size: {
-        width: Render.width,
-        height: Render.height,
-        depthOrArrayLayers: 1
-      },
-      format: 'depth24plus-stencil8',  // Formato de 24 bits para profundidad + 8 bits para stencil
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
-    });
-
-    this.depthView = this.depthTexture.createView();
   }
 
   // Ajustar el tamaño del buffer de render
@@ -220,123 +135,29 @@ export class Render {
         device: this.device,
         format: this.format,
       });
-
-      await this.createDepthBuffer();
     }
 
     return true;
   }
 
   // Comenzar un nuevo frame de renderizado
-  public beginFrame(): GPUCommandEncoder | null {
-    if (!this.device || !this.context) return null;
+  public beginFrame(): void {
+    if (!this.device || !this.context) return;
 
-    this.currentTexture = this.context.getCurrentTexture();
-    this.currentView = this.currentTexture.createView();
+    //this.currentTexture = this.context.getCurrentTexture();
+    //this.currentView = this.currentTexture.createView();
 
-    return this.device.createCommandEncoder();
-  }
-
-  // Iniciar el renderizado al buffer principal
-  public startRenderingBackBuffer(
-    encoder: GPUCommandEncoder,
-    clearColor: { r: number; g: number; b: number; a: number }
-  ): boolean {
-    if (!this.currentView || !this.depthView) return false;
-
-    // Configurar el pase de renderizado con los buffers de color y profundidad
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [{
-        view: this.currentView,
-        clearValue: clearColor,
-        loadOp: 'clear',     // Limpiar el buffer al inicio
-        storeOp: 'store'     // Guardar el resultado al final
-      }],
-      depthStencilAttachment: {
-        view: this.depthView,
-        depthClearValue: 1.0,        // Valor máximo de profundidad
-        depthLoadOp: 'clear',        // Limpiar el buffer de profundidad al inicio
-        depthStoreOp: 'store',       // Guardar los valores de profundidad
-        stencilClearValue: 0,
-        stencilLoadOp: 'clear',
-        stencilStoreOp: 'store'
-      }
-    });
-
-    if (!pass) {
-      this.currentPass = null;
-      return false;
-    }
-
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0, 0,                          // Offset X,Y
-      this.canvas.width,             // Width
-      this.canvas.height,            // Height
-      0.0, 1.0                       // Min/max depth
-    );
-
-    pass.setScissorRect(
-      0, 0,                          // Offset X,Y
-      this.canvas.width,             // Width
-      this.canvas.height             // Height
-    );
-
-    this.currentPass = pass;
-    return true;
+    this.currentCommandEncoder = this.device.createCommandEncoder();
   }
 
   // Finalizar y enviar los comandos de renderizado
-  public endFrame(commandEncoder: GPUCommandEncoder): void {
+  public endFrame(): void {
     if (!this.device) return;
 
-    const commandBuffer = commandEncoder.finish();
+    const commandBuffer = this.currentCommandEncoder.finish();
     this.device.queue.submit([commandBuffer]);
   }
-
-  public getDevice(): GPUDevice {
-    if (!this.device) {
-      throw new Error('GPUDevice is not initialized');
-    }
-    return this.device;
-  }
-
-  public getFormat(): GPUTextureFormat {
-    return this.format;
-  }
-
-  public getPass(): GPURenderPassEncoder | null {
-    return this.currentPass;
-  }
-
-  public getCanvas(): HTMLCanvasElement {
-    if (!this.canvas) {
-      throw new Error('Canvas is not initialized');
-    }
-    return this.canvas;
-  }
-
-  public getGlobalBindGroupLayout(): GPUBindGroupLayout {
-    if (!this.globalBindGroupLayout) {
-      throw new Error('Global bind group layout is not initialized');
-    }
-    return this.globalBindGroupLayout;
-  }
-
-  public getGlobalBindGroup(): GPUBindGroup {
-    if (!this.globalBindGroup) {
-      throw new Error('Global bind group is not initialized');
-    }
-    return this.globalBindGroup;
-  }
-
-  public getGlobalUniformBuffer(): GPUBuffer {
-    if (!this.globalUniformBuffer) {
-      throw new Error('Global uniform buffer is not initialized');
-    }
-    return this.globalUniformBuffer;
-  }
-
+  
   public static getInstance(): Render {
     if (!Render.instance) {
       Render.instance = new Render();
@@ -352,9 +173,22 @@ export class Render {
     return Render.screenHeight;
   }
 
+  public getDevice(): GPUDevice {
+    return this.device;
+  }
+
+  public getCanvas(): HTMLCanvasElement {
+    return this.canvas;
+  }
+
+  public getCommandEncoder(): GPUCommandEncoder {
+    return this.currentCommandEncoder;
+  }
+
+  public getFormat(): GPUTextureFormat {
+    return this.format;
+  }
+
   public destroy(): void {
-    if (this.depthTexture) {
-      this.depthTexture.destroy();
-    }
   }
 }

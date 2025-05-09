@@ -1,14 +1,16 @@
 NPM RUN DEV
 -------------------------------------------
 Deferred
+    Presentation on screen
+    GBuffer shader
 Skybox
 ToneMapping/HDR
 Antialiasing
-Performance numbers
-Order render keys based on technique, material, mesh. Then minimize the number of activations
+Minimize amount of pipelines, and other resources, Order render keys based on technique, material, mesh. Then minimize the number of activations
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 PointLight
 Prefab
+Performance numbers
 
 
 Mesh LOD/Generate LOD on texture and mesh automatically

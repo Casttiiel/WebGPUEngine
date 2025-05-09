@@ -74,4 +74,8 @@ export class Engine {
     public static getInput(): ModuleInput {
         return this._input;
     }
+
+    public static getRender(): ModuleRender {
+        return this._render;
+    }
 }

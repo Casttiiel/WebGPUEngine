@@ -101,6 +101,7 @@ export class ModuleEntities extends Module {
       }
     }
     return null;
+    console.log(`Entity with name ${name} not found`);
   }
 
   public stop(): void {

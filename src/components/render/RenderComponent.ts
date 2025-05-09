@@ -33,26 +33,15 @@ export class RenderComponent extends Component {
 
         const materialName = data.material || "default_material";
         const material = await Material.get(materialName);
-        material.getTechnique().createRenderPipeline(mesh);
+        material.getTechnique().createRenderPipeline(mesh, material.getCategory());
 
         const meshPart: MeshPartType = {
             mesh,
             material,
-            meshGroup: 0,
-            meshInstancesGroup: data.instances_group || 0,
             isVisible: data.visible !== undefined ? data.visible : true,
-            state: data.state || 0,
         };
 
         this.parts.push(meshPart);
-    }
-
-    public showMeshesWithState(newState: number): void {
-        this.currentState = newState;
-        for (const part of this.parts) {
-            part.isVisible = part.state === newState;
-        }
-        this.updateRenderManager();
     }
 
     private getWorldTransform(): Transform {
@@ -90,9 +79,7 @@ export class RenderComponent extends Component {
                 this,
                 part.mesh,
                 part.material,
-                worldTransform,
-                part.meshGroup,
-                part.meshInstancesGroup
+                worldTransform
             );
         }
     }
