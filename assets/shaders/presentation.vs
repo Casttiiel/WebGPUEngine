@@ -7,7 +7,7 @@ struct Output {
 fn vs(@location(0) position: vec3<f32>,) -> Output {
   var output: Output;
   output.position = vec4<f32>(position.xy, 1.0, 1.0);
-  output.uv = position.xy * 0.5 + 0.5; // Convertir de [-1, 1] a [0, 1]
+  output.uv = position.xy * vec2<f32>(0.5, -0.5) + 0.5; // Convertir de [-1, 1] a [0, 1]
 
   return output;
 }
