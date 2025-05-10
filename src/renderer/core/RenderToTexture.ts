@@ -5,6 +5,7 @@ export class RenderToTexture {
   private xRes: number = 0;
   private yRes: number = 0;
   private texture!: GPUTexture;
+  private textureView !: GPUTextureView;
 
   public createRT(name: string, width: number, height: number, format: GPUTextureFormat): void {
     this.destroy();
@@ -20,8 +21,10 @@ export class RenderToTexture {
     })
   }
 
-  public createView(): GPUTextureView {
-    return this.texture.createView();
+  public getView(): GPUTextureView {
+    if (this.textureView) return this.textureView;
+    this.textureView = this.texture.createView();
+    return this.textureView;
   }
 
   public getWidth(): number {

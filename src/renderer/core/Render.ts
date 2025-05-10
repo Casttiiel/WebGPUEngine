@@ -189,6 +189,10 @@ export class Render {
     return this.format;
   }
 
+  public getContext(): GPUCanvasContext {
+    return this.context; 
+  }
+
   public destroy(): void {
   }
 }

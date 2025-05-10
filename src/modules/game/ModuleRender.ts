@@ -1,8 +1,10 @@
 import { CameraComponent } from "../../components/render/CameraComponent";
 import { Engine } from "../../core/engine/Engine";
+import { ResourceManager } from "../../core/engine/ResourceManager";
 import { DeferredRenderer } from "../../renderer/core/DeferredRenderer";
 import { Render } from "../../renderer/core/render";
 import { RenderManager } from "../../renderer/core/RenderManager";
+import { Mesh } from "../../renderer/resources/Mesh";
 import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Module } from "../core/Module";
 
@@ -14,6 +16,11 @@ export class ModuleRender extends Module {
   private globalUniformBuffer!: GPUBuffer;
   private globalBindGroupLayout!: GPUBindGroupLayout;
   private globalBindGroup!: GPUBindGroup;
+
+  //Presentation data
+  private presentationPipeline !: GPURenderPipeline
+  private fullscreenQuadMesh !: Mesh;
+  private presentationBindGroup !: GPUBindGroup;
 
   // Debug values para Tweakpane
   private debugValues = {
@@ -32,6 +39,7 @@ export class ModuleRender extends Module {
     //this.setupDeferredOutput();
     this.onResolutionUpdated();
     this.initializeUniformBuffers();
+    await this.initializePresentationData();
     return true;
   }
 
@@ -64,9 +72,53 @@ export class ModuleRender extends Module {
     RenderManager.getInstance().setCamera(camera);
 
     //this.setupDeferredOutput();
-    this.deferred.render(camera);
+    const result = this.deferred.render(camera);
+
+    this.presentResult(result);
 
     Render.getInstance().endFrame();
+  }
+
+  private presentResult(result: GPUTextureView): void {
+    const render = Render.getInstance();
+    const pass = render.getCommandEncoder().beginRenderPass(
+      {
+        colorAttachments: [{
+          view: render.getContext().getCurrentTexture().createView(),
+          loadOp: 'clear',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        }],
+      }
+    );
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height,            // Height
+      0.0, 1.0                       // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height             // Height
+    );
+
+    // 1. Activar el pipeline
+    pass.setPipeline(this.presentationPipeline);
+
+    // 2. Activar mesh data
+    this.fullscreenQuadMesh.activate(pass);
+
+    // 3. Activar bind groups
+    pass.setBindGroup(0, this.presentationBindGroup);
+
+    // 4. Dibujar la mesh
+    this.fullscreenQuadMesh.renderGroup(pass);
+
+    pass.end();
   }
 
   public stop(): void {
@@ -130,6 +182,60 @@ export class ModuleRender extends Module {
         }
       ]
     });
+  }
+
+  private async initializePresentationData(): Promise<void> {
+    const device = Render.getInstance().getDevice();
+
+    this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
+
+    const vsData = await ResourceManager.loadShader('presentation.vs');
+    const fsData = await ResourceManager.loadShader('presentation.fs');
+
+    const module = device.createShaderModule({
+      label: `presentation_shaderModule`,
+      code: `${vsData}\n${fsData}`,
+    });
+
+    this.presentationPipeline = device.createRenderPipeline({
+      label: `presentation_pipeline`,
+      layout: 'auto',//pipelineLayout
+      vertex: {
+        module: module,
+        entryPoint: 'vs',
+        buffers: this.fullscreenQuadMesh.getVertexBufferLayout()
+      },
+      fragment: {
+        module: module,
+        entryPoint: 'fs',
+        targets: [{
+          format: navigator.gpu.getPreferredCanvasFormat(),
+        }]
+      },
+      primitive: {
+        topology: 'triangle-list'
+      }
+    });
+
+    const sampler = device.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
+
+    this.presentationBindGroup = device.createBindGroup({
+      label: `presentation_bindgroup`,
+      layout: this.presentationPipeline.getBindGroupLayout(0),
+      entries: [
+        {
+          binding: 0,
+          resource: this.deferred.rtAlbedos.getView(),
+        },
+        {
+          binding: 1,
+          resource: sampler,
+        },
+      ]
+    })
   }
 
   public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {

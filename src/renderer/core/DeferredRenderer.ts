@@ -7,7 +7,7 @@ import { RenderToTexture } from "./RenderToTexture";
 export class DeferredRenderer {
   private width!: number;
   private height!: number;
-  private rtAlbedos!: RenderToTexture;
+  public rtAlbedos!: RenderToTexture;
   private rtNormals!: RenderToTexture;
   private rtLinearDepth!: RenderToTexture;
   private rtAccLight!: RenderToTexture;
@@ -30,7 +30,6 @@ export class DeferredRenderer {
       this.rtSelfIllum = new RenderToTexture();
     }
 
-    //TODO THIS SIZE SHOULD BE STATIC ON DEFERRED RENDERER OR SOMEWHERE
     this.rtAlbedos.createRT("g_albedos.dds", width, height, 'rgba16float');
     this.rtNormals.createRT("g_normals.dds", width, height, 'rgba16float');
     this.rtSelfIllum.createRT("g_self_illum.dds", width, height, "rgba16float");
@@ -48,13 +47,14 @@ export class DeferredRenderer {
     });
   }
 
-  public render(camera: Camera) {
+  public render(camera: Camera): GPUTextureView {
     this.renderGBuffer();
     //TODO RENDER GBUFFERDECALS
     //TODO RENDER AO
     //TODO RENDER ACC LIGHTS
     //TODO RENDER CATEGORY TRANSPARENTS
-    //TODO RETURN TEXTURE
+    
+    return this.rtAlbedos.getView();
   }
 
   public renderGBuffer() {
@@ -84,25 +84,25 @@ export class DeferredRenderer {
     return {
       label: 'GBuffer Render pass',
       colorAttachments: [{
-        view: this.rtAlbedos.createView(),
+        view: this.rtAlbedos.getView(),
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
       },
       {
-        view: this.rtNormals.createView(),
+        view: this.rtNormals.getView(),
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
       },
       {
-        view: this.rtSelfIllum.createView(),
+        view: this.rtSelfIllum.getView(),
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
       },
       {
-        view: this.rtLinearDepth.createView(),
+        view: this.rtLinearDepth.getView(),
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
