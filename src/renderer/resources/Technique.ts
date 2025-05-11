@@ -1,9 +1,10 @@
 import { Engine } from "../../core/engine/Engine";
 import { ResourceManager } from "../../core/engine/ResourceManager";
+import { FragmentShaderTargets } from "../../types/FragmentShaderTargets.enum";
+import { PipelineBindGroupLayouts } from "../../types/PipelineBindGroupLayouts.enum";
 import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Render } from "../core/render";
 import { Mesh } from "./Mesh";
-import { Texture } from "./Texture";
 
 export class Technique {
   private name!: string;
@@ -11,12 +12,9 @@ export class Technique {
   private pipeline!: GPURenderPipeline;
   private blendMode!: string;
   private rasterizationMode!: string;
-  private depthMode!: string;
-
-  private uniformBuffer!: GPUBuffer;
-  private textureBindGroupLayout!: GPUBindGroupLayout;
-  private modelBindGroupLayout!: GPUBindGroupLayout;
-  private modelBindGroup!: GPUBindGroup;
+  private depthTest!: string;
+  private writesOn!: FragmentShaderTargets;
+  private uniformsLayout: ReadonlyArray<PipelineBindGroupLayouts> = [];
 
   constructor(name: string) {
     this.name = name;
@@ -38,7 +36,9 @@ export class Technique {
 
     this.blendMode = techniqueData.blend || "default";
     this.rasterizationMode = techniqueData.rs || "default";
-    this.depthMode = techniqueData.z || "default";
+    this.depthTest = techniqueData.z || "default";
+    this.writesOn = techniqueData.writesOn || FragmentShaderTargets.SCREEN;
+    this.uniformsLayout = techniqueData.uniforms;
 
     const vsData = await ResourceManager.loadShader(techniqueData.vs);
     const fsData = await ResourceManager.loadShader(techniqueData.fs);
@@ -49,91 +49,14 @@ export class Technique {
       label: `${this.name}_shaderModule`,
       code: `${vsData}\n${fsData}`,
     });
-
-    this.initializeBuffers();
   }
 
-  private initializeBuffers(): void {
+  public createRenderPipeline(mesh: Mesh): void {
     const device = Render.getInstance().getDevice();
 
-    // Crear buffer uniforme para la model matrix
-    this.uniformBuffer = device.createBuffer({
-      label: `${this.name}_uniformBuffer`,
-      size: 16 * 4, // 1 matriz 4x4 (model)
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    // Layout para texturas
-    this.textureBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' }
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' }
-        }
-      ]
-    });
-
-    // Layout para la matriz de modelo
-    this.modelBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' }
-        }
-      ]
-    });
-
-    // Bind group para la matriz de modelo
-    this.modelBindGroup = device.createBindGroup({
-      label: `${this.name}_modelBindGroup`,
-      layout: this.modelBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this.uniformBuffer }
-        }
-      ]
-    });
-  }
-
-  public createTextureBindGroup(texture: Texture): GPUBindGroup {
-    return Render.getInstance().getDevice().createBindGroup({
-      layout: this.textureBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: texture.getTextureView()
-        },
-        {
-          binding: 1,
-          resource: texture.getSampler()
-        }
-      ]
-    });
-  }
-
-  public createRenderPipeline(mesh: Mesh, category: RenderCategory): void {
-    const device = Render.getInstance().getDevice();
-
-    const pipelineLayout = device.createPipelineLayout({
-      label: `${this.name}_pipelineLayout`,
-      bindGroupLayouts: [
-        Engine.getRender().getGlobalBindGroupLayout(),
-        this.modelBindGroupLayout,
-        this.textureBindGroupLayout
-      ]
-    });
-
-    this.pipeline = device.createRenderPipeline({
+    let pipelineParams = {
       label: `${this.name}_pipeline`,
-      layout: pipelineLayout,
+      layout: this.getPipelineUniformLayout(),
       vertex: {
         module: this.module,
         entryPoint: 'vs',
@@ -142,25 +65,131 @@ export class Technique {
       fragment: {
         module: this.module,
         entryPoint: 'fs',
-        targets: this.getFragmentShaderTargetsBasedOnCategory(category)
+        targets: this.getFragmentShaderTarget()
       },
       primitive: {
         topology: 'triangle-list',
         cullMode: 'back'
       },
-      depthStencil: {
+    } as GPURenderPipelineDescriptor;
+
+    if (this.depthTest && this.depthTest !== "none") {
+      pipelineParams.depthStencil = {
         format: 'depth32float-stencil8',
         depthWriteEnabled: true,
         depthCompare: 'less'
+      };
+    }
+
+    this.pipeline = device.createRenderPipeline(pipelineParams);
+  }
+
+  private getPipelineUniformLayout(): "auto" | GPUPipelineLayout {
+    if (!this.uniformsLayout || this.uniformsLayout.length === 0) {
+      return 'auto';
+    }
+
+    const device = Render.getInstance().getDevice();
+    const layouts = [] as GPUBindGroupLayout[];
+
+    for (const uniform of this.uniformsLayout) {
+      switch (uniform) {
+        case PipelineBindGroupLayouts.CAMERA_UNIFORMS: {
+          layouts.push(device.createBindGroupLayout({
+            entries: [
+              {
+                binding: 0,
+                visibility: GPUShaderStage.VERTEX,
+                buffer: { type: 'uniform' }
+              }
+            ]
+          }));
+          break;
+        }
+        case PipelineBindGroupLayouts.MATERIAL_TEXTURES: {
+          layouts.push(device.createBindGroupLayout({
+            entries: [
+              {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float' }
+              },
+              {
+                binding: 1,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' }
+              },
+              {
+                binding: 2,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float' }
+              },
+              {
+                binding: 3,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' }
+              },
+              {
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float' }
+              },
+              {
+                binding: 5,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' }
+              },
+              {
+                binding: 6,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float' }
+              },
+              {
+                binding: 7,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' }
+              },
+              {
+                binding: 8,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float' }
+              },
+              {
+                binding: 9,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' }
+              }
+            ]
+          }));
+          break;
+        }
+        case PipelineBindGroupLayouts.OBJECT_UNIFORMS: {
+          layouts.push(device.createBindGroupLayout({
+            entries: [
+              {
+                binding: 0,
+                visibility: GPUShaderStage.VERTEX,
+                buffer: { type: 'uniform' }
+              }
+            ]
+          }));
+          break;
+        }
+        default: {
+          throw new Error(`${this.name}: Unknown uniform layout`)
+        }
       }
+    }
+
+    return device.createPipelineLayout({
+      label: `${this.name}_pipelineLayout`,
+      bindGroupLayouts: layouts
     });
   }
 
-  private getFragmentShaderTargetsBasedOnCategory(category: RenderCategory): GPUColorTargetState[] {
-    //TODO this should have logic based on the category
-
-    switch (category) {
-      case RenderCategory.SOLIDS: {
+  private getFragmentShaderTarget(): GPUColorTargetState[] {
+    switch (this.writesOn) {
+      case FragmentShaderTargets.GBUFFER: {
         return [{
           format: 'rgba16float',
         },
@@ -175,7 +204,13 @@ export class Technique {
         }];
         break;
       }
-      default: {
+      case FragmentShaderTargets.TEXTURE: {
+        return [{
+          format: 'rgba16float',
+        }];
+        break;
+      }
+      case FragmentShaderTargets.SCREEN: {
         return [{
           format: Render.getInstance().getFormat(),
           blend: {
@@ -193,30 +228,17 @@ export class Technique {
         }]
         break;
       }
+      default: {
+        throw new Error(`${this.name}: Unknown Fragment Shader Target`)
+      }
     }
-  }
-
-
-  public updateMatrices(modelMatrix: Float32Array): void {
-    if (!this.uniformBuffer) return;
-
-    const device = Render.getInstance().getDevice();
-
-    // Update modelMatrix
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,  // modelMatrix offset
-      modelMatrix.buffer
-    );
   }
 
   public activatePipeline(pass: GPURenderPassEncoder): void {
     pass.setPipeline(this.pipeline);
   }
 
-  public activate(pass: GPURenderPassEncoder, textureBindGroup: GPUBindGroup): void {
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
-    pass.setBindGroup(1, this.modelBindGroup);
-    pass.setBindGroup(2, textureBindGroup);
+  public getPipeline(): GPURenderPipeline {
+    return this.pipeline;
   }
 }

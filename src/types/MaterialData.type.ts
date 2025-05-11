@@ -2,7 +2,7 @@ import { RenderCategory } from "../renderer/core/render_category.enum";
 
 export type MaterialDataType = Readonly<{
     technique: string;
-    textures: ReadonlyArray<MaterialTextureDataType>;
+    textures: MaterialTextureDataType;
     casts_shadows: boolean;
     category: RenderCategory;
     shadows: boolean;

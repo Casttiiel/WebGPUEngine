@@ -1,8 +1,8 @@
 NPM RUN DEV
 -------------------------------------------
-ToneMapping/HDR
-Antialiasing
-Skybox
+ToneMapping using technique
+Antialiasing using technique
+Skybox using technique
 On Resize
 Deferred GBuffer shader
 PointLight

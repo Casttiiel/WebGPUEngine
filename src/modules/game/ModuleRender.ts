@@ -1,10 +1,10 @@
 import { CameraComponent } from "../../components/render/CameraComponent";
 import { Engine } from "../../core/engine/Engine";
-import { ResourceManager } from "../../core/engine/ResourceManager";
 import { DeferredRenderer } from "../../renderer/core/DeferredRenderer";
 import { Render } from "../../renderer/core/render";
 import { RenderManager } from "../../renderer/core/RenderManager";
 import { Mesh } from "../../renderer/resources/Mesh";
+import { Technique } from "../../renderer/resources/Technique";
 import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Module } from "../core/Module";
 
@@ -14,10 +14,10 @@ export class ModuleRender extends Module {
 
   // Buffer global para datos de cámara
   private globalUniformBuffer!: GPUBuffer;
-  private globalBindGroupLayout!: GPUBindGroupLayout;
   private globalBindGroup!: GPUBindGroup;
 
   //Presentation data
+  private presentationTechnique !: Technique;
   private presentationPipeline !: GPURenderPipeline
   private fullscreenQuadMesh !: Mesh;
   private presentationBindGroup !: GPUBindGroup;
@@ -74,12 +74,12 @@ export class ModuleRender extends Module {
     //this.setupDeferredOutput();
     const result = this.deferred.render(camera);
 
-    this.presentResult(result);
+    this.presentResult();
 
     Render.getInstance().endFrame();
   }
 
-  private presentResult(result: GPUTextureView): void {
+  private presentResult(): void {
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass(
       {
@@ -107,7 +107,8 @@ export class ModuleRender extends Module {
     );
 
     // 1. Activar el pipeline
-    pass.setPipeline(this.presentationPipeline);
+    this.presentationTechnique.activatePipeline(pass);
+    //pass.setPipeline(this.presentationPipeline);
 
     // 2. Activar mesh data
     this.fullscreenQuadMesh.activate(pass);
@@ -161,7 +162,7 @@ export class ModuleRender extends Module {
     });
 
     // Crear el layout para el bind group global
-    this.globalBindGroupLayout = render.getDevice().createBindGroupLayout({
+    const globalBindGroupLayout = render.getDevice().createBindGroupLayout({
       entries: [
         {
           binding: 0,
@@ -174,7 +175,7 @@ export class ModuleRender extends Module {
     // Crear el bind group global
     this.globalBindGroup = render.getDevice().createBindGroup({
       label: `global uniform bind group`,
-      layout: this.globalBindGroupLayout,
+      layout: globalBindGroupLayout,
       entries: [
         {
           binding: 0,
@@ -189,33 +190,8 @@ export class ModuleRender extends Module {
 
     this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
 
-    const vsData = await ResourceManager.loadShader('presentation.vs');
-    const fsData = await ResourceManager.loadShader('presentation.fs');
-
-    const module = device.createShaderModule({
-      label: `presentation_shaderModule`,
-      code: `${vsData}\n${fsData}`,
-    });
-
-    this.presentationPipeline = device.createRenderPipeline({
-      label: `presentation_pipeline`,
-      layout: 'auto',//pipelineLayout
-      vertex: {
-        module: module,
-        entryPoint: 'vs',
-        buffers: this.fullscreenQuadMesh.getVertexBufferLayout()
-      },
-      fragment: {
-        module: module,
-        entryPoint: 'fs',
-        targets: [{
-          format: navigator.gpu.getPreferredCanvasFormat(),
-        }]
-      },
-      primitive: {
-        topology: 'triangle-list'
-      }
-    });
+    this.presentationTechnique = await Technique.get("presentation.tech");
+    this.presentationTechnique.createRenderPipeline(this.fullscreenQuadMesh);
 
     const sampler = device.createSampler({
       magFilter: 'linear',
@@ -224,7 +200,7 @@ export class ModuleRender extends Module {
 
     this.presentationBindGroup = device.createBindGroup({
       label: `presentation_bindgroup`,
-      layout: this.presentationPipeline.getBindGroupLayout(0),
+      layout: this.presentationTechnique.getPipeline().getBindGroupLayout(0),
       entries: [
         {
           binding: 0,
@@ -261,9 +237,5 @@ export class ModuleRender extends Module {
       throw new Error('Global bind group is not initialized');
     }
     return this.globalBindGroup;
-  }
-
-  public getGlobalBindGroupLayout(): GPUBindGroupLayout {
-    return this.globalBindGroupLayout;
   }
 }

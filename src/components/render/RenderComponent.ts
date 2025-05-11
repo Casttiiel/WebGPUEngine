@@ -33,7 +33,7 @@ export class RenderComponent extends Component {
 
         const materialName = data.material || "default_material";
         const material = await Material.get(materialName);
-        material.getTechnique().createRenderPipeline(mesh, material.getCategory());
+        material.getTechnique().createRenderPipeline(mesh);
 
         const meshPart: MeshPartType = {
             mesh,
@@ -69,7 +69,8 @@ export class RenderComponent extends Component {
 
     private updateRenderManager(): void {
         const renderManager = RenderManager.getInstance();
-        const worldTransform = this.getWorldTransform();
+        const entity = this.getOwner();
+        const transformComponent = entity.getComponent("transform") as TransformComponent;
 
         renderManager.delKeys(this);
 
@@ -79,7 +80,7 @@ export class RenderComponent extends Component {
                 this,
                 part.mesh,
                 part.material,
-                worldTransform
+                transformComponent
             );
         }
     }

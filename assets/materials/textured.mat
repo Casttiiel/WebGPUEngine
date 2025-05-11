@@ -1,12 +1,12 @@
 {
     "technique": "gbuffer.tech",
-    "textures":[
-        {"txAlbedo": "lee.jpg"},
-        {"txNormal": "lee_normal.jpg"},
-        {"txMetallic": "lee_specular.jpg"},
-        {"txRoughness": "lee_specular.jpg"},
-        {"txEmissive": "black.png"}
-    ],
+    "textures":{
+        "txAlbedo": "lee.jpg",
+        "txNormal": "lee_normal.jpg",
+        "txMetallic": "lee_specular.jpg",
+        "txRoughness": "lee_specular.jpg",
+        "txEmissive": "black.png"
+    },
     "casts_shadows": false,
     "category": "solids",
     "shadows": false

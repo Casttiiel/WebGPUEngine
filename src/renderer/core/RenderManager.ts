@@ -1,6 +1,7 @@
+import { TransformComponent } from "../../components/core/TransformComponent";
 import { RenderComponent } from "../../components/render/RenderComponent";
+import { Engine } from "../../core/engine/Engine";
 import { Camera } from "../../core/math/Camera";
-import { Transform } from "../../core/math/Transform";
 import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Material } from "../resources/material";
 import { Mesh } from "../resources/Mesh";
@@ -9,7 +10,7 @@ interface RenderKey {
   mesh: Mesh;
   material: Material;
   owner: RenderComponent;
-  transform: Transform;
+  transform: TransformComponent;
   aabb: unknown | null;
   isInstanced: boolean;
 }
@@ -37,7 +38,7 @@ export class RenderManager {
     owner: RenderComponent,
     mesh: Mesh,
     material: Material,
-    transform: Transform,
+    transform: TransformComponent,
   ): void {
     const key: RenderKey = {
       mesh,
@@ -86,11 +87,14 @@ export class RenderManager {
       key.mesh.activate(pass);
 
       // 3. Actualizar uniforms
-      const modelMatrix = new Float32Array(key.transform.asMatrix());
-      key.material.getTechnique().updateMatrices(modelMatrix);
+      //const modelMatrix = new Float32Array(key.transform.asMatrix());
+      //key.material.getTechnique().updateMatrices(modelMatrix);
 
       // 4. Activar bind groups
-      key.material.getTechnique().activate(pass, key.material.getTextureBindGroup());
+      //ESTAMOS DANDO POR HECHO QUE TODAS LAS CATEGORIAS VAN A NECESITAR ESTOS DATOS Y PUEDE NO SER ASI EN EL FUTURO
+      pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+      pass.setBindGroup(1, key.transform.getModelBindGroup());
+      pass.setBindGroup(2, key.material.getTextureBindGroup());
 
       // 5. Dibujar la mesh
       if (key.isInstanced) {
