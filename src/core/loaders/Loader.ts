@@ -2,6 +2,7 @@ import { NameComponent } from "../../components/core/NameComponent";
 import { TransformComponent } from "../../components/core/TransformComponent";
 import { CameraComponent } from "../../components/render/CameraComponent";
 import { RenderComponent } from "../../components/render/RenderComponent";
+import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
 import { SceneDataType, EntityDataType } from "../../types/SceneData.type";
 import { Component } from "../ecs/Component";
 import { Entity } from "../ecs/Entity";
@@ -66,6 +67,9 @@ export class Loader {
         break;
       case 'camera':
         return new CameraComponent();
+        break;
+      case 'tone_mapping':
+        return new ToneMappingComponent();
         break;
       /*case 'autoAlignedBoundingBox':
         entity.addComponent(type, new AABBComponent());

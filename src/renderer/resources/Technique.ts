@@ -73,7 +73,7 @@ export class Technique {
       },
     } as GPURenderPipelineDescriptor;
 
-    if (this.depthTest && this.depthTest !== "none") {
+    if (this.depthTest && this.depthTest !== "disable_all") {
       pipelineParams.depthStencil = {
         format: 'depth32float-stencil8',
         depthWriteEnabled: true,

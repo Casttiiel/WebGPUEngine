@@ -1,6 +1,5 @@
 NPM RUN DEV
 -------------------------------------------
-ToneMapping using technique
 Antialiasing using technique
 Skybox using technique
 On Resize
@@ -10,6 +9,7 @@ Minimize amount of pipelines, and other resources, Order render keys based on te
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Prefab
 Performance numbers
+RenderToTexture inutil? Puede ser una textura y ya?
 
 
 Mesh LOD/Generate LOD on texture and mesh automatically

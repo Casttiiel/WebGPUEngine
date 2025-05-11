@@ -1,4 +1,5 @@
 import { CameraComponent } from "../../components/render/CameraComponent";
+import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
 import { Engine } from "../../core/engine/Engine";
 import { DeferredRenderer } from "../../renderer/core/DeferredRenderer";
 import { Render } from "../../renderer/core/render";
@@ -18,7 +19,6 @@ export class ModuleRender extends Module {
 
   //Presentation data
   private presentationTechnique !: Technique;
-  private presentationPipeline !: GPURenderPipeline
   private fullscreenQuadMesh !: Mesh;
   private presentationBindGroup !: GPUBindGroup;
 
@@ -72,15 +72,44 @@ export class ModuleRender extends Module {
     RenderManager.getInstance().setCamera(camera);
 
     //this.setupDeferredOutput();
-    const result = this.deferred.render(camera);
+    let result = this.deferred.render(camera);
 
-    this.presentResult();
+    if (mainCamera?.hasComponent("tone_mapping")) {
+      const toneMapping = mainCamera.getComponent("tone_mapping") as ToneMappingComponent;
+      result = toneMapping.apply(result);
+    }
+
+    this.presentResult(result);
 
     Render.getInstance().endFrame();
   }
 
-  private presentResult(): void {
+  private presentResult(result: GPUTextureView): void {
     const render = Render.getInstance();
+    const device = render.getDevice();
+
+    if (!this.presentationBindGroup) {
+      const sampler = device.createSampler({
+        magFilter: 'linear',
+        minFilter: 'linear',
+      });
+
+      this.presentationBindGroup = device.createBindGroup({
+        label: `presentation_bindgroup`,
+        layout: this.presentationTechnique.getPipeline().getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: result,
+          },
+          {
+            binding: 1,
+            resource: sampler,
+          },
+        ]
+      })
+    }
+    
     const pass = render.getCommandEncoder().beginRenderPass(
       {
         colorAttachments: [{
@@ -108,7 +137,6 @@ export class ModuleRender extends Module {
 
     // 1. Activar el pipeline
     this.presentationTechnique.activatePipeline(pass);
-    //pass.setPipeline(this.presentationPipeline);
 
     // 2. Activar mesh data
     this.fullscreenQuadMesh.activate(pass);
@@ -186,32 +214,10 @@ export class ModuleRender extends Module {
   }
 
   private async initializePresentationData(): Promise<void> {
-    const device = Render.getInstance().getDevice();
-
     this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
 
     this.presentationTechnique = await Technique.get("presentation.tech");
     this.presentationTechnique.createRenderPipeline(this.fullscreenQuadMesh);
-
-    const sampler = device.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
-
-    this.presentationBindGroup = device.createBindGroup({
-      label: `presentation_bindgroup`,
-      layout: this.presentationTechnique.getPipeline().getBindGroupLayout(0),
-      entries: [
-        {
-          binding: 0,
-          resource: this.deferred.rtAlbedos.getView(),
-        },
-        {
-          binding: 1,
-          resource: sampler,
-        },
-      ]
-    })
   }
 
   public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {
