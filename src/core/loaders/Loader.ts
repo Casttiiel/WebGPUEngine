@@ -1,5 +1,6 @@
 import { NameComponent } from "../../components/core/NameComponent";
 import { TransformComponent } from "../../components/core/TransformComponent";
+import { AntialiasingComponent } from "../../components/render/AntialiasingComponent";
 import { CameraComponent } from "../../components/render/CameraComponent";
 import { RenderComponent } from "../../components/render/RenderComponent";
 import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
@@ -70,6 +71,9 @@ export class Loader {
         break;
       case 'tone_mapping':
         return new ToneMappingComponent();
+        break;
+      case 'antialiasing':
+        return new AntialiasingComponent();
         break;
       /*case 'autoAlignedBoundingBox':
         entity.addComponent(type, new AABBComponent());

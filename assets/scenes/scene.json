@@ -105,7 +105,8 @@
           10
         ]
       },
-      "tone_mapping":{}
+      "tone_mapping":{},
+      "antialiasing": {}
     }
   }
 ]

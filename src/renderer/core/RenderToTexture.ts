@@ -15,6 +15,7 @@ export class RenderToTexture {
     this.yRes = height;
 
     this.texture = Render.getInstance().getDevice().createTexture({
+      label: `${this.name}_texture`,
       size: [width, height],
       format: format,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING
@@ -23,7 +24,9 @@ export class RenderToTexture {
 
   public getView(): GPUTextureView {
     if (this.textureView) return this.textureView;
-    this.textureView = this.texture.createView();
+    this.textureView = this.texture.createView({
+      label: `${this.name}_textureView`
+    });
     return this.textureView;
   }
 

@@ -1,3 +1,4 @@
+import { AntialiasingComponent } from "../../components/render/AntialiasingComponent";
 import { CameraComponent } from "../../components/render/CameraComponent";
 import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
 import { Engine } from "../../core/engine/Engine";
@@ -77,6 +78,11 @@ export class ModuleRender extends Module {
     if (mainCamera?.hasComponent("tone_mapping")) {
       const toneMapping = mainCamera.getComponent("tone_mapping") as ToneMappingComponent;
       result = toneMapping.apply(result);
+    }
+    
+    if (mainCamera?.hasComponent("antialiasing")) {
+      const antialiasing = mainCamera.getComponent("antialiasing") as AntialiasingComponent;
+      result = antialiasing.apply(result);
     }
 
     this.presentResult(result);

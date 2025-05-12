@@ -1,6 +1,6 @@
 NPM RUN DEV
 -------------------------------------------
-Antialiasing using technique
+Multisampling
 Skybox using technique
 On Resize
 Deferred GBuffer shader

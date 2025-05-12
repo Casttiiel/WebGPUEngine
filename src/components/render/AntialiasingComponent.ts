@@ -4,24 +4,39 @@ import { RenderToTexture } from "../../renderer/core/RenderToTexture";
 import { Mesh } from "../../renderer/resources/Mesh";
 import { Technique } from "../../renderer/resources/Technique";
 
-export class ToneMappingComponent extends Component {
+export class AntialiasingComponent extends Component {
     private technique !: Technique;
     private fullscreenQuadMesh !: Mesh;
     private bindGroup !: GPUBindGroup;
     private result !: RenderToTexture;
+    private uniformBuffer !: GPUBuffer;
 
     constructor() {
         super();
     }
 
     public async load(): Promise<void> {
+        const device = Render.getInstance().getDevice();
+
         this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
 
-        this.technique = await Technique.get("tone_mapping.tech");
+        this.technique = await Technique.get("antialiasing.tech");
         this.technique.createRenderPipeline(this.fullscreenQuadMesh);
 
         this.result = new RenderToTexture();
-        this.result.createRT("tone_mapping_result.dds", Render.width, Render.height, 'rgba16float');
+        this.result.createRT("antialiasing_result.dds", Render.width, Render.height, 'rgba16float');
+
+        this.uniformBuffer = device.createBuffer({
+            label: `antialiasing_uniformBuffer`,
+            size: 2 * 4, // 1 vec2 (ScreenSize)
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        device.queue.writeBuffer(
+            this.uniformBuffer,
+            0,  // offset
+            new Float32Array([Render.width, Render.height])
+        );
     }
 
     public apply(texture: GPUTextureView): GPUTextureView {
@@ -79,7 +94,7 @@ export class ToneMappingComponent extends Component {
         });
 
         this.bindGroup = device.createBindGroup({
-            label: `tonemapping_bindgroup`,
+            label: `antialiasing_bindgroup`,
             layout: this.technique.getPipeline().getBindGroupLayout(0),
             entries: [
                 {
@@ -90,6 +105,10 @@ export class ToneMappingComponent extends Component {
                     binding: 1,
                     resource: sampler,
                 },
+                {
+                    binding: 2,
+                    resource: { buffer: this.uniformBuffer }
+                }
             ]
         })
     }

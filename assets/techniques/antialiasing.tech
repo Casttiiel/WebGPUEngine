@@ -1,0 +1,6 @@
+{
+    "vs": "presentation.vs",
+    "fs": "antialiasing.fs",
+    "writesOn": "texture",
+    "z": "disable_all"
+}
