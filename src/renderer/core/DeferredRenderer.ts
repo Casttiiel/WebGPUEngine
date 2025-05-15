@@ -52,12 +52,12 @@ export class DeferredRenderer {
     //TODO RENDER GBUFFERDECALS
     //TODO RENDER AO
     //TODO RENDER ACC LIGHTS
-    //TODO RENDER CATEGORY TRANSPARENTS
+    this.renderTransparents();
     
     return this.rtAlbedos.getView();
   }
 
-  public renderGBuffer() {
+  public renderGBuffer(): void{
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass(this.getGBufferRenderPassDescriptor());
 
@@ -76,6 +76,43 @@ export class DeferredRenderer {
     );
 
     RenderManager.getInstance().render(RenderCategory.SOLIDS, pass);
+
+    pass.end();
+  }
+
+  private renderTransparents(): void {
+    const render = Render.getInstance();
+    const pass = render.getCommandEncoder().beginRenderPass({
+      label: 'Transparents Render pass',
+      colorAttachments: [{
+        view: this.rtAlbedos.getView(),
+        loadOp: 'load',
+        storeOp: 'store',
+      }],
+      depthStencilAttachment: {
+        view: this.depthStencil.createView(),
+        depthLoadOp: 'load',
+        depthStoreOp: 'discard',
+        stencilLoadOp: 'load',
+        stencilStoreOp: 'discard'
+      },
+    });
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height,            // Height
+      0.0, 1.0                       // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height             // Height
+    );
+
+    RenderManager.getInstance().render(RenderCategory.TRANSPARENT, pass);
 
     pass.end();
   }

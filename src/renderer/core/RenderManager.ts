@@ -71,10 +71,14 @@ export class RenderManager {
       return k1.material.getName().localeCompare(k2.material.getName());
     });*/
 
+    const keysToDraw = this.normalKeys.filter(key => 
+      key.material.getCategory() === category
+    );
+
     let numDrawCalls = 0;
 
 
-    for (const key of this.normalKeys) {
+    for (const key of keysToDraw) {
       if (!key.material || !key.mesh || !key.transform) {
         console.warn("Invalid render key - missing components");
         continue;

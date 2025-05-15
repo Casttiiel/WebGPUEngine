@@ -1,5 +1,7 @@
 import { Engine } from "../../core/engine/Engine";
 import { ResourceManager } from "../../core/engine/ResourceManager";
+import { BlendModes } from "../../types/BlendModes.enum";
+import { DepthModes } from "../../types/DepthModes.enum";
 import { FragmentShaderTargets } from "../../types/FragmentShaderTargets.enum";
 import { PipelineBindGroupLayouts } from "../../types/PipelineBindGroupLayouts.enum";
 import { RenderCategory } from "../../types/RenderCategory.enum";
@@ -73,12 +75,8 @@ export class Technique {
       },
     } as GPURenderPipelineDescriptor;
 
-    if (this.depthTest && this.depthTest !== "disable_all") {
-      pipelineParams.depthStencil = {
-        format: 'depth32float-stencil8',
-        depthWriteEnabled: true,
-        depthCompare: 'less'
-      };
+    if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
+      pipelineParams.depthStencil = this.getDepthConfig();
     }
 
     this.pipeline = device.createRenderPipeline(pipelineParams);
@@ -207,6 +205,7 @@ export class Technique {
       case FragmentShaderTargets.TEXTURE: {
         return [{
           format: 'rgba16float',
+          blend: this.getBlendConfig()
         }];
         break;
       }
@@ -232,6 +231,76 @@ export class Technique {
         throw new Error(`${this.name}: Unknown Fragment Shader Target`)
       }
     }
+  }
+
+  private getBlendConfig(): GPUBlendState {
+    switch (this.blendMode) {
+      case BlendModes.ADDITIVE_BY_SRC_ALPHA: {
+        return {
+          color: {
+            srcFactor: 'src-alpha',
+            dstFactor: 'one',
+            operation: 'add',
+          },
+          alpha: {
+            srcFactor: 'src-alpha',
+            dstFactor: 'one',
+            operation: 'add',
+          },
+        };
+        break;
+      }
+      case BlendModes.DEFAULT: {
+        return {
+          color: {
+            srcFactor: 'one',
+            dstFactor: 'zero',
+            operation: 'add',
+          },
+          alpha: {
+            srcFactor: 'one',
+            dstFactor: 'zero',
+            operation: 'add',
+          }
+        };
+        break;
+      }
+      default: {
+        throw new Error(`${this.name}: Unknown Blend mode`)
+      }
+    }
+  }
+
+  private getDepthConfig(): unknown {
+    switch (this.depthTest) {
+      case DepthModes.TEST_BUT_NO_WRITE: {
+        return {
+          depthWriteEnabled: false,
+          depthCompare: 'less',
+          format: 'depth32float-stencil8',
+          stencilFront: undefined,
+          stencilBack: undefined,
+          stencilReadMask: 0,
+          stencilWriteMask: 0,
+          depthBias: 0,
+          depthBiasSlopeScale: 0,
+          depthBiasClamp: 0,
+        };
+        break;
+      }
+      case BlendModes.DEFAULT: {
+        return {
+          format: 'depth32float-stencil8',
+          depthWriteEnabled: true,
+          depthCompare: 'less'
+        };
+        break;
+      }
+      default: {
+        throw new Error(`${this.name}: Unknown Depth mode`)
+      }
+    }
+
   }
 
   public activatePipeline(pass: GPURenderPassEncoder): void {

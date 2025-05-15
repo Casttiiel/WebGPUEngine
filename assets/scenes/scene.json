@@ -87,7 +87,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "textured.mat"
+            "material": "transparent.mat"
           }
         ]
       }
