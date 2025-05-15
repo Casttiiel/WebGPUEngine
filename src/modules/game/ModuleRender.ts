@@ -54,7 +54,7 @@ export class ModuleRender extends Module {
     }
   }*/
 
-  private onResolutionUpdated(): void {
+  public onResolutionUpdated(): void {
     this.deferred.create(Render.width, Render.height);
   }
 
@@ -62,7 +62,7 @@ export class ModuleRender extends Module {
     Render.getInstance().beginFrame();
 
     const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
-    const cameraComponent = mainCamera.getComponent("camera") as CameraComponent;
+    const cameraComponent = mainCamera?.getComponent("camera") as CameraComponent;
     const camera = cameraComponent.getCamera();
 
     // Actualizar buffer uniforme global solo con view y projection
@@ -75,7 +75,7 @@ export class ModuleRender extends Module {
     //this.setupDeferredOutput();
     let result = this.deferred.render(camera);
 
-    if (mainCamera?.hasComponent("tone_mapping")) {
+    /*if (mainCamera?.hasComponent("tone_mapping")) {
       const toneMapping = mainCamera.getComponent("tone_mapping") as ToneMappingComponent;
       result = toneMapping.apply(result);
     }
@@ -83,7 +83,7 @@ export class ModuleRender extends Module {
     if (mainCamera?.hasComponent("antialiasing")) {
       const antialiasing = mainCamera.getComponent("antialiasing") as AntialiasingComponent;
       result = antialiasing.apply(result);
-    }
+    }*/
 
     this.presentResult(result);
 

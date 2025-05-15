@@ -39,6 +39,10 @@ export class AntialiasingComponent extends Component {
         );
     }
 
+    public resize(): void {
+        this.result.createRT("antialiasing_result.dds", Render.width, Render.height, 'rgba16float');
+    }
+
     public apply(texture: GPUTextureView): GPUTextureView {
         this.setBindGroup(texture);
         const render = Render.getInstance();

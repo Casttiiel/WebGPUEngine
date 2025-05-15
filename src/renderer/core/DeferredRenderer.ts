@@ -5,9 +5,7 @@ import { RenderManager } from "./RenderManager";
 import { RenderToTexture } from "./RenderToTexture";
 
 export class DeferredRenderer {
-  private width!: number;
-  private height!: number;
-  public rtAlbedos!: RenderToTexture;
+  private rtAlbedos!: RenderToTexture;
   private rtNormals!: RenderToTexture;
   private rtLinearDepth!: RenderToTexture;
   private rtAccLight!: RenderToTexture;
@@ -39,8 +37,8 @@ export class DeferredRenderer {
 
     this.depthStencil = Render.getInstance().getDevice().createTexture({
       size: {
-        width: Render.width,
-        height: Render.height
+        width: width,
+        height: height
       },
       format: 'depth32float-stencil8',
       usage: GPUTextureUsage.RENDER_ATTACHMENT
@@ -51,7 +49,7 @@ export class DeferredRenderer {
     this.renderGBuffer();
     //TODO RENDER GBUFFERDECALS
     //TODO RENDER AO
-    //TODO RENDER ACC LIGHTS
+    this.renderAccLight();
     this.renderTransparents();
     
     return this.rtAlbedos.getView();
@@ -78,6 +76,19 @@ export class DeferredRenderer {
     RenderManager.getInstance().render(RenderCategory.SOLIDS, pass);
 
     pass.end();
+  }
+
+  public renderAccLight(): void {
+    //TODO AMBIENT PASS
+    //TODO POINT LIGHTS
+    //TODO DIRECTIONAL LIGHTS NO SHADOWS
+    //TODO DIRECTIONAL LIGHTS WITH SHADOWS
+    //TODO FAKE VOLUMETRIC LIGHTS
+    this.renderSkybox();
+  }
+
+  private renderSkybox(): void {
+    
   }
 
   private renderTransparents(): void {

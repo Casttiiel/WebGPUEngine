@@ -24,6 +24,10 @@ export class ToneMappingComponent extends Component {
         this.result.createRT("tone_mapping_result.dds", Render.width, Render.height, 'rgba16float');
     }
 
+    public resize(): void {
+        this.result.createRT("tone_mapping_result.dds", Render.width, Render.height, 'rgba16float');
+    }
+
     public apply(texture: GPUTextureView): GPUTextureView {
         this.setBindGroup(texture);
         const render = Render.getInstance();

@@ -30,18 +30,24 @@ class ObjectManager {
       c.renderDebug();
     }
   }
+  public getList(): Component[]{
+    return this.list;
+  }
 }
 
 export class ModuleEntities extends Module {
   private omEntities: Entity[] = [];
   private omToUpdate: Map<string, ObjectManager> = new Map();
   private omToRenderDebug: Map<string, ObjectManager> = new Map();
+  private omGeneral: Map<string, ObjectManager> = new Map();
 
   constructor(name: string) {
     super(name);
   }
 
   private loadListOfManagers(json: ComponentDataType): void {
+    this.omGeneral = new Map();
+
     this.omToUpdate = new Map();
     const update_names = json.update;
     for (const n of update_names) {
@@ -91,7 +97,18 @@ export class ModuleEntities extends Module {
   }
 
   public addComponentToManager(component: Component, managerName: string): void {
+    const om = this.omGeneral.get(managerName);
+    if(!om){
+      const newOm = new ObjectManager(managerName);
+      this.omGeneral.set(managerName, newOm);
+    }
+
+    this.omGeneral.get(managerName)?.addComponent(component);
     this.omToUpdate.get(managerName)?.addComponent(component);
+  }
+
+  public getObjectManagerByName(name: string): ObjectManager | undefined {
+    return this.omGeneral.get(name);
   }
 
   public getEntityByName(name: string): Entity | null {
@@ -101,7 +118,6 @@ export class ModuleEntities extends Module {
       }
     }
     return null;
-    console.log(`Entity with name ${name} not found`);
   }
 
   public stop(): void {

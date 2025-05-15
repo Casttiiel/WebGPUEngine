@@ -1,4 +1,6 @@
+import { AntialiasingComponent } from "../../components/render/AntialiasingComponent";
 import { CameraComponent } from "../../components/render/CameraComponent";
+import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
 import { Engine } from "../../core/engine/Engine";
 
 export class Render {
@@ -25,7 +27,7 @@ export class Render {
   private constructor() {
     // Constructor privado para patrón singleton
   }
-  
+
   public async initialize(canvas: HTMLCanvasElement): Promise<boolean> {
     if (!canvas) {
       console.error('Canvas element is null or undefined');
@@ -96,17 +98,31 @@ export class Render {
 
           width = Math.floor(Math.max(1, width));
           height = Math.floor(Math.max(1, height));
-  
+
           await this.resizeBackBuffer(width, height);
-          const entity = Engine.getEntities().getEntityByName("MainCamera");
-          if(!entity) return;
-          const component = entity.getComponent("camera") as CameraComponent;
+          const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
+          if (!mainCamera) return;
+          const component = mainCamera.getComponent("camera") as CameraComponent;
           if (!component) return;
           component.getCamera().setViewport(width, height);
+
+          const toneMappingOM = Engine.getEntities().getObjectManagerByName("tone_mapping");
+          for (const comp of (toneMappingOM?.getList() ?? [])) {
+            const tonemapping = comp as ToneMappingComponent;
+            tonemapping.resize();
+          }
+
+          const antialiasingOM = Engine.getEntities().getObjectManagerByName("antialiasing");
+          for (const comp of (antialiasingOM?.getList() ?? [])) {
+            const tonemapping = comp as AntialiasingComponent;
+            tonemapping.resize();
+          }
+
+          Engine.getRender().onResolutionUpdated();
         }
       });
       observer.observe(canvas);
-      
+
       return true;
 
     } catch (error) {
@@ -157,7 +173,7 @@ export class Render {
     const commandBuffer = this.currentCommandEncoder.finish();
     this.device.queue.submit([commandBuffer]);
   }
-  
+
   public static getInstance(): Render {
     if (!Render.instance) {
       Render.instance = new Render();
@@ -190,7 +206,7 @@ export class Render {
   }
 
   public getContext(): GPUCanvasContext {
-    return this.context; 
+    return this.context;
   }
 
   public destroy(): void {
