@@ -2,8 +2,6 @@ NPM RUN DEV
 -------------------------------------------
 (Deferred GBuffer shader)
 Ambient Light
-AABB
-CPU Culling on camera
 Skybox using technique
 Performance numbers
 Prefab
@@ -28,7 +26,7 @@ Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Mesh LOD/Generate LOD on texture and mesh automatically
 
 
-
+AABB/CPU Culling on camera
 Culling of lights
 Ambient Occlusion
 Decals Category

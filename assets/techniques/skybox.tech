@@ -1,0 +1,6 @@
+{
+    "vs": "presentation.vs",
+    "fs": "skybox.fs",
+    "writesOn": "texture",
+    "z": "test_equal"
+}
