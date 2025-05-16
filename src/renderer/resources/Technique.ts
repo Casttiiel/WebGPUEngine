@@ -271,13 +271,13 @@ export class Technique {
     }
   }
 
-  private getDepthConfig(): unknown {
+  private getDepthConfig(): GPUDepthStencilState {
     switch (this.depthTest) {
       case DepthModes.TEST_BUT_NO_WRITE: {
         return {
           depthWriteEnabled: false,
           depthCompare: 'less',
-          format: 'depth32float-stencil8',
+          format: 'depth32float',
           stencilFront: undefined,
           stencilBack: undefined,
           stencilReadMask: 0,
@@ -290,14 +290,14 @@ export class Technique {
       }
       case BlendModes.DEFAULT: {
         return {
-          format: 'depth32float-stencil8',
+          format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'less'
         };
         break;
       }
       default: {
-        throw new Error(`${this.name}: Unknown Depth mode`)
+        throw new Error(`${this.name}: Unknown Depth mode`);
       }
     }
 

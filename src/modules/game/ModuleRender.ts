@@ -21,7 +21,7 @@ export class ModuleRender extends Module {
   //Presentation data
   private presentationTechnique !: Technique;
   private fullscreenQuadMesh !: Mesh;
-  private presentationBindGroup !: GPUBindGroup;
+  private presentationBindGroup !: GPUBindGroup | null;
 
   // Debug values para Tweakpane
   private debugValues = {
@@ -44,18 +44,9 @@ export class ModuleRender extends Module {
     return true;
   }
 
-  /*private setupDeferredOutput(): void {
-    if (this.deferredOutput.getWidth() !== Render.width || this.deferredOutput.getHeight() !== Render.height) {
-      this.deferredOutput.createRT("g_deferred_output.dds", Render.width, Render.height, "rgba16float", "", true);
-    }
-
-    if (this.shineOutput.getWidth() !== Render.width || this.shineOutput.getHeight() !== Render.height) {
-      this.shineOutput.createRT("g_shine_output.dds", Render.width, Render.height, "rgba16float");
-    }
-  }*/
-
   public onResolutionUpdated(): void {
     this.deferred.create(Render.width, Render.height);
+    this.presentationBindGroup = null;
   }
 
   public generateFrame(): void {
@@ -75,7 +66,7 @@ export class ModuleRender extends Module {
     //this.setupDeferredOutput();
     let result = this.deferred.render(camera);
 
-    /*if (mainCamera?.hasComponent("tone_mapping")) {
+    if (mainCamera?.hasComponent("tone_mapping")) {
       const toneMapping = mainCamera.getComponent("tone_mapping") as ToneMappingComponent;
       result = toneMapping.apply(result);
     }
@@ -83,7 +74,7 @@ export class ModuleRender extends Module {
     if (mainCamera?.hasComponent("antialiasing")) {
       const antialiasing = mainCamera.getComponent("antialiasing") as AntialiasingComponent;
       result = antialiasing.apply(result);
-    }*/
+    }
 
     this.presentResult(result);
 

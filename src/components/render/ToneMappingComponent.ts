@@ -7,7 +7,7 @@ import { Technique } from "../../renderer/resources/Technique";
 export class ToneMappingComponent extends Component {
     private technique !: Technique;
     private fullscreenQuadMesh !: Mesh;
-    private bindGroup !: GPUBindGroup;
+    private bindGroup !: GPUBindGroup | null;
     private result !: RenderToTexture;
 
     constructor() {
@@ -26,6 +26,7 @@ export class ToneMappingComponent extends Component {
 
     public resize(): void {
         this.result.createRT("tone_mapping_result.dds", Render.width, Render.height, 'rgba16float');
+        this.bindGroup = null;
     }
 
     public apply(texture: GPUTextureView): GPUTextureView {

@@ -5,7 +5,7 @@ export class RenderToTexture {
   private xRes: number = 0;
   private yRes: number = 0;
   private texture!: GPUTexture;
-  private textureView !: GPUTextureView;
+  private textureView !: GPUTextureView | null;
 
   public createRT(name: string, width: number, height: number, format: GPUTextureFormat): void {
     this.destroy();
@@ -13,7 +13,6 @@ export class RenderToTexture {
     this.name = name;
     this.xRes = width;
     this.yRes = height;
-
     this.texture = Render.getInstance().getDevice().createTexture({
       label: `${this.name}_texture`,
       size: [width, height],
@@ -38,5 +37,10 @@ export class RenderToTexture {
     return this.yRes;
   }
 
-  public destroy(): void { }
+  public destroy(): void {
+    if(this.texture){
+      this.texture.destroy();
+    }
+    this.textureView = null;
+  }
 }

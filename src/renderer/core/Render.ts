@@ -1,5 +1,4 @@
 import { AntialiasingComponent } from "../../components/render/AntialiasingComponent";
-import { CameraComponent } from "../../components/render/CameraComponent";
 import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
 import { Engine } from "../../core/engine/Engine";
 
@@ -13,12 +12,6 @@ export class Render {
   private currentCommandEncoder!: GPUCommandEncoder; // Codificador de comandos actual
   private format: GPUTextureFormat = 'bgra8unorm';         // Formato de color (BGRA 8 bits por canal)
 
-  // Buffers de la pantalla
-  /*private depthTexture: GPUTexture | null = null;          // Textura para el buffer de profundidad
-  private depthView: GPUTextureView | null = null;         // Vista de la textura de profundidad
-  private currentTexture: GPUTexture | null = null;        // Textura del frame actual
-  private currentView: GPUTextureView | null = null;       // Vista de la textura del frame actual
-*/
   // Dimensiones del canvas
   private static screenWidth: number = 800;
   private static screenHeight: number = 600;
@@ -77,51 +70,7 @@ export class Render {
       });
 
       // Observador para manejar cambios de tamaño del canvas
-      const observer = new ResizeObserver(async entries => {
-        for (const entry of entries) {
-          const dpr = window.devicePixelRatio || 1;
-          let width = entry.contentBoxSize[0].inlineSize * dpr;
-          let height = entry.contentBoxSize[0].blockSize * dpr;
-
-          // Aplicar límites del dispositivo manteniendo el aspect ratio
-          const maxDim = this.device.limits.maxTextureDimension2D;
-          if (width > maxDim || height > maxDim) {
-            const aspectRatio = width / height;
-            if (width > height) {
-              width = maxDim;
-              height = width / aspectRatio;
-            } else {
-              height = maxDim;
-              width = height * aspectRatio;
-            }
-          }
-
-          width = Math.floor(Math.max(1, width));
-          height = Math.floor(Math.max(1, height));
-
-          await this.resizeBackBuffer(width, height);
-          const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
-          if (!mainCamera) return;
-          const component = mainCamera.getComponent("camera") as CameraComponent;
-          if (!component) return;
-          component.getCamera().setViewport(width, height);
-
-          const toneMappingOM = Engine.getEntities().getObjectManagerByName("tone_mapping");
-          for (const comp of (toneMappingOM?.getList() ?? [])) {
-            const tonemapping = comp as ToneMappingComponent;
-            tonemapping.resize();
-          }
-
-          const antialiasingOM = Engine.getEntities().getObjectManagerByName("antialiasing");
-          for (const comp of (antialiasingOM?.getList() ?? [])) {
-            const tonemapping = comp as AntialiasingComponent;
-            tonemapping.resize();
-          }
-
-          Engine.getRender().onResolutionUpdated();
-        }
-      });
-      observer.observe(canvas);
+      this.setupResizeObserver();
 
       return true;
 
@@ -160,9 +109,6 @@ export class Render {
   public beginFrame(): void {
     if (!this.device || !this.context) return;
 
-    //this.currentTexture = this.context.getCurrentTexture();
-    //this.currentView = this.currentTexture.createView();
-
     this.currentCommandEncoder = this.device.createCommandEncoder();
   }
 
@@ -172,6 +118,39 @@ export class Render {
 
     const commandBuffer = this.currentCommandEncoder.finish();
     this.device.queue.submit([commandBuffer]);
+  }
+
+  private setupResizeObserver(): void {
+    const observer = new ResizeObserver(() => {
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.floor(Math.max(1, this.canvas.clientWidth * dpr));
+      const height = Math.floor(Math.max(1, this.canvas.clientHeight * dpr));
+
+      this.resizeAndNotify(width, height);
+    });
+
+    observer.observe(this.canvas);
+  }
+
+  private resizeAndNotify(width: number, height: number): void {
+    this.device.queue.onSubmittedWorkDone().then(() => {
+      this.resizeBackBuffer(width, height);
+
+      const [w, h] = [Render.screenWidth, Render.screenHeight];
+
+      // Usa Render.getSize() en todos los componentes:
+      const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
+      mainCamera?.getComponent("camera")?.getCamera().setViewport(w, h);
+
+      for (const comp of (Engine.getEntities().getObjectManagerByName("tone_mapping")?.getList() ?? [])) {
+        (comp as ToneMappingComponent).resize();
+      }
+      for (const comp of (Engine.getEntities().getObjectManagerByName("antialiasing")?.getList() ?? [])) {
+        (comp as AntialiasingComponent).resize();
+      }
+
+      Engine.getRender().onResolutionUpdated();
+    })
   }
 
   public static getInstance(): Render {

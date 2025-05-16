@@ -11,12 +11,11 @@ export class DeferredRenderer {
   private rtAccLight!: RenderToTexture;
   private rtSelfIllum!: RenderToTexture;
   private depthStencil!: GPUTexture;
+  private depthStencilView !: GPUTextureView | null;
 
   constructor() { }
 
   public create(width: number, height: number) {
-    this.width = width;
-    this.height = height;
 
     this.destroy();
 
@@ -36,13 +35,17 @@ export class DeferredRenderer {
 
 
     this.depthStencil = Render.getInstance().getDevice().createTexture({
+      label: 'deferred depth stencil texture label',
       size: {
         width: width,
         height: height
       },
-      format: 'depth32float-stencil8',
+      format: 'depth32float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT
     });
+
+    if(!this.depthStencilView)
+      this.depthStencilView = this.depthStencil.createView();
   }
 
   public render(camera: Camera): GPUTextureView {
@@ -62,15 +65,15 @@ export class DeferredRenderer {
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
       0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height,            // Height
+      Render.width,             // Width
+      Render.height,            // Height
       0.0, 1.0                       // Min/max depth
     );
 
     pass.setScissorRect(
       0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height             // Height
+      Render.width,             // Width
+      Render.height             // Height
     );
 
     RenderManager.getInstance().render(RenderCategory.SOLIDS, pass);
@@ -101,11 +104,9 @@ export class DeferredRenderer {
         storeOp: 'store',
       }],
       depthStencilAttachment: {
-        view: this.depthStencil.createView(),
+        view: this.depthStencilView,
         depthLoadOp: 'load',
         depthStoreOp: 'discard',
-        stencilLoadOp: 'load',
-        stencilStoreOp: 'discard'
       },
     });
 
@@ -156,13 +157,10 @@ export class DeferredRenderer {
         storeOp: 'store',
       }],
       depthStencilAttachment: {
-        view: this.depthStencil.createView(),
+        view: this.depthStencilView,
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
-        stencilClearValue: 0,
-        stencilLoadOp: 'clear',
-        stencilStoreOp: 'store'
       },
     };
   }
@@ -174,6 +172,8 @@ export class DeferredRenderer {
       this.rtLinearDepth.destroy();
       this.rtAccLight.destroy();
       this.rtSelfIllum.destroy();
+      this.depthStencil.destroy();
+      this.depthStencilView = null;
     }
   }
 }

@@ -7,7 +7,7 @@ import { Technique } from "../../renderer/resources/Technique";
 export class AntialiasingComponent extends Component {
     private technique !: Technique;
     private fullscreenQuadMesh !: Mesh;
-    private bindGroup !: GPUBindGroup;
+    private bindGroup !: GPUBindGroup | null;
     private result !: RenderToTexture;
     private uniformBuffer !: GPUBuffer;
 
@@ -41,6 +41,12 @@ export class AntialiasingComponent extends Component {
 
     public resize(): void {
         this.result.createRT("antialiasing_result.dds", Render.width, Render.height, 'rgba16float');
+        Render.getInstance().getDevice().queue.writeBuffer(
+            this.uniformBuffer,
+            0,  // offset
+            new Float32Array([Render.width, Render.height])
+        );
+        this.bindGroup = null;
     }
 
     public apply(texture: GPUTextureView): GPUTextureView {
@@ -89,8 +95,8 @@ export class AntialiasingComponent extends Component {
     }
 
     private setBindGroup(texture: GPUTextureView): void {
-        if(this.bindGroup) return;
-        
+        if (this.bindGroup) return;
+
         const device = Render.getInstance().getDevice();
         const sampler = device.createSampler({
             magFilter: 'linear',
