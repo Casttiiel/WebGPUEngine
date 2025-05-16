@@ -37,7 +37,7 @@ export class ModuleRender extends Module {
   }
 
   public async start(): Promise<boolean> {
-    //this.setupDeferredOutput();
+    await this.deferred.load();
     this.onResolutionUpdated();
     this.initializeUniformBuffers();
     await this.initializePresentationData();

@@ -1,10 +1,16 @@
 import { Camera } from "../../core/math/Camera";
 import { RenderCategory } from "../../types/RenderCategory.enum";
+import { Mesh } from "../resources/Mesh";
+import { Technique } from "../resources/Technique";
 import { Render } from "./render";
 import { RenderManager } from "./RenderManager";
 import { RenderToTexture } from "./RenderToTexture";
 
 export class DeferredRenderer {
+  private fullscreenQuadMesh !: Mesh;
+
+  private ambientTechnique !: Technique;
+  
   private rtAlbedos!: RenderToTexture;
   private rtNormals!: RenderToTexture;
   private rtLinearDepth!: RenderToTexture;
@@ -44,8 +50,14 @@ export class DeferredRenderer {
       usage: GPUTextureUsage.RENDER_ATTACHMENT
     });
 
-    if(!this.depthStencilView)
+    if (!this.depthStencilView){
       this.depthStencilView = this.depthStencil.createView();
+    }
+  }
+
+  public async load(): Promise<void> {
+    this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
+    this.ambientTechnique = await Technique.get("ambient.tech");
   }
 
   public render(camera: Camera): GPUTextureView {
@@ -54,11 +66,11 @@ export class DeferredRenderer {
     //TODO RENDER AO
     this.renderAccLight();
     this.renderTransparents();
-    
+
     return this.rtAlbedos.getView();
   }
 
-  public renderGBuffer(): void{
+  public renderGBuffer(): void {
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass(this.getGBufferRenderPassDescriptor());
 
@@ -82,16 +94,58 @@ export class DeferredRenderer {
   }
 
   public renderAccLight(): void {
-    //TODO AMBIENT PASS
+    //this.renderAmbientPass();
     //TODO POINT LIGHTS
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS
     //TODO FAKE VOLUMETRIC LIGHTS
-    this.renderSkybox();
+    //this.renderSkybox();
+  }
+
+  private renderAmbientPass(): void {
+    const render = Render.getInstance();
+    const pass = render.getCommandEncoder().beginRenderPass(
+      {
+        colorAttachments: [{
+          view: this.rtAccLight.getView(),
+          loadOp: 'clear',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        }],
+      }
+    );
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height,            // Height
+      0.0, 1.0                       // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height             // Height
+    );
+
+    // 1. Activar el pipeline
+    this.ambientTechnique.activatePipeline(pass);
+
+    // 2. Activar mesh data
+    this.fullscreenQuadMesh.activate(pass);
+
+    // 3. Activar bind groups
+    //pass.setBindGroup(0, this.bindGroup);
+
+    // 4. Dibujar la mesh
+    this.fullscreenQuadMesh.renderGroup(pass);
+
+    pass.end();
   }
 
   private renderSkybox(): void {
-    
+
   }
 
   private renderTransparents(): void {

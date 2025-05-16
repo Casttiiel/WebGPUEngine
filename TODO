@@ -1,5 +1,6 @@
 NPM RUN DEV
 -------------------------------------------
+Sponza
 (Deferred GBuffer shader)
 Ambient Light
 Skybox using technique
@@ -9,7 +10,6 @@ Prefab
 
 PBR LIGHTS 
     PointLightWIthoutshadows
-Sponza
     renderDirectionalLightsWithoutShadows
     renderDirectionalLightsWithShadows
     RenderPointLighstWithShadows
