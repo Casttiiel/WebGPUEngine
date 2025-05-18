@@ -1,8 +1,9 @@
 import { Material } from "../../renderer/resources/material";
-import { Mesh } from "../../renderer/resources/mesh";
-import { Technique } from "../../renderer/resources/technique";
-import { Texture } from "../../renderer/resources/texture";
+import { Mesh } from "../../renderer/resources/Mesh";
+import { Technique } from "../../renderer/resources/Technique";
+import { Texture } from "../../renderer/resources/Texture";
 import { MaterialDataType } from "../../types/MaterialData.type";
+import { EntityDataType } from "../../types/SceneData.type";
 import { TechniqueDataType } from "../../types/TechniqueData.type";
 
 type Resource = Mesh | Material | Technique | object | string | Texture;// | Cubemap
@@ -14,12 +15,12 @@ export class ResourceManager {
         throw new Error("Cannot create instances of this class");
     }
 
-    public static async loadPrefab(prefabName: string): Promise<object> {
+    public static async loadPrefab(prefabName: string): Promise<EntityDataType> {
         if (!this.resources.has(prefabName)) {
-            const prefab = await fetch(`/prefabs/${prefabName}`).then(res => res.json());
+            const prefab = await fetch(`/assets/prefabs/${prefabName}`).then(res => res.json());
             this.resources.set(prefabName, prefab);
         }
-        return this.resources.get(prefabName) as object;
+        return this.resources.get(prefabName) as EntityDataType;
     }
 
     public static async loadMeshData(meshPath: string): Promise<string> {

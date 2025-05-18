@@ -1,26 +1,14 @@
 [
   {
-    "children": [
-    ],
+    "components": {
+      "name": "Sponza",
+      "transform": {}
+    }
+  },
+  {
     "components": {
       "name": "Player",
-      "transform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          1,
-          1,
-          1
-        ]
-      },
+      "transform": {},
       "render": {
         "meshes": [
           {
@@ -32,38 +20,24 @@
     }
   },
   {
-    "children": [],
+    "prefab": "cube.prefab",
     "components": {
-      "name": "Cube",
       "transform": {
         "position": [
           0,
           3,
           0
         ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
         "scale": [
           0.5,
           0.5,
           1
         ]
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "cube.obj",
-            "material": "textured.mat"
-          }
-        ]
       }
     }
   },
   {
-    "children": [],
+    "prefab": "cube.prefab",
     "components": {
       "name": "Cube 2",
       "transform": {
@@ -72,41 +46,15 @@
           -3,
           0
         ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
         "scale": [
           0.5,
           0.5,
           1
         ]
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "cube.obj",
-            "material": "transparent.mat"
-          }
-        ]
       }
     }
   },
   {
-    "components": {
-      "name": "MainCamera",
-      "camera": {
-        "controllable": true,
-        "fov": 60,
-        "position": [
-          0,
-          2,
-          10
-        ]
-      },
-      "tone_mapping":{},
-      "antialiasing": {}
-    }
+    "prefab": "main_camera.prefab"
   }
 ]

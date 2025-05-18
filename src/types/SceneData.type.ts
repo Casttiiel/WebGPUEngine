@@ -3,12 +3,12 @@ import { TransformComponentDataType } from "./TransformComponentData.type";
 
 export type SceneDataType = ReadonlyArray<EntityDataType>;
 
-export type EntityDataType = Readonly<{
-    name: string;
-    children: ReadonlyArray<EntityDataType>;
-    components: Readonly<{
+export type EntityDataType = {
+    children: Array<EntityDataType>;
+    components: {
         transform?: TransformComponentDataType;
         render?: RenderComponentDataType;
         name?: string;
-    }>;
-}>;
+    };
+    prefab: string;
+};

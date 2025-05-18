@@ -6,6 +6,7 @@ import { RenderComponentDataType, RenderComponentMeshDataType } from "../../type
 import { MeshPartType } from "../../types/MeshPart.type";
 import { RenderManager } from "../../renderer/core/RenderManager";
 import { Transform } from "../../core/math/Transform";
+import { GLTFLoader } from "../../core/loaders/GLTFLoader";
 
 export class RenderComponent extends Component {
     private isVisible: boolean = true;
@@ -17,8 +18,21 @@ export class RenderComponent extends Component {
     }
 
     public async load(data: RenderComponentDataType): Promise<void> {
-        for (const meshData of data.meshes) {
-            await this.readMesh(meshData);
+        if (data.gltf) {
+            await GLTFLoader.loadGLTF(
+                data.gltf.path,
+                this.getOwner(),
+                data.gltf.defaultMaterial,
+                data.gltf.scale
+            );
+            if (data.gltf.visible !== undefined) {
+                this.isVisible = data.gltf.visible;
+            }
+        }
+        else if (data.meshes) {
+            for (const meshData of data.meshes) {
+                await this.readMesh(meshData);
+            }
         }
 
         this.updateRenderManager();
@@ -53,7 +67,7 @@ export class RenderComponent extends Component {
 
         let worldTransform = transformComponent.getTransform();
         let parent = entity.getParent();
-                
+
         // Combinar con las transformaciones de los padres en orden desde el más cercano al más lejano
         while (parent) {
             const parentTransform = parent.getComponent("transform") as TransformComponent;

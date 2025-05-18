@@ -1,0 +1,16 @@
+{
+    "components": {
+      "name": "MainCamera",
+      "camera": {
+        "controllable": true,
+        "fov": 60,
+        "position": [
+          0,
+          2,
+          10
+        ]
+      },
+      "tone_mapping": {},
+      "antialiasing": {}
+    }
+  }
