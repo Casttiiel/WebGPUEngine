@@ -3,6 +3,8 @@ import { BlendModes } from "../../types/BlendModes.enum";
 import { DepthModes } from "../../types/DepthModes.enum";
 import { FragmentShaderTargets } from "../../types/FragmentShaderTargets.enum";
 import { PipelineBindGroupLayouts } from "../../types/PipelineBindGroupLayouts.enum";
+import { RasterizationMode } from "../../types/RasterizationMode.enum";
+import { TechniqueDataType } from "../../types/TechniqueData.type";
 import { Render } from "../core/render";
 import { Mesh } from "./Mesh";
 
@@ -10,9 +12,9 @@ export class Technique {
   private name!: string;
   private module!: GPUShaderModule;
   private pipeline!: GPURenderPipeline;
-  private blendMode!: string;
-  private rasterizationMode!: string;
-  private depthTest!: string;
+  private blendMode!: BlendModes;
+  private rasterizationMode!: RasterizationMode;
+  private depthTest!: DepthModes;
   private writesOn!: FragmentShaderTargets;
   private uniformsLayout: ReadonlyArray<PipelineBindGroupLayouts> = [];
 
@@ -20,28 +22,33 @@ export class Technique {
     this.name = name;
   }
 
-  public static async get(techniquePath: string): Promise<Technique> {
-    if (ResourceManager.hasResource(techniquePath)) {
-      return ResourceManager.getResource<Technique>(techniquePath);
-    }
+  public static async get(techniqueData: string | TechniqueDataType): Promise<Technique> {
+    if (typeof techniqueData === 'string') {
+      if (ResourceManager.hasResource(techniqueData)) {
+        return ResourceManager.getResource<Technique>(techniqueData);
+      }
 
-    const technique = new Technique(techniquePath);
-    await technique.load();
-    ResourceManager.setResource(techniquePath, technique);
-    return technique;
+      const technique = new Technique(techniqueData);
+      const data = await ResourceManager.loadTechniqueData(techniqueData);
+      await technique.load(data);
+      ResourceManager.setResource(techniqueData, technique);
+      return technique;
+    } else {
+      const technique = new Technique("unknown technique data");
+      await technique.load(techniqueData);
+      return technique;
+    }
   }
 
-  public async load(): Promise<void> {
-    const techniqueData = await ResourceManager.loadTechniqueData(this.name);
+  public async load(data: TechniqueDataType): Promise<void> {
+    this.blendMode = data.blend || BlendModes.DEFAULT;
+    this.rasterizationMode = data.rs || RasterizationMode.DEFAULT;
+    this.depthTest = data.z || DepthModes.DEFAULT;
+    this.writesOn = data.writesOn || FragmentShaderTargets.SCREEN;
+    this.uniformsLayout = data.uniforms;
 
-    this.blendMode = techniqueData.blend || "default";
-    this.rasterizationMode = techniqueData.rs || "default";
-    this.depthTest = techniqueData.z || "default";
-    this.writesOn = techniqueData.writesOn || FragmentShaderTargets.SCREEN;
-    this.uniformsLayout = techniqueData.uniforms;
-
-    const vsData = await ResourceManager.loadShader(techniqueData.vs);
-    const fsData = await ResourceManager.loadShader(techniqueData.fs);
+    const vsData = await ResourceManager.loadShader(data.vs);
+    const fsData = await ResourceManager.loadShader(data.fs);
 
     const device = Render.getInstance().getDevice();
 
@@ -69,7 +76,7 @@ export class Technique {
       },
       primitive: {
         topology: 'triangle-list',
-        cullMode: 'back'
+        cullMode: this.getRasterizationConfig()
       },
     } as GPURenderPipelineDescriptor;
 
@@ -78,6 +85,22 @@ export class Technique {
     }
 
     this.pipeline = device.createRenderPipeline(pipelineParams);
+  }
+
+  private getRasterizationConfig(): string {
+    switch (this.rasterizationMode) {
+      case RasterizationMode.DEFAULT: {
+        return 'back';
+        break;
+      }
+      case RasterizationMode.DOUBLE_SIDED: {
+        return 'none';
+        break;
+      }
+      default: {
+        throw new Error(`${this.name}: Unknown Rasterization Mode`)
+      }
+    }
   }
 
   private getPipelineUniformLayout(): "auto" | GPUPipelineLayout {

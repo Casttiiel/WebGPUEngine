@@ -40,7 +40,7 @@ export class Material {
 
     public async load(data: MaterialDataType): Promise<void> {
         // Cargar la técnica primero para tener acceso al layout
-        this.technique = await Technique.get(data.technique);
+        this.technique = await Technique.get(data.technique || data.techniqueData);
 
         const texture = await Texture.get(data.textures.txAlbedo || "white.png");
         this.textures.set('albedo', texture);

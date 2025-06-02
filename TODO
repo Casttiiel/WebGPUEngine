@@ -1,10 +1,10 @@
 NPM RUN DEV
 -------------------------------------------
-Double Sided
 Skybox using technique
 (Deferred GBuffer shader)
-GLTF ROtate object with transform
-Circle ENgine Loader 
+Mouse wheel controls
+GLTF Rotate object with transform
+Circle Engine Loader 
 Ambient Light
 Performance numbers
 

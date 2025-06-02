@@ -2,6 +2,7 @@ import { quat, vec3 } from "gl-matrix";
 import { EntityDataType } from "../../types/SceneData.type";
 import { TransformComponentDataType } from "../../types/TransformComponentData.type";
 import { RenderComponentDataType } from "../../types/RenderComponentData.type";
+import { RasterizationMode } from "../../types/RasterizationMode.enum";
 
 export class GLTFLoader {
     private static async loadBinaryFile(url: string): Promise<ArrayBuffer> {
@@ -78,24 +79,37 @@ export class GLTFLoader {
         //MATERIAL
         let materialDef = gltf.materials[primitive.material];
         const pbr = materialDef.pbrMetallicRoughness || {};
-        let technique = materialDef.alphaMode === "MASK" ? "gbuffer_mask.tech" : "gbuffer.tech";
         let category = "solids";
-        //TODO MORE TECHNIQUES BASED ON MASK AND DOUBLE SIDED
         const textures = {
             txEmissive: "black.png"
         };
-        if(pbr.baseColorTexture) textures["txAlbedo"] = GLTFLoader.getTextureName(gltf, gltf.textures[pbr.baseColorTexture.index]);
-        if(materialDef.normalTexture) textures["txNormal"] = GLTFLoader.getTextureName(gltf, gltf.textures[materialDef.normalTexture.index]);
-        if(pbr.metallicRoughnessTexture) textures["txMetallic"] = GLTFLoader.getTextureName(gltf, gltf.textures[pbr.metallicRoughnessTexture.index]);
-        if(pbr.metallicRoughnessTexture) textures["txRoughness"] = GLTFLoader.getTextureName(gltf, gltf.textures[pbr.metallicRoughnessTexture.index]);
+        if (pbr.baseColorTexture) textures["txAlbedo"] = GLTFLoader.getTextureName(gltf, gltf.textures[pbr.baseColorTexture.index]);
+        if (materialDef.normalTexture) textures["txNormal"] = GLTFLoader.getTextureName(gltf, gltf.textures[materialDef.normalTexture.index]);
+        if (pbr.metallicRoughnessTexture) textures["txMetallic"] = GLTFLoader.getTextureName(gltf, gltf.textures[pbr.metallicRoughnessTexture.index]);
+        if (pbr.metallicRoughnessTexture) textures["txRoughness"] = GLTFLoader.getTextureName(gltf, gltf.textures[pbr.metallicRoughnessTexture.index]);
 
         const material = {
-            technique: technique,
             casts_shadows: false,
             category: category,
             shadows: false,
             textures
         };
+
+        if (materialDef.doubleSided) {
+             material["techniqueData"] = {
+                vs: "gbuffer.vs",
+                fs: materialDef.alphaMode === "MASK" ? "gbuffer_mask.fs" : "gbuffer.fs",
+                uniforms: [
+                    "CameraUniforms",
+                    "ObjectUniforms",
+                    "MaterialTextures"
+                ],
+                writesOn: "gbuffer",
+                rs: RasterizationMode.DOUBLE_SIDED
+            }
+        }else{
+            material["technique"] = materialDef.alphaMode === "MASK" ? "gbuffer_mask.tech" : "gbuffer.tech";
+        }
 
         let render = {
             meshes: [

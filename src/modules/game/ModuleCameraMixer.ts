@@ -4,7 +4,7 @@ import { Entity } from "../../core/ecs/Entity";
 import { Camera } from "../../core/math/Camera";
 import { Render } from "../../renderer/core/render";
 import { Interpolator } from "../../types/interpolator.interface";
-import { MixedCamera } from "../../types/MixedCameraa.type";
+import { MixedCamera } from "../../types/MixedCamera.type";
 import { Module } from "../core/Module";
 
 
