@@ -6,7 +6,6 @@ import { RenderComponentDataType, RenderComponentMeshDataType } from "../../type
 import { MeshPartType } from "../../types/MeshPart.type";
 import { RenderManager } from "../../renderer/core/RenderManager";
 import { Transform } from "../../core/math/Transform";
-import { GLTFLoader } from "../../core/loaders/GLTFLoader";
 
 export class RenderComponent extends Component {
     private isVisible: boolean = true;
@@ -18,18 +17,7 @@ export class RenderComponent extends Component {
     }
 
     public async load(data: RenderComponentDataType): Promise<void> {
-        if (data.gltf) {
-            await GLTFLoader.loadGLTF(
-                data.gltf.path,
-                this.getOwner(),
-                data.gltf.defaultMaterial,
-                data.gltf.scale
-            );
-            if (data.gltf.visible !== undefined) {
-                this.isVisible = data.gltf.visible;
-            }
-        }
-        else if (data.meshes) {
+        if (data.meshes) {
             for (const meshData of data.meshes) {
                 await this.readMesh(meshData);
             }
@@ -39,14 +27,14 @@ export class RenderComponent extends Component {
     }
 
     private async readMesh(data: RenderComponentMeshDataType): Promise<void> {
-        if (!data.mesh) {
+        if (!data.mesh && !data.meshData) {
             throw new Error(`Missing attribute 'mesh' in input JSON: ${JSON.stringify(data)}`);
         }
 
-        const mesh = await Mesh.get(data.mesh);
+        const mesh = await Mesh.get(data.mesh || data.meshData);
 
-        const materialName = data.material || "default_material";
-        const material = await Material.get(materialName);
+        const materialData = data.material || data.materialData;
+        const material = await Material.get(materialData);
         material.getTechnique().createRenderPipeline(mesh);
 
         const meshPart: MeshPartType = {

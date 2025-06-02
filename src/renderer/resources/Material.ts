@@ -1,4 +1,5 @@
 import { ResourceManager } from "../../core/engine/ResourceManager";
+import { MaterialDataType } from "../../types/MaterialData.type";
 import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Render } from "../core/render";
 import { Technique } from "./Technique";
@@ -18,20 +19,26 @@ export class Material {
         this.name = name;
     }
 
-    public static async get(materialPath: string): Promise<Material> {
-        if (ResourceManager.hasResource(materialPath)) {
-            //return ResourceManager.getResource<Material>(materialPath);
+    public static async get(materialData: string | MaterialDataType): Promise<Material> {
+        if (typeof materialData === 'string') {
+            if (ResourceManager.hasResource(materialData)) {
+                return ResourceManager.getResource<Material>(materialData);
+            }
+
+            const material = new Material(materialData);
+            const data = await ResourceManager.loadMaterialData(material.name);
+            await material.load(data);
+            ResourceManager.setResource(materialData, material);
+            return material;
+        } else {
+            const material = new Material("unknown material name");
+            await material.load(materialData);
+            return material;
         }
 
-        const material = new Material(materialPath);
-        await material.load();
-        ResourceManager.setResource(materialPath, material);
-        return material;
     }
 
-    public async load(): Promise<void> {
-        const data = await ResourceManager.loadMaterialData(this.name);
-
+    public async load(data: MaterialDataType): Promise<void> {
         // Cargar la técnica primero para tener acceso al layout
         this.technique = await Technique.get(data.technique);
 

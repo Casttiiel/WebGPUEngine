@@ -22,21 +22,37 @@ export class Mesh {
         this.name = name;
     }
 
-    static async get(meshPath: string): Promise<Mesh> {
-        if (ResourceManager.hasResource(meshPath)) {
-            return ResourceManager.getResource<Mesh>(meshPath);
-        }
+    static async get(meshData: unknown): Promise<Mesh> {
+        if (typeof meshData === 'string') {
+            if (ResourceManager.hasResource(meshData)) {
+                return ResourceManager.getResource<Mesh>(meshData);
+            }
 
-        const mesh = new Mesh(meshPath);
-        await mesh.load();
-        ResourceManager.setResource(meshPath, mesh);
-        return mesh;
+            const mesh = new Mesh(meshData);
+            await mesh.load();
+            ResourceManager.setResource(meshData, mesh);
+            return mesh;
+        } else {
+            const mesh = new Mesh("unkown mesh name" + Mesh.id);
+            mesh.setData(meshData);
+            mesh.initBuffers();
+            return mesh;
+        }
     }
 
     public async load(): Promise<void> {
         const data = await ResourceManager.loadMeshData(this.name);
         this.loadObj(data);
         this.initBuffers();
+    }
+
+    public setData(meshData: unknown): void {
+        this.vertices = new Float32Array(meshData.attributes.POSITION.data);
+        this.normals = new Float32Array(meshData.attributes.NORMAL.data);
+        this.uvs = new Float32Array(meshData.attributes.TEXCOORD_0.data);
+        this.indices = new Uint16Array(meshData.indices.data);
+        this.tangents = new Float32Array();//TODO
+        this.indexCount = this.indices.length;
     }
 
     private loadObj(data: string): void {
@@ -273,14 +289,17 @@ export class Mesh {
         this.tangentBuffer.unmap();
 
         // Crear buffer de índices en GPU
+        const paddedIndexCount = Math.ceil(this.indices.length * 2 / 4) * 2;
+        const paddedArray = new Uint16Array(paddedIndexCount);
+        paddedArray.set(this.indices);
+
         this.indexBuffer = Render.getInstance().getDevice().createBuffer({
             label: `${this.name}_indexBuffer`,
-            size: this.indices.byteLength,
-            usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-            mappedAtCreation: true
+            size: paddedArray.byteLength,
+            usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
         });
-        new Uint16Array(this.indexBuffer.getMappedRange()).set(this.indices);
-        this.indexBuffer.unmap();
+
+        Render.getInstance().getDevice().queue.writeBuffer(this.indexBuffer, 0, paddedArray);
     }
 
     public getVertexBufferLayout(): GPUVertexBufferLayout[] {
@@ -323,7 +342,7 @@ export class Mesh {
             }
         ];
     }
-    
+
     // Activar esta malla para renderizado
     public activate(pass: GPURenderPassEncoder): void {
         pass.setVertexBuffer(0, this.vertexBuffer);

@@ -1,10 +1,8 @@
-import { Engine } from "../../core/engine/Engine";
 import { ResourceManager } from "../../core/engine/ResourceManager";
 import { BlendModes } from "../../types/BlendModes.enum";
 import { DepthModes } from "../../types/DepthModes.enum";
 import { FragmentShaderTargets } from "../../types/FragmentShaderTargets.enum";
 import { PipelineBindGroupLayouts } from "../../types/PipelineBindGroupLayouts.enum";
-import { RenderCategory } from "../../types/RenderCategory.enum";
 import { Render } from "../core/render";
 import { Mesh } from "./Mesh";
 
@@ -24,7 +22,7 @@ export class Technique {
 
   public static async get(techniquePath: string): Promise<Technique> {
     if (ResourceManager.hasResource(techniquePath)) {
-      //return ResourceManager.getResource<Technique>(techniquePath);
+      return ResourceManager.getResource<Technique>(techniquePath);
     }
 
     const technique = new Technique(techniquePath);

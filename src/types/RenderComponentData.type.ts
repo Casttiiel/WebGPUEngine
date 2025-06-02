@@ -1,20 +1,23 @@
+import { MaterialDataType } from "./MaterialData.type";
 
 export type RenderComponentDataType = Readonly<{
     meshes?: ReadonlyArray<RenderComponentMeshDataType>;
-    gltf?: RenderComponentGLTFDataType;
 }>;
 
 export type RenderComponentMeshDataType = Readonly<{
-    mesh: string;
-    material: string;
+    mesh?: string;
+    meshData?: {
+        attributes: {
+            NORMAL: unknown;
+            POSITION: unknown;
+            TANGENT: unknown;
+            TEXCOORD_0: unknown;
+        };
+        indices: unknown;
+    };
+    material?: string;
+    materialData?: MaterialDataType;
     instances_group?: number;
     visible?: boolean;
     state?: number;
-}>;
-
-export type RenderComponentGLTFDataType = Readonly<{
-    path: string;           // Ruta al archivo .gltf o .glb
-    defaultMaterial?: string; // Material por defecto para meshes sin material
-    scale?: number;        // Factor de escala para el modelo
-    visible?: boolean;     // Visibilidad inicial
 }>;

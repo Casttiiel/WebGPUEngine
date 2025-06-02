@@ -11,6 +11,7 @@ import { Component } from "../ecs/Component";
 import { Entity } from "../ecs/Entity";
 import { Engine } from "../engine/Engine";
 import { ResourceManager } from "../engine/ResourceManager";
+import { GLTFLoader } from "./GLTFLoader";
 
 type Operation = "add" | "multiply";
 
@@ -31,12 +32,12 @@ export class Loader {
 
     Engine.getEntities().addEntity(entity);
 
-    const entityChildrens = json.children ?? [];
+    let entityChildrens = json.children ?? [];
 
     if (json.prefab) {
       const prefabJson = await ResourceManager.loadPrefab(json.prefab);
       if (prefabJson.children) {
-        entityChildrens.concat(prefabJson.children);
+        entityChildrens = entityChildrens.concat(prefabJson.children);
       }
 
       const mergedComponents = {
@@ -53,6 +54,11 @@ export class Loader {
       }
 
       json.components = mergedComponents;
+    }
+
+    if(json.gltf){
+      const gltfJson = await GLTFLoader.loadGLTF(json.gltf);
+      entityChildrens = entityChildrens.concat(gltfJson);
     }
 
     await this.loadComponentFromJSON(json, entity);
