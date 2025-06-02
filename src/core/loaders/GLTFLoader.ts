@@ -78,7 +78,7 @@ export class GLTFLoader {
         //MATERIAL
         let materialDef = gltf.materials[primitive.material];
         const pbr = materialDef.pbrMetallicRoughness || {};
-        let technique = "gbuffer.tech";
+        let technique = materialDef.alphaMode === "MASK" ? "gbuffer_mask.tech" : "gbuffer.tech";
         let category = "solids";
         //TODO MORE TECHNIQUES BASED ON MASK AND DOUBLE SIDED
         const textures = {

@@ -1,0 +1,10 @@
+{
+    "vs": "gbuffer.vs",
+    "fs": "gbuffer_mask.fs",
+    "uniforms": [
+        "CameraUniforms",
+        "ObjectUniforms",
+        "MaterialTextures"
+    ],
+    "writesOn": "gbuffer"
+}
