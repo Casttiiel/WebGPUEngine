@@ -4,7 +4,6 @@ import { CameraComponentDataType } from "../../types/CameraComponentData.type";
 import { Engine } from "../../core/engine/Engine";
 import { KeyCode } from "../../types/KeyCode.enum";
 import { MouseButton } from "../../types/MouseButton.enum";
-import { mat4, vec3 } from "gl-matrix";
 
 export class CameraComponent extends Component {
     private camera: Camera;
@@ -68,6 +67,9 @@ export class CameraComponent extends Component {
             const mouseDelta = input.getMouseDelta();
             this.camera.rotate(-mouseDelta.x * this.rotationSpeed, -mouseDelta.y * this.rotationSpeed);
         }
+
+        const mouseWheelDelta = input.getMouseWheelDelta();
+        this.camera.move(Array.from(this.camera.getLocalVector([0, -0.05 * mouseWheelDelta * dt, 0])));
     }
 
     public renderInMenu(): void {
