@@ -46,29 +46,6 @@ export class RenderComponent extends Component {
         this.parts.push(meshPart);
     }
 
-    private getWorldTransform(): Transform {
-        const entity = this.getOwner();
-        const transformComponent = entity.getComponent("transform") as TransformComponent;
-        if (!transformComponent) {
-            throw new Error("Transform component not found");
-        }
-
-        let worldTransform = transformComponent.getTransform();
-        let parent = entity.getParent();
-
-        // Combinar con las transformaciones de los padres en orden desde el más cercano al más lejano
-        while (parent) {
-            const parentTransform = parent.getComponent("transform") as TransformComponent;
-            if (parentTransform) {
-                const parentMatrix = parentTransform.getTransform().asMatrix();
-                worldTransform = parentTransform.getTransform().combineWith(worldTransform);
-            }
-            parent = parent.getParent();
-        }
-
-        return worldTransform;
-    }
-
     private updateRenderManager(): void {
         const renderManager = RenderManager.getInstance();
         const entity = this.getOwner();
