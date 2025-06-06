@@ -28,7 +28,7 @@ export class Cubemap {
         const image = await createImageBitmap(await fetch(`/assets/textures/${this.name}`).then(r => r.blob()));
 
         const faceSize = image.width / 4; // Asumimos imagen 4x3 caras
-        const faceCoords = {
+        const faceCoords: Record<number, [number, number]> = {
             0: [2, 1], // +X
             1: [0, 1], // -X
             2: [1, 0], // +Y
@@ -39,10 +39,19 @@ export class Cubemap {
 
         const canvas = new OffscreenCanvas(faceSize, faceSize);
         const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            throw new Error('Could not get 2D context from canvas');
+        }
+        
         const faces: ImageBitmap[] = [];
 
         for (let i = 0; i < 6; i++) {
-            const [col, row] = faceCoords[i];
+            const coords = faceCoords[i];
+            if (!coords) {
+                throw new Error(`Invalid face index: ${i}`);
+            }
+            const [col, row] = coords;
+            
             ctx.clearRect(0, 0, faceSize, faceSize);
             ctx.drawImage(
                 image,
@@ -53,23 +62,32 @@ export class Cubemap {
             faces.push(face);
         }
 
+        // Calcular niveles de mipmap
+        const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1;
+
         // Crear la textura en GPU
         this.gpuTexture = device.createTexture({
             size: [faceSize, faceSize, 6],
             format: 'rgba8unorm',
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+            mipLevelCount: mipLevelCount
         });
 
+        // Copiar cada cara al nivel 0 de mipmap
         for (let i = 0; i < 6; i++) {
             device.queue.copyExternalImageToTexture(
                 { source: faces[i] },
-                { texture: this.gpuTexture, origin: { x: 0, y: 0, z: i } },
+                { texture: this.gpuTexture, origin: { x: 0, y: 0, z: i }, mipLevel: 0 },
                 [faceSize, faceSize]
             );
         }
 
-        // Crear la vista de la textura
-        this.gpuTextureView = this.gpuTexture.createView({ dimension: 'cube' });
+        // Crear la vista de la textura con todos los niveles de mipmap
+        this.gpuTextureView = this.gpuTexture.createView({ 
+            dimension: 'cube',
+            baseMipLevel: 0,
+            mipLevelCount: mipLevelCount
+        });
 
         // Crear el sampler
         this.gpuSampler = device.createSampler({
@@ -77,7 +95,8 @@ export class Cubemap {
             minFilter: 'linear',
             mipmapFilter: 'linear',
             addressModeU: 'repeat',
-            addressModeV: 'repeat'
+            addressModeV: 'repeat',
+            maxAnisotropy: 16 // Añadir filtrado anisotrópico para mejorar la calidad
         });
     }
 

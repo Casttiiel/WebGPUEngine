@@ -12,8 +12,7 @@ export class RenderToTexture {
 
     this.name = name;
     this.xRes = width;
-    this.yRes = height;
-    this.texture = Render.getInstance().getDevice().createTexture({
+    this.yRes = height;    this.texture = Render.getInstance().getDevice().createTexture({
       label: `${this.name}_texture`,
       size: [width, height],
       format: format,
@@ -22,8 +21,7 @@ export class RenderToTexture {
   }
 
   public getView(): GPUTextureView {
-    if (this.textureView) return this.textureView;
-    this.textureView = this.texture.createView({
+    if (this.textureView) return this.textureView;    this.textureView = this.texture.createView({
       label: `${this.name}_textureView`
     });
     return this.textureView;
