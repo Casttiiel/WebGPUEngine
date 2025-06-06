@@ -1,6 +1,10 @@
 {
-    "vs": "presentation.vs",
+    "vs": "skybox.vs",
     "fs": "skybox.fs",
     "writesOn": "texture",
-    "z": "test_equal"
+    "z": "test_equal",
+    "uniforms": [
+        "CameraUniforms",
+        "SingleTexture"
+    ]
 }

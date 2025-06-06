@@ -1,5 +1,7 @@
+import { Engine } from "../../core/engine/Engine";
 import { Camera } from "../../core/math/Camera";
 import { RenderCategory } from "../../types/RenderCategory.enum";
+import { Cubemap } from "../resources/Cubemap";
 import { Mesh } from "../resources/Mesh";
 import { Technique } from "../resources/Technique";
 import { Render } from "./render";
@@ -10,7 +12,10 @@ export class DeferredRenderer {
   private fullscreenQuadMesh !: Mesh;
 
   private ambientTechnique !: Technique;
-  
+  private skyboxTechnique !: Technique;
+  private skyboxBindGroup !: GPUBindGroup;
+  private skyboxTexture !: Cubemap;
+
   private rtAlbedos!: RenderToTexture;
   private rtNormals!: RenderToTexture;
   private rtLinearDepth!: RenderToTexture;
@@ -50,14 +55,40 @@ export class DeferredRenderer {
       usage: GPUTextureUsage.RENDER_ATTACHMENT
     });
 
-    if (!this.depthStencilView){
+    if (!this.depthStencilView) {
       this.depthStencilView = this.depthStencil.createView();
     }
   }
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
-    this.ambientTechnique = await Technique.get("ambient.tech");
+    this.skyboxTechnique = await Technique.get("skybox.tech");
+    this.skyboxTechnique.createRenderPipeline(this.fullscreenQuadMesh);
+    this.skyboxTexture = await Cubemap.get("skybox.png");
+    const sampler = Render.getInstance().getDevice().createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      addressModeW: 'clamp-to-edge',
+    });
+
+    this.skyboxBindGroup = Render.getInstance().getDevice().createBindGroup({
+      label: `skybox_bindgroup`,
+      layout: this.skyboxTechnique.getPipeline().getBindGroupLayout(1),
+      entries: [
+        {
+          binding: 0,
+          resource: this.skyboxTexture.getTextureView(),
+        },
+        {
+          binding: 1,
+          resource: sampler,
+        }
+      ]
+    })
+    //this.ambientTechnique = await Technique.get("ambient.tech");
   }
 
   public render(camera: Camera): GPUTextureView {
@@ -99,7 +130,7 @@ export class DeferredRenderer {
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS
     //TODO FAKE VOLUMETRIC LIGHTS
-    //this.renderSkybox();
+    this.renderSkybox();
   }
 
   private renderAmbientPass(): void {
@@ -145,7 +176,49 @@ export class DeferredRenderer {
   }
 
   private renderSkybox(): void {
+    const render = Render.getInstance();
+    const pass = render.getCommandEncoder().beginRenderPass(
+      {
+        colorAttachments: [{
+          view: this.rtAlbedos.getView(),
+          loadOp: 'load',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        }],
+        depthStencilAttachment: {
+          view: this.depthStencilView,
+          depthLoadOp: 'load',
+          depthStoreOp: 'discard',
+        },
+      }
+    );
 
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height,            // Height
+      0.0, 1.0                       // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0, 0,                          // Offset X,Y
+      render.getCanvas().width,             // Width
+      render.getCanvas().height             // Height
+    );
+
+    // 1. Activar el pipeline
+    this.skyboxTechnique.activatePipeline(pass);
+
+    // 2. Activar mesh data
+    this.fullscreenQuadMesh.activate(pass);    // 3. Activar bind groups
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(1, this.skyboxBindGroup);
+
+    // 4. Dibujar la mesh
+    this.fullscreenQuadMesh.renderGroup(pass);
+
+    pass.end();
   }
 
   private renderTransparents(): void {

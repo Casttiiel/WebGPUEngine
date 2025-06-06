@@ -115,6 +115,7 @@ export class Technique {
       switch (uniform) {
         case PipelineBindGroupLayouts.CAMERA_UNIFORMS: {
           layouts.push(device.createBindGroupLayout({
+            label: "camera uniforms bind group layout",
             entries: [
               {
                 binding: 0,
@@ -127,6 +128,7 @@ export class Technique {
         }
         case PipelineBindGroupLayouts.MATERIAL_TEXTURES: {
           layouts.push(device.createBindGroupLayout({
+            label: "material textures uniforms bind group layout",
             entries: [
               {
                 binding: 0,
@@ -184,12 +186,35 @@ export class Technique {
         }
         case PipelineBindGroupLayouts.OBJECT_UNIFORMS: {
           layouts.push(device.createBindGroupLayout({
+            label: "object uniforms bind group layout",
             entries: [
               {
                 binding: 0,
                 visibility: GPUShaderStage.VERTEX,
                 buffer: { type: 'uniform' }
               }
+            ]
+          }));
+          break;
+        }
+        case PipelineBindGroupLayouts.SINGLE_TEXTURE: {
+          layouts.push(device.createBindGroupLayout({
+            label: "single texture bind group layout",
+            entries: [
+              {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                  viewDimension: 'cube',
+                  sampleType: 'float',
+                  multisampled: false,
+                }
+              },
+              {
+                binding: 1,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' }
+              },
             ]
           }));
           break;
@@ -309,7 +334,22 @@ export class Technique {
         };
         break;
       }
-      case BlendModes.DEFAULT: {
+      case DepthModes.TEST_EQUAL: {
+        return {
+          depthWriteEnabled: false,
+          depthCompare: 'equal',
+          format: 'depth32float',
+          stencilFront: undefined,
+          stencilBack: undefined,
+          stencilReadMask: 0,
+          stencilWriteMask: 0,
+          depthBias: 0,
+          depthBiasSlopeScale: 0,
+          depthBiasClamp: 0
+        };
+        break;
+      }
+      case DepthModes.DEFAULT: {
         return {
           format: 'depth32float',
           depthWriteEnabled: true,

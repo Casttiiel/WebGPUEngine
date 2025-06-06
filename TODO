@@ -1,10 +1,13 @@
 NPM RUN DEV
 -------------------------------------------
-Skybox using technique
-(Deferred GBuffer shader)
 Mouse wheel controls
-GLTF Rotate object with transform
 Circle Engine Loader 
+MipMap
+FIchero de info copilot
+Uniforms issue
+Skybox using technique
+GLTF Rotate object with transform
+(Deferred GBuffer shader)
 Ambient Light
 Performance numbers
 

@@ -95,7 +95,7 @@ export class RenderManager {
       //key.material.getTechnique().updateMatrices(modelMatrix);
 
       // 4. Activar bind groups
-      //ESTAMOS DANDO POR HECHO QUE TODAS LAS CATEGORIAS VAN A NECESITAR ESTOS DATOS Y PUEDE NO SER ASI EN EL FUTURO
+      //TODO ESTAMOS DANDO POR HECHO QUE TODAS LAS CATEGORIAS VAN A NECESITAR ESTOS DATOS Y PUEDE NO SER ASI EN EL FUTURO
       pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
       pass.setBindGroup(1, key.transform.getModelBindGroup());
       pass.setBindGroup(2, key.material.getTextureBindGroup());

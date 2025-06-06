@@ -65,9 +65,6 @@ export class Texture {
         } catch (e) {
             console.log(e, img.src);
         }
-
-
-
     }
 
     public getTextureView(): GPUTextureView {
