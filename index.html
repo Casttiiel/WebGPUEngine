@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <title>WebGPU Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/vite.svg">
   <style>
     html,
     body {
@@ -14,6 +15,19 @@
       overflow: hidden;
       width: 100%;
       height: 100%;
+    }
+
+    #loader {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1000;
+      display: block;
+    }
+
+    #loader.hidden {
+      display: none;
     }
 
     canvas {
@@ -42,6 +56,7 @@
 <body>
   <div id="fps-display">FPS: 0</div>
   <canvas id="gfx-canvas"></canvas>
+  <img id="loader" src="assets/loader.gif" alt="Loading...">
   <script type="module" src="/src/main.ts"></script>
 </body>
 
