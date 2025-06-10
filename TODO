@@ -3,8 +3,6 @@
 
 Mejora en el Sistema de Renderizado
     
-    Reducir el número de activaciones de pipeline
-    Implementar cache de pipelines
 Sistema de Uniformes Mejorado
 Skybox using technique
 GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing

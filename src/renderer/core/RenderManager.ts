@@ -21,6 +21,11 @@ export class RenderManager {
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private camera!: Camera;
 
+  // Cache de estados para reducir cambios innecesarios
+  private currentPipeline: GPURenderPipeline | null = null;
+  private currentMeshBuffers: string | null = null;
+  private currentMaterialBindings: string | null = null;
+
   private constructor() {}
 
   public static getInstance(): RenderManager {
@@ -59,6 +64,11 @@ export class RenderManager {
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
     if (!this.camera) return;
 
+    // Reset estado
+    this.currentPipeline = null;
+    this.currentMeshBuffers = null;
+    this.currentMaterialBindings = null;
+
     // Filtrar primero por categoría y crear una copia para no modificar el array original
     const keysToDraw = [...this.normalKeys].filter((key) => key.material.getCategory() === category);
 
@@ -67,8 +77,12 @@ export class RenderManager {
       // 1. Ordenar por técnica (minimizar cambios de pipeline)
       const tech1 = k1.material.getTechnique();
       const tech2 = k2.material.getTechnique();
-      if (tech1.path !== tech2.path) {
-        return tech1.path.localeCompare(tech2.path);
+      if (!tech1 || !tech2) return 0;
+      
+      const techPath1 = tech1.path || '';
+      const techPath2 = tech2.path || '';
+      if (techPath1 !== techPath2) {
+        return techPath1.localeCompare(techPath2);
       }
 
       // 2. Si la técnica es la misma, ordenar por material (minimizar cambios de textura/uniforms)      
@@ -92,18 +106,47 @@ export class RenderManager {
         continue;
       }
 
-      // 1. Activar el pipeline
-      key.material.getTechnique().activatePipeline(pass);
+      const technique = key.material.getTechnique();
+      if (!technique) {
+        console.warn('Invalid render key - missing technique');
+        continue;
+      }
 
-      // 2. Activar mesh data
-      key.mesh.activate(pass);
+      const pipeline = technique.getPipeline();
+      if (!pipeline) {
+        console.warn('Invalid render key - missing pipeline');
+        continue;
+      }
 
-      // 3. Actualizar uniforms
+      // 1. Activar el pipeline solo si ha cambiado
+      if (this.currentPipeline !== pipeline) {
+        technique.activatePipeline(pass);
+        this.currentPipeline = pipeline;
+      }
 
-      // 4. Activar bind groups
+      // 2. Activar mesh data solo si ha cambiado
+      const meshId = key.mesh.getName();
+      if (this.currentMeshBuffers !== meshId) {
+        key.mesh.activate(pass);
+        this.currentMeshBuffers = meshId;
+      }
+
+      // 3. Actualizar uniforms y bind groups
+      // El bind group global (0) siempre se actualiza porque contiene datos de cámara
       pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+
+      // El bind group del modelo (1) siempre se actualiza porque contiene la matriz del modelo
       pass.setBindGroup(1, key.transform.getModelBindGroup());
-      pass.setBindGroup(2, key.material.getTextureBindGroup());
+
+      // 4. Bind group de material solo si ha cambiado
+      const materialId = key.material.getName();
+      if (this.currentMaterialBindings !== materialId) {
+        const textureBindGroup = key.material.getTextureBindGroup();
+        if (textureBindGroup) {
+          pass.setBindGroup(2, textureBindGroup);
+          this.currentMaterialBindings = materialId;
+        }
+      }
 
       // 5. Dibujar la mesh
       if (key.isInstanced) {
