@@ -1,3 +1,4 @@
+import { Engine } from '../../core/engine/Engine';
 import { Component } from '../../core/ecs/Component';
 import { Render } from '../../renderer/core/render';
 import { RenderToTexture } from '../../renderer/core/RenderToTexture';
@@ -9,7 +10,6 @@ export class AntialiasingComponent extends Component {
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
   private result!: RenderToTexture;
-  private uniformBuffer!: GPUBuffer;
 
   constructor() {
     super();
@@ -24,29 +24,10 @@ export class AntialiasingComponent extends Component {
 
     this.result = new RenderToTexture();
     this.result.createRT('antialiasing_result.dds', Render.width, Render.height, 'rgba16float');
-
-    this.uniformBuffer = device.createBuffer({
-      label: `antialiasing_uniformBuffer`,
-      size: 2 * 4, // 1 vec2 (ScreenSize)
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      0, // offset
-      new Float32Array([Render.width, Render.height]),
-    );
   }
 
   public resize(): void {
     this.result.createRT('antialiasing_result.dds', Render.width, Render.height, 'rgba16float');
-    Render.getInstance()
-      .getDevice()
-      .queue.writeBuffer(
-        this.uniformBuffer,
-        0, // offset
-        new Float32Array([Render.width, Render.height]),
-      );
     this.bindGroup = null;
   }
 
@@ -88,7 +69,8 @@ export class AntialiasingComponent extends Component {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Activar bind groups
-    pass.setBindGroup(0, this.bindGroup);
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(1, this.bindGroup);
 
     // 4. Dibujar la mesh
     this.fullscreenQuadMesh.renderGroup(pass);
@@ -105,11 +87,11 @@ export class AntialiasingComponent extends Component {
     const sampler = device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
-    });
-
+    });    
+    
     this.bindGroup = device.createBindGroup({
       label: `antialiasing_bindgroup`,
-      layout: this.technique.getPipeline().getBindGroupLayout(0),
+      layout: this.technique.getPipeline().getBindGroupLayout(1),
       entries: [
         {
           binding: 0,
@@ -118,11 +100,7 @@ export class AntialiasingComponent extends Component {
         {
           binding: 1,
           resource: sampler,
-        },
-        {
-          binding: 2,
-          resource: { buffer: this.uniformBuffer },
-        },
+        }
       ],
     });
   }

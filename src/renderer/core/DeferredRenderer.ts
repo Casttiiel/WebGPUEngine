@@ -146,7 +146,7 @@ export class DeferredRenderer {
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS
     //TODO FAKE VOLUMETRIC LIGHTS
-    this.renderSkybox();
+    //this.renderSkybox();
   }
 
   private renderAmbientPass(): void {

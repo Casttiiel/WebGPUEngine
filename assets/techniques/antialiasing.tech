@@ -3,5 +3,5 @@
     "fs": "antialiasing.fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["SingleTexture"]
+    "uniforms":["CameraUniforms","SingleTexture"]
 }

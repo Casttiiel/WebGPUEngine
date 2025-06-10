@@ -168,7 +168,7 @@ export class ModuleRender extends Module {
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
   }
 
-  public renderInMenu(): void {
+  public override renderInMenu(): void {
     if (this.debugControlsAdded) return;
 
     // Render Stats
@@ -202,7 +202,7 @@ export class ModuleRender extends Module {
     // Crear buffer uniforme global para las matrices de la cámara
     this.globalUniformBuffer = render.getDevice().createBuffer({
       label: `global uniform buffer`,
-      size: 2 * 16 * 4, // 2 matrices 4x4 (view, projection)
+      size: (16 * 4) + (16 * 4) + 16, // viewMatrix(64) + projectionMatrix(64) + sourceSize(16 aligned)
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -211,7 +211,7 @@ export class ModuleRender extends Module {
       entries: [
         {
           binding: 0,
-          visibility: GPUShaderStage.VERTEX,
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
           buffer: { type: 'uniform' },
         },
       ],
@@ -251,6 +251,12 @@ export class ModuleRender extends Module {
       this.globalUniformBuffer,
       16 * 4, // projectionMatrix offset
       projectionMatrix.buffer,
+    );
+
+    render.getDevice().queue.writeBuffer(
+      this.globalUniformBuffer,
+      16 * 4 * 2, // view and projectionMatrix offset
+      new Float32Array([Render.width, Render.height]),
     );
   }
 

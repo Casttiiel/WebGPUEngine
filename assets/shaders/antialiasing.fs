@@ -1,6 +1,12 @@
-@group(0) @binding(0) var gAlbedo: texture_2d<f32>;
-@group(0) @binding(1) var gAlbedoSampler: sampler;
-@group(0) @binding(2) var<uniform> SourceSize: vec2<f32>;
+struct CameraUniforms {
+    viewMatrix: mat4x4<f32>,
+    projectionMatrix: mat4x4<f32>,
+    SourceSize: vec2<f32>
+}
+
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+@group(1) @binding(0) var gAlbedo: texture_2d<f32>;
+@group(1) @binding(1) var gAlbedoSampler: sampler;
 
 const FXAA_EDGE_THRESHOLD : f32 = 1.0 / 8.0;
 const FXAA_EDGE_THRESHOLD_MIN : f32 = 1.0 / 24.0;
@@ -15,7 +21,7 @@ const FXAA_SUBPIX_CAP : f32 = 3.0 / 4.0;
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-    let rcpFrame = 1.0 / SourceSize;
+    let rcpFrame = 1.0 / camera.SourceSize;
 
         // === Sample all neighbors up front ===
     let colM = textureSample(gAlbedo, gAlbedoSampler, uv).rgb;
