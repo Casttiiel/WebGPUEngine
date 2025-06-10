@@ -386,4 +386,8 @@ export class Mesh extends GPUResource {
   public renderGroup(pass: GPURenderPassEncoder): void {
     pass.drawIndexed(this.indexCount);
   }
+
+  public getName(): string {
+    return this.path;
+  }
 }

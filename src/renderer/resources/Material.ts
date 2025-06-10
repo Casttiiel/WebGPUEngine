@@ -233,4 +233,8 @@ export class Material extends GPUResource {
   public getTextureBindGroup(): GPUBindGroup | undefined {
     return this.textureBindGroup;
   }
+
+  public getName(): string {
+    return this.path;
+  }
 }

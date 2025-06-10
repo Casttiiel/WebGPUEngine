@@ -59,19 +59,30 @@ export class RenderManager {
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
     if (!this.camera) return;
 
-    // Ordenar las keys por material
-    /*this.normalKeys.sort((k1, k2) => {
-      // Primero ordenar por material
-      if (k1.material.getCategory() !== k2.material.getCategory()) {
-        return k1.material.getCategory().localeCompare(k2.material.getCategory());
-      }
-      if (k1.material.getPriority() !== k2.material.getPriority()) {
-        return k1.material.getPriority() - k2.material.getPriority();
-      }
-      return k1.material.getName().localeCompare(k2.material.getName());
-    });*/
+    // Filtrar primero por categoría y crear una copia para no modificar el array original
+    const keysToDraw = [...this.normalKeys].filter((key) => key.material.getCategory() === category);
 
-    const keysToDraw = this.normalKeys.filter((key) => key.material.getCategory() === category);
+    // Ordenar las keys: técnica > material > mesh para minimizar cambios de estado
+    keysToDraw.sort((k1, k2) => {
+      // 1. Ordenar por técnica (minimizar cambios de pipeline)
+      const tech1 = k1.material.getTechnique();
+      const tech2 = k2.material.getTechnique();
+      if (tech1.path !== tech2.path) {
+        return tech1.path.localeCompare(tech2.path);
+      }
+
+      // 2. Si la técnica es la misma, ordenar por material (minimizar cambios de textura/uniforms)      
+      const mat1 = k1.material.getName();
+      const mat2 = k2.material.getName();
+      if (mat1 !== mat2) {
+        return mat1.localeCompare(mat2);
+      }
+
+      // 3. Si el material es el mismo, ordenar por mesh (minimizar cambios de geometría)
+      const mesh1 = k1.mesh.getName();
+      const mesh2 = k2.mesh.getName();
+      return mesh1.localeCompare(mesh2);
+    });
 
     let numDrawCalls = 0;
 
@@ -88,11 +99,8 @@ export class RenderManager {
       key.mesh.activate(pass);
 
       // 3. Actualizar uniforms
-      //const modelMatrix = new Float32Array(key.transform.asMatrix());
-      //key.material.getTechnique().updateMatrices(modelMatrix);
 
       // 4. Activar bind groups
-      //TODO ESTAMOS DANDO POR HECHO QUE TODAS LAS CATEGORIAS VAN A NECESITAR ESTOS DATOS Y PUEDE NO SER ASI EN EL FUTURO
       pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
       pass.setBindGroup(1, key.transform.getModelBindGroup());
       pass.setBindGroup(2, key.material.getTextureBindGroup());
