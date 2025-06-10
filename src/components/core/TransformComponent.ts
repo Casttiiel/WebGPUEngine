@@ -3,7 +3,7 @@ import { Transform } from "../../core/math/Transform";
 import { Component } from "../../core/ecs/Component";
 import { TransformComponentDataType } from "../../types/TransformComponentData.type";
 import { Render } from "../../renderer/core/render";
-
+import { Entity } from "../../core/ecs/Entity";
 
 export class TransformComponent extends Component {
     private transform: Transform;
@@ -49,7 +49,7 @@ export class TransformComponent extends Component {
 
     public async load(data: TransformComponentDataType): Promise<void> {
         if (data.position) {
-            this.transform.setPosition(data.position);
+            this.transform.setLocalPosition(data.position);
         }
 
         if (data.rotation) {
@@ -62,25 +62,60 @@ export class TransformComponent extends Component {
                 data.scale[1] ?? 1,
                 data.scale[2] ?? 1
             );
-            this.transform.setScale(scale);
+            this.transform.setLocalScale(scale);
         }
 
-        const device = Render.getInstance().getDevice();
+        this.updateWorldTransform();
+        this.updateModelMatrix();
+    }
 
-        // Update modelMatrix buffer
+    private updateWorldTransform(): void {
+        const entity = this.getOwner();
+        const parent = entity.getParent();
+        
+        if (parent) {
+            const parentTransform = parent.getComponent("transform") as TransformComponent;
+            if (parentTransform) {
+                this.transform.updateWorldTransform(parentTransform.getTransform());
+            } else {
+                this.transform.updateWorldTransform();
+            }
+        } else {
+            this.transform.updateWorldTransform();
+        }
+    }
+
+    private updateModelMatrix(): void {
+        const device = Render.getInstance().getDevice();
         device.queue.writeBuffer(
             this.uniformBuffer,
-            0,  // modelMatrix offset
-            new Float32Array(this.transform.asMatrix())
+            0,
+            new Float32Array(this.transform.getWorldMatrix())
         );
     }
 
+    private updateChildrenTransforms(): void {
+        const entity = this.getOwner();
+        const children = entity.getChildren();
+        
+        for (const child of children) {
+            const transformComponent = child.getComponent("transform") as TransformComponent;
+            if (transformComponent) {
+                transformComponent.updateWorldTransform();
+                transformComponent.updateModelMatrix();
+                transformComponent.updateChildrenTransforms();
+            }
+        }
+    }
+
     public update(dt: number): void {
-        // Transform components don't need update logic by default
+        this.updateWorldTransform();
+        this.updateModelMatrix();
+        this.updateChildrenTransforms();
     }
 
     public renderInMenu(): void {
-
+        // Implement if needed
     }
 
     public renderDebug(): void {

@@ -63,42 +63,53 @@ export class DeferredRenderer {
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
     this.skyboxTechnique = await Technique.get("skybox.tech");
-    this.skyboxTechnique.createRenderPipeline(this.fullscreenQuadMesh);
-    this.skyboxTexture = await Cubemap.get("skybox.png");
-    const sampler = Render.getInstance().getDevice().createSampler({
+
+    this.skyboxTexture = await Cubemap.get("skybox.png", {
       magFilter: 'linear',
       minFilter: 'linear',
       mipmapFilter: 'linear',
       addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      addressModeW: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge'
     });
+
+    const pipeline = await this.skyboxTechnique.getPipeline();
+    if (!pipeline) {
+      throw new Error('Failed to get skybox pipeline');
+    }
+
+    const textureView = this.skyboxTexture.getTextureView();
+    const sampler = this.skyboxTexture.getSampler();
+    if (!textureView || !sampler) {
+      throw new Error('Failed to get skybox texture view or sampler');
+    }
 
     this.skyboxBindGroup = Render.getInstance().getDevice().createBindGroup({
       label: `skybox_bindgroup`,
-      layout: this.skyboxTechnique.getPipeline().getBindGroupLayout(1),
+      layout: pipeline.getBindGroupLayout(1),
       entries: [
         {
           binding: 0,
-          resource: this.skyboxTexture.getTextureView(),
+          resource: textureView
         },
         {
           binding: 1,
-          resource: sampler,
+          resource: sampler
         }
       ]
-    })
+    });
     //this.ambientTechnique = await Technique.get("ambient.tech");
   }
 
-  public render(camera: Camera): GPUTextureView {
+  public render(_camera: Camera): GPUTextureView {
     this.renderGBuffer();
-    //TODO RENDER GBUFFERDECALS
-    //TODO RENDER AO
     this.renderAccLight();
     this.renderTransparents();
 
-    return this.rtAlbedos.getView();
+    const view = this.rtAlbedos.getView();
+    if (!view) {
+      throw new Error('Failed to get albedo render target view');
+    }
+    return view;
   }
 
   public renderGBuffer(): void {
@@ -177,21 +188,20 @@ export class DeferredRenderer {
 
   private renderSkybox(): void {
     const render = Render.getInstance();
-    const pass = render.getCommandEncoder().beginRenderPass(
-      {
-        colorAttachments: [{
-          view: this.rtAlbedos.getView(),
-          loadOp: 'load',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        }],
-        depthStencilAttachment: {
-          view: this.depthStencilView,
-          depthLoadOp: 'load',
-          depthStoreOp: 'discard',
-        },
-      }
-    );
+    const depthStencil = this.depthStencilAttachment();
+    if (!depthStencil) {
+      throw new Error('Depth stencil view not available for skybox pass');
+    }
+
+    const pass = render.getCommandEncoder().beginRenderPass({
+      colorAttachments: [{
+        view: this.rtAlbedos.getView(),
+        loadOp: 'load',
+        storeOp: 'store',
+        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+      }],
+      depthStencilAttachment: depthStencil
+    });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
@@ -223,6 +233,11 @@ export class DeferredRenderer {
 
   private renderTransparents(): void {
     const render = Render.getInstance();
+    const depthStencil = this.depthStencilAttachment();
+    if (!depthStencil) {
+      throw new Error('Depth stencil view not available for transparent pass');
+    }
+
     const pass = render.getCommandEncoder().beginRenderPass({
       label: 'Transparents Render pass',
       colorAttachments: [{
@@ -230,11 +245,7 @@ export class DeferredRenderer {
         loadOp: 'load',
         storeOp: 'store',
       }],
-      depthStencilAttachment: {
-        view: this.depthStencilView,
-        depthLoadOp: 'load',
-        depthStoreOp: 'discard',
-      },
+      depthStencilAttachment: depthStencil
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
@@ -256,7 +267,24 @@ export class DeferredRenderer {
     pass.end();
   }
 
+  private depthStencilAttachment(): GPURenderPassDepthStencilAttachment | undefined {
+    if (!this.depthStencilView) {
+      return undefined;
+    }
+    return {
+      view: this.depthStencilView,
+      depthLoadOp: 'clear',
+      depthStoreOp: 'store',
+      depthClearValue: 1.0
+    };
+  }
+
   private getGBufferRenderPassDescriptor(): GPURenderPassDescriptor {
+    const depthStencil = this.depthStencilAttachment();
+    if (!depthStencil) {
+      throw new Error('Depth stencil view not available for GBuffer pass');
+    }
+
     return {
       label: 'GBuffer Render pass',
       colorAttachments: [{
@@ -283,12 +311,7 @@ export class DeferredRenderer {
         loadOp: 'clear',
         storeOp: 'store',
       }],
-      depthStencilAttachment: {
-        view: this.depthStencilView,
-        depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
-      },
+      depthStencilAttachment: depthStencil,
     };
   }
 

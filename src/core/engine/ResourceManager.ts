@@ -1,26 +1,75 @@
-import { Material } from "../../renderer/resources/material";
-import { Mesh } from "../../renderer/resources/Mesh";
-import { Technique } from "../../renderer/resources/Technique";
-import { Texture } from "../../renderer/resources/Texture";
 import { MaterialDataType } from "../../types/MaterialData.type";
 import { EntityDataType } from "../../types/SceneData.type";
 import { TechniqueDataType } from "../../types/TechniqueData.type";
+import { IResource } from "../resources/IResource";
 
-type Resource = Mesh | Material | Technique | object | string | Texture;// | Cubemap
+// Type for managed resource tracking
+interface ResourceEntry {
+    resource: IResource;
+    loadPromise: Promise<void> | null;
+}
 
 export class ResourceManager {
-    private static resources: Map<string, Resource> = new Map();
+    private static resources: Map<string, ResourceEntry> = new Map();
 
     constructor() {
         throw new Error("Cannot create instances of this class");
     }
 
-    public static async loadPrefab(prefabName: string): Promise<EntityDataType> {
-        if (!this.resources.has(prefabName)) {
-            const prefab = await fetch(`/assets/prefabs/${prefabName}`).then(res => res.json());
-            this.resources.set(prefabName, prefab);
+    public static async getResource<T extends IResource>(path: string): Promise<T> {
+        const entry = this.resources.get(path);
+        
+        if (!entry) {
+            throw new Error(`Resource not found: ${path}`);
         }
-        return this.resources.get(prefabName) as EntityDataType;
+
+        if (entry.loadPromise) {
+            await entry.loadPromise;
+        }
+
+        entry.resource.addRef();
+        return entry.resource as T;
+    }
+
+    public static async registerResource<T extends IResource>(resource: T): Promise<void> {
+        if (this.resources.has(resource.path)) {
+            const existing = this.resources.get(resource.path)!;
+            if (existing.resource !== resource) {
+                throw new Error(`Different resource already registered with path: ${resource.path}`);
+            }
+            return;
+        }
+
+        const entry: ResourceEntry = {
+            resource,
+            loadPromise: !resource.isLoaded ? resource.load() : null
+        };
+
+        this.resources.set(resource.path, entry);
+
+        if (entry.loadPromise) {
+            try {
+                await entry.loadPromise;
+            } catch (error) {
+                this.resources.delete(resource.path);
+                throw error;
+            }
+            entry.loadPromise = null;
+        }
+    }
+
+    public static unregisterResource(path: string): void {
+        const entry = this.resources.get(path);
+        if (entry && entry.resource.refCount <= 0) {
+            entry.resource.unload().catch(console.error);
+            this.resources.delete(path);
+        }
+    }
+
+    // Data loading utilities
+    public static async loadPrefab(prefabName: string): Promise<EntityDataType> {
+        const prefab = await fetch(`/assets/prefabs/${prefabName}`).then(res => res.json());
+        return prefab;
     }
 
     public static async loadMeshData(meshPath: string): Promise<string> {
@@ -37,54 +86,5 @@ export class ResourceManager {
 
     public static async loadShader(shaderPath: string): Promise<string> {
         return await fetch(`/assets/shaders/${shaderPath}`).then(res => res.text());
-    }
-
-    /*static async loadGLTF(path: string): Promise<object> {
-        if (!this.resources.has(path)) {
-            const gltf = await fetch(`/meshes/${path}`).then(res => res.json());
-            const binResponse = await fetch(`/meshes/${gltf.buffers[0].uri}`).then(res => res);
-            const binArrayBuffer = await binResponse.arrayBuffer();
-            const scene = GLTFLoader.processScene(gltf, binArrayBuffer);
-            this.resources.set(path, scene);
-        }
-        return this.resources.get(path) as object;
-    }*/
-
-    /*static async loadTexture(texturePath: string): Promise<Texture> {
-        if (!this.resources.has(texturePath)) {
-            const image = new Image();
-            image.src = `/textures/${texturePath}`;
-            await new Promise<void>(resolve => (image.onload = () => resolve()));
-            const texture = new Texture(texturePath, image);
-            this.resources.set(texturePath, texture);
-        }
-        return this.resources.get(texturePath) as Texture;
-    }
-
-    static async loadCubemap(texturePath: string): Promise<Cubemap> {
-        if (!this.resources.has(texturePath)) {
-            const image = new Image();
-            image.src = `/textures/${texturePath}`;
-            await new Promise<void>(resolve => (image.onload = () => resolve()));
-            const texture = new Cubemap(texturePath, image);
-            this.resources.set(texturePath, texture);
-        }
-        return this.resources.get(texturePath) as Cubemap;
-    }*/
-
-    public static getResource<T extends Resource>(key: string): T {
-        const resource = this.resources.get(key);
-        if (!resource) {
-            throw new Error(`Resource could not be found: ${key}`);
-        }
-        return resource as T;
-    }
-
-    public static setResource(name: string, resource: Resource): void {
-        this.resources.set(name, resource);
-    }
-
-    public static hasResource(name: string): boolean {
-        return this.resources.has(name);
     }
 }

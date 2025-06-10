@@ -1,4 +1,4 @@
-{
+{    
     "vs": "skybox.vs",
     "fs": "skybox.fs",
     "writesOn": "texture",

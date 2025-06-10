@@ -214,7 +214,6 @@ export class ModuleRender extends Module {
     this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
 
     this.presentationTechnique = await Technique.get("presentation.tech");
-    this.presentationTechnique.createRenderPipeline(this.fullscreenQuadMesh);
   }
 
   public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {

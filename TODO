@@ -1,8 +1,20 @@
 NPM RUN DEV
 -------------------------------------------
-Uniforms issue
+
+
+Formatter
+
+
 Skybox using technique
 GLTF Rotate object with transform
+GLTF Primitives => 1 entity with render component array of meshes and materials
+Review all code
+
+
+Mejora en el Sistema de Renderizado
+Sistema de Uniformes Mejorado
+
+
 (Deferred GBuffer shader)
 Ambient Light
 Performance numbers

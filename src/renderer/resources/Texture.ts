@@ -1,186 +1,219 @@
-import { Render } from "../core/render";
+import { GPUResource, IGPUResourceOptions } from "../../core/resources/GPUResource";
+import { ResourceType } from "../../types/ResourceType.enum";
 import { ResourceManager } from "../../core/engine/ResourceManager";
+import { CubemapDataType } from "../../types/CubemapData.type";
 
-export class Texture {
-    private name: string;
-    private gpuTexture!: GPUTexture;
-    private gpuTextureView!: GPUTextureView;
-    private gpuSampler!: GPUSampler;
+export interface TextureOptions extends IGPUResourceOptions {
+    cubemapData?: CubemapDataType;
+    isCubemap?: boolean;
+    genMipmaps?: boolean;
+    format?: GPUTextureFormat;
+    usage?: GPUTextureUsageFlags;
+    magFilter?: GPUFilterMode;
+    minFilter?: GPUFilterMode;
+    mipmapFilter?: GPUMipmapFilterMode;
+    addressModeU?: GPUAddressMode;
+    addressModeV?: GPUAddressMode;
+    maxAnisotropy?: number;
+}
 
-    constructor(name: string) {
-        this.name = name;
+export class Texture extends GPUResource {
+    private texture?: GPUTexture;
+    private textureView?: GPUTextureView;
+    private sampler?: GPUSampler;
+    private isCubemap: boolean;
+    private cubemapData?: CubemapDataType;
+    private genMipmaps: boolean;
+    private format: GPUTextureFormat;
+    private usage: GPUTextureUsageFlags;
+    private magFilter: GPUFilterMode;
+    private minFilter: GPUFilterMode;
+    private mipmapFilter: GPUMipmapFilterMode;
+    private addressModeU: GPUAddressMode;
+    private addressModeV: GPUAddressMode;
+    private maxAnisotropy: number;
+
+    constructor(options: TextureOptions) {
+        super({
+            ...options,
+            type: ResourceType.TEXTURE
+        });
+        this.isCubemap = options.isCubemap ?? false;
+        this.cubemapData = options.cubemapData;
+        this.genMipmaps = options.genMipmaps ?? false;
+        this.format = options.format ?? 'rgba8unorm';
+        this.usage = options.usage ?? (GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT);
+        this.magFilter = options.magFilter ?? 'linear';
+        this.minFilter = options.minFilter ?? 'linear';
+        this.mipmapFilter = options.mipmapFilter ?? 'linear';
+        this.addressModeU = options.addressModeU ?? 'repeat';
+        this.addressModeV = options.addressModeV ?? 'repeat';
+        this.maxAnisotropy = options.maxAnisotropy ?? 1;
     }
 
-    public static async get(texturePath: string): Promise<Texture> {
-        if (ResourceManager.hasResource(texturePath)) {
-            return ResourceManager.getResource<Texture>(texturePath);
+    protected async createGPUResources(): Promise<void> {
+        if (this.isCubemap && this.cubemapData) {
+            await this.createCubemapTexture();
+        } else {
+            await this.createRegularTexture();
+        }
+    }
+
+    private async createCubemapTexture(): Promise<void> {
+        if (!this.cubemapData) throw new Error("No cubemap data provided");
+
+        const { faceSize, faces, format, mipLevelCount, dimension } = this.cubemapData;
+
+        this.texture = this.device.createTexture({
+            size: [faceSize, faceSize, 6], // width, height, and 6 faces
+            dimension: dimension || "2d",
+            format: format || "rgba8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+            mipLevelCount: mipLevelCount || 1,
+        });
+
+        // Copy each face
+        for (let face = 0; face < faces.length; face++) {
+            this.device.queue.copyExternalImageToTexture(
+                { source: faces[face] },
+                { texture: this.texture, origin: [0, 0, face] },
+                [faceSize, faceSize]
+            );
         }
 
-        const texture = new Texture(texturePath);
+        // Create view
+        this.textureView = this.texture.createView({
+            dimension: 'cube',
+            aspect: 'all',
+        });
+
+        // Create sampler
+        this.sampler = this.device.createSampler({
+            magFilter: 'linear',
+            minFilter: 'linear',
+            mipmapFilter: 'linear',
+            addressModeU: 'repeat',
+            addressModeV: 'repeat',
+            addressModeW: 'repeat',
+        });
+    }
+
+    private async createRegularTexture(): Promise<void> {
+        // Load image
+        const img = new Image();
+        // Si la ruta ya empieza con /assets, usarla como está
+        img.src = this.path.startsWith('/assets/') ? this.path : `/assets/textures/${this.path}`;
+        await img.decode();
+
+        const imageBitmap = await createImageBitmap(img);
+        const mipLevelCount = this.genMipmaps ?
+            Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1 : 1;
+
+        // Create GPU texture
+        this.texture = this.device.createTexture({
+            label: `${this.label}_texture`,
+            size: {
+                width: imageBitmap.width,
+                height: imageBitmap.height,
+                depthOrArrayLayers: 1,
+            },
+            format: this.format,
+            usage: this.usage,
+            mipLevelCount
+        });
+
+        // Copy image data
+        this.device.queue.copyExternalImageToTexture(
+            { source: imageBitmap },
+            { texture: this.texture },
+            { width: imageBitmap.width, height: imageBitmap.height }
+        );
+
+        // Generate mipmaps if needed
+        if (this.genMipmaps) {
+            await this.generateMipmapLevels();
+        }
+
+        // Create view and sampler
+        this.textureView = this.texture.createView({
+            label: `${this.label}_textureView`,
+            baseMipLevel: 0,
+            mipLevelCount
+        });
+
+        this.sampler = this.device.createSampler({
+            label: `${this.label}_sampler`,
+            magFilter: this.magFilter,
+            minFilter: this.minFilter,
+            mipmapFilter: this.genMipmaps ? this.mipmapFilter : undefined,
+            addressModeU: this.addressModeU,
+            addressModeV: this.addressModeV,
+            maxAnisotropy: this.maxAnisotropy
+        });
+    }
+
+    public static async get(pathOrData: string | CubemapDataType): Promise<Texture> {
+        const path = typeof pathOrData === 'string' ? pathOrData : `dynamic_texture_${this.generateDynamicId()}`;
+
+        // Check if texture is already registered
+        try {
+            const existingTexture = await ResourceManager.getResource<Texture>(path);
+            if (existingTexture) {
+                return existingTexture;
+            }
+        } catch {
+            // Texture not registered yet, continue with creation
+        }
+
+        // Create new texture and register it before loading
+        const texture = typeof pathOrData === 'string' 
+            ? new Texture({ path, type: ResourceType.TEXTURE })
+            : new Texture({ 
+                path, 
+                type: ResourceType.TEXTURE, 
+                cubemapData: pathOrData,
+                isCubemap: true 
+            });
+
+        // Register first to prevent race conditions
+        await ResourceManager.registerResource(texture);
+
+        // Then load the texture
         await texture.load();
-        ResourceManager.setResource(texturePath, texture);
         return texture;
     }
 
-    public async load(): Promise<void> {
-        const device = Render.getInstance().getDevice();
-
-        // Cargar la imagen
-        const img = new Image();
-        img.src = `/assets/textures/${this.name}`;
-        try {
-            await img.decode();
-            // Crear el bitmap para poder subirlo a la GPU
-            const imageBitmap = await createImageBitmap(img);
-
-            // Calcular niveles de mipmap
-            const mipLevelCount = Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1;
-
-            // Crear la textura en GPU con soporte para storage binding para generación de mipmaps
-            this.gpuTexture = device.createTexture({
-                size: {
-                    width: imageBitmap.width,
-                    height: imageBitmap.height,
-                    depthOrArrayLayers: 1,
-                },
-                format: 'rgba8unorm',
-                usage: GPUTextureUsage.TEXTURE_BINDING | 
-                       GPUTextureUsage.COPY_DST | 
-                       GPUTextureUsage.RENDER_ATTACHMENT |
-                       GPUTextureUsage.STORAGE_BINDING,
-                mipLevelCount: mipLevelCount
-            });
-
-            // Copiar los datos de la imagen al nivel 0 de mipmap
-            device.queue.copyExternalImageToTexture(
-                { source: imageBitmap },
-                { texture: this.gpuTexture },
-                { width: imageBitmap.width, height: imageBitmap.height }
-            );
-
-            // Generar los mipmaps
-            await this.generateMipmaps();
-
-            // Crear la vista de la textura con todos los niveles de mipmap
-            this.gpuTextureView = this.gpuTexture.createView({
-                baseMipLevel: 0,
-                mipLevelCount: mipLevelCount
-            });
-
-            // Crear el sampler con configuración de mipmaps
-            this.gpuSampler = device.createSampler({
-                magFilter: 'linear',
-                minFilter: 'linear',
-                mipmapFilter: 'linear',
-                addressModeU: 'repeat',
-                addressModeV: 'repeat',
-                maxAnisotropy: 16 // Añadir filtrado anisotrópico para mejorar la calidad
-            });
-        } catch (e) {
-            console.log(e, img.src);
-        }
+    private static idCounter = 0;
+    private static generateDynamicId(): string {
+        return (++this.idCounter).toString().padStart(6, '0');
     }
 
-    private static mipmapPipeline: GPUComputePipeline;
-    private static mipmapBindGroupLayout: GPUBindGroupLayout;
-    private static async initMipmapPipeline() {
-        if (this.mipmapPipeline) return;
-
-        const device = Render.getInstance().getDevice();
-        const shaderModule = device.createShaderModule({
-            label: "Mipmap generation shader",
-            code: await (await fetch('/assets/shaders/generate_mipmap.wgsl')).text()
-        });
-
-        this.mipmapBindGroupLayout = device.createBindGroupLayout({
-            entries: [
-                {
-                    binding: 0,
-                    visibility: GPUShaderStage.COMPUTE,
-                    texture: {
-                        sampleType: 'float',
-                        viewDimension: '2d'
-                    }
-                },
-                {
-                    binding: 1,
-                    visibility: GPUShaderStage.COMPUTE,
-                    storageTexture: {
-                        access: 'write-only',
-                        format: 'rgba8unorm',
-                        viewDimension: '2d'
-                    }
-                }
-            ]
-        });
-
-        const pipelineLayout = device.createPipelineLayout({
-            bindGroupLayouts: [this.mipmapBindGroupLayout]
-        });
-
-        this.mipmapPipeline = device.createComputePipeline({
-            layout: pipelineLayout,
-            compute: {
-                module: shaderModule,
-                entryPoint: 'main'
-            }
-        });
+    public isCubemapTexture(): boolean {
+        return this.isCubemap;
     }
 
-    private async generateMipmaps() {
-        const device = Render.getInstance().getDevice();
-        
-        // Asegurarnos de que el pipeline está inicializado
-        await Texture.initMipmapPipeline();
-
-        const commandEncoder = device.createCommandEncoder();
-
-        for (let level = 0; level < this.gpuTexture.mipLevelCount - 1; level++) {
-            const srcView = this.gpuTexture.createView({
-                baseMipLevel: level,
-                mipLevelCount: 1,
-            });
-
-            const dstView = this.gpuTexture.createView({
-                baseMipLevel: level + 1,
-                mipLevelCount: 1,
-            });
-
-            const bindGroup = device.createBindGroup({
-                layout: Texture.mipmapBindGroupLayout,
-                entries: [
-                    { binding: 0, resource: srcView },
-                    { binding: 1, resource: dstView }
-                ]
-            });
-
-            const passEncoder = commandEncoder.beginComputePass();
-            passEncoder.setPipeline(Texture.mipmapPipeline);
-            passEncoder.setBindGroup(0, bindGroup);
-
-            const width = Math.max(1, this.gpuTexture.width >> (level + 1));
-            const height = Math.max(1, this.gpuTexture.height >> (level + 1));
-            
-            passEncoder.dispatchWorkgroups(
-                Math.ceil(width / 8),
-                Math.ceil(height / 8)
-            );
-            
-            passEncoder.end();
-        }
-
-        device.queue.submit([commandEncoder.finish()]);
+    public getCubemapData(): CubemapDataType | undefined {
+        return this.cubemapData;
     }
 
-    public getTextureView(): GPUTextureView {
-        return this.gpuTextureView;
+    protected override async destroyGPUResources(): Promise<void> {
+        this.texture?.destroy();
+        this.texture = undefined;
+        this.textureView = undefined;
+        this.sampler = undefined;
     }
 
-    public getSampler(): GPUSampler {
-        return this.gpuSampler;
+    public getTextureView(): GPUTextureView | undefined {
+        return this.textureView;
     }
 
-    public getName(): string {
-        return this.name;
+    public getSampler(): GPUSampler | undefined {
+        return this.sampler;
+    }
+
+    private async generateMipmapLevels(): Promise<void> {
+        // Implementation for mipmap generation would go here
+        // This is a placeholder that should be implemented based on your engine's requirements
+        console.warn('Mipmap generation not implemented yet');
     }
 }

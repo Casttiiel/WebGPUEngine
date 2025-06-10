@@ -1,9 +1,13 @@
+import { GPUResource, IGPUResourceOptions } from "../../core/resources/GPUResource";
+import { ResourceType } from "../../types/ResourceType.enum";
 import { ResourceManager } from "../../core/engine/ResourceManager";
-import { Render } from "../core/render";
+import { MeshData } from "../../types/MeshData.type";
 
-export class Mesh {
-    private name: string;
-    // Datos de la geometría en CPU
+export interface MeshOptions extends IGPUResourceOptions {
+    meshData?: MeshData;
+}
+
+export class Mesh extends GPUResource {
     private vertices!: Float32Array;    // Posiciones de los vértices
     private normals!: Float32Array;     // Normales de los vértices
     private uvs!: Float32Array;         // Coordenadas de textura
@@ -18,44 +22,99 @@ export class Mesh {
     private tangentBuffer!: GPUBuffer;  // Buffer de tangentes
     private indexBuffer!: GPUBuffer;    // Buffer de índices
 
-    constructor(name: string) {
-        this.name = name;
+    constructor(options: MeshOptions) {
+        super({
+            ...options,
+            type: ResourceType.MESH
+        });
+
+        if (options.meshData) {
+            this.setData(options.meshData);
+        }
     }
 
-    static async get(meshData: unknown): Promise<Mesh> {
-        if (typeof meshData === 'string') {
-            if (ResourceManager.hasResource(meshData)) {
-                return ResourceManager.getResource<Mesh>(meshData);
+    static async get(meshPath: string | MeshData): Promise<Mesh> {
+        if (typeof meshPath === 'string') {
+            try {
+                return await ResourceManager.getResource<Mesh>(meshPath);
+            } catch {
+                const mesh = new Mesh({
+                    path: meshPath,
+                    type: ResourceType.MESH
+                });
+                await ResourceManager.registerResource(mesh);
+                return mesh;
             }
-
-            const mesh = new Mesh(meshData);
-            await mesh.load();
-            ResourceManager.setResource(meshData, mesh);
-            return mesh;
         } else {
-            const mesh = new Mesh("unkown mesh name" + Mesh.id);
-            mesh.setData(meshData);
-            mesh.initBuffers();
+            const mesh = new Mesh({
+                path: `dynamic_mesh_${Date.now()}`,
+                type: ResourceType.MESH,
+                meshData: meshPath
+            });
+            await ResourceManager.registerResource(mesh);
             return mesh;
         }
     }
 
-    public async load(): Promise<void> {
-        const data = await ResourceManager.loadMeshData(this.name);
-        this.loadObj(data);
+    protected async createGPUResources(): Promise<void> {
         this.initBuffers();
     }
 
-    public setData(meshData: unknown): void {
-        this.vertices = new Float32Array(meshData.attributes.POSITION.data);
-        this.normals = new Float32Array(meshData.attributes.NORMAL.data);
-        this.uvs = new Float32Array(meshData.attributes.TEXCOORD_0.data);
-        this.indices = new Uint16Array(meshData.indices.data);
-        this.tangents = new Float32Array();//TODO
-        this.indexCount = this.indices.length;
+    protected async destroyGPUResources(): Promise<void> {
+        this.vertexBuffer?.destroy();
+        this.normalBuffer?.destroy();
+        this.uvBuffer?.destroy();
+        this.tangentBuffer?.destroy();
+        this.indexBuffer?.destroy();
     }
 
-    private loadObj(data: string): void {
+    public override async load(): Promise<void> {
+        if (this.isLoaded) return;
+
+        try {
+            if (!this.hasData) {
+                const data = await ResourceManager.loadMeshData(this.path);
+                this.loadObj(data);
+            }
+            await this.createGPUResources();
+            this.setLoaded();
+        } catch (error) {
+            throw new Error(`Failed to load mesh ${this.path}: ${error}`);
+        }
+    }
+
+    public setData(meshData: MeshData): void {
+        if (Array.isArray(meshData.attributes.POSITION.data)) {
+            this.vertices = new Float32Array(meshData.attributes.POSITION.data);
+        } else {
+            this.vertices = meshData.attributes.POSITION.data;
+        }
+
+        if (Array.isArray(meshData.attributes.NORMAL.data)) {
+            this.normals = new Float32Array(meshData.attributes.NORMAL.data);
+        } else {
+            this.normals = meshData.attributes.NORMAL.data;
+        }
+
+        if (Array.isArray(meshData.attributes.TEXCOORD_0.data)) {
+            this.uvs = new Float32Array(meshData.attributes.TEXCOORD_0.data);
+        } else {
+            this.uvs = meshData.attributes.TEXCOORD_0.data;
+        }
+
+        if (Array.isArray(meshData.indices.data)) {
+            this.indices = new Uint16Array(meshData.indices.data);
+        } else {
+            this.indices = meshData.indices.data as Uint16Array;
+        }
+
+        this.tangents = new Float32Array();//TODO: Calculate tangents
+        this.indexCount = meshData.indices.count;
+
+        this.setHasData();
+    }
+
+    public loadObj(data: string): void {
         // Arrays temporales para acumular datos
         const verticesArray: number[] = [];
         const normalsArray: number[] = [];
@@ -249,18 +308,18 @@ export class Mesh {
 
     private initBuffers(): void {
         // Crear buffer de vértices en GPU
-        this.vertexBuffer = Render.getInstance().getDevice().createBuffer({
-            label: `${this.name}_vertexBuffer`,
+        this.vertexBuffer = this.device.createBuffer({
+            label: `${this.label}_vertexBuffer`,
             size: this.vertices.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-            mappedAtCreation: true  // Permitir escribir datos durante la creación
+            mappedAtCreation: true
         });
         new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertices);
         this.vertexBuffer.unmap();
 
         // Crear buffer de normales en GPU
-        this.normalBuffer = Render.getInstance().getDevice().createBuffer({
-            label: `${this.name}_normalBuffer`,
+        this.normalBuffer = this.device.createBuffer({
+            label: `${this.label}_normalBuffer`,
             size: this.normals.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true
@@ -269,8 +328,8 @@ export class Mesh {
         this.normalBuffer.unmap();
 
         // Crear buffer de UVs en GPU
-        this.uvBuffer = Render.getInstance().getDevice().createBuffer({
-            label: `${this.name}_uvBuffer`,
+        this.uvBuffer = this.device.createBuffer({
+            label: `${this.label}_uvBuffer`,
             size: this.uvs.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true
@@ -279,8 +338,8 @@ export class Mesh {
         this.uvBuffer.unmap();
 
         // Crear buffer de tangentes en GPU
-        this.tangentBuffer = Render.getInstance().getDevice().createBuffer({
-            label: `${this.name}_tangentBuffer`,
+        this.tangentBuffer = this.device.createBuffer({
+            label: `${this.label}_tangentBuffer`,
             size: this.tangents.byteLength,
             usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
             mappedAtCreation: true
@@ -293,13 +352,13 @@ export class Mesh {
         const paddedArray = new Uint16Array(paddedIndexCount);
         paddedArray.set(this.indices);
 
-        this.indexBuffer = Render.getInstance().getDevice().createBuffer({
-            label: `${this.name}_indexBuffer`,
+        this.indexBuffer = this.device.createBuffer({
+            label: `${this.label}_indexBuffer`,
             size: paddedArray.byteLength,
             usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
         });
 
-        Render.getInstance().getDevice().queue.writeBuffer(this.indexBuffer, 0, paddedArray);
+        this.device.queue.writeBuffer(this.indexBuffer, 0, paddedArray);
     }
 
     public getVertexBufferLayout(): GPUVertexBufferLayout[] {
@@ -343,8 +402,10 @@ export class Mesh {
         ];
     }
 
-    // Activar esta malla para renderizado
     public activate(pass: GPURenderPassEncoder): void {
+        if (!this.isLoaded) {
+            throw new Error(`Cannot activate unloaded mesh: ${this.path}`);
+        }
         pass.setVertexBuffer(0, this.vertexBuffer);
         pass.setVertexBuffer(1, this.normalBuffer);
         pass.setVertexBuffer(2, this.uvBuffer);
@@ -352,12 +413,10 @@ export class Mesh {
         pass.setIndexBuffer(this.indexBuffer, 'uint16');
     }
 
-    // Renderizar la malla completa
     public renderGroup(pass: GPURenderPassEncoder): void {
+        if (!this.isLoaded) {
+            throw new Error(`Cannot render unloaded mesh: ${this.path}`);
+        }
         pass.drawIndexed(this.indexCount);
-    }
-
-    public getName(): string {
-        return this.name;
     }
 }

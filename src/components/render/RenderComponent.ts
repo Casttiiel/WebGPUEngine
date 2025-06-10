@@ -5,12 +5,10 @@ import { TransformComponent } from "../core/TransformComponent";
 import { RenderComponentDataType, RenderComponentMeshDataType } from "../../types/RenderComponentData.type";
 import { MeshPartType } from "../../types/MeshPart.type";
 import { RenderManager } from "../../renderer/core/RenderManager";
-import { Transform } from "../../core/math/Transform";
 
 export class RenderComponent extends Component {
     private isVisible: boolean = true;
     private parts: MeshPartType[] = [];
-    private currentState: number = 0;
 
     constructor() {
         super();
@@ -27,23 +25,59 @@ export class RenderComponent extends Component {
     }
 
     private async readMesh(data: RenderComponentMeshDataType): Promise<void> {
-        if (!data.mesh && !data.meshData) {
-            throw new Error(`Missing attribute 'mesh' in input JSON: ${JSON.stringify(data)}`);
+        try {
+            const meshFile = data.mesh ?? data.meshData;
+            if (!meshFile) {
+                throw new Error("No mesh file specified in RenderComponent data");
+            }
+
+            const mesh = await Mesh.get(meshFile);
+            if (!mesh) {
+                throw new Error(`Failed to load mesh: ${meshFile}`);
+            }
+
+            // Load material first but don't create bind group yet
+            const material = await this.loadMaterial(data);
+            if (!material) {
+                throw new Error("Failed to load material");
+            }
+            this.material = material;
+
+            // Get technique from material
+            const technique = material.getTechnique();
+            if (!technique) {
+                throw new Error("No technique found in material");
+            }
+
+            // Get pipeline
+            const renderPipeline = await technique.getPipeline();
+            if (!renderPipeline) {
+                throw new Error("Failed to get render pipeline");
+            }
+
+            // Now create material bind group using pipeline layout
+            await material.createBindGroup(renderPipeline);
+
+            const meshPart: MeshPartType = {
+                mesh,
+                material,
+                isVisible: data.visible !== undefined ? data.visible : true,
+            };
+
+            this.parts.push(meshPart);
+        } catch (error) {
+            console.error("Error in readMesh:", error);
+            throw error;
+        }
+    }
+
+    private async loadMaterial(data: RenderComponentMeshDataType): Promise<Material> {
+        const materialData = data.material ?? data.materialData;
+        if (!materialData) {
+            throw new Error("No material specified in RenderComponent data");
         }
 
-        const mesh = await Mesh.get(data.mesh || data.meshData);
-
-        const materialData = data.material || data.materialData;
-        const material = await Material.get(materialData);
-        material.getTechnique().createRenderPipeline(mesh);
-
-        const meshPart: MeshPartType = {
-            mesh,
-            material,
-            isVisible: data.visible !== undefined ? data.visible : true,
-        };
-
-        this.parts.push(meshPart);
+        return Material.get(materialData);
     }
 
     private updateRenderManager(): void {
@@ -64,8 +98,9 @@ export class RenderComponent extends Component {
         }
     }
 
-    public update(dt: number): void {
-        throw new Error("Method not implemented.");
+    public update(_dt: number): void {
+        // Unused dt parameter is prefixed with underscore
+        // Implementation of update if needed
     }
 
     public renderInMenu(): void {

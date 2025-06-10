@@ -1,97 +1,170 @@
 import { vec3, quat, mat4 } from "gl-matrix";
 
 export class Transform {
-  private rotation: quat = quat.create();
-  private position: vec3 = vec3.create();
-  private scale: vec3 = vec3.fromValues(1, 1, 1);
+  // Local transforms
+  private localRotation: quat = quat.create();
+  private localPosition: vec3 = vec3.create();
+  private localScale: vec3 = vec3.fromValues(1, 1, 1);
+  
+  // World transforms (cached)
+  private worldRotation: quat = quat.create();
+  private worldPosition: vec3 = vec3.create();
+  private worldScale: vec3 = vec3.fromValues(1, 1, 1);
+  
+  // Cache control 
+  private isDirty: boolean = true;
 
   constructor() {}
 
-  public getPosition(): vec3 {
-    return this.position;
+  // Position methods
+  public getLocalPosition(): vec3 {
+    return this.localPosition;
   }
 
-  public getRotation(): quat {
-    return this.rotation;
+  public getWorldPosition(): vec3 {
+    return this.worldPosition;
   }
 
-  public setPosition(newPosition: vec3): void {
-    vec3.copy(this.position, newPosition);
+  public setLocalPosition(newPosition: vec3): void {
+    vec3.copy(this.localPosition, newPosition);
+    this.isDirty = true;
   }
 
-  public setRotation(newRotation: quat): void {
-    quat.copy(this.rotation, newRotation);
+  public setWorldPosition(newPosition: vec3): void {
+    vec3.copy(this.worldPosition, newPosition);
   }
 
-  public setScale(newScale: vec3): void {
-    vec3.copy(this.scale, newScale);
+  // Rotation methods
+  public getLocalRotation(): quat {
+    return this.localRotation;
   }
 
-  public getScale(): vec3 {
-    return this.scale;
+  public getWorldRotation(): quat {
+    return this.worldRotation;
   }
 
-  public asMatrix(): mat4 {
+  public setLocalRotation(newRotation: quat): void {
+    quat.copy(this.localRotation, newRotation);
+    this.isDirty = true;
+  }
+
+  public setWorldRotation(newRotation: quat): void {
+    quat.copy(this.worldRotation, newRotation);
+  }
+
+  // Scale methods
+  public getLocalScale(): vec3 {
+    return this.localScale;
+  }
+
+  public getWorldScale(): vec3 {
+    return this.worldScale;
+  }
+
+  public setLocalScale(newScale: vec3): void {
+    vec3.copy(this.localScale, newScale);
+    this.isDirty = true;
+  }
+
+  public setWorldScale(newScale: vec3): void {
+    vec3.copy(this.worldScale, newScale);
+  }
+
+  // Matrix conversions
+  public getLocalMatrix(): mat4 {
     const matrix = mat4.create();
-    mat4.fromRotationTranslationScale(matrix, this.rotation, this.position, this.scale);
+    mat4.fromRotationTranslationScale(matrix, this.localRotation, this.localPosition, this.localScale);
     return matrix;
+  }
+
+  public getWorldMatrix(): mat4 {
+    const matrix = mat4.create();
+    mat4.fromRotationTranslationScale(matrix, this.worldRotation, this.worldPosition, this.worldScale);
+    return matrix;
+  }
+
+  public updateWorldTransform(parentWorldTransform?: Transform): void {
+    if (!this.isDirty && !parentWorldTransform) return;
+
+    if (parentWorldTransform) {
+      // Update world position
+      vec3.transformQuat(this.worldPosition, this.localPosition, parentWorldTransform.getWorldRotation());
+      vec3.multiply(this.worldPosition, this.worldPosition, parentWorldTransform.getWorldScale());
+      vec3.add(this.worldPosition, this.worldPosition, parentWorldTransform.getWorldPosition());
+
+      // Update world rotation
+      quat.multiply(this.worldRotation, parentWorldTransform.getWorldRotation(), this.localRotation);
+
+      // Update world scale
+      vec3.multiply(this.worldScale, parentWorldTransform.getWorldScale(), this.localScale);
+    } else {
+      // No parent, world transforms are same as local
+      vec3.copy(this.worldPosition, this.localPosition);
+      quat.copy(this.worldRotation, this.localRotation);
+      vec3.copy(this.worldScale, this.localScale);
+    }
+
+    this.isDirty = false;
   }
 
   public fromMatrix(matrix: mat4): void {
     const scaleVec = vec3.create();
     mat4.getScaling(scaleVec, matrix);
-    vec3.copy(this.scale, scaleVec);
-    mat4.getRotation(this.rotation, matrix);
-    mat4.getTranslation(this.position, matrix);
+    const rotationQuat = quat.create();
+    mat4.getRotation(rotationQuat, matrix);
+    const positionVec = vec3.create();
+    mat4.getTranslation(positionVec, matrix);
+
+    this.setLocalScale(scaleVec);
+    this.setLocalRotation(rotationQuat);
+    this.setLocalPosition(positionVec);
   }
 
+  // Direction vectors
   public getFront(): vec3 {
     const front = vec3.fromValues(0, 0, -1);
-    vec3.transformQuat(front, front, this.rotation);
+    vec3.transformQuat(front, front, this.worldRotation);
     return front;
   }
 
   public getUp(): vec3 {
     const up = vec3.fromValues(0, 1, 0);
-    vec3.transformQuat(up, up, this.rotation);
+    vec3.transformQuat(up, up, this.worldRotation);
     return up;
-  }
-
-  public getLeft(): vec3 {
-    const left = vec3.fromValues(-1, 0, 0);
-    vec3.transformQuat(left, left, this.rotation);
-    return left;
   }
 
   public getRight(): vec3 {
     const right = vec3.fromValues(1, 0, 0);
-    vec3.transformQuat(right, right, this.rotation);
+    vec3.transformQuat(right, right, this.worldRotation);
     return right;
   }
 
-  public lookAt(eye: vec3, target: vec3, up: vec3 = vec3.fromValues(0, 1, 0)): void {
-    vec3.copy(this.position, eye);
-    const matrix = mat4.create();
-    mat4.targetTo(matrix, eye, target, up);
-    mat4.getRotation(this.rotation, matrix);
+  public getLeft(): vec3 {
+    const left = vec3.fromValues(-1, 0, 0);
+    vec3.transformQuat(left, left, this.worldRotation);
+    return left;
   }
 
-  public combineWith(deltaTransform: Transform): Transform {
-    const newTransform = new Transform();
-    quat.multiply(newTransform.rotation, deltaTransform.rotation, this.rotation);
+  // Rotation helpers
+  public setAngles(yaw: number, pitch: number, roll: number = 0): void {
+    quat.fromEuler(this.localRotation, pitch, yaw, roll);
+    quat.normalize(this.localRotation, this.localRotation);
+    this.isDirty = true;
+  }
 
-    const deltaPositionRotated = vec3.create();
-    vec3.transformQuat(deltaPositionRotated, deltaTransform.position, this.rotation);
-    vec3.multiply(deltaPositionRotated, deltaPositionRotated, this.scale);
-    vec3.add(newTransform.position, this.position, deltaPositionRotated);
-
-    vec3.multiply(newTransform.scale, this.scale, deltaTransform.scale);
-    return newTransform;
+  public getAngles(): { yaw: number; pitch: number; roll: number } {
+    const front = this.getFront();
+    const yaw = Math.atan2(front[0], front[2]);
+    const pitch = Math.asin(-front[1]);
+    const right = this.getRight();
+    const up = this.getUp();
+    const roll = Math.atan2(vec3.dot(right, up), vec3.dot(right, this.getRight()));
+    return { yaw, pitch, roll };
   }
 
   public getDeltaYawToAimTo(target: vec3): number {
     const dirToTarget = vec3.create();
-    vec3.subtract(dirToTarget, target, this.position);
+    vec3.subtract(dirToTarget, target, this.worldPosition);
     const left = this.getLeft();
     const front = this.getFront();
     const dotLeft = vec3.dot(left, dirToTarget);
@@ -101,7 +174,7 @@ export class Transform {
 
   public getDeltaPitchToAimTo(target: vec3): number {
     const dirToTarget = vec3.create();
-    vec3.subtract(dirToTarget, target, this.position);
+    vec3.subtract(dirToTarget, target, this.worldPosition);
     return -Math.atan2(dirToTarget[1], Math.sqrt(dirToTarget[0] ** 2 + dirToTarget[2] ** 2));
   }
 
@@ -119,25 +192,30 @@ export class Transform {
     this.setAngles(angles.yaw, angles.pitch, angles.roll);
   }
 
-  public getAngles(): { yaw: number; pitch: number; roll: number } {
-    const front = this.getFront();
-    // Convert front vector to yaw and pitch
-    const yaw = Math.atan2(front[0], front[2]);
-    const pitch = Math.asin(-front[1]);
-
-    const left = this.getLeft();
-    const up = this.getUp();
-    const roll = Math.atan2(vec3.dot(left, up), vec3.dot(left, this.getLeft()));
-
-    return { yaw, pitch, roll };
+  public lookAt(eye: vec3, target: vec3, up: vec3 = vec3.fromValues(0, 1, 0)): void {
+    vec3.copy(this.localPosition, eye);
+    const matrix = mat4.create();
+    mat4.targetTo(matrix, eye, target, up);
+    mat4.getRotation(this.localRotation, matrix);
+    this.isDirty = true;
   }
 
-  public setAngles(yaw: number, pitch: number, roll: number = 0): void {
-    // quat.fromEuler espera (out, x, y, z) donde:
-    // x = rotación alrededor del eje X (pitch)
-    // y = rotación alrededor del eje Y (yaw)
-    // z = rotación alrededor del eje Z (roll)
-    quat.fromEuler(this.rotation, pitch, yaw, roll);
-    quat.normalize(this.rotation, this.rotation);
+  public combineWith(deltaTransform: Transform): Transform {
+    const newTransform = new Transform();
+
+    // Combine rotations
+    quat.multiply(newTransform.localRotation, deltaTransform.getLocalRotation(), this.localRotation);
+
+    // Combine positions
+    const deltaPositionRotated = vec3.create();
+    vec3.transformQuat(deltaPositionRotated, deltaTransform.getLocalPosition(), this.localRotation);
+    vec3.multiply(deltaPositionRotated, deltaPositionRotated, this.localScale);
+    vec3.add(newTransform.localPosition, this.localPosition, deltaPositionRotated);
+
+    // Combine scales
+    vec3.multiply(newTransform.localScale, this.localScale, deltaTransform.getLocalScale());
+
+    newTransform.isDirty = true;
+    return newTransform;
   }
 }

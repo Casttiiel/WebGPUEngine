@@ -21,7 +21,6 @@ export class AntialiasingComponent extends Component {
         this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
 
         this.technique = await Technique.get("antialiasing.tech");
-        this.technique.createRenderPipeline(this.fullscreenQuadMesh);
 
         this.result = new RenderToTexture();
         this.result.createRT("antialiasing_result.dds", Render.width, Render.height, 'rgba16float');

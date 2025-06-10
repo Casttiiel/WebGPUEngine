@@ -18,7 +18,6 @@ export class ToneMappingComponent extends Component {
         this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
 
         this.technique = await Technique.get("tone_mapping.tech");
-        this.technique.createRenderPipeline(this.fullscreenQuadMesh);
 
         this.result = new RenderToTexture();
         this.result.createRT("tone_mapping_result.dds", Render.width, Render.height, 'rgba16float');
