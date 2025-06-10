@@ -1,17 +1,17 @@
-import { vec3, quat, mat4 } from "gl-matrix";
+import { vec3, quat, mat4 } from 'gl-matrix';
 
 export class Transform {
   // Local transforms
   private localRotation: quat = quat.create();
   private localPosition: vec3 = vec3.create();
   private localScale: vec3 = vec3.fromValues(1, 1, 1);
-  
+
   // World transforms (cached)
   private worldRotation: quat = quat.create();
   private worldPosition: vec3 = vec3.create();
   private worldScale: vec3 = vec3.fromValues(1, 1, 1);
-  
-  // Cache control 
+
+  // Cache control
   private isDirty: boolean = true;
 
   constructor() {}
@@ -73,13 +73,23 @@ export class Transform {
   // Matrix conversions
   public getLocalMatrix(): mat4 {
     const matrix = mat4.create();
-    mat4.fromRotationTranslationScale(matrix, this.localRotation, this.localPosition, this.localScale);
+    mat4.fromRotationTranslationScale(
+      matrix,
+      this.localRotation,
+      this.localPosition,
+      this.localScale,
+    );
     return matrix;
   }
 
   public getWorldMatrix(): mat4 {
     const matrix = mat4.create();
-    mat4.fromRotationTranslationScale(matrix, this.worldRotation, this.worldPosition, this.worldScale);
+    mat4.fromRotationTranslationScale(
+      matrix,
+      this.worldRotation,
+      this.worldPosition,
+      this.worldScale,
+    );
     return matrix;
   }
 
@@ -88,12 +98,20 @@ export class Transform {
 
     if (parentWorldTransform) {
       // Update world position
-      vec3.transformQuat(this.worldPosition, this.localPosition, parentWorldTransform.getWorldRotation());
+      vec3.transformQuat(
+        this.worldPosition,
+        this.localPosition,
+        parentWorldTransform.getWorldRotation(),
+      );
       vec3.multiply(this.worldPosition, this.worldPosition, parentWorldTransform.getWorldScale());
       vec3.add(this.worldPosition, this.worldPosition, parentWorldTransform.getWorldPosition());
 
       // Update world rotation
-      quat.multiply(this.worldRotation, parentWorldTransform.getWorldRotation(), this.localRotation);
+      quat.multiply(
+        this.worldRotation,
+        parentWorldTransform.getWorldRotation(),
+        this.localRotation,
+      );
 
       // Update world scale
       vec3.multiply(this.worldScale, parentWorldTransform.getWorldScale(), this.localScale);
@@ -204,7 +222,11 @@ export class Transform {
     const newTransform = new Transform();
 
     // Combine rotations
-    quat.multiply(newTransform.localRotation, deltaTransform.getLocalRotation(), this.localRotation);
+    quat.multiply(
+      newTransform.localRotation,
+      deltaTransform.getLocalRotation(),
+      this.localRotation,
+    );
 
     // Combine positions
     const deltaPositionRotated = vec3.create();

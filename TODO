@@ -1,49 +1,39 @@
-NPM RUN DEV
--------------------------------------------
+## NPM RUN DEV
 
-
-Formatter
-
+Review all code
+npm run check
+npx tsc --noEmit
 
 Skybox using technique
 GLTF Rotate object with transform
 GLTF Primitives => 1 entity with render component array of meshes and materials
-Review all code
-
 
 Mejora en el Sistema de Renderizado
 Sistema de Uniformes Mejorado
-
 
 (Deferred GBuffer shader)
 Ambient Light
 Performance numbers
 
-
-PBR LIGHTS 
-    PointLightWIthoutshadows
-    renderDirectionalLightsWithoutShadows
-    renderDirectionalLightsWithShadows
-    RenderPointLighstWithShadows
-    More lights?
-
+PBR LIGHTS
+PointLightWIthoutshadows
+renderDirectionalLightsWithoutShadows
+renderDirectionalLightsWithShadows
+RenderPointLighstWithShadows
+More lights?
 
 Distortion Category
-
 
 Blur
 Bloom
 Minimize amount of pipelines, and other resources, Order render keys based on technique, material, mesh. Then minimize the number of activations
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 
-
 AABB/CPU Culling on camera
 Culling of lights
 Ambient Occlusion
 Decals Category
 Mesh LOD/Generate LOD on texture and mesh automatically
-
-
 
 Lens Flare
 Camera Lens Dirt

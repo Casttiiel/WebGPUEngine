@@ -1,28 +1,25 @@
-import { Component } from "../../core/ecs/Component";
+import { Component } from '../../core/ecs/Component';
 
 export class NameComponent extends Component {
-    private name: string = "";
+  private name: string = '';
 
-    constructor() {
-        super();
-    }
+  constructor() {
+    super();
+  }
 
-    public async load(data: string): Promise<void> {
-        this.name = data;
-    }
+  public async load(data: string): Promise<void> {
+    this.name = data;
+  }
 
-    public update(dt: number): void {
-        // Name components don't need update logic by default
-    }
+  public update(dt: number): void {
+    // Name components don't need update logic by default
+  }
 
-    public renderInMenu(): void {
-        
-    }
+  public renderInMenu(): void {}
 
-    public renderDebug(): void {
-    }
+  public renderDebug(): void {}
 
-    public getName(): string {
-        return this.name;
-    }
+  public getName(): string {
+    return this.name;
+  }
 }

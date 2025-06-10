@@ -1,14 +1,14 @@
-import { AntialiasingComponent } from "../../components/render/AntialiasingComponent";
-import { CameraComponent } from "../../components/render/CameraComponent";
-import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
-import { Engine } from "../../core/engine/Engine";
-import { DeferredRenderer } from "../../renderer/core/DeferredRenderer";
-import { Render } from "../../renderer/core/render";
-import { RenderManager } from "../../renderer/core/RenderManager";
-import { Mesh } from "../../renderer/resources/Mesh";
-import { Technique } from "../../renderer/resources/Technique";
-import { RenderCategory } from "../../types/RenderCategory.enum";
-import { Module } from "../core/Module";
+import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
+import { CameraComponent } from '../../components/render/CameraComponent';
+import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { Engine } from '../../core/engine/Engine';
+import { DeferredRenderer } from '../../renderer/core/DeferredRenderer';
+import { Render } from '../../renderer/core/render';
+import { RenderManager } from '../../renderer/core/RenderManager';
+import { Mesh } from '../../renderer/resources/Mesh';
+import { Technique } from '../../renderer/resources/Technique';
+import { RenderCategory } from '../../types/RenderCategory.enum';
+import { Module } from '../core/Module';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -19,16 +19,16 @@ export class ModuleRender extends Module {
   private globalBindGroup!: GPUBindGroup;
 
   //Presentation data
-  private presentationTechnique !: Technique;
-  private fullscreenQuadMesh !: Mesh;
-  private presentationBindGroup !: GPUBindGroup | null;
+  private presentationTechnique!: Technique;
+  private fullscreenQuadMesh!: Mesh;
+  private presentationBindGroup!: GPUBindGroup | null;
 
   // Debug values para Tweakpane
   private debugValues = {
     drawCallsSolids: { name: 'Draw Calls (Solids)', value: 0 },
     drawCallsTransparent: { name: 'Draw Calls (Transparent)', value: 0 },
     totalDrawCalls: { name: 'Total Draw Calls', value: 0 },
-    resolution: { name: 'Resolution', value: '0x0' }
+    resolution: { name: 'Resolution', value: '0x0' },
   };
 
   constructor(name: string) {
@@ -52,27 +52,27 @@ export class ModuleRender extends Module {
   public generateFrame(): void {
     Render.getInstance().beginFrame();
 
-    const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
-    const cameraComponent = mainCamera?.getComponent("camera") as CameraComponent;
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
     const camera = cameraComponent.getCamera();
 
     // Actualizar buffer uniforme global solo con view y projection
     this.updateGlobalUniforms(
       new Float32Array(camera.getView()),
-      new Float32Array(camera.getProjection())
+      new Float32Array(camera.getProjection()),
     );
     RenderManager.getInstance().setCamera(camera);
 
     //this.setupDeferredOutput();
     let result = this.deferred.render(camera);
 
-    if (mainCamera?.hasComponent("tone_mapping")) {
-      const toneMapping = mainCamera.getComponent("tone_mapping") as ToneMappingComponent;
+    if (mainCamera?.hasComponent('tone_mapping')) {
+      const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
       result = toneMapping.apply(result);
     }
-    
-    if (mainCamera?.hasComponent("antialiasing")) {
-      const antialiasing = mainCamera.getComponent("antialiasing") as AntialiasingComponent;
+
+    if (mainCamera?.hasComponent('antialiasing')) {
+      const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
       result = antialiasing.apply(result);
     }
 
@@ -103,33 +103,36 @@ export class ModuleRender extends Module {
             binding: 1,
             resource: sampler,
           },
-        ]
-      })
+        ],
+      });
     }
-    
-    const pass = render.getCommandEncoder().beginRenderPass(
-      {
-        colorAttachments: [{
+
+    const pass = render.getCommandEncoder().beginRenderPass({
+      colorAttachments: [
+        {
           view: render.getContext().getCurrentTexture().createView(),
           loadOp: 'clear',
           storeOp: 'store',
           clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        }],
-      }
-    );
+        },
+      ],
+    });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height,            // Height
-      0.0, 1.0                       // Min/max depth
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+      0.0,
+      1.0, // Min/max depth
     );
 
     pass.setScissorRect(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height             // Height
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
     );
 
     // 1. Activar el pipeline
@@ -148,15 +151,20 @@ export class ModuleRender extends Module {
   }
 
   public stop(): void {
-    throw new Error("Method not implemented.");
+    throw new Error('Method not implemented.');
   }
 
   public update(dt: number): void {
     // Actualizar valores de debug
     const renderManager = RenderManager.getInstance();
-    this.debugValues.drawCallsSolids.value = renderManager.getDrawCallsForCategory(RenderCategory.SOLIDS);
-    this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(RenderCategory.TRANSPARENT);
-    this.debugValues.totalDrawCalls.value = this.debugValues.drawCallsSolids.value + this.debugValues.drawCallsTransparent.value;
+    this.debugValues.drawCallsSolids.value = renderManager.getDrawCallsForCategory(
+      RenderCategory.SOLIDS,
+    );
+    this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
+      RenderCategory.TRANSPARENT,
+    );
+    this.debugValues.totalDrawCalls.value =
+      this.debugValues.drawCallsSolids.value + this.debugValues.drawCallsTransparent.value;
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
   }
 
@@ -164,16 +172,28 @@ export class ModuleRender extends Module {
     if (this.debugControlsAdded) return;
 
     // Render Stats
-    this.addDebugControl(this.debugValues.drawCallsSolids, 'value', this.debugValues.drawCallsSolids.name);
-    this.addDebugControl(this.debugValues.drawCallsTransparent, 'value', this.debugValues.drawCallsTransparent.name);
-    this.addDebugControl(this.debugValues.totalDrawCalls, 'value', this.debugValues.totalDrawCalls.name);
+    this.addDebugControl(
+      this.debugValues.drawCallsSolids,
+      'value',
+      this.debugValues.drawCallsSolids.name,
+    );
+    this.addDebugControl(
+      this.debugValues.drawCallsTransparent,
+      'value',
+      this.debugValues.drawCallsTransparent.name,
+    );
+    this.addDebugControl(
+      this.debugValues.totalDrawCalls,
+      'value',
+      this.debugValues.totalDrawCalls.name,
+    );
     this.addDebugControl(this.debugValues.resolution, 'value', this.debugValues.resolution.name);
 
     this.debugControlsAdded = true;
   }
 
   public renderDebug(): void {
-    throw new Error("Method not implemented.");
+    throw new Error('Method not implemented.');
   }
 
   private initializeUniformBuffers(): void {
@@ -192,9 +212,9 @@ export class ModuleRender extends Module {
         {
           binding: 0,
           visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' }
-        }
-      ]
+          buffer: { type: 'uniform' },
+        },
+      ],
     });
 
     // Crear el bind group global
@@ -204,16 +224,16 @@ export class ModuleRender extends Module {
       entries: [
         {
           binding: 0,
-          resource: { buffer: this.globalUniformBuffer }
-        }
-      ]
+          resource: { buffer: this.globalUniformBuffer },
+        },
+      ],
     });
   }
 
   private async initializePresentationData(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
+    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
 
-    this.presentationTechnique = await Technique.get("presentation.tech");
+    this.presentationTechnique = await Technique.get('presentation.tech');
   }
 
   public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {
@@ -222,15 +242,15 @@ export class ModuleRender extends Module {
     // Escribir la matriz de vista con el nombre correcto viewMatrix
     render.getDevice().queue.writeBuffer(
       this.globalUniformBuffer,
-      0,  // viewMatrix offset
-      viewMatrix.buffer
+      0, // viewMatrix offset
+      viewMatrix.buffer,
     );
 
     // Escribir la matriz de proyección con el nombre correcto projectionMatrix
     render.getDevice().queue.writeBuffer(
       this.globalUniformBuffer,
-      16 * 4,  // projectionMatrix offset
-      projectionMatrix.buffer
+      16 * 4, // projectionMatrix offset
+      projectionMatrix.buffer,
     );
   }
 

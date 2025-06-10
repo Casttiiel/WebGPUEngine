@@ -1,20 +1,20 @@
-import { Engine } from "../../core/engine/Engine";
-import { Camera } from "../../core/math/Camera";
-import { RenderCategory } from "../../types/RenderCategory.enum";
-import { Cubemap } from "../resources/Cubemap";
-import { Mesh } from "../resources/Mesh";
-import { Technique } from "../resources/Technique";
-import { Render } from "./render";
-import { RenderManager } from "./RenderManager";
-import { RenderToTexture } from "./RenderToTexture";
+import { Engine } from '../../core/engine/Engine';
+import { Camera } from '../../core/math/Camera';
+import { RenderCategory } from '../../types/RenderCategory.enum';
+import { Cubemap } from '../resources/Cubemap';
+import { Mesh } from '../resources/Mesh';
+import { Technique } from '../resources/Technique';
+import { Render } from './render';
+import { RenderManager } from './RenderManager';
+import { RenderToTexture } from './RenderToTexture';
 
 export class DeferredRenderer {
-  private fullscreenQuadMesh !: Mesh;
+  private fullscreenQuadMesh!: Mesh;
 
-  private ambientTechnique !: Technique;
-  private skyboxTechnique !: Technique;
-  private skyboxBindGroup !: GPUBindGroup;
-  private skyboxTexture !: Cubemap;
+  private ambientTechnique!: Technique;
+  private skyboxTechnique!: Technique;
+  private skyboxBindGroup!: GPUBindGroup;
+  private skyboxTexture!: Cubemap;
 
   private rtAlbedos!: RenderToTexture;
   private rtNormals!: RenderToTexture;
@@ -22,12 +22,11 @@ export class DeferredRenderer {
   private rtAccLight!: RenderToTexture;
   private rtSelfIllum!: RenderToTexture;
   private depthStencil!: GPUTexture;
-  private depthStencilView !: GPUTextureView | null;
+  private depthStencilView!: GPUTextureView | null;
 
-  constructor() { }
+  constructor() {}
 
   public create(width: number, height: number) {
-
     this.destroy();
 
     if (!this.rtAlbedos) {
@@ -38,22 +37,23 @@ export class DeferredRenderer {
       this.rtSelfIllum = new RenderToTexture();
     }
 
-    this.rtAlbedos.createRT("g_albedos.dds", width, height, 'rgba16float');
-    this.rtNormals.createRT("g_normals.dds", width, height, 'rgba16float');
-    this.rtSelfIllum.createRT("g_self_illum.dds", width, height, "rgba16float");
-    this.rtLinearDepth.createRT("g_depths.dds", width, height, 'r16float');
-    this.rtAccLight.createRT("acc_light.dds", width, height, 'rgba16float');
+    this.rtAlbedos.createRT('g_albedos.dds', width, height, 'rgba16float');
+    this.rtNormals.createRT('g_normals.dds', width, height, 'rgba16float');
+    this.rtSelfIllum.createRT('g_self_illum.dds', width, height, 'rgba16float');
+    this.rtLinearDepth.createRT('g_depths.dds', width, height, 'r16float');
+    this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float');
 
-
-    this.depthStencil = Render.getInstance().getDevice().createTexture({
-      label: 'deferred depth stencil texture label',
-      size: {
-        width: width,
-        height: height
-      },
-      format: 'depth32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT
-    });
+    this.depthStencil = Render.getInstance()
+      .getDevice()
+      .createTexture({
+        label: 'deferred depth stencil texture label',
+        size: {
+          width: width,
+          height: height,
+        },
+        format: 'depth32float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      });
 
     if (!this.depthStencilView) {
       this.depthStencilView = this.depthStencil.createView();
@@ -61,15 +61,15 @@ export class DeferredRenderer {
   }
 
   public async load(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.get("fullscreenquad.obj");
-    this.skyboxTechnique = await Technique.get("skybox.tech");
+    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.skyboxTechnique = await Technique.get('skybox.tech');
 
-    this.skyboxTexture = await Cubemap.get("skybox.png", {
+    this.skyboxTexture = await Cubemap.get('skybox.png', {
       magFilter: 'linear',
       minFilter: 'linear',
       mipmapFilter: 'linear',
       addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge'
+      addressModeV: 'clamp-to-edge',
     });
 
     const pipeline = await this.skyboxTechnique.getPipeline();
@@ -83,20 +83,22 @@ export class DeferredRenderer {
       throw new Error('Failed to get skybox texture view or sampler');
     }
 
-    this.skyboxBindGroup = Render.getInstance().getDevice().createBindGroup({
-      label: `skybox_bindgroup`,
-      layout: pipeline.getBindGroupLayout(1),
-      entries: [
-        {
-          binding: 0,
-          resource: textureView
-        },
-        {
-          binding: 1,
-          resource: sampler
-        }
-      ]
-    });
+    this.skyboxBindGroup = Render.getInstance()
+      .getDevice()
+      .createBindGroup({
+        label: `skybox_bindgroup`,
+        layout: pipeline.getBindGroupLayout(1),
+        entries: [
+          {
+            binding: 0,
+            resource: textureView,
+          },
+          {
+            binding: 1,
+            resource: sampler,
+          },
+        ],
+      });
     //this.ambientTechnique = await Technique.get("ambient.tech");
   }
 
@@ -118,16 +120,19 @@ export class DeferredRenderer {
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
-      0, 0,                          // Offset X,Y
-      Render.width,             // Width
-      Render.height,            // Height
-      0.0, 1.0                       // Min/max depth
+      0,
+      0, // Offset X,Y
+      Render.width, // Width
+      Render.height, // Height
+      0.0,
+      1.0, // Min/max depth
     );
 
     pass.setScissorRect(
-      0, 0,                          // Offset X,Y
-      Render.width,             // Width
-      Render.height             // Height
+      0,
+      0, // Offset X,Y
+      Render.width, // Width
+      Render.height, // Height
     );
 
     RenderManager.getInstance().render(RenderCategory.SOLIDS, pass);
@@ -146,29 +151,32 @@ export class DeferredRenderer {
 
   private renderAmbientPass(): void {
     const render = Render.getInstance();
-    const pass = render.getCommandEncoder().beginRenderPass(
-      {
-        colorAttachments: [{
+    const pass = render.getCommandEncoder().beginRenderPass({
+      colorAttachments: [
+        {
           view: this.rtAccLight.getView(),
           loadOp: 'clear',
           storeOp: 'store',
           clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        }],
-      }
-    );
+        },
+      ],
+    });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height,            // Height
-      0.0, 1.0                       // Min/max depth
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+      0.0,
+      1.0, // Min/max depth
     );
 
     pass.setScissorRect(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height             // Height
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
     );
 
     // 1. Activar el pipeline
@@ -194,34 +202,39 @@ export class DeferredRenderer {
     }
 
     const pass = render.getCommandEncoder().beginRenderPass({
-      colorAttachments: [{
-        view: this.rtAlbedos.getView(),
-        loadOp: 'load',
-        storeOp: 'store',
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
-      }],
-      depthStencilAttachment: depthStencil
+      colorAttachments: [
+        {
+          view: this.rtAlbedos.getView(),
+          loadOp: 'load',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      ],
+      depthStencilAttachment: depthStencil,
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height,            // Height
-      0.0, 1.0                       // Min/max depth
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+      0.0,
+      1.0, // Min/max depth
     );
 
     pass.setScissorRect(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height             // Height
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
     );
 
     // 1. Activar el pipeline
     this.skyboxTechnique.activatePipeline(pass);
 
     // 2. Activar mesh data
-    this.fullscreenQuadMesh.activate(pass);    // 3. Activar bind groups
+    this.fullscreenQuadMesh.activate(pass); // 3. Activar bind groups
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
     pass.setBindGroup(1, this.skyboxBindGroup);
 
@@ -240,26 +253,31 @@ export class DeferredRenderer {
 
     const pass = render.getCommandEncoder().beginRenderPass({
       label: 'Transparents Render pass',
-      colorAttachments: [{
-        view: this.rtAlbedos.getView(),
-        loadOp: 'load',
-        storeOp: 'store',
-      }],
-      depthStencilAttachment: depthStencil
+      colorAttachments: [
+        {
+          view: this.rtAlbedos.getView(),
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: depthStencil,
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height,            // Height
-      0.0, 1.0                       // Min/max depth
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+      0.0,
+      1.0, // Min/max depth
     );
 
     pass.setScissorRect(
-      0, 0,                          // Offset X,Y
-      render.getCanvas().width,             // Width
-      render.getCanvas().height             // Height
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
     );
 
     RenderManager.getInstance().render(RenderCategory.TRANSPARENT, pass);
@@ -275,7 +293,7 @@ export class DeferredRenderer {
       view: this.depthStencilView,
       depthLoadOp: 'clear',
       depthStoreOp: 'store',
-      depthClearValue: 1.0
+      depthClearValue: 1.0,
     };
   }
 
@@ -287,30 +305,32 @@ export class DeferredRenderer {
 
     return {
       label: 'GBuffer Render pass',
-      colorAttachments: [{
-        view: this.rtAlbedos.getView(),
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        loadOp: 'clear',
-        storeOp: 'store',
-      },
-      {
-        view: this.rtNormals.getView(),
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        loadOp: 'clear',
-        storeOp: 'store',
-      },
-      {
-        view: this.rtSelfIllum.getView(),
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        loadOp: 'clear',
-        storeOp: 'store',
-      },
-      {
-        view: this.rtLinearDepth.getView(),
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        loadOp: 'clear',
-        storeOp: 'store',
-      }],
+      colorAttachments: [
+        {
+          view: this.rtAlbedos.getView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+        {
+          view: this.rtNormals.getView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+        {
+          view: this.rtSelfIllum.getView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+        {
+          view: this.rtLinearDepth.getView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
       depthStencilAttachment: depthStencil,
     };
   }

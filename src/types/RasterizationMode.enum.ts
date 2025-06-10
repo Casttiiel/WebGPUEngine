@@ -1,4 +1,4 @@
 export enum RasterizationMode {
-    DEFAULT= 'default',
-    DOUBLE_SIDED= 'double_sided'
+  DEFAULT = 'default',
+  DOUBLE_SIDED = 'double_sided',
 }

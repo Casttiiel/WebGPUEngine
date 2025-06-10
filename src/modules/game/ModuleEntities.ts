@@ -1,15 +1,14 @@
-
-import { Component } from "../../core/ecs/Component";
-import { Entity } from "../../core/ecs/Entity";
-import { ComponentDataType } from "../../types/ComponentData.type";
-import { Module } from "../core/Module";
+import { Component } from '../../core/ecs/Component';
+import { Entity } from '../../core/ecs/Entity';
+import { ComponentDataType } from '../../types/ComponentData.type';
+import { Module } from '../core/Module';
 
 class ObjectManager {
   private list: Component[] = [];
-  private name: string = "";
+  private name: string = '';
 
   constructor(name: string) {
-    this.name = name
+    this.name = name;
   }
 
   public getName(): string {
@@ -30,7 +29,7 @@ class ObjectManager {
       c.renderDebug();
     }
   }
-  public getList(): Component[]{
+  public getList(): Component[] {
     return this.list;
   }
 }
@@ -78,9 +77,7 @@ export class ModuleEntities extends Module {
     }
   }
 
-  public renderInMenu(): void {
-
-  }
+  public renderInMenu(): void {}
 
   public renderDebug(): void {
     this.renderDebugOfComponents();
@@ -98,7 +95,7 @@ export class ModuleEntities extends Module {
 
   public addComponentToManager(component: Component, managerName: string): void {
     const om = this.omGeneral.get(managerName);
-    if(!om){
+    if (!om) {
       const newOm = new ObjectManager(managerName);
       this.omGeneral.set(managerName, newOm);
     }
@@ -121,6 +118,6 @@ export class ModuleEntities extends Module {
   }
 
   public stop(): void {
-    throw new Error("Method not implemented.");
+    throw new Error('Method not implemented.');
   }
 }

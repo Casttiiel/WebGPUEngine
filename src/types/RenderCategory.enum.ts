@@ -1,5 +1,5 @@
 export enum RenderCategory {
-    SOLIDS= 'solids',
-    TRANSPARENT= 'transparent',
-    PRESENTATION = 'presentation'
+  SOLIDS = 'solids',
+  TRANSPARENT = 'transparent',
+  PRESENTATION = 'presentation',
 }

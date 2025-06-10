@@ -1,0 +1,42 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "rules": {
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/prefer-optional-chain": "error",
+    "prefer-const": "error",
+    "immutable/no-mutation": "error",
+    "@typescript-eslint/naming-convention": [
+      "error",
+      {
+        "selector": "variableLike",
+        "format": ["camelCase"],
+      },
+      {
+        "selector": "property",
+        "format": ["camelCase"],
+      },
+      {
+        "selector": "method",
+        "format": ["camelCase"],
+      },
+      {
+        "selector": "typeLike",
+        "format": ["PascalCase"],
+      },
+      {
+        "selector": "variable",
+        "format": ["UPPER_CASE"],
+        "types": ["boolean", "string", "number"],
+        "modifiers": ["global"],
+      },
+      {
+        "selector": "enumMember",
+        "format": ["UPPER_CASE"],
+      },
+    ],
+  },
+}

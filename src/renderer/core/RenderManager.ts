@@ -1,10 +1,10 @@
-import { TransformComponent } from "../../components/core/TransformComponent";
-import { RenderComponent } from "../../components/render/RenderComponent";
-import { Engine } from "../../core/engine/Engine";
-import { Camera } from "../../core/math/Camera";
-import { RenderCategory } from "../../types/RenderCategory.enum";
-import { Material } from "../resources/material";
-import { Mesh } from "../resources/Mesh";
+import { TransformComponent } from '../../components/core/TransformComponent';
+import { RenderComponent } from '../../components/render/RenderComponent';
+import { Engine } from '../../core/engine/Engine';
+import { Camera } from '../../core/math/Camera';
+import { RenderCategory } from '../../types/RenderCategory.enum';
+import { Material } from '../resources/material';
+import { Mesh } from '../resources/Mesh';
 
 interface RenderKey {
   mesh: Mesh;
@@ -21,7 +21,7 @@ export class RenderManager {
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private camera!: Camera;
 
-  private constructor() { }
+  private constructor() {}
 
   public static getInstance(): RenderManager {
     if (!RenderManager.instance) {
@@ -71,16 +71,13 @@ export class RenderManager {
       return k1.material.getName().localeCompare(k2.material.getName());
     });*/
 
-    const keysToDraw = this.normalKeys.filter(key => 
-      key.material.getCategory() === category
-    );
+    const keysToDraw = this.normalKeys.filter((key) => key.material.getCategory() === category);
 
     let numDrawCalls = 0;
 
-
     for (const key of keysToDraw) {
       if (!key.material || !key.mesh || !key.transform) {
-        console.warn("Invalid render key - missing components");
+        console.warn('Invalid render key - missing components');
         continue;
       }
 

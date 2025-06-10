@@ -1,8 +1,8 @@
-import { Module } from "../../modules/core/Module";
+import { Module } from '../../modules/core/Module';
 
 export class Gamestate {
-    public name: string = "";
-    public modules: Module[] = [];
+  public name: string = '';
+  public modules: Module[] = [];
 
   constructor(name: string) {
     this.name = name;
@@ -15,4 +15,4 @@ export class Gamestate {
   public [Symbol.iterator](): IterableIterator<Module> {
     return this.modules[Symbol.iterator]();
   }
-  }
+}

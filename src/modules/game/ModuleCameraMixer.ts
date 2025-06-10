@@ -1,12 +1,11 @@
-import { vec3 } from "gl-matrix";
-import { CameraComponent } from "../../components/render/CameraComponent";
-import { Entity } from "../../core/ecs/Entity";
-import { Camera } from "../../core/math/Camera";
-import { Render } from "../../renderer/core/render";
-import { Interpolator } from "../../types/interpolator.interface";
-import { MixedCamera } from "../../types/MixedCamera.type";
-import { Module } from "../core/Module";
-
+import { vec3 } from 'gl-matrix';
+import { CameraComponent } from '../../components/render/CameraComponent';
+import { Entity } from '../../core/ecs/Entity';
+import { Camera } from '../../core/math/Camera';
+import { Render } from '../../renderer/core/render';
+import { Interpolator } from '../../types/interpolator.interface';
+import { MixedCamera } from '../../types/MixedCamera.type';
+import { Module } from '../core/Module';
 
 export class ModuleCameraMixer extends Module {
   private mixedCameras: MixedCamera[] = [];
@@ -21,7 +20,7 @@ export class ModuleCameraMixer extends Module {
     return true;
   }
 
-  public stop(): void { }
+  public stop(): void {}
 
   public update(dt: number): void {
     // Update mixed cameras weights
@@ -30,11 +29,7 @@ export class ModuleCameraMixer extends Module {
       const mc = this.mixedCameras[i];
 
       if (mc.blendedWeight < 1.0) {
-        mc.blendedWeight = this.clamp(
-          mc.blendedWeight + dt / mc.blendTime,
-          0.0,
-          1.0
-        );
+        mc.blendedWeight = this.clamp(mc.blendedWeight + dt / mc.blendTime, 0.0, 1.0);
       }
 
       mc.appliedWeight = mc.blendedWeight * Math.min(mc.targetWeight, weight);
@@ -42,7 +37,7 @@ export class ModuleCameraMixer extends Module {
     }
 
     // Remove dead cameras
-    this.mixedCameras = this.mixedCameras.filter(mc => mc.appliedWeight > 0.0);
+    this.mixedCameras = this.mixedCameras.filter((mc) => mc.appliedWeight > 0.0);
 
     // Blend all active cameras
     let result = new Camera();
@@ -60,7 +55,7 @@ export class ModuleCameraMixer extends Module {
       ratio = mc.interpolator.blend(0.0, 1.0, ratio);
 
       if (isNaN(ratio)) {
-        throw new Error("NaN ratio in camera mixer");
+        throw new Error('NaN ratio in camera mixer');
         ratio = 0.0;
       }
 
@@ -80,18 +75,14 @@ export class ModuleCameraMixer extends Module {
       interpolator,
       blendedWeight: 0.0,
       appliedWeight: 0.0,
-      targetWeight: 1.0
+      targetWeight: 1.0,
     };
 
     this.mixedCameras.push(mc);
   }
 
-  private blendCameras(
-    camera1: Camera,
-    camera2: Camera,
-    ratio: number,
-  ): Camera {
-    if (!camera1 || !camera2 || ratio <= 0.0) throw new Error("Invalid cameras or ratio");
+  private blendCameras(camera1: Camera, camera2: Camera, ratio: number): Camera {
+    if (!camera1 || !camera2 || ratio <= 0.0) throw new Error('Invalid cameras or ratio');
 
     let output = new Camera();
 
@@ -99,29 +90,16 @@ export class ModuleCameraMixer extends Module {
       vec3.create(),
       camera1.getPosition(),
       camera2.getPosition(),
-      ratio
+      ratio,
     );
 
-    const newFront = vec3.lerp(
-      vec3.create(),
-      camera1.getFront(),
-      camera2.getFront(),
-      ratio
-    );
+    const newFront = vec3.lerp(vec3.create(), camera1.getFront(), camera2.getFront(), ratio);
 
-    const newUp = vec3.lerp(
-      vec3.create(),
-      camera1.getUp(),
-      camera2.getUp(),
-      ratio
-    );
+    const newUp = vec3.lerp(vec3.create(), camera1.getUp(), camera2.getUp(), ratio);
 
-    const newFov =
-      camera1.getFov() * (1.0 - ratio) + camera2.getFov() * ratio;
-    const newZNear =
-      camera1.getNear() * (1.0 - ratio) + camera2.getNear() * ratio;
-    const newZFar =
-      camera1.getFar() * (1.0 - ratio) + camera2.getFar() * ratio;
+    const newFov = camera1.getFov() * (1.0 - ratio) + camera2.getFov() * ratio;
+    const newZNear = camera1.getNear() * (1.0 - ratio) + camera2.getNear() * ratio;
+    const newZFar = camera1.getFar() * (1.0 - ratio) + camera2.getFar() * ratio;
 
     output.setProjectionParams(newFov, newZNear, newZFar);
     output.setViewport(0, 0, Render.width, Render.height);
@@ -131,20 +109,17 @@ export class ModuleCameraMixer extends Module {
   }
 
   private getCameraComponentFromEntity(entity: Entity): CameraComponent | null {
-    return entity.getComponent("camera") as CameraComponent;
+    return entity.getComponent('camera') as CameraComponent;
   }
 
   private clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
   }
 
-  public renderDebug(): void { }
+  public renderDebug(): void {}
 
-  public renderInMenu(): void {
-    
-  }
+  public renderInMenu(): void {}
 }
-
 
 // Implementaciones básicas de interpoladores
 class LinearInterpolator implements Interpolator {

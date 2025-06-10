@@ -1,5 +1,5 @@
 export enum FragmentShaderTargets {
-    SCREEN= 'screen',
-    GBUFFER= 'gbuffer',
-    TEXTURE = 'texture'
+  SCREEN = 'screen',
+  GBUFFER = 'gbuffer',
+  TEXTURE = 'texture',
 }

@@ -1,16 +1,16 @@
-import { AntialiasingComponent } from "../../components/render/AntialiasingComponent";
-import { ToneMappingComponent } from "../../components/render/ToneMappingComponent";
-import { Engine } from "../../core/engine/Engine";
+import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
+import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { Engine } from '../../core/engine/Engine';
 
 export class Render {
   private static instance: Render;
 
   // Objetos principales de WebGPU
-  private adapter!: GPUAdapter;           // Adaptador que representa el hardware gráfico
-  private device!: GPUDevice;             // Dispositivo lógico para crear recursos y ejecutar comandos
-  private context!: GPUCanvasContext;     // Contexto del canvas para presentar los frames
+  private adapter!: GPUAdapter; // Adaptador que representa el hardware gráfico
+  private device!: GPUDevice; // Dispositivo lógico para crear recursos y ejecutar comandos
+  private context!: GPUCanvasContext; // Contexto del canvas para presentar los frames
   private currentCommandEncoder!: GPUCommandEncoder; // Codificador de comandos actual
-  private format: GPUTextureFormat = 'bgra8unorm';         // Formato de color (BGRA 8 bits por canal)
+  private format: GPUTextureFormat = 'bgra8unorm'; // Formato de color (BGRA 8 bits por canal)
 
   // Dimensiones del canvas
   private static screenWidth: number = 800;
@@ -49,10 +49,10 @@ export class Render {
 
       // 2. Crear el dispositivo lógico con las características requeridas
       this.device = await this.adapter.requestDevice({
-        requiredFeatures: ['texture-compression-bc', 'depth32float-stencil8'],  // Soporte para compresión de texturas
+        requiredFeatures: ['texture-compression-bc', 'depth32float-stencil8'], // Soporte para compresión de texturas
         requiredLimits: {
           maxStorageBufferBindingSize: 1024 * 1024 * 1024, // 1GB de buffer máximo
-        }
+        },
       });
 
       // 3. Configurar el contexto del canvas para WebGPU
@@ -73,7 +73,6 @@ export class Render {
       this.setupResizeObserver();
 
       return true;
-
     } catch (error) {
       console.error('Error al inicializar WebGPU:', error);
       return false;
@@ -139,18 +138,20 @@ export class Render {
       const [w, h] = [Render.screenWidth, Render.screenHeight];
 
       // Usa Render.getSize() en todos los componentes:
-      const mainCamera = Engine.getEntities().getEntityByName("MainCamera");
-      mainCamera?.getComponent("camera")?.getCamera().setViewport(w, h);
+      const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+      mainCamera?.getComponent('camera')?.getCamera().setViewport(w, h);
 
-      for (const comp of (Engine.getEntities().getObjectManagerByName("tone_mapping")?.getList() ?? [])) {
+      for (const comp of Engine.getEntities().getObjectManagerByName('tone_mapping')?.getList() ??
+        []) {
         (comp as ToneMappingComponent).resize();
       }
-      for (const comp of (Engine.getEntities().getObjectManagerByName("antialiasing")?.getList() ?? [])) {
+      for (const comp of Engine.getEntities().getObjectManagerByName('antialiasing')?.getList() ??
+        []) {
         (comp as AntialiasingComponent).resize();
       }
 
       Engine.getRender().onResolutionUpdated();
-    })
+    });
   }
 
   public static getInstance(): Render {
@@ -188,6 +189,5 @@ export class Render {
     return this.context;
   }
 
-  public destroy(): void {
-  }
+  public destroy(): void {}
 }
