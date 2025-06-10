@@ -315,7 +315,7 @@ export class Technique extends GPUResource {
 
     const pipelineParams = {
       label: this.label,
-      layout: 'auto', //pipelineLayout,
+      layout: pipelineLayout,
       vertex: {
         module: vsModule,
         entryPoint: this.vsEntryPoint,
