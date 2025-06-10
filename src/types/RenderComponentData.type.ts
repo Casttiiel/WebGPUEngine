@@ -1,7 +1,7 @@
 import { MaterialDataType } from './MaterialData.type';
 
 export type RenderComponentDataType = Readonly<{
-  meshes?: ReadonlyArray<RenderComponentMeshDataType>;
+  meshes: ReadonlyArray<RenderComponentMeshDataType>;
 }>;
 
 export type RenderComponentMeshDataType = Readonly<{

@@ -1,7 +1,7 @@
 import { quat, vec3 } from 'gl-matrix';
 import { EntityDataType } from '../../types/SceneData.type';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
-import { RenderComponentDataType } from '../../types/RenderComponentData.type';
+import { RenderComponentDataType, RenderComponentMeshDataType } from '../../types/RenderComponentData.type';
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
 
 export class GLTFLoader {
@@ -31,17 +31,23 @@ export class GLTFLoader {
       for (const nodeIndex of gltf.scenes[0].nodes) {
         const primitiveList = gltf.meshes[gltf.nodes[nodeIndex].mesh].primitives;
         const transform = this.getNodeTransform(gltf.nodes[nodeIndex]);
+
+        let render = {
+          meshes: [],
+        } as unknown as RenderComponentDataType;
+
         for (const primitive of primitiveList) {
-          const render = this.processPrimitive(gltf, binData, primitive);
-          const res = {
-            children: [],
-            components: {
-              transform,
-              render,
-            },
-          } as EntityDataType;
-          gltfNodes.push(res);
+          render.meshes.push(this.processPrimitive(gltf, binData, primitive));
         }
+
+        const res = {
+          children: [],
+          components: {
+            transform,
+            render,
+          },
+        } as EntityDataType;
+        gltfNodes.push(res);
       }
     }
 
@@ -124,19 +130,15 @@ export class GLTFLoader {
         materialDef.alphaMode === 'MASK' ? 'gbuffer_mask.tech' : 'gbuffer.tech';
     }
 
-    let render = {
-      meshes: [
-        {
-          meshData: {
-            attributes,
-            indices,
-          },
-          materialData: material,
-        },
-      ],
-    } as unknown as RenderComponentDataType;
+    let meshData = {
+      meshData: {
+        attributes,
+        indices,
+      },
+      materialData: material,
+    } as unknown as RenderComponentMeshDataType;
 
-    return render;
+    return meshData;
   }
 
   private static getNodeTransform(node: any): TransformComponentDataType {
