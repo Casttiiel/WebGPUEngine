@@ -63,7 +63,6 @@ export class ModuleRender extends Module {
     );
     RenderManager.getInstance().setCamera(camera);
 
-    //this.setupDeferredOutput();
     let result = this.deferred.render(camera);
 
     if (mainCamera?.hasComponent('tone_mapping')) {

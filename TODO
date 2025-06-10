@@ -1,9 +1,4 @@
 ## NPM RUN DEV
-
-
-Mejora en el Sistema de Renderizado
-    
-Sistema de Uniformes Mejorado
 Skybox using technique
 GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
 
@@ -11,6 +6,8 @@ GLTF Crea las techniques con un name y usamos ese path luego en el rendercompone
 Ambient Light
 Performance numbers
 Replace Unknown Types
+
+Sistema de Uniformes Mejorado
 
 PBR LIGHTS
 PointLightWIthoutshadows
@@ -23,7 +20,6 @@ Distortion Category
 
 Blur
 Bloom
-Minimize amount of pipelines, and other resources, Order render keys based on technique, material, mesh. Then minimize the number of activations
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 
 AABB/CPU Culling on camera

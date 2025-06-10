@@ -73,6 +73,49 @@ Issues:
 - Pipeline configuration is spread across multiple resources
 ```
 
+### Current Technical Enhancements
+
+#### Pipeline Creation and State Management
+```typescript
+// Efficient pipeline state management
+class RenderManager {
+  // Cache for reducing state changes
+  private currentPipeline: GPURenderPipeline | null;
+  private currentMeshBuffers: string | null;
+  private currentMaterialBindings: string | null;
+
+  // Optimized rendering with state tracking
+  public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
+    // Sort by technique/material/mesh
+    // Track and minimize state changes
+    // Conditional updates only when needed
+  }
+}
+
+// Uniform buffer alignment and management
+const globalUniformBuffer = device.createBuffer({
+  size: (16 * 4) + (16 * 4) + 16, // Properly aligned for WebGPU
+  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+
+// Bind group visibility improvements
+const globalBindGroupLayout = device.createBindGroupLayout({
+  entries: [{
+    binding: 0,
+    visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+    buffer: { type: 'uniform' }
+  }]
+});
+```
+
+#### Implemented Optimizations
+- Minimized pipeline state changes through caching
+- Proper uniform buffer alignment
+- Efficient render key sorting
+- Conditional state updates
+- Improved bind group visibility handling
+- Reduced GPU state changes
+
 ### Binding Group Convention
 ```
 Group 0: View/Camera uniforms
@@ -110,6 +153,49 @@ Needed: Better resource identification system
 - No scene tree traversal needed for rendering
 - Direct access to renderable objects
 - Transform updates handled separately
+- **Pipeline State Optimization**
+  ```typescript
+  // Cache de estados para reducir cambios
+  private currentPipeline: GPURenderPipeline | null;
+  private currentMeshBuffers: string | null;
+  private currentMaterialBindings: string | null;
+  ```
+- **Render Key Sorting**
+  ```typescript
+  // Ordenamiento por técnica > material > mesh
+  keysToDraw.sort((k1, k2) => {
+    // 1. Sort by technique (minimize pipeline changes)
+    // 2. Sort by material (minimize texture/uniform changes)
+    // 3. Sort by mesh (minimize vertex buffer changes)
+  });
+  ```
+- **Conditional State Updates**
+  ```typescript
+  // Solo activar pipeline si ha cambiado
+  if (this.currentPipeline !== pipeline) {
+    technique.activatePipeline(pass);
+    this.currentPipeline = pipeline;
+  }
+
+  // Solo actualizar mesh data si ha cambiado
+  if (this.currentMeshBuffers !== meshId) {
+    key.mesh.activate(pass);
+    this.currentMeshBuffers = meshId;
+  }
+  ```
+
+#### Uniform System
+- **Global Uniforms**
+  - Camera matrices in viewMatrix(64 bytes)
+  - Projection matrix(64 bytes)
+  - Source size (16 bytes aligned)
+  - Proper alignment for WebGPU requirements
+- **Binding Groups Convention**
+  ```typescript
+  Group 0: View/Camera uniforms (always updated)
+  Group 1: Model uniforms (per-object transforms)
+  Group 2: Material uniforms (textures and parameters)
+  ```
 
 ## Development Patterns
 
@@ -292,24 +378,34 @@ assets/
 #### Phase 1: Core Rendering and Performance
 - **Performance Foundation**
   - Performance metrics and monitoring
-  - Pipeline state optimization
-  - Render key ordering (technique/material/mesh)
-  - Reduced pipeline activations
-  - Uniform system improvements
 
+- **Next Performance Steps**
+  - Implement PipelineStateManager for advanced caching
+  - Add instancing for repeated geometry
+  - Implement descriptor pooling
+  - Add performance profiling tools
+
+- **Current Focus: Uniform System**
+  - Create UniformBuffer class with automatic alignment
+  - Implement buffer pooling system
+  - Add efficient update mechanisms
+  - Improve memory management
+
+#### Phase 2: Lighting and Optimization
 - **Base Lighting System**
   - Point lights without shadows
   - Directional lights without shadows
-  - Ambient light
+  - Ambient light implementation
   - Light exposure control
+  - Skybox with technique support
 
 - **Primary Optimizations**
   - AABB/CPU-based camera culling
   - Light culling optimization
-  - Efficient uniform handling
   - Mesh LOD system
+  - GLTF optimization and path handling
 
-#### Phase 2: Advanced Rendering Features
+#### Phase 3: Advanced Rendering Features
 - **Shadow Implementation**
   - Shadow mapping system
   - Directional lights with shadows
@@ -328,24 +424,21 @@ assets/
   - Advanced material techniques
   - Parallax mapping
 
-#### Phase 3: Visual Effects and Environment
-- **Environmental Systems**
-  - Skybox with technique support
-  - Dynamic day/night cycle
-  - Terrain system with Perlin noise
-  - Weighted terrain support
-
+#### Phase 4: Visual Effects and Environment
 - **Advanced Effects**
   - Volumetric lighting and god rays
   - Ambient occlusion
   - Lens flare effects
   - Camera lens dirt simulation
-
-- **Scene Enhancement**
   - Decals system
   - Particle system
-  - Instancing support
-  - GLTF optimization and transformation
+  - Dynamic day/night cycle
+
+- **Environment Systems**
+  - Terrain system with Perlin noise
+  - Weighted terrain support
+  - Physics-based grass
+  - Advanced skybox features
 
 #### Phase 4: Animation and Physics
 - **Animation System**
@@ -374,34 +467,3 @@ assets/
   - Mipmap generation optimization
   - Normal map generation
   - Texture atlas support
-
-#### Runtime Systems
-- **Resource Management**
-  - Dynamic resource loading/unloading
-  - Memory pool optimization
-  - Asset streaming
-  - Cache management
-
-### Additional Features
-
-#### Audio System
-- Basic audio playback
-- Spatial audio support
-- Sound effects system
-- Music system with transitions
-
-#### Debug and Development Tools
-- Visual debugging tools
-- Performance profiling
-- Memory tracking
-- TweakPane integration for camera and scene control
-
-## Implementation Notes
-- Each phase builds upon the previous one
-- Focus on stability and performance before adding new features
-- Regular testing and optimization cycles
-- Documentation updates with each major feature
-- Community feedback integration points
-
-Always generate code that aligns with these practices, Roadmap and Future Features and include documentation and appropriate TypeScript typing.
-Whenever a new feature is developed, make sure to update this document—both the documentation section and the Roadmap section.

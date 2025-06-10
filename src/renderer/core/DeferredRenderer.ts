@@ -24,7 +24,7 @@ export class DeferredRenderer {
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView | null;
 
-  constructor() {}
+  constructor() { }
 
   public create(width: number, height: number) {
     this.destroy();
@@ -146,7 +146,7 @@ export class DeferredRenderer {
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS
     //TODO FAKE VOLUMETRIC LIGHTS
-    //this.renderSkybox();
+    this.renderSkybox();
   }
 
   private renderAmbientPass(): void {
@@ -196,10 +196,6 @@ export class DeferredRenderer {
 
   private renderSkybox(): void {
     const render = Render.getInstance();
-    const depthStencil = this.depthStencilAttachment();
-    if (!depthStencil) {
-      throw new Error('Depth stencil view not available for skybox pass');
-    }
 
     const pass = render.getCommandEncoder().beginRenderPass({
       colorAttachments: [
@@ -207,10 +203,13 @@ export class DeferredRenderer {
           view: this.rtAlbedos.getView(),
           loadOp: 'load',
           storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
         },
       ],
-      depthStencilAttachment: depthStencil,
+      depthStencilAttachment: {
+        view: this.depthStencilView,
+        depthLoadOp: 'load',
+        depthStoreOp: 'discard'
+      },
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
@@ -246,10 +245,6 @@ export class DeferredRenderer {
 
   private renderTransparents(): void {
     const render = Render.getInstance();
-    const depthStencil = this.depthStencilAttachment();
-    if (!depthStencil) {
-      throw new Error('Depth stencil view not available for transparent pass');
-    }
 
     const pass = render.getCommandEncoder().beginRenderPass({
       label: 'Transparents Render pass',
@@ -260,7 +255,11 @@ export class DeferredRenderer {
           storeOp: 'store',
         },
       ],
-      depthStencilAttachment: depthStencil,
+      depthStencilAttachment: {
+        view: this.depthStencilView,
+        depthLoadOp: 'load',
+        depthStoreOp: 'discard',
+      },
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
@@ -285,24 +284,7 @@ export class DeferredRenderer {
     pass.end();
   }
 
-  private depthStencilAttachment(): GPURenderPassDepthStencilAttachment | undefined {
-    if (!this.depthStencilView) {
-      return undefined;
-    }
-    return {
-      view: this.depthStencilView,
-      depthLoadOp: 'clear',
-      depthStoreOp: 'store',
-      depthClearValue: 1.0,
-    };
-  }
-
   private getGBufferRenderPassDescriptor(): GPURenderPassDescriptor {
-    const depthStencil = this.depthStencilAttachment();
-    if (!depthStencil) {
-      throw new Error('Depth stencil view not available for GBuffer pass');
-    }
-
     return {
       label: 'GBuffer Render pass',
       colorAttachments: [
@@ -331,7 +313,12 @@ export class DeferredRenderer {
           storeOp: 'store',
         },
       ],
-      depthStencilAttachment: depthStencil,
+      depthStencilAttachment: {
+        view: this.depthStencilView,
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      },
     };
   }
 
