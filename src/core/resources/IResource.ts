@@ -11,12 +11,10 @@ export interface IResource {
   readonly path: string;
   readonly type: ResourceType;
   readonly hasData: boolean;
-  readonly isLoaded: boolean;
   readonly dependencies: Set<string>;
   refCount: number;
 
   load(): Promise<void>;
-  unload(): Promise<void>;
   getDependencies(): Set<string>;
   addDependency(path: string): void;
   removeDependency(path: string): void;
@@ -28,7 +26,6 @@ export abstract class BaseResource implements IResource {
   public readonly path: string;
   public readonly type: ResourceType;
   public readonly dependencies: Set<string>;
-  private _isLoaded: boolean = false;
   private _hasData: boolean = false;
   private _refCount: number = 0;
 
@@ -36,10 +33,6 @@ export abstract class BaseResource implements IResource {
     this.path = options.path;
     this.type = options.type;
     this.dependencies = new Set(options.dependencies || []);
-  }
-
-  get isLoaded(): boolean {
-    return this._isLoaded;
   }
 
   get hasData(): boolean {
@@ -55,23 +48,6 @@ export abstract class BaseResource implements IResource {
   }
 
   public abstract load(): Promise<void>;
-
-  public async unload(): Promise<void> {
-    if (!this.isLoaded) return;
-    this._isLoaded = false;
-    await Promise.all(
-      Array.from(this.dependencies).map(async (dep) => {
-        const resource = await ResourceManager.getResource(dep);
-        if (resource) {
-          resource.release();
-        }
-      }),
-    );
-  }
-
-  protected setLoaded(): void {
-    this._isLoaded = true;
-  }
 
   protected setHasData(): void {
     this._hasData = true;

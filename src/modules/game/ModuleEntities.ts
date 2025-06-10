@@ -77,7 +77,7 @@ export class ModuleEntities extends Module {
     }
   }
 
-  public renderInMenu(): void {}
+  public override renderInMenu(): void {}
 
   public renderDebug(): void {
     this.renderDebugOfComponents();

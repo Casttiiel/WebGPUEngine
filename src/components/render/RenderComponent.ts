@@ -40,26 +40,10 @@ export class RenderComponent extends Component {
       }
 
       // Load material first but don't create bind group yet
-      const material = await this.loadMaterial(data);
+      const material = await Material.get(data.material ?? data.materialData);
       if (!material) {
         throw new Error('Failed to load material');
       }
-      this.material = material;
-
-      // Get technique from material
-      const technique = material.getTechnique();
-      if (!technique) {
-        throw new Error('No technique found in material');
-      }
-
-      // Get pipeline
-      const renderPipeline = await technique.getPipeline();
-      if (!renderPipeline) {
-        throw new Error('Failed to get render pipeline');
-      }
-
-      // Now create material bind group using pipeline layout
-      await material.createBindGroup(renderPipeline);
 
       const meshPart: MeshPartType = {
         mesh,
@@ -72,15 +56,6 @@ export class RenderComponent extends Component {
       console.error('Error in readMesh:', error);
       throw error;
     }
-  }
-
-  private async loadMaterial(data: RenderComponentMeshDataType): Promise<Material> {
-    const materialData = data.material ?? data.materialData;
-    if (!materialData) {
-      throw new Error('No material specified in RenderComponent data');
-    }
-
-    return Material.get(materialData);
   }
 
   private updateRenderManager(): void {
@@ -101,7 +76,7 @@ export class RenderComponent extends Component {
     // Implementation of update if needed
   }
 
-  public renderInMenu(): void {}
+  public override renderInMenu(): void {}
 
   public renderDebug(): void {
     throw new Error('Method not implemented.');

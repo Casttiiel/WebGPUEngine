@@ -42,18 +42,19 @@ export class Cubemap extends GPUResource {
 
   public static async get(path: string, options: Partial<CubemapOptions> = {}): Promise<Cubemap> {
     try {
-      return await ResourceManager.getResource<Cubemap>(path);
+      return ResourceManager.getResource<Cubemap>(path);
     } catch {
       const cubemap = new Cubemap({
         path,
         type: ResourceType.CUBEMAP,
         ...options,
       });
-      await ResourceManager.registerResource(cubemap);
+      await cubemap.load();
+      ResourceManager.registerResource(cubemap);
       return cubemap;
     }
   }
-  protected async createGPUResources(): Promise<void> {
+  public async load(): Promise<void> {
     try {
       const image = await createImageBitmap(
         await fetch(`/assets/textures/${this.path}`).then((r) => r.blob()),
@@ -149,13 +150,6 @@ export class Cubemap extends GPUResource {
     } catch (error) {
       throw new Error(`Failed to create GPU resources for cubemap ${this.path}: ${error}`);
     }
-  }
-
-  protected async destroyGPUResources(): Promise<void> {
-    this.gpuTexture?.destroy();
-    this.gpuTexture = undefined;
-    this.gpuTextureView = undefined;
-    this.gpuSampler = undefined;
   }
 
   public getTextureView(): GPUTextureView | undefined {

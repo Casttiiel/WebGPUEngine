@@ -6,7 +6,6 @@ import { IResource } from '../resources/IResource';
 // Type for managed resource tracking
 interface ResourceEntry {
   resource: IResource;
-  loadPromise: Promise<void> | null;
 }
 
 export class ResourceManager {
@@ -16,22 +15,18 @@ export class ResourceManager {
     throw new Error('Cannot create instances of this class');
   }
 
-  public static async getResource<T extends IResource>(path: string): Promise<T> {
+  public static getResource<T extends IResource>(path: string): T {
     const entry = this.resources.get(path);
 
     if (!entry) {
       throw new Error(`Resource not found: ${path}`);
     }
 
-    if (entry.loadPromise) {
-      await entry.loadPromise;
-    }
-
     entry.resource.addRef();
     return entry.resource as T;
   }
 
-  public static async registerResource<T extends IResource>(resource: T): Promise<void> {
+  public static registerResource<T extends IResource>(resource: T): void {
     if (this.resources.has(resource.path)) {
       const existing = this.resources.get(resource.path)!;
       if (existing.resource !== resource) {
@@ -42,20 +37,9 @@ export class ResourceManager {
 
     const entry: ResourceEntry = {
       resource,
-      loadPromise: !resource.isLoaded ? resource.load() : null,
     };
 
     this.resources.set(resource.path, entry);
-
-    if (entry.loadPromise) {
-      try {
-        await entry.loadPromise;
-      } catch (error) {
-        this.resources.delete(resource.path);
-        throw error;
-      }
-      entry.loadPromise = null;
-    }
   }
 
   public static unregisterResource(path: string): void {

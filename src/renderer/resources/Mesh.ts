@@ -2,6 +2,7 @@ import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResour
 import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { MeshData } from '../../types/MeshData.type';
+import { Engine } from '../../core/engine/Engine';
 
 export interface MeshOptions extends IGPUResourceOptions {
   meshData?: MeshData;
@@ -34,50 +35,38 @@ export class Mesh extends GPUResource {
   }
 
   static async get(meshPath: string | MeshData): Promise<Mesh> {
+    let mesh = null;
+
     if (typeof meshPath === 'string') {
       try {
-        return await ResourceManager.getResource<Mesh>(meshPath);
+        return ResourceManager.getResource<Mesh>(meshPath);
       } catch {
-        const mesh = new Mesh({
+        mesh = new Mesh({
           path: meshPath,
           type: ResourceType.MESH,
         });
-        await ResourceManager.registerResource(mesh);
-        return mesh;
       }
     } else {
-      const mesh = new Mesh({
-        path: `dynamic_mesh_${Date.now()}`,
+      const dynamicId = Engine.generateDynamicId();
+      mesh = new Mesh({
+        path: `dynamic_mesh_${dynamicId}`,
         type: ResourceType.MESH,
         meshData: meshPath,
       });
-      await ResourceManager.registerResource(mesh);
-      return mesh;
     }
-  }
 
-  protected async createGPUResources(): Promise<void> {
-    this.initBuffers();
-  }
-
-  protected async destroyGPUResources(): Promise<void> {
-    this.vertexBuffer?.destroy();
-    this.normalBuffer?.destroy();
-    this.uvBuffer?.destroy();
-    this.tangentBuffer?.destroy();
-    this.indexBuffer?.destroy();
+    await mesh.load();
+    ResourceManager.registerResource(mesh);
+    return mesh;
   }
 
   public override async load(): Promise<void> {
-    if (this.isLoaded) return;
-
     try {
       if (!this.hasData) {
         const data = await ResourceManager.loadMeshData(this.path);
         this.loadObj(data);
       }
-      await this.createGPUResources();
-      this.setLoaded();
+      this.initBuffers();
     } catch (error) {
       throw new Error(`Failed to load mesh ${this.path}: ${error}`);
     }
@@ -337,7 +326,7 @@ export class Mesh extends GPUResource {
     this.device.queue.writeBuffer(this.indexBuffer, 0, paddedArray);
   }
 
-  public getVertexBufferLayout(): GPUVertexBufferLayout[] {
+  public static getVertexBufferLayout(): GPUVertexBufferLayout[] {
     return [
       {
         // Position attribute
@@ -387,9 +376,6 @@ export class Mesh extends GPUResource {
   }
 
   public activate(pass: GPURenderPassEncoder): void {
-    if (!this.isLoaded) {
-      throw new Error(`Cannot activate unloaded mesh: ${this.path}`);
-    }
     pass.setVertexBuffer(0, this.vertexBuffer);
     pass.setVertexBuffer(1, this.normalBuffer);
     pass.setVertexBuffer(2, this.uvBuffer);
@@ -398,9 +384,6 @@ export class Mesh extends GPUResource {
   }
 
   public renderGroup(pass: GPURenderPassEncoder): void {
-    if (!this.isLoaded) {
-      throw new Error(`Cannot render unloaded mesh: ${this.path}`);
-    }
     pass.drawIndexed(this.indexCount);
   }
 }

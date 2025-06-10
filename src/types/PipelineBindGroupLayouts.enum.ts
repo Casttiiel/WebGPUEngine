@@ -3,4 +3,5 @@ export enum PipelineBindGroupLayouts {
   OBJECT_UNIFORMS = 'ObjectUniforms',
   MATERIAL_TEXTURES = 'MaterialTextures',
   SINGLE_TEXTURE = 'SingleTexture',
+  CUBEMAP_TEXTURE = 'CubemapTexture',
 }

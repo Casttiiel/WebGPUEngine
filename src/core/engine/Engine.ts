@@ -17,6 +17,15 @@ export class Engine {
   private static _camera_mixer: ModuleCameraMixer;
   private static _input: ModuleInput;
 
+  private static idCounter = 0;
+  private static nextId() {
+    return ++Engine.idCounter;
+  }
+
+  public static generateDynamicId(): string {
+    return Engine.nextId().toString().padStart(6, '0');
+  }
+
   public static async start(): Promise<void> {
     if (this.initialized) {
       console.warn('Engine is already started.');

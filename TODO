@@ -1,19 +1,16 @@
 ## NPM RUN DEV
 
-Review all code
-npm run check
-npx tsc --noEmit
-
-Skybox using technique
 GLTF Rotate object with transform
 GLTF Primitives => 1 entity with render component array of meshes and materials
+Sistema de Uniformes Mejorado
+Skybox using technique
 
 Mejora en el Sistema de Renderizado
-Sistema de Uniformes Mejorado
 
 (Deferred GBuffer shader)
 Ambient Light
 Performance numbers
+Replace Unknown Types
 
 PBR LIGHTS
 PointLightWIthoutshadows

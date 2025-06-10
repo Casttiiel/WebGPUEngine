@@ -5,13 +5,14 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 import { MaterialDataType } from '../../types/MaterialData.type';
 import { Technique } from './Technique';
 import { Texture } from './Texture';
+import { Engine } from '../../core/engine/Engine';
 
 export interface MaterialTexturesOptions {
-  albedo?: string;
-  normal?: string;
-  metallic?: string;
-  roughness?: string;
-  emissive?: string;
+  albedo: string;
+  normal: string;
+  metallic: string;
+  roughness: string;
+  emissive: string;
 }
 
 export interface MaterialBaseOptions {
@@ -19,7 +20,7 @@ export interface MaterialBaseOptions {
   castsShadows?: boolean;
   shadows?: boolean;
   textures?: MaterialTexturesOptions;
-  technique?: string;
+  technique?: Technique;
 }
 
 export type MaterialCreateOptions = MaterialBaseOptions & Omit<IGPUResourceOptions, 'type'>;
@@ -28,130 +29,75 @@ export type MaterialOptions = Required<Pick<MaterialBaseOptions, 'textures' | 't
   IGPUResourceOptions;
 
 export class Material extends GPUResource {
-  private static idCounter = 0;
-  private static nextId() {
-    return ++Material.idCounter;
-  }
-
-  private static generateDynamicId(): string {
-    return Material.nextId().toString().padStart(6, '0');
-  }
-
   private technique?: Technique;
   private textures: Map<string, Texture> = new Map();
   private category: RenderCategory;
   private castsShadows: boolean;
   private shadows: boolean;
   private textureBindGroup?: GPUBindGroup;
-  private techniqueFile: string;
   private textureFiles: MaterialTexturesOptions;
 
   constructor(options: MaterialOptions) {
-    const dependencies = [options.technique];
-    if (options.textures) {
-      Object.values(options.textures).forEach((texture) => {
-        if (texture) {
-          dependencies.push(texture);
-        }
-      });
-    }
-
     super({
       ...options,
       type: ResourceType.MATERIAL,
-      dependencies,
     });
 
     this.category = options.category || RenderCategory.SOLIDS;
     this.castsShadows = options.castsShadows ?? false;
     this.shadows = options.shadows ?? false;
-    this.techniqueFile = options.technique;
+    this.technique = options.technique;
     this.textureFiles = options.textures;
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
+    let materialData = null;
     if (typeof pathOrData === 'string') {
       try {
-        return await ResourceManager.getResource<Material>(pathOrData);
+        return ResourceManager.getResource<Material>(pathOrData);
       } catch {
         // Load material data from file if needed
-        const materialData = await ResourceManager.loadMaterialData(pathOrData);
-        const techniqueToUse = await this.resolveTechnique(materialData);
-        if (!techniqueToUse) {
-          throw new Error(`Missing technique for material: ${pathOrData}`);
-        }
-
-        const textures: MaterialTexturesOptions = {
-          albedo: materialData?.textures.txAlbedo || 'white.png',
-          normal: materialData?.textures.txNormal,
-          metallic: materialData?.textures.txMetallic || 'black.png',
-          roughness: materialData?.textures.txRoughness || 'black.png',
-          emissive: materialData?.textures.txEmissive || 'black.png',
-        };
-
-        const material = new Material({
-          path: pathOrData,
-          type: ResourceType.MATERIAL,
-          technique: techniqueToUse,
-          textures,
-          category: materialData?.category,
-          castsShadows: materialData?.casts_shadows,
-          shadows: materialData?.shadows,
-        });
-
-        await ResourceManager.registerResource(material);
-        return material;
+        materialData = await ResourceManager.loadMaterialData(pathOrData);
       }
     } else {
-      // Handle direct material data
-      const techniqueToUse = await this.resolveTechnique(pathOrData);
-      if (!techniqueToUse) {
-        throw new Error('Missing technique in material data');
-      }
-
-      const textures: MaterialTexturesOptions = {
-        albedo: pathOrData.textures.txAlbedo || 'white.png',
-        normal: pathOrData.textures.txNormal,
-        metallic: pathOrData.textures.txMetallic || 'black.png',
-        roughness: pathOrData.textures.txRoughness || 'black.png',
-        emissive: pathOrData.textures.txEmissive || 'black.png',
-      };
-      const dynamicId = Material.generateDynamicId();
-      const material = new Material({
-        path: `dynamic_material_${dynamicId}`,
-        type: ResourceType.MATERIAL,
-        technique: techniqueToUse,
-        textures,
-        category: pathOrData?.category ?? RenderCategory.SOLIDS,
-        castsShadows: pathOrData?.casts_shadows ?? false,
-        shadows: pathOrData?.shadows ?? false,
-      });
-
-      await ResourceManager.registerResource(material);
-      return material;
-    }
-  }
-
-  private static async resolveTechnique(
-    data: MaterialDataType | null,
-  ): Promise<string | undefined> {
-    if (!data) return undefined;
-
-    // If techniqueData is provided, create a dynamic technique
-    if (data.techniqueData) {
-      const techniquePath = `dynamic_technique_${Material.generateDynamicId()}.tech`;
-      await Technique.get(techniquePath, data.techniqueData);
-      return techniquePath;
+      materialData = pathOrData;
     }
 
-    return data.technique;
+    const techniqueToUse = await Technique.get(
+      materialData.technique ?? materialData.techniqueData,
+    );
+    if (!techniqueToUse) {
+      throw new Error(`Missing technique for material: ${pathOrData}`);
+    }
+
+    const textures: MaterialTexturesOptions = {
+      albedo: materialData?.textures.txAlbedo || 'white.png',
+      normal: materialData?.textures.txNormal || 'black.png',
+      metallic: materialData?.textures.txMetallic || 'black.png',
+      roughness: materialData?.textures.txRoughness || 'black.png',
+      emissive: materialData?.textures.txEmissive || 'black.png',
+    };
+
+    const material = new Material({
+      path:
+        typeof pathOrData === 'string'
+          ? pathOrData
+          : `dynamic_material_${Engine.generateDynamicId()}`,
+      type: ResourceType.MATERIAL,
+      technique: techniqueToUse,
+      textures,
+      category: materialData?.category,
+      castsShadows: materialData?.casts_shadows,
+      shadows: materialData?.shadows,
+    });
+
+    await material.load();
+    ResourceManager.registerResource(material);
+    return material;
   }
 
-  protected async createGPUResources(): Promise<void> {
+  public override async load(): Promise<void> {
     try {
-      // Load technique
-      this.technique = await Technique.get(this.techniqueFile);
-
       // Load textures secuencialmente para evitar race conditions
       await this.loadTexture('albedo', this.textureFiles.albedo);
       await this.loadTexture('normal', this.textureFiles.normal);
@@ -160,12 +106,13 @@ export class Material extends GPUResource {
       await this.loadTexture('emissive', this.textureFiles.emissive);
 
       // Note: Bind group will be created later when we have the pipeline
+      this.createBindGroup();
     } catch (error) {
       throw new Error(`Failed to create GPU resources for material ${this.path}: ${error}`);
     }
   }
 
-  public async createBindGroup(renderPipeline: GPURenderPipeline): Promise<void> {
+  private async createBindGroup(): Promise<void> {
     if (!this.technique) {
       throw new Error('Technique not loaded');
     }
@@ -199,36 +146,71 @@ export class Material extends GPUResource {
       bindingIndex += 2;
     }
 
-    // Get bind group layout from pipeline
-    const bindGroupLayout = renderPipeline.getBindGroupLayout(1); // Material textures are in group 1
+    const textureBingGroupLayout = this.device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' },
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' },
+        },
+        {
+          binding: 5,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 6,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' },
+        },
+        {
+          binding: 7,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 8,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' },
+        },
+        {
+          binding: 9,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' },
+        },
+      ],
+    });
 
     // Create bind group
     this.textureBindGroup = this.device.createBindGroup({
       label: `${this.label}_texture_bindgroup`,
-      layout: bindGroupLayout,
+      layout: textureBingGroupLayout,
       entries,
     });
   }
 
-  protected override async destroyGPUResources(): Promise<void> {
-    this.textureBindGroup = undefined;
-
-    // Release textures
-    for (const [_, texture] of this.textures) {
-      texture.release();
-    }
-    this.textures.clear();
-
-    // Release technique
-    if (this.technique) {
-      this.technique.release();
-      this.technique = undefined;
-    }
-  }
-
-  private async loadTexture(type: string, path?: string): Promise<void> {
-    const texturePath = path || (type === 'albedo' ? 'white.png' : 'black.png');
-    const texture = await Texture.get(texturePath);
+  private async loadTexture(type: string, path: string): Promise<void> {
+    const texture = await Texture.get(path);
     this.textures.set(type, texture);
   }
 
@@ -250,16 +232,5 @@ export class Material extends GPUResource {
 
   public getTextureBindGroup(): GPUBindGroup | undefined {
     return this.textureBindGroup;
-  }
-
-  public override async load(): Promise<void> {
-    if (this.isLoaded) return;
-    try {
-      await this.createGPUResources();
-      await super.load();
-      this.setLoaded();
-    } catch (error) {
-      throw new Error(`Failed to load material ${this.path}: ${error}`);
-    }
   }
 }

@@ -2,5 +2,6 @@
     "vs": "presentation.vs",
     "fs": "tone_mapping.fs",
     "writesOn": "texture",
-    "z": "disable_all"
+    "z": "disable_all",
+    "uniforms":["SingleTexture"]
 }

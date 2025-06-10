@@ -5,6 +5,6 @@
     "z": "test_equal",
     "uniforms": [
         "CameraUniforms",
-        "SingleTexture"
+        "CubemapTexture"
     ]
 }

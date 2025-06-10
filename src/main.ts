@@ -15,7 +15,7 @@ try {
     Engine.render();
     requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
+  //requestAnimationFrame(frame);
 } catch (error) {
   console.error('Error starting engine:', error);
   // Si hay un error, también ocultamos el loader y mostramos un mensaje
