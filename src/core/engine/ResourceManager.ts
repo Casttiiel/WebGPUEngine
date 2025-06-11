@@ -2,6 +2,7 @@ import { MaterialDataType } from '../../types/MaterialData.type';
 import { EntityDataType } from '../../types/SceneData.type';
 import { TechniqueDataType } from '../../types/TechniqueData.type';
 import { IResource } from '../resources/IResource';
+import { ShaderPreprocessor } from '../../renderer/core/ShaderPreprocessor';
 
 // Type for managed resource tracking
 interface ResourceEntry {
@@ -69,6 +70,12 @@ export class ResourceManager {
   }
 
   public static async loadShader(shaderPath: string): Promise<string> {
-    return await fetch(`/assets/shaders/${shaderPath}`).then((res) => res.text());
+    // Always use preprocessor to handle includes
+    try {
+      return await ShaderPreprocessor.preprocessShader(shaderPath);
+    } catch (error) {
+      console.error(`Error loading shader ${shaderPath}:`, error);
+      throw error;
+    }
   }
 }

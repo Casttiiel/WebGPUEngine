@@ -471,6 +471,9 @@ export class Technique extends GPUResource {
   }
 
   public getPipeline(): GPURenderPipeline {
+    if (!this.pipeline) {
+      throw new Error(`Pipeline not initialized for technique ${this.path}`);
+    }
     return this.pipeline;
   }
 

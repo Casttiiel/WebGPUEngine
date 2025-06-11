@@ -1,27 +1,5 @@
-struct CameraUniforms {
-    viewMatrix: mat4x4<f32>,
-    projectionMatrix: mat4x4<f32>,
-    screenToWorld: mat4x4<f32>,
-    cameraPosition: vec3<f32>,
-    sourceSize: vec2<f32>,
-    cameraFront: vec3<f32>,
-    cameraZFar: f32,
-}
-
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) N: vec3<f32>,
-    @location(1) Uv: vec2<f32>,
-    @location(2) WorldPos: vec3<f32>,
-    @location(3) T: vec4<f32>,
-}
-
-struct FragmentOutput {
-    @location(0) albedo: vec4<f32>,
-    @location(1) normal: vec4<f32>,
-    @location(2) selfIllum: vec4<f32>,
-    @location(3) depth: f32,
-}
+#include "common/uniforms"
+#include "common/structs"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(2) @binding(0) var txAlbedo: texture_2d<f32>;

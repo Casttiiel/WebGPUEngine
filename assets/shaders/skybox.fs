@@ -1,12 +1,4 @@
-struct CameraUniforms {
-    viewMatrix: mat4x4<f32>,
-    projectionMatrix: mat4x4<f32>,
-    screenToWorld: mat4x4<f32>,
-    cameraPosition: vec3<f32>,
-    sourceSize: vec2<f32>,
-    cameraFront: vec3<f32>,
-    cameraZFar: f32,
-}
+#include "common/uniforms"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var skyboxTexture: texture_cube<f32>;
