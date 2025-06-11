@@ -97,7 +97,7 @@ export class Mesh extends GPUResource {
       this.indices = meshData.indices.data as Uint16Array;
     }
 
-    this.tangents = new Float32Array(); //TODO: Calculate tangents
+    this.tangents = this.computeMeshTangents();
     this.indexCount = meshData.indices.count;
 
     this.setHasData();
@@ -109,14 +109,12 @@ export class Mesh extends GPUResource {
     const normalsArray: number[] = [];
     const uvsArray: number[] = [];
     const indicesArray: number[] = [];
-    const tangentsArray: number[] = [];
 
     // Arrays temporales para datos del archivo OBJ
     const tempVertices: number[] = []; // Posiciones del archivo
     const tempNormals: number[] = []; // Normales del archivo
     const tempUVs: number[] = []; // UVs del archivo
     const tempIndices: { [key: string]: number } = {}; // Mapa de índices únicos
-    const tangentAccum: { [key: number]: number[] } = {}; // Acumulador de tangentes
     let indexCount = 0;
 
     // Procesar el archivo OBJ línea por línea
@@ -194,43 +192,6 @@ export class Mesh extends GPUResource {
 
             faceIndices.push(idx);
           }
-
-          // Calcular tangentes para normal mapping
-          if (faceVertices.length === 3 && faceUVs.length === 3) {
-            const idx0 = faceIndices[0];
-            const idx1 = faceIndices[1];
-            const idx2 = faceIndices[2];
-
-            const p0 = tempVertices.slice(idx0 * 3, idx0 * 3 + 3);
-            const p1 = tempVertices.slice(idx1 * 3, idx1 * 3 + 3);
-            const p2 = tempVertices.slice(idx2 * 3, idx2 * 3 + 3);
-
-            const uv0 = faceUVs[0];
-            const uv1 = faceUVs[1];
-            const uv2 = faceUVs[2];
-
-            // Calcular tangente para este triángulo
-            const tangentData = this.computeTangent(p0, p1, p2, uv0, uv1, uv2);
-
-            const tangent = tangentData.tangent;
-            const w = tangentData.w;
-
-            // Almacenar tangente para cada vértice del triángulo
-            faceIndices.forEach((idx) => {
-              if (!tangentAccum[idx]) tangentAccum[idx] = [0, 0, 0];
-              tangentAccum[idx][0] += tangent[0];
-              tangentAccum[idx][1] += tangent[1];
-              tangentAccum[idx][2] += tangent[2];
-
-              while (tangentsArray.length < idx * 4 + 4) {
-                tangentsArray.push(0);
-              }
-              tangentsArray[idx * 4] = tangent[0];
-              tangentsArray[idx * 4 + 1] = tangent[1];
-              tangentsArray[idx * 4 + 2] = tangent[2];
-              tangentsArray[idx * 4 + 3] = w;
-            });
-          }
           break;
       }
     }
@@ -240,7 +201,7 @@ export class Mesh extends GPUResource {
     this.normals = new Float32Array(normalsArray);
     this.uvs = new Float32Array(uvsArray);
     this.indices = new Uint16Array(indicesArray);
-    this.tangents = new Float32Array(tangentsArray);
+    this.tangents = this.computeMeshTangents();
     this.indexCount = this.indices.length;
   }
 
@@ -269,6 +230,83 @@ export class Mesh extends GPUResource {
     const w = uDirection >= 0 ? 1 : -1; // 1 o -1 dependiendo de la dirección
 
     return { tangent, w };
+  }
+
+  private computeMeshTangents(): Float32Array {
+    // Create tangent array initialized to zero
+    const tangents = new Float32Array(this.vertices.length * 4/3); // 4 components (xyz + w) per vertex
+
+    // Process each triangle
+    for (let i = 0; i < this.indices.length - 2; i += 3) {
+      const i0 = this.indices[i];
+      const i1 = this.indices[i + 1];
+      const i2 = this.indices[i + 2];
+
+      if (i0 === undefined || i1 === undefined || i2 === undefined) continue;
+
+      // Get vertices of the triangle
+      const p0 = [
+        this.vertices[i0 * 3] ?? 0,
+        this.vertices[i0 * 3 + 1] ?? 0,
+        this.vertices[i0 * 3 + 2] ?? 0
+      ];
+      const p1 = [
+        this.vertices[i1 * 3] ?? 0,
+        this.vertices[i1 * 3 + 1] ?? 0,
+        this.vertices[i1 * 3 + 2] ?? 0
+      ];
+      const p2 = [
+        this.vertices[i2 * 3] ?? 0,
+        this.vertices[i2 * 3 + 1] ?? 0,
+        this.vertices[i2 * 3 + 2] ?? 0
+      ];
+
+      // Get UVs of the triangle
+      const uv0 = [
+        this.uvs[i0 * 2] ?? 0,
+        this.uvs[i0 * 2 + 1] ?? 0
+      ];
+      const uv1 = [
+        this.uvs[i1 * 2] ?? 0,
+        this.uvs[i1 * 2 + 1] ?? 0
+      ];
+      const uv2 = [
+        this.uvs[i2 * 2] ?? 0,
+        this.uvs[i2 * 2 + 1] ?? 0
+      ];
+
+      // Compute tangent for this triangle
+      const tangentData = this.computeTangent(p0, p1, p2, uv0, uv1, uv2);
+
+      // Add computed tangent to each vertex of the triangle
+      for (const idx of [i0, i1, i2]) {
+        const baseIdx = idx * 4;
+        const currentTangentX = tangents[baseIdx] ?? 0;
+        const currentTangentY = tangents[baseIdx + 1] ?? 0;
+        const currentTangentZ = tangents[baseIdx + 2] ?? 0;
+
+        tangents[baseIdx] = currentTangentX + tangentData.tangent[0];
+        tangents[baseIdx + 1] = currentTangentY + tangentData.tangent[1];
+        tangents[baseIdx + 2] = currentTangentZ + tangentData.tangent[2];
+        tangents[baseIdx + 3] = tangentData.w; // w component (handedness)
+      }
+    }
+
+    // Normalize the tangents
+    for (let i = 0; i < tangents.length - 3; i += 4) {
+      const x = tangents[i] ?? 0;
+      const y = tangents[i + 1] ?? 0;
+      const z = tangents[i + 2] ?? 0;
+      const len = Math.sqrt(x * x + y * y + z * z);
+      
+      if (len > 0) {
+        tangents[i] = x / len;
+        tangents[i + 1] = y / len;
+        tangents[i + 2] = z / len;
+      }
+    }
+
+    return tangents;
   }
 
   private initBuffers(): void {

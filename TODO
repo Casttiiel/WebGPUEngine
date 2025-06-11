@@ -1,21 +1,22 @@
 ## NPM RUN DEV
-Ambient Light: Bad Normals(Create T on mesh), Check viewDir, Irradiance and other uniforms
+Improve uniform declaration. SI yo se lo que debo tener en el shader vs y fs. El pipeline deberia ser capaz de saberlo de alguna manera, o se lo deberia yo especificar, en la tecnica. Para de esta manera poder crear el pipeline layout de una manera automatica. Ademas, seria maravilloso si ademas puedo luego crear el bindgroup con el dato que yo quiero automaticamente.
+Ambient Light: Irradiance and other uniforms, Check linear z, viewDir
 Replace Unknown Types
 GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
 
 Distortion Category
 
 PBR LIGHTS
-PointLightWIthoutshadows
-renderDirectionalLightsWithoutShadows
-renderDirectionalLightsWithShadows
-RenderPointLighstWithShadows
+1.PointLightWithoutshadows
+2.DirectionalLightsWithoutShadows
+3.DirectionalLightsWithShadows
+4.RenderPointLighstWithShadows
 
 Blur
 Bloom
-Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 
 Ambient Occlusion
+Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 
 Decals Category
 AABB/CPU Culling on camera

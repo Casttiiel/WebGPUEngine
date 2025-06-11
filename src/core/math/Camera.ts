@@ -51,10 +51,9 @@ export class Camera {
     const m = mat4.create();
 
     // Aplicar las operaciones en orden
-
     const cameraInvResolution = vec2.fromValues(1.0 / Render.width, 1.0 / Render.height);
 
-    // Escalado inicial
+    // Escalado inicial para convertir de coordenadas de pantalla a [0,1]
     const scale1 = mat4.fromScaling(mat4.create(), [
       cameraInvResolution[0],
       cameraInvResolution[1],
@@ -62,11 +61,7 @@ export class Camera {
     ]);
     mat4.multiply(m, m, scale1);
 
-    // Traslación
-    const translation = mat4.fromTranslation(mat4.create(), [0, 0, 0]);
-    mat4.multiply(m, m, translation);
-
-    // Escalado con el FOV y la relación de aspecto
+    // Escalado con el FOV y la relación de aspecto para crear los rayos correctos
     const scale2 = mat4.fromScaling(mat4.create(), [
       Math.tan(this.fovRadians * 0.5) * this.aspectRatio,
       Math.tan(this.fovRadians * 0.5),
@@ -76,7 +71,7 @@ export class Camera {
 
     // Escalado con ZFar
     const scale3 = mat4.fromScaling(mat4.create(), [this.zFar, this.zFar, this.zFar]);
-    mat4.multiply(m, m, scale3);
+    //mat4.multiply(m, m, scale3);
 
     // Paso 2: Crear la matriz para el sistema de coordenadas del mundo usando los vectores de la cámara (Front, Left, Up)
     let mtx_axis = mat4.create();

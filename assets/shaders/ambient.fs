@@ -33,10 +33,8 @@ struct AmbientUniforms {
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
 /*@group(2) @binding(0) var txEnvironment: texture_cube<f32>;
-@group(2) @binding(1) var txIrradiance: texture_cube<f32>;
-@group(2) @binding(2) var samplerEnv: sampler;
-
-@group(3) @binding(0) var<uniform> ambient: AmbientUniforms;*/
+@group(2) @binding(1) var samplerEnv: sampler;
+@group(2) @binding(2) var<uniform> ambient: AmbientUniforms;*/
 
 
 fn decodeGBuffer(uv: vec2<f32>, coords: vec2<f32>) -> GBuffer {
@@ -93,7 +91,7 @@ fn Specular_F_Roughness(specularColor: vec3<f32>, roughness: f32, n: vec3<f32>, 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     // Diffuse IBL
-    //let irradiance = textureSample(txIrradiance, samplerEnv, g.normal).rgb;
+    //let irradiance = textureSample(txEnvironment, samplerEnv, g.normal).rgb;
     let irradiance = 1.0;
     let diffuse = g.albedo * irradiance;
     
@@ -113,8 +111,7 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let energyConservation = 1.0 - rough * fresnel;
     let finalDiffuse = diffuse * energyConservation;
     
-    return (finalDiffuse + 
-            specular) * 
+    return (finalDiffuse + specular) * 
             ao;
     /*return (finalDiffuse * ambient.ambientLightIntensity + 
             specular * ambient.reflectionIntensity) * 

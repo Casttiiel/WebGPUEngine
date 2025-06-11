@@ -12,4 +12,3 @@ struct FragmentOutput {
     @location(2) selfIllum: vec4<f32>,
     @location(3) depth: f32,
 }
-
