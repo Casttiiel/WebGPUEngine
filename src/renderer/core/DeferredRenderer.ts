@@ -371,4 +371,8 @@ export class DeferredRenderer {
       this.depthStencilView = null;
     }
   }
+
+  public getDepthStencilView(): GPUTextureView | null {
+    return this.depthStencilView;
+  }
 }

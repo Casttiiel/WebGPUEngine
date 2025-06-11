@@ -28,6 +28,7 @@ export class ModuleRender extends Module {
   private debugValues = {
     drawCallsSolids: { name: 'Draw Calls (Solids)', value: 0 },
     drawCallsTransparent: { name: 'Draw Calls (Transparent)', value: 0 },
+    drawCallsDistorsions: { name: 'Draw Calls (Distorsions)', value: 0 },
     totalDrawCalls: { name: 'Total Draw Calls', value: 0 },
     resolution: { name: 'Resolution', value: '0x0' },
   };
@@ -63,6 +64,8 @@ export class ModuleRender extends Module {
 
     let result = this.deferred.render(camera);
 
+    this.renderDistorsions(result);
+
     if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
       result = toneMapping.apply(result);
@@ -76,6 +79,46 @@ export class ModuleRender extends Module {
     this.presentResult(result);
 
     Render.getInstance().endFrame();
+  }
+
+  public renderDistorsions(texture : GPUTextureView): void {
+    const render = Render.getInstance();
+    const pass = render.getCommandEncoder().beginRenderPass({
+      label: 'Distorsions Render pass',
+      colorAttachments: [
+        {
+          view: texture,
+          loadOp: 'load',
+          storeOp: 'store',
+        }
+      ],
+      depthStencilAttachment: {
+        view: this.deferred.getDepthStencilView(),
+        depthLoadOp: 'load',
+        depthStoreOp: 'discard',
+      },
+    });
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0,
+      0, // Offset X,Y
+      Render.width, // Width
+      Render.height, // Height
+      0.0,
+      1.0, // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0,
+      0, // Offset X,Y
+      Render.width, // Width
+      Render.height, // Height
+    );
+
+    RenderManager.getInstance().render(RenderCategory.DISTORSIONS, pass);
+
+    pass.end();
   }
 
   private presentResult(result: GPUTextureView): void {
@@ -160,8 +203,11 @@ export class ModuleRender extends Module {
     this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
       RenderCategory.TRANSPARENT,
     );
+    this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
+      RenderCategory.DISTORSIONS,
+    );
     this.debugValues.totalDrawCalls.value =
-      this.debugValues.drawCallsSolids.value + this.debugValues.drawCallsTransparent.value;
+      this.debugValues.drawCallsSolids.value + this.debugValues.drawCallsTransparent.value  + this.debugValues.drawCallsDistorsions.value;
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
   }
 
@@ -178,6 +224,11 @@ export class ModuleRender extends Module {
       this.debugValues.drawCallsTransparent,
       'value',
       this.debugValues.drawCallsTransparent.name,
+    );
+    this.addDebugControl(
+      this.debugValues.drawCallsDistorsions,
+      'value',
+      this.debugValues.drawCallsDistorsions.name,
     );
     this.addDebugControl(
       this.debugValues.totalDrawCalls,
