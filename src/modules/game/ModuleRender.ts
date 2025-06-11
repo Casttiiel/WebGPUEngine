@@ -2,6 +2,7 @@ import { AntialiasingComponent } from '../../components/render/AntialiasingCompo
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { Engine } from '../../core/engine/Engine';
+import { Camera } from '../../core/math/Camera';
 import { DeferredRenderer } from '../../renderer/core/DeferredRenderer';
 import { Render } from '../../renderer/core/render';
 import { RenderManager } from '../../renderer/core/RenderManager';
@@ -57,10 +58,7 @@ export class ModuleRender extends Module {
     const camera = cameraComponent.getCamera();
 
     // Actualizar buffer uniforme global solo con view y projection
-    this.updateGlobalUniforms(
-      new Float32Array(camera.getView()),
-      new Float32Array(camera.getProjection()),
-    );
+    this.updateGlobalUniforms(camera);
     RenderManager.getInstance().setCamera(camera);
 
     let result = this.deferred.render(camera);
@@ -201,7 +199,7 @@ export class ModuleRender extends Module {
     // Crear buffer uniforme global para las matrices de la cámara
     this.globalUniformBuffer = render.getDevice().createBuffer({
       label: `global uniform buffer`,
-      size: (16 * 4) + (16 * 4) + 16, // viewMatrix(64) + projectionMatrix(64) + sourceSize(16 aligned)
+      size: 16 * 4 + 16 * 4 + 16 * 4 + 16, // viewMatrix(64) + projectionMatrix(64) + ScreenToWorldMatrix(64) + sourceSize(16 aligned)
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -235,8 +233,12 @@ export class ModuleRender extends Module {
     this.presentationTechnique = await Technique.get('presentation.tech');
   }
 
-  public updateGlobalUniforms(viewMatrix: Float32Array, projectionMatrix: Float32Array): void {
+  public updateGlobalUniforms(camera: Camera): void {
     const render = Render.getInstance();
+
+    const viewMatrix = new Float32Array(camera.getView());
+    const projectionMatrix = new Float32Array(camera.getProjection());
+    const screenToWorldMatrix = new Float32Array(camera.getScreenToWorld());
 
     // Escribir la matriz de vista con el nombre correcto viewMatrix
     render.getDevice().queue.writeBuffer(
@@ -254,7 +256,13 @@ export class ModuleRender extends Module {
 
     render.getDevice().queue.writeBuffer(
       this.globalUniformBuffer,
-      16 * 4 * 2, // view and projectionMatrix offset
+      16 * 4 * 2, // view and projection matrix offset
+      screenToWorldMatrix.buffer,
+    );
+
+    render.getDevice().queue.writeBuffer(
+      this.globalUniformBuffer,
+      16 * 4 * 3, // view projectionMatrix screenToWorldMatrix offset
       new Float32Array([Render.width, Render.height]),
     );
   }

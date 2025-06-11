@@ -1,46 +1,43 @@
 ## NPM RUN DEV
-Skybox using technique
-GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
 
-(Deferred GBuffer shader)
 Ambient Light
-Performance numbers
 Replace Unknown Types
+GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
+struct CameraUNiform deberia compartirse entre los shaders.
 
-Sistema de Uniformes Mejorado
+Distortion Category
 
 PBR LIGHTS
 PointLightWIthoutshadows
 renderDirectionalLightsWithoutShadows
 renderDirectionalLightsWithShadows
 RenderPointLighstWithShadows
-More lights?
-
-Distortion Category
 
 Blur
 Bloom
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 
+Ambient Occlusion
+
+Decals Category
 AABB/CPU Culling on camera
 Culling of lights
-Ambient Occlusion
-Decals Category
 Mesh LOD/Generate LOD on texture and mesh automatically
 
+Instancing
+Particles/Computing Shaders
+
+MISC-----------------------------------
+Cascaded Shadow Maps
+Terrain with perlin noise
 Lens Flare
 Camera Lens Dirt
-Volumetric Lights/God Rays
-Terrain with perlin noise
-Weighted terrain
 Light Exposure
+Volumetric Lights/God Rays
+Weighted terrain
 Paralax Mapping
-Instancing
-Particles
-Computing Shaders
-Cascaded Shadow Maps
-Animations
 GAME-----------------------------------
+Animations
 Physics
 Music
 Grass

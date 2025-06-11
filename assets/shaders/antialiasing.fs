@@ -1,6 +1,7 @@
 struct CameraUniforms {
     viewMatrix: mat4x4<f32>,
     projectionMatrix: mat4x4<f32>,
+    screenToWorld: mat4x4<f32>,
     SourceSize: vec2<f32>
 }
 
