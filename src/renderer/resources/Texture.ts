@@ -37,7 +37,7 @@ export class Texture extends GPUResource {
       type: ResourceType.TEXTURE,
     });
     this.genMipmaps = options.genMipmaps ?? true;
-    this.format = options.format ?? 'rgba8unorm';
+    this.format = options.format ?? 'rgba16float'; // rgba16float es filtrable y tiene suficiente precisión para HDR
     this.usage =
       options.usage ??
       GPUTextureUsage.TEXTURE_BINDING |
@@ -202,7 +202,7 @@ export class Texture extends GPUResource {
           visibility: GPUShaderStage.COMPUTE,
           storageTexture: {
             access: 'write-only',
-            format: 'rgba8unorm',
+            format: 'rgba16float',
             viewDimension: '2d',
           },
         },

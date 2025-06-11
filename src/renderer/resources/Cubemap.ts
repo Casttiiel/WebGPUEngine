@@ -108,7 +108,7 @@ export class Cubemap extends GPUResource {
       this.gpuTexture = this.device.createTexture({
         label: `${this.label}_texture`,
         size: [faceSize, faceSize, 6],
-        format: 'rgba8unorm',
+        format: 'rgba16float',
         usage:
           GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |

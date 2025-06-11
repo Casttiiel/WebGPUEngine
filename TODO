@@ -1,6 +1,5 @@
 ## NPM RUN DEV
 
-Texture format improved
 struct CameraUNiform code deberia compartirse entre los shaders.
 Ambient Light: Bad Normals(Create T on mesh), Check viewDir, Irradiance and other uniforms
 Replace Unknown Types
