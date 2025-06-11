@@ -194,12 +194,10 @@ export class ModuleRender extends Module {
   }
 
   private initializeUniformBuffers(): void {
-    const render = Render.getInstance();
-
-    // Crear buffer uniforme global para las matrices de la cámara
+    const render = Render.getInstance(); // Crear buffer uniforme global para las matrices de la cámara    this.globalUniformBuffer = render.getDevice().createBuffer({
     this.globalUniformBuffer = render.getDevice().createBuffer({
       label: `global uniform buffer`,
-      size: 16 * 4 + 16 * 4 + 16 * 4 + 16, // viewMatrix(64) + projectionMatrix(64) + ScreenToWorldMatrix(64) + sourceSize(16 aligned)
+      size: 256,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -232,39 +230,48 @@ export class ModuleRender extends Module {
 
     this.presentationTechnique = await Technique.get('presentation.tech');
   }
-
   public updateGlobalUniforms(camera: Camera): void {
     const render = Render.getInstance();
 
     const viewMatrix = new Float32Array(camera.getView());
     const projectionMatrix = new Float32Array(camera.getProjection());
     const screenToWorldMatrix = new Float32Array(camera.getScreenToWorld());
+    const cameraPosition = new Float32Array(camera.getPosition());
 
-    // Escribir la matriz de vista con el nombre correcto viewMatrix
-    render.getDevice().queue.writeBuffer(
-      this.globalUniformBuffer,
-      0, // viewMatrix offset
-      viewMatrix.buffer,
-    );
+    // viewMatrix (offset 0)
+    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 0, viewMatrix);
 
-    // Escribir la matriz de proyección con el nombre correcto projectionMatrix
-    render.getDevice().queue.writeBuffer(
-      this.globalUniformBuffer,
-      16 * 4, // projectionMatrix offset
-      projectionMatrix.buffer,
-    );
+    // projectionMatrix (offset 64)
+    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
 
-    render.getDevice().queue.writeBuffer(
-      this.globalUniformBuffer,
-      16 * 4 * 2, // view and projection matrix offset
-      screenToWorldMatrix.buffer,
-    );
+    // screenToWorld (offset 128)
+    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 128, screenToWorldMatrix);
 
-    render.getDevice().queue.writeBuffer(
-      this.globalUniformBuffer,
-      16 * 4 * 3, // view projectionMatrix screenToWorldMatrix offset
-      new Float32Array([Render.width, Render.height]),
-    );
+    // cameraPosition (offset 192)
+    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 192, cameraPosition);
+
+    // sourceSize (offset 208)
+    render
+      .getDevice()
+      .queue.writeBuffer(
+        this.globalUniformBuffer,
+        208,
+        new Float32Array([Render.width, Render.height]),
+      );
+
+    // cameraFront + cameraZFar (offset 224)
+    render
+      .getDevice()
+      .queue.writeBuffer(
+        this.globalUniformBuffer,
+        224,
+        new Float32Array([
+          camera.getFront()[0],
+          camera.getFront()[1],
+          camera.getFront()[2],
+          camera.getFar(),
+        ]),
+      );
   }
 
   public getGlobalBindGroup(): GPUBindGroup {

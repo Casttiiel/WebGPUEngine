@@ -133,18 +133,19 @@ export class Material extends GPUResource {
         throw new Error(`Texture ${type} view or sampler not available`);
       }
 
-      entries.push(
-        {
-          binding: bindingIndex,
-          resource: view,
-        },
-        {
-          binding: bindingIndex + 1,
-          resource: sampler,
-        },
-      );
-      bindingIndex += 2;
+      entries.push({
+        binding: bindingIndex,
+        resource: view,
+      });
+      bindingIndex++;
     }
+
+    const texture = this.textures.get('albedo');
+    const sampler = texture.getSampler();
+    entries.push({
+      binding: bindingIndex,
+      resource: sampler,
+    });
 
     const textureBingGroupLayout = this.device.createBindGroupLayout({
       entries: [
@@ -156,7 +157,7 @@ export class Material extends GPUResource {
         {
           binding: 1,
           visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' },
+          texture: { sampleType: 'float' },
         },
         {
           binding: 2,
@@ -166,7 +167,7 @@ export class Material extends GPUResource {
         {
           binding: 3,
           visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' },
+          texture: { sampleType: 'float' },
         },
         {
           binding: 4,
@@ -175,26 +176,6 @@ export class Material extends GPUResource {
         },
         {
           binding: 5,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 6,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 7,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 8,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 9,
           visibility: GPUShaderStage.FRAGMENT,
           sampler: { type: 'filtering' },
         },

@@ -2,5 +2,6 @@
     "vs": "presentation.vs",
     "fs": "ambient.fs",
     "writesOn": "texture",
-    "z": "disable_all"
+    "z": "disable_all",
+    "uniforms":["CameraUniforms", "GBufferUniforms"]
 }

@@ -14,6 +14,7 @@ export class DeferredRenderer {
   private ambientTechnique!: Technique;
   private skyboxTechnique!: Technique;
   private skyboxBindGroup!: GPUBindGroup;
+  private ambientBindGroup!: GPUBindGroup;
   private skyboxTexture!: Cubemap;
 
   private rtAlbedos!: RenderToTexture;
@@ -24,7 +25,7 @@ export class DeferredRenderer {
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView | null;
 
-  constructor() { }
+  constructor() {}
 
   public create(width: number, height: number) {
     this.destroy();
@@ -58,6 +59,41 @@ export class DeferredRenderer {
     if (!this.depthStencilView) {
       this.depthStencilView = this.depthStencil.createView();
     }
+
+    const sampler = this.skyboxTexture.getSampler();
+
+    this.ambientBindGroup = Render.getInstance()
+      .getDevice()
+      .createBindGroup({
+        label: `ambient_bindgroup`,
+        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(1),
+        entries: [
+          {
+            binding: 0,
+            resource: this.rtAlbedos.getView(),
+          },
+          {
+            binding: 1,
+            resource: this.rtNormals.getView(),
+          },
+          {
+            binding: 2,
+            resource: this.rtLinearDepth.getView(),
+          },
+          {
+            binding: 3,
+            resource: this.rtSelfIllum.getView(),
+          },
+          {
+            binding: 4,
+            resource: this.rtSelfIllum.getView(),
+          },
+          {
+            binding: 5,
+            resource: sampler,
+          },
+        ],
+      });
   }
 
   public async load(): Promise<void> {
@@ -72,7 +108,7 @@ export class DeferredRenderer {
       addressModeV: 'clamp-to-edge',
     });
 
-    const pipeline = await this.skyboxTechnique.getPipeline();
+    const pipeline = this.skyboxTechnique.getPipeline();
     if (!pipeline) {
       throw new Error('Failed to get skybox pipeline');
     }
@@ -99,7 +135,8 @@ export class DeferredRenderer {
           },
         ],
       });
-    //this.ambientTechnique = await Technique.get("ambient.tech");
+
+    this.ambientTechnique = await Technique.get('ambient.tech');
   }
 
   public render(_camera: Camera): GPUTextureView {
@@ -107,7 +144,7 @@ export class DeferredRenderer {
     this.renderAccLight();
     this.renderTransparents();
 
-    const view = this.rtAlbedos.getView();
+    const view = this.rtAccLight.getView();
     if (!view) {
       throw new Error('Failed to get albedo render target view');
     }
@@ -141,7 +178,7 @@ export class DeferredRenderer {
   }
 
   public renderAccLight(): void {
-    //this.renderAmbientPass();
+    this.renderAmbientPass();
     //TODO POINT LIGHTS
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS
@@ -186,7 +223,8 @@ export class DeferredRenderer {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Activar bind groups
-    //pass.setBindGroup(0, this.bindGroup);
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
+    pass.setBindGroup(1, this.ambientBindGroup); // GBuffer textures
 
     // 4. Dibujar la mesh
     this.fullscreenQuadMesh.renderGroup(pass);
@@ -200,7 +238,7 @@ export class DeferredRenderer {
     const pass = render.getCommandEncoder().beginRenderPass({
       colorAttachments: [
         {
-          view: this.rtAlbedos.getView(),
+          view: this.rtAccLight.getView(),
           loadOp: 'load',
           storeOp: 'store',
         },
@@ -208,7 +246,7 @@ export class DeferredRenderer {
       depthStencilAttachment: {
         view: this.depthStencilView,
         depthLoadOp: 'load',
-        depthStoreOp: 'discard'
+        depthStoreOp: 'discard',
       },
     });
 
@@ -250,7 +288,7 @@ export class DeferredRenderer {
       label: 'Transparents Render pass',
       colorAttachments: [
         {
-          view: this.rtAlbedos.getView(),
+          view: this.rtAccLight.getView(),
           loadOp: 'load',
           storeOp: 'store',
         },

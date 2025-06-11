@@ -169,7 +169,7 @@ export class Technique extends GPUResource {
             {
               binding: 1,
               visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
+              texture: { sampleType: 'float' },
             },
             {
               binding: 2,
@@ -179,7 +179,7 @@ export class Technique extends GPUResource {
             {
               binding: 3,
               visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
+              texture: { sampleType: 'float' },
             },
             {
               binding: 4,
@@ -188,26 +188,6 @@ export class Technique extends GPUResource {
             },
             {
               binding: 5,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-            {
-              binding: 6,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 7,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-            {
-              binding: 8,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 9,
               visibility: GPUShaderStage.FRAGMENT,
               sampler: { type: 'filtering' },
             },
@@ -243,24 +223,45 @@ export class Technique extends GPUResource {
           ],
         });
       }
-      case PipelineBindGroupLayouts.TEXTURE_WITH_SIZE: {
+      case PipelineBindGroupLayouts.GBUFFER_UNIFORMS: {
         return this.device.createBindGroupLayout({
-          label: 'texture with size bind group layout',
+          label: 'g buffer uniforms bind group layout',
           entries: [
+            // Albedo texture
             {
               binding: 0,
               visibility: GPUShaderStage.FRAGMENT,
               texture: { sampleType: 'float' },
             },
+            // Normal texture
             {
               binding: 1,
               visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
+              texture: { sampleType: 'float' },
             },
+            // Linear depth texture
             {
               binding: 2,
               visibility: GPUShaderStage.FRAGMENT,
-              buffer: { type: 'uniform' },
+              texture: { sampleType: 'float' },
+            },
+            // Self illumination texture
+            {
+              binding: 3,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: { sampleType: 'float' },
+            },
+            // AO texture
+            {
+              binding: 4,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: { sampleType: 'float' },
+            },
+            // Shared sampler for all textures
+            {
+              binding: 5,
+              visibility: GPUShaderStage.FRAGMENT,
+              sampler: { type: 'filtering' },
             },
           ],
         });
