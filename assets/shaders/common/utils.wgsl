@@ -16,6 +16,7 @@ fn get3x3From4x4(mat: mat4x4<f32>) -> mat3x3<f32> {
     );
 }
 
+
 // TBN matrix calculation
 fn computeTBN(inputN: vec3<f32>, inputT: vec4<f32>) -> mat3x3<f32> {
     let N = inputN;

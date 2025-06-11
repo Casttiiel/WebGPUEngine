@@ -1,5 +1,6 @@
 #include "common/uniforms"
 #include "common/structs"
+#include "common/utils"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(2) @binding(0) var txAlbedo: texture_2d<f32>;
@@ -8,18 +9,6 @@
 @group(2) @binding(3) var txRoughness: texture_2d<f32>;
 @group(2) @binding(4) var txEmissive: texture_2d<f32>;
 @group(2) @binding(5) var samplerState: sampler;
-
-
-fn encodeNormal(n: vec3<f32>, nw: f32) -> vec4<f32> {
-    return vec4<f32>((n + 1.0) * 0.5, nw);
-}
-
-fn computeTBN(inputN: vec3<f32>, inputT: vec4<f32>) -> mat3x3<f32> {
-    let N = inputN;
-    let T = inputT.xyz;
-    let B = cross(N, T) * inputT.w;
-    return mat3x3<f32>(T, B, N);
-}
 
 @fragment
 fn fs(input: VertexOutput) -> FragmentOutput {

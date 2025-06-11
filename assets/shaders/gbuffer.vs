@@ -1,35 +1,9 @@
-struct CameraUniforms {
-    viewMatrix: mat4x4<f32>,
-    projectionMatrix: mat4x4<f32>,
-    screenToWorld: mat4x4<f32>,
-    cameraPosition: vec3<f32>,
-    sourceSize: vec2<f32>,
-    cameraFront: vec3<f32>,
-    cameraZFar: f32,
-}
-
-struct ObjectUniforms {
-    modelMatrix: mat4x4<f32>,
-}
+#include "common/uniforms"
+#include "common/structs"
+#include "common/utils"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;
-
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) N: vec3<f32>,
-    @location(1) Uv: vec2<f32>,
-    @location(2) WorldPos: vec3<f32>,
-    @location(3) T: vec4<f32>,
-}
-
-fn get3x3From4x4(mat: mat4x4<f32>) -> mat3x3<f32> {
-    return mat3x3<f32>(
-        mat[0].xyz,
-        mat[1].xyz,
-        mat[2].xyz
-    );
-}
 
 @vertex
 fn vs(

@@ -38,20 +38,6 @@ struct AmbientUniforms {
 
 @group(3) @binding(0) var<uniform> ambient: AmbientUniforms;*/
 
-fn encodeNormal(n: vec3<f32>, nw: f32) -> vec4<f32> {
-    return vec4<f32>((n + 1.0) * 0.5, nw);
-}
-
-fn decodeNormal(encodedNormal: vec3<f32>) -> vec3<f32> {
-    return encodedNormal * 2.0 - 1.0;
-}
-
-fn getWorldCoords(coords: vec2<f32>, zlinear_normalized: f32) -> vec3<f32> {
-    let screen_coords = ((coords * 2.0) - 1.0) * camera.sourceSize;
-    let view_dir_homogeneous = vec4<f32>(screen_coords, -1.0, 1.0);
-    let view_dir = (camera.screenToWorld * view_dir_homogeneous).xyz;
-    return view_dir * zlinear_normalized + camera.cameraPosition;
-}
 
 fn decodeGBuffer(uv: vec2<f32>, coords: vec2<f32>) -> GBuffer {
     var g: GBuffer;
@@ -59,7 +45,7 @@ fn decodeGBuffer(uv: vec2<f32>, coords: vec2<f32>) -> GBuffer {
     // Get linear depth and world position
     let zlinear = textureSample(gLinearDepth, samplerGBuffer, uv).x;
     g.zlinear = zlinear;
-    g.worldPos = getWorldCoords(coords, zlinear);
+    g.worldPos = getWorldCoords(coords, zlinear, camera);
     
     // Get normal
     let normalData = textureSample(gNormals, samplerGBuffer, uv);
