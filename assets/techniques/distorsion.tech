@@ -1,0 +1,11 @@
+{
+    "vs": "distorsion.vs",
+    "fs": "distorsion.fs",
+    "writesOn": "texture",
+    "z": "test_but_no_write",
+    "uniforms": [
+        "CameraUniforms",
+        "ObjectUniforms",
+        "MaterialTextures"
+    ]
+}
