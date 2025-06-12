@@ -1,9 +1,12 @@
 ## NPM RUN DEV
-Ambient Light: Irradiance and other uniforms, Check linear z, viewDir
 
 Skybox Class
 Ambient Light Class
 DO not duplicate bindgrouplayouts, get them from pipeline.
+Ambient Light: Irradiance and other uniforms, Check linear z, viewDir
+
+
+FPS Performance
 Replace Unknown Types
 GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
 
@@ -17,8 +20,6 @@ PBR LIGHTS
 4.RenderPointLighstWithShadows
 
 Improve uniform declaration. SI yo se lo que debo tener en el shader vs y fs. El pipeline deberia ser capaz de saberlo de alguna manera, o se lo deberia yo especificar, en la tecnica. Para de esta manera poder crear el pipeline layout de una manera automatica. Ademas, seria maravilloso si ademas puedo luego crear el bindgroup con el dato que yo quiero automaticamente.
-
-FPS Performance
 
 Blur
 Bloom
