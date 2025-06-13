@@ -1,14 +1,14 @@
 ## NPM RUN DEV
 
-Skybox Class
-Ambient Light Class
-DO not duplicate bindgrouplayouts, get them from pipeline.
+Error en consola
 Ambient Light: Irradiance and other uniforms, Check linear z, viewDir
 
-
-FPS Performance
+FPS Performance/Memory used
+Resource List on UI
 Replace Unknown Types
 GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
+
+Mejorar el fichero de copilot
 
 Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
 ........SOlucion: Hacer que esta se envie en el material.
