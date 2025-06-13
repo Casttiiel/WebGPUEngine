@@ -1,8 +1,5 @@
-import { Engine } from '../../core/engine/Engine';
 import { Camera } from '../../core/math/Camera';
 import { RenderCategory } from '../../types/RenderCategory.enum';
-import { Mesh } from '../resources/Mesh';
-import { Technique } from '../resources/Technique';
 import { AmbientLight } from '../shading/AmbientLight';
 import { Skybox } from '../shading/Skybox';
 import { Render } from './render';
@@ -10,7 +7,7 @@ import { RenderManager } from './RenderManager';
 import { RenderToTexture } from './RenderToTexture';
 
 export class DeferredRenderer {
-  private fullscreenQuadMesh!: Mesh;
+  private isLoaded = false;
 
   private skybox!: Skybox;
   private ambientLight!: AmbientLight;
@@ -26,6 +23,7 @@ export class DeferredRenderer {
   constructor() {}
 
   public create(width: number, height: number) {
+    if (!this.isLoaded) return;
     this.destroy();
 
     if (!this.rtAlbedos) {
@@ -72,6 +70,7 @@ export class DeferredRenderer {
 
     this.ambientLight = new AmbientLight();
     await this.ambientLight.load();
+    this.isLoaded = true;
   }
 
   public render(_camera: Camera): GPUTextureView {

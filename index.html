@@ -1,63 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebGPU Engine</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="/vite.svg"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #111;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+      }
 
-<head>
-  <meta charset="UTF-8" />
-  <title>WebGPU Engine</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/x-icon" href="/vite.svg">
-  <style>
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-      background: #111;
-      overflow: hidden;
-      width: 100%;
-      height: 100%;
-    }
+      #loader {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        display: block;
+      }
 
-    #loader {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 1000;
-      display: block;
-    }
+      #loader.hidden {
+        display: none;
+      }
 
-    #loader.hidden {
-      display: none;
-    }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        object-fit: contain;
+        image-rendering: crisp-edges;
+        image-rendering: pixelated;
+      }
 
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-      object-fit: contain;
-      image-rendering: crisp-edges;
-      image-rendering: pixelated;
-    }
+      #fps-display {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-family: monospace;
+        font-size: 14px;
+        line-height: 1.4;
+        color: #00ff00;
+        background-color: rgba(0, 0, 0, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        white-space: pre;
+        pointer-events: none;
+        z-index: 1000;
+      }
+    </style>
+  </head>
 
-    #fps-display {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      font-family: Arial, sans-serif;
-      font-size: 16px;
-      color: white;
-      background-color: rgba(0, 0, 0, 0.5);
-      padding: 5px;
-      border-radius: 5px;
-    }
-  </style>
-</head>
-
-<body>
-  <div id="fps-display">FPS: 0</div>
-  <canvas id="gfx-canvas"></canvas>
-  <img id="loader" src="assets/loader.gif" alt="Loading...">
-  <script type="module" src="/src/main.ts"></script>
-</body>
-
+  <body>
+    <div id="fps-display">FPS: 0</div>
+    <canvas id="gfx-canvas"></canvas>
+    <img
+      id="loader"
+      src="assets/loader.gif"
+      alt="Loading..."
+    />
+    <script
+      type="module"
+      src="/src/main.ts"
+    ></script>
+  </body>
 </html>
