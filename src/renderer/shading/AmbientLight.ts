@@ -2,9 +2,11 @@ import { Engine } from '../../core/engine/Engine';
 import { Render } from '../core/render';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
+import { Texture } from '../resources/Texture';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
+  private whiteTexture!: Texture;
 
   private ambientTechnique!: Technique;
   private ambientBindGroup!: GPUBindGroup;
@@ -51,7 +53,7 @@ export class AmbientLight {
           },
           {
             binding: 4,
-            resource: rtSelfIllum,
+            resource: this.whiteTexture.getTextureView(),
           },
           {
             binding: 5,
@@ -64,6 +66,7 @@ export class AmbientLight {
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
+    this.whiteTexture = await Texture.get('white.png');
   }
 
   public render(rtAccLight: GPUTextureView): void {

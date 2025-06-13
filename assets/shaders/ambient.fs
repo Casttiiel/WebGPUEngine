@@ -123,8 +123,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Decode GBuffer data
     let g = decodeGBuffer(uv, uv);
     // Get ambient occlusion
-    //let ao = textureSample(gAO, samplerGBuffer, texCoords).r;
-    let ao = 1.0;
+    let ao = textureSample(gAO, samplerGBuffer, uv).r;
     
     // Calculate image based lighting
     let ibl = calculateIBL(g, ao);
