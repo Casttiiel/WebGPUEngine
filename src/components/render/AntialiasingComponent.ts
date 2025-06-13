@@ -16,8 +16,6 @@ export class AntialiasingComponent extends Component {
   }
 
   public async load(): Promise<void> {
-    const device = Render.getInstance().getDevice();
-
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
 
     this.technique = await Technique.get('antialiasing.tech');
@@ -87,8 +85,8 @@ export class AntialiasingComponent extends Component {
     const sampler = device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
-    });    
-    
+    });
+
     this.bindGroup = device.createBindGroup({
       label: `antialiasing_bindgroup`,
       layout: this.technique.getPipeline().getBindGroupLayout(1),
@@ -100,7 +98,7 @@ export class AntialiasingComponent extends Component {
         {
           binding: 1,
           resource: sampler,
-        }
+        },
       ],
     });
   }

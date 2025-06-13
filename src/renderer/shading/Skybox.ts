@@ -17,13 +17,7 @@ export class Skybox {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.skyboxTechnique = await Technique.get('skybox.tech');
 
-    this.skyboxTexture = await Cubemap.get('skybox.png', {
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    });
+    this.skyboxTexture = await Cubemap.get('skybox.png');
 
     const textureView = this.skyboxTexture.getTextureView();
     const sampler = this.skyboxTexture.getSampler();

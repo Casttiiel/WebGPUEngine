@@ -9,6 +9,7 @@ export interface CubemapOptions extends IGPUResourceOptions {
   mipmapFilter?: GPUFilterMode;
   addressModeU?: GPUAddressMode;
   addressModeV?: GPUAddressMode;
+  addressModeW?: GPUAddressMode;
   maxAnisotropy?: number;
 }
 
@@ -35,8 +36,9 @@ export class Cubemap extends GPUResource {
     this.magFilter = options.magFilter || 'linear';
     this.minFilter = options.minFilter || 'linear';
     this.mipmapFilter = options.mipmapFilter || 'linear';
-    this.addressModeU = options.addressModeU || 'repeat';
-    this.addressModeV = options.addressModeV || 'repeat';
+    this.addressModeU = options.addressModeU || 'clamp-to-edge';
+    this.addressModeV = options.addressModeV || 'clamp-to-edge';
+    this.addressModeW = options.addressModeW || 'clamp-to-edge';
     this.maxAnisotropy = options.maxAnisotropy || 16;
   }
 
@@ -145,6 +147,7 @@ export class Cubemap extends GPUResource {
         mipmapFilter: this.mipmapFilter,
         addressModeU: this.addressModeU,
         addressModeV: this.addressModeV,
+        addressModeW: this.addressModeW,
         maxAnisotropy: this.maxAnisotropy,
       });
     } catch (error) {

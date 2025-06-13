@@ -3,7 +3,6 @@ import { Transform } from '../../core/math/Transform';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
 import { Render } from '../../renderer/core/render';
-import { Entity } from '../../core/ecs/Entity';
 
 export class TransformComponent extends Component {
   private transform: Transform;
@@ -109,7 +108,7 @@ export class TransformComponent extends Component {
     this.updateChildrenTransforms();
   }
 
-  public renderInMenu(): void {
+  public override renderInMenu(): void {
     // Implement if needed
   }
 

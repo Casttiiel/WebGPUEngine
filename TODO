@@ -1,6 +1,6 @@
 ## NPM RUN DEV
 
-Ambient Light: Irradiance and other uniforms,
+Ambient Light: ROughness and metallic values good? Calc of specular. Mipmap levels on cubemap.
 Replace Unknown Types
 GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
 Resource List on UI

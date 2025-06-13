@@ -18,8 +18,8 @@ fn vs(
     output.position = camera.projectionMatrix * camera.viewMatrix * worldPos;
     
     let model3x3 = get3x3From4x4(object.modelMatrix);
-    output.N = model3x3 * normal;
-    output.T = vec4<f32>(model3x3 * tangent.xyz, tangent.w);
+    output.N = normalize(model3x3 * normal);
+    output.T = vec4<f32>(normalize(model3x3 * tangent.xyz), tangent.w);
     output.Uv = uv;
     return output;
 }

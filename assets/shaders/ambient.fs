@@ -91,14 +91,14 @@ fn Specular_F_Roughness(specularColor: vec3<f32>, roughness: f32, n: vec3<f32>, 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     // Diffuse IBL
-    let irradiance = textureSample(txEnvironment, samplerEnv, g.normal).rgb;
+    let irradiance = textureSampleLevel(txEnvironment, samplerEnv, g.normal, 0.0).rgb;
     let diffuse = g.albedo * irradiance;
     
     // Specular IBL
     let rough = g.roughness * g.roughness; // Use squared roughness for better visual results
     let mipLevel = rough * 8.0; // Assuming environment map has 8 mip levels
-    //let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, g.reflectedDir, mipLevel).rgb;
-    let prefilteredColor = textureSample(txEnvironment, samplerEnv, g.reflectedDir).rgb;
+    //let prefilteredColor = textureSampleLevel(txEnvironment, w, g.reflectedDir, mipLevel).rgb;
+    let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, g.reflectedDir, 0.0).rgb;
     // Calculate fresnel for IBL
     let fresnel = Specular_F_Roughness(g.specularColor, g.roughness, g.normal, g.viewDir);
     
@@ -109,7 +109,7 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let energyConservation = 1.0 - rough * fresnel;
     let finalDiffuse = diffuse * energyConservation;
     
-    return (irradiance) * 
+    return (finalDiffuse) * 
             ao;
     /*return (finalDiffuse * ambient.ambientLightIntensity + 
             specular * ambient.reflectionIntensity) * 

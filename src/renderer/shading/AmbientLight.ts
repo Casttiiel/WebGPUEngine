@@ -22,16 +22,7 @@ export class AmbientLight {
     rtLinearDepth: GPUTextureView,
     rtSelfIllum: GPUTextureView,
   ): void {
-    const sampler = Render.getInstance().getDevice().createSampler({
-      label: 'ambient_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear', // Required for anisotropic filtering
-      addressModeU: 'repeat',
-      addressModeV: 'repeat',
-      maxAnisotropy: 16,
-    });
-
+    const sampler = this.environmentTexture.getSampler();
     this.gBufferBindGroup = Render.getInstance()
       .getDevice()
       .createBindGroup({
@@ -71,13 +62,7 @@ export class AmbientLight {
     this.ambientTechnique = await Technique.get('ambient.tech');
     this.whiteTexture = await Texture.get('white.png');
 
-    this.environmentTexture = await Cubemap.get('skybox.png', {
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    });
+    this.environmentTexture = await Cubemap.get('skybox.png');
 
     this.environmentBindGroup = Render.getInstance()
       .getDevice()
