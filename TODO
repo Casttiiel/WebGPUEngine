@@ -1,6 +1,6 @@
 ## NPM RUN DEV
 
-Ambient Light: Check linear z, Irradiance and other uniforms, viewDir
+Ambient Light: Irradiance and other uniforms,
 Replace Unknown Types
 GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
 Resource List on UI

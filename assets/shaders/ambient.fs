@@ -32,18 +32,18 @@ struct AmbientUniforms {
 @group(1) @binding(4) var gAO: texture_2d<f32>;
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
-/*@group(2) @binding(0) var txEnvironment: texture_cube<f32>;
+@group(2) @binding(0) var txEnvironment: texture_cube<f32>;
 @group(2) @binding(1) var samplerEnv: sampler;
-@group(2) @binding(2) var<uniform> ambient: AmbientUniforms;*/
+/*@group(2) @binding(2) var<uniform> ambient: AmbientUniforms;*/
 
 
-fn decodeGBuffer(uv: vec2<f32>, coords: vec2<f32>) -> GBuffer {
+fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     var g: GBuffer;
     
     // Get linear depth and world position
     let zlinear = textureSample(gLinearDepth, samplerGBuffer, uv).x;
     g.zlinear = zlinear;
-    g.worldPos = getWorldCoords(coords, zlinear, camera);
+    g.worldPos = getWorldCoords(uv, zlinear, camera);
     
     // Get normal
     let normalData = textureSample(gNormals, samplerGBuffer, uv);
@@ -91,16 +91,14 @@ fn Specular_F_Roughness(specularColor: vec3<f32>, roughness: f32, n: vec3<f32>, 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     // Diffuse IBL
-    //let irradiance = textureSample(txEnvironment, samplerEnv, g.normal).rgb;
-    let irradiance = 1.0;
+    let irradiance = textureSample(txEnvironment, samplerEnv, g.normal).rgb;
     let diffuse = g.albedo * irradiance;
     
     // Specular IBL
     let rough = g.roughness * g.roughness; // Use squared roughness for better visual results
     let mipLevel = rough * 8.0; // Assuming environment map has 8 mip levels
     //let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, g.reflectedDir, mipLevel).rgb;
-    let prefilteredColor = 1.0; // Placeholder for prefiltered color
-    
+    let prefilteredColor = textureSample(txEnvironment, samplerEnv, g.reflectedDir).rgb;
     // Calculate fresnel for IBL
     let fresnel = Specular_F_Roughness(g.specularColor, g.roughness, g.normal, g.viewDir);
     
@@ -111,7 +109,7 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let energyConservation = 1.0 - rough * fresnel;
     let finalDiffuse = diffuse * energyConservation;
     
-    return (finalDiffuse + specular) * 
+    return (irradiance) * 
             ao;
     /*return (finalDiffuse * ambient.ambientLightIntensity + 
             specular * ambient.reflectionIntensity) * 
@@ -121,16 +119,13 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Decode GBuffer data
-    let g = decodeGBuffer(uv, uv);
+    let g = decodeGBuffer(uv);
     // Get ambient occlusion
     let ao = textureSample(gAO, samplerGBuffer, uv).r;
     
     // Calculate image based lighting
     let ibl = calculateIBL(g, ao);
-    
-    // Add self illumination
-    //let final_color = vec4<f32>(g.normal, 1.0);
+
     let final_color = vec4<f32>(ibl + g.selfIllum, 1.0);
-    
     return final_color;
 }

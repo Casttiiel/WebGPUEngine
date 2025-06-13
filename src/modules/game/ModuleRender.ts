@@ -81,7 +81,7 @@ export class ModuleRender extends Module {
     Render.getInstance().endFrame();
   }
 
-  public renderDistorsions(texture : GPUTextureView): void {
+  public renderDistorsions(texture: GPUTextureView): void {
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass({
       label: 'Distorsions Render pass',
@@ -90,7 +90,7 @@ export class ModuleRender extends Module {
           view: texture,
           loadOp: 'load',
           storeOp: 'store',
-        }
+        },
       ],
       depthStencilAttachment: {
         view: this.deferred.getDepthStencilView(),
@@ -207,7 +207,9 @@ export class ModuleRender extends Module {
       RenderCategory.DISTORSIONS,
     );
     this.debugValues.totalDrawCalls.value =
-      this.debugValues.drawCallsSolids.value + this.debugValues.drawCallsTransparent.value  + this.debugValues.drawCallsDistorsions.value;
+      this.debugValues.drawCallsSolids.value +
+      this.debugValues.drawCallsTransparent.value +
+      this.debugValues.drawCallsDistorsions.value;
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
   }
 
@@ -286,7 +288,7 @@ export class ModuleRender extends Module {
 
     const viewMatrix = new Float32Array(camera.getView());
     const projectionMatrix = new Float32Array(camera.getProjection());
-    const screenToWorldMatrix = new Float32Array(camera.getScreenToWorld());
+    const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
     const cameraPosition = new Float32Array(camera.getPosition());
 
     // viewMatrix (offset 0)
@@ -295,13 +297,13 @@ export class ModuleRender extends Module {
     // projectionMatrix (offset 64)
     render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
 
-    // screenToWorld (offset 128)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 128, screenToWorldMatrix);
+    // invViewProjectionMatrix (offset 128)
+    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 128, invViewProjectionMatrix);
 
     // cameraPosition (offset 192)
     render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 192, cameraPosition);
 
-    // sourceSize (offset 208)
+    // screenSize (offset 208)
     render
       .getDevice()
       .queue.writeBuffer(

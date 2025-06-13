@@ -1,5 +1,6 @@
 import { Engine } from '../../core/engine/Engine';
 import { Render } from '../core/render';
+import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { Texture } from '../resources/Texture';
@@ -7,9 +8,11 @@ import { Texture } from '../resources/Texture';
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
   private whiteTexture!: Texture;
+  private environmentTexture!: Cubemap;
 
   private ambientTechnique!: Technique;
-  private ambientBindGroup!: GPUBindGroup;
+  private gBufferBindGroup!: GPUBindGroup;
+  private environmentBindGroup!: GPUBindGroup;
 
   constructor() {}
 
@@ -29,7 +32,7 @@ export class AmbientLight {
       maxAnisotropy: 16,
     });
 
-    this.ambientBindGroup = Render.getInstance()
+    this.gBufferBindGroup = Render.getInstance()
       .getDevice()
       .createBindGroup({
         label: `ambient_bindgroup`,
@@ -67,6 +70,31 @@ export class AmbientLight {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
     this.whiteTexture = await Texture.get('white.png');
+
+    this.environmentTexture = await Cubemap.get('skybox.png', {
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+    });
+
+    this.environmentBindGroup = Render.getInstance()
+      .getDevice()
+      .createBindGroup({
+        label: `skybox_bindgroup`,
+        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(2),
+        entries: [
+          {
+            binding: 0,
+            resource: this.environmentTexture.getTextureView(),
+          },
+          {
+            binding: 1,
+            resource: this.environmentTexture.getSampler(),
+          },
+        ],
+      });
   }
 
   public render(rtAccLight: GPUTextureView): void {
@@ -107,7 +135,8 @@ export class AmbientLight {
 
     // 3. Activar bind groups
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.ambientBindGroup); // GBuffer textures
+    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+    pass.setBindGroup(2, this.environmentBindGroup); // Environment texture
 
     // 4. Dibujar la mesh
     this.fullscreenQuadMesh.renderGroup(pass);

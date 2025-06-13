@@ -17,7 +17,7 @@ const FXAA_SUBPIX_CAP : f32 = 3.0 / 4.0;
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-    let rcpFrame = 1.0 / camera.sourceSize;
+    let rcpFrame = 1.0 / camera.screenSize;
 
         // === Sample all neighbors up front ===
     let colM = textureSample(gAlbedo, gAlbedoSampler, uv).rgb;

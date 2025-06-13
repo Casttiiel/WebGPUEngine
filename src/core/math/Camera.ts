@@ -1,11 +1,11 @@
-import { mat4, vec3, vec2 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Render } from '../../renderer/core/render';
 
 export class Camera {
   private view: mat4 = mat4.create();
   private projection: mat4 = mat4.create();
   private viewProjection: mat4 = mat4.create();
-  private screenToWorld: mat4 = mat4.create();
+  private invViewProjection: mat4 = mat4.create();
 
   private eye: vec3 = vec3.fromValues(0, 0, 0);
   private target: vec3 = vec3.fromValues(0, 0, -1);
@@ -43,46 +43,16 @@ export class Camera {
 
   private updateViewProjection(): void {
     mat4.multiply(this.viewProjection, this.projection, this.view);
-    this.calculateScreenToWorldMatrix();
+    this.calculateInvViewProjectionMatrix();
   }
+  private calculateInvViewProjectionMatrix(): void {
+    // Create inverse view-projection matrix for world position reconstruction
+    // This matrix transforms from NDC space (-1 to 1) to world space
+    const invViewProjection = mat4.create();
+    mat4.invert(invViewProjection, this.viewProjection);
 
-  private calculateScreenToWorldMatrix(): void {
-    // Crear la matriz
-    const m = mat4.create();
-
-    // Aplicar las operaciones en orden
-    const cameraInvResolution = vec2.fromValues(1.0 / Render.width, 1.0 / Render.height);
-
-    // Escalado inicial para convertir de coordenadas de pantalla a [0,1]
-    const scale1 = mat4.fromScaling(mat4.create(), [
-      cameraInvResolution[0],
-      cameraInvResolution[1],
-      1.0,
-    ]);
-    mat4.multiply(m, m, scale1);
-
-    // Escalado con el FOV y la relación de aspecto para crear los rayos correctos
-    const scale2 = mat4.fromScaling(mat4.create(), [
-      Math.tan(this.fovRadians * 0.5) * this.aspectRatio,
-      Math.tan(this.fovRadians * 0.5),
-      1.0,
-    ]);
-    mat4.multiply(m, m, scale2);
-
-    // Escalado con ZFar
-    const scale3 = mat4.fromScaling(mat4.create(), [this.zFar, this.zFar, this.zFar]);
-    //mat4.multiply(m, m, scale3);
-
-    // Paso 2: Crear la matriz para el sistema de coordenadas del mundo usando los vectores de la cámara (Front, Left, Up)
-    let mtx_axis = mat4.create();
-
-    // Crear la matriz con las direcciones de la cámara
-    mat4.lookAt(mtx_axis, [0, 0, 0], this.front, this.up);
-    mat4.invert(mtx_axis, mtx_axis);
-
-    // Paso 3: Multiplicar las matrices
-    this.screenToWorld = mat4.create();
-    mat4.multiply(this.screenToWorld, mtx_axis, m);
+    // Store the inverse view-projection matrix as invViewProjection
+    this.invViewProjection = invViewProjection;
   }
 
   private updateProjection(): void {
@@ -241,8 +211,8 @@ export class Camera {
     return this.projection;
   }
 
-  public getScreenToWorld(): mat4 {
-    return this.screenToWorld;
+  public getInvViewProjectionMatrix(): mat4 {
+    return this.invViewProjection;
   }
 
   public getViewProjection(): mat4 {
