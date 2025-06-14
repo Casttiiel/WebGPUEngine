@@ -111,6 +111,18 @@ export class AmbientLight {
 
   public render(rtAccLight: GPUTextureView): void {
     const render = Render.getInstance();
+    render
+      .getDevice()
+      .queue.writeBuffer(
+        this.ambientUniformBuffer,
+        0,
+        new Float32Array([
+          this.reflectionIntensity,
+          this.ambientLightIntensity,
+          this.globalAmbientBoost,
+          0.0,
+        ]),
+      );
     const pass = render.getCommandEncoder().beginRenderPass({
       colorAttachments: [
         {
@@ -157,18 +169,5 @@ export class AmbientLight {
     pass.end();
   }
 
-  public update(dt: number): void {
-    Render.getInstance()
-      .getDevice()
-      .queue.writeBuffer(
-        this.ambientUniformBuffer,
-        0,
-        new Float32Array([
-          this.reflectionIntensity,
-          this.ambientLightIntensity,
-          this.globalAmbientBoost,
-          0.0,
-        ]),
-      );
-  }
+  public update(dt: number): void {}
 }
