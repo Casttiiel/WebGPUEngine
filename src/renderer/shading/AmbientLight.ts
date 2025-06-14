@@ -13,6 +13,12 @@ export class AmbientLight {
   private ambientTechnique!: Technique;
   private gBufferBindGroup!: GPUBindGroup;
   private environmentBindGroup!: GPUBindGroup;
+  private uniformBindGroup!: GPUBindGroup;
+  private ambientUniformBuffer!: GPUBuffer;
+
+  private reflectionIntensity = 0.3;
+  private ambientLightIntensity = 0.7;
+  private globalAmbientBoost = 0.4;
 
   constructor() {}
 
@@ -80,6 +86,27 @@ export class AmbientLight {
           },
         ],
       });
+
+    this.ambientUniformBuffer = Render.getInstance()
+      .getDevice()
+      .createBuffer({
+        label: `ambient uniform buffer`,
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+
+    this.uniformBindGroup = Render.getInstance()
+      .getDevice()
+      .createBindGroup({
+        label: `ambient light uniform bind group`,
+        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(3),
+        entries: [
+          {
+            binding: 0,
+            resource: { buffer: this.ambientUniformBuffer },
+          },
+        ],
+      });
   }
 
   public render(rtAccLight: GPUTextureView): void {
@@ -122,10 +149,26 @@ export class AmbientLight {
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
     pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
     pass.setBindGroup(2, this.environmentBindGroup); // Environment texture
+    pass.setBindGroup(3, this.uniformBindGroup); // ambient parameters
 
     // 4. Dibujar la mesh
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();
+  }
+
+  public update(dt: number): void {
+    Render.getInstance()
+      .getDevice()
+      .queue.writeBuffer(
+        this.ambientUniformBuffer,
+        0,
+        new Float32Array([
+          this.reflectionIntensity,
+          this.ambientLightIntensity,
+          this.globalAmbientBoost,
+          0.0,
+        ]),
+      );
   }
 }

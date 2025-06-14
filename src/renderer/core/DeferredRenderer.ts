@@ -199,6 +199,10 @@ export class DeferredRenderer {
     };
   }
 
+  public update(dt: number): void {
+    this.ambientLight.update(dt);
+  }
+
   private destroy() {
     if (this.rtAlbedos) {
       this.rtAlbedos.destroy();

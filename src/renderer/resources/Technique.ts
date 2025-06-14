@@ -287,6 +287,18 @@ export class Technique extends GPUResource {
           ],
         });
       }
+      case PipelineBindGroupLayouts.BUFFER_UNIFORM: {
+        return this.device.createBindGroupLayout({
+          label: 'buffer uniform bind group layout',
+          entries: [
+            {
+              binding: 0,
+              visibility: GPUShaderStage.FRAGMENT,
+              buffer: { type: 'uniform' },
+            },
+          ],
+        });
+      }
       default: {
         throw new Error(`${this.label}: Unknown uniform layout`);
       }

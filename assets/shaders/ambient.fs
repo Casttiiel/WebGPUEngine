@@ -34,7 +34,7 @@ struct AmbientUniforms {
 
 @group(2) @binding(0) var txEnvironment: texture_cube<f32>;
 @group(2) @binding(1) var samplerEnv: sampler;
-/*@group(2) @binding(2) var<uniform> ambient: AmbientUniforms;*/
+@group(3) @binding(0) var<uniform> ambient: AmbientUniforms;
 
 
 fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
@@ -76,44 +76,54 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     return g;
 }
 
-fn Specular_F_Roughness(specularColor: vec3<f32>, roughness: f32, n: vec3<f32>, v: vec3<f32>) -> vec3<f32> {
-    // Calculate half vector between view direction and normal
-    let h = normalize(n + v);
-    
-    // Fresnel-Schlick
-    let dotVH = max(dot(v, h), 0.0);
-    let f0 = specularColor;
-    let fresnel = f0 + (vec3<f32>(1.0) - f0) * pow(1.0 - dotVH, 5.0);
+// PBR Fresnel-Schlick approximation for IBL
+fn fresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
 
-    // Adjust fresnel based on roughness (this helps prevent overly bright edges on rough surfaces)
-    return mix(fresnel, f0, roughness);
+// PBR Fresnel with roughness compensation for IBL
+fn fresnelSchlickRoughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let oneMinusRoughness = vec3<f32>(1.0 - roughness);
+    return F0 + (max(oneMinusRoughness, F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
-    // Diffuse IBL
-    let irradiance = textureSampleLevel(txEnvironment, samplerEnv, g.normal, 0.0).rgb;
-    let diffuse = g.albedo * irradiance;
+    let N = normalize(g.normal);
+    let V = normalize(g.viewDir);
+    let R = normalize(g.reflectedDir);
     
-    // Specular IBL
-    let rough = g.roughness * g.roughness; // Use squared roughness for better visual results
-    let mipLevel = rough * 8.0; // Assuming environment map has 8 mip levels
-    //let prefilteredColor = textureSampleLevel(txEnvironment, w, g.reflectedDir, mipLevel).rgb;
-    let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, g.reflectedDir, 0.0).rgb;
-    // Calculate fresnel for IBL
-    let fresnel = Specular_F_Roughness(g.specularColor, g.roughness, g.normal, g.viewDir);
+    // Calculate angles for PBR
+    let NdotV = max(dot(N, V), 0.0);
     
-    // Combine diffuse and specular IBL
-    let specular = prefilteredColor * fresnel;
+    // PBR material properties
+    let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic); // Base reflectance
     
-    // Energy conservation: reduce diffuse contribution based on specularity and roughness
-    let energyConservation = 1.0 - rough * fresnel;
-    let finalDiffuse = diffuse * energyConservation;
+    // Sample diffuse irradiance (should be pre-convolved for lambertian BRDF)
+    let irradiance = textureSampleLevel(txEnvironment, samplerEnv, N, 0.0).rgb;
     
-    return (finalDiffuse) * 
-            ao;
-    /*return (finalDiffuse * ambient.ambientLightIntensity + 
-            specular * ambient.reflectionIntensity) * 
-            ambient.globalAmbientBoost * ao;*/
+    // Sample specular radiance with roughness-based mip level
+    let roughness = g.roughness;
+    //let mipLevel = roughness * 7.0; // Assuming 8 mip levels (0-7)
+    let mipLevel = 0.0;
+    let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, R, mipLevel).rgb;
+    
+    // Calculate Fresnel term for IBL
+    let F = fresnelSchlickRoughness(NdotV, F0, roughness);
+    
+    // Energy conservation
+    let kS = F; // Specular contribution
+    let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse only for non-metals
+    
+    // Diffuse contribution
+    let diffuse = kD * g.albedo * irradiance;
+    
+    // Specular contribution
+    // For a proper PBR pipeline, you would sample a BRDF integration map here
+    // For now, we'll use a simplified approach
+    let specular = prefilteredColor * F;
+    
+    // Combine and apply ambient occlusion
+    return (diffuse * ambient.ambientLightIntensity + specular * ambient.reflectionIntensity) * ambient.globalAmbientBoost * ao;
 }
 
 @fragment
@@ -126,6 +136,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Calculate image based lighting
     let ibl = calculateIBL(g, ao);
 
+    //let final_color = vec4<f32>(ibl + g.selfIllum, 1.0);
     let final_color = vec4<f32>(ibl + g.selfIllum, 1.0);
     return final_color;
 }

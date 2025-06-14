@@ -211,6 +211,8 @@ export class ModuleRender extends Module {
       this.debugValues.drawCallsTransparent.value +
       this.debugValues.drawCallsDistorsions.value;
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
+
+    this.deferred.update(dt);
   }
 
   public override renderInMenu(): void {

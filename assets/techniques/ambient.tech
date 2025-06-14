@@ -3,5 +3,5 @@
     "fs": "ambient.fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["CameraUniforms", "GBufferUniforms", "CubemapTexture"]
+    "uniforms":["CameraUniforms", "GBufferUniforms", "CubemapTexture", "BufferUniform"]
 }
