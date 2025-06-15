@@ -15,7 +15,7 @@ export class NameComponent extends Component {
     // Name components don't need update logic by default
   }
 
-  public renderInMenu(): void {}
+  public override renderInMenu(): void {}
 
   public renderDebug(): void {}
 

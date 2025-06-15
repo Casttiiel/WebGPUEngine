@@ -1,5 +1,5 @@
 import { Component } from '../../core/ecs/Component';
-import { Render } from '../../renderer/core/render';
+import { Render } from '../../renderer/core/Render';
 import { RenderToTexture } from '../../renderer/core/RenderToTexture';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';

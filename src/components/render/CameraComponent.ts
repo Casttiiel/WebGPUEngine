@@ -72,7 +72,7 @@ export class CameraComponent extends Component {
     this.camera.move(Array.from(this.camera.getLocalVector([0, -0.05 * mouseWheelDelta * dt, 0])));
   }
 
-  public renderInMenu(): void {}
+  public override renderInMenu(): void {}
 
   public renderDebug(): void {
     // Implementar visualización de debug de la cámara si es necesario

@@ -2,7 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { Transform } from '../../core/math/Transform';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
-import { Render } from '../../renderer/core/render';
+import { Render } from '../../renderer/core/Render';
 
 export class TransformComponent extends Component {
   private transform: Transform;

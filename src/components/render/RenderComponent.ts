@@ -1,6 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { Mesh } from '../../renderer/resources/Mesh';
-import { Material } from '../../renderer/resources/material';
+import { Material } from '../../renderer/resources/Material';
 import { TransformComponent } from '../core/TransformComponent';
 import {
   RenderComponentDataType,
