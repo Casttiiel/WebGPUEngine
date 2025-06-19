@@ -1,5 +1,9 @@
 ## NPM RUN DEV
 
+Resolution? FFXA? Multisampling?
+HDR? Light Exposure (For now is immediate)
+Parpadeo con low frames de skybox?
+
 FPS Performance/Memory used
 
 Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
