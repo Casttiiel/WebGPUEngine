@@ -297,6 +297,22 @@ export class Technique extends GPUResource {
           ],
         });
       }
+      case PipelineBindGroupLayouts.DEPTH_TEXTURE: {
+        return this.device.createBindGroupLayout({
+          label: 'depth texture bind group layout',
+          entries: [
+            {
+              binding: 0,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: {
+                sampleType: 'depth',
+                viewDimension: '2d',
+                multisampled: true,
+              },
+            },
+          ],
+        });
+      }
       default: {
         throw new Error(`${this.label}: Unknown uniform layout`);
       }
@@ -416,6 +432,9 @@ export class Technique extends GPUResource {
           },
         ];
       }
+      case FragmentShaderTargets.DEPTH_ONLY: {
+        return []; // No color targets, only depth output
+      }
       default: {
         throw new Error(`${this.label}: Unknown Fragment Shader Target`);
       }
@@ -474,6 +493,13 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'less',
+        };
+      }
+      case DepthModes.ALWAYS: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: true,
+          depthCompare: 'always',
         };
       }
       default: {

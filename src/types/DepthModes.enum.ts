@@ -3,4 +3,5 @@ export enum DepthModes {
   DISABLE_ALL = 'disable_all',
   TEST_EQUAL = 'test_equal',
   DEFAULT = 'default',
+  ALWAYS = 'always',
 }

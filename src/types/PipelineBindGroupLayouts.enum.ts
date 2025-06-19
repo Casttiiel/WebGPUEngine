@@ -6,4 +6,5 @@ export enum PipelineBindGroupLayouts {
   CUBEMAP_TEXTURE = 'CubemapTexture',
   GBUFFER_UNIFORMS = 'GBufferUniforms',
   BUFFER_UNIFORM = 'BufferUniform',
+  DEPTH_TEXTURE = 'DepthTexture',
 }
