@@ -1,0 +1,7 @@
+{
+    "vs": "presentation.vs",
+    "fs": "ambient_occlusion.fs",
+    "writesOn": "single_channel",
+    "z": "disable_all",
+    "uniforms":["CameraUniforms", "GBufferUniforms"]
+}

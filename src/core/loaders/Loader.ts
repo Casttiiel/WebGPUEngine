@@ -12,6 +12,7 @@ import { Entity } from '../ecs/Entity';
 import { Engine } from '../engine/Engine';
 import { ResourceManager } from '../engine/ResourceManager';
 import { GLTFLoader } from './GLTFLoader';
+import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -113,6 +114,9 @@ export class Loader {
         break;
       case 'antialiasing':
         return new AntialiasingComponent();
+        break;
+      case 'ambient_occlusion':
+        return new AmbientOcclusionComponent();
         break;
       /*case 'autoAlignedBoundingBox':
         entity.addComponent(type, new AABBComponent());

@@ -30,6 +30,7 @@ export class AmbientLight {
     rtNormals: GPUTextureView,
     rtLinearDepth: GPUTextureView,
     rtSelfIllum: GPUTextureView,
+    rtAmbientOcclusion: GPUTextureView,
   ): void {
     const sampler = this.environmentTexture.getSampler();
     this.gBufferBindGroup = Render.getInstance()
@@ -56,7 +57,7 @@ export class AmbientLight {
           },
           {
             binding: 4,
-            resource: this.whiteTexture.getTextureView(),
+            resource: rtAmbientOcclusion,
           },
           {
             binding: 5,

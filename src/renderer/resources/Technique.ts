@@ -462,6 +462,13 @@ export class Technique extends GPUResource {
           },
         ];
       }
+      case FragmentShaderTargets.SINGLE_CHANNEL: {
+        return [
+          {
+            format: 'r16float'
+          },
+        ];
+      }
       case FragmentShaderTargets.SCREEN: {
         return [
           {

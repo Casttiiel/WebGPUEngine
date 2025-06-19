@@ -3,4 +3,5 @@ export enum FragmentShaderTargets {
   GBUFFER = 'gbuffer',
   TEXTURE = 'texture',
   DEPTH_ONLY = 'depth_only',
+  SINGLE_CHANNEL = 'single_channel',
 }

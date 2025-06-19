@@ -1,3 +1,4 @@
+import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
 import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
@@ -159,6 +160,11 @@ export class Render {
       for (const comp of Engine.getEntities().getObjectManagerByName('antialiasing')?.getList() ??
         []) {
         (comp as AntialiasingComponent).resize();
+      }
+
+      for (const comp of Engine.getEntities().getObjectManagerByName('ambient_occlusion')?.getList() ??
+        []) {
+        (comp as AmbientOcclusionComponent).resize();
       }
 
       Engine.getRender().onResolutionUpdated();

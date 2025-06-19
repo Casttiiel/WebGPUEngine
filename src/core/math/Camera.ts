@@ -1,5 +1,5 @@
 import { mat4, vec3, vec4 } from 'gl-matrix';
-import { Render } from '../../renderer/core/render';
+import { Render } from '../../renderer/core/Render';
 
 export class Camera {
   private view: mat4 = mat4.create();

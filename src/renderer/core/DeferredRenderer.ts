@@ -6,6 +6,8 @@ import { Render } from './Render';
 import { RenderManager } from './RenderManager';
 import { RenderToTexture } from './RenderToTexture';
 import { DepthResolver } from './DepthResolver';
+import { Entity } from '@/core/ecs/Entity';
+import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -18,7 +20,8 @@ export class DeferredRenderer {
   private rtAccLight!: RenderToTexture;
   private rtSelfIllum!: RenderToTexture;
   private depthStencil!: GPUTexture;
-  private depthStencilView!: GPUTextureView | null;
+  private depthStencilView!: GPUTextureView;
+  private ambientOcclusionResult !: RenderToTexture;
 
   // MSAA depth buffer for G-Buffer pass
   private msaaDepthStencil!: GPUTexture;
@@ -36,6 +39,7 @@ export class DeferredRenderer {
       this.rtLinearDepth = new RenderToTexture();
       this.rtAccLight = new RenderToTexture();
       this.rtSelfIllum = new RenderToTexture();
+      this.ambientOcclusionResult = new RenderToTexture();
     }
 
     this.rtAlbedos.createRT('g_albedos.dds', width, height, 'rgba16float', true);
@@ -43,6 +47,7 @@ export class DeferredRenderer {
     this.rtSelfIllum.createRT('g_self_illum.dds', width, height, 'rgba16float', true);
     this.rtLinearDepth.createRT('g_depths.dds', width, height, 'r16float', true);
     this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float');
+    this.ambientOcclusionResult.createRT('ambient_occlusion_result.dds', width, height, 'r16float');
 
     const device = Render.getInstance().getDevice();
 
@@ -77,6 +82,7 @@ export class DeferredRenderer {
       this.rtNormals.getView(),
       this.rtLinearDepth.getView(),
       this.rtSelfIllum.getView(),
+      this.ambientOcclusionResult.getView(),
     );
   }
   public async load(): Promise<void> {
@@ -92,8 +98,10 @@ export class DeferredRenderer {
     this.isLoaded = true;
   }
 
-  public render(_camera: Camera): GPUTextureView {
+  public render(camera: Entity): GPUTextureView {
     this.renderGBuffer();
+    //decals 
+    this.renderAO(camera);
     this.renderAccLight();
     this.renderTransparents();
 
@@ -104,7 +112,7 @@ export class DeferredRenderer {
     return view;
   }
 
-  public renderGBuffer(): void {
+  private renderGBuffer(): void {
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass(this.getGBufferRenderPassDescriptor());
 
@@ -132,7 +140,21 @@ export class DeferredRenderer {
     this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
   }
 
-  public renderAccLight(): void {
+  private renderAO(camera: Entity): void {
+    const ambientOcclusionComponent = camera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
+    if(!ambientOcclusionComponent) {
+      throw new Error('Ambient Occlusion component not found on camera entity');
+    }
+    ambientOcclusionComponent.setBindGroup(
+      this.rtAlbedos.getView(),
+      this.rtNormals.getView(),
+      this.rtLinearDepth.getView(),
+      this.rtSelfIllum.getView(),
+    );
+    ambientOcclusionComponent.compute(this.ambientOcclusionResult.getView());
+  }
+
+  private renderAccLight(): void {
     this.ambientLight.render(this.rtAccLight.getView());
     //TODO POINT LIGHTS
     //TODO DIRECTIONAL LIGHTS NO SHADOWS

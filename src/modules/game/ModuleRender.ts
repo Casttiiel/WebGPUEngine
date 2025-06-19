@@ -62,7 +62,7 @@ export class ModuleRender extends Module {
     this.updateGlobalUniforms(camera);
     RenderManager.getInstance().setCamera(camera);
 
-    let result = this.deferred.render(camera);
+    let result = this.deferred.render(mainCamera);
 
     this.renderDistorsions(result);
 
