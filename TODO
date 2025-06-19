@@ -1,6 +1,26 @@
 ## NPM RUN DEV
 
-Ambient Occlusion (If no component then white)
+Ambient Occlusion (If no component then white) SSAO -> GTAO
+Efficient Sample Generation:
+
+Using screen-space coordinates for noise to avoid repeating patterns
+Hemisphere samples are oriented to surface normal
+Fixed sample count (16) balances quality and performance
+Depth-based Occlusion:
+
+Using linear depth from G-Buffer
+Samples checked against surface depth with bias to prevent self-occlusion
+Non-linear falloff based on distance and angle
+Performance Optimizations:
+
+Early-out for samples outside screen or maximum distance
+Using smoothstep for efficient range falloff
+Normal-based weighting to reduce false occlusion
+Quality Features:
+
+Normal-weighted occlusion for better physical accuracy
+Distance-based falloff to prevent far samples from contributing too much
+Screen-space noise to prevent banding and patterns
 
 Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
 ........Solucion: Hacer que esta se envie en el material.
