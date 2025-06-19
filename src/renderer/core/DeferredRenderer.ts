@@ -5,12 +5,13 @@ import { Skybox } from '../shading/Skybox';
 import { Render } from './Render';
 import { RenderManager } from './RenderManager';
 import { RenderToTexture } from './RenderToTexture';
+import { DepthResolver } from './DepthResolver';
 
 export class DeferredRenderer {
   private isLoaded = false;
-
   private skybox!: Skybox;
   private ambientLight!: AmbientLight;
+  private depthResolver!: DepthResolver;
   private rtAlbedos!: RenderToTexture;
   private rtNormals!: RenderToTexture;
   private rtLinearDepth!: RenderToTexture;
@@ -57,9 +58,7 @@ export class DeferredRenderer {
       sampleCount: 1,
     });
 
-    this.depthStencilView = this.depthStencil.createView();
-
-    // Create MSAA depth buffer for G-Buffer pass
+    this.depthStencilView = this.depthStencil.createView(); // Create MSAA depth buffer for G-Buffer pass
     this.msaaDepthStencil = device.createTexture({
       label: 'deferred msaa depth stencil texture label',
       size: {
@@ -67,7 +66,7 @@ export class DeferredRenderer {
         height: height,
       },
       format: 'depth32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       sampleCount: 4,
     });
 
@@ -80,13 +79,16 @@ export class DeferredRenderer {
       this.rtSelfIllum.getView(),
     );
   }
-
   public async load(): Promise<void> {
     this.skybox = new Skybox();
     await this.skybox.load();
 
     this.ambientLight = new AmbientLight();
     await this.ambientLight.load();
+
+    this.depthResolver = new DepthResolver();
+    await this.depthResolver.load();
+
     this.isLoaded = true;
   }
 
@@ -122,10 +124,12 @@ export class DeferredRenderer {
       Render.width, // Width
       Render.height, // Height
     );
-
     RenderManager.getInstance().render(RenderCategory.SOLIDS, pass);
 
     pass.end();
+
+    // Resolve MSAA depth to single-sample depth for skybox
+    this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
   }
 
   public renderAccLight(): void {
@@ -216,7 +220,6 @@ export class DeferredRenderer {
   public update(dt: number): void {
     this.ambientLight.update(dt);
   }
-
   private destroy() {
     if (this.rtAlbedos) {
       this.rtAlbedos.destroy();
@@ -231,6 +234,11 @@ export class DeferredRenderer {
       if (this.msaaDepthStencil) {
         this.msaaDepthStencil.destroy();
         this.msaaDepthStencilView = null;
+      }
+
+      // Clean up depth resolver
+      if (this.depthResolver) {
+        this.depthResolver.destroy();
       }
     }
   }
