@@ -298,6 +298,55 @@ export class Technique extends GPUResource {
           ],
         });
       }
+      case PipelineBindGroupLayouts.LUMINANCE_REDUCE: {
+        return this.device.createBindGroupLayout({
+          label: 'luminance reduction bind group layout',
+          entries: [
+            {
+              binding: 0,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: { sampleType: 'float' },
+            },
+            {
+              binding: 1,
+              visibility: GPUShaderStage.FRAGMENT,
+              sampler: { type: 'filtering' },
+            },
+            {
+              binding: 2,
+              visibility: GPUShaderStage.FRAGMENT,
+              buffer: { type: 'uniform' },
+            },
+          ],
+        });
+      }
+      case PipelineBindGroupLayouts.TONE_MAPPING: {
+        return this.device.createBindGroupLayout({
+          label: 'tone mapping bind group layout',
+          entries: [
+            {
+              binding: 0,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: { sampleType: 'float' },
+            },
+            {
+              binding: 1,
+              visibility: GPUShaderStage.FRAGMENT,
+              sampler: { type: 'filtering' },
+            },
+            {
+              binding: 2,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: { sampleType: 'float' },
+            },
+            {
+              binding: 3,
+              visibility: GPUShaderStage.FRAGMENT,
+              buffer: { type: 'uniform' },
+            },
+          ],
+        });
+      }
       default: {
         throw new Error(`${this.label}: Unknown uniform layout`);
       }
@@ -388,6 +437,14 @@ export class Technique extends GPUResource {
         return [
           {
             format: 'rgba16float',
+            blend: this.getBlendState(),
+          },
+        ];
+      }
+      case FragmentShaderTargets.TEXTURE_CHANNEL: {
+        return [
+          {
+            format: 'r16float',
             blend: this.getBlendState(),
           },
         ];

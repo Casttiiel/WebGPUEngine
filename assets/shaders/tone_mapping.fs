@@ -1,5 +1,19 @@
+struct ToneMappingParams {
+    minLogLuminance: f32,
+    maxLogLuminance: f32,
+    tau: f32,          // Adaptation speed
+    exposure: f32,
+};
+
 @group(0) @binding(0) var gAlbedo: texture_2d<f32>;
-@group(0) @binding(1) var gAlbedoSampler: sampler;
+@group(0) @binding(1) var defaultSampler: sampler;
+@group(0) @binding(2) var averageLuminance: texture_2d<f32>;
+@group(0) @binding(3) var<uniform> params: ToneMappingParams;
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
 
 fn Uncharted2Tonemap(x: vec3<f32>) -> vec3<f32> {
     let A: f32 = 0.15;
@@ -23,11 +37,19 @@ fn toneMappingUncharted2(x: vec3<f32>) -> vec3<f32> {
 }
 
 @fragment
-fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
-    let GlobalExposureAdjustment: f32 = 1.0; // TODO DEBERIA SER UNA UNIFORM
-    var hdrColor = textureSample(gAlbedo, gAlbedoSampler, uv);
-    hdrColor = hdrColor * GlobalExposureAdjustment;
-
-    let tmColorUC2 = toneMappingUncharted2(hdrColor.xyz);
+fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
+    // Get adaptive average luminance
+    let avgLogLuminance = textureLoad(averageLuminance, vec2<i32>(0, 0), 0).r;
+    let logLuminanceRange = params.maxLogLuminance - params.minLogLuminance;
+    let avgLuminance = exp2(avgLogLuminance * logLuminanceRange + params.minLogLuminance);    // Calculate adaptive exposure with un poco más de protección para highlights
+    let adaptedLum = params.exposure / (avgLuminance + 0.005);
+    
+    var hdrColor = textureSample(gAlbedo, defaultSampler, input.uv);
+    // Aplicamos una curva suave antes del tone mapping para preservar más detalles
+    let exposedColor = hdrColor.xyz * adaptedLum;
+    let compressedColor = exposedColor / (vec3<f32>(1.0) + exposedColor);
+    
+    // Aplicamos el tone mapping con un poco más de control en las altas luces
+    let tmColorUC2 = toneMappingUncharted2(compressedColor);
     return vec4<f32>(tmColorUC2, 1.0);
 }

@@ -1,0 +1,8 @@
+{
+    "vs": "luminance_reduce.vs",
+    "fs": "luminance_reduce.fs",
+    "blend": "NONE",
+    "z": "disable_all",
+    "writesOn": "texture_channel",
+    "uniforms": ["LuminanceReduce"]
+}

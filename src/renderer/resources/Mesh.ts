@@ -234,7 +234,7 @@ export class Mesh extends GPUResource {
 
   private computeMeshTangents(): Float32Array {
     // Create tangent array initialized to zero
-    const tangents = new Float32Array(this.vertices.length * 4/3); // 4 components (xyz + w) per vertex
+    const tangents = new Float32Array((this.vertices.length * 4) / 3); // 4 components (xyz + w) per vertex
 
     // Process each triangle
     for (let i = 0; i < this.indices.length - 2; i += 3) {
@@ -248,32 +248,23 @@ export class Mesh extends GPUResource {
       const p0 = [
         this.vertices[i0 * 3] ?? 0,
         this.vertices[i0 * 3 + 1] ?? 0,
-        this.vertices[i0 * 3 + 2] ?? 0
+        this.vertices[i0 * 3 + 2] ?? 0,
       ];
       const p1 = [
         this.vertices[i1 * 3] ?? 0,
         this.vertices[i1 * 3 + 1] ?? 0,
-        this.vertices[i1 * 3 + 2] ?? 0
+        this.vertices[i1 * 3 + 2] ?? 0,
       ];
       const p2 = [
         this.vertices[i2 * 3] ?? 0,
         this.vertices[i2 * 3 + 1] ?? 0,
-        this.vertices[i2 * 3 + 2] ?? 0
+        this.vertices[i2 * 3 + 2] ?? 0,
       ];
 
       // Get UVs of the triangle
-      const uv0 = [
-        this.uvs[i0 * 2] ?? 0,
-        this.uvs[i0 * 2 + 1] ?? 0
-      ];
-      const uv1 = [
-        this.uvs[i1 * 2] ?? 0,
-        this.uvs[i1 * 2 + 1] ?? 0
-      ];
-      const uv2 = [
-        this.uvs[i2 * 2] ?? 0,
-        this.uvs[i2 * 2 + 1] ?? 0
-      ];
+      const uv0 = [this.uvs[i0 * 2] ?? 0, this.uvs[i0 * 2 + 1] ?? 0];
+      const uv1 = [this.uvs[i1 * 2] ?? 0, this.uvs[i1 * 2 + 1] ?? 0];
+      const uv2 = [this.uvs[i2 * 2] ?? 0, this.uvs[i2 * 2 + 1] ?? 0];
 
       // Compute tangent for this triangle
       const tangentData = this.computeTangent(p0, p1, p2, uv0, uv1, uv2);
@@ -298,7 +289,7 @@ export class Mesh extends GPUResource {
       const y = tangents[i + 1] ?? 0;
       const z = tangents[i + 2] ?? 0;
       const len = Math.sqrt(x * x + y * y + z * z);
-      
+
       if (len > 0) {
         tangents[i] = x / len;
         tangents[i + 1] = y / len;

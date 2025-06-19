@@ -1,6 +1,12 @@
 ## NPM RUN DEV
 
-FPS Performance/Memory used
+HDR? Light Exposure (For now is immediate)
+Resolution? FFXA? Multisampling?
+
+Mipmap levels on cubemap for ambient light
+
+Blur
+Bloom (antes o despues del light exposure calc?)
 
 Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
 ........Solucion: Hacer que esta se envie en el material.
@@ -12,12 +18,10 @@ Ambient Occlusion
 3.DirectionalLightsWithShadows
 4.RenderPointLighstWithShadows
 
+FPS Performance/Memory used
+
 Improve uniform declaration. SI yo se lo que debo tener en el shader vs y fs. El pipeline deberia ser capaz de saberlo de alguna manera, o se lo deberia yo especificar, en la tecnica. Para de esta manera poder crear el pipeline layout de una manera automatica. Ademas, seria maravilloso si ademas puedo luego crear el bindgroup con el dato que yo quiero automaticamente.
 
-Mipmap levels on cubemap for ambient light
-
-Blur
-Bloom
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 
 Decals Category
@@ -33,7 +37,6 @@ Cascaded Shadow Maps
 Terrain with perlin noise
 Lens Flare
 Camera Lens Dirt
-Light Exposure
 Volumetric Lights/God Rays
 Weighted terrain
 Paralax Mapping

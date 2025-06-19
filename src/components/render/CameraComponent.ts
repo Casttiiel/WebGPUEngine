@@ -69,7 +69,7 @@ export class CameraComponent extends Component {
     }
 
     const mouseWheelDelta = input.getMouseWheelDelta();
-    this.camera.move(Array.from(this.camera.getLocalVector([0, -0.05 * mouseWheelDelta * dt, 0])));
+    this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
   }
 
   public override renderInMenu(): void {}

@@ -1,7 +1,10 @@
 import { quat, vec3 } from 'gl-matrix';
 import { EntityDataType } from '../../types/SceneData.type';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
-import { RenderComponentDataType, RenderComponentMeshDataType } from '../../types/RenderComponentData.type';
+import {
+  RenderComponentDataType,
+  RenderComponentMeshDataType,
+} from '../../types/RenderComponentData.type';
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
 
 export class GLTFLoader {

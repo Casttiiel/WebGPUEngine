@@ -70,7 +70,9 @@ export class RenderManager {
     this.currentMaterialBindings = null;
 
     // Filtrar primero por categoría y crear una copia para no modificar el array original
-    const keysToDraw = [...this.normalKeys].filter((key) => key.material.getCategory() === category);
+    const keysToDraw = [...this.normalKeys].filter(
+      (key) => key.material.getCategory() === category,
+    );
 
     // Ordenar las keys: técnica > material > mesh para minimizar cambios de estado
     keysToDraw.sort((k1, k2) => {
@@ -78,14 +80,14 @@ export class RenderManager {
       const tech1 = k1.material.getTechnique();
       const tech2 = k2.material.getTechnique();
       if (!tech1 || !tech2) return 0;
-      
+
       const techPath1 = tech1.path || '';
       const techPath2 = tech2.path || '';
       if (techPath1 !== techPath2) {
         return techPath1.localeCompare(techPath2);
       }
 
-      // 2. Si la técnica es la misma, ordenar por material (minimizar cambios de textura/uniforms)      
+      // 2. Si la técnica es la misma, ordenar por material (minimizar cambios de textura/uniforms)
       const mat1 = k1.material.getName();
       const mat2 = k2.material.getName();
       if (mat1 !== mat2) {
