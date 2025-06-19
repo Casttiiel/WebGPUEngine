@@ -2,6 +2,7 @@ import { ResourceManager } from '../../core/engine/ResourceManager';
 import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResource';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { CubemapDataType } from '../../types/CubemapData.type';
+import { MipmapGenerator } from '../core/MipmapGenerator';
 
 export interface CubemapOptions extends IGPUResourceOptions {
   magFilter?: GPUFilterMode;
@@ -114,7 +115,8 @@ export class Cubemap extends GPUResource {
         usage:
           GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |
-          GPUTextureUsage.RENDER_ATTACHMENT,
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.STORAGE_BINDING,
         mipLevelCount: mipLevelCount,
       });
 
@@ -129,6 +131,14 @@ export class Cubemap extends GPUResource {
           },
           [faceSize, faceSize],
         );
+      }
+
+      // Generate mipmaps for the cubemap if more than 1 mip level
+      if (mipLevelCount > 1) {
+        const mipmapGenerator = new MipmapGenerator();
+        await mipmapGenerator.initialize();
+        mipmapGenerator.generateMipmapsForCubemap(this.gpuTexture, mipLevelCount);
+        mipmapGenerator.dispose();
       }
 
       // Crear la vista de la textura
