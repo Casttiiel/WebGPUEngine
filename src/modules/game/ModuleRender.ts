@@ -4,7 +4,7 @@ import { ToneMappingComponent } from '../../components/render/ToneMappingCompone
 import { Engine } from '../../core/engine/Engine';
 import { Camera } from '../../core/math/Camera';
 import { DeferredRenderer } from '../../renderer/core/DeferredRenderer';
-import { Render } from '../../renderer/core/render';
+import { Render } from '../../renderer/core/Render';
 import { RenderManager } from '../../renderer/core/RenderManager';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';

@@ -63,13 +63,13 @@ export class CameraComponent extends Component {
       this.camera.move(Array.from(this.camera.getLocalVector([0, 0, -4.0 * multiplier * dt])));
 
     // Rotación de la cámara con el ratón
-    if (input.isMouseButtonPressed(MouseButton.RIGHT)) {
+    if (input.isMouseButtonPressed(MouseButton.LEFT)) {
       const mouseDelta = input.getMouseDelta();
       this.camera.rotate(-mouseDelta.x * this.rotationSpeed, -mouseDelta.y * this.rotationSpeed);
     }
 
     const mouseWheelDelta = input.getMouseWheelDelta();
-    this.camera.move(Array.from(this.camera.getLocalVector([0, -0.05 * mouseWheelDelta * dt, 0])));
+    this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
   }
 
   public override renderInMenu(): void {}

@@ -7,8 +7,7 @@ import { FragmentShaderTargets } from '../../types/FragmentShaderTargets.enum';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { Mesh } from './Mesh';
-import { Render } from '../core/render';
-import { Engine } from '../../core/engine/Engine';
+import { Render } from '../core/Render';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
@@ -347,6 +346,12 @@ export class Technique extends GPUResource {
 
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
       pipelineParams.depthStencil = this.getDepthConfig();
+    }
+
+    if (this.writesOn === FragmentShaderTargets.GBUFFER) {
+      pipelineParams.multisample = {
+        count: 4,
+      };
     }
 
     this.pipeline = this.device.createRenderPipeline(pipelineParams);

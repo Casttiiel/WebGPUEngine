@@ -2,7 +2,7 @@ import { Camera } from '../../core/math/Camera';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { AmbientLight } from '../shading/AmbientLight';
 import { Skybox } from '../shading/Skybox';
-import { Render } from './render';
+import { Render } from './Render';
 import { RenderManager } from './RenderManager';
 import { RenderToTexture } from './RenderToTexture';
 
@@ -11,7 +11,6 @@ export class DeferredRenderer {
 
   private skybox!: Skybox;
   private ambientLight!: AmbientLight;
-
   private rtAlbedos!: RenderToTexture;
   private rtNormals!: RenderToTexture;
   private rtLinearDepth!: RenderToTexture;
@@ -19,6 +18,10 @@ export class DeferredRenderer {
   private rtSelfIllum!: RenderToTexture;
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView | null;
+
+  // MSAA depth buffer for G-Buffer pass
+  private msaaDepthStencil!: GPUTexture;
+  private msaaDepthStencilView!: GPUTextureView | null;
 
   constructor() {}
 
@@ -34,27 +37,41 @@ export class DeferredRenderer {
       this.rtSelfIllum = new RenderToTexture();
     }
 
-    this.rtAlbedos.createRT('g_albedos.dds', width, height, 'rgba16float');
-    this.rtNormals.createRT('g_normals.dds', width, height, 'rgba16float');
-    this.rtSelfIllum.createRT('g_self_illum.dds', width, height, 'rgba16float');
-    this.rtLinearDepth.createRT('g_depths.dds', width, height, 'r16float');
+    this.rtAlbedos.createRT('g_albedos.dds', width, height, 'rgba16float', true);
+    this.rtNormals.createRT('g_normals.dds', width, height, 'rgba16float', true);
+    this.rtSelfIllum.createRT('g_self_illum.dds', width, height, 'rgba16float', true);
+    this.rtLinearDepth.createRT('g_depths.dds', width, height, 'r16float', true);
     this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float');
 
-    this.depthStencil = Render.getInstance()
-      .getDevice()
-      .createTexture({
-        label: 'deferred depth stencil texture label',
-        size: {
-          width: width,
-          height: height,
-        },
-        format: 'depth32float',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT,
-      });
+    const device = Render.getInstance().getDevice();
 
-    if (!this.depthStencilView) {
-      this.depthStencilView = this.depthStencil.createView();
-    }
+    // Create single-sample depth buffer (for non-MSAA passes and skybox)
+    this.depthStencil = device.createTexture({
+      label: 'deferred depth stencil texture label',
+      size: {
+        width: width,
+        height: height,
+      },
+      format: 'depth32float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      sampleCount: 1,
+    });
+
+    this.depthStencilView = this.depthStencil.createView();
+
+    // Create MSAA depth buffer for G-Buffer pass
+    this.msaaDepthStencil = device.createTexture({
+      label: 'deferred msaa depth stencil texture label',
+      size: {
+        width: width,
+        height: height,
+      },
+      format: 'depth32float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      sampleCount: 4,
+    });
+
+    this.msaaDepthStencilView = this.msaaDepthStencil.createView();
 
     this.ambientLight.create(
       this.rtAlbedos.getView(),
@@ -117,7 +134,7 @@ export class DeferredRenderer {
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS
     //TODO FAKE VOLUMETRIC LIGHTS
-    this.skybox.render(this.rtAccLight.getView(), this.depthStencilView);
+    this.skybox.render(this.rtAccLight.getView(), this.depthStencilView!);
   }
 
   private renderTransparents(): void {
@@ -133,7 +150,7 @@ export class DeferredRenderer {
         },
       ],
       depthStencilAttachment: {
-        view: this.depthStencilView,
+        view: this.depthStencilView!, // Use single-sample depth for transparent pass
         depthLoadOp: 'load',
         depthStoreOp: 'discard',
       },
@@ -160,38 +177,35 @@ export class DeferredRenderer {
 
     pass.end();
   }
-
   private getGBufferRenderPassDescriptor(): GPURenderPassDescriptor {
+    // Helper function to create color attachment with optional resolve target
+    const createColorAttachment = (rt: RenderToTexture): GPURenderPassColorAttachment => {
+      const attachment: GPURenderPassColorAttachment = {
+        view: rt.getRenderView(), // MSAA view if enabled, otherwise single-sample
+        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        loadOp: 'clear',
+        storeOp: 'store',
+      };
+
+      // Add resolve target only if MSAA is enabled
+      const resolveTarget = rt.getResolveTarget();
+      if (resolveTarget) {
+        attachment.resolveTarget = resolveTarget;
+      }
+
+      return attachment;
+    };
+
     return {
       label: 'GBuffer Render pass',
       colorAttachments: [
-        {
-          view: this.rtAlbedos.getView(),
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-        {
-          view: this.rtNormals.getView(),
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-        {
-          view: this.rtSelfIllum.getView(),
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-        {
-          view: this.rtLinearDepth.getView(),
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
+        createColorAttachment(this.rtAlbedos),
+        createColorAttachment(this.rtNormals),
+        createColorAttachment(this.rtSelfIllum),
+        createColorAttachment(this.rtLinearDepth),
       ],
       depthStencilAttachment: {
-        view: this.depthStencilView,
+        view: this.msaaDepthStencilView!, // Use MSAA depth buffer for G-Buffer pass
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -212,6 +226,12 @@ export class DeferredRenderer {
       this.rtSelfIllum.destroy();
       this.depthStencil.destroy();
       this.depthStencilView = null;
+
+      // Clean up MSAA depth buffer
+      if (this.msaaDepthStencil) {
+        this.msaaDepthStencil.destroy();
+        this.msaaDepthStencilView = null;
+      }
     }
   }
 

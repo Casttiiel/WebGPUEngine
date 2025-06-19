@@ -1,5 +1,5 @@
 import { Engine } from '../../core/engine/Engine';
-import { Render } from '../core/render';
+import { Render } from '../core/Render';
 import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';

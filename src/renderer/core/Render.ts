@@ -1,4 +1,5 @@
 import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
+import { CameraComponent } from '../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { Engine } from '../../core/engine/Engine';
 
@@ -30,10 +31,17 @@ export class Render {
 
     // Configurar tamaño del canvas considerando la densidad de píxeles del dispositivo
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvas.clientWidth * dpr;
-    canvas.height = canvas.clientHeight * dpr;
-    Render.screenWidth = canvas.width;
-    Render.screenHeight = canvas.height;
+    const width = Math.floor(Math.max(1, canvas.clientWidth * dpr));
+    const height = Math.floor(Math.max(1, canvas.clientHeight * dpr));
+
+    canvas.width = width;
+    canvas.height = height;
+    Render.screenWidth = width;
+    Render.screenHeight = height;
+
+    console.warn(
+      `Canvas initialized: ${width}x${height} (DPR: ${dpr}, Client: ${canvas.clientWidth}x${canvas.clientHeight})`,
+    );
 
     try {
       // 1. Obtener el adaptador WebGPU que representa el hardware gráfico
@@ -139,7 +147,10 @@ export class Render {
 
       // Usa Render.getSize() en todos los componentes:
       const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-      mainCamera?.getComponent('camera')?.getCamera().setViewport(w, h);
+      const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+      if (cameraComponent) {
+        cameraComponent.getCamera().setViewport(w, h);
+      }
 
       for (const comp of Engine.getEntities().getObjectManagerByName('tone_mapping')?.getList() ??
         []) {
