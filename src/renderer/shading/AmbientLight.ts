@@ -11,6 +11,7 @@ export class AmbientLight {
   private environmentTexture!: Cubemap;
   private irradianceTexture!: Cubemap;
   private brdfLUTTexture!: Texture;
+  private brdfLUTSampler!: GPUSampler;
 
   private ambientTechnique!: Technique;
   private gBufferBindGroup!: GPUBindGroup;
@@ -18,9 +19,9 @@ export class AmbientLight {
   private uniformBindGroup!: GPUBindGroup;
   private ambientUniformBuffer!: GPUBuffer;
 
-  private reflectionIntensity = 0.3;
-  private ambientLightIntensity = 0.7;
-  private globalAmbientBoost = 0.4;
+  private reflectionIntensity = 0.2;
+  private ambientLightIntensity = 0.8;
+  private globalAmbientBoost = 0.2;
 
   constructor() {}
 
@@ -73,6 +74,16 @@ export class AmbientLight {
     this.irradianceTexture = await Cubemap.get('irradiance.png');
     this.brdfLUTTexture = await Texture.get('brdfLUT.png');
 
+    // Create specific sampler for BRDF LUT (clamp-to-edge, linear filtering)
+    this.brdfLUTSampler = Render.getInstance().getDevice().createSampler({
+      label: 'BRDF LUT Sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+    });
+
     this.environmentBindGroup = Render.getInstance()
       .getDevice()
       .createBindGroup({
@@ -93,7 +104,7 @@ export class AmbientLight {
           },
           {
             binding: 3,
-            resource: this.brdfLUTTexture.getSampler(),
+            resource: this.brdfLUTSampler, // Use specific BRDF LUT sampler
           },
           {
             binding: 4,

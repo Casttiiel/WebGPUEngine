@@ -117,10 +117,11 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse only for non-metals
     
     // Diffuse contribution
-    let diffuse = kD * g.albedo * irradiance;
-      // Specular contribution using BRDF integration LUT
+    let diffuse = kD * g.albedo * irradiance;    // Specular contribution using BRDF integration LUT
     // Sample the BRDF LUT with NdotV and roughness
-    let brdf = textureSample(brdfLUT, samplerBRDF, vec2<f32>(NdotV, roughness)).rg;
+    // Ensure coordinates are in valid range [0, 1]
+    let brdfCoords = vec2<f32>(clamp(NdotV, 0.0, 1.0), clamp(roughness, 0.0, 1.0));
+    let brdf = textureSample(brdfLUT, samplerBRDF, brdfCoords).rg;
     let specular = prefilteredColor * (F * brdf.x + brdf.y);
     
     // Combine and apply ambient occlusion
