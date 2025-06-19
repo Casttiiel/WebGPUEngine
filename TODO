@@ -1,13 +1,13 @@
 ## NPM RUN DEV
 
 Review ambient
-HDR? Light Exposure (For now is immediate)
+Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
+........Solucion: Hacer que esta se envie en el material.
+Mipmap levels on cubemap for ambient light
+HDR? Light Exposure (For now is immediate)(HAY BRANCH)
 Parpadeo con low frames de skybox?
 
 FPS Performance/Memory used
-
-Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
-........Solucion: Hacer que esta se envie en el material.
 
 PBR LIGHTS
 1.PointLightWithoutshadows
@@ -17,8 +17,6 @@ Ambient Occlusion
 4.RenderPointLighstWithShadows
 
 Improve uniform declaration. SI yo se lo que debo tener en el shader vs y fs. El pipeline deberia ser capaz de saberlo de alguna manera, o se lo deberia yo especificar, en la tecnica. Para de esta manera poder crear el pipeline layout de una manera automatica. Ademas, seria maravilloso si ademas puedo luego crear el bindgroup con el dato que yo quiero automaticamente.
-
-Mipmap levels on cubemap for ambient light
 
 Blur
 Bloom

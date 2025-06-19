@@ -320,6 +320,167 @@ let TBN = computeTBN(normalize(input.N), input.T);
 let N_world = normalize(TBN * N_tangent_space.xyz);
 ```
 
+## MSAA (Multisample Anti-Aliasing) Implementation
+
+### MSAA Architecture
+
+The engine implements MSAA in the deferred rendering pipeline with manual depth resolve:
+
+**MSAA Textures Creation**
+
+- G-Buffer textures support both MSAA and single-sample formats
+- Depth buffer has both MSAA (for geometry pass) and single-sample (for post-processing) versions
+- Sample count is configurable (typically 4x MSAA)
+
+**Manual Depth Resolve**
+
+- Custom depth resolve pass using a fullscreen quad and shader
+- Resolves MSAA depth to single-sample for skybox and post-processing compatibility
+- Uses the engine's Technique and Mesh systems for consistency
+
+### DepthResolver Implementation
+
+```typescript
+export class DepthResolver {
+  private depthResolveTechnique: Technique; // Uses depth_resolve.tech
+  private fullscreenQuadMesh: Mesh; // fullscreenquad.obj
+
+  resolve(msaaDepth: GPUTexture, singleDepth: GPUTexture): void;
+}
+```
+
+**Key Features:**
+
+- Integrates with existing resource management system
+- Uses `depth_resolve.tech` technique with `DEPTH_ONLY` fragment target
+- Employs `ALWAYS` depth mode for unconditional depth writing
+- Samples all MSAA samples and selects minimum depth (closest surface)
+
+### MSAA Shader Implementation
+
+**Depth Resolve Shader (`depth_resolve.fs`)**
+
+```wgsl
+@group(0) @binding(0) var msaa_depth_texture: texture_depth_multisampled_2d;
+
+@fragment
+fn fs(@builtin(position) coord: vec4<f32>) -> @builtin(frag_depth) f32 {
+  // Sample all MSAA samples and find closest depth
+  let sample_count = 4u;
+  var min_depth = 1.0;
+  for (var i = 0u; i < sample_count; i++) {
+    let depth = textureLoad(msaa_depth_texture, vec2<i32>(coord.xy), i);
+    min_depth = min(min_depth, depth);
+  }
+  return min_depth;
+}
+```
+
+### Extended Enums for MSAA Support
+
+**New Fragment Target:**
+
+- `DEPTH_ONLY`: For depth-only rendering passes (depth resolve)
+
+**New Depth Mode:**
+
+- `ALWAYS`: Unconditional depth writing (depthCompare: 'always')
+
+**New Bind Group Layout:**
+
+- `DEPTH_TEXTURE`: For binding depth textures in shaders
+
+## Engine Extension Patterns
+
+### Adding New Rendering Features
+
+When implementing new rendering features like MSAA:
+
+1. **Extend Core Enums**
+
+   - Add new values to relevant enums (`FragmentShaderTargets`, `DepthModes`, etc.)
+   - Update switch statements in `Technique.ts` to handle new cases
+
+2. **Create Specialized Renderers**
+
+   - Follow the pattern of `DepthResolver` for specialized rendering operations
+   - Use existing `Technique` and `Mesh` classes for consistency
+   - Integrate with the resource management system
+
+3. **Shader and Technique Integration**
+
+   - Create `.tech` files that reference the new enums
+   - Implement corresponding WGSL shaders
+   - Ensure bind group layouts match between shader and technique
+
+4. **Texture and Buffer Management**
+   - Extend `RenderToTexture` for new texture formats/configurations
+   - Add appropriate usage flags (`TEXTURE_BINDING`, `RENDER_ATTACHMENT`, etc.)
+   - Handle both creation and cleanup properly
+
+### Resource System Extension Example
+
+```typescript
+// Pattern for extending the engine with new rendering capabilities
+class CustomRenderer {
+  private technique: Technique;
+  private mesh: Mesh;
+  private bindGroup: GPUBindGroup;
+
+  async load(): Promise<void> {
+    // Use engine's resource system
+    this.technique = await Technique.get('custom.tech');
+    this.mesh = await Mesh.get('custom.obj');
+    // Create GPU resources using engine patterns
+  }
+
+  render(source: GPUTexture, target: GPUTexture): void {
+    // Follow deferred renderer patterns
+    const device = Render.getInstance().getDevice();
+    const encoder = Render.getInstance().getCommandEncoder();
+    // Implement render pass...
+  }
+}
+```
+
+## Debugging and Troubleshooting
+
+### Common WebGPU Integration Issues
+
+**Enum Extension Checklist:**
+
+- Add new enum value to the enum file
+- Update corresponding switch statement in `Technique.ts`
+- Ensure technique files use the correct string values
+- Verify shader compatibility with new pipeline configurations
+
+**MSAA-Specific Issues:**
+
+- Ensure MSAA textures have correct sample count across all passes
+- Verify depth resolve happens before skybox/post-processing
+- Check that bind group layouts match between shaders and techniques
+- Validate texture usage flags for MSAA textures
+
+**Resource Management Issues:**
+
+- Always use `await` when loading resources through the engine system
+- Ensure proper cleanup in `dispose()` methods
+- Check for null/undefined resources before use
+- Use engine's error handling patterns consistently
+
+### Error Patterns and Solutions
+
+```typescript
+// Common error: Unknown enum value
+// Solution: Add case to switch statement in Technique.ts
+case NewEnumValue.CUSTOM: {
+  return { /* appropriate configuration */ };
+}
+
+// Common error: Bind group layout mismatch
+// Solution: Ensure .tech file layout matches shader @group/@binding
+```
+
 ## Development Patterns
 
 ### Component Implementation Template
@@ -408,6 +569,7 @@ const passEncoder = commandEncoder.beginRenderPass({
 - ✅ GLTF model loading and rendering
 - ✅ Post-processing (FXAA, tone mapping)
 - ✅ Normal mapping and tangent space calculations
+- ✅ MSAA (4x Multisample Anti-Aliasing) with manual depth resolve
 
 ### Planned Enhancements
 
@@ -434,12 +596,20 @@ const passEncoder = commandEncoder.beginRenderPass({
 - Implement frustum culling for large scenes
 - Use appropriate texture formats and compression
 - Profile GPU performance using browser dev tools
+- **MSAA Considerations**: Use appropriate sample counts (4x recommended for performance/quality balance)
+- **Depth Resolve Efficiency**: Minimize resolve passes; batch when possible
+- **Texture Memory**: Monitor MSAA texture memory usage (4x memory overhead)
+- **Bind Group Reuse**: Cache bind groups for repeated operations like depth resolve
 
 ### Code Organization
 
 - Keep components focused on single responsibilities
 - Use dependency injection for WebGPU device access
 - Implement proper resource cleanup in dispose methods
+- **Specialized Renderers**: Place in `src/renderer/core/` alongside `DeferredRenderer`
+- **Enum Extensions**: Always update corresponding switch statements immediately
+- **Resource Integration**: Use engine's resource system (`Technique.get()`, `Mesh.get()`) consistently
+- **Error Handling**: Follow engine patterns for resource loading and validation
 - Follow consistent naming conventions for shaders and uniforms
 - Document complex mathematical operations (matrix transformations, PBR calculations)
 

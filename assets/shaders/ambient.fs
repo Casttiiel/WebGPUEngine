@@ -34,6 +34,10 @@ struct AmbientUniforms {
 
 @group(2) @binding(0) var txEnvironment: texture_cube<f32>;
 @group(2) @binding(1) var samplerEnv: sampler;
+@group(2) @binding(2) var brdfLUT: texture_2d<f32>;
+@group(2) @binding(3) var samplerBRDF: sampler;
+@group(2) @binding(4) var irradianceMap: texture_cube<f32>;
+@group(2) @binding(5) var samplerIrradiance: sampler;
 @group(3) @binding(0) var<uniform> ambient: AmbientUniforms;
 
 
@@ -97,14 +101,12 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     
     // PBR material properties
     let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic); // Base reflectance
-    
-    // Sample diffuse irradiance (should be pre-convolved for lambertian BRDF)
-    let irradiance = textureSampleLevel(txEnvironment, samplerEnv, N, 0.0).rgb;
-    
-    // Sample specular radiance with roughness-based mip level
+      // Sample diffuse irradiance from pre-convolved irradiance map
+    let irradiance = textureSample(irradianceMap, samplerIrradiance, N).rgb;
+      // Sample specular radiance with roughness-based mip level
     let roughness = g.roughness;
-    //let mipLevel = roughness * 7.0; // Assuming 8 mip levels (0-7)
-    let mipLevel = 0.0;
+    let maxMipLevel = 7.0; // Assuming 8 mip levels (0-7) in environment map
+    let mipLevel = roughness * maxMipLevel;
     let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, R, mipLevel).rgb;
     
     // Calculate Fresnel term for IBL
@@ -116,11 +118,10 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     
     // Diffuse contribution
     let diffuse = kD * g.albedo * irradiance;
-    
-    // Specular contribution
-    // For a proper PBR pipeline, you would sample a BRDF integration map here
-    // For now, we'll use a simplified approach
-    let specular = prefilteredColor * F;
+      // Specular contribution using BRDF integration LUT
+    // Sample the BRDF LUT with NdotV and roughness
+    let brdf = textureSample(brdfLUT, samplerBRDF, vec2<f32>(NdotV, roughness)).rg;
+    let specular = prefilteredColor * (F * brdf.x + brdf.y);
     
     // Combine and apply ambient occlusion
     return (diffuse * ambient.ambientLightIntensity + specular * ambient.reflectionIntensity) * ambient.globalAmbientBoost * ao;

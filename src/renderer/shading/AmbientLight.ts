@@ -9,6 +9,8 @@ export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
   private whiteTexture!: Texture;
   private environmentTexture!: Cubemap;
+  private irradianceTexture!: Cubemap;
+  private brdfLUTTexture!: Texture;
 
   private ambientTechnique!: Technique;
   private gBufferBindGroup!: GPUBindGroup;
@@ -67,13 +69,14 @@ export class AmbientLight {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
     this.whiteTexture = await Texture.get('white.png');
-
     this.environmentTexture = await Cubemap.get('skybox.png');
+    this.irradianceTexture = await Cubemap.get('irradiance.png');
+    this.brdfLUTTexture = await Texture.get('brdfLUT.png');
 
     this.environmentBindGroup = Render.getInstance()
       .getDevice()
       .createBindGroup({
-        label: `skybox_bindgroup`,
+        label: `environment_with_brdf_bindgroup`,
         layout: this.ambientTechnique.getPipeline().getBindGroupLayout(2),
         entries: [
           {
@@ -83,6 +86,22 @@ export class AmbientLight {
           {
             binding: 1,
             resource: this.environmentTexture.getSampler(),
+          },
+          {
+            binding: 2,
+            resource: this.brdfLUTTexture.getTextureView(),
+          },
+          {
+            binding: 3,
+            resource: this.brdfLUTTexture.getSampler(),
+          },
+          {
+            binding: 4,
+            resource: this.irradianceTexture.getTextureView(),
+          },
+          {
+            binding: 5,
+            resource: this.irradianceTexture.getSampler(),
           },
         ],
       });

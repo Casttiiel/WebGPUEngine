@@ -285,6 +285,55 @@ export class Technique extends GPUResource {
           ],
         });
       }
+      case PipelineBindGroupLayouts.CUBEMAP_WITH_BRDF: {
+        return this.device.createBindGroupLayout({
+          label: 'cubemap with brdf lut bind group layout',
+          entries: [
+            {
+              binding: 0,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: {
+                viewDimension: 'cube',
+                sampleType: 'float',
+                multisampled: false,
+              },
+            },
+            {
+              binding: 1,
+              visibility: GPUShaderStage.FRAGMENT,
+              sampler: { type: 'filtering' },
+            },
+            {
+              binding: 2,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: {
+                viewDimension: '2d',
+                sampleType: 'float',
+                multisampled: false,
+              },
+            },
+            {
+              binding: 3,
+              visibility: GPUShaderStage.FRAGMENT,
+              sampler: { type: 'filtering' },
+            },
+            {
+              binding: 4,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: {
+                viewDimension: 'cube',
+                sampleType: 'float',
+                multisampled: false,
+              },
+            },
+            {
+              binding: 5,
+              visibility: GPUShaderStage.FRAGMENT,
+              sampler: { type: 'filtering' },
+            },
+          ],
+        });
+      }
       case PipelineBindGroupLayouts.BUFFER_UNIFORM: {
         return this.device.createBindGroupLayout({
           label: 'buffer uniform bind group layout',
