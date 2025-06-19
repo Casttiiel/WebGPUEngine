@@ -1,11 +1,9 @@
 ## NPM RUN DEV
 
-GLTF Crea las techniques con un name y usamos ese path luego en el rendercomponent parsing
-
 FPS Performance/Memory used
 
 Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
-........SOlucion: Hacer que esta se envie en el material.
+........Solucion: Hacer que esta se envie en el material.
 
 PBR LIGHTS
 1.PointLightWithoutshadows

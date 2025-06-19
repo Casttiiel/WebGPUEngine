@@ -66,19 +66,18 @@ export class Technique extends GPUResource {
     pathOrData: string | Partial<TechniqueCreateOptions>,
   ): Promise<Technique> {
     let techniqueData = null;
-    if (typeof pathOrData === 'string') {
-      try {
-        return ResourceManager.getResource<Technique>(pathOrData);
-      } catch {
-        techniqueData = await ResourceManager.loadTechniqueData(pathOrData);
-      }
-    } else {
-      techniqueData = pathOrData;
-    }
     const path =
-      typeof pathOrData === 'string'
-        ? pathOrData
-        : `dynamic_technique${Engine.generateDynamicId()}`;
+      typeof pathOrData === 'string' ? pathOrData : `${pathOrData?.vs}-${pathOrData?.fs}`;
+
+    try {
+      return ResourceManager.getResource<Technique>(path);
+    } catch {
+      if (typeof pathOrData === 'string') {
+        techniqueData = await ResourceManager.loadTechniqueData(pathOrData);
+      } else {
+        techniqueData = pathOrData;
+      }
+    }
 
     const technique = new Technique({
       path,
