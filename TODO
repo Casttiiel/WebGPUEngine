@@ -1,7 +1,9 @@
 ## NPM RUN DEV
 
+Review TExtur BRDF
 Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
 ........Solucion: Hacer que esta se envie en el material.
+
 HDR? Light Exposure (For now is immediate)(HAY BRANCH)
 Parpadeo con low frames de skybox?
 

@@ -19,8 +19,8 @@ export class AmbientLight {
   private uniformBindGroup!: GPUBindGroup;
   private ambientUniformBuffer!: GPUBuffer;
 
-  private reflectionIntensity = 0.2;
-  private ambientLightIntensity = 0.8;
+  private reflectionIntensity = 0.3;
+  private ambientLightIntensity = 0.7;
   private globalAmbientBoost = 0.2;
 
   constructor() {}
