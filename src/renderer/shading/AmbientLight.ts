@@ -7,7 +7,6 @@ import { Texture } from '../resources/Texture';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
-  private whiteTexture!: Texture;
   private environmentTexture!: Cubemap;
   private irradianceTexture!: Cubemap;
   private brdfLUTTexture!: Texture;
@@ -18,21 +17,60 @@ export class AmbientLight {
   private environmentBindGroup!: GPUBindGroup;
   private uniformBindGroup!: GPUBindGroup;
   private ambientUniformBuffer!: GPUBuffer;
+  // Referencias a las texturas del G-Buffer
+  private gBufferTextures: {
+    albedo: GPUTextureView;
+    normal: GPUTextureView;
+    depth: GPUTextureView;
+    selfIllum: GPUTextureView;
+    sampler: GPUSampler;
+  } | null = null;
+
+  // Mantener track del estado actual del AO
+  private currentAOState: {
+    hasAO: boolean;
+    textureView: GPUTextureView;
+  } | null = null;
 
   private reflectionIntensity = 0.3;
   private ambientLightIntensity = 0.7;
   private globalAmbientBoost = 0.2;
+  private whiteTexture!: Texture;
 
   constructor() {}
-
   public create(
     rtAlbedos: GPUTextureView,
     rtNormals: GPUTextureView,
     rtLinearDepth: GPUTextureView,
     rtSelfIllum: GPUTextureView,
-    rtAmbientOcclusion: GPUTextureView,
+    rtAmbientOcclusion: GPUTextureView | null,
   ): void {
     const sampler = this.environmentTexture.getSampler();
+    
+    // Si no hay AO, usar la textura blanca (que representa sin oclusión)
+    const aoView = rtAmbientOcclusion !== null ? 
+      rtAmbientOcclusion : 
+      this.whiteTexture.getTextureView();
+
+    // Asegurarnos de que todos los recursos estén definidos
+    if (!aoView || !sampler || !rtAlbedos || !rtNormals || !rtLinearDepth || !rtSelfIllum) {
+      throw new Error('Required resources are undefined in AmbientLight.create');
+    }
+
+    // Guardar estado inicial del AO
+    this.currentAOState = {
+      hasAO: rtAmbientOcclusion !== null,
+      textureView: aoView,
+    };
+
+    this.gBufferTextures = {
+      albedo: rtAlbedos,
+      normal: rtNormals,
+      depth: rtLinearDepth,
+      selfIllum: rtSelfIllum,
+      sampler: sampler,
+    };
+
     this.gBufferBindGroup = Render.getInstance()
       .getDevice()
       .createBindGroup({
@@ -57,7 +95,7 @@ export class AmbientLight {
           },
           {
             binding: 4,
-            resource: rtAmbientOcclusion,
+            resource: aoView,
           },
           {
             binding: 5,
@@ -200,5 +238,66 @@ export class AmbientLight {
     pass.end();
   }
 
-  public update(dt: number): void {}
+  public update(_dt: number): void {}
+  public updateAOTexture(rtAmbientOcclusion: GPUTextureView | null): void {
+    if (!this.gBufferTextures || !this.currentAOState) {
+      throw new Error('Resources not initialized. Call create() first.');
+    }
+
+    // Determinar el nuevo estado del AO
+    const hasNewAO = rtAmbientOcclusion !== null;
+    const aoTextureView = hasNewAO ? 
+      rtAmbientOcclusion : 
+      this.whiteTexture.getTextureView();
+
+    if (!aoTextureView) {
+      throw new Error('AO texture view is undefined in AmbientLight.updateAOTexture');
+    }
+
+    // Verificar si hubo un cambio real en el estado del AO
+    if (this.currentAOState.hasAO === hasNewAO && 
+        this.currentAOState.textureView === aoTextureView) {
+      return; // No hay cambio, mantener el bind group actual
+    }
+
+    // Actualizar el estado del AO
+    this.currentAOState = {
+      hasAO: hasNewAO,
+      textureView: aoTextureView,
+    };
+
+    // Recrear el bind group solo si hubo un cambio
+    this.gBufferBindGroup = Render.getInstance()
+      .getDevice()
+      .createBindGroup({
+        label: `ambient_bindgroup`,
+        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(1),
+        entries: [
+          {
+            binding: 0,
+            resource: this.gBufferTextures.albedo,
+          },
+          {
+            binding: 1,
+            resource: this.gBufferTextures.normal,
+          },
+          {
+            binding: 2,
+            resource: this.gBufferTextures.depth,
+          },
+          {
+            binding: 3,
+            resource: this.gBufferTextures.selfIllum,
+          },
+          {
+            binding: 4,
+            resource: aoTextureView,
+          },
+          {
+            binding: 5,
+            resource: this.gBufferTextures.sampler,
+          },
+        ],
+      });
+  }
 }

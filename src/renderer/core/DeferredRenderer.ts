@@ -1,4 +1,3 @@
-import { Camera } from '../../core/math/Camera';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { AmbientLight } from '../shading/AmbientLight';
 import { Skybox } from '../shading/Skybox';
@@ -75,16 +74,18 @@ export class DeferredRenderer {
       sampleCount: 4,
     });
 
-    this.msaaDepthStencilView = this.msaaDepthStencil.createView();
+    
+  this.msaaDepthStencilView = this.msaaDepthStencil.createView();
 
     this.ambientLight.create(
       this.rtAlbedos.getView(),
       this.rtNormals.getView(),
       this.rtLinearDepth.getView(),
       this.rtSelfIllum.getView(),
-      this.ambientOcclusionResult.getView(),
+      null // Inicialmente sin AO, se actualizará en runtime
     );
   }
+
   public async load(): Promise<void> {
     this.skybox = new Skybox();
     await this.skybox.load();
@@ -101,8 +102,8 @@ export class DeferredRenderer {
   public render(camera: Entity): GPUTextureView {
     this.renderGBuffer();
     //decals 
-    this.renderAO(camera);
-    this.renderAccLight();
+    const aoResult = this.renderAO(camera);
+    this.renderAccLight(aoResult);
     this.renderTransparents();
 
     const view = this.rtAccLight.getView();
@@ -139,12 +140,12 @@ export class DeferredRenderer {
     // Resolve MSAA depth to single-sample depth for skybox
     this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
   }
-
-  private renderAO(camera: Entity): void {
+  private renderAO(camera: Entity): GPUTextureView | undefined {
     const ambientOcclusionComponent = camera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
-    if(!ambientOcclusionComponent) {
-      throw new Error('Ambient Occlusion component not found on camera entity');
+    if (!ambientOcclusionComponent) {
+      return undefined;
     }
+    
     ambientOcclusionComponent.setBindGroup(
       this.rtAlbedos.getView(),
       this.rtNormals.getView(),
@@ -152,10 +153,14 @@ export class DeferredRenderer {
       this.rtSelfIllum.getView(),
     );
     ambientOcclusionComponent.compute(this.ambientOcclusionResult.getView());
-  }
-
-  private renderAccLight(): void {
+    return this.ambientOcclusionResult.getView();
+  }  
+  
+  private renderAccLight(aoTextureView: GPUTextureView | undefined): void {
+    // Actualizar solo la textura de AO
+    this.ambientLight.updateAOTexture(aoTextureView || null);
     this.ambientLight.render(this.rtAccLight.getView());
+    
     //TODO POINT LIGHTS
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS

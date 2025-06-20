@@ -138,7 +138,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Calculate image based lighting
     let ibl = calculateIBL(g, ao);
 
-    //let final_color = vec4<f32>(ibl + g.selfIllum, 1.0);
-    let final_color = vec4<f32>(ao);
+    let final_color = vec4<f32>(ibl + g.selfIllum, 1.0);
+    //let final_color = vec4<f32>(ao);
     return final_color;
 }
