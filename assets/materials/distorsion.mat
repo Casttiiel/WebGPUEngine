@@ -1,11 +1,7 @@
 {
     "technique": "distorsion.tech",
     "textures":{
-        "txAlbedo": "lee.jpg",
-        "txNormal": "lee_normal.jpg",
-        "txMetallic": "lee_specular.jpg",
-        "txRoughness": "lee_specular.jpg",
-        "txEmissive": "black.png"
+        "txAlbedo": "acc_light.dds"
     },
     "casts_shadows": false,
     "category": "distorsions",
