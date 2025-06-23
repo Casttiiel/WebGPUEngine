@@ -1,38 +1,40 @@
 ## NPM RUN DEV
 
-Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
-........Solucion: Hacer que esta se envie en el material.
-
-FPS Performance/Memory used
+1. Culling System
+   Crítico: Frustum culling
+2. Forward+ para transparencias (Especificar todo el motor actual como funciona primero)
+3. FPS Performance/Memory used
+4. Temporal Anti-Aliasing (TAA)
+5. Compute-based distortion
+6. Volume lights
+   PointLightWithoutshadows
+   DirectionalLightsWithoutShadows
+7. Bloom
+8. Ambient Occlusion (SSAO -> GTAO)
+9. Volume lights with shadows
+   DirectionalLightsWithShadows
+   RenderPointLighstWithShadows
+10. Decals Category
+11. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+12. Motion Blur
+13. Particles
+14. Occlusion culling
+15. Escalabilidad de Luces
+    Moderno: Cientos de luces con clustered culling+instancing
+16. Memory Bandwidth
+    Actual: G-Buffer consume mucho ancho de banda
+    Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
+17. GPU-Driven Rendering 🚀 Futuro
 
 Improve uniform declaration. Poder especificar Group y binding
-
-Ambient Occlusion (SSAO -> GTAO)
-
-PBR LIGHTS
-1.PointLightWithoutshadows
-2.DirectionalLightsWithoutShadows
-3.DirectionalLightsWithShadows
-4.RenderPointLighstWithShadows
-
-Blur
-Bloom
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-
-Decals Category
-AABB/CPU Culling on camera
-Culling of lights
 Mesh LOD/Generate LOD on texture and mesh automatically
-
-Instancing
-Particles/Computing Shaders
 
 MISC-----------------------------------
 Cascaded Shadow Maps
 Terrain with perlin noise
 Lens Flare
 Camera Lens Dirt
-Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
 Volumetric Lights/God Rays
 Weighted terrain
 Paralax Mapping

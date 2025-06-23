@@ -6,12 +6,9 @@
         "rotation": [0, 90, 0]
       }
     },
-    "gltf":"sponza.gltf"
+    "gltf": "sponza.gltf"
   },
   {
     "prefab": "main_camera.prefab"
-  },
-  {
-    "prefab": "cube_distorsion.prefab"
   }
 ]
