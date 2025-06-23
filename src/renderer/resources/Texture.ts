@@ -3,7 +3,8 @@ import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Render } from '../core/render';
 
-export interface TextureOptions extends IGPUResourceOptions {
+export interface TextureOptions extends Omit<IGPUResourceOptions, 'path'> {
+  path?: string;
   genMipmaps?: boolean;
   format?: GPUTextureFormat;
   usage?: GPUTextureUsageFlags;
@@ -13,12 +14,15 @@ export interface TextureOptions extends IGPUResourceOptions {
   addressModeU?: GPUAddressMode;
   addressModeV?: GPUAddressMode;
   maxAnisotropy?: number;
+  width?: number;
+  height?: number;
+  sampleCount?: number;
 }
 
 export class Texture extends GPUResource {
-  private texture?: GPUTexture;
-  private textureView?: GPUTextureView;
-  private sampler?: GPUSampler;
+  private texture: GPUTexture | null = null;
+  private textureView: GPUTextureView | null = null;
+  private sampler: GPUSampler | null = null;
   private genMipmaps: boolean;
   private format: GPUTextureFormat;
   private usage: GPUTextureUsageFlags;
@@ -28,14 +32,16 @@ export class Texture extends GPUResource {
   private addressModeU: GPUAddressMode;
   private addressModeV: GPUAddressMode;
   private maxAnisotropy: number;
+  protected options: TextureOptions;
   private static mipmapPipeline: GPUComputePipeline;
   private static mipmapBindGroupLayout: GPUBindGroupLayout;
 
   constructor(options: TextureOptions) {
     super({
-      ...options,
+      path: options.path ?? '',
       type: ResourceType.TEXTURE,
     });
+    this.options = options;
     this.genMipmaps = options.genMipmaps ?? true;
     this.format = options.format ?? 'rgba16float'; // rgba16float es filtrable y tiene suficiente precisión para HDR
     this.usage =
@@ -70,10 +76,61 @@ export class Texture extends GPUResource {
   }
 
   public async load(): Promise<void> {
-    await this.createTexture();
+    if (this.path) {
+      await this.createTextureFromImage();
+    } else if (this.options?.width && this.options?.height) {
+      await this.createEmptyTexture();
+    } else {
+      throw new Error('Need either path or dimensions to create a texture');
+    }
   }
 
-  private async createTexture(): Promise<void> {
+  private async createEmptyTexture(): Promise<void> {
+    const { width, height, sampleCount = 1 } = this.options;
+    if (!width || !height) throw new Error('Width and height required');
+
+    const mipLevelCount = this.genMipmaps
+      ? Math.floor(Math.log2(Math.max(width, height))) + 1
+      : 1;
+
+    // Create GPU texture
+    this.texture = this.device.createTexture({
+      label: `${this.label}_texture`,
+      size: {
+        width,
+        height,
+        depthOrArrayLayers: 1,
+      },
+      format: this.format,
+      usage: this.usage,
+      mipLevelCount,
+      sampleCount,
+    });
+
+    // Create view and sampler
+    this.textureView = this.texture.createView({
+      label: `${this.label}_textureView`,
+      baseMipLevel: 0,
+      mipLevelCount,
+    });
+
+    const samplerDescriptor: GPUSamplerDescriptor = {
+      label: `${this.label}_sampler`,
+      magFilter: this.magFilter,
+      minFilter: this.minFilter,
+      addressModeU: this.addressModeU,
+      addressModeV: this.addressModeV,
+      maxAnisotropy: this.maxAnisotropy,
+    };
+    if (this.genMipmaps) {
+      samplerDescriptor.mipmapFilter = this.mipmapFilter;
+    }
+    this.sampler = this.device.createSampler(samplerDescriptor);
+  }
+
+  private async createTextureFromImage(): Promise<void> {
+    if (!this.path) throw new Error('Path required for image texture');
+
     // Load image
     const img = new Image();
     img.src = `/assets/textures/${this.path}`;
@@ -130,27 +187,22 @@ export class Texture extends GPUResource {
     this.sampler = this.device.createSampler(samplerDescriptor);
   }
 
-  public getTextureView(): GPUTextureView | undefined {
-    return this.textureView;
-  }
-
-  public getSampler(): GPUSampler | undefined {
-    return this.sampler;
-  }
-
   private async generateMipmapLevels(): Promise<void> {
-    // Asegurarnos de que el pipeline está inicializado
+    const texture = this.texture;
+    if (!texture) return;
+
+    // Ensure pipeline is initialized
     await Texture.initMipmapPipeline();
 
     const commandEncoder = this.device.createCommandEncoder();
 
-    for (let level = 0; level < this.texture.mipLevelCount - 1; level++) {
-      const srcView = this.texture.createView({
+    for (let level = 0; level < texture.mipLevelCount - 1; level++) {
+      const srcView = texture.createView({
         baseMipLevel: level,
         mipLevelCount: 1,
       });
 
-      const dstView = this.texture.createView({
+      const dstView = texture.createView({
         baseMipLevel: level + 1,
         mipLevelCount: 1,
       });
@@ -167,11 +219,10 @@ export class Texture extends GPUResource {
       passEncoder.setPipeline(Texture.mipmapPipeline);
       passEncoder.setBindGroup(0, bindGroup);
 
-      const width = Math.max(1, this.texture.width >> (level + 1));
-      const height = Math.max(1, this.texture.height >> (level + 1));
+      const width = Math.max(1, texture.width >> (level + 1));
+      const height = Math.max(1, texture.height >> (level + 1));
 
       passEncoder.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
-
       passEncoder.end();
     }
 
@@ -220,5 +271,25 @@ export class Texture extends GPUResource {
         entryPoint: 'main',
       },
     });
+  }
+
+  public getTextureView(): GPUTextureView {
+    if (!this.textureView) {
+      throw new Error('Texture view not created');
+    }
+    return this.textureView;
+  }
+
+  public getSampler(): GPUSampler | null {
+    return this.sampler;
+  }
+
+  public destroy(): void {
+    if (this.texture) {
+      this.texture.destroy();
+    }
+    this.texture = null;
+    this.textureView = null;
+    this.sampler = null;
   }
 }

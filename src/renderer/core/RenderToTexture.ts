@@ -1,15 +1,12 @@
-import { Render } from './Render';
+import { Texture } from '../resources/Texture';
+import { ResourceType } from '../../types/ResourceType.enum';
+import { ResourceManager } from '../../core/engine/ResourceManager';
 
 export class RenderToTexture {
-  private name: string = '';
-  private xRes: number = 0;
-  private yRes: number = 0;
-  private texture!: GPUTexture;
-  private textureView!: GPUTextureView | null;
-
-  // MSAA support
-  private msaaTexture!: GPUTexture; // Multi-sample texture (for rendering)
-  private msaaTextureView!: GPUTextureView | null;
+  private baseTexture: Texture | null = null;  // Single-sample texture for shader sampling
+  private msaaTexture: Texture | null = null;  // Multi-sample texture for rendering
+  private width: number = 0;
+  private height: number = 0;
   private isMultisample: boolean = false;
 
   public createRT(
@@ -21,76 +18,89 @@ export class RenderToTexture {
   ): void {
     this.destroy();
 
-    this.name = name;
-    this.xRes = width;
-    this.yRes = height;
+    this.width = width;
+    this.height = height;
     this.isMultisample = multisampling;
 
-    const device = Render.getInstance().getDevice();
-
-    // Always create the single-sample texture (for shader sampling)
-    this.texture = device.createTexture({
-      label: `${this.name}_resolve_texture`,
-      size: [width, height],
-      format: format,
-      sampleCount: 1, // Always single-sample for shader access
+    // Create base texture (single-sample)
+    this.baseTexture = new Texture({
+      label: `${name}_resolve`,
+      path: `${name}_resolve`,
+      type: ResourceType.TEXTURE,
+      format,
+      width,
+      height,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      genMipmaps: false,
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
     });
+    
+    ResourceManager.registerResource(this.baseTexture);
+    void this.baseTexture.load();
 
-    // If MSAA enabled, create additional multi-sample texture
+    // Create MSAA texture if multisampling is enabled
     if (multisampling) {
-      this.msaaTexture = device.createTexture({
-        label: `${this.name}_msaa_texture`,
-        size: [width, height],
-        format: format,
-        sampleCount: 4, // Multi-sample for rendering
-        usage: GPUTextureUsage.RENDER_ATTACHMENT, // No TEXTURE_BINDING needed
+      this.msaaTexture = new Texture({
+        label: `${name}_msaa`,
+        path: `${name}_msaa`,
+        type: ResourceType.TEXTURE,
+        format,
+        width,
+        height,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        genMipmaps: false,
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        sampleCount: 4,
       });
+      
+      ResourceManager.registerResource(this.msaaTexture);
+      void this.msaaTexture.load();
     }
   }
 
-  // Returns the view for shader sampling (always single-sample)
+  /**
+   * Returns the view for shader sampling (always single-sample)
+   */
   public getView(): GPUTextureView {
-    if (this.textureView) return this.textureView;
-    this.textureView = this.texture.createView({
-      label: `${this.name}_textureView`,
-    });
-    return this.textureView;
+    if (!this.baseTexture) {
+      throw new Error('RenderToTexture not initialized');
+    }
+    return this.baseTexture.getTextureView();
   }
 
-  // Returns the view for rendering (MSAA if enabled, otherwise single-sample)
+  /**
+   * Returns the view for rendering (MSAA if enabled, otherwise single-sample)
+   */
   public getRenderView(): GPUTextureView {
-    if (this.isMultisample) {
-      if (this.msaaTextureView) return this.msaaTextureView;
-      this.msaaTextureView = this.msaaTexture.createView({
-        label: `${this.name}_msaa_textureView`,
-      });
-      return this.msaaTextureView;
+    if (this.isMultisample && this.msaaTexture) {
+      return this.msaaTexture.getTextureView();
     }
     return this.getView(); // Use single-sample view if no MSAA
   }
 
-  // Returns the resolve target (only if MSAA is enabled)
+  /**
+   * Returns the resolve target (only if MSAA is enabled)
+   */
   public getResolveTarget(): GPUTextureView | undefined {
     return this.isMultisample ? this.getView() : undefined;
   }
 
   public getWidth(): number {
-    return this.xRes;
+    return this.width;
   }
 
   public getHeight(): number {
-    return this.yRes;
+    return this.height;
   }
-
   public destroy(): void {
-    if (this.texture) {
-      this.texture.destroy();
+    if (this.baseTexture) {
+      this.baseTexture.destroy();
+      this.baseTexture = null;
     }
     if (this.msaaTexture) {
       this.msaaTexture.destroy();
-    }
-    this.textureView = null;
-    this.msaaTextureView = null;
-  }
+      this.msaaTexture = null;
+    }  }
 }
