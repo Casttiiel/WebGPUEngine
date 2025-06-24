@@ -1,4 +1,5 @@
 import { Engine } from './core/engine/Engine';
+import { Time } from './core/engine/Time';
 
 // Esperar a que el motor cargue
 try {
@@ -9,10 +10,18 @@ try {
     loader.classList.add('hidden');
   }
 
+  let then = 0;
+
   // Iniciar el bucle de renderizado
-  async function frame() {
-    Engine.update();
+  async function frame(now: number) {
+    now *= 0.001;
+    const deltaTime = now - then;
+    then = now;
+
+    Engine.update(deltaTime);
     await Engine.render();
+
+    Time.updateFPSDisplay(deltaTime);
     requestAnimationFrame(frame);
   }
 
