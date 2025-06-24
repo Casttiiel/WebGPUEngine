@@ -212,7 +212,7 @@ export class ModuleRender extends Module {
     this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
       RenderCategory.TRANSPARENT,
     );
-    this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
+    this.debugValues.drawCallsDistorsions.value = renderManager.getDrawCallsForCategory(
       RenderCategory.DISTORSIONS,
     );
     this.debugValues.totalDrawCalls.value =

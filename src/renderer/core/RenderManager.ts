@@ -6,6 +6,7 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Material } from '../resources/Material';
 import { Mesh } from '../resources/Mesh';
 import { GPUFrustumCuller, CullableObject, AABB } from '../culling/GPUFrustumCuller';
+import { vec3 } from 'gl-matrix';
 
 interface RenderKey {
   mesh: Mesh;
@@ -24,8 +25,6 @@ export class RenderManager {
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private camera!: Camera;
   private frustumCuller: GPUFrustumCuller | null = null;
-  private cullingEnabled = true;
-  private useCPUCulling = false; // Toggle between CPU and GPU culling
   private nextObjectId = 0;
 
   // Cache de estados para reducir cambios innecesarios
@@ -82,18 +81,11 @@ export class RenderManager {
 
     let keysToDraw = categoryKeys;
 
-    // Apply frustum culling if enabled and available
-    if (this.cullingEnabled && this.frustumCuller && categoryKeys.length > 0) {
+    // Apply frustum culling
+    if (this.frustumCuller && categoryKeys.length > 0) {
       try {
-        if (this.useCPUCulling) {
-          // Use CPU culling for debugging
-          keysToDraw = this.performCPUCulling(categoryKeys);
-          //console.warn(`CPU Culling: ${keysToDraw.length}/${categoryKeys.length} objects visible`);
-        } else {
-          // Use GPU culling
-          keysToDraw = await this.performGPUCulling(categoryKeys);
-          //console.warn(`GPU Culling: ${keysToDraw.length}/${categoryKeys.length} objects visible`);
-        }
+        // Use GPU culling
+        keysToDraw = await this.performGPUCulling(categoryKeys);
       } catch (error) {
         console.warn('Culling failed, rendering all objects:', error);
         keysToDraw = categoryKeys;
@@ -115,10 +107,8 @@ export class RenderManager {
     // Use pre-culled keys if available, otherwise use all keys for the category
     const keysToDraw =
       this.culledKeys.get(category) ||
-      this.normalKeys.filter((key) => key.material.getCategory() === category);
-
-    // Sort keys to minimize state changes
-    this.sortRenderKeys(keysToDraw); // Render visible objects
+      this.normalKeys.filter((key) => key.material.getCategory() === category); // Sort keys to minimize state changes or by depth for transparents
+    this.sortRenderKeys(keysToDraw, category); // Render visible objects
     this.renderKeys(keysToDraw, pass, category);
   }
 
@@ -144,9 +134,14 @@ export class RenderManager {
 
     return visibleKeys;
   }
+  private sortRenderKeys(keys: RenderKey[], category: RenderCategory): void {
+    // Para TRANSPARENCIAS: ordenar por profundidad (lejos → cerca) para blending correcto
+    if (category === RenderCategory.TRANSPARENT) {
+      this.sortTransparentsByDepth(keys);
+      return;
+    }
 
-  private sortRenderKeys(keys: RenderKey[]): void {
-    // Ordenar las keys: técnica > material > mesh para minimizar cambios de estado
+    // Para OPACOS y DISTORSIONES: ordenar por estado para minimizar cambios de pipeline
     keys.sort((k1, k2) => {
       // 1. Ordenar por técnica (minimizar cambios de pipeline)
       const tech1 = k1.material.getTechnique();
@@ -170,6 +165,25 @@ export class RenderManager {
       const mesh1 = k1.mesh.getName();
       const mesh2 = k2.mesh.getName();
       return mesh1.localeCompare(mesh2);
+    });
+  }
+
+  private sortTransparentsByDepth(keys: RenderKey[]): void {
+    if (!this.camera) return;
+
+    const cameraPos = this.camera.getPosition();
+
+    keys.sort((a, b) => {
+      // Obtener posiciones mundiales de los objetos
+      const posA = a.transform.getTransform().getWorldPosition();
+      const posB = b.transform.getTransform().getWorldPosition();
+
+      // Calcular distancias al cuadrado (más eficiente que sqrt)
+      const distSqA = vec3.squaredDistance(cameraPos, posA);
+      const distSqB = vec3.squaredDistance(cameraPos, posB);
+
+      // Ordenar de más lejos a más cerca (descending order)
+      return distSqB - distSqA;
     });
   }
 

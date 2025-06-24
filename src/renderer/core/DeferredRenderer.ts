@@ -97,6 +97,7 @@ export class DeferredRenderer {
 
     this.isLoaded = true;
   }
+
   public async render(camera: Entity): Promise<GPUTextureView> {
     await this.renderGBuffer();
     //decals
@@ -143,6 +144,7 @@ export class DeferredRenderer {
     // Resolve MSAA depth to single-sample depth for skybox
     this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
   }
+
   private renderAO(camera: Entity): GPUTextureView | undefined {
     const ambientOcclusionComponent = camera.getComponent(
       'ambient_occlusion',
@@ -213,6 +215,7 @@ export class DeferredRenderer {
 
     pass.end();
   }
+
   private getGBufferRenderPassDescriptor(): GPURenderPassDescriptor {
     // Helper function to create color attachment with optional resolve target
     const createColorAttachment = (rt: RenderToTexture): GPURenderPassColorAttachment => {
@@ -252,6 +255,7 @@ export class DeferredRenderer {
   public update(dt: number): void {
     this.ambientLight.update(dt);
   }
+
   private destroy() {
     if (this.rtAlbedos) {
       this.rtAlbedos.destroy();

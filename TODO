@@ -1,28 +1,27 @@
 ## NPM RUN DEV
 
-1. Forward+ para transparencias (Especificar todo el motor actual como funciona primero)
-2. Temporal Anti-Aliasing (TAA)
-3. FPS Performance/Memory used
-4. Compute-based distortion
-5. Volume lights
+1. Temporal Anti-Aliasing (TAA)
+2. FPS Performance/Memory used
+3. Compute-based distortion
+4. Volume lights
    PointLightWithoutshadows
    DirectionalLightsWithoutShadows
-6. Bloom
-7. Ambient Occlusion (SSAO -> GTAO)
-8. Volume lights with shadows
+5. Bloom
+6. Ambient Occlusion (SSAO -> GTAO)
+7. Volume lights with shadows
    DirectionalLightsWithShadows
    RenderPointLighstWithShadows
-9. Decals Category
-10. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-11. Motion Blur
-12. Particles
-13. Occlusion culling
-14. Escalabilidad de Luces
+8. Decals Category
+9. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+10. Motion Blur
+11. Particles
+12. Occlusion culling
+13. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-15. Memory Bandwidth
+14. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-16. GPU-Driven Rendering 🚀 Futuro
+15. GPU-Driven Rendering 🚀 Futuro
 
 Improve uniform declaration. Poder especificar Group y binding
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer

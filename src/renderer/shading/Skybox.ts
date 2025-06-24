@@ -57,7 +57,7 @@ export class Skybox {
       depthStencilAttachment: {
         view: depthStencilView,
         depthLoadOp: 'load',
-        depthStoreOp: 'discard',
+        depthStoreOp: 'store',
       },
     });
 
