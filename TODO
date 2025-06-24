@@ -1,30 +1,28 @@
 ## NPM RUN DEV
 
-1. Culling System
-   Crítico: Frustum culling
-2. Forward+ para transparencias (Especificar todo el motor actual como funciona primero)
+1. Forward+ para transparencias (Especificar todo el motor actual como funciona primero)
+2. Temporal Anti-Aliasing (TAA)
 3. FPS Performance/Memory used
-4. Temporal Anti-Aliasing (TAA)
-5. Compute-based distortion
-6. Volume lights
+4. Compute-based distortion
+5. Volume lights
    PointLightWithoutshadows
    DirectionalLightsWithoutShadows
-7. Bloom
-8. Ambient Occlusion (SSAO -> GTAO)
-9. Volume lights with shadows
+6. Bloom
+7. Ambient Occlusion (SSAO -> GTAO)
+8. Volume lights with shadows
    DirectionalLightsWithShadows
    RenderPointLighstWithShadows
-10. Decals Category
-11. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-12. Motion Blur
-13. Particles
-14. Occlusion culling
-15. Escalabilidad de Luces
+9. Decals Category
+10. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+11. Motion Blur
+12. Particles
+13. Occlusion culling
+14. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-16. Memory Bandwidth
+15. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-17. GPU-Driven Rendering 🚀 Futuro
+16. GPU-Driven Rendering 🚀 Futuro
 
 Improve uniform declaration. Poder especificar Group y binding
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer

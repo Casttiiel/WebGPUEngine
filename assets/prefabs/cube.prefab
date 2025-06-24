@@ -23,7 +23,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "distorsion.mat"
+            "material": "textured.mat"
           }
         ]
       }

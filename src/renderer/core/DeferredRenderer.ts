@@ -20,7 +20,7 @@ export class DeferredRenderer {
   private rtSelfIllum!: RenderToTexture;
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView;
-  private ambientOcclusionResult !: RenderToTexture;
+  private ambientOcclusionResult!: RenderToTexture;
 
   // MSAA depth buffer for G-Buffer pass
   private msaaDepthStencil!: GPUTexture;
@@ -74,15 +74,14 @@ export class DeferredRenderer {
       sampleCount: 4,
     });
 
-    
-  this.msaaDepthStencilView = this.msaaDepthStencil.createView();
+    this.msaaDepthStencilView = this.msaaDepthStencil.createView();
 
     this.ambientLight.create(
       this.rtAlbedos.getView(),
       this.rtNormals.getView(),
       this.rtLinearDepth.getView(),
       this.rtSelfIllum.getView(),
-      null // Inicialmente sin AO, se actualizará en runtime
+      null, // Inicialmente sin AO, se actualizará en runtime
     );
   }
 
@@ -98,10 +97,9 @@ export class DeferredRenderer {
 
     this.isLoaded = true;
   }
-
-  public render(camera: Entity): GPUTextureView {
-    this.renderGBuffer();
-    //decals 
+  public async render(camera: Entity): Promise<GPUTextureView> {
+    await this.renderGBuffer();
+    //decals
     const aoResult = this.renderAO(camera);
     this.renderAccLight(aoResult);
     this.renderTransparents();
@@ -113,7 +111,10 @@ export class DeferredRenderer {
     return view;
   }
 
-  private renderGBuffer(): void {
+  private async renderGBuffer(): Promise<void> {
+    // Pre-render GPU culling - do this BEFORE starting render passes
+    await RenderManager.getInstance().performPreRenderCulling(RenderCategory.SOLIDS);
+
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass(this.getGBufferRenderPassDescriptor());
 
@@ -133,6 +134,8 @@ export class DeferredRenderer {
       Render.width, // Width
       Render.height, // Height
     );
+
+    // Now use synchronous render with pre-culled objects
     RenderManager.getInstance().render(RenderCategory.SOLIDS, pass);
 
     pass.end();
@@ -141,11 +144,13 @@ export class DeferredRenderer {
     this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
   }
   private renderAO(camera: Entity): GPUTextureView | undefined {
-    const ambientOcclusionComponent = camera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
+    const ambientOcclusionComponent = camera.getComponent(
+      'ambient_occlusion',
+    ) as AmbientOcclusionComponent;
     if (!ambientOcclusionComponent) {
       return undefined;
     }
-    
+
     ambientOcclusionComponent.setBindGroup(
       this.rtAlbedos.getView(),
       this.rtNormals.getView(),
@@ -154,13 +159,13 @@ export class DeferredRenderer {
     );
     ambientOcclusionComponent.compute(this.ambientOcclusionResult.getView());
     return this.ambientOcclusionResult.getView();
-  }  
-  
+  }
+
   private renderAccLight(aoTextureView: GPUTextureView | undefined): void {
     // Actualizar solo la textura de AO
     this.ambientLight.updateAOTexture(aoTextureView || null);
     this.ambientLight.render(this.rtAccLight.getView());
-    
+
     //TODO POINT LIGHTS
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS

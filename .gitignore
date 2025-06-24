@@ -11,6 +11,7 @@ lerna-debug.log*
 dist/
 dist-ssr
 build/
+MCV_Supermarket-master/
 
 # IDE and editor files
 .vscode/*

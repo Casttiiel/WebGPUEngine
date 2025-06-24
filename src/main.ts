@@ -10,11 +10,12 @@ try {
   }
 
   // Iniciar el bucle de renderizado
-  function frame() {
+  async function frame() {
     Engine.update();
-    Engine.render();
+    await Engine.render();
     requestAnimationFrame(frame);
   }
+
   requestAnimationFrame(frame);
 } catch (error) {
   console.error('Error starting engine:', error);

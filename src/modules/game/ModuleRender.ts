@@ -43,6 +43,10 @@ export class ModuleRender extends Module {
     this.onResolutionUpdated();
     this.initializeUniformBuffers();
     await this.initializePresentationData();
+
+    // Initialize GPU Frustum Culling
+    await RenderManager.getInstance().initialize();
+
     return true;
   }
 
@@ -51,7 +55,7 @@ export class ModuleRender extends Module {
     this.presentationBindGroup = null;
   }
 
-  public generateFrame(): void {
+  public async generateFrame(): Promise<void> {
     Render.getInstance().beginFrame();
 
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
@@ -62,7 +66,12 @@ export class ModuleRender extends Module {
     this.updateGlobalUniforms(camera);
     RenderManager.getInstance().setCamera(camera);
 
-    let result = this.deferred.render(mainCamera);
+    if (!mainCamera) {
+      console.warn('No main camera found');
+      return;
+    }
+
+    let result = await this.deferred.render(mainCamera);
 
     this.renderDistorsions(result);
 
@@ -93,7 +102,7 @@ export class ModuleRender extends Module {
         },
       ],
       depthStencilAttachment: {
-        view: this.deferred.getDepthStencilView(),
+        view: this.deferred.getDepthStencilView()!,
         depthLoadOp: 'load',
         depthStoreOp: 'discard',
       },

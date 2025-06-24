@@ -36,8 +36,8 @@ export class CameraComponent extends Component {
       this.isControllable = data.controllable;
     }
 
-    const position = data.position || [0, 5, 10];
-    const target = data.target || [0, 0, 0];
+    const position = data.position || [0, 0, 0];
+    const target = data.target || [0, 0, 1];
     const up = data.up || [0, 1, 0];
     this.camera.lookAt(position, target, up);
   }

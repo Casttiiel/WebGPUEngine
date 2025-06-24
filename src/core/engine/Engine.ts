@@ -4,7 +4,7 @@ import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
 import { ModuleEntities } from '../../modules/game/ModuleEntities';
 import { ModuleInput } from '../../modules/game/ModuleInput';
 import { ModuleRender } from '../../modules/game/ModuleRender';
-import { Render } from '../../renderer/core/render';
+import { Render } from '../../renderer/core/Render';
 import { Time } from './Time';
 
 export class Engine {
@@ -32,7 +32,7 @@ export class Engine {
       return;
     }
     this.initialized = true;
-    console.log('Engine started.');
+    console.warn('Engine started.');
     this._time = new Time();
     const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
     await Render.getInstance().initialize(canvas);
@@ -63,12 +63,12 @@ export class Engine {
     this._modules.renderInMenu();
   }
 
-  public static render(): void {
+  public static async render(): Promise<void> {
     if (!this.initialized) {
       console.error('Engine is not started yet.');
       return;
     }
-    this._render.generateFrame();
+    await this._render.generateFrame();
   }
 
   public static getModules(): ModuleManager {

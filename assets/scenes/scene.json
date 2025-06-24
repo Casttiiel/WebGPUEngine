@@ -1,14 +1,45 @@
 [
   {
-    "components": {
-      "name": "Sponza",
-      "transform": {
-        "rotation": [0, 90, 0]
-      }
-    },
-    "gltf": "sponza.gltf"
+    "prefab": "main_camera.prefab"
   },
   {
-    "prefab": "main_camera.prefab"
+    "prefab": "cube.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 2, 10],
+
+        "scale": [1, 1, 1]
+      }
+    }
+  },
+  {
+    "prefab": "cube.prefab",
+    "components": {
+      "transform": {
+        "position": [6, 2, 10],
+
+        "scale": [1, 1, 1]
+      }
+    }
+  },
+  {
+    "prefab": "cube.prefab",
+    "components": {
+      "transform": {
+        "position": [-6, 2, 10],
+
+        "scale": [1, 1, 1]
+      }
+    }
+  },
+  {
+    "prefab": "cube.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 8, 10],
+
+        "scale": [1, 1, 1]
+      }
+    }
   }
 ]

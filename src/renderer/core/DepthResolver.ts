@@ -61,6 +61,5 @@ export class DepthResolver {
   }
   public destroy(): void {
     // Mesh and Technique are managed by ResourceManager, no need to destroy manually
-    this.isLoaded = false;
   }
 }

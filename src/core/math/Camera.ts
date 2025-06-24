@@ -1,4 +1,4 @@
-import { mat4, vec3, vec4 } from 'gl-matrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { Render } from '../../renderer/core/Render';
 
 export class Camera {
@@ -193,12 +193,11 @@ export class Camera {
     // Actualizar la cámara
     this.lookAt(this.eye, this.target, this.upAux);
   }
-
   public getLocalVector(vec: number[]): vec3 {
     const result = vec3.create();
-    vec3.scale(result, this.left, vec[0]);
-    vec3.scaleAndAdd(result, result, this.up, vec[1]);
-    vec3.scaleAndAdd(result, result, this.front, vec[2]);
+    vec3.scale(result, this.left, vec[0] || 0);
+    vec3.scaleAndAdd(result, result, this.up, vec[1] || 0);
+    vec3.scaleAndAdd(result, result, this.front, vec[2] || 0);
     return result;
   }
 
