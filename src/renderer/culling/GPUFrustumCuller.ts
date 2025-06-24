@@ -77,20 +77,18 @@ export class GPUFrustumCuller {
       label: 'Objects Buffer',
       size: objectSize * this.maxObjects,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-
-    // Visibility result buffer (1 uint32 per object)
+    }); // Visibility result buffer (1 uint32 per object)
     this.visibilityBuffer = this.device.createBuffer({
       label: 'Visibility Buffer',
       size: 4 * this.maxObjects,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     });
 
     // Visible count buffer (atomic counter)
     this.visibleCountBuffer = this.device.createBuffer({
       label: 'Visible Count Buffer',
       size: 4, // 1 uint32
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     });
 
     // Readback buffer for CPU access
@@ -370,9 +368,5 @@ export class GPUFrustumCuller {
       this.readbackBuffer?.destroy();
       this.isInitialized = false;
     }
-  }
-
-  public isReady(): boolean {
-    return this.isInitialized;
   }
 }

@@ -50,10 +50,6 @@ export class RenderManager {
     this.camera = camera;
   }
 
-  public getCamera(): Camera | null {
-    return this.camera || null;
-  }
-
   public addKey(
     owner: RenderComponent,
     mesh: Mesh,
@@ -107,6 +103,7 @@ export class RenderManager {
     // Store culled keys for this category
     this.culledKeys.set(category, keysToDraw);
   }
+
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
     if (!this.camera) return;
 
