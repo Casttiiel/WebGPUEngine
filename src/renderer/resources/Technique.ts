@@ -594,6 +594,13 @@ export class Technique extends GPUResource {
           depthCompare: 'always',
         };
       }
+      case DepthModes.LESS_EQUAL_NO_WRITE: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: false,
+          depthCompare: 'less-equal',
+        };
+      }
       default: {
         throw new Error(`${this.label}: Unknown Depth mode`);
       }

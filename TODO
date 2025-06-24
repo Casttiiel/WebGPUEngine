@@ -1,12 +1,12 @@
 ## NPM RUN DEV
 
-1. Decals Category
-2. FPS Performance/Memory used
-3. Volume lights
+1. FPS Performance/Memory used
+2. Volume lights
    PointLightWithoutshadows
    SpotLightsWithoutShadows
-4. Ambient Occlusion (SSAO -> GTAO)
-5. Bloom
+3. Ambient Occlusion (SSAO -> GTAO)
+4. Bloom
+5. Decals Category
 6. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 7. Compute-based distortion
 8. More lights (ask)

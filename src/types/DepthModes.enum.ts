@@ -5,4 +5,5 @@ export enum DepthModes {
   TEST_EQUAL = 'test_equal',
   DEFAULT = 'default',
   ALWAYS = 'always',
+  LESS_EQUAL_NO_WRITE = 'less_equal_no_write',
 }
