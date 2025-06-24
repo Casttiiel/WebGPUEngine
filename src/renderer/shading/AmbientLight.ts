@@ -46,11 +46,10 @@ export class AmbientLight {
     rtAmbientOcclusion: GPUTextureView | null,
   ): void {
     const sampler = this.environmentTexture.getSampler();
-    
+
     // Si no hay AO, usar la textura blanca (que representa sin oclusión)
-    const aoView = rtAmbientOcclusion !== null ? 
-      rtAmbientOcclusion : 
-      this.whiteTexture.getTextureView();
+    const aoView =
+      rtAmbientOcclusion !== null ? rtAmbientOcclusion : this.whiteTexture.getTextureView();
 
     // Asegurarnos de que todos los recursos estén definidos
     if (!aoView || !sampler || !rtAlbedos || !rtNormals || !rtLinearDepth || !rtSelfIllum) {
@@ -239,6 +238,7 @@ export class AmbientLight {
   }
 
   public update(_dt: number): void {}
+
   public updateAOTexture(rtAmbientOcclusion: GPUTextureView | null): void {
     if (!this.gBufferTextures || !this.currentAOState) {
       throw new Error('Resources not initialized. Call create() first.');
@@ -246,17 +246,17 @@ export class AmbientLight {
 
     // Determinar el nuevo estado del AO
     const hasNewAO = rtAmbientOcclusion !== null;
-    const aoTextureView = hasNewAO ? 
-      rtAmbientOcclusion : 
-      this.whiteTexture.getTextureView();
+    const aoTextureView = hasNewAO ? rtAmbientOcclusion : this.whiteTexture.getTextureView();
 
     if (!aoTextureView) {
       throw new Error('AO texture view is undefined in AmbientLight.updateAOTexture');
     }
 
     // Verificar si hubo un cambio real en el estado del AO
-    if (this.currentAOState.hasAO === hasNewAO && 
-        this.currentAOState.textureView === aoTextureView) {
+    if (
+      this.currentAOState.hasAO === hasNewAO &&
+      this.currentAOState.textureView === aoTextureView
+    ) {
       return; // No hay cambio, mantener el bind group actual
     }
 

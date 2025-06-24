@@ -17,37 +17,17 @@
       "transform": {
         "position": [0, 2, 10],
 
-        "scale": [1, 1, 1]
+        "scale": [0.5, 0.5, 0.5]
       }
     }
   },
   {
-    "prefab": "cube_transparent.prefab",
+    "prefab": "blood_decal.prefab",
     "components": {
       "transform": {
-        "position": [6, 2, 10],
+        "position": [0, 0, 7],
 
-        "scale": [1, 1, 1]
-      }
-    }
-  },
-  {
-    "prefab": "cube_transparent.prefab",
-    "components": {
-      "transform": {
-        "position": [-6, 2, 10],
-
-        "scale": [1, 1, 1]
-      }
-    }
-  },
-  {
-    "prefab": "cube_transparent.prefab",
-    "components": {
-      "transform": {
-        "position": [0, 8, 10],
-
-        "scale": [1, 1, 1]
+        "scale": [0.5, 0.5, 0.5]
       }
     }
   }

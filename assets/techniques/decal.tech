@@ -1,0 +1,13 @@
+{
+    "vs": "decal.vs",
+    "fs": "decal.fs",
+    "uniforms": [
+        "CameraUniforms",
+        "ObjectUniforms",
+        "MaterialTextures"
+    ],
+    "blend": "combinative_gbuffer",
+    "rs": "reverse_culling",
+    "z": "inverse_test_no_write",
+    "writesOn": "partial_gbuffer"
+}

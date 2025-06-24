@@ -100,7 +100,9 @@ export class DeferredRenderer {
 
   public async render(camera: Entity): Promise<GPUTextureView> {
     await this.renderGBuffer();
-    //decals
+    this.renderGBufferDecals();
+    // Resolve MSAA depth to single-sample depth for skybox
+    this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
     const aoResult = this.renderAO(camera);
     this.renderAccLight(aoResult);
     this.renderTransparents();
@@ -140,9 +142,34 @@ export class DeferredRenderer {
     RenderManager.getInstance().render(RenderCategory.SOLIDS, pass);
 
     pass.end();
+  }
 
-    // Resolve MSAA depth to single-sample depth for skybox
-    this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
+  private renderGBufferDecals(): void {
+    const render = Render.getInstance();
+    const pass = render
+      .getCommandEncoder()
+      .beginRenderPass(this.getGBufferDecalsRenderPassDescriptor());
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0,
+      0, // Offset X,Y
+      Render.width, // Width
+      Render.height, // Height
+      0.0,
+      1.0, // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0,
+      0, // Offset X,Y
+      Render.width, // Width
+      Render.height, // Height
+    );
+
+    RenderManager.getInstance().render(RenderCategory.DECALS, pass);
+
+    pass.end();
   }
 
   private renderAO(camera: Entity): GPUTextureView | undefined {
@@ -217,31 +244,13 @@ export class DeferredRenderer {
   }
 
   private getGBufferRenderPassDescriptor(): GPURenderPassDescriptor {
-    // Helper function to create color attachment with optional resolve target
-    const createColorAttachment = (rt: RenderToTexture): GPURenderPassColorAttachment => {
-      const attachment: GPURenderPassColorAttachment = {
-        view: rt.getRenderView(), // MSAA view if enabled, otherwise single-sample
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        loadOp: 'clear',
-        storeOp: 'store',
-      };
-
-      // Add resolve target only if MSAA is enabled
-      const resolveTarget = rt.getResolveTarget();
-      if (resolveTarget) {
-        attachment.resolveTarget = resolveTarget;
-      }
-
-      return attachment;
-    };
-
     return {
       label: 'GBuffer Render pass',
       colorAttachments: [
-        createColorAttachment(this.rtAlbedos),
-        createColorAttachment(this.rtNormals),
-        createColorAttachment(this.rtSelfIllum),
-        createColorAttachment(this.rtLinearDepth),
+        this.createColorAttachment(this.rtAlbedos),
+        this.createColorAttachment(this.rtNormals),
+        this.createColorAttachment(this.rtSelfIllum),
+        this.createColorAttachment(this.rtLinearDepth),
       ],
       depthStencilAttachment: {
         view: this.msaaDepthStencilView!, // Use MSAA depth buffer for G-Buffer pass
@@ -252,9 +261,40 @@ export class DeferredRenderer {
     };
   }
 
-  public update(dt: number): void {
-    this.ambientLight.update(dt);
+  private getGBufferDecalsRenderPassDescriptor(): GPURenderPassDescriptor {
+    return {
+      label: 'GBuffer Decals Render pass',
+      colorAttachments: [
+        this.createColorAttachment(this.rtAlbedos),
+        this.createColorAttachment(this.rtSelfIllum),
+      ],
+      depthStencilAttachment: {
+        view: this.msaaDepthStencilView!, // Use MSAA depth buffer for G-Buffer pass
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+      },
+    };
   }
+
+  // Helper function to create color attachment with optional resolve target
+  private createColorAttachment = (rt: RenderToTexture): GPURenderPassColorAttachment => {
+    const attachment: GPURenderPassColorAttachment = {
+      view: rt.getRenderView(), // MSAA view if enabled, otherwise single-sample
+      clearValue: { r: 0, g: 0, b: 0, a: 1 },
+      loadOp: 'load',
+      storeOp: 'store',
+    };
+
+    // Add resolve target only if MSAA is enabled
+    const resolveTarget = rt.getResolveTarget();
+    if (resolveTarget) {
+      attachment.resolveTarget = resolveTarget;
+    }
+
+    return attachment;
+  };
+
+  public update(dt: number): void {}
 
   private destroy() {
     if (this.rtAlbedos) {

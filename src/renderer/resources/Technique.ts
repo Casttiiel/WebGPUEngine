@@ -413,7 +413,10 @@ export class Technique extends GPUResource {
       pipelineParams.depthStencil = this.getDepthConfig();
     }
 
-    if (this.writesOn === FragmentShaderTargets.GBUFFER) {
+    if (
+      this.writesOn === FragmentShaderTargets.GBUFFER ||
+      this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER
+    ) {
       pipelineParams.multisample = {
         count: 4,
       };
@@ -426,6 +429,9 @@ export class Technique extends GPUResource {
     switch (this.rasterizationMode) {
       case RasterizationMode.DEFAULT: {
         return 'back';
+      }
+      case RasterizationMode.REVERSE_CULLING: {
+        return 'front';
       }
       case RasterizationMode.DOUBLE_SIDED: {
         return 'none';
@@ -454,6 +460,16 @@ export class Technique extends GPUResource {
           },
         ];
       }
+      case FragmentShaderTargets.PARTIAL_GBUFFER: {
+        return [
+          {
+            format: 'rgba16float',
+          },
+          {
+            format: 'rgba16float',
+          },
+        ];
+      }
       case FragmentShaderTargets.TEXTURE: {
         return [
           {
@@ -465,7 +481,7 @@ export class Technique extends GPUResource {
       case FragmentShaderTargets.SINGLE_CHANNEL: {
         return [
           {
-            format: 'r16float'
+            format: 'r16float',
           },
         ];
       }
@@ -512,6 +528,19 @@ export class Technique extends GPUResource {
             operation: 'add',
           },
         };
+      case BlendModes.COMBINATIVE_GBUFFER:
+        return {
+          color: {
+            srcFactor: 'src-alpha',
+            dstFactor: 'one-minus-src-alpha',
+            operation: 'add',
+          },
+          alpha: {
+            srcFactor: 'src-alpha',
+            dstFactor: 'one-minus-src-alpha',
+            operation: 'add',
+          },
+        };
       default:
         return {
           color: {
@@ -541,6 +570,13 @@ export class Technique extends GPUResource {
         return {
           depthWriteEnabled: false,
           depthCompare: 'equal',
+          format: 'depth32float',
+        };
+      }
+      case DepthModes.INVERSE_TEST_NO_WRITE: {
+        return {
+          depthWriteEnabled: false,
+          depthCompare: 'greater',
           format: 'depth32float',
         };
       }

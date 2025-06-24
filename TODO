@@ -1,45 +1,47 @@
 ## NPM RUN DEV
 
-1. Temporal Anti-Aliasing (TAA)
+1. Decals Category
 2. FPS Performance/Memory used
-3. Compute-based distortion
-4. Volume lights
+3. Volume lights
    PointLightWithoutshadows
-   DirectionalLightsWithoutShadows
+   SpotLightsWithoutShadows
+4. Ambient Occlusion (SSAO -> GTAO)
 5. Bloom
-6. Ambient Occlusion (SSAO -> GTAO)
-7. Volume lights with shadows
-   DirectionalLightsWithShadows
+6. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+7. Compute-based distortion
+8. More lights (ask)
+   Directional Light
+   Area Light
+9. Volume lights with shadows
+   SpotLightsWithShadows
    RenderPointLighstWithShadows
-8. Decals Category
-9. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-10. Motion Blur
-11. Particles
-12. Occlusion culling
-13. Escalabilidad de Luces
+10. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-14. Memory Bandwidth
+11. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+12. Temporal Anti-Aliasing (TAA)
+13. Motion Blur
+14. Particles
+15. Improve uniform declaration. Poder especificar Group y binding
+16. Mesh LOD/Generate LOD on texture and mesh automatically
+17. Occlusion culling
+18. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-15. GPU-Driven Rendering 🚀 Futuro
-
-Improve uniform declaration. Poder especificar Group y binding
-Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-Mesh LOD/Generate LOD on texture and mesh automatically
+19. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
-Cascaded Shadow Maps
 Terrain with perlin noise
+Paralax Mapping
+Weighted terrain
+Cascaded Shadow Maps
 Lens Flare
 Camera Lens Dirt
 Volumetric Lights/God Rays
-Weighted terrain
-Paralax Mapping
 GAME-----------------------------------
-Animations
-Physics
 Music
-Grass
+Physics
+Animations
 Skybox with Day/Night Cycle
 Day/Night Cycle
+Grass
 Physics Grass
