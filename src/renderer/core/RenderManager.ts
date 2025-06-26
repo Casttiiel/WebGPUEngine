@@ -21,7 +21,7 @@ interface RenderKey {
 export class RenderManager {
   private static instance: RenderManager | null = null;
   private normalKeys: RenderKey[] = [];
-  private culledKeys: Map<RenderCategory, RenderKey[]> = new Map();
+  private culledKeys: RenderKey[] = [];
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private camera!: Camera;
   private frustumCuller: GPUFrustumCuller | null = null;
@@ -73,27 +73,24 @@ export class RenderManager {
   }
 
   // GPU/CPU culling should be done before render passes begin
-  public async performPreRenderCulling(category: RenderCategory): Promise<void> {
+  public async performPreRenderCulling(): Promise<void> {
     if (!this.camera) return;
 
-    // Filter by category first
-    const categoryKeys = this.normalKeys.filter((key) => key.material.getCategory() === category);
-
-    let keysToDraw = categoryKeys;
+    let keysToDraw = this.normalKeys;
 
     // Apply frustum culling
-    if (this.frustumCuller && categoryKeys.length > 0) {
+    if (this.frustumCuller && this.normalKeys.length > 0) {
       try {
         // Use GPU culling
-        keysToDraw = await this.performGPUCulling(categoryKeys);
+        keysToDraw = await this.performGPUCulling(this.normalKeys);
       } catch (error) {
         console.warn('Culling failed, rendering all objects:', error);
-        keysToDraw = categoryKeys;
+        keysToDraw = this.normalKeys;
       }
     }
 
     // Store culled keys for this category
-    this.culledKeys.set(category, keysToDraw);
+    this.culledKeys = keysToDraw;
   }
 
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
@@ -105,9 +102,7 @@ export class RenderManager {
     this.currentMaterialBindings = null;
 
     // Use pre-culled keys if available, otherwise use all keys for the category
-    const keysToDraw =
-      this.culledKeys.get(category) ||
-      this.normalKeys.filter((key) => key.material.getCategory() === category); // Sort keys to minimize state changes or by depth for transparents
+    const keysToDraw = this.culledKeys.filter((key) => key.material.getCategory() === category); // Sort keys to minimize state changes or by depth for transparents
     this.sortRenderKeys(keysToDraw, category); // Render visible objects
     this.renderKeys(keysToDraw, pass, category);
   }

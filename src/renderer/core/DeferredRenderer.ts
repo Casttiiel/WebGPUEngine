@@ -201,7 +201,9 @@ export class DeferredRenderer {
   }
 
   public async render(camera: Entity): Promise<GPUTextureView> {
-    await this.renderGBuffer();
+    // Pre-render GPU culling - do this BEFORE starting render passes
+    await RenderManager.getInstance().performPreRenderCulling();
+    this.renderGBuffer();
     this.renderGBufferDecals();
     // Resolve MSAA depth to single-sample depth for skybox
     this.depthResolver.resolve(this.msaaDepthStencil, this.depthStencil);
@@ -216,10 +218,7 @@ export class DeferredRenderer {
     return view;
   }
 
-  private async renderGBuffer(): Promise<void> {
-    // Pre-render GPU culling - do this BEFORE starting render passes
-    await RenderManager.getInstance().performPreRenderCulling(RenderCategory.SOLIDS);
-
+  private renderGBuffer(): void {
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass(this.getGBufferRenderPassDescriptor());
 
