@@ -316,7 +316,7 @@ export class DeferredRenderer {
       depthStencilAttachment: {
         view: this.depthStencilView!, // Use single-sample depth for poitng light pass
         depthLoadOp: 'load',
-        depthStoreOp: 'discard',
+        depthStoreOp: 'store',
       },
     });
 
