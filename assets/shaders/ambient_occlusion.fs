@@ -62,47 +62,6 @@ struct GBuffer {
 @group(1) @binding(4) var gAO: texture_2d<f32>;
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
-
-fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
-    var g: GBuffer;
-    
-    // Get linear depth and world position
-    let zlinear = textureSample(gLinearDepth, samplerGBuffer, uv).x;
-    g.zlinear = zlinear;
-    g.worldPos = getWorldCoords(uv, zlinear, camera);
-    
-    // Get normal
-    let normalData = textureSample(gNormals, samplerGBuffer, uv);
-    g.normal = normalize(decodeNormal(normalData.xyz));
-    
-    // Get albedo and metallic
-    let albedo = textureSample(gAlbedo, samplerGBuffer, uv);
-    g.metallic = albedo.a;
-    g.roughness = normalData.a;
-    g.metallic = max(clamp(1.0 - normalData.a, 0.0, 1.0), g.metallic);
-    
-    // Gamma correction for albedo
-    let albedoLinear = pow(abs(albedo.rgb), vec3<f32>(2.2));
-    
-    // Mix with metallic for proper albedo and specular
-    g.albedo = albedoLinear * (1.0 - g.metallic);
-    
-    // Get self illumination
-    g.emissive = textureSample(gSelfIllum, samplerGBuffer, uv).x;
-    g.selfIllum = g.albedo * g.emissive;
-    
-    // Default specular for dielectrics is 0.03
-    g.specularColor = mix(vec3<f32>(0.03), albedoLinear, g.metallic);
-    
-    // View and reflection directions
-    let incident_dir = normalize(g.worldPos - camera.cameraPosition);
-    g.reflectedDir = normalize(reflect(incident_dir, g.normal));
-    g.viewDir = -incident_dir;
-    
-    return g;
-}
-
-
 fn samplePosition(centerPos: vec3<f32>, normal: vec3<f32>, screenPos: vec2<f32>, index: u32) -> vec2<f32> {
     let sampleVec = hemispherePoint(screenPos + vec2<f32>(f32(index) * 0.0713, f32(index) * 0.4271), normal);
     let samplePos = centerPos + sampleVec * RADIUS;

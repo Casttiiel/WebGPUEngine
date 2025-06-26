@@ -13,101 +13,19 @@ export class AmbientLight {
   private brdfLUTSampler!: GPUSampler;
 
   private ambientTechnique!: Technique;
-  private gBufferBindGroup!: GPUBindGroup;
   private environmentBindGroup!: GPUBindGroup;
   private uniformBindGroup!: GPUBindGroup;
   private ambientUniformBuffer!: GPUBuffer;
-  // Referencias a las texturas del G-Buffer
-  private gBufferTextures: {
-    albedo: GPUTextureView;
-    normal: GPUTextureView;
-    depth: GPUTextureView;
-    selfIllum: GPUTextureView;
-    sampler: GPUSampler;
-  } | null = null;
-
-  // Mantener track del estado actual del AO
-  private currentAOState: {
-    hasAO: boolean;
-    textureView: GPUTextureView;
-  } | null = null;
 
   private reflectionIntensity = 0.3;
   private ambientLightIntensity = 0.7;
   private globalAmbientBoost = 0.2;
-  private whiteTexture!: Texture;
 
   constructor() {}
-  public create(
-    rtAlbedos: GPUTextureView,
-    rtNormals: GPUTextureView,
-    rtLinearDepth: GPUTextureView,
-    rtSelfIllum: GPUTextureView,
-    rtAmbientOcclusion: GPUTextureView | null,
-  ): void {
-    const sampler = this.environmentTexture.getSampler();
-
-    // Si no hay AO, usar la textura blanca (que representa sin oclusión)
-    const aoView =
-      rtAmbientOcclusion !== null ? rtAmbientOcclusion : this.whiteTexture.getTextureView();
-
-    // Asegurarnos de que todos los recursos estén definidos
-    if (!aoView || !sampler || !rtAlbedos || !rtNormals || !rtLinearDepth || !rtSelfIllum) {
-      throw new Error('Required resources are undefined in AmbientLight.create');
-    }
-
-    // Guardar estado inicial del AO
-    this.currentAOState = {
-      hasAO: rtAmbientOcclusion !== null,
-      textureView: aoView,
-    };
-
-    this.gBufferTextures = {
-      albedo: rtAlbedos,
-      normal: rtNormals,
-      depth: rtLinearDepth,
-      selfIllum: rtSelfIllum,
-      sampler: sampler,
-    };
-
-    this.gBufferBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `ambient_bindgroup`,
-        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(1),
-        entries: [
-          {
-            binding: 0,
-            resource: rtAlbedos,
-          },
-          {
-            binding: 1,
-            resource: rtNormals,
-          },
-          {
-            binding: 2,
-            resource: rtLinearDepth,
-          },
-          {
-            binding: 3,
-            resource: rtSelfIllum,
-          },
-          {
-            binding: 4,
-            resource: aoView,
-          },
-          {
-            binding: 5,
-            resource: sampler,
-          },
-        ],
-      });
-  }
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
-    this.whiteTexture = await Texture.get('white.png');
     this.environmentTexture = await Cubemap.get('skybox.png');
     this.irradianceTexture = await Cubemap.get('irradiance.png');
     this.brdfLUTTexture = await Texture.get('brdfLUT.png');
@@ -177,7 +95,7 @@ export class AmbientLight {
       });
   }
 
-  public render(rtAccLight: GPUTextureView): void {
+  public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     const render = Render.getInstance();
     render
       .getDevice()
@@ -227,7 +145,7 @@ export class AmbientLight {
 
     // 3. Activar bind groups
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+    pass.setBindGroup(1, gBufferBindGroup); // GBuffer textures
     pass.setBindGroup(2, this.environmentBindGroup); // Environment texture
     pass.setBindGroup(3, this.uniformBindGroup); // ambient parameters
 
@@ -238,66 +156,4 @@ export class AmbientLight {
   }
 
   public update(_dt: number): void {}
-
-  public updateAOTexture(rtAmbientOcclusion: GPUTextureView | null): void {
-    if (!this.gBufferTextures || !this.currentAOState) {
-      throw new Error('Resources not initialized. Call create() first.');
-    }
-
-    // Determinar el nuevo estado del AO
-    const hasNewAO = rtAmbientOcclusion !== null;
-    const aoTextureView = hasNewAO ? rtAmbientOcclusion : this.whiteTexture.getTextureView();
-
-    if (!aoTextureView) {
-      throw new Error('AO texture view is undefined in AmbientLight.updateAOTexture');
-    }
-
-    // Verificar si hubo un cambio real en el estado del AO
-    if (
-      this.currentAOState.hasAO === hasNewAO &&
-      this.currentAOState.textureView === aoTextureView
-    ) {
-      return; // No hay cambio, mantener el bind group actual
-    }
-
-    // Actualizar el estado del AO
-    this.currentAOState = {
-      hasAO: hasNewAO,
-      textureView: aoTextureView,
-    };
-
-    // Recrear el bind group solo si hubo un cambio
-    this.gBufferBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `ambient_bindgroup`,
-        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(1),
-        entries: [
-          {
-            binding: 0,
-            resource: this.gBufferTextures.albedo,
-          },
-          {
-            binding: 1,
-            resource: this.gBufferTextures.normal,
-          },
-          {
-            binding: 2,
-            resource: this.gBufferTextures.depth,
-          },
-          {
-            binding: 3,
-            resource: this.gBufferTextures.selfIllum,
-          },
-          {
-            binding: 4,
-            resource: aoTextureView,
-          },
-          {
-            binding: 5,
-            resource: this.gBufferTextures.sampler,
-          },
-        ],
-      });
-  }
 }

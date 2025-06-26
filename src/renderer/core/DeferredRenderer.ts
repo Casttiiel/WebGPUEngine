@@ -7,6 +7,12 @@ import { RenderToTexture } from './RenderToTexture';
 import { DepthResolver } from './DepthResolver';
 import { Entity } from '@/core/ecs/Entity';
 import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
+import { Technique } from '../resources/Technique';
+import { Mesh } from '../resources/Mesh';
+import { Engine } from '../../core/engine/Engine';
+import { PointLightComponent } from '../../components/render/PointLightComponent';
+import { TransformComponent } from '../../components/core/TransformComponent';
+import { Texture } from '../resources/Texture';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -18,15 +24,72 @@ export class DeferredRenderer {
   private rtLinearDepth!: RenderToTexture;
   private rtAccLight!: RenderToTexture;
   private rtSelfIllum!: RenderToTexture;
+  private ambientOcclusionResult!: RenderToTexture;
+
+  private gBufferBindGroup!: GPUBindGroup;
+  private gbufferLayout: GPUBindGroupLayout;
+  private whiteTexture!: Texture;
+  // Mantener track del estado actual del AO
+  private currentAOState: {
+    hasAO: boolean;
+    textureView: GPUTextureView;
+  } | null = null;
+
+  private pointLightTechnique!: Technique;
+  private unitSphere!: Mesh;
+
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView;
-  private ambientOcclusionResult!: RenderToTexture;
 
   // MSAA depth buffer for G-Buffer pass
   private msaaDepthStencil!: GPUTexture;
   private msaaDepthStencilView!: GPUTextureView | null;
 
-  constructor() {}
+  constructor() {
+    this.gbufferLayout = Render.getInstance()
+      .getDevice()
+      .createBindGroupLayout({
+        label: 'g buffer uniforms bind group layout',
+        entries: [
+          // Albedo texture
+          {
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float' },
+          },
+          // Normal texture
+          {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float' },
+          },
+          // Linear depth texture
+          {
+            binding: 2,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float' },
+          },
+          // Self illumination texture
+          {
+            binding: 3,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float' },
+          },
+          // AO texture
+          {
+            binding: 4,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float' },
+          },
+          // Shared sampler for all textures
+          {
+            binding: 5,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: { type: 'filtering' },
+          },
+        ],
+      });
+  }
 
   public create(width: number, height: number) {
     if (!this.isLoaded) return;
@@ -76,13 +139,47 @@ export class DeferredRenderer {
 
     this.msaaDepthStencilView = this.msaaDepthStencil.createView();
 
-    this.ambientLight.create(
-      this.rtAlbedos.getView(),
-      this.rtNormals.getView(),
-      this.rtLinearDepth.getView(),
-      this.rtSelfIllum.getView(),
-      null, // Inicialmente sin AO, se actualizará en runtime
-    );
+    // Si no hay AO, usar la textura blanca (que representa sin oclusión)
+    const aoView = this.whiteTexture.getTextureView();
+
+    this.gBufferBindGroup = Render.getInstance()
+      .getDevice()
+      .createBindGroup({
+        label: `ambient_bindgroup`,
+        layout: this.gbufferLayout,
+        entries: [
+          {
+            binding: 0,
+            resource: this.rtAlbedos.getView(),
+          },
+          {
+            binding: 1,
+            resource: this.rtNormals.getView(),
+          },
+          {
+            binding: 2,
+            resource: this.rtLinearDepth.getView(),
+          },
+          {
+            binding: 3,
+            resource: this.rtSelfIllum.getView(),
+          },
+          {
+            binding: 4,
+            resource: aoView,
+          },
+          {
+            binding: 5,
+            resource: this.whiteTexture.getSampler(),
+          },
+        ],
+      });
+
+    // Guardar estado inicial del AO
+    this.currentAOState = {
+      hasAO: false,
+      textureView: aoView,
+    };
   }
 
   public async load(): Promise<void> {
@@ -94,6 +191,11 @@ export class DeferredRenderer {
 
     this.depthResolver = new DepthResolver();
     await this.depthResolver.load();
+
+    this.pointLightTechnique = await Technique.get('point_light.tech');
+    this.unitSphere = await Mesh.get('unit_sphere.obj');
+
+    this.whiteTexture = await Texture.get('white.png');
 
     this.isLoaded = true;
   }
@@ -191,15 +293,73 @@ export class DeferredRenderer {
   }
 
   private renderAccLight(aoTextureView: GPUTextureView | undefined): void {
-    // Actualizar solo la textura de AO
-    this.ambientLight.updateAOTexture(aoTextureView || null);
-    this.ambientLight.render(this.rtAccLight.getView());
-
-    //TODO POINT LIGHTS
+    this.updateAOTexture(aoTextureView || null);
+    this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    this.renderPointLights();
     //TODO DIRECTIONAL LIGHTS NO SHADOWS
     //TODO DIRECTIONAL LIGHTS WITH SHADOWS
     //TODO FAKE VOLUMETRIC LIGHTS
     this.skybox.render(this.rtAccLight.getView(), this.depthStencilView!);
+  }
+
+  private renderPointLights(): void {
+    const render = Render.getInstance();
+    const pass = render.getCommandEncoder().beginRenderPass({
+      label: 'Point Lights Render pass',
+      colorAttachments: [
+        {
+          view: this.rtAccLight.getView(),
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: this.depthStencilView!, // Use single-sample depth for poitng light pass
+        depthLoadOp: 'load',
+        depthStoreOp: 'discard',
+      },
+    });
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+      0.0,
+      1.0, // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+    );
+
+    // 1. Activar el pipeline
+    this.pointLightTechnique.activatePipeline(pass);
+
+    // 2. Activar mesh data
+    this.unitSphere.activate(pass);
+
+    // 3. Activar bind groups
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
+    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
+      []) {
+      const pointLightComponent = comp as PointLightComponent;
+      const entity = pointLightComponent.getOwner();
+      const transform = entity.getComponent('transform') as TransformComponent;
+      pass.setBindGroup(2, transform.getModelBindGroup());
+      pointLightComponent.setBindGroup(pass);
+
+      // 4. Dibujar la mesh
+      this.unitSphere.renderGroup(pass);
+    }
+
+    pass.end();
   }
 
   private renderTransparents(): void {
@@ -321,5 +481,63 @@ export class DeferredRenderer {
 
   public getDepthStencilView(): GPUTextureView | null {
     return this.depthStencilView;
+  }
+
+  private updateAOTexture(rtAmbientOcclusion: GPUTextureView | null): void {
+    // Determinar el nuevo estado del AO
+    const hasNewAO = rtAmbientOcclusion !== null;
+    const aoTextureView = hasNewAO ? rtAmbientOcclusion : this.whiteTexture.getTextureView();
+
+    if (!aoTextureView) {
+      throw new Error('AO texture view is undefined in AmbientLight.updateAOTexture');
+    }
+
+    // Verificar si hubo un cambio real en el estado del AO
+    if (
+      this.currentAOState.hasAO === hasNewAO &&
+      this.currentAOState.textureView === aoTextureView
+    ) {
+      return; // No hay cambio, mantener el bind group actual
+    }
+
+    // Actualizar el estado del AO
+    this.currentAOState = {
+      hasAO: hasNewAO,
+      textureView: aoTextureView,
+    };
+
+    // Recrear el bind group solo si hubo un cambio
+    this.gBufferBindGroup = Render.getInstance()
+      .getDevice()
+      .createBindGroup({
+        label: `gbuffer bind group`,
+        layout: this.gbufferLayout,
+        entries: [
+          {
+            binding: 0,
+            resource: this.rtAlbedos.getView(),
+          },
+          {
+            binding: 1,
+            resource: this.rtNormals.getView(),
+          },
+          {
+            binding: 2,
+            resource: this.rtLinearDepth.getView(),
+          },
+          {
+            binding: 3,
+            resource: this.rtSelfIllum.getView(),
+          },
+          {
+            binding: 4,
+            resource: rtAmbientOcclusion,
+          },
+          {
+            binding: 5,
+            resource: this.whiteTexture.getSampler(),
+          },
+        ],
+      });
   }
 }

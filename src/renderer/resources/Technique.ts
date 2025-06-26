@@ -512,13 +512,25 @@ export class Technique extends GPUResource {
       }
     }
   }
-
   private getBlendState(): GPUBlendState {
     switch (this.blendMode) {
       case BlendModes.ADDITIVE_BY_SRC_ALPHA:
         return {
           color: {
             srcFactor: 'src-alpha',
+            dstFactor: 'one',
+            operation: 'add',
+          },
+          alpha: {
+            srcFactor: 'one',
+            dstFactor: 'one',
+            operation: 'add',
+          },
+        };
+      case BlendModes.ADDITIVE:
+        return {
+          color: {
+            srcFactor: 'one',
             dstFactor: 'one',
             operation: 'add',
           },

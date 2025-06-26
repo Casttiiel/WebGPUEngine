@@ -1,32 +1,36 @@
 ## NPM RUN DEV
 
 1. Volume lights
-   PointLightWithoutshadows
+   PointLightWithoutshadows (Attenuation working weird)(Remove gbuffer bind group from AO)
+   Ambient not working
    SpotLightsWithoutShadows
-2. Ambient Occlusion (SSAO -> GTAO)
-3. Bloom
-4. Decals Category
-5. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+2. Cull non solid objects
+3. Cull lights
+4. Ambient Occlusion (SSAO -> GTAO)
+5. Bloom
 6. Compute-based distortion
-7. More lights (ask)
+7. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+8. More lights (ask)
    Directional Light
    Area Light
-8. Volume lights with shadows
-   SpotLightsWithShadows
+9. Volume lights with shadows
    RenderPointLighstWithShadows
-9. Escalabilidad de Luces
-   Moderno: Cientos de luces con clustered culling+instancing
+   SpotLightsWithShadows
 10. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
 11. Temporal Anti-Aliasing (TAA)
-12. Motion Blur
-13. Particles
-14. Improve uniform declaration. Poder especificar Group y binding
-15. Mesh LOD/Generate LOD on texture and mesh automatically
-16. Occlusion culling
-17. Memory Bandwidth
+12. MSAA on lights?
+13. Motion Blur
+14. Decals Category
+15. Particles
+16. Escalabilidad de Luces
+    Moderno: Cientos de luces con clustered culling+instancing
+17. Improve uniform declaration. Poder especificar Group y binding
+18. Mesh LOD/Generate LOD on texture and mesh automatically
+19. Occlusion culling
+20. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-18. GPU-Driven Rendering 🚀 Futuro
+21. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
 Terrain with perlin noise

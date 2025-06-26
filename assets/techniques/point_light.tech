@@ -1,0 +1,16 @@
+{
+    "vs": "pbr.vs",
+    "vsEntryPoint": "VS_pass",
+    "fs": "pbr.fs",
+    "fsEntryPoint": "PS_point_lights",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferUniforms",
+        "ObjectUniforms",
+        "BufferUniform"
+    ],
+    "blend": "additive",
+    "rs": "reverse_culling",
+    "z": "inverse_test_no_write",
+    "writesOn": "texture"
+}
