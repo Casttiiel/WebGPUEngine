@@ -25,16 +25,15 @@
     "children": [],
     "components": {
       "name": "Spot Light",
-      "transform": {
-        "position": [0, 1, 7]
-      },
       "spot_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
-        "intensity": 10,
-        "radius": 7,
+        "intensity": 20,
+        "radius": 1000,
         "near": 0.1,
-        "far": 10,
-        "fov": 60
+        "far": 20,
+        "fov": 30,
+        "position": [0, 2, 0],
+        "target": [0, 2, 1]
       }
     }
   }
