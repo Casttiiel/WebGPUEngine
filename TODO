@@ -1,7 +1,7 @@
 ## NPM RUN DEV
 
-1. PointLightWithoutshadows (Attenuation working weird)(Remove gbuffer bind group from AO)
-2. SpotLightsWithoutShadows
+1. SpotLightsWithoutShadows
+2. Remove gbuffer bind group from AO
 3. Ambient Occlusion (SSAO -> GTAO)
 4. Cull lights
 5. Bloom

@@ -91,11 +91,8 @@ fn Specular(specularColor: vec3<f32>, h: vec3<f32>, v: vec3<f32>, l: vec3<f32>, 
     let G = Geometric_Smith_Schlick_GGX(NdV, NdL, a);
     let F = Fresnel_Schlick(VdH, F0);
     
-    let kS = F;
-    let kD = (vec3<f32>(1.0) - kS);
-    
     let numerator = NDF * G * F;
-    let denominator = 4.0 * NdV * NdL + 0.001; // Add small epsilon to prevent division by zero
+    let denominator = 4.0 * NdV * NdL + 0.0001; // Prevent division by zero
     
     return numerator / denominator;
 }
@@ -137,7 +134,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     
     // From worldPos to Light (assuming light position is at origin for now)
     let light_dir_full = light.position.xyz - g.worldPos;
-    let distance_to_light = length(light_dir_full);
+    let distance_to_light = abs(length(light_dir_full));
     let light_dir = light_dir_full / distance_to_light;
     
     let NdL = saturate(dot(g.normal, light_dir));
@@ -154,9 +151,11 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
     // Attenuation
-    var att = saturate(distance_to_light / light.radius);
-    att = 1.0 - att;
-    
+    // Physically-based attenuation (inverse square + smooth cutoff)
+    let distance_attenuation = 1.0 / max(distance_to_light * distance_to_light, 0.01);
+    let radius_attenuation = saturate(1.0 - pow(distance_to_light / light.radius, 4.0));
+    let att = distance_attenuation * radius_attenuation * radius_attenuation;
+
     // Energy conservation: specular contribution reduces diffuse
     let final_color = light.color.xyz * NdL * (cDiff + cSpec) * att * light.intensity * shadow_factor;
     return vec4<f32>(final_color, 1.0);
