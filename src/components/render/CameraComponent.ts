@@ -6,7 +6,7 @@ import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
 
 export class CameraComponent extends Component {
-  private camera: Camera;
+  protected camera: Camera;
   private isControllable: boolean = false;
   private rotationSpeed: number = 0.005;
 

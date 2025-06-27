@@ -31,21 +31,10 @@
       "spot_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
         "intensity": 10,
-        "radius": 7
-      }
-    }
-  },
-  {
-    "children": [],
-    "components": {
-      "name": "Point Light",
-      "transform": {
-        "position": [0, 1, -7]
-      },
-      "point_light": {
-        "color": [1.0, 1.0, 1.0, 1.0],
-        "intensity": 10,
-        "radius": 7
+        "radius": 7,
+        "near": 0.1,
+        "far": 10,
+        "fov": 60
       }
     }
   }

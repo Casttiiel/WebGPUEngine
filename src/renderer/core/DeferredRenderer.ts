@@ -411,9 +411,6 @@ export class DeferredRenderer {
 
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
       const spotLightComponent = comp as SpotLightComponent;
-      const entity = spotLightComponent.getOwner();
-      const transform = entity.getComponent('transform') as TransformComponent;
-      pass.setBindGroup(2, transform.getModelBindGroup());
       spotLightComponent.setBindGroup(pass);
 
       // 4. Dibujar la mesh

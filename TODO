@@ -1,6 +1,6 @@
 ## NPM RUN DEV
 
-1. SpotLightsWithoutShadows
+1. SpotLightsWithoutShadows (enhance data loading of component) (enhance uniforms) (Fix shadows shader code)
 2. Remove gbuffer bind group from AO
 3. Ambient Occlusion (SSAO -> GTAO)
 4. Cull lights
