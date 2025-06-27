@@ -39,7 +39,7 @@ export class PointLightComponent extends Component {
       .getDevice()
       .createBuffer({
         label: `point light uniform buffer`,
-        size: 48,
+        size: 28 * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
@@ -67,29 +67,28 @@ export class PointLightComponent extends Component {
       const transform = entity.getComponent('transform') as TransformComponent;
       transform
         .getTransform()
-        .setLocalScale(vec3.fromValues(this.radius, this.radius, this.radius));
+        .setLocalScale(vec3.fromValues(this.radius + 1.0, this.radius + 1.0, this.radius + 1.0));
       vec3.copy(this.position, transform.getTransform().getWorldPosition());
 
       const render = Render.getInstance();
+
+      render.getDevice().queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
       render
         .getDevice()
         .queue.writeBuffer(
           this.uniformBuffer,
-          0,
-          new Float32Array([
-            this.position[0],
-            this.position[1],
-            this.position[2],
-            0.0,
-            this.color[0],
-            this.color[1],
-            this.color[2],
-            this.color[3],
-            this.intensity,
-            this.radius,
-            0.0,
-            0.0,
-          ]),
+          16,
+          new Float32Array(
+            vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
+          ),
+        );
+
+      render
+        .getDevice()
+        .queue.writeBuffer(
+          this.uniformBuffer,
+          96,
+          new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
         );
       this.isDirty = false;
     }

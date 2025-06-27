@@ -27,14 +27,17 @@
       "name": "Spot Light",
       "spot_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
-        "intensity": 20,
-        "radius": 1000,
+        "intensity": 5,
+        "radius": 20,
         "near": 0.1,
         "far": 20,
-        "fov": 30,
+        "fov": 20,
         "position": [0, 2, 0],
         "target": [0, 2, 1]
       }
     }
+  },
+  {
+    "prefab": "point_light.prefab"
   }
 ]

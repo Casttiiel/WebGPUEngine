@@ -3,16 +3,6 @@ import { Render } from '../../renderer/core/Render';
 import { Technique } from '../../renderer/resources/Technique';
 import { CameraComponent } from './CameraComponent';
 
-/*float4 LightColor;
-  float3 LightPosition;
-  float  LightIntensity;
-  matrix LightViewProjOffset;
-  float  LightShadowStep;
-  float  LightShadowInverseResolution;
-  float  LightShadowStepDivResolution;
-  float  LightRadius;
-*/
-
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
   private position = vec3.create();
@@ -70,7 +60,7 @@ export class SpotLightComponent extends CameraComponent {
       .getDevice()
       .createBuffer({
         label: `spot light uniform buffer`,
-        size: 48,
+        size: 28 * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
@@ -88,25 +78,38 @@ export class SpotLightComponent extends CameraComponent {
       });
 
     const render = Render.getInstance();
+
+    render.getDevice().queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
     render
       .getDevice()
       .queue.writeBuffer(
         this.uniformBuffer,
-        0,
-        new Float32Array([
-          this.position[0],
-          this.position[1],
-          this.position[2],
-          0.0,
-          this.color[0],
-          this.color[1],
-          this.color[2],
-          this.color[3],
-          this.intensity,
-          this.radius,
-          0.0,
-          0.0,
-        ]),
+        16,
+        new Float32Array(
+          vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
+        ),
+      );
+
+    // Calculate LightViewProjOffset matrix
+    const mtx_scale = mat4.create();
+    const mtx_translation = mat4.create();
+    const mtx_offset = mat4.create();
+    const lightViewProjOffset = mat4.create();
+
+    mat4.scale(mtx_scale, mat4.create(), [0.5, -0.5, 1.0]);
+    mat4.translate(mtx_translation, mat4.create(), [0.5, 0.5, 0.0]);
+    mat4.multiply(mtx_offset, mtx_scale, mtx_translation);
+    mat4.multiply(lightViewProjOffset, this.camera.getViewProjection(), mtx_offset);
+
+    render
+      .getDevice()
+      .queue.writeBuffer(this.uniformBuffer, 32, new Float32Array(this.camera.getViewProjection()));
+    render
+      .getDevice()
+      .queue.writeBuffer(
+        this.uniformBuffer,
+        96,
+        new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
       );
 
     const modelBindGroupLayout = render.getDevice().createBindGroupLayout({
@@ -148,7 +151,7 @@ export class SpotLightComponent extends CameraComponent {
     pass.setBindGroup(3, this.uniformBindGroup); // spot light parameters
   }
 
-  public override update(dt: number): void {}
+  public override update(_dt: number): void {}
 
   public debugInMenu(): void {
     // Implement debug menu if needed

@@ -5,11 +5,14 @@
 const PI: f32 = 3.14159265359;
 
 struct LightUniforms {
-    position: vec4<f32>,
     color: vec4<f32>,
+    position: vec3<f32>,
     intensity: f32,
+    viewProjOffset: mat4x4<f32>,
     radius: f32,
-    padding2: vec2<f32>,
+    shadowStep: f32,
+    shadowInverseResolution: f32,
+    shadowStepDivResolution: f32,
 }
 
 // Helper function for saturate (clamp to 0-1)
@@ -101,7 +104,7 @@ fn Diffuse(pAlbedo: vec3<f32>) -> vec3<f32> {
     return pAlbedo / PI;
 }
 
-fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32> {
+fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool, smooth_attenuation: bool) -> vec4<f32> {
     let g = decodeGBuffer(iPosition);
     
     // Shadow factor entre 0 (totalmente en sombra) y 1 (no ocluido)
@@ -112,19 +115,17 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     
     let worldPos = vec4<f32>(g.worldPos, 1.0);
     
-    // TODO: Implement shadow projection fix
-    /*
     if (fix_shadows) {
-        let almostScreenPos = LightViewProjOffset * worldPos;
+        let almostScreenPos = light.viewProjOffset * worldPos;
         let screenPos = almostScreenPos.xyz / almostScreenPos.w;
         // if out of range, shadow_factor = 0
         if (screenPos.x < -1.0 || screenPos.x > 1.0 || screenPos.y < -1.0 || screenPos.y > 1.0) {
             shadow_factor = 0.0;
         }
     }
-    
+    /*
     if (fix_shadows || use_shadows) {
-        let PosLightProjection = LightViewProjOffset * worldPos;
+        let PosLightProjection = light.viewProjOffset * worldPos;
         let PosLightHomoSpace = PosLightProjection.xyz / PosLightProjection.w;
         
         let texture_color = textureSample(txProjector, samBorderColor, PosLightHomoSpace.xy);
@@ -151,10 +152,14 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
     // Attenuation
-    // Physically-based attenuation (inverse square + smooth cutoff)
-    let distance_attenuation = 1.0 / max(distance_to_light * distance_to_light, 0.01);
-    let radius_attenuation = saturate(1.0 - pow(distance_to_light / light.radius, 4.0));
-    let att = distance_attenuation * radius_attenuation * radius_attenuation;
+    var att = saturate(distance_to_light / light.radius);
+    att = 1.0 - att;
+    if(smooth_attenuation){
+        // Physically-based attenuation (inverse square + smooth cutoff)
+        let distance_attenuation = 1.0 / max(distance_to_light * distance_to_light, 0.01);
+        let radius_attenuation = saturate(1.0 - pow(distance_to_light / light.radius, 4.0));
+        att = distance_attenuation * radius_attenuation * radius_attenuation;
+    }
 
     // Energy conservation: specular contribution reduces diffuse
     let final_color = light.color.xyz * NdL * (cDiff + cSpec) * att * light.intensity * shadow_factor;
@@ -174,11 +179,11 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
 @fragment
 fn PS_point_lights(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = position.xy / camera.screenSize;
-    return shade(pos, false, false);
+    return shade(pos, false, false, true);
 }
 
 @fragment
 fn PS_dir_lights_no_shadow(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = position.xy / camera.screenSize;
-    return shade(pos, false, true);
+    return shade(pos, false, true, false);
 }
