@@ -49,6 +49,16 @@ export class SpotLightComponent extends CameraComponent {
       this.camera.setViewport(data.viewport.width, data.viewport.height);
     }
 
+    if (data.isOrtho) {
+      this.camera.setOrthoParams(
+        data.orthoCentered || true,
+        data.orthoLeft,
+        data.orthoWidth,
+        data.orthoTop,
+        data.orthoHeight,
+      );
+    }
+
     const position = data.position || [0, 0, 0];
     const target = data.target || [0, 0, 1];
     const up = data.up || [0, 1, 0];

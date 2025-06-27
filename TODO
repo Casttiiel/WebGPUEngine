@@ -1,31 +1,29 @@
 ## NPM RUN DEV
 
-1. SpotLightsWithoutShadows (ortho camera)
-2. Remove gbuffer bind group from AO
-3. Ambient Occlusion (SSAO -> GTAO)
-4. Cull lights
-5. Bloom
-6. Compute-based distortion
-7. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-8. Directional Light
-9. Area Light
-10. RenderPointLighstWithShadows
-11. SpotLightsWithShadows
-12. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-13. Temporal Anti-Aliasing (TAA)
-14. MSAA on lights?
-15. Motion Blur
-16. Decals Category
-17. Particles
-18. Escalabilidad de Luces
+1. Remove gbuffer bind group from AO
+2. Ambient Occlusion (SSAO -> GTAO)
+3. Bloom
+4. Compute-based distortion
+5. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+6. Directional Light
+7. Area Light
+8. RenderPointLighstWithShadows
+9. SpotLightsWithShadows
+10. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+11. Temporal Anti-Aliasing (TAA)
+12. MSAA on lights?
+13. Motion Blur
+14. Decals Category
+15. Particles
+16. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-19. Improve uniform declaration. Poder especificar Group y binding
-20. Mesh LOD/Generate LOD on texture and mesh automatically
-21. Occlusion culling
-22. Memory Bandwidth
+17. Improve uniform declaration. Poder especificar Group y binding
+18. Mesh LOD/Generate LOD on texture and mesh automatically
+19. Occlusion culling
+20. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-23. GPU-Driven Rendering 🚀 Futuro
+21. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
 Terrain with perlin noise

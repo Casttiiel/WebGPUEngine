@@ -33,7 +33,12 @@
         "far": 20,
         "fov": 20,
         "position": [0, 2, 0],
-        "target": [0, 2, 1]
+        "target": [0, 2, 1],
+        "isOrtho": false,
+        "orthoLeft": 10,
+        "orthoWidth": 2,
+        "orthoTop": 10,
+        "orthoHeight": 2
       }
     }
   },

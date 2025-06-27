@@ -45,6 +45,7 @@ export class Camera {
     mat4.multiply(this.viewProjection, this.projection, this.view);
     this.calculateInvViewProjectionMatrix();
   }
+
   private calculateInvViewProjectionMatrix(): void {
     // Create inverse view-projection matrix for world position reconstruction
     // This matrix transforms from NDC space (-1 to 1) to world space
@@ -98,8 +99,6 @@ export class Camera {
     width: number,
     top: number,
     height: number,
-    zNear: number,
-    zFar: number,
   ): void {
     this.isOrtho = true;
     this.orthoCentered = centered;
@@ -107,8 +106,6 @@ export class Camera {
     this.orthoWidth = width;
     this.orthoTop = top;
     this.orthoHeight = height;
-    this.zNear = zNear;
-    this.zFar = zFar;
 
     this.aspectRatio = Math.abs(width / height);
     this.updateProjection();
@@ -193,6 +190,7 @@ export class Camera {
     // Actualizar la cámara
     this.lookAt(this.eye, this.target, this.upAux);
   }
+
   public getLocalVector(vec: number[]): vec3 {
     const result = vec3.create();
     vec3.scale(result, this.left, vec[0] || 0);
