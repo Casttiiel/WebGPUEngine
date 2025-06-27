@@ -285,14 +285,7 @@ export class DeferredRenderer {
     if (!ambientOcclusionComponent) {
       return undefined;
     }
-
-    ambientOcclusionComponent.setBindGroup(
-      this.rtAlbedos.getView(),
-      this.rtNormals.getView(),
-      this.rtLinearDepth.getView(),
-      this.rtSelfIllum.getView(),
-    );
-    ambientOcclusionComponent.compute(this.ambientOcclusionResult.getView());
+    ambientOcclusionComponent.compute(this.ambientOcclusionResult.getView(), this.gBufferBindGroup);
     return this.ambientOcclusionResult.getView();
   }
 

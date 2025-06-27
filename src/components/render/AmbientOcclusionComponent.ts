@@ -1,4 +1,3 @@
-import { Texture } from '../../renderer/resources/Texture';
 import { Component } from '../../core/ecs/Component';
 import { Render } from '../../renderer/core/Render';
 import { RenderToTexture } from '../../renderer/core/RenderToTexture';
@@ -9,8 +8,6 @@ import { Engine } from '../../core/engine/Engine';
 export class AmbientOcclusionComponent extends Component {
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
-  private whiteTexture!: Texture;
-  private bindGroup!: GPUBindGroup | null;
   private result!: RenderToTexture;
 
   constructor() {
@@ -19,7 +16,6 @@ export class AmbientOcclusionComponent extends Component {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
-    this.whiteTexture = await Texture.get('white.png');
     this.technique = await Technique.get('ambient_occlusion.tech');
 
     this.result = new RenderToTexture();
@@ -28,10 +24,9 @@ export class AmbientOcclusionComponent extends Component {
 
   public resize(): void {
     this.result.createRT('ambient_occlusion_result.dds', Render.width, Render.height, 'r16float');
-    this.bindGroup = null;
   }
 
-  public compute(texture: GPUTextureView): void {
+  public compute(texture: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     const render = Render.getInstance();
     const pass = render.getCommandEncoder().beginRenderPass({
       colorAttachments: [
@@ -69,60 +64,12 @@ export class AmbientOcclusionComponent extends Component {
 
     // 3. Activar bind groups
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.bindGroup); // GBuffer textures
+    pass.setBindGroup(1, gBufferBindGroup); // GBuffer textures
 
     // 4. Dibujar la mesh
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();
-  }
-
-  public setBindGroup(
-    rtAlbedos: GPUTextureView,
-    rtNormals: GPUTextureView,
-    rtLinearDepth: GPUTextureView,
-    rtSelfIllum: GPUTextureView
-  ): void {
-    if (this.bindGroup) return;
-
-    const device = Render.getInstance().getDevice();
-    const sampler = device.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
-
-    this.bindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `ambient_occlusion_bindgroup`,
-        layout: this.technique.getPipeline().getBindGroupLayout(1),
-        entries: [
-          {
-            binding: 0,
-            resource: rtAlbedos,
-          },
-          {
-            binding: 1,
-            resource: rtNormals,
-          },
-          {
-            binding: 2,
-            resource: rtLinearDepth,
-          },
-          {
-            binding: 3,
-            resource: rtSelfIllum,
-          },
-          {
-            binding: 4,
-            resource: this.whiteTexture.getTextureView(),
-          },
-          {
-            binding: 5,
-            resource: sampler,
-          },
-        ],
-      });
   }
 
   public update(dt: number): void {

@@ -1,6 +1,6 @@
 ## NPM RUN DEV
 
-1. Remove gbuffer bind group from AO
+1.
 2. Ambient Occlusion (SSAO -> GTAO)
 3. Bloom
 4. Compute-based distortion
