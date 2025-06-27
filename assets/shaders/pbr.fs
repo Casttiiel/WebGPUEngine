@@ -158,7 +158,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
 
     // Energy conservation: specular contribution reduces diffuse
     let final_color = light.color.xyz * NdL * (cDiff + cSpec) * att * light.intensity * shadow_factor;
-    return vec4<f32>(final_color, 1.0);
+    return vec4<f32>(1.0);
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -172,7 +172,13 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
 @group(3) @binding(0) var<uniform> light: LightUniforms;
 
 @fragment
-fn fs(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
+fn PS_point_lights(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = position.xy / camera.screenSize;
     return shade(pos, false, false);
+}
+
+@fragment
+fn PS_dir_lights_no_shadow(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
+    let pos = position.xy / camera.screenSize;
+    return shade(pos, false, true);
 }

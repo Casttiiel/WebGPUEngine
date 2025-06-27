@@ -88,6 +88,8 @@ export class Technique extends GPUResource {
       z: techniqueData?.z ?? DepthModes.DEFAULT,
       writesOn: techniqueData?.writesOn ?? FragmentShaderTargets.SCREEN,
       uniforms: techniqueData?.uniforms ?? [],
+      vsEntryPoint: techniqueData?.vsEntryPoint,
+      fsEntryPoint: techniqueData?.fsEntryPoint,
     });
 
     if (!technique.vsFile || !technique.fsFile) {

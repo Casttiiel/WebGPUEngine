@@ -13,6 +13,7 @@ import { Engine } from '../../core/engine/Engine';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { TransformComponent } from '../../components/core/TransformComponent';
 import { Texture } from '../resources/Texture';
+import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -36,7 +37,9 @@ export class DeferredRenderer {
   } | null = null;
 
   private pointLightTechnique!: Technique;
+  private spotLightTechnique!: Technique;
   private unitSphere!: Mesh;
+  private unitFrustum!: Mesh;
 
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView;
@@ -193,7 +196,9 @@ export class DeferredRenderer {
     await this.depthResolver.load();
 
     this.pointLightTechnique = await Technique.get('point_light.tech');
+    this.spotLightTechnique = await Technique.get('spot_light.tech');
     this.unitSphere = await Mesh.get('unit_sphere.obj');
+    this.unitFrustum = await Mesh.get('unit_frustum.obj');
 
     this.whiteTexture = await Texture.get('white.png');
 
@@ -295,9 +300,7 @@ export class DeferredRenderer {
     this.updateAOTexture(aoTextureView || null);
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     this.renderPointLights();
-    //TODO DIRECTIONAL LIGHTS NO SHADOWS
-    //TODO DIRECTIONAL LIGHTS WITH SHADOWS
-    //TODO FAKE VOLUMETRIC LIGHTS
+    this.renderSpotLightsNoShadows();
     this.skybox.render(this.rtAccLight.getView(), this.depthStencilView!);
   }
 
@@ -356,6 +359,65 @@ export class DeferredRenderer {
 
       // 4. Dibujar la mesh
       this.unitSphere.renderGroup(pass);
+    }
+
+    pass.end();
+  }
+
+  private renderSpotLightsNoShadows(): void {
+    const render = Render.getInstance();
+    const pass = render.getCommandEncoder().beginRenderPass({
+      label: 'Spot Lights Render pass',
+      colorAttachments: [
+        {
+          view: this.rtAccLight.getView(),
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: this.depthStencilView!, // Use single-sample depth for poitng light pass
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+      },
+    });
+
+    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    pass.setViewport(
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+      0.0,
+      1.0, // Min/max depth
+    );
+
+    pass.setScissorRect(
+      0,
+      0, // Offset X,Y
+      render.getCanvas().width, // Width
+      render.getCanvas().height, // Height
+    );
+
+    // 1. Activar el pipeline
+    this.spotLightTechnique.activatePipeline(pass);
+
+    // 2. Activar mesh data
+    this.unitFrustum.activate(pass);
+
+    // 3. Activar bind groups
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
+    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
+      const spotLightComponent = comp as SpotLightComponent;
+      const entity = spotLightComponent.getOwner();
+      const transform = entity.getComponent('transform') as TransformComponent;
+      pass.setBindGroup(2, transform.getModelBindGroup());
+      spotLightComponent.setBindGroup(pass);
+
+      // 4. Dibujar la mesh
+      this.unitFrustum.renderGroup(pass);
     }
 
     pass.end();

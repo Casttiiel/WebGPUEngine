@@ -28,6 +28,20 @@
       "transform": {
         "position": [0, 1, 7]
       },
+      "spot_light": {
+        "color": [1.0, 1.0, 1.0, 1.0],
+        "intensity": 10,
+        "radius": 7
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Point Light",
+      "transform": {
+        "position": [0, 1, -7]
+      },
       "point_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
         "intensity": 10,
