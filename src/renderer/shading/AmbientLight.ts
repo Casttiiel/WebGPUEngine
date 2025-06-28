@@ -4,6 +4,7 @@ import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { Texture } from '../resources/Texture';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
@@ -21,7 +22,7 @@ export class AmbientLight {
   private ambientLightIntensity = 0.7;
   private globalAmbientBoost = 0.2;
 
-  constructor() {}
+  constructor() { }
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
@@ -31,7 +32,7 @@ export class AmbientLight {
     this.brdfLUTTexture = await Texture.get('brdfLUT.png');
 
     // Create specific sampler for BRDF LUT (clamp-to-edge, linear filtering)
-    this.brdfLUTSampler = Render.getInstance().getDevice().createSampler({
+    this.brdfLUTSampler = GPUUtils.createSampler({
       label: 'BRDF LUT Sampler',
       magFilter: 'linear',
       minFilter: 'linear',
@@ -94,48 +95,33 @@ export class AmbientLight {
         ],
       });
   }
-
   public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     const render = Render.getInstance();
-    render
-      .getDevice()
-      .queue.writeBuffer(
-        this.ambientUniformBuffer,
-        0,
-        new Float32Array([
-          this.reflectionIntensity,
-          this.ambientLightIntensity,
-          this.globalAmbientBoost,
-          0.0,
-        ]),
-      );
-    const pass = render.getCommandEncoder().beginRenderPass({
-      colorAttachments: [
-        {
-          view: rtAccLight,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        },
-      ],
-    });
-
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
+    GPUUtils.writeBuffer(
+      this.ambientUniformBuffer,
       0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-      0.0,
-      1.0, // Min/max depth
+      new Float32Array([
+        this.reflectionIntensity,
+        this.ambientLightIntensity,
+        this.globalAmbientBoost,
+        0.0,
+      ]),
     );
 
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
+    const colorAttachment = GPUUtils.createColorAttachment(
+      rtAccLight,
+      'clear',
+      'store',
+      { r: 0, g: 0, b: 0, a: 1 }
     );
+
+    const pass = render.getCommandEncoder().beginRenderPass(
+      GPUUtils.createRenderPassDescriptor(
+        'ambient light render pass',
+        [colorAttachment]
+      )
+    );    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    GPUUtils.configureViewportAndScissor(pass);
 
     // 1. Activar el pipeline
     this.ambientTechnique.activatePipeline(pass);
@@ -155,5 +141,5 @@ export class AmbientLight {
     pass.end();
   }
 
-  public update(_dt: number): void {}
+  public update(_dt: number): void { }
 }

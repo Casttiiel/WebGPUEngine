@@ -1,7 +1,7 @@
 import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResource';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
-import { Render } from '../core/render';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
@@ -41,9 +41,9 @@ export class Texture extends GPUResource {
     this.usage =
       options.usage ??
       GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.STORAGE_BINDING;
+      GPUTextureUsage.COPY_DST |
+      GPUTextureUsage.RENDER_ATTACHMENT |
+      GPUTextureUsage.STORAGE_BINDING;
     this.magFilter = options.magFilter ?? 'linear';
     this.minFilter = options.minFilter ?? 'linear';
     this.mipmapFilter = options.mipmapFilter ?? 'linear';
@@ -82,20 +82,17 @@ export class Texture extends GPUResource {
     const imageBitmap = await createImageBitmap(img);
     const mipLevelCount = this.genMipmaps
       ? Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1
-      : 1;
-
-    // Create GPU texture
-    this.texture = this.device.createTexture({
-      label: `${this.label}_texture`,
-      size: {
-        width: imageBitmap.width,
-        height: imageBitmap.height,
-        depthOrArrayLayers: 1,
-      },
-      format: this.format,
-      usage: this.usage,
+      : 1;    // Create GPU texture
+    this.texture = GPUUtils.createTextureWithMipmaps(
+      `${this.label}_texture`,
+      imageBitmap.width,
+      imageBitmap.height,
+      this.format,
+      this.usage,
       mipLevelCount,
-    });
+      1,
+      1
+    );
 
     // Copy image data
     this.device.queue.copyExternalImageToTexture(
@@ -127,7 +124,7 @@ export class Texture extends GPUResource {
     if (this.genMipmaps) {
       samplerDescriptor.mipmapFilter = this.mipmapFilter;
     }
-    this.sampler = this.device.createSampler(samplerDescriptor);
+    this.sampler = GPUUtils.createSampler(samplerDescriptor);
   }
 
   public getTextureView(): GPUTextureView | undefined {
@@ -181,7 +178,7 @@ export class Texture extends GPUResource {
   private static async initMipmapPipeline() {
     if (this.mipmapPipeline) return;
 
-    const device = Render.getInstance().getDevice();
+    const device = GPUUtils.getDevice();
     const shaderModule = device.createShaderModule({
       label: 'Mipmap generation shader',
       code: await (await fetch('/assets/shaders/generate_mipmap.wgsl')).text(),

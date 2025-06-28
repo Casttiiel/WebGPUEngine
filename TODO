@@ -1,16 +1,20 @@
 ## NPM RUN DEV
 
-1. Usar GPUUtils, Usar las nuevas clases
+1. Usar las nuevas clases
 2. Ambient Occlusion SSAO
 2. Ambient Occlusion GTAO
-4. SHader functions duplication
+4. Shader functions duplication
+5. RenderToTexture Refactor?
 3. Bloom
 4. Compute-based distortion
+6. Typing things and connected with resources json?
 5. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 6. Directional Light
 7. Area Light
 8. RenderPointLighstWithShadows
 9. SpotLightsWithShadows
+11. OPtimizacion WebGPUFundamentals
+12. Load locks or s async?
 10. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
 11. Temporal Anti-Aliasing (TAA)
 12. MSAA on lights?

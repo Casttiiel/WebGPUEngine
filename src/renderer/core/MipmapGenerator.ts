@@ -1,4 +1,4 @@
-import { Render } from '../core/Render';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class MipmapGenerator {
   private device!: GPUDevice;
@@ -7,7 +7,7 @@ export class MipmapGenerator {
   private isInitialized = false;
 
   async initialize(): Promise<void> {
-    this.device = Render.getInstance().getDevice();
+    this.device = GPUUtils.getDevice();
 
     // Load and compile the compute shader
     const shaderResponse = await fetch('/assets/shaders/generate_mipmap.wgsl');

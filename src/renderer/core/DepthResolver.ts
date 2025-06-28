@@ -1,6 +1,7 @@
 import { Render } from '../core/Render';
 import { Technique } from '../resources/Technique';
 import { Mesh } from '../resources/Mesh';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class DepthResolver {
   private depthResolveTechnique!: Technique;
@@ -20,7 +21,7 @@ export class DepthResolver {
       return;
     }
 
-    const device = Render.getInstance().getDevice();
+    const device = GPUUtils.getDevice();
     const commandEncoder = Render.getInstance().getCommandEncoder(); // Create bind group for the MSAA depth texture
     const bindGroupLayout = this.depthResolveTechnique.getBindGroupLayout(0);
     if (!bindGroupLayout) {

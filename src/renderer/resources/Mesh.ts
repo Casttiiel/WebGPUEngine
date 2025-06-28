@@ -4,6 +4,7 @@ import { ResourceManager } from '../../core/engine/ResourceManager';
 import { MeshData } from '../../types/MeshData.type';
 import { Engine } from '../../core/engine/Engine';
 import { AABB } from '../culling/GPUFrustumCuller';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export interface MeshOptions extends IGPUResourceOptions {
   meshData?: MeshData;
@@ -300,60 +301,51 @@ export class Mesh extends GPUResource {
 
     return tangents;
   }
-
   private initBuffers(): void {
     // Crear buffer de vértices en GPU
-    this.vertexBuffer = this.device.createBuffer({
-      label: `${this.label}_vertexBuffer`,
-      size: this.vertices.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertices);
-    this.vertexBuffer.unmap();
+    this.vertexBuffer = GPUUtils.createBuffer(
+      `${this.label}_vertexBuffer`,
+      this.vertices.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.vertices
+    );
 
     // Crear buffer de normales en GPU
-    this.normalBuffer = this.device.createBuffer({
-      label: `${this.label}_normalBuffer`,
-      size: this.normals.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.normalBuffer.getMappedRange()).set(this.normals);
-    this.normalBuffer.unmap();
+    this.normalBuffer = GPUUtils.createBuffer(
+      `${this.label}_normalBuffer`,
+      this.normals.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.normals
+    );
 
     // Crear buffer de UVs en GPU
-    this.uvBuffer = this.device.createBuffer({
-      label: `${this.label}_uvBuffer`,
-      size: this.uvs.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.uvBuffer.getMappedRange()).set(this.uvs);
-    this.uvBuffer.unmap();
+    this.uvBuffer = GPUUtils.createBuffer(
+      `${this.label}_uvBuffer`,
+      this.uvs.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.uvs
+    );
 
     // Crear buffer de tangentes en GPU
-    this.tangentBuffer = this.device.createBuffer({
-      label: `${this.label}_tangentBuffer`,
-      size: this.tangents.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.tangentBuffer.getMappedRange()).set(this.tangents);
-    this.tangentBuffer.unmap();
+    this.tangentBuffer = GPUUtils.createBuffer(
+      `${this.label}_tangentBuffer`,
+      this.tangents.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.tangents
+    );
 
     // Crear buffer de índices en GPU
     const paddedIndexCount = Math.ceil((this.indices.length * 2) / 4) * 2;
     const paddedArray = new Uint16Array(paddedIndexCount);
     paddedArray.set(this.indices);
 
-    this.indexBuffer = this.device.createBuffer({
-      label: `${this.label}_indexBuffer`,
-      size: paddedArray.byteLength,
-      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    });
+    this.indexBuffer = GPUUtils.createBuffer(
+      `${this.label}_indexBuffer`,
+      paddedArray.byteLength,
+      GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+    );
 
-    this.device.queue.writeBuffer(this.indexBuffer, 0, paddedArray);
+    GPUUtils.writeBuffer(this.indexBuffer, 0, paddedArray);
   }
 
   private calculateAABB(): AABB {

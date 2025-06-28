@@ -1,5 +1,5 @@
 import { BaseResource, IResourceOptions } from './IResource';
-import { Render } from '../../renderer/core/render';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 
 export interface IGPUResourceOptions extends IResourceOptions {
   label?: string;
@@ -11,7 +11,7 @@ export abstract class GPUResource extends BaseResource {
 
   constructor(options: IGPUResourceOptions) {
     super(options);
-    this.device = Render.getInstance().getDevice();
+    this.device = GPUUtils.getDevice();
     this.label = options.label || options.path;
   }
 }

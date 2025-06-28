@@ -1,4 +1,4 @@
-import { Render } from './Render';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class RenderToTexture {
   private name: string = '';
@@ -26,26 +26,26 @@ export class RenderToTexture {
     this.yRes = height;
     this.isMultisample = multisampling;
 
-    const device = Render.getInstance().getDevice();
-
     // Always create the single-sample texture (for shader sampling)
-    this.texture = device.createTexture({
-      label: `${this.name}_resolve_texture`,
-      size: [width, height],
-      format: format,
-      sampleCount: 1, // Always single-sample for shader access
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
+    this.texture = GPUUtils.createTexture(
+      `${this.name}_resolve_texture`,
+      width,
+      height,
+      format,
+      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      1 // Always single-sample for shader access
+    );
 
     // If MSAA enabled, create additional multi-sample texture
     if (multisampling) {
-      this.msaaTexture = device.createTexture({
-        label: `${this.name}_msaa_texture`,
-        size: [width, height],
-        format: format,
-        sampleCount: 4, // Multi-sample for rendering
-        usage: GPUTextureUsage.RENDER_ATTACHMENT, // No TEXTURE_BINDING needed
-      });
+      this.msaaTexture = GPUUtils.createTexture(
+        `${this.name}_msaa_texture`,
+        width,
+        height,
+        format,
+        GPUTextureUsage.RENDER_ATTACHMENT, // No TEXTURE_BINDING needed
+        4 // Multi-sample for rendering
+      );
     }
   }
 

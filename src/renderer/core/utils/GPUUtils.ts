@@ -139,6 +139,59 @@ export class GPUUtils {
     }
 
     /**
+     * Creates a texture with mipmaps and complex configuration
+     */
+    public static createTextureWithMipmaps(
+        label: string,
+        width: number,
+        height: number,
+        format: GPUTextureFormat,
+        usage: GPUTextureUsageFlags,
+        mipLevelCount: number,
+        depthOrArrayLayers = 1,
+        sampleCount = 1,
+    ): GPUTexture {
+        return this.device.createTexture({
+            label,
+            size: {
+                width,
+                height,
+                depthOrArrayLayers,
+            },
+            format,
+            usage,
+            mipLevelCount,
+            sampleCount,
+        });
+    }
+
+    /**
+     * Creates a cubemap texture
+     */
+    public static createCubemapTexture(
+        label: string,
+        faceSize: number,
+        format: GPUTextureFormat,
+        usage: GPUTextureUsageFlags,
+        mipLevelCount = 1,
+    ): GPUTexture {
+        return this.device.createTexture({
+            label,
+            size: [faceSize, faceSize, 6],
+            format,
+            usage,
+            mipLevelCount,
+        });
+    }
+
+    /**
+     * Creates a GPU sampler with the given descriptor
+     */
+    public static createSampler(descriptor: GPUSamplerDescriptor): GPUSampler {
+        return this.device.createSampler(descriptor);
+    }
+
+    /**
      * Writes data to a buffer with offset
      */
     public static writeBuffer(

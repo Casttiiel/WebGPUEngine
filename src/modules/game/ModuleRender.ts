@@ -10,6 +10,7 @@ import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Module } from '../core/Module';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -89,24 +90,23 @@ export class ModuleRender extends Module {
 
     Render.getInstance().endFrame();
   }
-
   public renderDistorsions(texture: GPUTextureView): void {
     const render = Render.getInstance();
-    const pass = render.getCommandEncoder().beginRenderPass({
-      label: 'Distorsions Render pass',
-      colorAttachments: [
-        {
-          view: texture,
-          loadOp: 'load',
-          storeOp: 'store',
-        },
-      ],
-      depthStencilAttachment: {
-        view: this.deferred.getDepthStencilView()!,
-        depthLoadOp: 'load',
-        depthStoreOp: 'discard',
-      },
-    });
+
+    const colorAttachment = GPUUtils.createColorAttachment(texture, 'load', 'store');
+    const depthAttachment = GPUUtils.createDepthStencilAttachment(
+      this.deferred.getDepthStencilView()!,
+      'load',
+      'discard'
+    );
+
+    const pass = render.getCommandEncoder().beginRenderPass(
+      GPUUtils.createRenderPassDescriptor(
+        'Distorsions Render pass',
+        [colorAttachment],
+        depthAttachment
+      )
+    );
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
     pass.setViewport(
@@ -133,9 +133,8 @@ export class ModuleRender extends Module {
   private presentResult(result: GPUTextureView): void {
     const render = Render.getInstance();
     const device = render.getDevice();
-
     if (!this.presentationBindGroup) {
-      const sampler = device.createSampler({
+      const sampler = GPUUtils.createSampler({
         magFilter: 'linear',
         minFilter: 'linear',
       });
@@ -155,34 +154,20 @@ export class ModuleRender extends Module {
         ],
       });
     }
-
-    const pass = render.getCommandEncoder().beginRenderPass({
-      colorAttachments: [
-        {
-          view: render.getContext().getCurrentTexture().createView(),
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        },
-      ],
-    });
-
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-      0.0,
-      1.0, // Min/max depth
+    const colorAttachment = GPUUtils.createColorAttachment(
+      render.getContext().getCurrentTexture().createView(),
+      'clear',
+      'store',
+      { r: 0, g: 0, b: 0, a: 1 }
     );
 
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-    );
+    const pass = render.getCommandEncoder().beginRenderPass(
+      GPUUtils.createRenderPassDescriptor(
+        'main presentation render pass',
+        [colorAttachment]
+      )
+    );    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    GPUUtils.configureViewportAndScissor(pass);
 
     // 1. Activar el pipeline
     this.presentationTechnique.activatePipeline(pass);
@@ -256,14 +241,13 @@ export class ModuleRender extends Module {
   public renderDebug(): void {
     throw new Error('Method not implemented.');
   }
-
   private initializeUniformBuffers(): void {
-    const render = Render.getInstance(); // Crear buffer uniforme global para las matrices de la cámara    this.globalUniformBuffer = render.getDevice().createBuffer({
-    this.globalUniformBuffer = render.getDevice().createBuffer({
-      label: `global uniform buffer`,
-      size: 256,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    // Crear buffer uniforme global para las matrices de la cámara
+    this.globalUniformBuffer = GPUUtils.createBuffer(
+      'global uniform buffer',
+      256,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    ); const render = Render.getInstance();
 
     // Crear el layout para el bind group global
     const globalBindGroupLayout = render.getDevice().createBindGroupLayout({
@@ -295,47 +279,40 @@ export class ModuleRender extends Module {
     this.presentationTechnique = await Technique.get('presentation.tech');
   }
   public updateGlobalUniforms(camera: Camera): void {
-    const render = Render.getInstance();
 
     const viewMatrix = new Float32Array(camera.getView());
     const projectionMatrix = new Float32Array(camera.getProjection());
     const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
-    const cameraPosition = new Float32Array(camera.getPosition());
-
-    // viewMatrix (offset 0)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 0, viewMatrix);
+    const cameraPosition = new Float32Array(camera.getPosition());    // viewMatrix (offset 0)
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 0, viewMatrix);
 
     // projectionMatrix (offset 64)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
 
     // invViewProjectionMatrix (offset 128)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 128, invViewProjectionMatrix);
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 128, invViewProjectionMatrix);
 
     // cameraPosition (offset 192)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 192, cameraPosition);
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 192, cameraPosition);
 
     // screenSize (offset 208)
-    render
-      .getDevice()
-      .queue.writeBuffer(
-        this.globalUniformBuffer,
-        208,
-        new Float32Array([Render.width, Render.height]),
-      );
+    GPUUtils.writeBuffer(
+      this.globalUniformBuffer,
+      208,
+      new Float32Array([Render.width, Render.height]),
+    );
 
     // cameraFront + cameraZFar (offset 224)
-    render
-      .getDevice()
-      .queue.writeBuffer(
-        this.globalUniformBuffer,
-        224,
-        new Float32Array([
-          camera.getFront()[0],
-          camera.getFront()[1],
-          camera.getFront()[2],
-          camera.getFar(),
-        ]),
-      );
+    GPUUtils.writeBuffer(
+      this.globalUniformBuffer,
+      224,
+      new Float32Array([
+        camera.getFront()[0],
+        camera.getFront()[1],
+        camera.getFront()[2],
+        camera.getFar(),
+      ]),
+    );
   }
 
   public getGlobalBindGroup(): GPUBindGroup {

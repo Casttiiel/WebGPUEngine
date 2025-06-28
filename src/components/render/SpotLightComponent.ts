@@ -2,6 +2,7 @@ import { vec3, vec4, mat4 } from 'gl-matrix';
 import { Render } from '../../renderer/core/Render';
 import { Technique } from '../../renderer/resources/Technique';
 import { CameraComponent } from './CameraComponent';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
@@ -65,14 +66,11 @@ export class SpotLightComponent extends CameraComponent {
     this.camera.lookAt(position, target, up);
 
     this.technique = await Technique.get('spot_light.tech');
-
-    this.uniformBuffer = Render.getInstance()
-      .getDevice()
-      .createBuffer({
-        label: `spot light uniform buffer`,
-        size: 28 * 4,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
+    this.uniformBuffer = GPUUtils.createBuffer(
+      'spot light uniform buffer',
+      28 * 4,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    );
 
     this.uniformBindGroup = Render.getInstance()
       .getDevice()
@@ -86,19 +84,16 @@ export class SpotLightComponent extends CameraComponent {
           },
         ],
       });
-
     const render = Render.getInstance();
 
-    render.getDevice().queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
-    render
-      .getDevice()
-      .queue.writeBuffer(
-        this.uniformBuffer,
-        16,
-        new Float32Array(
-          vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
-        ),
-      );
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
+    GPUUtils.writeBuffer(
+      this.uniformBuffer,
+      16,
+      new Float32Array(
+        vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
+      ),
+    );
 
     // Calculate LightViewProjOffset matrix
     const mtx_scale = mat4.create();
@@ -111,16 +106,12 @@ export class SpotLightComponent extends CameraComponent {
     mat4.multiply(mtx_offset, mtx_scale, mtx_translation);
     mat4.multiply(lightViewProjOffset, this.camera.getViewProjection(), mtx_offset);
 
-    render
-      .getDevice()
-      .queue.writeBuffer(this.uniformBuffer, 32, new Float32Array(this.camera.getViewProjection()));
-    render
-      .getDevice()
-      .queue.writeBuffer(
-        this.uniformBuffer,
-        96,
-        new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
-      );
+    GPUUtils.writeBuffer(this.uniformBuffer, 32, new Float32Array(this.camera.getViewProjection()));
+    GPUUtils.writeBuffer(
+      this.uniformBuffer,
+      96,
+      new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
+    );
 
     const modelBindGroupLayout = render.getDevice().createBindGroupLayout({
       entries: [
@@ -132,16 +123,14 @@ export class SpotLightComponent extends CameraComponent {
       ],
     });
 
-    const device = render.getDevice();
-
-    this.modelUniformBuffer = device.createBuffer({
-      label: `spot_light_transform_uniformBuffer`,
-      size: 16 * 4, // 1 matriz 4x4 (model)
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    const device = render.getDevice(); this.modelUniformBuffer = GPUUtils.createBuffer(
+      'spot_light_transform_uniformBuffer',
+      16 * 4, // 1 matriz 4x4 (model)
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    );
     const res = mat4.create();
     mat4.invert(res, this.camera.getViewProjection());
-    device.queue.writeBuffer(this.modelUniformBuffer, 0, new Float32Array(res));
+    GPUUtils.writeBuffer(this.modelUniformBuffer, 0, new Float32Array(res));
 
     // Bind group para la matriz de modelo
     this.modelBindGroup = device.createBindGroup({
@@ -161,7 +150,7 @@ export class SpotLightComponent extends CameraComponent {
     pass.setBindGroup(3, this.uniformBindGroup); // spot light parameters
   }
 
-  public override update(_dt: number): void {}
+  public override update(_dt: number): void { }
 
   public debugInMenu(): void {
     // Implement debug menu if needed

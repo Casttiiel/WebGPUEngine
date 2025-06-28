@@ -8,6 +8,7 @@ import { DepthResolver } from './DepthResolver';
 import { Entity } from '@/core/ecs/Entity';
 import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
 import { Technique } from '../resources/Technique';
+import { GPUUtils } from './utils/GPUUtils';
 import { Mesh } from '../resources/Mesh';
 import { Engine } from '../../core/engine/Engine';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
@@ -111,31 +112,25 @@ export class DeferredRenderer {
     this.rtLinearDepth.createRT('g_depths.dds', width, height, 'r16float', true);
     this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float');
 
-    const device = Render.getInstance().getDevice();
-
     // Create single-sample depth buffer (for non-MSAA passes and skybox)
-    this.depthStencil = device.createTexture({
-      label: 'deferred depth stencil texture label',
-      size: {
-        width: width,
-        height: height,
-      },
-      format: 'depth32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-      sampleCount: 1,
-    });
+    this.depthStencil = GPUUtils.createTexture(
+      'deferred depth stencil texture label',
+      width,
+      height,
+      'depth32float',
+      GPUTextureUsage.RENDER_ATTACHMENT,
+      1
+    );
 
     this.depthStencilView = this.depthStencil.createView(); // Create MSAA depth buffer for G-Buffer pass
-    this.msaaDepthStencil = device.createTexture({
-      label: 'deferred msaa depth stencil texture label',
-      size: {
-        width: width,
-        height: height,
-      },
-      format: 'depth32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-      sampleCount: 4,
-    });
+    this.msaaDepthStencil = GPUUtils.createTexture(
+      'deferred msaa depth stencil texture label',
+      width,
+      height,
+      'depth32float',
+      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      4
+    );
 
     this.msaaDepthStencilView = this.msaaDepthStencil.createView();
 

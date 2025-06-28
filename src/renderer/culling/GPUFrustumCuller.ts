@@ -1,6 +1,6 @@
 import { mat4 } from 'gl-matrix';
 import { Camera } from '../../core/math/Camera';
-import { Render } from '../core/Render';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export interface AABB {
   min: [number, number, number];
@@ -37,10 +37,10 @@ export class GPUFrustumCuller {
   // Current capacity
   private maxObjects = 1000;
 
-  constructor() {}
+  constructor() { }
 
   public async load(): Promise<void> {
-    this.device = Render.getInstance().getDevice();
+    this.device = GPUUtils.getDevice();
 
     try {
       await this.initializeComputeShader();
@@ -151,20 +151,19 @@ export class GPUFrustumCuller {
       const frustumPlanes = this.extractFrustumPlanes(camera);
 
       // Convert to GPU format (6 vec4s)
-      const frustumData = this.convertFrustumPlanesToGPUFormat(frustumPlanes);
-      // Upload frustum data
-      this.device.queue.writeBuffer(this.frustumBuffer, 0, frustumData.buffer);
+      const frustumData = this.convertFrustumPlanesToGPUFormat(frustumPlanes);      // Upload frustum data
+      GPUUtils.writeBuffer(this.frustumBuffer, 0, frustumData.buffer);
 
       // Convert objects to GPU format
       const objectsData = this.convertObjectsToGPUFormat(objects);
 
       // Upload objects data
-      this.device.queue.writeBuffer(this.objectsBuffer, 0, objectsData.buffer);
+      GPUUtils.writeBuffer(this.objectsBuffer, 0, objectsData.buffer);
 
       // Clear visibility and count buffers
       const clearData = new Uint32Array(objects.length + 1); // +1 for count
-      this.device.queue.writeBuffer(this.visibilityBuffer, 0, clearData.slice(0, objects.length));
-      this.device.queue.writeBuffer(this.visibleCountBuffer, 0, clearData.slice(0, 1));
+      GPUUtils.writeBuffer(this.visibilityBuffer, 0, clearData.slice(0, objects.length));
+      GPUUtils.writeBuffer(this.visibleCountBuffer, 0, clearData.slice(0, 1));
 
       // Execute compute shader
       const result = await this.executeCompute(objects.length);

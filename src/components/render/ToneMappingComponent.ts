@@ -3,6 +3,7 @@ import { Render } from '../../renderer/core/Render';
 import { RenderToTexture } from '../../renderer/core/RenderToTexture';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 
 export class ToneMappingComponent extends Component {
   private technique!: Technique;
@@ -77,10 +78,8 @@ export class ToneMappingComponent extends Component {
   }
 
   private setBindGroup(texture: GPUTextureView): void {
-    if (this.bindGroup) return;
-
-    const device = Render.getInstance().getDevice();
-    const sampler = device.createSampler({
+    if (this.bindGroup) return; const device = GPUUtils.getDevice();
+    const sampler = GPUUtils.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
     });

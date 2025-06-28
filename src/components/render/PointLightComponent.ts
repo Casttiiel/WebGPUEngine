@@ -3,6 +3,7 @@ import { Component } from '../../core/ecs/Component';
 import { Render } from '../../renderer/core/Render';
 import { Technique } from '../../renderer/resources/Technique';
 import { TransformComponent } from '../core/TransformComponent';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 
 export class PointLightComponent extends Component {
   private color = vec4.create();
@@ -34,14 +35,11 @@ export class PointLightComponent extends Component {
     }
 
     this.technique = await Technique.get('point_light.tech');
-
-    this.uniformBuffer = Render.getInstance()
-      .getDevice()
-      .createBuffer({
-        label: `point light uniform buffer`,
-        size: 28 * 4,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
+    this.uniformBuffer = GPUUtils.createBuffer(
+      'point light uniform buffer',
+      28 * 4,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    );
 
     this.uniformBindGroup = Render.getInstance()
       .getDevice()
@@ -70,26 +68,20 @@ export class PointLightComponent extends Component {
         .setLocalScale(vec3.fromValues(this.radius + 1.0, this.radius + 1.0, this.radius + 1.0));
       vec3.copy(this.position, transform.getTransform().getWorldPosition());
 
-      const render = Render.getInstance();
+      GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
+      GPUUtils.writeBuffer(
+        this.uniformBuffer,
+        16,
+        new Float32Array(
+          vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
+        ),
+      );
 
-      render.getDevice().queue.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
-      render
-        .getDevice()
-        .queue.writeBuffer(
-          this.uniformBuffer,
-          16,
-          new Float32Array(
-            vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
-          ),
-        );
-
-      render
-        .getDevice()
-        .queue.writeBuffer(
-          this.uniformBuffer,
-          96,
-          new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
-        );
+      GPUUtils.writeBuffer(
+        this.uniformBuffer,
+        96,
+        new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
+      );
       this.isDirty = false;
     }
   }

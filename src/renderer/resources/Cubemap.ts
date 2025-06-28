@@ -1,8 +1,8 @@
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResource';
 import { ResourceType } from '../../types/ResourceType.enum';
-import { CubemapDataType } from '../../types/CubemapData.type';
 import { MipmapGenerator } from '../core/MipmapGenerator';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export interface CubemapOptions extends IGPUResourceOptions {
   magFilter?: GPUFilterMode;
@@ -105,20 +105,17 @@ export class Cubemap extends GPUResource {
       }
 
       // Calcular niveles de mipmap
-      const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1;
-
-      // Crear la textura en GPU
-      this.gpuTexture = this.device.createTexture({
-        label: `${this.label}_texture`,
-        size: [faceSize, faceSize, 6],
-        format: 'rgba16float',
-        usage:
-          GPUTextureUsage.TEXTURE_BINDING |
-          GPUTextureUsage.COPY_DST |
-          GPUTextureUsage.RENDER_ATTACHMENT |
-          GPUTextureUsage.STORAGE_BINDING,
-        mipLevelCount: mipLevelCount,
-      });
+      const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1;      // Crear la textura en GPU
+      this.gpuTexture = GPUUtils.createCubemapTexture(
+        `${this.label}_texture`,
+        faceSize,
+        'rgba16float',
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.STORAGE_BINDING,
+        mipLevelCount
+      );
 
       // Copiar cada cara al nivel 0 de mipmap
       for (let i = 0; i < 6; i++) {
@@ -148,9 +145,8 @@ export class Cubemap extends GPUResource {
         baseMipLevel: 0,
         mipLevelCount: mipLevelCount,
       });
-
       // Crear el sampler
-      this.gpuSampler = this.device.createSampler({
+      this.gpuSampler = GPUUtils.createSampler({
         label: `${this.label}_sampler`,
         magFilter: this.magFilter,
         minFilter: this.minFilter,

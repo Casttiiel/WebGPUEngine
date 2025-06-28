@@ -420,12 +420,9 @@ export class Technique extends GPUResource {
       this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER ||
       this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA
     ) {
-      console.warn(`${this.label}: Enabling MSAA for writesOn = ${this.writesOn}`);
       pipelineParams.multisample = {
         count: 4,
       };
-    } else {
-      console.warn(`${this.label}: No MSAA for writesOn = ${this.writesOn}`);
     }
 
     this.pipeline = this.device.createRenderPipeline(pipelineParams);

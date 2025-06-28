@@ -1,8 +1,9 @@
 import { Engine } from '../../core/engine/Engine';
-import { Render } from '../core/render';
+import { Render } from '../core/Render';
 import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export class Skybox {
   private fullscreenQuadMesh!: Mesh;
@@ -11,7 +12,7 @@ export class Skybox {
   private skyboxBindGroup!: GPUBindGroup;
   private skyboxTexture!: Cubemap;
 
-  constructor() {}
+  constructor() { }
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
@@ -46,37 +47,17 @@ export class Skybox {
   public render(rtAccLight: GPUTextureView, depthStencilView: GPUTextureView): void {
     const render = Render.getInstance();
 
-    const pass = render.getCommandEncoder().beginRenderPass({
-      colorAttachments: [
-        {
-          view: rtAccLight,
-          loadOp: 'load',
-          storeOp: 'store',
-        },
-      ],
-      depthStencilAttachment: {
-        view: depthStencilView,
-        depthLoadOp: 'load',
-        depthStoreOp: 'store',
-      },
-    });
+    const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
+    const depthAttachment = GPUUtils.createDepthStencilAttachment(depthStencilView, 'load', 'store');
 
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-      0.0,
-      1.0, // Min/max depth
-    );
-
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-    );
+    const pass = render.getCommandEncoder().beginRenderPass(
+      GPUUtils.createRenderPassDescriptor(
+        'skybox render pass',
+        [colorAttachment],
+        depthAttachment
+      )
+    );    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    GPUUtils.configureViewportAndScissor(pass);
 
     // 1. Activar el pipeline
     this.skyboxTechnique.activatePipeline(pass);
