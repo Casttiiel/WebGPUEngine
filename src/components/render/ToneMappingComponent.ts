@@ -4,6 +4,7 @@ import { RenderToTexture } from '../../renderer/core/RenderToTexture';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 
 export class ToneMappingComponent extends Component {
   private technique!: Technique;
@@ -76,18 +77,18 @@ export class ToneMappingComponent extends Component {
 
     return this.result.getView();
   }
-
   private setBindGroup(texture: GPUTextureView): void {
-    if (this.bindGroup) return; const device = GPUUtils.getDevice();
+    if (this.bindGroup) return;
+
     const sampler = GPUUtils.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
     });
 
-    this.bindGroup = device.createBindGroup({
-      label: `tonemapping_bindgroup`,
-      layout: this.technique.getPipeline().getBindGroupLayout(0),
-      entries: [
+    this.bindGroup = BindGroupFactory.createBindGroup(
+      `tonemapping_bindgroup`,
+      this.technique.getPipeline().getBindGroupLayout(0),
+      [
         {
           binding: 0,
           resource: texture,
@@ -96,8 +97,8 @@ export class ToneMappingComponent extends Component {
           binding: 1,
           resource: sampler,
         },
-      ],
-    });
+      ]
+    );
   }
 
   public update(dt: number): void {

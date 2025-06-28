@@ -5,6 +5,7 @@ import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { Texture } from '../resources/Texture';
 import { GPUUtils } from '../core/utils/GPUUtils';
+import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
@@ -40,60 +41,53 @@ export class AmbientLight {
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     });
+    this.environmentBindGroup = BindGroupFactory.createBindGroup(
+      'environment_with_brdf_bindgroup',
+      this.ambientTechnique.getPipeline().getBindGroupLayout(2),
+      [
+        {
+          binding: 0,
+          resource: this.environmentTexture.getTextureView()!,
+        },
+        {
+          binding: 1,
+          resource: this.environmentTexture.getSampler()!,
+        },
+        {
+          binding: 2,
+          resource: this.brdfLUTTexture.getTextureView()!,
+        },
+        {
+          binding: 3,
+          resource: this.brdfLUTSampler,
+        },
+        {
+          binding: 4,
+          resource: this.irradianceTexture.getTextureView()!,
+        },
+        {
+          binding: 5,
+          resource: this.irradianceTexture.getSampler()!,
+        },
+      ],
+    );
 
-    this.environmentBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `environment_with_brdf_bindgroup`,
-        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(2),
-        entries: [
-          {
-            binding: 0,
-            resource: this.environmentTexture.getTextureView(),
-          },
-          {
-            binding: 1,
-            resource: this.environmentTexture.getSampler(),
-          },
-          {
-            binding: 2,
-            resource: this.brdfLUTTexture.getTextureView(),
-          },
-          {
-            binding: 3,
-            resource: this.brdfLUTSampler, // Use specific BRDF LUT sampler
-          },
-          {
-            binding: 4,
-            resource: this.irradianceTexture.getTextureView(),
-          },
-          {
-            binding: 5,
-            resource: this.irradianceTexture.getSampler(),
-          },
-        ],
-      });
+    this.ambientUniformBuffer = GPUUtils.createBuffer(
+      'ambient uniform buffer',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
 
-    this.ambientUniformBuffer = Render.getInstance()
-      .getDevice()
-      .createBuffer({
-        label: `ambient uniform buffer`,
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-
-    this.uniformBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `ambient light uniform bind group`,
-        layout: this.ambientTechnique.getPipeline().getBindGroupLayout(3),
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: this.ambientUniformBuffer },
-          },
-        ],
-      });
+    this.uniformBindGroup = BindGroupFactory.createBindGroup(
+      'ambient light uniform bind group',
+      this.ambientTechnique.getPipeline().getBindGroupLayout(3),
+      [
+        {
+          binding: 0,
+          resource: { buffer: this.ambientUniformBuffer },
+        },
+      ],
+    );
   }
   public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     const render = Render.getInstance();

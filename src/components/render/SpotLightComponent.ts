@@ -1,8 +1,9 @@
 import { vec3, vec4, mat4 } from 'gl-matrix';
-import { Render } from '../../renderer/core/Render';
 import { Technique } from '../../renderer/resources/Technique';
 import { CameraComponent } from './CameraComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
@@ -71,20 +72,16 @@ export class SpotLightComponent extends CameraComponent {
       28 * 4,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     );
-
-    this.uniformBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `spot light uniform bind group`,
-        layout: this.technique.getPipeline().getBindGroupLayout(3),
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: this.uniformBuffer },
-          },
-        ],
-      });
-    const render = Render.getInstance();
+    this.uniformBindGroup = BindGroupFactory.createBindGroup(
+      `spot light uniform bind group`,
+      this.technique.getPipeline().getBindGroupLayout(3)!,
+      [
+        {
+          binding: 0,
+          resource: { buffer: this.uniformBuffer },
+        },
+      ]
+    );
 
     GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
     GPUUtils.writeBuffer(
@@ -111,19 +108,11 @@ export class SpotLightComponent extends CameraComponent {
       this.uniformBuffer,
       96,
       new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
+    ); const modelBindGroupLayout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.OBJECT_UNIFORMS
     );
 
-    const modelBindGroupLayout = render.getDevice().createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
-
-    const device = render.getDevice(); this.modelUniformBuffer = GPUUtils.createBuffer(
+    this.modelUniformBuffer = GPUUtils.createBuffer(
       'spot_light_transform_uniformBuffer',
       16 * 4, // 1 matriz 4x4 (model)
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
@@ -133,16 +122,16 @@ export class SpotLightComponent extends CameraComponent {
     GPUUtils.writeBuffer(this.modelUniformBuffer, 0, new Float32Array(res));
 
     // Bind group para la matriz de modelo
-    this.modelBindGroup = device.createBindGroup({
-      label: `transform_modelBindGroup`,
-      layout: modelBindGroupLayout,
-      entries: [
+    this.modelBindGroup = BindGroupFactory.createBindGroup(
+      `transform_modelBindGroup`,
+      modelBindGroupLayout,
+      [
         {
           binding: 0,
           resource: { buffer: this.modelUniformBuffer },
         },
-      ],
-    });
+      ]
+    );
   }
 
   public setBindGroup(pass: GPURenderPassEncoder): void {

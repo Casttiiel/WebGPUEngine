@@ -1,7 +1,7 @@
 import { Render } from '../core/Render';
 import { Technique } from '../resources/Technique';
 import { Mesh } from '../resources/Mesh';
-import { GPUUtils } from './utils/GPUUtils';
+import { BindGroupFactory } from './factories/BindGroupFactory';
 
 export class DepthResolver {
   private depthResolveTechnique!: Technique;
@@ -20,25 +20,22 @@ export class DepthResolver {
       console.error('DepthResolver not loaded');
       return;
     }
-
-    const device = GPUUtils.getDevice();
     const commandEncoder = Render.getInstance().getCommandEncoder(); // Create bind group for the MSAA depth texture
     const bindGroupLayout = this.depthResolveTechnique.getBindGroupLayout(0);
     if (!bindGroupLayout) {
       console.error('Failed to get bind group layout from depth resolve technique');
       return;
     }
-
-    this.depthBindGroup = device.createBindGroup({
-      label: 'Depth Resolve Bind Group',
-      layout: bindGroupLayout,
-      entries: [
+    this.depthBindGroup = BindGroupFactory.createBindGroup(
+      'Depth Resolve Bind Group',
+      bindGroupLayout,
+      [
         {
           binding: 0,
           resource: msaaDepthTexture.createView(),
         },
-      ],
-    });
+      ]
+    );
 
     // Create render pass to resolve depth
     const renderPass = commandEncoder.beginRenderPass({

@@ -1,6 +1,7 @@
 import { mat4 } from 'gl-matrix';
 import { Camera } from '../../core/math/Camera';
 import { GPUUtils } from '../core/utils/GPUUtils';
+import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 
 export interface AABB {
   min: [number, number, number];
@@ -99,33 +100,29 @@ export class GPUFrustumCuller {
     });
   }
 
-  private async createComputePipeline(): Promise<void> {
-    // Create bind group layout
-    this.bindGroupLayout = this.device.createBindGroupLayout({
-      label: 'Frustum Culling Bind Group Layout',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' }, // frustum planes
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'read-only-storage' }, // objects
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'storage' }, // visibility results
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'storage' }, // visible count
-        },
-      ],
-    });
+  private async createComputePipeline(): Promise<void> {    // Create bind group layout
+    this.bindGroupLayout = BindGroupFactory.getLayout('frustum_culling', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' }, // frustum planes
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'read-only-storage' }, // objects
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'storage' }, // visibility results
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'storage' }, // visible count
+      },
+    ]);
 
     // Create compute pipeline
     this.computePipeline = this.device.createComputePipeline({
@@ -212,18 +209,17 @@ export class GPUFrustumCuller {
     return data;
   }
 
-  private async executeCompute(objectCount: number): Promise<CullResult> {
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'Frustum Culling Bind Group',
-      layout: this.bindGroupLayout,
-      entries: [
+  private async executeCompute(objectCount: number): Promise<CullResult> {    // Create bind group
+    const bindGroup = BindGroupFactory.createBindGroup(
+      'Frustum Culling Bind Group',
+      this.bindGroupLayout,
+      [
         { binding: 0, resource: { buffer: this.frustumBuffer } },
         { binding: 1, resource: { buffer: this.objectsBuffer } },
         { binding: 2, resource: { buffer: this.visibilityBuffer } },
         { binding: 3, resource: { buffer: this.visibleCountBuffer } },
-      ],
-    });
+      ]
+    );
 
     // Create command encoder
     const commandEncoder = this.device.createCommandEncoder({

@@ -1,4 +1,5 @@
 import { GPUUtils } from './utils/GPUUtils';
+import { BindGroupFactory } from './factories/BindGroupFactory';
 
 export class MipmapGenerator {
   private device!: GPUDevice;
@@ -17,30 +18,26 @@ export class MipmapGenerator {
       label: 'Mipmap Generation Compute Shader',
       code: shaderCode,
     });
-
     // Create bind group layout
-    this.bindGroupLayout = this.device.createBindGroupLayout({
-      label: 'Mipmap Generation Bind Group Layout',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: {
-            viewDimension: '2d',
-            sampleType: 'float',
-          },
+    this.bindGroupLayout = BindGroupFactory.getLayout('mipmap_generation', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          viewDimension: '2d',
+          sampleType: 'float',
         },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-            viewDimension: '2d',
-          },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+          viewDimension: '2d',
         },
-      ],
-    });
+      },
+    ]);
 
     // Create compute pipeline
     this.computePipeline = this.device.createComputePipeline({
@@ -90,12 +87,11 @@ export class MipmapGenerator {
           baseMipLevel: mipLevel,
           mipLevelCount: 1,
         });
-
         // Create bind group for this mip level generation
-        const bindGroup = this.device.createBindGroup({
-          label: `Mipmap Generation Face ${face} Level ${mipLevel}`,
-          layout: this.bindGroupLayout,
-          entries: [
+        const bindGroup = BindGroupFactory.createBindGroup(
+          `Mipmap Generation Face ${face} Level ${mipLevel}`,
+          this.bindGroupLayout,
+          [
             {
               binding: 0,
               resource: sourceView,
@@ -104,8 +100,8 @@ export class MipmapGenerator {
               binding: 1,
               resource: destView,
             },
-          ],
-        });
+          ]
+        );
 
         // Dispatch compute shader
         const computePass = commandEncoder.beginComputePass({

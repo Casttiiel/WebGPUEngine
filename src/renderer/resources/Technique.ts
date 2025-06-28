@@ -8,6 +8,7 @@ import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.e
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { Mesh } from './Mesh';
 import { Render } from '../core/Render';
+import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
@@ -144,230 +145,7 @@ export class Technique extends GPUResource {
   }
 
   private createBindGroupLayout(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
-    switch (layout) {
-      case PipelineBindGroupLayouts.CAMERA_UNIFORMS: {
-        return this.device.createBindGroupLayout({
-          label: 'camera uniforms bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-              buffer: { type: 'uniform' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.MATERIAL_TEXTURES: {
-        return this.device.createBindGroupLayout({
-          label: 'material textures uniforms bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 2,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 3,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 4,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 5,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.OBJECT_UNIFORMS: {
-        return this.device.createBindGroupLayout({
-          label: 'object uniforms bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.VERTEX,
-              buffer: { type: 'uniform' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.SINGLE_TEXTURE: {
-        return this.device.createBindGroupLayout({
-          label: 'single texture bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.GBUFFER_UNIFORMS: {
-        return this.device.createBindGroupLayout({
-          label: 'g buffer uniforms bind group layout',
-          entries: [
-            // Albedo texture
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Normal texture
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Linear depth texture
-            {
-              binding: 2,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Self illumination texture
-            {
-              binding: 3,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // AO texture
-            {
-              binding: 4,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Shared sampler for all textures
-            {
-              binding: 5,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.CUBEMAP_TEXTURE: {
-        return this.device.createBindGroupLayout({
-          label: 'cubemap texture bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: 'cube',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.CUBEMAP_WITH_BRDF: {
-        return this.device.createBindGroupLayout({
-          label: 'cubemap with brdf lut bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: 'cube',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-            {
-              binding: 2,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: '2d',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 3,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-            {
-              binding: 4,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: 'cube',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 5,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.BUFFER_UNIFORM: {
-        return this.device.createBindGroupLayout({
-          label: 'buffer uniform bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              buffer: { type: 'uniform' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.DEPTH_TEXTURE: {
-        return this.device.createBindGroupLayout({
-          label: 'depth texture bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                sampleType: 'depth',
-                viewDimension: '2d',
-                multisampled: true,
-              },
-            },
-          ],
-        });
-      }
-      default: {
-        throw new Error(`${this.label}: Unknown uniform layout`);
-      }
-    }
+    return BindGroupFactory.getLayoutFromEnum(layout);
   }
 
   private createPipeline(): void {
@@ -638,9 +416,10 @@ export class Technique extends GPUResource {
       throw new Error(`Pipeline not initialized for technique ${this.path}`);
     }
     return this.pipeline;
-  }
-
-  public getBindGroupLayout(idx: number): GPUBindGroupLayout | undefined {
+  } public getBindGroupLayout(idx: number): GPUBindGroupLayout | undefined {
+    if (!this.pipelineLayouts || idx < 0 || idx >= this.pipelineLayouts.length) {
+      return undefined;
+    }
     return this.pipelineLayouts[idx];
   }
 }

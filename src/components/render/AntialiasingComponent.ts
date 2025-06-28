@@ -5,6 +5,7 @@ import { RenderToTexture } from '../../renderer/core/RenderToTexture';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 
 export class AntialiasingComponent extends Component {
   private technique!: Technique;
@@ -82,16 +83,15 @@ export class AntialiasingComponent extends Component {
   private setBindGroup(texture: GPUTextureView): void {
     if (this.bindGroup) return;
 
-    const device = GPUUtils.getDevice();
     const sampler = GPUUtils.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
     });
 
-    this.bindGroup = device.createBindGroup({
-      label: `antialiasing_bindgroup`,
-      layout: this.technique.getPipeline().getBindGroupLayout(1),
-      entries: [
+    this.bindGroup = BindGroupFactory.createBindGroup(
+      `antialiasing_bindgroup`,
+      this.technique.getPipeline().getBindGroupLayout(1),
+      [
         {
           binding: 0,
           resource: texture,
@@ -100,8 +100,8 @@ export class AntialiasingComponent extends Component {
           binding: 1,
           resource: sampler,
         },
-      ],
-    });
+      ]
+    );
   }
 
   public update(dt: number): void {

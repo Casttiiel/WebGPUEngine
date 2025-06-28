@@ -1,9 +1,9 @@
 import { vec3, vec4 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
-import { Render } from '../../renderer/core/Render';
 import { Technique } from '../../renderer/resources/Technique';
 import { TransformComponent } from '../core/TransformComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 
 export class PointLightComponent extends Component {
   private color = vec4.create();
@@ -40,19 +40,16 @@ export class PointLightComponent extends Component {
       28 * 4,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     );
-
-    this.uniformBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `point light uniform bind group`,
-        layout: this.technique.getPipeline().getBindGroupLayout(3),
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: this.uniformBuffer },
-          },
-        ],
-      });
+    this.uniformBindGroup = BindGroupFactory.createBindGroup(
+      `point light uniform bind group`,
+      this.technique.getPipeline().getBindGroupLayout(3)!,
+      [
+        {
+          binding: 0,
+          resource: { buffer: this.uniformBuffer },
+        },
+      ]
+    );
   }
 
   public setBindGroup(pass: GPURenderPassEncoder): void {

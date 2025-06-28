@@ -1,35 +1,36 @@
 ## NPM RUN DEV
 
-1. Usar las nuevas clases
-2. Ambient Occlusion SSAO
-2. Ambient Occlusion GTAO
-4. Shader functions duplication
-5. RenderToTexture Refactor?
-3. Bloom
-4. Compute-based distortion
-6. Typing things and connected with resources json?
-5. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-6. Directional Light
-7. Area Light
-8. RenderPointLighstWithShadows
-9. SpotLightsWithShadows
-11. OPtimizacion WebGPUFundamentals
-12. Load locks or s async?
-10. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-11. Temporal Anti-Aliasing (TAA)
-12. MSAA on lights?
-13. Motion Blur
-14. Decals Category
-15. Particles
-16. Escalabilidad de Luces
+1. ✅ BindGroupFactory COMPLETED - All bind groups and layouts now use BindGroupFactory
+2. PipelineFactory BaseRenderPass GBufferpass. Layout auto en algo? Set ViewPoert, Technique, DeferredRenderer
+3. Ambient Occlusion SSAO
+4. Ambient Occlusion GTAO
+5. Shader functions duplication
+6. RenderToTexture Refactor?
+7. Typing things and connected with resources json?
+8. OPtimizacion WebGPUFundamentals
+9. Load locks or async?
+10. Bloom
+11. Compute-based distortion
+12. SpotLightsWithShadows
+13. PointLighstWithShadows
+14. Directional Light
+15. Area Light
+16. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+17. Temporal Anti-Aliasing (TAA)
+18. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+19. MSAA on lights?
+20. Motion Blur
+21. Decals Category
+22. Particles
+23. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-17. Improve uniform declaration. Poder especificar Group y binding
-18. Mesh LOD/Generate LOD on texture and mesh automatically
-19. Occlusion culling
-20. Memory Bandwidth
+24. Improve uniform declaration. Poder especificar Group y binding
+25. Mesh LOD/Generate LOD on texture and mesh automatically
+26. Occlusion culling
+27. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-21. GPU-Driven Rendering 🚀 Futuro
+28. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
 Terrain with perlin noise

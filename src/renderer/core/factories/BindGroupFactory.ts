@@ -162,12 +162,129 @@ export class BindGroupFactory {
                 sampler: { type: 'filtering' },
             },
         ]);
+    }    /**
+     * Creates a single texture bind group layout
+     */
+    public static getSingleTextureLayout(): GPUBindGroupLayout {
+        return this.getLayout('single_texture', [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float' },
+            },
+            {
+                binding: 1,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' },
+            },
+        ]);
+    }
+
+    /**
+     * Creates a cubemap texture bind group layout
+     */
+    public static getCubemapTextureLayout(): GPUBindGroupLayout {
+        return this.getLayout('cubemap_texture', [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    viewDimension: 'cube',
+                    sampleType: 'float',
+                    multisampled: false,
+                },
+            },
+            {
+                binding: 1,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' },
+            },
+        ]);
+    }
+
+    /**
+     * Creates a cubemap with BRDF LUT bind group layout
+     */
+    public static getCubemapWithBRDFLayout(): GPUBindGroupLayout {
+        return this.getLayout('cubemap_with_brdf', [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    viewDimension: 'cube',
+                    sampleType: 'float',
+                    multisampled: false,
+                },
+            },
+            {
+                binding: 1,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' },
+            },
+            {
+                binding: 2,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    viewDimension: '2d',
+                    sampleType: 'float',
+                    multisampled: false,
+                },
+            },
+            {
+                binding: 3,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' },
+            },
+            {
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    viewDimension: 'cube',
+                    sampleType: 'float',
+                    multisampled: false,
+                },
+            },
+            {
+                binding: 5,
+                visibility: GPUShaderStage.FRAGMENT,
+                sampler: { type: 'filtering' },
+            },
+        ]);
+    }
+
+    /**
+     * Creates a buffer uniform bind group layout
+     */
+    public static getBufferUniformLayout(): GPUBindGroupLayout {
+        return this.getLayout('buffer_uniform', [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                buffer: { type: 'uniform' },
+            },
+        ]);
+    }
+
+    /**
+     * Creates a depth texture bind group layout
+     */
+    public static getDepthTextureLayout(): GPUBindGroupLayout {
+        return this.getLayout('depth_texture', [
+            {
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {
+                    sampleType: 'depth',
+                    viewDimension: '2d',
+                    multisampled: true,
+                },
+            },
+        ]);
     }
 
     /**
      * Creates bind group layout from enum
-     */
-    public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
+     */    public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
         switch (layout) {
             case PipelineBindGroupLayouts.CAMERA_UNIFORMS:
                 return this.getCameraUniformsLayout();
@@ -175,6 +292,18 @@ export class BindGroupFactory {
                 return this.getObjectUniformsLayout();
             case PipelineBindGroupLayouts.MATERIAL_TEXTURES:
                 return this.getMaterialTexturesLayout();
+            case PipelineBindGroupLayouts.SINGLE_TEXTURE:
+                return this.getSingleTextureLayout();
+            case PipelineBindGroupLayouts.CUBEMAP_TEXTURE:
+                return this.getCubemapTextureLayout();
+            case PipelineBindGroupLayouts.CUBEMAP_WITH_BRDF:
+                return this.getCubemapWithBRDFLayout();
+            case PipelineBindGroupLayouts.GBUFFER_UNIFORMS:
+                return this.getGBufferLayout();
+            case PipelineBindGroupLayouts.BUFFER_UNIFORM:
+                return this.getBufferUniformLayout();
+            case PipelineBindGroupLayouts.DEPTH_TEXTURE:
+                return this.getDepthTextureLayout();
             default:
                 throw new Error(`Unknown bind group layout: ${layout}`);
         }

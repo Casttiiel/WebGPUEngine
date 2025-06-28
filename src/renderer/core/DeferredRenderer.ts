@@ -13,6 +13,7 @@ import { Mesh } from '../resources/Mesh';
 import { Engine } from '../../core/engine/Engine';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { TransformComponent } from '../../components/core/TransformComponent';
+import { BindGroupFactory } from './factories/BindGroupFactory';
 import { Texture } from '../resources/Texture';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 
@@ -49,49 +50,7 @@ export class DeferredRenderer {
   private msaaDepthStencilView!: GPUTextureView | null;
 
   constructor() {
-    this.gbufferLayout = Render.getInstance()
-      .getDevice()
-      .createBindGroupLayout({
-        label: 'g buffer uniforms bind group layout',
-        entries: [
-          // Albedo texture
-          {
-            binding: 0,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'float' },
-          },
-          // Normal texture
-          {
-            binding: 1,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'float' },
-          },
-          // Linear depth texture
-          {
-            binding: 2,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'float' },
-          },
-          // Self illumination texture
-          {
-            binding: 3,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'float' },
-          },
-          // AO texture
-          {
-            binding: 4,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'float' },
-          },
-          // Shared sampler for all textures
-          {
-            binding: 5,
-            visibility: GPUShaderStage.FRAGMENT,
-            sampler: { type: 'filtering' },
-          },
-        ],
-      });
+    this.gbufferLayout = BindGroupFactory.getGBufferLayout();
   }
 
   public create(width: number, height: number) {
@@ -132,43 +91,39 @@ export class DeferredRenderer {
       4
     );
 
-    this.msaaDepthStencilView = this.msaaDepthStencil.createView();
-
-    // Si no hay AO, usar la textura blanca (que representa sin oclusión)
+    this.msaaDepthStencilView = this.msaaDepthStencil.createView();    // Si no hay AO, usar la textura blanca (que representa sin oclusión)
     const aoView = this.whiteTexture.getTextureView();
 
-    this.gBufferBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `ambient_bindgroup`,
-        layout: this.gbufferLayout,
-        entries: [
-          {
-            binding: 0,
-            resource: this.rtAlbedos.getView(),
-          },
-          {
-            binding: 1,
-            resource: this.rtNormals.getView(),
-          },
-          {
-            binding: 2,
-            resource: this.rtLinearDepth.getView(),
-          },
-          {
-            binding: 3,
-            resource: this.rtSelfIllum.getView(),
-          },
-          {
-            binding: 4,
-            resource: aoView,
-          },
-          {
-            binding: 5,
-            resource: this.whiteTexture.getSampler(),
-          },
-        ],
-      });
+    this.gBufferBindGroup = BindGroupFactory.createBindGroup(
+      `ambient_bindgroup`,
+      this.gbufferLayout,
+      [
+        {
+          binding: 0,
+          resource: this.rtAlbedos.getView(),
+        },
+        {
+          binding: 1,
+          resource: this.rtNormals.getView(),
+        },
+        {
+          binding: 2,
+          resource: this.rtLinearDepth.getView(),
+        },
+        {
+          binding: 3,
+          resource: this.rtSelfIllum.getView(),
+        },
+        {
+          binding: 4,
+          resource: aoView,
+        },
+        {
+          binding: 5,
+          resource: this.whiteTexture.getSampler(),
+        },
+      ]
+    );
 
     // Guardar estado inicial del AO
     this.currentAOState = {
@@ -547,39 +502,36 @@ export class DeferredRenderer {
       hasAO: hasNewAO,
       textureView: aoTextureView,
     };
-
     // Recrear el bind group solo si hubo un cambio
-    this.gBufferBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `gbuffer bind group`,
-        layout: this.gbufferLayout,
-        entries: [
-          {
-            binding: 0,
-            resource: this.rtAlbedos.getView(),
-          },
-          {
-            binding: 1,
-            resource: this.rtNormals.getView(),
-          },
-          {
-            binding: 2,
-            resource: this.rtLinearDepth.getView(),
-          },
-          {
-            binding: 3,
-            resource: this.rtSelfIllum.getView(),
-          },
-          {
-            binding: 4,
-            resource: rtAmbientOcclusion,
-          },
-          {
-            binding: 5,
-            resource: this.whiteTexture.getSampler(),
-          },
-        ],
-      });
+    this.gBufferBindGroup = BindGroupFactory.createBindGroup(
+      `gbuffer bind group`,
+      this.gbufferLayout,
+      [
+        {
+          binding: 0,
+          resource: this.rtAlbedos.getView(),
+        },
+        {
+          binding: 1,
+          resource: this.rtNormals.getView(),
+        },
+        {
+          binding: 2,
+          resource: this.rtLinearDepth.getView(),
+        },
+        {
+          binding: 3,
+          resource: this.rtSelfIllum.getView(),
+        },
+        {
+          binding: 4,
+          resource: rtAmbientOcclusion,
+        },
+        {
+          binding: 5,
+          resource: this.whiteTexture.getSampler(),
+        },
+      ]
+    );
   }
 }

@@ -3,6 +3,8 @@ import { Transform } from '../../core/math/Transform';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 
 export class TransformComponent extends Component {
   private transform: Transform;
@@ -21,28 +23,21 @@ export class TransformComponent extends Component {
     );
 
     // Layout para la matriz de modelo
-    const device = GPUUtils.getDevice();
-    const modelBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
+    const modelBindGroupLayout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.OBJECT_UNIFORMS
+    );
 
     // Bind group para la matriz de modelo
-    this.modelBindGroup = device.createBindGroup({
-      label: `transform_modelBindGroup`,
-      layout: modelBindGroupLayout,
-      entries: [
+    this.modelBindGroup = BindGroupFactory.createBindGroup(
+      `transform_modelBindGroup`,
+      modelBindGroupLayout,
+      [
         {
           binding: 0,
           resource: { buffer: this.uniformBuffer },
         },
-      ],
-    });
+      ]
+    );
   }
 
   public async load(data: TransformComponentDataType): Promise<void> {

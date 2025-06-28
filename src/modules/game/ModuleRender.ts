@@ -11,6 +11,7 @@ import { Technique } from '../../renderer/resources/Technique';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Module } from '../core/Module';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -129,20 +130,18 @@ export class ModuleRender extends Module {
 
     pass.end();
   }
-
   private presentResult(result: GPUTextureView): void {
     const render = Render.getInstance();
-    const device = render.getDevice();
     if (!this.presentationBindGroup) {
       const sampler = GPUUtils.createSampler({
         magFilter: 'linear',
         minFilter: 'linear',
       });
 
-      this.presentationBindGroup = device.createBindGroup({
-        label: `presentation_bindgroup`,
-        layout: this.presentationTechnique.getPipeline().getBindGroupLayout(0),
-        entries: [
+      this.presentationBindGroup = BindGroupFactory.createBindGroup(
+        `presentation_bindgroup`,
+        this.presentationTechnique.getPipeline().getBindGroupLayout(0),
+        [
           {
             binding: 0,
             resource: result,
@@ -151,8 +150,8 @@ export class ModuleRender extends Module {
             binding: 1,
             resource: sampler,
           },
-        ],
-      });
+        ]
+      );
     }
     const colorAttachment = GPUUtils.createColorAttachment(
       render.getContext().getCurrentTexture().createView(),
@@ -246,31 +245,20 @@ export class ModuleRender extends Module {
     this.globalUniformBuffer = GPUUtils.createBuffer(
       'global uniform buffer',
       256,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-    ); const render = Render.getInstance();
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
-    // Crear el layout para el bind group global
-    const globalBindGroupLayout = render.getDevice().createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
-
-    // Crear el bind group global
-    this.globalBindGroup = render.getDevice().createBindGroup({
-      label: `global uniform bind group`,
-      layout: globalBindGroupLayout,
-      entries: [
+    // Crear el bind group global usando la factory
+    const globalBindGroupLayout = BindGroupFactory.getCameraUniformsLayout();
+    this.globalBindGroup = BindGroupFactory.createBindGroup(
+      'global uniform bind group',
+      globalBindGroupLayout,
+      [
         {
           binding: 0,
           resource: { buffer: this.globalUniformBuffer },
         },
       ],
-    });
+    );
   }
 
   private async initializePresentationData(): Promise<void> {

@@ -4,6 +4,7 @@ import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { GPUUtils } from '../core/utils/GPUUtils';
+import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 
 export class Skybox {
   private fullscreenQuadMesh!: Mesh;
@@ -25,23 +26,20 @@ export class Skybox {
     if (!textureView || !sampler) {
       throw new Error('Failed to get skybox texture view or sampler');
     }
-
-    this.skyboxBindGroup = Render.getInstance()
-      .getDevice()
-      .createBindGroup({
-        label: `skybox_bindgroup`,
-        layout: this.skyboxTechnique.getPipeline().getBindGroupLayout(1),
-        entries: [
-          {
-            binding: 0,
-            resource: textureView,
-          },
-          {
-            binding: 1,
-            resource: sampler,
-          },
-        ],
-      });
+    this.skyboxBindGroup = BindGroupFactory.createBindGroup(
+      `skybox_bindgroup`,
+      this.skyboxTechnique.getPipeline().getBindGroupLayout(1)!,
+      [
+        {
+          binding: 0,
+          resource: textureView,
+        },
+        {
+          binding: 1,
+          resource: sampler,
+        },
+      ]
+    );
   }
 
   public render(rtAccLight: GPUTextureView, depthStencilView: GPUTextureView): void {
