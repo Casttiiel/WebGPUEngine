@@ -39,6 +39,7 @@ export class DeferredRenderer {
   constructor() {
     this.gbufferLayout = BindGroupFactory.getGBufferLayout();
   }
+
   public create(width: number, height: number) {
     if (!this.isLoaded) return;
     this.destroy();
@@ -74,7 +75,7 @@ export class DeferredRenderer {
     const aoView = this.whiteTexture.getTextureView();
 
     this.gBufferBindGroup = BindGroupFactory.createBindGroup(
-      `ambient_bindgroup`,
+      `gbuffer_bindgroup`,
       this.gbufferLayout,
       [
         {
@@ -120,6 +121,7 @@ export class DeferredRenderer {
       textureView: aoView!,
     };
   }
+
   public async load(): Promise<void> {
     this.skybox = new Skybox();
     await this.skybox.load();
@@ -179,6 +181,7 @@ export class DeferredRenderer {
     }
     return ambientOcclusionComponent.compute(this.gBufferBindGroup);
   }
+
   private renderAccLight(aoTextureView: GPUTextureView | undefined): void {
     this.updateAOTexture(aoTextureView || null);
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
@@ -190,7 +193,9 @@ export class DeferredRenderer {
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
+
   public update(_dt: number): void { }
+
   private destroy(): void {
     if (this.gBufferPass) {
       this.gBufferPass.dispose();
@@ -209,6 +214,7 @@ export class DeferredRenderer {
       this.depthResolver.destroy();
     }
   }
+
   public getDepthStencilView(): GPUTextureView | null {
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     return gBufferDepthTextures.singleDepthView;

@@ -20,11 +20,11 @@ export class GBufferPass {
         // Empty constructor
     }
 
-    public async load(): Promise<void> {
-        await this.createRenderTargets();
+    public load(): void {
+        this.createRenderTargets();
     }
 
-    private async createRenderTargets(): Promise<void> {
+    private createRenderTargets(): void {
         const width = Render.width;
         const height = Render.height;        // Create G-Buffer render targets with formats matching gbuffer.tech pipeline
         this.rtAlbedos = new RenderToTexture();

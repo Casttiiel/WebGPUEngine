@@ -9,6 +9,7 @@ export class DepthResolver {
   private fullscreenQuadMesh!: Mesh;
   private depthBindGroup!: GPUBindGroup;
   private isLoaded = false;
+
   public async load(): Promise<void> {
     // Load fullscreen quad mesh and technique using existing classes
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');

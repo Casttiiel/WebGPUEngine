@@ -197,12 +197,7 @@ export class RenderPassManager {
         bindGroup: GPUBindGroup,
         result: RenderToTexture
     ): void {
-        const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
-
-        // Override clear value for AO (white = no occlusion)
-        if (passConfig.colorAttachments[0]) {
-            passConfig.colorAttachments[0].clearValue = { r: 1, g: 1, b: 1, a: 1 };
-        }
+        const passConfig = RenderPassFactory.createPostProcessPassConfigMSAA(result);
 
         const pass = new AmbientOcclusionRenderPass(passConfig, mesh, technique, bindGroup);
         this.executeDynamicPass(pass);

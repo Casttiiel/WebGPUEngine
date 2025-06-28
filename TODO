@@ -1,35 +1,34 @@
 ## NPM RUN DEV
 
-2. 
-3. Ambient Occlusion SSAO
-4. Ambient Occlusion GTAO
-5. Shader functions duplication
-6. RenderToTexture Refactor?
-7. Typing things and connected with resources json?
-8. OPtimizacion WebGPUFundamentals
-9. Load locks or async?
-10. Bloom
-11. Compute-based distortion
-12. SpotLightsWithShadows
-13. PointLighstWithShadows
-14. Directional Light
-15. Area Light
-16. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-17. Temporal Anti-Aliasing (TAA)
-18. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-19. MSAA on lights?
-20. Motion Blur
-21. Decals Category
-22. Particles
-23. Escalabilidad de Luces
+1. Ambient Occlusion SSAO
+2. Ambient Occlusion GTAO
+3. Shader functions duplication
+4. RenderToTexture Refactor?
+5. Typing things and connected with resources json?
+6. OPtimizacion WebGPUFundamentals
+7. Load locks or async?
+8. Bloom
+9. Compute-based distortion
+10. SpotLightsWithShadows
+11. PointLighstWithShadows
+12. Directional Light
+13. Area Light
+14. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+15. Temporal Anti-Aliasing (TAA)
+16. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+17. MSAA on lights?
+18. Motion Blur
+19. Decals Category
+20. Particles
+21. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-24. Improve uniform declaration. Poder especificar Group y binding
-25. Mesh LOD/Generate LOD on texture and mesh automatically
-26. Occlusion culling
-27. Memory Bandwidth
+22. Improve uniform declaration. Poder especificar Group y binding
+23. Mesh LOD/Generate LOD on texture and mesh automatically
+24. Occlusion culling
+25. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-28. GPU-Driven Rendering 🚀 Futuro
+26. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
 Terrain with perlin noise

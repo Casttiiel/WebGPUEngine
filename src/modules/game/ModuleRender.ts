@@ -75,7 +75,7 @@ export class ModuleRender extends Module {
 
     let result = await this.deferred.render(mainCamera);
 
-    this.renderDistorsions(result);
+    //this.renderDistorsions(result);
 
     if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
@@ -225,6 +225,7 @@ export class ModuleRender extends Module {
   public renderDebug(): void {
     throw new Error('Method not implemented.');
   }
+
   private initializeUniformBuffers(): void {
     // Crear buffer uniforme global para las matrices de la cámara
     this.globalUniformBuffer = GPUUtils.createBuffer(
@@ -251,6 +252,7 @@ export class ModuleRender extends Module {
 
     this.presentationTechnique = await Technique.get('presentation.tech');
   }
+
   public updateGlobalUniforms(camera: Camera): void {
 
     const viewMatrix = new Float32Array(camera.getView());

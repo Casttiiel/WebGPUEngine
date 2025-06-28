@@ -56,6 +56,7 @@ export class RenderToTexture {
     });
     return this.textureView;
   }
+
   // Returns the view for rendering (MSAA if enabled, otherwise single-sample)
   public getRenderView(): GPUTextureView {
     if (this.isMultisample) {

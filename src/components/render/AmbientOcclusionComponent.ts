@@ -25,7 +25,7 @@ export class AmbientOcclusionComponent extends Component {
       Render.width,
       Render.height,
       'r16float',
-      false, // Disable MSAA temporarily to fix usage conflict
+      true,
     );
   }
 
@@ -35,7 +35,7 @@ export class AmbientOcclusionComponent extends Component {
       Render.width,
       Render.height,
       'r16float',
-      false, // Disable MSAA temporarily to fix usage conflict
+      true
     );
   }
 
