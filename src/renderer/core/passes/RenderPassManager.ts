@@ -1,7 +1,7 @@
 import { BaseRenderPass } from './BaseRenderPass';
 import { GBufferRenderPass, DecalRenderPass, TransparentRenderPass } from './DeferredRenderPasses';
 import { PointLightRenderPass, SpotLightRenderPass } from './LightingRenderPasses';
-import { ToneMappingRenderPass, AntialiasingRenderPass, AmbientOcclusionRenderPass } from './PostProcessingRenderPasses';
+import { ToneMappingRenderPass, AntialiasingRenderPass, AmbientOcclusionRenderPass, AOBilateralFilterRenderPass } from './PostProcessingRenderPasses';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderToTexture } from '../RenderToTexture';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
@@ -199,6 +199,19 @@ export class RenderPassManager {
     ): void {
         const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
         const pass = new AmbientOcclusionRenderPass(passConfig, mesh, technique, bindGroup);
+        this.executeDynamicPass(pass);
+    }    /**
+     * Create and execute an AO bilateral filter pass dynamically
+     */
+    public executeAOBilateralFilterPass(
+        mesh: any,
+        technique: any,
+        gBufferBindGroup: GPUBindGroup,
+        aoBindGroup: GPUBindGroup,
+        result: RenderToTexture
+    ): void {
+        const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+        const pass = new AOBilateralFilterRenderPass(passConfig, mesh, technique, gBufferBindGroup, aoBindGroup);
         this.executeDynamicPass(pass);
     }
 }

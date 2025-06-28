@@ -2,12 +2,38 @@
 #include "common/structs"
 #include "common/utils"
 
-// Constantes SSAO
+// Constantes SSAO mejoradas
 const SAMPLE_COUNT = 16u;
-const RADIUS = 0.2;           // Radio en unidades de mundo (reducido para mayor detalle)
-const BIAS = 0.001;          // Para evitar self-occlusion (reducido para detectar mejor las oclusiones)
-const AO_STRENGTH = 3.0;      // Intensidad del efecto (aumentado para mejor contraste)
-const MAX_DISTANCE = 0.3;     // Distancia máxima de consideración (reducida para oclusión más local)
+const RADIUS = 0.5;           // Radio en espacio de vista
+const BIAS = 0.025;           // Para evitar self-occlusion
+const AO_STRENGTH = 1.5;      // Intensidad del efecto
+const MAX_DISTANCE = 1.0;     // Distancia máxima en espacio de vista
+const NOISE_SCALE = 4.0;      // Escala del ruido para mejor distribución
+
+// Constantes para bilateral filter
+const BILATERAL_RADIUS = 2u;      // Radio del filtro bilateral
+const BILATERAL_SIGMA_DEPTH = 0.1; // Sensibilidad a diferencias de profundidad
+const BILATERAL_SIGMA_NORMAL = 0.5; // Sensibilidad a diferencias de normales
+
+// Pre-computed Poisson disk samples para mejor distribución
+const POISSON_SAMPLES = array<vec2<f32>, 16>(
+    vec2<f32>(-0.5119625f, -0.4827938f),
+    vec2<f32>(-0.2171264f, -0.4768726f),
+    vec2<f32>(-0.7552931f, -0.2426507f),
+    vec2<f32>(-0.7136765f, 0.1735522f),
+    vec2<f32>(-0.5019965f, -0.1767688f),
+    vec2<f32>(-0.5312779f, 0.1921148f),
+    vec2<f32>(-0.3753618f, 0.4054451f),
+    vec2<f32>(-0.1565506f, 0.7612801f),
+    vec2<f32>(0.0033669f, -0.7118613f),
+    vec2<f32>(0.0920513f, -0.3131883f),
+    vec2<f32>(0.1851896f, 0.1624865f),
+    vec2<f32>(0.2829556f, -0.0987928f),
+    vec2<f32>(0.5198096f, 0.1897564f),
+    vec2<f32>(0.6253080f, -0.2991339f),
+    vec2<f32>(0.3852080f, 0.5509507f),
+    vec2<f32>(0.7672689f, 0.1565740f)
+);
 
 fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     var g: GBuffer;
@@ -48,7 +74,7 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     return g;
 }
 
-// Generación de ruido procedural
+// Generación de ruido procedural mejorado
 fn hash(p: vec2<f32>) -> vec2<f32> {
     let p2 = vec2<f32>(
         dot(p, vec2<f32>(127.1, 311.7)),
@@ -57,25 +83,35 @@ fn hash(p: vec2<f32>) -> vec2<f32> {
     return fract(sin(p2) * 43758.5453123);
 }
 
-// Generación de vector hemisférico para sample
-fn hemispherePoint(seed: vec2<f32>, n: vec3<f32>) -> vec3<f32> {
-    let noise = hash(seed);
-    let theta = noise.x * 2.0 * 3.14159;
-    let r = sqrt(noise.y);
+// Generación de vector hemisférico con Poisson disk mejorado
+fn hemispherePointPoisson(index: u32, n: vec3<f32>, noise: vec2<f32>) -> vec3<f32> {
+    // Usar muestras pre-computadas de Poisson disk
+    let poissonSample = POISSON_SAMPLES[index];
     
-    // Crear vector en hemisferio
-    let v = vec3<f32>(
-        r * cos(theta),
-        r * sin(theta),
-        sqrt(1.0 - noise.y)
+    // Rotar la muestra con el ruido para reducir patrones
+    let angle = noise.x * 2.0 * 3.14159;
+    let cosAngle = cos(angle);
+    let sinAngle = sin(angle);
+    let rotatedSample = vec2<f32>(
+        poissonSample.x * cosAngle - poissonSample.y * sinAngle,
+        poissonSample.x * sinAngle + poissonSample.y * cosAngle
     );
     
-    // Orientar hacia la normal
+    // Convertir a 3D hemisférico
+    let r = sqrt(rotatedSample.x * rotatedSample.x + rotatedSample.y * rotatedSample.y);
+    let theta = atan2(rotatedSample.y, rotatedSample.x);
+    let phi = acos(sqrt(1.0 - r * r));
+    
+    let x = sin(phi) * cos(theta);
+    let y = sin(phi) * sin(theta);
+    let z = cos(phi);
+    
+    // Orientar hacia la normal usando TBN matrix
     let up = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.y) > 0.999);
     let tangent = normalize(cross(up, n));
     let bitangent = cross(n, tangent);
     
-    return tangent * v.x + bitangent * v.y + n * v.z;
+    return normalize(tangent * x + bitangent * y + n * z);
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -88,38 +124,70 @@ fn hemispherePoint(seed: vec2<f32>, n: vec3<f32>) -> vec3<f32> {
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
 fn samplePosition(centerPos: vec3<f32>, normal: vec3<f32>, screenPos: vec2<f32>, index: u32) -> vec2<f32> {
-    let sampleVec = hemispherePoint(screenPos + vec2<f32>(f32(index) * 0.0713, f32(index) * 0.4271), normal);
-    let samplePos = centerPos + sampleVec * RADIUS;
-    let sampleNDC = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(samplePos, 1.0);
-    return clamp((sampleNDC.xy / sampleNDC.w) * 0.5 + 0.5, vec2<f32>(0.0), vec2<f32>(1.0));
+    // Usar Poisson disk con ruido rotacional
+    let noise = hash(screenPos * NOISE_SCALE);
+    let sampleVec = hemispherePointPoisson(index, normal, noise);
+    
+    // Trabajar en espacio de vista en lugar de mundo
+    let viewPos = (camera.viewMatrix * vec4<f32>(centerPos, 1.0)).xyz;
+    let viewNormal = normalize((camera.viewMatrix * vec4<f32>(normal, 0.0)).xyz);
+    let viewSampleVec = normalize((camera.viewMatrix * vec4<f32>(sampleVec, 0.0)).xyz);
+    
+    // Escalar el radio según la profundidad (más cerca = radio más pequeño)
+    let depthScale = clamp(-viewPos.z / 10.0, 0.1, 1.0);
+    let samplePosView = viewPos + viewSampleVec * RADIUS * depthScale;
+    
+    // Proyectar a espacio de pantalla
+    let sampleNDC = camera.projectionMatrix * vec4<f32>(samplePosView, 1.0);
+    let screenUV = (sampleNDC.xy / sampleNDC.w) * 0.5 + 0.5;
+    
+    // Asegurar que las coordenadas están en rango válido
+    return clamp(screenUV, vec2<f32>(0.001), vec2<f32>(0.999));
 }
 
-fn calculateAO(g: GBuffer, uv: vec2<f32>) -> f32 {
+
+fn calculateAORaw(g: GBuffer, uv: vec2<f32>) -> f32 {
     var occlusion = 0.0;
     let pixelPos = g.worldPos;
     let normal = g.normal;
     let screenPos = uv * camera.screenSize;
     
+    // Convertir a espacio de vista para cálculos independientes de zFar
+    let viewPos = (camera.viewMatrix * vec4<f32>(pixelPos, 1.0)).xyz;
+    let viewNormal = normalize((camera.viewMatrix * vec4<f32>(normal, 0.0)).xyz);
+
     // Calculamos y acumulamos la oclusión para todas las muestras
     for (var i = 0u; i < SAMPLE_COUNT; i = i + 1u) {
-        let sampleUV = samplePosition(pixelPos, normal, screenPos, i);
+        var sampleUV = samplePosition(pixelPos, normal, screenPos, i);
+        sampleUV.y = 1.0 - sampleUV.y; // Invertir Y para coordenadas de textura
         let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUV).x;
         
-        // Cálculos de oclusión
+        // Cálculos de oclusión en espacio de vista
         let sampleWorldPos = getWorldCoords(sampleUV, sampleDepth, camera);
-        let distVec = sampleWorldPos - pixelPos;
+        let sampleViewPos = (camera.viewMatrix * vec4<f32>(sampleWorldPos, 1.0)).xyz;
+        
+        let distVec = sampleViewPos - viewPos;
         let dist = length(distVec);
         
-        // Factores de peso
-        let distScale = 1.0 - smoothstep(0.0, MAX_DISTANCE, dist);
-        let distToSurface = g.zlinear - sampleDepth;
-        let normalFactor = max(dot(normal, normalize(distVec)), 0.0);
+        // Factores de peso usando distancias en espacio de vista
+        let validDepth = f32(sampleDepth > 0.0 && sampleDepth < 1.0);
+        let validDistance = f32(dist <= MAX_DISTANCE);
         
-        // Acumular oclusión pesada
-        let contribution = normalFactor * distScale;
-        occlusion += contribution * f32(distToSurface > BIAS && distToSurface < MAX_DISTANCE);
+        let distScale = 1.0 - smoothstep(0.0, MAX_DISTANCE, dist);
+        
+        // Usar diferencia de profundidad en espacio de vista
+        let viewDepthDiff = sampleViewPos.z - viewPos.z;
+        let normalFactor = max(dot(viewNormal, normalize(distVec)), 0.0);
+        
+        // Verificar oclusión con bias adaptativo en espacio de vista
+        let adaptiveBias = BIAS * (1.0 + dist * 2.0);
+        let validOcclusion = f32(viewDepthDiff > adaptiveBias && dist < MAX_DISTANCE);
+        
+        // Acumular oclusión usando multiplicación en lugar de condicionales
+        let contribution = normalFactor * distScale * validDepth * validDistance * validOcclusion;
+        occlusion += contribution;
     }
-    
+  
     // Normalizar y aplicar contraste
     occlusion = (occlusion / f32(SAMPLE_COUNT)) * AO_STRENGTH;
     return clamp(1.0 - occlusion, 0.0, 1.0);
@@ -130,13 +198,13 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     // Decode GBuffer data
     let g = decodeGBuffer(uv);
     
-    // Calculate ambient occlusion
-    let ao = calculateAO(g, uv);
+    // Calculate raw ambient occlusion only (no bilateral filter)
+    let rawAO = calculateAORaw(g, uv);
     
     // Blend between AO and fully lit based on depth
     let backgroundFactor = smoothstep(0.9995, 0.9999, g.zlinear);
-    let finalAO = mix(pow(ao, 1.5), 1.0, backgroundFactor);
-    
-    // Output AO value (1.0 = fully lit, 0.0 = fully occluded)
-    return 1.0;
+    let finalAO = mix(pow(rawAO, 1.5), 1.0, backgroundFactor);
+
+    // Output raw AO value (bilateral filter will be applied in separate pass)
+    return finalAO;
 }

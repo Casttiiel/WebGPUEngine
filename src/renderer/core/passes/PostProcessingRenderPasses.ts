@@ -127,3 +127,45 @@ export class AmbientOcclusionRenderPass extends PostProcessingRenderPass {
         this.gBufferBindGroup = bindGroup;
     }
 }
+
+/**
+ * AO Bilateral Filter post-processing render pass
+ * This pass takes the raw AO texture and applies bilateral filtering using G-Buffer data
+ */
+export class AOBilateralFilterRenderPass extends PostProcessingRenderPass {
+    private gBufferBindGroup: GPUBindGroup;
+    private aoBindGroup: GPUBindGroup;
+
+    constructor(
+        config: RenderPassConfig,
+        mesh: any,
+        technique: any,
+        gBufferBindGroup: GPUBindGroup,
+        aoBindGroup: GPUBindGroup,
+    ) {
+        super(config, mesh, technique);
+        this.gBufferBindGroup = gBufferBindGroup;
+        this.aoBindGroup = aoBindGroup;
+    }
+
+    protected setBindGroups(pass: GPURenderPassEncoder): void {
+        // AO bilateral filter needs global camera uniforms at group 0, G-Buffer at group 1, and AO texture at group 2
+        pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+        pass.setBindGroup(1, this.gBufferBindGroup);
+        pass.setBindGroup(2, this.aoBindGroup);
+    }
+
+    /**
+     * Update the G-Buffer bind group
+     */
+    public updateGBufferBindGroup(bindGroup: GPUBindGroup): void {
+        this.gBufferBindGroup = bindGroup;
+    }
+
+    /**
+     * Update the AO texture bind group
+     */
+    public updateAOBindGroup(bindGroup: GPUBindGroup): void {
+        this.aoBindGroup = bindGroup;
+    }
+}
