@@ -12,6 +12,7 @@ import { BindGroupFactory } from './factories/BindGroupFactory';
 import { Texture } from '../resources/Texture';
 import { GBufferPass } from './passes/GBufferPass';
 import { RenderPassManager } from './passes/RenderPassManager';
+import { Render } from './Render';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -21,15 +22,12 @@ export class DeferredRenderer {
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
   private rtAccLight!: RenderToTexture;
+  private rtAO!: RenderToTexture;
+  private rtAOBinding!: RenderToTexture; // Copy target for binding
 
   private gBufferBindGroup!: GPUBindGroup;
-  private gbufferLayout: GPUBindGroupLayout;
+  private gBufferLayout: GPUBindGroupLayout;
   private whiteTexture!: Texture;
-  // Mantener track del estado actual del AO
-  private currentAOState: {
-    hasAO: boolean;
-    textureView: GPUTextureView;
-  } | null = null;
 
   private pointLightTechnique!: Technique;
   private spotLightTechnique!: Technique;
@@ -37,7 +35,7 @@ export class DeferredRenderer {
   private unitFrustum!: Mesh;
 
   constructor() {
-    this.gbufferLayout = BindGroupFactory.getGBufferLayout();
+    this.gBufferLayout = BindGroupFactory.getGBufferLayout();
   }
 
   public create(width: number, height: number) {
@@ -56,7 +54,16 @@ export class DeferredRenderer {
     if (!this.rtAccLight) {
       this.rtAccLight = new RenderToTexture();
     }
-    this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float');
+    this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float'); if (!this.rtAO) {
+      this.rtAO = new RenderToTexture();
+    }
+    this.rtAO.createRT('ambient_occlusion_result.dds', width, height, 'r16float', false, GPUTextureUsage.COPY_SRC); // Add COPY_SRC
+
+    if (!this.rtAOBinding) {
+      this.rtAOBinding = new RenderToTexture();
+    }
+    this.rtAOBinding.createRT('ambient_occlusion_binding.dds', width, height, 'r16float', false, GPUTextureUsage.COPY_DST); // Add COPY_DST
+
 
     // Initialize render passes with GBufferPass render targets
     const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
@@ -70,13 +77,10 @@ export class DeferredRenderer {
       gBufferDepthTextures.msaaDepthView,
       gBufferDepthTextures.singleDepthView,
     );
-
-    // Si no hay AO, usar la textura blanca (que representa sin oclusión)
-    const aoView = this.whiteTexture.getTextureView();
-
+    // Create bind group with AO texture (now MSAA compatible)
     this.gBufferBindGroup = BindGroupFactory.createBindGroup(
       `gbuffer_bindgroup`,
-      this.gbufferLayout,
+      this.gBufferLayout,
       [
         {
           binding: 0,
@@ -93,10 +97,9 @@ export class DeferredRenderer {
         {
           binding: 3,
           resource: gBufferRenderTargets.selfIllum.getView()!,
-        },
-        {
+        }, {
           binding: 4,
-          resource: aoView!,
+          resource: this.rtAOBinding.getView()!, // Use binding texture instead
         },
         {
           binding: 5,
@@ -114,12 +117,6 @@ export class DeferredRenderer {
       this.unitFrustum,
       this.gBufferBindGroup,
     );
-
-    // Guardar estado inicial del AO
-    this.currentAOState = {
-      hasAO: false,
-      textureView: aoView!,
-    };
   }
 
   public async load(): Promise<void> {
@@ -153,14 +150,16 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
     // Execute Decal pass
-    this.renderPassManager.executePass('decals', RenderCategory.DECALS);
-
-    // Resolve MSAA depth to single-sample depth for skybox
+    this.renderPassManager.executePass('decals', RenderCategory.DECALS);    // Resolve MSAA depth to single-sample depth for skybox
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
+    this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);    // Execute AO pass first
+    this.renderAO(camera, this.rtAO);
 
-    const aoResult = this.renderAO(camera);
-    this.renderAccLight(aoResult);
+    // Copy AO result to binding texture to avoid usage conflicts
+    this.copyAOTextureToBinding();
+
+    // Render accumulated light with AO texture
+    this.renderAccLight();
 
     // Execute transparent pass
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
@@ -172,18 +171,14 @@ export class DeferredRenderer {
     return view;
   }
 
-  private renderAO(camera: Entity): GPUTextureView | undefined {
+  private renderAO(camera: Entity, ao: RenderToTexture): void {
     const ambientOcclusionComponent = camera.getComponent(
       'ambient_occlusion',
     ) as AmbientOcclusionComponent;
-    if (!ambientOcclusionComponent) {
-      return undefined;
-    }
-    return ambientOcclusionComponent.compute(this.gBufferBindGroup);
+    ambientOcclusionComponent.compute(this.gBufferBindGroup, ao);
   }
 
-  private renderAccLight(aoTextureView: GPUTextureView | undefined): void {
-    this.updateAOTexture(aoTextureView || null);
+  private renderAccLight(): void {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
@@ -194,15 +189,37 @@ export class DeferredRenderer {
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
 
+  private copyAOTextureToBinding(): void {
+    // Copy AO result to binding texture using GPU
+    const encoder = Render.getInstance().getCommandEncoder();
+
+    encoder.copyTextureToTexture(
+      { texture: this.rtAO.getTexture() },
+      { texture: this.rtAOBinding.getTexture() },
+      {
+        width: this.rtAO.getWidth(),
+        height: this.rtAO.getHeight(),
+        depthOrArrayLayers: 1
+      }
+    );
+  }
+
   public update(_dt: number): void { }
 
   private destroy(): void {
     if (this.gBufferPass) {
       this.gBufferPass.dispose();
     }
-
     if (this.rtAccLight) {
       this.rtAccLight.destroy();
+    }
+
+    if (this.rtAO) {
+      this.rtAO.destroy();
+    }
+
+    if (this.rtAOBinding) {
+      this.rtAOBinding.destroy();
     }
 
     if (this.renderPassManager) {
@@ -218,63 +235,5 @@ export class DeferredRenderer {
   public getDepthStencilView(): GPUTextureView | null {
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     return gBufferDepthTextures.singleDepthView;
-  }
-
-  private updateAOTexture(rtAmbientOcclusion: GPUTextureView | null): void {
-    // Determinar el nuevo estado del AO
-    const hasNewAO = rtAmbientOcclusion !== null;
-    const aoTextureView = hasNewAO ? rtAmbientOcclusion : this.whiteTexture.getTextureView();
-
-    if (!aoTextureView) {
-      throw new Error('AO texture view is undefined in AmbientLight.updateAOTexture');
-    }
-
-    // Verificar si hubo un cambio real en el estado del AO
-    if (
-      this.currentAOState &&
-      this.currentAOState.hasAO === hasNewAO &&
-      this.currentAOState.textureView === aoTextureView
-    ) {
-      return; // No hay cambio, mantener el bind group actual
-    }
-
-    // Actualizar el estado del AO
-    this.currentAOState = {
-      hasAO: hasNewAO,
-      textureView: aoTextureView,
-    };
-
-    // Recrear el bind group solo si hubo un cambio
-    const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
-    this.gBufferBindGroup = BindGroupFactory.createBindGroup(
-      `gbuffer bind group`,
-      this.gbufferLayout,
-      [
-        {
-          binding: 0,
-          resource: gBufferRenderTargets.albedos.getView()!,
-        },
-        {
-          binding: 1,
-          resource: gBufferRenderTargets.normals.getView()!,
-        },
-        {
-          binding: 2,
-          resource: gBufferRenderTargets.linearDepth.getView()!,
-        },
-        {
-          binding: 3,
-          resource: gBufferRenderTargets.selfIllum.getView()!,
-        },
-        {
-          binding: 4,
-          resource: rtAmbientOcclusion!,
-        },
-        {
-          binding: 5,
-          resource: this.whiteTexture.getSampler()!,
-        },
-      ]
-    );
   }
 }

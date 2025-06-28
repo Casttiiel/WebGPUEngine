@@ -8,7 +8,6 @@ import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager'
 export class AmbientOcclusionComponent extends Component {
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
-  private result!: RenderToTexture;
   private renderPassManager!: RenderPassManager;
 
   constructor() {
@@ -18,37 +17,16 @@ export class AmbientOcclusionComponent extends Component {
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('ambient_occlusion.tech');
-
-    this.result = new RenderToTexture();
-    this.result.createRT(
-      'ambient_occlusion_result.dds',
-      Render.width,
-      Render.height,
-      'r16float',
-      true,
-    );
   }
 
-  public resize(): void {
-    this.result.createRT(
-      'ambient_occlusion_result.dds',
-      Render.width,
-      Render.height,
-      'r16float',
-      true
-    );
-  }
-
-  public compute(gBufferBindGroup: GPUBindGroup): GPUTextureView | undefined {
+  public compute(gBufferBindGroup: GPUBindGroup, rtAO: RenderToTexture): void {
     // Use RenderPassManager to execute ambient occlusion pass dynamically
     this.renderPassManager.executeAmbientOcclusionPass(
       this.fullscreenQuadMesh,
       this.technique,
       gBufferBindGroup,
-      this.result
+      rtAO
     );
-
-    return this.result.getView();
   }
 
   public update(_dt: number): void {

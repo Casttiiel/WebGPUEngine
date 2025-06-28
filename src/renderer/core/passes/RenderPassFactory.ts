@@ -128,16 +128,19 @@ export class RenderPassFactory {
         target: RenderToTexture,
         viewport?: { width: number; height: number },
     ): RenderPassConfig {
+        const colorAttachments: GPURenderPassColorAttachment[] = [
+            {
+                view: target.getRenderView()!,
+                clearValue: { r: 0, g: 0, b: 0, a: 1 },
+                loadOp: 'clear',
+                storeOp: 'store',
+                ...(target.getResolveTarget() && { resolveTarget: target.getResolveTarget()! }),
+            },
+        ];
+
         return {
             label: 'Post Process Pass',
-            colorAttachments: [
-                {
-                    view: target.getView()!,
-                    clearValue: { r: 0, g: 0, b: 0, a: 1 },
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                },
-            ],
+            colorAttachments,
             viewport,
         };
     }

@@ -197,8 +197,7 @@ export class RenderPassManager {
         bindGroup: GPUBindGroup,
         result: RenderToTexture
     ): void {
-        const passConfig = RenderPassFactory.createPostProcessPassConfigMSAA(result);
-
+        const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
         const pass = new AmbientOcclusionRenderPass(passConfig, mesh, technique, bindGroup);
         this.executeDynamicPass(pass);
     }

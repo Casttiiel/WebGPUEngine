@@ -64,7 +64,8 @@ export class DecalRenderPass extends BaseRenderPass {
 export class TransparentRenderPass extends BaseRenderPass {
     constructor(config: RenderPassConfig) {
         super(config);
-    } protected render(
+    }
+    protected render(
         pass: GPURenderPassEncoder,
         _category?: RenderCategory,
         _renderKeys?: any[],

@@ -215,9 +215,7 @@ export class Technique extends GPUResource {
     };
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
       pipelineConfig.depthStencil = this.getDepthConfig();
-    }
-
-    // Add multisample if needed for MSAA passes
+    }    // Add multisample if needed for MSAA passes
     if (this.needsMSAA()) {
       pipelineConfig.multisample = { count: 4 };
     }

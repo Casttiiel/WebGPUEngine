@@ -41,6 +41,7 @@ export class AmbientLight {
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     });
+
     this.environmentBindGroup = BindGroupFactory.createBindGroup(
       'environment_with_brdf_bindgroup',
       this.ambientTechnique.getPipeline().getBindGroupLayout(2),
@@ -88,8 +89,7 @@ export class AmbientLight {
         },
       ],
     );
-  } public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
-    const render = Render.getInstance();
+
     GPUUtils.writeBuffer(
       this.ambientUniformBuffer,
       0,
@@ -100,6 +100,10 @@ export class AmbientLight {
         0.0,
       ]),
     );
+  }
+
+  public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+    const render = Render.getInstance();
 
     // Use GPUUtils for consistent render pass descriptor creation
     const colorAttachment = GPUUtils.createColorAttachment(

@@ -163,12 +163,6 @@ export class Render {
         (comp as AntialiasingComponent).resize();
       }
 
-      for (const comp of Engine.getEntities()
-        .getObjectManagerByName('ambient_occlusion')
-        ?.getList() ?? []) {
-        (comp as AmbientOcclusionComponent).resize();
-      }
-
       Engine.getRender().onResolutionUpdated();
     });
   }

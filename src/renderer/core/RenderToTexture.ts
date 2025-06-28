@@ -11,13 +11,13 @@ export class RenderToTexture {
   private msaaTexture!: GPUTexture; // Multi-sample texture (for rendering)
   private msaaTextureView!: GPUTextureView | null;
   private isMultisample: boolean = false;
-
   public createRT(
     name: string,
     width: number,
     height: number,
     format: GPUTextureFormat,
     multisampling = false,
+    extraUsage = 0, // Additional usage flags
   ): void {
     this.destroy();
 
@@ -26,12 +26,13 @@ export class RenderToTexture {
     this.yRes = height;
     this.isMultisample = multisampling;    // Always create the single-sample texture (for shader sampling)
     // Always use both RENDER_ATTACHMENT and TEXTURE_BINDING for maximum flexibility
+    const baseUsage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
     this.texture = GPUUtils.createTexture(
       `${this.name}_resolve_texture`,
       width,
       height,
       format,
-      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      baseUsage | extraUsage,
       1 // Always single-sample for shader access
     );
 
@@ -81,6 +82,11 @@ export class RenderToTexture {
 
   public getHeight(): number {
     return this.yRes;
+  }
+
+  // Get the underlying texture for copying operations
+  public getTexture(): GPUTexture {
+    return this.texture;
   }
 
   public destroy(): void {

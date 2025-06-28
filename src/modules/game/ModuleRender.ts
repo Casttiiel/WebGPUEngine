@@ -100,7 +100,8 @@ export class ModuleRender extends Module {
       this.deferred.getDepthStencilView()!,
       'load',
       'discard'
-    ); const pass = render.getCommandEncoder().beginRenderPass(
+    );
+    const pass = render.getCommandEncoder().beginRenderPass(
       GPUUtils.createRenderPassDescriptor(
         'Distorsions Render pass',
         [colorAttachment],
