@@ -11,7 +11,7 @@ export class NameComponent extends Component {
     this.name = data;
   }
 
-  public update(dt: number): void {
+  public update(): void {
     // Name components don't need update logic by default
   }
 

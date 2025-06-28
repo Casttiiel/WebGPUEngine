@@ -30,6 +30,15 @@
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
 
+    /* Additional Strict Rules */
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+
     /* Advanced Type Checking */
     "noUncheckedSideEffectImports": true,
     "forceConsistentCasingInFileNames": true

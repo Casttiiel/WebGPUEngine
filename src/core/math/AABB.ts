@@ -36,12 +36,13 @@ export class AABB {
     });
 
     const result = new AABB();
-    result.min = vec3.clone(transformedCorners[0]);
-    result.max = vec3.clone(transformedCorners[0]);
+    const firstCorner = transformedCorners[0] ?? vec3.create();
+    result.min = vec3.clone(firstCorner);
+    result.max = vec3.clone(firstCorner);
 
     for (let i = 1; i < transformedCorners.length; i++) {
-      vec3.min(result.min, result.min, transformedCorners[i]);
-      vec3.max(result.max, result.max, transformedCorners[i]);
+      vec3.min(result.min, result.min, transformedCorners[i]!);
+      vec3.max(result.max, result.max, transformedCorners[i]!);
     }
 
     return result;

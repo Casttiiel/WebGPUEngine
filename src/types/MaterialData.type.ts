@@ -1,4 +1,4 @@
-import { RenderCategory } from '../renderer/core/render_category.enum';
+import { RenderCategory } from './RenderCategory.enum';
 import { TechniqueDataType } from './TechniqueData.type';
 
 export type MaterialDataType = Readonly<{

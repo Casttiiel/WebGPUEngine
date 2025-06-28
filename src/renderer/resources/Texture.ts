@@ -43,9 +43,9 @@ export class Texture extends GPUResource {
     this.usage =
       options.usage ??
       GPUTextureUsage.TEXTURE_BINDING |
-      GPUTextureUsage.COPY_DST |
-      GPUTextureUsage.RENDER_ATTACHMENT |
-      GPUTextureUsage.STORAGE_BINDING;
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.STORAGE_BINDING;
     this.magFilter = options.magFilter ?? 'linear';
     this.minFilter = options.minFilter ?? 'linear';
     this.mipmapFilter = options.mipmapFilter ?? 'linear';
@@ -84,7 +84,7 @@ export class Texture extends GPUResource {
     const imageBitmap = await createImageBitmap(img);
     const mipLevelCount = this.genMipmaps
       ? Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1
-      : 1;    // Create GPU texture
+      : 1; // Create GPU texture
     this.texture = GPUUtils.createTextureWithMipmaps(
       `${this.label}_texture`,
       imageBitmap.width,
@@ -93,7 +93,7 @@ export class Texture extends GPUResource {
       this.usage,
       mipLevelCount,
       1,
-      1
+      1,
     );
 
     // Copy image data
@@ -141,9 +141,14 @@ export class Texture extends GPUResource {
     // Asegurarnos de que el pipeline está inicializado
     await Texture.initMipmapPipeline();
 
+    if (!this.texture) {
+      throw new Error('Texture is not initialized.');
+    }
+
+    const mipLevelCount = this.texture.mipLevelCount ?? 1;
     const commandEncoder = this.device.createCommandEncoder();
 
-    for (let level = 0; level < this.texture.mipLevelCount - 1; level++) {
+    for (let level = 0; level < mipLevelCount - 1; level++) {
       const srcView = this.texture.createView({
         baseMipLevel: level,
         mipLevelCount: 1,
@@ -159,7 +164,7 @@ export class Texture extends GPUResource {
         [
           { binding: 0, resource: srcView },
           { binding: 1, resource: dstView },
-        ]
+        ],
       );
 
       const passEncoder = commandEncoder.beginComputePass();
@@ -204,10 +209,9 @@ export class Texture extends GPUResource {
         },
       },
     ]);
-    const pipelineLayout = PipelineFactory.createPipelineLayout(
-      'texture_mipmap_pipeline_layout',
-      [this.mipmapBindGroupLayout],
-    );
+    const pipelineLayout = PipelineFactory.createPipelineLayout('texture_mipmap_pipeline_layout', [
+      this.mipmapBindGroupLayout,
+    ]);
 
     this.mipmapPipeline = PipelineFactory.createComputePipeline({
       label: 'Mipmap generation pipeline',

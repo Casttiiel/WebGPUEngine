@@ -76,7 +76,7 @@ export class RenderComponent extends Component {
     // Implementation of update if needed
   }
 
-  public override renderInMenu(): void { }
+  public override renderInMenu(): void {}
 
   public renderDebug(): void {
     throw new Error('Method not implemented.');

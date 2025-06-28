@@ -1,4 +1,3 @@
-import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
 import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
@@ -70,7 +69,7 @@ export class Render {
       if (!context) {
         throw new Error('No se pudo obtener el contexto WebGPU');
       }
-      this.context = context;      // Configurar el formato de color preferido
+      this.context = context; // Configurar el formato de color preferido
       this.format = navigator.gpu.getPreferredCanvasFormat();
       this.context.configure({
         device: this.device,
@@ -202,5 +201,5 @@ export class Render {
     return this.context;
   }
 
-  public destroy(): void { }
+  public destroy(): void {}
 }

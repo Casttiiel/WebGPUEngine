@@ -11,6 +11,8 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Module } from '../core/Module';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
+import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -98,15 +100,17 @@ export class ModuleRender extends Module {
     const depthAttachment = GPUUtils.createDepthStencilAttachment(
       this.deferred.getDepthStencilView()!,
       'load',
-      'discard'
+      'discard',
     );
-    const pass = render.getCommandEncoder().beginRenderPass(
-      GPUUtils.createRenderPassDescriptor(
-        'Distorsions Render pass',
-        [colorAttachment],
-        depthAttachment
-      )
-    );
+    const pass = render
+      .getCommandEncoder()
+      .beginRenderPass(
+        GPUUtils.createRenderPassDescriptor(
+          'Distorsions Render pass',
+          [colorAttachment],
+          depthAttachment,
+        ),
+      );
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
@@ -135,20 +139,20 @@ export class ModuleRender extends Module {
             binding: 1,
             resource: sampler,
           },
-        ]
+        ],
       );
     }
     const colorAttachment = GPUUtils.createColorAttachment(
       render.getContext().getCurrentTexture().createView(),
       'clear',
       'store',
-      { r: 0, g: 0, b: 0, a: 1 }
-    ); const pass = render.getCommandEncoder().beginRenderPass(
-      GPUUtils.createRenderPassDescriptor(
-        'main presentation render pass',
-        [colorAttachment]
-      )
+      { r: 0, g: 0, b: 0, a: 1 },
     );
+    const pass = render
+      .getCommandEncoder()
+      .beginRenderPass(
+        GPUUtils.createRenderPassDescriptor('main presentation render pass', [colorAttachment]),
+      );
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);
@@ -247,7 +251,8 @@ export class ModuleRender extends Module {
     this.globalUniformBuffer = GPUUtils.createBuffer(
       'global uniform buffer',
       256,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
 
     // Crear el bind group global usando la factory
     const globalBindGroupLayout = BindGroupFactory.getCameraUniformsLayout();
@@ -270,11 +275,10 @@ export class ModuleRender extends Module {
   }
 
   public updateGlobalUniforms(camera: Camera): void {
-
     const viewMatrix = new Float32Array(camera.getView());
     const projectionMatrix = new Float32Array(camera.getProjection());
     const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
-    const cameraPosition = new Float32Array(camera.getPosition());    // viewMatrix (offset 0)
+    const cameraPosition = new Float32Array(camera.getPosition()); // viewMatrix (offset 0)
     GPUUtils.writeBuffer(this.globalUniformBuffer, 0, viewMatrix);
 
     // projectionMatrix (offset 64)

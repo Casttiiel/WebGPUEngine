@@ -19,12 +19,12 @@ export class TransformComponent extends Component {
     this.uniformBuffer = GPUUtils.createBuffer(
       'transform_uniformBuffer',
       16 * 4, // 1 matriz 4x4 (model)
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
     // Layout para la matriz de modelo
     const modelBindGroupLayout = BindGroupFactory.getLayoutFromEnum(
-      PipelineBindGroupLayouts.OBJECT_UNIFORMS
+      PipelineBindGroupLayouts.OBJECT_UNIFORMS,
     );
 
     // Bind group para la matriz de modelo
@@ -36,7 +36,7 @@ export class TransformComponent extends Component {
           binding: 0,
           resource: { buffer: this.uniformBuffer },
         },
-      ]
+      ],
     );
   }
 
@@ -75,11 +75,7 @@ export class TransformComponent extends Component {
   }
 
   private updateModelMatrix(): void {
-    GPUUtils.writeBuffer(
-      this.uniformBuffer,
-      0,
-      new Float32Array(this.transform.getWorldMatrix()),
-    );
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.transform.getWorldMatrix()));
   }
 
   private updateChildrenTransforms(): void {
@@ -96,7 +92,7 @@ export class TransformComponent extends Component {
     }
   }
 
-  public update(dt: number): void {
+  public update(): void {
     this.updateWorldTransform();
     this.updateModelMatrix();
     this.updateChildrenTransforms();

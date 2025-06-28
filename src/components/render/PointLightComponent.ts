@@ -38,7 +38,7 @@ export class PointLightComponent extends Component {
     this.uniformBuffer = GPUUtils.createBuffer(
       'point light uniform buffer',
       28 * 4,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
       `point light uniform bind group`,
@@ -48,7 +48,7 @@ export class PointLightComponent extends Component {
           binding: 0,
           resource: { buffer: this.uniformBuffer },
         },
-      ]
+      ],
     );
   }
 

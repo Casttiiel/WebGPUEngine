@@ -1,4 +1,4 @@
-import { Material } from '../renderer/resources/material';
+import { Material } from '../renderer/resources/Material';
 import { Mesh } from '../renderer/resources/Mesh';
 
 export type MeshPartType = {

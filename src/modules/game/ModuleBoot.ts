@@ -18,7 +18,7 @@ export class ModuleBoot extends Module {
   public stop(): void {
     throw new Error('Method not implemented.');
   }
-  public update(dt: number): void {
+  public update(): void {
     throw new Error('Method not implemented.');
   }
   public renderDebug(): void {

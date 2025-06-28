@@ -1,5 +1,4 @@
 import { ResourceType } from '../../types/ResourceType.enum';
-import { ResourceManager } from '../engine/ResourceManager';
 
 export interface IResourceOptions {
   path: string;
@@ -35,6 +34,10 @@ export abstract class BaseResource implements IResource {
     this.dependencies = new Set(options.dependencies || []);
   }
 
+  release(): void {
+    throw new Error('Method not implemented.');
+  }
+
   get hasData(): boolean {
     return this._hasData;
   }
@@ -67,11 +70,5 @@ export abstract class BaseResource implements IResource {
 
   public addRef(): void {
     this._refCount++;
-  }
-
-  public release(): void {
-    if (--this._refCount <= 0) {
-      this.unload().catch((err) => console.error(`Error unloading resource ${this.path}: ${err}`));
-    }
   }
 }

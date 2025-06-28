@@ -49,7 +49,7 @@ export class Loader {
       };
 
       if (json.components) {
-        if (json.components.name) {
+        if (json.components.name && prefabJson.components.name !== undefined) {
           mergedComponents.name = prefabJson.components.name;
         }
         if (json.components.transform && prefabJson.components.transform) {

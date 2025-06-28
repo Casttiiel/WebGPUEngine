@@ -4,15 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "npm run check && vite",
+    "build": "npm run check && tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
-    "check": "npm run format:check && npm run lint",
-    "fix": "npm run format && npm run lint:fix"
+    "type-check": "tsc --noEmit",
+    "check": "npm run type-check && npm run format:check && npm run lint",
+    "fix": "npm run format && npm run lint:fix",
+    "dev:unsafe": "vite"
   },
   "devDependencies": {
     "@tweakpane/core": "^2.0.5",

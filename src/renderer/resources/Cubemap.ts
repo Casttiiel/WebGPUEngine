@@ -25,8 +25,6 @@ export class Cubemap extends GPUResource {
   private addressModeV: GPUAddressMode;
   private addressModeW: GPUAddressMode;
   private maxAnisotropy: number;
-  private faceSize: number;
-  private mipLevelCount?: number;
 
   constructor(options: CubemapOptions) {
     super({
@@ -57,6 +55,7 @@ export class Cubemap extends GPUResource {
       return cubemap;
     }
   }
+
   public async load(): Promise<void> {
     try {
       const image = await createImageBitmap(
@@ -105,22 +104,25 @@ export class Cubemap extends GPUResource {
       }
 
       // Calcular niveles de mipmap
-      const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1;      // Crear la textura en GPU
+      const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1; // Crear la textura en GPU
       this.gpuTexture = GPUUtils.createCubemapTexture(
         `${this.label}_texture`,
         faceSize,
         'rgba16float',
         GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.STORAGE_BINDING,
-        mipLevelCount
+          GPUTextureUsage.COPY_DST |
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.STORAGE_BINDING,
+        mipLevelCount,
       );
 
       // Copiar cada cara al nivel 0 de mipmap
       for (let i = 0; i < 6; i++) {
+        if (!faces[i]) {
+          throw new Error(`Face image for index ${i} is undefined`);
+        }
         this.device.queue.copyExternalImageToTexture(
-          { source: faces[i] },
+          { source: faces[i] as ImageBitmap },
           {
             texture: this.gpuTexture,
             origin: { x: 0, y: 0, z: i },

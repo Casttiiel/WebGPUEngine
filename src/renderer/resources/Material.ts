@@ -65,9 +65,18 @@ export class Material extends GPUResource {
       materialData = pathOrData;
     }
 
-    const techniqueToUse = await Technique.get(
-      materialData.technique ?? materialData.techniqueData,
-    );
+    const techniqueSource =
+      materialData.technique !== undefined
+        ? materialData.technique
+        : materialData.techniqueData !== undefined
+          ? materialData.techniqueData
+          : undefined;
+
+    if (techniqueSource === undefined) {
+      throw new Error(`Missing technique for material: ${pathOrData}`);
+    }
+
+    const techniqueToUse = await Technique.get(techniqueSource);
     if (!techniqueToUse) {
       throw new Error(`Missing technique for material: ${pathOrData}`);
     }
@@ -156,14 +165,14 @@ export class Material extends GPUResource {
     });
 
     const textureBingGroupLayout = BindGroupFactory.getLayoutFromEnum(
-      PipelineBindGroupLayouts.MATERIAL_TEXTURES
+      PipelineBindGroupLayouts.MATERIAL_TEXTURES,
     );
 
     // Create bind group
     this.textureBindGroup = BindGroupFactory.createBindGroup(
       `${this.label}_texture_bindgroup`,
       textureBingGroupLayout,
-      entries
+      entries,
     );
   }
 
@@ -195,4 +204,6 @@ export class Material extends GPUResource {
   public getName(): string {
     return this.path;
   }
+
+  public override release(): void {}
 }

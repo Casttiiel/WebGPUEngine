@@ -1,5 +1,5 @@
-import { Entity } from '../core/entity';
-import { Interpolator } from '../interfaces/interpolator.interface';
+import { Entity } from '../core/ecs/Entity';
+import { Interpolator } from './Interpolator.interface';
 
 export type MixedCamera = {
   cameraEntity: Entity;

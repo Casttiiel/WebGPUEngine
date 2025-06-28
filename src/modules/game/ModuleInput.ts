@@ -1,7 +1,7 @@
 import { Module } from '../core/Module';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
-import { Render } from '../../renderer/core/render';
+import { Render } from '../../renderer/core/Render';
 
 export class ModuleInput extends Module {
   private mousePosition: { x: number; y: number } = { x: 0, y: 0 };
@@ -85,7 +85,7 @@ export class ModuleInput extends Module {
     event.preventDefault();
   };
 
-  public update(dt: number): void {
+  public update(): void {
     // Update last frame's key states
     this.keysLastFrame = new Map(this.keys);
 
@@ -114,7 +114,7 @@ export class ModuleInput extends Module {
     // No visual debug needed
   }
 
-  public renderInMenu(): void {
+  public override renderInMenu(): void {
     if (this.debugControlsAdded) return;
 
     // Mouse Buttons

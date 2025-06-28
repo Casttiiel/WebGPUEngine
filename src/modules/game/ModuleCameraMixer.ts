@@ -2,8 +2,8 @@ import { vec3 } from 'gl-matrix';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { Entity } from '../../core/ecs/Entity';
 import { Camera } from '../../core/math/Camera';
-import { Render } from '../../renderer/core/render';
-import { Interpolator } from '../../types/interpolator.interface';
+import { Render } from '../../renderer/core/Render';
+import { Interpolator } from '../../types/Interpolator.interface';
 import { MixedCamera } from '../../types/MixedCamera.type';
 import { Module } from '../core/Module';
 
@@ -28,12 +28,14 @@ export class ModuleCameraMixer extends Module {
     for (let i = this.mixedCameras.length - 1; i >= 0; i--) {
       const mc = this.mixedCameras[i];
 
-      if (mc.blendedWeight < 1.0) {
+      if (mc && mc.blendedWeight < 1.0) {
         mc.blendedWeight = this.clamp(mc.blendedWeight + dt / mc.blendTime, 0.0, 1.0);
       }
 
-      mc.appliedWeight = mc.blendedWeight * Math.min(mc.targetWeight, weight);
-      weight -= mc.appliedWeight;
+      if (mc) {
+        mc.appliedWeight = mc.blendedWeight * Math.min(mc.targetWeight, weight);
+        weight -= mc.appliedWeight;
+      }
     }
 
     // Remove dead cameras
@@ -56,7 +58,6 @@ export class ModuleCameraMixer extends Module {
 
       if (isNaN(ratio)) {
         throw new Error('NaN ratio in camera mixer');
-        ratio = 0.0;
       }
 
       result = this.blendCameras(result, cameraComponent.getCamera(), ratio);
@@ -102,7 +103,7 @@ export class ModuleCameraMixer extends Module {
     const newZFar = camera1.getFar() * (1.0 - ratio) + camera2.getFar() * ratio;
 
     output.setProjectionParams(newFov, newZNear, newZFar);
-    output.setViewport(0, 0, Render.width, Render.height);
+    output.setViewport(Render.width, Render.height);
     output.lookAt(newPosition, vec3.add(vec3.create(), newPosition, newFront), newUp);
 
     return output;
@@ -118,18 +119,5 @@ export class ModuleCameraMixer extends Module {
 
   public renderDebug(): void {}
 
-  public renderInMenu(): void {}
-}
-
-// Implementaciones básicas de interpoladores
-class LinearInterpolator implements Interpolator {
-  blend(start: number, end: number, ratio: number): number {
-    return start + (end - start) * ratio;
-  }
-}
-
-class QuadInInterpolator implements Interpolator {
-  blend(start: number, end: number, ratio: number): number {
-    return start + (end - start) * ratio * ratio;
-  }
+  public override renderInMenu(): void {}
 }

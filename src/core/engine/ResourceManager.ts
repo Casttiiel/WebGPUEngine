@@ -45,7 +45,6 @@ export class ResourceManager {
   public static unregisterResource(path: string): void {
     const entry = this.resources.get(path);
     if (entry && entry.resource.refCount <= 0) {
-      entry.resource.unload().catch(console.error);
       this.resources.delete(path);
     }
   }
