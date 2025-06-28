@@ -19,24 +19,39 @@ export class AmbientOcclusionComponent extends Component {
     this.technique = await Technique.get('ambient_occlusion.tech');
 
     this.result = new RenderToTexture();
-    this.result.createRT('ambient_occlusion_result.dds', Render.width, Render.height, 'r16float');
+    this.result.createRT(
+      'ambient_occlusion_result.dds',
+      Render.width,
+      Render.height,
+      'r16float',
+      true,
+    ); // Enable MSAA
   }
 
   public resize(): void {
-    this.result.createRT('ambient_occlusion_result.dds', Render.width, Render.height, 'r16float');
+    this.result.createRT(
+      'ambient_occlusion_result.dds',
+      Render.width,
+      Render.height,
+      'r16float',
+      true,
+    ); // Enable MSAA
   }
 
-  public compute(texture: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+  public compute(gBufferBindGroup: GPUBindGroup): GPUTextureView | undefined {
     const render = Render.getInstance();
+
+    // Create color attachment with MSAA handling
+    const colorAttachment: GPURenderPassColorAttachment = {
+      view: this.result.getRenderView(), // MSAA view for rendering
+      loadOp: 'clear',
+      storeOp: 'store',
+      clearValue: { r: 1, g: 1, b: 1, a: 1 },
+    };
+
     const pass = render.getCommandEncoder().beginRenderPass({
-      colorAttachments: [
-        {
-          view: texture,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 1, g: 1, b: 1, a: 1 },
-        },
-      ],
+      label: 'Ambient Occlusion Pass',
+      colorAttachments: [colorAttachment],
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
@@ -70,9 +85,11 @@ export class AmbientOcclusionComponent extends Component {
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();
+
+    return this.result.getView();
   }
 
-  public update(dt: number): void {
+  public update(_dt: number): void {
     throw new Error('Method not implemented.');
   }
 

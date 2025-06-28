@@ -25,7 +25,6 @@ export class DeferredRenderer {
   private rtLinearDepth!: RenderToTexture;
   private rtAccLight!: RenderToTexture;
   private rtSelfIllum!: RenderToTexture;
-  private ambientOcclusionResult!: RenderToTexture;
 
   private gBufferBindGroup!: GPUBindGroup;
   private gbufferLayout: GPUBindGroupLayout;
@@ -104,7 +103,6 @@ export class DeferredRenderer {
       this.rtLinearDepth = new RenderToTexture();
       this.rtAccLight = new RenderToTexture();
       this.rtSelfIllum = new RenderToTexture();
-      this.ambientOcclusionResult = new RenderToTexture();
     }
 
     this.rtAlbedos.createRT('g_albedos.dds', width, height, 'rgba16float', true);
@@ -112,7 +110,6 @@ export class DeferredRenderer {
     this.rtSelfIllum.createRT('g_self_illum.dds', width, height, 'rgba16float', true);
     this.rtLinearDepth.createRT('g_depths.dds', width, height, 'r16float', true);
     this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float');
-    this.ambientOcclusionResult.createRT('ambient_occlusion_result.dds', width, height, 'r16float');
 
     const device = Render.getInstance().getDevice();
 
@@ -285,8 +282,7 @@ export class DeferredRenderer {
     if (!ambientOcclusionComponent) {
       return undefined;
     }
-    ambientOcclusionComponent.compute(this.ambientOcclusionResult.getView(), this.gBufferBindGroup);
-    return this.ambientOcclusionResult.getView();
+    return ambientOcclusionComponent.compute(this.gBufferBindGroup);
   }
 
   private renderAccLight(aoTextureView: GPUTextureView | undefined): void {
@@ -507,7 +503,7 @@ export class DeferredRenderer {
 
   public update(dt: number): void {}
 
-  private destroy() {
+  private destroy(): void {
     if (this.rtAlbedos) {
       this.rtAlbedos.destroy();
       this.rtNormals.destroy();

@@ -5,4 +5,5 @@ export enum FragmentShaderTargets {
   TEXTURE = 'texture',
   DEPTH_ONLY = 'depth_only',
   SINGLE_CHANNEL = 'single_channel',
+  SINGLE_CHANNEL_MSAA = 'single_channel_msaa',
 }

@@ -1,7 +1,7 @@
 ## NPM RUN DEV
 
-1.
-2. Ambient Occlusion (SSAO -> GTAO)
+1. Ambient Occlusion SSAO
+2. Ambient Occlusion GTAO
 3. Bloom
 4. Compute-based distortion
 5. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
