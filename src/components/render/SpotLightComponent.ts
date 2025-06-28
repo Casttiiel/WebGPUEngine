@@ -4,6 +4,7 @@ import { CameraComponent } from './CameraComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
+import { SpotLightComponentData } from '../../types/SpotLightComponentData.type';
 
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
@@ -22,7 +23,7 @@ export class SpotLightComponent extends CameraComponent {
     super();
   }
 
-  public override async load(data: unknown): Promise<void> {
+  public override async load(data: SpotLightComponentData): Promise<void> {
     if (data.color) {
       vec4.copy(this.color, data.color);
     }
@@ -54,23 +55,20 @@ export class SpotLightComponent extends CameraComponent {
     if (data.isOrtho) {
       this.camera.setOrthoParams(
         data.orthoCentered || true,
-        data.orthoLeft,
-        data.orthoWidth,
-        data.orthoTop,
-        data.orthoHeight,
+        data.orthoLeft || 0,
+        data.orthoWidth || 1,
+        data.orthoTop || 0,
+        data.orthoHeight || 1,
       );
     }
 
-    const position = data.position || [0, 0, 0];
-    const target = data.target || [0, 0, 1];
-    const up = data.up || [0, 1, 0];
-    this.camera.lookAt(position, target, up);
+    this.camera.lookAt(data.position, data.target, data.up);
 
     this.technique = await Technique.get('spot_light.tech');
     this.uniformBuffer = GPUUtils.createBuffer(
       'spot light uniform buffer',
       28 * 4,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
       `spot light uniform bind group`,
@@ -80,7 +78,7 @@ export class SpotLightComponent extends CameraComponent {
           binding: 0,
           resource: { buffer: this.uniformBuffer },
         },
-      ]
+      ],
     );
 
     GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
@@ -108,14 +106,15 @@ export class SpotLightComponent extends CameraComponent {
       this.uniformBuffer,
       96,
       new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
-    ); const modelBindGroupLayout = BindGroupFactory.getLayoutFromEnum(
-      PipelineBindGroupLayouts.OBJECT_UNIFORMS
+    );
+    const modelBindGroupLayout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.OBJECT_UNIFORMS,
     );
 
     this.modelUniformBuffer = GPUUtils.createBuffer(
       'spot_light_transform_uniformBuffer',
       16 * 4, // 1 matriz 4x4 (model)
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     const res = mat4.create();
     mat4.invert(res, this.camera.getViewProjection());
@@ -130,7 +129,7 @@ export class SpotLightComponent extends CameraComponent {
           binding: 0,
           resource: { buffer: this.modelUniformBuffer },
         },
-      ]
+      ],
     );
   }
 
@@ -139,7 +138,7 @@ export class SpotLightComponent extends CameraComponent {
     pass.setBindGroup(3, this.uniformBindGroup); // spot light parameters
   }
 
-  public override update(_dt: number): void { }
+  public override update(_dt: number): void {}
 
   public debugInMenu(): void {
     // Implement debug menu if needed

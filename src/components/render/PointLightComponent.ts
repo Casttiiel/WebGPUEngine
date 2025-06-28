@@ -4,6 +4,7 @@ import { Technique } from '../../renderer/resources/Technique';
 import { TransformComponent } from '../core/TransformComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { PointLightComponentData } from '../../types/PointLightComponentData.type';
 
 export class PointLightComponent extends Component {
   private color = vec4.create();
@@ -21,7 +22,7 @@ export class PointLightComponent extends Component {
     super();
   }
 
-  public async load(data: unknown): Promise<void> {
+  public async load(data: PointLightComponentData): Promise<void> {
     if (data.color) {
       vec4.copy(this.color, data.color);
     }
@@ -56,7 +57,7 @@ export class PointLightComponent extends Component {
     pass.setBindGroup(3, this.uniformBindGroup); // point light parameters
   }
 
-  public update(dt: number): void {
+  public update(_dt: number): void {
     if (this.isDirty) {
       const entity = this.getOwner();
       const transform = entity.getComponent('transform') as TransformComponent;

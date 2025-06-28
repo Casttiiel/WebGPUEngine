@@ -134,15 +134,21 @@ export class Mesh extends GPUResource {
 
       switch (keyword) {
         case 'v': // Vértice
-          tempVertices.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+          if (parts[1] && parts[2] && parts[3]) {
+            tempVertices.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+          }
           break;
 
         case 'vn': // Normal
-          tempNormals.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+          if (parts[1] && parts[2] && parts[3]) {
+            tempNormals.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+          }
           break;
 
         case 'vt': // Coordenada de textura
-          tempUVs.push(parseFloat(parts[1]), parseFloat(parts[2]));
+          if (parts[1] && parts[2]) {
+            tempUVs.push(parseFloat(parts[1]), parseFloat(parts[2]));
+          }
           break;
 
         case 'f': // Cara (triángulo)
@@ -153,6 +159,8 @@ export class Mesh extends GPUResource {
           // Procesar cada vértice de la cara
           for (let i = 1; i < parts.length; i++) {
             const vertex = parts[i];
+            if (!vertex) continue;
+
             if (!(vertex in tempIndices)) {
               // Formato del OBJ: v/vt/vn
               const indices = vertex.split('/').map((index) => parseInt(index) - 1);
@@ -160,40 +168,56 @@ export class Mesh extends GPUResource {
               const vt = indices[1]; // índice de UV
               const vn = indices[2]; // índice de normal
 
-              // Añadir atributos a los arrays finales
-              verticesArray.push(
-                tempVertices[v * 3],
-                tempVertices[v * 3 + 1],
-                tempVertices[v * 3 + 2],
-              );
+              // Verificar que v esté definido y sea válido
+              if (v !== undefined && !isNaN(v) && v >= 0) {
+                // Añadir atributos a los arrays finales
+                const x = tempVertices[v * 3];
+                const y = tempVertices[v * 3 + 1];
+                const z = tempVertices[v * 3 + 2];
 
-              if (vt !== undefined && !isNaN(vt)) {
-                uvsArray.push(tempUVs[vt * 2], tempUVs[vt * 2 + 1]);
+                if (x !== undefined && y !== undefined && z !== undefined) {
+                  verticesArray.push(x, y, z);
+                }
+
+                if (vt !== undefined && !isNaN(vt) && vt >= 0) {
+                  const u = tempUVs[vt * 2];
+                  const v_uv = tempUVs[vt * 2 + 1];
+                  if (u !== undefined && v_uv !== undefined) {
+                    uvsArray.push(u, v_uv);
+                  }
+                }
+
+                if (vn !== undefined && !isNaN(vn) && vn >= 0) {
+                  const nx = tempNormals[vn * 3];
+                  const ny = tempNormals[vn * 3 + 1];
+                  const nz = tempNormals[vn * 3 + 2];
+                  if (nx !== undefined && ny !== undefined && nz !== undefined) {
+                    normalsArray.push(nx, ny, nz);
+                  }
+                }
+
+                tempIndices[vertex] = indexCount++;
               }
-
-              if (vn !== undefined && !isNaN(vn)) {
-                normalsArray.push(
-                  tempNormals[vn * 3],
-                  tempNormals[vn * 3 + 1],
-                  tempNormals[vn * 3 + 2],
-                );
-              }
-
-              tempIndices[vertex] = indexCount++;
             }
 
             const idx = tempIndices[vertex];
-            indicesArray.push(idx);
-            faceVertices.push(idx);
+            if (idx !== undefined) {
+              indicesArray.push(idx);
+              faceVertices.push(idx);
 
-            // Extraer índices de UV nuevamente para el cálculo de tangentes
-            const indices = vertex.split('/').map((index) => parseInt(index) - 1);
-            const vt = indices[1]; // índice de UV
-            if (vertex.includes('/') && vt !== undefined && !isNaN(vt)) {
-              faceUVs.push([tempUVs[vt * 2], tempUVs[vt * 2 + 1]]);
+              // Extraer índices de UV nuevamente para el cálculo de tangentes
+              const indices = vertex.split('/').map((index) => parseInt(index) - 1);
+              const vt = indices[1]; // índice de UV
+              if (vertex.includes('/') && vt !== undefined && !isNaN(vt) && vt >= 0) {
+                const u = tempUVs[vt * 2];
+                const v_uv = tempUVs[vt * 2 + 1];
+                if (u !== undefined && v_uv !== undefined) {
+                  faceUVs.push([u, v_uv]);
+                }
+              }
+
+              faceIndices.push(idx);
             }
-
-            faceIndices.push(idx);
           }
           break;
       }
@@ -215,20 +239,44 @@ export class Mesh extends GPUResource {
     uv1: number[],
     uv2: number[],
   ): { tangent: number[]; w: number } {
-    const edge1 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
-    const edge2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+    // Verificar que todos los arrays tengan las dimensiones correctas
+    if (
+      p0.length < 3 ||
+      p1.length < 3 ||
+      p2.length < 3 ||
+      uv0.length < 2 ||
+      uv1.length < 2 ||
+      uv2.length < 2
+    ) {
+      return { tangent: [1, 0, 0], w: 1 }; // Valor por defecto
+    }
 
-    const deltaUV1 = [uv1[0] - uv0[0], uv1[1] - uv0[1]];
-    const deltaUV2 = [uv2[0] - uv0[0], uv2[1] - uv0[1]];
-
-    const f = 1.0 / (deltaUV1[0] * deltaUV2[1] - deltaUV2[0] * deltaUV1[1]);
-    const tangent = [
-      f * (deltaUV2[1] * edge1[0] - deltaUV1[1] * edge2[0]),
-      f * (deltaUV2[1] * edge1[1] - deltaUV1[1] * edge2[1]),
-      f * (deltaUV2[1] * edge1[2] - deltaUV1[1] * edge2[2]),
+    const edge1 = [
+      (p1[0] ?? 0) - (p0[0] ?? 0),
+      (p1[1] ?? 0) - (p0[1] ?? 0),
+      (p1[2] ?? 0) - (p0[2] ?? 0),
+    ];
+    const edge2 = [
+      (p2[0] ?? 0) - (p0[0] ?? 0),
+      (p2[1] ?? 0) - (p0[1] ?? 0),
+      (p2[2] ?? 0) - (p0[2] ?? 0),
     ];
 
-    const uDirection = deltaUV1[0] * deltaUV2[1] - deltaUV2[0] * deltaUV1[1];
+    const deltaUV1 = [(uv1[0] ?? 0) - (uv0[0] ?? 0), (uv1[1] ?? 0) - (uv0[1] ?? 0)];
+    const deltaUV2 = [(uv2[0] ?? 0) - (uv0[0] ?? 0), (uv2[1] ?? 0) - (uv0[1] ?? 0)];
+
+    const denominator =
+      (deltaUV1[0] ?? 0) * (deltaUV2[1] ?? 0) - (deltaUV2[0] ?? 0) * (deltaUV1[1] ?? 0);
+    const f = denominator !== 0 ? 1.0 / denominator : 1.0;
+
+    const tangent = [
+      f * ((deltaUV2[1] ?? 0) * (edge1[0] ?? 0) - (deltaUV1[1] ?? 0) * (edge2[0] ?? 0)),
+      f * ((deltaUV2[1] ?? 0) * (edge1[1] ?? 0) - (deltaUV1[1] ?? 0) * (edge2[1] ?? 0)),
+      f * ((deltaUV2[1] ?? 0) * (edge1[2] ?? 0) - (deltaUV1[1] ?? 0) * (edge2[2] ?? 0)),
+    ];
+
+    const uDirection =
+      (deltaUV1[0] ?? 0) * (deltaUV2[1] ?? 0) - (deltaUV2[0] ?? 0) * (deltaUV1[1] ?? 0);
     const w = uDirection >= 0 ? 1 : -1; // 1 o -1 dependiendo de la dirección
 
     return { tangent, w };
@@ -278,9 +326,9 @@ export class Mesh extends GPUResource {
         const currentTangentY = tangents[baseIdx + 1] ?? 0;
         const currentTangentZ = tangents[baseIdx + 2] ?? 0;
 
-        tangents[baseIdx] = currentTangentX + tangentData.tangent[0];
-        tangents[baseIdx + 1] = currentTangentY + tangentData.tangent[1];
-        tangents[baseIdx + 2] = currentTangentZ + tangentData.tangent[2];
+        tangents[baseIdx] = currentTangentX + (tangentData.tangent[0] ?? 0);
+        tangents[baseIdx + 1] = currentTangentY + (tangentData.tangent[1] ?? 0);
+        tangents[baseIdx + 2] = currentTangentZ + (tangentData.tangent[2] ?? 0);
         tangents[baseIdx + 3] = tangentData.w; // w component (handedness)
       }
     }
@@ -307,7 +355,7 @@ export class Mesh extends GPUResource {
       `${this.label}_vertexBuffer`,
       this.vertices.byteLength,
       GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.vertices
+      this.vertices,
     );
 
     // Crear buffer de normales en GPU
@@ -315,7 +363,7 @@ export class Mesh extends GPUResource {
       `${this.label}_normalBuffer`,
       this.normals.byteLength,
       GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.normals
+      this.normals,
     );
 
     // Crear buffer de UVs en GPU
@@ -323,7 +371,7 @@ export class Mesh extends GPUResource {
       `${this.label}_uvBuffer`,
       this.uvs.byteLength,
       GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.uvs
+      this.uvs,
     );
 
     // Crear buffer de tangentes en GPU
@@ -331,7 +379,7 @@ export class Mesh extends GPUResource {
       `${this.label}_tangentBuffer`,
       this.tangents.byteLength,
       GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.tangents
+      this.tangents,
     );
 
     // Crear buffer de índices en GPU
@@ -342,7 +390,7 @@ export class Mesh extends GPUResource {
     this.indexBuffer = GPUUtils.createBuffer(
       `${this.label}_indexBuffer`,
       paddedArray.byteLength,
-      GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     );
 
     GPUUtils.writeBuffer(this.indexBuffer, 0, paddedArray);

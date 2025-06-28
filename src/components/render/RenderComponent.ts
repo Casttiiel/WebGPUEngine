@@ -7,6 +7,7 @@ import {
   RenderComponentMeshDataType,
 } from '../../types/RenderComponentData.type';
 import { MeshPartType } from '../../types/MeshPart.type';
+import { MeshData } from '../../types/MeshData.type';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 
 export class RenderComponent extends Component {
@@ -29,18 +30,33 @@ export class RenderComponent extends Component {
 
   private async readMesh(data: RenderComponentMeshDataType): Promise<void> {
     try {
-      const meshFile = data.mesh ?? data.meshData;
-      if (!meshFile) {
+      // Handle mesh loading - priority to mesh string path over meshData
+      let mesh: Mesh;
+      if (data.mesh) {
+        mesh = await Mesh.get(data.mesh);
+      } else if (data.meshData) {
+        // Cast the meshData structure to the expected MeshData format
+        // This is safe because GLTFLoader creates this structure correctly
+        const meshData = data.meshData as MeshData;
+        mesh = await Mesh.get(meshData);
+      } else {
         throw new Error('No mesh file specified in RenderComponent data');
       }
 
-      const mesh = await Mesh.get(meshFile);
       if (!mesh) {
-        throw new Error(`Failed to load mesh: ${meshFile}`);
+        throw new Error('Failed to load mesh');
       }
 
-      // Load material first but don't create bind group yet
-      const material = await Material.get(data.material ?? data.materialData);
+      // Handle material loading - ensure we have material data
+      let material: Material;
+      if (data.material) {
+        material = await Material.get(data.material);
+      } else if (data.materialData) {
+        material = await Material.get(data.materialData);
+      } else {
+        throw new Error('No material specified in RenderComponent data');
+      }
+
       if (!material) {
         throw new Error('Failed to load material');
       }

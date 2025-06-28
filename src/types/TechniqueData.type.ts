@@ -7,9 +7,9 @@ import { RasterizationMode } from './RasterizationMode.enum';
 export type TechniqueDataType = Readonly<{
   vs: string;
   fs: string;
-  blend: BlendModes;
-  rs: RasterizationMode;
-  z: DepthModes;
+  blend?: BlendModes;
+  rs?: RasterizationMode;
+  z?: DepthModes;
   writesOn: FragmentShaderTargets;
   uniforms: ReadonlyArray<PipelineBindGroupLayouts>;
 }>;

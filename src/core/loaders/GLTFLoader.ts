@@ -1,8 +1,23 @@
-import { quat, vec3 } from 'gl-matrix';
+import { vec3 } from 'gl-matrix';
 import { EntityDataType } from '../../types/SceneData.type';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
-import { RenderComponentDataType, RenderComponentMeshDataType } from '../../types/RenderComponentData.type';
+import {
+  RenderComponentDataType,
+  RenderComponentMeshDataType,
+} from '../../types/RenderComponentData.type';
+import { MaterialDataType } from '../../types/MaterialData.type';
+import { RenderCategory } from '../../types/RenderCategory.enum';
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
+import { FragmentShaderTargets } from '../../types/FragmentShaderTargets.enum';
+import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
+import {
+  GLTF,
+  GLTFNode,
+  GLTFMeshPrimitive,
+  GLTFAccessor,
+  GLTFBufferView,
+  GLTFTexture,
+} from '../../types/GLTF.type';
 
 export class GLTFLoader {
   private static async loadBinaryFile(url: string): Promise<ArrayBuffer> {
@@ -14,11 +29,11 @@ export class GLTFLoader {
     const folderName = path.split('.')[0];
     // 1. Cargar el archivo GLTF
     const gltfResponse = await fetch(`/assets/meshes/${folderName}/${path}`);
-    const gltf = await gltfResponse.json();
+    const gltf: GLTF = await gltfResponse.json();
 
     // 2. Cargar el archivo .bin asociado si existe
     let binData: ArrayBuffer | null = null;
-    if (gltf.buffers && gltf.buffers[0]) {
+    if (gltf.buffers?.[0]?.uri) {
       const binPath = gltf.buffers[0].uri;
       const fullBinPath = `/assets/meshes/${folderName}/${binPath}`;
       binData = await this.loadBinaryFile(fullBinPath);
@@ -27,26 +42,37 @@ export class GLTFLoader {
     const gltfNodes: Array<EntityDataType> = [];
 
     // 3. Procesar cada nodo del GLTF y crear entidades
-    if (gltf.scenes) {
+    if (gltf.scenes?.[0]?.nodes) {
       for (const nodeIndex of gltf.scenes[0].nodes) {
-        const primitiveList = gltf.meshes[gltf.nodes[nodeIndex].mesh].primitives;
-        const transform = this.getNodeTransform(gltf.nodes[nodeIndex]);
-
-        let render = {
-          meshes: [],
-        } as unknown as RenderComponentDataType;
-
-        for (const primitive of primitiveList) {
-          render.meshes.push(this.processPrimitive(gltf, binData, primitive));
+        const node = gltf.nodes?.[nodeIndex];
+        if (!node || node.mesh === undefined || !gltf.meshes?.[node.mesh]) {
+          continue;
         }
 
-        const res = {
+        const mesh = gltf.meshes[node.mesh];
+        if (!mesh) continue;
+        const primitiveList = mesh.primitives;
+        const transform = this.getNodeTransform(node);
+
+        const meshes: RenderComponentMeshDataType[] = [];
+
+        for (const primitive of primitiveList) {
+          if (binData) {
+            meshes.push(this.processPrimitive(gltf, binData, primitive));
+          }
+        }
+
+        const render: RenderComponentDataType = {
+          meshes,
+        };
+
+        const res: EntityDataType = {
           children: [],
           components: {
             transform,
             render,
           },
-        } as EntityDataType;
+        };
         gltfNodes.push(res);
       }
     }
@@ -55,115 +81,177 @@ export class GLTFLoader {
   }
 
   private static processPrimitive(
-    gltf: any,
+    gltf: GLTF,
     binData: ArrayBuffer,
-    primitive: any,
-  ): RenderComponentDataType {
-    //MESH ATTRIBUTES
-    const attributes = {};
+    primitive: GLTFMeshPrimitive,
+  ): RenderComponentMeshDataType {
+    // MESH ATTRIBUTES - convertir a la estructura esperada
+    const attributesMap: Record<string, { data: number[]; size: number }> = {};
+
     for (const [key, accessorIndex] of Object.entries(primitive.attributes)) {
-      const accessor = gltf.accessors[accessorIndex];
-      const bufferView = gltf.bufferViews[accessor.bufferView];
+      const accessor = gltf.accessors?.[accessorIndex];
+      if (!accessor) continue;
+
+      const bufferView = gltf.bufferViews?.[accessor.bufferView ?? 0];
+      if (!bufferView) continue;
 
       const data = GLTFLoader.getBufferData(binData, accessor, bufferView);
-      attributes[key] = {
-        data: Array.from(data), // Devuelve los datos como array
+      attributesMap[key] = {
+        data: Array.from(data),
         size: GLTFLoader.getAccessorSize(accessor.type),
       };
     }
 
-    //MESH INDICES
-    const accessor = gltf.accessors[primitive.indices];
-    const bufferView = gltf.bufferViews[accessor.bufferView];
-    const data = GLTFLoader.getBufferData(binData, accessor, bufferView, true);
-    const indices = {
-      data: Array.from(data), // Devuelve los índices como array
-      count: accessor.count,
-      type: accessor.componentType,
-    };
-
-    //MATERIAL
-    let materialDef = gltf.materials[primitive.material];
-    const pbr = materialDef.pbrMetallicRoughness || {};
-    let category = 'solids';
-    const textures = {
-      txEmissive: 'black.png',
-    };
-    if (pbr.baseColorTexture)
-      textures['txAlbedo'] = GLTFLoader.getTextureName(
-        gltf,
-        gltf.textures[pbr.baseColorTexture.index],
-      );
-    if (materialDef.normalTexture)
-      textures['txNormal'] = GLTFLoader.getTextureName(
-        gltf,
-        gltf.textures[materialDef.normalTexture.index],
-      );
-    if (pbr.metallicRoughnessTexture)
-      textures['txMetallic'] = GLTFLoader.getTextureName(
-        gltf,
-        gltf.textures[pbr.metallicRoughnessTexture.index],
-      );
-    if (pbr.metallicRoughnessTexture)
-      textures['txRoughness'] = GLTFLoader.getTextureName(
-        gltf,
-        gltf.textures[pbr.metallicRoughnessTexture.index],
-      );
-
-    const material = {
-      casts_shadows: false,
-      category: category,
-      shadows: false,
-      textures,
-    };
-
-    if (materialDef.doubleSided) {
-      material['techniqueData'] = {
-        vs: 'gbuffer.vs',
-        fs: materialDef.alphaMode === 'MASK' ? 'gbuffer_mask.fs' : 'gbuffer.fs',
-        uniforms: ['CameraUniforms', 'ObjectUniforms', 'MaterialTextures'],
-        writesOn: 'gbuffer',
-        rs: RasterizationMode.DOUBLE_SIDED,
-      };
-    } else {
-      material['technique'] =
-        materialDef.alphaMode === 'MASK' ? 'gbuffer_mask.tech' : 'gbuffer.tech';
+    // MESH INDICES
+    let indicesData: { data: number[]; count: number; type: number } | undefined;
+    if (primitive.indices !== undefined) {
+      const accessor = gltf.accessors?.[primitive.indices];
+      if (accessor) {
+        const bufferView = gltf.bufferViews?.[accessor.bufferView ?? 0];
+        if (bufferView) {
+          const data = GLTFLoader.getBufferData(binData, accessor, bufferView, true);
+          indicesData = {
+            data: Array.from(data),
+            count: accessor.count,
+            type: accessor.componentType,
+          };
+        }
+      }
     }
 
-    let meshData = {
+    // MATERIAL
+    const materialDef =
+      primitive.material !== undefined ? gltf.materials?.[primitive.material] : undefined;
+    const pbr = materialDef?.pbrMetallicRoughness ?? {};
+    const category = RenderCategory.SOLIDS;
+    const textures: Record<string, string> = {
+      txEmissive: 'black.png',
+    };
+
+    if (pbr.baseColorTexture?.index !== undefined && gltf.textures?.[pbr.baseColorTexture.index]) {
+      const texture = gltf.textures[pbr.baseColorTexture.index];
+      if (texture) {
+        textures.txAlbedo = GLTFLoader.getTextureName(gltf, texture);
+      }
+    }
+
+    if (
+      materialDef?.normalTexture?.index !== undefined &&
+      gltf.textures?.[materialDef.normalTexture.index]
+    ) {
+      const texture = gltf.textures[materialDef.normalTexture.index];
+      if (texture) {
+        textures.txNormal = GLTFLoader.getTextureName(gltf, texture);
+      }
+    }
+
+    if (
+      pbr.metallicRoughnessTexture?.index !== undefined &&
+      gltf.textures?.[pbr.metallicRoughnessTexture.index]
+    ) {
+      const texture = gltf.textures[pbr.metallicRoughnessTexture.index];
+      if (texture) {
+        textures.txMetallic = GLTFLoader.getTextureName(gltf, texture);
+        textures.txRoughness = GLTFLoader.getTextureName(gltf, texture);
+      }
+    }
+
+    const material: MaterialDataType = materialDef?.doubleSided
+      ? {
+          casts_shadows: false,
+          category: category,
+          shadows: false,
+          textures,
+          techniqueData: {
+            vs: 'gbuffer.vs',
+            fs: materialDef.alphaMode === 'MASK' ? 'gbuffer_mask.fs' : 'gbuffer.fs',
+            uniforms: [
+              PipelineBindGroupLayouts.CAMERA_UNIFORMS,
+              PipelineBindGroupLayouts.OBJECT_UNIFORMS,
+              PipelineBindGroupLayouts.MATERIAL_TEXTURES,
+            ] as const,
+            writesOn: FragmentShaderTargets.GBUFFER,
+            rs: RasterizationMode.DOUBLE_SIDED,
+          },
+        }
+      : {
+          casts_shadows: false,
+          category: category,
+          shadows: false,
+          textures,
+          technique: materialDef?.alphaMode === 'MASK' ? 'gbuffer_mask.tech' : 'gbuffer.tech',
+        };
+
+    // Crear la estructura compatible con RenderComponentMeshDataType
+    const renderMeshData: RenderComponentMeshDataType = {
       meshData: {
-        attributes,
-        indices,
+        attributes: {
+          POSITION: attributesMap.POSITION,
+          NORMAL: attributesMap.NORMAL,
+          TEXCOORD_0: attributesMap.TEXCOORD_0,
+          TANGENT: attributesMap.TANGENT,
+        },
+        indices: indicesData,
       },
       materialData: material,
-    } as unknown as RenderComponentMeshDataType;
+    };
 
-    return meshData;
+    return renderMeshData;
   }
 
-  private static getNodeTransform(node: any): TransformComponentDataType {
-    let transform = {} as TransformComponentDataType;
+  private static getNodeTransform(node: GLTFNode): TransformComponentDataType {
+    const transform: Partial<TransformComponentDataType> = {};
 
     if (node.matrix) {
       throw new Error('GLTF Node Matrix needs to be parsed!');
     } else {
-      if (node.translation) transform.position = node.translation;
-      if (node.rotation) transform.rotation = GLTFLoader.getEuler(node.rotation);
-      if (node.scale) transform.scale = node.scale;
+      if (node.translation) {
+        const position = vec3.create();
+        vec3.set(
+          position,
+          node.translation[0] || 0,
+          node.translation[1] || 0,
+          node.translation[2] || 0,
+        );
+        transform.position = position;
+      }
+      if (node.rotation) {
+        transform.rotation = GLTFLoader.getEuler(node.rotation);
+      }
+      if (node.scale) {
+        const scale = vec3.create();
+        vec3.set(scale, node.scale[0] || 1, node.scale[1] || 1, node.scale[2] || 1);
+        transform.scale = scale;
+      }
     }
 
-    return transform;
+    return transform as TransformComponentDataType;
   }
 
-  private static getTextureName(gltf: unknown, data: unknown): string {
-    const file = gltf.buffers[0].uri;
+  private static getTextureName(gltf: GLTF, data: GLTFTexture): string {
+    const file = gltf.buffers?.[0]?.uri;
+    if (!file) return 'default.png';
+
     const file_name = file.split('.')[0];
     if (data.name) return file_name + '/' + data.name;
-    return file_name + '/' + gltf.images[data.source].uri;
+
+    if (data.source !== undefined && gltf.images?.[data.source]?.uri) {
+      return file_name + '/' + gltf.images[data.source]!.uri;
+    }
+
+    return 'default.png';
   }
 
-  private static getEuler(quat: quat): vec3 {
-    const [x, y, z, w] = quat;
+  private static getEuler(quatArray: number[]): vec3 {
+    if (quatArray.length !== 4) {
+      throw new Error('Quaternion must have 4 components');
+    }
+
+    const x = quatArray[0]!;
+    const y = quatArray[1]!;
+    const z = quatArray[2]!;
+    const w = quatArray[3]!;
+
     const x2 = x * x,
       y2 = y * y,
       z2 = z * z,
@@ -173,7 +261,7 @@ export class GLTFLoader {
     const test = x * w - y * z;
 
     const radToDeg = 180 / Math.PI;
-    let out = vec3.create();
+    const out = vec3.create();
 
     if (test > 0.499995 * unit) {
       // Singularity at north pole
@@ -196,10 +284,10 @@ export class GLTFLoader {
 
   private static getBufferData(
     bin: ArrayBuffer,
-    accessor: unknown,
-    bufferView: unknown,
+    accessor: GLTFAccessor,
+    bufferView: GLTFBufferView,
     isIndex = false,
-  ) {
+  ): Float32Array | Uint16Array {
     const byteOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
     const byteLength =
       accessor.count *

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run check && vite",
+    "dev": "vite",
     "build": "npm run check && tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
@@ -14,7 +14,8 @@
     "type-check": "tsc --noEmit",
     "check": "npm run type-check && npm run format:check && npm run lint",
     "fix": "npm run format && npm run lint:fix",
-    "dev:unsafe": "vite"
+    "dev:unsafe": "vite",
+    "dev:check": "npm run check && vite"
   },
   "devDependencies": {
     "@tweakpane/core": "^2.0.5",
