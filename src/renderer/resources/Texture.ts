@@ -3,6 +3,7 @@ import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { PipelineFactory } from '../core/factories/PipelineFactory';
 
 export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
@@ -203,12 +204,13 @@ export class Texture extends GPUResource {
         },
       },
     ]);
+    const pipelineLayout = PipelineFactory.createPipelineLayout(
+      'texture_mipmap_pipeline_layout',
+      [this.mipmapBindGroupLayout],
+    );
 
-    const pipelineLayout = device.createPipelineLayout({
-      bindGroupLayouts: [this.mipmapBindGroupLayout],
-    });
-
-    this.mipmapPipeline = device.createComputePipeline({
+    this.mipmapPipeline = PipelineFactory.createComputePipeline({
+      label: 'Mipmap generation pipeline',
       layout: pipelineLayout,
       compute: {
         module: shaderModule,

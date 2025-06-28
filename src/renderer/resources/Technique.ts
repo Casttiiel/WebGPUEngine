@@ -9,6 +9,7 @@ import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { Mesh } from './Mesh';
 import { Render } from '../core/Render';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
@@ -159,17 +160,15 @@ export class Technique extends GPUResource {
     if (!layouts) {
       throw new Error(`Cannot create pipeline for technique ${this.path}: No layouts available`);
     }
-
-    const pipelineLayout = this.device.createPipelineLayout({
-      label: `${this.label}_pipelineLayout`,
-      bindGroupLayouts: layouts,
-    });
+    const pipelineLayout = PipelineFactory.createPipelineLayout(
+      `${this.label}_pipelineLayout`,
+      layouts,
+    );
 
     const vsModule = this.vsModule;
     const fsModule = this.fsModule;
     if (!vsModule || !fsModule) throw new Error('Shader modules not available');
-
-    const pipelineParams = {
+    const pipelineConfig: PipelineConfig = {
       label: this.label,
       layout: pipelineLayout,
       vertex: {
@@ -187,23 +186,22 @@ export class Technique extends GPUResource {
         cullMode: this.getRasterizationConfig(),
         frontFace: 'ccw',
       },
-    } as GPURenderPipelineDescriptor;
+    };
 
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
-      pipelineParams.depthStencil = this.getDepthConfig();
+      pipelineConfig.depthStencil = this.getDepthConfig();
     }
 
+    // Add multisample if needed for MSAA passes
     if (
       this.writesOn === FragmentShaderTargets.GBUFFER ||
       this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER ||
       this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA
     ) {
-      pipelineParams.multisample = {
-        count: 4,
-      };
+      pipelineConfig.multisample = { count: 4 };
     }
 
-    this.pipeline = this.device.createRenderPipeline(pipelineParams);
+    this.pipeline = PipelineFactory.createPipeline(pipelineConfig);
   }
 
   private getRasterizationConfig(): GPUCullMode {
@@ -299,22 +297,10 @@ export class Technique extends GPUResource {
         throw new Error(`${this.label}: Unknown Fragment Shader Target`);
       }
     }
-  }
-  private getBlendState(): GPUBlendState {
+  } private getBlendState(): GPUBlendState {
     switch (this.blendMode) {
       case BlendModes.ADDITIVE_BY_SRC_ALPHA:
-        return {
-          color: {
-            srcFactor: 'src-alpha',
-            dstFactor: 'one',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'one',
-            dstFactor: 'one',
-            operation: 'add',
-          },
-        };
+        return PipelineFactory.getAdditiveBlending();
       case BlendModes.ADDITIVE:
         return {
           color: {
@@ -329,18 +315,7 @@ export class Technique extends GPUResource {
           },
         };
       case BlendModes.COMBINATIVE_GBUFFER:
-        return {
-          color: {
-            srcFactor: 'src-alpha',
-            dstFactor: 'one-minus-src-alpha',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'src-alpha',
-            dstFactor: 'one-minus-src-alpha',
-            operation: 'add',
-          },
-        };
+        return PipelineFactory.getAlphaBlending();
       default:
         return {
           color: {

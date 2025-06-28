@@ -1,5 +1,6 @@
 import { GPUUtils } from './utils/GPUUtils';
 import { BindGroupFactory } from './factories/BindGroupFactory';
+import { PipelineFactory, ComputePipelineConfig } from './factories/PipelineFactory';
 
 export class MipmapGenerator {
   private device!: GPUDevice;
@@ -38,18 +39,20 @@ export class MipmapGenerator {
         },
       },
     ]);
-
     // Create compute pipeline
-    this.computePipeline = this.device.createComputePipeline({
+    const computeConfig: ComputePipelineConfig = {
       label: 'Mipmap Generation Pipeline',
-      layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [this.bindGroupLayout],
-      }),
+      layout: PipelineFactory.createPipelineLayout(
+        'mipmap_generation_pipeline_layout',
+        [this.bindGroupLayout],
+      ),
       compute: {
         module: shaderModule,
         entryPoint: 'main',
       },
-    });
+    };
+
+    this.computePipeline = PipelineFactory.createComputePipeline(computeConfig);
 
     this.isInitialized = true;
   }

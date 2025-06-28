@@ -1,7 +1,6 @@
 ## NPM RUN DEV
 
-1. ✅ BindGroupFactory COMPLETED - All bind groups and layouts now use BindGroupFactory
-2. PipelineFactory BaseRenderPass GBufferpass. Layout auto en algo? Set ViewPoert, Technique, DeferredRenderer
+2. BaseRenderPass GBufferpass. Layout auto en algo? Set ViewPoert, Technique, DeferredRenderer
 3. Ambient Occlusion SSAO
 4. Ambient Occlusion GTAO
 5. Shader functions duplication

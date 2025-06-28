@@ -2,6 +2,7 @@ import { mat4 } from 'gl-matrix';
 import { Camera } from '../../core/math/Camera';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { PipelineFactory, ComputePipelineConfig } from '../core/factories/PipelineFactory';
 
 export interface AABB {
   min: [number, number, number];
@@ -123,18 +124,20 @@ export class GPUFrustumCuller {
         buffer: { type: 'storage' }, // visible count
       },
     ]);
-
     // Create compute pipeline
-    this.computePipeline = this.device.createComputePipeline({
+    const computeConfig: ComputePipelineConfig = {
       label: 'Frustum Culling Compute Pipeline',
-      layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [this.bindGroupLayout],
-      }),
+      layout: PipelineFactory.createPipelineLayout(
+        'frustum_culling_pipeline_layout',
+        [this.bindGroupLayout],
+      ),
       compute: {
         module: this.computeShader,
         entryPoint: 'main',
       },
-    });
+    };
+
+    this.computePipeline = PipelineFactory.createComputePipeline(computeConfig);
   }
 
   public async cullObjects(camera: Camera, objects: CullableObject[]): Promise<CullResult> {
