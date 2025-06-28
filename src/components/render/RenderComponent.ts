@@ -7,7 +7,7 @@ import {
   RenderComponentMeshDataType,
 } from '../../types/RenderComponentData.type';
 import { MeshPartType } from '../../types/MeshPart.type';
-import { RenderManager } from '../../renderer/core/RenderManager';
+import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 
 export class RenderComponent extends Component {
   private isVisible: boolean = true;
@@ -76,7 +76,7 @@ export class RenderComponent extends Component {
     // Implementation of update if needed
   }
 
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void { }
 
   public renderDebug(): void {
     throw new Error('Method not implemented.');

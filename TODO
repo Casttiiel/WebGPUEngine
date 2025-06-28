@@ -1,7 +1,9 @@
 ## NPM RUN DEV
 
-1. Ambient Occlusion SSAO
+1. Usar GPUUtils, Usar las nuevas clases
+2. Ambient Occlusion SSAO
 2. Ambient Occlusion GTAO
+4. SHader functions duplication
 3. Bloom
 4. Compute-based distortion
 5. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer

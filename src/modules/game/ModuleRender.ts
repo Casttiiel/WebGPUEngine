@@ -5,7 +5,7 @@ import { Engine } from '../../core/engine/Engine';
 import { Camera } from '../../core/math/Camera';
 import { DeferredRenderer } from '../../renderer/core/DeferredRenderer';
 import { Render } from '../../renderer/core/Render';
-import { RenderManager } from '../../renderer/core/RenderManager';
+import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { RenderCategory } from '../../types/RenderCategory.enum';

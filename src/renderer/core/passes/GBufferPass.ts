@@ -1,0 +1,138 @@
+import { RenderToTexture } from '../RenderToTexture';
+import { GPUUtils } from '../utils/GPUUtils';
+import { Render } from '../Render';
+
+/**
+ * G-Buffer render pass for deferred rendering
+ * Renders geometry to multiple render targets (albedo, normal, depth, etc.)
+ */
+export class GBufferPass {
+    private rtAlbedos!: RenderToTexture;
+    private rtNormals!: RenderToTexture;
+    private rtSelfIllum!: RenderToTexture;
+    private rtLinearDepth!: RenderToTexture;
+    private depthStencil!: GPUTexture;
+    private depthStencilView!: GPUTextureView;
+    private msaaDepthStencil!: GPUTexture;
+    private msaaDepthStencilView!: GPUTextureView | null;
+
+    constructor() {
+        // Empty constructor
+    }
+
+    public async load(): Promise<void> {
+        await this.createRenderTargets();
+    }
+
+    private async createRenderTargets(): Promise<void> {
+        const width = Render.width;
+        const height = Render.height;
+
+        // Create G-Buffer render targets
+        this.rtAlbedos = new RenderToTexture();
+        this.rtAlbedos.createRT('gbuffer_albedos', width, height, 'rgba8unorm', true);
+
+        this.rtNormals = new RenderToTexture();
+        this.rtNormals.createRT('gbuffer_normals', width, height, 'rgba8unorm', true);
+
+        this.rtSelfIllum = new RenderToTexture();
+        this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, 'rgba8unorm', true);
+
+        this.rtLinearDepth = new RenderToTexture();
+        this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, 'r32float', true);    // Create depth buffers (both MSAA and single-sample)
+        this.depthStencil = GPUUtils.createTexture(
+            'gbuffer_depth_single',
+            width,
+            height,
+            'depth32float-stencil8',
+            GPUTextureUsage.RENDER_ATTACHMENT,
+        );
+        this.depthStencilView = this.depthStencil.createView();
+
+        this.msaaDepthStencil = GPUUtils.createTexture(
+            'gbuffer_depth_msaa',
+            width,
+            height,
+            'depth32float-stencil8',
+            GPUTextureUsage.RENDER_ATTACHMENT,
+            4,
+        );
+        this.msaaDepthStencilView = this.msaaDepthStencil.createView();
+    }
+    
+    public execute(encoder: GPUCommandEncoder, renderCallback: (pass: GPURenderPassEncoder) => void): void {
+        const colorAttachments: GPURenderPassColorAttachment[] = [
+            GPUUtils.createColorAttachment(this.rtAlbedos.getRenderView(), 'clear'),
+            GPUUtils.createColorAttachment(this.rtNormals.getRenderView(), 'clear'),
+            GPUUtils.createColorAttachment(this.rtSelfIllum.getRenderView(), 'clear'),
+            GPUUtils.createColorAttachment(this.rtLinearDepth.getRenderView(), 'clear'),
+        ];
+
+        // Add resolve targets for MSAA if available
+        const albedoResolve = this.rtAlbedos.getResolveTarget();
+        const normalResolve = this.rtNormals.getResolveTarget();
+        const selfIllumResolve = this.rtSelfIllum.getResolveTarget();
+        const linearDepthResolve = this.rtLinearDepth.getResolveTarget(); if (albedoResolve) colorAttachments[0]!.resolveTarget = albedoResolve;
+        if (normalResolve) colorAttachments[1]!.resolveTarget = normalResolve;
+        if (selfIllumResolve) colorAttachments[2]!.resolveTarget = selfIllumResolve;
+        if (linearDepthResolve) colorAttachments[3]!.resolveTarget = linearDepthResolve;
+
+        const depthStencilAttachment = GPUUtils.createDepthStencilAttachment(
+            this.msaaDepthStencilView!,
+            'clear',
+            'store'
+        );
+
+        const passDescriptor: GPURenderPassDescriptor = {
+            label: 'G-Buffer Pass',
+            colorAttachments,
+            depthStencilAttachment,
+        };
+
+        const pass = encoder.beginRenderPass(passDescriptor);
+        renderCallback(pass);
+        pass.end();
+    }
+
+    public getRenderTargets(): {
+        albedos: RenderToTexture;
+        normals: RenderToTexture;
+        selfIllum: RenderToTexture;
+        linearDepth: RenderToTexture;
+    } {
+        return {
+            albedos: this.rtAlbedos,
+            normals: this.rtNormals,
+            selfIllum: this.rtSelfIllum,
+            linearDepth: this.rtLinearDepth,
+        };
+    }
+
+    public getDepthTextures(): {
+        msaaDepth: GPUTexture;
+        singleDepth: GPUTexture;
+        msaaDepthView: GPUTextureView;
+        singleDepthView: GPUTextureView;
+    } {
+        return {
+            msaaDepth: this.msaaDepthStencil,
+            singleDepth: this.depthStencil,
+            msaaDepthView: this.msaaDepthStencilView!,
+            singleDepthView: this.depthStencilView,
+        };
+    }
+
+    public async resize(): Promise<void> {
+        this.dispose();
+        await this.createRenderTargets();
+    }
+
+    public dispose(): void {
+        this.rtAlbedos?.destroy();
+        this.rtNormals?.destroy();
+        this.rtSelfIllum?.destroy();
+        this.rtLinearDepth?.destroy();
+        this.depthStencil?.destroy();
+        this.msaaDepthStencil?.destroy();
+    }
+}

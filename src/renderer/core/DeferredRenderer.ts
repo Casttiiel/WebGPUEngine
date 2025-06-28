@@ -2,7 +2,7 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 import { AmbientLight } from '../shading/AmbientLight';
 import { Skybox } from '../shading/Skybox';
 import { Render } from './Render';
-import { RenderManager } from './RenderManager';
+import { RenderManagerV2 as RenderManager } from './managers/RenderManagerV2';
 import { RenderToTexture } from './RenderToTexture';
 import { DepthResolver } from './DepthResolver';
 import { Entity } from '@/core/ecs/Entity';
@@ -501,7 +501,7 @@ export class DeferredRenderer {
     return attachment;
   };
 
-  public update(dt: number): void {}
+  public update(dt: number): void { }
 
   private destroy(): void {
     if (this.rtAlbedos) {
