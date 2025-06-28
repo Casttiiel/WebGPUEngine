@@ -9,8 +9,9 @@ The engine leverages WebGPU's capabilities to deliver high-performance 3D render
 ## IMPORTANT: Update Instructions
 
 **Every time you make changes to the engine, you MUST update this Copilot Instructions file to reflect:**
+
 - New file structures or patterns
-- Updated code examples and paths  
+- Updated code examples and paths
 - Modified architectural decisions
 - New development patterns
 - Changed best practices
@@ -36,33 +37,39 @@ The engine implements a module-based architecture with clear separation of conce
 #### Core Modules (src/modules/)
 
 **ModuleManager** (`src/modules/core/ModuleManager.ts`)
+
 - Coordinates all engine modules
 - Manages module lifecycle (init → start → update → render → destroy)
 - Centralized module registration and dependency management
 
 **ModuleBoot** (`src/modules/game/ModuleBoot.ts`)
+
 - Engine initialization and startup procedures
 - WebGPU device creation and context setup
 - Initial resource loading and configuration
 
 **ModuleInput** (`src/modules/game/ModuleInput.ts`)
+
 - User input processing (keyboard, mouse, touch)
 - Input event handling and state management
 - Integration with camera and interaction systems
 
 **ModuleEntities** (`src/modules/game/ModuleEntities.ts`)
+
 - ECS (Entity-Component-System) management
 - Entity creation, destruction, and hierarchy
 - Component registration and lifecycle management
 - Scene graph traversal and updates
 
 **ModuleRender** (`src/modules/game/ModuleRender.ts`)
+
 - Graphics pipeline coordination
 - Deferred rendering implementation
 - Draw call management and optimization
 - Post-processing effects coordination
 
 **ModuleCameraMixer** (`src/modules/game/ModuleCameraMixer.ts`)
+
 - Camera system management
 - Multiple camera support and switching
 - Camera animation and interpolation
@@ -85,12 +92,14 @@ interface Module {
 ### Core ECS Concepts (src/core/ecs/)
 
 **Entities** (`src/core/ecs/Entity.ts`)
+
 - Unique containers identified by IDs
 - Support hierarchical parent-child relationships
 - Serve as attachment points for components
 - No inherent functionality - purely organizational
 
 **Components** (`src/core/ecs/Component.ts`)
+
 - Modular pieces of functionality and data
 - Single responsibility principle
 - Attach to entities to provide specific behaviors
@@ -115,12 +124,14 @@ class TransformComponent implements Component {
 ```
 
 Features:
+
 - Hierarchical transformations with automatic propagation
 - Direct GPU uniform buffer integration
 - World space matrix calculation
 - WebGPU bind group management for shaders
 
 **NameComponent** (`src/components/core/NameComponent.ts`)
+
 - Simple component for entity identification and debugging
 
 #### Render Components (`src/components/render/`)
@@ -143,15 +154,18 @@ class CameraComponent implements Component {
 ```
 
 **RenderComponent** (`src/components/render/RenderComponent.ts`)
+
 - Mesh rendering capabilities
 - Material assignments
 - Render category management
 
 **Lighting Components:**
+
 - **PointLightComponent** (`src/components/render/PointLightComponent.ts`)
 - **SpotLightComponent** (`src/components/render/SpotLightComponent.ts`)
 
 **Post-Processing Components:**
+
 - **ToneMappingComponent** (`src/components/render/ToneMappingComponent.ts`)
 - **AntialiasingComponent** (`src/components/render/AntialiasingComponent.ts`)
 - **AmbientOcclusionComponent** (`src/components/render/AmbientOcclusionComponent.ts`)
@@ -163,18 +177,21 @@ class CameraComponent implements Component {
 The engine implements a fully modular render pass system that eliminates manual `beginRenderPass` logic:
 
 **BaseRenderPass** (`src/renderer/core/passes/BaseRenderPass.ts`)
+
 - Abstract base class for all render passes
 - Handles common pass execution logic
 - Viewport and scissor configuration
 - Pass descriptor management
 
 **RenderPassManager** (`src/renderer/core/passes/RenderPassManager.ts`)
+
 - Centralizes render pass coordination
 - Manages registered passes by name
 - Supports dynamic pass execution
 - Provides specialized methods for common pass types
 
 **RenderPassFactory** (`src/renderer/core/passes/RenderPassFactory.ts`)
+
 - Factory for creating render pass configurations
 - Centralized blend state creation
 - Pass-specific configuration builders
@@ -189,7 +206,7 @@ export class GBufferRenderPass extends BaseRenderPass {
   // Geometry rendering to multiple render targets
 }
 
-// Decal Pass  
+// Decal Pass
 export class DecalRenderPass extends BaseRenderPass {
   // Decal projection and blending
 }
@@ -241,11 +258,13 @@ export class AmbientOcclusionRenderPass extends PostProcessingRenderPass {
 ### Specialized Passes
 
 **GBufferPass** (`src/renderer/core/passes/GBufferPass.ts`)
+
 - Handles G-Buffer geometry rendering
 - Integrates with ECS for entity processing
 - Supports MSAA and viewport management
 
 **DepthResolver** (`src/renderer/core/DepthResolver.ts`)
+
 - Manual MSAA depth resolve for compatibility
 - Uses specialized technique and mesh
 - Integrates with the modular pass system
@@ -270,18 +289,21 @@ struct FragmentOutput {
 #### Rendering Passes
 
 **1. G-Buffer Pass**
+
 - Geometry rendering to multiple render targets
 - World space normal encoding
 - Linear depth calculation for position reconstruction
 - Material parameter storage (metallic, roughness, emissive)
 
 **2. Lighting Pass**
+
 - Screen-space lighting calculations
 - World position reconstruction from linear depth
 - Physically-Based Rendering (PBR) with Image-Based Lighting
 - Multiple light type support (directional, point, spot)
 
 **3. Post-Processing Pass**
+
 - Anti-aliasing (FXAA)
 - Tone mapping and color grading
 - Ambient occlusion (SSAO)
@@ -290,6 +312,7 @@ struct FragmentOutput {
 ### Physically-Based Rendering (PBR)
 
 #### Material Model
+
 - Metallic-roughness workflow
 - Energy conservation principles
 - Fresnel calculations for realistic reflections
@@ -329,20 +352,24 @@ fn getWorldCoords(coords: vec2<f32>, zlinear: f32, camera: CameraUniforms) -> ve
 ### Core Resource System (`src/core/resources/`)
 
 **IResource** (`src/core/resources/IResource.ts`)
+
 - Interface for all engine resources
 - Standardized load/dispose lifecycle
 
 **GPUResource** (`src/core/resources/GPUResource.ts`)
+
 - Base class for WebGPU resources
 - GPU memory management
 
 **ResourceManager** (`src/core/engine/ResourceManager.ts`)
+
 - Centralized resource loading and caching
 - Asynchronous resource resolution
 
 ### Asset Loading System (`src/renderer/resources/`)
 
 **Supported Formats**
+
 - GLTF: 3D models with PBR materials
 - PNG/JPG: Texture maps
 - JSON: Scene definitions and prefabs
@@ -393,12 +420,14 @@ Declarative shader pipeline configuration:
 
 ### GPU Resource Management
 
-**RenderToTexture** (`src/renderer/core/RenderToTexture.ts`)
+**RenderTarget** (`src/renderer/core/RenderTarget.ts`)
+
 - Render target management
 - MSAA support with usage flag handling
 - Automatic view creation
 
 **Factories** (`src/renderer/core/factories/`)
+
 - **BindGroupFactory** (`src/renderer/core/factories/BindGroupFactory.ts`) - Bind group creation and caching
 - **PipelineFactory** (`src/renderer/core/factories/PipelineFactory.ts`) - Pipeline state and blend mode management
 
@@ -411,15 +440,33 @@ Centralized WebGPU utility functions:
 ```typescript
 class GPUUtils {
   // Viewport and scissor configuration
-  static configureViewportAndScissor(pass: GPURenderPassEncoder, width?: number, height?: number): void;
-  
+  static configureViewportAndScissor(
+    pass: GPURenderPassEncoder,
+    width?: number,
+    height?: number,
+  ): void;
+
   // Render pass descriptor creation
-  static createRenderPassDescriptor(label: string, colorAttachments: GPURenderPassColorAttachment[], depthStencilAttachment?: GPURenderPassDepthStencilAttachment): GPURenderPassDescriptor;
-  
+  static createRenderPassDescriptor(
+    label: string,
+    colorAttachments: GPURenderPassColorAttachment[],
+    depthStencilAttachment?: GPURenderPassDepthStencilAttachment,
+  ): GPURenderPassDescriptor;
+
   // Attachment creation helpers
-  static createColorAttachment(view: GPUTextureView, loadOp: GPULoadOp, storeOp: GPUStoreOp, clearValue?: GPUColor): GPURenderPassColorAttachment;
-  static createDepthStencilAttachment(view: GPUTextureView, depthLoadOp: GPULoadOp, depthStoreOp: GPUStoreOp, clearValue?: number): GPURenderPassDepthStencilAttachment;
-  
+  static createColorAttachment(
+    view: GPUTextureView,
+    loadOp: GPULoadOp,
+    storeOp: GPUStoreOp,
+    clearValue?: GPUColor,
+  ): GPURenderPassColorAttachment;
+  static createDepthStencilAttachment(
+    view: GPUTextureView,
+    depthLoadOp: GPULoadOp,
+    depthStoreOp: GPUStoreOp,
+    clearValue?: number,
+  ): GPURenderPassDepthStencilAttachment;
+
   // Sampler creation
   static createSampler(descriptor: GPUSamplerDescriptor): GPUSampler;
 }
@@ -428,26 +475,32 @@ class GPUUtils {
 ### Render Management (`src/renderer/core/managers/`)
 
 **RenderManagerV2** (`src/renderer/core/managers/RenderManagerV2.ts`)
+
 - Entity rendering coordination
 - Category-based render organization
 - Integration with ECS system
 
 **RenderKeyManager** (`src/renderer/core/managers/RenderKeyManager.ts`)
+
 - Render key generation and management
 - Sorting and batching optimization
 
 **RenderStateManager** (`src/renderer/core/managers/RenderStateManager.ts`)
+
 - GPU state management and optimization
 
 ### Specialized Systems
 
 **ShaderPreprocessor** (`src/renderer/core/ShaderPreprocessor.ts`)
+
 - WGSL shader processing and optimization
 
 **MipmapGenerator** (`src/renderer/core/MipmapGenerator.ts`)
+
 - GPU-based mipmap generation for textures
 
 **GPUFrustumCuller** (`src/renderer/culling/GPUFrustumCuller.ts`)
+
 - GPU-based frustum culling for performance
 
 ## Shader System
@@ -473,6 +526,7 @@ struct ObjectUniforms {
 ```
 
 **Bind Group Layout** (`src/types/PipelineBindGroupLayouts.enum.ts`)
+
 - Group 0: Camera uniforms (global)
 - Group 1: Object uniforms (per-object)
 - Group 2: Material textures and samplers
@@ -481,25 +535,30 @@ struct ObjectUniforms {
 ### Shader Organization
 
 **Core Shaders:**
+
 - `basic.vs/fs` - Basic mesh rendering
 - `gbuffer.vs/fs` - G-Buffer generation
 - `pbr.vs/fs` - Physically-based rendering
 
 **Lighting Shaders:**
+
 - `ambient.fs` - Ambient lighting and IBL
 - Point/spot light shaders for deferred lighting
 
 **Post-Processing Shaders:**
+
 - `antialiasing.fs` - FXAA implementation
 - `tone_mapping.fs` - HDR tone mapping
 - `ambient_occlusion.fs` - SSAO implementation
 
 **Utility Shaders:**
+
 - `depth_resolve.fs` - MSAA depth resolve
 - `skybox.vs/fs` - Skybox rendering
 - `presentation.vs/fs` - Final presentation
 
 **Common Functions:** (`assets/shaders/common/`)
+
 - Shared utility functions and constants
 - PBR calculation helpers
 
@@ -510,11 +569,13 @@ struct ObjectUniforms {
 The engine implements MSAA in the deferred rendering pipeline with manual depth resolve:
 
 **MSAA Textures Creation**
+
 - G-Buffer textures support both MSAA and single-sample formats
 - Depth buffer has both MSAA (for geometry pass) and single-sample (for post-processing) versions
 - Sample count is configurable (typically 4x MSAA)
 
 **Manual Depth Resolve** (`src/renderer/core/DepthResolver.ts`)
+
 - Custom depth resolve pass using a fullscreen quad and shader
 - Resolves MSAA depth to single-sample for skybox and post-processing compatibility
 - Uses the engine's Technique and Mesh systems for consistency
@@ -531,6 +592,7 @@ export class DepthResolver {
 ```
 
 **Key Features:**
+
 - Integrates with existing resource management system
 - Uses `depth_resolve.tech` technique with `DEPTH_ONLY` fragment target
 - Employs `ALWAYS` depth mode for unconditional depth writing
@@ -539,12 +601,15 @@ export class DepthResolver {
 ### Extended Enums for MSAA Support
 
 **Fragment Target:** (`src/types/FragmentShaderTargets.enum.ts`)
+
 - `DEPTH_ONLY`: For depth-only rendering passes (depth resolve)
 
 **Depth Mode:** (`src/types/DepthModes.enum.ts`)
+
 - `ALWAYS`: Unconditional depth writing (depthCompare: 'always')
 
 **Bind Group Layout:** (`src/types/PipelineBindGroupLayouts.enum.ts`)
+
 - `DEPTH_TEXTURE`: For binding depth textures in shaders
 
 ## Type System (`src/types/`)
@@ -552,6 +617,7 @@ export class DepthResolver {
 ### Enums and Constants
 
 **Rendering Enums:**
+
 - `BlendModes.enum.ts` - Blend mode definitions
 - `DepthModes.enum.ts` - Depth test configurations
 - `FragmentShaderTargets.enum.ts` - Fragment output targets
@@ -559,22 +625,26 @@ export class DepthResolver {
 - `RenderCategory.enum.ts` - Object rendering categories
 
 **Input Enums:**
+
 - `KeyCode.enum.ts` - Keyboard input codes
 - `MouseButton.enum.ts` - Mouse button definitions
 
 **Resource Enums:**
+
 - `ResourceType.enum.ts` - Resource type identifiers
 - `PipelineBindGroupLayouts.enum.ts` - Bind group layout types
 
 ### Data Types
 
 **Component Data Types:**
+
 - `CameraComponentData.type.ts` - Camera configuration
 - `RenderComponentData.type.ts` - Render settings
 - `TransformComponentData.type.ts` - Transform data
 - `AABBComponentData.type.ts` - Bounding box data
 
 **Asset Data Types:**
+
 - `MaterialData.type.ts` - Material definitions
 - `MeshData.type.ts` - Mesh geometry data
 - `TextureData.type.ts` - Texture configurations
@@ -582,29 +652,35 @@ export class DepthResolver {
 - `GLTF.type.ts` - GLTF asset structure
 
 **Scene Data Types:**
+
 - `SceneData.type.ts` - Scene composition
 - `ComponentData.type.ts` - Generic component data
 
 ## Core Math System (`src/core/math/`)
 
 **Transform** (`src/core/math/Transform.ts`)
+
 - Position, rotation, scale management
 - Matrix calculations and hierarchy support
 
 **Camera** (`src/core/math/Camera.ts`)
+
 - Camera projection and view calculations
 - Frustum management
 
 **AABB** (`src/core/math/AABB.ts`)
+
 - Axis-aligned bounding box calculations
 - Collision and culling support
 
 ## Asset Loading (`src/core/loaders/`)
 
 **Loader** (`src/core/loaders/Loader.ts`)
+
 - Base loader interface and utilities
 
 **GLTFLoader** (`src/core/loaders/GLTFLoader.ts`)
+
 - Complete GLTF 2.0 asset loading
 - PBR material conversion
 - Mesh and texture processing
@@ -616,22 +692,25 @@ export class DepthResolver {
 When implementing new rendering features:
 
 1. **Extend Core Enums**
+
    - Add new values to relevant enums (in `src/types/`)
    - Update switch statements in `Technique.ts` to handle new cases
 
 2. **Create Specialized Render Passes**
+
    - Follow the pattern of passes in `src/renderer/core/passes/`
    - Extend `BaseRenderPass` or appropriate specialized base class
    - Use existing `Technique` and `Mesh` classes for consistency
    - Integrate with `RenderPassManager`
 
 3. **Shader and Technique Integration**
+
    - Create `.tech` files in `assets/techniques/`
    - Implement corresponding WGSL shaders in `assets/shaders/`
    - Ensure bind group layouts match between shader and technique
 
 4. **Resource Management Integration**
-   - Extend `RenderToTexture` for new texture formats/configurations
+   - Extend `RenderTarget` for new texture formats/configurations
    - Add appropriate usage flags (`TEXTURE_BINDING`, `RENDER_ATTACHMENT`, etc.)
    - Handle both creation and cleanup properly
 
@@ -687,7 +766,7 @@ export class CustomPostProcessComponent extends Component {
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
-  private result!: RenderToTexture;
+  private result!: RenderTarget;
   private renderPassManager!: RenderPassManager;
 
   public apply(texture: GPUTextureView): GPUTextureView {
@@ -698,7 +777,7 @@ export class CustomPostProcessComponent extends Component {
       this.fullscreenQuadMesh,
       this.technique,
       this.bindGroup!,
-      this.result
+      this.result,
     );
 
     return this.result.getView();
@@ -721,16 +800,9 @@ renderPassManager.executeDynamicPass(pass);
 
 ```typescript
 // Use factories for consistent resource creation
-const bindGroup = BindGroupFactory.createBindGroup(
-  'resource_name',
-  layout,
-  entries
-);
+const bindGroup = BindGroupFactory.createBindGroup('resource_name', layout, entries);
 
-const pipeline = PipelineFactory.createRenderPipeline(
-  technique,
-  vertexLayout
-);
+const pipeline = PipelineFactory.createRenderPipeline(technique, vertexLayout);
 ```
 
 ## Development Status & Roadmap

@@ -1,7 +1,7 @@
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { Render } from '../../renderer/core/Render';
-import { RenderToTexture } from '../../renderer/core/RenderToTexture';
+import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
@@ -15,7 +15,7 @@ export class AmbientOcclusionComponent extends Component {
   private renderPassManager!: RenderPassManager;
 
   // Render targets for the two-pass process
-  private rawAOTarget!: RenderToTexture;
+  private rawAOTarget!: RenderTarget;
   private bilateralFilterBindGroup!: GPUBindGroup | null;
 
   // SSAO Parameters for ImGui
@@ -49,7 +49,7 @@ export class AmbientOcclusionComponent extends Component {
     this.bilateralFilterTechnique = await Technique.get('ao_bilateral_filter.tech');
 
     // Create intermediate render target for raw AO
-    this.rawAOTarget = new RenderToTexture();
+    this.rawAOTarget = new RenderTarget();
     this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, 'r16float');
 
     // Create uniform buffer for SSAO parameters
@@ -62,7 +62,7 @@ export class AmbientOcclusionComponent extends Component {
     this.ssaoParamsBuffer = GPUUtils.createBuffer(
       'SSAO Parameters Buffer',
       32,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
     this.updateSSAOParamsBuffer();
@@ -78,7 +78,7 @@ export class AmbientOcclusionComponent extends Component {
       this.ssaoParams.maxDistance,
       this.ssaoParams.noiseScale,
       0, // padding
-      0  // padding
+      0, // padding
     ]);
 
     GPUUtils.writeBuffer(this.ssaoParamsBuffer, 0, paramsData);
@@ -103,11 +103,11 @@ export class AmbientOcclusionComponent extends Component {
             buffer: this.ssaoParamsBuffer,
           },
         },
-      ]
+      ],
     );
   }
 
-  public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderToTexture): void {
+  public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
     this.createSSAOParamsBindGroup();
 
     // Pass 1: Generate raw AO using SSAO with parameters
@@ -116,23 +116,23 @@ export class AmbientOcclusionComponent extends Component {
       this.aoTechnique,
       gBufferBindGroup,
       this.ssaoParamsBindGroup!,
-      this.rawAOTarget
+      this.rawAOTarget,
     );
 
     // Pass 2: Apply bilateral filter to the raw AO
     this.applyBilateralFilter(gBufferBindGroup, finalAOTarget);
   }
 
-  private applyBilateralFilter(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderToTexture): void {
+  private applyBilateralFilter(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
     this.setupBilateralFilterBindGroup();
 
     // Use RenderPassManager to execute bilateral filter pass with both bind groups
     this.renderPassManager.executeAOBilateralFilterPass(
       this.fullscreenQuadMesh,
       this.bilateralFilterTechnique,
-      gBufferBindGroup,              // G-Buffer bind group (group 1)
+      gBufferBindGroup, // G-Buffer bind group (group 1)
       this.bilateralFilterBindGroup!, // AO texture bind group (group 2)
-      finalAOTarget
+      finalAOTarget,
     );
   }
 
@@ -157,7 +157,7 @@ export class AmbientOcclusionComponent extends Component {
           binding: 1,
           resource: sampler,
         },
-      ]
+      ],
     );
   }
 
@@ -186,12 +186,36 @@ export class AmbientOcclusionComponent extends Component {
     if (this.debugControlsAdded) return;
 
     // SSAO Parameters with appropriate ranges
-    this.addInteractiveControl(this.ssaoParams, 'sampleCount', 'SSAO Sample Count', { min: 4, max: 32, step: 1 });
-    this.addInteractiveControl(this.ssaoParams, 'radius', 'SSAO Radius', { min: 0.1, max: 2.0, step: 0.01 });
-    this.addInteractiveControl(this.ssaoParams, 'bias', 'SSAO Bias', { min: 0.001, max: 0.1, step: 0.001 });
-    this.addInteractiveControl(this.ssaoParams, 'aoStrength', 'SSAO Strength', { min: 0.1, max: 5.0, step: 0.1 });
-    this.addInteractiveControl(this.ssaoParams, 'maxDistance', 'SSAO Max Distance', { min: 0.1, max: 5.0, step: 0.1 });
-    this.addInteractiveControl(this.ssaoParams, 'noiseScale', 'SSAO Noise Scale', { min: 1.0, max: 10.0, step: 0.1 });
+    this.addInteractiveControl(this.ssaoParams, 'sampleCount', 'SSAO Sample Count', {
+      min: 4,
+      max: 32,
+      step: 1,
+    });
+    this.addInteractiveControl(this.ssaoParams, 'radius', 'SSAO Radius', {
+      min: 0.1,
+      max: 2.0,
+      step: 0.01,
+    });
+    this.addInteractiveControl(this.ssaoParams, 'bias', 'SSAO Bias', {
+      min: 0.001,
+      max: 0.1,
+      step: 0.001,
+    });
+    this.addInteractiveControl(this.ssaoParams, 'aoStrength', 'SSAO Strength', {
+      min: 0.1,
+      max: 5.0,
+      step: 0.1,
+    });
+    this.addInteractiveControl(this.ssaoParams, 'maxDistance', 'SSAO Max Distance', {
+      min: 0.1,
+      max: 5.0,
+      step: 0.1,
+    });
+    this.addInteractiveControl(this.ssaoParams, 'noiseScale', 'SSAO Noise Scale', {
+      min: 1.0,
+      max: 10.0,
+      step: 0.1,
+    });
 
     this.debugControlsAdded = true;
   }
@@ -201,10 +225,10 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   protected addInteractiveControl(
-    object: unknown, 
-    propertyKey: string, 
+    object: unknown,
+    propertyKey: string,
     label?: string,
-    options?: { min?: number; max?: number; step?: number }
+    options?: { min?: number; max?: number; step?: number },
   ): void {
     const moduleManager = Engine.getModules();
     moduleManager.addInteractiveControl('SSAO', object, propertyKey, label, options);

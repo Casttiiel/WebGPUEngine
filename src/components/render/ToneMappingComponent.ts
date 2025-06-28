@@ -1,6 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { Render } from '../../renderer/core/Render';
-import { RenderToTexture } from '../../renderer/core/RenderToTexture';
+import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
@@ -11,7 +11,7 @@ export class ToneMappingComponent extends Component {
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
-  private result!: RenderToTexture;
+  private result!: RenderTarget;
   private renderPassManager!: RenderPassManager;
 
   constructor() {
@@ -22,7 +22,7 @@ export class ToneMappingComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('tone_mapping.tech');
 
-    this.result = new RenderToTexture();
+    this.result = new RenderTarget();
     this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, 'rgba16float');
   }
 
@@ -39,7 +39,7 @@ export class ToneMappingComponent extends Component {
       this.fullscreenQuadMesh,
       this.technique,
       this.bindGroup!,
-      this.result
+      this.result,
     );
 
     return this.result.getView();
@@ -64,7 +64,7 @@ export class ToneMappingComponent extends Component {
           binding: 1,
           resource: sampler,
         },
-      ]
+      ],
     );
   }
   public update(_dt: number): void {

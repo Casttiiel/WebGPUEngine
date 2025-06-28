@@ -1,6 +1,6 @@
-import { GPUUtils } from './utils/GPUUtils';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
-export class RenderToTexture {
+export class RenderTarget {
   private name: string = '';
   private xRes: number = 0;
   private yRes: number = 0;
@@ -24,7 +24,7 @@ export class RenderToTexture {
     this.name = name;
     this.xRes = width;
     this.yRes = height;
-    this.isMultisample = multisampling;    // Always create the single-sample texture (for shader sampling)
+    this.isMultisample = multisampling; // Always create the single-sample texture (for shader sampling)
     // Always use both RENDER_ATTACHMENT and TEXTURE_BINDING for maximum flexibility
     const baseUsage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
     this.texture = GPUUtils.createTexture(
@@ -33,7 +33,7 @@ export class RenderToTexture {
       height,
       format,
       baseUsage | extraUsage,
-      1 // Always single-sample for shader access
+      1, // Always single-sample for shader access
     );
 
     // If MSAA enabled, create additional multi-sample texture
@@ -44,7 +44,7 @@ export class RenderToTexture {
         height,
         format,
         GPUTextureUsage.RENDER_ATTACHMENT, // No TEXTURE_BINDING needed
-        4 // Multi-sample for rendering
+        4, // Multi-sample for rendering
       );
     }
   }

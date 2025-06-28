@@ -1,6 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { Render } from '../../renderer/core/Render';
-import { RenderToTexture } from '../../renderer/core/RenderToTexture';
+import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
@@ -11,7 +11,7 @@ export class AntialiasingComponent extends Component {
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
-  private result!: RenderToTexture;
+  private result!: RenderTarget;
   private renderPassManager!: RenderPassManager;
 
   constructor() {
@@ -23,7 +23,7 @@ export class AntialiasingComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('antialiasing.tech');
 
-    this.result = new RenderToTexture();
+    this.result = new RenderTarget();
     this.result.createRT('antialiasing_result.dds', Render.width, Render.height, 'rgba16float');
   }
 
@@ -40,7 +40,7 @@ export class AntialiasingComponent extends Component {
       this.fullscreenQuadMesh,
       this.technique,
       this.bindGroup!,
-      this.result
+      this.result,
     );
 
     return this.result.getView();
@@ -66,7 +66,7 @@ export class AntialiasingComponent extends Component {
           binding: 1,
           resource: sampler,
         },
-      ]
+      ],
     );
   }
 

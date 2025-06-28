@@ -2,7 +2,7 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 import { AmbientLight } from '../shading/AmbientLight';
 import { Skybox } from '../shading/Skybox';
 import { RenderManagerV2 as RenderManager } from './managers/RenderManagerV2';
-import { RenderToTexture } from './RenderToTexture';
+import { RenderTarget } from '../resources/RenderTarget';
 import { DepthResolver } from './DepthResolver';
 import { Entity } from '@/core/ecs/Entity';
 import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
@@ -21,9 +21,9 @@ export class DeferredRenderer {
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
-  private rtAccLight!: RenderToTexture;
-  private rtAO!: RenderToTexture;
-  private rtAOBinding!: RenderToTexture; // Copy target for binding
+  private rtAccLight!: RenderTarget;
+  private rtAO!: RenderTarget;
+  private rtAOBinding!: RenderTarget; // Copy target for binding
 
   private gBufferBindGroup!: GPUBindGroup;
   private gBufferLayout: GPUBindGroupLayout;
@@ -52,18 +52,32 @@ export class DeferredRenderer {
 
     // Create accumulation light render target
     if (!this.rtAccLight) {
-      this.rtAccLight = new RenderToTexture();
+      this.rtAccLight = new RenderTarget();
     }
-    this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float'); if (!this.rtAO) {
-      this.rtAO = new RenderToTexture();
+    this.rtAccLight.createRT('acc_light.dds', width, height, 'rgba16float');
+    if (!this.rtAO) {
+      this.rtAO = new RenderTarget();
     }
-    this.rtAO.createRT('ambient_occlusion_result.dds', width, height, 'r16float', false, GPUTextureUsage.COPY_SRC); // Add COPY_SRC
+    this.rtAO.createRT(
+      'ambient_occlusion_result.dds',
+      width,
+      height,
+      'r16float',
+      false,
+      GPUTextureUsage.COPY_SRC,
+    ); // Add COPY_SRC
 
     if (!this.rtAOBinding) {
-      this.rtAOBinding = new RenderToTexture();
+      this.rtAOBinding = new RenderTarget();
     }
-    this.rtAOBinding.createRT('ambient_occlusion_binding.dds', width, height, 'r16float', false, GPUTextureUsage.COPY_DST); // Add COPY_DST
-
+    this.rtAOBinding.createRT(
+      'ambient_occlusion_binding.dds',
+      width,
+      height,
+      'r16float',
+      false,
+      GPUTextureUsage.COPY_DST,
+    ); // Add COPY_DST
 
     // Initialize render passes with GBufferPass render targets
     const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
@@ -97,7 +111,8 @@ export class DeferredRenderer {
         {
           binding: 3,
           resource: gBufferRenderTargets.selfIllum.getView()!,
-        }, {
+        },
+        {
           binding: 4,
           resource: this.rtAOBinding.getView()!, // Use binding texture instead
         },
@@ -105,7 +120,8 @@ export class DeferredRenderer {
           binding: 5,
           resource: this.whiteTexture.getSampler()!,
         },
-      ],);
+      ],
+    );
 
     // Initialize lighting passes after gBufferBindGroup is created
     this.renderPassManager.initializeLightingPasses(
@@ -150,9 +166,9 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
     // Execute Decal pass
-    this.renderPassManager.executePass('decals', RenderCategory.DECALS);    // Resolve MSAA depth to single-sample depth for skybox
+    this.renderPassManager.executePass('decals', RenderCategory.DECALS); // Resolve MSAA depth to single-sample depth for skybox
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);    // Execute AO pass first
+    this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth); // Execute AO pass first
     this.renderAO(camera, this.rtAO);
 
     // Copy AO result to binding texture to avoid usage conflicts
@@ -171,7 +187,7 @@ export class DeferredRenderer {
     return view;
   }
 
-  private renderAO(camera: Entity, ao: RenderToTexture): void {
+  private renderAO(camera: Entity, ao: RenderTarget): void {
     const ambientOcclusionComponent = camera.getComponent(
       'ambient_occlusion',
     ) as AmbientOcclusionComponent;
@@ -199,12 +215,12 @@ export class DeferredRenderer {
       {
         width: this.rtAO.getWidth(),
         height: this.rtAO.getHeight(),
-        depthOrArrayLayers: 1
-      }
+        depthOrArrayLayers: 1,
+      },
     );
   }
 
-  public update(_dt: number): void { }
+  public update(_dt: number): void {}
 
   private destroy(): void {
     if (this.gBufferPass) {
