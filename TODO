@@ -1,32 +1,31 @@
 ## NPM RUN DEV
 
-1. UNknown/Any
-2. Load locks or async?
-3. Optimizacion WebGPUFundamentals
-4. Engine quality settings
-5. Bloom
-6. Compute-based distortion
-7. SpotLightsWithShadows
-8. Ambient Occlusion GTAO
-9. PointLighstWithShadows
-10. Directional Light
-11. Area Light
-12. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-13. Temporal Anti-Aliasing (TAA)
-14. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-15. MSAA on lights?
-16. Motion Blur
-17. Decals Category
-18. Particles
-19. Escalabilidad de Luces
+1. Load locks or async?
+2. Optimizacion WebGPUFundamentals
+3. Engine quality settings
+4. Bloom
+5. Compute-based distortion
+6. SpotLightsWithShadows
+7. Ambient Occlusion GTAO
+8. PointLighstWithShadows
+9. Directional Light
+10. Area Light
+11. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+12. Temporal Anti-Aliasing (TAA)
+13. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+14. MSAA on lights?
+15. Motion Blur
+16. Decals Category
+17. Particles
+18. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-20. Improve uniform declaration. Poder especificar Group y binding
-21. Mesh LOD/Generate LOD on texture and mesh automatically
-22. Occlusion culling
-23. Memory Bandwidth
+19. Improve uniform declaration. Poder especificar Group y binding
+20. Mesh LOD/Generate LOD on texture and mesh automatically
+21. Occlusion culling
+22. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-24. GPU-Driven Rendering 🚀 Futuro
+23. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
 Terrain with perlin noise

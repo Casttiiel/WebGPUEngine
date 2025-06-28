@@ -11,6 +11,9 @@ import { RenderPassFactory } from './RenderPassFactory';
 import { RenderTarget } from '../../resources/RenderTarget';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { Render } from '../Render';
+import { RenderKey } from '../managers/RenderKeyManager';
+import { Mesh } from '../../resources/Mesh';
+import { Technique } from '../../resources/Technique';
 
 /**
  * Manager for coordinating multiple render passes in the deferred rendering pipeline
@@ -58,7 +61,7 @@ export class RenderPassManager {
   /**
    * Execute a specific render pass
    */
-  public executePass(passName: string, category?: RenderCategory, renderKeys?: any[]): void {
+  public executePass(passName: string, category?: RenderCategory, renderKeys?: RenderKey[]): void {
     const pass = this.renderPasses.get(passName);
     if (!pass) {
       throw new Error(`Render pass '${passName}' not found`);
@@ -116,10 +119,10 @@ export class RenderPassManager {
   public initializeLightingPasses(
     accLight: RenderTarget,
     singleDepthView: GPUTextureView,
-    pointLightTechnique: any,
-    spotLightTechnique: any,
-    unitSphere: any,
-    unitFrustum: any,
+    pointLightTechnique: Technique,
+    spotLightTechnique: Technique,
+    unitSphere: Mesh,
+    unitFrustum: Mesh,
     gBufferBindGroup: GPUBindGroup,
   ): void {
     // Create Point Light pass
@@ -152,7 +155,7 @@ export class RenderPassManager {
   public executeDynamicPass(
     pass: BaseRenderPass,
     category?: RenderCategory,
-    renderKeys?: any[],
+    renderKeys?: RenderKey[],
   ): void {
     const encoder = Render.getInstance().getCommandEncoder();
     pass.execute(encoder, category, renderKeys);
@@ -162,8 +165,8 @@ export class RenderPassManager {
    * Create and execute a tone mapping pass dynamically
    */
   public executeToneMappingPass(
-    mesh: any,
-    technique: any,
+    mesh: Mesh,
+    technique: Technique,
     bindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
@@ -176,8 +179,8 @@ export class RenderPassManager {
    * Create and execute an antialiasing pass dynamically
    */
   public executeAntialiasingPass(
-    mesh: any,
-    technique: any,
+    mesh: Mesh,
+    technique: Technique,
     bindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
@@ -190,8 +193,8 @@ export class RenderPassManager {
    * Create and execute an ambient occlusion pass dynamically
    */
   public executeAmbientOcclusionPass(
-    mesh: any,
-    technique: any,
+    mesh: Mesh,
+    technique: Technique,
     gBufferBindGroup: GPUBindGroup,
     ssaoParamsBindGroup: GPUBindGroup | undefined,
     result: RenderTarget,
@@ -209,8 +212,8 @@ export class RenderPassManager {
    * Create and execute an AO bilateral filter pass dynamically
    */
   public executeAOBilateralFilterPass(
-    mesh: any,
-    technique: any,
+    mesh: Mesh,
+    technique: Technique,
     gBufferBindGroup: GPUBindGroup,
     aoBindGroup: GPUBindGroup,
     result: RenderTarget,

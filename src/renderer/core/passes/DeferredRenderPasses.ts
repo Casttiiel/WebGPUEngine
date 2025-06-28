@@ -3,6 +3,7 @@ import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
 import { Render } from '../Render';
 import { GPUUtils } from '../utils/GPUUtils';
+import { RenderKey } from '../managers/RenderKeyManager';
 
 /**
  * G-Buffer render pass for deferred rendering using BaseRenderPass
@@ -40,7 +41,7 @@ export class DecalRenderPass extends BaseRenderPass {
   protected render(
     pass: GPURenderPassEncoder,
     _category?: RenderCategory,
-    _renderKeys?: any[],
+    _renderKeys?: RenderKey[],
   ): void {
     // Configure viewport for decals
     const viewport = this.config.viewport;
@@ -65,7 +66,7 @@ export class TransparentRenderPass extends BaseRenderPass {
   protected render(
     pass: GPURenderPassEncoder,
     _category?: RenderCategory,
-    _renderKeys?: any[],
+    _renderKeys?: RenderKey[],
   ): void {
     // Configure viewport for transparent objects
     const viewport = this.config.viewport;
