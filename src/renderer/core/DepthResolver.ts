@@ -32,17 +32,20 @@ export class DepthResolver {
       [
         {
           binding: 0,
-          resource: msaaDepthTexture.createView(),
+          resource: msaaDepthTexture.createView({
+            aspect: 'depth-only'
+          }),
         },
       ]
     );
-
     // Create render pass to resolve depth
     const renderPass = commandEncoder.beginRenderPass({
       label: 'Depth Resolve Render Pass',
       colorAttachments: [], // No color attachments
       depthStencilAttachment: {
-        view: singleSampleDepthTexture.createView(),
+        view: singleSampleDepthTexture.createView({
+          aspect: 'depth-only'
+        }),
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',

@@ -26,40 +26,41 @@ export class GBufferPass {
 
     private async createRenderTargets(): Promise<void> {
         const width = Render.width;
-        const height = Render.height;
-
-        // Create G-Buffer render targets
+        const height = Render.height;        // Create G-Buffer render targets with formats matching gbuffer.tech pipeline
         this.rtAlbedos = new RenderToTexture();
-        this.rtAlbedos.createRT('gbuffer_albedos', width, height, 'rgba8unorm', true);
+        this.rtAlbedos.createRT('gbuffer_albedos', width, height, 'rgba16float', true);
 
         this.rtNormals = new RenderToTexture();
-        this.rtNormals.createRT('gbuffer_normals', width, height, 'rgba8unorm', true);
+        this.rtNormals.createRT('gbuffer_normals', width, height, 'rgba16float', true);
 
         this.rtSelfIllum = new RenderToTexture();
-        this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, 'rgba8unorm', true);
+        this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, 'rgba16float', true);
 
         this.rtLinearDepth = new RenderToTexture();
-        this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, 'r32float', true);    // Create depth buffers (both MSAA and single-sample)
+        this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, 'r16float', true);// Create depth buffers (both MSAA and single-sample)
         this.depthStencil = GPUUtils.createTexture(
             'gbuffer_depth_single',
             width,
             height,
-            'depth32float-stencil8',
-            GPUTextureUsage.RENDER_ATTACHMENT,
-        );
-        this.depthStencilView = this.depthStencil.createView();
+            'depth32float',
+            GPUTextureUsage.RENDER_ATTACHMENT,);
+        this.depthStencilView = this.depthStencil.createView({
+            aspect: 'depth-only'
+        });
 
         this.msaaDepthStencil = GPUUtils.createTexture(
             'gbuffer_depth_msaa',
             width,
             height,
-            'depth32float-stencil8',
-            GPUTextureUsage.RENDER_ATTACHMENT,
+            'depth32float',
+            GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
             4,
         );
-        this.msaaDepthStencilView = this.msaaDepthStencil.createView();
+        this.msaaDepthStencilView = this.msaaDepthStencil.createView({
+            aspect: 'depth-only'
+        });
     }
-    
+
     public execute(encoder: GPUCommandEncoder, renderCallback: (pass: GPURenderPassEncoder) => void): void {
         const colorAttachments: GPURenderPassColorAttachment[] = [
             GPUUtils.createColorAttachment(this.rtAlbedos.getRenderView(), 'clear'),

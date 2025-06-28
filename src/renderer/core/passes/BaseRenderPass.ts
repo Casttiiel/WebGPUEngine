@@ -7,7 +7,7 @@ export interface RenderPassConfig {
     label: string;
     colorAttachments: GPURenderPassColorAttachment[];
     depthStencilAttachment?: GPURenderPassDepthStencilAttachment;
-    viewport?: { width: number; height: number };
+    viewport?: { width: number; height: number } | undefined;
 }
 
 /**
