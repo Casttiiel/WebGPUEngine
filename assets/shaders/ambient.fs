@@ -2,20 +2,6 @@
 #include "common/structs"
 #include "common/utils"
 
-struct GBuffer {
-    worldPos: vec3<f32>,
-    normal: vec3<f32>,
-    albedo: vec3<f32>,
-    specularColor: vec3<f32>,
-    roughness: f32,
-    selfIllum: vec3<f32>,
-    emissive: f32,
-    reflectedDir: vec3<f32>,
-    viewDir: vec3<f32>,
-    metallic: f32,
-    zlinear: f32,
-}
-
 struct AmbientUniforms {
     reflectionIntensity: f32,
     ambientLightIntensity: f32,

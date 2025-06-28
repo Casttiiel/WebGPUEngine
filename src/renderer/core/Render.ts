@@ -3,16 +3,17 @@ import { AntialiasingComponent } from '../../components/render/AntialiasingCompo
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { Engine } from '../../core/engine/Engine';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class Render {
   private static instance: Render;
 
   // Objetos principales de WebGPU
-  private adapter!: GPUAdapter; // Adaptador que representa el hardware gráfico
-  private device!: GPUDevice; // Dispositivo lógico para crear recursos y ejecutar comandos
-  private context!: GPUCanvasContext; // Contexto del canvas para presentar los frames
-  private currentCommandEncoder!: GPUCommandEncoder; // Codificador de comandos actual
-  private format: GPUTextureFormat = 'bgra8unorm'; // Formato de color (BGRA 8 bits por canal)
+  private adapter!: GPUAdapter;
+  private device!: GPUDevice;
+  private context!: GPUCanvasContext;
+  private currentCommandEncoder!: GPUCommandEncoder;
+  private format: GPUTextureFormat = 'bgra8unorm';
 
   // Dimensiones del canvas
   private static screenWidth: number = 800;
@@ -58,7 +59,7 @@ export class Render {
 
       // 2. Crear el dispositivo lógico con las características requeridas
       this.device = await this.adapter.requestDevice({
-        requiredFeatures: ['texture-compression-bc', 'depth32float-stencil8'], // Soporte para compresión de texturas
+        requiredFeatures: ['texture-compression-bc', 'depth32float-stencil8'],
         requiredLimits: {
           maxStorageBufferBindingSize: 1024 * 1024 * 1024, // 1GB de buffer máximo
         },
@@ -69,17 +70,17 @@ export class Render {
       if (!context) {
         throw new Error('No se pudo obtener el contexto WebGPU');
       }
-      this.context = context;
-
-      // Configurar el formato de color preferido
+      this.context = context;      // Configurar el formato de color preferido
       this.format = navigator.gpu.getPreferredCanvasFormat();
       this.context.configure({
         device: this.device,
         format: this.format,
       });
-
-      // Observador para manejar cambios de tamaño del canvas
       this.setupResizeObserver();
+
+      // Initialize GPUUtils with the WebGPU device
+      GPUUtils.initialize(this.device);
+      console.warn('GPUUtils initialized with WebGPU device');
 
       return true;
     } catch (error) {
@@ -162,11 +163,6 @@ export class Render {
         (comp as AntialiasingComponent).resize();
       }
 
-      for (const comp of Engine.getEntities().getObjectManagerByName('ambient_occlusion')?.getList() ??
-        []) {
-        (comp as AmbientOcclusionComponent).resize();
-      }
-
       Engine.getRender().onResolutionUpdated();
     });
   }
@@ -206,5 +202,5 @@ export class Render {
     return this.context;
   }
 
-  public destroy(): void {}
+  public destroy(): void { }
 }

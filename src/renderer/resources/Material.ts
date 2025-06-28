@@ -6,6 +6,8 @@ import { MaterialDataType } from '../../types/MaterialData.type';
 import { Technique } from './Technique';
 import { Texture } from './Texture';
 import { Engine } from '../../core/engine/Engine';
+import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 
 export interface MaterialTexturesOptions {
   albedo: string;
@@ -141,53 +143,28 @@ export class Material extends GPUResource {
     }
 
     const texture = this.textures.get('albedo');
+    if (!texture) {
+      throw new Error(`Required albedo texture not found for material ${this.label}`);
+    }
     const sampler = texture.getSampler();
+    if (!sampler) {
+      throw new Error(`Sampler not available for albedo texture in material ${this.label}`);
+    }
     entries.push({
       binding: bindingIndex,
       resource: sampler,
     });
 
-    const textureBingGroupLayout = this.device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 5,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' },
-        },
-      ],
-    });
+    const textureBingGroupLayout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.MATERIAL_TEXTURES
+    );
 
     // Create bind group
-    this.textureBindGroup = this.device.createBindGroup({
-      label: `${this.label}_texture_bindgroup`,
-      layout: textureBingGroupLayout,
-      entries,
-    });
+    this.textureBindGroup = BindGroupFactory.createBindGroup(
+      `${this.label}_texture_bindgroup`,
+      textureBingGroupLayout,
+      entries
+    );
   }
 
   private async loadTexture(type: string, path: string): Promise<void> {

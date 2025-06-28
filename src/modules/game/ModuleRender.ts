@@ -5,11 +5,13 @@ import { Engine } from '../../core/engine/Engine';
 import { Camera } from '../../core/math/Camera';
 import { DeferredRenderer } from '../../renderer/core/DeferredRenderer';
 import { Render } from '../../renderer/core/Render';
-import { RenderManager } from '../../renderer/core/RenderManager';
+import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Module } from '../core/Module';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -43,6 +45,10 @@ export class ModuleRender extends Module {
     this.onResolutionUpdated();
     this.initializeUniformBuffers();
     await this.initializePresentationData();
+
+    // Initialize GPU Frustum Culling
+    await RenderManager.getInstance().initialize();
+
     return true;
   }
 
@@ -51,7 +57,7 @@ export class ModuleRender extends Module {
     this.presentationBindGroup = null;
   }
 
-  public generateFrame(): void {
+  public async generateFrame(): Promise<void> {
     Render.getInstance().beginFrame();
 
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
@@ -62,9 +68,14 @@ export class ModuleRender extends Module {
     this.updateGlobalUniforms(camera);
     RenderManager.getInstance().setCamera(camera);
 
-    let result = this.deferred.render(mainCamera);
+    if (!mainCamera) {
+      console.warn('No main camera found');
+      return;
+    }
 
-    this.renderDistorsions(result);
+    let result = await this.deferred.render(mainCamera);
+
+    //this.renderDistorsions(result);
 
     if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
@@ -83,58 +94,40 @@ export class ModuleRender extends Module {
 
   public renderDistorsions(texture: GPUTextureView): void {
     const render = Render.getInstance();
-    const pass = render.getCommandEncoder().beginRenderPass({
-      label: 'Distorsions Render pass',
-      colorAttachments: [
-        {
-          view: texture,
-          loadOp: 'load',
-          storeOp: 'store',
-        },
-      ],
-      depthStencilAttachment: {
-        view: this.deferred.getDepthStencilView(),
-        depthLoadOp: 'load',
-        depthStoreOp: 'discard',
-      },
-    });
 
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      Render.width, // Width
-      Render.height, // Height
-      0.0,
-      1.0, // Min/max depth
+    const colorAttachment = GPUUtils.createColorAttachment(texture, 'load', 'store');
+    const depthAttachment = GPUUtils.createDepthStencilAttachment(
+      this.deferred.getDepthStencilView()!,
+      'load',
+      'discard'
+    );
+    const pass = render.getCommandEncoder().beginRenderPass(
+      GPUUtils.createRenderPassDescriptor(
+        'Distorsions Render pass',
+        [colorAttachment],
+        depthAttachment
+      )
     );
 
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      Render.width, // Width
-      Render.height, // Height
-    );
+    // Configure viewport and scissor using GPUUtils
+    GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
 
     RenderManager.getInstance().render(RenderCategory.DISTORSIONS, pass);
 
     pass.end();
   }
-
   private presentResult(result: GPUTextureView): void {
     const render = Render.getInstance();
-    const device = render.getDevice();
-
     if (!this.presentationBindGroup) {
-      const sampler = device.createSampler({
+      const sampler = GPUUtils.createSampler({
         magFilter: 'linear',
         minFilter: 'linear',
       });
 
-      this.presentationBindGroup = device.createBindGroup({
-        label: `presentation_bindgroup`,
-        layout: this.presentationTechnique.getPipeline().getBindGroupLayout(0),
-        entries: [
+      this.presentationBindGroup = BindGroupFactory.createBindGroup(
+        `presentation_bindgroup`,
+        this.presentationTechnique.getPipeline().getBindGroupLayout(0),
+        [
           {
             binding: 0,
             resource: result,
@@ -143,48 +136,34 @@ export class ModuleRender extends Module {
             binding: 1,
             resource: sampler,
           },
-        ],
-      });
+        ]
+      );
     }
-
-    const pass = render.getCommandEncoder().beginRenderPass({
-      colorAttachments: [
-        {
-          view: render.getContext().getCurrentTexture().createView(),
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        },
-      ],
-    });
-
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-      0.0,
-      1.0, // Min/max depth
+    const colorAttachment = GPUUtils.createColorAttachment(
+      render.getContext().getCurrentTexture().createView(),
+      'clear',
+      'store',
+      { r: 0, g: 0, b: 0, a: 1 }
+    ); const pass = render.getCommandEncoder().beginRenderPass(
+      GPUUtils.createRenderPassDescriptor(
+        'main presentation render pass',
+        [colorAttachment]
+      )
     );
 
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-    );
+    // Configure viewport and scissor using GPUUtils
+    GPUUtils.configureViewportAndScissor(pass);
 
-    // 1. Activar el pipeline
+    // 1. Activate pipeline
     this.presentationTechnique.activatePipeline(pass);
 
-    // 2. Activar mesh data
+    // 2. Activate mesh data
     this.fullscreenQuadMesh.activate(pass);
 
-    // 3. Activar bind groups
+    // 3. Set bind groups
     pass.setBindGroup(0, this.presentationBindGroup);
 
-    // 4. Dibujar la mesh
+    // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();
@@ -203,7 +182,7 @@ export class ModuleRender extends Module {
     this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
       RenderCategory.TRANSPARENT,
     );
-    this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
+    this.debugValues.drawCallsDistorsions.value = renderManager.getDrawCallsForCategory(
       RenderCategory.DISTORSIONS,
     );
     this.debugValues.totalDrawCalls.value =
@@ -249,35 +228,24 @@ export class ModuleRender extends Module {
   }
 
   private initializeUniformBuffers(): void {
-    const render = Render.getInstance(); // Crear buffer uniforme global para las matrices de la cámara    this.globalUniformBuffer = render.getDevice().createBuffer({
-    this.globalUniformBuffer = render.getDevice().createBuffer({
-      label: `global uniform buffer`,
-      size: 256,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    // Crear buffer uniforme global para las matrices de la cámara
+    this.globalUniformBuffer = GPUUtils.createBuffer(
+      'global uniform buffer',
+      256,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
-    // Crear el layout para el bind group global
-    const globalBindGroupLayout = render.getDevice().createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
-
-    // Crear el bind group global
-    this.globalBindGroup = render.getDevice().createBindGroup({
-      label: `global uniform bind group`,
-      layout: globalBindGroupLayout,
-      entries: [
+    // Crear el bind group global usando la factory
+    const globalBindGroupLayout = BindGroupFactory.getCameraUniformsLayout();
+    this.globalBindGroup = BindGroupFactory.createBindGroup(
+      'global uniform bind group',
+      globalBindGroupLayout,
+      [
         {
           binding: 0,
           resource: { buffer: this.globalUniformBuffer },
         },
       ],
-    });
+    );
   }
 
   private async initializePresentationData(): Promise<void> {
@@ -285,48 +253,42 @@ export class ModuleRender extends Module {
 
     this.presentationTechnique = await Technique.get('presentation.tech');
   }
+
   public updateGlobalUniforms(camera: Camera): void {
-    const render = Render.getInstance();
 
     const viewMatrix = new Float32Array(camera.getView());
     const projectionMatrix = new Float32Array(camera.getProjection());
     const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
-    const cameraPosition = new Float32Array(camera.getPosition());
-
-    // viewMatrix (offset 0)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 0, viewMatrix);
+    const cameraPosition = new Float32Array(camera.getPosition());    // viewMatrix (offset 0)
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 0, viewMatrix);
 
     // projectionMatrix (offset 64)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
 
     // invViewProjectionMatrix (offset 128)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 128, invViewProjectionMatrix);
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 128, invViewProjectionMatrix);
 
     // cameraPosition (offset 192)
-    render.getDevice().queue.writeBuffer(this.globalUniformBuffer, 192, cameraPosition);
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 192, cameraPosition);
 
     // screenSize (offset 208)
-    render
-      .getDevice()
-      .queue.writeBuffer(
-        this.globalUniformBuffer,
-        208,
-        new Float32Array([Render.width, Render.height]),
-      );
+    GPUUtils.writeBuffer(
+      this.globalUniformBuffer,
+      208,
+      new Float32Array([Render.width, Render.height]),
+    );
 
     // cameraFront + cameraZFar (offset 224)
-    render
-      .getDevice()
-      .queue.writeBuffer(
-        this.globalUniformBuffer,
-        224,
-        new Float32Array([
-          camera.getFront()[0],
-          camera.getFront()[1],
-          camera.getFront()[2],
-          camera.getFar(),
-        ]),
-      );
+    GPUUtils.writeBuffer(
+      this.globalUniformBuffer,
+      224,
+      new Float32Array([
+        camera.getFront()[0],
+        camera.getFront()[1],
+        camera.getFront()[2],
+        camera.getFar(),
+      ]),
+    );
   }
 
   public getGlobalBindGroup(): GPUBindGroup {

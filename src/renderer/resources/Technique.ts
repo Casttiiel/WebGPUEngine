@@ -8,6 +8,8 @@ import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.e
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { Mesh } from './Mesh';
 import { Render } from '../core/Render';
+import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
@@ -60,42 +62,70 @@ export class Technique extends GPUResource {
     this.vsEntryPoint = options.vsEntryPoint || 'vs';
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
   }
-
   public static async get(
     pathOrData: string | Partial<TechniqueCreateOptions>,
   ): Promise<Technique> {
-    let techniqueData = null;
-    const path =
-      typeof pathOrData === 'string' ? pathOrData : `${pathOrData?.vs}-${pathOrData?.fs}`;
+    const path = this.generatePath(pathOrData);
 
+    // Try to get existing resource
     try {
       return ResourceManager.getResource<Technique>(path);
     } catch {
-      if (typeof pathOrData === 'string') {
-        techniqueData = await ResourceManager.loadTechniqueData(pathOrData);
-      } else {
-        techniqueData = pathOrData;
-      }
+      // Resource doesn't exist, create new one
     }
 
-    const technique = new Technique({
-      path,
-      type: ResourceType.TECHNIQUE,
-      vs: techniqueData?.vs ?? '',
-      fs: techniqueData?.fs ?? '',
-      blend: techniqueData?.blend ?? BlendModes.DEFAULT,
-      rs: techniqueData?.rs ?? RasterizationMode.DEFAULT,
-      z: techniqueData?.z ?? DepthModes.DEFAULT,
-      writesOn: techniqueData?.writesOn ?? FragmentShaderTargets.SCREEN,
-      uniforms: techniqueData?.uniforms ?? [],
-    });
+    const techniqueData = await this.loadTechniqueData(pathOrData);
+    const technique = this.createTechnique(path, techniqueData);
 
-    if (!technique.vsFile || !technique.fsFile) {
-      throw new Error(`Missing shader files for technique: ${path}`);
-    }
     await technique.load();
     ResourceManager.registerResource(technique);
     return technique;
+  }
+
+  private static generatePath(pathOrData: string | Partial<TechniqueCreateOptions>): string {
+    return typeof pathOrData === 'string'
+      ? pathOrData
+      : `${pathOrData?.vs}-${pathOrData?.fs}`;
+  }
+
+  private static async loadTechniqueData(
+    pathOrData: string | Partial<TechniqueCreateOptions>
+  ): Promise<Partial<TechniqueCreateOptions>> {
+    if (typeof pathOrData === 'string') {
+      return await ResourceManager.loadTechniqueData(pathOrData);
+    }
+    return pathOrData;
+  }
+
+  private static createTechnique(
+    path: string,
+    techniqueData: Partial<TechniqueCreateOptions>
+  ): Technique {
+    if (!techniqueData?.vs || !techniqueData?.fs) {
+      throw new Error(`Missing shader files for technique: ${path}`);
+    }
+
+    const options: TechniqueOptions = {
+      path,
+      type: ResourceType.TECHNIQUE,
+      vs: techniqueData.vs,
+      fs: techniqueData.fs,
+      blend: techniqueData.blend ?? BlendModes.DEFAULT,
+      rs: techniqueData.rs ?? RasterizationMode.DEFAULT,
+      z: techniqueData.z ?? DepthModes.DEFAULT,
+      writesOn: techniqueData.writesOn ?? FragmentShaderTargets.SCREEN,
+      uniforms: techniqueData.uniforms ?? [],
+    };
+
+    // Add optional properties only if they exist
+    if (techniqueData.vsEntryPoint) {
+      options.vsEntryPoint = techniqueData.vsEntryPoint;
+    }
+    if (techniqueData.fsEntryPoint) {
+      options.fsEntryPoint = techniqueData.fsEntryPoint;
+    }
+
+    return new Technique(options);
   }
 
   public override async load(): Promise<void> {
@@ -142,230 +172,7 @@ export class Technique extends GPUResource {
   }
 
   private createBindGroupLayout(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
-    switch (layout) {
-      case PipelineBindGroupLayouts.CAMERA_UNIFORMS: {
-        return this.device.createBindGroupLayout({
-          label: 'camera uniforms bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-              buffer: { type: 'uniform' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.MATERIAL_TEXTURES: {
-        return this.device.createBindGroupLayout({
-          label: 'material textures uniforms bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 2,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 3,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 4,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 5,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.OBJECT_UNIFORMS: {
-        return this.device.createBindGroupLayout({
-          label: 'object uniforms bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.VERTEX,
-              buffer: { type: 'uniform' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.SINGLE_TEXTURE: {
-        return this.device.createBindGroupLayout({
-          label: 'single texture bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.GBUFFER_UNIFORMS: {
-        return this.device.createBindGroupLayout({
-          label: 'g buffer uniforms bind group layout',
-          entries: [
-            // Albedo texture
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Normal texture
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Linear depth texture
-            {
-              binding: 2,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Self illumination texture
-            {
-              binding: 3,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // AO texture
-            {
-              binding: 4,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: { sampleType: 'float' },
-            },
-            // Shared sampler for all textures
-            {
-              binding: 5,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.CUBEMAP_TEXTURE: {
-        return this.device.createBindGroupLayout({
-          label: 'cubemap texture bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: 'cube',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.CUBEMAP_WITH_BRDF: {
-        return this.device.createBindGroupLayout({
-          label: 'cubemap with brdf lut bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: 'cube',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-            {
-              binding: 2,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: '2d',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 3,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-            {
-              binding: 4,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                viewDimension: 'cube',
-                sampleType: 'float',
-                multisampled: false,
-              },
-            },
-            {
-              binding: 5,
-              visibility: GPUShaderStage.FRAGMENT,
-              sampler: { type: 'filtering' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.BUFFER_UNIFORM: {
-        return this.device.createBindGroupLayout({
-          label: 'buffer uniform bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              buffer: { type: 'uniform' },
-            },
-          ],
-        });
-      }
-      case PipelineBindGroupLayouts.DEPTH_TEXTURE: {
-        return this.device.createBindGroupLayout({
-          label: 'depth texture bind group layout',
-          entries: [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.FRAGMENT,
-              texture: {
-                sampleType: 'depth',
-                viewDimension: '2d',
-                multisampled: true,
-              },
-            },
-          ],
-        });
-      }
-      default: {
-        throw new Error(`${this.label}: Unknown uniform layout`);
-      }
-    }
+    return BindGroupFactory.getLayoutFromEnum(layout);
   }
 
   private createPipeline(): void {
@@ -379,17 +186,15 @@ export class Technique extends GPUResource {
     if (!layouts) {
       throw new Error(`Cannot create pipeline for technique ${this.path}: No layouts available`);
     }
-
-    const pipelineLayout = this.device.createPipelineLayout({
-      label: `${this.label}_pipelineLayout`,
-      bindGroupLayouts: layouts,
-    });
+    const pipelineLayout = PipelineFactory.createPipelineLayout(
+      `${this.label}_pipelineLayout`,
+      layouts,
+    );
 
     const vsModule = this.vsModule;
     const fsModule = this.fsModule;
     if (!vsModule || !fsModule) throw new Error('Shader modules not available');
-
-    const pipelineParams = {
+    const pipelineConfig: PipelineConfig = {
       label: this.label,
       layout: pipelineLayout,
       vertex: {
@@ -407,25 +212,34 @@ export class Technique extends GPUResource {
         cullMode: this.getRasterizationConfig(),
         frontFace: 'ccw',
       },
-    } as GPURenderPipelineDescriptor;
-
+    };
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
-      pipelineParams.depthStencil = this.getDepthConfig();
+      pipelineConfig.depthStencil = this.getDepthConfig();
+    }    // Add multisample if needed for MSAA passes
+    if (this.needsMSAA()) {
+      pipelineConfig.multisample = { count: 4 };
     }
 
-    if (this.writesOn === FragmentShaderTargets.GBUFFER) {
-      pipelineParams.multisample = {
-        count: 4,
-      };
-    }
-
-    this.pipeline = this.device.createRenderPipeline(pipelineParams);
+    this.pipeline = PipelineFactory.createPipeline(pipelineConfig);
   }
+
+  private needsMSAA(): boolean {
+    return this.writesOn === FragmentShaderTargets.GBUFFER ||
+      this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER ||
+      this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA;
+  }
+
+  // ============================================================================
+  // PIPELINE CONFIGURATION METHODS
+  // ============================================================================
 
   private getRasterizationConfig(): GPUCullMode {
     switch (this.rasterizationMode) {
       case RasterizationMode.DEFAULT: {
         return 'back';
+      }
+      case RasterizationMode.REVERSE_CULLING: {
+        return 'front';
       }
       case RasterizationMode.DOUBLE_SIDED: {
         return 'none';
@@ -436,97 +250,87 @@ export class Technique extends GPUResource {
     }
   }
 
+  // ============================================================================
+  // FRAGMENT TARGET CONFIGURATION METHODS  
+  // ============================================================================
+
   private getFragmentShaderTarget(): GPUColorTargetState[] {
     switch (this.writesOn) {
-      case FragmentShaderTargets.GBUFFER: {
-        return [
-          {
-            format: 'rgba16float',
-          },
-          {
-            format: 'rgba16float',
-          },
-          {
-            format: 'rgba16float',
-          },
-          {
-            format: 'r16float',
-          },
-        ];
-      }
-      case FragmentShaderTargets.TEXTURE: {
-        return [
-          {
-            format: 'rgba16float',
-            blend: this.getBlendState(),
-          },
-        ];
-      }
-      case FragmentShaderTargets.SINGLE_CHANNEL: {
-        return [
-          {
-            format: 'r16float'
-          },
-        ];
-      }
-      case FragmentShaderTargets.SCREEN: {
-        return [
-          {
-            format: Render.getInstance().getFormat(),
-            blend: {
-              color: {
-                srcFactor: 'one',
-                dstFactor: 'zero',
-                operation: 'add',
-              },
-              alpha: {
-                srcFactor: 'one',
-                dstFactor: 'zero',
-                operation: 'add',
-              },
-            },
-          },
-        ];
-      }
-      case FragmentShaderTargets.DEPTH_ONLY: {
+      case FragmentShaderTargets.GBUFFER:
+        return this.createGBufferTargets();
+      case FragmentShaderTargets.PARTIAL_GBUFFER:
+        return this.createPartialGBufferTargets();
+      case FragmentShaderTargets.TEXTURE:
+        return this.createTextureTarget();
+      case FragmentShaderTargets.SINGLE_CHANNEL:
+      case FragmentShaderTargets.SINGLE_CHANNEL_MSAA:
+        return this.createSingleChannelTarget();
+      case FragmentShaderTargets.SCREEN:
+        return this.createScreenTarget();
+      case FragmentShaderTargets.DEPTH_ONLY:
         return []; // No color targets, only depth output
-      }
-      default: {
+      default:
         throw new Error(`${this.label}: Unknown Fragment Shader Target`);
-      }
     }
   }
+
+  private createGBufferTargets(): GPUColorTargetState[] {
+    return [
+      { format: 'rgba16float' }, // Albedo + metallic
+      { format: 'rgba16float' }, // Normal + roughness  
+      { format: 'rgba16float' }, // Self illumination
+      { format: 'r16float' },    // Linear depth
+    ];
+  }
+
+  private createPartialGBufferTargets(): GPUColorTargetState[] {
+    return [
+      { format: 'rgba16float' }, // Albedo + metallic
+      { format: 'rgba16float' }, // Normal + roughness
+    ];
+  }
+
+  private createTextureTarget(): GPUColorTargetState[] {
+    return [
+      {
+        format: 'rgba16float',
+        blend: this.getBlendState(),
+      },
+    ];
+  }
+
+  private createSingleChannelTarget(): GPUColorTargetState[] {
+    return [{ format: 'r16float' }];
+  }
+  private createScreenTarget(): GPUColorTargetState[] {
+    return [
+      {
+        format: Render.getInstance().getFormat(),
+        blend: PipelineFactory.getOpaqueBlending(),
+      },
+    ];
+  }
+
+  // ============================================================================
+  // BLEND STATE CONFIGURATION METHODS
+  // ============================================================================
 
   private getBlendState(): GPUBlendState {
     switch (this.blendMode) {
       case BlendModes.ADDITIVE_BY_SRC_ALPHA:
-        return {
-          color: {
-            srcFactor: 'src-alpha',
-            dstFactor: 'one',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'one',
-            dstFactor: 'one',
-            operation: 'add',
-          },
-        };
+        return PipelineFactory.getAdditiveBlending();
+      case BlendModes.ADDITIVE:
+        return PipelineFactory.getPureAdditiveBlending();
+      case BlendModes.COMBINATIVE_GBUFFER:
+        return PipelineFactory.getAlphaBlending();
       default:
-        return {
-          color: {
-            srcFactor: 'one',
-            dstFactor: 'zero',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'one',
-            dstFactor: 'zero',
-            operation: 'add',
-          },
-        };
+        return PipelineFactory.getOpaqueBlending();
     }
   }
+
+  // ============================================================================
+  // DEPTH CONFIGURATION METHODS
+  // ============================================================================
 
   private getDepthConfig(): GPUDepthStencilState {
     switch (this.depthTest) {
@@ -544,6 +348,13 @@ export class Technique extends GPUResource {
           format: 'depth32float',
         };
       }
+      case DepthModes.INVERSE_TEST_NO_WRITE: {
+        return {
+          depthWriteEnabled: false,
+          depthCompare: 'greater',
+          format: 'depth32float',
+        };
+      }
       case DepthModes.DEFAULT: {
         return {
           format: 'depth32float',
@@ -556,6 +367,13 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'always',
+        };
+      }
+      case DepthModes.LESS_EQUAL_NO_WRITE: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: false,
+          depthCompare: 'less-equal',
         };
       }
       default: {
@@ -576,6 +394,9 @@ export class Technique extends GPUResource {
   }
 
   public getBindGroupLayout(idx: number): GPUBindGroupLayout | undefined {
+    if (!this.pipelineLayouts || idx < 0 || idx >= this.pipelineLayouts.length) {
+      return undefined;
+    }
     return this.pipelineLayouts[idx];
   }
 }

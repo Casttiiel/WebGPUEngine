@@ -13,6 +13,8 @@ import { Engine } from '../engine/Engine';
 import { ResourceManager } from '../engine/ResourceManager';
 import { GLTFLoader } from './GLTFLoader';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
+import { PointLightComponent } from '../../components/render/PointLightComponent';
+import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -99,31 +101,22 @@ export class Loader {
     switch (type) {
       case 'name':
         return new NameComponent();
-        break;
       case 'transform':
         return new TransformComponent();
-        break;
       case 'render':
         return new RenderComponent();
-        break;
       case 'camera':
         return new CameraComponent();
-        break;
       case 'tone_mapping':
         return new ToneMappingComponent();
-        break;
       case 'antialiasing':
         return new AntialiasingComponent();
-        break;
       case 'ambient_occlusion':
         return new AmbientOcclusionComponent();
-        break;
-      /*case 'autoAlignedBoundingBox':
-        entity.addComponent(type, new AABBComponent());
-        break;
-      case 'light':
-        entity.addComponent(type, new LightComponent(compData));
-        break;*/
+      case 'point_light':
+        return new PointLightComponent();
+      case 'spot_light':
+        return new SpotLightComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

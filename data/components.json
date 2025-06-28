@@ -1,9 +1,4 @@
 {
-    "update": [
-      "transform",
-      "camera"
-    ],
-    "render_debug": [
-
-    ]
-  }
+  "update": ["point_light", "transform", "camera"],
+  "render_debug": []
+}

@@ -6,12 +6,43 @@
         "rotation": [0, 90, 0]
       }
     },
-    "gltf":"sponza.gltf"
+    "gltf": "sponza.gltf"
   },
   {
     "prefab": "main_camera.prefab"
   },
   {
-    "prefab": "cube_distorsion.prefab"
+    "prefab": "cube_transparent.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 2, 10],
+
+        "scale": [0.5, 0.5, 0.5]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Spot Light",
+      "spot_light": {
+        "color": [1.0, 1.0, 1.0, 1.0],
+        "intensity": 5,
+        "radius": 20,
+        "near": 0.1,
+        "far": 20,
+        "fov": 20,
+        "position": [0, 2, 0],
+        "target": [0, 2, 1],
+        "isOrtho": false,
+        "orthoLeft": 10,
+        "orthoWidth": 2,
+        "orthoTop": 10,
+        "orthoHeight": 2
+      }
+    }
+  },
+  {
+    "prefab": "point_light.prefab"
   }
 ]

@@ -2,7 +2,9 @@ import { vec3 } from 'gl-matrix';
 import { Transform } from '../../core/math/Transform';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
-import { Render } from '../../renderer/core/Render';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 
 export class TransformComponent extends Component {
   private transform: Transform;
@@ -11,38 +13,31 @@ export class TransformComponent extends Component {
 
   constructor() {
     super();
-    const device = Render.getInstance().getDevice();
     this.transform = new Transform();
 
     // Crear buffer uniforme para la model matrix
-    this.uniformBuffer = device.createBuffer({
-      label: `transform_uniformBuffer`,
-      size: 16 * 4, // 1 matriz 4x4 (model)
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    this.uniformBuffer = GPUUtils.createBuffer(
+      'transform_uniformBuffer',
+      16 * 4, // 1 matriz 4x4 (model)
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    );
 
     // Layout para la matriz de modelo
-    const modelBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
+    const modelBindGroupLayout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.OBJECT_UNIFORMS
+    );
 
     // Bind group para la matriz de modelo
-    this.modelBindGroup = device.createBindGroup({
-      label: `transform_modelBindGroup`,
-      layout: modelBindGroupLayout,
-      entries: [
+    this.modelBindGroup = BindGroupFactory.createBindGroup(
+      `transform_modelBindGroup`,
+      modelBindGroupLayout,
+      [
         {
           binding: 0,
           resource: { buffer: this.uniformBuffer },
         },
-      ],
-    });
+      ]
+    );
   }
 
   public async load(data: TransformComponentDataType): Promise<void> {
@@ -80,8 +75,7 @@ export class TransformComponent extends Component {
   }
 
   private updateModelMatrix(): void {
-    const device = Render.getInstance().getDevice();
-    device.queue.writeBuffer(
+    GPUUtils.writeBuffer(
       this.uniformBuffer,
       0,
       new Float32Array(this.transform.getWorldMatrix()),

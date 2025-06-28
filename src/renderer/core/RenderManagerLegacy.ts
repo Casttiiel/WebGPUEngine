@@ -3,23 +3,29 @@ import { RenderComponent } from '../../components/render/RenderComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Camera } from '../../core/math/Camera';
 import { RenderCategory } from '../../types/RenderCategory.enum';
-import { Material } from '../resources/material';
+import { Material } from '../resources/Material';
 import { Mesh } from '../resources/Mesh';
+import { GPUFrustumCuller, CullableObject, AABB } from '../culling/GPUFrustumCuller';
+import { vec3 } from 'gl-matrix';
 
 interface RenderKey {
   mesh: Mesh;
   material: Material;
   owner: RenderComponent;
   transform: TransformComponent;
-  aabb: unknown | null;
+  aabb: AABB | null;
   isInstanced: boolean;
+  id: number; // Unique ID for culling
 }
 
 export class RenderManager {
   private static instance: RenderManager | null = null;
   private normalKeys: RenderKey[] = [];
+  private culledKeys: RenderKey[] = [];
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private camera!: Camera;
+  private frustumCuller: GPUFrustumCuller | null = null;
+  private nextObjectId = 0;
 
   // Cache de estados para reducir cambios innecesarios
   private currentPipeline: GPURenderPipeline | null = null;
@@ -33,6 +39,10 @@ export class RenderManager {
       RenderManager.instance = new RenderManager();
     }
     return RenderManager.instance;
+  }
+  public async initialize(): Promise<void> {
+    this.frustumCuller = new GPUFrustumCuller();
+    await this.frustumCuller.load();
   }
 
   public setCamera(camera: Camera): void {
@@ -50,8 +60,9 @@ export class RenderManager {
       material,
       owner,
       transform,
-      aabb: null,
+      aabb: mesh.getAABB(),
       isInstanced: false,
+      id: this.nextObjectId++,
     };
 
     this.normalKeys.push(key);
@@ -61,31 +72,84 @@ export class RenderManager {
     this.normalKeys = this.normalKeys.filter((key) => key.owner !== owner);
   }
 
+  // GPU/CPU culling should be done before render passes begin
+  public async performPreRenderCulling(): Promise<void> {
+    if (!this.camera) return;
+
+    let keysToDraw = this.normalKeys;
+
+    // Apply frustum culling
+    if (this.frustumCuller && this.normalKeys.length > 0) {
+      try {
+        // Use GPU culling
+        keysToDraw = await this.performGPUCulling(this.normalKeys);
+      } catch (error) {
+        console.warn('Culling failed, rendering all objects:', error);
+        keysToDraw = this.normalKeys;
+      }
+    }
+
+    // Store culled keys for this category
+    this.culledKeys = keysToDraw;
+  }
+
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
     if (!this.camera) return;
 
-    // Reset estado
+    // Reset state
     this.currentPipeline = null;
     this.currentMeshBuffers = null;
     this.currentMaterialBindings = null;
 
-    // Filtrar primero por categoría y crear una copia para no modificar el array original
-    const keysToDraw = [...this.normalKeys].filter((key) => key.material.getCategory() === category);
+    // Use pre-culled keys if available, otherwise use all keys for the category
+    const keysToDraw = this.culledKeys.filter((key) => key.material.getCategory() === category); // Sort keys to minimize state changes or by depth for transparents
+    this.sortRenderKeys(keysToDraw, category); // Render visible objects
+    this.renderKeys(keysToDraw, pass, category);
+  }
 
-    // Ordenar las keys: técnica > material > mesh para minimizar cambios de estado
-    keysToDraw.sort((k1, k2) => {
+  private async performGPUCulling(keys: RenderKey[]): Promise<RenderKey[]> {
+    if (!this.frustumCuller) return keys; // Convert render keys to cullable objects
+    const cullableObjects: CullableObject[] = keys.map((key) => ({
+      id: key.id,
+      bounds: key.aabb || { min: [-1, -1, -1], max: [1, 1, 1] },
+      modelMatrix: new Float32Array(key.transform.getTransform().getWorldMatrix()),
+    }));
+
+    // Perform GPU culling
+    const cullResult = await this.frustumCuller.cullObjects(this.camera, cullableObjects); // Filter keys based on culling results
+    const visibleKeys: RenderKey[] = [];
+    for (const visibleIndex of cullResult.visibleIndices) {
+      if (visibleIndex < keys.length) {
+        const key = keys[visibleIndex];
+        if (key) {
+          visibleKeys.push(key);
+        }
+      }
+    }
+
+    return visibleKeys;
+  }
+  private sortRenderKeys(keys: RenderKey[], category: RenderCategory): void {
+    // Para TRANSPARENCIAS: ordenar por profundidad (lejos → cerca) para blending correcto
+    if (category === RenderCategory.TRANSPARENT) {
+      this.sortTransparentsByDepth(keys);
+      return;
+    }
+
+    // Para OPACOS y DISTORSIONES: ordenar por estado para minimizar cambios de pipeline
+    keys.sort((k1, k2) => {
       // 1. Ordenar por técnica (minimizar cambios de pipeline)
       const tech1 = k1.material.getTechnique();
       const tech2 = k2.material.getTechnique();
       if (!tech1 || !tech2) return 0;
-      
+
       const techPath1 = tech1.path || '';
       const techPath2 = tech2.path || '';
       if (techPath1 !== techPath2) {
         return techPath1.localeCompare(techPath2);
       }
 
-      // 2. Si la técnica es la misma, ordenar por material (minimizar cambios de textura/uniforms)      
+      // 2. Si la técnica es la misma, ordenar por material (minimizar cambios de textura/uniforms)
       const mat1 = k1.material.getName();
       const mat2 = k2.material.getName();
       if (mat1 !== mat2) {
@@ -97,7 +161,32 @@ export class RenderManager {
       const mesh2 = k2.mesh.getName();
       return mesh1.localeCompare(mesh2);
     });
+  }
 
+  private sortTransparentsByDepth(keys: RenderKey[]): void {
+    if (!this.camera) return;
+
+    const cameraPos = this.camera.getPosition();
+
+    keys.sort((a, b) => {
+      // Obtener posiciones mundiales de los objetos
+      const posA = a.transform.getTransform().getWorldPosition();
+      const posB = b.transform.getTransform().getWorldPosition();
+
+      // Calcular distancias al cuadrado (más eficiente que sqrt)
+      const distSqA = vec3.squaredDistance(cameraPos, posA);
+      const distSqB = vec3.squaredDistance(cameraPos, posB);
+
+      // Ordenar de más lejos a más cerca (descending order)
+      return distSqB - distSqA;
+    });
+  }
+
+  private renderKeys(
+    keysToDraw: RenderKey[],
+    pass: GPURenderPassEncoder,
+    category: RenderCategory,
+  ): void {
     let numDrawCalls = 0;
 
     for (const key of keysToDraw) {

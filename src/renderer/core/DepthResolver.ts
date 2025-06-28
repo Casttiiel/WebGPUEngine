@@ -1,12 +1,15 @@
 import { Render } from '../core/Render';
 import { Technique } from '../resources/Technique';
 import { Mesh } from '../resources/Mesh';
+import { BindGroupFactory } from './factories/BindGroupFactory';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class DepthResolver {
   private depthResolveTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private depthBindGroup!: GPUBindGroup;
   private isLoaded = false;
+
   public async load(): Promise<void> {
     // Load fullscreen quad mesh and technique using existing classes
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
@@ -20,36 +23,44 @@ export class DepthResolver {
       return;
     }
 
-    const device = Render.getInstance().getDevice();
-    const commandEncoder = Render.getInstance().getCommandEncoder(); // Create bind group for the MSAA depth texture
+    const commandEncoder = Render.getInstance().getCommandEncoder();
+
+    // Create bind group for the MSAA depth texture
     const bindGroupLayout = this.depthResolveTechnique.getBindGroupLayout(0);
     if (!bindGroupLayout) {
       console.error('Failed to get bind group layout from depth resolve technique');
       return;
     }
 
-    this.depthBindGroup = device.createBindGroup({
-      label: 'Depth Resolve Bind Group',
-      layout: bindGroupLayout,
-      entries: [
+    this.depthBindGroup = BindGroupFactory.createBindGroup(
+      'Depth Resolve Bind Group',
+      bindGroupLayout,
+      [
         {
           binding: 0,
-          resource: msaaDepthTexture.createView(),
+          resource: msaaDepthTexture.createView({
+            aspect: 'depth-only'
+          }),
         },
-      ],
-    });
+      ]
+    );
 
-    // Create render pass to resolve depth
+    // Create render pass to resolve depth using GPURenderPassDescriptor pattern
     const renderPass = commandEncoder.beginRenderPass({
       label: 'Depth Resolve Render Pass',
       colorAttachments: [], // No color attachments
       depthStencilAttachment: {
-        view: singleSampleDepthTexture.createView(),
+        view: singleSampleDepthTexture.createView({
+          aspect: 'depth-only'
+        }),
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
       },
     });
+
+    // Configure viewport and scissor using GPUUtils
+    GPUUtils.configureViewportAndScissor(renderPass);
 
     // Use technique and mesh like other components
     this.depthResolveTechnique.activatePipeline(renderPass);
@@ -61,6 +72,5 @@ export class DepthResolver {
   }
   public destroy(): void {
     // Mesh and Technique are managed by ResourceManager, no need to destroy manually
-    this.isLoaded = false;
   }
 }

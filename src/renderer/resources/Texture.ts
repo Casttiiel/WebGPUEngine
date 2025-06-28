@@ -1,7 +1,9 @@
 import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResource';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
-import { Render } from '../core/render';
+import { GPUUtils } from '../core/utils/GPUUtils';
+import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { PipelineFactory } from '../core/factories/PipelineFactory';
 
 export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
@@ -41,9 +43,9 @@ export class Texture extends GPUResource {
     this.usage =
       options.usage ??
       GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.STORAGE_BINDING;
+      GPUTextureUsage.COPY_DST |
+      GPUTextureUsage.RENDER_ATTACHMENT |
+      GPUTextureUsage.STORAGE_BINDING;
     this.magFilter = options.magFilter ?? 'linear';
     this.minFilter = options.minFilter ?? 'linear';
     this.mipmapFilter = options.mipmapFilter ?? 'linear';
@@ -82,20 +84,17 @@ export class Texture extends GPUResource {
     const imageBitmap = await createImageBitmap(img);
     const mipLevelCount = this.genMipmaps
       ? Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1
-      : 1;
-
-    // Create GPU texture
-    this.texture = this.device.createTexture({
-      label: `${this.label}_texture`,
-      size: {
-        width: imageBitmap.width,
-        height: imageBitmap.height,
-        depthOrArrayLayers: 1,
-      },
-      format: this.format,
-      usage: this.usage,
+      : 1;    // Create GPU texture
+    this.texture = GPUUtils.createTextureWithMipmaps(
+      `${this.label}_texture`,
+      imageBitmap.width,
+      imageBitmap.height,
+      this.format,
+      this.usage,
       mipLevelCount,
-    });
+      1,
+      1
+    );
 
     // Copy image data
     this.device.queue.copyExternalImageToTexture(
@@ -127,7 +126,7 @@ export class Texture extends GPUResource {
     if (this.genMipmaps) {
       samplerDescriptor.mipmapFilter = this.mipmapFilter;
     }
-    this.sampler = this.device.createSampler(samplerDescriptor);
+    this.sampler = GPUUtils.createSampler(samplerDescriptor);
   }
 
   public getTextureView(): GPUTextureView | undefined {
@@ -154,14 +153,14 @@ export class Texture extends GPUResource {
         baseMipLevel: level + 1,
         mipLevelCount: 1,
       });
-
-      const bindGroup = this.device.createBindGroup({
-        layout: Texture.mipmapBindGroupLayout,
-        entries: [
+      const bindGroup = BindGroupFactory.createBindGroup(
+        'mipmap_generation',
+        Texture.mipmapBindGroupLayout,
+        [
           { binding: 0, resource: srcView },
           { binding: 1, resource: dstView },
-        ],
-      });
+        ]
+      );
 
       const passEncoder = commandEncoder.beginComputePass();
       passEncoder.setPipeline(Texture.mipmapPipeline);
@@ -181,39 +180,37 @@ export class Texture extends GPUResource {
   private static async initMipmapPipeline() {
     if (this.mipmapPipeline) return;
 
-    const device = Render.getInstance().getDevice();
+    const device = GPUUtils.getDevice();
     const shaderModule = device.createShaderModule({
       label: 'Mipmap generation shader',
       code: await (await fetch('/assets/shaders/generate_mipmap.wgsl')).text(),
     });
-
-    this.mipmapBindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: {
-            sampleType: 'float',
-            viewDimension: '2d',
-          },
+    this.mipmapBindGroupLayout = BindGroupFactory.getLayout('texture_mipmap', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float',
+          viewDimension: '2d',
         },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-            viewDimension: '2d',
-          },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+          viewDimension: '2d',
         },
-      ],
-    });
+      },
+    ]);
+    const pipelineLayout = PipelineFactory.createPipelineLayout(
+      'texture_mipmap_pipeline_layout',
+      [this.mipmapBindGroupLayout],
+    );
 
-    const pipelineLayout = device.createPipelineLayout({
-      bindGroupLayouts: [this.mipmapBindGroupLayout],
-    });
-
-    this.mipmapPipeline = device.createComputePipeline({
+    this.mipmapPipeline = PipelineFactory.createComputePipeline({
+      label: 'Mipmap generation pipeline',
       layout: pipelineLayout,
       compute: {
         module: shaderModule,

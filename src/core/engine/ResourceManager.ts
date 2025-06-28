@@ -39,7 +39,6 @@ export class ResourceManager {
     const entry: ResourceEntry = {
       resource,
     };
-
     this.resources.set(resource.path, entry);
   }
 

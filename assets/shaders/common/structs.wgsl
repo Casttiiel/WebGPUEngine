@@ -12,3 +12,17 @@ struct FragmentOutput {
     @location(2) selfIllum: vec4<f32>,
     @location(3) depth: f32,
 }
+
+struct GBuffer {
+    worldPos: vec3<f32>,
+    normal: vec3<f32>,
+    albedo: vec3<f32>,
+    specularColor: vec3<f32>,
+    roughness: f32,
+    selfIllum: vec3<f32>,
+    emissive: f32,
+    reflectedDir: vec3<f32>,
+    viewDir: vec3<f32>,
+    metallic: f32,
+    zlinear: f32,
+}

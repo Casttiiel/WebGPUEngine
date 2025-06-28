@@ -4,12 +4,10 @@ import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
 import { ModuleEntities } from '../../modules/game/ModuleEntities';
 import { ModuleInput } from '../../modules/game/ModuleInput';
 import { ModuleRender } from '../../modules/game/ModuleRender';
-import { Render } from '../../renderer/core/render';
-import { Time } from './Time';
+import { Render } from '../../renderer/core/Render';
 
 export class Engine {
   private static initialized: boolean = false;
-  private static _time: Time;
 
   private static _modules: ModuleManager;
   private static _render: ModuleRender;
@@ -32,8 +30,7 @@ export class Engine {
       return;
     }
     this.initialized = true;
-    console.log('Engine started.');
-    this._time = new Time();
+    console.warn('Engine started.');
     const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
     await Render.getInstance().initialize(canvas);
 
@@ -52,23 +49,21 @@ export class Engine {
     await this._modules.start();
   }
 
-  public static update(): void {
+  public static update(dt: number): void {
     if (!this.initialized) {
       console.error('Engine is not started yet.');
       return;
     }
-    this._time.update();
-    const dt = this._time.getDeltaTime();
     this._modules.update(dt);
     this._modules.renderInMenu();
   }
 
-  public static render(): void {
+  public static async render(): Promise<void> {
     if (!this.initialized) {
       console.error('Engine is not started yet.');
       return;
     }
-    this._render.generateFrame();
+    await this._render.generateFrame();
   }
 
   public static getModules(): ModuleManager {

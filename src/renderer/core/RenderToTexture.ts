@@ -1,4 +1,4 @@
-import { Render } from './Render';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class RenderToTexture {
   private name: string = '';
@@ -11,41 +11,41 @@ export class RenderToTexture {
   private msaaTexture!: GPUTexture; // Multi-sample texture (for rendering)
   private msaaTextureView!: GPUTextureView | null;
   private isMultisample: boolean = false;
-
   public createRT(
     name: string,
     width: number,
     height: number,
     format: GPUTextureFormat,
     multisampling = false,
+    extraUsage = 0, // Additional usage flags
   ): void {
     this.destroy();
 
     this.name = name;
     this.xRes = width;
     this.yRes = height;
-    this.isMultisample = multisampling;
-
-    const device = Render.getInstance().getDevice();
-
-    // Always create the single-sample texture (for shader sampling)
-    this.texture = device.createTexture({
-      label: `${this.name}_resolve_texture`,
-      size: [width, height],
-      format: format,
-      sampleCount: 1, // Always single-sample for shader access
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
+    this.isMultisample = multisampling;    // Always create the single-sample texture (for shader sampling)
+    // Always use both RENDER_ATTACHMENT and TEXTURE_BINDING for maximum flexibility
+    const baseUsage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
+    this.texture = GPUUtils.createTexture(
+      `${this.name}_resolve_texture`,
+      width,
+      height,
+      format,
+      baseUsage | extraUsage,
+      1 // Always single-sample for shader access
+    );
 
     // If MSAA enabled, create additional multi-sample texture
     if (multisampling) {
-      this.msaaTexture = device.createTexture({
-        label: `${this.name}_msaa_texture`,
-        size: [width, height],
-        format: format,
-        sampleCount: 4, // Multi-sample for rendering
-        usage: GPUTextureUsage.RENDER_ATTACHMENT, // No TEXTURE_BINDING needed
-      });
+      this.msaaTexture = GPUUtils.createTexture(
+        `${this.name}_msaa_texture`,
+        width,
+        height,
+        format,
+        GPUTextureUsage.RENDER_ATTACHMENT, // No TEXTURE_BINDING needed
+        4 // Multi-sample for rendering
+      );
     }
   }
 
@@ -67,7 +67,8 @@ export class RenderToTexture {
       });
       return this.msaaTextureView;
     }
-    return this.getView(); // Use single-sample view if no MSAA
+    // For non-MSAA, return the single texture view (which has RENDER_ATTACHMENT usage)
+    return this.getView();
   }
 
   // Returns the resolve target (only if MSAA is enabled)
@@ -81,6 +82,11 @@ export class RenderToTexture {
 
   public getHeight(): number {
     return this.yRes;
+  }
+
+  // Get the underlying texture for copying operations
+  public getTexture(): GPUTexture {
+    return this.texture;
   }
 
   public destroy(): void {

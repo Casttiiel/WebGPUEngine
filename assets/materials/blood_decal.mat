@@ -1,0 +1,9 @@
+{
+    "technique": "decal.tech",
+    "textures":{
+        "txAlbedo": "blood.png"
+    },
+    "casts_shadows": false,
+    "category": "decals",
+    "shadows": false
+}

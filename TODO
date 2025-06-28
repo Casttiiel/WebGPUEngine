@@ -1,46 +1,48 @@
 ## NPM RUN DEV
 
-Distortion Category. USo el render manager pero este siempre envia los mismos recursos. EL problema de este caso es que necesito tambien un uniform con el accLights.
-........Solucion: Hacer que esta se envie en el material.
-
-FPS Performance/Memory used
-
-Improve uniform declaration. Poder especificar Group y binding
-
-Ambient Occlusion (SSAO -> GTAO)
-
-PBR LIGHTS
-1.PointLightWithoutshadows
-2.DirectionalLightsWithoutShadows
-3.DirectionalLightsWithShadows
-4.RenderPointLighstWithShadows
-
-Blur
-Bloom
-Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-
-Decals Category
-AABB/CPU Culling on camera
-Culling of lights
-Mesh LOD/Generate LOD on texture and mesh automatically
-
-Instancing
-Particles/Computing Shaders
+1. Ambient Occlusion SSAO
+2. Ambient Occlusion GTAO
+3. Shader functions duplication
+4. RenderToTexture Refactor?
+5. Typing things and connected with resources json?
+6. OPtimizacion WebGPUFundamentals
+7. Load locks or async?
+8. Bloom
+9. Compute-based distortion
+10. SpotLightsWithShadows
+11. PointLighstWithShadows
+12. Directional Light
+13. Area Light
+14. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+15. Temporal Anti-Aliasing (TAA)
+16. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+17. MSAA on lights?
+18. Motion Blur
+19. Decals Category
+20. Particles
+21. Escalabilidad de Luces
+    Moderno: Cientos de luces con clustered culling+instancing
+22. Improve uniform declaration. Poder especificar Group y binding
+23. Mesh LOD/Generate LOD on texture and mesh automatically
+24. Occlusion culling
+25. Memory Bandwidth
+    Actual: G-Buffer consume mucho ancho de banda
+    Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
+26. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
-Cascaded Shadow Maps
 Terrain with perlin noise
+Paralax Mapping
+Weighted terrain
+Cascaded Shadow Maps
 Lens Flare
 Camera Lens Dirt
-Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
 Volumetric Lights/God Rays
-Weighted terrain
-Paralax Mapping
 GAME-----------------------------------
-Animations
-Physics
 Music
-Grass
+Physics
+Animations
 Skybox with Day/Night Cycle
 Day/Night Cycle
+Grass
 Physics Grass

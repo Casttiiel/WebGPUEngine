@@ -9,60 +9,6 @@ const BIAS = 0.001;          // Para evitar self-occlusion (reducido para detect
 const AO_STRENGTH = 3.0;      // Intensidad del efecto (aumentado para mejor contraste)
 const MAX_DISTANCE = 0.3;     // Distancia máxima de consideración (reducida para oclusión más local)
 
-// Generación de ruido procedural
-fn hash(p: vec2<f32>) -> vec2<f32> {
-    let p2 = vec2<f32>(
-        dot(p, vec2<f32>(127.1, 311.7)),
-        dot(p, vec2<f32>(269.5, 183.3))
-    );
-    return fract(sin(p2) * 43758.5453123);
-}
-
-// Generación de vector hemisférico para sample
-fn hemispherePoint(seed: vec2<f32>, n: vec3<f32>) -> vec3<f32> {
-    let noise = hash(seed);
-    let theta = noise.x * 2.0 * 3.14159;
-    let r = sqrt(noise.y);
-    
-    // Crear vector en hemisferio
-    let v = vec3<f32>(
-        r * cos(theta),
-        r * sin(theta),
-        sqrt(1.0 - noise.y)
-    );
-    
-    // Orientar hacia la normal
-    let up = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.y) > 0.999);
-    let tangent = normalize(cross(up, n));
-    let bitangent = cross(n, tangent);
-    
-    return tangent * v.x + bitangent * v.y + n * v.z;
-}
-
-struct GBuffer {
-    worldPos: vec3<f32>,
-    normal: vec3<f32>,
-    albedo: vec3<f32>,
-    specularColor: vec3<f32>,
-    roughness: f32,
-    selfIllum: vec3<f32>,
-    emissive: f32,
-    reflectedDir: vec3<f32>,
-    viewDir: vec3<f32>,
-    metallic: f32,
-    zlinear: f32,
-}
-
-@group(0) @binding(0) var<uniform> camera: CameraUniforms;
-
-@group(1) @binding(0) var gAlbedo: texture_2d<f32>;
-@group(1) @binding(1) var gNormals: texture_2d<f32>;
-@group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
-@group(1) @binding(3) var gSelfIllum: texture_2d<f32>;
-@group(1) @binding(4) var gAO: texture_2d<f32>;
-@group(1) @binding(5) var samplerGBuffer: sampler;
-
-
 fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     var g: GBuffer;
     
@@ -102,6 +48,44 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     return g;
 }
 
+// Generación de ruido procedural
+fn hash(p: vec2<f32>) -> vec2<f32> {
+    let p2 = vec2<f32>(
+        dot(p, vec2<f32>(127.1, 311.7)),
+        dot(p, vec2<f32>(269.5, 183.3))
+    );
+    return fract(sin(p2) * 43758.5453123);
+}
+
+// Generación de vector hemisférico para sample
+fn hemispherePoint(seed: vec2<f32>, n: vec3<f32>) -> vec3<f32> {
+    let noise = hash(seed);
+    let theta = noise.x * 2.0 * 3.14159;
+    let r = sqrt(noise.y);
+    
+    // Crear vector en hemisferio
+    let v = vec3<f32>(
+        r * cos(theta),
+        r * sin(theta),
+        sqrt(1.0 - noise.y)
+    );
+    
+    // Orientar hacia la normal
+    let up = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(n.y) > 0.999);
+    let tangent = normalize(cross(up, n));
+    let bitangent = cross(n, tangent);
+    
+    return tangent * v.x + bitangent * v.y + n * v.z;
+}
+
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+
+@group(1) @binding(0) var gAlbedo: texture_2d<f32>;
+@group(1) @binding(1) var gNormals: texture_2d<f32>;
+@group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
+@group(1) @binding(3) var gSelfIllum: texture_2d<f32>;
+@group(1) @binding(4) var gAO: texture_2d<f32>;
+@group(1) @binding(5) var samplerGBuffer: sampler;
 
 fn samplePosition(centerPos: vec3<f32>, normal: vec3<f32>, screenPos: vec2<f32>, index: u32) -> vec2<f32> {
     let sampleVec = hemispherePoint(screenPos + vec2<f32>(f32(index) * 0.0713, f32(index) * 0.4271), normal);
@@ -154,5 +138,5 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     let finalAO = mix(pow(ao, 1.5), 1.0, backgroundFactor);
     
     // Output AO value (1.0 = fully lit, 0.0 = fully occluded)
-    return finalAO;
+    return 1.0;
 }

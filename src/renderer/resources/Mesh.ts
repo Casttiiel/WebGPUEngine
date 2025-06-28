@@ -3,6 +3,8 @@ import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { MeshData } from '../../types/MeshData.type';
 import { Engine } from '../../core/engine/Engine';
+import { AABB } from '../culling/GPUFrustumCuller';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export interface MeshOptions extends IGPUResourceOptions {
   meshData?: MeshData;
@@ -15,6 +17,7 @@ export class Mesh extends GPUResource {
   private indices!: Uint16Array; // Índices para formar triángulos
   private tangents!: Float32Array; // Vectores tangentes para normal mapping
   private indexCount!: number; // Número total de índices
+  private aabb!: AABB; // Axis-Aligned Bounding Box for culling
 
   // Buffers en GPU
   private vertexBuffer!: GPUBuffer; // Buffer de vértices
@@ -96,9 +99,9 @@ export class Mesh extends GPUResource {
     } else {
       this.indices = meshData.indices.data as Uint16Array;
     }
-
     this.tangents = this.computeMeshTangents();
     this.indexCount = meshData.indices.count;
+    this.aabb = this.calculateAABB();
 
     this.setHasData();
   }
@@ -194,15 +197,14 @@ export class Mesh extends GPUResource {
           }
           break;
       }
-    }
-
-    // Crear los TypedArrays finales con los datos procesados
+    } // Crear los TypedArrays finales con los datos procesados
     this.vertices = new Float32Array(verticesArray);
     this.normals = new Float32Array(normalsArray);
     this.uvs = new Float32Array(uvsArray);
     this.indices = new Uint16Array(indicesArray);
     this.tangents = this.computeMeshTangents();
     this.indexCount = this.indices.length;
+    this.aabb = this.calculateAABB();
   }
 
   private computeTangent(
@@ -234,7 +236,7 @@ export class Mesh extends GPUResource {
 
   private computeMeshTangents(): Float32Array {
     // Create tangent array initialized to zero
-    const tangents = new Float32Array(this.vertices.length * 4/3); // 4 components (xyz + w) per vertex
+    const tangents = new Float32Array((this.vertices.length * 4) / 3); // 4 components (xyz + w) per vertex
 
     // Process each triangle
     for (let i = 0; i < this.indices.length - 2; i += 3) {
@@ -248,32 +250,23 @@ export class Mesh extends GPUResource {
       const p0 = [
         this.vertices[i0 * 3] ?? 0,
         this.vertices[i0 * 3 + 1] ?? 0,
-        this.vertices[i0 * 3 + 2] ?? 0
+        this.vertices[i0 * 3 + 2] ?? 0,
       ];
       const p1 = [
         this.vertices[i1 * 3] ?? 0,
         this.vertices[i1 * 3 + 1] ?? 0,
-        this.vertices[i1 * 3 + 2] ?? 0
+        this.vertices[i1 * 3 + 2] ?? 0,
       ];
       const p2 = [
         this.vertices[i2 * 3] ?? 0,
         this.vertices[i2 * 3 + 1] ?? 0,
-        this.vertices[i2 * 3 + 2] ?? 0
+        this.vertices[i2 * 3 + 2] ?? 0,
       ];
 
       // Get UVs of the triangle
-      const uv0 = [
-        this.uvs[i0 * 2] ?? 0,
-        this.uvs[i0 * 2 + 1] ?? 0
-      ];
-      const uv1 = [
-        this.uvs[i1 * 2] ?? 0,
-        this.uvs[i1 * 2 + 1] ?? 0
-      ];
-      const uv2 = [
-        this.uvs[i2 * 2] ?? 0,
-        this.uvs[i2 * 2 + 1] ?? 0
-      ];
+      const uv0 = [this.uvs[i0 * 2] ?? 0, this.uvs[i0 * 2 + 1] ?? 0];
+      const uv1 = [this.uvs[i1 * 2] ?? 0, this.uvs[i1 * 2 + 1] ?? 0];
+      const uv2 = [this.uvs[i2 * 2] ?? 0, this.uvs[i2 * 2 + 1] ?? 0];
 
       // Compute tangent for this triangle
       const tangentData = this.computeTangent(p0, p1, p2, uv0, uv1, uv2);
@@ -298,7 +291,7 @@ export class Mesh extends GPUResource {
       const y = tangents[i + 1] ?? 0;
       const z = tangents[i + 2] ?? 0;
       const len = Math.sqrt(x * x + y * y + z * z);
-      
+
       if (len > 0) {
         tangents[i] = x / len;
         tangents[i + 1] = y / len;
@@ -308,60 +301,88 @@ export class Mesh extends GPUResource {
 
     return tangents;
   }
-
   private initBuffers(): void {
     // Crear buffer de vértices en GPU
-    this.vertexBuffer = this.device.createBuffer({
-      label: `${this.label}_vertexBuffer`,
-      size: this.vertices.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertices);
-    this.vertexBuffer.unmap();
+    this.vertexBuffer = GPUUtils.createBuffer(
+      `${this.label}_vertexBuffer`,
+      this.vertices.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.vertices
+    );
 
     // Crear buffer de normales en GPU
-    this.normalBuffer = this.device.createBuffer({
-      label: `${this.label}_normalBuffer`,
-      size: this.normals.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.normalBuffer.getMappedRange()).set(this.normals);
-    this.normalBuffer.unmap();
+    this.normalBuffer = GPUUtils.createBuffer(
+      `${this.label}_normalBuffer`,
+      this.normals.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.normals
+    );
 
     // Crear buffer de UVs en GPU
-    this.uvBuffer = this.device.createBuffer({
-      label: `${this.label}_uvBuffer`,
-      size: this.uvs.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.uvBuffer.getMappedRange()).set(this.uvs);
-    this.uvBuffer.unmap();
+    this.uvBuffer = GPUUtils.createBuffer(
+      `${this.label}_uvBuffer`,
+      this.uvs.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.uvs
+    );
 
     // Crear buffer de tangentes en GPU
-    this.tangentBuffer = this.device.createBuffer({
-      label: `${this.label}_tangentBuffer`,
-      size: this.tangents.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.tangentBuffer.getMappedRange()).set(this.tangents);
-    this.tangentBuffer.unmap();
+    this.tangentBuffer = GPUUtils.createBuffer(
+      `${this.label}_tangentBuffer`,
+      this.tangents.byteLength,
+      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      this.tangents
+    );
 
     // Crear buffer de índices en GPU
     const paddedIndexCount = Math.ceil((this.indices.length * 2) / 4) * 2;
     const paddedArray = new Uint16Array(paddedIndexCount);
     paddedArray.set(this.indices);
 
-    this.indexBuffer = this.device.createBuffer({
-      label: `${this.label}_indexBuffer`,
-      size: paddedArray.byteLength,
-      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    });
+    this.indexBuffer = GPUUtils.createBuffer(
+      `${this.label}_indexBuffer`,
+      paddedArray.byteLength,
+      GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+    );
 
-    this.device.queue.writeBuffer(this.indexBuffer, 0, paddedArray);
+    GPUUtils.writeBuffer(this.indexBuffer, 0, paddedArray);
+  }
+
+  private calculateAABB(): AABB {
+    if (!this.vertices || this.vertices.length === 0) {
+      return { min: [0, 0, 0], max: [0, 0, 0] };
+    }
+
+    // Initialize with first vertex
+    let minX = this.vertices[0] || 0;
+    let minY = this.vertices[1] || 0;
+    let minZ = this.vertices[2] || 0;
+    let maxX = this.vertices[0] || 0;
+    let maxY = this.vertices[1] || 0;
+    let maxZ = this.vertices[2] || 0;
+
+    // Iterate through all vertices (3 components per vertex)
+    for (let i = 3; i < this.vertices.length; i += 3) {
+      const x = this.vertices[i] || 0;
+      const y = this.vertices[i + 1] || 0;
+      const z = this.vertices[i + 2] || 0;
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      minZ = Math.min(minZ, z);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      maxZ = Math.max(maxZ, z);
+    }
+
+    return {
+      min: [minX, minY, minZ],
+      max: [maxX, maxY, maxZ],
+    };
+  }
+
+  public getAABB(): AABB {
+    return this.aabb;
   }
 
   public static getVertexBufferLayout(): GPUVertexBufferLayout[] {
