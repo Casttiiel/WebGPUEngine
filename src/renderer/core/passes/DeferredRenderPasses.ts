@@ -2,6 +2,7 @@ import { BaseRenderPass, RenderPassConfig } from './BaseRenderPass';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
 import { Render } from '../Render';
+import { GPUUtils } from '../utils/GPUUtils';
 
 /**
  * G-Buffer render pass for deferred rendering using BaseRenderPass
@@ -22,25 +23,9 @@ export class GBufferRenderPass extends BaseRenderPass {
         // Configure viewport for the pass
         const viewport = this.config.viewport;
         if (viewport) {
-            pass.setViewport(
-                0, 0,
-                viewport.width, viewport.height,
-                0.0, 1.0
-            );
-            pass.setScissorRect(
-                0, 0,
-                viewport.width, viewport.height
-            );
+            GPUUtils.configureViewportAndScissor(pass, viewport.width, viewport.height);
         } else {
-            pass.setViewport(
-                0, 0,
-                Render.width, Render.height,
-                0.0, 1.0
-            );
-            pass.setScissorRect(
-                0, 0,
-                Render.width, Render.height
-            );
+            GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
         }
 
         // Render solid geometry to G-Buffer
@@ -55,27 +40,17 @@ export class GBufferRenderPass extends BaseRenderPass {
 export class DecalRenderPass extends BaseRenderPass {
     constructor(config: RenderPassConfig) {
         super(config);
-    }
-
-    protected render(
+    } protected render(
         pass: GPURenderPassEncoder,
-        category?: RenderCategory,
-        renderKeys?: any[],
+        _category?: RenderCategory,
+        _renderKeys?: any[],
     ): void {
         // Configure viewport for decals
         const viewport = this.config.viewport;
         if (viewport) {
-            pass.setViewport(
-                0, 0,
-                viewport.width, viewport.height,
-                0.0, 1.0
-            );
+            GPUUtils.configureViewportAndScissor(pass, viewport.width, viewport.height);
         } else {
-            pass.setViewport(
-                0, 0,
-                Render.width, Render.height,
-                0.0, 1.0
-            );
+            GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
         }
 
         // Render decals on top of G-Buffer
@@ -89,27 +64,17 @@ export class DecalRenderPass extends BaseRenderPass {
 export class TransparentRenderPass extends BaseRenderPass {
     constructor(config: RenderPassConfig) {
         super(config);
-    }
-
-    protected render(
+    } protected render(
         pass: GPURenderPassEncoder,
-        category?: RenderCategory,
-        renderKeys?: any[],
+        _category?: RenderCategory,
+        _renderKeys?: any[],
     ): void {
         // Configure viewport for transparent objects
         const viewport = this.config.viewport;
         if (viewport) {
-            pass.setViewport(
-                0, 0,
-                viewport.width, viewport.height,
-                0.0, 1.0
-            );
+            GPUUtils.configureViewportAndScissor(pass, viewport.width, viewport.height);
         } else {
-            pass.setViewport(
-                0, 0,
-                Render.width, Render.height,
-                0.0, 1.0
-            );
+            GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
         }
 
         // Render transparent objects

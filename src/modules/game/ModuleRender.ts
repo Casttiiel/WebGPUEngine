@@ -106,25 +106,10 @@ export class ModuleRender extends Module {
         'Distorsions Render pass',
         [colorAttachment],
         depthAttachment
-      )
-    );
+      ));
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      Render.width, // Width
-      Render.height, // Height
-      0.0,
-      1.0, // Min/max depth
-    );
-
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      Render.width, // Width
-      Render.height, // Height
-    );
+    GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
 
     RenderManager.getInstance().render(RenderCategory.DISTORSIONS, pass);
 

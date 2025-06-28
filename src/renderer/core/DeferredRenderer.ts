@@ -17,6 +17,7 @@ import { Texture } from '../resources/Texture';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { GBufferPass } from './passes/GBufferPass';
 import { RenderPassManager } from './passes/RenderPassManager';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -183,6 +184,7 @@ export class DeferredRenderer {
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
+
   private renderPointLights(): void {
     const render = Render.getInstance();
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
@@ -204,21 +206,7 @@ export class DeferredRenderer {
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-      0.0,
-      1.0, // Min/max depth
-    );
-
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-    );
+    GPUUtils.configureViewportAndScissor(pass, render.getCanvas().width, render.getCanvas().height);
 
     // 1. Activar el pipeline
     this.pointLightTechnique.activatePipeline(pass);
@@ -244,6 +232,7 @@ export class DeferredRenderer {
 
     pass.end();
   }
+
   private renderSpotLightsNoShadows(): void {
     const render = Render.getInstance();
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
@@ -265,21 +254,7 @@ export class DeferredRenderer {
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-      0.0,
-      1.0, // Min/max depth
-    );
-
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-    );
+    GPUUtils.configureViewportAndScissor(pass, render.getCanvas().width, render.getCanvas().height);
 
     // 1. Activar el pipeline
     this.spotLightTechnique.activatePipeline(pass);

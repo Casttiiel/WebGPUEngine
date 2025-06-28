@@ -46,21 +46,7 @@ export class AntialiasingComponent extends Component {
     });
 
     // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    pass.setViewport(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-      0.0,
-      1.0, // Min/max depth
-    );
-
-    pass.setScissorRect(
-      0,
-      0, // Offset X,Y
-      render.getCanvas().width, // Width
-      render.getCanvas().height, // Height
-    );
+    GPUUtils.configureViewportAndScissor(pass, render.getCanvas().width, render.getCanvas().height);
 
     // 1. Activar el pipeline
     this.technique.activatePipeline(pass);
