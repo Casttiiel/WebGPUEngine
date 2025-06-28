@@ -91,6 +91,10 @@ export class GBufferPass {
         };
 
         const pass = encoder.beginRenderPass(passDescriptor);
+
+        // Configure viewport and scissor using GPUUtils
+        GPUUtils.configureViewportAndScissor(pass);
+
         renderCallback(pass);
         pass.end();
     }

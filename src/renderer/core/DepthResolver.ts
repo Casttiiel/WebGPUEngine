@@ -2,6 +2,7 @@ import { Render } from '../core/Render';
 import { Technique } from '../resources/Technique';
 import { Mesh } from '../resources/Mesh';
 import { BindGroupFactory } from './factories/BindGroupFactory';
+import { GPUUtils } from './utils/GPUUtils';
 
 export class DepthResolver {
   private depthResolveTechnique!: Technique;
@@ -20,12 +21,16 @@ export class DepthResolver {
       console.error('DepthResolver not loaded');
       return;
     }
-    const commandEncoder = Render.getInstance().getCommandEncoder(); // Create bind group for the MSAA depth texture
+
+    const commandEncoder = Render.getInstance().getCommandEncoder();
+
+    // Create bind group for the MSAA depth texture
     const bindGroupLayout = this.depthResolveTechnique.getBindGroupLayout(0);
     if (!bindGroupLayout) {
       console.error('Failed to get bind group layout from depth resolve technique');
       return;
     }
+
     this.depthBindGroup = BindGroupFactory.createBindGroup(
       'Depth Resolve Bind Group',
       bindGroupLayout,
@@ -38,7 +43,8 @@ export class DepthResolver {
         },
       ]
     );
-    // Create render pass to resolve depth
+
+    // Create render pass to resolve depth using GPURenderPassDescriptor pattern
     const renderPass = commandEncoder.beginRenderPass({
       label: 'Depth Resolve Render Pass',
       colorAttachments: [], // No color attachments
@@ -51,6 +57,9 @@ export class DepthResolver {
         depthStoreOp: 'store',
       },
     });
+
+    // Configure viewport and scissor using GPUUtils
+    GPUUtils.configureViewportAndScissor(renderPass);
 
     // Use technique and mesh like other components
     this.depthResolveTechnique.activatePipeline(renderPass);

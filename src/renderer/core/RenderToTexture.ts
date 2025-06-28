@@ -24,9 +24,8 @@ export class RenderToTexture {
     this.name = name;
     this.xRes = width;
     this.yRes = height;
-    this.isMultisample = multisampling;
-
-    // Always create the single-sample texture (for shader sampling)
+    this.isMultisample = multisampling;    // Always create the single-sample texture (for shader sampling)
+    // Always use both RENDER_ATTACHMENT and TEXTURE_BINDING for maximum flexibility
     this.texture = GPUUtils.createTexture(
       `${this.name}_resolve_texture`,
       width,
@@ -57,7 +56,6 @@ export class RenderToTexture {
     });
     return this.textureView;
   }
-
   // Returns the view for rendering (MSAA if enabled, otherwise single-sample)
   public getRenderView(): GPUTextureView {
     if (this.isMultisample) {
@@ -67,7 +65,8 @@ export class RenderToTexture {
       });
       return this.msaaTextureView;
     }
-    return this.getView(); // Use single-sample view if no MSAA
+    // For non-MSAA, return the single texture view (which has RENDER_ATTACHMENT usage)
+    return this.getView();
   }
 
   // Returns the resolve target (only if MSAA is enabled)

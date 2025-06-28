@@ -91,6 +91,7 @@ export class ModuleRender extends Module {
 
     Render.getInstance().endFrame();
   }
+
   public renderDistorsions(texture: GPUTextureView): void {
     const render = Render.getInstance();
 
@@ -99,16 +100,15 @@ export class ModuleRender extends Module {
       this.deferred.getDepthStencilView()!,
       'load',
       'discard'
-    );
-
-    const pass = render.getCommandEncoder().beginRenderPass(
+    ); const pass = render.getCommandEncoder().beginRenderPass(
       GPUUtils.createRenderPassDescriptor(
         'Distorsions Render pass',
         [colorAttachment],
         depthAttachment
-      ));
+      )
+    );
 
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
 
     RenderManager.getInstance().render(RenderCategory.DISTORSIONS, pass);
@@ -143,26 +143,26 @@ export class ModuleRender extends Module {
       'clear',
       'store',
       { r: 0, g: 0, b: 0, a: 1 }
-    );
-
-    const pass = render.getCommandEncoder().beginRenderPass(
+    ); const pass = render.getCommandEncoder().beginRenderPass(
       GPUUtils.createRenderPassDescriptor(
         'main presentation render pass',
         [colorAttachment]
       )
-    );    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    );
+
+    // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);
 
-    // 1. Activar el pipeline
+    // 1. Activate pipeline
     this.presentationTechnique.activatePipeline(pass);
 
-    // 2. Activar mesh data
+    // 2. Activate mesh data
     this.fullscreenQuadMesh.activate(pass);
 
-    // 3. Activar bind groups
+    // 3. Set bind groups
     pass.setBindGroup(0, this.presentationBindGroup);
 
-    // 4. Dibujar la mesh
+    // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();

@@ -121,9 +121,7 @@ export class RenderPassFactory {
             },
             viewport,
         };
-    }
-
-    /**
+    }    /**
      * Creates a fullscreen post-processing pass configuration
      */
     public static createPostProcessPassConfig(
@@ -141,6 +139,76 @@ export class RenderPassFactory {
                 },
             ],
             viewport,
+        };
+    }
+
+    /**
+     * Creates a fullscreen post-processing pass configuration with MSAA support
+     */
+    public static createPostProcessPassConfigMSAA(
+        target: RenderToTexture,
+        viewport?: { width: number; height: number },
+    ): RenderPassConfig {
+        return {
+            label: 'Post Process Pass (MSAA)',
+            colorAttachments: [
+                {
+                    view: target.getRenderView()!,
+                    clearValue: { r: 0, g: 0, b: 0, a: 1 },
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                    ...(target.getResolveTarget() && { resolveTarget: target.getResolveTarget()! }),
+                },
+            ],
+            viewport,
+        };
+    }
+
+    /**
+     * Creates configuration for point light render pass
+     */
+    public static createPointLightPassConfig(
+        accLight: RenderToTexture,
+        singleDepthView: GPUTextureView,
+    ): RenderPassConfig {
+        return {
+            label: 'Point Lights Render Pass',
+            colorAttachments: [
+                {
+                    view: accLight.getView()!,
+                    loadOp: 'load', // Load existing lighting data
+                    storeOp: 'store',
+                },
+            ],
+            depthStencilAttachment: {
+                view: singleDepthView,
+                depthLoadOp: 'load', // Load existing depth
+                depthStoreOp: 'store',
+            },
+        };
+    }
+
+    /**
+     * Creates configuration for spot light render pass
+     */
+    public static createSpotLightPassConfig(
+        accLight: RenderToTexture,
+        singleDepthView: GPUTextureView,
+    ): RenderPassConfig {
+        return {
+            label: 'Spot Lights Render Pass',
+            colorAttachments: [
+                {
+                    view: accLight.getView()!,
+                    loadOp: 'load', // Load existing lighting data
+                    storeOp: 'store',
+                },
+            ],
+            depthStencilAttachment: {
+                view: singleDepthView,
+                depthLoadOp: 'load', // Load existing depth
+                depthStoreOp: 'store',
+            },
         };
     }
 }

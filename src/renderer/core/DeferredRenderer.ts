@@ -1,7 +1,6 @@
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { AmbientLight } from '../shading/AmbientLight';
 import { Skybox } from '../shading/Skybox';
-import { Render } from './Render';
 import { RenderManagerV2 as RenderManager } from './managers/RenderManagerV2';
 import { RenderToTexture } from './RenderToTexture';
 import { DepthResolver } from './DepthResolver';
@@ -9,15 +8,10 @@ import { Entity } from '@/core/ecs/Entity';
 import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
 import { Technique } from '../resources/Technique';
 import { Mesh } from '../resources/Mesh';
-import { Engine } from '../../core/engine/Engine';
-import { PointLightComponent } from '../../components/render/PointLightComponent';
-import { TransformComponent } from '../../components/core/TransformComponent';
 import { BindGroupFactory } from './factories/BindGroupFactory';
 import { Texture } from '../resources/Texture';
-import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { GBufferPass } from './passes/GBufferPass';
 import { RenderPassManager } from './passes/RenderPassManager';
-import { GPUUtils } from './utils/GPUUtils';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -66,7 +60,6 @@ export class DeferredRenderer {
     // Initialize render passes with GBufferPass render targets
     const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-
     this.renderPassManager.initializeDeferredPasses(
       gBufferRenderTargets.albedos,
       gBufferRenderTargets.normals,
@@ -108,7 +101,17 @@ export class DeferredRenderer {
           binding: 5,
           resource: this.whiteTexture.getSampler()!,
         },
-      ],
+      ],);
+
+    // Initialize lighting passes after gBufferBindGroup is created
+    this.renderPassManager.initializeLightingPasses(
+      this.rtAccLight,
+      gBufferDepthTextures.singleDepthView,
+      this.pointLightTechnique,
+      this.spotLightTechnique,
+      this.unitSphere,
+      this.unitFrustum,
+      this.gBufferBindGroup,
     );
 
     // Guardar estado inicial del AO
@@ -138,8 +141,7 @@ export class DeferredRenderer {
     this.whiteTexture = await Texture.get('white.png');
 
     this.isLoaded = true;
-  }
-  public async render(camera: Entity): Promise<GPUTextureView> {
+  }  public async render(camera: Entity): Promise<GPUTextureView> {
     // Pre-render GPU culling - do this BEFORE starting render passes
     await RenderManager.getInstance().performPreRenderCulling();
 
@@ -178,103 +180,13 @@ export class DeferredRenderer {
   private renderAccLight(aoTextureView: GPUTextureView | undefined): void {
     this.updateAOTexture(aoTextureView || null);
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
-    this.renderPointLights();
-    this.renderSpotLightsNoShadows();
+
+    // Use new render pass system for lights
+    this.renderPassManager.executePass('pointLights');
+    this.renderPassManager.executePass('spotLights');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
-  }
-
-  private renderPointLights(): void {
-    const render = Render.getInstance();
-    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-
-    const pass = render.getCommandEncoder().beginRenderPass({
-      label: 'Point Lights Render pass',
-      colorAttachments: [
-        {
-          view: this.rtAccLight.getView(),
-          loadOp: 'load',
-          storeOp: 'store',
-        },
-      ],
-      depthStencilAttachment: {
-        view: gBufferDepthTextures.singleDepthView, // Use single-sample depth for point light pass
-        depthLoadOp: 'load',
-        depthStoreOp: 'store',
-      },
-    });
-
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    GPUUtils.configureViewportAndScissor(pass, render.getCanvas().width, render.getCanvas().height);
-
-    // 1. Activar el pipeline
-    this.pointLightTechnique.activatePipeline(pass);
-
-    // 2. Activar mesh data
-    this.unitSphere.activate(pass);
-
-    // 3. Activar bind groups
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
-      []) {
-      const pointLightComponent = comp as PointLightComponent;
-      const entity = pointLightComponent.getOwner();
-      const transform = entity.getComponent('transform') as TransformComponent;
-      pass.setBindGroup(2, transform.getModelBindGroup());
-      pointLightComponent.setBindGroup(pass);
-
-      // 4. Dibujar la mesh
-      this.unitSphere.renderGroup(pass);
-    }
-
-    pass.end();
-  }
-
-  private renderSpotLightsNoShadows(): void {
-    const render = Render.getInstance();
-    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-
-    const pass = render.getCommandEncoder().beginRenderPass({
-      label: 'Spot Lights Render pass',
-      colorAttachments: [
-        {
-          view: this.rtAccLight.getView(),
-          loadOp: 'load',
-          storeOp: 'store',
-        },
-      ],
-      depthStencilAttachment: {
-        view: gBufferDepthTextures.singleDepthView, // Use single-sample depth for spot light pass
-        depthLoadOp: 'load',
-        depthStoreOp: 'store',
-      },
-    });
-
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    GPUUtils.configureViewportAndScissor(pass, render.getCanvas().width, render.getCanvas().height);
-
-    // 1. Activar el pipeline
-    this.spotLightTechnique.activatePipeline(pass);
-
-    // 2. Activar mesh data
-    this.unitFrustum.activate(pass);
-
-    // 3. Activar bind groups
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
-      const spotLightComponent = comp as SpotLightComponent;
-      spotLightComponent.setBindGroup(pass);
-
-      // 4. Dibujar la mesh
-      this.unitFrustum.renderGroup(pass);
-    }
-
-    pass.end();
   }
   public update(_dt: number): void { }
   private destroy(): void {

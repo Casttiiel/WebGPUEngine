@@ -1,5 +1,7 @@
 import { BaseRenderPass } from './BaseRenderPass';
 import { GBufferRenderPass, DecalRenderPass, TransparentRenderPass } from './DeferredRenderPasses';
+import { PointLightRenderPass, SpotLightRenderPass } from './LightingRenderPasses';
+import { ToneMappingRenderPass, AntialiasingRenderPass, AmbientOcclusionRenderPass } from './PostProcessingRenderPasses';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderToTexture } from '../RenderToTexture';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
@@ -109,5 +111,99 @@ export class RenderPassManager {
      */
     public clear(): void {
         this.renderPasses.clear();
+    }
+
+    /**
+     * Initialize lighting passes for deferred rendering
+     */
+    public initializeLightingPasses(
+        accLight: RenderToTexture,
+        singleDepthView: GPUTextureView,
+        pointLightTechnique: any,
+        spotLightTechnique: any,
+        unitSphere: any,
+        unitFrustum: any,
+        gBufferBindGroup: GPUBindGroup,
+    ): void {
+        // Create Point Light pass
+        const pointLightConfig = RenderPassFactory.createPointLightPassConfig(
+            accLight,
+            singleDepthView,
+        );
+        const pointLightPass = new PointLightRenderPass(
+            pointLightConfig,
+            pointLightTechnique,
+            unitSphere,
+            gBufferBindGroup
+        );
+        this.renderPasses.set('pointLights', pointLightPass);
+
+        // Create Spot Light pass
+        const spotLightConfig = RenderPassFactory.createSpotLightPassConfig(
+            accLight,
+            singleDepthView,
+        );
+        const spotLightPass = new SpotLightRenderPass(
+            spotLightConfig,
+            spotLightTechnique,
+            unitFrustum,
+            gBufferBindGroup
+        );
+        this.renderPasses.set('spotLights', spotLightPass);    }
+
+    /**
+     * Execute a dynamic render pass directly without registration
+     */
+    public executeDynamicPass(pass: BaseRenderPass, category?: RenderCategory, renderKeys?: any[]): void {
+        const encoder = Render.getInstance().getCommandEncoder();
+        pass.execute(encoder, category, renderKeys);
+    }
+
+    /**
+     * Create and execute a tone mapping pass dynamically
+     */
+    public executeToneMappingPass(
+        mesh: any,
+        technique: any,
+        bindGroup: GPUBindGroup,
+        result: RenderToTexture
+    ): void {
+        const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+        const pass = new ToneMappingRenderPass(passConfig, mesh, technique, bindGroup);
+        this.executeDynamicPass(pass);
+    }
+
+    /**
+     * Create and execute an antialiasing pass dynamically
+     */
+    public executeAntialiasingPass(
+        mesh: any,
+        technique: any,
+        bindGroup: GPUBindGroup,
+        result: RenderToTexture
+    ): void {
+        const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+        const pass = new AntialiasingRenderPass(passConfig, mesh, technique, bindGroup);
+        this.executeDynamicPass(pass);
+    }
+
+    /**
+     * Create and execute an ambient occlusion pass dynamically
+     */
+    public executeAmbientOcclusionPass(
+        mesh: any,
+        technique: any,
+        bindGroup: GPUBindGroup,
+        result: RenderToTexture
+    ): void {
+        const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+        
+        // Override clear value for AO (white = no occlusion)
+        if (passConfig.colorAttachments[0]) {
+            passConfig.colorAttachments[0].clearValue = { r: 1, g: 1, b: 1, a: 1 };
+        }
+
+        const pass = new AmbientOcclusionRenderPass(passConfig, mesh, technique, bindGroup);
+        this.executeDynamicPass(pass);
     }
 }

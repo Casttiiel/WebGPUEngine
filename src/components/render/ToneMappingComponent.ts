@@ -5,20 +5,21 @@ import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 
 export class ToneMappingComponent extends Component {
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
   private result!: RenderToTexture;
+  private renderPassManager!: RenderPassManager;
 
   constructor() {
     super();
+    this.renderPassManager = new RenderPassManager();
   }
-
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
-
     this.technique = await Technique.get('tone_mapping.tech');
 
     this.result = new RenderToTexture();
@@ -32,34 +33,14 @@ export class ToneMappingComponent extends Component {
 
   public apply(texture: GPUTextureView): GPUTextureView {
     this.setBindGroup(texture);
-    const render = Render.getInstance();
-    const pass = render.getCommandEncoder().beginRenderPass({
-      colorAttachments: [
-        {
-          view: this.result.getView(),
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        },
-      ],
-    });
 
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    GPUUtils.configureViewportAndScissor(pass, render.getCanvas().width, render.getCanvas().height);
-
-    // 1. Activar el pipeline
-    this.technique.activatePipeline(pass);
-
-    // 2. Activar mesh data
-    this.fullscreenQuadMesh.activate(pass);
-
-    // 3. Activar bind groups
-    pass.setBindGroup(0, this.bindGroup);
-
-    // 4. Dibujar la mesh
-    this.fullscreenQuadMesh.renderGroup(pass);
-
-    pass.end();
+    // Use RenderPassManager to execute tone mapping pass dynamically
+    this.renderPassManager.executeToneMappingPass(
+      this.fullscreenQuadMesh,
+      this.technique,
+      this.bindGroup!,
+      this.result
+    );
 
     return this.result.getView();
   }
@@ -86,8 +67,7 @@ export class ToneMappingComponent extends Component {
       ]
     );
   }
-
-  public update(dt: number): void {
+  public update(_dt: number): void {
     throw new Error('Method not implemented.');
   }
 

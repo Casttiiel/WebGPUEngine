@@ -21,7 +21,7 @@ export class AmbientLight {
 
   private reflectionIntensity = 0.3;
   private ambientLightIntensity = 0.7;
-  private globalAmbientBoost = 0.2;
+  private globalAmbientBoost = 0.1;
 
   constructor() { }
 
@@ -88,8 +88,7 @@ export class AmbientLight {
         },
       ],
     );
-  }
-  public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+  } public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     const render = Render.getInstance();
     GPUUtils.writeBuffer(
       this.ambientUniformBuffer,
@@ -102,6 +101,7 @@ export class AmbientLight {
       ]),
     );
 
+    // Use GPUUtils for consistent render pass descriptor creation
     const colorAttachment = GPUUtils.createColorAttachment(
       rtAccLight,
       'clear',
@@ -114,22 +114,24 @@ export class AmbientLight {
         'ambient light render pass',
         [colorAttachment]
       )
-    );    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    );
+
+    // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);
 
-    // 1. Activar el pipeline
+    // 1. Activate pipeline
     this.ambientTechnique.activatePipeline(pass);
 
-    // 2. Activar mesh data
+    // 2. Activate mesh data
     this.fullscreenQuadMesh.activate(pass);
 
-    // 3. Activar bind groups
+    // 3. Set bind groups
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
     pass.setBindGroup(1, gBufferBindGroup); // GBuffer textures
     pass.setBindGroup(2, this.environmentBindGroup); // Environment texture
     pass.setBindGroup(3, this.uniformBindGroup); // ambient parameters
 
-    // 4. Dibujar la mesh
+    // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();

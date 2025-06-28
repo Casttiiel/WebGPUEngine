@@ -45,6 +45,7 @@ export class Skybox {
   public render(rtAccLight: GPUTextureView, depthStencilView: GPUTextureView): void {
     const render = Render.getInstance();
 
+    // Use GPUUtils for consistent render pass descriptor creation
     const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
     const depthAttachment = GPUUtils.createDepthStencilAttachment(depthStencilView, 'load', 'store');
 
@@ -54,20 +55,22 @@ export class Skybox {
         [colorAttachment],
         depthAttachment
       )
-    );    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
+    );
+
+    // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);
 
-    // 1. Activar el pipeline
+    // 1. Activate pipeline
     this.skyboxTechnique.activatePipeline(pass);
 
-    // 2. Activar mesh data
+    // 2. Activate mesh data
     this.fullscreenQuadMesh.activate(pass);
 
-    // 3. Activar bind groups
+    // 3. Set bind groups
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
     pass.setBindGroup(1, this.skyboxBindGroup);
 
-    // 4. Dibujar la mesh
+    // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();

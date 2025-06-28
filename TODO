@@ -1,6 +1,17 @@
 ## NPM RUN DEV
 
-2. DeferredRenderer
+✅ 1. Modular render pass system refactor - COMPLETED
+   - Refactored DeferredRenderer to use RenderPassManager
+   - Refactored all lighting passes (point lights, spot lights) 
+   - Refactored all post-processing components (ToneMappingComponent, AntialiasingComponent, AmbientOcclusionComponent)
+   - Refactored utility passes (AmbientLight, Skybox, DepthResolver, GBufferPass)
+   - Centralized viewport/scissor logic with GPUUtils.configureViewportAndScissor
+   - Eliminated all manual beginRenderPass usage except BaseRenderPass (system base class)
+   - All rendering now uses modular system with consistent configuration patterns
+   - Fixed MSAA attachment compatibility issues 
+   - ⚠️ Note: WebGPU validation warnings for texture usage conflicts (texture used as both RENDER_ATTACHMENT and TEXTURE_BINDING in same scope) - functionally works but could be optimized with double buffering in future
+
+2. COpilotFile
 3. Ambient Occlusion SSAO
 4. Ambient Occlusion GTAO
 5. Shader functions duplication

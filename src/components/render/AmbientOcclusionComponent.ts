@@ -3,18 +3,18 @@ import { Render } from '../../renderer/core/Render';
 import { RenderToTexture } from '../../renderer/core/RenderToTexture';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
-import { Engine } from '../../core/engine/Engine';
-import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 
 export class AmbientOcclusionComponent extends Component {
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private result!: RenderToTexture;
+  private renderPassManager!: RenderPassManager;
 
   constructor() {
     super();
+    this.renderPassManager = new RenderPassManager();
   }
-
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('ambient_occlusion.tech');
@@ -25,53 +25,26 @@ export class AmbientOcclusionComponent extends Component {
       Render.width,
       Render.height,
       'r16float',
-      true,
-    ); // Enable MSAA
-  }
-
-  public resize(): void {
+      false, // Disable MSAA temporarily to fix usage conflict
+    );
+  }  public resize(): void {
     this.result.createRT(
       'ambient_occlusion_result.dds',
       Render.width,
       Render.height,
       'r16float',
-      true,
-    ); // Enable MSAA
+      false, // Disable MSAA temporarily to fix usage conflict
+    );
   }
 
   public compute(gBufferBindGroup: GPUBindGroup): GPUTextureView | undefined {
-    const render = Render.getInstance();
-
-    // Create color attachment with MSAA handling
-    const colorAttachment: GPURenderPassColorAttachment = {
-      view: this.result.getRenderView(), // MSAA view for rendering
-      loadOp: 'clear',
-      storeOp: 'store',
-      clearValue: { r: 1, g: 1, b: 1, a: 1 },
-    };
-
-    const pass = render.getCommandEncoder().beginRenderPass({
-      label: 'Ambient Occlusion Pass',
-      colorAttachments: [colorAttachment],
-    });
-
-    // Configurar el viewport y scissor para asegurar que todo el canvas sea utilizable
-    GPUUtils.configureViewportAndScissor(pass, render.getCanvas().width, render.getCanvas().height);
-
-    // 1. Activar el pipeline
-    this.technique.activatePipeline(pass);
-
-    // 2. Activar mesh data
-    this.fullscreenQuadMesh.activate(pass);
-
-    // 3. Activar bind groups
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, gBufferBindGroup); // GBuffer textures
-
-    // 4. Dibujar la mesh
-    this.fullscreenQuadMesh.renderGroup(pass);
-
-    pass.end();
+    // Use RenderPassManager to execute ambient occlusion pass dynamically
+    this.renderPassManager.executeAmbientOcclusionPass(
+      this.fullscreenQuadMesh,
+      this.technique,
+      gBufferBindGroup,
+      this.result
+    );
 
     return this.result.getView();
   }
