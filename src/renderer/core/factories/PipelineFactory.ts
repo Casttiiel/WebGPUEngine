@@ -118,4 +118,40 @@ export class PipelineFactory {
             },
         };
     }
+
+    /**
+     * Gets pure additive blending state (one + one)
+     */
+    public static getPureAdditiveBlending(): GPUBlendState {
+        return {
+            color: {
+                srcFactor: 'one',
+                dstFactor: 'one',
+                operation: 'add',
+            },
+            alpha: {
+                srcFactor: 'one',
+                dstFactor: 'one',
+                operation: 'add',
+            },
+        };
+    }
+
+    /**
+     * Gets opaque blending state (replaces destination)
+     */
+    public static getOpaqueBlending(): GPUBlendState {
+        return {
+            color: {
+                srcFactor: 'one',
+                dstFactor: 'zero',
+                operation: 'add',
+            },
+            alpha: {
+                srcFactor: 'one',
+                dstFactor: 'zero',
+                operation: 'add',
+            },
+        };
+    }
 }

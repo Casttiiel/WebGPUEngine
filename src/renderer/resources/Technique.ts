@@ -62,44 +62,70 @@ export class Technique extends GPUResource {
     this.vsEntryPoint = options.vsEntryPoint || 'vs';
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
   }
-
   public static async get(
     pathOrData: string | Partial<TechniqueCreateOptions>,
   ): Promise<Technique> {
-    let techniqueData = null;
-    const path =
-      typeof pathOrData === 'string' ? pathOrData : `${pathOrData?.vs}-${pathOrData?.fs}`;
+    const path = this.generatePath(pathOrData);
 
+    // Try to get existing resource
     try {
       return ResourceManager.getResource<Technique>(path);
     } catch {
-      if (typeof pathOrData === 'string') {
-        techniqueData = await ResourceManager.loadTechniqueData(pathOrData);
-      } else {
-        techniqueData = pathOrData;
-      }
+      // Resource doesn't exist, create new one
     }
 
-    const technique = new Technique({
-      path,
-      type: ResourceType.TECHNIQUE,
-      vs: techniqueData?.vs ?? '',
-      fs: techniqueData?.fs ?? '',
-      blend: techniqueData?.blend ?? BlendModes.DEFAULT,
-      rs: techniqueData?.rs ?? RasterizationMode.DEFAULT,
-      z: techniqueData?.z ?? DepthModes.DEFAULT,
-      writesOn: techniqueData?.writesOn ?? FragmentShaderTargets.SCREEN,
-      uniforms: techniqueData?.uniforms ?? [],
-      vsEntryPoint: techniqueData?.vsEntryPoint,
-      fsEntryPoint: techniqueData?.fsEntryPoint,
-    });
+    const techniqueData = await this.loadTechniqueData(pathOrData);
+    const technique = this.createTechnique(path, techniqueData);
 
-    if (!technique.vsFile || !technique.fsFile) {
-      throw new Error(`Missing shader files for technique: ${path}`);
-    }
     await technique.load();
     ResourceManager.registerResource(technique);
     return technique;
+  }
+
+  private static generatePath(pathOrData: string | Partial<TechniqueCreateOptions>): string {
+    return typeof pathOrData === 'string'
+      ? pathOrData
+      : `${pathOrData?.vs}-${pathOrData?.fs}`;
+  }
+
+  private static async loadTechniqueData(
+    pathOrData: string | Partial<TechniqueCreateOptions>
+  ): Promise<Partial<TechniqueCreateOptions>> {
+    if (typeof pathOrData === 'string') {
+      return await ResourceManager.loadTechniqueData(pathOrData);
+    }
+    return pathOrData;
+  }
+
+  private static createTechnique(
+    path: string,
+    techniqueData: Partial<TechniqueCreateOptions>
+  ): Technique {
+    if (!techniqueData?.vs || !techniqueData?.fs) {
+      throw new Error(`Missing shader files for technique: ${path}`);
+    }
+
+    const options: TechniqueOptions = {
+      path,
+      type: ResourceType.TECHNIQUE,
+      vs: techniqueData.vs,
+      fs: techniqueData.fs,
+      blend: techniqueData.blend ?? BlendModes.DEFAULT,
+      rs: techniqueData.rs ?? RasterizationMode.DEFAULT,
+      z: techniqueData.z ?? DepthModes.DEFAULT,
+      writesOn: techniqueData.writesOn ?? FragmentShaderTargets.SCREEN,
+      uniforms: techniqueData.uniforms ?? [],
+    };
+
+    // Add optional properties only if they exist
+    if (techniqueData.vsEntryPoint) {
+      options.vsEntryPoint = techniqueData.vsEntryPoint;
+    }
+    if (techniqueData.fsEntryPoint) {
+      options.fsEntryPoint = techniqueData.fsEntryPoint;
+    }
+
+    return new Technique(options);
   }
 
   public override async load(): Promise<void> {
@@ -187,22 +213,27 @@ export class Technique extends GPUResource {
         frontFace: 'ccw',
       },
     };
-
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
       pipelineConfig.depthStencil = this.getDepthConfig();
     }
 
     // Add multisample if needed for MSAA passes
-    if (
-      this.writesOn === FragmentShaderTargets.GBUFFER ||
-      this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER ||
-      this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA
-    ) {
+    if (this.needsMSAA()) {
       pipelineConfig.multisample = { count: 4 };
     }
 
     this.pipeline = PipelineFactory.createPipeline(pipelineConfig);
   }
+
+  private needsMSAA(): boolean {
+    return this.writesOn === FragmentShaderTargets.GBUFFER ||
+      this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER ||
+      this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA;
+  }
+
+  // ============================================================================
+  // PIPELINE CONFIGURATION METHODS
+  // ============================================================================
 
   private getRasterizationConfig(): GPUCullMode {
     switch (this.rasterizationMode) {
@@ -221,116 +252,87 @@ export class Technique extends GPUResource {
     }
   }
 
+  // ============================================================================
+  // FRAGMENT TARGET CONFIGURATION METHODS  
+  // ============================================================================
+
   private getFragmentShaderTarget(): GPUColorTargetState[] {
     switch (this.writesOn) {
-      case FragmentShaderTargets.GBUFFER: {
-        return [
-          {
-            format: 'rgba16float',
-          },
-          {
-            format: 'rgba16float',
-          },
-          {
-            format: 'rgba16float',
-          },
-          {
-            format: 'r16float',
-          },
-        ];
-      }
-      case FragmentShaderTargets.PARTIAL_GBUFFER: {
-        return [
-          {
-            format: 'rgba16float',
-          },
-          {
-            format: 'rgba16float',
-          },
-        ];
-      }
-      case FragmentShaderTargets.TEXTURE: {
-        return [
-          {
-            format: 'rgba16float',
-            blend: this.getBlendState(),
-          },
-        ];
-      }
-      case FragmentShaderTargets.SINGLE_CHANNEL: {
-        return [
-          {
-            format: 'r16float',
-          },
-        ];
-      }
-      case FragmentShaderTargets.SINGLE_CHANNEL_MSAA: {
-        return [
-          {
-            format: 'r16float',
-          },
-        ];
-      }
-      case FragmentShaderTargets.SCREEN: {
-        return [
-          {
-            format: Render.getInstance().getFormat(),
-            blend: {
-              color: {
-                srcFactor: 'one',
-                dstFactor: 'zero',
-                operation: 'add',
-              },
-              alpha: {
-                srcFactor: 'one',
-                dstFactor: 'zero',
-                operation: 'add',
-              },
-            },
-          },
-        ];
-      }
-      case FragmentShaderTargets.DEPTH_ONLY: {
+      case FragmentShaderTargets.GBUFFER:
+        return this.createGBufferTargets();
+      case FragmentShaderTargets.PARTIAL_GBUFFER:
+        return this.createPartialGBufferTargets();
+      case FragmentShaderTargets.TEXTURE:
+        return this.createTextureTarget();
+      case FragmentShaderTargets.SINGLE_CHANNEL:
+      case FragmentShaderTargets.SINGLE_CHANNEL_MSAA:
+        return this.createSingleChannelTarget();
+      case FragmentShaderTargets.SCREEN:
+        return this.createScreenTarget();
+      case FragmentShaderTargets.DEPTH_ONLY:
         return []; // No color targets, only depth output
-      }
-      default: {
+      default:
         throw new Error(`${this.label}: Unknown Fragment Shader Target`);
-      }
     }
-  } private getBlendState(): GPUBlendState {
+  }
+
+  private createGBufferTargets(): GPUColorTargetState[] {
+    return [
+      { format: 'rgba16float' }, // Albedo + metallic
+      { format: 'rgba16float' }, // Normal + roughness  
+      { format: 'rgba16float' }, // Self illumination
+      { format: 'r16float' },    // Linear depth
+    ];
+  }
+
+  private createPartialGBufferTargets(): GPUColorTargetState[] {
+    return [
+      { format: 'rgba16float' }, // Albedo + metallic
+      { format: 'rgba16float' }, // Normal + roughness
+    ];
+  }
+
+  private createTextureTarget(): GPUColorTargetState[] {
+    return [
+      {
+        format: 'rgba16float',
+        blend: this.getBlendState(),
+      },
+    ];
+  }
+
+  private createSingleChannelTarget(): GPUColorTargetState[] {
+    return [{ format: 'r16float' }];
+  }
+  private createScreenTarget(): GPUColorTargetState[] {
+    return [
+      {
+        format: Render.getInstance().getFormat(),
+        blend: PipelineFactory.getOpaqueBlending(),
+      },
+    ];
+  }
+
+  // ============================================================================
+  // BLEND STATE CONFIGURATION METHODS
+  // ============================================================================
+
+  private getBlendState(): GPUBlendState {
     switch (this.blendMode) {
       case BlendModes.ADDITIVE_BY_SRC_ALPHA:
         return PipelineFactory.getAdditiveBlending();
       case BlendModes.ADDITIVE:
-        return {
-          color: {
-            srcFactor: 'one',
-            dstFactor: 'one',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'one',
-            dstFactor: 'one',
-            operation: 'add',
-          },
-        };
+        return PipelineFactory.getPureAdditiveBlending();
       case BlendModes.COMBINATIVE_GBUFFER:
         return PipelineFactory.getAlphaBlending();
       default:
-        return {
-          color: {
-            srcFactor: 'one',
-            dstFactor: 'zero',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'one',
-            dstFactor: 'zero',
-            operation: 'add',
-          },
-        };
+        return PipelineFactory.getOpaqueBlending();
     }
   }
+
+  // ============================================================================
+  // DEPTH CONFIGURATION METHODS
+  // ============================================================================
 
   private getDepthConfig(): GPUDepthStencilState {
     switch (this.depthTest) {
@@ -391,7 +393,9 @@ export class Technique extends GPUResource {
       throw new Error(`Pipeline not initialized for technique ${this.path}`);
     }
     return this.pipeline;
-  } public getBindGroupLayout(idx: number): GPUBindGroupLayout | undefined {
+  }
+
+  public getBindGroupLayout(idx: number): GPUBindGroupLayout | undefined {
     if (!this.pipelineLayouts || idx < 0 || idx >= this.pipelineLayouts.length) {
       return undefined;
     }

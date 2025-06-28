@@ -1,6 +1,6 @@
 ## NPM RUN DEV
 
-2. Layout auto en algo? Technique, DeferredRenderer
+2. DeferredRenderer
 3. Ambient Occlusion SSAO
 4. Ambient Occlusion GTAO
 5. Shader functions duplication
