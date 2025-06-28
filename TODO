@@ -1,15 +1,14 @@
 ## NPM RUN DEV
 
-2. Ambient Occlusion GTAO
-3. Shader functions duplication
-4. RenderToTexture Refactor?
-5. Typing things and connected with resources json?
-6. OPtimizacion WebGPUFundamentals
-7. Load locks or async?
-7. Engine quality settings
-8. Bloom
-9. Compute-based distortion
-10. SpotLightsWithShadows
+2. RenderToTexture Refactor?
+3. Typing things and connected with resources json?
+4. OPtimizacion WebGPUFundamentals
+5. Load locks or async?
+6. Engine quality settings
+7. Bloom
+8. Compute-based distortion
+9. SpotLightsWithShadows
+10. Ambient Occlusion GTAO
 11. PointLighstWithShadows
 12. Directional Light
 13. Area Light

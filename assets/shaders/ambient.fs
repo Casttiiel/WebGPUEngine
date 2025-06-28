@@ -1,6 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
+#include "common/gbuffer"
 
 struct AmbientUniforms {
     reflectionIntensity: f32,
@@ -25,51 +26,6 @@ struct AmbientUniforms {
 @group(2) @binding(4) var irradianceMap: texture_cube<f32>;
 @group(2) @binding(5) var samplerIrradiance: sampler;
 @group(3) @binding(0) var<uniform> ambient: AmbientUniforms;
-
-
-fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
-    var g: GBuffer;
-    
-    // Get linear depth and world position
-    let zlinear = textureSample(gLinearDepth, samplerGBuffer, uv).x;
-    g.zlinear = zlinear;
-    g.worldPos = getWorldCoords(uv, zlinear, camera);
-    
-    // Get normal
-    let normalData = textureSample(gNormals, samplerGBuffer, uv);
-    g.normal = normalize(decodeNormal(normalData.xyz));
-    
-    // Get albedo and metallic
-    let albedo = textureSample(gAlbedo, samplerGBuffer, uv);
-    g.metallic = albedo.a;
-    g.roughness = normalData.a;
-    g.metallic = max(clamp(1.0 - normalData.a, 0.0, 1.0), g.metallic);
-    
-    // Gamma correction for albedo
-    let albedoLinear = pow(abs(albedo.rgb), vec3<f32>(2.2));
-    
-    // Mix with metallic for proper albedo and specular
-    g.albedo = albedoLinear * (1.0 - g.metallic);
-    
-    // Get self illumination
-    g.emissive = textureSample(gSelfIllum, samplerGBuffer, uv).x;
-    g.selfIllum = g.albedo * g.emissive;
-    
-    // Default specular for dielectrics is 0.03
-    g.specularColor = mix(vec3<f32>(0.03), albedoLinear, g.metallic);
-    
-    // View and reflection directions
-    let incident_dir = normalize(g.worldPos - camera.cameraPosition);
-    g.reflectedDir = normalize(reflect(incident_dir, g.normal));
-    g.viewDir = -incident_dir;
-    
-    return g;
-}
-
-// PBR Fresnel-Schlick approximation for IBL
-fn fresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
 
 // PBR Fresnel with roughness compensation for IBL
 fn fresnelSchlickRoughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -> vec3<f32> {

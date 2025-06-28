@@ -1,6 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
+#include "common/gbuffer"
 
 // Estructura para parámetros SSAO solamente
 struct SSAOParams {
@@ -31,45 +32,6 @@ const POISSON_SAMPLES = array<vec2<f32>, 16>(
     vec2<f32>(0.3852080f, 0.5509507f),
     vec2<f32>(0.7672689f, 0.1565740f)
 );
-
-fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
-    var g: GBuffer;
-    
-    // Get linear depth and world position
-    let zlinear = textureSample(gLinearDepth, samplerGBuffer, uv).x;
-    g.zlinear = zlinear;
-    g.worldPos = getWorldCoords(uv, zlinear, camera);
-    
-    // Get normal
-    let normalData = textureSample(gNormals, samplerGBuffer, uv);
-    g.normal = normalize(decodeNormal(normalData.xyz));
-    
-    // Get albedo and metallic
-    let albedo = textureSample(gAlbedo, samplerGBuffer, uv);
-    g.metallic = albedo.a;
-    g.roughness = normalData.a;
-    g.metallic = max(clamp(1.0 - normalData.a, 0.0, 1.0), g.metallic);
-    
-    // Gamma correction for albedo
-    let albedoLinear = pow(abs(albedo.rgb), vec3<f32>(2.2));
-    
-    // Mix with metallic for proper albedo and specular
-    g.albedo = albedoLinear * (1.0 - g.metallic);
-    
-    // Get self illumination
-    g.emissive = textureSample(gSelfIllum, samplerGBuffer, uv).x;
-    g.selfIllum = g.albedo * g.emissive;
-    
-    // Default specular for dielectrics is 0.03
-    g.specularColor = mix(vec3<f32>(0.03), albedoLinear, g.metallic);
-    
-    // View and reflection directions
-    let incident_dir = normalize(g.worldPos - camera.cameraPosition);
-    g.reflectedDir = normalize(reflect(incident_dir, g.normal));
-    g.viewDir = -incident_dir;
-    
-    return g;
-}
 
 // Generación de ruido procedural mejorado
 fn hash(p: vec2<f32>) -> vec2<f32> {
