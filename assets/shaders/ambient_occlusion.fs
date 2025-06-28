@@ -2,18 +2,15 @@
 #include "common/structs"
 #include "common/utils"
 
-// Constantes SSAO mejoradas
-const SAMPLE_COUNT = 16u;
-const RADIUS = 0.5;           // Radio en espacio de vista
-const BIAS = 0.025;           // Para evitar self-occlusion
-const AO_STRENGTH = 1.5;      // Intensidad del efecto
-const MAX_DISTANCE = 1.0;     // Distancia máxima en espacio de vista
-const NOISE_SCALE = 4.0;      // Escala del ruido para mejor distribución
-
-// Constantes para bilateral filter
-const BILATERAL_RADIUS = 2u;      // Radio del filtro bilateral
-const BILATERAL_SIGMA_DEPTH = 0.1; // Sensibilidad a diferencias de profundidad
-const BILATERAL_SIGMA_NORMAL = 0.5; // Sensibilidad a diferencias de normales
+// Estructura para parámetros SSAO solamente
+struct SSAOParams {
+    sampleCount: f32,
+    radius: f32,
+    bias: f32,
+    aoStrength: f32,
+    maxDistance: f32,
+    noiseScale: f32,
+}
 
 // Pre-computed Poisson disk samples para mejor distribución
 const POISSON_SAMPLES = array<vec2<f32>, 16>(
@@ -123,9 +120,12 @@ fn hemispherePointPoisson(index: u32, n: vec3<f32>, noise: vec2<f32>) -> vec3<f3
 @group(1) @binding(4) var gAO: texture_2d<f32>;
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
+// Uniform buffer para parámetros SSAO
+@group(2) @binding(0) var<uniform> ssaoParams: SSAOParams;
+
 fn samplePosition(centerPos: vec3<f32>, normal: vec3<f32>, screenPos: vec2<f32>, index: u32) -> vec2<f32> {
     // Usar Poisson disk con ruido rotacional
-    let noise = hash(screenPos * NOISE_SCALE);
+    let noise = hash(screenPos * ssaoParams.noiseScale);
     let sampleVec = hemispherePointPoisson(index, normal, noise);
     
     // Trabajar en espacio de vista en lugar de mundo
@@ -135,7 +135,7 @@ fn samplePosition(centerPos: vec3<f32>, normal: vec3<f32>, screenPos: vec2<f32>,
     
     // Escalar el radio según la profundidad (más cerca = radio más pequeño)
     let depthScale = clamp(-viewPos.z / 10.0, 0.1, 1.0);
-    let samplePosView = viewPos + viewSampleVec * RADIUS * depthScale;
+    let samplePosView = viewPos + viewSampleVec * ssaoParams.radius * depthScale;
     
     // Proyectar a espacio de pantalla
     let sampleNDC = camera.projectionMatrix * vec4<f32>(samplePosView, 1.0);
@@ -157,7 +157,7 @@ fn calculateAORaw(g: GBuffer, uv: vec2<f32>) -> f32 {
     let viewNormal = normalize((camera.viewMatrix * vec4<f32>(normal, 0.0)).xyz);
 
     // Calculamos y acumulamos la oclusión para todas las muestras
-    for (var i = 0u; i < SAMPLE_COUNT; i = i + 1u) {
+    for (var i = 0u; i < u32(ssaoParams.sampleCount); i = i + 1u) {
         var sampleUV = samplePosition(pixelPos, normal, screenPos, i);
         sampleUV.y = 1.0 - sampleUV.y; // Invertir Y para coordenadas de textura
         let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUV).x;
@@ -171,17 +171,17 @@ fn calculateAORaw(g: GBuffer, uv: vec2<f32>) -> f32 {
         
         // Factores de peso usando distancias en espacio de vista
         let validDepth = f32(sampleDepth > 0.0 && sampleDepth < 1.0);
-        let validDistance = f32(dist <= MAX_DISTANCE);
+        let validDistance = f32(dist <= ssaoParams.maxDistance);
         
-        let distScale = 1.0 - smoothstep(0.0, MAX_DISTANCE, dist);
+        let distScale = 1.0 - smoothstep(0.0, ssaoParams.maxDistance, dist);
         
         // Usar diferencia de profundidad en espacio de vista
         let viewDepthDiff = sampleViewPos.z - viewPos.z;
         let normalFactor = max(dot(viewNormal, normalize(distVec)), 0.0);
         
         // Verificar oclusión con bias adaptativo en espacio de vista
-        let adaptiveBias = BIAS * (1.0 + dist * 2.0);
-        let validOcclusion = f32(viewDepthDiff > adaptiveBias && dist < MAX_DISTANCE);
+        let adaptiveBias = ssaoParams.bias * (1.0 + dist * 2.0);
+        let validOcclusion = f32(viewDepthDiff > adaptiveBias && dist < ssaoParams.maxDistance);
         
         // Acumular oclusión usando multiplicación en lugar de condicionales
         let contribution = normalFactor * distScale * validDepth * validDistance * validOcclusion;
@@ -189,7 +189,7 @@ fn calculateAORaw(g: GBuffer, uv: vec2<f32>) -> f32 {
     }
   
     // Normalizar y aplicar contraste
-    occlusion = (occlusion / f32(SAMPLE_COUNT)) * AO_STRENGTH;
+    occlusion = (occlusion / ssaoParams.sampleCount) * ssaoParams.aoStrength;
     return clamp(1.0 - occlusion, 0.0, 1.0);
 }
 

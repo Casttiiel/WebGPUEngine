@@ -1,6 +1,5 @@
 ## NPM RUN DEV
 
-1. Ambient Occlusion SSAO (parametros como input para jugar con ellos)
 2. Ambient Occlusion GTAO
 3. Shader functions duplication
 4. RenderToTexture Refactor?

@@ -194,11 +194,12 @@ export class RenderPassManager {
     public executeAmbientOcclusionPass(
         mesh: any,
         technique: any,
-        bindGroup: GPUBindGroup,
+        gBufferBindGroup: GPUBindGroup,
+        ssaoParamsBindGroup: GPUBindGroup | undefined,
         result: RenderToTexture
     ): void {
         const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
-        const pass = new AmbientOcclusionRenderPass(passConfig, mesh, technique, bindGroup);
+        const pass = new AmbientOcclusionRenderPass(passConfig, mesh, technique, gBufferBindGroup, ssaoParamsBindGroup);
         this.executeDynamicPass(pass);
     }    /**
      * Create and execute an AO bilateral filter pass dynamically

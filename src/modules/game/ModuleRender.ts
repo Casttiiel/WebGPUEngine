@@ -1,6 +1,5 @@
-import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { CameraComponent } from '../../components/render/CameraComponent';
-import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Camera } from '../../core/math/Camera';
 import { DeferredRenderer } from '../../renderer/core/DeferredRenderer';
@@ -221,6 +220,22 @@ export class ModuleRender extends Module {
     this.addDebugControl(this.debugValues.resolution, 'value', this.debugValues.resolution.name);
 
     this.debugControlsAdded = true;
+
+    // Call renderInMenu for camera components
+    this.renderCameraComponentsInMenu();
+  }
+
+  private renderCameraComponentsInMenu(): void {
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    if (!mainCamera) return;
+
+    // Render ImGui controls for camera components
+    if (mainCamera.hasComponent('ambient_occlusion')) {
+      const aoComponent = mainCamera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
+      if (aoComponent) {
+        aoComponent.renderInMenu();
+      }
+    }
   }
 
   public renderDebug(): void {

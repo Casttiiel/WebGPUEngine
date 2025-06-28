@@ -13,7 +13,7 @@ export class ModuleManager {
   private gamestates: Gamestate[] = [];
   private requestedGamestate: Gamestate | null = null;
   private debugPane: Pane | null = null;
-  private debugFolders: Map<string, any> = new Map();
+  private debugFolders: Map<string, FolderApi> = new Map();
   private engineControlsAdded: boolean = false;
 
   public async start(): Promise<void> {
@@ -179,10 +179,44 @@ export class ModuleManager {
       this.debugFolders.set(moduleName, folder);
     }
 
-    folder.addBinding(object, propertyKey, {
+    folder.addBinding(object as Record<string, unknown>, propertyKey, {
       label: label || propertyKey,
       readonly: true,
     });
+  }
+
+  public addInteractiveControl(
+    moduleName: string,
+    object: unknown,
+    propertyKey: string,
+    label?: string,
+    options?: {
+      min?: number;
+      max?: number;
+      step?: number;
+    }
+  ): void {
+    if (!this.debugPane) return;
+
+    let folder = this.debugFolders.get(moduleName);
+    if (!folder) {
+      folder = this.debugPane.addFolder({ title: moduleName });
+      this.debugFolders.set(moduleName, folder);
+    }
+
+    const bindingOptions: Record<string, unknown> = {
+      label: label || propertyKey,
+      readonly: false,
+    };
+
+    // Add range options if provided
+    if (options) {
+      if (options.min !== undefined) bindingOptions.min = options.min;
+      if (options.max !== undefined) bindingOptions.max = options.max;
+      if (options.step !== undefined) bindingOptions.step = options.step;
+    }
+
+    folder.addBinding(object as Record<string, unknown>, propertyKey, bindingOptions);
   }
 
   public renderInMenu(): void {

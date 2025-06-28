@@ -103,21 +103,27 @@ export class AntialiasingRenderPass extends PostProcessingRenderPass {
  */
 export class AmbientOcclusionRenderPass extends PostProcessingRenderPass {
     private gBufferBindGroup: GPUBindGroup;
+    private ssaoParamsBindGroup?: GPUBindGroup | undefined;
 
     constructor(
         config: RenderPassConfig,
         mesh: any,
         technique: any,
         gBufferBindGroup: GPUBindGroup,
+        ssaoParamsBindGroup?: GPUBindGroup,
     ) {
         super(config, mesh, technique);
         this.gBufferBindGroup = gBufferBindGroup;
+        this.ssaoParamsBindGroup = ssaoParamsBindGroup;
     }
 
     protected setBindGroups(pass: GPURenderPassEncoder): void {
-        // AO needs global bind group at 0 and G-Buffer at 1
+        // AO needs global bind group at 0, G-Buffer at 1, and optionally SSAO params at 2
         pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
         pass.setBindGroup(1, this.gBufferBindGroup);
+        if (this.ssaoParamsBindGroup) {
+            pass.setBindGroup(2, this.ssaoParamsBindGroup);
+        }
     }
 
     /**
@@ -125,6 +131,13 @@ export class AmbientOcclusionRenderPass extends PostProcessingRenderPass {
      */
     public updateGBufferBindGroup(bindGroup: GPUBindGroup): void {
         this.gBufferBindGroup = bindGroup;
+    }
+
+    /**
+     * Update the SSAO parameters bind group
+     */
+    public updateSSAOParamsBindGroup(bindGroup: GPUBindGroup): void {
+        this.ssaoParamsBindGroup = bindGroup;
     }
 }
 
