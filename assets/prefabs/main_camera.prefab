@@ -2,7 +2,7 @@
     "components": {
       "name": "MainCamera",
       "camera": {
-        "controllable": false,
+        "controllable": true,
         "fov": 60,
         "position": [
           0,

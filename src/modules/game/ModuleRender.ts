@@ -74,9 +74,9 @@ export class ModuleRender extends Module {
 
     let result = await this.deferred.render(mainCamera);
 
-    //this.renderDistorsions(result);
+    this.renderDistorsions(result);
 
-    /*if (mainCamera?.hasComponent('tone_mapping')) {
+    if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
       result = toneMapping.apply(result);
     }
@@ -84,7 +84,7 @@ export class ModuleRender extends Module {
     if (mainCamera?.hasComponent('antialiasing')) {
       const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
       result = antialiasing.apply(result);
-    }*/
+    }
 
     this.presentResult(result);
 
