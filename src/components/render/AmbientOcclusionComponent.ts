@@ -27,7 +27,9 @@ export class AmbientOcclusionComponent extends Component {
       'r16float',
       false, // Disable MSAA temporarily to fix usage conflict
     );
-  }  public resize(): void {
+  }
+
+  public resize(): void {
     this.result.createRT(
       'ambient_occlusion_result.dds',
       Render.width,

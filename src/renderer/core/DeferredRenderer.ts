@@ -141,7 +141,9 @@ export class DeferredRenderer {
     this.whiteTexture = await Texture.get('white.png');
 
     this.isLoaded = true;
-  }  public async render(camera: Entity): Promise<GPUTextureView> {
+  }
+
+  public async render(camera: Entity): Promise<GPUTextureView> {
     // Pre-render GPU culling - do this BEFORE starting render passes
     await RenderManager.getInstance().performPreRenderCulling();
 
