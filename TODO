@@ -2,8 +2,7 @@
 
 1. Engine quality settings
    --V-renderResolution (still needs to be painted on full canvas)
-   --V-msaaLevel
-   --Gbuffer texture quality
+   --Texture quality cubemap, skybox, postfx
    --ambient occlusion Quality
    --aliasing quality
    --CPU/GPU culling

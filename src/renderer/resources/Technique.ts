@@ -11,6 +11,7 @@ import { Render } from '../core/Render';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
 import { QualitySettings } from '../../core/engine/QualitySettings';
+import { GBufferQualityConfig } from '../core/GBufferQualityConfig';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
@@ -279,18 +280,28 @@ export class Technique extends GPUResource {
   }
 
   private createGBufferTargets(): GPUColorTargetState[] {
+    // Get current G-Buffer texture formats based on quality settings
+    const qualitySettings = QualitySettings.getInstance();
+    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
+    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
+    
     return [
-      { format: 'rgba16float' }, // Albedo + metallic
-      { format: 'rgba16float' }, // Normal + roughness  
-      { format: 'rgba16float' }, // Self illumination
-      { format: 'r16float' },    // Linear depth
+      { format: formats.albedo },    // Albedo + metallic
+      { format: formats.normal },    // Normal + roughness  
+      { format: formats.selfIllum }, // Self illumination
+      { format: formats.linearDepth }, // Linear depth
     ];
   }
 
   private createPartialGBufferTargets(): GPUColorTargetState[] {
+    // Get current G-Buffer texture formats for partial G-Buffer
+    const qualitySettings = QualitySettings.getInstance();
+    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
+    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
+    
     return [
-      { format: 'rgba16float' }, // Albedo + metallic
-      { format: 'rgba16float' }, // Normal + roughness
+      { format: formats.albedo }, // Albedo + metallic
+      { format: formats.normal }, // Normal + roughness
     ];
   }
 
@@ -306,6 +317,7 @@ export class Technique extends GPUResource {
   private createSingleChannelTarget(): GPUColorTargetState[] {
     return [{ format: 'r16float' }];
   }
+  
   private createScreenTarget(): GPUColorTargetState[] {
     return [
       {

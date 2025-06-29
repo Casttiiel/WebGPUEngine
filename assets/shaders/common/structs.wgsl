@@ -10,7 +10,7 @@ struct FragmentOutput {
     @location(0) albedo: vec4<f32>,
     @location(1) normal: vec4<f32>,
     @location(2) selfIllum: vec4<f32>,
-    @location(3) depth: f32,
+    @location(3) depth: vec2<f32>,
 }
 
 struct GBuffer {

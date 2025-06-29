@@ -2,6 +2,7 @@ import { RenderTarget } from '../../resources/RenderTarget';
 import { GPUUtils } from '../utils/GPUUtils';
 import { Render } from '../Render';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
+import { GBufferQualityConfig } from '../GBufferQualityConfig';
 
 /**
  * G-Buffer render pass for deferred rendering
@@ -30,20 +31,32 @@ export class GBufferPass {
     const height = Render.height;
     const qualitySettings = QualitySettings.getInstance();
     const msaaLevel = qualitySettings.getMSAALevel();
+    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
     const enableMSAA = msaaLevel > 0;
     
-    // Create G-Buffer render targets with formats matching gbuffer.tech pipeline
+    // Get optimal texture formats based on quality setting
+    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
+    
+    // Log quality settings for debugging
+    console.log(`Creating G-Buffer with quality: ${gBufferQuality}`, {
+      formats,
+      msaaLevel,
+      resolution: `${width}x${height}`,
+      estimatedMemory: `${GBufferQualityConfig.getMemoryUsage(width, height, gBufferQuality, msaaLevel).toFixed(1)} MB`
+    });
+    
+    // Create G-Buffer render targets with dynamic formats
     this.rtAlbedos = new RenderTarget();
-    this.rtAlbedos.createRT('gbuffer_albedos', width, height, 'rgba16float', enableMSAA);
+    this.rtAlbedos.createRT('gbuffer_albedos', width, height, formats.albedo, enableMSAA);
 
     this.rtNormals = new RenderTarget();
-    this.rtNormals.createRT('gbuffer_normals', width, height, 'rgba16float', enableMSAA);
+    this.rtNormals.createRT('gbuffer_normals', width, height, formats.normal, enableMSAA);
 
     this.rtSelfIllum = new RenderTarget();
-    this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, 'rgba16float', enableMSAA);
+    this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, formats.selfIllum, enableMSAA);
 
     this.rtLinearDepth = new RenderTarget();
-    this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, 'r16float', enableMSAA);
+    this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, formats.linearDepth, enableMSAA);
     
     // Create depth buffers (both MSAA and single-sample)
     this.depthStencil = GPUUtils.createTexture(

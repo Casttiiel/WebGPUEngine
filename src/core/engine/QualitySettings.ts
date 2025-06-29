@@ -1,6 +1,6 @@
 export interface GraphicsQualitySettings {
   renderResolution: number; // 0.5 = 50%, 1.0 = 100%
-  msaaLevel: number; // 0, 2, 4
+  msaaLevel: number; // 1, 4
   ambientOcclusionQuality: 'off' | 'low' | 'medium' | 'high';
   gBufferTextureQuality: 'low' | 'medium' | 'high';
   aliasingQuality: 'none' | 'fxaa' | 'msaa' | 'taa';
@@ -37,7 +37,7 @@ export class QualitySettings {
 
     MEDIUM: {
       renderResolution: 0.85,
-      msaaLevel: 2,
+      msaaLevel: 4,
       ambientOcclusionQuality: 'medium',
       gBufferTextureQuality: 'medium',
       aliasingQuality: 'fxaa',
@@ -68,7 +68,7 @@ export class QualitySettings {
 
   private constructor() {
     // Start with medium settings
-    this.settings = { ...QualitySettings.PRESETS.LOW };
+    this.settings = { ...QualitySettings.PRESETS.MINIMUM };
   }
 
   public static getInstance(): QualitySettings {
@@ -100,6 +100,11 @@ export class QualitySettings {
     return this.settings.msaaLevel;
   }
 
+  public getGBufferTextureQuality(): 'low' | 'medium' | 'high' {
+    return this.settings.gBufferTextureQuality;
+  }
+
+
   private onSettingsChanged(): void {
     // Emit event or trigger updates in renderer
     console.log('Graphics settings changed:', this.settings);
@@ -107,7 +112,12 @@ export class QualitySettings {
     // Dispatch a custom event that the engine can listen to
     if (typeof window !== 'undefined') {
       const event = new CustomEvent('qualitySettingsChanged', {
-        detail: { settings: { ...this.settings } }
+        detail: { 
+          settings: { ...this.settings },
+          // Include specific change types for optimized updates
+          requiresPipelineRecreation: true,
+          requiresRenderTargetRecreation: true
+        }
       });
       window.dispatchEvent(event);
     }
