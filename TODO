@@ -1,31 +1,45 @@
 ## NPM RUN DEV
 
-1. Load locks or async?
-2. Optimizacion WebGPUFundamentals
-3. Engine quality settings
-4. Bloom
-5. Compute-based distortion
-6. SpotLightsWithShadows
-7. Ambient Occlusion GTAO
-8. PointLighstWithShadows
-9. Directional Light
-10. Area Light
-11. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-12. Temporal Anti-Aliasing (TAA)
-13. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-14. MSAA on lights?
-15. Motion Blur
-16. Decals Category
-17. Particles
-18. Escalabilidad de Luces
+1. Engine quality settings
+   --renderResolution: 0.75,
+   --msaaLevel: 0,
+   --ambient occlusion Quality
+   -- Gbuffer texture quality
+   --aliasing quality
+   --CPU/GPU culling
+   --enableBloom: false,
+   --FUTURE: shadow quality, anisotropic filtering
+
+2. Directional Light
+3. Bloom
+4. Compute-based distortion
+5. Motion Blur
+6. Decals Category
+7. Temporal Anti-Aliasing (TAA)
+8. Particles
+9. SpotLightsWithShadows
+10. PointLighstWithShadows
+11. Ambient Occlusion GTAO
+12. **ASYNC LOADING SYSTEM** 🚀
+
+- Implementar sistema de carga asíncrona progresiva con prioridades
+- ResourceManager con carga en background y LOD
+- Progress indicators y loading states
+- Streaming de recursos bajo demanda
+
+15. Optimizacion WebGPUFundamentals
+16. Area Light
+17. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+18. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+19. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-19. Improve uniform declaration. Poder especificar Group y binding
 20. Mesh LOD/Generate LOD on texture and mesh automatically
 21. Occlusion culling
 22. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
 23. GPU-Driven Rendering 🚀 Futuro
+24. Tweakpane instead of IMGUI
 
 MISC-----------------------------------
 Terrain with perlin noise
