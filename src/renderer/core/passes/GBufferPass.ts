@@ -1,6 +1,7 @@
 import { RenderTarget } from '../../resources/RenderTarget';
 import { GPUUtils } from '../utils/GPUUtils';
 import { Render } from '../Render';
+import { QualitySettings } from '../../../core/engine/QualitySettings';
 
 /**
  * G-Buffer render pass for deferred rendering
@@ -26,18 +27,25 @@ export class GBufferPass {
 
   private createRenderTargets(): void {
     const width = Render.width;
-    const height = Render.height; // Create G-Buffer render targets with formats matching gbuffer.tech pipeline
+    const height = Render.height;
+    const qualitySettings = QualitySettings.getInstance();
+    const msaaLevel = qualitySettings.getMSAALevel();
+    const enableMSAA = msaaLevel > 0;
+    
+    // Create G-Buffer render targets with formats matching gbuffer.tech pipeline
     this.rtAlbedos = new RenderTarget();
-    this.rtAlbedos.createRT('gbuffer_albedos', width, height, 'rgba16float', true);
+    this.rtAlbedos.createRT('gbuffer_albedos', width, height, 'rgba16float', enableMSAA);
 
     this.rtNormals = new RenderTarget();
-    this.rtNormals.createRT('gbuffer_normals', width, height, 'rgba16float', true);
+    this.rtNormals.createRT('gbuffer_normals', width, height, 'rgba16float', enableMSAA);
 
     this.rtSelfIllum = new RenderTarget();
-    this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, 'rgba16float', true);
+    this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, 'rgba16float', enableMSAA);
 
     this.rtLinearDepth = new RenderTarget();
-    this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, 'r16float', true); // Create depth buffers (both MSAA and single-sample)
+    this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, 'r16float', enableMSAA);
+    
+    // Create depth buffers (both MSAA and single-sample)
     this.depthStencil = GPUUtils.createTexture(
       'gbuffer_depth_single',
       width,
@@ -49,17 +57,23 @@ export class GBufferPass {
       aspect: 'depth-only',
     });
 
-    this.msaaDepthStencil = GPUUtils.createTexture(
-      'gbuffer_depth_msaa',
-      width,
-      height,
-      'depth32float',
-      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-      4,
-    );
-    this.msaaDepthStencilView = this.msaaDepthStencil.createView({
-      aspect: 'depth-only',
-    });
+    if (enableMSAA) {
+      this.msaaDepthStencil = GPUUtils.createTexture(
+        'gbuffer_depth_msaa',
+        width,
+        height,
+        'depth32float',
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        msaaLevel,
+      );
+      this.msaaDepthStencilView = this.msaaDepthStencil.createView({
+        aspect: 'depth-only',
+      });
+    } else {
+      // When MSAA is disabled, use the single-sample depth texture for both
+      this.msaaDepthStencil = this.depthStencil;
+      this.msaaDepthStencilView = this.depthStencilView;
+    }
   }
 
   public execute(

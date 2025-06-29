@@ -1,4 +1,5 @@
 import { GPUUtils } from '../core/utils/GPUUtils';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 export class RenderTarget {
   private name: string = '';
@@ -24,7 +25,12 @@ export class RenderTarget {
     this.name = name;
     this.xRes = width;
     this.yRes = height;
-    this.isMultisample = multisampling; // Always create the single-sample texture (for shader sampling)
+    this.isMultisample = multisampling;
+    
+    // Get MSAA level from quality settings
+    const msaaLevel = multisampling ? QualitySettings.getInstance().getMSAALevel() : 1;
+    
+    // Always create the single-sample texture (for shader sampling)
     // Always use both RENDER_ATTACHMENT and TEXTURE_BINDING for maximum flexibility
     const baseUsage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
     this.texture = GPUUtils.createTexture(
@@ -37,14 +43,14 @@ export class RenderTarget {
     );
 
     // If MSAA enabled, create additional multi-sample texture
-    if (multisampling) {
+    if (multisampling && msaaLevel > 1) {
       this.msaaTexture = GPUUtils.createTexture(
         `${this.name}_msaa_texture`,
         width,
         height,
         format,
         GPUTextureUsage.RENDER_ATTACHMENT, // No TEXTURE_BINDING needed
-        4, // Multi-sample for rendering
+        msaaLevel, // Use quality settings MSAA level
       );
     }
   }
@@ -60,20 +66,23 @@ export class RenderTarget {
 
   // Returns the view for rendering (MSAA if enabled, otherwise single-sample)
   public getRenderView(): GPUTextureView {
-    if (this.isMultisample) {
+    const msaaLevel = QualitySettings.getInstance().getMSAALevel();
+    
+    if (this.isMultisample && msaaLevel > 1) {
       if (this.msaaTextureView) return this.msaaTextureView;
       this.msaaTextureView = this.msaaTexture.createView({
         label: `${this.name}_msaa_textureView`,
       });
       return this.msaaTextureView;
     }
-    // For non-MSAA, return the single texture view (which has RENDER_ATTACHMENT usage)
+    // For non-MSAA or MSAA level 1, return the single texture view
     return this.getView();
   }
 
   // Returns the resolve target (only if MSAA is enabled)
   public getResolveTarget(): GPUTextureView | undefined {
-    return this.isMultisample ? this.getView() : undefined;
+    const msaaLevel = QualitySettings.getInstance().getMSAALevel();
+    return (this.isMultisample && msaaLevel > 1) ? this.getView() : undefined;
   }
 
   public getWidth(): number {

@@ -1,0 +1,115 @@
+export interface GraphicsQualitySettings {
+  renderResolution: number; // 0.5 = 50%, 1.0 = 100%
+  msaaLevel: number; // 0, 2, 4
+  ambientOcclusionQuality: 'off' | 'low' | 'medium' | 'high';
+  gBufferTextureQuality: 'low' | 'medium' | 'high';
+  aliasingQuality: 'none' | 'fxaa' | 'msaa' | 'taa';
+  cullingMode: 'cpu' | 'gpu' | 'hybrid';
+  enableBloom: boolean;
+  // Future: shadowQuality, anisotropicFiltering
+}
+
+export class QualitySettings {
+  private static instance: QualitySettings | null = null;
+  private settings: GraphicsQualitySettings;
+
+  // Predefined quality presets
+  public static readonly PRESETS = {
+    MINIMUM: {
+      renderResolution: 0.5,
+      msaaLevel: 1,
+      ambientOcclusionQuality: 'off',
+      gBufferTextureQuality: 'low',
+      aliasingQuality: 'none',
+      cullingMode: 'cpu',
+      enableBloom: false,
+    } as GraphicsQualitySettings,
+
+    LOW: {
+      renderResolution: 0.75,
+      msaaLevel: 1,
+      ambientOcclusionQuality: 'low',
+      gBufferTextureQuality: 'low',
+      aliasingQuality: 'fxaa',
+      cullingMode: 'cpu',
+      enableBloom: false,
+    } as GraphicsQualitySettings,
+
+    MEDIUM: {
+      renderResolution: 0.85,
+      msaaLevel: 2,
+      ambientOcclusionQuality: 'medium',
+      gBufferTextureQuality: 'medium',
+      aliasingQuality: 'fxaa',
+      cullingMode: 'gpu',
+      enableBloom: true,
+    } as GraphicsQualitySettings,
+
+    HIGH: {
+      renderResolution: 1.0,
+      msaaLevel: 4,
+      ambientOcclusionQuality: 'high',
+      gBufferTextureQuality: 'high',
+      aliasingQuality: 'msaa',
+      cullingMode: 'gpu',
+      enableBloom: true,
+    } as GraphicsQualitySettings,
+
+    ULTRA: {
+      renderResolution: 1.0,
+      msaaLevel: 4,
+      ambientOcclusionQuality: 'high',
+      gBufferTextureQuality: 'high',
+      aliasingQuality: 'taa',
+      cullingMode: 'gpu',
+      enableBloom: true,
+    } as GraphicsQualitySettings,
+  };
+
+  private constructor() {
+    // Start with medium settings
+    this.settings = { ...QualitySettings.PRESETS.LOW };
+  }
+
+  public static getInstance(): QualitySettings {
+    if (!QualitySettings.instance) {
+      QualitySettings.instance = new QualitySettings();
+    }
+    return QualitySettings.instance;
+  }
+
+  public getSettings(): GraphicsQualitySettings {
+    return { ...this.settings };
+  }
+
+  public updateSettings(newSettings: Partial<GraphicsQualitySettings>): void {
+    this.settings = { ...this.settings, ...newSettings };
+    this.onSettingsChanged();
+  }
+
+  public applyPreset(presetName: keyof typeof QualitySettings.PRESETS): void {
+    this.settings = { ...QualitySettings.PRESETS[presetName] };
+    this.onSettingsChanged();
+  }
+
+  public getRenderResolution(): number {
+    return this.settings.renderResolution;
+  }
+
+  public getMSAALevel(): number {
+    return this.settings.msaaLevel;
+  }
+
+  private onSettingsChanged(): void {
+    // Emit event or trigger updates in renderer
+    console.log('Graphics settings changed:', this.settings);
+    
+    // Dispatch a custom event that the engine can listen to
+    if (typeof window !== 'undefined') {
+      const event = new CustomEvent('qualitySettingsChanged', {
+        detail: { settings: { ...this.settings } }
+      });
+      window.dispatchEvent(event);
+    }
+  }
+}

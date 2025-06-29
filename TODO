@@ -1,12 +1,13 @@
 ## NPM RUN DEV
 
 1. Engine quality settings
-   --renderResolution: 0.75,
-   --msaaLevel: 0,
+   --V-renderResolution (still needs to be painted on full canvas)
+   --V-msaaLevel
+   --Gbuffer texture quality
    --ambient occlusion Quality
-   -- Gbuffer texture quality
    --aliasing quality
    --CPU/GPU culling
+   --SESSION STORAGE
    --enableBloom: false,
    --FUTURE: shadow quality, anisotropic filtering
 

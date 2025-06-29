@@ -10,6 +10,7 @@ import { Mesh } from './Mesh';
 import { Render } from '../core/Render';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
@@ -215,9 +216,12 @@ export class Technique extends GPUResource {
     };
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
       pipelineConfig.depthStencil = this.getDepthConfig();
-    }    // Add multisample if needed for MSAA passes
+    }    
+    // Add multisample based on quality settings for MSAA passes
     if (this.needsMSAA()) {
-      pipelineConfig.multisample = { count: 4 };
+      const msaaLevel = QualitySettings.getInstance().getMSAALevel();
+      pipelineConfig.multisample = { count: msaaLevel };
+
     }
 
     this.pipeline = PipelineFactory.createPipeline(pipelineConfig);

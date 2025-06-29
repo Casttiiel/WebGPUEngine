@@ -2,6 +2,7 @@ import { AntialiasingComponent } from '../../components/render/AntialiasingCompo
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { Engine } from '../../core/engine/Engine';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 import { GPUUtils } from './utils/GPUUtils';
 
 export class Render {
@@ -14,9 +15,14 @@ export class Render {
   private currentCommandEncoder!: GPUCommandEncoder;
   private format: GPUTextureFormat = 'bgra8unorm';
 
-  // Dimensiones del canvas
-  private static screenWidth: number = 800;
-  private static screenHeight: number = 600;
+  // Dimensiones del canvas (tamaño real del canvas)
+  private static canvasWidth: number = 800;
+  private static canvasHeight: number = 600;
+  
+  // Dimensiones de renderizado (pueden ser menores para render resolution)
+  private static renderWidth: number = 800;
+  private static renderHeight: number = 600;
+  
   private canvas!: HTMLCanvasElement;
 
   private constructor() {
@@ -37,8 +43,9 @@ export class Render {
 
     canvas.width = width;
     canvas.height = height;
-    Render.screenWidth = width;
-    Render.screenHeight = height;
+    Render.canvasWidth = width;
+    Render.canvasHeight = height;
+    Render.updateRenderDimensions();
 
     console.warn(
       `Canvas initialized: ${width}x${height} (DPR: ${dpr}, Client: ${canvas.clientWidth}x${canvas.clientHeight})`,
@@ -88,14 +95,26 @@ export class Render {
     }
   }
 
+  // Update render dimensions based on quality settings
+  private static updateRenderDimensions(): void {
+    const qualitySettings = QualitySettings.getInstance();
+    const renderRes = qualitySettings.getRenderResolution();
+    
+    Render.renderWidth = Math.floor(Render.canvasWidth * renderRes);
+    Render.renderHeight = Math.floor(Render.canvasHeight * renderRes);
+    
+    console.warn(`Render resolution updated: ${Render.renderWidth}x${Render.renderHeight} (${(renderRes * 100).toFixed(0)}% of ${Render.canvasWidth}x${Render.canvasHeight})`);
+  }
+
   // Ajustar el tamaño del buffer de render
   public async resizeBackBuffer(newWidth: number, newHeight: number): Promise<boolean> {
-    if (Render.screenWidth === newWidth && Render.screenHeight === newHeight) {
+    if (Render.canvasWidth === newWidth && Render.canvasHeight === newHeight) {
       return false;
     }
 
-    Render.screenWidth = newWidth;
-    Render.screenHeight = newHeight;
+    Render.canvasWidth = newWidth;
+    Render.canvasHeight = newHeight;
+    Render.updateRenderDimensions();
 
     if (this.canvas) {
       this.canvas.width = newWidth;
@@ -144,7 +163,7 @@ export class Render {
     this.device.queue.onSubmittedWorkDone().then(() => {
       this.resizeBackBuffer(width, height);
 
-      const [w, h] = [Render.screenWidth, Render.screenHeight];
+      const [w, h] = [Render.renderWidth, Render.renderHeight];
 
       // Usa Render.getSize() en todos los componentes:
       const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
@@ -174,11 +193,23 @@ export class Render {
   }
 
   public static get width(): number {
-    return Render.screenWidth;
+    return Render.renderWidth;
   }
 
   public static get height(): number {
-    return Render.screenHeight;
+    return Render.renderHeight;
+  }
+
+  public static get canvasSize(): { width: number; height: number } {
+    return { width: Render.canvasWidth, height: Render.canvasHeight };
+  }
+
+  public static get renderSize(): { width: number; height: number } {
+    return { width: Render.renderWidth, height: Render.renderHeight };
+  }
+
+  public static updateQualitySettings(): void {
+    Render.updateRenderDimensions();
   }
 
   public getDevice(): GPUDevice {

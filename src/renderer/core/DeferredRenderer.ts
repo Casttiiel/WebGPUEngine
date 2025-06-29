@@ -13,6 +13,7 @@ import { Texture } from '../resources/Texture';
 import { GBufferPass } from './passes/GBufferPass';
 import { RenderPassManager } from './passes/RenderPassManager';
 import { Render } from './Render';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -166,9 +167,16 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
     // Execute Decal pass
-    this.renderPassManager.executePass('decals', RenderCategory.DECALS); // Resolve MSAA depth to single-sample depth for skybox
+    this.renderPassManager.executePass('decals', RenderCategory.DECALS);
+    
+    // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth); // Execute AO pass first
+    const qualitySettings = QualitySettings.getInstance();
+    const msaaLevel = qualitySettings.getMSAALevel();
+    
+    if (msaaLevel > 1) {
+      this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
+    } // Execute AO pass first
     this.renderAO(camera, this.rtAO);
 
     // Copy AO result to binding texture to avoid usage conflicts
