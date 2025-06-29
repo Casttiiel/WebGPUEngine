@@ -19,7 +19,7 @@ export class AmbientOcclusionComponent extends Component {
   private rawAOTarget!: RenderTarget;
   private bilateralFilterBindGroup!: GPUBindGroup | null;
 
-  // SSAO Parameters for ImGui
+  // Dynamic SSAO Parameters from quality settings
   private ssaoParams = {
     sampleCount: 16,
     radius: 0.5,
@@ -36,12 +36,34 @@ export class AmbientOcclusionComponent extends Component {
   private ssaoParamsBuffer!: GPUBuffer;
   private ssaoParamsBindGroup!: GPUBindGroup | null;
   private debugControlsAdded = false;
+  private isEnabled = true;
 
   constructor() {
     super();
     this.renderPassManager = new RenderPassManager();
     // Initialize previous params after ssaoParams is defined
     this.previousSSAOParams = { ...this.ssaoParams };
+    
+    // Update parameters from quality settings
+    this.updateParametersFromQuality();
+  }
+
+  private updateParametersFromQuality(): void {
+    const qualitySettings = QualitySettings.getInstance();
+    const aoConfig = qualitySettings.getAmbientOcclusionConfig();
+    
+    this.isEnabled = aoConfig.enabled;
+    
+    if (aoConfig.enabled) {
+      this.ssaoParams = {
+        sampleCount: aoConfig.sampleCount,
+        radius: aoConfig.radius,
+        bias: aoConfig.bias,
+        aoStrength: aoConfig.aoStrength,
+        maxDistance: aoConfig.maxDistance,
+        noiseScale: aoConfig.noiseScale,
+      };
+    }
   }
 
   public async load(): Promise<void> {
@@ -86,15 +108,37 @@ export class AmbientOcclusionComponent extends Component {
     ]);
 
     GPUUtils.writeBuffer(this.ssaoParamsBuffer, 0, paramsData);
+    
+    // Update the previous params cache
+    this.previousSSAOParams = { ...this.ssaoParams };
+  }
+
+  private hasParametersChanged(): boolean {
+    return (
+      this.ssaoParams.sampleCount !== this.previousSSAOParams.sampleCount ||
+      this.ssaoParams.radius !== this.previousSSAOParams.radius ||
+      this.ssaoParams.bias !== this.previousSSAOParams.bias ||
+      this.ssaoParams.aoStrength !== this.previousSSAOParams.aoStrength ||
+      this.ssaoParams.maxDistance !== this.previousSSAOParams.maxDistance ||
+      this.ssaoParams.noiseScale !== this.previousSSAOParams.noiseScale
+    );
   }
 
   public resize(): void {
+    // Update parameters from quality settings in case they changed
+    this.updateParametersFromQuality();
+    
     const qualitySettings = QualitySettings.getInstance();
     const aoFormat = qualitySettings.getPostProcessingFormats().aoTexture;
     
     this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
     this.bilateralFilterBindGroup = null;
     this.ssaoParamsBindGroup = null;
+    
+    // Force update of SSAO parameters buffer
+    if (this.ssaoParamsBuffer) {
+      this.updateSSAOParamsBuffer();
+    }
   }
 
   private createSSAOParamsBindGroup(): void {
@@ -114,7 +158,44 @@ export class AmbientOcclusionComponent extends Component {
     );
   }
 
+  private renderDisabledAO(finalAOTarget: RenderTarget): void {
+    // When AO is disabled, we need to fill the target with white (no occlusion)
+    // This ensures the lighting calculations work correctly
+    const commandEncoder = GPUUtils.getDevice().createCommandEncoder({
+      label: 'Disabled AO Clear Pass',
+    });
+
+    const renderPass = commandEncoder.beginRenderPass({
+      label: 'Clear AO Target',
+      colorAttachments: [{
+        view: finalAOTarget.getView(),
+        clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, // White = no occlusion
+        loadOp: 'clear',
+        storeOp: 'store',
+      }],
+    });
+
+    renderPass.end();
+    GPUUtils.getDevice().queue.submit([commandEncoder.finish()]);
+  }
+
   public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
+    // Update parameters from quality settings (in case they changed)
+    this.updateParametersFromQuality();
+    
+    // Update SSAO parameters buffer if parameters changed
+    if (this.hasParametersChanged()) {
+      this.updateSSAOParamsBuffer();
+      // Invalidate bind group to recreate with new parameters
+      this.ssaoParamsBindGroup = null;
+    }
+    
+    // If AO is disabled, render a white texture (no occlusion)
+    if (!this.isEnabled) {
+      this.renderDisabledAO(finalAOTarget);
+      return;
+    }
+    
     this.createSSAOParamsBindGroup();
 
     // Pass 1: Generate raw AO using SSAO with parameters

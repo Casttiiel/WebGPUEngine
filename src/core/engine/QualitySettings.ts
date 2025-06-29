@@ -1,4 +1,5 @@
 import { PostProcessingQualityConfig } from '../../renderer/core/PostProcessingQualityConfig';
+import { AmbientOcclusionQualityConfig } from '../../renderer/core/AmbientOcclusionQualityConfig';
 
 export interface GraphicsQualitySettings {
   renderResolution: number; // 0.5 = 50%, 1.0 = 100%
@@ -112,6 +113,10 @@ export class QualitySettings {
     return this.settings.gBufferTextureQuality;
   }
 
+
+  public getAmbientOcclusionConfig() {
+    return AmbientOcclusionQualityConfig.getConfig(this.settings.ambientOcclusionQuality);
+  }
 
   public getPostProcessingFormats() {
     return PostProcessingQualityConfig.getFormats(this.settings.postProcessingQuality);
