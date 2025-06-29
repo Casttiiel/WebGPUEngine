@@ -154,8 +154,9 @@ export class ModuleRender extends Module {
         GPUUtils.createRenderPassDescriptor('main presentation render pass', [colorAttachment]),
       );
 
-    // Configure viewport and scissor using GPUUtils
-    GPUUtils.configureViewportAndScissor(pass);
+    // Configure viewport and scissor for presentation (use full canvas size)
+    const canvasSize = Render.canvasSize;
+    GPUUtils.configureViewportAndScissor(pass, canvasSize.width, canvasSize.height);
 
     // 1. Activate pipeline
     this.presentationTechnique.activatePipeline(pass);
