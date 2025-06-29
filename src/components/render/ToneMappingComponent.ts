@@ -1,4 +1,5 @@
 import { Component } from '../../core/ecs/Component';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -22,12 +23,18 @@ export class ToneMappingComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('tone_mapping.tech');
 
+    const qualitySettings = QualitySettings.getInstance();
+    const toneMappingFormat = qualitySettings.getPostProcessingFormats().toneMappingTexture;
+
     this.result = new RenderTarget();
-    this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, 'rgba16float');
+    this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, toneMappingFormat);
   }
 
   public resize(): void {
-    this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, 'rgba16float');
+    const qualitySettings = QualitySettings.getInstance();
+    const toneMappingFormat = qualitySettings.getPostProcessingFormats().toneMappingTexture;
+    
+    this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, toneMappingFormat);
     this.bindGroup = null;
   }
 

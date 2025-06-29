@@ -1,13 +1,12 @@
 ## NPM RUN DEV
 
 1. Engine quality settings
-   --Texture quality cubemap, skybox, postfx
    --ambient occlusion Quality
    --aliasing quality
    --CPU/GPU culling
    --SESSION STORAGE
    --enableBloom: false,
-   --FUTURE: shadow quality, anisotropic filtering
+   --FUTURE: shadow quality
 
 2. Directional Light
 3. Bloom

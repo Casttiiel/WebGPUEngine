@@ -1,4 +1,5 @@
 import { ResourceManager } from '../../core/engine/ResourceManager';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResource';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { MipmapGenerator } from '../core/MipmapGenerator';
@@ -105,10 +106,14 @@ export class Cubemap extends GPUResource {
 
       // Calcular niveles de mipmap
       const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1; // Crear la textura en GPU
+      
+      const qualitySettings = QualitySettings.getInstance();
+      const skyboxFormat = qualitySettings.getPostProcessingFormats().skyboxTexture;
+      
       this.gpuTexture = GPUUtils.createCubemapTexture(
         `${this.label}_texture`,
         faceSize,
-        'rgba16float',
+        skyboxFormat,
         GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |
           GPUTextureUsage.RENDER_ATTACHMENT |

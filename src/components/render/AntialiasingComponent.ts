@@ -1,4 +1,5 @@
 import { Component } from '../../core/ecs/Component';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -23,12 +24,18 @@ export class AntialiasingComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('antialiasing.tech');
 
+    const qualitySettings = QualitySettings.getInstance();
+    const aliasingFormat = qualitySettings.getPostProcessingFormats().aliasingTexture;
+
     this.result = new RenderTarget();
-    this.result.createRT('antialiasing_result.dds', Render.width, Render.height, 'rgba16float');
+    this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
   }
 
   public resize(): void {
-    this.result.createRT('antialiasing_result.dds', Render.width, Render.height, 'rgba16float');
+    const qualitySettings = QualitySettings.getInstance();
+    const aliasingFormat = qualitySettings.getPostProcessingFormats().aliasingTexture;
+    
+    this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
     this.bindGroup = null;
   }
 

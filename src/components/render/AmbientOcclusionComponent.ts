@@ -1,5 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -49,8 +50,11 @@ export class AmbientOcclusionComponent extends Component {
     this.bilateralFilterTechnique = await Technique.get('ao_bilateral_filter.tech');
 
     // Create intermediate render target for raw AO
+    const qualitySettings = QualitySettings.getInstance();
+    const aoFormat = qualitySettings.getPostProcessingFormats().aoTexture;
+    
     this.rawAOTarget = new RenderTarget();
-    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, 'r16float');
+    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
 
     // Create uniform buffer for SSAO parameters
     this.createSSAOParamsBuffer();
@@ -85,7 +89,10 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   public resize(): void {
-    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, 'r16float');
+    const qualitySettings = QualitySettings.getInstance();
+    const aoFormat = qualitySettings.getPostProcessingFormats().aoTexture;
+    
+    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
     this.bilateralFilterBindGroup = null;
     this.ssaoParamsBindGroup = null;
   }

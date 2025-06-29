@@ -1,8 +1,11 @@
+import { PostProcessingQualityConfig } from '../../renderer/core/PostProcessingQualityConfig';
+
 export interface GraphicsQualitySettings {
   renderResolution: number; // 0.5 = 50%, 1.0 = 100%
   msaaLevel: number; // 1, 4
   ambientOcclusionQuality: 'off' | 'low' | 'medium' | 'high';
   gBufferTextureQuality: 'low' | 'medium' | 'high';
+  postProcessingQuality: 'low' | 'medium' | 'high'; // For post-processing texture formats
   aliasingQuality: 'none' | 'fxaa' | 'msaa' | 'taa';
   cullingMode: 'cpu' | 'gpu' | 'hybrid';
   enableBloom: boolean;
@@ -20,6 +23,7 @@ export class QualitySettings {
       msaaLevel: 1,
       ambientOcclusionQuality: 'off',
       gBufferTextureQuality: 'low',
+      postProcessingQuality: 'low',
       aliasingQuality: 'none',
       cullingMode: 'cpu',
       enableBloom: false,
@@ -30,6 +34,7 @@ export class QualitySettings {
       msaaLevel: 1,
       ambientOcclusionQuality: 'low',
       gBufferTextureQuality: 'low',
+      postProcessingQuality: 'low',
       aliasingQuality: 'fxaa',
       cullingMode: 'cpu',
       enableBloom: false,
@@ -40,6 +45,7 @@ export class QualitySettings {
       msaaLevel: 4,
       ambientOcclusionQuality: 'medium',
       gBufferTextureQuality: 'medium',
+      postProcessingQuality: 'medium',
       aliasingQuality: 'fxaa',
       cullingMode: 'gpu',
       enableBloom: true,
@@ -50,6 +56,7 @@ export class QualitySettings {
       msaaLevel: 4,
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
+      postProcessingQuality: 'high',
       aliasingQuality: 'msaa',
       cullingMode: 'gpu',
       enableBloom: true,
@@ -60,6 +67,7 @@ export class QualitySettings {
       msaaLevel: 4,
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
+      postProcessingQuality: 'high',
       aliasingQuality: 'taa',
       cullingMode: 'gpu',
       enableBloom: true,
@@ -68,7 +76,7 @@ export class QualitySettings {
 
   private constructor() {
     // Start with medium settings
-    this.settings = { ...QualitySettings.PRESETS.MINIMUM };
+    this.settings = { ...QualitySettings.PRESETS.MEDIUM };
   }
 
   public static getInstance(): QualitySettings {
@@ -102,6 +110,11 @@ export class QualitySettings {
 
   public getGBufferTextureQuality(): 'low' | 'medium' | 'high' {
     return this.settings.gBufferTextureQuality;
+  }
+
+
+  public getPostProcessingFormats() {
+    return PostProcessingQualityConfig.getFormats(this.settings.postProcessingQuality);
   }
 
 
