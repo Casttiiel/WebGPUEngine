@@ -6,6 +6,7 @@ import {
   AntialiasingRenderPass,
   AmbientOcclusionRenderPass,
   AOBilateralFilterRenderPass,
+  BloomFilteringRenderPass,
 } from './PostProcessingRenderPasses';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderTarget } from '../../resources/RenderTarget';
@@ -186,6 +187,20 @@ export class RenderPassManager {
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
     const pass = new AntialiasingRenderPass(passConfig, mesh, technique, bindGroup);
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Create and execute an antialiasing pass dynamically
+   */
+  public executeBloomFilteringPass(
+    mesh: Mesh,
+    technique: Technique,
+    bindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const pass = new BloomFilteringRenderPass(passConfig, mesh, technique, bindGroup);
     this.executeDynamicPass(pass);
   }
 

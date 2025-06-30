@@ -15,6 +15,7 @@
       },
       "tone_mapping": {},
       "antialiasing": {},
-      "ambient_occlusion": {}
+      "ambient_occlusion": {},
+      "bloom": {}
     }
   }

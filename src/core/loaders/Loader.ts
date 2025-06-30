@@ -15,6 +15,7 @@ import { GLTFLoader } from './GLTFLoader';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
+import { BloomComponent } from '../../components/render/BloomComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -117,6 +118,8 @@ export class Loader {
         return new PointLightComponent();
       case 'spot_light':
         return new SpotLightComponent();
+      case 'bloom':
+        return new BloomComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

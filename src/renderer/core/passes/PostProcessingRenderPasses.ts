@@ -60,6 +60,37 @@ export class ToneMappingRenderPass extends PostProcessingRenderPass {
 }
 
 /**
+ * Bloom Filtering post-processing render pass
+ * This pass requires two bind groups: global camera uniforms and texture
+ */
+export class BloomFilteringRenderPass extends PostProcessingRenderPass {
+  private textureBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    textureBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.textureBindGroup = textureBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    // Bloom filtering needs global bind group at 0 and texture at 1
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(1, this.textureBindGroup);
+  }
+
+  /**
+   * Update the texture bind group for antialiasing
+   */
+  public updateTextureBindGroup(bindGroup: GPUBindGroup): void {
+    this.textureBindGroup = bindGroup;
+  }
+}
+
+/**
  * Anti-aliasing (FXAA) post-processing render pass
  * This pass requires two bind groups: global camera uniforms and texture
  */

@@ -13,6 +13,7 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { BloomComponent } from '../../components/render/BloomComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -77,6 +78,12 @@ export class ModuleRender extends Module {
     let result = await this.deferred.render(mainCamera);
 
     this.renderDistorsions(result);
+
+    if (mainCamera?.hasComponent('bloom')) {
+      const bloom = mainCamera.getComponent('bloom') as BloomComponent;
+      result = bloom.generateHighlights(result);
+      result = bloom.apply(result);
+    }
 
     if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;

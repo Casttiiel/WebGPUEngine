@@ -1,0 +1,8 @@
+{
+    "vs": "presentation.vs",
+    "fs": "bloom.fs",
+    "fsEntryPoint": "PS_filter",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms":["CameraUniforms","SingleTexture"]
+}
