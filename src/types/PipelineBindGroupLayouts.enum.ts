@@ -8,4 +8,5 @@ export enum PipelineBindGroupLayouts {
   GBUFFER_UNIFORMS = 'GBufferUniforms',
   BUFFER_UNIFORM = 'BufferUniform',
   DEPTH_TEXTURE = 'DepthTexture',
+  BLOOM_PARAMS = 'BloomParams',
 }

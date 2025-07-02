@@ -86,12 +86,11 @@ export class ModuleRender extends Module {
       const qualitySettings = QualitySettings.getInstance();
       const bloomConfig = qualitySettings.getBloomConfig();
 
-      // Only process bloom if enabled in quality settings
       if (bloomConfig.enabled) {
         // Apply quality-based bloom settings
         this.applyBloomQualitySettings(bloom);
-        result = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
-        //result = bloom.addBloom(result);
+        const bloomTexture = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
+        result = bloom.addBloom(result, bloomTexture);
       }
     }
 

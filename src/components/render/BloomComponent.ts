@@ -7,14 +7,48 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { BlurComponent } from './BlurComponent';
+import { RenderPassFactory } from '../../renderer/core/passes/RenderPassFactory';
+import { BaseRenderPass, RenderPassConfig } from '../../renderer/core/passes/BaseRenderPass';
+import { PostProcessingRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
+import { Engine } from '../../core/engine/Engine';
+
+/**
+ * BloomCombineRenderPass - Custom render pass for combining original image with bloom
+ */
+class BloomCombineRenderPass extends PostProcessingRenderPass {
+  private originalBindGroup: GPUBindGroup;
+  private bloomBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    originalBindGroup: GPUBindGroup,
+    bloomBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.originalBindGroup = originalBindGroup;
+    this.bloomBindGroup = bloomBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    // Set all bind groups needed for the bloom combine shader
+    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
+    pass.setBindGroup(1, this.originalBindGroup); // Original texture
+    pass.setBindGroup(2, this.bloomBindGroup); // Bloom texture
+    pass.setBindGroup(3, this.paramsBindGroup); // Bloom parameters
+  }
+}
 
 export class BloomComponent extends BlurComponent {
   private technique!: Technique;
-  // TODO: Uncomment when implementing full bloom combination
-  // private combineTechnique!: Technique;
+  private combineTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
-  // private combineBindGroup!: GPUBindGroup | null;
+  private combineBindGroup!: GPUBindGroup | null;
   private result!: RenderTarget;
   private finalResult!: RenderTarget;
   private renderPassManager!: RenderPassManager;
@@ -37,8 +71,7 @@ export class BloomComponent extends BlurComponent {
 
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('bloom_filter.tech');
-    // TODO: Load combine technique when shader system supports it
-    // this.combineTechnique = await Technique.get('bloom_combine.tech');
+    this.combineTechnique = await Technique.get('bloom_combine.tech');
 
     const qualitySettings = QualitySettings.getInstance();
     const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
@@ -69,7 +102,7 @@ export class BloomComponent extends BlurComponent {
     this.result.createRT('bloom_filter_result.dds', Render.width, Render.height, bloomFormat);
     this.finalResult.createRT('bloom_final_result.dds', Render.width, Render.height, bloomFormat);
     this.bindGroup = null;
-    // this.combineBindGroup = null; // TODO: Uncomment when implementing combination
+    this.combineBindGroup = null;
   }
 
   private updateBloomParams(): void {
@@ -105,10 +138,70 @@ export class BloomComponent extends BlurComponent {
     return blurredHighlights;
   }
 
-  public addBloom(_originalTexture: GPUTextureView, bloomTexture: GPUTextureView): GPUTextureView {
-    // For now, just return the bloom texture (highlights with blur applied)
-    // TODO: Implement proper combination when shader system supports multiple bind groups
-    return bloomTexture;
+  public addBloom(originalTexture: GPUTextureView, bloomTexture: GPUTextureView): GPUTextureView {
+    // Create bind groups for the combine operation
+    this.setupCombineBindGroups(originalTexture, bloomTexture);
+
+    // Use the RenderPassFactory to create a post-process pass config
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(this.finalResult);
+
+    // Create a bloom combine render pass
+    const pass = new BloomCombineRenderPass(
+      passConfig,
+      this.fullscreenQuadMesh,
+      this.combineTechnique,
+      this.combineBindGroup!, // Original texture bindgroup
+      this.bloomBindGroup!, // Bloom texture bindgroup
+      this.bloomParamsBindGroup!, // Bloom parameters bindgroup
+    );
+
+    // Execute the custom pass directly using RenderPassManager
+    this.renderPassManager.executeDynamicPass(pass);
+
+    // Return the combined result
+    return this.finalResult.getView();
+  }
+
+  // Additional bind groups for bloom combine operation
+  private bloomBindGroup!: GPUBindGroup;
+  private bloomParamsBindGroup!: GPUBindGroup;
+
+  private setupCombineBindGroups(
+    originalTexture: GPUTextureView,
+    bloomTexture: GPUTextureView,
+  ): void {
+    // Create a sampler for texture sampling
+    const sampler = GPUUtils.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
+
+    // Create bind group for original texture (group 1)
+    this.combineBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_original_bindgroup`,
+      this.combineTechnique.getPipeline().getBindGroupLayout(1),
+      [
+        { binding: 0, resource: originalTexture },
+        { binding: 1, resource: sampler },
+      ],
+    );
+
+    // Create bind group for bloom texture (group 2)
+    this.bloomBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_bloom_bindgroup`,
+      this.combineTechnique.getPipeline().getBindGroupLayout(2),
+      [
+        { binding: 0, resource: bloomTexture },
+        { binding: 1, resource: sampler },
+      ],
+    );
+
+    // Create bind group for bloom parameters (group 3)
+    this.bloomParamsBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_params_bindgroup`,
+      this.combineTechnique.getPipeline().getBindGroupLayout(3),
+      [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
+    );
   }
 
   private setBindGroup(texture: GPUTextureView): void {
@@ -135,29 +228,7 @@ export class BloomComponent extends BlurComponent {
     );
   }
 
-  // TODO: Uncomment when implementing full bloom combination
-  /*
-  private setCombineBindGroup(originalTexture: GPUTextureView, _bloomTexture: GPUTextureView): void {
-    if (this.combineBindGroup) return;
-
-    const sampler = GPUUtils.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
-
-    // Create bind groups for original texture (we'll create others when needed)
-    this.combineBindGroup = BindGroupFactory.createBindGroup(
-      `bloom_original_bindgroup`,
-      this.combineTechnique.getPipeline().getBindGroupLayout(1),
-      [
-        { binding: 0, resource: originalTexture },
-        { binding: 1, resource: sampler },
-      ],
-    );
-
-    // TODO: Store bloom and params bind groups when render pass system supports multiple bind groups
-  }
-  */
+  // Bind groups are now set up in setupCombineBindGroups method
 
   // Getters for bloom parameters (for UI/debug)
   public getBloomIntensity(): number {
