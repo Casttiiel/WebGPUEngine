@@ -99,8 +99,12 @@ export class BlurComponent extends Component {
   protected steps: BlurStep[] = [];
   protected downsamplePipeline!: GPUComputePipeline;
   protected upsamplePipeline!: GPUComputePipeline;
+  protected downsamplePipelineRGBA8!: GPUComputePipeline; // For low quality
+  protected upsamplePipelineRGBA8!: GPUComputePipeline; // For low quality
   protected downsampleBindGroupLayout!: GPUBindGroupLayout;
   protected upsampleBindGroupLayout!: GPUBindGroupLayout;
+  protected downsampleBindGroupLayoutRGBA8!: GPUBindGroupLayout; // For low quality
+  protected upsampleBindGroupLayoutRGBA8!: GPUBindGroupLayout; // For low quality
   protected sampler!: GPUSampler;
   protected maxBlurSteps: number = 4;
   protected blurIntensity: number = 1.0;
@@ -133,80 +137,25 @@ export class BlurComponent extends Component {
   private async createComputePipelines(): Promise<void> {
     const device = Render.getInstance().getDevice();
 
-    // Load shaders
+    // Load shaders for both RGBA16 and RGBA8 formats
     const downsampleShaderCode = await fetch('/assets/shaders/bloom_downsample_blur.cs').then((r) =>
       r.text(),
     );
     const upsampleShaderCode = await fetch('/assets/shaders/bloom_upsample_blend.cs').then((r) =>
       r.text(),
     );
+    const downsampleShaderCodeRGBA8 = await fetch(
+      '/assets/shaders/bloom_downsample_blur_rgba8.cs',
+    ).then((r) => r.text());
+    const upsampleShaderCodeRGBA8 = await fetch(
+      '/assets/shaders/bloom_upsample_blend_rgba8.cs',
+    ).then((r) => r.text());
 
-    // Create downsampling bind group layout (4 bindings)
-    this.downsampleBindGroupLayout = device.createBindGroupLayout({
-      label: 'Downsample Blur Bind Group Layout',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-            viewDimension: '2d',
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
+    // Create bind group layouts for RGBA16Float
+    this.createBindGroupLayouts(device, 'rgba16float');
 
-    // Create upsampling bind group layout (5 bindings)
-    this.upsampleBindGroupLayout = device.createBindGroupLayout({
-      label: 'Upsample Blur Bind Group Layout',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-            viewDimension: '2d',
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
+    // Create bind group layouts for RGBA8Unorm
+    this.createBindGroupLayoutsRGBA8(device);
 
     // Create pipeline layouts
     const downsamplePipelineLayout = device.createPipelineLayout({
@@ -219,7 +168,17 @@ export class BlurComponent extends Component {
       bindGroupLayouts: [this.upsampleBindGroupLayout],
     });
 
-    // Create downsample pipeline
+    const downsamplePipelineLayoutRGBA8 = device.createPipelineLayout({
+      label: 'Downsample Blur Pipeline Layout RGBA8',
+      bindGroupLayouts: [this.downsampleBindGroupLayoutRGBA8],
+    });
+
+    const upsamplePipelineLayoutRGBA8 = device.createPipelineLayout({
+      label: 'Upsample Blur Pipeline Layout RGBA8',
+      bindGroupLayouts: [this.upsampleBindGroupLayoutRGBA8],
+    });
+
+    // Create RGBA16Float pipelines
     const downsampleShader = device.createShaderModule({
       label: 'Downsample Blur Compute Shader',
       code: downsampleShaderCode,
@@ -234,7 +193,6 @@ export class BlurComponent extends Component {
       },
     });
 
-    // Create upsample pipeline
     const upsampleShader = device.createShaderModule({
       label: 'Upsample Blend Compute Shader',
       code: upsampleShaderCode,
@@ -245,6 +203,35 @@ export class BlurComponent extends Component {
       layout: upsamplePipelineLayout,
       compute: {
         module: upsampleShader,
+        entryPoint: 'CS_upsample_blend',
+      },
+    });
+
+    // Create RGBA8Unorm pipelines
+    const downsampleShaderRGBA8 = device.createShaderModule({
+      label: 'Downsample Blur Compute Shader RGBA8',
+      code: downsampleShaderCodeRGBA8,
+    });
+
+    this.downsamplePipelineRGBA8 = device.createComputePipeline({
+      label: 'Downsample Blur Pipeline RGBA8',
+      layout: downsamplePipelineLayoutRGBA8,
+      compute: {
+        module: downsampleShaderRGBA8,
+        entryPoint: 'CS_downsample_blur',
+      },
+    });
+
+    const upsampleShaderRGBA8 = device.createShaderModule({
+      label: 'Upsample Blend Compute Shader RGBA8',
+      code: upsampleShaderCodeRGBA8,
+    });
+
+    this.upsamplePipelineRGBA8 = device.createComputePipeline({
+      label: 'Upsample Blend Pipeline RGBA8',
+      layout: upsamplePipelineLayoutRGBA8,
+      compute: {
+        module: upsampleShaderRGBA8,
         entryPoint: 'CS_upsample_blend',
       },
     });
@@ -309,8 +296,11 @@ export class BlurComponent extends Component {
     }
     this.steps = [];
 
-    // Recreate blur steps with new resolution
+    // Recreate blur steps with new resolution and format
     this.createBlurSteps();
+
+    // Recreate pipelines if texture format changed
+    this.recreatePipelinesForFormat().catch(console.error);
   }
 
   /**
@@ -319,6 +309,20 @@ export class BlurComponent extends Component {
   public applyMultiscaleBlur(inputTexture: GPUTextureView): GPUTextureView {
     const render = Render.getInstance();
     const commandEncoder = render.getCommandEncoder();
+
+    // Determine which pipelines and layouts to use based on texture format
+    const qualitySettings = QualitySettings.getInstance();
+    const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
+    const isRGBA8 = bloomFormat === 'rgba8unorm';
+
+    const downsamplePipeline = isRGBA8 ? this.downsamplePipelineRGBA8 : this.downsamplePipeline;
+    const upsamplePipeline = isRGBA8 ? this.upsamplePipelineRGBA8 : this.upsamplePipeline;
+    const downsampleLayout = isRGBA8
+      ? this.downsampleBindGroupLayoutRGBA8
+      : this.downsampleBindGroupLayout;
+    const upsampleLayout = isRGBA8
+      ? this.upsampleBindGroupLayoutRGBA8
+      : this.upsampleBindGroupLayout;
 
     // Downsampling pass - create blur pyramid
     let currentInput = inputTexture;
@@ -329,7 +333,7 @@ export class BlurComponent extends Component {
       step.createDownsampleBindGroup(
         currentInput,
         this.sampler,
-        this.downsampleBindGroupLayout,
+        downsampleLayout,
         this.blurUniformBuffer,
       );
 
@@ -338,7 +342,7 @@ export class BlurComponent extends Component {
         label: `Bloom Downsample Step ${i}`,
       });
 
-      computePass.setPipeline(this.downsamplePipeline);
+      computePass.setPipeline(downsamplePipeline);
       computePass.setBindGroup(0, step.downsampleBindGroup!);
 
       const workgroupsX = Math.ceil(step.width / 16);
@@ -368,7 +372,7 @@ export class BlurComponent extends Component {
         inputFromLowerRes,
         currentStepRead,
         this.sampler,
-        this.upsampleBindGroupLayout,
+        upsampleLayout,
         this.blurUniformBuffer,
       );
 
@@ -377,7 +381,7 @@ export class BlurComponent extends Component {
         label: `Bloom Upsample Step ${i}`,
       });
 
-      computePass.setPipeline(this.upsamplePipeline);
+      computePass.setPipeline(upsamplePipeline);
       computePass.setBindGroup(0, currentStep.upsampleBindGroup!);
 
       const workgroupsX = Math.ceil(currentStep.width / 16);
@@ -444,5 +448,149 @@ export class BlurComponent extends Component {
     ]);
 
     device.queue.writeBuffer(this.blurUniformBuffer, 0, uniformData);
+  }
+
+  private createBindGroupLayouts(device: GPUDevice, format: GPUTextureFormat): void {
+    // Create downsampling bind group layout (4 bindings)
+    this.downsampleBindGroupLayout = device.createBindGroupLayout({
+      label: 'Downsample Blur Bind Group Layout',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'float', viewDimension: '2d' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: format,
+            viewDimension: '2d',
+          },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+
+    // Create upsampling bind group layout (5 bindings)
+    this.upsampleBindGroupLayout = device.createBindGroupLayout({
+      label: 'Upsample Blur Bind Group Layout',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'float', viewDimension: '2d' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: format,
+            viewDimension: '2d',
+          },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'float', viewDimension: '2d' },
+        },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+  }
+
+  private createBindGroupLayoutsRGBA8(device: GPUDevice): void {
+    // Create downsampling bind group layout for RGBA8 (4 bindings)
+    this.downsampleBindGroupLayoutRGBA8 = device.createBindGroupLayout({
+      label: 'Downsample Blur Bind Group Layout RGBA8',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'float', viewDimension: '2d' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: 'rgba8unorm',
+            viewDimension: '2d',
+          },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+
+    // Create upsampling bind group layout for RGBA8 (5 bindings)
+    this.upsampleBindGroupLayoutRGBA8 = device.createBindGroupLayout({
+      label: 'Upsample Blur Bind Group Layout RGBA8',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'float', viewDimension: '2d' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: 'rgba8unorm',
+            viewDimension: '2d',
+          },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          sampler: { type: 'filtering' },
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'float', viewDimension: '2d' },
+        },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+  }
+
+  public async recreatePipelinesForFormat(): Promise<void> {
+    // This method should be called when quality settings change
+    await this.createComputePipelines();
+    console.log('Bloom pipelines recreated for new texture format');
   }
 }

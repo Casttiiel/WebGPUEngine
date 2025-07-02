@@ -14,10 +14,12 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private debugControlsAdded: boolean = false;
+  private lastBloomQualitySetting: string = ''; // Track bloom quality changes
 
   // Buffer global para datos de cámara
   private globalUniformBuffer!: GPUBuffer;
@@ -81,8 +83,16 @@ export class ModuleRender extends Module {
 
     if (mainCamera?.hasComponent('bloom')) {
       const bloom = mainCamera.getComponent('bloom') as BloomComponent;
-      result = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
-      //result = bloom.addBloom(result);
+      const qualitySettings = QualitySettings.getInstance();
+      const bloomConfig = qualitySettings.getBloomConfig();
+
+      // Only process bloom if enabled in quality settings
+      if (bloomConfig.enabled) {
+        // Apply quality-based bloom settings
+        this.applyBloomQualitySettings(bloom);
+        result = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
+        //result = bloom.addBloom(result);
+      }
     }
 
     if (mainCamera?.hasComponent('tone_mapping')) {
@@ -248,6 +258,33 @@ export class ModuleRender extends Module {
         aoComponent.renderInMenu();
       }
     }
+
+    // Add bloom quality controls
+    this.renderBloomQualityControls();
+  }
+
+  private renderBloomQualityControls(): void {
+    const qualitySettings = QualitySettings.getInstance();
+    const currentSettings = qualitySettings.getSettings();
+    const bloomConfig = qualitySettings.getBloomConfig();
+
+    // Create a simple debug object for bloom quality
+    const bloomDebugObj = {
+      quality: currentSettings.bloomQuality,
+      enabled: bloomConfig.enabled,
+      maxBlurSteps: bloomConfig.maxBlurSteps,
+      blurStrength: bloomConfig.blurStrength,
+      bloomIntensity: bloomConfig.bloomIntensity,
+      bloomThreshold: bloomConfig.bloomThreshold,
+    };
+
+    // Add controls for bloom parameters (read-only for now)
+    this.addDebugControl(bloomDebugObj, 'quality', 'Bloom Quality');
+    this.addDebugControl(bloomDebugObj, 'enabled', 'Bloom Enabled');
+    this.addDebugControl(bloomDebugObj, 'maxBlurSteps', 'Bloom Blur Steps');
+    this.addDebugControl(bloomDebugObj, 'blurStrength', 'Bloom Blur Strength');
+    this.addDebugControl(bloomDebugObj, 'bloomIntensity', 'Bloom Intensity');
+    this.addDebugControl(bloomDebugObj, 'bloomThreshold', 'Bloom Threshold');
   }
 
   public renderDebug(): void {
@@ -323,5 +360,53 @@ export class ModuleRender extends Module {
       throw new Error('Global bind group is not initialized');
     }
     return this.globalBindGroup;
+  }
+
+  private applyBloomQualitySettings(bloomComponent: BloomComponent): void {
+    const qualitySettings = QualitySettings.getInstance();
+    const bloomConfig = qualitySettings.getBloomConfig();
+    const currentBloomQuality = qualitySettings.getSettings().bloomQuality;
+
+    // Only apply settings if quality has changed or this is the first time
+    if (this.lastBloomQualitySetting !== currentBloomQuality) {
+      this.lastBloomQualitySetting = currentBloomQuality;
+
+      if (!bloomConfig.enabled) {
+        // Bloom disabled, skip processing
+        return;
+      }
+
+      // Apply bloom parameters based on quality settings
+      bloomComponent.setMaxBlurSteps(bloomConfig.maxBlurSteps);
+      bloomComponent.setBlurStrength(bloomConfig.blurStrength);
+      bloomComponent.setBlendIntensity(bloomConfig.blendIntensity);
+      bloomComponent.setBloomIntensity(bloomConfig.bloomIntensity);
+      bloomComponent.setBloomThreshold(bloomConfig.bloomThreshold);
+      bloomComponent.setBloomRadius(bloomConfig.bloomRadius);
+      bloomComponent.setBloomKnee(bloomConfig.bloomKnee);
+
+      console.log(`Applied bloom quality settings: ${currentBloomQuality}`, bloomConfig);
+    }
+  }
+
+  // Public methods for controlling bloom quality
+  public setBloomQuality(quality: 'off' | 'low' | 'medium' | 'high'): void {
+    const qualitySettings = QualitySettings.getInstance();
+    qualitySettings.updateSettings({ bloomQuality: quality });
+
+    // Force re-application of bloom settings
+    this.lastBloomQualitySetting = '';
+
+    console.log(`Bloom quality changed to: ${quality}`);
+  }
+
+  public getBloomQuality(): string {
+    const qualitySettings = QualitySettings.getInstance();
+    return qualitySettings.getSettings().bloomQuality;
+  }
+
+  public getCurrentBloomConfig() {
+    const qualitySettings = QualitySettings.getInstance();
+    return qualitySettings.getBloomConfig();
   }
 }

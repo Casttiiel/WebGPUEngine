@@ -1,5 +1,6 @@
 import { PostProcessingQualityConfig } from '../../renderer/core/PostProcessingQualityConfig';
 import { AmbientOcclusionQualityConfig } from '../../renderer/core/AmbientOcclusionQualityConfig';
+import { BloomQualityConfigProvider } from '../../renderer/core/BloomQualityConfig';
 
 export interface GraphicsQualitySettings {
   renderResolution: number; // 0.5 = 50%, 1.0 = 100%
@@ -7,9 +8,10 @@ export interface GraphicsQualitySettings {
   ambientOcclusionQuality: 'off' | 'low' | 'medium' | 'high';
   gBufferTextureQuality: 'low' | 'medium' | 'high';
   postProcessingQuality: 'low' | 'medium' | 'high'; // For post-processing texture formats
+  bloomQuality: 'off' | 'low' | 'medium' | 'high'; // Bloom quality setting
   aliasingQuality: 'none' | 'fxaa' | 'msaa' | 'taa';
   cullingMode: 'cpu' | 'gpu' | 'hybrid';
-  enableBloom: boolean;
+  enableBloom: boolean; // Deprecated: use bloomQuality instead
   // Future: shadowQuality, anisotropicFiltering
 }
 
@@ -25,6 +27,7 @@ export class QualitySettings {
       ambientOcclusionQuality: 'off',
       gBufferTextureQuality: 'low',
       postProcessingQuality: 'low',
+      bloomQuality: 'off',
       aliasingQuality: 'none',
       cullingMode: 'cpu',
       enableBloom: false,
@@ -36,9 +39,10 @@ export class QualitySettings {
       ambientOcclusionQuality: 'low',
       gBufferTextureQuality: 'low',
       postProcessingQuality: 'low',
+      bloomQuality: 'low',
       aliasingQuality: 'fxaa',
       cullingMode: 'cpu',
-      enableBloom: false,
+      enableBloom: true,
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -47,6 +51,7 @@ export class QualitySettings {
       ambientOcclusionQuality: 'medium',
       gBufferTextureQuality: 'medium',
       postProcessingQuality: 'medium',
+      bloomQuality: 'medium',
       aliasingQuality: 'fxaa',
       cullingMode: 'gpu',
       enableBloom: true,
@@ -58,6 +63,7 @@ export class QualitySettings {
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
       postProcessingQuality: 'high',
+      bloomQuality: 'high',
       aliasingQuality: 'msaa',
       cullingMode: 'gpu',
       enableBloom: true,
@@ -69,6 +75,7 @@ export class QualitySettings {
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
       postProcessingQuality: 'high',
+      bloomQuality: 'high',
       aliasingQuality: 'taa',
       cullingMode: 'gpu',
       enableBloom: true,
@@ -119,6 +126,13 @@ export class QualitySettings {
 
   public getPostProcessingFormats() {
     return PostProcessingQualityConfig.getFormats(this.settings.postProcessingQuality);
+  }
+
+  public getBloomConfig() {
+    if (this.settings.bloomQuality === 'off') {
+      return BloomQualityConfigProvider.getDisabledConfig();
+    }
+    return BloomQualityConfigProvider.getConfig(this.settings.bloomQuality);
   }
 
   private onSettingsChanged(): void {
