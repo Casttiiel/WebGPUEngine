@@ -196,11 +196,18 @@ export class RenderPassManager {
   public executeBloomFilteringPass(
     mesh: Mesh,
     technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
     bindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
-    const pass = new BloomFilteringRenderPass(passConfig, mesh, technique, bindGroup);
+    const pass = new BloomFilteringRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      gBufferBindGroup,
+      bindGroup,
+    );
     this.executeDynamicPass(pass);
   }
 

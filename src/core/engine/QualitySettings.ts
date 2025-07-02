@@ -77,7 +77,7 @@ export class QualitySettings {
 
   private constructor() {
     // Start with medium settings
-    this.settings = { ...QualitySettings.PRESETS.MEDIUM };
+    this.settings = { ...QualitySettings.PRESETS.ULTRA };
   }
 
   public static getInstance(): QualitySettings {
@@ -113,7 +113,6 @@ export class QualitySettings {
     return this.settings.gBufferTextureQuality;
   }
 
-
   public getAmbientOcclusionConfig() {
     return AmbientOcclusionQualityConfig.getConfig(this.settings.ambientOcclusionQuality);
   }
@@ -122,20 +121,19 @@ export class QualitySettings {
     return PostProcessingQualityConfig.getFormats(this.settings.postProcessingQuality);
   }
 
-
   private onSettingsChanged(): void {
     // Emit event or trigger updates in renderer
     console.log('Graphics settings changed:', this.settings);
-    
+
     // Dispatch a custom event that the engine can listen to
     if (typeof window !== 'undefined') {
       const event = new CustomEvent('qualitySettingsChanged', {
-        detail: { 
+        detail: {
           settings: { ...this.settings },
           // Include specific change types for optimized updates
           requiresPipelineRecreation: true,
-          requiresRenderTargetRecreation: true
-        }
+          requiresRenderTargetRecreation: true,
+        },
       });
       window.dispatchEvent(event);
     }

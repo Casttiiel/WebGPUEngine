@@ -1,25 +1,25 @@
 ## NPM RUN DEV
 
-1. Bloom
 2. Bloom quality
-3. Directional Light
-4. Compute-based distortion
-5. HDR correctness
-6. Motion Blur
-7. Decals Category
-8. Temporal Anti-Aliasing (TAA)
-9. Engine quality settings
-   --aliasing quality
-   --CPU/GPU culling
-   --SESSION STORAGE
-10. Particles
-11. SpotLightsWithShadows
-12. PointLighstWithShadows
-13. Shadow quality
-14. Ambient Occlusion GTAO
-15. Tweakpane instead of IMGUI
-16. Optimizacion WebGPUFundamentals
-17. **ASYNC LOADING SYSTEM** 🚀
+3. AddBloom
+4. Directional Light
+5. Compute-based distortion
+6. HDR correctness
+7. Motion Blur
+8. Decals Category
+9. Temporal Anti-Aliasing (TAA)
+10. Engine quality settings
+    --aliasing quality
+    --CPU/GPU culling
+    --SESSION STORAGE
+11. Particles
+12. SpotLightsWithShadows
+13. PointLighstWithShadows
+14. Shadow quality
+15. Ambient Occlusion GTAO
+16. Tweakpane instead of IMGUI
+17. Optimizacion WebGPUFundamentals
+18. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD

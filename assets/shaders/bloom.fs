@@ -1,0 +1,27 @@
+#include "common/uniforms"
+#include "common/structs"
+#include "common/utils"
+#include "common/gbuffer"
+
+const bloom_threshold_min : f32 = 0.3;
+const bloom_threshold_max : f32 = 1.0;
+const emissive_bloom_factor : f32 = 8.0;
+
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+@group(1) @binding(0) var gAlbedo: texture_2d<f32>;
+@group(1) @binding(1) var gNormals: texture_2d<f32>;
+@group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
+@group(1) @binding(3) var gSelfIllum: texture_2d<f32>;
+@group(1) @binding(4) var gAO: texture_2d<f32>;
+@group(1) @binding(5) var samplerGBuffer: sampler;
+@group(2) @binding(0) var accLights: texture_2d<f32>;
+@group(2) @binding(1) var accLightsSampler: sampler;
+
+@fragment
+fn PS_filter(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+    let g = decodeGBuffer(uv);
+    let in_color = textureSample(accLights, accLightsSampler, uv).rgb;
+    let lum = dot(in_color, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let amount = smoothstep(bloom_threshold_min, bloom_threshold_max, (lum + g.emissive) / emissive_bloom_factor);
+    return vec4<f32>(in_color.rgb * amount, 1.0);
+}

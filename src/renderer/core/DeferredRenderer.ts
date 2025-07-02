@@ -54,11 +54,16 @@ export class DeferredRenderer {
     // Create accumulation light render target
     const qualitySettings = QualitySettings.getInstance();
     const postProcessingFormats = qualitySettings.getPostProcessingFormats();
-    
+
     if (!this.rtAccLight) {
       this.rtAccLight = new RenderTarget();
     }
-    this.rtAccLight.createRT('acc_light.dds', width, height, postProcessingFormats.toneMappingTexture);
+    this.rtAccLight.createRT(
+      'acc_light.dds',
+      width,
+      height,
+      postProcessingFormats.toneMappingTexture,
+    );
     if (!this.rtAO) {
       this.rtAO = new RenderTarget();
     }
@@ -171,12 +176,12 @@ export class DeferredRenderer {
 
     // Execute Decal pass
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
-    
+
     // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     const qualitySettings = QualitySettings.getInstance();
     const msaaLevel = qualitySettings.getMSAALevel();
-    
+
     if (msaaLevel > 1) {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     } // Execute AO pass first
@@ -262,5 +267,9 @@ export class DeferredRenderer {
   public getDepthStencilView(): GPUTextureView | null {
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     return gBufferDepthTextures.singleDepthView;
+  }
+
+  public getGBufferBindGroup(): GPUBindGroup {
+    return this.gBufferBindGroup;
   }
 }

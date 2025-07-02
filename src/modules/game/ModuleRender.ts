@@ -81,8 +81,8 @@ export class ModuleRender extends Module {
 
     if (mainCamera?.hasComponent('bloom')) {
       const bloom = mainCamera.getComponent('bloom') as BloomComponent;
-      result = bloom.generateHighlights(result);
-      result = bloom.apply(result);
+      result = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
+      //result = bloom.addBloom(result);
     }
 
     if (mainCamera?.hasComponent('tone_mapping')) {

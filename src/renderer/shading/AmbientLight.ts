@@ -19,11 +19,11 @@ export class AmbientLight {
   private uniformBindGroup!: GPUBindGroup;
   private ambientUniformBuffer!: GPUBuffer;
 
-  private reflectionIntensity = 0.3;
+  private reflectionIntensity = 0.4;
   private ambientLightIntensity = 0.7;
-  private globalAmbientBoost = 0.5;
+  private globalAmbientBoost = 0.3;
 
-  constructor() { }
+  constructor() {}
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
@@ -106,19 +106,18 @@ export class AmbientLight {
     const render = Render.getInstance();
 
     // Use GPUUtils for consistent render pass descriptor creation
-    const colorAttachment = GPUUtils.createColorAttachment(
-      rtAccLight,
-      'clear',
-      'store',
-      { r: 0, g: 0, b: 0, a: 1 }
-    );
+    const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'clear', 'store', {
+      r: 0,
+      g: 0,
+      b: 0,
+      a: 1,
+    });
 
-    const pass = render.getCommandEncoder().beginRenderPass(
-      GPUUtils.createRenderPassDescriptor(
-        'ambient light render pass',
-        [colorAttachment]
-      )
-    );
+    const pass = render
+      .getCommandEncoder()
+      .beginRenderPass(
+        GPUUtils.createRenderPassDescriptor('ambient light render pass', [colorAttachment]),
+      );
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);
@@ -141,5 +140,5 @@ export class AmbientLight {
     pass.end();
   }
 
-  public update(_dt: number): void { }
+  public update(_dt: number): void {}
 }

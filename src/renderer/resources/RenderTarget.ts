@@ -26,10 +26,10 @@ export class RenderTarget {
     this.xRes = width;
     this.yRes = height;
     this.isMultisample = multisampling;
-    
+
     // Get MSAA level from quality settings
     const msaaLevel = multisampling ? QualitySettings.getInstance().getMSAALevel() : 1;
-    
+
     // Always create the single-sample texture (for shader sampling)
     // Always use both RENDER_ATTACHMENT and TEXTURE_BINDING for maximum flexibility
     const baseUsage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
@@ -64,10 +64,17 @@ export class RenderTarget {
     return this.textureView;
   }
 
+  // Returns a storage texture view for compute shaders
+  public getStorageView(): GPUTextureView {
+    return this.texture.createView({
+      label: `${this.name}_storageView`,
+    });
+  }
+
   // Returns the view for rendering (MSAA if enabled, otherwise single-sample)
   public getRenderView(): GPUTextureView {
     const msaaLevel = QualitySettings.getInstance().getMSAALevel();
-    
+
     if (this.isMultisample && msaaLevel > 1) {
       if (this.msaaTextureView) return this.msaaTextureView;
       this.msaaTextureView = this.msaaTexture.createView({
@@ -82,7 +89,7 @@ export class RenderTarget {
   // Returns the resolve target (only if MSAA is enabled)
   public getResolveTarget(): GPUTextureView | undefined {
     const msaaLevel = QualitySettings.getInstance().getMSAALevel();
-    return (this.isMultisample && msaaLevel > 1) ? this.getView() : undefined;
+    return this.isMultisample && msaaLevel > 1 ? this.getView() : undefined;
   }
 
   public getWidth(): number {
