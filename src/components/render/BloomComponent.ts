@@ -8,7 +8,7 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { BlurComponent } from './BlurComponent';
 import { RenderPassFactory } from '../../renderer/core/passes/RenderPassFactory';
-import { BaseRenderPass, RenderPassConfig } from '../../renderer/core/passes/BaseRenderPass';
+import { RenderPassConfig } from '../../renderer/core/passes/BaseRenderPass';
 import { PostProcessingRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
 import { Engine } from '../../core/engine/Engine';
 

@@ -3,9 +3,9 @@
 #include "common/utils"
 #include "common/gbuffer"
 
-const bloom_threshold_min : f32 = 0.3;
+const bloom_threshold_min : f32 = 0.1;
 const bloom_threshold_max : f32 = 1.0;
-const emissive_bloom_factor : f32 = 8.0;
+const emissive_bloom_factor : f32 = 12.0;
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var gAlbedo: texture_2d<f32>;

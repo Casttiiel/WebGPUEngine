@@ -4,17 +4,20 @@
  */
 
 export interface AmbientOcclusionConfig {
-  sampleCount: number;    // Number of samples per pixel (more = better quality, slower)
-  radius: number;         // AO sampling radius
-  bias: number;          // Depth bias to prevent self-occlusion
-  aoStrength: number;    // AO effect intensity
-  maxDistance: number;   // Maximum distance for AO calculation
-  noiseScale: number;    // Noise texture scale for sample distribution
-  enabled: boolean;      // Whether AO is enabled at all
+  sampleCount: number; // Number of samples per pixel (more = better quality, slower)
+  radius: number; // AO sampling radius
+  bias: number; // Depth bias to prevent self-occlusion
+  aoStrength: number; // AO effect intensity
+  maxDistance: number; // Maximum distance for AO calculation
+  noiseScale: number; // Noise texture scale for sample distribution
+  enabled: boolean; // Whether AO is enabled at all
 }
 
 export class AmbientOcclusionQualityConfig {
-  private static readonly QUALITY_CONFIGS: Record<'off' | 'low' | 'medium' | 'high', AmbientOcclusionConfig> = {
+  private static readonly QUALITY_CONFIGS: Record<
+    'off' | 'low' | 'medium' | 'high',
+    AmbientOcclusionConfig
+  > = {
     off: {
       sampleCount: 0,
       radius: 0,
@@ -25,30 +28,30 @@ export class AmbientOcclusionQualityConfig {
       enabled: false,
     },
     low: {
-      sampleCount: 8,      // Minimal samples for performance
-      radius: 0.3,         // Smaller radius for subtle effect
-      bias: 0.03,          // Higher bias to reduce artifacts
-      aoStrength: 1.0,     // Moderate strength
-      maxDistance: 0.8,    // Shorter distance
-      noiseScale: 4.0,     // Standard noise scale
+      sampleCount: 4, // Minimal samples for performance
+      radius: 0.3, // Smaller radius for subtle effect
+      bias: 0.03, // Higher bias to reduce artifacts
+      aoStrength: 1.0, // Moderate strength
+      maxDistance: 0.8, // Shorter distance
+      noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },
     medium: {
-      sampleCount: 16,     // Balanced samples
-      radius: 0.5,         // Standard radius
-      bias: 0.025,         // Balanced bias
-      aoStrength: 1.5,     // Good strength
-      maxDistance: 1.0,    // Standard distance
-      noiseScale: 4.0,     // Standard noise scale
+      sampleCount: 8, // Balanced samples
+      radius: 0.5, // Standard radius
+      bias: 0.025, // Balanced bias
+      aoStrength: 1.5, // Good strength
+      maxDistance: 1.0, // Standard distance
+      noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },
     high: {
-      sampleCount: 32,     // High sample count for quality
-      radius: 0.7,         // Larger radius for more detailed AO
-      bias: 0.02,          // Lower bias for accuracy
-      aoStrength: 2.0,     // Strong effect
-      maxDistance: 1.2,    // Extended distance
-      noiseScale: 4.0,     // Standard noise scale
+      sampleCount: 16, // High sample count for quality
+      radius: 0.7, // Larger radius for more detailed AO
+      bias: 0.02, // Lower bias for accuracy
+      aoStrength: 2.0, // Strong effect
+      maxDistance: 1.2, // Extended distance
+      noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },
   };
@@ -66,11 +69,16 @@ export class AmbientOcclusionQualityConfig {
    */
   public static getPerformanceImpact(quality: 'off' | 'low' | 'medium' | 'high'): number {
     switch (quality) {
-      case 'off': return 0.0;      // No cost
-      case 'low': return 1.0;      // Baseline
-      case 'medium': return 2.0;   // 2x cost due to double samples
-      case 'high': return 4.0;     // 4x cost due to quadruple samples
-      default: return 1.0;
+      case 'off':
+        return 0.0; // No cost
+      case 'low':
+        return 1.0; // Baseline
+      case 'medium':
+        return 2.0; // 2x cost due to double samples
+      case 'high':
+        return 4.0; // 4x cost due to quadruple samples
+      default:
+        return 1.0;
     }
   }
 
@@ -82,11 +90,11 @@ export class AmbientOcclusionQualityConfig {
    */
   public static getRecommendedQuality(
     targetFrameTime: number,
-    currentFrameTime: number
+    currentFrameTime: number,
   ): 'off' | 'low' | 'medium' | 'high' {
     const availableBudget = targetFrameTime - currentFrameTime;
     const baseAOCost = 2.0; // Estimated base AO cost in ms
-    
+
     if (availableBudget < baseAOCost) return 'off';
     if (availableBudget < baseAOCost * 2) return 'low';
     if (availableBudget < baseAOCost * 4) return 'medium';
@@ -98,11 +106,16 @@ export class AmbientOcclusionQualityConfig {
    */
   public static getQualityDescription(quality: 'off' | 'low' | 'medium' | 'high'): string {
     switch (quality) {
-      case 'off': return 'Disabled - Maximum performance, no ambient occlusion';
-      case 'low': return 'Low - Subtle AO with minimal performance impact (8 samples)';
-      case 'medium': return 'Medium - Balanced AO quality and performance (16 samples)';
-      case 'high': return 'High - Detailed AO with higher quality (32 samples)';
-      default: return 'Unknown quality level';
+      case 'off':
+        return 'Disabled - Maximum performance, no ambient occlusion';
+      case 'low':
+        return 'Low - Subtle AO with minimal performance impact (8 samples)';
+      case 'medium':
+        return 'Medium - Balanced AO quality and performance (16 samples)';
+      case 'high':
+        return 'High - Detailed AO with higher quality (32 samples)';
+      default:
+        return 'Unknown quality level';
     }
   }
 
@@ -114,14 +127,19 @@ export class AmbientOcclusionQualityConfig {
    */
   public static validateQualityForHardware(
     quality: 'off' | 'low' | 'medium' | 'high',
-    gpuTier: number
+    gpuTier: number,
   ): boolean {
     switch (quality) {
-      case 'off': return true;           // Always supported
-      case 'low': return gpuTier >= 1;   // Any GPU
-      case 'medium': return gpuTier >= 2; // Mid-range+ GPU
-      case 'high': return gpuTier >= 3;   // High-end GPU
-      default: return false;
+      case 'off':
+        return true; // Always supported
+      case 'low':
+        return gpuTier >= 1; // Any GPU
+      case 'medium':
+        return gpuTier >= 2; // Mid-range+ GPU
+      case 'high':
+        return gpuTier >= 3; // High-end GPU
+      default:
+        return false;
     }
   }
 }
