@@ -1,8 +1,8 @@
 import { RenderTarget } from '../../resources/RenderTarget';
 import { GPUUtils } from '../utils/GPUUtils';
-import { Render } from '../Render';
+import { Render } from '../pipeline/Render';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
-import { GBufferQualityConfig } from '../GBufferQualityConfig';
+import { GBufferQualityConfig } from '../config/GBufferQualityConfig';
 
 /**
  * G-Buffer render pass for deferred rendering
@@ -33,18 +33,18 @@ export class GBufferPass {
     const msaaLevel = qualitySettings.getMSAALevel();
     const gBufferQuality = qualitySettings.getGBufferTextureQuality();
     const enableMSAA = msaaLevel > 0;
-    
+
     // Get optimal texture formats based on quality setting
     const formats = GBufferQualityConfig.getFormats(gBufferQuality);
-    
+
     // Log quality settings for debugging
     console.log(`Creating G-Buffer with quality: ${gBufferQuality}`, {
       formats,
       msaaLevel,
       resolution: `${width}x${height}`,
-      estimatedMemory: `${GBufferQualityConfig.getMemoryUsage(width, height, gBufferQuality, msaaLevel).toFixed(1)} MB`
+      estimatedMemory: `${GBufferQualityConfig.getMemoryUsage(width, height, gBufferQuality, msaaLevel).toFixed(1)} MB`,
     });
-    
+
     // Create G-Buffer render targets with dynamic formats
     this.rtAlbedos = new RenderTarget();
     this.rtAlbedos.createRT('gbuffer_albedos', width, height, formats.albedo, enableMSAA);
@@ -56,8 +56,14 @@ export class GBufferPass {
     this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, formats.selfIllum, enableMSAA);
 
     this.rtLinearDepth = new RenderTarget();
-    this.rtLinearDepth.createRT('gbuffer_linear_depth', width, height, formats.linearDepth, enableMSAA);
-    
+    this.rtLinearDepth.createRT(
+      'gbuffer_linear_depth',
+      width,
+      height,
+      formats.linearDepth,
+      enableMSAA,
+    );
+
     // Create depth buffers (both MSAA and single-sample)
     this.depthStencil = GPUUtils.createTexture(
       'gbuffer_depth_single',

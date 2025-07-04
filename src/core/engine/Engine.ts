@@ -4,7 +4,7 @@ import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
 import { ModuleEntities } from '../../modules/game/ModuleEntities';
 import { ModuleInput } from '../../modules/game/ModuleInput';
 import { ModuleRender } from '../../modules/game/ModuleRender';
-import { Render } from '../../renderer/core/Render';
+import { Render } from '../../renderer/core/pipeline/Render';
 import { DebugUIManager } from '../debug/DebugUIManager';
 
 export class Engine {

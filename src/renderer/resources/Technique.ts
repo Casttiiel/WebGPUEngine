@@ -7,11 +7,11 @@ import { FragmentShaderTargets } from '../../types/FragmentShaderTargets.enum';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { Mesh } from './Mesh';
-import { Render } from '../core/Render';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { GBufferQualityConfig } from '../core/GBufferQualityConfig';
+import { GBufferQualityConfig } from '../core/config/GBufferQualityConfig';
+import { Render } from '../core/pipeline/Render';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
@@ -85,13 +85,11 @@ export class Technique extends GPUResource {
   }
 
   private static generatePath(pathOrData: string | Partial<TechniqueCreateOptions>): string {
-    return typeof pathOrData === 'string'
-      ? pathOrData
-      : `${pathOrData?.vs}-${pathOrData?.fs}`;
+    return typeof pathOrData === 'string' ? pathOrData : `${pathOrData?.vs}-${pathOrData?.fs}`;
   }
 
   private static async loadTechniqueData(
-    pathOrData: string | Partial<TechniqueCreateOptions>
+    pathOrData: string | Partial<TechniqueCreateOptions>,
   ): Promise<Partial<TechniqueCreateOptions>> {
     if (typeof pathOrData === 'string') {
       return await ResourceManager.loadTechniqueData(pathOrData);
@@ -101,7 +99,7 @@ export class Technique extends GPUResource {
 
   private static createTechnique(
     path: string,
-    techniqueData: Partial<TechniqueCreateOptions>
+    techniqueData: Partial<TechniqueCreateOptions>,
   ): Technique {
     if (!techniqueData?.vs || !techniqueData?.fs) {
       throw new Error(`Missing shader files for technique: ${path}`);
@@ -217,21 +215,22 @@ export class Technique extends GPUResource {
     };
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
       pipelineConfig.depthStencil = this.getDepthConfig();
-    }    
+    }
     // Add multisample based on quality settings for MSAA passes
     if (this.needsMSAA()) {
       const msaaLevel = QualitySettings.getInstance().getMSAALevel();
       pipelineConfig.multisample = { count: msaaLevel };
-
     }
 
     this.pipeline = PipelineFactory.createPipeline(pipelineConfig);
   }
 
   private needsMSAA(): boolean {
-    return this.writesOn === FragmentShaderTargets.GBUFFER ||
+    return (
+      this.writesOn === FragmentShaderTargets.GBUFFER ||
       this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER ||
-      this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA;
+      this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA
+    );
   }
 
   // ============================================================================
@@ -256,7 +255,7 @@ export class Technique extends GPUResource {
   }
 
   // ============================================================================
-  // FRAGMENT TARGET CONFIGURATION METHODS  
+  // FRAGMENT TARGET CONFIGURATION METHODS
   // ============================================================================
 
   private getFragmentShaderTarget(): GPUColorTargetState[] {
@@ -284,10 +283,10 @@ export class Technique extends GPUResource {
     const qualitySettings = QualitySettings.getInstance();
     const gBufferQuality = qualitySettings.getGBufferTextureQuality();
     const formats = GBufferQualityConfig.getFormats(gBufferQuality);
-    
+
     return [
-      { format: formats.albedo },    // Albedo + metallic
-      { format: formats.normal },    // Normal + roughness  
+      { format: formats.albedo }, // Albedo + metallic
+      { format: formats.normal }, // Normal + roughness
       { format: formats.selfIllum }, // Self illumination
       { format: formats.linearDepth }, // Linear depth
     ];
@@ -298,7 +297,7 @@ export class Technique extends GPUResource {
     const qualitySettings = QualitySettings.getInstance();
     const gBufferQuality = qualitySettings.getGBufferTextureQuality();
     const formats = GBufferQualityConfig.getFormats(gBufferQuality);
-    
+
     return [
       { format: formats.albedo }, // Albedo + metallic
       { format: formats.normal }, // Normal + roughness
@@ -308,7 +307,7 @@ export class Technique extends GPUResource {
   private createTextureTarget(): GPUColorTargetState[] {
     const qualitySettings = QualitySettings.getInstance();
     const postProcessingFormat = qualitySettings.getPostProcessingFormats().toneMappingTexture;
-    
+
     return [
       {
         format: postProcessingFormat,

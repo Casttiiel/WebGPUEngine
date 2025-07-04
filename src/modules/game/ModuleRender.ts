@@ -2,8 +2,6 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Camera } from '../../core/math/Camera';
-import { DeferredRenderer } from '../../renderer/core/DeferredRenderer';
-import { Render } from '../../renderer/core/Render';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
@@ -15,6 +13,8 @@ import { AntialiasingComponent } from '../../components/render/AntialiasingCompo
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { QualitySettings } from '../../core/engine/QualitySettings';
+import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
+import { Render } from '../../renderer/core/pipeline/Render';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;

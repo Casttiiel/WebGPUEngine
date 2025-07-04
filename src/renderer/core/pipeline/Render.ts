@@ -1,9 +1,9 @@
-import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
-import { CameraComponent } from '../../components/render/CameraComponent';
-import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
-import { Engine } from '../../core/engine/Engine';
-import { QualitySettings } from '../../core/engine/QualitySettings';
-import { GPUUtils } from './utils/GPUUtils';
+import { AntialiasingComponent } from '../../../components/render/AntialiasingComponent';
+import { CameraComponent } from '../../../components/render/CameraComponent';
+import { ToneMappingComponent } from '../../../components/render/ToneMappingComponent';
+import { Engine } from '../../../core/engine/Engine';
+import { QualitySettings } from '../../../core/engine/QualitySettings';
+import { GPUUtils } from '../utils/GPUUtils';
 
 export class Render {
   private static instance: Render;
@@ -18,11 +18,11 @@ export class Render {
   // Dimensiones del canvas (tamaño real del canvas)
   private static canvasWidth: number = 800;
   private static canvasHeight: number = 600;
-  
+
   // Dimensiones de renderizado (pueden ser menores para render resolution)
   private static renderWidth: number = 800;
   private static renderHeight: number = 600;
-  
+
   private canvas!: HTMLCanvasElement;
 
   private constructor() {
@@ -99,11 +99,13 @@ export class Render {
   private static updateRenderDimensions(): void {
     const qualitySettings = QualitySettings.getInstance();
     const renderRes = qualitySettings.getRenderResolution();
-    
+
     Render.renderWidth = Math.floor(Render.canvasWidth * renderRes);
     Render.renderHeight = Math.floor(Render.canvasHeight * renderRes);
-    
-    console.warn(`Render resolution updated: ${Render.renderWidth}x${Render.renderHeight} (${(renderRes * 100).toFixed(0)}% of ${Render.canvasWidth}x${Render.canvasHeight})`);
+
+    console.warn(
+      `Render resolution updated: ${Render.renderWidth}x${Render.renderHeight} (${(renderRes * 100).toFixed(0)}% of ${Render.canvasWidth}x${Render.canvasHeight})`,
+    );
   }
 
   // Ajustar el tamaño del buffer de render

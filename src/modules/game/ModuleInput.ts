@@ -1,7 +1,7 @@
 import { Module } from '../core/Module';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
-import { Render } from '../../renderer/core/Render';
+import { Render } from '../../renderer/core/pipeline/Render';
 
 export class ModuleInput extends Module {
   private mousePosition: { x: number; y: number } = { x: 0, y: 0 };

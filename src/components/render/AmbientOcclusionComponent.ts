@@ -1,13 +1,13 @@
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { Render } from '../../renderer/core/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { Render } from '../../renderer/core/pipeline/Render';
 
 export class AmbientOcclusionComponent extends Component {
   private aoTechnique!: Technique;

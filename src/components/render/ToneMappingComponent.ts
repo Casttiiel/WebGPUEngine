@@ -1,6 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { Render } from '../../renderer/core/Render';
+import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
@@ -33,7 +33,7 @@ export class ToneMappingComponent extends Component {
   public resize(): void {
     const qualitySettings = QualitySettings.getInstance();
     const toneMappingFormat = qualitySettings.getPostProcessingFormats().toneMappingTexture;
-    
+
     this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, toneMappingFormat);
     this.bindGroup = null;
   }

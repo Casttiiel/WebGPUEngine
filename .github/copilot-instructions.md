@@ -87,6 +87,133 @@ interface Module {
 }
 ```
 
+## Debug UI System
+
+### Architecture Overview (`src/core/debug/`)
+
+The engine implements a centralized debug UI system using Tweakpane, with Engine as the sole owner and manager:
+
+**DebugUIManager** (`src/core/debug/DebugUIManager.ts`)
+
+- Singleton pattern for global debug UI access
+- Tweakpane integration with resizable, draggable interface
+- Advanced control registration system to prevent duplicates
+- Support for interactive and read-only controls
+- Hierarchical folder structure for organized debugging
+
+**Key Features:**
+
+- **Control Registration**: Prevents duplicate controls using unique keys based on folder, property, and label
+- **Subfolder Support**: Nested debug UI structure for entity hierarchies
+- **Interactive Controls**: Editable controls for real-time parameter adjustment
+- **Read-only Controls**: Display-only controls for monitoring values
+- **Automatic Updates**: Values update in real-time without recreating controls
+
+### Debug UI Integration Pattern
+
+**Engine Ownership** (`src/core/engine/Engine.ts`)
+
+```typescript
+export class Engine {
+  private static _debugUI: DebugUIManager = DebugUIManager.getInstance();
+  private static debugControlsInitialized: boolean = false;
+
+  public static async start(): Promise<void> {
+    // Engine initializes debug UI
+    this._debugUI.initialize();
+    // ...
+  }
+
+  public static getDebugUI(): DebugUIManager {
+    return this._debugUI;
+  }
+
+  public static renderInMenu(): void {
+    // Only add Engine controls once
+    if (!this.debugControlsInitialized) {
+      const timeScaleWrapper = {
+        get timeScale() {
+          return Engine._timeScale;
+        },
+        set timeScale(value) {
+          Engine._timeScale = value;
+        },
+      };
+
+      this._debugUI.addInteractiveControl('Engine', timeScaleWrapper, 'timeScale', 'Time Scale', {
+        min: 0.1,
+        max: 10.0,
+        step: 0.1,
+      });
+
+      this.debugControlsInitialized = true;
+    }
+  }
+}
+```
+
+**Module Debug Integration** (`src/modules/core/Module.ts`)
+
+```typescript
+export abstract class Module {
+  // Helper for adding controls to debug UI
+  protected addDebugControl(object: unknown, propertyKey: string, label?: string): void {
+    const debugUI = Engine.getDebugUI();
+    debugUI.addDebugControl(this.name, object, propertyKey, label);
+  }
+}
+```
+
+**Component Debug Integration** (`src/components/core/TransformComponent.ts`)
+
+```typescript
+export class TransformComponent extends Component {
+  public override renderInMenu(): void {
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      const debugUI = Engine.getDebugUI();
+      // Specify readonly: false for interactive controls
+      debugUI.addControlToSubFolder(parentFolder, entityKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Interactive position, rotation, scale controls
+    addControl(position, 'x', 'Position X', { min: -10, max: 10, step: 0.1 });
+    // ...
+  }
+}
+```
+
+### Debug UI Control Types
+
+**addDebugControl**: Read-only monitoring controls
+**addInteractiveControl**: Editable parameter controls  
+**addControlToSubFolder**: Controls within entity subfolders
+**addSubFolder**: Create nested folder structure
+
+### Control Registration System
+
+The debug UI uses a sophisticated registration system to prevent duplicate controls:
+
+```typescript
+// Unique key generation includes folder, property, label for specificity
+const controlKey = `${folderName}_${propertyKey}_${uniqueLabel}_debug`;
+
+// Only create control if not already registered
+if (!this.controlRegistry.has(controlKey)) {
+  // Create and register control
+  this.controlRegistry.add(controlKey);
+}
+```
+
+**Key Benefits:**
+
+- Prevents visual duplication in debug UI
+- Allows value updates without recreating controls
+- Supports multiple controls with same property key but different labels
+- Maintains clean, organized debug interface
+
 ## Entity Component System (ECS)
 
 ### Core ECS Concepts (src/core/ecs/)

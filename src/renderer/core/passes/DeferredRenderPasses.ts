@@ -1,7 +1,7 @@
 import { BaseRenderPass, RenderPassConfig } from './BaseRenderPass';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
-import { Render } from '../Render';
+import { Render } from '../pipeline/Render';
 import { GPUUtils } from '../utils/GPUUtils';
 import { RenderKey } from '../managers/RenderKeyManager';
 

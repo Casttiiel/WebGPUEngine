@@ -1,5 +1,5 @@
 import { Engine } from '../../core/engine/Engine';
-import { Render } from '../core/Render';
+import { Render } from '../core/pipeline/Render';
 import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
@@ -13,7 +13,7 @@ export class Skybox {
   private skyboxBindGroup!: GPUBindGroup;
   private skyboxTexture!: Cubemap;
 
-  constructor() { }
+  constructor() {}
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
@@ -38,7 +38,7 @@ export class Skybox {
           binding: 1,
           resource: sampler,
         },
-      ]
+      ],
     );
   }
 
@@ -47,15 +47,21 @@ export class Skybox {
 
     // Use GPUUtils for consistent render pass descriptor creation
     const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
-    const depthAttachment = GPUUtils.createDepthStencilAttachment(depthStencilView, 'load', 'store');
-
-    const pass = render.getCommandEncoder().beginRenderPass(
-      GPUUtils.createRenderPassDescriptor(
-        'skybox render pass',
-        [colorAttachment],
-        depthAttachment
-      )
+    const depthAttachment = GPUUtils.createDepthStencilAttachment(
+      depthStencilView,
+      'load',
+      'store',
     );
+
+    const pass = render
+      .getCommandEncoder()
+      .beginRenderPass(
+        GPUUtils.createRenderPassDescriptor(
+          'skybox render pass',
+          [colorAttachment],
+          depthAttachment,
+        ),
+      );
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);

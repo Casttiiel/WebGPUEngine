@@ -1,8 +1,8 @@
-import { Render } from '../core/Render';
-import { Technique } from '../resources/Technique';
-import { Mesh } from '../resources/Mesh';
-import { BindGroupFactory } from './factories/BindGroupFactory';
-import { GPUUtils } from './utils/GPUUtils';
+import { Mesh } from '../../resources/Mesh';
+import { Technique } from '../../resources/Technique';
+import { BindGroupFactory } from '../factories/BindGroupFactory';
+import { Render } from '../pipeline/Render';
+import { GPUUtils } from '../utils/GPUUtils';
 
 export class DepthResolver {
   private depthResolveTechnique!: Technique;
@@ -39,10 +39,10 @@ export class DepthResolver {
         {
           binding: 0,
           resource: msaaDepthTexture.createView({
-            aspect: 'depth-only'
+            aspect: 'depth-only',
           }),
         },
-      ]
+      ],
     );
 
     // Create render pass to resolve depth using GPURenderPassDescriptor pattern
@@ -51,7 +51,7 @@ export class DepthResolver {
       colorAttachments: [], // No color attachments
       depthStencilAttachment: {
         view: singleSampleDepthTexture.createView({
-          aspect: 'depth-only'
+          aspect: 'depth-only',
         }),
         depthClearValue: 1.0,
         depthLoadOp: 'clear',

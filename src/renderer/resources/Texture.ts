@@ -2,8 +2,8 @@ import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResour
 import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { MipmapGenerator } from '../core/MipmapGenerator';
 import { GPUUtils } from '../core/utils/GPUUtils';
+import { MipmapGenerator } from '../core/processing/MipmapGenerator';
 
 export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
@@ -31,7 +31,6 @@ export class Texture extends GPUResource {
   private addressModeV: GPUAddressMode;
   private maxAnisotropy: number;
   private static mipmapGenerator: MipmapGenerator;
-  
 
   constructor(options: TextureOptions) {
     super({
@@ -39,7 +38,7 @@ export class Texture extends GPUResource {
       type: ResourceType.TEXTURE,
     });
     this.genMipmaps = options.genMipmaps ?? true;
-    
+
     // Use quality settings for texture format if not explicitly specified
     if (options.format) {
       this.format = options.format;
@@ -48,7 +47,7 @@ export class Texture extends GPUResource {
       const postProcessingFormats = qualitySettings.getPostProcessingFormats();
       this.format = postProcessingFormats.skyboxTexture; // Use skybox format as default for general textures
     }
-    
+
     this.usage =
       options.usage ??
       GPUTextureUsage.TEXTURE_BINDING |
@@ -155,7 +154,7 @@ export class Texture extends GPUResource {
     }
 
     const mipLevelCount = this.texture.mipLevelCount ?? 1;
-    
+
     // Use the dynamic MipmapGenerator for 2D textures
     Texture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount);
   }

@@ -2,7 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { Entity } from '../../core/ecs/Entity';
 import { Camera } from '../../core/math/Camera';
-import { Render } from '../../renderer/core/Render';
+import { Render } from '../../renderer/core/pipeline/Render';
 import { Interpolator } from '../../types/Interpolator.interface';
 import { MixedCamera } from '../../types/MixedCamera.type';
 import { Module } from '../core/Module';

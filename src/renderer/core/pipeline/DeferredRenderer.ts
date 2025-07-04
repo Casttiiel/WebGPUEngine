@@ -1,19 +1,19 @@
-import { RenderCategory } from '../../types/RenderCategory.enum';
-import { AmbientLight } from '../shading/AmbientLight';
-import { Skybox } from '../shading/Skybox';
-import { RenderManagerV2 as RenderManager } from './managers/RenderManagerV2';
-import { RenderTarget } from '../resources/RenderTarget';
-import { DepthResolver } from './DepthResolver';
-import { Entity } from '@/core/ecs/Entity';
-import { AmbientOcclusionComponent } from '@/components/render/AmbientOcclusionComponent';
-import { Technique } from '../resources/Technique';
-import { Mesh } from '../resources/Mesh';
-import { BindGroupFactory } from './factories/BindGroupFactory';
-import { Texture } from '../resources/Texture';
-import { GBufferPass } from './passes/GBufferPass';
-import { RenderPassManager } from './passes/RenderPassManager';
+import { AmbientOcclusionComponent } from '../../../components/render/AmbientOcclusionComponent';
+import { Entity } from '../../../core/ecs/Entity';
+import { QualitySettings } from '../../../core/engine/QualitySettings';
+import { RenderCategory } from '../../../types/RenderCategory.enum';
+import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
+import { Mesh } from '../../resources/Mesh';
+import { RenderTarget } from '../../resources/RenderTarget';
+import { Technique } from '../../resources/Technique';
+import { Texture } from '../../resources/Texture';
+import { AmbientLight } from '../../shading/AmbientLight';
+import { Skybox } from '../../shading/Skybox';
+import { BindGroupFactory } from '../factories/BindGroupFactory';
+import { GBufferPass } from '../passes/GBufferPass';
+import { RenderPassManager } from '../passes/RenderPassManager';
+import { DepthResolver } from '../processing/DepthResolver';
 import { Render } from './Render';
-import { QualitySettings } from '../../core/engine/QualitySettings';
 
 export class DeferredRenderer {
   private isLoaded = false;

@@ -1,5 +1,5 @@
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { Render } from '../../renderer/core/Render';
+import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';

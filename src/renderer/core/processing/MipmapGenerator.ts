@@ -1,6 +1,6 @@
-import { GPUUtils } from './utils/GPUUtils';
-import { BindGroupFactory } from './factories/BindGroupFactory';
-import { PipelineFactory, ComputePipelineConfig } from './factories/PipelineFactory';
+import { BindGroupFactory } from '../factories/BindGroupFactory';
+import { ComputePipelineConfig, PipelineFactory } from '../factories/PipelineFactory';
+import { GPUUtils } from '../utils/GPUUtils';
 
 export class MipmapGenerator {
   private device!: GPUDevice;
@@ -24,7 +24,10 @@ export class MipmapGenerator {
     return this.baseShaderCode.replace('rgba16float', format);
   }
 
-  private getOrCreatePipeline(format: GPUTextureFormat): { pipeline: GPUComputePipeline, bindGroupLayout: GPUBindGroupLayout } {
+  private getOrCreatePipeline(format: GPUTextureFormat): {
+    pipeline: GPUComputePipeline;
+    bindGroupLayout: GPUBindGroupLayout;
+  } {
     if (!this.pipelines.has(format)) {
       // Create shader module for this specific format
       const shaderCode = this.createShaderForFormat(format);
@@ -68,14 +71,14 @@ export class MipmapGenerator {
       };
 
       const pipeline = PipelineFactory.createComputePipeline(computeConfig);
-      
+
       this.pipelines.set(format, pipeline);
       this.bindGroupLayouts.set(format, bindGroupLayout);
     }
 
     return {
       pipeline: this.pipelines.get(format)!,
-      bindGroupLayout: this.bindGroupLayouts.get(format)!
+      bindGroupLayout: this.bindGroupLayouts.get(format)!,
     };
   }
 
@@ -128,7 +131,7 @@ export class MipmapGenerator {
               binding: 1,
               resource: destView,
             },
-          ]
+          ],
         );
 
         // Dispatch compute shader
@@ -196,7 +199,7 @@ export class MipmapGenerator {
             binding: 1,
             resource: destView,
           },
-        ]
+        ],
       );
 
       // Dispatch compute shader

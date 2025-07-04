@@ -1,6 +1,6 @@
-import { PostProcessingQualityConfig } from '../../renderer/core/PostProcessingQualityConfig';
-import { AmbientOcclusionQualityConfig } from '../../renderer/core/AmbientOcclusionQualityConfig';
-import { BloomQualityConfigProvider } from '../../renderer/core/BloomQualityConfig';
+import { AmbientOcclusionQualityConfig } from '../../renderer/core/config/AmbientOcclusionQualityConfig';
+import { BloomQualityConfigProvider } from '../../renderer/core/config/BloomQualityConfig';
+import { PostProcessingQualityConfig } from '../../renderer/core/config/PostProcessingQualityConfig';
 
 export interface GraphicsQualitySettings {
   renderResolution: number; // 0.5 = 50%, 1.0 = 100%
