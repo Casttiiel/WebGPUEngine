@@ -116,17 +116,8 @@ export class RenderComponent extends Component {
       label: string,
       options?: { min?: number; max?: number; step?: number },
     ) => {
-      const moduleManager = Engine.getModules();
-      if (!moduleManager) return;
-
-      moduleManager.addSubFolderControl(
-        parentFolder,
-        entityKey,
-        object,
-        propertyKey,
-        label,
-        options,
-      );
+      const debugUI = Engine.getDebugUI();
+      debugUI.addControlToSubFolder(parentFolder, entityKey, object, propertyKey, label, options);
     };
 
     // Show visibility toggle

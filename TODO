@@ -1,53 +1,52 @@
 ## NPM RUN DEV
 
-1. Tweakpane instead of IMGUI
-   -On scroll on tweakpane -> No camera controls
-   -Transform on tweakpane (Rotation and Scale not working properly)
+1. Tweakpane
+   -Quality Settings Config
    -Parameters Ambient Light
    -Parameters Bloom
-   -Quality Settings Config
-2. Compute-based distortion
-3. OnResize
-4. Directional Light
-5. Area Light
-6. Decals Category
-7. Temporal Anti-Aliasing (TAA)
-8. Aliasing quality
-9. Engine quality settings SESSION STORAGE
-10. SpotLightsWithShadows
-11. PointLighstWithShadows
-12. Shadow quality
-13. Ambient Occlusion GTAO
+2. Reorganize files
+3. Engine quality settings SESSION STORAGE
+4. OnResize
+5. Compute-based distortion
+6. SpotLightsWithShadows
+7. PointLighstWithShadows
+8. Shadow quality
+9. Ambient Occlusion GTAO
+10. Temporal Anti-Aliasing (TAA)
+11. Aliasing quality
+12. Directional Light
+13. Area Light
 14. Motion Blur
-15. Optimizacion WebGPUFundamentals
-16. **ASYNC LOADING SYSTEM** 🚀
+15. Decals Category
+16. Particles
+17. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+18. Optimizacion WebGPUFundamentals
+19. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD
 - Progress indicators y loading states
 - Streaming de recursos bajo demanda
 
-19. Particles
-20. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-21. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-22. Escalabilidad de Luces
+21. Escalabilidad de Luces
     Moderno: Cientos de luces con clustered culling+instancing
-23. Mesh LOD/Generate LOD on texture and mesh automatically
-24. Occlusion culling
-25. Memory Bandwidth
+22. Mesh LOD/Generate LOD on texture and mesh automatically
+23. Occlusion culling
+24. Memory Bandwidth
     Actual: G-Buffer consume mucho ancho de banda
     Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-26. GPU-Driven Rendering 🚀 Futuro
+25. GPU-Driven Rendering 🚀 Futuro
 
 MISC-----------------------------------
-Terrain with perlin noise
-Paralax Mapping
-Weighted terrain
 Cascaded Shadow Maps
 Lens Flare
 Camera Lens Dirt
 Volumetric Lights/God Rays
+Paralax Mapping
+Terrain with perlin noise
+Weighted terrain
 GAME-----------------------------------
+Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Music
 Physics
 Animations

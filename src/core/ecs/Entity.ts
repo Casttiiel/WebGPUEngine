@@ -68,7 +68,8 @@ export class Entity {
     const folderKey = `${parentFolder}_${entityKey}`;
 
     // Create an entity subfolder with its name (collapsed by default)
-    const entityFolder = moduleManager.addSubFolder(
+    const debugUI = Engine.getDebugUI();
+    const entityFolder = debugUI.addSubFolder(
       parentFolder, // Parent folder name
       entityKey, // Subfolder key
       entityName, // Display title
@@ -80,7 +81,7 @@ export class Entity {
     // Now add controls for each component
     this.components.forEach((component, componentName) => {
       // Add component type info to the entity folder
-      moduleManager.addSubFolderControl(
+      debugUI.addControlToSubFolder(
         parentFolder,
         entityKey,
         { type: componentName },

@@ -72,7 +72,36 @@ export class CameraComponent extends Component {
     this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
   }
 
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void {
+    // Get the owner entity
+    const entity = this.getOwner();
+    const entityId = entity.id;
+    const entityKey = `entity_${entityId}`;
+
+    // Get the parent folder from the entity hierarchy
+    let parentFolder = 'entities';
+    const parentEntity = entity.getParent();
+    if (parentEntity) {
+      const parentId = parentEntity.id;
+      const parentEntityKey = `entity_${parentId}`;
+      // If this entity has a parent, it's in a subfolder
+      parentFolder = `entities_${parentEntityKey}`;
+    }
+
+    // Create helper method to add controls to the entity's folder
+    const addControl = (
+      object: unknown,
+      propertyKey: string,
+      label: string,
+      options?: { min?: number; max?: number; step?: number; readonly?: boolean },
+    ) => {
+      const debugUI = Engine.getDebugUI();
+      debugUI.addControlToSubFolder(parentFolder, entityKey, object, propertyKey, label, options);
+    };
+
+    // Add control for toggling the camera controllable state
+    addControl(this, 'isControllable', 'Camera: Controllable', { readonly: false });
+  }
 
   public renderDebug(): void {
     // Implementar visualización de debug de la cámara si es necesario

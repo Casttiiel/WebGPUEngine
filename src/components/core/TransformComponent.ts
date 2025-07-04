@@ -117,7 +117,7 @@ export class TransformComponent extends Component {
       parentFolder = `entities_${parentEntityKey}`;
     }
 
-    // Create helper methods to access ModuleManager
+    // Create helper methods to access DebugUIManager
     const addControl = (
       object: unknown,
       propertyKey: string,
@@ -127,14 +127,8 @@ export class TransformComponent extends Component {
       const moduleManager = Engine.getModules();
       if (!moduleManager) return;
 
-      moduleManager.addSubFolderControl(
-        parentFolder,
-        entityKey,
-        object,
-        propertyKey,
-        label,
-        options,
-      );
+      const debugUI = Engine.getDebugUI();
+      debugUI.addControlToSubFolder(parentFolder, entityKey, object, propertyKey, label, options);
     };
 
     // Create reactive objects for position, rotation, and scale that update the transform

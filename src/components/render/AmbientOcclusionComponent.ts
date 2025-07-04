@@ -43,7 +43,7 @@ export class AmbientOcclusionComponent extends Component {
     this.renderPassManager = new RenderPassManager();
     // Initialize previous params after ssaoParams is defined
     this.previousSSAOParams = { ...this.ssaoParams };
-    
+
     // Update parameters from quality settings
     this.updateParametersFromQuality();
   }
@@ -51,9 +51,9 @@ export class AmbientOcclusionComponent extends Component {
   private updateParametersFromQuality(): void {
     const qualitySettings = QualitySettings.getInstance();
     const aoConfig = qualitySettings.getAmbientOcclusionConfig();
-    
+
     this.isEnabled = aoConfig.enabled;
-    
+
     if (aoConfig.enabled) {
       this.ssaoParams = {
         sampleCount: aoConfig.sampleCount,
@@ -74,7 +74,7 @@ export class AmbientOcclusionComponent extends Component {
     // Create intermediate render target for raw AO
     const qualitySettings = QualitySettings.getInstance();
     const aoFormat = qualitySettings.getPostProcessingFormats().aoTexture;
-    
+
     this.rawAOTarget = new RenderTarget();
     this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
 
@@ -108,7 +108,7 @@ export class AmbientOcclusionComponent extends Component {
     ]);
 
     GPUUtils.writeBuffer(this.ssaoParamsBuffer, 0, paramsData);
-    
+
     // Update the previous params cache
     this.previousSSAOParams = { ...this.ssaoParams };
   }
@@ -127,14 +127,14 @@ export class AmbientOcclusionComponent extends Component {
   public resize(): void {
     // Update parameters from quality settings in case they changed
     this.updateParametersFromQuality();
-    
+
     const qualitySettings = QualitySettings.getInstance();
     const aoFormat = qualitySettings.getPostProcessingFormats().aoTexture;
-    
+
     this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
     this.bilateralFilterBindGroup = null;
     this.ssaoParamsBindGroup = null;
-    
+
     // Force update of SSAO parameters buffer
     if (this.ssaoParamsBuffer) {
       this.updateSSAOParamsBuffer();
@@ -167,12 +167,14 @@ export class AmbientOcclusionComponent extends Component {
 
     const renderPass = commandEncoder.beginRenderPass({
       label: 'Clear AO Target',
-      colorAttachments: [{
-        view: finalAOTarget.getView(),
-        clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, // White = no occlusion
-        loadOp: 'clear',
-        storeOp: 'store',
-      }],
+      colorAttachments: [
+        {
+          view: finalAOTarget.getView(),
+          clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, // White = no occlusion
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
     });
 
     renderPass.end();
@@ -182,20 +184,20 @@ export class AmbientOcclusionComponent extends Component {
   public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
     // Update parameters from quality settings (in case they changed)
     this.updateParametersFromQuality();
-    
+
     // Update SSAO parameters buffer if parameters changed
     if (this.hasParametersChanged()) {
       this.updateSSAOParamsBuffer();
       // Invalidate bind group to recreate with new parameters
       this.ssaoParamsBindGroup = null;
     }
-    
+
     // If AO is disabled, render a white texture (no occlusion)
     if (!this.isEnabled) {
       this.renderDisabledAO(finalAOTarget);
       return;
     }
-    
+
     this.createSSAOParamsBindGroup();
 
     // Pass 1: Generate raw AO using SSAO with parameters
@@ -318,12 +320,12 @@ export class AmbientOcclusionComponent extends Component {
     label?: string,
     options?: { min?: number; max?: number; step?: number },
   ): void {
-    const moduleManager = Engine.getModules();
-    moduleManager.addInteractiveControl('SSAO', object, propertyKey, label, options);
+    const debugUI = Engine.getDebugUI();
+    debugUI.addInteractiveControl('SSAO', object, propertyKey, label, options);
   }
 
   protected addDebugControl(object: unknown, propertyKey: string, label?: string): void {
-    const moduleManager = Engine.getModules();
-    moduleManager.addDebugControl('SSAO', object, propertyKey, label);
+    const debugUI = Engine.getDebugUI();
+    debugUI.addDebugControl('SSAO', object, propertyKey, label);
   }
 }
