@@ -72,8 +72,7 @@ export class DebugUIManager {
    * @param object The object to bind to
    * @param propertyKey The property to bind
    * @param label Optional display label
-   */
-  public addDebugControl(
+   */ public addDebugControl(
     folderName: string,
     object: unknown,
     propertyKey: string,
@@ -82,23 +81,24 @@ export class DebugUIManager {
     if (!this.debugPane) return;
 
     // Create a unique key for this control to avoid duplicates
-    const controlKey = `${folderName}_${propertyKey}_debug`;
+    // Use label to ensure uniqueness when multiple controls have the same property key
+    const uniqueLabel = label || propertyKey;
+    const controlKey = `${folderName}_${propertyKey}_${uniqueLabel}_debug`;
 
-    // Check if control already exists
-    if (this.controlRegistry.has(controlKey)) {
-      return; // Control already exists, skip adding it again
+    // Skip creating duplicate controls, but don't return
+    // This allows values to still be updated for existing controls
+    if (!this.controlRegistry.has(controlKey)) {
+      let folder = this.getOrCreateFolder(folderName);
+      if (!folder) return;
+
+      folder.addBinding(object as Record<string, unknown>, propertyKey, {
+        label: label || propertyKey,
+        readonly: true,
+      });
+
+      // Register this control to prevent duplicates
+      this.controlRegistry.add(controlKey);
     }
-
-    let folder = this.getOrCreateFolder(folderName);
-    if (!folder) return;
-
-    folder.addBinding(object as Record<string, unknown>, propertyKey, {
-      label: label || propertyKey,
-      readonly: true,
-    });
-
-    // Register this control to prevent duplicates
-    this.controlRegistry.add(controlKey);
   }
 
   /**
@@ -108,8 +108,7 @@ export class DebugUIManager {
    * @param propertyKey The property to bind
    * @param label Optional display label
    * @param options Optional configuration (min, max, step)
-   */
-  public addInteractiveControl(
+   */ public addInteractiveControl(
     folderName: string,
     object: unknown,
     propertyKey: string,
@@ -123,32 +122,33 @@ export class DebugUIManager {
     if (!this.debugPane) return;
 
     // Create a unique key for this control to avoid duplicates
-    const controlKey = `${folderName}_${propertyKey}_interactive`;
+    // Use label to ensure uniqueness when multiple controls have the same property key
+    const uniqueLabel = label || propertyKey;
+    const controlKey = `${folderName}_${propertyKey}_${uniqueLabel}_interactive`;
 
-    // Check if control already exists
-    if (this.controlRegistry.has(controlKey)) {
-      return; // Control already exists, skip adding it again
+    // Skip creating duplicate controls, but don't return
+    // This allows values to still be updated for existing controls
+    if (!this.controlRegistry.has(controlKey)) {
+      let folder = this.getOrCreateFolder(folderName);
+      if (!folder) return;
+
+      const bindingOptions: Record<string, unknown> = {
+        label: label || propertyKey,
+        readonly: false,
+      };
+
+      // Add range options if provided
+      if (options) {
+        if (options.min !== undefined) bindingOptions.min = options.min;
+        if (options.max !== undefined) bindingOptions.max = options.max;
+        if (options.step !== undefined) bindingOptions.step = options.step;
+      }
+
+      folder.addBinding(object as Record<string, unknown>, propertyKey, bindingOptions);
+
+      // Register this control to prevent duplicates
+      this.controlRegistry.add(controlKey);
     }
-
-    let folder = this.getOrCreateFolder(folderName);
-    if (!folder) return;
-
-    const bindingOptions: Record<string, unknown> = {
-      label: label || propertyKey,
-      readonly: false,
-    };
-
-    // Add range options if provided
-    if (options) {
-      if (options.min !== undefined) bindingOptions.min = options.min;
-      if (options.max !== undefined) bindingOptions.max = options.max;
-      if (options.step !== undefined) bindingOptions.step = options.step;
-    }
-
-    folder.addBinding(object as Record<string, unknown>, propertyKey, bindingOptions);
-
-    // Register this control to prevent duplicates
-    this.controlRegistry.add(controlKey);
   }
 
   /**
@@ -256,6 +256,12 @@ export class DebugUIManager {
   ): void {
     if (!this.debugPane) return;
 
+    // Create a unique key for this control to avoid duplicates
+    // Use label to ensure uniqueness when multiple controls have the same property key
+    const uniqueLabel = label || propertyKey;
+    const controlKey = `${parentFolderName}_${subFolderName}_${propertyKey}_${uniqueLabel}_subfolder`;
+
+    // Get the subfolder
     const fullKey = `${parentFolderName}_${subFolderName}`;
     const folder = this.debugFolders.get(fullKey);
     if (!folder) {
@@ -263,7 +269,13 @@ export class DebugUIManager {
       return;
     }
 
-    this.addFolderControl(folder, object, propertyKey, label, options);
+    // Skip creating duplicate controls, but don't return early
+    // This allows values to be updated for existing controls
+    if (!this.controlRegistry.has(controlKey)) {
+      this.addFolderControl(folder, object, propertyKey, label, options);
+      // Register this control to prevent duplicates
+      this.controlRegistry.add(controlKey);
+    }
   }
 
   /**
@@ -352,6 +364,20 @@ export class DebugUIManager {
 
     // Make the panel draggable
     this.makeDraggable(resizableContainer, dragHandle);
+  }
+
+  /**
+   * Clear the control registry - useful for debugging or resetting the UI
+   */
+  public clearControlRegistry(): void {
+    this.controlRegistry.clear();
+  }
+
+  /**
+   * Get the current control registry for debugging purposes
+   */
+  public getControlRegistry(): Set<string> {
+    return new Set(this.controlRegistry); // Return a copy
   }
 
   /**

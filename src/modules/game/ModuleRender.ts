@@ -221,9 +221,7 @@ export class ModuleRender extends Module {
   }
 
   public override renderInMenu(): void {
-    if (this.debugControlsAdded) return;
-
-    // Render Stats
+    // Render Stats - llamados en cada frame para mantener los valores actualizados
     this.addDebugControl(
       this.debugValues.drawCallsSolids,
       'value',
@@ -251,10 +249,11 @@ export class ModuleRender extends Module {
     );
     this.addDebugControl(this.debugValues.resolution, 'value', this.debugValues.resolution.name);
 
-    this.debugControlsAdded = true;
-
-    // Call renderInMenu for camera components
-    this.renderCameraComponentsInMenu();
+    // Solo iniciamos componentes de cámara una vez
+    if (!this.debugControlsAdded) {
+      this.debugControlsAdded = true;
+      this.renderCameraComponentsInMenu();
+    }
   }
 
   private renderCameraComponentsInMenu(): void {

@@ -124,11 +124,12 @@ export class TransformComponent extends Component {
       label: string,
       options?: { min?: number; max?: number; step?: number },
     ) => {
-      const moduleManager = Engine.getModules();
-      if (!moduleManager) return;
-
       const debugUI = Engine.getDebugUI();
-      debugUI.addControlToSubFolder(parentFolder, entityKey, object, propertyKey, label, options);
+      // Especificar explícitamente readonly: false para que los controles sean interactivos
+      debugUI.addControlToSubFolder(parentFolder, entityKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
     };
 
     // Create reactive objects for position, rotation, and scale that update the transform

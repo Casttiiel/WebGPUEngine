@@ -10,7 +10,6 @@ export class ModuleInput extends Module {
   private keys: Map<KeyCode, boolean> = new Map();
   private keysLastFrame: Map<KeyCode, boolean> = new Map();
   private mouseWheelDelta: number = 0;
-  private debugControlsAdded: boolean = false;
 
   // Valores observables para Tweakpane
   private debugValues = {
@@ -52,7 +51,6 @@ export class ModuleInput extends Module {
     window.removeEventListener('wheel', this.handleMouseWheel.bind(this));
     window.removeEventListener('keydown', this.handleKeyDown.bind(this));
     window.removeEventListener('keyup', this.handleKeyUp.bind(this));
-    this.debugControlsAdded = false;
   }
 
   private handleMouseMove(event: MouseEvent): void {
@@ -115,7 +113,7 @@ export class ModuleInput extends Module {
   }
 
   public override renderInMenu(): void {
-    if (this.debugControlsAdded) return;
+    // Llamado cada frame para mantener los valores actualizados
 
     // Mouse Buttons
     this.addDebugControl(this.debugValues.mouseLeft, 'value', this.debugValues.mouseLeft.name);
@@ -131,8 +129,6 @@ export class ModuleInput extends Module {
     this.addDebugControl(this.debugValues.mouseDeltaX, 'value', this.debugValues.mouseDeltaX.name);
     this.addDebugControl(this.debugValues.mouseDeltaY, 'value', this.debugValues.mouseDeltaY.name);
     this.addDebugControl(this.debugValues.mouseWheel, 'value', this.debugValues.mouseWheel.name);
-
-    this.debugControlsAdded = true;
   }
 
   // Utility methods for other modules

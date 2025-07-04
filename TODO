@@ -1,10 +1,8 @@
-## NPM RUN DEV
-
-1. Tweakpane
+1. Reorganize files
+2. Tweakpane
    -Quality Settings Config
    -Parameters Ambient Light
    -Parameters Bloom
-2. Reorganize files
 3. Engine quality settings SESSION STORAGE
 4. OnResize
 5. Compute-based distortion
