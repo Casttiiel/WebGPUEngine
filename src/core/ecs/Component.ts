@@ -9,7 +9,7 @@ export abstract class Component {
   public abstract update(dt: number): void;
   public abstract renderDebug(): void;
 
-  // Método base para debug UI que los componentes pueden sobreescribir
+  // Base method for debug UI that components can override
   public renderInMenu(): void {}
 
   public setOwner(owner: Entity): void {

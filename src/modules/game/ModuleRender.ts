@@ -35,6 +35,7 @@ export class ModuleRender extends Module {
     drawCallsSolids: { name: 'Draw Calls (Solids)', value: 0 },
     drawCallsTransparent: { name: 'Draw Calls (Transparent)', value: 0 },
     drawCallsDistorsions: { name: 'Draw Calls (Distorsions)', value: 0 },
+    drawCallsDecals: { name: 'Draw Calls (Decals)', value: 0 },
     totalDrawCalls: { name: 'Total Draw Calls', value: 0 },
     resolution: { name: 'Resolution', value: '0x0' },
   };
@@ -135,6 +136,7 @@ export class ModuleRender extends Module {
 
     pass.end();
   }
+
   private presentResult(result: GPUTextureView): void {
     const render = Render.getInstance();
     if (!this.presentationBindGroup) {
@@ -205,10 +207,14 @@ export class ModuleRender extends Module {
     this.debugValues.drawCallsDistorsions.value = renderManager.getDrawCallsForCategory(
       RenderCategory.DISTORSIONS,
     );
+    this.debugValues.drawCallsDecals.value = renderManager.getDrawCallsForCategory(
+      RenderCategory.DECALS,
+    );
     this.debugValues.totalDrawCalls.value =
       this.debugValues.drawCallsSolids.value +
       this.debugValues.drawCallsTransparent.value +
-      this.debugValues.drawCallsDistorsions.value;
+      this.debugValues.drawCallsDistorsions.value +
+      this.debugValues.drawCallsDecals.value;
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
 
     this.deferred.update(dt);
@@ -234,6 +240,11 @@ export class ModuleRender extends Module {
       this.debugValues.drawCallsDistorsions.name,
     );
     this.addDebugControl(
+      this.debugValues.drawCallsDecals,
+      'value',
+      this.debugValues.drawCallsDecals.name,
+    );
+    this.addDebugControl(
       this.debugValues.totalDrawCalls,
       'value',
       this.debugValues.totalDrawCalls.name,
@@ -257,33 +268,6 @@ export class ModuleRender extends Module {
         aoComponent.renderInMenu();
       }
     }
-
-    // Add bloom quality controls
-    this.renderBloomQualityControls();
-  }
-
-  private renderBloomQualityControls(): void {
-    const qualitySettings = QualitySettings.getInstance();
-    const currentSettings = qualitySettings.getSettings();
-    const bloomConfig = qualitySettings.getBloomConfig();
-
-    // Create a simple debug object for bloom quality
-    const bloomDebugObj = {
-      quality: currentSettings.bloomQuality,
-      enabled: bloomConfig.enabled,
-      maxBlurSteps: bloomConfig.maxBlurSteps,
-      blurStrength: bloomConfig.blurStrength,
-      bloomIntensity: bloomConfig.bloomIntensity,
-      bloomThreshold: bloomConfig.bloomThreshold,
-    };
-
-    // Add controls for bloom parameters (read-only for now)
-    this.addDebugControl(bloomDebugObj, 'quality', 'Bloom Quality');
-    this.addDebugControl(bloomDebugObj, 'enabled', 'Bloom Enabled');
-    this.addDebugControl(bloomDebugObj, 'maxBlurSteps', 'Bloom Blur Steps');
-    this.addDebugControl(bloomDebugObj, 'blurStrength', 'Bloom Blur Strength');
-    this.addDebugControl(bloomDebugObj, 'bloomIntensity', 'Bloom Intensity');
-    this.addDebugControl(bloomDebugObj, 'bloomThreshold', 'Bloom Threshold');
   }
 
   public renderDebug(): void {

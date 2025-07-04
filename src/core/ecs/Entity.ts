@@ -1,5 +1,6 @@
 import { NameComponent } from '../../components/core/NameComponent';
 import { Component } from './Component';
+import { Engine } from '../../core/engine/Engine';
 
 export class Entity {
   private static nextId = 0;
@@ -53,5 +54,53 @@ export class Entity {
 
   public toString(): string {
     return `Entity(${this.getName()}, id=${this.id})`;
+  }
+
+  public renderInMenu(parentFolder: string = 'entities'): void {
+    // Get Engine instance and ModuleManager
+    const moduleManager = Engine.getModules();
+    if (!moduleManager) return;
+
+    // Create a subfolder for this entity within the parent folder
+    // Use the entity's name as the display title and a unique key based on ID
+    const entityName = this.getName();
+    const entityKey = `entity_${this.id}`;
+    const folderKey = `${parentFolder}_${entityKey}`;
+
+    // Create an entity subfolder with its name (collapsed by default)
+    const entityFolder = moduleManager.addSubFolder(
+      parentFolder, // Parent folder name
+      entityKey, // Subfolder key
+      entityName, // Display title
+      false, // Start collapsed
+    );
+
+    if (!entityFolder) return;
+
+    // Now add controls for each component
+    this.components.forEach((component, componentName) => {
+      // Add component type info to the entity folder
+      moduleManager.addSubFolderControl(
+        parentFolder,
+        entityKey,
+        { type: componentName },
+        'type',
+        `Component: ${componentName}`,
+      );
+
+      // Let the component add its own controls if it implements renderInMenu
+      if (typeof component.renderInMenu === 'function') {
+        component.renderInMenu();
+      }
+    });
+
+    // Render all child entities as direct subfolders of this entity
+    if (this.children.length > 0) {
+      // For each child entity, create its own subfolder under the current entity's folder
+      for (const child of this.children) {
+        // Pass the current entity's folder key as the parent folder for the child
+        child.renderInMenu(folderKey);
+      }
+    }
   }
 }

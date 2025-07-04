@@ -9,6 +9,7 @@ import {
 import { MeshPartType } from '../../types/MeshPart.type';
 import { MeshData } from '../../types/MeshData.type';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
+import { Engine } from '../../core/engine/Engine';
 
 export class RenderComponent extends Component {
   private isVisible: boolean = true;
@@ -92,7 +93,113 @@ export class RenderComponent extends Component {
     // Implementation of update if needed
   }
 
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void {
+    // Get the owner entity
+    const entity = this.getOwner();
+    const entityId = entity.id;
+    const entityKey = `entity_${entityId}`;
+
+    // Get the parent folder from the entity hierarchy
+    let parentFolder = 'entities';
+    const parentEntity = entity.getParent();
+    if (parentEntity) {
+      const parentId = parentEntity.id;
+      const parentEntityKey = `entity_${parentId}`;
+      // If this entity has a parent, it's in a subfolder
+      parentFolder = `entities_${parentEntityKey}`;
+    }
+
+    // Create helper method to add controls to the entity's folder
+    const addControl = (
+      object: unknown,
+      propertyKey: string,
+      label: string,
+      options?: { min?: number; max?: number; step?: number },
+    ) => {
+      const moduleManager = Engine.getModules();
+      if (!moduleManager) return;
+
+      moduleManager.addSubFolderControl(
+        parentFolder,
+        entityKey,
+        object,
+        propertyKey,
+        label,
+        options,
+      );
+    };
+
+    // Show visibility toggle
+    const visibilityControl = {
+      get visible() {
+        return this._visible;
+      },
+      set visible(value) {
+        this._visible = value;
+        this.component.isVisible = value;
+        this.component.updateRenderManager();
+      },
+      _visible: this.isVisible,
+      component: this,
+    };
+
+    addControl(visibilityControl, 'visible', 'Visible');
+
+    // Show mesh and material information for each part
+    for (let i = 0; i < this.parts.length; i++) {
+      const part = this.parts[i];
+      if (!part) continue;
+
+      const partIndex = i;
+
+      // Get the part path info from the resources
+      const meshPath = part.mesh.path || `Mesh_${i}`;
+      const materialPath = part.material.path || `Material_${i}`;
+      const techniquePath = part.material.getTechnique()?.path || 'None';
+
+      // Create info objects for display with just the names (no full paths)
+      const meshInfo = {
+        name: meshPath.split('/').pop() || meshPath,
+      };
+
+      const materialInfo = {
+        name: materialPath.split('/').pop() || materialPath,
+        category: part.material.getCategory(),
+        techniqueName: techniquePath.split('/').pop() || techniquePath,
+        castsShadows: part.material.getCastsShadows(),
+        receiveShadows: part.material.getShadows(),
+      };
+
+      // Add mesh control - just the name
+      addControl(meshInfo, 'name', `Mesh ${partIndex}`);
+
+      // Add material controls - just the essential info
+      addControl(materialInfo, 'name', `Material ${partIndex}`);
+      addControl(materialInfo, 'category', `Category`);
+      addControl(materialInfo, 'techniqueName', `Technique`);
+      addControl(materialInfo, 'castsShadows', `Casts Shadows`);
+      addControl(materialInfo, 'receiveShadows', `Receives Shadows`);
+
+      // Part visibility toggle
+      const partVisibility = {
+        get visible() {
+          return this._visible;
+        },
+        set visible(value) {
+          this._visible = value;
+          if (this.part) {
+            this.part.isVisible = value;
+            this.component.updateRenderManager();
+          }
+        },
+        _visible: part.isVisible,
+        part,
+        component: this,
+      };
+
+      addControl(partVisibility, 'visible', `Mesh ${partIndex} Visible`);
+    }
+  }
 
   public renderDebug(): void {
     throw new Error('Method not implemented.');

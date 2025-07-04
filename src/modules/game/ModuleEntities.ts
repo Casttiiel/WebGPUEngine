@@ -39,6 +39,11 @@ export class ModuleEntities extends Module {
   private omToUpdate: Map<string, ObjectManager> = new Map();
   private omToRenderDebug: Map<string, ObjectManager> = new Map();
   private omGeneral: Map<string, ObjectManager> = new Map();
+  private debugControlsAdded = false;
+  // Debug values para Tweakpane
+  private debugValues = {
+    numberEntities: { name: '# Entities', value: 0 },
+  };
 
   constructor(name: string) {
     super(name);
@@ -75,9 +80,25 @@ export class ModuleEntities extends Module {
     for (const [, om] of this.omToUpdate) {
       om.updateAll(delta);
     }
+
+    this.debugValues.numberEntities.value = this.omEntities.length;
   }
 
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void {
+    if (this.debugControlsAdded) return;
+
+    this.addDebugControl(
+      this.debugValues.numberEntities,
+      'value',
+      this.debugValues.numberEntities.name,
+    );
+    for (const entity of this.omEntities) {
+      if (entity.getParent() !== null) continue; // Skip children entities
+      entity.renderInMenu();
+    }
+
+    this.debugControlsAdded = true;
+  }
 
   public renderDebug(): void {
     this.renderDebugOfComponents();
