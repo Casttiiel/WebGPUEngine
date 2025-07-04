@@ -1,13 +1,11 @@
 ## NPM RUN DEV
 
-1. Bloom Parametrization
-2. Directional Light
 3. Compute-based distortion
-4. HDR correctness
 5. OnResize
-6. Motion Blur
 7. Tweakpane instead of IMGUI
 7. Parametrization
+6. Motion Blur
+2. Directional Light
 8. Decals Category
 9. Temporal Anti-Aliasing (TAA)
 10. Engine quality settings
