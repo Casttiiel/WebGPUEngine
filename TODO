@@ -1,25 +1,20 @@
-1.
-2. Tweakpane
-   -Quality Settings Config
-   -Parameters Ambient Light
-   -Parameters Bloom
-3. Engine quality settings SESSION STORAGE
-4. OnResize
-5. Compute-based distortion
-6. SpotLightsWithShadows
-7. PointLighstWithShadows
-8. Shadow quality
-9. Ambient Occlusion GTAO
-10. Temporal Anti-Aliasing (TAA)
-11. Aliasing quality
-12. Directional Light
-13. Area Light
-14. Motion Blur
-15. Decals Category
-16. Particles
-17. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-18. Optimizacion WebGPUFundamentals
-19. **ASYNC LOADING SYSTEM** 🚀
+1. Quality Settings Set
+2. OnResize
+3. Compute-based distortion
+4. SpotLightsWithShadows
+5. PointLighstWithShadows
+6. Shadow quality
+7. Ambient Occlusion GTAO
+8. Temporal Anti-Aliasing (TAA)
+9. Aliasing quality
+10. Directional Light
+11. Area Light
+12. Motion Blur
+13. Decals Category
+14. Particles
+15. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+16. Optimizacion WebGPUFundamentals
+17. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD

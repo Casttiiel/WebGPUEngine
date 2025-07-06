@@ -234,5 +234,34 @@ export class Render {
     return this.context;
   }
 
-  public destroy(): void {}
+  public destroy(): void {
+    console.log('Cleaning up Render singleton...');
+
+    try {
+      // Clean up device resources if they exist
+      if (this.device) {
+        // Note: WebGPU device cleanup is automatic when references are released
+        this.device = null as any;
+      }
+
+      // Clear context
+      if (this.context) {
+        this.context = null as any;
+      }
+
+      // Clear adapter
+      if (this.adapter) {
+        this.adapter = null as any;
+      }
+
+      // Clear command encoder
+      if (this.currentCommandEncoder) {
+        this.currentCommandEncoder = null as any;
+      }
+
+      console.log('Render singleton cleaned up successfully.');
+    } catch (error) {
+      console.error('Error cleaning up Render singleton:', error);
+    }
+  }
 }

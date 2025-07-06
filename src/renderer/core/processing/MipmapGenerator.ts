@@ -82,7 +82,7 @@ export class MipmapGenerator {
     };
   }
 
-  generateMipmapsForCubemap(texture: GPUTexture, mipLevelCount: number): void {
+  public generateMipmapsForCubemap(texture: GPUTexture, mipLevelCount: number): void {
     if (!this.isInitialized) {
       throw new Error('MipmapGenerator not initialized');
     }
@@ -154,7 +154,7 @@ export class MipmapGenerator {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  generateMipmapsFor2D(texture: GPUTexture, mipLevelCount: number): void {
+  public generateMipmapsFor2D(texture: GPUTexture, mipLevelCount: number): void {
     if (!this.isInitialized) {
       throw new Error('MipmapGenerator not initialized');
     }
@@ -221,8 +221,15 @@ export class MipmapGenerator {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  dispose(): void {
+  public dispose(): void {
     // WebGPU resources are garbage collected automatically
-    this.isInitialized = false;
+  }
+
+  public destroy(): void {
+    // WebGPU resources are garbage collected automatically
+    this.device = null!;
+    this.baseShaderCode = null!;
+    this.pipelines = new Map();
+    this.bindGroupLayouts = new Map();
   }
 }

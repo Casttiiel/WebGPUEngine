@@ -139,6 +139,13 @@ export class ModuleEntities extends Module {
   }
 
   public stop(): void {
-    throw new Error('Method not implemented.');
+    // Clear entities array (entities will be recreated on restart)
+    this.omEntities = [];
+    this.omToUpdate = new Map();
+    this.omToRenderDebug = new Map();
+    this.omGeneral = new Map();
+    this.debugControlsAdded = false;
+
+    console.log('ModuleEntities stopped and entities cleared.');
   }
 }

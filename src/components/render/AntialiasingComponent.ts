@@ -7,6 +7,7 @@ import { Technique } from '../../renderer/resources/Technique';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
+import { Engine } from '../../core/engine/Engine';
 
 export class AntialiasingComponent extends Component {
   private technique!: Technique;
@@ -14,6 +15,14 @@ export class AntialiasingComponent extends Component {
   private bindGroup!: GPUBindGroup | null;
   private result!: RenderTarget;
   private renderPassManager!: RenderPassManager;
+
+  // FXAA parameters that can be tweaked
+  private fxaaParams = {
+    enabled: true,
+    subPixelShift: 0.25,
+    edgeThreshold: 0.063,
+    edgeThresholdMin: 0.0312,
+  };
 
   constructor() {
     super();
@@ -79,6 +88,39 @@ export class AntialiasingComponent extends Component {
 
   public update(_dt: number): void {
     throw new Error('Method not implemented.');
+  }
+
+  public override renderInMenu(): void {
+    const debugUI = Engine.getDebugUI();
+    const parentFolder = 'render';
+    const subfolderKey = 'Camera Components';
+    const componentName = 'Antialiasing';
+
+    // Add controls to the Camera Components subfolder
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Add controls for FXAA parameters
+    addControl(this.fxaaParams, 'enabled', `${componentName} Enabled`);
+    addControl(this.fxaaParams, 'subPixelShift', `${componentName} Sub-pixel Shift`, {
+      min: 0.0,
+      max: 1.0,
+      step: 0.01,
+    });
+    addControl(this.fxaaParams, 'edgeThreshold', `${componentName} Edge Threshold`, {
+      min: 0.0,
+      max: 0.5,
+      step: 0.001,
+    });
+    addControl(this.fxaaParams, 'edgeThresholdMin', `${componentName} Edge Threshold Min`, {
+      min: 0.0,
+      max: 0.1,
+      step: 0.001,
+    });
   }
 
   public debugInMenu(): void {

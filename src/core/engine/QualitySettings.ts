@@ -83,8 +83,7 @@ export class QualitySettings {
   };
 
   private constructor() {
-    // Start with medium settings
-    this.settings = { ...QualitySettings.PRESETS.ULTRA };
+    this.applyPreset('ULTRA');
   }
 
   public static getInstance(): QualitySettings {
@@ -104,6 +103,8 @@ export class QualitySettings {
   }
 
   public applyPreset(presetName: keyof typeof QualitySettings.PRESETS): void {
+    console.log(`Applied ${presetName} quality preset`);
+
     this.settings = { ...QualitySettings.PRESETS[presetName] };
     this.onSettingsChanged();
   }

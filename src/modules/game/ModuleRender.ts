@@ -1,6 +1,7 @@
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { Engine } from '../../core/engine/Engine';
+import { Entity } from '../../core/ecs/Entity';
 import { Camera } from '../../core/math/Camera';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -18,7 +19,6 @@ import { Render } from '../../renderer/core/pipeline/Render';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
-  private debugControlsAdded: boolean = false;
   private lastBloomQualitySetting: string = ''; // Track bloom quality changes
 
   // Buffer global para datos de cámara
@@ -192,7 +192,29 @@ export class ModuleRender extends Module {
   }
 
   public stop(): void {
-    throw new Error('Method not implemented.');
+    console.log('Stopping ModuleRender...');
+
+    try {
+      // Clean up deferred renderer first
+      if (this.deferred) {
+        this.deferred.cleanup();
+        this.deferred = null as any;
+      }
+
+      // Clean up render resources
+      if (this.globalUniformBuffer) {
+        this.globalUniformBuffer.destroy();
+        this.globalUniformBuffer = null as any;
+      }
+
+      // Reset bind groups (they will be recreated when engine restarts)
+      this.globalBindGroup = null as any;
+      this.presentationBindGroup = null;
+
+      console.log('ModuleRender stopped and resources cleaned up.');
+    } catch (error) {
+      console.error('Error stopping ModuleRender:', error);
+    }
   }
 
   public update(dt: number): void {
@@ -249,22 +271,51 @@ export class ModuleRender extends Module {
     );
     this.addDebugControl(this.debugValues.resolution, 'value', this.debugValues.resolution.name);
 
-    // Solo iniciamos componentes de cámara una vez
-    if (!this.debugControlsAdded) {
-      this.debugControlsAdded = true;
-      this.renderCameraComponentsInMenu();
+    // Get main camera same way as in generateFrame()
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    if (mainCamera) {
+      this.renderCameraComponentsInMenu(mainCamera);
     }
   }
 
-  private renderCameraComponentsInMenu(): void {
-    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    if (!mainCamera) return;
+  private renderCameraComponentsInMenu(mainCamera: Entity): void {
+    const debugUI = Engine.getDebugUI();
 
-    // Render ImGui controls for camera components
+    // Create a subfolder for camera components within the Render module
+    const renderFolderName = this.getName(); // "render"
+    const cameraSubfolderName = 'Camera Components';
+
+    debugUI.addSubFolder(renderFolderName, cameraSubfolderName, 'Camera Components', true);
+
+    // Render each component in its own subfolder
+
     if (mainCamera.hasComponent('ambient_occlusion')) {
       const aoComponent = mainCamera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
-      if (aoComponent) {
+      if (aoComponent && typeof aoComponent.renderInMenu === 'function') {
         aoComponent.renderInMenu();
+      }
+    }
+
+    if (mainCamera.hasComponent('antialiasing')) {
+      const antialiasingComponent = mainCamera.getComponent(
+        'antialiasing',
+      ) as AntialiasingComponent;
+      if (antialiasingComponent && typeof antialiasingComponent.renderInMenu === 'function') {
+        antialiasingComponent.renderInMenu();
+      }
+    }
+
+    if (mainCamera.hasComponent('tone_mapping')) {
+      const toneMappingComponent = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
+      if (toneMappingComponent && typeof toneMappingComponent.renderInMenu === 'function') {
+        toneMappingComponent.renderInMenu();
+      }
+    }
+
+    if (mainCamera.hasComponent('bloom')) {
+      const bloomComponent = mainCamera.getComponent('bloom') as BloomComponent;
+      if (bloomComponent && typeof bloomComponent.renderInMenu === 'function') {
+        bloomComponent.renderInMenu();
       }
     }
   }

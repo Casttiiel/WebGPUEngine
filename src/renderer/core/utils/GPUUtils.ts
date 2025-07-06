@@ -1,3 +1,4 @@
+import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { Render } from '../pipeline/Render';
 
 /**
@@ -200,5 +201,10 @@ export class GPUUtils {
     data: ArrayBuffer | ArrayBufferView,
   ): void {
     this.device.queue.writeBuffer(buffer, offset, data);
+  }
+
+  public static destroy(): void {
+    this.device = null as any; // Clear the device reference
+    BindGroupFactory.clearCache();
   }
 }

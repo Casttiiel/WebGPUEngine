@@ -279,6 +279,30 @@ export class DebugUIManager {
   }
 
   /**
+   * Adds a button to a folder
+   * @param folderName The name of the folder
+   * @param label The button label
+   * @param callback The function to call when button is clicked
+   */
+  public addButton(folderName: string, label: string, callback: () => void): void {
+    if (!this.debugPane) return;
+
+    // Create a unique key for this button to avoid duplicates
+    const buttonKey = `${folderName}_button_${label}`;
+
+    // Skip creating duplicate buttons
+    if (!this.controlRegistry.has(buttonKey)) {
+      let folder = this.getOrCreateFolder(folderName);
+      if (!folder) return;
+
+      folder.addButton({ title: label }).on('click', callback);
+
+      // Register this button to prevent duplicates
+      this.controlRegistry.add(buttonKey);
+    }
+  }
+
+  /**
    * Helper to get or create a folder
    * @private
    */

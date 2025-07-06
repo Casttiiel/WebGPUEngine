@@ -16,12 +16,15 @@ export class ModuleBoot extends Module {
   }
 
   public stop(): void {
-    throw new Error('Method not implemented.');
+    // ModuleBoot doesn't need cleanup - it's just initialization
+    console.log('ModuleBoot stopped.');
   }
+
   public update(): void {
-    throw new Error('Method not implemented.');
+    // ModuleBoot doesn't need per-frame updates
   }
+
   public renderDebug(): void {
-    throw new Error('Method not implemented.');
+    // ModuleBoot doesn't have debug info to render
   }
 }

@@ -153,5 +153,14 @@ export class ModuleManager {
   public stop(): void {
     // Stop all modules
     this.stopModules(this.allModules);
+
+    this.allModules = [];
+    this.systemModules = [];
+    this.updateModules = [];
+    this.renderDebugModules = [];
+    this.startGamestate = '';
+    this.currentGamestate = null;
+    this.gamestates = [];
+    this.requestedGamestate = null;
   }
 }

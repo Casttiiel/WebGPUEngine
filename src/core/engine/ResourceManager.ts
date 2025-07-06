@@ -76,4 +76,8 @@ export class ResourceManager {
       throw error;
     }
   }
+
+  public static stop(): void {
+    this.resources = new Map();
+  }
 }

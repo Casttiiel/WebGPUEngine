@@ -5,11 +5,15 @@ import { ModuleEntities } from '../../modules/game/ModuleEntities';
 import { ModuleInput } from '../../modules/game/ModuleInput';
 import { ModuleRender } from '../../modules/game/ModuleRender';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { DebugUIManager } from '../debug/DebugUIManager';
+import { QualitySettings } from './QualitySettings';
+import { ResourceManager } from './ResourceManager';
 
 export class Engine {
   private static initialized: boolean = false;
   private static debugControlsInitialized: boolean = false;
+  private static isRestarting: boolean = false;
 
   private static _modules: ModuleManager;
   private static _render: ModuleRender;
@@ -58,8 +62,7 @@ export class Engine {
   }
 
   public static update(dt: number): void {
-    if (!this.initialized) {
-      console.error('Engine is not started yet.');
+    if (!this.initialized || this.isRestarting) {
       return;
     }
     this._modules.update(dt * this._timeScale);
@@ -68,8 +71,7 @@ export class Engine {
   }
 
   public static async render(): Promise<void> {
-    if (!this.initialized) {
-      console.error('Engine is not started yet.');
+    if (!this.initialized || this.isRestarting) {
       return;
     }
     await this._render.generateFrame();
@@ -98,6 +100,10 @@ export class Engine {
     return this._debugUI;
   }
 
+  public static isEngineRestarting(): boolean {
+    return this.isRestarting;
+  }
+
   public static renderInMenu(): void {
     // Solo inicializamos los controles una vez para evitar duplicados
     if (!this.debugControlsInitialized) {
@@ -116,6 +122,27 @@ export class Engine {
         min: 0.1,
         max: 10.0,
         step: 0.1,
+      });
+
+      // Quality Settings Buttons
+      this._debugUI.addButton('Engine', 'Minimum Quality', async () => {
+        await this.applyQualityPresetAndRestart('MINIMUM');
+      });
+
+      this._debugUI.addButton('Engine', 'Low Quality', async () => {
+        await this.applyQualityPresetAndRestart('LOW');
+      });
+
+      this._debugUI.addButton('Engine', 'Medium Quality', async () => {
+        await this.applyQualityPresetAndRestart('MEDIUM');
+      });
+
+      this._debugUI.addButton('Engine', 'High Quality', async () => {
+        await this.applyQualityPresetAndRestart('HIGH');
+      });
+
+      this._debugUI.addButton('Engine', 'Ultra Quality', async () => {
+        await this.applyQualityPresetAndRestart('ULTRA');
       });
 
       this.debugControlsInitialized = true;
@@ -137,15 +164,94 @@ export class Engine {
       this._modules.stop();
     }
 
+    ResourceManager.stop();
+
+    // Clean up render singleton
+    try {
+      Render.getInstance().destroy();
+    } catch (error) {
+      console.warn('Error cleaning up Render singleton:', error);
+    }
+
+    GPUUtils.destroy();
+
     // Clean up debug UI
     if (this._debugUI) {
       this._debugUI.dispose();
     }
 
-    // Reset state
+    // Reset state (but don't reset isRestarting flag - let restart() handle it)
     this.initialized = false;
     this.debugControlsInitialized = false;
 
     console.warn('Engine stopped.');
+  }
+
+  /**
+   * Show or hide the loading screen
+   */
+  public static toggleLoader(show: boolean): void {
+    const loader = document.getElementById('loader');
+    if (loader) {
+      if (show) {
+        loader.classList.remove('hidden');
+      } else {
+        loader.classList.add('hidden');
+      }
+    }
+  }
+
+  /**
+   * Check if engine is ready (initialized and not restarting)
+   */
+  public static isReady(): boolean {
+    return this.initialized && !this.isRestarting;
+  }
+
+  /**
+   * Restart the engine - useful when quality settings change
+   */
+  public static async restart(): Promise<void> {
+    console.log('Restarting engine...');
+
+    // Show loader during restart
+    this.toggleLoader(true);
+
+    // Set restarting flag to pause update/render loops
+    this.isRestarting = true;
+
+    // Wait longer to let current frame and any async operations finish
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Stop current engine
+    this.stop();
+
+    // Wait additional time to ensure complete cleanup of WebGPU resources
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Start engine again
+    await this.start();
+
+    // Clear restarting flag to resume update/render loops
+    this.isRestarting = false;
+
+    // Don't hide loader here - main.ts will handle it when isReady() returns true
+
+    console.log('Engine restarted successfully.');
+  }
+
+  /**
+   * Apply quality preset and restart engine
+   */
+  private static async applyQualityPresetAndRestart(
+    presetName: keyof typeof QualitySettings.PRESETS,
+  ): Promise<void> {
+    const qualitySettings = QualitySettings.getInstance();
+
+    console.log(`Applying ${presetName} quality preset...`);
+    qualitySettings.applyPreset(presetName);
+
+    // Restart engine to apply changes
+    await this.restart();
   }
 }

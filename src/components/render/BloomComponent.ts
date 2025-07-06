@@ -285,6 +285,88 @@ export class BloomComponent extends BlurComponent {
     // Implement debug menu for bloom parameters
   }
 
+  public override renderInMenu(): void {
+    const debugUI = Engine.getDebugUI();
+    const parentFolder = 'render';
+    const subfolderKey = 'Camera Components';
+    const componentName = 'Bloom';
+
+    // Add controls to the Camera Components subfolder
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Add controls for bloom parameters
+    addControl(this, 'bloomIntensity', `${componentName} Intensity`, {
+      min: 0.0,
+      max: 5.0,
+      step: 0.1,
+    });
+    addControl(this, 'bloomThreshold', `${componentName} Threshold`, {
+      min: 0.0,
+      max: 5.0,
+      step: 0.1,
+    });
+    addControl(this, 'bloomKnee', `${componentName} Knee`, {
+      min: 0.0,
+      max: 1.0,
+      step: 0.05,
+    });
+    addControl(this, 'bloomRadius', `${componentName} Radius`, {
+      min: 0.5,
+      max: 5.0,
+      step: 0.1,
+    });
+
+    // Add controls for inherited blur parameters from BlurComponent using wrapper objects
+    const self = this;
+    const blurStrengthWrapper = {
+      get blurStrength() {
+        return self.getBlurStrength();
+      },
+      set blurStrength(value) {
+        self.setBlurStrength(value);
+      },
+    };
+
+    const maxBlurStepsWrapper = {
+      get maxBlurSteps() {
+        return self.getMaxBlurSteps();
+      },
+      set maxBlurSteps(value) {
+        self.setMaxBlurSteps(value);
+      },
+    };
+
+    const blendIntensityWrapper = {
+      get blendIntensity() {
+        return self.getBlendIntensity();
+      },
+      set blendIntensity(value) {
+        self.setBlendIntensity(value);
+      },
+    };
+
+    addControl(blurStrengthWrapper, 'blurStrength', `${componentName} Blur Strength`, {
+      min: 0.0,
+      max: 10.0,
+      step: 0.1,
+    });
+    addControl(maxBlurStepsWrapper, 'maxBlurSteps', `${componentName} Max Blur Steps`, {
+      min: 1,
+      max: 20,
+      step: 1,
+    });
+    addControl(blendIntensityWrapper, 'blendIntensity', `${componentName} Blend Intensity`, {
+      min: 0.0,
+      max: 2.0,
+      step: 0.05,
+    });
+  }
+
   public override renderDebug(): void {
     // Implement debug rendering if needed
   }

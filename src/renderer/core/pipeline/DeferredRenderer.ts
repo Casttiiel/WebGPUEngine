@@ -272,4 +272,13 @@ export class DeferredRenderer {
   public getGBufferBindGroup(): GPUBindGroup {
     return this.gBufferBindGroup;
   }
+
+  /**
+   * Public cleanup method for external use
+   */
+  public cleanup(): void {
+    console.log('Cleaning up DeferredRenderer...');
+    this.destroy();
+    this.isLoaded = false;
+  }
 }

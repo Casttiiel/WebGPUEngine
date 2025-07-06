@@ -7,6 +7,7 @@ import { Technique } from '../../renderer/resources/Technique';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
+import { Engine } from '../../core/engine/Engine';
 
 export class ToneMappingComponent extends Component {
   private technique!: Technique;
@@ -14,6 +15,17 @@ export class ToneMappingComponent extends Component {
   private bindGroup!: GPUBindGroup | null;
   private result!: RenderTarget;
   private renderPassManager!: RenderPassManager;
+
+  // Tone mapping parameters that can be tweaked
+  private toneMappingParams = {
+    enabled: true,
+    exposure: 1.0,
+    gamma: 2.2,
+    contrast: 1.0,
+    brightness: 0.0,
+    saturation: 1.0,
+    toneMappingOperator: 'aces', // 'aces', 'reinhard', 'filmic', 'linear'
+  };
 
   constructor() {
     super();
@@ -76,6 +88,49 @@ export class ToneMappingComponent extends Component {
   }
   public update(_dt: number): void {
     throw new Error('Method not implemented.');
+  }
+
+  public override renderInMenu(): void {
+    const debugUI = Engine.getDebugUI();
+    const parentFolder = 'render';
+    const subfolderKey = 'Camera Components';
+    const componentName = 'Tone Mapping';
+
+    // Add controls to the Camera Components subfolder
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Add controls for tone mapping parameters
+    addControl(this.toneMappingParams, 'enabled', `${componentName} Enabled`);
+    addControl(this.toneMappingParams, 'exposure', `${componentName} Exposure`, {
+      min: 0.1,
+      max: 10.0,
+      step: 0.1,
+    });
+    addControl(this.toneMappingParams, 'gamma', `${componentName} Gamma`, {
+      min: 1.0,
+      max: 3.0,
+      step: 0.1,
+    });
+    addControl(this.toneMappingParams, 'contrast', `${componentName} Contrast`, {
+      min: 0.5,
+      max: 2.0,
+      step: 0.05,
+    });
+    addControl(this.toneMappingParams, 'brightness', `${componentName} Brightness`, {
+      min: -1.0,
+      max: 1.0,
+      step: 0.05,
+    });
+    addControl(this.toneMappingParams, 'saturation', `${componentName} Saturation`, {
+      min: 0.0,
+      max: 2.0,
+      step: 0.05,
+    });
   }
 
   public debugInMenu(): void {
