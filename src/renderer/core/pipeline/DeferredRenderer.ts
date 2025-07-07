@@ -39,7 +39,7 @@ export class DeferredRenderer {
 
   public create(width: number, height: number) {
     if (!this.isLoaded) return;
-    this.destroy();
+    this.dispose();
 
     this.gBufferLayout = BindGroupFactory.getGBufferLayout();
 
@@ -238,9 +238,7 @@ export class DeferredRenderer {
 
   public update(_dt: number): void {}
 
-  public destroy(): void {
-    console.log('Cleaning up DeferredRenderer...');
-
+  private dispose(): void {
     if (this.gBufferPass) {
       this.gBufferPass.dispose();
     }
@@ -267,7 +265,11 @@ export class DeferredRenderer {
 
     this.gBufferBindGroup = null as any;
     this.gBufferLayout = null as any;
+  }
 
+  public destroy(): void {
+    console.log('Cleaning up DeferredRenderer...');
+    this.dispose();
     this.isLoaded = false;
   }
 

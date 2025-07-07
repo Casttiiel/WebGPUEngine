@@ -165,9 +165,9 @@ export class GBufferPass {
     };
   }
 
-  public async resize(): Promise<void> {
+  public resize(): void {
     this.dispose();
-    await this.createRenderTargets();
+    this.createRenderTargets();
   }
 
   public dispose(): void {

@@ -1,4 +1,6 @@
+import { AmbientOcclusionComponent } from '../../../components/render/AmbientOcclusionComponent';
 import { AntialiasingComponent } from '../../../components/render/AntialiasingComponent';
+import { BloomComponent } from '../../../components/render/BloomComponent';
 import { CameraComponent } from '../../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../../components/render/ToneMappingComponent';
 import { Engine } from '../../../core/engine/Engine';
@@ -107,9 +109,9 @@ export class Render {
     Render.renderWidth = Math.floor(Render.canvasWidth * renderRes);
     Render.renderHeight = Math.floor(Render.canvasHeight * renderRes);
 
-    console.warn(
+    /*console.warn(
       `Render resolution updated: ${Render.renderWidth}x${Render.renderHeight} (${(renderRes * 100).toFixed(0)}% of ${Render.canvasWidth}x${Render.canvasHeight})`,
-    );
+    );*/
   }
 
   // Ajustar el tamaño del buffer de render
@@ -185,6 +187,15 @@ export class Render {
       for (const comp of Engine.getEntities().getObjectManagerByName('antialiasing')?.getList() ??
         []) {
         (comp as AntialiasingComponent).resize();
+      }
+      for (const comp of Engine.getEntities()
+        .getObjectManagerByName('ambient_occlusion')
+        ?.getList() ?? []) {
+        (comp as AmbientOcclusionComponent).resize();
+      }
+
+      for (const comp of Engine.getEntities().getObjectManagerByName('bloom')?.getList() ?? []) {
+        (comp as BloomComponent).resize();
       }
 
       Engine.getRender().onResolutionUpdated();
