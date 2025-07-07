@@ -18,6 +18,7 @@ export interface GraphicsQualitySettings {
 export class QualitySettings {
   private static instance: QualitySettings | null = null;
   private settings: GraphicsQualitySettings;
+  private currentPreset: keyof typeof QualitySettings.PRESETS = 'ULTRA';
 
   // Predefined quality presets
   public static readonly PRESETS = {
@@ -97,14 +98,36 @@ export class QualitySettings {
     return { ...this.settings };
   }
 
+  public getCurrentQualityName(): string {
+    // If using a custom configuration, try to match against presets
+    if (this.currentPreset === ('CUSTOM' as any)) {
+      // Try to find if current settings match any preset
+      for (const [presetName, presetSettings] of Object.entries(QualitySettings.PRESETS)) {
+        const matches = Object.keys(presetSettings).every((key) => {
+          return (this.settings as any)[key] === (presetSettings as any)[key];
+        });
+        if (matches) {
+          this.currentPreset = presetName as keyof typeof QualitySettings.PRESETS;
+          return presetName;
+        }
+      }
+      return 'CUSTOM';
+    }
+
+    return this.currentPreset;
+  }
+
   public updateSettings(newSettings: Partial<GraphicsQualitySettings>): void {
     this.settings = { ...this.settings, ...newSettings };
+    // Mark as custom when individual settings are changed
+    this.currentPreset = 'CUSTOM' as any;
     this.onSettingsChanged();
   }
 
   public applyPreset(presetName: keyof typeof QualitySettings.PRESETS): void {
     console.log(`Applied ${presetName} quality preset`);
 
+    this.currentPreset = presetName;
     this.settings = { ...QualitySettings.PRESETS[presetName] };
     this.onSettingsChanged();
   }

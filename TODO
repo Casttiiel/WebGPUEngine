@@ -1,20 +1,19 @@
-1. Quality Settings Set
-2. OnResize
-3. Compute-based distortion
-4. SpotLightsWithShadows
-5. PointLighstWithShadows
-6. Shadow quality
-7. Ambient Occlusion GTAO
-8. Temporal Anti-Aliasing (TAA)
-9. Aliasing quality
-10. Directional Light
-11. Area Light
-12. Motion Blur
-13. Decals Category
-14. Particles
-15. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-16. Optimizacion WebGPUFundamentals
-17. **ASYNC LOADING SYSTEM** 🚀
+1. OnResize
+2. Compute-based distortion
+3. SpotLightsWithShadows
+4. PointLighstWithShadows
+5. Shadow quality
+6. Ambient Occlusion GTAO
+7. Temporal Anti-Aliasing (TAA)
+8. Aliasing quality
+9. Directional Light
+10. Area Light
+11. Motion Blur
+12. Decals Category
+13. Particles
+14. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+15. Optimizacion WebGPUFundamentals
+16. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD

@@ -1,3 +1,5 @@
+import { QualitySettings } from './QualitySettings';
+
 export class Time {
   private static lastTimeFPSUpdate: number = 0;
 
@@ -7,7 +9,11 @@ export class Time {
       Time.lastTimeFPSUpdate = 0;
       const fpsDisplay = document.getElementById('fps-display');
       if (fpsDisplay) {
-        fpsDisplay.innerText = `FPS: ${(1 / deltaTime).toFixed(1)}. CPU: ${deltaTime.toFixed(2)}ms`;
+        // Get current quality setting
+        const qualitySettings = QualitySettings.getInstance();
+        const currentQuality = qualitySettings.getCurrentQualityName();
+
+        fpsDisplay.innerText = `FPS: ${(1 / deltaTime).toFixed(1)} | CPU: ${deltaTime.toFixed(2)}ms | Quality: ${currentQuality}`;
       }
     }
   }
