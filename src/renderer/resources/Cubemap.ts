@@ -139,10 +139,9 @@ export class Cubemap extends GPUResource {
 
       // Generate mipmaps for the cubemap if more than 1 mip level
       if (mipLevelCount > 1) {
-        const mipmapGenerator = new MipmapGenerator();
+        const mipmapGenerator = MipmapGenerator.getInstance();
         await mipmapGenerator.initialize();
-        mipmapGenerator.generateMipmapsForCubemap(this.gpuTexture, mipLevelCount);
-        mipmapGenerator.dispose();
+        await mipmapGenerator.generateMipmapsForCubemap(this.gpuTexture, mipLevelCount);
       }
 
       // Crear la vista de la textura

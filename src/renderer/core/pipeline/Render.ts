@@ -3,6 +3,9 @@ import { CameraComponent } from '../../../components/render/CameraComponent';
 import { ToneMappingComponent } from '../../../components/render/ToneMappingComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
+import { Texture } from '../../resources/Texture';
+import { BindGroupFactory } from '../factories/BindGroupFactory';
+import { MipmapGenerator } from '../processing/MipmapGenerator';
 import { GPUUtils } from '../utils/GPUUtils';
 
 export class Render {
@@ -65,6 +68,7 @@ export class Render {
 
       // 2. Crear el dispositivo lógico con las características requeridas
       this.device = await this.adapter.requestDevice({
+        label: `${Date.now()}`,
         requiredFeatures: ['texture-compression-bc', 'depth32float-stencil8'],
         requiredLimits: {
           maxStorageBufferBindingSize: 1024 * 1024 * 1024, // 1GB de buffer máximo
@@ -210,10 +214,6 @@ export class Render {
     return { width: Render.renderWidth, height: Render.renderHeight };
   }
 
-  public static updateQualitySettings(): void {
-    Render.updateRenderDimensions();
-  }
-
   public getDevice(): GPUDevice {
     return this.device;
   }
@@ -258,6 +258,13 @@ export class Render {
       if (this.currentCommandEncoder) {
         this.currentCommandEncoder = null as any;
       }
+
+      BindGroupFactory.clearCache();
+      MipmapGenerator.destroyInstance();
+      Texture.cleanup();
+      GPUUtils.destroy();
+
+      Render.instance = null as any; // Clear singleton instance
 
       console.log('Render singleton cleaned up successfully.');
     } catch (error) {

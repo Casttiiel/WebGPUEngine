@@ -197,7 +197,7 @@ export class ModuleRender extends Module {
     try {
       // Clean up deferred renderer first
       if (this.deferred) {
-        this.deferred.cleanup();
+        this.deferred.destroy();
         this.deferred = null as any;
       }
 
@@ -210,6 +210,8 @@ export class ModuleRender extends Module {
       // Reset bind groups (they will be recreated when engine restarts)
       this.globalBindGroup = null as any;
       this.presentationBindGroup = null;
+
+      RenderManager.getInstance().destroy();
 
       console.log('ModuleRender stopped and resources cleaned up.');
     } catch (error) {

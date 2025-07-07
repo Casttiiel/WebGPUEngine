@@ -35,13 +35,13 @@ export class DeferredRenderer {
   private unitSphere!: Mesh;
   private unitFrustum!: Mesh;
 
-  constructor() {
-    this.gBufferLayout = BindGroupFactory.getGBufferLayout();
-  }
+  constructor() {}
 
   public create(width: number, height: number) {
     if (!this.isLoaded) return;
     this.destroy();
+
+    this.gBufferLayout = BindGroupFactory.getGBufferLayout();
 
     // Create G-Buffer pass with specified dimensions by resizing
     this.gBufferPass.resize();
@@ -238,7 +238,9 @@ export class DeferredRenderer {
 
   public update(_dt: number): void {}
 
-  private destroy(): void {
+  public destroy(): void {
+    console.log('Cleaning up DeferredRenderer...');
+
     if (this.gBufferPass) {
       this.gBufferPass.dispose();
     }
@@ -262,6 +264,11 @@ export class DeferredRenderer {
     if (this.depthResolver) {
       this.depthResolver.destroy();
     }
+
+    this.gBufferBindGroup = null as any;
+    this.gBufferLayout = null as any;
+
+    this.isLoaded = false;
   }
 
   public getDepthStencilView(): GPUTextureView | null {
@@ -271,14 +278,5 @@ export class DeferredRenderer {
 
   public getGBufferBindGroup(): GPUBindGroup {
     return this.gBufferBindGroup;
-  }
-
-  /**
-   * Public cleanup method for external use
-   */
-  public cleanup(): void {
-    console.log('Cleaning up DeferredRenderer...');
-    this.destroy();
-    this.isLoaded = false;
   }
 }

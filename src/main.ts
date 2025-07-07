@@ -34,7 +34,6 @@ try {
   requestAnimationFrame(frame);
 } catch (error) {
   console.error('Error starting engine:', error);
-  // Si hay un error, también ocultamos el loader y mostramos un mensaje
   const loader = document.getElementById('loader');
   if (loader) {
     loader.classList.add('hidden');

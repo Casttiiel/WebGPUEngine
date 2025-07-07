@@ -54,13 +54,11 @@ export class RenderManagerV2 {
   ): void {
     this.keyManager.addKey(owner, mesh, material, transform);
   }
+
   public delKeys(owner: RenderComponent): void {
     this.keyManager.removeKeys(owner);
   }
 
-  /**
-   * Performs pre-render culling using GPU frustum culling
-   */
   public async performPreRenderCulling(): Promise<void> {
     if (!this.camera) return;
 
@@ -79,9 +77,6 @@ export class RenderManagerV2 {
     this.culledKeys = keysToDraw;
   }
 
-  /**
-   * Renders objects of a specific category
-   */
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
     if (!this.camera) return;
 
@@ -99,23 +94,14 @@ export class RenderManagerV2 {
     this.drawCallsPerCategory.set(category, drawCalls);
   }
 
-  /**
-   * Gets the number of draw calls for a category
-   */
   public getDrawCallsForCategory(category: RenderCategory): number {
     return this.drawCallsPerCategory.get(category) || 0;
   }
 
-  /**
-   * Gets all render keys (for debugging)
-   */
   public getAllKeys(): RenderKey[] {
     return this.keyManager.getAllKeys();
   }
 
-  /**
-   * Gets culled keys (for debugging)
-   */
   public getCulledKeys(): RenderKey[] {
     return this.culledKeys;
   }
@@ -204,5 +190,21 @@ export class RenderManagerV2 {
   private getGlobalBindGroup(): GPUBindGroup {
     // This should be obtained from the render module or engine
     return Engine.getRender().getGlobalBindGroup();
+  }
+
+  public destroy(): void {
+    if (this.frustumCuller) {
+      this.frustumCuller.dispose();
+      this.frustumCuller = null;
+    }
+
+    this.keyManager.clear();
+    this.stateManager.clear();
+
+    this.camera = null;
+    this.culledKeys = [];
+    this.drawCallsPerCategory.clear();
+
+    RenderManagerV2.instance = null;
   }
 }

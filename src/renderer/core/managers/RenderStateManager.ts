@@ -115,4 +115,11 @@ export class RenderStateManager {
   public getCurrentMaterialBindings(): string | null {
     return this.currentMaterialBindings;
   }
+
+  public clear(): void {
+    this.currentPipeline = null;
+    this.currentMeshBuffers = null;
+    this.currentMaterialBindings = null;
+    this.currentBindGroups = new Map();
+  }
 }

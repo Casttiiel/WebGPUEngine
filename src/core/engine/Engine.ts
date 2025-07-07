@@ -5,7 +5,6 @@ import { ModuleEntities } from '../../modules/game/ModuleEntities';
 import { ModuleInput } from '../../modules/game/ModuleInput';
 import { ModuleRender } from '../../modules/game/ModuleRender';
 import { Render } from '../../renderer/core/pipeline/Render';
-import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { DebugUIManager } from '../debug/DebugUIManager';
 import { QualitySettings } from './QualitySettings';
 import { ResourceManager } from './ResourceManager';
@@ -37,8 +36,7 @@ export class Engine {
       console.warn('Engine is already started.');
       return;
     }
-    this.initialized = true;
-    this.debugControlsInitialized = false; // Reset debug controls flag
+    this.debugControlsInitialized = false;
     console.warn('Engine started.');
     const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
     await Render.getInstance().initialize(canvas);
@@ -59,6 +57,7 @@ export class Engine {
     this._modules.registerSystemModule(new ModuleBoot('boot'));
 
     await this._modules.start();
+    this.initialized = true;
   }
 
   public static update(dt: number): void {
@@ -75,33 +74,6 @@ export class Engine {
       return;
     }
     await this._render.generateFrame();
-  }
-
-  public static getModules(): ModuleManager {
-    return this._modules;
-  }
-
-  public static getEntities(): ModuleEntities {
-    return this._entities;
-  }
-
-  public static getInput(): ModuleInput {
-    return this._input;
-  }
-
-  public static getRender(): ModuleRender {
-    return this._render;
-  }
-
-  /**
-   * Get the debug UI manager
-   */
-  public static getDebugUI(): DebugUIManager {
-    return this._debugUI;
-  }
-
-  public static isEngineRestarting(): boolean {
-    return this.isRestarting;
   }
 
   public static renderInMenu(): void {
@@ -151,66 +123,23 @@ export class Engine {
     this._modules.renderInMenu();
   }
 
-  /**
-   * Stop and clean up engine resources
-   */
   public static stop(): void {
     if (!this.initialized) {
       return;
     }
 
     // Clean up modules
-    if (this._modules) {
-      this._modules.stop();
-    }
-
+    this._modules.stop();
+    this._debugUI.dispose();
+    Render.getInstance().destroy();
     ResourceManager.stop();
 
-    // Clean up render singleton
-    try {
-      Render.getInstance().destroy();
-    } catch (error) {
-      console.warn('Error cleaning up Render singleton:', error);
-    }
-
-    GPUUtils.destroy();
-
-    // Clean up debug UI
-    if (this._debugUI) {
-      this._debugUI.dispose();
-    }
-
-    // Reset state (but don't reset isRestarting flag - let restart() handle it)
     this.initialized = false;
     this.debugControlsInitialized = false;
 
     console.warn('Engine stopped.');
   }
 
-  /**
-   * Show or hide the loading screen
-   */
-  public static toggleLoader(show: boolean): void {
-    const loader = document.getElementById('loader');
-    if (loader) {
-      if (show) {
-        loader.classList.remove('hidden');
-      } else {
-        loader.classList.add('hidden');
-      }
-    }
-  }
-
-  /**
-   * Check if engine is ready (initialized and not restarting)
-   */
-  public static isReady(): boolean {
-    return this.initialized && !this.isRestarting;
-  }
-
-  /**
-   * Restart the engine - useful when quality settings change
-   */
   public static async restart(): Promise<void> {
     console.log('Restarting engine...');
 
@@ -240,9 +169,6 @@ export class Engine {
     console.log('Engine restarted successfully.');
   }
 
-  /**
-   * Apply quality preset and restart engine
-   */
   private static async applyQualityPresetAndRestart(
     presetName: keyof typeof QualitySettings.PRESETS,
   ): Promise<void> {
@@ -253,5 +179,44 @@ export class Engine {
 
     // Restart engine to apply changes
     await this.restart();
+  }
+
+  public static toggleLoader(show: boolean): void {
+    const loader = document.getElementById('loader');
+    if (loader) {
+      if (show) {
+        loader.classList.remove('hidden');
+      } else {
+        loader.classList.add('hidden');
+      }
+    }
+  }
+
+  public static isReady(): boolean {
+    return this.initialized && !this.isRestarting;
+  }
+
+  public static getModules(): ModuleManager {
+    return this._modules;
+  }
+
+  public static getEntities(): ModuleEntities {
+    return this._entities;
+  }
+
+  public static getInput(): ModuleInput {
+    return this._input;
+  }
+
+  public static getRender(): ModuleRender {
+    return this._render;
+  }
+
+  public static getDebugUI(): DebugUIManager {
+    return this._debugUI;
+  }
+
+  public static isEngineRestarting(): boolean {
+    return this.isRestarting;
   }
 }

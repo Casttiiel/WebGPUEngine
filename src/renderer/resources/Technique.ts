@@ -64,6 +64,7 @@ export class Technique extends GPUResource {
     this.vsEntryPoint = options.vsEntryPoint || 'vs';
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
   }
+
   public static async get(
     pathOrData: string | Partial<TechniqueCreateOptions>,
   ): Promise<Technique> {

@@ -1,21 +1,23 @@
 import { vec3 } from 'gl-matrix';
-import { NameComponent } from '../../components/core/NameComponent';
-import { TransformComponent } from '../../components/core/TransformComponent';
-import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
-import { CameraComponent } from '../../components/render/CameraComponent';
-import { RenderComponent } from '../../components/render/RenderComponent';
-import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
-import { SceneDataType, EntityDataType } from '../../types/SceneData.type';
-import { TransformComponentDataType } from '../../types/TransformComponentData.type';
 import { Component } from '../ecs/Component';
 import { Entity } from '../ecs/Entity';
 import { Engine } from '../engine/Engine';
 import { ResourceManager } from '../engine/ResourceManager';
 import { GLTFLoader } from './GLTFLoader';
+
+import { SceneDataType, EntityDataType } from '../../types/SceneData.type';
+import { TransformComponentDataType } from '../../types/TransformComponentData.type';
+
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
+import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { NameComponent } from '../../components/core/NameComponent';
+import { TransformComponent } from '../../components/core/TransformComponent';
+import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
+import { CameraComponent } from '../../components/render/CameraComponent';
+import { RenderComponent } from '../../components/render/RenderComponent';
 
 type Operation = 'add' | 'multiply';
 

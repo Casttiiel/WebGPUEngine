@@ -30,7 +30,7 @@ export class Texture extends GPUResource {
   private addressModeU: GPUAddressMode;
   private addressModeV: GPUAddressMode;
   private maxAnisotropy: number;
-  private static mipmapGenerator: MipmapGenerator;
+  private static mipmapGenerator: MipmapGenerator | null = null;
 
   constructor(options: TextureOptions) {
     super({
@@ -92,7 +92,9 @@ export class Texture extends GPUResource {
     const imageBitmap = await createImageBitmap(img);
     const mipLevelCount = this.genMipmaps
       ? Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1
-      : 1; // Create GPU texture
+      : 1;
+
+    // Create GPU texture
     this.texture = GPUUtils.createTextureWithMipmaps(
       `${this.label}_texture`,
       imageBitmap.width,
@@ -113,7 +115,7 @@ export class Texture extends GPUResource {
 
     // Generate mipmaps if needed
     if (this.genMipmaps) {
-      await this.generateMipmapLevels();
+      await this.generateMipmaps();
     }
 
     // Create view and sampler
@@ -145,24 +147,37 @@ export class Texture extends GPUResource {
     return this.sampler;
   }
 
-  private async generateMipmapLevels(): Promise<void> {
-    // Initialize mipmap generator if needed
+  public async generateMipmaps(): Promise<void> {
     await Texture.initMipmapGenerator();
 
     if (!this.texture) {
       throw new Error('Texture is not initialized.');
     }
 
+    if (!Texture.mipmapGenerator) {
+      throw new Error('MipmapGenerator is not initialized.');
+    }
+
     const mipLevelCount = this.texture.mipLevelCount ?? 1;
 
     // Use the dynamic MipmapGenerator for 2D textures
-    Texture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount);
+    await Texture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount);
   }
 
   private static async initMipmapGenerator() {
     if (this.mipmapGenerator) return;
 
-    this.mipmapGenerator = new MipmapGenerator();
+    this.mipmapGenerator = MipmapGenerator.getInstance();
     await this.mipmapGenerator.initialize();
+  }
+
+  /**
+   * Clean up static resources
+   */
+  public static cleanup(): void {
+    if (this.mipmapGenerator) {
+      MipmapGenerator.destroyInstance();
+      this.mipmapGenerator = null;
+    }
   }
 }

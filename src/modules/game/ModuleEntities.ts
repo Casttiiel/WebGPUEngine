@@ -40,7 +40,7 @@ export class ModuleEntities extends Module {
   private omToRenderDebug: Map<string, ObjectManager> = new Map();
   private omGeneral: Map<string, ObjectManager> = new Map();
   private debugControlsAdded = false;
-  // Debug values para Tweakpane
+
   private debugValues = {
     numberEntities: { name: '# Entities', value: 0 },
   };

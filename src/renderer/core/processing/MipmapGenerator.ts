@@ -3,11 +3,31 @@ import { ComputePipelineConfig, PipelineFactory } from '../factories/PipelineFac
 import { GPUUtils } from '../utils/GPUUtils';
 
 export class MipmapGenerator {
+  private static instance: MipmapGenerator | null = null;
+
   private device!: GPUDevice;
   private baseShaderCode!: string;
   private pipelines: Map<GPUTextureFormat, GPUComputePipeline> = new Map();
   private bindGroupLayouts: Map<GPUTextureFormat, GPUBindGroupLayout> = new Map();
   private isInitialized = false;
+
+  private constructor() {
+    // Private constructor for singleton pattern
+  }
+
+  public static getInstance(): MipmapGenerator {
+    if (!MipmapGenerator.instance) {
+      MipmapGenerator.instance = new MipmapGenerator();
+    }
+    return MipmapGenerator.instance;
+  }
+
+  public static destroyInstance(): void {
+    if (MipmapGenerator.instance) {
+      MipmapGenerator.instance.destroy();
+      MipmapGenerator.instance = null;
+    }
+  }
 
   async initialize(): Promise<void> {
     this.device = GPUUtils.getDevice();
@@ -82,7 +102,13 @@ export class MipmapGenerator {
     };
   }
 
-  public generateMipmapsForCubemap(texture: GPUTexture, mipLevelCount: number): void {
+  public async generateMipmapsForCubemap(
+    texture: GPUTexture,
+    mipLevelCount: number,
+  ): Promise<void> {
+    // Ensure we have a valid device before proceeding
+    await this.ensureValidDevice();
+
     if (!this.isInitialized) {
       throw new Error('MipmapGenerator not initialized');
     }
@@ -154,7 +180,10 @@ export class MipmapGenerator {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  public generateMipmapsFor2D(texture: GPUTexture, mipLevelCount: number): void {
+  public async generateMipmapsFor2D(texture: GPUTexture, mipLevelCount: number): Promise<void> {
+    // Ensure we have a valid device before proceeding
+    await this.ensureValidDevice();
+
     if (!this.isInitialized) {
       throw new Error('MipmapGenerator not initialized');
     }
@@ -222,14 +251,36 @@ export class MipmapGenerator {
   }
 
   public dispose(): void {
-    // WebGPU resources are garbage collected automatically
+    this.destroy();
   }
 
   public destroy(): void {
-    // WebGPU resources are garbage collected automatically
+    console.log('Destroying MipmapGenerator...');
+
+    // Clear all cached pipelines and bind group layouts
+    this.pipelines.clear();
+    this.bindGroupLayouts.clear();
+
+    // Clear device reference
     this.device = null!;
     this.baseShaderCode = null!;
-    this.pipelines = new Map();
-    this.bindGroupLayouts = new Map();
+
+    // Mark as not initialized to force re-initialization
+    this.isInitialized = false;
+
+    console.log('MipmapGenerator destroyed.');
+  }
+
+  /**
+   * Check if the current device is still valid and re-initialize if needed
+   */
+  private async ensureValidDevice(): Promise<void> {
+    const currentDevice = GPUUtils.getDevice();
+
+    // If device has changed or we're not initialized, re-initialize
+    if (!this.isInitialized || this.device !== currentDevice) {
+      console.log('MipmapGenerator device invalid, re-initializing...');
+      await this.initialize();
+    }
   }
 }

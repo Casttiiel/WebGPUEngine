@@ -31,6 +31,7 @@ export class ToneMappingComponent extends Component {
     super();
     this.renderPassManager = new RenderPassManager();
   }
+
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('tone_mapping.tech');

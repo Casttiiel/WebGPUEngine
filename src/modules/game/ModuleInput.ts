@@ -41,7 +41,7 @@ export class ModuleInput extends Module {
     return true;
   }
 
-  public stop(): void {
+  public override stop(): void {
     const canvas = Render.getInstance().getCanvas();
     canvas.removeEventListener('contextmenu', this.handleContextMenu);
 

@@ -39,7 +39,7 @@ export class GPUFrustumCuller {
   // Current capacity
   private maxObjects = 1000;
 
-  constructor() { }
+  constructor() {}
 
   public async load(): Promise<void> {
     this.device = GPUUtils.getDevice();
@@ -101,7 +101,8 @@ export class GPUFrustumCuller {
     });
   }
 
-  private async createComputePipeline(): Promise<void> {    // Create bind group layout
+  private async createComputePipeline(): Promise<void> {
+    // Create bind group layout
     this.bindGroupLayout = BindGroupFactory.getLayout('frustum_culling', [
       {
         binding: 0,
@@ -127,10 +128,9 @@ export class GPUFrustumCuller {
     // Create compute pipeline
     const computeConfig: ComputePipelineConfig = {
       label: 'Frustum Culling Compute Pipeline',
-      layout: PipelineFactory.createPipelineLayout(
-        'frustum_culling_pipeline_layout',
-        [this.bindGroupLayout],
-      ),
+      layout: PipelineFactory.createPipelineLayout('frustum_culling_pipeline_layout', [
+        this.bindGroupLayout,
+      ]),
       compute: {
         module: this.computeShader,
         entryPoint: 'main',
@@ -151,7 +151,7 @@ export class GPUFrustumCuller {
       const frustumPlanes = this.extractFrustumPlanes(camera);
 
       // Convert to GPU format (6 vec4s)
-      const frustumData = this.convertFrustumPlanesToGPUFormat(frustumPlanes);      // Upload frustum data
+      const frustumData = this.convertFrustumPlanesToGPUFormat(frustumPlanes); // Upload frustum data
       GPUUtils.writeBuffer(this.frustumBuffer, 0, frustumData.buffer);
 
       // Convert objects to GPU format
@@ -212,7 +212,8 @@ export class GPUFrustumCuller {
     return data;
   }
 
-  private async executeCompute(objectCount: number): Promise<CullResult> {    // Create bind group
+  private async executeCompute(objectCount: number): Promise<CullResult> {
+    // Create bind group
     const bindGroup = BindGroupFactory.createBindGroup(
       'Frustum Culling Bind Group',
       this.bindGroupLayout,
@@ -221,7 +222,7 @@ export class GPUFrustumCuller {
         { binding: 1, resource: { buffer: this.objectsBuffer } },
         { binding: 2, resource: { buffer: this.visibilityBuffer } },
         { binding: 3, resource: { buffer: this.visibleCountBuffer } },
-      ]
+      ],
     );
 
     // Create command encoder
@@ -359,11 +360,15 @@ export class GPUFrustumCuller {
 
   public dispose(): void {
     if (this.isInitialized) {
+      this.device = null as any;
       this.frustumBuffer?.destroy();
       this.objectsBuffer?.destroy();
       this.visibilityBuffer?.destroy();
       this.visibleCountBuffer?.destroy();
       this.readbackBuffer?.destroy();
+      this.computeShader = null as any;
+      this.computePipeline = null as any;
+      this.bindGroupLayout = null as any;
       this.isInitialized = false;
     }
   }

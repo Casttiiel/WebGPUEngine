@@ -1,4 +1,3 @@
-import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { Render } from '../pipeline/Render';
 
 /**
@@ -205,6 +204,5 @@ export class GPUUtils {
 
   public static destroy(): void {
     this.device = null as any; // Clear the device reference
-    BindGroupFactory.clearCache();
   }
 }
