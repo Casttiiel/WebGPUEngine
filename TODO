@@ -1,7 +1,9 @@
-1. Compute-based distortion
+1. LOW quality settings -> No transparency or distortion?
+2. What takes more performance?
 2. Unstable FPS
-3. SpotLightsWithShadows
-4. PointLighstWithShadows
+3. Compute-based distortion
+4. SpotLightsWithShadows
+5. PointLighstWithShadows
 5. Shadow quality
 6. Ambient Occlusion GTAO
 7. Temporal Anti-Aliasing (TAA)

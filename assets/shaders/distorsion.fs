@@ -20,20 +20,20 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     
     // Project displaced position to screen space
     let displacedClipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(displacedWorldPos, 1.0);
-    let displacedNDC = displacedClipPos.xyz / displacedClipPos.w;
+    let displacedNDC = displacedClipPos.xy / displacedClipPos.w;
     
-    // Convert current position to NDC
-    let currentNDC = input.position.xyz / input.position.w;
+    // Current position is already in NDC after perspective divide
+    let currentNDC = input.position.xy;
     
-    // Calculate distortion vector in screen space
-    let distortionVector = displacedNDC.xy - currentNDC.xy;
-    
-    // Output distortion as RG channels (XY displacement)
-    // Scale and bias to [0,1] range for storage in texture
-    if(input.position.x > 0.0) {
+    // Calculate distortion vector in NDC space [-1,1]
+    let distortionVector = displacedNDC - currentNDC;
+    if(currentNDC.x > 0.0) {
         return vec4<f32>(1.0, 0.0,0.0, 1.0);
     } else {
         return vec4<f32>(0.0, 1.0, 0.0,1.0);
     }
-    return vec4<f32>(distortionVector * 0.5 + 0.5, 0.0, 1.0);
+    // Output distortion as RG channels (XY displacement in NDC)
+    // NO scaling to [0,1] - necesitamos mantener valores negativos
+    // R = deltaX, G = deltaY en coordenadas NDC
+    //return vec4<f32>(distortionVector, 0.0, 1.0);
 }

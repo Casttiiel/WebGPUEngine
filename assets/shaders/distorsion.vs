@@ -15,8 +15,7 @@ fn vs(
     var output: VertexOutput;
     let worldPos = object.modelMatrix * vec4<f32>(position, 1.0);
     output.WorldPos = worldPos.xyz;
-    let pos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(worldPos.xyz, 1.0);
-    output.position = vec4<f32>(pos.xyz / pos.w, 1.0); // Perspective divide
+    output.position = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(worldPos.xyz, 1.0);
     
     let model3x3 = get3x3From4x4(object.modelMatrix);
     output.N = normalize(model3x3 * normal);
