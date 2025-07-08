@@ -52,7 +52,7 @@ export class AmbientOcclusionQualityConfig {
       aoStrength: 2.0, // Strong effect
       maxDistance: 1.2, // Extended distance
       noiseScale: 4.0, // Standard noise scale
-      enabled: true,
+      enabled: false,
     },
   };
 

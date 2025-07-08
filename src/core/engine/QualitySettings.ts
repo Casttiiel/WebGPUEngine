@@ -84,7 +84,7 @@ export class QualitySettings {
   };
 
   private constructor() {
-    this.applyPreset('MEDIUM');
+    this.applyPreset('ULTRA');
   }
 
   public static getInstance(): QualitySettings {

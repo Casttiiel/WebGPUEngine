@@ -1,6 +1,8 @@
-1. LOW quality settings -> No transparency or distortion?
-2. What takes more performance?
-2. Unstable FPS
+1. Unstable FPS
+2. AO removal breaks everything
+1. LOW quality settings -> No transparency or distortion? MSAA Issue
+
+
 3. Compute-based distortion
 4. SpotLightsWithShadows
 5. PointLighstWithShadows

@@ -80,7 +80,7 @@ export class ModuleRender extends Module {
 
     let result = await this.deferred.render(mainCamera);
 
-    if (mainCamera?.hasComponent('bloom')) {
+    /*if (mainCamera?.hasComponent('bloom')) {
       const bloom = mainCamera.getComponent('bloom') as BloomComponent;
       const qualitySettings = QualitySettings.getInstance();
       const bloomConfig = qualitySettings.getBloomConfig();
@@ -103,7 +103,7 @@ export class ModuleRender extends Module {
     if (mainCamera?.hasComponent('antialiasing')) {
       const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
       result = antialiasing.apply(result);
-    }
+    }*/
 
     this.presentResult(result);
 
