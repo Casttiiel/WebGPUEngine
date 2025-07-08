@@ -1,8 +1,6 @@
 {
     "technique": "distorsion.tech",
-    "textures":{
-        "txAlbedo": "acc_light.dds"
-    },
+    "textures":{},
     "casts_shadows": false,
     "category": "distorsions",
     "shadows": false

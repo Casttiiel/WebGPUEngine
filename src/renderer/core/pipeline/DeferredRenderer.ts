@@ -253,6 +253,11 @@ export class DeferredRenderer {
     if (this.rtAOBinding) {
       this.rtAOBinding.destroy();
     }
+  }
+
+  public destroy(): void {
+    console.log('Cleaning up DeferredRenderer...');
+    this.dispose();
 
     if (this.renderPassManager) {
       this.renderPassManager.clear();
@@ -265,11 +270,6 @@ export class DeferredRenderer {
 
     this.gBufferBindGroup = null as any;
     this.gBufferLayout = null as any;
-  }
-
-  public destroy(): void {
-    console.log('Cleaning up DeferredRenderer...');
-    this.dispose();
     this.isLoaded = false;
   }
 

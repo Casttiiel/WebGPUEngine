@@ -80,8 +80,6 @@ export class ModuleRender extends Module {
 
     let result = await this.deferred.render(mainCamera);
 
-    this.renderDistorsions(result);
-
     if (mainCamera?.hasComponent('bloom')) {
       const bloom = mainCamera.getComponent('bloom') as BloomComponent;
       const qualitySettings = QualitySettings.getInstance();
@@ -94,6 +92,8 @@ export class ModuleRender extends Module {
         result = bloom.addBloom(result, bloomTexture);
       }
     }
+
+    this.renderDistorsions(result);
 
     if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;

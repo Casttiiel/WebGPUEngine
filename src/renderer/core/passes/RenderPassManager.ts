@@ -81,9 +81,6 @@ export class RenderPassManager {
 
     // Execute Decal pass
     this.executePass('decals', RenderCategory.DECALS);
-
-    // Transparent pass would be executed after lighting passes
-    // this.executePass('transparent', RenderCategory.TRANSPARENT);
   }
 
   /**
