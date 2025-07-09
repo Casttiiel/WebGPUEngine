@@ -175,7 +175,7 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
     // Execute Decal pass
-    //this.renderPassManager.executePass('decals', RenderCategory.DECALS);
+    this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
     // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
@@ -184,17 +184,14 @@ export class DeferredRenderer {
 
     if (msaaLevel > 1) {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
-    } // Execute AO pass first
+    }
+
     this.renderAO(camera, this.rtAO);
 
-    // Copy AO result to binding texture to avoid usage conflicts
-    //this.copyAOTextureToBinding();
-
-    // Render accumulated light with AO texture
     this.renderAccLight();
 
     // Execute transparent pass
-    //this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     const view = this.rtAccLight.getView();
     if (!view) {
@@ -208,17 +205,18 @@ export class DeferredRenderer {
       'ambient_occlusion',
     ) as AmbientOcclusionComponent;
     ambientOcclusionComponent.compute(this.gBufferBindGroup, ao);
+    this.copyAOTextureToBinding();
   }
 
   private renderAccLight(): void {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
-    //this.renderPassManager.executePass('pointLights');
-    //this.renderPassManager.executePass('spotLights');
+    this.renderPassManager.executePass('pointLights');
+    this.renderPassManager.executePass('spotLights');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    //this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
+    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
 
   private copyAOTextureToBinding(): void {

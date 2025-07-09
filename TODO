@@ -1,10 +1,10 @@
-1. AO removal breaks everything
-2. Unstable FPS
+1. Unstable FPS (AO takes a lot of performance)
+2. Bloom params
 
-3. Temporal Anti-Aliasing (TAA)
-4. Aliasing quality
-5. Ambient Occlusion GTAO
-6. AO quality
+3. Ambient Occlusion GTAO
+4. AO quality
+5. Temporal Anti-Aliasing (TAA)
+6. Aliasing quality
 7. Compute-based distortion
 8. SpotLightsWithShadows
 9. PointLighstWithShadows

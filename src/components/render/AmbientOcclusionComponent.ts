@@ -275,33 +275,49 @@ export class AmbientOcclusionComponent extends Component {
   public override renderInMenu(): void {
     if (this.debugControlsAdded) return;
 
+    const debugUI = Engine.getDebugUI();
+    const parentFolder = 'render';
+    const subfolderKey = 'Camera Components';
+    const componentName = 'Ambient Occlusion';
+
+    // Add controls to the Camera Components subfolder
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Enable/Disable control
+    addControl(this, 'isEnabled', `${componentName} Enabled`);
+
     // SSAO Parameters with appropriate ranges
-    this.addInteractiveControl(this.ssaoParams, 'sampleCount', 'SSAO Sample Count', {
+    addControl(this.ssaoParams, 'sampleCount', `${componentName} Sample Count`, {
       min: 4,
       max: 32,
       step: 1,
     });
-    this.addInteractiveControl(this.ssaoParams, 'radius', 'SSAO Radius', {
+    addControl(this.ssaoParams, 'radius', `${componentName} Radius`, {
       min: 0.1,
       max: 2.0,
       step: 0.01,
     });
-    this.addInteractiveControl(this.ssaoParams, 'bias', 'SSAO Bias', {
+    addControl(this.ssaoParams, 'bias', `${componentName} Bias`, {
       min: 0.001,
       max: 0.1,
       step: 0.001,
     });
-    this.addInteractiveControl(this.ssaoParams, 'aoStrength', 'SSAO Strength', {
+    addControl(this.ssaoParams, 'aoStrength', `${componentName} Strength`, {
       min: 0.1,
       max: 5.0,
       step: 0.1,
     });
-    this.addInteractiveControl(this.ssaoParams, 'maxDistance', 'SSAO Max Distance', {
+    addControl(this.ssaoParams, 'maxDistance', `${componentName} Max Distance`, {
       min: 0.1,
       max: 5.0,
       step: 0.1,
     });
-    this.addInteractiveControl(this.ssaoParams, 'noiseScale', 'SSAO Noise Scale', {
+    addControl(this.ssaoParams, 'noiseScale', `${componentName} Noise Scale`, {
       min: 1.0,
       max: 10.0,
       step: 0.1,
