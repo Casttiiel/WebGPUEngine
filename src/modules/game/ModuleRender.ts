@@ -89,7 +89,8 @@ export class ModuleRender extends Module {
         // Apply quality-based bloom settings
         this.applyBloomQualitySettings(bloom);
         const bloomTexture = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
-        result = bloom.addBloom(result, bloomTexture);
+        result = bloomTexture;
+        //result = bloom.addBloom(result, bloomTexture);
       }
     }
 
@@ -415,10 +416,6 @@ export class ModuleRender extends Module {
       bloomComponent.setMaxBlurSteps(bloomConfig.maxBlurSteps);
       bloomComponent.setBlurStrength(bloomConfig.blurStrength);
       bloomComponent.setBlendIntensity(bloomConfig.blendIntensity);
-      bloomComponent.setBloomIntensity(bloomConfig.bloomIntensity);
-      bloomComponent.setBloomThreshold(bloomConfig.bloomThreshold);
-      bloomComponent.setBloomRadius(bloomConfig.bloomRadius);
-      bloomComponent.setBloomKnee(bloomConfig.bloomKnee);
 
       console.log(`Applied bloom quality settings: ${currentBloomQuality}`, bloomConfig);
     }

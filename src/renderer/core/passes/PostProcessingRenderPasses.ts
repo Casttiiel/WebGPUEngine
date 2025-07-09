@@ -66,6 +66,7 @@ export class ToneMappingRenderPass extends PostProcessingRenderPass {
 export class BloomFilteringRenderPass extends PostProcessingRenderPass {
   private gBufferBindGroup: GPUBindGroup;
   private textureBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup | null;
 
   constructor(
     config: RenderPassConfig,
@@ -73,17 +74,24 @@ export class BloomFilteringRenderPass extends PostProcessingRenderPass {
     technique: Technique,
     gBufferBindGroup: GPUBindGroup,
     textureBindGroup: GPUBindGroup,
+    paramsBindGroup?: GPUBindGroup,
   ) {
     super(config, mesh, technique);
     this.textureBindGroup = textureBindGroup;
     this.gBufferBindGroup = gBufferBindGroup;
+    this.paramsBindGroup = paramsBindGroup || null;
   }
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
-    // Bloom filtering needs global bind group at 0 and texture at 1
+    // Bloom filtering needs global bind group at 0, gBuffer at 1, texture at 2, and params at 3
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
     pass.setBindGroup(1, this.gBufferBindGroup);
     pass.setBindGroup(2, this.textureBindGroup);
+
+    // Set bloom parameters bind group if available
+    if (this.paramsBindGroup) {
+      pass.setBindGroup(3, this.paramsBindGroup);
+    }
   }
 
   /**

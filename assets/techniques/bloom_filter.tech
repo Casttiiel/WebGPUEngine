@@ -4,5 +4,5 @@
     "fsEntryPoint": "PS_filter",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["CameraUniforms", "GBufferUniforms", "SingleTexture"]
+    "uniforms":["CameraUniforms", "GBufferUniforms", "SingleTexture", "BufferUniform"]
 }

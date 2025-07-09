@@ -4,5 +4,5 @@
     "fsEntryPoint": "fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["CameraUniforms", "SingleTexture", "SingleTexture", "BloomParams"]
+    "uniforms":["CameraUniforms", "SingleTexture", "SingleTexture"]
 }

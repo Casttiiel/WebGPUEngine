@@ -3,9 +3,13 @@
 #include "common/utils"
 #include "common/gbuffer"
 
-const bloom_threshold_min : f32 = 0.1;
-const bloom_threshold_max : f32 = 1.0;
-const emissive_bloom_factor : f32 = 12.0;
+// Estructura para parámetros de bloom
+struct BloomParams {
+    threshold_min: f32,
+    threshold_max: f32, 
+    emissive_factor: f32,
+    padding: f32, // Para alineación de 16 bytes
+}
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var gAlbedo: texture_2d<f32>;
@@ -17,11 +21,26 @@ const emissive_bloom_factor : f32 = 12.0;
 @group(2) @binding(0) var accLights: texture_2d<f32>;
 @group(2) @binding(1) var accLightsSampler: sampler;
 
+// Uniform buffer para parámetros de bloom
+@group(3) @binding(0) var<uniform> bloomParams: BloomParams;
+
 @fragment
 fn PS_filter(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let g = decodeGBuffer(uv);
     let in_color = textureSample(accLights, accLightsSampler, uv).rgb;
+    
+    // Calcular luminancia perceptual
     let lum = dot(in_color, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let amount = smoothstep(bloom_threshold_min, bloom_threshold_max, (lum + g.emissive) / emissive_bloom_factor);
-    return vec4<f32>(in_color.rgb * amount, 1.0);
+    
+    // Combinar luminancia con emisivos usando uniforms
+    let emissive_contribution = g.emissive * bloomParams.emissive_factor;
+    let total_brightness = lum + emissive_contribution;
+    
+    // Aplicar threshold usando uniforms
+    let amount = smoothstep(bloomParams.threshold_min, bloomParams.threshold_max, total_brightness);
+    
+    // Aplicar una curva adicional para hacer el bloom más dramático
+    let bloom_curve = amount * amount; // Curva cuadrática para mejor falloff
+    
+    return vec4<f32>(in_color.rgb * bloom_curve, 1.0);
 }

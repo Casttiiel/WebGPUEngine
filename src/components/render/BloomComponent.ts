@@ -18,7 +18,6 @@ import { Engine } from '../../core/engine/Engine';
 class BloomCombineRenderPass extends PostProcessingRenderPass {
   private originalBindGroup: GPUBindGroup;
   private bloomBindGroup: GPUBindGroup;
-  private paramsBindGroup: GPUBindGroup;
 
   constructor(
     config: RenderPassConfig,
@@ -26,12 +25,10 @@ class BloomCombineRenderPass extends PostProcessingRenderPass {
     technique: Technique,
     originalBindGroup: GPUBindGroup,
     bloomBindGroup: GPUBindGroup,
-    paramsBindGroup: GPUBindGroup,
   ) {
     super(config, mesh, technique);
     this.originalBindGroup = originalBindGroup;
     this.bloomBindGroup = bloomBindGroup;
-    this.paramsBindGroup = paramsBindGroup;
   }
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
@@ -39,7 +36,6 @@ class BloomCombineRenderPass extends PostProcessingRenderPass {
     pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
     pass.setBindGroup(1, this.originalBindGroup); // Original texture
     pass.setBindGroup(2, this.bloomBindGroup); // Bloom texture
-    pass.setBindGroup(3, this.paramsBindGroup); // Bloom parameters
   }
 }
 
@@ -53,12 +49,16 @@ export class BloomComponent extends BlurComponent {
   private finalResult!: RenderTarget;
   private renderPassManager!: RenderPassManager;
 
-  // Bloom parameters
-  private bloomIntensity: number = 1.0;
-  private bloomThreshold: number = 1.0;
-  private bloomKnee: number = 0.5;
-  private bloomRadius: number = 1.0;
-  private uniformBuffer!: GPUBuffer;
+  // Bloom filter parameters (controlables desde Tweakpane)
+  private thresholdMin: number = 1.2;
+  private thresholdMax: number = 3.0;
+  private emissiveFactor: number = 2.0;
+
+  private bloomParamsBuffer!: GPUBuffer; // Buffer específico para parámetros del filter
+
+  // Additional bind groups for bloom combine operation
+  private bloomBindGroup!: GPUBindGroup;
+  private bloomFilterParamsBindGroup!: GPUBindGroup | null;
 
   constructor() {
     super();
@@ -82,14 +82,14 @@ export class BloomComponent extends BlurComponent {
     this.finalResult = new RenderTarget();
     this.finalResult.createRT('bloom_final_result.dds', Render.width, Render.height, bloomFormat);
 
-    // Create uniform buffer for bloom parameters
-    this.uniformBuffer = GPUUtils.createBuffer(
-      'bloom_params_buffer',
-      16, // 4 floats * 4 bytes
+    // Create uniform buffer specifically for bloom filter parameters
+    this.bloomParamsBuffer = GPUUtils.createBuffer(
+      'bloom_filter_params_buffer',
+      16, // 4 floats * 4 bytes (threshold_min, threshold_max, emissive_factor, padding)
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
-    this.updateBloomParams();
+    this.updateBloomFilterParams();
   }
 
   public override resize(): void {
@@ -105,14 +105,16 @@ export class BloomComponent extends BlurComponent {
     this.combineBindGroup = null;
   }
 
-  private updateBloomParams(): void {
-    const params = new Float32Array([
-      this.bloomIntensity,
-      this.bloomThreshold,
-      this.bloomKnee,
-      this.bloomRadius,
+  private updateBloomFilterParams(): void {
+    // Update bloom filter parameters buffer
+    const paramsData = new Float32Array([
+      this.thresholdMin,
+      this.thresholdMax,
+      this.emissiveFactor,
+      0.0, // padding
     ]);
-    GPUUtils.writeBuffer(this.uniformBuffer, 0, params);
+
+    GPUUtils.writeBuffer(this.bloomParamsBuffer, 0, paramsData);
   }
 
   public generateHighlights(
@@ -120,22 +122,24 @@ export class BloomComponent extends BlurComponent {
     texture: GPUTextureView,
   ): GPUTextureView {
     this.setBindGroup(texture);
+    this.createBloomFilterParamsBindGroup();
 
-    // Use RenderPassManager to execute bloom filter pass dynamically
+    // Use RenderPassManager to execute bloom filter pass with parameters
     this.renderPassManager.executeBloomFilteringPass(
       this.fullscreenQuadMesh,
       this.technique,
       gBufferBindGroup,
       this.bindGroup!,
       this.result,
+      this.bloomFilterParamsBindGroup!,
     );
 
     const highlightsResult = this.result.getView();
 
     // Apply multiscaling blur to the highlights
-    const blurredHighlights = this.applyMultiscaleBlur(highlightsResult);
+    this.applyMultiscaleBlur(highlightsResult);
 
-    return blurredHighlights;
+    return highlightsResult;
   }
 
   public addBloom(originalTexture: GPUTextureView, bloomTexture: GPUTextureView): GPUTextureView {
@@ -152,7 +156,6 @@ export class BloomComponent extends BlurComponent {
       this.combineTechnique,
       this.combineBindGroup!, // Original texture bindgroup
       this.bloomBindGroup!, // Bloom texture bindgroup
-      this.bloomParamsBindGroup!, // Bloom parameters bindgroup
     );
 
     // Execute the custom pass directly using RenderPassManager
@@ -162,9 +165,22 @@ export class BloomComponent extends BlurComponent {
     return this.finalResult.getView();
   }
 
-  // Additional bind groups for bloom combine operation
-  private bloomBindGroup!: GPUBindGroup;
-  private bloomParamsBindGroup!: GPUBindGroup;
+  private createBloomFilterParamsBindGroup(): void {
+    if (this.bloomFilterParamsBindGroup) return;
+
+    this.bloomFilterParamsBindGroup = BindGroupFactory.createBindGroup(
+      'bloom_filter_params_bindgroup',
+      BindGroupFactory.getBufferUniformLayout(),
+      [
+        {
+          binding: 0,
+          resource: {
+            buffer: this.bloomParamsBuffer,
+          },
+        },
+      ],
+    );
+  }
 
   private setupCombineBindGroups(
     originalTexture: GPUTextureView,
@@ -196,12 +212,7 @@ export class BloomComponent extends BlurComponent {
       ],
     );
 
-    // Create bind group for bloom parameters (group 3)
-    this.bloomParamsBindGroup = BindGroupFactory.createBindGroup(
-      `bloom_params_bindgroup`,
-      this.combineTechnique.getPipeline().getBindGroupLayout(3),
-      [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
-    );
+    this.createBloomFilterParamsBindGroup();
   }
 
   private setBindGroup(texture: GPUTextureView): void {
@@ -226,42 +237,6 @@ export class BloomComponent extends BlurComponent {
         },
       ],
     );
-  }
-
-  // Bind groups are now set up in setupCombineBindGroups method
-
-  // Getters for bloom parameters (for UI/debug)
-  public getBloomIntensity(): number {
-    return this.bloomIntensity;
-  }
-  public setBloomIntensity(value: number): void {
-    this.bloomIntensity = value;
-    this.updateBloomParams();
-  }
-
-  public getBloomThreshold(): number {
-    return this.bloomThreshold;
-  }
-  public setBloomThreshold(value: number): void {
-    this.bloomThreshold = value;
-    this.updateBloomParams();
-  }
-
-  // Additional bloom parameter controls
-  public getBloomRadius(): number {
-    return this.bloomRadius;
-  }
-  public setBloomRadius(value: number): void {
-    this.bloomRadius = Math.max(0.1, Math.min(5.0, value));
-    this.updateBloomParams();
-  }
-
-  public getBloomKnee(): number {
-    return this.bloomKnee;
-  }
-  public setBloomKnee(value: number): void {
-    this.bloomKnee = Math.max(0.0, Math.min(1.0, value));
-    this.updateBloomParams();
   }
 
   // Inherit blur parameter controls from parent
@@ -291,6 +266,9 @@ export class BloomComponent extends BlurComponent {
     const subfolderKey = 'Camera Components';
     const componentName = 'Bloom';
 
+    // Declare self at the beginning to avoid reference errors
+    const self = this;
+
     // Add controls to the Camera Components subfolder
     const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
       debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
@@ -299,30 +277,57 @@ export class BloomComponent extends BlurComponent {
       });
     };
 
-    // Add controls for bloom parameters
-    addControl(this, 'bloomIntensity', `${componentName} Intensity`, {
+    // Add controls for bloom filter parameters
+    const thresholdMinWrapper = {
+      get thresholdMin() {
+        return self.thresholdMin;
+      },
+      set thresholdMin(value) {
+        self.thresholdMin = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    const thresholdMaxWrapper = {
+      get thresholdMax() {
+        return self.thresholdMax;
+      },
+      set thresholdMax(value) {
+        self.thresholdMax = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    const emissiveFactorWrapper = {
+      get emissiveFactor() {
+        return self.emissiveFactor;
+      },
+      set emissiveFactor(value) {
+        self.emissiveFactor = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    addControl(thresholdMinWrapper, 'thresholdMin', `${componentName} Filter Threshold Min`, {
       min: 0.0,
-      max: 5.0,
+      max: 10.0,
       step: 0.1,
     });
-    addControl(this, 'bloomThreshold', `${componentName} Threshold`, {
-      min: 0.0,
-      max: 5.0,
-      step: 0.1,
-    });
-    addControl(this, 'bloomKnee', `${componentName} Knee`, {
-      min: 0.0,
-      max: 1.0,
-      step: 0.05,
-    });
-    addControl(this, 'bloomRadius', `${componentName} Radius`, {
+    addControl(thresholdMaxWrapper, 'thresholdMax', `${componentName} Filter Threshold Max`, {
       min: 0.5,
-      max: 5.0,
+      max: 16.0,
+      step: 0.1,
+    });
+    addControl(emissiveFactorWrapper, 'emissiveFactor', `${componentName} Emissive Factor`, {
+      min: 0.1,
+      max: 10.0,
       step: 0.1,
     });
 
     // Add controls for inherited blur parameters from BlurComponent using wrapper objects
-    const self = this;
     const blurStrengthWrapper = {
       get blurStrength() {
         return self.getBlurStrength();
@@ -380,8 +385,8 @@ export class BloomComponent extends BlurComponent {
     if (this.finalResult) {
       this.finalResult.destroy();
     }
-    if (this.uniformBuffer) {
-      this.uniformBuffer.destroy();
+    if (this.bloomParamsBuffer) {
+      this.bloomParamsBuffer.destroy();
     }
   }
 }

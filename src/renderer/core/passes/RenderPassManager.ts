@@ -188,7 +188,7 @@ export class RenderPassManager {
   }
 
   /**
-   * Create and execute an antialiasing pass dynamically
+   * Create and execute a bloom filtering pass dynamically
    */
   public executeBloomFilteringPass(
     mesh: Mesh,
@@ -196,6 +196,7 @@ export class RenderPassManager {
     gBufferBindGroup: GPUBindGroup,
     bindGroup: GPUBindGroup,
     result: RenderTarget,
+    paramsBindGroup?: GPUBindGroup,
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
     const pass = new BloomFilteringRenderPass(
@@ -204,6 +205,7 @@ export class RenderPassManager {
       technique,
       gBufferBindGroup,
       bindGroup,
+      paramsBindGroup,
     );
     this.executeDynamicPass(pass);
   }
