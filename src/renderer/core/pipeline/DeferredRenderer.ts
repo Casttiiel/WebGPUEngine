@@ -155,7 +155,7 @@ export class DeferredRenderer {
     await this.depthResolver.load();
 
     this.gBufferPass = new GBufferPass();
-    await this.gBufferPass.load();
+    this.gBufferPass.load();
 
     this.pointLightTechnique = await Technique.get('point_light.tech');
     this.spotLightTechnique = await Technique.get('spot_light.tech');

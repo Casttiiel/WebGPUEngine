@@ -66,7 +66,7 @@ export class Engine {
     }
     this._modules.update(dt * this._timeScale);
 
-    //Engine.renderInMenu();
+    Engine.renderInMenu();
   }
 
   public static async render(): Promise<void> {

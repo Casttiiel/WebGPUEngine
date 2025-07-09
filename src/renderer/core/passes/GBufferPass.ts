@@ -32,7 +32,7 @@ export class GBufferPass {
     const qualitySettings = QualitySettings.getInstance();
     const msaaLevel = qualitySettings.getMSAALevel();
     const gBufferQuality = qualitySettings.getGBufferTextureQuality();
-    const enableMSAA = msaaLevel > 0;
+    const enableMSAA = msaaLevel > 1;
 
     // Get optimal texture formats based on quality setting
     const formats = GBufferQualityConfig.getFormats(gBufferQuality);

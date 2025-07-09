@@ -1,23 +1,22 @@
-1. Unstable FPS
-2. AO removal breaks everything
-1. LOW quality settings -> No transparency or distortion? MSAA Issue
+1. AO removal breaks everything
+2. Unstable FPS
 
-
-3. Compute-based distortion
-4. SpotLightsWithShadows
-5. PointLighstWithShadows
-5. Shadow quality
-6. Ambient Occlusion GTAO
-7. Temporal Anti-Aliasing (TAA)
-8. Aliasing quality
-9. Directional Light
-10. Area Light
-11. Motion Blur
-12. Decals Category
-13. Particles
-14. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-15. Optimizacion WebGPUFundamentals
-16. **ASYNC LOADING SYSTEM** 🚀
+3. Temporal Anti-Aliasing (TAA)
+4. Aliasing quality
+5. Ambient Occlusion GTAO
+6. AO quality
+7. Compute-based distortion
+8. SpotLightsWithShadows
+9. PointLighstWithShadows
+10. Shadow quality
+11. Directional Light
+12. Area Light
+13. Motion Blur
+14. Decals Category
+15. Particles
+16. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+17. Optimizacion WebGPUFundamentals
+18. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD

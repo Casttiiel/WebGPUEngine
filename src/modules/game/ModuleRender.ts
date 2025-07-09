@@ -91,11 +91,11 @@ export class ModuleRender extends Module {
         const bloomTexture = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
         result = bloom.addBloom(result, bloomTexture);
       }
-    }
+    }*/
 
-    this.renderDistorsions(result);
+    //this.renderDistorsions(result);
 
-    if (mainCamera?.hasComponent('tone_mapping')) {
+    /*if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
       result = toneMapping.apply(result);
     }
