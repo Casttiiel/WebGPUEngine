@@ -7,7 +7,6 @@ import { QualitySettings } from '../../core/engine/QualitySettings';
 import {
   AdvancedBlurConfig,
   AdvancedBlurParameters,
-  BlurPreset,
 } from '../../renderer/core/config/AdvancedBlurConfig';
 
 /**
@@ -18,8 +17,6 @@ export class BlurStep {
   public tempRenderTarget: RenderTarget; // For ping-pong rendering
   public width: number;
   public height: number;
-  public downsampleBindGroup: GPUBindGroup | null = null;
-  public upsampleBindGroup: GPUBindGroup | null = null;
 
   constructor(name: string, width: number, height: number, format: GPUTextureFormat) {
     this.width = width;
@@ -48,86 +45,53 @@ export class BlurStep {
     );
   }
 
-  public createDownsampleBindGroup(
-    inputTexture: GPUTextureView,
-    sampler: GPUSampler,
-    layout: GPUBindGroupLayout,
-    uniformBuffer: GPUBuffer,
-  ): void {
-    this.downsampleBindGroup = BindGroupFactory.createBindGroup(
-      `blur_step_downsample_${this.width}x${this.height}`,
-      layout,
-      [
-        { binding: 0, resource: inputTexture },
-        { binding: 1, resource: this.renderTarget.getStorageView() },
-        { binding: 2, resource: sampler },
-        { binding: 3, resource: { buffer: uniformBuffer } },
-      ],
-    );
-  }
-
-  public createUpsampleBindGroup(
-    inputTexture: GPUTextureView,
-    higherResTexture: GPUTextureView,
-    sampler: GPUSampler,
-    layout: GPUBindGroupLayout,
-    uniformBuffer: GPUBuffer,
-  ): void {
-    this.upsampleBindGroup = BindGroupFactory.createBindGroup(
-      `blur_step_upsample_${this.width}x${this.height}`,
-      layout,
-      [
-        { binding: 0, resource: inputTexture },
-        { binding: 1, resource: this.tempRenderTarget.getStorageView() }, // Write to temp
-        { binding: 2, resource: sampler },
-        { binding: 3, resource: higherResTexture },
-        { binding: 4, resource: { buffer: uniformBuffer } },
-      ],
-    );
-  }
-
   public dispose(): void {
     this.renderTarget.destroy();
     this.tempRenderTarget.destroy();
   }
-
-  // Get the final result (after upsampling, use temp target)
-  public getFinalView(): GPUTextureView {
-    return this.tempRenderTarget.getView();
-  }
 }
 
 /**
- * Modern blur component using compute shaders for multiscaling blur
+ * Modern blur component using separable Gaussian blur
  */
 export class BlurComponent extends Component {
   protected steps: BlurStep[] = [];
-  protected downsamplePipeline!: GPUComputePipeline;
-  protected upsamplePipeline!: GPUComputePipeline;
-  protected downsamplePipelineRGBA8!: GPUComputePipeline; // For low quality
-  protected upsamplePipelineRGBA8!: GPUComputePipeline; // For low quality
-  protected downsampleBindGroupLayout!: GPUBindGroupLayout;
-  protected upsampleBindGroupLayout!: GPUBindGroupLayout;
-  protected downsampleBindGroupLayoutRGBA8!: GPUBindGroupLayout; // For low quality
-  protected upsampleBindGroupLayoutRGBA8!: GPUBindGroupLayout; // For low quality
-
-  // Advanced blur pipelines for separable Gaussian blur
   protected advancedHorizontalPipeline!: GPUComputePipeline;
   protected advancedVerticalPipeline!: GPUComputePipeline;
   protected advancedBlurBindGroupLayout!: GPUBindGroupLayout;
 
   protected sampler!: GPUSampler;
   protected maxBlurSteps: number = 4;
-  protected blurIntensity: number = 1.0;
 
   // Uniform buffers for blur parameters
-  protected blurUniformBuffer!: GPUBuffer;
   protected blurStrength: number = 1.0;
   protected blendIntensity: number = 0.8;
 
   // Advanced blur configuration
   protected blurConfig: AdvancedBlurParameters;
   protected advancedBlurUniformBuffer!: GPUBuffer;
+
+  // Gaussian blur properties
+  private gaussianBlurUniformBuffer!: GPUBuffer;
+  private blurTargetA!: RenderTarget;
+  private blurTargetB!: RenderTarget;
+  private blurEnabled: boolean = true;
+  private globalDistance: number = 1.0;
+
+  // Default weights from blur.fx - well balanced for most situations
+  private weights = {
+    center: 0.2508, // w0 - center weight
+    first: 0.2004, // w1 - first pair weight
+    second: 0.124, // w2 - second pair weight
+    third: 0.0539, // w3 - third pair weight
+  };
+
+  // Default offsets from blur.fx - based on optimal sampling pattern
+  private distances = {
+    first: 1.407, // d1 - first sample distance
+    second: 3.294, // d2 - second sample distance
+    third: 5.181, // d3 - third sample distance
+  };
 
   constructor() {
     super();
@@ -140,10 +104,25 @@ export class BlurComponent extends Component {
   }
 
   public async load(): Promise<void> {
-    await this.createComputePipelines();
     await this.createAdvancedBlurPipelines();
-    this.createUniformBuffers();
     this.createAdvancedBlurUniformBuffer();
+
+    // Create uniform buffer for Gaussian blur parameters
+    this.gaussianBlurUniformBuffer = GPUUtils.createBuffer(
+      'gaussian_blur_uniforms',
+      64, // 16 floats * 4 bytes (weights, distances, direction, globalDistance)
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    // Create blur render targets for ping-pong
+    const qualitySettings = QualitySettings.getInstance();
+    const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
+
+    this.blurTargetA = new RenderTarget();
+    this.blurTargetA.createRT('blur_target_a.dds', Render.width, Render.height, bloomFormat);
+
+    this.blurTargetB = new RenderTarget();
+    this.blurTargetB.createRT('blur_target_b.dds', Render.width, Render.height, bloomFormat);
 
     // Create sampler for texture sampling
     this.sampler = GPUUtils.createSampler({
@@ -156,109 +135,31 @@ export class BlurComponent extends Component {
 
     this.createBlurSteps();
     this.updateAdvancedBlurParams();
+    this.updateGaussianBlurParams();
   }
 
-  private async createComputePipelines(): Promise<void> {
-    const device = Render.getInstance().getDevice();
+  private updateGaussianBlurParams(): void {
+    // Update Gaussian blur parameters buffer
+    const uniformData = new Float32Array([
+      this.weights.center,
+      this.weights.first,
+      this.weights.second,
+      this.weights.third,
+      this.distances.first,
+      this.distances.second,
+      this.distances.third,
+      this.globalDistance,
+      0.0,
+      0.0, // direction will be set per pass
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0, // padding
+    ]);
 
-    // Load shaders for both RGBA16 and RGBA8 formats
-    const downsampleShaderCode = await fetch('/assets/shaders/bloom_downsample_blur.cs').then((r) =>
-      r.text(),
-    );
-    const upsampleShaderCode = await fetch('/assets/shaders/bloom_upsample_blend.cs').then((r) =>
-      r.text(),
-    );
-    const downsampleShaderCodeRGBA8 = await fetch(
-      '/assets/shaders/bloom_downsample_blur_rgba8.cs',
-    ).then((r) => r.text());
-    const upsampleShaderCodeRGBA8 = await fetch(
-      '/assets/shaders/bloom_upsample_blend_rgba8.cs',
-    ).then((r) => r.text());
-
-    // Create bind group layouts for RGBA16Float
-    this.createBindGroupLayouts(device, 'rgba16float');
-
-    // Create bind group layouts for RGBA8Unorm
-    this.createBindGroupLayoutsRGBA8(device);
-
-    // Create pipeline layouts
-    const downsamplePipelineLayout = device.createPipelineLayout({
-      label: 'Downsample Blur Pipeline Layout',
-      bindGroupLayouts: [this.downsampleBindGroupLayout],
-    });
-
-    const upsamplePipelineLayout = device.createPipelineLayout({
-      label: 'Upsample Blur Pipeline Layout',
-      bindGroupLayouts: [this.upsampleBindGroupLayout],
-    });
-
-    const downsamplePipelineLayoutRGBA8 = device.createPipelineLayout({
-      label: 'Downsample Blur Pipeline Layout RGBA8',
-      bindGroupLayouts: [this.downsampleBindGroupLayoutRGBA8],
-    });
-
-    const upsamplePipelineLayoutRGBA8 = device.createPipelineLayout({
-      label: 'Upsample Blur Pipeline Layout RGBA8',
-      bindGroupLayouts: [this.upsampleBindGroupLayoutRGBA8],
-    });
-
-    // Create RGBA16Float pipelines
-    const downsampleShader = device.createShaderModule({
-      label: 'Downsample Blur Compute Shader',
-      code: downsampleShaderCode,
-    });
-
-    this.downsamplePipeline = device.createComputePipeline({
-      label: 'Downsample Blur Pipeline',
-      layout: downsamplePipelineLayout,
-      compute: {
-        module: downsampleShader,
-        entryPoint: 'CS_downsample_blur',
-      },
-    });
-
-    const upsampleShader = device.createShaderModule({
-      label: 'Upsample Blend Compute Shader',
-      code: upsampleShaderCode,
-    });
-
-    this.upsamplePipeline = device.createComputePipeline({
-      label: 'Upsample Blend Pipeline',
-      layout: upsamplePipelineLayout,
-      compute: {
-        module: upsampleShader,
-        entryPoint: 'CS_upsample_blend',
-      },
-    });
-
-    // Create RGBA8Unorm pipelines
-    const downsampleShaderRGBA8 = device.createShaderModule({
-      label: 'Downsample Blur Compute Shader RGBA8',
-      code: downsampleShaderCodeRGBA8,
-    });
-
-    this.downsamplePipelineRGBA8 = device.createComputePipeline({
-      label: 'Downsample Blur Pipeline RGBA8',
-      layout: downsamplePipelineLayoutRGBA8,
-      compute: {
-        module: downsampleShaderRGBA8,
-        entryPoint: 'CS_downsample_blur',
-      },
-    });
-
-    const upsampleShaderRGBA8 = device.createShaderModule({
-      label: 'Upsample Blend Compute Shader RGBA8',
-      code: upsampleShaderCodeRGBA8,
-    });
-
-    this.upsamplePipelineRGBA8 = device.createComputePipeline({
-      label: 'Upsample Blend Pipeline RGBA8',
-      layout: upsamplePipelineLayoutRGBA8,
-      compute: {
-        module: upsampleShaderRGBA8,
-        entryPoint: 'CS_upsample_blend',
-      },
-    });
+    GPUUtils.writeBuffer(this.gaussianBlurUniformBuffer, 0, uniformData);
   }
 
   private async createAdvancedBlurPipelines(): Promise<void> {
@@ -375,198 +276,6 @@ export class BlurComponent extends Component {
     GPUUtils.writeBuffer(this.advancedBlurUniformBuffer, 0, uniformData);
   }
 
-  /**
-   * Apply preset configuration for advanced blur
-   */
-  public applyBlurPreset(preset: BlurPreset): void {
-    this.blurConfig = AdvancedBlurConfig.getPreset(preset);
-    this.updateAdvancedBlurParams();
-  }
-
-  /**
-   * Update specific blur parameters
-   */
-  public updateBlurConfig(config: Partial<AdvancedBlurParameters>): void {
-    this.blurConfig = { ...this.blurConfig, ...config };
-    this.updateAdvancedBlurParams();
-  }
-
-  /**
-   * Get current blur configuration
-   */
-  public getBlurConfig(): AdvancedBlurParameters {
-    return { ...this.blurConfig };
-  }
-
-  private createUniformBuffers(): void {
-    const device = Render.getInstance().getDevice();
-
-    // Create uniform buffer for blur parameters (4 floats = 16 bytes)
-    this.blurUniformBuffer = device.createBuffer({
-      label: 'Blur Uniforms Buffer',
-      size: 16, // 4 floats * 4 bytes each
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
-    this.updateUniformBuffers();
-  }
-
-  private updateUniformBuffers(): void {
-    const device = Render.getInstance().getDevice();
-    const uniformData = new Float32Array([
-      this.blurStrength,
-      this.blendIntensity,
-      0.0, // padding
-      0.0, // padding
-    ]);
-
-    device.queue.writeBuffer(this.blurUniformBuffer, 0, uniformData);
-  }
-
-  private createBindGroupLayouts(device: GPUDevice, format: GPUTextureFormat): void {
-    // Create downsampling bind group layout (4 bindings)
-    this.downsampleBindGroupLayout = device.createBindGroupLayout({
-      label: 'Downsample Blur Bind Group Layout',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: format,
-            viewDimension: '2d',
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
-
-    // Create upsampling bind group layout (5 bindings)
-    this.upsampleBindGroupLayout = device.createBindGroupLayout({
-      label: 'Upsample Blur Bind Group Layout',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: format,
-            viewDimension: '2d',
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
-  }
-
-  private createBindGroupLayoutsRGBA8(device: GPUDevice): void {
-    // Create downsampling bind group layout for RGBA8 (4 bindings)
-    this.downsampleBindGroupLayoutRGBA8 = device.createBindGroupLayout({
-      label: 'Downsample Blur Bind Group Layout RGBA8',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba8unorm',
-            viewDimension: '2d',
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
-
-    // Create upsampling bind group layout for RGBA8 (5 bindings)
-    this.upsampleBindGroupLayoutRGBA8 = device.createBindGroupLayout({
-      label: 'Upsample Blur Bind Group Layout RGBA8',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba8unorm',
-            viewDimension: '2d',
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          sampler: { type: 'filtering' },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'float', viewDimension: '2d' },
-        },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    });
-  }
-
-  public async recreatePipelinesForFormat(): Promise<void> {
-    // This method should be called when quality settings change
-    await this.createComputePipelines();
-    console.log('Bloom pipelines recreated for new texture format');
-  }
-
   private createBlurSteps(): void {
     const qualitySettings = QualitySettings.getInstance();
     const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
@@ -598,8 +307,31 @@ export class BlurComponent extends Component {
 
   public dispose(): void {
     this.steps.forEach((step) => step.dispose());
-    this.blurUniformBuffer?.destroy();
     this.advancedBlurUniformBuffer?.destroy();
+
+    // Dispose Gaussian blur resources
+    this.gaussianBlurUniformBuffer?.destroy();
+    this.blurTargetA?.destroy();
+    this.blurTargetB?.destroy();
+  }
+
+  // Gaussian blur parameter setters
+
+  /**
+   * Set the global blur distance (affects both horizontal and vertical passes)
+   * @param distance The global distance multiplier
+   */
+  public setGaussianBlurDistance(distance: number): void {
+    this.globalDistance = distance;
+    this.updateGaussianBlurParams();
+  }
+
+  public getBlurStrength(): number {
+    return this.globalDistance;
+  }
+
+  public getBlendIntensity(): number {
+    return this.blendIntensity;
   }
 
   /**
@@ -612,11 +344,11 @@ export class BlurComponent extends Component {
   }
 
   /**
-   * Set blur strength parameter
+   * Set blur strength parameter (now controls Gaussian blur global distance)
    */
   public setBlurStrength(strength: number): void {
     this.blurStrength = Math.max(0.1, Math.min(5.0, strength));
-    this.updateUniformBuffers();
+    this.setGaussianBlurDistance(this.blurStrength);
   }
 
   /**
@@ -624,21 +356,6 @@ export class BlurComponent extends Component {
    */
   public setBlendIntensity(intensity: number): void {
     this.blendIntensity = Math.max(0.0, Math.min(2.0, intensity));
-    this.updateUniformBuffers();
-  }
-
-  /**
-   * Get current blur strength
-   */
-  public getBlurStrength(): number {
-    return this.blurStrength;
-  }
-
-  /**
-   * Get current blend intensity
-   */
-  public getBlendIntensity(): number {
-    return this.blendIntensity;
   }
 
   /**
@@ -652,178 +369,29 @@ export class BlurComponent extends Component {
    * Resize blur component when screen resolution changes
    */
   public resize(): void {
+    // Dispose of any existing blur steps
+    this.steps.forEach((step) => step.dispose());
+    this.steps = [];
+
     // Recreate blur steps with new screen resolution
     this.createBlurSteps();
-  }
 
-  /**
-   * Apply blur to a single step using downsample/upsample pipelines
-   */
-  protected applyBlurStep(
-    inputTexture: GPUTextureView,
-    step: BlurStep,
-    stepIndex: number,
-  ): GPUTextureView {
-    const device = Render.getInstance().getDevice();
-    const commandEncoder = device.createCommandEncoder({
-      label: `Blur Step ${stepIndex} Command Encoder`,
-    });
+    // Recreate Gaussian blur targets with new resolution
+    if (this.blurTargetA && this.blurTargetB) {
+      const qualitySettings = QualitySettings.getInstance();
+      const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
 
-    // Determine which pipeline to use based on quality settings
-    const qualitySettings = QualitySettings.getInstance();
-    const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
-    const isHighQuality = bloomFormat === 'rgba16float';
+      // Use screen resolution for the blur targets
+      const targetWidth = Render.width;
+      const targetHeight = Render.height;
 
-    // Choose appropriate pipelines and layouts
-    const downsamplePipeline = isHighQuality
-      ? this.downsamplePipeline
-      : this.downsamplePipelineRGBA8;
-    const downsampleLayout = isHighQuality
-      ? this.downsampleBindGroupLayout
-      : this.downsampleBindGroupLayoutRGBA8;
+      this.blurTargetA.createRT('blur_target_a.dds', targetWidth, targetHeight, bloomFormat);
+      this.blurTargetB.createRT('blur_target_b.dds', targetWidth, targetHeight, bloomFormat);
 
-    // Create downsample bind group for this step
-    step.createDownsampleBindGroup(
-      inputTexture,
-      this.sampler,
-      downsampleLayout,
-      this.blurUniformBuffer,
-    );
-
-    // Dispatch downsample pass
-    if (step.downsampleBindGroup) {
-      const computePass = commandEncoder.beginComputePass({
-        label: `Downsample Blur Pass Step ${stepIndex}`,
-      });
-
-      computePass.setPipeline(downsamplePipeline);
-      computePass.setBindGroup(0, step.downsampleBindGroup);
-
-      // Calculate dispatch size
-      const workgroupSize = 16; // From shader WORKGROUP_SIZE
-      const dispatchX = Math.ceil(step.width / workgroupSize);
-      const dispatchY = Math.ceil(step.height / workgroupSize);
-
-      computePass.dispatchWorkgroups(dispatchX, dispatchY);
-      computePass.end();
+      console.log(`Resized Gaussian blur targets to ${targetWidth}x${targetHeight}`);
     }
-
-    // Submit the command buffer
-    device.queue.submit([commandEncoder.finish()]);
-
-    // Return the downsampled result
-    return step.renderTarget.getView();
   }
 
-  /**
-   * Apply multiscale blur with proper upsample passes
-   */
-  public applyMultiscaleBlur(inputTexture: GPUTextureView): GPUTextureView {
-    if (this.steps.length === 0) return inputTexture;
-
-    // Downsample pass - blur each step progressively
-    let currentTexture = inputTexture;
-    const activeSteps = Math.min(this.blurConfig.activeSteps, this.steps.length);
-
-    // Downsample phase
-    for (let i = 0; i < activeSteps; i++) {
-      const step = this.steps[i];
-      if (step) {
-        currentTexture = this.applyBlurStep(currentTexture, step, i);
-      }
-    }
-
-    // Upsample phase - blend back up to original resolution
-    for (let i = activeSteps - 2; i >= 0; i--) {
-      const step = this.steps[i];
-      const higherResStep = i === 0 ? null : this.steps[i - 1] || null;
-
-      if (step) {
-        currentTexture = this.applyUpsampleStep(currentTexture, step, higherResStep, i);
-      }
-    }
-
-    return currentTexture;
-  }
-
-  /**
-   * Apply upsample step with blending
-   */
-  protected applyUpsampleStep(
-    inputTexture: GPUTextureView,
-    step: BlurStep,
-    higherResStep: BlurStep | null,
-    stepIndex: number,
-  ): GPUTextureView {
-    const device = Render.getInstance().getDevice();
-    const commandEncoder = device.createCommandEncoder({
-      label: `Upsample Step ${stepIndex} Command Encoder`,
-    });
-
-    // Determine which pipeline to use based on quality settings
-    const qualitySettings = QualitySettings.getInstance();
-    const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
-    const isHighQuality = bloomFormat === 'rgba16float';
-
-    // Choose appropriate pipelines and layouts
-    const upsamplePipeline = isHighQuality ? this.upsamplePipeline : this.upsamplePipelineRGBA8;
-    const upsampleLayout = isHighQuality
-      ? this.upsampleBindGroupLayout
-      : this.upsampleBindGroupLayoutRGBA8;
-
-    // Use original input texture if no higher resolution step available
-    const higherResTexture = higherResStep ? higherResStep.renderTarget.getView() : inputTexture;
-
-    // Create upsample bind group for this step
-    step.createUpsampleBindGroup(
-      inputTexture,
-      higherResTexture,
-      this.sampler,
-      upsampleLayout,
-      this.blurUniformBuffer,
-    );
-
-    // Dispatch upsample pass
-    if (step.upsampleBindGroup) {
-      const computePass = commandEncoder.beginComputePass({
-        label: `Upsample Blur Pass Step ${stepIndex}`,
-      });
-
-      computePass.setPipeline(upsamplePipeline);
-      computePass.setBindGroup(0, step.upsampleBindGroup);
-
-      // Calculate dispatch size for higher resolution
-      const workgroupSize = 16;
-      const targetWidth = higherResStep ? higherResStep.width : Render.width;
-      const targetHeight = higherResStep ? higherResStep.height : Render.height;
-      const dispatchX = Math.ceil(targetWidth / workgroupSize);
-      const dispatchY = Math.ceil(targetHeight / workgroupSize);
-
-      computePass.dispatchWorkgroups(dispatchX, dispatchY);
-      computePass.end();
-    }
-
-    // Submit the command buffer
-    device.queue.submit([commandEncoder.finish()]);
-
-    // Return the upsampled result (from temp target)
-    return step.getFinalView();
-  }
-
-  /**
-   * Debug menu for blur parameters
-   */
-  public debugInMenu(): void {
-    // Debug interface for blur parameters
-    console.log('Blur Config:', this.blurConfig);
-    console.log('Max Steps:', this.maxBlurSteps);
-    console.log('Blur Strength:', this.blurStrength);
-    console.log('Blend Intensity:', this.blendIntensity);
-  }
-
-  /**
-   * Apply advanced Gaussian blur using separable horizontal/vertical passes
-   */
   public applyAdvancedBlur(inputTexture: GPUTextureView): GPUTextureView {
     if (this.steps.length === 0) return inputTexture;
 
@@ -937,14 +505,7 @@ export class BlurComponent extends Component {
     return step.tempRenderTarget.getView();
   }
 
-  /**
-   * Switch between standard and advanced blur methods
-   */
-  public applyBlur(inputTexture: GPUTextureView, useAdvancedBlur: boolean = false): GPUTextureView {
-    if (useAdvancedBlur) {
-      return this.applyAdvancedBlur(inputTexture);
-    } else {
-      return this.applyMultiscaleBlur(inputTexture);
-    }
+  public applyBlur(inputTexture: GPUTextureView): GPUTextureView {
+    return this.applyAdvancedBlur(inputTexture);
   }
 }

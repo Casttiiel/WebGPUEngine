@@ -89,8 +89,7 @@ export class ModuleRender extends Module {
         // Apply quality-based bloom settings
         this.applyBloomQualitySettings(bloom);
         const bloomTexture = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
-        result = bloomTexture;
-        //result = bloom.addBloom(result, bloomTexture);
+        result = bloom.addBloom(result, bloomTexture);
       }
     }
 

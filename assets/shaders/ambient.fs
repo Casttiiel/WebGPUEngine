@@ -68,7 +68,7 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     
     // Combine and apply ambient occlusion
     //return vec3<f32>(ao);
-    return (diffuse * ambient.ambientLightIntensity + specular * ambient.reflectionIntensity) * ambient.globalAmbientBoost * ao;
+    return (diffuse * ambient.ambientLightIntensity + specular * ambient.reflectionIntensity) * ambient.globalAmbientBoost;
 }
 
 @fragment

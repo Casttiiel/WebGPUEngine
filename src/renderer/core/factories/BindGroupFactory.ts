@@ -259,7 +259,7 @@ export class BindGroupFactory {
     return this.getLayout('buffer_uniform', [
       {
         binding: 0,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },
     ]);
@@ -296,6 +296,19 @@ export class BindGroupFactory {
   }
 
   /**
+   * Creates a Gaussian blur uniforms bind group layout
+   */
+  public static getGaussianBlurUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('gaussian_blur_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
+  /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
     switch (layout) {
@@ -317,8 +330,6 @@ export class BindGroupFactory {
         return this.getBufferUniformLayout();
       case PipelineBindGroupLayouts.DEPTH_TEXTURE:
         return this.getDepthTextureLayout();
-      case PipelineBindGroupLayouts.BLOOM_PARAMS:
-        return this.getBloomParamsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

@@ -93,7 +93,6 @@ export class BloomComponent extends BlurComponent {
   }
 
   public override resize(): void {
-    // Call parent resize
     super.resize();
 
     const qualitySettings = QualitySettings.getInstance();
@@ -137,9 +136,7 @@ export class BloomComponent extends BlurComponent {
     const highlightsResult = this.result.getView();
 
     // Apply multiscaling blur to the highlights
-    this.applyMultiscaleBlur(highlightsResult);
-
-    return highlightsResult;
+    return this.applyBlur(highlightsResult);
   }
 
   public addBloom(originalTexture: GPUTextureView, bloomTexture: GPUTextureView): GPUTextureView {
@@ -256,7 +253,7 @@ export class BloomComponent extends BlurComponent {
     // Update bloom parameters if needed
   }
 
-  public override debugInMenu(): void {
+  public debugInMenu(): void {
     // Implement debug menu for bloom parameters
   }
 
