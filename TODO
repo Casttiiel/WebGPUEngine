@@ -1,22 +1,20 @@
-1. Unstable FPS (AO takes a lot of performance)
-2. Bloom params
-
-3. Ambient Occlusion GTAO
-4. AO quality
-5. Temporal Anti-Aliasing (TAA)
-6. Aliasing quality
-7. Compute-based distortion
-8. SpotLightsWithShadows
-9. PointLighstWithShadows
-10. Shadow quality
-11. Directional Light
-12. Area Light
-13. Motion Blur
-14. Decals Category
-15. Particles
-16. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-17. Optimizacion WebGPUFundamentals
-18. **ASYNC LOADING SYSTEM** 🚀
+1. Bloom params
+2. Temporal Anti-Aliasing (TAA)
+3. Aliasing quality
+4. Compute-based distortion
+5. SpotLightsWithShadows
+6. PointLighstWithShadows
+7. Shadow quality
+8. Ambient Occlusion GTAO (unstable FPS have in mind)
+9. AO quality
+10. Directional Light
+11. Area Light
+12. Motion Blur
+13. Decals Category
+14. Particles
+15. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+16. Optimizacion WebGPUFundamentals
+17. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD

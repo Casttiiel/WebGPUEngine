@@ -5,7 +5,7 @@ export class Time {
 
   public static updateFPSDisplay(deltaTime: number): void {
     Time.lastTimeFPSUpdate += deltaTime;
-    if (Time.lastTimeFPSUpdate >= 0.1) {
+    if (Time.lastTimeFPSUpdate >= 0.2) {
       Time.lastTimeFPSUpdate = 0;
       const fpsDisplay = document.getElementById('fps-display');
       if (fpsDisplay) {

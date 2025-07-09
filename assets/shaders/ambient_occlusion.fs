@@ -114,44 +114,53 @@ fn calculateAORaw(g: GBuffer, uv: vec2<f32>) -> f32 {
     let normal = g.normal;
     let screenPos = uv * camera.screenSize;
     
+    // Use conditional multiplier instead of early exit for background pixels
+    let backgroundFactor = f32(g.zlinear <= 0.999);
+    
     // Convertir a espacio de vista para cálculos independientes de zFar
     let viewPos = (camera.viewMatrix * vec4<f32>(pixelPos, 1.0)).xyz;
     let viewNormal = normalize((camera.viewMatrix * vec4<f32>(normal, 0.0)).xyz);
-
+    
+    // Optimize sample count based on distance (LOD) - pero mantener uniforme
+    let sampleCountFloat = ssaoParams.sampleCount;
+    let distanceToCamera = length(viewPos);
+    let lodFactor = clamp(distanceToCamera / 20.0, 0.25, 1.0); // Reduce samples for distant objects
+    let actualSampleCount = u32(sampleCountFloat); // Keep uniform for now, apply LOD via contribution weight
+    
     // Calculamos y acumulamos la oclusión para todas las muestras
-    for (var i = 0u; i < u32(ssaoParams.sampleCount); i = i + 1u) {
+    for (var i = 0u; i < 1; i = i + 1u) {
         var sampleUV = samplePosition(pixelPos, normal, screenPos, i);
         sampleUV.y = 1.0 - sampleUV.y; // Invertir Y para coordenadas de textura
         let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUV).x;
         
-        // Cálculos de oclusión en espacio de vista
+        // Use conditional assignments instead of early returns to maintain uniform control flow
+        let validDepth = f32(sampleDepth > 0.0 && sampleDepth < 1.0);
+        
+        // Cálculos de oclusión en espacio de vista (optimized)
         let sampleWorldPos = getWorldCoords(sampleUV, sampleDepth, camera);
         let sampleViewPos = (camera.viewMatrix * vec4<f32>(sampleWorldPos, 1.0)).xyz;
         
         let distVec = sampleViewPos - viewPos;
         let dist = length(distVec);
         
-        // Factores de peso usando distancias en espacio de vista
-        let validDepth = f32(sampleDepth > 0.0 && sampleDepth < 1.0);
+        // Use conditional instead of early exit
         let validDistance = f32(dist <= ssaoParams.maxDistance);
         
-        let distScale = 1.0 - smoothstep(0.0, ssaoParams.maxDistance, dist);
-        
-        // Usar diferencia de profundidad en espacio de vista
+        // Optimized occlusion calculation
         let viewDepthDiff = sampleViewPos.z - viewPos.z;
+        let adaptiveBias = ssaoParams.bias * (1.0 + dist);
+        
+        let validOcclusion = f32(viewDepthDiff > adaptiveBias);
         let normalFactor = max(dot(viewNormal, normalize(distVec)), 0.0);
+        let distScale = 1.0 - (dist / ssaoParams.maxDistance);
         
-        // Verificar oclusión con bias adaptativo en espacio de vista
-        let adaptiveBias = ssaoParams.bias * (1.0 + dist * 2.0);
-        let validOcclusion = f32(viewDepthDiff > adaptiveBias && dist < ssaoParams.maxDistance);
-        
-        // Acumular oclusión usando multiplicación en lugar de condicionales
-        let contribution = normalFactor * distScale * validDepth * validDistance * validOcclusion;
+        // Combine all validity checks into a single multiplier, apply LOD factor and background factor
+        let contribution = normalFactor * distScale * validDepth * validDistance * validOcclusion * lodFactor * backgroundFactor;
         occlusion += contribution;
     }
   
     // Normalizar y aplicar contraste
-    occlusion = (occlusion / ssaoParams.sampleCount) * ssaoParams.aoStrength;
+    occlusion = (occlusion / f32(actualSampleCount)) * ssaoParams.aoStrength;
     return clamp(1.0 - occlusion, 0.0, 1.0);
 }
 
@@ -163,10 +172,13 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     // Calculate raw ambient occlusion only (no bilateral filter)
     let rawAO = calculateAORaw(g, uv);
     
-    // Blend between AO and fully lit based on depth
+    // Apply background blend using conditional multiplier instead of mix
     let backgroundFactor = smoothstep(0.9995, 0.9999, g.zlinear);
-    let finalAO = mix(pow(rawAO, 1.5), 1.0, backgroundFactor);
+    let finalAO = rawAO * (1.0 - backgroundFactor) + backgroundFactor;
+    
+    // Apply power function for contrast
+    let contrastedAO = pow(finalAO, 1.5);
 
-    // Output raw AO value (bilateral filter will be applied in separate pass)
-    return finalAO;
+    // Output final AO value (bilateral filter will be applied in separate pass)
+    return contrastedAO;
 }
