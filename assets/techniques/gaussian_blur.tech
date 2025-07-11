@@ -3,5 +3,5 @@
     "fs": "gaussian_blur.fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms": ["CameraUniforms", "BufferUniform", "SingleTexture"]
+    "uniforms": ["SingleTexture", "BufferUniform"]
 }

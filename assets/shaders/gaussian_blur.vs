@@ -1,11 +1,10 @@
 #include "common/uniforms"
 
-// Gaussian blur uniforms matching your C++ implementation
 struct GaussianBlurUniforms {
-    blurStep: vec2<f32>,      // Texel step size (normalized)
-    blurWeights: vec4<f32>,   // [center, first, second, third]
-    blurDistances: vec4<f32>, // [first, second, third, unused]
-    padding: vec4<f32>,       // Padding for alignment
+    blur_w: vec4<f32>, 
+    blur_d: vec3<f32>, 
+    global_distance: f32,
+    direction: vec2<f32>,
 }
 
 // Vertex shader inputs/outputs
@@ -27,19 +26,16 @@ fn vs(@location(0) position: vec2<f32>) -> VertexOutput {
     // Convert to NDC space
     output.position = vec4<f32>(position * 2.0 - 1.0, 0.0, 1.0);
     output.uv = position;
-    
-    // Pre-calculate texture offsets in vertex shader (optimization from your C++ code)
-    // This matches the VS function in blur.fx
-    let step = blurParams.blurStep;
+
     let uv = position; // Use position directly as UV
     
     // Create temporary variables for all offsets
-    let offset1Plus = uv + step * blurParams.blurDistances.x;
-    let offset1Minus = uv - step * blurParams.blurDistances.x;
-    let offset2Plus = uv + step * blurParams.blurDistances.y;
-    let offset2Minus = uv - step * blurParams.blurDistances.y;
-    let offset3Plus = uv + step * blurParams.blurDistances.z;
-    let offset3Minus = uv - step * blurParams.blurDistances.z;
+    let offset1Plus = uv + blurParams.direction * blurParams.blur_d.x;
+    let offset1Minus = uv - blurParams.direction * blurParams.blur_d.x;
+    let offset2Plus = uv + blurParams.direction * blurParams.blur_d.y;
+    let offset2Minus = uv - blurParams.direction * blurParams.blur_d.y;
+    let offset3Plus = uv + blurParams.direction * blurParams.blur_d.z;
+    let offset3Minus = uv - blurParams.direction * blurParams.blur_d.z;
     
     // Assign the complete vectors at once (not component-wise)
     output.offset1 = vec4<f32>(offset1Plus.x, offset1Plus.y, offset1Minus.x, offset1Minus.y);

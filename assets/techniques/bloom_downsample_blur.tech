@@ -1,4 +1,0 @@
-{
-  "compute": "bloom_downsample_blur.cs",
-  "label": "bloom_downsample_blur"
-}

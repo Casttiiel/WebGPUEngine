@@ -1,4 +1,0 @@
-{
-  "compute": "bloom_upsample_blend.cs",
-  "label": "bloom_upsample_blend"
-}

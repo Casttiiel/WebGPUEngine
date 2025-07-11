@@ -1,6 +1,0 @@
-{
-    "cs": "advanced_blur_vertical.cs",
-    "uniforms": [
-        "AdvancedBlurTexture"
-    ]
-}

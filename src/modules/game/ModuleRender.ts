@@ -414,7 +414,7 @@ export class ModuleRender extends Module {
       // Apply bloom parameters based on quality settings
       bloomComponent.setMaxBlurSteps(bloomConfig.maxBlurSteps);
       bloomComponent.setBlurStrength(bloomConfig.blurStrength);
-      bloomComponent.setBlendIntensity(bloomConfig.blendIntensity);
+      //bloomComponent.setBlendIntensity(bloomConfig.blendIntensity);
 
       console.log(`Applied bloom quality settings: ${currentBloomQuality}`, bloomConfig);
     }

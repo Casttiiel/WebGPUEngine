@@ -245,10 +245,6 @@ export class BloomComponent extends BlurComponent {
     super.setBlurStrength(strength);
   }
 
-  public override setBlendIntensity(intensity: number): void {
-    super.setBlendIntensity(intensity);
-  }
-
   public override update(_dt: number): void {
     // Update bloom parameters if needed
   }
@@ -343,15 +339,6 @@ export class BloomComponent extends BlurComponent {
       },
     };
 
-    const blendIntensityWrapper = {
-      get blendIntensity() {
-        return self.getBlendIntensity();
-      },
-      set blendIntensity(value) {
-        self.setBlendIntensity(value);
-      },
-    };
-
     addControl(blurStrengthWrapper, 'blurStrength', `${componentName} Blur Strength`, {
       min: 0.0,
       max: 10.0,
@@ -361,11 +348,6 @@ export class BloomComponent extends BlurComponent {
       min: 1,
       max: 20,
       step: 1,
-    });
-    addControl(blendIntensityWrapper, 'blendIntensity', `${componentName} Blend Intensity`, {
-      min: 0.0,
-      max: 2.0,
-      step: 0.05,
     });
   }
 

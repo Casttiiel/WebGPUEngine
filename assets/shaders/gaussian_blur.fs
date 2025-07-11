@@ -1,17 +1,16 @@
 #include "common/uniforms"
 
-// Gaussian blur uniforms matching your C++ implementation
 struct GaussianBlurUniforms {
-    blurStep: vec2<f32>,      // Texel step size (normalized)
-    blurWeights: vec4<f32>,   // [center, first, second, third]
-    blurDistances: vec4<f32>, // [first, second, third, unused]
-    padding: vec4<f32>,       // Padding for alignment
+    blur_w: vec4<f32>, 
+    blur_d: vec3<f32>, 
+    global_distance: f32,
+    direction: vec2<f32>,
 }
 
-@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+@group(0) @binding(0) var inputTexture: texture_2d<f32>;
+@group(0) @binding(1) var inputSampler: sampler;
 @group(1) @binding(0) var<uniform> blurParams: GaussianBlurUniforms;
-@group(2) @binding(0) var inputTexture: texture_2d<f32>;
-@group(2) @binding(1) var inputSampler: sampler;
+
 
 @fragment
 fn fs(
@@ -32,10 +31,10 @@ fn fs(
     
     // Weighted sum using normalized weights
     let finalColor = 
-        (c0)        * blurParams.blurWeights.x +
-        (cp1 + cn1) * blurParams.blurWeights.y +
-        (cp2 + cn2) * blurParams.blurWeights.z +
-        (cp3 + cn3) * blurParams.blurWeights.w;
+        (c0)        * blurParams.blur_w.x +
+        (cp1 + cn1) * blurParams.blur_w.y +
+        (cp2 + cn2) * blurParams.blur_w.z +
+        (cp3 + cn3) * blurParams.blur_w.w;
     
     return finalColor;
 }
