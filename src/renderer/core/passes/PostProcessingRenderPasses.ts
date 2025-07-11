@@ -218,3 +218,26 @@ export class AOBilateralFilterRenderPass extends PostProcessingRenderPass {
     this.aoBindGroup = bindGroup;
   }
 }
+
+export class BloomCombineRenderPass extends PostProcessingRenderPass {
+  private bloomCombineParamsBindGroup: GPUBindGroup;
+  private bloomTexturesBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    bloomCombineParamsBindGroup: GPUBindGroup,
+    bloomTexturesBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.bloomCombineParamsBindGroup = bloomCombineParamsBindGroup;
+    this.bloomTexturesBindGroup = bloomTexturesBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    // Set all bind groups needed for the bloom combine shader
+    pass.setBindGroup(0, this.bloomCombineParamsBindGroup);
+    pass.setBindGroup(1, this.bloomTexturesBindGroup);
+  }
+}

@@ -61,7 +61,7 @@ export class BlurComponent extends Component {
   // Gaussian blur properties following C++ blur.fx pattern
   private gaussianBlurTechnique!: Technique;
   private gaussianBlurUniformBuffer!: GPUBuffer;
-  private fullscreenQuadMesh!: Mesh;
+  protected fullscreenQuadMesh!: Mesh;
   private globalDistance: number = 2.0;
 
   // Default weights from blur.fx - well balanced for most situations

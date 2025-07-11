@@ -8,17 +8,17 @@ export class BloomQualityConfigProvider {
   private static readonly configs: Record<'low' | 'medium' | 'high', BloomQualityConfig> = {
     low: {
       enabled: true,
-      maxBlurSteps: 2,
+      maxBlurSteps: 1,
       blurStrength: 1.0,
     },
     medium: {
       enabled: true,
-      maxBlurSteps: 4,
+      maxBlurSteps: 2,
       blurStrength: 1.5,
     },
     high: {
       enabled: true,
-      maxBlurSteps: 6,
+      maxBlurSteps: 4,
       blurStrength: 2.0,
     },
   };

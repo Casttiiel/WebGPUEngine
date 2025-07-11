@@ -8,43 +8,12 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { BlurComponent } from './BlurComponent';
 import { RenderPassFactory } from '../../renderer/core/passes/RenderPassFactory';
-import { RenderPassConfig } from '../../renderer/core/passes/BaseRenderPass';
-import { PostProcessingRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
 import { Engine } from '../../core/engine/Engine';
-
-/**
- * BloomCombineRenderPass - Custom render pass for combining original image with bloom
- */
-class BloomCombineRenderPass extends PostProcessingRenderPass {
-  private originalBindGroup: GPUBindGroup;
-  private bloomBindGroup: GPUBindGroup;
-
-  constructor(
-    config: RenderPassConfig,
-    mesh: Mesh,
-    technique: Technique,
-    originalBindGroup: GPUBindGroup,
-    bloomBindGroup: GPUBindGroup,
-  ) {
-    super(config, mesh, technique);
-    this.originalBindGroup = originalBindGroup;
-    this.bloomBindGroup = bloomBindGroup;
-  }
-
-  protected setBindGroups(pass: GPURenderPassEncoder): void {
-    // Set all bind groups needed for the bloom combine shader
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.originalBindGroup); // Original texture
-    pass.setBindGroup(2, this.bloomBindGroup); // Bloom texture
-  }
-}
+import { BloomCombineRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
 
 export class BloomComponent extends BlurComponent {
   private technique!: Technique;
   private combineTechnique!: Technique;
-  private fullscreenQuadMesh!: Mesh;
-  private bindGroup!: GPUBindGroup | null;
-  private combineBindGroup!: GPUBindGroup | null;
   private result!: RenderTarget;
   private finalResult!: RenderTarget;
   private renderPassManager!: RenderPassManager;
@@ -54,11 +23,15 @@ export class BloomComponent extends BlurComponent {
   private thresholdMax: number = 3.0;
   private emissiveFactor: number = 2.0;
 
-  private bloomParamsBuffer!: GPUBuffer; // Buffer específico para parámetros del filter
-
   // Additional bind groups for bloom combine operation
-  private bloomBindGroup!: GPUBindGroup;
+  private inputTextureBindGroup!: GPUBindGroup | null;
+
+  private bloomCombineParamsBuffer!: GPUBuffer; // Buffer específico para parámetros del combine
+  private bloomCombineParamsBindGroup!: GPUBindGroup | null;
+  private bloomFiltersParamsBuffer!: GPUBuffer; // Buffer específico para parámetros del filter
   private bloomFilterParamsBindGroup!: GPUBindGroup | null;
+
+  private bloomTexturesBindGroup!: GPUBindGroup | null;
 
   constructor() {
     super();
@@ -83,13 +56,21 @@ export class BloomComponent extends BlurComponent {
     this.finalResult.createRT('bloom_final_result.dds', Render.width, Render.height, bloomFormat);
 
     // Create uniform buffer specifically for bloom filter parameters
-    this.bloomParamsBuffer = GPUUtils.createBuffer(
+    this.bloomFiltersParamsBuffer = GPUUtils.createBuffer(
       'bloom_filter_params_buffer',
       16, // 4 floats * 4 bytes (threshold_min, threshold_max, emissive_factor, padding)
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
+    // Create uniform buffer specifically for bloom combine parameters
+    this.bloomCombineParamsBuffer = GPUUtils.createBuffer(
+      'bloom_combine_params_buffer',
+      16, // 4 floats * 4 bytes (threshold_min, threshold_max, emissive_factor, padding)
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
     this.updateBloomFilterParams();
+    this.updateBloomCombineParams();
   }
 
   public override resize(): void {
@@ -113,14 +94,21 @@ export class BloomComponent extends BlurComponent {
       0.0, // padding
     ]);
 
-    GPUUtils.writeBuffer(this.bloomParamsBuffer, 0, paramsData);
+    GPUUtils.writeBuffer(this.bloomFiltersParamsBuffer, 0, paramsData);
+  }
+
+  private updateBloomCombineParams(): void {
+    // Update bloom combine parameters buffer
+    const paramsData = new Float32Array([3.0, 1.0, 0.6, 0.4]);
+
+    GPUUtils.writeBuffer(this.bloomCombineParamsBuffer, 0, paramsData);
   }
 
   public generateHighlights(
     gBufferBindGroup: GPUBindGroup,
-    texture: GPUTextureView,
+    inputTexture: GPUTextureView,
   ): GPUTextureView {
-    this.setBindGroup(texture);
+    this.setInputTextureBindGroup(inputTexture);
     this.createBloomFilterParamsBindGroup();
 
     // Use RenderPassManager to execute bloom filter pass with parameters
@@ -128,31 +116,29 @@ export class BloomComponent extends BlurComponent {
       this.fullscreenQuadMesh,
       this.technique,
       gBufferBindGroup,
-      this.bindGroup!,
+      this.inputTextureBindGroup!,
       this.result,
       this.bloomFilterParamsBindGroup!,
     );
 
     const highlightsResult = this.result.getView();
-
-    // Apply multiscaling blur to the highlights
     return this.applyBlur(highlightsResult);
   }
 
-  public addBloom(originalTexture: GPUTextureView, bloomTexture: GPUTextureView): GPUTextureView {
+  public addBloom(originalTexture: GPUTextureView): GPUTextureView {
     // Create bind groups for the combine operation
-    this.setupCombineBindGroups(originalTexture, bloomTexture);
+    this.setupCombineBindGroups();
 
     // Use the RenderPassFactory to create a post-process pass config
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(this.finalResult);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(this.finalResult); //originalTexture
 
     // Create a bloom combine render pass
     const pass = new BloomCombineRenderPass(
       passConfig,
       this.fullscreenQuadMesh,
       this.combineTechnique,
-      this.combineBindGroup!, // Original texture bindgroup
-      this.bloomBindGroup!, // Bloom texture bindgroup
+      this.bloomCombineParamsBindGroup!,
+      this.bloomTexturesBindGroup!,
     );
 
     // Execute the custom pass directly using RenderPassManager
@@ -172,55 +158,55 @@ export class BloomComponent extends BlurComponent {
         {
           binding: 0,
           resource: {
-            buffer: this.bloomParamsBuffer,
+            buffer: this.bloomFiltersParamsBuffer,
           },
         },
       ],
     );
   }
 
-  private setupCombineBindGroups(
-    originalTexture: GPUTextureView,
-    bloomTexture: GPUTextureView,
-  ): void {
+  private setupCombineBindGroups(): void {
     // Create a sampler for texture sampling
     const sampler = GPUUtils.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
     });
 
-    // Create bind group for original texture (group 1)
-    this.combineBindGroup = BindGroupFactory.createBindGroup(
-      `bloom_original_bindgroup`,
+    this.bloomCombineParamsBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_combine_params_bindgroup`,
+      this.combineTechnique.getPipeline().getBindGroupLayout(0),
+      [
+        {
+          binding: 0,
+          resource: {
+            buffer: this.bloomCombineParamsBuffer,
+          },
+        },
+      ],
+    );
+
+    this.bloomTexturesBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_textures_bindgroup`,
       this.combineTechnique.getPipeline().getBindGroupLayout(1),
       [
-        { binding: 0, resource: originalTexture },
-        { binding: 1, resource: sampler },
+        { binding: 0, resource: sampler },
+        { binding: 1, resource: this.steps[0].getOutputView() },
+        { binding: 2, resource: this.steps[1].getOutputView() },
+        { binding: 3, resource: this.steps[2].getOutputView() },
+        { binding: 4, resource: this.steps[3].getOutputView() },
       ],
     );
-
-    // Create bind group for bloom texture (group 2)
-    this.bloomBindGroup = BindGroupFactory.createBindGroup(
-      `bloom_bloom_bindgroup`,
-      this.combineTechnique.getPipeline().getBindGroupLayout(2),
-      [
-        { binding: 0, resource: bloomTexture },
-        { binding: 1, resource: sampler },
-      ],
-    );
-
-    this.createBloomFilterParamsBindGroup();
   }
 
-  private setBindGroup(texture: GPUTextureView): void {
-    if (this.bindGroup) return;
+  private setInputTextureBindGroup(texture: GPUTextureView): void {
+    if (this.inputTextureBindGroup) return;
 
     const sampler = GPUUtils.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
     });
 
-    this.bindGroup = BindGroupFactory.createBindGroup(
+    this.inputTextureBindGroup = BindGroupFactory.createBindGroup(
       `bloom_bindgroup`,
       this.technique.getPipeline().getBindGroupLayout(2),
       [

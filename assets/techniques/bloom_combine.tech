@@ -4,5 +4,6 @@
     "fsEntryPoint": "fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["CameraUniforms", "SingleTexture", "SingleTexture"]
+    "blend": "additive",
+    "uniforms":["BufferUniform", "FourTexture"]
 }

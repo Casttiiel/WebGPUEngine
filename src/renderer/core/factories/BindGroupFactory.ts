@@ -282,6 +282,36 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getFourTextureLayout(): GPUBindGroupLayout {
+    return this.getLayout('four_texture', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+    ]);
+  }
+
   /**
    * Creates a bloom parameters bind group layout
    */
@@ -330,6 +360,8 @@ export class BindGroupFactory {
         return this.getBufferUniformLayout();
       case PipelineBindGroupLayouts.DEPTH_TEXTURE:
         return this.getDepthTextureLayout();
+      case PipelineBindGroupLayouts.FOUR_TEXTURE:
+        return this.getFourTextureLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

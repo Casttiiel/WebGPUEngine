@@ -194,7 +194,7 @@ export class RenderPassManager {
     mesh: Mesh,
     technique: Technique,
     gBufferBindGroup: GPUBindGroup,
-    bindGroup: GPUBindGroup,
+    inputTextureBindGroup: GPUBindGroup,
     result: RenderTarget,
     paramsBindGroup?: GPUBindGroup,
   ): void {
@@ -204,7 +204,7 @@ export class RenderPassManager {
       mesh,
       technique,
       gBufferBindGroup,
-      bindGroup,
+      inputTextureBindGroup,
       paramsBindGroup,
     );
     this.executeDynamicPass(pass);
