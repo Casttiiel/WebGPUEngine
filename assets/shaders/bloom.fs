@@ -33,7 +33,7 @@ fn PS_filter(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let lum = dot(in_color, vec3<f32>(0.2126, 0.7152, 0.0722));
     
     // Combinar luminancia con emisivos usando uniforms
-    let emissive_contribution = g.emissive * bloomParams.emissive_factor;
+    let emissive_contribution = g.emissive / bloomParams.emissive_factor;
     let total_brightness = lum + emissive_contribution;
     
     // Aplicar threshold usando uniforms

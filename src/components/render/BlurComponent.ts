@@ -75,7 +75,6 @@ export class BlurComponent extends Component {
   private gaussianBlurUniformBuffer!: GPUBuffer;
   private blurTargetA!: RenderTarget;
   private blurTargetB!: RenderTarget;
-  private blurEnabled: boolean = true;
   private globalDistance: number = 1.0;
 
   // Default weights from blur.fx - well balanced for most situations
