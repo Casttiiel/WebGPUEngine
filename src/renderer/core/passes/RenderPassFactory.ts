@@ -146,6 +146,25 @@ export class RenderPassFactory {
     };
   }
 
+  public static createBloomCombinePassConfig(
+    target: GPUTextureView,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    const colorAttachments: GPURenderPassColorAttachment[] = [
+      {
+        view: target,
+        loadOp: 'load',
+        storeOp: 'store',
+      },
+    ];
+
+    return {
+      label: 'Bloom Combine Pass',
+      colorAttachments,
+      viewport,
+    };
+  }
+
   /**
    * Creates a fullscreen post-processing pass configuration with MSAA support
    */

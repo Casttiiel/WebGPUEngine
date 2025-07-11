@@ -88,8 +88,8 @@ export class ModuleRender extends Module {
       if (bloomConfig.enabled) {
         // Apply quality-based bloom settings
         this.applyBloomQualitySettings(bloom);
-        const bloomTexture = bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
-        result = bloom.addBloom(result, bloomTexture);
+        bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
+        bloom.addBloom(result);
       }
     }
 
@@ -417,26 +417,5 @@ export class ModuleRender extends Module {
 
       console.log(`Applied bloom quality settings: ${currentBloomQuality}`, bloomConfig);
     }
-  }
-
-  // Public methods for controlling bloom quality
-  public setBloomQuality(quality: 'off' | 'low' | 'medium' | 'high'): void {
-    const qualitySettings = QualitySettings.getInstance();
-    qualitySettings.updateSettings({ bloomQuality: quality });
-
-    // Force re-application of bloom settings
-    this.lastBloomQualitySetting = '';
-
-    console.log(`Bloom quality changed to: ${quality}`);
-  }
-
-  public getBloomQuality(): string {
-    const qualitySettings = QualitySettings.getInstance();
-    return qualitySettings.getSettings().bloomQuality;
-  }
-
-  public getCurrentBloomConfig() {
-    const qualitySettings = QualitySettings.getInstance();
-    return qualitySettings.getBloomConfig();
   }
 }

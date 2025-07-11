@@ -10,12 +10,13 @@ import { BlurComponent } from './BlurComponent';
 import { RenderPassFactory } from '../../renderer/core/passes/RenderPassFactory';
 import { Engine } from '../../core/engine/Engine';
 import { BloomCombineRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
+import { Texture } from '../../renderer/resources/Texture';
 
 export class BloomComponent extends BlurComponent {
+  private whiteTexture!: Texture;
   private technique!: Technique;
   private combineTechnique!: Technique;
   private result!: RenderTarget;
-  private finalResult!: RenderTarget;
   private renderPassManager!: RenderPassManager;
 
   // Bloom filter parameters (controlables desde Tweakpane)
@@ -42,6 +43,7 @@ export class BloomComponent extends BlurComponent {
     // Load parent blur component first
     await super.load();
 
+    this.whiteTexture = await Texture.get('white.png');
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('bloom_filter.tech');
     this.combineTechnique = await Technique.get('bloom_combine.tech');
@@ -51,9 +53,6 @@ export class BloomComponent extends BlurComponent {
 
     this.result = new RenderTarget();
     this.result.createRT('bloom_filter_result.dds', Render.width, Render.height, bloomFormat);
-
-    this.finalResult = new RenderTarget();
-    this.finalResult.createRT('bloom_final_result.dds', Render.width, Render.height, bloomFormat);
 
     // Create uniform buffer specifically for bloom filter parameters
     this.bloomFiltersParamsBuffer = GPUUtils.createBuffer(
@@ -80,9 +79,8 @@ export class BloomComponent extends BlurComponent {
     const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
 
     this.result.createRT('bloom_filter_result.dds', Render.width, Render.height, bloomFormat);
-    this.finalResult.createRT('bloom_final_result.dds', Render.width, Render.height, bloomFormat);
-    this.bindGroup = null;
-    this.combineBindGroup = null;
+    this.inputTextureBindGroup = null;
+    this.bloomTexturesBindGroup = null;
   }
 
   private updateBloomFilterParams(): void {
@@ -99,15 +97,17 @@ export class BloomComponent extends BlurComponent {
 
   private updateBloomCombineParams(): void {
     // Update bloom combine parameters buffer
-    const paramsData = new Float32Array([3.0, 1.0, 0.6, 0.4]);
+    const paramsData = new Float32Array([
+      3.0,
+      this.maxBlurSteps > 1 ? 1.0 : 0.0,
+      this.maxBlurSteps > 2 ? 0.6 : 0.0,
+      this.maxBlurSteps > 3 ? 0.4 : 0.0,
+    ]);
 
     GPUUtils.writeBuffer(this.bloomCombineParamsBuffer, 0, paramsData);
   }
 
-  public generateHighlights(
-    gBufferBindGroup: GPUBindGroup,
-    inputTexture: GPUTextureView,
-  ): GPUTextureView {
+  public generateHighlights(gBufferBindGroup: GPUBindGroup, inputTexture: GPUTextureView): void {
     this.setInputTextureBindGroup(inputTexture);
     this.createBloomFilterParamsBindGroup();
 
@@ -122,15 +122,15 @@ export class BloomComponent extends BlurComponent {
     );
 
     const highlightsResult = this.result.getView();
-    return this.applyBlur(highlightsResult);
+    this.applyBlur(highlightsResult);
   }
 
-  public addBloom(originalTexture: GPUTextureView): GPUTextureView {
+  public addBloom(originalTexture: GPUTextureView): void {
     // Create bind groups for the combine operation
     this.setupCombineBindGroups();
 
     // Use the RenderPassFactory to create a post-process pass config
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(this.finalResult); //originalTexture
+    const passConfig = RenderPassFactory.createBloomCombinePassConfig(originalTexture);
 
     // Create a bloom combine render pass
     const pass = new BloomCombineRenderPass(
@@ -143,9 +143,6 @@ export class BloomComponent extends BlurComponent {
 
     // Execute the custom pass directly using RenderPassManager
     this.renderPassManager.executeDynamicPass(pass);
-
-    // Return the combined result
-    return this.finalResult.getView();
   }
 
   private createBloomFilterParamsBindGroup(): void {
@@ -185,16 +182,38 @@ export class BloomComponent extends BlurComponent {
       ],
     );
 
+    const bindGroupData = [
+      { binding: 0, resource: sampler },
+      {
+        binding: 1,
+        resource: this.steps[0]
+          ? this.steps[0].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 2,
+        resource: this.steps[1]
+          ? this.steps[1].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 3,
+        resource: this.steps[2]
+          ? this.steps[2].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 4,
+        resource: this.steps[3]
+          ? this.steps[3].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+    ];
+
     this.bloomTexturesBindGroup = BindGroupFactory.createBindGroup(
       `bloom_textures_bindgroup`,
       this.combineTechnique.getPipeline().getBindGroupLayout(1),
-      [
-        { binding: 0, resource: sampler },
-        { binding: 1, resource: this.steps[0].getOutputView() },
-        { binding: 2, resource: this.steps[1].getOutputView() },
-        { binding: 3, resource: this.steps[2].getOutputView() },
-        { binding: 4, resource: this.steps[3].getOutputView() },
-      ],
+      bindGroupData,
     );
   }
 
@@ -225,6 +244,7 @@ export class BloomComponent extends BlurComponent {
   // Inherit blur parameter controls from parent
   public override setMaxBlurSteps(steps: number): void {
     super.setMaxBlurSteps(steps);
+    this.updateBloomCombineParams();
   }
 
   public override setBlurStrength(strength: number): void {
@@ -346,12 +366,6 @@ export class BloomComponent extends BlurComponent {
 
     if (this.result) {
       this.result.destroy();
-    }
-    if (this.finalResult) {
-      this.finalResult.destroy();
-    }
-    if (this.bloomParamsBuffer) {
-      this.bloomParamsBuffer.destroy();
     }
   }
 }
