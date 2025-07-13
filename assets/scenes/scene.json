@@ -3,7 +3,11 @@
     "components": {
       "name": "Sponza",
       "transform": {
-        "rotation": [0, 90, 0]
+        "rotation": [
+          0,
+          90,
+          0
+        ]
       }
     },
     "gltf": "sponza.gltf"
@@ -15,9 +19,16 @@
     "prefab": "cube_transparent.prefab",
     "components": {
       "transform": {
-        "position": [0, 2, -10],
-
-        "scale": [0.5, 0.5, 0.5]
+        "position": [
+          0,
+          2,
+          -10
+        ],
+        "scale": [
+          0.5,
+          0.5,
+          0.5
+        ]
       }
     }
   },
@@ -25,14 +36,35 @@
     "prefab": "cube_distorsion.prefab",
     "components": {
       "transform": {
-        "position": [0, 2, 10],
-        "rotation": [0, 45, 0],
-        "scale": [0.5, 0.5, 0.5]
+        "position": [
+          0,
+          2,
+          10
+        ],
+        "rotation": [
+          0,
+          45,
+          0
+        ],
+        "scale": [
+          0.5,
+          0.5,
+          0.5
+        ]
       }
     }
   },
   {
-    "prefab": "blood_decal.prefab"
+    "prefab": "blood_decal.prefab",
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          7
+        ]
+      }
+    }
   },
   {
     "prefab": "spot_light.prefab"

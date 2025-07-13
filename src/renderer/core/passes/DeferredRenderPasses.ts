@@ -35,9 +35,16 @@ export class GBufferRenderPass extends BaseRenderPass {
  * Decals render pass for G-Buffer
  */
 export class DecalRenderPass extends BaseRenderPass {
+  private customBindGroup: GPUBindGroup | null = null;
+
   constructor(config: RenderPassConfig) {
     super(config);
   }
+
+  public setCustomBindGroup(bindGroup: GPUBindGroup): void {
+    this.customBindGroup = bindGroup;
+  }
+
   protected render(
     pass: GPURenderPassEncoder,
     _category?: RenderCategory,
@@ -49,6 +56,11 @@ export class DecalRenderPass extends BaseRenderPass {
       GPUUtils.configureViewportAndScissor(pass, viewport.width, viewport.height);
     } else {
       GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
+    }
+
+    // Set the custom bind group if provided
+    if (this.customBindGroup) {
+      pass.setBindGroup(3, this.customBindGroup);
     }
 
     // Render decals on top of G-Buffer

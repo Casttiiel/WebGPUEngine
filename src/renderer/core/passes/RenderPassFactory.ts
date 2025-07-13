@@ -66,6 +66,7 @@ export class RenderPassFactory {
    */
   public static createDecalPassConfig(
     albedos: RenderTarget,
+    normals: RenderTarget,
     selfIllum: RenderTarget,
     msaaDepthView: GPUTextureView,
     viewport?: { width: number; height: number },
@@ -77,6 +78,12 @@ export class RenderPassFactory {
         loadOp: 'load',
         storeOp: 'store',
         ...(albedos.getResolveTarget() && { resolveTarget: albedos.getResolveTarget()! }),
+      },
+      {
+        view: normals.getRenderView()!,
+        loadOp: 'load',
+        storeOp: 'store',
+        ...(normals.getResolveTarget() && { resolveTarget: normals.getResolveTarget()! }),
       },
       {
         view: selfIllum.getRenderView()!,

@@ -3,8 +3,9 @@
 #include "common/utils"
 
 struct DecalFragmentOutput {
-    @location(0) albedo: vec4<f32>,
-    @location(1) selfIllum: vec4<f32>,
+  @location(0) albedo: vec4<f32>,     // RGB: albedo, A: metallic
+  @location(1) normal: vec4<f32>,     // RGB: world normal, A: roughness
+  @location(2) selfIllum: vec4<f32>,  // RGB: emissive, A: unused
 }
 
 struct DecalVertexOutput {
@@ -24,6 +25,9 @@ struct DecalVertexOutput {
 @group(2) @binding(3) var txRoughness: texture_2d<f32>;
 @group(2) @binding(4) var txEmissive: texture_2d<f32>;
 @group(2) @binding(5) var samplerState: sampler;
+@group(3) @binding(0) var gLinearDepth: texture_2d<f32>;
+@group(3) @binding(1) var samplerState2: sampler;
+
 
 @fragment
 fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
@@ -31,7 +35,7 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     let screen_pos = input.position.xy / camera.screenSize;
 
     // Sample depth buffer to get linear depth
-    let depth = textureSample(txNormal, samplerState, screen_pos).x;
+    let depth = textureSample(gLinearDepth, samplerState, screen_pos).x;
     
     // Recover world position from depth
     let world_pos = getWorldCoords(screen_pos, depth, camera);
@@ -44,12 +48,13 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     
     // Check bounds (0-1 range for UV projection)
     if (amount_of_x < 0.0 || amount_of_x > 1.0 || amount_of_z < 0.0 || amount_of_z > 1.0) {
-        //discard;
+        discard;
     }
     
     // Sample decal texture using projected coordinates
     let decal_uv = vec2<f32>(amount_of_x, amount_of_z);
     let albedo_color = textureSample(txAlbedo, samplerState, decal_uv);
+    let normal = textureSample(txNormal, samplerState, decal_uv);
     let emissive_color = textureSample(txEmissive, samplerState, decal_uv);
     
     // Vertical fade factor
@@ -60,13 +65,14 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     
     // Discard if alpha too low
     if (final_alpha < 0.01) {
-        //discard;
+        discard;
     }
     
     var output: DecalFragmentOutput;
     
     // Output with color modulation
     output.albedo = vec4<f32>(albedo_color.rgb, final_alpha);
+    output.normal = vec4<f32>(normal.rgb, 1.0);
     output.selfIllum = vec4<f32>(emissive_color.rgb, final_alpha);
     
     return output;

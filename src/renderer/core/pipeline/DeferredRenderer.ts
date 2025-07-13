@@ -27,7 +27,7 @@ export class DeferredRenderer {
   private rtAOBinding!: RenderTarget; // Copy target for binding
 
   private gBufferBindGroup!: GPUBindGroup;
-  private gBufferLayout: GPUBindGroupLayout;
+  private gBufferLayout!: GPUBindGroupLayout;
   private whiteTexture!: Texture;
 
   private pointLightTechnique!: Technique;
@@ -88,9 +88,27 @@ export class DeferredRenderer {
       GPUTextureUsage.COPY_DST,
     ); // Add COPY_DST
 
+
     // Initialize render passes with GBufferPass render targets
     const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
+
+    
+    const gBufferLinearDepthBindGroup = BindGroupFactory.createBindGroup(
+      `gBuffer_Linear_Depth_Bind_Group`,
+      BindGroupFactory.getSingleTextureLayout(),
+      [
+        {
+          binding: 0,
+          resource: gBufferRenderTargets.linearDepth.getView()!,
+        },
+        {
+          binding: 1,
+          resource: this.whiteTexture.getSampler()!,
+        },
+      ],
+    );
+
     this.renderPassManager.initializeDeferredPasses(
       gBufferRenderTargets.albedos,
       gBufferRenderTargets.normals,
@@ -99,7 +117,9 @@ export class DeferredRenderer {
       this.rtAccLight,
       gBufferDepthTextures.msaaDepthView,
       gBufferDepthTextures.singleDepthView,
+      gBufferLinearDepthBindGroup
     );
+    
     // Create bind group with AO texture (now MSAA compatible)
     this.gBufferBindGroup = BindGroupFactory.createBindGroup(
       `gbuffer_bindgroup`,

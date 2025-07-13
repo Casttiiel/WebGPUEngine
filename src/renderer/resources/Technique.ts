@@ -302,6 +302,7 @@ export class Technique extends GPUResource {
     return [
       { format: formats.albedo }, // Albedo + metallic
       { format: formats.normal }, // Normal + roughness
+      { format: formats.selfIllum }, // Normal + roughness
     ];
   }
 
@@ -395,6 +396,13 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: false,
           depthCompare: 'less-equal',
+        };
+      }
+      case DepthModes.TEST_EQUAL_NO_WRITE: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: false,
+          depthCompare: 'equal',
         };
       }
       default: {

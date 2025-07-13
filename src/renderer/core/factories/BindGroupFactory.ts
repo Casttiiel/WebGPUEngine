@@ -162,7 +162,9 @@ export class BindGroupFactory {
         sampler: { type: 'filtering' },
       },
     ]);
-  } /**
+  } 
+  
+  /**
    * Creates a single texture bind group layout
    */
   public static getSingleTextureLayout(): GPUBindGroupLayout {

@@ -4,7 +4,8 @@
     "uniforms": [
         "CameraUniforms",
         "ObjectUniforms",
-        "MaterialTextures"
+        "MaterialTextures",
+        "SingleTexture"
     ],
     "blend": "combinative_gbuffer",
     "rs": "reverse_culling",
