@@ -66,22 +66,23 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     let final_alpha = decal_albedo.a * vertical_factor;
     
     // Discard if alpha too low
-    if (final_alpha < 0.0001) {
-        //discard;
+    if (final_alpha < 0.01) {
+        discard;
     }
     
     var output: DecalFragmentOutput;
 
-    let orig_albedo = textureSample(gBufferAlbedo, samplerState, screen_pos);
 
     // Mezcla solo los canales RGB, deja el canal A intacto
+    let orig_albedo = textureSample(gBufferAlbedo, samplerState, screen_pos);
     let out_albedo_rgb = mix(orig_albedo.rgb, decal_albedo.rgb, final_alpha);
     let out_albedo_a = orig_albedo.a; // Mantén el metallic original
+    let orig_normals = textureSample(gBufferNormals, samplerState, screen_pos);
     
     // Output with color modulation
     output.albedo = vec4<f32>(out_albedo_rgb, out_albedo_a);
-    output.normal = vec4<f32>(normal.rgb, 1.0);
-    output.selfIllum = vec4<f32>(emissive_color.rgb, final_alpha);
+    output.normal = vec4<f32>(normal.rgb, orig_normals.a); // Manten el roughness original
+    output.selfIllum = vec4<f32>(emissive_color);
 
     return output;
 }

@@ -231,10 +231,10 @@ export class TransformComponent extends Component {
       transform: this.transform,
       updateRotation() {
         // Convert degrees to radians
-        const angleX = this._x * (Math.PI / 180);
-        const angleY = this._y * (Math.PI / 180);
-        const angleZ = this._z * (Math.PI / 180);
-
+        const angleX = this._x;
+        const angleY = this._y;
+        const angleZ = this._z;
+        console.log(angleX);
         // Update rotation using the transform helper method
         this.transform.setAngles(angleY, angleX, angleZ);
         this.update();
