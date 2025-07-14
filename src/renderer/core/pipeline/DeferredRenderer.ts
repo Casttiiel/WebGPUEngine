@@ -14,6 +14,7 @@ import { GBufferPass } from '../passes/GBufferPass';
 import { RenderPassManager } from '../passes/RenderPassManager';
 import { DepthResolver } from '../processing/DepthResolver';
 import { Render } from './Render';
+import { GBufferQualityConfig } from '../config/GBufferQualityConfig';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -25,6 +26,9 @@ export class DeferredRenderer {
   private rtAccLight!: RenderTarget;
   private rtAO!: RenderTarget;
   private rtAOBinding!: RenderTarget; // Copy target for binding
+  private rtCopyAlbedos!: RenderTarget;
+  private rtCopyNormals!: RenderTarget;
+  private rtCopySelfIllum!: RenderTarget;
 
   private gBufferBindGroup!: GPUBindGroup;
   private gBufferLayout!: GPUBindGroupLayout;
@@ -54,6 +58,10 @@ export class DeferredRenderer {
     // Create accumulation light render target
     const qualitySettings = QualitySettings.getInstance();
     const postProcessingFormats = qualitySettings.getPostProcessingFormats();
+    const msaaLevel = qualitySettings.getMSAALevel();
+    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
+    const enableMSAA = msaaLevel > 1;
+    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
 
     if (!this.rtAccLight) {
       this.rtAccLight = new RenderTarget();
@@ -88,22 +96,72 @@ export class DeferredRenderer {
       GPUTextureUsage.COPY_DST,
     ); // Add COPY_DST
 
+    if (!this.rtCopyAlbedos) {
+      this.rtCopyAlbedos = new RenderTarget();
+    }
+    this.rtCopyAlbedos.createRT(
+      'gbuffer_copy_albedos',
+      width,
+      height,
+      formats.albedo,
+      enableMSAA,
+      GPUTextureUsage.COPY_DST,
+    );
+
+    if (!this.rtCopyNormals) {
+      this.rtCopyNormals = new RenderTarget();
+    }
+    this.rtCopyNormals.createRT(
+      'gbuffer_copy_normals',
+      width,
+      height,
+      formats.normal,
+      enableMSAA,
+      GPUTextureUsage.COPY_DST,
+    );
+
+    if (!this.rtCopySelfIllum) {
+      this.rtCopySelfIllum = new RenderTarget();
+    }
+    this.rtCopySelfIllum.createRT(
+      'gbuffer_copy_selfillum',
+      width,
+      height,
+      formats.selfIllum,
+      enableMSAA,
+      GPUTextureUsage.COPY_DST,
+    );
 
     // Initialize render passes with GBufferPass render targets
     const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
 
-    
-    const gBufferLinearDepthBindGroup = BindGroupFactory.createBindGroup(
-      `gBuffer_Linear_Depth_Bind_Group`,
-      BindGroupFactory.getSingleTextureLayout(),
+    const copyPartialGBufferBindGroup = BindGroupFactory.createBindGroup(
+      `gBuffer_copy_bind_group`,
+      this.gBufferLayout,
       [
         {
           binding: 0,
-          resource: gBufferRenderTargets.linearDepth.getView()!,
+          resource: this.rtCopyAlbedos.getView()!,
         },
         {
           binding: 1,
+          resource: this.rtCopyNormals.getView()!,
+        },
+        {
+          binding: 2,
+          resource: gBufferRenderTargets.linearDepth.getView()!,
+        },
+        {
+          binding: 3,
+          resource: this.rtCopySelfIllum.getView()!,
+        },
+        {
+          binding: 4,
+          resource: this.whiteTexture.getTextureView()!,
+        },
+        {
+          binding: 5,
           resource: this.whiteTexture.getSampler()!,
         },
       ],
@@ -117,9 +175,9 @@ export class DeferredRenderer {
       this.rtAccLight,
       gBufferDepthTextures.msaaDepthView,
       gBufferDepthTextures.singleDepthView,
-      gBufferLinearDepthBindGroup
+      copyPartialGBufferBindGroup,
     );
-    
+
     // Create bind group with AO texture (now MSAA compatible)
     this.gBufferBindGroup = BindGroupFactory.createBindGroup(
       `gbuffer_bindgroup`,
@@ -195,6 +253,7 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
     // Execute Decal pass
+    this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
     // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
@@ -218,6 +277,44 @@ export class DeferredRenderer {
       throw new Error('Failed to get albedo render target view');
     }
     return view;
+  }
+
+  private copyGBufferTexturesToBindGroup(): void {
+    const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
+    const encoder = Render.getInstance().getCommandEncoder();
+
+    // Copiar albedo
+    encoder.copyTextureToTexture(
+      { texture: gBufferRenderTargets.albedos.getTexture() },
+      { texture: this.rtCopyAlbedos.getTexture() },
+      {
+        width: this.rtCopyAlbedos.getWidth(),
+        height: this.rtCopyAlbedos.getHeight(),
+        depthOrArrayLayers: 1,
+      },
+    );
+
+    // Copiar normal
+    encoder.copyTextureToTexture(
+      { texture: gBufferRenderTargets.normals.getTexture() },
+      { texture: this.rtCopyNormals.getTexture() },
+      {
+        width: this.rtCopyNormals.getWidth(),
+        height: this.rtCopyNormals.getHeight(),
+        depthOrArrayLayers: 1,
+      },
+    );
+
+    // Copiar selfIllum
+    encoder.copyTextureToTexture(
+      { texture: gBufferRenderTargets.selfIllum.getTexture() },
+      { texture: this.rtCopySelfIllum.getTexture() },
+      {
+        width: this.rtCopySelfIllum.getWidth(),
+        height: this.rtCopySelfIllum.getHeight(),
+        depthOrArrayLayers: 1,
+      },
+    );
   }
 
   private renderAO(camera: Entity, ao: RenderTarget): void {

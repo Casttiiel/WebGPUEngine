@@ -22,7 +22,7 @@
       "render": {
         "meshes": [
           {
-            "mesh": "cube.obj",
+            "mesh": "unit_cube.obj",
             "material": "blood_decal.mat"
           }
         ]

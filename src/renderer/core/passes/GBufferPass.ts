@@ -47,13 +47,34 @@ export class GBufferPass {
 
     // Create G-Buffer render targets with dynamic formats
     this.rtAlbedos = new RenderTarget();
-    this.rtAlbedos.createRT('gbuffer_albedos', width, height, formats.albedo, enableMSAA);
+    this.rtAlbedos.createRT(
+      'gbuffer_albedos',
+      width,
+      height,
+      formats.albedo,
+      enableMSAA,
+      GPUTextureUsage.COPY_SRC,
+    );
 
     this.rtNormals = new RenderTarget();
-    this.rtNormals.createRT('gbuffer_normals', width, height, formats.normal, enableMSAA);
+    this.rtNormals.createRT(
+      'gbuffer_normals',
+      width,
+      height,
+      formats.normal,
+      enableMSAA,
+      GPUTextureUsage.COPY_SRC,
+    );
 
     this.rtSelfIllum = new RenderTarget();
-    this.rtSelfIllum.createRT('gbuffer_selfillum', width, height, formats.selfIllum, enableMSAA);
+    this.rtSelfIllum.createRT(
+      'gbuffer_selfillum',
+      width,
+      height,
+      formats.selfIllum,
+      enableMSAA,
+      GPUTextureUsage.COPY_SRC,
+    );
 
     this.rtLinearDepth = new RenderTarget();
     this.rtLinearDepth.createRT(

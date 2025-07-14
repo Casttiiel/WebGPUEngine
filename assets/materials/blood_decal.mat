@@ -1,7 +1,8 @@
 {
     "technique": "decal.tech",
     "textures":{
-        "txAlbedo": "blood.png"
+        "txAlbedo": "blood.png",
+        "txEmissive": "white.png"
     },
     "casts_shadows": false,
     "category": "decals",

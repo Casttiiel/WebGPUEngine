@@ -25,8 +25,11 @@ struct DecalVertexOutput {
 @group(2) @binding(3) var txRoughness: texture_2d<f32>;
 @group(2) @binding(4) var txEmissive: texture_2d<f32>;
 @group(2) @binding(5) var samplerState: sampler;
-@group(3) @binding(0) var gLinearDepth: texture_2d<f32>;
-@group(3) @binding(1) var samplerState2: sampler;
+@group(3) @binding(0) var gBufferAlbedo: texture_2d<f32>;
+@group(3) @binding(1) var gBufferNormals: texture_2d<f32>;
+@group(3) @binding(2) var gLinearDepth: texture_2d<f32>;
+@group(3) @binding(3) var gBufferSelfIllum: texture_2d<f32>;
+@group(3) @binding(5) var samplerState2: sampler;
 
 
 @fragment
@@ -40,7 +43,6 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     // Recover world position from depth
     let world_pos = getWorldCoords(screen_pos, depth, camera);
     
-    // Convert to local decal space (exactly like MCV_Supermarket)
     let decal_top_left_to_wPos = world_pos - input.decal_top_left;
     let amount_of_x = dot(decal_top_left_to_wPos, input.decal_axis_x);
     let amount_of_z = dot(decal_top_left_to_wPos, input.decal_axis_z);
@@ -53,7 +55,7 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     
     // Sample decal texture using projected coordinates
     let decal_uv = vec2<f32>(amount_of_x, amount_of_z);
-    let albedo_color = textureSample(txAlbedo, samplerState, decal_uv);
+    let decal_albedo = textureSample(txAlbedo, samplerState, decal_uv);
     let normal = textureSample(txNormal, samplerState, decal_uv);
     let emissive_color = textureSample(txEmissive, samplerState, decal_uv);
     
@@ -61,19 +63,25 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     let vertical_factor = 1.0 - abs(amount_of_y * 2.0);
     
     // Final alpha with opacity and vertical fade
-    let final_alpha = albedo_color.a * vertical_factor;
+    let final_alpha = decal_albedo.a * vertical_factor;
     
     // Discard if alpha too low
-    if (final_alpha < 0.01) {
-        discard;
+    if (final_alpha < 0.0001) {
+        //discard;
     }
     
     var output: DecalFragmentOutput;
+
+    let orig_albedo = textureSample(gBufferAlbedo, samplerState, screen_pos);
+
+    // Mezcla solo los canales RGB, deja el canal A intacto
+    let out_albedo_rgb = mix(orig_albedo.rgb, decal_albedo.rgb, final_alpha);
+    let out_albedo_a = orig_albedo.a; // Mantén el metallic original
     
     // Output with color modulation
-    output.albedo = vec4<f32>(albedo_color.rgb, final_alpha);
+    output.albedo = vec4<f32>(out_albedo_rgb, out_albedo_a);
     output.normal = vec4<f32>(normal.rgb, 1.0);
     output.selfIllum = vec4<f32>(emissive_color.rgb, final_alpha);
-    
+
     return output;
 }

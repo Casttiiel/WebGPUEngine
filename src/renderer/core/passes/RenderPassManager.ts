@@ -33,7 +33,7 @@ export class RenderPassManager {
     accLight: RenderTarget,
     msaaDepthView: GPUTextureView,
     singleDepthView: GPUTextureView,
-    gBufferBindGroup: GPUBindGroup,
+    copyPartialGBufferBindGroup: GPUBindGroup,
   ): void {
     // Create G-Buffer pass
     const gBufferConfig = RenderPassFactory.createGBufferPassConfig(
@@ -47,9 +47,14 @@ export class RenderPassManager {
     this.renderPasses.set('gbuffer', gBufferPass);
 
     // Create Decal pass
-    const decalConfig = RenderPassFactory.createDecalPassConfig(albedos, normals, selfIllum, msaaDepthView);
+    const decalConfig = RenderPassFactory.createDecalPassConfig(
+      albedos,
+      normals,
+      selfIllum,
+      msaaDepthView,
+    );
     const decalPass = new DecalRenderPass(decalConfig);
-    decalPass.setCustomBindGroup(gBufferBindGroup);
+    decalPass.setCustomBindGroup(copyPartialGBufferBindGroup);
     this.renderPasses.set('decals', decalPass);
 
     // Create Transparent pass
