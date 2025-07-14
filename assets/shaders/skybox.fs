@@ -42,5 +42,5 @@ fn fs(@location(0) position_clip: vec3<f32>) -> @location(0) vec4<f32> {
     
     // Sample the cubemap - el vector debe estar normalizado
     let color = textureSample(skyboxTexture, skyboxSampler, sample_dir);
-    return vec4<f32>(color.rgb, 1.0);
+    return vec4<f32>(color.rgb * 2, 1.0);
 }

@@ -20,8 +20,8 @@ export class BloomComponent extends BlurComponent {
   private renderPassManager!: RenderPassManager;
 
   // Bloom filter parameters (controlables desde Tweakpane)
-  private thresholdMin: number = 1.2;
-  private thresholdMax: number = 3.0;
+  private thresholdMin: number = 4.0; // Más alto para evitar specular común
+  private thresholdMax: number = 12.0; // Threshold más alto para HDR
   private emissiveFactor: number = 2.0;
 
   // Additional bind groups for bloom combine operation
@@ -98,7 +98,7 @@ export class BloomComponent extends BlurComponent {
   private updateBloomCombineParams(): void {
     // Update bloom combine parameters buffer
     const paramsData = new Float32Array([
-      3.0,
+      1.0,
       this.maxBlurSteps > 1 ? 1.0 : 0.0,
       this.maxBlurSteps > 2 ? 0.6 : 0.0,
       this.maxBlurSteps > 3 ? 0.4 : 0.0,
@@ -107,7 +107,10 @@ export class BloomComponent extends BlurComponent {
     GPUUtils.writeBuffer(this.bloomCombineParamsBuffer, 0, paramsData);
   }
 
-  public generateHighlights(gBufferBindGroup: GPUBindGroup, inputTexture: GPUTextureView): void {
+  public generateHighlights(
+    gBufferBindGroup: GPUBindGroup,
+    inputTexture: GPUTextureView,
+  ): GPUTextureView {
     this.setInputTextureBindGroup(inputTexture);
     this.createBloomFilterParamsBindGroup();
 
@@ -122,6 +125,7 @@ export class BloomComponent extends BlurComponent {
     );
 
     const highlightsResult = this.result.getView();
+    //return highlightsResult;
     this.applyBlur(highlightsResult);
   }
 
@@ -312,12 +316,12 @@ export class BloomComponent extends BlurComponent {
 
     addControl(thresholdMinWrapper, 'thresholdMin', `${componentName} Filter Threshold Min`, {
       min: 0.0,
-      max: 10.0,
+      max: 26.0,
       step: 0.1,
     });
     addControl(thresholdMaxWrapper, 'thresholdMax', `${componentName} Filter Threshold Max`, {
       min: 0.5,
-      max: 16.0,
+      max: 32.0,
       step: 0.1,
     });
     addControl(emissiveFactorWrapper, 'emissiveFactor', `${componentName} Emissive Factor`, {
@@ -326,7 +330,6 @@ export class BloomComponent extends BlurComponent {
       step: 0.1,
     });
 
-    // Add controls for inherited blur parameters from BlurComponent using wrapper objects
     const blurStrengthWrapper = {
       get blurStrength() {
         return self.getBlurStrength();

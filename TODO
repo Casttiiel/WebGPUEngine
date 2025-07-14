@@ -1,5 +1,5 @@
-1. Bloom params
-2. Decals Category
+1. Decals Category (On low quality failure)
+2. Bloom params (Filtering, Blur, Combine)
 3. Temporal Anti-Aliasing (TAA)
 4. Aliasing quality
 5. Compute-based distortion
