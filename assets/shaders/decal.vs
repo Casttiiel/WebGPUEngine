@@ -11,7 +11,8 @@ struct DecalVertexOutput {
     @location(1) decal_axis_x: vec3<f32>,
     @location(2) decal_axis_z: vec3<f32>,
     @location(3) decal_axis_y: vec3<f32>,
-    @location(4) uv: vec2<f32>,
+    @location(4) N: vec3<f32>,
+    @location(5) T: vec4<f32>,
 }
 
 @vertex
@@ -28,6 +29,10 @@ fn vs(
     
     // Transform to clip space
     output.position = camera.projectionMatrix * camera.viewMatrix * worldPos;
+
+    let model3x3 = get3x3From4x4(object.modelMatrix);
+    output.N = normalize(model3x3 * normal);
+    output.T = vec4<f32>(normalize(model3x3 * tangent.xyz), tangent.w);
     
     // Extract decal axes from world matrix
     let center = vec3<f32>(object.modelMatrix[3].x, object.modelMatrix[3].y, object.modelMatrix[3].z);
@@ -41,8 +46,6 @@ fn vs(
     output.decal_axis_x = decal_x * decal_inv_size;
     output.decal_axis_z = decal_z * decal_inv_size;
     output.decal_axis_y = decal_y * decal_inv_size;
-    
-    output.uv = uv;
-    
+        
     return output;
 }

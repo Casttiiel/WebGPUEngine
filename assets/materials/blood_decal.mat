@@ -2,6 +2,7 @@
     "technique": "decal.tech",
     "textures":{
         "txAlbedo": "blood.png",
+        "txNormal": "lee_normal.jpg",
         "txEmissive": "white.png"
     },
     "casts_shadows": false,

@@ -14,7 +14,8 @@ struct DecalVertexOutput {
     @location(1) decal_axis_x: vec3<f32>,
     @location(2) decal_axis_z: vec3<f32>,
     @location(3) decal_axis_y: vec3<f32>,
-    @location(4) uv: vec2<f32>,
+    @location(4) N: vec3<f32>,
+    @location(5) T: vec4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -56,8 +57,6 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     // Sample decal texture using projected coordinates
     let decal_uv = vec2<f32>(amount_of_x, amount_of_z);
     let decal_albedo = textureSample(txAlbedo, samplerState, decal_uv);
-    let normal = textureSample(txNormal, samplerState, decal_uv);
-    let emissive_color = textureSample(txEmissive, samplerState, decal_uv);
     
     // Vertical fade factor
     let vertical_factor = 1.0 - abs(amount_of_y * 2.0);
@@ -69,19 +68,28 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     if (final_alpha < 0.01) {
         discard;
     }
+
+    let N_tangent_space = textureSample(txNormal, samplerState, decal_uv) * 2.0 - 1.0;
+    let emissive_color = textureSample(txEmissive, samplerState, decal_uv);
     
     var output: DecalFragmentOutput;
-
 
     // Mezcla solo los canales RGB, deja el canal A intacto
     let orig_albedo = textureSample(gBufferAlbedo, samplerState, screen_pos);
     let out_albedo_rgb = mix(orig_albedo.rgb, decal_albedo.rgb, final_alpha);
     let out_albedo_a = orig_albedo.a; // Mantén el metallic original
+
+    let TBN = computeTBN(normalize(input.N), input.T);
+    let decal_normal = normalize(TBN * N_tangent_space.xyz);
     let orig_normals = textureSample(gBufferNormals, samplerState, screen_pos);
-    
+    let orig_normal = decodeNormal(orig_normals.rgb);
+    let blended_normal = normalize(mix(orig_normal, decal_normal, final_alpha));
+    let out_normal_rgb = encodeNormal(blended_normal, orig_normals.a); // Manten el roughness original
+
+
     // Output with color modulation
     output.albedo = vec4<f32>(out_albedo_rgb, out_albedo_a);
-    output.normal = vec4<f32>(normal.rgb, orig_normals.a); // Manten el roughness original
+    output.normal = vec4<f32>(out_normal_rgb);
     output.selfIllum = vec4<f32>(emissive_color);
 
     return output;
