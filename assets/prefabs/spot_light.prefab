@@ -7,7 +7,7 @@
         "intensity": 5,
         "radius": 20,
         "near": 0.1,
-        "far": 20,
+        "far": 30,
         "fov": 20,
         "position": [0, 2, 0],
         "target": [0, 2, 1],

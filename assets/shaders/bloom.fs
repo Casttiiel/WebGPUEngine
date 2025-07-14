@@ -39,8 +39,5 @@ fn PS_filter(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Aplicar threshold usando uniforms
     let amount = smoothstep(bloomParams.threshold_min, bloomParams.threshold_max, total_brightness);
     
-    // Aplicar una curva adicional para hacer el bloom más dramático
-    let bloom_curve = amount * amount; // Curva cuadrática para mejor falloff
-    
-    return vec4<f32>(in_color.rgb * bloom_curve, 1.0);
+    return vec4<f32>(in_color.rgb * amount, 1.0);
 }

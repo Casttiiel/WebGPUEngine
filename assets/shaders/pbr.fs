@@ -111,7 +111,10 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool, smooth_atte
     
     // PBR calculations
     let cDiff = Diffuse(g.albedo);
-    let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
+    let cSpec_raw = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
+    
+    // Limitar el specular para evitar valores extremos que causan bloom no deseado
+    let cSpec = min(cSpec_raw, vec3<f32>(8.0)); // Limitar a 8.0 máximo por componente
     
     // Attenuation
     var att = saturate(distance_to_light / light.radius);
@@ -124,7 +127,15 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool, smooth_atte
     }
 
     // Energy conservation: specular contribution reduces diffuse
-    let final_color = light.color.xyz * NdL * (cDiff + cSpec) * att * light.intensity * shadow_factor;
+    let F = Fresnel_Schlick(VdH, g.specularColor);
+    let kS = F; // Specular contribution
+    let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse contribution
+    
+    // Aplicar energy conservation correctamente
+    let diffuse_contrib = kD * cDiff;
+    let specular_contrib = cSpec;
+    
+    let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * att * light.intensity * shadow_factor;
     return vec4<f32>(final_color, 1.0);
 }
 

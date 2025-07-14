@@ -1,21 +1,24 @@
-1. Decals Category (Normals)
-2. Default specular for dielectrics is 0.03?
-3. Bloom params (Self illum? Decals?)
-4. Temporal Anti-Aliasing (TAA)
-5. Aliasing quality
+1. Emissive
+2. Spot Light tweakpane
+3. Point light tweakpane
+4. Decals Category (Normals)
+5. Default specular for dielectrics is 0.03?
 6. Compute-based distortion
-7. SpotLightsWithShadows
-8. PointLighstWithShadows
-9. Shadow quality
-10. Ambient Occlusion GTAO (unstable FPS have in mind)
-11. AO quality
-12. Directional Light
-13. Area Light
-14. Motion Blur
-15. Particles
-16. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-17. Optimizacion WebGPUFundamentals
-18. **ASYNC LOADING SYSTEM** 🚀
+7. Temporal Anti-Aliasing (TAA)
+8. Aliasing quality
+9. Spot Light Render In Debug
+10. SpotLightsWithShadows
+11. PointLighstWithShadows
+12. Shadow quality
+13. Ambient Occlusion GTAO (unstable FPS have in mind)
+14. AO quality
+15. Directional Light
+16. Area Light
+17. Motion Blur
+18. Particles
+19. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+20. Optimizacion WebGPUFundamentals
+21. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD
