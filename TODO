@@ -1,20 +1,22 @@
 1. Decals Category (On low quality failure)
-2. Bloom params (Filtering, Blur, Combine)
-3. Temporal Anti-Aliasing (TAA)
-4. Aliasing quality
-5. Compute-based distortion
-6. SpotLightsWithShadows
-7. PointLighstWithShadows
-8. Shadow quality
-9. Ambient Occlusion GTAO (unstable FPS have in mind)
-10. AO quality
-11. Directional Light
-12. Area Light
-13. Motion Blur
-14. Particles
-15. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-16. Optimizacion WebGPUFundamentals
-17. **ASYNC LOADING SYSTEM** 🚀
+2. Temporal Anti-Aliasing (TAA)
+3. Aliasing quality
+4. Compute-based distortion
+5. Spot Light Render In Debug
+6. Spot Light tweakpane
+7. Point light tweakpane
+8. SpotLightsWithShadows
+9. PointLighstWithShadows
+10. Shadow quality
+11. Ambient Occlusion GTAO (unstable FPS have in mind)
+12. AO quality
+13. Directional Light
+14. Area Light
+15. Motion Blur
+16. Particles
+17. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+18. Optimizacion WebGPUFundamentals
+19. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD

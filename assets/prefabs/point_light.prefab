@@ -7,7 +7,7 @@
       },
       "point_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
-        "intensity": 1,
+        "intensity": 10,
         "radius": 7
       }
     }

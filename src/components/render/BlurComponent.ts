@@ -139,8 +139,8 @@ export class BlurComponent extends Component {
 
     // Create blur steps with progressively smaller input resolutions
     // Each step takes input at one resolution and outputs at half resolution
-    let inputWidth = Render.width;
-    let inputHeight = Render.height;
+    let inputWidth = Render.width / 2;
+    let inputHeight = Render.height / 2;
 
     for (let i = 0; i < this.maxBlurSteps; i++) {
       const step = new BlurStep(`step_${i}`, inputWidth, inputHeight, bloomFormat);
