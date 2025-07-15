@@ -4,4 +4,5 @@ export interface PointLightComponentData {
   color?: vec4;
   intensity?: number;
   radius?: number;
+  startFallof?: number;
 }

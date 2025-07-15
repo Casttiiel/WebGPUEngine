@@ -11,6 +11,7 @@ export class SpotLightComponent extends CameraComponent {
   private position = vec3.create();
   private intensity = 1.0;
   private radius = 1.0;
+  private startFallof = 0.0;
 
   private uniformBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
@@ -52,6 +53,10 @@ export class SpotLightComponent extends CameraComponent {
       this.camera.setViewport(data.viewport.width, data.viewport.height);
     }
 
+    if (data.startFallof) {
+      this.startFallof = data.startFallof;
+    }
+
     if (data.isOrtho) {
       this.camera.setOrthoParams(
         data.orthoCentered || true,
@@ -67,7 +72,7 @@ export class SpotLightComponent extends CameraComponent {
     this.technique = await Technique.get('spot_light.tech');
     this.uniformBuffer = GPUUtils.createBuffer(
       'spot light uniform buffer',
-      28 * 4,
+      36 * 4,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
@@ -107,6 +112,13 @@ export class SpotLightComponent extends CameraComponent {
       96,
       new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
     );
+
+    GPUUtils.writeBuffer(
+      this.uniformBuffer,
+      112,
+      new Float32Array(vec4.fromValues(this.startFallof, 0.0, 0.0, 0.0)),
+    );
+
     const modelBindGroupLayout = BindGroupFactory.getLayoutFromEnum(
       PipelineBindGroupLayouts.OBJECT_UNIFORMS,
     );

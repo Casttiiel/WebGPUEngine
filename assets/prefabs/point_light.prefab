@@ -7,8 +7,9 @@
       },
       "point_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
-        "intensity": 10,
-        "radius": 7
+        "intensity": 5,
+        "radius": 5,
+        "startFallof": 3
       }
     }
   }

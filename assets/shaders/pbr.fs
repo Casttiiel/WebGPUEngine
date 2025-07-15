@@ -6,14 +6,17 @@
 const PI: f32 = 3.14159265359;
 
 struct LightUniforms {
-    color: vec4<f32>,
-    position: vec3<f32>,
-    intensity: f32,
-    viewProjOffset: mat4x4<f32>,
-    radius: f32,
-    shadowStep: f32,
-    shadowInverseResolution: f32,
-    shadowStepDivResolution: f32,
+    color: vec4<f32>,            // 16 bytes (0-15)
+    position: vec3<f32>,         // 12 bytes (16-27)
+    intensity: f32,              // 4 bytes  (28-31)
+    viewProjOffset: mat4x4<f32>, // 64 bytes (32-95)
+    radius: f32,                 // 4 bytes  (96-99)
+    shadowStep: f32,             // 4 bytes  (100-103)
+    shadowInverseResolution: f32, // 4 bytes (104-107)
+    shadowStepDivResolution: f32, // 4 bytes (108-111)
+    startFalloff: f32,           // 4 bytes  (112-115)
+    padding: vec3<f32>,          // 12 bytes (116-127)
+    extraPadding: f32,           // 4 bytes  (128-131) para llegar a 144 bytes
 }
 
 // Helper function for saturate (clamp to 0-1)
@@ -66,7 +69,7 @@ fn Diffuse(pAlbedo: vec3<f32>) -> vec3<f32> {
     return pAlbedo / PI;
 }
 
-fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool, smooth_attenuation: bool) -> vec4<f32> {
+fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32> {
     let g = decodeGBuffer(iPosition);
     
     // Shadow factor entre 0 (totalmente en sombra) y 1 (no ocluido)
@@ -114,17 +117,11 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool, smooth_atte
     let cSpec_raw = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
     // Limitar el specular para evitar valores extremos que causan bloom no deseado
-    let cSpec = min(cSpec_raw, vec3<f32>(8.0)); // Limitar a 8.0 máximo por componente
+    let cSpec = min(cSpec_raw, vec3<f32>(4.0)); // Limitar a 4.0 máximo por componente
     
     // Attenuation
-    var att = saturate(distance_to_light / light.radius);
-    att = 1.0 - att;
-    if(smooth_attenuation){
-        // Physically-based attenuation (inverse square + smooth cutoff)
-        let distance_attenuation = 1.0 / max(distance_to_light * distance_to_light, 0.01);
-        let radius_attenuation = saturate(1.0 - pow(distance_to_light / light.radius, 4.0));
-        att = distance_attenuation * radius_attenuation * radius_attenuation;
-    }
+    let normalized_distance = max(distance_to_light - light.startFalloff, 0.0) / (light.radius - light.startFalloff);
+    var att = saturate(1.0 - normalized_distance);
 
     // Energy conservation: specular contribution reduces diffuse
     let F = Fresnel_Schlick(VdH, g.specularColor);
@@ -152,11 +149,11 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool, smooth_atte
 @fragment
 fn PS_point_lights(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = position.xy / camera.screenSize;
-    return shade(pos, false, false, true);
+    return shade(pos, false, false);
 }
 
 @fragment
 fn PS_dir_lights_no_shadow(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = position.xy / camera.screenSize;
-    return shade(pos, false, true, false);
+    return shade(pos, false, true);
 }

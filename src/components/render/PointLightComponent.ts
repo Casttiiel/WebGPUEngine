@@ -11,6 +11,7 @@ export class PointLightComponent extends Component {
   private position = vec3.create();
   private intensity = 1.0;
   private radius = 1.0;
+  private startFallof = 0.0;
   private isDirty = true;
 
   private uniformBindGroup!: GPUBindGroup;
@@ -35,10 +36,14 @@ export class PointLightComponent extends Component {
       this.radius = data.radius;
     }
 
+    if (data.startFallof) {
+      this.startFallof = data.startFallof;
+    }
+
     this.technique = await Technique.get('point_light.tech');
     this.uniformBuffer = GPUUtils.createBuffer(
       'point light uniform buffer',
-      28 * 4,
+      36 * 4,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
@@ -79,6 +84,12 @@ export class PointLightComponent extends Component {
         this.uniformBuffer,
         96,
         new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
+      );
+
+      GPUUtils.writeBuffer(
+        this.uniformBuffer,
+        112,
+        new Float32Array(vec4.fromValues(this.startFallof, 0.0, 0.0, 0.0)),
       );
       this.isDirty = false;
     }

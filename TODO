@@ -1,26 +1,25 @@
-1. Distance params on lights
+1. Default specular for dielectrics is 0.03?
 2. Spot Light tweakpane
 3. Point light tweakpane
-4. Default specular for dielectrics is 0.03?
-5. All metallic, no roughness weird behavior
-6. Blood decal without emissive is half transparent?
-7. Compute-based distortion
-8. Decals Category (Normals)
-9. Temporal Anti-Aliasing (TAA)
-10. Aliasing quality
-11. Spot Light Render In Debug
-12. SpotLightsWithShadows
-13. PointLighstWithShadows
-14. Shadow quality
-15. Ambient Occlusion GTAO (unstable FPS have in mind)
-16. AO quality
-17. Directional Light
-18. Area Light
-19. Motion Blur
-20. Particles
-21. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-22. Optimizacion WebGPUFundamentals
-23. **ASYNC LOADING SYSTEM** 🚀
+4. All metallic, no roughness weird behavior
+5. Blood decal without emissive is half transparent?
+6. Compute-based distortion
+7. Decals Category (Normals)
+8. Temporal Anti-Aliasing (TAA)
+9. Aliasing quality
+10. Spot Light Render In Debug
+11. SpotLightsWithShadows
+12. PointLighstWithShadows
+13. Shadow quality
+14. Ambient Occlusion GTAO (unstable FPS have in mind)
+15. AO quality
+16. Directional Light
+17. Area Light
+18. Motion Blur
+19. Particles
+20. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+21. Optimizacion WebGPUFundamentals
+22. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD

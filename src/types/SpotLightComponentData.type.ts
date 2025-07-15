@@ -11,4 +11,5 @@ export interface SpotLightComponentData extends CameraComponentDataType {
   orthoWidth?: number;
   orthoTop?: number;
   orthoHeight?: number;
+  startFallof?: number;
 }
