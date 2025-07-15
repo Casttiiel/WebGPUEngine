@@ -34,7 +34,7 @@
     "prefab": "blood_decal.prefab",
     "components": {
       "transform": {
-        "position": [0, 0, 7]
+        "position": [0, 0, -7]
       }
     }
   },

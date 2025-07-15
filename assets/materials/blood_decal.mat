@@ -1,8 +1,7 @@
 {
     "technique": "decal.tech",
     "textures":{
-        "txAlbedo": "blood.png",
-        "txNormal": "lee_normal.jpg"
+        "txAlbedo": "blood.png"
     },
     "casts_shadows": false,
     "category": "decals",

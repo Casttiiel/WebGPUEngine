@@ -83,7 +83,7 @@ export class Material extends GPUResource {
 
     const textures: MaterialTexturesOptions = {
       albedo: materialData?.textures.txAlbedo || 'white.png',
-      normal: materialData?.textures.txNormal || 'black.png',
+      normal: materialData?.textures.txNormal || 'no-normal.jpg',
       metallic: materialData?.textures.txMetallic || 'black.png',
       roughness: materialData?.textures.txRoughness || 'black.png',
       emissive: materialData?.textures.txEmissive || 'black.png',
