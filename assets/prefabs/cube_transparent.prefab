@@ -1,7 +1,7 @@
 {
     "children": [],
     "components": {
-      "name": "Cube",
+      "name": "Transparent Cube",
       "transform": {
         "position": [
           0,

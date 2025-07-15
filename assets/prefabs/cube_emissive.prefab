@@ -1,7 +1,7 @@
 {
     "children": [],
     "components": {
-      "name": "Distorsion Cube",
+      "name": "Emissive Cube",
       "transform": {
         "position": [
           0,
@@ -23,7 +23,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "distorsion.mat"
+            "material": "emissive.mat"
           }
         ]
       }

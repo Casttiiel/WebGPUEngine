@@ -22,7 +22,7 @@ export class BloomComponent extends BlurComponent {
   // Bloom filter parameters (controlables desde Tweakpane)
   private thresholdMin: number = 10.0; // Más alto para evitar specular común
   private thresholdMax: number = 30.0; // Threshold más alto para HDR
-  private emissiveFactor: number = 2.0;
+  private emissiveFactor: number = 15.0; // Factor de multiplicación para superficies emisivas
 
   // Additional bind groups for bloom combine operation
   private inputTextureBindGroup!: GPUBindGroup | null;
