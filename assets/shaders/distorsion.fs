@@ -13,27 +13,22 @@
 @fragment
 fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // Distorsion strength (could be a uniform parameter)
-    let distortionStrength = 0.05;
+    let distortionStrength = 1.0;
     
     // Calculate position displaced by normal in world space
-    let displacedWorldPos = input.WorldPos.xyz + input.N.xyz * distortionStrength;
+    let displacedWorldPos = input.WorldPos.xyz + (input.N.xyz * distortionStrength);
     
     // Project displaced position to screen space
     let displacedClipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(displacedWorldPos, 1.0);
     let displacedNDC = displacedClipPos.xy / displacedClipPos.w;
-    
-    // Current position is already in NDC after perspective divide
-    let currentNDC = input.position.xy;
+
+    let clipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(input.WorldPos.xyz, 1.0);
+    let currentNDC = clipPos.xy / clipPos.w;
     
     // Calculate distortion vector in NDC space [-1,1]
     let distortionVector = displacedNDC - currentNDC;
-    if(currentNDC.x > 0.0) {
-        return vec4<f32>(1.0, 0.0,0.0, 1.0);
-    } else {
-        return vec4<f32>(0.0, 1.0, 0.0,1.0);
-    }
-    // Output distortion as RG channels (XY displacement in NDC)
-    // NO scaling to [0,1] - necesitamos mantener valores negativos
-    // R = deltaX, G = deltaY en coordenadas NDC
-    //return vec4<f32>(distortionVector, 0.0, 1.0);
+    
+    // Output distortion vector in RG channels, usar B para refraction strength
+    // R = deltaX, G = deltaY en coordenadas NDC, B = refraction strength
+    return vec4<f32>(distortionVector.x, distortionVector.y, 0.0, 1.0);
 }

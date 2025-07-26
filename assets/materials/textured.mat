@@ -3,8 +3,8 @@
     "textures":{
         "txAlbedo": "lee.jpg",
         "txNormal": "lee_normal.jpg",
-        "txMetallic": "lee_specular.jpg",
-        "txRoughness": "lee_specular.jpg",
+        "txMetallic": "black.png",
+        "txRoughness": "white.png",
         "txEmissive": "black.png"
     },
     "casts_shadows": false,
