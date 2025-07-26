@@ -1,18 +1,23 @@
-1. Compute-based distortion
-2. Ambient Occlusion GTAO (unstable FPS have in mind)
-3. AO quality
-4. SpotLightsWithShadows (Tweakpane) (RenderInDebug)
-5. Shadow quality
-6. Decals Category (Normals)(Check on change quality)
-7. Directional Light
-8. Area Light
-9. Temporal Anti-Aliasing (TAA)
-10. Aliasing quality
-11. PointLighstWithShadows (Tweakpane)
-12. Motion Blur
-13. Particles
-14. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-15. Optimizacion WebGPUFundamentals
+1. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
+2. Check GLTF PBR Data / new sponza
+3. Grain
+4. AGX Tonemapper
+5. FXAA
+6. Compute-based distortion
+7. Directional Light with shadows?
+8. Motion Blur
+9. Volumetric lighting
+10. Atmospheric scattering
+11. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+12. Decals Category (Normals)(Check on change quality)
+13. Area Light
+14. Particles
+15. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+16. PointLighstWithShadows (Tweakpane)
+17. Indirect light
+18. Volumetric fog
+19. Global Ilumination
+20. Optimizacion WebGPUFundamentals
 
 UPGRADES------------------------------------------
 **ASYNC LOADING SYSTEM** 🚀
@@ -31,7 +36,7 @@ UPGRADES------------------------------------------
    Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
 6. GPU-Driven Rendering 🚀 Futuro
 
-MISC-----------------------------------
+MISC----------------------------------- 13. Temporal Anti-Aliasing (TAA) / Aliasing quality
 Cascaded Shadow Maps
 Lens Flare
 Camera Lens Dirt
