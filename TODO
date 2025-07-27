@@ -1,9 +1,9 @@
-1. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
-2. Check GLTF PBR Data / new sponza
-3. Grain
-4. AGX Tonemapper
-5. FXAA
-6. Compute-based distortion
+1. AGX Tonemapper
+2. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
+3. Compute-based distortion
+4. FXAA
+5. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+6. Check GLTF PBR Data / new sponza
 7. Directional Light with shadows?
 8. Motion Blur
 9. Volumetric lighting
@@ -12,12 +12,11 @@
 12. Decals Category (Normals)(Check on change quality)
 13. Area Light
 14. Particles
-15. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-16. PointLighstWithShadows (Tweakpane)
-17. Indirect light
-18. Volumetric fog
-19. Global Ilumination
-20. Optimizacion WebGPUFundamentals
+15. PointLighstWithShadows (Tweakpane)
+16. Indirect light
+17. Volumetric fog
+18. Global Ilumination
+19. Optimizacion WebGPUFundamentals
 
 UPGRADES------------------------------------------
 **ASYNC LOADING SYSTEM** 🚀
