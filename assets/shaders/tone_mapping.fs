@@ -5,7 +5,6 @@
 fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     let adaptedExposure = 0.18; // TODO DEBERIA SER UNA UNIFORM
     var hdrColor = textureSample(gAlbedo, gAlbedoSampler, uv).rgb;
-
     hdrColor *= adaptedExposure;
 
     // ===== AGX tonemapping core =====
@@ -18,10 +17,10 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     var c = 0.10;
     var d = 0.20;
     var e = 0.01;
-    var f = 0.30;
 
-    hdrColor = (hdrColor * (a * hdrColor + b)) / (hdrColor * (c * hdrColor + d) + e) + f;
-    hdrColor /= ((a + b) / (c + d) + e) + f;
+    hdrColor = (hdrColor * (a * hdrColor + b)) / (hdrColor * (c * hdrColor + d) + e);
+    let whitePoint = (a + b) / (c + d);
+    hdrColor = hdrColor / whitePoint;
 
     return vec4<f32>(hdrColor, 1.0);
 }

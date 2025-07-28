@@ -1,6 +1,6 @@
 1. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
 2. Compute-based distortion
-3. Check GLTF PBR Data / new sponza
+3. GLTF Base Color factor / new sponza
 4. Cubemap environment ambient
 5. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
 6. Directional Light with shadows?
