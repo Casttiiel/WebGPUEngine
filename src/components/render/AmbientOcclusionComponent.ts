@@ -21,12 +21,12 @@ export class AmbientOcclusionComponent extends Component {
 
   // Dynamic SSAO Parameters from quality settings
   private ssaoParams = {
-    sampleCount: 16,
+    sampleCount: 64 as number, // Será convertido a u32 al escribir en el buffer
     radius: 0.5,
     bias: 0.025,
     aoStrength: 1.5,
     maxDistance: 1.0,
-    noiseScale: 4.0,
+    occScale: 4.0,
   };
 
   // Cache previous values to detect changes (initialized in constructor)
@@ -61,7 +61,7 @@ export class AmbientOcclusionComponent extends Component {
         bias: aoConfig.bias,
         aoStrength: aoConfig.aoStrength,
         maxDistance: aoConfig.maxDistance,
-        noiseScale: aoConfig.noiseScale,
+        occScale: aoConfig.noiseScale,
       };
     }
   }
@@ -95,17 +95,22 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   private updateSSAOParamsBuffer(): void {
-    // Pack SSAO parameters only into Float32Array
-    const paramsData = new Float32Array([
-      this.ssaoParams.sampleCount,
-      this.ssaoParams.radius,
-      this.ssaoParams.bias,
-      this.ssaoParams.aoStrength,
-      this.ssaoParams.maxDistance,
-      this.ssaoParams.noiseScale,
-      0, // padding
-      0, // padding
-    ]);
+    // Creamos un ArrayBuffer para almacenar tanto u32 como f32
+    const arrayBuffer = new ArrayBuffer(32); // 8 * 4 bytes (1 u32 + 5 f32 + 2 padding)
+    const u32View = new Uint32Array(arrayBuffer, 0, 1);
+    const f32View = new Float32Array(arrayBuffer, 4); // Comienza después del u32
+
+    // Escribimos los datos
+    u32View[0] = this.ssaoParams.sampleCount;
+    f32View[0] = this.ssaoParams.radius;
+    f32View[1] = this.ssaoParams.bias;
+    f32View[2] = this.ssaoParams.aoStrength;
+    f32View[3] = this.ssaoParams.maxDistance;
+    f32View[4] = this.ssaoParams.occScale;
+    f32View[5] = 0; // padding
+    f32View[6] = 0; // padding
+
+    const paramsData = new Uint8Array(arrayBuffer);
 
     GPUUtils.writeBuffer(this.ssaoParamsBuffer, 0, paramsData);
 
@@ -120,7 +125,7 @@ export class AmbientOcclusionComponent extends Component {
       this.ssaoParams.bias !== this.previousSSAOParams.bias ||
       this.ssaoParams.aoStrength !== this.previousSSAOParams.aoStrength ||
       this.ssaoParams.maxDistance !== this.previousSSAOParams.maxDistance ||
-      this.ssaoParams.noiseScale !== this.previousSSAOParams.noiseScale
+      this.ssaoParams.occScale !== this.previousSSAOParams.occScale
     );
   }
 
@@ -268,7 +273,7 @@ export class AmbientOcclusionComponent extends Component {
       this.ssaoParams.bias !== this.previousSSAOParams.bias ||
       this.ssaoParams.aoStrength !== this.previousSSAOParams.aoStrength ||
       this.ssaoParams.maxDistance !== this.previousSSAOParams.maxDistance ||
-      this.ssaoParams.noiseScale !== this.previousSSAOParams.noiseScale
+      this.ssaoParams.occScale !== this.previousSSAOParams.occScale
     );
   }
 
@@ -317,7 +322,7 @@ export class AmbientOcclusionComponent extends Component {
       max: 5.0,
       step: 0.1,
     });
-    addControl(this.ssaoParams, 'noiseScale', `${componentName} Noise Scale`, {
+    addControl(this.ssaoParams, 'occScale', `${componentName} Noise Scale`, {
       min: 1.0,
       max: 10.0,
       step: 0.1,

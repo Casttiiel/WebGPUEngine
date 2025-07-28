@@ -95,10 +95,10 @@ export class ModuleRender extends Module {
 
     this.renderDistorsions(result);
 
-    /*if (mainCamera?.hasComponent('tone_mapping')) {
+    if (mainCamera?.hasComponent('tone_mapping')) {
       const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
       result = toneMapping.apply(result);
-    }*/
+    }
 
     if (mainCamera?.hasComponent('antialiasing')) {
       const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;

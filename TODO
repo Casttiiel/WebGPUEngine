@@ -1,21 +1,24 @@
 1. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
-2. Compute-based distortion
-3. Check GLTF PBR Data / new sponza
-4. Cubemap environment ambient
-5. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-6. Directional Light with shadows?
-7. Motion Blur
-8. Volumetric lighting
-9. Atmospheric scattering
-10. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-11. Decals Category (Normals)(Check on change quality)
-12. Area Light
-13. Particles
-14. PointLighstWithShadows (Tweakpane)
-15. Indirect light
-16. Volumetric fog
-17. Global Ilumination
-18. Optimizacion WebGPUFundamentals
+2. Tonemapping fix
+3. Compute-based distortion
+4. Check GLTF PBR Data / new sponza
+5. Cubemap environment ambient
+6. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+7. Directional Light with shadows?
+8. Motion Blur
+9. Volumetric lighting
+10. Atmospheric scattering
+11. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+12. Decals Category (Normals)(Check on change quality)
+13. Area Light
+14. Particles
+15. PointLighstWithShadows (Tweakpane)
+16. Screen Space Reflections with the ability to switch between Hi-Z and Linear raymarching
+17. Temporal Anti-Aliasing (TAA)
+18. Indirect light
+19. Volumetric fog
+20. Global Ilumination
+21. Optimizacion WebGPUFundamentals
 
 UPGRADES------------------------------------------
 **ASYNC LOADING SYSTEM** 🚀
