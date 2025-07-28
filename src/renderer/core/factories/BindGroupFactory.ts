@@ -117,6 +117,11 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'filtering' },
       },
+      {
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
     ]);
   }
 
@@ -162,8 +167,8 @@ export class BindGroupFactory {
         sampler: { type: 'filtering' },
       },
     ]);
-  } 
-  
+  }
+
   /**
    * Creates a single texture bind group layout
    */

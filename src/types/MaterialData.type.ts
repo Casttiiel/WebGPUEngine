@@ -4,6 +4,7 @@ import { TechniqueDataType } from './TechniqueData.type';
 export type MaterialDataType = Readonly<{
   technique?: string;
   techniqueData?: TechniqueDataType;
+  baseColorFactor?: number[];
   textures: MaterialTextureDataType;
   casts_shadows: boolean;
   category: RenderCategory;

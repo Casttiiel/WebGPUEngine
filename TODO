@@ -1,6 +1,6 @@
-1. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
-2. Compute-based distortion
-3. GLTF Base Color factor / new sponza
+1. Decals Category (Normals)(Check on change quality)
+2. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
+3. Compute-based distortion
 4. Cubemap environment ambient
 5. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
 6. Directional Light with shadows?
@@ -8,14 +8,13 @@
 8. Volumetric lighting
 9. Atmospheric scattering
 10. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-11. Decals Category (Normals)(Check on change quality)
-12. Area Light
-13. Particles
-14. PointLighstWithShadows (Tweakpane)
-15. Indirect light
-16. Volumetric fog
-17. Global Ilumination
-18. Optimizacion WebGPUFundamentals
+11. Area Light
+12. Particles
+13. PointLighstWithShadows (Tweakpane)
+14. Indirect light
+15. Volumetric fog
+16. Global Ilumination
+17. Optimizacion WebGPUFundamentals
 
 UPGRADES------------------------------------------
 **ASYNC LOADING SYSTEM** 🚀

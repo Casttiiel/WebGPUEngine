@@ -8,6 +8,7 @@ import { Texture } from './Texture';
 import { Engine } from '../../core/engine/Engine';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
+import { GPUUtils } from '../core/utils/GPUUtils';
 
 export interface MaterialTexturesOptions {
   albedo: string;
@@ -23,6 +24,7 @@ export interface MaterialBaseOptions {
   shadows?: boolean;
   textures?: MaterialTexturesOptions;
   technique?: Technique;
+  baseColorFactor?: number[];
 }
 
 export type MaterialCreateOptions = MaterialBaseOptions & Omit<IGPUResourceOptions, 'type'>;
@@ -33,6 +35,7 @@ export type MaterialOptions = Required<Pick<MaterialBaseOptions, 'textures' | 't
 export class Material extends GPUResource {
   private technique?: Technique;
   private textures: Map<string, Texture> = new Map();
+  private baseColorFactor!: number[];
   private category: RenderCategory;
   private castsShadows: boolean;
   private shadows: boolean;
@@ -50,6 +53,7 @@ export class Material extends GPUResource {
     this.shadows = options.shadows ?? false;
     this.technique = options.technique;
     this.textureFiles = options.textures;
+    this.baseColorFactor = options.baseColorFactor;
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
@@ -98,6 +102,7 @@ export class Material extends GPUResource {
       technique: techniqueToUse,
       textures,
       category: materialData?.category,
+      baseColorFactor: materialData?.baseColorFactor || [1.0, 1.0, 1.0, 1.0],
       castsShadows: materialData?.casts_shadows,
       shadows: materialData?.shadows,
     });
@@ -162,6 +167,21 @@ export class Material extends GPUResource {
     entries.push({
       binding: bindingIndex,
       resource: sampler,
+    });
+
+    bindingIndex++;
+
+    const uniformBuffer = GPUUtils.createBuffer(
+      'material uniform buffer',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    GPUUtils.writeBuffer(uniformBuffer, 0, new Float32Array(this.baseColorFactor));
+
+    entries.push({
+      binding: 6,
+      resource: { buffer: uniformBuffer },
     });
 
     const textureBingGroupLayout = BindGroupFactory.getLayoutFromEnum(

@@ -162,6 +162,7 @@ export class GLTFLoader {
           category: category,
           shadows: false,
           textures,
+          baseColorFactor: pbr.baseColorFactor || [1, 1, 1, 1],
           techniqueData: {
             vs: 'gbuffer.vs',
             fs: materialDef.alphaMode === 'MASK' ? 'gbuffer_mask.fs' : 'gbuffer.fs',
@@ -178,6 +179,7 @@ export class GLTFLoader {
           casts_shadows: false,
           category: category,
           shadows: false,
+          baseColorFactor: pbr.baseColorFactor || [1, 1, 1, 1],
           textures,
           technique: materialDef?.alphaMode === 'MASK' ? 'gbuffer_mask.tech' : 'gbuffer.tech',
         };
