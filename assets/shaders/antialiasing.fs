@@ -9,34 +9,59 @@ const FXAA_EDGE_THRESHOLD_MIN : f32 = 1.0 / 24.0;
 const FXAA_SUBPIX_TRIM : f32 = 1.0 / 4.0;
 const FXAA_SUBPIX_TRIM_SCALE : f32 = 1.0 / (1.0 - FXAA_SUBPIX_TRIM);
 const FXAA_SUBPIX_CAP : f32 = 3.0 / 4.0;
+const FXAA_JITTER_STRENGTH : f32 = 0.25;
 
  fn luma(color: vec3<f32>) -> f32 {
-        return color.y * (0.587 / 0.299) + color.x;
-    };
+        return sqrt(dot(color, vec3(0.299, 0.587, 0.114)));
+ };
 
+ // Resolution-dependent threshold calculation
+fn calculateEdgeThreshold(resolution: vec2<f32>) -> f32 {
+    let resolutionFactor = sqrt(camera.screenSize.x * camera.screenSize.y) / 1920.0; // Normalizado a 1080p
+    return FXAA_EDGE_THRESHOLD * (1.0 + (resolutionFactor - 1.0) * 0.5);
+};
+
+
+// Subpixel jittering function
+fn calculateJitterOffset(uv: vec2<f32>) -> vec2<f32> {
+    let rand1 = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
+    let rand2 = fract(sin(dot(uv, vec2(39.346, 11.135))) * 22578.1459);
+    return (vec2(rand1, rand2) - 0.5) * FXAA_JITTER_STRENGTH / camera.screenSize;
+};
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let rcpFrame = 1.0 / camera.screenSize;
+    
+    // Calculate dynamic edge threshold based on resolution
+    let dynamicEdgeThreshold = calculateEdgeThreshold(camera.screenSize);
+    
+    // Apply subpixel jittering
+    let jitterOffset = calculateJitterOffset(uv);
+    let jitteredUV = uv + jitterOffset;
 
-        // === Sample all neighbors up front ===
-    let colM = textureSample(gAlbedo, gAlbedoSampler, uv).rgb;
-    let colN = textureSample(gAlbedo, gAlbedoSampler, uv + vec2(0.0, -rcpFrame.y)).rgb;
-    let colS = textureSample(gAlbedo, gAlbedoSampler, uv + vec2(0.0,  rcpFrame.y)).rgb;
-    let colE = textureSample(gAlbedo, gAlbedoSampler, uv + vec2( rcpFrame.x, 0.0)).rgb;
-    let colW = textureSample(gAlbedo, gAlbedoSampler, uv + vec2(-rcpFrame.x, 0.0)).rgb;
+    // === Sample all neighbors with jittered coordinates ===
+    let colM = textureSample(gAlbedo, gAlbedoSampler, jitteredUV).rgb;
+    let colN = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2(0.0, -rcpFrame.y)).rgb;
+    let colS = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2(0.0,  rcpFrame.y)).rgb;
+    let colE = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2( rcpFrame.x, 0.0)).rgb;
+    let colW = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2(-rcpFrame.x, 0.0)).rgb;
 
-    let colNW = textureSample(gAlbedo, gAlbedoSampler, uv + vec2(-rcpFrame.x, -rcpFrame.y)).rgb;
-    let colNE = textureSample(gAlbedo, gAlbedoSampler, uv + vec2( rcpFrame.x, -rcpFrame.y)).rgb;
-    let colSW = textureSample(gAlbedo, gAlbedoSampler, uv + vec2(-rcpFrame.x,  rcpFrame.y)).rgb;
-    let colSE = textureSample(gAlbedo, gAlbedoSampler, uv + vec2( rcpFrame.x,  rcpFrame.y)).rgb;
+    let colNW = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2(-rcpFrame.x, -rcpFrame.y)).rgb;
+    let colNE = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2( rcpFrame.x, -rcpFrame.y)).rgb;
+    let colSW = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2(-rcpFrame.x,  rcpFrame.y)).rgb;
+    let colSE = textureSample(gAlbedo, gAlbedoSampler, jitteredUV + vec2( rcpFrame.x,  rcpFrame.y)).rgb;
 
-    // === Compute luma values ===
+    // === Compute luma values for all samples ===
     let lumaM = luma(colM);
     let lumaN = luma(colN);
     let lumaS = luma(colS);
     let lumaE = luma(colE);
     let lumaW = luma(colW);
+    let lumaNW = luma(colNW);
+    let lumaNE = luma(colNE);
+    let lumaSW = luma(colSW);
+    let lumaSE = luma(colSE);
 
     let rangeMin = min(lumaM, min(min(lumaN, lumaS), min(lumaE, lumaW)));
     let rangeMax = max(lumaM, max(max(lumaN, lumaS), max(lumaE, lumaW)));
@@ -48,15 +73,33 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     var blendL = max(0.0, (rangeL / range) - FXAA_SUBPIX_TRIM) * FXAA_SUBPIX_TRIM_SCALE;
     blendL = min(FXAA_SUBPIX_CAP, blendL);
 
-    // === Average 3x3 region ===
-    let blurred = (
-        colM + colN + colS + colE + colW +
-        colNW + colNE + colSW + colSE
-    ) / 9.0;
+    // === Adaptive edge detection with dynamic threshold ===
+    let isEdge = range >= max(FXAA_EDGE_THRESHOLD_MIN, rangeMax * dynamicEdgeThreshold);
+    
+    // Enhanced subpixel processing
+    var finalColor = colM;
+    if (isEdge) {
+        // Calculate edge direction
+        let horizontal = abs(lumaN + lumaS - 2.0 * lumaM) * 2.0 + 
+                        abs(lumaNE + lumaSE - 2.0 * lumaE) +
+                        abs(lumaNW + lumaSW - 2.0 * lumaW);
+        let vertical = abs(lumaE + lumaW - 2.0 * lumaM) * 2.0 +
+                      abs(lumaNE + lumaNW - 2.0 * lumaN) +
+                      abs(lumaSE + lumaSW - 2.0 * lumaS);
+        
+        // Determine blend direction
+        let isHorizontal = horizontal >= vertical;
+        
+        // Blend based on edge direction
+        if (isHorizontal) {
+            finalColor = mix(colM, mix(colE, colW, 0.5), blendL);
+        } else {
+            finalColor = mix(colM, mix(colN, colS, 0.5), blendL);
+        }
+    }
 
-    // === Skip blend if contrast is too low ===
-    let isEdge = range >= max(FXAA_EDGE_THRESHOLD_MIN, rangeMax * FXAA_EDGE_THRESHOLD);
-    let finalColor = select(colM, mix(blurred, colM, blendL), isEdge);
+    // Remove jitter artifacts
+    finalColor = mix(finalColor, colM, length(jitterOffset) * 2.0);
 
     return vec4<f32>(finalColor, 1.0);
 }
