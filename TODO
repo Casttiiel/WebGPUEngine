@@ -1,48 +1,60 @@
-1. Decals Category (Normals)(Check on change quality)
-2. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
-3. Compute-based distortion
-4. Cubemap environment ambient
-5. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-6. Directional Light with shadows?
-7. Motion Blur
-8. Volumetric lighting
-9. Atmospheric scattering
-10. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-11. Area Light
-12. Particles
-13. PointLighstWithShadows (Tweakpane)
-14. Indirect light
-15. Volumetric fog
-16. Global Ilumination
-17. Optimizacion WebGPUFundamentals
+1. Paralax Mapping
+2. Directional Light with Shadow Maps
+3. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
+4. Paralax Mapping with Shadow maps and AO
+5. Screen Space Reflections
+6. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+7. Area Light
+8. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+9. Volumetric lighting
 
-UPGRADES------------------------------------------
-**ASYNC LOADING SYSTEM** 🚀
+FIXES------------------------------------------
+
+1. Decals Category (Normals)(Check on change quality)
+2. Sponza Cubemap environment ambient
+3. Skybox improvement hdr and more
+
+HIGH-END-FEATURES------------------------------
+
+1. Temporal Anti-Aliasing (TAA) / Aliasing quality
+2. Motion Blur
+3. Atmospheric scattering
+4. Global Ilumination
+5. Indirect light
+6. Volumetric fog
+7. Particles
+
+MISC-----------------------------------
+
+1. Compute-based distortion
+2. Grain
+3. Cascade shadow maps
+4. Lens Flare
+5. Camera Lens Dirt
+6. Volumetric Lights/God Rays
+
+MAJOR-UPGRADES------------------------------------------
+
+1. **ASYNC LOADING SYSTEM** 🚀
 
 - Implementar sistema de carga asíncrona progresiva con prioridades
 - ResourceManager con carga en background y LOD
 - Progress indicators y loading states
 - Streaming de recursos bajo demanda
 
-2. Escalabilidad de Luces
-   Moderno: Cientos de luces con clustered culling+instancing
-3. Mesh LOD/Generate LOD on texture and mesh automatically
-4. Occlusion culling
-5. Memory Bandwidth
+2. Memory Bandwidth
    Actual: G-Buffer consume mucho ancho de banda
    Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
-6. GPU-Driven Rendering 🚀 Futuro
-
-MISC----------------------------------- 13. Temporal Anti-Aliasing (TAA) / Aliasing quality
-Cascaded Shadow Maps
-Lens Flare
-Camera Lens Dirt
-Volumetric Lights/God Rays
-Paralax Mapping
-Terrain with perlin noise
-Weighted terrain
+3. Escalabilidad de Luces
+   Moderno: Cientos de luces con clustered culling+instancing
+4. Occlusion culling
+5. GPU-Driven Rendering 🚀 Futuro
+6. Optimizacion WebGPUFundamentals
+7. Mesh LOD/Generate LOD on texture and mesh automatically
 
 GAME-----------------------------------
+Terrain with perlin noise
+Weighted terrain
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Music
 Physics
