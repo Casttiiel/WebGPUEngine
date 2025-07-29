@@ -1,6 +1,8 @@
 #include "common/uniforms"
 #include "common/utils"
 
+const PI: f32 = 3.14159265359;
+
 struct SSAOParams {
     sampleCount: u32,
     radius: f32,
@@ -22,17 +24,13 @@ struct SSAOParams {
 // Uniform buffer para parámetros SSAO
 @group(2) @binding(0) var<uniform> ssaoParams: SSAOParams;
 
-fn noise2D(p: vec2<f32>) -> f32 {
-    return fract(sin(dot(p, vec2<f32>(12.9898, 78.233))) * 43758.5453);
-}
-
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     // === Parameters ===
     let r = 0.5;
     let bias = 0.1;
-    let strength = 2.0;
+    let strength = 2.5;
     let sampleCount = 8u;
     let resolution = camera.screenSize;
 
@@ -49,14 +47,17 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     let viewPosH = camera.invProjection * ndc;
     let viewPos = viewPosH.xyz / viewPosH.w;
 
-    let stepAngle = 6.283185 / f32(sampleCount);
+    let stepAngle = 2.0 * PI / f32(sampleCount);
     var occlusion = 0.0;
 
     // === Loop over directions ===
     for (var i = 0u; i < sampleCount; i++) {
-        let angle = f32(i) * stepAngle;
+        let randAngle = noise2D(uv * resolution / 4.0) * 2.0 * PI;
+        let angle = f32(i) * stepAngle + randAngle;
         let dir = vec2<f32>(cos(angle), sin(angle));
-        let sampleUv = clamp(uv + dir * (r / resolution), vec2(0.0), vec2(1.0));
+        let radiusScale = f32(i + 1u) / f32(sampleCount);
+        let offset = dir * (r * radiusScale / resolution);
+        let sampleUv = clamp(uv + offset, vec2(0.0), vec2(1.0));
 
         // Get sample depth
         let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUv).x;
