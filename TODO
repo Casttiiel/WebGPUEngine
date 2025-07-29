@@ -1,18 +1,17 @@
-1. Paralax Mapping
-2. Directional Light with Shadow Maps
-3. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
-4. Paralax Mapping with Shadow maps and AO
-5. Screen Space Reflections
-6. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-7. Area Light
-8. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-9. Volumetric lighting
+1. Directional Light with Shadow Maps
+2. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
+3. Screen Space Reflections
+4. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+5. Area Light
+6. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+7. Volumetric lighting
 
 FIXES------------------------------------------
 
 1. Decals Category (Normals)(Check on change quality)
-2. Sponza Cubemap environment ambient
-3. Skybox improvement hdr and more
+2. Enhance GLTF Loader
+3. Sponza Cubemap environment ambient
+4. Skybox improvement hdr and more
 
 HIGH-END-FEATURES------------------------------
 
@@ -23,6 +22,8 @@ HIGH-END-FEATURES------------------------------
 5. Indirect light
 6. Volumetric fog
 7. Particles
+8. Fog
+9. Rain
 
 MISC-----------------------------------
 
@@ -63,3 +64,4 @@ Skybox with Day/Night Cycle
 Day/Night Cycle
 Grass
 Physics Grass
+Paralax Mapping (Needs height map!)

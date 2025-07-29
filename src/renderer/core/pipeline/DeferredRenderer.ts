@@ -15,11 +15,13 @@ import { RenderPassManager } from '../passes/RenderPassManager';
 import { DepthResolver } from '../processing/DepthResolver';
 import { Render } from './Render';
 import { GBufferQualityConfig } from '../config/GBufferQualityConfig';
+import { DirectionalLight } from '../../shading/DirectionalLight';
 
 export class DeferredRenderer {
   private isLoaded = false;
   private skybox!: Skybox;
   private ambientLight!: AmbientLight;
+  private directionalLight!: DirectionalLight;
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
@@ -229,6 +231,9 @@ export class DeferredRenderer {
     this.ambientLight = new AmbientLight();
     await this.ambientLight.load();
 
+    this.directionalLight = new DirectionalLight();
+    await this.directionalLight.load();
+
     this.depthResolver = new DepthResolver();
     await this.depthResolver.load();
 
@@ -329,6 +334,7 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
+    this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
 

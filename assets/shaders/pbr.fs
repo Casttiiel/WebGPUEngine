@@ -3,8 +3,6 @@
 #include "common/utils"
 #include "common/gbuffer"
 
-const PI: f32 = 3.14159265359;
-
 struct LightUniforms {
     color: vec4<f32>,            // 16 bytes (0-15)
     position: vec3<f32>,         // 12 bytes (16-27)
@@ -17,56 +15,6 @@ struct LightUniforms {
     startFalloff: f32,           // 4 bytes  (112-115)
     padding: vec3<f32>,          // 12 bytes (116-127)
     extraPadding: f32,           // 4 bytes  (128-131) para llegar a 144 bytes
-}
-
-// Helper function for saturate (clamp to 0-1)
-fn saturate(x: f32) -> f32 {
-    return clamp(x, 0.0, 1.0);
-}
-
-// PBR helper functions
-fn NormalDistribution_GGX(NdotH: f32, roughness: f32) -> f32 {
-    let a = roughness * roughness;
-    let a2 = a * a;
-    let NdotH2 = NdotH * NdotH;
-    
-    let num = a2;
-    var denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
-    
-    return num / denom;
-}
-
-fn Geometric_Smith_Schlick_GGX(NdotV: f32, NdotL: f32, roughness: f32) -> f32 {
-    let r = (roughness + 1.0);
-    let k = (r * r) / 8.0;
-    
-    let ggx2 = NdotV / (NdotV * (1.0 - k) + k);
-    let ggx1 = NdotL / (NdotL * (1.0 - k) + k);
-    
-    return ggx1 * ggx2;
-}
-
-fn Fresnel_Schlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
-    return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
-}
-
-fn Specular(specularColor: vec3<f32>, h: vec3<f32>, v: vec3<f32>, l: vec3<f32>, a: f32, NdL: f32, NdV: f32, NdH: f32, VdH: f32, LdV: f32) -> vec3<f32> {
-    let F0 = specularColor;
-    
-    // Cook-Torrance BRDF
-    let NDF = NormalDistribution_GGX(NdH, a);
-    let G = Geometric_Smith_Schlick_GGX(NdV, NdL, a);
-    let F = Fresnel_Schlick(VdH, F0);
-    
-    let numerator = NDF * G * F;
-    let denominator = 4.0 * NdV * NdL + 0.0001; // Prevent division by zero
-    
-    return numerator / denominator;
-}
-
-fn Diffuse(pAlbedo: vec3<f32>) -> vec3<f32> {
-    return pAlbedo / PI;
 }
 
 fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32> {
