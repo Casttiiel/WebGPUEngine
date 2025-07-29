@@ -6,6 +6,7 @@ export class Camera {
   private projection: mat4 = mat4.create();
   private viewProjection: mat4 = mat4.create();
   private invViewProjection: mat4 = mat4.create();
+  private invProjection: mat4 = mat4.create();
 
   private eye: vec3 = vec3.fromValues(0, 0, 0);
   private target: vec3 = vec3.fromValues(0, 0, -1);
@@ -82,7 +83,16 @@ export class Camera {
     } else {
       mat4.perspective(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
     }
+    this.calculateInvProjectionMatrix();
     this.updateViewProjection();
+  }
+
+  private calculateInvProjectionMatrix(): void {
+    const invProjection = mat4.create();
+    mat4.invert(invProjection, this.projection);
+
+    // Store the inverse view-projection matrix as invViewProjection
+    this.invProjection = invProjection;
   }
 
   public setProjectionParams(fovRadians: number, zNear: number, zFar: number): void {
@@ -206,6 +216,10 @@ export class Camera {
 
   public getProjection(): mat4 {
     return this.projection;
+  }
+
+  public getInvProjectionMatrix(): mat4 {
+    return this.invProjection;
   }
 
   public getInvViewProjectionMatrix(): mat4 {

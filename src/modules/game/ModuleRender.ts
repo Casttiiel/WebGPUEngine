@@ -330,7 +330,7 @@ export class ModuleRender extends Module {
     // Crear buffer uniforme global para las matrices de la cámara
     this.globalUniformBuffer = GPUUtils.createBuffer(
       'global uniform buffer',
-      256,
+      512,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
@@ -357,9 +357,10 @@ export class ModuleRender extends Module {
   public updateGlobalUniforms(camera: Camera): void {
     const viewMatrix = new Float32Array(camera.getView());
     const projectionMatrix = new Float32Array(camera.getProjection());
+    const invProjectionMatrix = new Float32Array(camera.getInvProjectionMatrix());
     const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
-    const cameraPosition = new Float32Array(camera.getPosition()); // viewMatrix (offset 0)
-    GPUUtils.writeBuffer(this.globalUniformBuffer, 0, viewMatrix);
+    const cameraPosition = new Float32Array(camera.getPosition());
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 0, viewMatrix); // viewMatrix (offset 0)
 
     // projectionMatrix (offset 64)
     GPUUtils.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
@@ -388,6 +389,8 @@ export class ModuleRender extends Module {
         camera.getFar(),
       ]),
     );
+
+    GPUUtils.writeBuffer(this.globalUniformBuffer, 240, invProjectionMatrix);
   }
 
   public getGlobalBindGroup(): GPUBindGroup {

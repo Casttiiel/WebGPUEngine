@@ -1,6 +1,6 @@
 {
     "vs": "presentation.vs",
-    "fs": "ssao.fs",
+    "fs": "hbao.fs",
     "writesOn": "single_channel",
     "z": "disable_all",
     "uniforms":["CameraUniforms", "GBufferUniforms", "BufferUniform"]
