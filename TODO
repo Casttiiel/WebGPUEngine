@@ -1,4 +1,4 @@
-1. HBAO/hemisphere sampling/Uniforms/AO quality
+1. hemisphere sampling/Sampling en view-space real, con dirección proyectada desde normal/AO quality and Uniforms
 2. Compute-based distortion
 3. Check GLTF PBR Data / new sponza
 4. Cubemap environment ambient

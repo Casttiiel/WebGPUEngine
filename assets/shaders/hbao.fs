@@ -37,13 +37,14 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     // === Fetch depth & normal ===
     let linearZ = textureSample(gLinearDepth, samplerGBuffer, uv).x;
     let normalData = textureSample(gNormals, samplerGBuffer, uv);
-    let normal = normalize(decodeNormal(normalData.xyz));
+    let worldNormal = normalize(decodeNormal(normalData.xyz));
+    let normal = normalize((camera.viewMatrix * vec4(worldNormal, 0.0)).xyz);
 
     // === Early-out value (no AO) ===
     let skipAO = linearZ >= 1.0;
 
     // === Reconstruct view position ===
-    let ndc = vec4f(uv * 2.0 - 1.0, linearZ * 2.0 - 1.0, 1.0);
+    let ndc = vec4f(uv * 2.0 - 1.0, linearZ, 1.0);
     let viewPosH = camera.invProjection * ndc;
     let viewPos = viewPosH.xyz / viewPosH.w;
 
@@ -64,7 +65,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
         let sampleDepthClamped = select(sampleDepth, 0.999, sampleDepth >= 1.0);
 
         // Reconstruct sample position
-        let sampleNdc = vec4(sampleUv * 2.0 - 1.0, sampleDepth * 2.0 - 1.0, 1.0);
+        let sampleNdc = vec4(sampleUv * 2.0 - 1.0, sampleDepth, 1.0);
         let sampleViewH = camera.invProjection * sampleNdc;
         let sampleViewPos = sampleViewH.xyz / sampleViewH.w;
 
