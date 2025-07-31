@@ -149,15 +149,27 @@ export class AmbientOcclusionComponent extends Component {
   private createSSAOParamsBindGroup(): void {
     if (this.ssaoParamsBindGroup) return;
 
+    const sampler = GPUUtils.createSampler({
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+    });
+
     this.ssaoParamsBindGroup = BindGroupFactory.createBindGroup(
       'ssao_params_bindgroup',
-      BindGroupFactory.getBufferUniformLayout(),
+      BindGroupFactory.getHBAOUniformsLayout(),
       [
         {
           binding: 0,
           resource: {
             buffer: this.ssaoParamsBuffer,
           },
+        },
+        {
+          binding: 1,
+          resource: sampler,
         },
       ],
     );
@@ -187,9 +199,6 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
-    // Update parameters from quality settings (in case they changed)
-    this.updateParametersFromQuality();
-
     // Update SSAO parameters buffer if parameters changed
     if (this.hasParametersChanged()) {
       this.updateSSAOParamsBuffer();
@@ -303,17 +312,17 @@ export class AmbientOcclusionComponent extends Component {
       step: 1,
     });
     addControl(this.ssaoParams, 'radius', `${componentName} Radius`, {
-      min: 0.1,
-      max: 2.0,
-      step: 0.01,
+      min: 0.001,
+      max: 0.5,
+      step: 0.001,
     });
     addControl(this.ssaoParams, 'bias', `${componentName} Bias`, {
       min: 0.001,
-      max: 0.1,
+      max: 1.0,
       step: 0.001,
     });
     addControl(this.ssaoParams, 'aoStrength', `${componentName} Strength`, {
-      min: 0.1,
+      min: 1.0,
       max: 5.0,
       step: 0.1,
     });

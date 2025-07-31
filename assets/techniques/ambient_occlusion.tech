@@ -3,5 +3,5 @@
     "fs": "hbao.fs",
     "writesOn": "single_channel",
     "z": "disable_all",
-    "uniforms":["CameraUniforms", "GBufferUniforms", "BufferUniform"]
+    "uniforms":["CameraUniforms", "GBufferUniforms", "HBAOUniforms"]
 }

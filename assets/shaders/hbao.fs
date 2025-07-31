@@ -1,8 +1,6 @@
 #include "common/uniforms"
 #include "common/utils"
 
-const PI: f32 = 3.14159265359;
-
 struct SSAOParams {
     sampleCount: u32,
     radius: f32,
@@ -21,63 +19,124 @@ struct SSAOParams {
 @group(1) @binding(4) var gAO: texture_2d<f32>;
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
-// Uniform buffer para parámetros SSAO
 @group(2) @binding(0) var<uniform> ssaoParams: SSAOParams;
+@group(2) @binding(1) var hbaoSampler: sampler;
 
+const PI: f32 = 3.14159265359;
+
+fn computeViewRayFromUV(uv: vec2<f32>) -> vec3<f32> {
+    let ndc = vec4(uv * 2.0 - 1.0, 1.0, 1.0); // z = 1.0 at the far plane
+    let rayH = camera.invProjection * ndc;
+    return normalize(rayH.xyz / rayH.w);
+}
+
+fn getViewPosition(uv: vec2<f32>) -> vec3<f32> {
+    let z = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
+    let viewRay = computeViewRayFromUV(uv);
+    return viewRay * -z; // Negative because camera looks down -Z
+}
+
+fn computeTanAngle(viewDelta: vec3<f32>) -> f32 {
+    return -(viewDelta.z) / length(viewDelta.xy);
+}
+
+fn sinFromTan(x: f32) -> f32 {
+    return x / sqrt(1.0 + x * x);
+}
+
+fn cosineSampleHemisphere(xi: vec2<f32>) -> vec3<f32> {
+    let r = sqrt(xi.x);
+    let theta = 2.0 * PI * xi.y;
+    let x = r * cos(theta);
+    let y = r * sin(theta);
+    let z = sqrt(max(0.0, 1.0 - x * x - y * y));
+    return vec3<f32>(x, y, z);
+}
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
-    // === Parameters ===
-    let r = 0.5;
-    let bias = 0.1;
-    let strength = 2.5;
-    let sampleCount = 8u;
-    let resolution = camera.screenSize;
+    let radius = ssaoParams.radius;
+    let biasAngle = ssaoParams.bias;
+    let aoStrength = ssaoParams.aoStrength;
+    let stepCount = 8u;
+    let directionCount = ssaoParams.sampleCount;
+    let screenSize = camera.screenSize;
 
-    // === Fetch depth & normal ===
-    let linearZ = textureSample(gLinearDepth, samplerGBuffer, uv).x;
-    let normalData = textureSample(gNormals, samplerGBuffer, uv);
-    let worldNormal = normalize(decodeNormal(normalData.xyz));
-    let normal = normalize((camera.viewMatrix * vec4(worldNormal, 0.0)).xyz);
-
-    // === Early-out value (no AO) ===
-    let skipAO = linearZ >= 1.0;
-
-    // === Reconstruct view position ===
-    let ndc = vec4f(uv * 2.0 - 1.0, linearZ, 1.0);
-    let viewPosH = camera.invProjection * ndc;
-    let viewPos = viewPosH.xyz / viewPosH.w;
-
-    let stepAngle = 2.0 * PI / f32(sampleCount);
-    var occlusion = 0.0;
-
-    // === Loop over directions ===
-    for (var i = 0u; i < sampleCount; i++) {
-        let randAngle = noise2D(uv * resolution / 4.0) * 2.0 * PI;
-        let angle = f32(i) * stepAngle + randAngle;
-        let dir = vec2<f32>(cos(angle), sin(angle));
-        let radiusScale = f32(i + 1u) / f32(sampleCount);
-        let offset = dir * (r * radiusScale / resolution);
-        let sampleUv = clamp(uv + offset, vec2(0.0), vec2(1.0));
-
-        // Get sample depth
-        let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUv).x;
-        let sampleDepthClamped = select(sampleDepth, 0.999, sampleDepth >= 1.0);
-
-        // Reconstruct sample position
-        let sampleNdc = vec4(sampleUv * 2.0 - 1.0, sampleDepth, 1.0);
-        let sampleViewH = camera.invProjection * sampleNdc;
-        let sampleViewPos = sampleViewH.xyz / sampleViewH.w;
-
-        // Compute AO contribution
-        let diff = sampleViewPos - viewPos;
-        let dist = length(diff);
-        let NdotD = dot(normal, normalize(diff));
-        let attenuation = max(0.0, NdotD - bias);
-        occlusion += attenuation / (1.0 + dist * dist);
+    // Early out if depth is invalid (e.g. background)
+    let zRaw = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
+    //return zRaw;
+    if (zRaw >= 1.0) {
+        return 0.0;
     }
 
-    var ao = pow(1.0 - occlusion / f32(sampleCount), strength);
-    ao = select(ao, 1.0, skipAO);
-    return ao;
+    let viewPos = getViewPosition(uv);
+
+    let normalData = textureSampleLevel(gNormals, hbaoSampler, uv, 0.0);
+    let normalWorld = normalize(decodeNormal(normalData.xyz));
+    var normalView = normalize((camera.viewMatrix * vec4(normalWorld, 0.0)).xyz);
+    normalView *= vec3<f32>(-1.0, 1.0, -1.0); // Necesary to flip Y and Z for correct view space normals
+
+    var upVec = vec3<f32>(0.0, 1.0, 0.0);
+    if (abs(dot(normalView, upVec)) > 0.99) {
+        upVec = vec3<f32>(1.0, 0.0, 0.0); // Evitar degeneración en superficies verticales
+    }
+    let tangent = normalize(cross(upVec, normalView));
+    let bitangent = cross(normalView, tangent);
+    let TBN = mat3x3<f32>(tangent, bitangent, normalView); // Tangente en columnas
+
+    // === Radial sample setup ===
+    let angleStep = 2.0 * PI / f32(directionCount);
+    let focalLength = vec2<f32>(
+        camera.projectionMatrix[0][0], // fx
+        camera.projectionMatrix[1][1]  // fy
+    );
+
+    let rayRadiusUV = 0.5 * radius * focalLength / viewPos.z;
+
+    let randomAngle = noise2D(uv * screenSize / 4.0) * 2.0 * PI;
+
+    var occlusion = 0.0;
+
+    for (var d = 0u; d < directionCount; d++) {
+        let seed = uv * screenSize + vec2<f32>(f32(d), 0.0);
+        let xi = vec2<f32>(noise2D(seed), noise2D(seed + 0.1));
+
+        let hemiSampleLocal = cosineSampleHemisphere(xi);
+        let sampleVecView = normalize(TBN * hemiSampleLocal) * radius;
+
+        let samplePos = viewPos + sampleVecView;
+
+        // Proyectamos a espacio NDC
+        let clip = camera.projectionMatrix * vec4(samplePos, 1.0);
+        let ndc = clip.xyz / clip.w;
+        let sampleUV = ndc.xy * 0.5 + 0.5;
+
+        // Validamos límites
+        if (any(sampleUV < vec2<f32>(0.0)) || any(sampleUV > vec2<f32>(1.0))) {
+            continue;
+        }
+
+        let sampleDepthRaw = textureSampleLevel(gLinearDepth, hbaoSampler, sampleUV, 0.0).x;
+        if (sampleDepthRaw >= 1.0) {
+            continue;
+        }
+
+        let viewSampleDepth = -sampleDepthRaw;
+        let delta = vec3<f32>(sampleVecView.xy, viewSampleDepth - viewPos.z);
+
+        let tanSample = computeTanAngle(delta);
+        let tanBase = computeTanAngle(sampleVecView);
+        let tanBiased = tanBase + biasAngle;
+
+        let sinBase = sinFromTan(tanBiased);
+        let sinHorizon = sinFromTan(tanSample);
+
+        let falloff = 1.0 - clamp(length(sampleVecView.xy) / radius, 0.0, 1.0);
+        let aoDir = max(0.0, (sinHorizon - sinBase) * falloff);
+
+        occlusion += aoDir;
+    }
+
+    let ao = 1.0 - (occlusion / f32(directionCount)) * aoStrength;
+    return clamp(ao, 0.0, 1.0);
 }

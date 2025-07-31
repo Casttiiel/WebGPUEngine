@@ -71,7 +71,7 @@ fn bilateralFilter(centerUV: vec2<f32>) -> f32 {
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     // Apply bilateral filter to the AO texture
     let filteredAO = bilateralFilter(uv);
-    
+    let sampleAO = textureSample(aoTexture, samplerAO, uv).r;
     // Output filtered AO value
-    return filteredAO;
+    return sampleAO;
 }
