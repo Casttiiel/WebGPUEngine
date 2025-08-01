@@ -90,10 +90,10 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     for (var i = 0u; i < samplingDirections; i = i + 1u) {
         let angle = f32(i) * angleStep;
         let dir2D = vec2<f32>(cos(angle), sin(angle));
-        let dirView = TBN * vec3<f32>(dir2D, 0.0); // Direction in view space
+        let dirView = TBN * vec3<f32>(dir2D, 0.1); // Direction in view space
 
         // Calculate initial tangent angle
-        let tangentAngle = atan(dirView.z / length(dirView.xy)) + tangentBias;
+        let tangentAngle = atan2(dirView.z, length(dirView.xy)) + tangentBias;
         var horizonAngle = tangentAngle;
 
         var lastDifference = vec3<f32>(0.0);
@@ -129,5 +129,5 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     }
 
     sum /= f32(samplingDirections);
-    return clamp(1.0 - sum * aoStrength, 0.0, 1.0);
+    return clamp(sum * aoStrength, 0.0, 1.0);
 }

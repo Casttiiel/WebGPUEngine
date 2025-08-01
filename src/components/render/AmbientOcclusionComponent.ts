@@ -328,7 +328,7 @@ export class AmbientOcclusionComponent extends Component {
     });
     addControl(this.ssaoParams, 'maxDistance', `${componentName} Max Distance`, {
       min: 0.001,
-      max: 0.5,
+      max: 5.0,
       step: 0.001,
     });
     addControl(this.ssaoParams, 'occScale', `${componentName} Noise Scale`, {
