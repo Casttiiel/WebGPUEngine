@@ -42,78 +42,92 @@ fn projectViewToUV(viewPos: vec3<f32>) -> vec2<f32> {
     return ndc * 0.5 + vec2<f32>(0.5);
 }
 
+// Construir TBN robusto en view space
+fn computeTBN2(normal: vec3<f32>) -> mat3x3<f32> {
+    let n = normalize(normal);
+    let sign = select(1.0, -1.0, n.z < 0.0);
+    let a = -1.0 / (sign + n.z);
+    let b = n.x * n.y * a;
+
+    let tangent = normalize(vec3<f32>(1.0 + sign * n.x * n.x * a, sign * b, -sign * n.x));
+    let bitangent = normalize(vec3<f32>(b, sign + n.y * n.y * a, -n.y));
+
+    return mat3x3<f32>(tangent, bitangent, n);
+}
+
+//HBAO Fragment Shader
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
-    let radius = 1.0;
+    let radius = ssaoParams.radius;
     let step = 0.02;
-    let tangentBias = 0.3;
-    let aoStrength = 2.0;
-    let samplingDirections = 16u;
-    let stepCount = 4u;
-    let screenSize = camera.screenSize;
-    let uvRadius = false;
+    let tangentBias = ssaoParams.bias;
+    let samplingDirections = ssaoParams.sampleCount;
+    let stepCount = 8u;
+    let aoStrength = ssaoParams.aoStrength;
+    let maxDistance = ssaoParams.maxDistance;
 
-    // Early out if depth is invalid (e.g. background)
+    // Sample the linear depth to discard background
     let linearZ = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
-    //return zRaw;
     if (linearZ >= 1.0) {
         return 0.0;
     }
 
+    // Reconstruct normal from G-buffer and convert to view space
     let normalData = textureSampleLevel(gNormals, hbaoSampler, uv, 0.0);
     let normalWorld = normalize(decodeNormal(normalData.xyz));
     var normalView = normalize((camera.viewMatrix * vec4(normalWorld, 0.0)).xyz);
-    normalView *= vec3<f32>(-1.0, 1.0, -1.0); // Necesary to flip Y and Z for correct view space normals
+    normalView *= vec3<f32>(-1.0, 1.0, -1.0); // Flip Y and Z to convert to left-handed view space
+
     let viewPosition = getViewPosition(uv);
 
-    let samplingDiskDirection = 2.0 * PI / f32(samplingDirections);
+    // Build tangent space in view space
+    let TBN = computeTBN2(normalView);
+
+    let angleStep = 2.0 * PI / f32(samplingDirections);
     var sum = 0.0;
-    var occlusion = 0.0;
 
+    // Loop over directions in tangent plane
     for (var i = 0u; i < samplingDirections; i = i + 1u) {
-        let samplingDirectionAngle = f32(i) * samplingDiskDirection;
-        let samplingDirection = vec2<f32>(cos(samplingDirectionAngle), sin(samplingDirectionAngle));
+        let angle = f32(i) * angleStep;
+        let dir2D = vec2<f32>(cos(angle), sin(angle));
+        let dirView = TBN * vec3<f32>(dir2D, 0.0); // Direction in view space
 
-        let tangentAngle = acos(dot(vec3(samplingDirection, 0.0), normalView.xyz)) - (0.5 * PI) + tangentBias;
-        var horizonAngle = tangentAngle; //set the horizon angle to the tangent angle to begin with
+        // Calculate initial tangent angle
+        let tangentAngle = atan(dirView.z / length(dirView.xy)) + tangentBias;
+        var horizonAngle = tangentAngle;
 
         var lastDifference = vec3<f32>(0.0);
 
+        // Step outward in this direction
         for (var j = 0u; j < stepCount; j = j + 1u) {
-            var sampleUV: vec2<f32>; 
-            if(uvRadius){
-                // step forward in the sampling direction
-                let stepForward = f32(j+1) * step * samplingDirection;
-                // use the stepforward position as an offset from the current fragment position in order to move to that location
-                sampleUV = uv + stepForward;
-            }else{
-                // step forward in the sampling direction
-                let stepForward = vec2<f32>(cos(samplingDirectionAngle), sin(samplingDirectionAngle)) * (f32(j + 1) * step);
-                // use the stepforward position as an offset from the current fragment position in order to move to that location
-                let stepPosition = viewPosition + vec3<f32>(stepForward.x, 0.0, stepForward.y); // desplazamiento en el plano XY (view space) : ESTO ES INCORRECTO!
-                sampleUV = projectViewToUV(stepPosition);
-            }
-            
-            let viewSpaceSteppedPosition = getViewPosition(sampleUV);
-            
-            // Now that we have the view-space position of the offset sample point
-            // We can check the distance from our current fragment to the offset point
-            let diff = viewSpaceSteppedPosition.xyz - viewPosition;           
-            // If the distance is less than the set radius 
-            if(length(diff) < radius){
+            let stepLength = f32(j + 1) * step;
+            let stepPos = viewPosition + dirView * stepLength;
+            let sampleUV = projectViewToUV(stepPos);
+            let sampleViewPos = getViewPosition(sampleUV);
+
+            let diff = sampleViewPos - viewPosition;
+            let dist = length(diff);
+
+            if (dist < radius) {
                 lastDifference = diff;
-                let foundElevationAngle = atan(diff.z / length(diff.xy));
-                horizonAngle = max(horizonAngle, foundElevationAngle);
+                let elevationAngle = atan(diff.z / length(diff.xy));
+                horizonAngle = max(horizonAngle, elevationAngle);
             }
         }
 
-        let norm = length(lastDifference) / radius;
-        let attenuation = 1 - norm * norm;
+        let distance = length(lastDifference);
+        if (distance > 0.0 && distance < maxDistance) {
+            let norm = distance / radius;
+            let attenuation = max(1.0 - norm * norm, 0.0);
+            let falloff = attenuation * attenuation; // HBAO-style falloff
 
-        occlusion = clamp(attenuation * (sin(horizonAngle) - sin(tangentAngle)), 0.0, 1.0);
-        sum += 1.0 - occlusion;
+            let rangeFade = clamp(1.0 - distance / maxDistance, 0.0, 1.0);
+            let delta = clamp(falloff * (sin(horizonAngle) - sin(tangentAngle)), 0.0, 1.0);
+
+            sum += delta * rangeFade;
+        }
     }
 
     sum /= f32(samplingDirections);
-    return sum;
+    return clamp(1.0 - sum * aoStrength, 0.0, 1.0);
 }

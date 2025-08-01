@@ -1,9 +1,5 @@
 1. HBAO:
    Comprobar que ViewSpace
-   Sampling UV (Muestrear en espacio de vista y proyectar a UV)
-   Falloff
-   Flip de normal?
-   Dot Invalid (Construir TBN, proyectar dirección en el plano tangente)
    Aleatoriedad
 2. Check PBR Functions
 3. Compute-based distortion

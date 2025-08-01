@@ -47,10 +47,10 @@ export class AmbientOcclusionQualityConfig {
     },
     high: {
       sampleCount: 16, // High sample count for quality
-      radius: 0.01, // Larger radius for more detailed AO
-      bias: 0.1, // Lower bias for accuracy
-      aoStrength: 1.5, // Strong effect
-      maxDistance: 1.2, // Extended distance
+      radius: 0.5, // Larger radius for more detailed AO
+      bias: 0.05, // Lower bias for accuracy
+      aoStrength: 1.0, // Strong effect
+      maxDistance: 2.0, // Extended distance
       noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },

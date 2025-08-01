@@ -312,14 +312,14 @@ export class AmbientOcclusionComponent extends Component {
       step: 1,
     });
     addControl(this.ssaoParams, 'radius', `${componentName} Radius`, {
-      min: 0.0001,
-      max: 0.1,
-      step: 0.0001,
+      min: 0.00001,
+      max: 0.5,
+      step: 0.00001,
     });
     addControl(this.ssaoParams, 'bias', `${componentName} Bias`, {
-      min: 0.001,
-      max: 1.0,
-      step: 0.001,
+      min: 0.01,
+      max: 5.0,
+      step: 0.01,
     });
     addControl(this.ssaoParams, 'aoStrength', `${componentName} Strength`, {
       min: 1.0,
@@ -327,9 +327,9 @@ export class AmbientOcclusionComponent extends Component {
       step: 0.1,
     });
     addControl(this.ssaoParams, 'maxDistance', `${componentName} Max Distance`, {
-      min: 0.1,
-      max: 5.0,
-      step: 0.1,
+      min: 0.001,
+      max: 0.5,
+      step: 0.001,
     });
     addControl(this.ssaoParams, 'occScale', `${componentName} Noise Scale`, {
       min: 1.0,
