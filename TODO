@@ -1,5 +1,5 @@
 1. HBAO:
-   Comprobar que ViewSpace function es correcta
+   Comprobar que ViewSpace
    Sampling UV (Muestrear en espacio de vista y proyectar a UV)
    Falloff
    Flip de normal?

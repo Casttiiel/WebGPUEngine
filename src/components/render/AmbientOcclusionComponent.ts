@@ -312,9 +312,9 @@ export class AmbientOcclusionComponent extends Component {
       step: 1,
     });
     addControl(this.ssaoParams, 'radius', `${componentName} Radius`, {
-      min: 0.001,
-      max: 0.5,
-      step: 0.001,
+      min: 0.0001,
+      max: 0.1,
+      step: 0.0001,
     });
     addControl(this.ssaoParams, 'bias', `${componentName} Bias`, {
       min: 0.001,
