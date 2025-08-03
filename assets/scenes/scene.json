@@ -10,5 +10,47 @@
   },
   {
     "prefab": "main_camera.prefab"
+  },
+  {
+    "prefab": "cube_transparent.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 2, -10],
+        "scale": [0.5, 0.5, 0.5]
+      }
+    }
+  },
+  {
+    "prefab": "cube_distorsion.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 2, 10],
+        "rotation": [0, 0, 0],
+        "scale": [0.5, 0.5, 0.5]
+      }
+    }
+  },
+  {
+    "prefab": "blood_decal.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 0, -7]
+      }
+    }
+  },
+  {
+    "prefab": "cube_emissive.prefab",
+    "components": {
+      "transform": {
+        "position": [-1, 2, 10],
+        "scale": [0.25, 0.25, 0.25]
+      }
+    }
+  },
+  {
+    "prefab": "spot_light.prefab"
+  },
+  {
+    "prefab": "point_light.prefab"
   }
 ]

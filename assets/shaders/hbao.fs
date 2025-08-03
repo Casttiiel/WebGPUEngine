@@ -58,13 +58,15 @@ fn computeTBN2(normal: vec3<f32>) -> mat3x3<f32> {
 //HBAO Fragment Shader
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
-    let radius = ssaoParams.radius;
-    let step = 0.02;
+    let radius = 1.0;
+    let step = ssaoParams.radius;
     let tangentBias = ssaoParams.bias;
     let samplingDirections = ssaoParams.sampleCount;
     let stepCount = 8u;
     let aoStrength = ssaoParams.aoStrength;
     let maxDistance = ssaoParams.maxDistance;
+    let resolution = camera.screenSize;
+    let texelSize = 1.0 / resolution;
 
     // Sample the linear depth to discard background
     let linearZ = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
@@ -83,51 +85,44 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     // Build tangent space in view space
     let TBN = computeTBN2(normalView);
 
-    let angleStep = 2.0 * PI / f32(samplingDirections);
+    let samplingDiskDirection = 2.0 * PI / f32(samplingDirections);
     var sum = 0.0;
 
     // Loop over directions in tangent plane
     for (var i = 0u; i < samplingDirections; i = i + 1u) {
-        let angle = f32(i) * angleStep;
-        let dir2D = vec2<f32>(cos(angle), sin(angle));
-        let dirView = TBN * vec3<f32>(dir2D, 0.1); // Direction in view space
+        let samplingDirectionAngle = f32(i) * samplingDiskDirection;
+        let samplingDirection = vec2<f32>(
+            cos(samplingDirectionAngle),
+            sin(samplingDirectionAngle),
+        );
 
         // Calculate initial tangent angle
-        let tangentAngle = atan2(dirView.z, length(dirView.xy)) + tangentBias;
-        var horizonAngle = tangentAngle;
+        let tangentAngle = atan(-normalView.z / length(normalView.xy)) + tangentBias;
+        var maxElevation = tangentAngle;
+        var r = 0.0;
 
-        var lastDifference = vec3<f32>(0.0);
-
-        // Step outward in this direction
         for (var j = 0u; j < stepCount; j = j + 1u) {
-            let stepLength = f32(j + 1) * step;
-            let stepPos = viewPosition + dirView * stepLength;
-            let sampleUV = projectViewToUV(stepPos);
-            let sampleViewPos = getViewPosition(sampleUV);
+            let stepOffsetVS = TBN * vec3<f32>(samplingDirection * (f32(j + 1) * step), 0.0);
+            let sampleVS = viewPosition + stepOffsetVS;
 
-            let diff = sampleViewPos - viewPosition;
-            let dist = length(diff);
+            let snappedUV = projectViewToUV(sampleVS);
+            let viewSample = getViewPosition(snappedUV);
+            let delta = viewSample - viewPosition;
 
-            if (dist < radius) {
-                lastDifference = diff;
-                let elevationAngle = atan(diff.z / length(diff.xy));
-                horizonAngle = max(horizonAngle, elevationAngle);
-            }
+            if (length(delta) > radius) { continue; }
+
+            r = length(delta);
+            let elev = atan(-delta.z / length(delta.xy));
+            maxElevation = max(maxElevation, elev);
         }
 
-        let distance = length(lastDifference);
-        if (distance > 0.0 && distance < maxDistance) {
-            let norm = distance / radius;
-            let attenuation = max(1.0 - norm * norm, 0.0);
-            let falloff = attenuation * attenuation; // HBAO-style falloff
+        let weight = max(0.0, 1.0 - r / radius);
+        let contribution = (sin(maxElevation) - sin(tangentAngle)) * weight;
 
-            let rangeFade = clamp(1.0 - distance / maxDistance, 0.0, 1.0);
-            let delta = clamp(falloff * (sin(horizonAngle) - sin(tangentAngle)), 0.0, 1.0);
-
-            sum += delta * rangeFade;
-        }
+        let occlusion = clamp(contribution, 0.0, 1.0);
+        sum += 1.0 - occlusion;
     }
 
     sum /= f32(samplingDirections);
-    return clamp(sum * aoStrength, 0.0, 1.0);
+    return pow(sum, aoStrength);
 }

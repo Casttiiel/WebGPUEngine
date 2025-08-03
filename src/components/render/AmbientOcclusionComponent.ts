@@ -8,6 +8,7 @@ import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager'
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { Texture } from '../../renderer/resources/Texture';
 
 export class AmbientOcclusionComponent extends Component {
   private aoTechnique!: Technique;
@@ -26,7 +27,7 @@ export class AmbientOcclusionComponent extends Component {
     bias: 0.025,
     aoStrength: 1.5,
     maxDistance: 1.0,
-    occScale: 4.0,
+    noiseScale: 4.0,
   };
 
   // Cache previous values to detect changes (initialized in constructor)
@@ -37,6 +38,7 @@ export class AmbientOcclusionComponent extends Component {
   private ssaoParamsBindGroup!: GPUBindGroup | null;
   private debugControlsAdded = false;
   private isEnabled = true;
+  private noiseTexture!: Texture;
 
   constructor() {
     super();
@@ -61,7 +63,7 @@ export class AmbientOcclusionComponent extends Component {
         bias: aoConfig.bias,
         aoStrength: aoConfig.aoStrength,
         maxDistance: aoConfig.maxDistance,
-        occScale: aoConfig.noiseScale,
+        noiseScale: aoConfig.noiseScale,
       };
     }
   }
@@ -70,6 +72,7 @@ export class AmbientOcclusionComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.aoTechnique = await Technique.get('ambient_occlusion.tech');
     this.bilateralFilterTechnique = await Technique.get('ao_bilateral_filter.tech');
+    this.noiseTexture = await Texture.get('noiseRGB.jpg');
 
     // Create intermediate render target for raw AO
     const qualitySettings = QualitySettings.getInstance();
@@ -106,7 +109,7 @@ export class AmbientOcclusionComponent extends Component {
     f32View[1] = this.ssaoParams.bias;
     f32View[2] = this.ssaoParams.aoStrength;
     f32View[3] = this.ssaoParams.maxDistance;
-    f32View[4] = this.ssaoParams.occScale;
+    f32View[4] = this.ssaoParams.noiseScale;
     f32View[5] = 0; // padding
     f32View[6] = 0; // padding
 
@@ -125,7 +128,7 @@ export class AmbientOcclusionComponent extends Component {
       this.ssaoParams.bias !== this.previousSSAOParams.bias ||
       this.ssaoParams.aoStrength !== this.previousSSAOParams.aoStrength ||
       this.ssaoParams.maxDistance !== this.previousSSAOParams.maxDistance ||
-      this.ssaoParams.occScale !== this.previousSSAOParams.occScale
+      this.ssaoParams.noiseScale !== this.previousSSAOParams.noiseScale
     );
   }
 
@@ -170,6 +173,10 @@ export class AmbientOcclusionComponent extends Component {
         {
           binding: 1,
           resource: sampler,
+        },
+        {
+          binding: 2,
+          resource: this.noiseTexture.getTextureView()!,
         },
       ],
     );
@@ -282,7 +289,7 @@ export class AmbientOcclusionComponent extends Component {
       this.ssaoParams.bias !== this.previousSSAOParams.bias ||
       this.ssaoParams.aoStrength !== this.previousSSAOParams.aoStrength ||
       this.ssaoParams.maxDistance !== this.previousSSAOParams.maxDistance ||
-      this.ssaoParams.occScale !== this.previousSSAOParams.occScale
+      this.ssaoParams.noiseScale !== this.previousSSAOParams.noiseScale
     );
   }
 
@@ -312,18 +319,18 @@ export class AmbientOcclusionComponent extends Component {
       step: 1,
     });
     addControl(this.ssaoParams, 'radius', `${componentName} Radius`, {
-      min: 0.00001,
-      max: 0.5,
-      step: 0.00001,
+      min: 0.000001,
+      max: 0.5, //0.00009
+      step: 0.000001,
     });
     addControl(this.ssaoParams, 'bias', `${componentName} Bias`, {
-      min: 0.01,
-      max: 5.0,
-      step: 0.01,
+      min: 0.0,
+      max: 1.0,
+      step: 1.0,
     });
     addControl(this.ssaoParams, 'aoStrength', `${componentName} Strength`, {
       min: 1.0,
-      max: 5.0,
+      max: 3.0,
       step: 0.1,
     });
     addControl(this.ssaoParams, 'maxDistance', `${componentName} Max Distance`, {
@@ -331,10 +338,10 @@ export class AmbientOcclusionComponent extends Component {
       max: 5.0,
       step: 0.001,
     });
-    addControl(this.ssaoParams, 'occScale', `${componentName} Noise Scale`, {
-      min: 1.0,
-      max: 10.0,
-      step: 0.1,
+    addControl(this.ssaoParams, 'noiseScale', `${componentName} Noise Scale`, {
+      min: 0.0001,
+      max: 0.3,
+      step: 0.0001,
     });
 
     this.debugControlsAdded = true;

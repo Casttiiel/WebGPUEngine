@@ -270,7 +270,7 @@ export class DeferredRenderer {
     this.renderAccLight();
 
     // Execute transparent pass
-    //this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     const view = this.rtAccLight.getView();
     if (!view) {
@@ -329,8 +329,8 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
-    //this.renderPassManager.executePass('pointLights');
-    //this.renderPassManager.executePass('spotLights');
+    this.renderPassManager.executePass('pointLights');
+    this.renderPassManager.executePass('spotLights');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);

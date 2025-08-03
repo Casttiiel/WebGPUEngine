@@ -326,6 +326,11 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'filtering' },
       },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
     ]);
   }
 
