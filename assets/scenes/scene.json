@@ -46,11 +46,5 @@
         "scale": [0.25, 0.25, 0.25]
       }
     }
-  },
-  {
-    "prefab": "spot_light.prefab"
-  },
-  {
-    "prefab": "point_light.prefab"
   }
 ]

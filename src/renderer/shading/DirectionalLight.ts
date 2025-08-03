@@ -10,6 +10,7 @@ export class DirectionalLight {
 
   private directionalLightTechnique!: Technique;
   private directionalLightBindGroup!: GPUBindGroup;
+  private uniformBuffer!: GPUBuffer;
 
   constructor() {}
 
@@ -17,20 +18,31 @@ export class DirectionalLight {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.directionalLightTechnique = await Technique.get('directional_light.tech');
 
-    /*this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
-      `skybox_bindgroup`,
-      this.directionalLightTechnique.getPipeline().getBindGroupLayout(1)!,
+    this.uniformBuffer = GPUUtils.createBuffer(
+      'directional light uniform buffer',
+      36 * 4,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array([1.0, 0.956, 0.878, 1.0])); // color
+    GPUUtils.writeBuffer(
+      this.uniformBuffer,
+      16,
+      new Float32Array(
+        [-0.5, 1.0, 0.0, 10.0], // position and intensity (position is not used in directional light)
+      ),
+    );
+
+    this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
+      `directional_light_bindgroup`,
+      this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!,
       [
         {
           binding: 0,
-          resource: textureView,
-        },
-        {
-          binding: 1,
-          resource: sampler,
+          resource: { buffer: this.uniformBuffer },
         },
       ],
-    );*/
+    );
   }
 
   public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {

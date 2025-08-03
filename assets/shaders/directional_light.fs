@@ -3,11 +3,18 @@
 #include "common/utils"
 #include "common/gbuffer"
 
-struct DirectionalLightUniforms {
-    color: vec4<f32>,
-    position: vec3<f32>,
-    direction: vec3<f32>,
-    intensity: f32,
+struct LightUniforms {
+    color: vec4<f32>,            // 16 bytes (0-15)
+    position: vec3<f32>,         // 12 bytes (16-27)
+    intensity: f32,              // 4 bytes  (28-31)
+    viewProjOffset: mat4x4<f32>, // 64 bytes (32-95)
+    radius: f32,                 // 4 bytes  (96-99)
+    shadowStep: f32,             // 4 bytes  (100-103)
+    shadowInverseResolution: f32, // 4 bytes (104-107)
+    shadowStepDivResolution: f32, // 4 bytes (108-111)
+    startFalloff: f32,           // 4 bytes  (112-115)
+    padding: vec3<f32>,          // 12 bytes (116-127)
+    extraPadding: f32,           // 4 bytes  (128-131) para llegar a 144 bytes
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -18,7 +25,7 @@ struct DirectionalLightUniforms {
 @group(1) @binding(4) var gAO: texture_2d<f32>;
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
-@group(2) @binding(0) var<uniform> light: DirectionalLightUniforms;
+@group(2) @binding(0) var<uniform> light: LightUniforms;
 
 
 @fragment
@@ -31,7 +38,7 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
         // shadow_factor = getShadowFactor(g.worldPos); // TODO: Implement shadow mapping
     }*/
         
-    let light_dir = light.direction;
+    let light_dir = normalize(light.position);//this will be used as a directional light
     
     let NdL = saturate(dot(g.normal, light_dir));
     let NdV = saturate(dot(g.normal, g.viewDir));

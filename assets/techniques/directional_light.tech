@@ -3,6 +3,7 @@
     "fs": "directional_light.fs",
     "writesOn": "texture",
     "z": "disable_all",
+    "blend": "additive",
     "uniforms": [
         "CameraUniforms",
         "GBufferUniforms",
