@@ -1,29 +1,27 @@
 1. Directional Light with Shadow Maps
-2. Ambient Occlusion SSAO / Spiral SSAO / GTAO (unstable FPS have in mind) / AO quality
+2. Check PBR Functions
 3. Screen Space Reflections
-4. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-5. Area Light
-6. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-7. Volumetric lighting
+4. Volumetric lighting
+5. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+6. Area Light
 
 FIXES------------------------------------------
 
-1. Decals Category (Normals)(Check on change quality)
-2. Enhance GLTF Loader
-3. Sponza Cubemap environment ambient
-4. Skybox improvement hdr and more
+1. Skybox HDR texture
+2. Decals Category (Normals)(Check on change quality)
+3. Enhance GLTF Loader
+4. Sponza Cubemap environment ambient
 
 HIGH-END-FEATURES------------------------------
 
-1. Temporal Anti-Aliasing (TAA) / Aliasing quality
-2. Motion Blur
-3. Atmospheric scattering
-4. Global Ilumination
-5. Indirect light
-6. Volumetric fog
-7. Particles
-8. Fog
-9. Rain
+1. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+2. Temporal Anti-Aliasing (TAA) / Aliasing quality
+3. Motion Blur
+4. Atmospheric scattering
+5. Global Ilumination
+6. Indirect light
+7. Volumetric fog
+8. Particles
 
 MISC-----------------------------------
 

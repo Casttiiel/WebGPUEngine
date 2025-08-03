@@ -12,6 +12,7 @@ export class RenderTarget {
   private msaaTexture!: GPUTexture; // Multi-sample texture (for rendering)
   private msaaTextureView!: GPUTextureView | null;
   private isMultisample: boolean = false;
+
   public createRT(
     name: string,
     width: number,

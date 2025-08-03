@@ -17,8 +17,26 @@ const FXAA_JITTER_STRENGTH : f32 = 0.25;
 
  // Resolution-dependent threshold calculation
 fn calculateEdgeThreshold(resolution: vec2<f32>) -> f32 {
-    let resolutionFactor = sqrt(camera.screenSize.x * camera.screenSize.y) / 1920.0; // Normalizado a 1080p
-    return FXAA_EDGE_THRESHOLD * (1.0 + (resolutionFactor - 1.0) * 0.5);
+    // Calculate pixels per screen width (medida de densidad de píxeles)
+    let pixelDensity = resolution.x;
+    
+    // Adjust threshold based on pixel density:
+    // - Para resoluciones bajas (< 720p): threshold más alto para evitar blur excesivo
+    // - Para resoluciones medias: threshold base
+    // - Para resoluciones altas (> 2K): threshold más bajo para mejor detección de bordes
+    var scaleFactor: f32;
+    if (pixelDensity < 1280.0) {
+        // Para resoluciones bajas, aumentar threshold
+        scaleFactor = 1.25;
+    } else if (pixelDensity > 2560.0) {
+        // Para resoluciones altas, reducir threshold
+        scaleFactor = 0.75;
+    } else {
+        // Para resoluciones medias, escalar linealmente
+        scaleFactor = 1.0 - (pixelDensity - 1280.0) / (2560.0 - 1280.0) * 0.5;
+    }
+    
+    return FXAA_EDGE_THRESHOLD * scaleFactor;
 };
 
 

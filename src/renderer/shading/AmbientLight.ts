@@ -21,7 +21,7 @@ export class AmbientLight {
 
   private reflectionIntensity = 0.8;
   private ambientLightIntensity = 0.8;
-  private globalAmbientBoost = 0.1;
+  private globalAmbientBoost = 0.05;
 
   constructor() {}
 

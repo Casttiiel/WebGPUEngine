@@ -63,7 +63,7 @@ export class CameraComponent extends Component {
       this.camera.move(Array.from(this.camera.getLocalVector([0, 0, -4.0 * multiplier * dt])));
 
     // Rotación de la cámara con el ratón
-    if (input.isMouseButtonPressed(MouseButton.LEFT)) {
+    if (input.isMouseButtonPressed(MouseButton.RIGHT)) {
       const mouseDelta = input.getMouseDelta();
       this.camera.rotate(-mouseDelta.x * this.rotationSpeed, -mouseDelta.y * this.rotationSpeed);
     }

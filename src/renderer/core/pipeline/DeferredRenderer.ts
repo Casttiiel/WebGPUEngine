@@ -270,7 +270,7 @@ export class DeferredRenderer {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     }
 
-    //this.renderAO(camera, this.rtAO);
+    this.renderAO(camera, this.rtAO);
 
     this.renderAccLight();
 

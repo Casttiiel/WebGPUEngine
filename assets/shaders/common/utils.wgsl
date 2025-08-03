@@ -8,6 +8,10 @@ fn decodeNormal(encodedNormal: vec3<f32>) -> vec3<f32> {
     return encodedNormal * 2.0 - 1.0;
 }
 
+fn noise2D(p: vec2<f32>) -> f32 {
+    return fract(sin(dot(p, vec2<f32>(12.9898, 78.233))) * 43758.5453);
+}
+
 // Matrix utilities
 fn get3x3From4x4(mat: mat4x4<f32>) -> mat3x3<f32> {
     return mat3x3<f32>(
