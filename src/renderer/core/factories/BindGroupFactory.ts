@@ -319,6 +319,26 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getHBAOUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('sampler', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+    ]);
+  }
+
   /**
    * Creates a bloom parameters bind group layout
    */
@@ -369,6 +389,8 @@ export class BindGroupFactory {
         return this.getDepthTextureLayout();
       case PipelineBindGroupLayouts.FOUR_TEXTURE:
         return this.getFourTextureLayout();
+      case PipelineBindGroupLayouts.HBAO_UNIFORMS:
+        return this.getHBAOUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

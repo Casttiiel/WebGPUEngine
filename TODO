@@ -7,6 +7,26 @@
 7. Area Light
 8. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
 9. Volumetric lighting
+10. Check PBR Functions
+11. Compute-based distortion
+12. Check GLTF PBR Data / new sponza
+13. Cubemap environment ambient
+14. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+15. Directional Light with shadows?
+16. Motion Blur
+17. Volumetric lighting
+18. Atmospheric scattering
+19. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+20. Decals Category (Normals)(Check on change quality)
+21. Area Light
+22. Particles
+23. PointLighstWithShadows (Tweakpane)
+24. Screen Space Reflections with the ability to switch between Hi-Z and Linear raymarching
+25. Temporal Anti-Aliasing (TAA)
+26. Indirect light
+27. Volumetric fog
+28. Global Ilumination
+29. Optimizacion WebGPUFundamentals
 
 FIXES------------------------------------------
 

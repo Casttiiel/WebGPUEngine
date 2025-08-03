@@ -9,4 +9,5 @@ export enum PipelineBindGroupLayouts {
   BUFFER_UNIFORM = 'BufferUniform',
   DEPTH_TEXTURE = 'DepthTexture',
   FOUR_TEXTURE = 'FourTexture',
+  HBAO_UNIFORMS = 'HBAOUniforms',
 }

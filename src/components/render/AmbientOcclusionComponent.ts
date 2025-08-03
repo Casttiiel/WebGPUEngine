@@ -8,6 +8,7 @@ import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager'
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { Texture } from '../../renderer/resources/Texture';
 
 export class AmbientOcclusionComponent extends Component {
   private aoTechnique!: Technique;
@@ -21,7 +22,7 @@ export class AmbientOcclusionComponent extends Component {
 
   // Dynamic SSAO Parameters from quality settings
   private ssaoParams = {
-    sampleCount: 16,
+    sampleCount: 64 as number, // Será convertido a u32 al escribir en el buffer
     radius: 0.5,
     bias: 0.025,
     aoStrength: 1.5,
@@ -37,6 +38,7 @@ export class AmbientOcclusionComponent extends Component {
   private ssaoParamsBindGroup!: GPUBindGroup | null;
   private debugControlsAdded = false;
   private isEnabled = true;
+  private noiseTexture!: Texture;
 
   constructor() {
     super();
@@ -70,6 +72,7 @@ export class AmbientOcclusionComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.aoTechnique = await Technique.get('ambient_occlusion.tech');
     this.bilateralFilterTechnique = await Technique.get('ao_bilateral_filter.tech');
+    this.noiseTexture = await Texture.get('noiseRGB.jpg');
 
     // Create intermediate render target for raw AO
     const qualitySettings = QualitySettings.getInstance();
@@ -95,17 +98,22 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   private updateSSAOParamsBuffer(): void {
-    // Pack SSAO parameters only into Float32Array
-    const paramsData = new Float32Array([
-      this.ssaoParams.sampleCount,
-      this.ssaoParams.radius,
-      this.ssaoParams.bias,
-      this.ssaoParams.aoStrength,
-      this.ssaoParams.maxDistance,
-      this.ssaoParams.noiseScale,
-      0, // padding
-      0, // padding
-    ]);
+    // Creamos un ArrayBuffer para almacenar tanto u32 como f32
+    const arrayBuffer = new ArrayBuffer(32); // 8 * 4 bytes (1 u32 + 5 f32 + 2 padding)
+    const u32View = new Uint32Array(arrayBuffer, 0, 1);
+    const f32View = new Float32Array(arrayBuffer, 4); // Comienza después del u32
+
+    // Escribimos los datos
+    u32View[0] = this.ssaoParams.sampleCount;
+    f32View[0] = this.ssaoParams.radius;
+    f32View[1] = this.ssaoParams.bias;
+    f32View[2] = this.ssaoParams.aoStrength;
+    f32View[3] = this.ssaoParams.maxDistance;
+    f32View[4] = this.ssaoParams.noiseScale;
+    f32View[5] = 0; // padding
+    f32View[6] = 0; // padding
+
+    const paramsData = new Uint8Array(arrayBuffer);
 
     GPUUtils.writeBuffer(this.ssaoParamsBuffer, 0, paramsData);
 
@@ -144,15 +152,31 @@ export class AmbientOcclusionComponent extends Component {
   private createSSAOParamsBindGroup(): void {
     if (this.ssaoParamsBindGroup) return;
 
+    const sampler = GPUUtils.createSampler({
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+    });
+
     this.ssaoParamsBindGroup = BindGroupFactory.createBindGroup(
       'ssao_params_bindgroup',
-      BindGroupFactory.getBufferUniformLayout(),
+      BindGroupFactory.getHBAOUniformsLayout(),
       [
         {
           binding: 0,
           resource: {
             buffer: this.ssaoParamsBuffer,
           },
+        },
+        {
+          binding: 1,
+          resource: sampler,
+        },
+        {
+          binding: 2,
+          resource: this.noiseTexture.getTextureView()!,
         },
       ],
     );
@@ -182,9 +206,6 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
-    // Update parameters from quality settings (in case they changed)
-    this.updateParametersFromQuality();
-
     // Update SSAO parameters buffer if parameters changed
     if (this.hasParametersChanged()) {
       this.updateSSAOParamsBuffer();
@@ -298,29 +319,29 @@ export class AmbientOcclusionComponent extends Component {
       step: 1,
     });
     addControl(this.ssaoParams, 'radius', `${componentName} Radius`, {
-      min: 0.1,
-      max: 2.0,
-      step: 0.01,
+      min: 0.000001,
+      max: 0.5, //0.00009
+      step: 0.000001,
     });
     addControl(this.ssaoParams, 'bias', `${componentName} Bias`, {
-      min: 0.001,
-      max: 0.1,
-      step: 0.001,
+      min: 0.0,
+      max: 1.0,
+      step: 1.0,
     });
     addControl(this.ssaoParams, 'aoStrength', `${componentName} Strength`, {
-      min: 0.1,
-      max: 5.0,
+      min: 1.0,
+      max: 3.0,
       step: 0.1,
     });
     addControl(this.ssaoParams, 'maxDistance', `${componentName} Max Distance`, {
-      min: 0.1,
+      min: 0.001,
       max: 5.0,
-      step: 0.1,
+      step: 0.001,
     });
     addControl(this.ssaoParams, 'noiseScale', `${componentName} Noise Scale`, {
-      min: 1.0,
-      max: 10.0,
-      step: 0.1,
+      min: 0.0001,
+      max: 0.3,
+      step: 0.0001,
     });
 
     this.debugControlsAdded = true;

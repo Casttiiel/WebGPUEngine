@@ -6,6 +6,7 @@ struct CameraUniforms {
     screenSize: vec2<f32>,
     cameraFront: vec3<f32>,
     cameraZFar: f32,
+    invProjection: mat4x4<f32>,
 }
 
 struct ObjectUniforms {
