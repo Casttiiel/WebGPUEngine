@@ -29,27 +29,27 @@ export class AmbientOcclusionQualityConfig {
     },
     low: {
       sampleCount: 4, // Minimal samples for performance
-      radius: 0.05, // Larger radius for more detailed AO
+      radius: 0.1, // Larger radius for more detailed AO
       bias: 0.1, // Lower bias for accuracy
-      aoStrength: 2.0, // Strong effect
+      aoStrength: 2.5, // Strong effect
       maxDistance: 0.8, // Shorter distance
       noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },
     medium: {
       sampleCount: 16, // Balanced samples
-      radius: 0.05, // Larger radius for more detailed AO
+      radius: 0.1, // Larger radius for more detailed AO
       bias: 0.1, // Lower bias for accuracy
-      aoStrength: 2.0, // Strong effect
+      aoStrength: 2.5, // Strong effect
       maxDistance: 1.0, // Standard distance
       noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },
     high: {
       sampleCount: 32, // High sample count for quality
-      radius: 0.05, // Larger radius for more detailed AO
+      radius: 0.1, // Larger radius for more detailed AO
       bias: 0.0025, // Lower bias for accuracy
-      aoStrength: 2.0, // Strong effect
+      aoStrength: 2.5, // Strong effect
       maxDistance: 2.0, // Extended distance
       noiseScale: 0.01, // Standard noise scale
       enabled: true,
