@@ -1,10 +1,11 @@
 1. Check PBR Functions
 2. Decals Category (Normals)(Check on change quality)
 3. Skybox HDR texture
-4. Directional Light with Shadow Maps
-5. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-6. Volumetric lighting
-7. Screen Space Reflections
+4. Bloom pbr values
+5. Directional Light with Shadow Maps
+6. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+7. Volumetric lighting
+8. Screen Space Reflections
 
 FIXES------------------------------------------
 
