@@ -1,15 +1,15 @@
-1. Directional Light with Shadow Maps
-2. Check PBR Functions
-3. Screen Space Reflections
-4. Volumetric lighting
+1. Check PBR Functions
+2. Decals Category (Normals)(Check on change quality)
+3. Skybox HDR texture
+4. Directional Light with Shadow Maps
 5. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-6. Area Light
+6. Volumetric lighting
+7. Screen Space Reflections
 
 FIXES------------------------------------------
 
-1. Skybox HDR texture
-2. Decals Category (Normals)(Check on change quality)
-3. Sponza Cubemap environment ambient
+1. Sponza Cubemap environment ambient
+2. Review ambient light calcs and intensity
 
 HIGH-END-FEATURES------------------------------
 
@@ -21,6 +21,7 @@ HIGH-END-FEATURES------------------------------
 6. Indirect light
 7. Volumetric fog
 8. Particles
+9. Area Light
 
 MISC-----------------------------------
 
@@ -29,7 +30,6 @@ MISC-----------------------------------
 3. Cascade shadow maps
 4. Lens Flare
 5. Camera Lens Dirt
-6. Volumetric Lights/God Rays
 
 MAJOR-UPGRADES------------------------------------------
 
