@@ -1,17 +1,17 @@
 import { Engine } from '../../core/engine/Engine';
 import { Render } from '../core/pipeline/Render';
-import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { HDRTexture } from '../resources/HDRTexture';
 
 export class Skybox {
   private fullscreenQuadMesh!: Mesh;
 
   private skyboxTechnique!: Technique;
   private skyboxBindGroup!: GPUBindGroup;
-  private skyboxTexture!: Cubemap;
+  private skyboxTexture!: HDRTexture;
 
   constructor() {}
 
@@ -19,7 +19,7 @@ export class Skybox {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.skyboxTechnique = await Technique.get('skybox.tech');
 
-    this.skyboxTexture = await Cubemap.get('skybox.png');
+    this.skyboxTexture = await HDRTexture.get('qwantani_mid_morning_puresky_1k.hdr');
 
     const textureView = this.skyboxTexture.getTextureView();
     const sampler = this.skyboxTexture.getSampler();

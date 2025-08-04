@@ -323,20 +323,10 @@ export class AmbientOcclusionComponent extends Component {
       max: 0.5, //0.00009
       step: 0.000001,
     });
-    addControl(this.ssaoParams, 'bias', `${componentName} Bias`, {
-      min: 0.0,
-      max: 1.0,
-      step: 1.0,
-    });
     addControl(this.ssaoParams, 'aoStrength', `${componentName} Strength`, {
       min: 1.0,
       max: 3.0,
       step: 0.1,
-    });
-    addControl(this.ssaoParams, 'maxDistance', `${componentName} Max Distance`, {
-      min: 0.001,
-      max: 5.0,
-      step: 0.001,
     });
     addControl(this.ssaoParams, 'noiseScale', `${componentName} Noise Scale`, {
       min: 0.0001,

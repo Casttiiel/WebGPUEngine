@@ -1,15 +1,15 @@
-1. Decals Category Low quality error
-2. Sponza Cubemap environment ambient
-3. Bloom pbr values and error on change quality
-4. Skybox HDR texture
-5. Directional Light with Shadow Maps / Discard linear z >= 1.0 / Bloom values / Remove unused values on tweakpane of Ambient occlusion
-6. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-7. Volumetric lighting
-8. Screen Space Reflections
+1. Sponza Cubemap environment ambient
+2. Bloom pbr values
+3. Directional Light with Shadow Maps / Discard linear z >= 1.0
+4. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+5. Volumetric lighting
+6. Screen Space Reflections
 
 FIXES------------------------------------------
 
-1. Review ambient light calcs and intensity
+1. Blur error on change quality
+2. Decals Category Low quality error
+3. Review ambient light calcs and intensity
 
 HIGH-END-FEATURES------------------------------
 
