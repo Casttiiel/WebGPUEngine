@@ -44,12 +44,12 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     // PBR material properties
     let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic); // Base reflectance
       // Sample diffuse irradiance from pre-convolved irradiance map
-    let irradiance = textureSample(irradianceMap, samplerIrradiance, N).rgb;
+    let irradiance = vec3<f32>(0.3);//textureSample(irradianceMap, samplerIrradiance, N).rgb;
       // Sample specular radiance with roughness-based mip level
     let roughness = g.roughness;
     let maxMipLevel = 7.0; // Assuming 8 mip levels (0-7) in environment map
     let mipLevel = roughness * maxMipLevel;
-    let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, R, mipLevel).rgb;
+    let prefilteredColor = vec3<f32>(0.2);//textureSampleLevel(txEnvironment, samplerEnv, R, mipLevel).rgb;
     
     // Calculate Fresnel term for IBL
     let F = fresnelSchlickRoughness(NdotV, F0, roughness);

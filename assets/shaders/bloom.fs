@@ -39,5 +39,6 @@ fn PS_filter(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Aplicar threshold usando uniforms
     let amount = smoothstep(bloomParams.threshold_min, bloomParams.threshold_max, total_brightness);
     
-    return vec4<f32>(in_color.rgb * amount, 1.0);
+    return vec4<f32>(0.0);
+    //return vec4<f32>(in_color.rgb * amount, 1.0);
 }

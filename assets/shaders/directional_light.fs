@@ -51,13 +51,10 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     
     // PBR calculations
     let cDiff = Diffuse(g.albedo);
-    let cSpec_raw = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
-    
-    // Limitar el specular para evitar valores extremos que causan bloom no deseado
-    let cSpec = min(cSpec_raw, vec3<f32>(4.0)); // Limitar a 4.0 máximo por componente
+    let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
     // Energy conservation: specular contribution reduces diffuse
-    let F = Fresnel_Schlick(VdH, g.specularColor);
+    let F = Fresnel_Schlick_Roughness(VdH, g.specularColor, a);
     let kS = F; // Specular contribution
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse contribution
     
