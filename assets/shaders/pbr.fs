@@ -51,13 +51,17 @@ fn Fresnel_Schlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
     return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
 }
 
+fn Fresnel_Schlick_Roughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
+    return F0 + (max(vec3f(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
 fn Specular(specularColor: vec3<f32>, h: vec3<f32>, v: vec3<f32>, l: vec3<f32>, a: f32, NdL: f32, NdV: f32, NdH: f32, VdH: f32, LdV: f32) -> vec3<f32> {
     let F0 = specularColor;
     
     // Cook-Torrance BRDF
     let NDF = NormalDistribution_GGX(NdH, a);
     let G = Geometric_Smith_Schlick_GGX(NdV, NdL, a);
-    let F = Fresnel_Schlick(VdH, F0);
+    let F = Fresnel_Schlick_Roughness(VdH, F0, a);
     
     let numerator = NDF * G * F;
     let denominator = 4.0 * NdV * NdL + 0.0001; // Prevent division by zero
@@ -114,17 +118,14 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     
     // PBR calculations
     let cDiff = Diffuse(g.albedo);
-    let cSpec_raw = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
-    
-    // Limitar el specular para evitar valores extremos que causan bloom no deseado
-    let cSpec = min(cSpec_raw, vec3<f32>(4.0)); // Limitar a 4.0 máximo por componente
+    let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
     // Attenuation
     let normalized_distance = max(distance_to_light - light.startFalloff, 0.0) / (light.radius - light.startFalloff);
     var att = saturate(1.0 - normalized_distance);
 
     // Energy conservation: specular contribution reduces diffuse
-    let F = Fresnel_Schlick(VdH, g.specularColor);
+    let F = Fresnel_Schlick_Roughness(VdH, g.specularColor, a);
     let kS = F; // Specular contribution
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse contribution
     

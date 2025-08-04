@@ -29,8 +29,8 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     g.emissive = textureSample(gSelfIllum, samplerGBuffer, uv).x;
     g.selfIllum = g.albedo * g.emissive;
     
-    // Default specular for dielectrics is 0.03
-    g.specularColor = mix(vec3<f32>(0.03), albedoLinear, g.metallic);
+    // Default specular for dielectrics is 0.04
+    g.specularColor = mix(vec3<f32>(0.04), albedoLinear, g.metallic);
     
     // View and reflection directions
     let incident_dir = normalize(g.worldPos - camera.cameraPosition);
