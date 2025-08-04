@@ -1,26 +1,24 @@
 @group(0) @binding(0) var gAlbedo: texture_2d<f32>;
 @group(0) @binding(1) var gAlbedoSampler: sampler;
 
+fn tonemapACES(color: vec3<f32>) -> vec3<f32> {
+    // ACES approximation by Krzysztof Narkowicz
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+
+    return clamp((color * (a * color + vec3(b))) / (color * (c * color + vec3(d)) + vec3(e)), vec3(0.0), vec3(1.0));
+}
+
 @fragment
 fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     let adaptedExposure = 1.0; // TODO DEBERIA SER UNA UNIFORM
     var hdrColor = textureSample(gAlbedo, gAlbedoSampler, uv).rgb;
     hdrColor *= adaptedExposure;
 
-    // ===== AGX tonemapping core =====
-    /*var luma = dot(hdrColor, vec3<f32>(0.2126, 0.7152, 0.0722));
-    hdrColor = mix(vec3<f32>(luma), hdrColor, 0.95); // pre-desaturar highlights
-
-    // Shoulder curve
-    var a = 0.22;
-    var b = 0.30;
-    var c = 0.10;
-    var d = 0.20;
-    var e = 0.01;
-
-    hdrColor = (hdrColor * (a * hdrColor + b)) / (hdrColor * (c * hdrColor + d) + e);
-    let whitePoint = (a + b) / (c + d);
-    hdrColor = hdrColor / whitePoint;*/
+    hdrColor = tonemapACES(hdrColor);
 
     return vec4<f32>(hdrColor, 1.0);
 }

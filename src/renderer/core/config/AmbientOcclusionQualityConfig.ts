@@ -6,9 +6,7 @@
 export interface AmbientOcclusionConfig {
   sampleCount: number; // Number of samples per pixel (more = better quality, slower)
   radius: number; // AO sampling radius
-  bias: number; // Depth bias to prevent self-occlusion
   aoStrength: number; // AO effect intensity
-  maxDistance: number; // Maximum distance for AO calculation
   noiseScale: number; // Noise texture scale for sample distribution
   enabled: boolean; // Whether AO is enabled at all
 }
@@ -21,36 +19,27 @@ export class AmbientOcclusionQualityConfig {
     off: {
       sampleCount: 0,
       radius: 0,
-      bias: 0,
       aoStrength: 0,
-      maxDistance: 0,
       noiseScale: 0,
       enabled: false,
     },
     low: {
       sampleCount: 4, // Minimal samples for performance
       radius: 0.1, // Larger radius for more detailed AO
-      bias: 0.1, // Lower bias for accuracy
-      aoStrength: 2.5, // Strong effect
-      maxDistance: 0.8, // Shorter distance
-      noiseScale: 4.0, // Standard noise scale
+      aoStrength: 3.0, // Strong effect
       enabled: true,
     },
     medium: {
       sampleCount: 16, // Balanced samples
       radius: 0.1, // Larger radius for more detailed AO
-      bias: 0.1, // Lower bias for accuracy
-      aoStrength: 2.5, // Strong effect
-      maxDistance: 1.0, // Standard distance
+      aoStrength: 3.0, // Strong effect
       noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },
     high: {
       sampleCount: 32, // High sample count for quality
       radius: 0.1, // Larger radius for more detailed AO
-      bias: 0.0025, // Lower bias for accuracy
-      aoStrength: 2.5, // Strong effect
-      maxDistance: 2.0, // Extended distance
+      aoStrength: 3.0, // Strong effect
       noiseScale: 0.01, // Standard noise scale
       enabled: true,
     },

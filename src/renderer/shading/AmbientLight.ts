@@ -20,8 +20,8 @@ export class AmbientLight {
   private ambientUniformBuffer!: GPUBuffer;
 
   private reflectionIntensity = 1.0;
-  private ambientLightIntensity = 0.8;
-  private globalAmbientBoost = 1.2;
+  private ambientLightIntensity = 1.0;
+  private globalAmbientBoost = 0.4;
 
   constructor() {}
 

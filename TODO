@@ -9,7 +9,6 @@ FIXES------------------------------------------
 
 1. Blur error on change quality
 2. Decals Category Low quality error
-3. Review ambient light calcs and intensity
 
 HIGH-END-FEATURES------------------------------
 
@@ -61,3 +60,4 @@ Skybox with Day/Night Cycle
 Day/Night Cycle
 Grass
 Physics Grass
+Paralax Mapping (Needs height map!)
