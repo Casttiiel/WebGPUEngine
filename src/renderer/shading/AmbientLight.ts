@@ -1,16 +1,16 @@
 import { Engine } from '../../core/engine/Engine';
 import { Render } from '../core/pipeline/Render';
-import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { Texture } from '../resources/Texture';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { HDRTexture } from '../resources/HDRTexture';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
-  private environmentTexture!: Cubemap;
-  private irradianceTexture!: Cubemap;
+  private environmentTexture!: HDRTexture;
+  private irradianceTexture!: HDRTexture;
   private brdfLUTTexture!: Texture;
   private brdfLUTSampler!: GPUSampler;
 
@@ -28,8 +28,8 @@ export class AmbientLight {
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
-    this.environmentTexture = await Cubemap.get('skybox.png');
-    this.irradianceTexture = await Cubemap.get('irradiance.png');
+    this.environmentTexture = await HDRTexture.get('empty_workshop_1k.hdr');
+    this.irradianceTexture = await HDRTexture.get('empty_workshop_1k.hdr');
     this.brdfLUTTexture = await Texture.get('brdfLUT.png');
 
     // Create specific sampler for BRDF LUT (clamp-to-edge, linear filtering)

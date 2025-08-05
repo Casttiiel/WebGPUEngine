@@ -19,55 +19,23 @@ struct AmbientUniforms {
 @group(1) @binding(4) var gAO: texture_2d<f32>;
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
-@group(2) @binding(0) var txEnvironment: texture_cube<f32>;
+@group(2) @binding(0) var txEnvironment: texture_2d<f32>;
 @group(2) @binding(1) var samplerEnv: sampler;
 @group(2) @binding(2) var brdfLUT: texture_2d<f32>;
 @group(2) @binding(3) var samplerBRDF: sampler;
-@group(2) @binding(4) var irradianceMap: texture_cube<f32>;
+@group(2) @binding(4) var irradianceMap: texture_2d<f32>;
 @group(2) @binding(5) var samplerIrradiance: sampler;
 @group(3) @binding(0) var<uniform> ambient: AmbientUniforms;
 
-// PBR Fresnel with roughness compensation for IBL
-fn fresnelSchlickRoughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
-    let oneMinusRoughness = vec3<f32>(1.0 - roughness);
-    return F0 + (max(oneMinusRoughness, F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let N = normalize(g.normal);
-    let V = normalize(g.viewDir);
-    let R = normalize(g.reflectedDir);
-    
-    // Calculate angles for PBR
-    let NdotV = max(dot(N, V), 0.0);
-    
-    // PBR material properties
-    let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic); // Base reflectance
-      // Sample diffuse irradiance from pre-convolved irradiance map
-    let irradiance = textureSample(irradianceMap, samplerIrradiance, N).rgb;
-      // Sample specular radiance with roughness-based mip level
-    let roughness = g.roughness;
-    let maxMipLevel = 7.0; // Assuming 8 mip levels (0-7) in environment map
-    let mipLevel = roughness * maxMipLevel;
-    let prefilteredColor = textureSampleLevel(txEnvironment, samplerEnv, R, mipLevel).rgb;
-    
-    // Calculate Fresnel term for IBL
-    let F = fresnelSchlickRoughness(NdotV, F0, roughness);
-    
-    // Energy conservation
-    let kS = F; // Specular contribution
-    let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse only for non-metals
-    
-    // Diffuse contribution
-    let diffuse = kD * g.albedo * irradiance;    // Specular contribution using BRDF integration LUT
-    // Sample the BRDF LUT with NdotV and roughness
-    // Ensure coordinates are in valid range [0, 1]
-    let brdfCoords = vec2<f32>(clamp(roughness, 0.0, 1.0), clamp(1.0 - NdotV, 0.0, 1.0));
-    let brdf = textureSample(brdfLUT, samplerBRDF, brdfCoords).rg;
-    let specular = prefilteredColor * (F * brdf.x + brdf.y);
-    
-    // Combine and apply ambient occlusion
-    return (diffuse * ambient.ambientLightIntensity + specular * ambient.reflectionIntensity) * ambient.globalAmbientBoost * ao;
+    let irradiance = vec3<f32>(1.0); //textureSample(irradianceMap, samplerIrradiance, direction_to_equirect_uv(N)).rgb;
+
+    let kD = 1.0 - g.metallic; // Only non-metals get diffuse
+    let diffuse = kD * Diffuse(g.albedo) * irradiance;
+
+    return diffuse * ambient.ambientLightIntensity * ambient.globalAmbientBoost * ao;
 }
 
 @fragment

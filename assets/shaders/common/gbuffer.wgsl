@@ -17,20 +17,17 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     let albedo = textureSample(gAlbedo, samplerGBuffer, uv);
     g.metallic = albedo.a;
     g.roughness = normalData.a;
-    g.metallic = max(clamp(1.0 - normalData.a, 0.0, 1.0), g.metallic);
+    //g.metallic = max(clamp(1.0 - normalData.a, 0.0, 1.0), g.metallic);
     
     // Gamma correction for albedo
-    let albedoLinear = pow(abs(albedo.rgb), vec3<f32>(2.2));
-    
-    // Mix with metallic for proper albedo and specular
-    g.albedo = albedoLinear * (1.0 - g.metallic);
+    g.albedo = pow(abs(albedo.rgb), vec3<f32>(2.2));
     
     // Get self illumination
     g.emissive = textureSample(gSelfIllum, samplerGBuffer, uv).x;
     g.selfIllum = g.albedo * g.emissive;
     
     // Default specular for dielectrics is 0.04
-    g.specularColor = mix(vec3<f32>(0.04), albedoLinear, g.metallic);
+    g.specularColor = mix(vec3<f32>(0.04), g.albedo, g.metallic);
     
     // View and reflection directions
     let incident_dir = normalize(g.worldPos - camera.cameraPosition);

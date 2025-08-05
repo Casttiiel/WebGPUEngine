@@ -217,11 +217,7 @@ export class BindGroupFactory {
       {
         binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          viewDimension: 'cube',
-          sampleType: 'float',
-          multisampled: false,
-        },
+        texture: { sampleType: 'float' },
       },
       {
         binding: 1,
@@ -245,11 +241,7 @@ export class BindGroupFactory {
       {
         binding: 4,
         visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          viewDimension: 'cube',
-          sampleType: 'float',
-          multisampled: false,
-        },
+        texture: { sampleType: 'float' },
       },
       {
         binding: 5,

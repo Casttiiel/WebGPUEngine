@@ -1,12 +1,14 @@
 1. Directional Light with Shadow Maps
 2. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-3. Volumetric lighting
+3. New Bloom
 4. Screen Space Reflections
+5. Volumetric lighting
 
 FIXES------------------------------------------
 
-1. Blur error on change quality
-2. Decals Category Low quality error
+1. Irradiance map ambient light
+2. Blur error on change quality
+3. Decals Category Low quality error
 
 HIGH-END-FEATURES------------------------------
 
