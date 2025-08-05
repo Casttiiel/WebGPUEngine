@@ -1,9 +1,7 @@
-1. No color on specular parts?
-2. Bloom filter is only on shine objects
-3. Directional Light with Shadow Maps / Discard linear z >= 1.0
-4. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-5. Volumetric lighting
-6. Screen Space Reflections
+1. Directional Light with Shadow Maps
+2. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+3. Volumetric lighting
+4. Screen Space Reflections
 
 FIXES------------------------------------------
 

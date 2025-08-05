@@ -32,6 +32,10 @@ struct LightUniforms {
 fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     let g = decodeGBuffer(uv);
     
+    if(g.zlinear >= 1.0){
+        discard;
+    }
+
     // Shadow factor entre 0 (totalmente en sombra) y 1 (no ocluido)
     var shadow_factor = 1.0;
     /*if (use_shadows) {
@@ -61,7 +65,7 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     // Aplicar energy conservation correctamente
     let diffuse_contrib = kD * cDiff;
     let specular_contrib = cSpec;
-    
+
     let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * light.intensity * shadow_factor;
     return vec4<f32>(final_color, 1.0);
 }
