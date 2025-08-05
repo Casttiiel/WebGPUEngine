@@ -6,9 +6,9 @@ export type MaterialDataType = Readonly<{
   techniqueData?: TechniqueDataType;
   baseColorFactor?: number[];
   textures: MaterialTextureDataType;
-  casts_shadows: boolean;
+  casts_shadows?: boolean;
   category: RenderCategory;
-  shadows: boolean;
+  shadows?: boolean;
 }>;
 
 type MaterialTextureDataType = Readonly<{

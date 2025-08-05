@@ -53,6 +53,9 @@ export class RenderManagerV2 {
     transform: TransformComponent,
   ): void {
     this.keyManager.addKey(owner, mesh, material, transform);
+    if (material.getCastsShadows()) {
+      this.keyManager.addKey(owner, mesh, material.getShadowsMaterial(), transform);
+    }
   }
 
   public delKeys(owner: RenderComponent): void {

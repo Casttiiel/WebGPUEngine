@@ -69,6 +69,9 @@ export class ModuleRender extends Module {
     const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
     const camera = cameraComponent.getCamera();
 
+    //Generate shadow maps if needed
+    this.generateShadowMaps();
+
     // Actualizar buffer uniforme global solo con view y projection
     this.updateGlobalUniforms(camera);
     RenderManager.getInstance().setCamera(camera);
@@ -110,6 +113,10 @@ export class ModuleRender extends Module {
     Render.getInstance().endFrame();
   }
 
+  public generateShadowMaps(): void {
+    this.deferred.generateShadowMaps();
+  }
+
   public renderDistorsions(texture: GPUTextureView): void {
     const render = Render.getInstance();
 
@@ -144,7 +151,7 @@ export class ModuleRender extends Module {
         magFilter: 'linear',
         minFilter: 'linear',
       });
-
+      result = this.deferred.directionalLight.shadowMap.getView();
       this.presentationBindGroup = BindGroupFactory.createBindGroup(
         `presentation_bindgroup`,
         this.presentationTechnique.getPipeline().getBindGroupLayout(0),
@@ -354,7 +361,7 @@ export class ModuleRender extends Module {
     this.presentationTechnique = await Technique.get('presentation.tech');
   }
 
-  public updateGlobalUniforms(camera: Camera): void {
+  private updateGlobalUniforms(camera: Camera): void {
     const viewMatrix = new Float32Array(camera.getView());
     const projectionMatrix = new Float32Array(camera.getProjection());
     const invProjectionMatrix = new Float32Array(camera.getInvProjectionMatrix());

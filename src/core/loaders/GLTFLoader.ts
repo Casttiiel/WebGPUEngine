@@ -158,9 +158,7 @@ export class GLTFLoader {
 
     const material: MaterialDataType = materialDef?.doubleSided
       ? {
-          casts_shadows: false,
           category: category,
-          shadows: false,
           textures,
           baseColorFactor: pbr.baseColorFactor || [1, 1, 1, 1],
           techniqueData: {
@@ -176,9 +174,7 @@ export class GLTFLoader {
           },
         }
       : {
-          casts_shadows: false,
           category: category,
-          shadows: false,
           baseColorFactor: pbr.baseColorFactor || [1, 1, 1, 1],
           textures,
           technique: materialDef?.alphaMode === 'MASK' ? 'gbuffer_mask.tech' : 'gbuffer.tech',

@@ -4,13 +4,22 @@ import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { RenderTarget } from '../resources/RenderTarget';
+import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
+import { RenderCategory } from '../../types/RenderCategory.enum';
+import { Camera } from '../../core/math/Camera';
 
 export class DirectionalLight {
   private fullscreenQuadMesh!: Mesh;
-
   private directionalLightTechnique!: Technique;
   private directionalLightBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
+  public shadowMap!: RenderTarget;
+  private depthStencil!: GPUTexture;
+  private depthStencilView!: GPUTextureView;
+  private camera!: Camera;
+  private cameraUniformBuffer!: GPUBuffer;
+  private cameraBindGroup!: GPUBindGroup;
 
   constructor() {}
 
@@ -29,7 +38,7 @@ export class DirectionalLight {
       this.uniformBuffer,
       16,
       new Float32Array(
-        [-0.5, 1.0, 0.0, 10.0], // position and intensity (position is not used in directional light)
+        [-0.5, 1.0, 0.0, 10.0], // direction and intensity
       ),
     );
 
@@ -43,6 +52,77 @@ export class DirectionalLight {
         },
       ],
     );
+
+    this.cameraUniformBuffer = GPUUtils.createBuffer(
+      'global uniform buffer',
+      512,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    // Crear el bind group global usando la factory
+    const cameraBindGroupLayout = BindGroupFactory.getCameraUniformsLayout();
+    this.cameraBindGroup = BindGroupFactory.createBindGroup(
+      'camera directional light uniform bind group',
+      cameraBindGroupLayout,
+      [
+        {
+          binding: 0,
+          resource: { buffer: this.cameraUniformBuffer },
+        },
+      ],
+    );
+
+    this.shadowMap = new RenderTarget();
+    this.shadowMap.createRT(
+      'directional_light_shadow_map.dds',
+      Render.width,
+      Render.height,
+      'r16float',
+    );
+
+    this.depthStencil = GPUUtils.createTexture(
+      'directional light depth stencil',
+      Render.width,
+      Render.height,
+      'depth32float',
+      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    );
+
+    this.depthStencilView = this.depthStencil.createView({
+      aspect: 'depth-only',
+    });
+
+    this.camera = new Camera();
+    this.camera.setOrthoParams(true, 0, Render.width, 0, Render.height);
+    this.camera.setNearPlane(0.1);
+    this.camera.setFarPlane(100.0);
+    this.camera.lookAt([4.0, 20.0, 0.0], [-0.5, -0.8, 0.0]);
+  }
+
+  public renderShadowMap(): void {
+    const render = Render.getInstance();
+
+    const colorAttachment = GPUUtils.createColorAttachment(this.shadowMap.getView()!);
+
+    const depthStencilAttachment = GPUUtils.createDepthStencilAttachment(this.depthStencilView!);
+
+    const pass = render
+      .getCommandEncoder()
+      .beginRenderPass(
+        GPUUtils.createRenderPassDescriptor(
+          'directional light shadow map render pass',
+          [colorAttachment],
+          depthStencilAttachment,
+        ),
+      );
+    GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
+
+    this.updateCameraUniforms(this.camera);
+    RenderManager.getInstance().setCamera(this.camera);
+
+    RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
+
+    pass.end();
   }
 
   public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
@@ -75,5 +155,44 @@ export class DirectionalLight {
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();
+  }
+
+  private updateCameraUniforms(camera: Camera): void {
+    const viewMatrix = new Float32Array(camera.getView());
+    const projectionMatrix = new Float32Array(camera.getProjection());
+    const invProjectionMatrix = new Float32Array(camera.getInvProjectionMatrix());
+    const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
+    const cameraPosition = new Float32Array(camera.getPosition());
+    GPUUtils.writeBuffer(this.cameraUniformBuffer, 0, viewMatrix); // viewMatrix (offset 0)
+
+    // projectionMatrix (offset 64)
+    GPUUtils.writeBuffer(this.cameraUniformBuffer, 64, projectionMatrix);
+
+    // invViewProjectionMatrix (offset 128)
+    GPUUtils.writeBuffer(this.cameraUniformBuffer, 128, invViewProjectionMatrix);
+
+    // cameraPosition (offset 192)
+    GPUUtils.writeBuffer(this.cameraUniformBuffer, 192, cameraPosition);
+
+    // screenSize (offset 208)
+    GPUUtils.writeBuffer(
+      this.cameraUniformBuffer,
+      208,
+      new Float32Array([Render.width, Render.height]),
+    );
+
+    // cameraFront + cameraZFar (offset 224)
+    GPUUtils.writeBuffer(
+      this.cameraUniformBuffer,
+      224,
+      new Float32Array([
+        camera.getFront()[0],
+        camera.getFront()[1],
+        camera.getFront()[2],
+        camera.getFar(),
+      ]),
+    );
+
+    GPUUtils.writeBuffer(this.cameraUniformBuffer, 240, invProjectionMatrix);
   }
 }

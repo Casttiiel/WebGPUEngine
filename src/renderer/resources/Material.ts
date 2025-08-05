@@ -41,6 +41,7 @@ export class Material extends GPUResource {
   private shadows: boolean;
   private textureBindGroup?: GPUBindGroup;
   private textureFiles: MaterialTexturesOptions;
+  private shadowsMaterial?: Material;
 
   constructor(options: MaterialOptions) {
     super({
@@ -49,7 +50,7 @@ export class Material extends GPUResource {
     });
 
     this.category = options.category || RenderCategory.SOLIDS;
-    this.castsShadows = options.castsShadows ?? false;
+    this.castsShadows = options.castsShadows ?? true;
     this.shadows = options.shadows ?? false;
     this.technique = options.technique;
     this.textureFiles = options.textures;
@@ -114,6 +115,9 @@ export class Material extends GPUResource {
 
   public override async load(): Promise<void> {
     try {
+      if (this.castsShadows) {
+        this.shadowsMaterial = await Material.get('shadows_material.mat');
+      }
       // Load textures secuencialmente para evitar race conditions
       await this.loadTexture('albedo', this.textureFiles.albedo);
       await this.loadTexture('normal', this.textureFiles.normal);
@@ -207,6 +211,10 @@ export class Material extends GPUResource {
 
   public getCastsShadows(): boolean {
     return this.castsShadows;
+  }
+
+  public getShadowsMaterial(): Material {
+    return this.shadowsMaterial!;
   }
 
   public getShadows(): boolean {

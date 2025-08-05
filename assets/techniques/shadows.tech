@@ -1,0 +1,11 @@
+{
+    "vs": "shadows.vs",
+    "fs": "shadows.fs",
+    "writesOn": "single_channel",
+    "uniforms": [
+        "CameraUniforms",
+        "ObjectUniforms",
+        "MaterialTextures"
+    ],
+    "rs": "shadows"
+}

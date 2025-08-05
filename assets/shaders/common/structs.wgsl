@@ -6,6 +6,11 @@ struct VertexOutput {
     @location(3) T: vec4<f32>,
 }
 
+struct ShadowsVertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) worldPos: vec3<f32>,
+}
+
 struct FragmentOutput {
     @location(0) albedo: vec4<f32>,
     @location(1) normal: vec4<f32>,

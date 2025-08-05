@@ -21,7 +21,7 @@ export class DeferredRenderer {
   private isLoaded = false;
   private skybox!: Skybox;
   private ambientLight!: AmbientLight;
-  private directionalLight!: DirectionalLight;
+  public directionalLight!: DirectionalLight;
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
@@ -248,6 +248,16 @@ export class DeferredRenderer {
     this.whiteTexture = await Texture.get('white.png');
 
     this.isLoaded = true;
+  }
+
+  public generateShadowMaps(): void {
+    if (!this.directionalLight) {
+      console.warn('Directional light not loaded, cannot generate shadow maps.');
+      return;
+    }
+
+    // Generate shadow map for directional light
+    this.directionalLight.renderShadowMap();
   }
 
   public async render(camera: Entity): Promise<GPUTextureView> {

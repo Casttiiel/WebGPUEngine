@@ -1,7 +1,13 @@
-1. Directional Light with Shadow Maps
-2. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-3. New Bloom
-4. Screen Space Reflections
+1. Directional Light with Shadow Maps (Rasterizer not complete?)
+   Mover camera uniform bind group from ModuleRender to Camera
+   RenderManager Uses camera set
+   ***
+   Pass data to shader and use it
+   Quality
+   Cull objects
+2. New Bloom
+3. Screen Space Reflections
+4. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
 5. Volumetric lighting
 
 FIXES------------------------------------------
@@ -12,9 +18,9 @@ FIXES------------------------------------------
 
 HIGH-END-FEATURES------------------------------
 
-1. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-2. Temporal Anti-Aliasing (TAA) / Aliasing quality
-3. Motion Blur
+1. Motion Blur
+2. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+3. Temporal Anti-Aliasing (TAA) / Aliasing quality
 4. Atmospheric scattering
 5. Global Ilumination
 6. Indirect light

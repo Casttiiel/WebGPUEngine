@@ -249,6 +249,9 @@ export class Technique extends GPUResource {
       case RasterizationMode.DOUBLE_SIDED: {
         return 'none';
       }
+      case RasterizationMode.SHADOWS: {
+        return 'back';
+      }
       default: {
         throw new Error(`${this.label}: Unknown Rasterization Mode`);
       }

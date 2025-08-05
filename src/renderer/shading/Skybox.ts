@@ -8,7 +8,6 @@ import { HDRTexture } from '../resources/HDRTexture';
 
 export class Skybox {
   private fullscreenQuadMesh!: Mesh;
-
   private skyboxTechnique!: Technique;
   private skyboxBindGroup!: GPUBindGroup;
   private skyboxTexture!: HDRTexture;
