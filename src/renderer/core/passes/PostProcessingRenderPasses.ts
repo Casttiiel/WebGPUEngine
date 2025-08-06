@@ -84,7 +84,7 @@ export class BloomFilteringRenderPass extends PostProcessingRenderPass {
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
     // Bloom filtering needs global bind group at 0, gBuffer at 1, texture at 2, and params at 3
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, this.gBufferBindGroup);
     pass.setBindGroup(2, this.textureBindGroup);
 
@@ -121,7 +121,7 @@ export class AntialiasingRenderPass extends PostProcessingRenderPass {
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
     // Antialiasing needs global bind group at 0 and texture at 1
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, this.textureBindGroup);
   }
 
@@ -155,7 +155,7 @@ export class AmbientOcclusionRenderPass extends PostProcessingRenderPass {
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
     // AO needs global bind group at 0, G-Buffer at 1, and optionally SSAO params at 2
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, this.gBufferBindGroup);
     if (this.ssaoParamsBindGroup) {
       pass.setBindGroup(2, this.ssaoParamsBindGroup);
@@ -199,7 +199,7 @@ export class AOBilateralFilterRenderPass extends PostProcessingRenderPass {
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
     // AO bilateral filter needs global camera uniforms at group 0, G-Buffer at group 1, and AO texture at group 2
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, this.gBufferBindGroup);
     pass.setBindGroup(2, this.aoBindGroup);
   }

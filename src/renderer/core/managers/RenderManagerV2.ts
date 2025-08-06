@@ -87,7 +87,11 @@ export class RenderManagerV2 {
     this.stateManager.reset();
 
     // Filter culled keys by category
-    const keysToDraw = this.culledKeys.filter((key) => key.material.getCategory() === category);
+    let keys = this.culledKeys;
+    if (category === RenderCategory.SHADOWS) {
+      keys = this.getAllKeys();
+    }
+    const keysToDraw = keys.filter((key) => key.material.getCategory() === category);
 
     // Sort keys for optimal rendering
     this.keyManager.sortKeys(keysToDraw, category, this.camera);
@@ -139,6 +143,8 @@ export class RenderManagerV2 {
   private renderKeys(keys: RenderKey[], pass: GPURenderPassEncoder): number {
     let drawCalls = 0;
 
+    this.stateManager.setBindGroup(pass, 0, this.camera!.getBindGroup());
+
     for (const key of keys) {
       if (!this.validateRenderKey(key)) {
         continue;
@@ -149,9 +155,8 @@ export class RenderManagerV2 {
 
       // Use state manager to minimize state changes
       this.stateManager.setPipeline(pass, pipeline, () => technique.activatePipeline(pass));
-      this.stateManager.setMeshBuffers(pass, key.mesh.getName(), () => key.mesh.activate(pass)); // Set bind groups - camera uniforms (always set as they may change per frame)
-      this.stateManager.forceSetBindGroup(pass, 0, this.getGlobalBindGroup());
-      this.stateManager.forceSetBindGroup(pass, 1, key.transform.getModelBindGroup());
+      this.stateManager.setMeshBuffers(pass, key.mesh.getName(), () => key.mesh.activate(pass));
+      this.stateManager.setBindGroup(pass, 1, key.transform.getModelBindGroup());
 
       // Set material bind group (cache aware)
       this.stateManager.setMaterialBindings(
@@ -188,11 +193,6 @@ export class RenderManagerV2 {
     }
 
     return true;
-  }
-
-  private getGlobalBindGroup(): GPUBindGroup {
-    // This should be obtained from the render module or engine
-    return Engine.getRender().getGlobalBindGroup();
   }
 
   public destroy(): void {

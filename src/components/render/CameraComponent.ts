@@ -40,6 +40,7 @@ export class CameraComponent extends Component {
     const target = data.target || [0, 0, 1];
     const up = data.up || [0, 1, 0];
     this.camera.lookAt(position, target, up);
+    this.camera.updateUniforms();
   }
 
   public setCamera(camera: Camera): void {
@@ -51,25 +52,43 @@ export class CameraComponent extends Component {
 
     const input = Engine.getInput();
     const multiplier = input.isKeyPressed(KeyCode.SHIFT) ? 10.0 : 1.0;
+    let cameraChanged = false;
 
     // Movimiento de la cámara
-    if (input.isKeyPressed(KeyCode.A))
+    if (input.isKeyPressed(KeyCode.A)) {
       this.camera.move(Array.from(this.camera.getLocalVector([4.0 * multiplier * dt, 0, 0])));
-    if (input.isKeyPressed(KeyCode.D))
+      cameraChanged = true;
+    }
+    if (input.isKeyPressed(KeyCode.D)) {
       this.camera.move(Array.from(this.camera.getLocalVector([-4.0 * multiplier * dt, 0, 0])));
-    if (input.isKeyPressed(KeyCode.W))
+      cameraChanged = true;
+    }
+    if (input.isKeyPressed(KeyCode.W)) {
       this.camera.move(Array.from(this.camera.getLocalVector([0, 0, 4.0 * multiplier * dt])));
-    if (input.isKeyPressed(KeyCode.S))
+      cameraChanged = true;
+    }
+    if (input.isKeyPressed(KeyCode.S)) {
       this.camera.move(Array.from(this.camera.getLocalVector([0, 0, -4.0 * multiplier * dt])));
+      cameraChanged = true;
+    }
 
     // Rotación de la cámara con el ratón
     if (input.isMouseButtonPressed(MouseButton.RIGHT)) {
       const mouseDelta = input.getMouseDelta();
       this.camera.rotate(-mouseDelta.x * this.rotationSpeed, -mouseDelta.y * this.rotationSpeed);
+      cameraChanged = true;
     }
 
     const mouseWheelDelta = input.getMouseWheelDelta();
-    this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
+    if (mouseWheelDelta !== 0) {
+      this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
+      cameraChanged = true;
+    }
+
+    // Only update uniforms if camera actually changed
+    if (cameraChanged) {
+      this.camera.updateUniforms();
+    }
   }
 
   public override renderInMenu(): void {

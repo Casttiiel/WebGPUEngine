@@ -129,7 +129,7 @@ export class AmbientLight {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Set bind groups
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
     pass.setBindGroup(1, gBufferBindGroup); // GBuffer textures
     pass.setBindGroup(2, this.environmentBindGroup); // Environment texture
     pass.setBindGroup(3, this.uniformBindGroup); // ambient parameters

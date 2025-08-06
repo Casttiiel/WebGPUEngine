@@ -139,7 +139,7 @@ export class GeometryRenderPass extends BaseRenderPass {
       }
 
       // 3. Set bind groups
-      pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup()); // Camera uniforms
+      pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
       pass.setBindGroup(1, key.transform.getModelBindGroup()); // Object uniforms
 
       // 4. Set material bind group only if changed

@@ -72,7 +72,7 @@ export class Skybox {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Set bind groups
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, this.skyboxBindGroup);
 
     // 4. Draw the mesh

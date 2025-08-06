@@ -2,7 +2,6 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
-import { Camera } from '../../core/math/Camera';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
@@ -16,19 +15,17 @@ import { BloomComponent } from '../../components/render/BloomComponent';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { Camera } from '../../core/math/Camera';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private lastBloomQualitySetting: string = ''; // Track bloom quality changes
 
-  // Buffer global para datos de cámara
-  private globalUniformBuffer!: GPUBuffer;
-  private globalBindGroup!: GPUBindGroup;
-
   //Presentation data
   private presentationTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private presentationBindGroup!: GPUBindGroup | null;
+  private mainCamera!: Camera;
 
   // Debug values para Tweakpane
   private debugValues = {
@@ -48,7 +45,6 @@ export class ModuleRender extends Module {
   public async start(): Promise<boolean> {
     await this.deferred.load();
     this.onResolutionUpdated();
-    this.initializeUniformBuffers();
     await this.initializePresentationData();
 
     // Initialize GPU Frustum Culling
@@ -73,13 +69,14 @@ export class ModuleRender extends Module {
     this.generateShadowMaps();
 
     // Actualizar buffer uniforme global solo con view y projection
-    this.updateGlobalUniforms(camera);
     RenderManager.getInstance().setCamera(camera);
 
     if (!mainCamera) {
       console.warn('No main camera found');
       return;
     }
+
+    this.mainCamera = camera;
 
     let result = await this.deferred.render(mainCamera);
 
@@ -208,14 +205,6 @@ export class ModuleRender extends Module {
         this.deferred = null as any;
       }
 
-      // Clean up render resources
-      if (this.globalUniformBuffer) {
-        this.globalUniformBuffer.destroy();
-        this.globalUniformBuffer = null as any;
-      }
-
-      // Reset bind groups (they will be recreated when engine restarts)
-      this.globalBindGroup = null as any;
       this.presentationBindGroup = null;
 
       RenderManager.getInstance().destroy();
@@ -333,78 +322,14 @@ export class ModuleRender extends Module {
     throw new Error('Method not implemented.');
   }
 
-  private initializeUniformBuffers(): void {
-    // Crear buffer uniforme global para las matrices de la cámara
-    this.globalUniformBuffer = GPUUtils.createBuffer(
-      'global uniform buffer',
-      512,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
-
-    // Crear el bind group global usando la factory
-    const globalBindGroupLayout = BindGroupFactory.getCameraUniformsLayout();
-    this.globalBindGroup = BindGroupFactory.createBindGroup(
-      'global uniform bind group',
-      globalBindGroupLayout,
-      [
-        {
-          binding: 0,
-          resource: { buffer: this.globalUniformBuffer },
-        },
-      ],
-    );
-  }
-
   private async initializePresentationData(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
 
     this.presentationTechnique = await Technique.get('presentation.tech');
   }
 
-  private updateGlobalUniforms(camera: Camera): void {
-    const viewMatrix = new Float32Array(camera.getView());
-    const projectionMatrix = new Float32Array(camera.getProjection());
-    const invProjectionMatrix = new Float32Array(camera.getInvProjectionMatrix());
-    const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
-    const cameraPosition = new Float32Array(camera.getPosition());
-    GPUUtils.writeBuffer(this.globalUniformBuffer, 0, viewMatrix); // viewMatrix (offset 0)
-
-    // projectionMatrix (offset 64)
-    GPUUtils.writeBuffer(this.globalUniformBuffer, 64, projectionMatrix);
-
-    // invViewProjectionMatrix (offset 128)
-    GPUUtils.writeBuffer(this.globalUniformBuffer, 128, invViewProjectionMatrix);
-
-    // cameraPosition (offset 192)
-    GPUUtils.writeBuffer(this.globalUniformBuffer, 192, cameraPosition);
-
-    // screenSize (offset 208)
-    GPUUtils.writeBuffer(
-      this.globalUniformBuffer,
-      208,
-      new Float32Array([Render.width, Render.height]),
-    );
-
-    // cameraFront + cameraZFar (offset 224)
-    GPUUtils.writeBuffer(
-      this.globalUniformBuffer,
-      224,
-      new Float32Array([
-        camera.getFront()[0],
-        camera.getFront()[1],
-        camera.getFront()[2],
-        camera.getFar(),
-      ]),
-    );
-
-    GPUUtils.writeBuffer(this.globalUniformBuffer, 240, invProjectionMatrix);
-  }
-
-  public getGlobalBindGroup(): GPUBindGroup {
-    if (!this.globalBindGroup) {
-      throw new Error('Global bind group is not initialized');
-    }
-    return this.globalBindGroup;
+  public getMainCameraBindGroup(): GPUBindGroup {
+    return this.mainCamera.getBindGroup();
   }
 
   private applyBloomQualitySettings(bloomComponent: BloomComponent): void {

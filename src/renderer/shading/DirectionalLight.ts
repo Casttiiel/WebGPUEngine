@@ -18,8 +18,6 @@ export class DirectionalLight {
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView;
   private camera!: Camera;
-  private cameraUniformBuffer!: GPUBuffer;
-  private cameraBindGroup!: GPUBindGroup;
 
   constructor() {}
 
@@ -53,25 +51,6 @@ export class DirectionalLight {
       ],
     );
 
-    this.cameraUniformBuffer = GPUUtils.createBuffer(
-      'global uniform buffer',
-      512,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
-
-    // Crear el bind group global usando la factory
-    const cameraBindGroupLayout = BindGroupFactory.getCameraUniformsLayout();
-    this.cameraBindGroup = BindGroupFactory.createBindGroup(
-      'camera directional light uniform bind group',
-      cameraBindGroupLayout,
-      [
-        {
-          binding: 0,
-          resource: { buffer: this.cameraUniformBuffer },
-        },
-      ],
-    );
-
     this.shadowMap = new RenderTarget();
     this.shadowMap.createRT(
       'directional_light_shadow_map.dds',
@@ -93,10 +72,13 @@ export class DirectionalLight {
     });
 
     this.camera = new Camera();
-    this.camera.setOrthoParams(true, 0, Render.width, 0, Render.height);
     this.camera.setNearPlane(0.1);
-    this.camera.setFarPlane(100.0);
-    this.camera.lookAt([4.0, 20.0, 0.0], [-0.5, -0.8, 0.0]);
+    this.camera.setFarPlane(200.0);
+    this.camera.setOrthoParams(true, 0, 50, 0, 50);
+    //this.camera.setProjectionParams(60, 0.1, 200.0);
+    //this.camera.lookAt([3.5, 20.0, 0.0], [-0.5, -0.8, 0.0]);
+    this.camera.lookAt([0.0, 2.0, 0.0], [0.0, 2.0, 1.0]);
+    this.camera.updateUniforms();
   }
 
   public renderShadowMap(): void {
@@ -117,7 +99,6 @@ export class DirectionalLight {
       );
     GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
 
-    this.updateCameraUniforms(this.camera);
     RenderManager.getInstance().setCamera(this.camera);
 
     RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
@@ -147,7 +128,7 @@ export class DirectionalLight {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Set bind groups
-    pass.setBindGroup(0, Engine.getRender().getGlobalBindGroup());
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, gBufferBindGroup);
     pass.setBindGroup(2, this.directionalLightBindGroup);
 
@@ -155,44 +136,5 @@ export class DirectionalLight {
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();
-  }
-
-  private updateCameraUniforms(camera: Camera): void {
-    const viewMatrix = new Float32Array(camera.getView());
-    const projectionMatrix = new Float32Array(camera.getProjection());
-    const invProjectionMatrix = new Float32Array(camera.getInvProjectionMatrix());
-    const invViewProjectionMatrix = new Float32Array(camera.getInvViewProjectionMatrix());
-    const cameraPosition = new Float32Array(camera.getPosition());
-    GPUUtils.writeBuffer(this.cameraUniformBuffer, 0, viewMatrix); // viewMatrix (offset 0)
-
-    // projectionMatrix (offset 64)
-    GPUUtils.writeBuffer(this.cameraUniformBuffer, 64, projectionMatrix);
-
-    // invViewProjectionMatrix (offset 128)
-    GPUUtils.writeBuffer(this.cameraUniformBuffer, 128, invViewProjectionMatrix);
-
-    // cameraPosition (offset 192)
-    GPUUtils.writeBuffer(this.cameraUniformBuffer, 192, cameraPosition);
-
-    // screenSize (offset 208)
-    GPUUtils.writeBuffer(
-      this.cameraUniformBuffer,
-      208,
-      new Float32Array([Render.width, Render.height]),
-    );
-
-    // cameraFront + cameraZFar (offset 224)
-    GPUUtils.writeBuffer(
-      this.cameraUniformBuffer,
-      224,
-      new Float32Array([
-        camera.getFront()[0],
-        camera.getFront()[1],
-        camera.getFront()[2],
-        camera.getFar(),
-      ]),
-    );
-
-    GPUUtils.writeBuffer(this.cameraUniformBuffer, 240, invProjectionMatrix);
   }
 }

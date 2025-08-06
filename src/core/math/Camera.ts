@@ -1,5 +1,7 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 
 export class Camera {
   private view: mat4 = mat4.create();
@@ -27,6 +29,7 @@ export class Camera {
   private orthoWidth: number = 1.0;
   private orthoHeight: number = 1.0;
   private orthoCentered: boolean = false;
+  private isDirty: boolean = true;
 
   // Viewport
   private viewport = {
@@ -37,9 +40,14 @@ export class Camera {
   };
   private aspectRatio: number = Math.abs(this.viewport.width / this.viewport.height);
 
+  private uniformBuffer!: GPUBuffer;
+  private bindGroup!: GPUBindGroup;
+
   constructor() {
     this.updateProjection();
     this.lookAt(vec3.fromValues(1, 1, 1), vec3.fromValues(0, 0, 0));
+
+    this.initializeUniformBuffers();
   }
 
   private updateViewProjection(): void {
@@ -95,12 +103,13 @@ export class Camera {
     this.invProjection = invProjection;
   }
 
-  public setProjectionParams(fovRadians: number, zNear: number, zFar: number): void {
+  public setProjectionParams(fov: number, zNear: number, zFar: number): void {
     this.isOrtho = false;
-    this.fovRadians = fovRadians;
+    this.fovRadians = (fov * Math.PI) / 180;
     this.zNear = zNear;
     this.zFar = zFar;
     this.updateProjection();
+    this.isDirty = true;
   }
 
   public setOrthoParams(
@@ -119,6 +128,7 @@ export class Camera {
 
     this.aspectRatio = Math.abs(width / height);
     this.updateProjection();
+    this.isDirty = true;
   }
 
   public lookAt(newEye: vec3, newTarget: vec3, newUpAux: vec3 = vec3.fromValues(0, 1, 0)): void {
@@ -138,6 +148,7 @@ export class Camera {
     vec3.cross(this.up, this.front, this.left);
 
     this.updateViewProjection();
+    this.isDirty = true;
   }
 
   public setViewport(width: number, height: number): void {
@@ -179,6 +190,7 @@ export class Camera {
     vec3.add(this.eye, this.eye, delta as vec3);
     vec3.add(this.target, this.target, delta as vec3);
     this.lookAt(this.eye, this.target, this.upAux);
+    this.isDirty = true;
   }
 
   public rotate(yaw: number, pitch: number): void {
@@ -199,6 +211,7 @@ export class Camera {
 
     // Actualizar la cámara
     this.lookAt(this.eye, this.target, this.upAux);
+    this.isDirty = true;
   }
 
   public getLocalVector(vec: number[]): vec3 {
@@ -207,6 +220,73 @@ export class Camera {
     vec3.scaleAndAdd(result, result, this.up, vec[1] || 0);
     vec3.scaleAndAdd(result, result, this.front, vec[2] || 0);
     return result;
+  }
+
+  private initializeUniformBuffers(): void {
+    // Crear buffer uniforme global para las matrices de la cámara
+    this.uniformBuffer = GPUUtils.createBuffer(
+      'camera uniform buffer',
+      512,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    // Crear el bind group global usando la factory
+    const bindGroupLayout = BindGroupFactory.getCameraUniformsLayout();
+    this.bindGroup = BindGroupFactory.createBindGroup(
+      'camera uniform bind group',
+      bindGroupLayout,
+      [
+        {
+          binding: 0,
+          resource: { buffer: this.uniformBuffer },
+        },
+      ],
+    );
+  }
+
+  public updateUniforms(): void {
+    if (!this.isDirty) return;
+
+    // Create a single buffer with all data to minimize GPU writes
+    const uniformData = new Float32Array(128); // 512 bytes / 4 = 128 floats
+
+    // Copy matrices and data into single buffer
+    const viewMatrix = this.getView();
+    const projectionMatrix = this.getProjection();
+    const invViewProjectionMatrix = this.getInvViewProjectionMatrix();
+    const invProjectionMatrix = this.getInvProjectionMatrix();
+    const cameraPosition = this.getPosition();
+    const cameraFront = this.getFront();
+
+    // viewMatrix (offset 0-15)
+    uniformData.set(viewMatrix, 0);
+
+    // projectionMatrix (offset 16-31)
+    uniformData.set(projectionMatrix, 16);
+
+    // invViewProjectionMatrix (offset 32-47)
+    uniformData.set(invViewProjectionMatrix, 32);
+
+    // cameraPosition (offset 48-50)
+    uniformData.set(cameraPosition, 48);
+
+    // screenSize (offset 52-53)
+    uniformData[52] = Render.width;
+    uniformData[53] = Render.height;
+
+    // cameraFront + cameraZFar (offset 56-59)
+    uniformData[56] = cameraFront[0];
+    uniformData[57] = cameraFront[1];
+    uniformData[58] = cameraFront[2];
+    uniformData[59] = this.getFar();
+
+    // invProjectionMatrix (offset 60-75)
+    uniformData.set(invProjectionMatrix, 60);
+
+    // Single GPU write instead of 7 separate writes
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, uniformData);
+
+    this.isDirty = false;
   }
 
   // Getters
@@ -231,6 +311,7 @@ export class Camera {
   }
 
   public setNearPlane(near: number): void {
+    this.isDirty = true;
     this.zNear = near;
     this.updateProjection();
   }
@@ -240,6 +321,7 @@ export class Camera {
   }
 
   public setFarPlane(far: number): void {
+    this.isDirty = true;
     this.zFar = far;
     this.updateProjection();
   }
@@ -249,6 +331,7 @@ export class Camera {
   }
 
   public setFov(fov: number): void {
+    this.isDirty = true;
     this.fovRadians = fov * (Math.PI / 180); // Convert degrees to radians
     this.updateProjection();
   }
@@ -299,5 +382,9 @@ export class Camera {
 
   public isOrthoCentered(): boolean {
     return this.orthoCentered;
+  }
+
+  public getBindGroup(): GPUBindGroup {
+    return this.bindGroup;
   }
 }

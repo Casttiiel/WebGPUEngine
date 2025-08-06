@@ -1,10 +1,9 @@
 1. Directional Light with Shadow Maps (Rasterizer not complete?)
-   Mover camera uniform bind group from ModuleRender to Camera
-   RenderManager Uses camera set
-   ***
+   Orthogonal Camera
    Pass data to shader and use it
    Quality
-   Cull objects
+   Cull objects?
+
 2. New Bloom
 3. Screen Space Reflections
 4. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
