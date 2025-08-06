@@ -58,7 +58,7 @@ export class ModuleRender extends Module {
     this.presentationBindGroup = null;
   }
 
-  public async generateFrame(): Promise<void> {
+  public generateFrame(): void {
     Render.getInstance().beginFrame();
 
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
@@ -78,7 +78,7 @@ export class ModuleRender extends Module {
 
     this.mainCamera = camera;
 
-    let result = await this.deferred.render(mainCamera);
+    let result = this.deferred.render(mainCamera);
 
     if (mainCamera?.hasComponent('bloom')) {
       const bloom = mainCamera.getComponent('bloom') as BloomComponent;
@@ -148,7 +148,7 @@ export class ModuleRender extends Module {
         magFilter: 'linear',
         minFilter: 'linear',
       });
-      result = this.deferred.directionalLight.shadowMap.getView();
+      //result = this.deferred.directionalLight.shadowMap.getView();
       this.presentationBindGroup = BindGroupFactory.createBindGroup(
         `presentation_bindgroup`,
         this.presentationTechnique.getPipeline().getBindGroupLayout(0),

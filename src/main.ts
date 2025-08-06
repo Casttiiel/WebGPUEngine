@@ -8,7 +8,7 @@ try {
   let then = 0;
 
   // Iniciar el bucle de renderizado
-  async function frame(now: number) {
+  function frame(now: number) {
     now *= 0.001;
     const deltaTime = now - then;
     then = now;
@@ -16,7 +16,7 @@ try {
     // Solo ejecutar update/render si el engine no está reiniciando
     if (!Engine.isEngineRestarting()) {
       Engine.update(deltaTime);
-      await Engine.render();
+      Engine.render();
       Time.updateFPSDisplay(deltaTime);
     }
 

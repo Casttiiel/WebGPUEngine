@@ -260,9 +260,9 @@ export class DeferredRenderer {
     this.directionalLight.renderShadowMap();
   }
 
-  public async render(camera: Entity): Promise<GPUTextureView> {
+  public render(camera: Entity): GPUTextureView {
     // Pre-render GPU culling - do this BEFORE starting render passes
-    await RenderManager.getInstance().performPreRenderCulling();
+    RenderManager.getInstance().performPreRenderCulling();
 
     // Execute G-Buffer pass using new render pass system
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);

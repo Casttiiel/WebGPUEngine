@@ -69,11 +69,11 @@ export class Engine {
     Engine.renderInMenu();
   }
 
-  public static async render(): Promise<void> {
+  public static render(): void {
     if (!this.initialized || this.isRestarting) {
       return;
     }
-    await this._render.generateFrame();
+    this._render.generateFrame();
   }
 
   public static renderInMenu(): void {
