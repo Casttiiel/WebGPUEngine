@@ -3,11 +3,10 @@
    Pass data to shader and use it
    Quality
    Cull objects?
-2. Performance
-3. New Bloom
-4. Screen Space Reflections
-5. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-6. Volumetric lighting
+2. New Bloom
+3. Screen Space Reflections
+4. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+5. Volumetric lighting
 
 FIXES------------------------------------------
 
@@ -49,7 +48,7 @@ MAJOR-UPGRADES------------------------------------------
    Moderno: Técnicas de compresión (octahedral normals, packed formats) / . Visibility Buffer Rendering
 3. Escalabilidad de Luces
    Moderno: Cientos de luces con clustered culling+instancing
-4. Occlusion culling
+4. Occlusion culling / Multi-Strategy Culling System
 5. GPU-Driven Rendering 🚀 Futuro
 6. Optimizacion WebGPUFundamentals
 7. Mesh LOD/Generate LOD on texture and mesh automatically

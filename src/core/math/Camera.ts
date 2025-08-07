@@ -336,8 +336,18 @@ export class Camera {
     this.updateProjection();
   }
 
+  public setFovRadians(fovRadiuans: number): void {
+    this.isDirty = true;
+    this.fovRadians = fovRadiuans;
+    this.updateProjection();
+  }
+
   public getFov(): number {
     return this.fovRadians;
+  }
+
+  public getViewport(): { x0: number; y0: number; width: number; height: number } {
+    return this.viewport;
   }
 
   public getAspectRatio(): number {

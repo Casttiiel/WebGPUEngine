@@ -4,14 +4,11 @@ import { Camera } from '../../../core/math/Camera';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { Material } from '../../resources/Material';
 import { Mesh } from '../../resources/Mesh';
-import { GPUFrustumCuller, CullableObject } from '../../culling/GPUFrustumCuller';
+import { GPUFrustumCuller } from '../../culling/GPUFrustumCuller';
+import { TemporalCullingManager } from '../culling/TemporalCullingManager';
 import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
-import { Engine } from '../../../core/engine/Engine';
 
-/**
- * Refactored RenderManager with improved separation of concerns
- */
 export class RenderManagerV2 {
   private static instance: RenderManagerV2 | null = null;
 
@@ -19,6 +16,7 @@ export class RenderManagerV2 {
   private keyManager: RenderKeyManager;
   private stateManager: RenderStateManager;
   private frustumCuller: GPUFrustumCuller | null = null;
+  private temporalCuller: TemporalCullingManager | null = null;
 
   // State
   private camera: Camera | null = null;
@@ -38,8 +36,16 @@ export class RenderManagerV2 {
   }
 
   public async initialize(): Promise<void> {
+    console.log('RenderManagerV2: Initializing with temporal culling...');
+
+    // Initialize GPU frustum culler
     this.frustumCuller = new GPUFrustumCuller();
     await this.frustumCuller.load();
+
+    // Initialize temporal culling system
+    this.temporalCuller = new TemporalCullingManager(this.frustumCuller);
+
+    console.log('RenderManagerV2: Temporal culling system initialized');
   }
 
   public setCamera(camera: Camera): void {
@@ -62,22 +68,12 @@ export class RenderManagerV2 {
     this.keyManager.removeKeys(owner);
   }
 
-  public async performPreRenderCulling(): Promise<void> {
+  public performPreRenderCulling(): void {
     if (!this.camera) return;
 
-    let keysToDraw = this.keyManager.getAllKeys();
+    const allKeys = this.keyManager.getAllKeys();
 
-    // Apply frustum culling if available
-    if (this.frustumCuller && keysToDraw.length > 0) {
-      try {
-        keysToDraw = await this.performGPUCulling(keysToDraw);
-      } catch (error) {
-        console.warn('Culling failed, rendering all objects:', error);
-        keysToDraw = this.keyManager.getAllKeys();
-      }
-    }
-
-    this.culledKeys = keysToDraw;
+    this.culledKeys = this.temporalCuller!.performCulling(allKeys, this.camera);
   }
 
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
@@ -111,33 +107,6 @@ export class RenderManagerV2 {
 
   public getCulledKeys(): RenderKey[] {
     return this.culledKeys;
-  }
-
-  private async performGPUCulling(keys: RenderKey[]): Promise<RenderKey[]> {
-    if (!this.frustumCuller || !this.camera) return keys;
-
-    // Convert render keys to cullable objects
-    const cullableObjects: CullableObject[] = keys.map((key) => ({
-      id: key.id,
-      bounds: key.aabb || { min: [-1, -1, -1], max: [1, 1, 1] },
-      modelMatrix: new Float32Array(key.transform.getTransform().getWorldMatrix()),
-    }));
-
-    // Perform GPU culling
-    const cullResult = await this.frustumCuller.cullObjects(this.camera, cullableObjects);
-
-    // Filter keys based on culling results
-    const visibleKeys: RenderKey[] = [];
-    for (const visibleIndex of cullResult.visibleIndices) {
-      if (visibleIndex < keys.length) {
-        const key = keys[visibleIndex];
-        if (key) {
-          visibleKeys.push(key);
-        }
-      }
-    }
-
-    return visibleKeys;
   }
 
   private renderKeys(keys: RenderKey[], pass: GPURenderPassEncoder): number {
@@ -199,6 +168,11 @@ export class RenderManagerV2 {
     if (this.frustumCuller) {
       this.frustumCuller.dispose();
       this.frustumCuller = null;
+    }
+
+    if (this.temporalCuller) {
+      this.temporalCuller.dispose();
+      this.temporalCuller = null;
     }
 
     this.keyManager.clear();
