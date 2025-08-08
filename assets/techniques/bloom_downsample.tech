@@ -1,0 +1,8 @@
+{
+    "vs": "presentation.vs",
+    "fs": "bloom_downsample.fs",
+    "fsEntryPoint": "fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": ["BufferUniform", "SingleTexture"]
+}

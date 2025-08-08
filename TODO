@@ -1,12 +1,15 @@
-1. Directional Light with Shadow Maps (Rasterizer not complete?)
+1. New Bloom
+   Additive upscaling
+2. Documentation + Review textures and +
+3. Screen Space Reflections
+4. Directional Light with Shadow Maps (Rasterizer not complete?)
    Orthogonal Camera
    Pass data to shader and use it
    Quality
    Cull objects?
-2. New Bloom
-3. Screen Space Reflections
-4. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-5. Volumetric lighting
+5. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+6. Better Predict Temporal Culling Manager (not lineal)
+7. Volumetric lighting
 
 FIXES------------------------------------------
 

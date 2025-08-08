@@ -30,7 +30,7 @@ export class TemporalCullingManager {
   private isGPUCullingActive = false; // Prevent concurrent GPU operations
 
   // Configuration
-  private FRAME_LAG = 1; // Use results from 2 frames ago (configurable via debug)
+  private FRAME_LAG = 2; // Use results from 2 frames ago (configurable via debug)
   private readonly CACHE_SIZE = 10; // Keep last 10 frames
   private readonly HISTORY_SIZE = 5; // Camera history for prediction
   private PREDICTION_STRENGTH = 1.0; // Reduce prediction aggressiveness (0.0 = no prediction, 1.0 = full prediction)

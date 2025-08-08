@@ -27,17 +27,18 @@ export class AmbientOcclusionQualityConfig {
       sampleCount: 4, // Minimal samples for performance
       radius: 0.1, // Larger radius for more detailed AO
       aoStrength: 3.0, // Strong effect
+      noiseScale: 4.0,
       enabled: true,
     },
     medium: {
-      sampleCount: 16, // Balanced samples
+      sampleCount: 8, // Balanced samples
       radius: 0.1, // Larger radius for more detailed AO
       aoStrength: 3.0, // Strong effect
       noiseScale: 4.0, // Standard noise scale
       enabled: true,
     },
     high: {
-      sampleCount: 32, // High sample count for quality
+      sampleCount: 16, // High sample count for quality
       radius: 0.1, // Larger radius for more detailed AO
       aoStrength: 3.0, // Strong effect
       noiseScale: 0.01, // Standard noise scale

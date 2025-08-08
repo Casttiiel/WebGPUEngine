@@ -66,7 +66,7 @@ export class ModuleRender extends Module {
     const camera = cameraComponent.getCamera();
 
     //Generate shadow maps if needed
-    this.generateShadowMaps();
+    //this.generateShadowMaps();
 
     // Actualizar buffer uniforme global solo con view y projection
     RenderManager.getInstance().setCamera(camera);
@@ -86,10 +86,9 @@ export class ModuleRender extends Module {
       const bloomConfig = qualitySettings.getBloomConfig();
 
       if (bloomConfig.enabled) {
-        // Apply quality-based bloom settings
+        // Apply quality-based bloom settings and apply bloom effect
         this.applyBloomQualitySettings(bloom);
-        bloom.generateHighlights(this.deferred.getGBufferBindGroup(), result);
-        bloom.addBloom(result);
+        result = bloom.apply(result);
       }
     }
 
@@ -347,8 +346,13 @@ export class ModuleRender extends Module {
       }
 
       // Apply bloom parameters based on quality settings
-      bloomComponent.setMaxBlurSteps(bloomConfig.maxBlurSteps);
-      bloomComponent.setBlurStrength(bloomConfig.blurStrength);
+      // Use the new BloomComponent parameters: numMips, filterRadius, bloomStrength
+      if (bloomConfig.maxBlurSteps !== undefined) {
+        bloomComponent.setNumMips(Math.max(3, Math.min(8, bloomConfig.maxBlurSteps)));
+      }
+      if (bloomConfig.blurStrength !== undefined) {
+        bloomComponent.setBloomStrength(bloomConfig.blurStrength);
+      }
 
       console.log(`Applied bloom quality settings: ${currentBloomQuality}`, bloomConfig);
     }
