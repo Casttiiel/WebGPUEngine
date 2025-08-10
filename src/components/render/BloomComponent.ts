@@ -23,19 +23,25 @@ export class BloomComponent extends Component {
   private downsampleShader!: GPUShaderModule;
   private upsampleShader!: GPUShaderModule;
   private combineShader!: GPUShaderModule;
+  private additiveShader!: GPUShaderModule;
+  private upsampleAdditiveShader!: GPUShaderModule;
   private downsamplePipeline!: GPUComputePipeline;
   private upsamplePipeline!: GPUComputePipeline;
   private combinePipeline!: GPUComputePipeline;
+  private additivePipeline!: GPUComputePipeline;
 
   // Bind group layouts
   private downsampleBindGroupLayout!: GPUBindGroupLayout;
   private upsampleBindGroupLayout!: GPUBindGroupLayout;
   private combineBindGroupLayout!: GPUBindGroupLayout;
+  private additiveBindGroupLayout!: GPUBindGroupLayout;
 
   // Mip chain for progressive downsampling/upsampling
   private mipChain: RenderTarget[] = [];
   private accumChain: RenderTarget[] = []; // Separate accumulation textures for upsample
+  private tempChain: RenderTarget[] = []; // Temporary textures for additive blending
   private fullSizeResult: RenderTarget | null = null; // Final full-size result
+  private fullSizeTemp: RenderTarget | null = null; // Temporary for full-size additive blending
   private finalCombinedResult: RenderTarget | null = null; // Final combined result (original + bloom)
   private numMips = 6; // Default number of mips (3-8 range)
 
@@ -109,6 +115,24 @@ export class BloomComponent extends Component {
     this.combineShader = this.device.createShaderModule({
       label: 'Bloom Combine Compute Shader',
       code: combineCode,
+    });
+
+    // Load additive compute shader
+    const additiveResponse = await fetch('/assets/shaders/bloom_additive.cs');
+    const additiveCode = await additiveResponse.text();
+
+    this.additiveShader = this.device.createShaderModule({
+      label: 'Bloom Additive Compute Shader',
+      code: additiveCode,
+    });
+
+    // Load upsample+additive compute shader
+    const upsampleAdditiveResponse = await fetch('/assets/shaders/bloom_upsample_additive.cs');
+    const upsampleAdditiveCode = await upsampleAdditiveResponse.text();
+
+    this.upsampleAdditiveShader = this.device.createShaderModule({
+      label: 'Bloom Upsample Additive Compute Shader',
+      code: upsampleAdditiveCode,
     });
   }
 
@@ -194,6 +218,33 @@ export class BloomComponent extends Component {
       },
     ]);
 
+    // Create additive bind group layout
+    this.additiveBindGroupLayout = BindGroupFactory.getLayout('bloom_additive_compute', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' }, // existing texture
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' }, // new texture to add
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'filtering' }, // texture sampler
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+        }, // result texture
+      },
+    ]);
+
     // Create downsample compute pipeline
     const downsampleConfig: ComputePipelineConfig = {
       label: 'Bloom Downsample Compute Pipeline',
@@ -235,6 +286,20 @@ export class BloomComponent extends Component {
     };
 
     this.combinePipeline = PipelineFactory.createComputePipeline(combineConfig);
+
+    // Create additive compute pipeline
+    const additiveConfig: ComputePipelineConfig = {
+      label: 'Bloom Additive Compute Pipeline',
+      layout: PipelineFactory.createPipelineLayout('bloom_additive_pipeline_layout', [
+        this.additiveBindGroupLayout,
+      ]),
+      compute: {
+        module: this.additiveShader,
+        entryPoint: 'cs',
+      },
+    };
+
+    this.additivePipeline = PipelineFactory.createComputePipeline(additiveConfig);
   }
 
   private createUniformBuffers(): void {
@@ -293,6 +358,17 @@ export class BloomComponent extends Component {
       GPUTextureUsage.STORAGE_BINDING, // Allow use as storage texture in compute shaders
     );
 
+    // Create full-size temporary texture for additive blending
+    this.fullSizeTemp = new RenderTarget();
+    this.fullSizeTemp.createRT(
+      'bloom_full_size_temp',
+      baseWidth,
+      baseHeight,
+      bloomFormat,
+      false, // No MSAA for bloom textures
+      GPUTextureUsage.STORAGE_BINDING, // Allow use as storage texture in compute shaders
+    );
+
     // Create mip chain (each level is half the resolution)
     for (let i = 0; i < this.numMips; i++) {
       const mipWidth = Math.max(1, Math.floor(baseWidth / Math.pow(2, i + 1)));
@@ -323,6 +399,19 @@ export class BloomComponent extends Component {
       );
 
       this.accumChain.push(accumTarget);
+
+      // Create temporary target for additive blending (same size as mip level)
+      const tempTarget = new RenderTarget();
+      tempTarget.createRT(
+        `bloom_temp_${i}`,
+        mipWidth,
+        mipHeight,
+        bloomFormat,
+        false, // No MSAA for bloom textures
+        GPUTextureUsage.STORAGE_BINDING, // Allow use as storage texture in compute shaders
+      );
+
+      this.tempChain.push(tempTarget);
 
       // Create bind groups for this mip level
       this.createBindGroupsForMip(i);
@@ -523,8 +612,9 @@ export class BloomComponent extends Component {
   }
 
   private performUpsample(commandEncoder: GPUCommandEncoder): void {
-    // Upsample from smallest to largest (reverse order)
-    // Include one extra iteration to go from mip 0 to full size
+    // Simplified upsample with progressive accumulation
+    // Each step upsamples from smaller mip and accumulates in larger mip
+
     for (let i = this.mipChain.length - 1; i >= 0; i--) {
       const computePass = commandEncoder.beginComputePass({
         label: i > 0 ? `bloom_upsample_mip_${i}` : 'bloom_upsample_full_size',
@@ -532,7 +622,7 @@ export class BloomComponent extends Component {
 
       computePass.setPipeline(this.upsamplePipeline);
 
-      // For i > 0: normal mip-to-mip upsample
+      // For i > 0: normal mip-to-mip upsample to accumulation texture
       // For i = 0: mip 0 to full size upsample
       const bindGroup = i > 0 ? this.upsampleBindGroups[i] : this.fullSizeUpsampleBindGroup!;
       computePass.setBindGroup(0, bindGroup);
@@ -594,7 +684,7 @@ export class BloomComponent extends Component {
 
   // Public setters for configuration
   public setNumMips(numMips: number): void {
-    if (numMips !== this.numMips && numMips >= 3 && numMips <= 8) {
+    if (numMips !== this.numMips && numMips >= 0 && numMips <= 8) {
       this.numMips = numMips;
       if (this.isLoaded) {
         this.resize(); // Recreate mip chain
@@ -657,7 +747,7 @@ export class BloomComponent extends Component {
     };
 
     addControl(numMipsWrapper, 'numMips', `${componentName} Mip Levels`, {
-      min: 3,
+      min: 0,
       max: 8,
       step: 1,
     });
@@ -709,9 +799,19 @@ export class BloomComponent extends Component {
     }
     this.accumChain = [];
 
+    for (const renderTarget of this.tempChain) {
+      renderTarget.destroy();
+    }
+    this.tempChain = [];
+
     if (this.fullSizeResult) {
       this.fullSizeResult.destroy();
       this.fullSizeResult = null;
+    }
+
+    if (this.fullSizeTemp) {
+      this.fullSizeTemp.destroy();
+      this.fullSizeTemp = null;
     }
 
     if (this.finalCombinedResult) {

@@ -1,14 +1,15 @@
 1. New Bloom
    Additive upscaling
-2. Documentation + Review textures and +
-3. Screen Space Reflections
-4. Directional Light with Shadow Maps (Rasterizer not complete?)
+   Performance: even with 0 blur steps it is slowed
+2. Better Predict Temporal Culling Manager (not lineal)
+3. Documentation + Review textures and bindgroups
+4. Screen Space Reflections
+5. Directional Light with Shadow Maps (Rasterizer not complete?)
    Orthogonal Camera
    Pass data to shader and use it
    Quality
    Cull objects?
-5. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-6. Better Predict Temporal Culling Manager (not lineal)
+6. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
 7. Volumetric lighting
 
 FIXES------------------------------------------

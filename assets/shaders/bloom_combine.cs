@@ -30,5 +30,5 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let finalColor = mix(originalColor, bloomColor, 0.1);
     
     // Store the combined result
-    textureStore(resultTexture, coords, vec4<f32>(finalColor, 1.0));
+    textureStore(resultTexture, coords, vec4<f32>(bloomColor, 1.0));
 }

@@ -1,5 +1,5 @@
 // Physically-Based Bloom Upsampling Compute Shader
-// 3x3 tent filter with compute optimization
+// 3x3 tent filter - produces blur result to be added to existing content
 
 @group(0) @binding(0) var<uniform> upsampleParams: vec4<f32>; // filterRadius + padding
 @group(0) @binding(1) var srcTexture: texture_2d<f32>;
@@ -52,6 +52,7 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Normalize: (1*4 + 2*4 + 4*1) = 16
     result *= 1.0 / 16.0;
     
-    // Store the upsampled result directly (no additive blending for now)
+    // Store the upsampled result
+    // Note: Additive blending will be handled by copying existing content first
     textureStore(dstTexture, coords, vec4<f32>(result, 1.0));
 }

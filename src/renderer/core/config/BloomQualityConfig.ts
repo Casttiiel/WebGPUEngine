@@ -18,7 +18,7 @@ export class BloomQualityConfigProvider {
     },
     high: {
       enabled: true,
-      maxBlurSteps: 4,
+      maxBlurSteps: 3,
       blurStrength: 2.0,
     },
   };
