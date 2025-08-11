@@ -21,8 +21,8 @@ A modern 3D rendering engine built on **WebGPU** technology, implementing physic
 
 ### Performance
 
-- **GPU-Based Frustum Culling** - Compute shader parallel culling
-- **Temporal Culling** - Advanced motion prediction with lag compensation
+- **CPU-Based Frustum Culling** - Reliable frustum culling with world-space AABB transformation
+- **Efficient Culling Algorithm** - Center + half-extents method matching GPU shader implementation
 - **Quality Settings** - Adaptive rendering based on performance requirements
 - **WebGPU Optimization** - Optimized for browser GPU limitations and web deployment
 
@@ -93,7 +93,7 @@ WebGPU Layer         │ DeferredRenderer, RenderManagerV2, GPU utilities
 
 - **ModuleRender** - Coordinates the rendering pipeline and post-processing effects
 - **DeferredRenderer** - Implements G-Buffer based deferred rendering
-- **RenderManagerV2** - Manages entity rendering with advanced culling systems
+- **RenderManagerV2** - Manages entity rendering with CPU-based frustum culling
 - **ECS System** - Entity-Component-System for modular object composition
 
 ## 📚 Documentation
@@ -216,8 +216,8 @@ npm run lint         # ESLint code checking
 
 ### Performance Optimizations
 
-- **GPU Frustum Culling** - Parallel object culling on GPU
-- **Temporal Culling** - Motion prediction for lag compensation
+- **CPU Frustum Culling** - Reliable frustum culling with immediate results
+- **World-Space Transformation** - Proper AABB transformation using model matrices
 - **State Management** - Optimized GPU state changes
 - **MSAA Support** - Hardware anti-aliasing
 

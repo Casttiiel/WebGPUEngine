@@ -9,7 +9,7 @@ The render module implements a modern deferred rendering pipeline with the follo
 - **Deferred Rendering**: G-Buffer based approach for efficient multi-light scenarios
 - **Physically-Based Rendering (PBR)**: Metallic-roughness workflow with Image-Based Lighting
 - **Modular Post-Processing**: Extensible effects pipeline including bloom, tone mapping, anti-aliasing, and ambient occlusion
-- **Performance Optimization**: GPU-based frustum culling with temporal culling system
+- **Performance Optimization**: CPU-based frustum culling for reliable object culling
 - **Quality Management**: Adaptive rendering quality based on performance requirements
 
 ## ModuleRender
@@ -247,7 +247,7 @@ public create(width: number, height: number) {
 
 ## RenderManagerV2
 
-`RenderManagerV2` serves as the bridge between the ECS system and the GPU, managing render keys, performing culling operations, and coordinating draw calls. This component implements advanced performance optimizations including temporal culling and GPU-based frustum culling.
+`RenderManagerV2` serves as the bridge between the ECS system and the GPU, managing render keys, performing culling operations, and coordinating draw calls. This component implements CPU-based frustum culling for reliable and efficient object culling.
 
 ### Core Architecture
 
@@ -259,8 +259,7 @@ The system organizes renderable objects through a render key system:
 export class RenderManagerV2 {
   private keyManager: RenderKeyManager;
   private stateManager: RenderStateManager;
-  private frustumCuller: GPUFrustumCuller | null = null;
-  private temporalCuller: TemporalCullingManager | null = null;
+  private cpuCuller: CPUCullingManager | null = null;
 
   public addKey(
     owner: RenderComponent,
@@ -278,79 +277,86 @@ export class RenderManagerV2 {
 }
 ```
 
-#### 2. **Advanced Culling System**
+#### 2. **CPU Frustum Culling System**
 
-RenderManagerV2 implements a sophisticated two-tier culling system:
+RenderManagerV2 implements a reliable CPU-based frustum culling system:
 
-**GPU Frustum Culling:**
-
-```typescript
-// Initialize GPU frustum culler
-this.frustumCuller = new GPUFrustumCuller();
-await this.frustumCuller.load();
-```
-
-**Temporal Culling with Motion Prediction:**
+**CPU Frustum Culling:**
 
 ```typescript
-// Initialize temporal culling system
-this.temporalCuller = new TemporalCullingManager(this.frustumCuller);
+// Initialize CPU culling system
+this.cpuCuller = new CPUCullingManager();
 
 public performPreRenderCulling(): void {
   if (!this.camera) return;
 
   const allKeys = this.keyManager.getAllKeys();
 
-  // Temporal culling with motion prediction and cache
-  this.culledKeys = this.temporalCuller!.performCulling(allKeys, this.camera);
+  // Direct CPU frustum culling - reliable and immediate
+  this.culledKeys = this.cpuCuller!.performCulling(allKeys, this.camera);
 }
 ```
 
-#### 3. **Temporal Culling System**
+#### 3. **CPU Culling Implementation**
 
-The temporal culling system provides AAA-style lag compensation:
+The CPU culling system provides reliable frustum testing:
 
 **Key Features:**
 
-- **Motion Prediction**: Uses camera velocity and acceleration to predict future positions
-- **Frame Lag Compensation**: Uses results from previous frames while computing future frames in background
-- **Cache Management**: Intelligent caching system with motion-based invalidation
-- **Fallback Strategies**: Multiple fallback approaches when cache misses occur
+- **World Space Transformation**: Properly transforms object AABBs to world space using model matrices
+- **Robust Algorithm**: Uses center + half-extents method (same as GPU shader implementation)
+- **Immediate Results**: No frame lag - culling results available immediately
+- **Debug Statistics**: Performance monitoring and culling efficiency tracking
 
-**Motion Prediction Algorithm:**
+**Culling Algorithm:**
 
-```typescript
+````typescript
 // Quadratic motion prediction: position = p0 + v*t + 0.5*a*t^2
 private predictCameraPosition(currentCamera: Camera, frameDelta: number): Camera {
   // Calculate velocity from recent camera history
   const velocity = this.calculateVelocity();
   const acceleration = this.calculateAcceleration();
 
-  // Predict future position with motion physics
-  const predictedTime = frameDelta * frameTime;
-  const linearOffset = velocity * predictedTime * predictionStrength;
-  const quadraticOffset = 0.5 * acceleration * predictedTime^2 * predictionStrength;
+```typescript
+// Transform AABB to world space using model matrix
+const worldAABB = this.transformAABBToWorldSpace(key.aabb, modelMatrix);
 
-  const predictedPosition = currentPosition + linearOffset + quadraticOffset;
+// Calculate AABB center and half extents (matches GPU shader algorithm)
+const aabbCenter = vec3.create();
+const aabbHalf = vec3.create();
 
-  return this.createPredictedCamera(predictedPosition);
+vec3.add(aabbCenter, worldAABB.min, worldAABB.max);
+vec3.scale(aabbCenter, aabbCenter, 0.5);
+
+vec3.subtract(aabbHalf, worldAABB.max, worldAABB.min);
+vec3.scale(aabbHalf, aabbHalf, 0.5);
+
+// Test against frustum planes using center + half-extents method
+for (const plane of frustumPlanes) {
+  const r = dot(abs(plane.normal), aabbHalf);
+  const c = dot(plane.normal, aabbCenter) + plane.distance;
+
+  if (c < -r) {
+    return false; // Object is outside frustum
+  }
 }
-```
+````
 
-**Cache System:**
+**AABB Transformation:**
 
 ```typescript
-public performCulling(keys: RenderKey[], camera: Camera): RenderKey[] {
-  this.frameNumber++;
-  this.updateCameraHistory(camera);
+private transformAABBToWorldSpace(aabb: AABB, modelMatrix: mat4): AABB {
+  // Transform all 8 corners to world space
+  for (let i = 0; i < 8; i++) {
+    const corner = vec3.fromValues(
+      (i & 1) !== 0 ? aabb.max[0] : aabb.min[0],
+      (i & 2) !== 0 ? aabb.max[1] : aabb.min[1],
+      (i & 4) !== 0 ? aabb.max[2] : aabb.min[2]
+    );
 
-  // Get cached results immediately (0ms blocking)
-  const cachedResults = this.getCachedResults(keys);
-
-  // Start background culling for future frame
-  this.startBackgroundCulling(keys, camera);
-
-  return cachedResults;
+    vec3.transformMat4(worldCorner, corner, modelMatrix);
+    // Update world AABB bounds
+  }
 }
 ```
 
@@ -483,10 +489,9 @@ Adapts culling parameters based on quality settings:
 ```typescript
 public initialize(): Promise<void> {
   const qualitySettings = QualitySettings.getInstance();
-  const cullingConfig = qualitySettings.getCullingConfig();
 
-  this.temporalCuller.setFrameLag(cullingConfig.frameLag);
-  this.temporalCuller.setPredictionStrength(cullingConfig.predictionStrength);
+  // CPU culling requires no special configuration
+  // Quality settings can still control other rendering parameters
 }
 ```
 
@@ -496,13 +501,13 @@ The three components work together in a coordinated fashion:
 
 1. **ModuleRender** orchestrates the overall frame generation
 2. **DeferredRenderer** handles the core G-Buffer and lighting passes
-3. **RenderManagerV2** provides optimized object culling and rendering
+3. **RenderManagerV2** provides reliable CPU-based frustum culling and rendering
 
 This architecture provides:
 
-- **High Performance**: GPU-based culling with temporal optimization
+- **High Performance**: Efficient CPU-based culling with immediate results
 - **Visual Quality**: Physically-based deferred rendering with post-processing
-- **Scalability**: Modular design allows for easy extension and modification
+- **Reliability**: Direct frustum testing without frame lag or cache dependencies
 - **Maintainability**: Clear separation of concerns and responsibilities
 
 The system is designed to handle complex 3D scenes efficiently while maintaining high visual fidelity and providing the flexibility needed for modern real-time rendering applications.

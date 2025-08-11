@@ -4,8 +4,7 @@ import { Camera } from '../../../core/math/Camera';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { Material } from '../../resources/Material';
 import { Mesh } from '../../resources/Mesh';
-import { GPUFrustumCuller } from '../../culling/GPUFrustumCuller';
-import { TemporalCullingManager } from '../culling/TemporalCullingManager';
+import { CPUCullingManager } from '../culling/CPUCullingManager';
 import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
 
@@ -15,8 +14,7 @@ export class RenderManagerV2 {
   // Managers
   private keyManager: RenderKeyManager;
   private stateManager: RenderStateManager;
-  private frustumCuller: GPUFrustumCuller | null = null;
-  private temporalCuller: TemporalCullingManager | null = null;
+  private cpuCuller: CPUCullingManager | null = null;
 
   // State
   private camera: Camera | null = null;
@@ -36,16 +34,12 @@ export class RenderManagerV2 {
   }
 
   public async initialize(): Promise<void> {
-    console.log('RenderManagerV2: Initializing with temporal culling...');
+    console.log('RenderManagerV2: Initializing with CPU culling...');
 
-    // Initialize GPU frustum culler
-    this.frustumCuller = new GPUFrustumCuller();
-    await this.frustumCuller.load();
+    // Initialize CPU culling system
+    this.cpuCuller = new CPUCullingManager();
 
-    // Initialize temporal culling system
-    this.temporalCuller = new TemporalCullingManager(this.frustumCuller);
-
-    console.log('RenderManagerV2: Temporal culling system initialized');
+    console.log('RenderManagerV2: CPU culling system initialized');
   }
 
   public setCamera(camera: Camera): void {
@@ -73,7 +67,7 @@ export class RenderManagerV2 {
 
     const allKeys = this.keyManager.getAllKeys();
 
-    this.culledKeys = this.temporalCuller!.performCulling(allKeys, this.camera);
+    this.culledKeys = this.cpuCuller!.performCulling(allKeys, this.camera);
   }
 
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
@@ -165,14 +159,9 @@ export class RenderManagerV2 {
   }
 
   public destroy(): void {
-    if (this.frustumCuller) {
-      this.frustumCuller.dispose();
-      this.frustumCuller = null;
-    }
-
-    if (this.temporalCuller) {
-      this.temporalCuller.dispose();
-      this.temporalCuller = null;
+    if (this.cpuCuller) {
+      this.cpuCuller.dispose();
+      this.cpuCuller = null;
     }
 
     this.keyManager.clear();
