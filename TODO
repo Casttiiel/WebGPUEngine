@@ -1,17 +1,16 @@
 1. Review textures and +
-2.
-3. New Bloom
+2. New Bloom
    Additive upscaling
-4. Downscaled VFX
-5. Directional Light with Shadow Maps (Rasterizer not complete?)
+3. Downscaled VFX
+4. Directional Light with Shadow Maps (Rasterizer not complete?)
    Orthogonal Camera
    Pass data to shader and use it
    Quality
    Cull objects?
-6. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
-7. Screen Space Reflections
-8. Volumetric lighting
-9. Github pages
+5. SpotLightsWithShadows (Tweakpane) (RenderInDebug) / Shadow quality
+6. Screen Space Reflections
+7. Volumetric lighting
+8. Github pages
 
 FIXES------------------------------------------
 
