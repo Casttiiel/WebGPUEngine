@@ -11,17 +11,20 @@ The WebGPU Engine implements a modern and flexible Entity-Component-System (ECS)
 ### **Fundamental Concepts**
 
 #### **Entity**
+
 - **Container**: Simple container with unique ID
 - **No Logic**: Contains no behavior, only acts as aggregator
 - **Composition**: Functionality defined by contained components
 - **Hierarchy**: Support for parent-child relationships
 
-#### **Component**  
+#### **Component**
+
 - **Data + Logic**: Encapsulates both data and specific behavior
 - **Specialization**: Each component has a single responsibility
 - **Reuse**: Can be combined to create complex behaviors
 
 #### **System**
+
 - **Processing**: Handled by modules that process components
 - **Coordination**: `ModuleEntities` acts as main system
 
@@ -33,16 +36,17 @@ The WebGPU Engine implements a modern and flexible Entity-Component-System (ECS)
 
 ```typescript
 export class Entity {
-  public readonly id: number;                    // Auto-generated unique ID
-  private components: Map<string, Component>;    // Associated components
-  private parent: Entity | null;                 // Parent entity
-  private children: Entity[];                    // Child entities
+  public readonly id: number; // Auto-generated unique ID
+  private components: Map<string, Component>; // Associated components
+  private parent: Entity | null; // Parent entity
+  private children: Entity[]; // Child entities
 }
 ```
 
 ### **Main Functionalities**
 
 #### **Component Management:**
+
 ```typescript
 // Add component
 entity.addComponent('transform', new TransformComponent());
@@ -51,13 +55,16 @@ entity.addComponent('transform', new TransformComponent());
 const transform = entity.getComponent('transform') as TransformComponent;
 
 // Check existence
-if (entity.hasComponent('render')) { /* ... */ }
+if (entity.hasComponent('render')) {
+  /* ... */
+}
 
 // Remove component
 entity.removeComponent('transform');
 ```
 
 #### **Hierarchies:**
+
 ```typescript
 // Establish parent-child relationship
 parentEntity.addChildren(childEntity);
@@ -68,6 +75,7 @@ const children = entity.getChildren();
 ```
 
 #### **Identification:**
+
 ```typescript
 // Friendly name (uses NameComponent if exists)
 const name = entity.getName(); // "Player" or "Entity_123"
@@ -84,12 +92,12 @@ Each entity can render its components in the debug UI:
 public renderInMenu(parentFolder: string = 'entities'): void {
     // Create folder for entity
     const entityFolder = debugUI.addSubFolder(parentFolder, entityKey, entityName);
-    
+
     // Add information for each component
     this.components.forEach((component, componentName) => {
         component.renderInMenu(); // Allow component to add its controls
     });
-    
+
     // Render child entities recursively
     for (const child of this.children) {
         child.renderInMenu(folderKey);
@@ -105,16 +113,16 @@ public renderInMenu(parentFolder: string = 'entities'): void {
 
 ```typescript
 export abstract class Component {
-  private owner!: Entity;  // Entity that owns this component
+  private owner!: Entity; // Entity that owns this component
 
   // Required abstract methods
-  public abstract load(data: unknown): Promise<void>;    // Load initial data
-  public abstract update(dt: number): void;              // Per-frame update
-  public abstract renderDebug(): void;                   // Debug rendering
+  public abstract load(data: unknown): Promise<void>; // Load initial data
+  public abstract update(dt: number): void; // Per-frame update
+  public abstract renderDebug(): void; // Debug rendering
 
   // Optional methods
-  public renderInMenu(): void {}                         // Debug UI (Tweakpane)
-  
+  public renderInMenu(): void {} // Debug UI (Tweakpane)
+
   // Ownership management
   public setOwner(owner: Entity): void;
   public getOwner(): Entity;
@@ -137,14 +145,15 @@ export abstract class Component {
 ### **1. Core Components**
 
 #### **NameComponent**
+
 ```typescript
 export class NameComponent extends Component {
   private name: string = '';
-  
+
   public async load(data: string): Promise<void> {
     this.name = data;
   }
-  
+
   public getName(): string {
     return this.name;
   }
@@ -152,11 +161,13 @@ export class NameComponent extends Component {
 ```
 
 **Purpose:**
+
 - Provides readable names for entities
 - Used in debug UI and logging
 - Simple string storage
 
 **Usage:**
+
 ```json
 {
   "components": {
@@ -166,26 +177,30 @@ export class NameComponent extends Component {
 ```
 
 #### **TransformComponent**
+
 ```typescript
 export class TransformComponent extends Component {
-  private transform: Transform;           // 3D transformation data
-  private uniformBuffer: GPUBuffer;       // GPU buffer for matrices
-  private modelBindGroup: GPUBindGroup;   // Bind group for shaders
+  private transform: Transform; // 3D transformation data
+  private uniformBuffer: GPUBuffer; // GPU buffer for matrices
+  private modelBindGroup: GPUBindGroup; // Bind group for shaders
 }
 ```
 
 **Purpose:**
+
 - Manages 3D position, rotation, and scale
 - Support for transformation hierarchies
 - Direct GPU integration (uniform buffers)
 
 **Features:**
+
 - **Local Transformation**: Relative to parent
 - **World Transformation**: Automatically calculated
 - **Hierarchical Propagation**: Updates children automatically
 - **GPU Integration**: Matrices uploaded to GPU each frame
 
 **Loading Data:**
+
 ```json
 {
   "components": {
@@ -199,6 +214,7 @@ export class TransformComponent extends Component {
 ```
 
 **Debug UI:**
+
 - Position sliders (X, Y, Z)
 - Rotation controls (Pitch, Yaw, Roll)
 - Scale controls (X, Y, Z)
@@ -206,26 +222,30 @@ export class TransformComponent extends Component {
 ### **2. Rendering Components**
 
 #### **CameraComponent**
+
 ```typescript
 export class CameraComponent extends Component {
-  protected camera: Camera;               // 3D camera object
-  private isControllable: boolean;        // If it accepts user input
-  private rotationSpeed: number;          // Rotation speed
+  protected camera: Camera; // 3D camera object
+  private isControllable: boolean; // If it accepts user input
+  private rotationSpeed: number; // Rotation speed
 }
 ```
 
 **Purpose:**
+
 - Defines viewpoints in the 3D world
 - Controls view and projection matrices
 - Support for optional FPS controls
 
 **Features:**
+
 - **Projection Parameters**: FOV, near/far planes, aspect ratio
 - **Look-At**: Positioning with target and up vector
 - **FPS Controls**: WASD movement + mouse (optional)
 - **Viewport**: Rendering region configuration
 
 **Loading Data:**
+
 ```json
 {
   "components": {
@@ -237,32 +257,36 @@ export class CameraComponent extends Component {
       "target": [0, 0, 0],
       "up": [0, 1, 0],
       "controllable": true,
-      "viewport": {"width": 1920, "height": 1080}
+      "viewport": { "width": 1920, "height": 1080 }
     }
   }
 }
 ```
 
 #### **RenderComponent**
+
 ```typescript
 export class RenderComponent extends Component {
-  private isVisible: boolean;             // Object visibility
-  private parts: MeshPartType[];          // List of mesh/material pairs
+  private isVisible: boolean; // Object visibility
+  private parts: MeshPartType[]; // List of mesh/material pairs
 }
 ```
 
 **Purpose:**
+
 - Makes an entity renderable
 - Manages meshes and materials
 - Integration with rendering system
 
 **Features:**
+
 - **Multi-Mesh**: Support for multiple parts per entity
 - **Visibility**: Rendering control per part
 - **Render Manager**: Automatic registration in rendering system
 - **Material/Mesh Pairing**: Each part has its specific material
 
 **Loading Data:**
+
 ```json
 {
   "components": {
@@ -282,38 +306,43 @@ export class RenderComponent extends Component {
 ### **3. Lighting Components**
 
 #### **PointLightComponent**
+
 ```typescript
 export class PointLightComponent extends Component {
-  private color: vec3;                    // RGB light color
-  private intensity: number;              // Light intensity
-  private range: number;                  // Range reach
-  private uniformBuffer: GPUBuffer;       // GPU buffer for light data
+  private color: vec3; // RGB light color
+  private intensity: number; // Light intensity
+  private range: number; // Range reach
+  private uniformBuffer: GPUBuffer; // GPU buffer for light data
 }
 ```
 
 **Purpose:**
+
 - Omnidirectional point lights
 - Distance-based attenuation
 - Integration with deferred rendering
 
 **Features:**
+
 - **HDR Color**: Color values above 1.0
 - **Physical Attenuation**: Realistic quadratic falloff
 - **Debug Visualization**: Debug sphere for range
 - **GPU Uniforms**: Data automatically uploaded
 
 #### **SpotLightComponent**
+
 ```typescript
 export class SpotLightComponent extends Component {
-  private color: vec3;                    // Light color
-  private intensity: number;              // Intensity
-  private range: number;                  // Maximum range
-  private angle: number;                  // Cone angle (degrees)
-  private softness: number;               // Edge softness
+  private color: vec3; // Light color
+  private intensity: number; // Intensity
+  private range: number; // Maximum range
+  private angle: number; // Cone angle (degrees)
+  private softness: number; // Edge softness
 }
 ```
 
 **Purpose:**
+
 - Directional cone-shaped lights
 - Directional projection with angular falloff
 - Ideal for flashlights, spotlights, etc.
@@ -321,45 +350,77 @@ export class SpotLightComponent extends Component {
 ### **4. Post-Processing Components**
 
 #### **ToneMappingComponent**
+
 ```typescript
 export class ToneMappingComponent extends Component {
-  private exposure: number;               // Image exposure
-  private gamma: number;                  // Gamma correction
-  private algorithm: string;              // Tone mapping algorithm
+  private exposure: number; // Image exposure
+  private gamma: number; // Gamma correction
+  private algorithm: string; // Tone mapping algorithm
 }
 ```
 
 **Purpose:**
+
 - Converts HDR to LDR
 - Exposure and gamma control
 - Multiple algorithms available
 
 #### **AntialiasingComponent**
+
 ```typescript
 export class AntialiasingComponent extends Component {
-  private technique: Technique;           // FXAA shader
-  private enabled: boolean;               // Effect state
+  private technique: Technique; // FXAA shader
+  private enabled: boolean; // Effect state
 }
 ```
 
 **Purpose:**
+
 - Post-processing anti-aliasing (FXAA)
 - Improves visual quality without MSAA cost
 - Applied at end of pipeline
 
 #### **BloomComponent**
+
 ```typescript
 export class BloomComponent extends Component {
-  private threshold: number;              // Brightness threshold
-  private intensity: number;              // Effect intensity
-  private iterations: number;             // Number of blur passes
+  // Compute shaders and pipelines
+  private downsampleShader: GPUShaderModule;
+  private upsampleShader: GPUShaderModule;
+  private combineShader: GPUShaderModule;
+  private downsamplePipeline: GPUComputePipeline;
+  private upsamplePipeline: GPUComputePipeline;
+  private combinePipeline: GPUComputePipeline;
+
+  // Mip chain and result textures
+  public mipChain: RenderTarget[]; // Progressive downsampling chain
+  public accumChain: RenderTarget[]; // Accumulation textures for upsample
+  private fullSizeResult: RenderTarget; // Final full-size bloom result
+  private finalCombinedResult: RenderTarget; // Final combined result (original + bloom)
+  private numMips: number; // Number of mips (3-8 range)
 }
 ```
 
 **Purpose:**
-- Glow effect for bright objects
-- Multiple blur passes
-- Fine parameter control
+
+- High-performance bloom effect using Compute Shaders
+- Implements Call of Duty: Advanced Warfare technique with GPU optimization
+- Progressive downsampling and upsampling for efficient glow effect
+
+**Features:**
+
+- **Compute-Based**: Uses WebGPU compute shaders for maximum performance
+- **Mip Chain**: Progressive resolution reduction for efficient processing
+- **Separate Submissions**: Each compute pass uses dedicated command encoder for proper synchronization
+- **Quality Adaptive**: Number of mips and parameters adjust based on quality settings
+- **COD Advanced Warfare Technique**: Industry-proven bloom algorithm implementation
+
+**Technical Implementation:**
+
+- **Three-Phase Process**: Downsample → Upsample → Combine
+- **WebGPU Synchronization**: Separate command encoder submissions prevent race conditions
+- **Dynamic Bind Groups**: Runtime creation for flexibility across different mip counts
+- **Memory Efficient**: Reuses textures and properly manages GPU resources
 
 ---
 
@@ -368,6 +429,7 @@ export class BloomComponent extends Component {
 ### **Loader.ts - Main Loader**
 
 #### **Loading from JSON:**
+
 ```typescript
 public static async loadSceneFromJSON(json: SceneDataType): Promise<void> {
     for (const entityData of json) {
@@ -377,40 +439,42 @@ public static async loadSceneFromJSON(json: SceneDataType): Promise<void> {
 ```
 
 #### **Entity Loading:**
+
 ```typescript
 public static async loadEntityFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
     const entity = new Entity();
-    
+
     // 1. Establish hierarchy
     if (parent) {
         parent.addChildren(entity);
     }
-    
+
     // 2. Process prefabs
     if (json.prefab) {
         const prefabJson = await ResourceManager.loadPrefab(json.prefab);
         json.components = {...json.components, ...prefabJson.components};
     }
-    
+
     // 3. Process GLTF
     if (json.gltf) {
         const gltfEntities = await GLTFLoader.loadGLTF(json.gltf);
         // Add GLTF entities as children
     }
-    
+
     // 4. Load components
     await this.loadComponentFromJSON(json, entity);
-    
+
     // 5. Load child entities
     for (const childData of json.children ?? []) {
         await this.loadEntityFromJSON(childData, entity);
     }
-    
+
     return entity;
 }
 ```
 
 ### **Component Factory:**
+
 ```typescript
 public static createComponentFromJSON(type: string): Component {
     switch (type) {
@@ -430,6 +494,7 @@ public static createComponentFromJSON(type: string): Component {
 ### **Data Formats**
 
 #### **JSON Scene Structure:**
+
 ```json
 [
   {
@@ -459,6 +524,7 @@ public static createComponentFromJSON(type: string): Component {
 ```
 
 #### **Prefabs:**
+
 ```json
 {
   "components": {
@@ -486,19 +552,21 @@ public static createComponentFromJSON(type: string): Component {
 ### **ModuleEntities - ECS System**
 
 #### **Object Managers:**
+
 ```typescript
 class ObjectManager {
-    private list: Component[];              // List of components of same type
-    
-    public updateAll(delta: number): void {
-        for (const component of this.list) {
-            component.update(delta);
-        }
+  private list: Component[]; // List of components of same type
+
+  public updateAll(delta: number): void {
+    for (const component of this.list) {
+      component.update(delta);
     }
+  }
 }
 ```
 
 #### **Categorization:**
+
 - **`omToUpdate`**: Components that need `update()`
 - **`omToRenderDebug`**: Components with debug information
 - **`omGeneral`**: General registry by component type
@@ -506,6 +574,7 @@ class ObjectManager {
 ### **Processing Flow:**
 
 #### **Initialization:**
+
 ```
 1. ModuleBoot loads scene.json
 2. Loader.loadSceneFromJSON()
@@ -518,6 +587,7 @@ class ObjectManager {
 ```
 
 #### **Runtime (each frame):**
+
 ```
 1. ModuleEntities.update(dt)
    ├── For each ObjectManager in omToUpdate:
@@ -535,21 +605,25 @@ class ObjectManager {
 ## 🎯 ECS System Advantages
 
 ### **Modularity**
+
 - **Reusable Components**: A `TransformComponent` works for any entity
 - **Composition vs Inheritance**: Flexibility without complex hierarchies
 - **Easy Extension**: New components integrate automatically
 
 ### **Performance**
+
 - **Cache Friendly**: Components of same type processed together
 - **Selective Updates**: Only needed components are updated
 - **GPU Integration**: Uniform buffers managed automatically
 
 ### **Debugging**
+
 - **Introspection**: Easy visualization of entities and components
 - **Debug UI**: Each component can expose its parameters
 - **Visual Hierarchies**: Clear parent-child structure in debug
 
 ### **Flexibility**
+
 - **Data-Driven**: Scenes defined in JSON
 - **Prefabs**: Configuration reuse
 - **GLTF Integration**: Complex model loading
@@ -560,6 +634,7 @@ class ObjectManager {
 ## 🚀 Practical Examples
 
 ### **Simple Entity (Static Cube):**
+
 ```json
 {
   "components": {
@@ -568,13 +643,14 @@ class ObjectManager {
       "position": [0, 0, 0]
     },
     "render": {
-      "meshes": [{"mesh": "cube.obj", "material": "basic.mat"}]
+      "meshes": [{ "mesh": "cube.obj", "material": "basic.mat" }]
     }
   }
 }
 ```
 
 ### **Complex Entity (Controllable Camera):**
+
 ```json
 {
   "components": {
@@ -591,19 +667,20 @@ class ObjectManager {
 ```
 
 ### **Entity with Hierarchy:**
+
 ```json
 {
   "components": {
     "name": "Car",
-    "transform": {"position": [0, 0, 0]},
-    "render": {"meshes": [{"mesh": "car_body.obj", "material": "car.mat"}]}
+    "transform": { "position": [0, 0, 0] },
+    "render": { "meshes": [{ "mesh": "car_body.obj", "material": "car.mat" }] }
   },
   "children": [
     {
       "components": {
         "name": "Front Left Wheel",
-        "transform": {"position": [-1, 0, 1]},
-        "render": {"meshes": [{"mesh": "wheel.obj", "material": "rubber.mat"}]}
+        "transform": { "position": [-1, 0, 1] },
+        "render": { "meshes": [{ "mesh": "wheel.obj", "material": "rubber.mat" }] }
       }
     }
   ]

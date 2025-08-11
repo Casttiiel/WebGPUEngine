@@ -8,9 +8,20 @@ The render module implements a modern deferred rendering pipeline with the follo
 
 - **Deferred Rendering**: G-Buffer based approach for efficient multi-light scenarios
 - **Physically-Based Rendering (PBR)**: Metallic-roughness workflow with Image-Based Lighting
-- **Modular Post-Processing**: Extensible effects pipeline including bloom, tone mapping, anti-aliasing, and ambient occlusion
+- **Modular Post-Processing**: Extensible effects pipeline including high-performance compute-based bloom, tone mapping, anti-aliasing, and ambient occlusion
 - **Performance Optimization**: CPU-based frustum culling for reliable object culling
 - **Quality Management**: Adaptive rendering quality based on performance requirements
+
+### Compute-Based Bloom System
+
+The engine features a state-of-the-art bloom implementation using WebGPU compute shaders:
+
+- **Call of Duty: Advanced Warfare Technique**: Industry-proven algorithm implementation
+- **Three-Phase Pipeline**: Progressive downsample → upsample → combine process
+- **WebGPU Synchronization**: Separate command encoder submissions prevent race conditions
+- **Adaptive Quality**: Dynamic mip count (3-8 range) based on quality settings
+- **Memory Optimization**: Efficient texture reuse and proper resource cleanup
+- **GPU Performance**: Compute shaders provide maximum throughput for bloom calculations
 
 ## ModuleRender
 
@@ -101,6 +112,14 @@ private applyBloomQualitySettings(bloom: BloomComponent): void {
   }
 }
 ```
+
+**Bloom Integration:**
+The system includes advanced compute-based bloom that adapts to quality settings through:
+
+- **Adaptive Mip Count**: Quality settings control the number of downsampling steps (3-8 range)
+- **Compute Shader Performance**: Uses WebGPU compute pipelines for maximum efficiency
+- **Synchronization Architecture**: Separate command encoder submissions ensure proper execution order
+- **Memory Management**: Dynamic bind group creation and efficient texture reuse
 
 #### 4. **Debug Information**
 
@@ -503,10 +522,48 @@ The three components work together in a coordinated fashion:
 2. **DeferredRenderer** handles the core G-Buffer and lighting passes
 3. **RenderManagerV2** provides reliable CPU-based frustum culling and rendering
 
+### Bloom System Integration
+
+The compute-based bloom system integrates seamlessly with the rendering pipeline:
+
+#### **Three-Phase Execution:**
+
+1. **Downsample Phase**: Progressive resolution reduction using compute shaders
+
+   - Separate command encoder submission for each mip level
+   - Dynamic bind group creation for flexible mip chain handling
+   - Proper synchronization to prevent GPU race conditions
+
+2. **Upsample Phase**: Progressive resolution increase with bloom accumulation
+
+   - Works directly with mip chain textures for efficiency
+   - Uses linear filtering for smooth bloom gradients
+   - Memory-efficient approach without additional accumulation textures
+
+3. **Combine Phase**: Final composition of original and bloom results
+   - High-performance compute shader for final blending
+   - Quality-adaptive parameters based on engine settings
+   - Seamless integration with tone mapping pipeline
+
+#### **Synchronization Architecture:**
+
+```typescript
+// Each compute pass uses separate command encoder for guaranteed ordering
+const downsampleEncoder = device.createCommandEncoder({ label: 'Bloom Downsample' });
+const downsamplePass = downsampleEncoder.beginComputePass();
+// ... downsample operations ...
+downsamplePass.end();
+device.queue.submit([downsampleEncoder.finish()]);
+
+// Separate submission ensures proper synchronization
+const upsampleEncoder = device.createCommandEncoder({ label: 'Bloom Upsample' });
+// ... upsample operations ...
+```
+
 This architecture provides:
 
 - **High Performance**: Efficient CPU-based culling with immediate results
-- **Visual Quality**: Physically-based deferred rendering with post-processing
+- **Visual Quality**: Physically-based deferred rendering with advanced compute-based bloom
 - **Reliability**: Direct frustum testing without frame lag or cache dependencies
 - **Maintainability**: Clear separation of concerns and responsibilities
 
