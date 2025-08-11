@@ -19,7 +19,6 @@ import { Camera } from '../../core/math/Camera';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
-  private lastBloomQualitySetting: string = ''; // Track bloom quality changes
 
   //Presentation data
   private presentationTechnique!: Technique;
@@ -87,7 +86,6 @@ export class ModuleRender extends Module {
 
       if (bloomConfig.enabled) {
         // Apply quality-based bloom settings and apply bloom effect
-        this.applyBloomQualitySettings(bloom);
         result = bloom.apply(result);
       }
     }
@@ -329,32 +327,5 @@ export class ModuleRender extends Module {
 
   public getMainCameraBindGroup(): GPUBindGroup {
     return this.mainCamera.getBindGroup();
-  }
-
-  private applyBloomQualitySettings(bloomComponent: BloomComponent): void {
-    const qualitySettings = QualitySettings.getInstance();
-    const bloomConfig = qualitySettings.getBloomConfig();
-    const currentBloomQuality = qualitySettings.getSettings().bloomQuality;
-
-    // Only apply settings if quality has changed or this is the first time
-    if (this.lastBloomQualitySetting !== currentBloomQuality) {
-      this.lastBloomQualitySetting = currentBloomQuality;
-
-      if (!bloomConfig.enabled) {
-        // Bloom disabled, skip processing
-        return;
-      }
-
-      // Apply bloom parameters based on quality settings
-      // Use the new BloomComponent parameters: numMips, filterRadius, bloomStrength
-      if (bloomConfig.maxBlurSteps !== undefined) {
-        bloomComponent.setNumMips(Math.max(3, Math.min(8, bloomConfig.maxBlurSteps)));
-      }
-      if (bloomConfig.blurStrength !== undefined) {
-        bloomComponent.setBloomStrength(bloomConfig.blurStrength);
-      }
-
-      console.log(`Applied bloom quality settings: ${currentBloomQuality}`, bloomConfig);
-    }
   }
 }

@@ -1,10 +1,9 @@
 // Physically-Based Bloom Upsampling Compute Shader
 // 3x3 tent filter - produces blur result to be added to existing content
 
-@group(0) @binding(0) var<uniform> upsampleParams: vec4<f32>; // filterRadius + padding
-@group(0) @binding(1) var srcTexture: texture_2d<f32>;
-@group(0) @binding(2) var srcSampler: sampler;
-@group(0) @binding(3) var dstTexture: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(0) var srcTexture: texture_2d<f32>;
+@group(0) @binding(1) var srcSampler: sampler;
+@group(0) @binding(2) var dstTexture: texture_storage_2d<rgba16float, write>;
 
 // Work group size optimized for GPU architecture
 @compute @workgroup_size(8, 8, 1)
