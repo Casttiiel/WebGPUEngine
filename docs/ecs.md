@@ -1,0 +1,613 @@
+# Entity-Component-System (ECS)
+
+## Overview
+
+The WebGPU Engine implements a modern and flexible Entity-Component-System (ECS) architecture that separates data (Components) from logic (Systems) and enables modular composition of game objects (Entities). This architecture promotes code reuse, facilitates testing, and provides excellent performance.
+
+---
+
+## 🏗️ ECS Architecture
+
+### **Fundamental Concepts**
+
+#### **Entity**
+- **Container**: Simple container with unique ID
+- **No Logic**: Contains no behavior, only acts as aggregator
+- **Composition**: Functionality defined by contained components
+- **Hierarchy**: Support for parent-child relationships
+
+#### **Component**  
+- **Data + Logic**: Encapsulates both data and specific behavior
+- **Specialization**: Each component has a single responsibility
+- **Reuse**: Can be combined to create complex behaviors
+
+#### **System**
+- **Processing**: Handled by modules that process components
+- **Coordination**: `ModuleEntities` acts as main system
+
+---
+
+## 🎯 Entities (Entity)
+
+### **Entity Class**
+
+```typescript
+export class Entity {
+  public readonly id: number;                    // Auto-generated unique ID
+  private components: Map<string, Component>;    // Associated components
+  private parent: Entity | null;                 // Parent entity
+  private children: Entity[];                    // Child entities
+}
+```
+
+### **Main Functionalities**
+
+#### **Component Management:**
+```typescript
+// Add component
+entity.addComponent('transform', new TransformComponent());
+
+// Get component
+const transform = entity.getComponent('transform') as TransformComponent;
+
+// Check existence
+if (entity.hasComponent('render')) { /* ... */ }
+
+// Remove component
+entity.removeComponent('transform');
+```
+
+#### **Hierarchies:**
+```typescript
+// Establish parent-child relationship
+parentEntity.addChildren(childEntity);
+
+// Navigation
+const parent = entity.getParent();
+const children = entity.getChildren();
+```
+
+#### **Identification:**
+```typescript
+// Friendly name (uses NameComponent if exists)
+const name = entity.getName(); // "Player" or "Entity_123"
+
+// Complete representation
+console.log(entity.toString()); // "Entity(Player, id=123)"
+```
+
+### **Integrated Debug UI**
+
+Each entity can render its components in the debug UI:
+
+```typescript
+public renderInMenu(parentFolder: string = 'entities'): void {
+    // Create folder for entity
+    const entityFolder = debugUI.addSubFolder(parentFolder, entityKey, entityName);
+    
+    // Add information for each component
+    this.components.forEach((component, componentName) => {
+        component.renderInMenu(); // Allow component to add its controls
+    });
+    
+    // Render child entities recursively
+    for (const child of this.children) {
+        child.renderInMenu(folderKey);
+    }
+}
+```
+
+---
+
+## 🔧 Components (Component)
+
+### **Base Component Class**
+
+```typescript
+export abstract class Component {
+  private owner!: Entity;  // Entity that owns this component
+
+  // Required abstract methods
+  public abstract load(data: unknown): Promise<void>;    // Load initial data
+  public abstract update(dt: number): void;              // Per-frame update
+  public abstract renderDebug(): void;                   // Debug rendering
+
+  // Optional methods
+  public renderInMenu(): void {}                         // Debug UI (Tweakpane)
+  
+  // Ownership management
+  public setOwner(owner: Entity): void;
+  public getOwner(): Entity;
+}
+```
+
+### **Component Lifecycle**
+
+1. **Creation**: `new ComponentType()`
+2. **Assignment**: `entity.addComponent(name, component)`
+3. **Loading**: `component.load(data)` - Asynchronous initialization
+4. **Registration**: `ModuleEntities.addComponentToManager()` - System registration
+5. **Update**: `component.update(dt)` - Each frame
+6. **Debug**: `component.renderDebug()` / `renderInMenu()` - Debug info
+
+---
+
+## 📦 System Components
+
+### **1. Core Components**
+
+#### **NameComponent**
+```typescript
+export class NameComponent extends Component {
+  private name: string = '';
+  
+  public async load(data: string): Promise<void> {
+    this.name = data;
+  }
+  
+  public getName(): string {
+    return this.name;
+  }
+}
+```
+
+**Purpose:**
+- Provides readable names for entities
+- Used in debug UI and logging
+- Simple string storage
+
+**Usage:**
+```json
+{
+  "components": {
+    "name": "Player Character"
+  }
+}
+```
+
+#### **TransformComponent**
+```typescript
+export class TransformComponent extends Component {
+  private transform: Transform;           // 3D transformation data
+  private uniformBuffer: GPUBuffer;       // GPU buffer for matrices
+  private modelBindGroup: GPUBindGroup;   // Bind group for shaders
+}
+```
+
+**Purpose:**
+- Manages 3D position, rotation, and scale
+- Support for transformation hierarchies
+- Direct GPU integration (uniform buffers)
+
+**Features:**
+- **Local Transformation**: Relative to parent
+- **World Transformation**: Automatically calculated
+- **Hierarchical Propagation**: Updates children automatically
+- **GPU Integration**: Matrices uploaded to GPU each frame
+
+**Loading Data:**
+```json
+{
+  "components": {
+    "transform": {
+      "position": [0, 1, 0],
+      "rotation": [0, 45, 0],
+      "scale": [1, 1, 1]
+    }
+  }
+}
+```
+
+**Debug UI:**
+- Position sliders (X, Y, Z)
+- Rotation controls (Pitch, Yaw, Roll)
+- Scale controls (X, Y, Z)
+
+### **2. Rendering Components**
+
+#### **CameraComponent**
+```typescript
+export class CameraComponent extends Component {
+  protected camera: Camera;               // 3D camera object
+  private isControllable: boolean;        // If it accepts user input
+  private rotationSpeed: number;          // Rotation speed
+}
+```
+
+**Purpose:**
+- Defines viewpoints in the 3D world
+- Controls view and projection matrices
+- Support for optional FPS controls
+
+**Features:**
+- **Projection Parameters**: FOV, near/far planes, aspect ratio
+- **Look-At**: Positioning with target and up vector
+- **FPS Controls**: WASD movement + mouse (optional)
+- **Viewport**: Rendering region configuration
+
+**Loading Data:**
+```json
+{
+  "components": {
+    "camera": {
+      "fov": 75,
+      "near": 0.1,
+      "far": 1000,
+      "position": [0, 5, 10],
+      "target": [0, 0, 0],
+      "up": [0, 1, 0],
+      "controllable": true,
+      "viewport": {"width": 1920, "height": 1080}
+    }
+  }
+}
+```
+
+#### **RenderComponent**
+```typescript
+export class RenderComponent extends Component {
+  private isVisible: boolean;             // Object visibility
+  private parts: MeshPartType[];          // List of mesh/material pairs
+}
+```
+
+**Purpose:**
+- Makes an entity renderable
+- Manages meshes and materials
+- Integration with rendering system
+
+**Features:**
+- **Multi-Mesh**: Support for multiple parts per entity
+- **Visibility**: Rendering control per part
+- **Render Manager**: Automatic registration in rendering system
+- **Material/Mesh Pairing**: Each part has its specific material
+
+**Loading Data:**
+```json
+{
+  "components": {
+    "render": {
+      "meshes": [
+        {
+          "mesh": "assets/meshes/cube.obj",
+          "material": "assets/materials/textured.mat",
+          "visible": true
+        }
+      ]
+    }
+  }
+}
+```
+
+### **3. Lighting Components**
+
+#### **PointLightComponent**
+```typescript
+export class PointLightComponent extends Component {
+  private color: vec3;                    // RGB light color
+  private intensity: number;              // Light intensity
+  private range: number;                  // Range reach
+  private uniformBuffer: GPUBuffer;       // GPU buffer for light data
+}
+```
+
+**Purpose:**
+- Omnidirectional point lights
+- Distance-based attenuation
+- Integration with deferred rendering
+
+**Features:**
+- **HDR Color**: Color values above 1.0
+- **Physical Attenuation**: Realistic quadratic falloff
+- **Debug Visualization**: Debug sphere for range
+- **GPU Uniforms**: Data automatically uploaded
+
+#### **SpotLightComponent**
+```typescript
+export class SpotLightComponent extends Component {
+  private color: vec3;                    // Light color
+  private intensity: number;              // Intensity
+  private range: number;                  // Maximum range
+  private angle: number;                  // Cone angle (degrees)
+  private softness: number;               // Edge softness
+}
+```
+
+**Purpose:**
+- Directional cone-shaped lights
+- Directional projection with angular falloff
+- Ideal for flashlights, spotlights, etc.
+
+### **4. Post-Processing Components**
+
+#### **ToneMappingComponent**
+```typescript
+export class ToneMappingComponent extends Component {
+  private exposure: number;               // Image exposure
+  private gamma: number;                  // Gamma correction
+  private algorithm: string;              // Tone mapping algorithm
+}
+```
+
+**Purpose:**
+- Converts HDR to LDR
+- Exposure and gamma control
+- Multiple algorithms available
+
+#### **AntialiasingComponent**
+```typescript
+export class AntialiasingComponent extends Component {
+  private technique: Technique;           // FXAA shader
+  private enabled: boolean;               // Effect state
+}
+```
+
+**Purpose:**
+- Post-processing anti-aliasing (FXAA)
+- Improves visual quality without MSAA cost
+- Applied at end of pipeline
+
+#### **BloomComponent**
+```typescript
+export class BloomComponent extends Component {
+  private threshold: number;              // Brightness threshold
+  private intensity: number;              // Effect intensity
+  private iterations: number;             // Number of blur passes
+}
+```
+
+**Purpose:**
+- Glow effect for bright objects
+- Multiple blur passes
+- Fine parameter control
+
+---
+
+## 📁 Loading System
+
+### **Loader.ts - Main Loader**
+
+#### **Loading from JSON:**
+```typescript
+public static async loadSceneFromJSON(json: SceneDataType): Promise<void> {
+    for (const entityData of json) {
+        await this.loadEntityFromJSON(entityData);
+    }
+}
+```
+
+#### **Entity Loading:**
+```typescript
+public static async loadEntityFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
+    const entity = new Entity();
+    
+    // 1. Establish hierarchy
+    if (parent) {
+        parent.addChildren(entity);
+    }
+    
+    // 2. Process prefabs
+    if (json.prefab) {
+        const prefabJson = await ResourceManager.loadPrefab(json.prefab);
+        json.components = {...json.components, ...prefabJson.components};
+    }
+    
+    // 3. Process GLTF
+    if (json.gltf) {
+        const gltfEntities = await GLTFLoader.loadGLTF(json.gltf);
+        // Add GLTF entities as children
+    }
+    
+    // 4. Load components
+    await this.loadComponentFromJSON(json, entity);
+    
+    // 5. Load child entities
+    for (const childData of json.children ?? []) {
+        await this.loadEntityFromJSON(childData, entity);
+    }
+    
+    return entity;
+}
+```
+
+### **Component Factory:**
+```typescript
+public static createComponentFromJSON(type: string): Component {
+    switch (type) {
+        case 'name': return new NameComponent();
+        case 'transform': return new TransformComponent();
+        case 'camera': return new CameraComponent();
+        case 'render': return new RenderComponent();
+        case 'point_light': return new PointLightComponent();
+        case 'spot_light': return new SpotLightComponent();
+        // ... more components
+        default:
+            throw new Error(`Unknown component type: ${type}`);
+    }
+}
+```
+
+### **Data Formats**
+
+#### **JSON Scene Structure:**
+```json
+[
+  {
+    "components": {
+      "name": "Main Camera",
+      "transform": {
+        "position": [0, 5, 10],
+        "rotation": [0, 0, 0]
+      },
+      "camera": {
+        "fov": 75,
+        "near": 0.1,
+        "far": 1000,
+        "controllable": true
+      }
+    }
+  },
+  {
+    "prefab": "assets/prefabs/cube.prefab",
+    "components": {
+      "transform": {
+        "position": [2, 0, 0]
+      }
+    }
+  }
+]
+```
+
+#### **Prefabs:**
+```json
+{
+  "components": {
+    "name": "Standard Cube",
+    "transform": {
+      "position": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "assets/meshes/cube.obj",
+          "material": "assets/materials/textured.mat"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+## 🔄 Management and Processing
+
+### **ModuleEntities - ECS System**
+
+#### **Object Managers:**
+```typescript
+class ObjectManager {
+    private list: Component[];              // List of components of same type
+    
+    public updateAll(delta: number): void {
+        for (const component of this.list) {
+            component.update(delta);
+        }
+    }
+}
+```
+
+#### **Categorization:**
+- **`omToUpdate`**: Components that need `update()`
+- **`omToRenderDebug`**: Components with debug information
+- **`omGeneral`**: General registry by component type
+
+### **Processing Flow:**
+
+#### **Initialization:**
+```
+1. ModuleBoot loads scene.json
+2. Loader.loadSceneFromJSON()
+   ├── For each entity in JSON:
+   │   ├── Create Entity()
+   │   ├── Process prefabs/GLTF
+   │   ├── Load components
+   │   └── Process child entities
+   └── Register in ModuleEntities
+```
+
+#### **Runtime (each frame):**
+```
+1. ModuleEntities.update(dt)
+   ├── For each ObjectManager in omToUpdate:
+   │   └── objectManager.updateAll(dt)
+   └── Update debug counters
+
+2. ModuleEntities.renderDebug()
+   ├── For each ObjectManager in omToRenderDebug:
+   │   └── objectManager.renderDebugAll()
+   └── Render debug UI
+```
+
+---
+
+## 🎯 ECS System Advantages
+
+### **Modularity**
+- **Reusable Components**: A `TransformComponent` works for any entity
+- **Composition vs Inheritance**: Flexibility without complex hierarchies
+- **Easy Extension**: New components integrate automatically
+
+### **Performance**
+- **Cache Friendly**: Components of same type processed together
+- **Selective Updates**: Only needed components are updated
+- **GPU Integration**: Uniform buffers managed automatically
+
+### **Debugging**
+- **Introspection**: Easy visualization of entities and components
+- **Debug UI**: Each component can expose its parameters
+- **Visual Hierarchies**: Clear parent-child structure in debug
+
+### **Flexibility**
+- **Data-Driven**: Scenes defined in JSON
+- **Prefabs**: Configuration reuse
+- **GLTF Integration**: Complex model loading
+- **Runtime Changes**: Add/remove components dynamically
+
+---
+
+## 🚀 Practical Examples
+
+### **Simple Entity (Static Cube):**
+```json
+{
+  "components": {
+    "name": "Static Cube",
+    "transform": {
+      "position": [0, 0, 0]
+    },
+    "render": {
+      "meshes": [{"mesh": "cube.obj", "material": "basic.mat"}]
+    }
+  }
+}
+```
+
+### **Complex Entity (Controllable Camera):**
+```json
+{
+  "components": {
+    "name": "Player Camera",
+    "transform": {
+      "position": [0, 5, 10]
+    },
+    "camera": {
+      "fov": 75,
+      "controllable": true
+    }
+  }
+}
+```
+
+### **Entity with Hierarchy:**
+```json
+{
+  "components": {
+    "name": "Car",
+    "transform": {"position": [0, 0, 0]},
+    "render": {"meshes": [{"mesh": "car_body.obj", "material": "car.mat"}]}
+  },
+  "children": [
+    {
+      "components": {
+        "name": "Front Left Wheel",
+        "transform": {"position": [-1, 0, 1]},
+        "render": {"meshes": [{"mesh": "wheel.obj", "material": "rubber.mat"}]}
+      }
+    }
+  ]
+}
+```
+
+This ECS system provides a solid and flexible foundation for the WebGPU Engine, enabling the creation of complex entities through composition of simple and specialized components.
