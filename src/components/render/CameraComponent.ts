@@ -56,10 +56,6 @@ export class CameraComponent extends Component {
     this.camera.updateUniforms();
   }
 
-  public setCamera(camera: Camera): void {
-    this.camera = camera;
-  }
-
   public update(dt: number): void {
     if (!this.isControllable) return;
 
@@ -141,5 +137,9 @@ export class CameraComponent extends Component {
 
   public getCamera(): Camera {
     return this.camera;
+  }
+
+  public setCamera(camera: Camera): void {
+    this.camera = camera;
   }
 }

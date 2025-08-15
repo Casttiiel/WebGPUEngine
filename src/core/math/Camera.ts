@@ -44,9 +44,6 @@ export class Camera {
   private bindGroup!: GPUBindGroup;
 
   constructor() {
-    this.updateProjection();
-    this.lookAt(vec3.fromValues(1, 1, 1), vec3.fromValues(0, 0, 0));
-
     this.initializeUniformBuffers();
   }
 
@@ -68,7 +65,7 @@ export class Camera {
   private updateProjection(): void {
     if (this.isOrtho) {
       if (this.orthoCentered) {
-        mat4.ortho(
+        mat4.orthoZO(
           this.projection,
           -this.orthoWidth / 2,
           this.orthoWidth / 2,
@@ -78,7 +75,7 @@ export class Camera {
           this.zFar,
         );
       } else {
-        mat4.ortho(
+        mat4.orthoZO(
           this.projection,
           this.orthoLeft,
           this.orthoLeft + this.orthoWidth,
@@ -88,17 +85,9 @@ export class Camera {
           this.zFar,
         );
       }
-
-      // Fix Z convention: negate Z components to match WebGPU expectations
-      // This makes objects in front of camera have positive Z values
-      this.projection[10] *= -1; // Z scaling component
-      this.projection[14] *= -1; // Z translation component
     } else {
+      //mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
       mat4.perspective(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
-
-      // Apply same Z fix for perspective cameras for consistency
-      this.projection[10] *= -1;
-      this.projection[14] *= -1;
     }
     this.calculateInvProjectionMatrix();
     this.updateViewProjection();

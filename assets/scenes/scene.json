@@ -9,7 +9,7 @@
     "gltf": "sponza.gltf"
   },
   {
-    "prefab": "ortho_camera.prefab"
+    "prefab": "main_camera.prefab"
   },
   {
     "prefab": "cube_emissive.prefab"
