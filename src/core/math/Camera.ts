@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
@@ -88,8 +88,17 @@ export class Camera {
           this.zFar,
         );
       }
+
+      // Fix Z convention: negate Z components to match WebGPU expectations
+      // This makes objects in front of camera have positive Z values
+      this.projection[10] *= -1; // Z scaling component
+      this.projection[14] *= -1; // Z translation component
     } else {
       mat4.perspective(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
+
+      // Apply same Z fix for perspective cameras for consistency
+      this.projection[10] *= -1;
+      this.projection[14] *= -1;
     }
     this.calculateInvProjectionMatrix();
     this.updateViewProjection();
@@ -113,11 +122,11 @@ export class Camera {
   }
 
   public setOrthoParams(
-    centered: boolean,
-    left: number,
-    width: number,
-    top: number,
-    height: number,
+    centered: boolean = true,
+    left: number = 0,
+    width: number = 20,
+    top: number = 0,
+    height: number = 20,
   ): void {
     this.isOrtho = true;
     this.orthoCentered = centered;
@@ -126,6 +135,7 @@ export class Camera {
     this.orthoTop = top;
     this.orthoHeight = height;
 
+    // For orthographic cameras, aspect ratio should match the ortho dimensions
     this.aspectRatio = Math.abs(width / height);
     this.updateProjection();
     this.isDirty = true;
@@ -160,30 +170,6 @@ export class Camera {
     if (!this.isOrtho) {
       this.updateProjection();
     }
-  }
-
-  public getScreenCoordsOfWorldCoord(worldPos: vec3): {
-    screenCoords: vec3;
-    isInsideFrustum: boolean;
-  } {
-    const posInHomoSpace = vec3.create();
-    vec3.transformMat4(posInHomoSpace, worldPos, this.viewProjection);
-
-    const posInScreenSpace = vec3.fromValues(
-      this.viewport.x0 + (posInHomoSpace[0] + 1.0) * 0.5 * this.viewport.width,
-      this.viewport.y0 + (1.0 - posInHomoSpace[1]) * 0.5 * this.viewport.height,
-      posInHomoSpace[2],
-    );
-
-    const isInsideFrustum =
-      posInHomoSpace[0] >= -1.0 &&
-      posInHomoSpace[0] <= 1.0 &&
-      posInHomoSpace[1] >= -1.0 &&
-      posInHomoSpace[1] <= 1.0 &&
-      posInHomoSpace[2] >= 0.0 &&
-      posInHomoSpace[2] <= 1.0;
-
-    return { screenCoords: posInScreenSpace, isInsideFrustum };
   }
 
   public move(delta: number[]): void {
@@ -396,5 +382,22 @@ export class Camera {
 
   public getBindGroup(): GPUBindGroup {
     return this.bindGroup;
+  }
+
+  public isOrthographic(): boolean {
+    return this.isOrtho;
+  }
+
+  public switchToOrthographic(
+    width: number = 20,
+    height: number = 20,
+    centered: boolean = true,
+  ): void {
+    this.setOrthoParams(centered, 0, width, 0, height);
+  }
+
+  public switchToPerspective(fov: number = 60, near: number = 0.1, far: number = 1000): void {
+    this.isOrtho = false;
+    this.setProjectionParams(fov, near, far);
   }
 }

@@ -30,8 +30,8 @@ export class BloomComponent extends Component {
   private combineBindGroupLayout!: GPUBindGroupLayout;
 
   // Mip chain and result textures
-  public mipChain: RenderTarget[] = [];
-  public accumChain: RenderTarget[] = []; // Accumulation textures for upsample
+  private mipChain: RenderTarget[] = [];
+  private accumChain: RenderTarget[] = []; // Accumulation textures for upsample
   private fullSizeResult: RenderTarget | null = null; // Final full-size bloom result
   private finalCombinedResult: RenderTarget | null = null; // Final combined result (original + bloom)
   private numMips = 6; // Default number of mips (3-8 range)
@@ -42,7 +42,6 @@ export class BloomComponent extends Component {
   // Bind groups for each mip level
   private downsampleBindGroups: GPUBindGroup[] = [];
   private upsampleBindGroups: GPUBindGroup[] = [];
-  private fullSizeUpsampleBindGroup: GPUBindGroup | null = null;
   private combineBindGroup: GPUBindGroup | null = null;
 
   // Sampler
@@ -299,9 +298,6 @@ export class BloomComponent extends Component {
       false,
       GPUTextureUsage.STORAGE_BINDING,
     );
-
-    // Create bind group for final upsample to full size
-    this.createFullSizeUpsampleBindGroup();
   }
 
   private createBindGroupsForMip(mipIndex: number): void {
@@ -356,28 +352,6 @@ export class BloomComponent extends Component {
 
       this.upsampleBindGroups[mipIndex] = upsampleBindGroup;
     }
-  }
-
-  private createFullSizeUpsampleBindGroup(): void {
-    // Create bind group for final upsample from mip 0 to full size
-    this.fullSizeUpsampleBindGroup = BindGroupFactory.createBindGroup(
-      'bloom_upsample_full_size',
-      this.upsampleBindGroupLayout,
-      [
-        {
-          binding: 0,
-          resource: this.accumChain[0]!.getTexture().createView(), // Source (accumulated mip 0)
-        },
-        {
-          binding: 1,
-          resource: this.linearSampler,
-        },
-        {
-          binding: 2,
-          resource: this.fullSizeResult!.getStorageView(), // Destination (full size) - use getStorageView for writing
-        },
-      ],
-    );
   }
 
   private updateDownsampleParams(resolution: number[]): void {
@@ -668,7 +642,6 @@ export class BloomComponent extends Component {
       this.finalCombinedResult = null;
     }
 
-    this.fullSizeUpsampleBindGroup = null;
     this.combineBindGroup = null;
   }
 }

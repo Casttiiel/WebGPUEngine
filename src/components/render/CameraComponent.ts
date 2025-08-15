@@ -4,6 +4,7 @@ import { CameraComponentDataType } from '../../types/CameraComponentData.type';
 import { Engine } from '../../core/engine/Engine';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
+import { Render } from '../../renderer/core/pipeline/Render';
 
 export class CameraComponent extends Component {
   protected camera: Camera;
@@ -16,16 +17,28 @@ export class CameraComponent extends Component {
   }
 
   public async load(data: CameraComponentDataType): Promise<void> {
+    if (data.ortho) {
+      // Configure orthographic camera
+      const orthoWidth = data.orthoWidth || Render.width;
+      const orthoHeight = data.orthoHeight || Render.height;
+      const orthoLeft = data.orthoLeft || 0;
+      const orthoTop = data.orthoTop || 0;
+      const orthoCentered = data.orthoCentered !== undefined ? data.orthoCentered : true;
+
+      this.camera.setOrthoParams(orthoCentered, orthoLeft, orthoWidth, orthoTop, orthoHeight);
+    } else {
+      if (data.fov) {
+        this.camera.setFov(data.fov);
+      }
+    }
+
+    // Configure perspective camera
     if (data.near) {
       this.camera.setNearPlane(data.near);
     }
 
     if (data.far) {
       this.camera.setFarPlane(data.far);
-    }
-
-    if (data.fov) {
-      this.camera.setFov(data.fov);
     }
 
     if (data.viewport) {

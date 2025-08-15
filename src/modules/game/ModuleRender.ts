@@ -65,7 +65,7 @@ export class ModuleRender extends Module {
     const camera = cameraComponent.getCamera();
 
     //Generate shadow maps if needed
-    //this.generateShadowMaps();
+    this.generateShadowMaps();
 
     // Actualizar buffer uniforme global solo con view y projection
     RenderManager.getInstance().setCamera(camera);
