@@ -76,7 +76,6 @@ export class DirectionalLight {
     this.camera.setFarPlane(50.0);
     this.camera.setOrthoParams(true, 0, 20, 0, 20);
     this.camera.lookAt([3.5, 20.0, 0.0], [-2.0, -1.0, 0.0]);
-    //this.camera.lookAt([0.0, 2.0, 0.0], [0.0, 2.0, 1.0]);
     this.camera.updateUniforms();
   }
 

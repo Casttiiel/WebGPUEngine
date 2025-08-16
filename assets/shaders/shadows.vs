@@ -14,7 +14,7 @@ fn vs(
     var output: ShadowsVertexOutput;
     let worldPos = object.modelMatrix * vec4<f32>(position, 1.0);
     output.worldPos = worldPos.xyz;
-    output.position = vec4(worldPos.x %1.0);//camera.projectionMatrix * camera.viewMatrix * worldPos;
+    output.position = camera.projectionMatrix * camera.viewMatrix * worldPos;
 
     return output;
 }
