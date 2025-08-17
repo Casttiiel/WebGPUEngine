@@ -251,10 +251,6 @@ We welcome contributions! Please see our contributing guidelines:
 - Add debug UI controls for new parameters
 - Optimize for WebGPU web deployment
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - **WebGPU Working Group** - For the amazing graphics API

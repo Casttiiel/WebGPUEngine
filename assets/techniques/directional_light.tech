@@ -7,6 +7,6 @@
     "uniforms": [
         "CameraUniforms",
         "GBufferUniforms",
-        "BufferUniform"
+        "DirectionalLightUniforms"
     ]
 }

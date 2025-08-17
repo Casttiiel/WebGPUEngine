@@ -4,17 +4,17 @@
 #include "common/gbuffer"
 
 struct LightUniforms {
-    color: vec4<f32>,            // 16 bytes (0-15)
-    position: vec3<f32>,         // 12 bytes (16-27)
-    intensity: f32,              // 4 bytes  (28-31)
-    viewProjOffset: mat4x4<f32>, // 64 bytes (32-95)
-    radius: f32,                 // 4 bytes  (96-99)
-    shadowStep: f32,             // 4 bytes  (100-103)
-    shadowInverseResolution: f32, // 4 bytes (104-107)
-    shadowStepDivResolution: f32, // 4 bytes (108-111)
-    startFalloff: f32,           // 4 bytes  (112-115)
-    padding: vec3<f32>,          // 12 bytes (116-127)
-    extraPadding: f32,           // 4 bytes  (128-131) para llegar a 144 bytes
+    color: vec4<f32>,
+    position: vec3<f32>, //This will be the direction
+    intensity: f32,
+    viewProjOffset: mat4x4<f32>,
+    radius: f32, //Not used
+    shadowStep: f32,
+    shadowInverseResolution: f32,
+    shadowStepDivResolution: f32,
+    startFalloff: f32, //Not used
+    padding: vec3<f32>,
+    extraPadding: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -26,6 +26,8 @@ struct LightUniforms {
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
 @group(2) @binding(0) var<uniform> light: LightUniforms;
+@group(2) @binding(1) var gShadowMap: texture_depth_2d;
+@group(2) @binding(2) var gShadowSampler: sampler_comparison;
 
 
 @fragment
@@ -37,11 +39,8 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     }
 
     // Shadow factor entre 0 (totalmente en sombra) y 1 (no ocluido)
-    var shadow_factor = 1.0;
-    /*if (use_shadows) {
-        // shadow_factor = getShadowFactor(g.worldPos); // TODO: Implement shadow mapping
-    }*/
-        
+    var shadow_factor = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler);
+
     let light_dir = normalize(light.position);//this will be used as a directional light
     
     let NdL = saturate(dot(g.normal, light_dir));

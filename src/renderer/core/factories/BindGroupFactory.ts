@@ -358,6 +358,34 @@ export class BindGroupFactory {
   }
 
   /**
+   * Creates a directional light uniforms bind group layout
+   * Includes uniform buffer, depth texture and comparison sampler for shadows
+   */
+  public static getDirectionalLightUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('directional_light_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'comparison' },
+      },
+    ]);
+  }
+
+  /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
     switch (layout) {
@@ -383,6 +411,8 @@ export class BindGroupFactory {
         return this.getFourTextureLayout();
       case PipelineBindGroupLayouts.HBAO_UNIFORMS:
         return this.getHBAOUniformsLayout();
+      case PipelineBindGroupLayouts.DIRECTIONAL_LIGHT_UNIFORMS:
+        return this.getDirectionalLightUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

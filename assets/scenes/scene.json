@@ -12,6 +12,11 @@
     "prefab": "main_camera.prefab"
   },
   {
-    "prefab": "cube_emissive.prefab"
+    "prefab": "cube_emissive.prefab",
+    "components": {
+      "transform": {
+        "position": [3.5, 20, 0]
+      }
+    }
   }
 ]

@@ -2,18 +2,11 @@
 #include "common/structs"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
+@group(1) @binding(0) var<uniform> object: ObjectUniforms;
 
 @fragment
-fn fs(input: ShadowsVertexOutput) -> @location(0) f32 {
-        // Convert world position to view space
-    let viewPos = camera.viewMatrix * vec4<f32>(input.worldPos, 1.0);
-    
-    // For orthographic projection, depth is the view space Z coordinate
-    // Normalize to [0, 1] using camera far plane (assuming near is close to 0)
-    let linear_depth = -viewPos.z / camera.cameraZFar;
-    
-    // Clamp to [0, 1] range
-    let clamped_depth = clamp(linear_depth, 0.0, 1.0);
-    
-    return clamped_depth;
+fn fs(input: ShadowsVertexOutput) {
+    // Para depth-only shadow mapping, no necesitamos output de color
+    // El depth buffer se llena automáticamente por el GPU
+    // Opcionalmente podemos hacer alpha testing aquí si fuera necesario
 }
