@@ -7,10 +7,10 @@
         "orthoWidth": 20,
         "orthoHeight": 20,
         "near": 0.1,
-        "far": 100,
+        "far": 50,
         "controllable": true,
-        "position": [0,2,0],
-        "target": [0,2,1]
+        "position": [0.0, 15.0, 0.0],
+        "target": [-3.0, 0.0, 0.0]
       },
       "tone_mapping": {},
       "antialiasing": {},

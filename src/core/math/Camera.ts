@@ -86,8 +86,7 @@ export class Camera {
         );
       }
     } else {
-      //mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
-      mat4.perspective(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
+      mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
     }
     this.calculateInvProjectionMatrix();
     this.updateViewProjection();

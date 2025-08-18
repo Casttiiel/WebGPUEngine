@@ -49,6 +49,8 @@ export class DirectionalLight {
       label: 'directional_light_shadow_sampler',
       magFilter: 'linear',
       minFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
       compare: 'less', // Función de comparación para shadows
     });
 
@@ -73,10 +75,9 @@ export class DirectionalLight {
 
     this.camera = new Camera();
     this.camera.setNearPlane(0.1);
-    this.camera.setFarPlane(50.0);
+    this.camera.setFarPlane(100.0);
     this.camera.setOrthoParams(true, 0, 20, 0, 20);
-    //this.camera.lookAt([3.5, 20.0, 0.0], [-2.0, -1.0, 0.0]);
-    this.camera.lookAt([0.0, 20.0, 0.0], [0.0, 0.0, 0.0]);
+    this.camera.lookAt([0.0, 15.0, 0.0], [-3.0, 0.0, 0.0]);
     this.camera.updateUniforms();
 
     this.updateLightUniforms();
@@ -86,32 +87,42 @@ export class DirectionalLight {
     // color (vec4) - bytes 0-15
     GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array([1.0, 0.956, 0.878, 1.0]));
 
-    const direction = this.camera.getFront();
+    // Para luz direccional: la dirección debe ser HACIA la fuente de luz
+    // Si la cámara mira hacia abajo [0, -1, 0], la luz viene de arriba [0, 1, 0]
+    const cameraDirection = this.camera.getFront();
+    const lightDirection = vec3.fromValues(
+      -cameraDirection[0],
+      -cameraDirection[1],
+      -cameraDirection[2],
+    );
+
     // position (vec3) + intensity (f32) - bytes 16-31
     GPUUtils.writeBuffer(
       this.uniformBuffer,
       16,
-      new Float32Array([-direction[0], -direction[1], direction[2], 10.0]),
+      new Float32Array([lightDirection[0], lightDirection[1], lightDirection[2], 10.0]),
     );
 
+    // Crear matriz de transformación de clip space a UV space
     const mtx_scale = mat4.create();
     const mtx_translation = mat4.create();
     const mtx_offset = mat4.create();
     const lightViewProjOffset = mat4.create();
 
+    // CORRECCIÓN: Escalar de [-1,1] a [0,1] y aplicar offset
     mat4.scale(mtx_scale, mat4.create(), [0.5, -0.5, 1.0]);
     mat4.translate(mtx_translation, mat4.create(), [0.5, 0.5, 0.0]);
-    mat4.multiply(mtx_offset, mtx_scale, mtx_translation);
-    mat4.multiply(lightViewProjOffset, this.camera.getViewProjection(), mtx_offset);
-    /////////////////////////////////////////////
-    const position = vec3.fromValues(13.5, 19.0, 0.0);
-    const transformedPos = vec3.create();
-    vec3.transformMat4(transformedPos, position, this.camera.getViewProjection());
-    console.log(transformedPos);
-    /////////////////////////////////////////////
-    GPUUtils.writeBuffer(this.uniformBuffer, 32, new Float32Array(this.camera.getViewProjection()));
 
-    // radius (f32) - bytes 96-99 (no se usa para directional light)
+    // CORRECCIÓN: Orden correcto de transformaciones
+    // Primero escalar, luego trasladar: T * S (se lee de derecha a izquierda)
+    mat4.multiply(mtx_offset, mtx_translation, mtx_scale);
+
+    // CORRECCIÓN: ViewProjection PRIMERO, luego la transformación a UV
+    // Orden: UV_Transform * ViewProjection * worldPos
+    mat4.multiply(lightViewProjOffset, mtx_offset, this.camera.getViewProjection());
+
+    // Escribir la matriz lightViewProjOffset completa (NO solo ViewProjection)
+    GPUUtils.writeBuffer(this.uniformBuffer, 32, new Float32Array(lightViewProjOffset)); // radius (f32) - bytes 96-99 (no se usa para directional light)
     GPUUtils.writeBuffer(this.uniformBuffer, 96, new Float32Array([0.0]));
 
     // shadowStep (f32) - bytes 100-103

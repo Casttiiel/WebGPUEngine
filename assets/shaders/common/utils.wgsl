@@ -143,70 +143,37 @@ fn direction_to_equirect_uv(dir: vec3<f32>) -> vec2<f32> {
 }
 
 fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison) -> f32 {
-    return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, coord_z);
+    // Quick optimization: clamp coordinates instead of branching
+    let clamped_coord = clamp(homo_coord, vec2<f32>(0.0), vec2<f32>(1.0));
+    
+    // Add small depth bias to prevent shadow acne
+    let biased_depth = coord_z - 0.0005;
+    return textureSampleCompareLevel(shadowMap, shadowSampler, clamped_coord, biased_depth);
 }
 
 fn hash2(p: f32) -> vec2<f32> {
-    return fract(sin(vec2<f32>(p * 12.9898, p * 78.233)) * 43758.5453);
+    let n = sin(p * 12.9898 + 78.233) * 43758.5453;
+    return fract(vec2<f32>(n, n * 1.3));
+}
+
+fn hash3(p: vec3<f32>) -> f32 {
+    return fract(sin(dot(p, vec3<f32>(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 
 fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
-    var lightHomeSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
+    var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
 
-    lightHomeSpacePos.x = lightHomeSpacePos.x * 0.5 + 0.5;
-    lightHomeSpacePos.y = lightHomeSpacePos.y * 0.5 + 0.5;
-
-    if (lightHomeSpacePos.z < 0.0 || lightHomeSpacePos.z > 1.0) {
-        return 0.0;
+    // Verificar que esté dentro del rango válido de la shadow map
+    if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0) {
+        return 0.0; // Fuera del rango de profundidad = sin sombra
     }
 
-    if (lightHomeSpacePos.x < 0.0 || lightHomeSpacePos.x > 1.0 || 
-        lightHomeSpacePos.y < 0.0 || lightHomeSpacePos.y > 1.0) {
-        return 0.0;
+    if (lightUVSpacePos.x < 0.0 || lightUVSpacePos.x > 1.0 || 
+        lightUVSpacePos.y < 0.0 || lightUVSpacePos.y > 1.0) {
+        return 0.0; // Fuera del rango UV = sin sombra
     }
 
-
-    // Poisson distribution random points around a circle
-    let offsets = array<vec2<f32>, 12>(
-        vec2<f32>(0.0, 0.0),
-        vec2<f32>(-0.3700152, 0.575369),
-        vec2<f32>(0.5462944, 0.5835142),
-        vec2<f32>(-0.4171277, -0.2965972),
-        vec2<f32>(-0.8671125, 0.4483297),
-        vec2<f32>(0.183309, 0.1595028),
-        vec2<f32>(0.6757001, -0.4031624),
-        vec2<f32>(0.8230421, 0.1482845),
-        vec2<f32>(0.1492012, 0.9389217),
-        vec2<f32>(-0.2219742, -0.7762423),
-        vec2<f32>(-0.9708459, -0.1171268),
-        vec2<f32>(0.2790326, -0.8920202)
-    );
-
-    let scale_factor = lightShadowStepDivResolution;
-
-    // Generate random angle for Poisson disk rotation
-    let angle = hash2(wPos.x + hash2(wPos.z).x).x * 2.0 * PI;
-    let cos_a = cos(angle) * scale_factor;
-    let sin_a = sin(angle) * scale_factor;
-
-    let nsamples = 1;
-    var shadow_factor = 0.0;
-    
-    for (var i = 0; i < nsamples; i++) {
-        let coord = offsets[i];
-
-        // Rotate the sample point
-        let rotated_coord = vec2<f32>(
-            coord.x * cos_a - coord.y * sin_a,
-            coord.y * cos_a + coord.x * sin_a
-        );
-
-        let uv = lightHomeSpacePos.xy + rotated_coord;
-        shadow_factor += shadowsTap(uv, lightHomeSpacePos.z, shadowMap, shadowSampler);
-    }
-
-    shadow_factor /= f32(nsamples);
-    
-    return shadow_factor;
+    // Optimización: Solo usar una muestra central sin rotación para mejor performance
+    return shadowsTap(lightUVSpacePos.xy, lightUVSpacePos.z, shadowMap, shadowSampler);
 }
