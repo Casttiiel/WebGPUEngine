@@ -4,7 +4,7 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
-import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { Engine } from '../../core/engine/Engine';
@@ -33,23 +33,21 @@ export class AntialiasingComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.technique = await Technique.get('antialiasing.tech');
 
-    const qualitySettings = QualitySettings.getInstance();
-    const aliasingFormat = qualitySettings.getPostProcessingFormats().aliasingTexture;
+    const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
     this.result = new RenderTarget();
     this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
   }
 
   public resize(): void {
-    const qualitySettings = QualitySettings.getInstance();
-    const aliasingFormat = qualitySettings.getPostProcessingFormats().aliasingTexture;
+    const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
     this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
     this.bindGroup = null;
   }
 
   public apply(texture: GPUTextureView): GPUTextureView {
-    this.setBindGroup(texture);
+    this.createBindGroup(texture);
 
     // Use RenderPassManager to execute antialiasing pass dynamically
     this.renderPassManager.executeAntialiasingPass(
@@ -62,13 +60,10 @@ export class AntialiasingComponent extends Component {
     return this.result.getView();
   }
 
-  private setBindGroup(texture: GPUTextureView): void {
+  private createBindGroup(texture: GPUTextureView): void {
     if (this.bindGroup) return;
 
-    const sampler = GPUUtils.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
+    const sampler = SamplerLibrary.toneMappingFXAA;
 
     this.bindGroup = BindGroupFactory.createBindGroup(
       `antialiasing_bindgroup`,

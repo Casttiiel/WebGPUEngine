@@ -97,9 +97,6 @@ export class Engine {
       });
 
       // Quality Settings Buttons
-      this._debugUI.addButton('Engine', 'Minimum Quality', async () => {
-        await this.applyQualityPresetAndRestart('MINIMUM');
-      });
 
       this._debugUI.addButton('Engine', 'Low Quality', async () => {
         await this.applyQualityPresetAndRestart('LOW');

@@ -87,17 +87,17 @@ export class ModuleRender extends Module {
       }
     }
 
-    this.renderDistorsions(result);
+    this.renderDistorsions(result);*/
 
-    if (mainCamera?.hasComponent('tone_mapping')) {
-      const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
+    if (mainCameraEntity.hasComponent('tone_mapping')) {
+      const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
       result = toneMapping.apply(result);
     }
 
-    if (mainCamera?.hasComponent('antialiasing')) {
-      const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
+    if (mainCameraEntity.hasComponent('antialiasing')) {
+      const antialiasing = mainCameraEntity.getComponent('antialiasing') as AntialiasingComponent;
       result = antialiasing.apply(result);
-    }*/
+    }
 
     this.presentResult(result);
 

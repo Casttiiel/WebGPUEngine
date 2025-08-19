@@ -9,6 +9,7 @@ import { Texture } from '../../resources/Texture';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { MipmapGenerator } from '../processing/MipmapGenerator';
 import { GPUUtils } from '../utils/GPUUtils';
+import { SamplerLibrary } from '../utils/SamplerLibrary';
 
 export class Render {
   private static instance: Render;
@@ -97,6 +98,10 @@ export class Render {
       // Initialize GPUUtils with the WebGPU device
       GPUUtils.initialize(this.device);
       console.warn('GPUUtils initialized with WebGPU device');
+
+      // Initialize SamplerLibrary with reusable samplers
+      SamplerLibrary.initialize();
+      console.warn('SamplerLibrary initialized with reusable samplers');
 
       return true;
     } catch (error) {
@@ -275,6 +280,7 @@ export class Render {
       BindGroupFactory.clearCache();
       MipmapGenerator.destroyInstance();
       Texture.cleanup();
+      SamplerLibrary.destroy();
       GPUUtils.destroy();
 
       Render.instance = null as any; // Clear singleton instance

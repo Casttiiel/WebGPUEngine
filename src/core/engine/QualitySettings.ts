@@ -3,7 +3,9 @@ import { BloomQualityConfigProvider } from '../../renderer/core/config/BloomQual
 import { PostProcessingQualityConfig } from '../../renderer/core/config/PostProcessingQualityConfig';
 
 export interface GraphicsQualitySettings {
-  renderResolution: number; // 0.5 = 50%, 1.0 = 100%
+  renderResolution: number;
+  aliasingTexture: GPUTextureFormat;
+  toneMappingTexture: GPUTextureFormat;
   msaaLevel: number; // 1, 4
   ambientOcclusionQuality: 'off' | 'low' | 'medium' | 'high';
   gBufferTextureQuality: 'low' | 'medium' | 'high';
@@ -22,20 +24,10 @@ export class QualitySettings {
 
   // Predefined quality presets
   public static readonly PRESETS = {
-    MINIMUM: {
-      renderResolution: 0.5,
-      msaaLevel: 1,
-      ambientOcclusionQuality: 'off',
-      gBufferTextureQuality: 'low',
-      postProcessingQuality: 'low',
-      bloomQuality: 'off',
-      aliasingQuality: 'none',
-      cullingMode: 'cpu',
-      enableBloom: false,
-    } as GraphicsQualitySettings,
-
     LOW: {
       renderResolution: 0.75,
+      aliasingTexture: 'rgba16float', // Used
+      toneMappingTexture: 'rgba16float', // Used
       msaaLevel: 1,
       ambientOcclusionQuality: 'low',
       gBufferTextureQuality: 'low',
@@ -48,6 +40,8 @@ export class QualitySettings {
 
     MEDIUM: {
       renderResolution: 0.85,
+      aliasingTexture: 'rgba16float', // Used
+      toneMappingTexture: 'rgba16float', // Used
       msaaLevel: 4,
       ambientOcclusionQuality: 'medium',
       gBufferTextureQuality: 'medium',
@@ -60,6 +54,8 @@ export class QualitySettings {
 
     HIGH: {
       renderResolution: 1.0,
+      aliasingTexture: 'rgba16float', // Used
+      toneMappingTexture: 'rgba16float', // Used
       msaaLevel: 4,
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
@@ -71,7 +67,9 @@ export class QualitySettings {
     } as GraphicsQualitySettings,
 
     ULTRA: {
-      renderResolution: 1.0,
+      renderResolution: 1.0, // Used
+      aliasingTexture: 'rgba16float', // Used
+      toneMappingTexture: 'rgba16float', // Used
       msaaLevel: 4,
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
