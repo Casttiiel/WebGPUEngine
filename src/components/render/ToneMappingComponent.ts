@@ -53,7 +53,7 @@ export class ToneMappingComponent extends Component {
   private createBindGroup(texture: GPUTextureView): void {
     if (this.bindGroup) return;
 
-    const sampler = SamplerLibrary.toneMappingFXAA;
+    const sampler = SamplerLibrary.simpleSampler;
 
     this.bindGroup = BindGroupFactory.createBindGroup(
       `tonemapping_bindgroup`,

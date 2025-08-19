@@ -15,9 +15,8 @@ export class SamplerLibrary {
   private static _nearestRepeat: GPUSampler;
 
   // Specialized samplers for post-processing
-  private static _toneMappingFXAASampler: GPUSampler;
+  private static _simpleSampler: GPUSampler;
   private static _bloomSampler: GPUSampler;
-  private static _presentationSampler: GPUSampler;
 
   // Specialized samplers for 3D rendering
   private static _diffuseSampler: GPUSampler;
@@ -94,11 +93,11 @@ export class SamplerLibrary {
     });
 
     // Post-processing samplers
-    SamplerLibrary._toneMappingFXAASampler = GPUUtils.createSampler({
+    SamplerLibrary._simpleSampler = GPUUtils.createSampler({
       label: 'fxaa_sampler',
       magFilter: 'linear',
       minFilter: 'linear',
-      mipmapFilter: 'nearest', // FXAA doesn't use mipmaps
+      mipmapFilter: 'nearest',
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
       maxAnisotropy: 1,
@@ -109,16 +108,6 @@ export class SamplerLibrary {
       magFilter: 'linear',
       minFilter: 'linear',
       mipmapFilter: 'linear', // Bloom uses mip chain
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      maxAnisotropy: 1,
-    });
-
-    SamplerLibrary._presentationSampler = GPUUtils.createSampler({
-      label: 'presentation_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'nearest', // Final presentation doesn't use mipmaps
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
       maxAnisotropy: 1,
@@ -227,9 +216,8 @@ export class SamplerLibrary {
     SamplerLibrary._linearMirror = null as any;
     SamplerLibrary._nearestClamp = null as any;
     SamplerLibrary._nearestRepeat = null as any;
-    SamplerLibrary._toneMappingFXAASampler = null as any;
+    SamplerLibrary._simpleSampler = null as any;
     SamplerLibrary._bloomSampler = null as any;
-    SamplerLibrary._presentationSampler = null as any;
     SamplerLibrary._diffuseSampler = null as any;
     SamplerLibrary._normalMapSampler = null as any;
     SamplerLibrary._skyboxSampler = null as any;
@@ -286,14 +274,6 @@ export class SamplerLibrary {
 
   // ========== POST-PROCESSING SAMPLERS ==========
 
-  /** Optimized sampler for FXAA anti-aliasing */
-  public static get toneMappingFXAA(): GPUSampler {
-    if (!SamplerLibrary.initialized) {
-      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
-    }
-    return SamplerLibrary._toneMappingFXAASampler;
-  }
-
   /** Optimized sampler for bloom post-processing */
   public static get bloom(): GPUSampler {
     if (!SamplerLibrary.initialized) {
@@ -303,11 +283,11 @@ export class SamplerLibrary {
   }
 
   /** Optimized sampler for final presentation */
-  public static get presentation(): GPUSampler {
+  public static get simpleSampler(): GPUSampler {
     if (!SamplerLibrary.initialized) {
       throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
     }
-    return SamplerLibrary._presentationSampler;
+    return SamplerLibrary._simpleSampler;
   }
 
   // ========== 3D RENDERING SAMPLERS ==========

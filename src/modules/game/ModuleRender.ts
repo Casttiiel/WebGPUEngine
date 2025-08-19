@@ -15,6 +15,7 @@ import { BloomComponent } from '../../components/render/BloomComponent';
 import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { Camera } from '../../core/math/Camera';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -85,9 +86,9 @@ export class ModuleRender extends Module {
         // Apply quality-based bloom settings and apply bloom effect
         result = bloom.apply(result);
       }
-    }
+    }*/
 
-    this.renderDistorsions(result);*/
+    //this.renderDistorsions(result);
 
     if (mainCameraEntity.hasComponent('tone_mapping')) {
       const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
@@ -134,11 +135,8 @@ export class ModuleRender extends Module {
   private presentResult(result: GPUTextureView): void {
     const render = Render.getInstance();
     if (!this.presentationBindGroup) {
-      const sampler = GPUUtils.createSampler({
-        magFilter: 'linear',
-        minFilter: 'linear',
-      });
-      //result = this.deferred.directionalLight.shadowMap.getView();
+      const sampler = SamplerLibrary.simpleSampler;
+
       this.presentationBindGroup = BindGroupFactory.createBindGroup(
         `presentation_bindgroup`,
         this.presentationTechnique.getPipeline().getBindGroupLayout(0),
