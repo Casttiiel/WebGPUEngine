@@ -6,7 +6,7 @@
         "CameraUniforms",
         "GBufferUniforms",
         "ObjectUniforms",
-        "BufferUniform"
+        "DirectionalLightUniforms"
     ],
     "blend": "additive",
     "rs": "reverse_culling",

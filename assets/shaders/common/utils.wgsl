@@ -160,9 +160,13 @@ fn hash3(p: vec3<f32>) -> f32 {
     return fract(sin(dot(p, vec3<f32>(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 
-fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison) -> f32 {
+fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
+    if(adaptUVs){
+        lightUVSpacePos.x = lightUVSpacePos.x * 0.5 + 0.5;
+        lightUVSpacePos.y = lightUVSpacePos.y * -0.5 + 0.5;
+    }
 
     // Verificar que esté dentro del rango válido de la shadow map
     if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0) {

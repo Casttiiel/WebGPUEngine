@@ -15,7 +15,7 @@ export class DirectionalLight {
   private directionalLightBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
   private shadowDepthTexture!: GPUTexture;
-  public shadowDepthView!: GPUTextureView;
+  private shadowDepthView!: GPUTextureView;
   private shadowSampler!: GPUSampler;
   private camera!: Camera;
 
@@ -77,7 +77,7 @@ export class DirectionalLight {
     this.camera.setNearPlane(0.1);
     this.camera.setFarPlane(100.0);
     this.camera.setOrthoParams(true, 0, 20, 0, 20);
-    this.camera.lookAt([0.0, 15.0, 0.0], [-3.0, 0.0, 0.0]);
+    this.camera.lookAt([0.0, 15.0, 0.0], [-3.0, 0.0, 3.0]);
     this.camera.updateUniforms();
 
     this.updateLightUniforms();

@@ -46,6 +46,21 @@ export class PointLightComponent extends Component {
       36 * 4,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
+
+    // Create dummy shadow resources for the DIRECTIONAL_LIGHT_UNIFORMS layout
+    const dummyShadowTexture = GPUUtils.createTexture(
+      'dummy_shadow_texture_point_light',
+      1,
+      1,
+      'depth32float',
+      GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+    );
+    const dummyShadowSampler = GPUUtils.getDevice().createSampler({
+      compare: 'less',
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
+
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
       `point light uniform bind group`,
       this.technique.getPipeline().getBindGroupLayout(3)!,
@@ -53,6 +68,14 @@ export class PointLightComponent extends Component {
         {
           binding: 0,
           resource: { buffer: this.uniformBuffer },
+        },
+        {
+          binding: 1,
+          resource: dummyShadowTexture.createView(),
+        },
+        {
+          binding: 2,
+          resource: dummyShadowSampler,
         },
       ],
     );

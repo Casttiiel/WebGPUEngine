@@ -16,6 +16,8 @@ import { DepthResolver } from '../processing/DepthResolver';
 import { Render } from './Render';
 import { GBufferQualityConfig } from '../config/GBufferQualityConfig';
 import { DirectionalLight } from '../../shading/DirectionalLight';
+import { Engine } from '../../../core/engine/Engine';
+import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -251,13 +253,12 @@ export class DeferredRenderer {
   }
 
   public generateShadowMaps(): void {
-    if (!this.directionalLight) {
-      console.warn('Directional light not loaded, cannot generate shadow maps.');
-      return;
-    }
-
-    // Generate shadow map for directional light
     this.directionalLight.renderShadowMap();
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
+      const spotLightComponent = comp as SpotLightComponent;
+      if (spotLightComponent.hasShadows()) spotLightComponent.generateShadowMap();
+    }
   }
 
   public render(camera: Entity): GPUTextureView {

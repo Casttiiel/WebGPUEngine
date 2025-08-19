@@ -23,7 +23,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     // Shadow factor entre 0 (totalmente en sombra) y 1 (no ocluido)
     var shadow_factor = 1.0;
     if (use_shadows) {
-        // shadow_factor = getShadowFactor(g.worldPos); // TODO: Implement shadow mapping
+        shadow_factor = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true);
     }
     
     let worldPos = vec4<f32>(g.worldPos, 1.0);
@@ -32,19 +32,10 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
         let almostScreenPos = light.viewProjOffset * worldPos;
         let screenPos = almostScreenPos.xyz / almostScreenPos.w;
         // if out of range, shadow_factor = 0
-        if (screenPos.x < -1.0 || screenPos.x > 1.0 || screenPos.y < -1.0 || screenPos.y > 1.0) {
+        if (screenPos.x < -1.0 || screenPos.x > 1.0 || screenPos.y < -1.0 || screenPos.y > 1.0 || screenPos.z < 0.0 || screenPos.z > 1.0) {
             shadow_factor = 0.0;
         }
-    }
-    /*
-    if (fix_shadows || use_shadows) {
-        let PosLightProjection = light.viewProjOffset * worldPos;
-        let PosLightHomoSpace = PosLightProjection.xyz / PosLightProjection.w;
-        
-        let texture_color = textureSample(txProjector, samBorderColor, PosLightHomoSpace.xy);
-        shadow_factor *= texture_color.x;
-    }
-    */
+    }    
     
     // From worldPos to Light (assuming light position is at origin for now)
     let light_dir_full = light.position.xyz - g.worldPos;
@@ -90,6 +81,8 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
 @group(1) @binding(5) var samplerGBuffer: sampler;
 
 @group(3) @binding(0) var<uniform> light: LightUniforms;
+@group(3) @binding(1) var gShadowMap: texture_depth_2d;
+@group(3) @binding(2) var gShadowSampler: sampler_comparison;
 
 @fragment
 fn PS_point_lights(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
@@ -101,4 +94,10 @@ fn PS_point_lights(@builtin(position) position: vec4<f32>) -> @location(0) vec4<
 fn PS_dir_lights_no_shadow(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = position.xy / camera.screenSize;
     return shade(pos, false, true);
+}
+
+@fragment
+fn PS_dir_lights_shadow(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
+    let pos = position.xy / camera.screenSize;
+    return shade(pos, true, true);
 }

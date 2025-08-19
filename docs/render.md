@@ -568,3 +568,280 @@ This architecture provides:
 - **Maintainability**: Clear separation of concerns and responsibilities
 
 The system is designed to handle complex 3D scenes efficiently while maintaining high visual fidelity and providing the flexibility needed for modern real-time rendering applications.
+
+---
+
+## Directional Light Shadow System
+
+The WebGPU Engine implements a robust directional light shadow mapping system that provides high-quality shadows with excellent performance characteristics. This system uses orthographic projection for directional lights and includes sophisticated coordinate transformation and filtering techniques.
+
+### System Architecture
+
+#### **DirectionalLight Class**
+
+The `DirectionalLight` class manages the complete shadow mapping pipeline:
+
+```typescript
+export class DirectionalLight {
+  private camera!: Camera; // Orthographic shadow camera
+  private shadowDepthTexture!: GPUTexture; // 2048x2048 depth texture
+  private shadowDepthView!: GPUTextureView; // Depth-only view
+  private shadowSampler!: GPUSampler; // Comparison sampler
+  private uniformBuffer!: GPUBuffer; // Light uniforms + shadow matrix
+}
+```
+
+### Shadow Camera Configuration
+
+#### **Critical Setup Requirements**
+
+The shadow camera configuration requires precise parameter setup to avoid matrix calculation issues:
+
+```typescript
+// CRITICAL: Correct orthographic parameter setup
+// setOrthoParams(centered, left, WIDTH, top, HEIGHT)
+this.camera.setOrthoParams(true, 0, 20, 0, 20); // Creates [-10,10] x [-10,10] bounds
+
+// CRITICAL: Use non-degenerate up vector when looking straight down
+this.camera.lookAt([0.0, 25.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+
+// CRITICAL: Update matrices AFTER all parameter configuration
+this.camera.updateUniforms();
+```
+
+#### **Common Configuration Pitfalls**
+
+**❌ Incorrect orthographic bounds:**
+
+```typescript
+// WRONG: This creates bounds [-10, 0] x [-20, -10] instead of [-10, 10] x [-10, 10]
+this.camera.setOrthoParams(true, -10, 10, -10, 10);
+```
+
+**❌ Degenerate up vector:**
+
+```typescript
+// WRONG: Creates degenerate View matrix when looking straight down
+this.camera.lookAt([0, 25, 0], [0, 0, 0], [0, 1, 0]); // up parallel to front
+```
+
+**❌ Missing matrix update:**
+
+```typescript
+// WRONG: ViewProjection matrix remains uninitialized
+this.camera.lookAt(...);
+// Missing: this.camera.updateUniforms();
+```
+
+### Shadow Matrix Transformations
+
+#### **Coordinate Space Pipeline**
+
+The shadow system transforms coordinates through multiple spaces:
+
+```
+World Space → Light View Space → Light Clip Space → Light UV Space → Shadow Map
+```
+
+#### **UV Transform Matrix**
+
+Critical Y-axis inversion fix for proper shadow coordinate mapping:
+
+```typescript
+// CRITICAL: Y-axis must be negative to fix shadow inversion
+mat4.scale(mtx_scale, mat4.create(), [0.5, -0.5, 1.0]); // Note: -0.5 for Y
+mat4.translate(mtx_translation, mat4.create(), [0.5, 0.5, 0.0]);
+
+// Correct transformation order: Translation * Scale
+mat4.multiply(mtx_offset, mtx_translation, mtx_scale);
+
+// Final matrix: UV_Transform * ViewProjection
+mat4.multiply(lightViewProjOffset, mtx_offset, this.camera.getViewProjection());
+```
+
+#### **Light Direction Calculation**
+
+```typescript
+// CRITICAL: Light direction must be TOWARDS the light source
+const cameraDirection = this.camera.getFront(); // [0, -1, 0] looking down
+const lightDirection = vec3.fromValues(
+  -cameraDirection[0], // Invert camera direction
+  -cameraDirection[1], // Results in [0, 1, 0] - light from above
+  -cameraDirection[2],
+);
+```
+
+### GPU Resources and Sampling
+
+#### **Shadow Texture Configuration**
+
+```typescript
+// High-resolution depth texture for quality shadows
+this.shadowDepthTexture = GPUUtils.createTexture(
+  'directional_light_shadow_depth_map',
+  2048,
+  2048, // High resolution for detailed shadows
+  'depth32float',
+  GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+);
+
+// Comparison sampler with proper clamping
+this.shadowSampler = device.createSampler({
+  magFilter: 'linear',
+  minFilter: 'linear',
+  addressModeU: 'clamp-to-edge', // Prevents texture wrapping artifacts
+  addressModeV: 'clamp-to-edge',
+  compare: 'less', // Depth comparison for shadow testing
+});
+```
+
+### WGSL Shadow Sampling
+
+#### **Optimized Shadow Factor Calculation**
+
+The shadow sampling in WGSL is optimized for performance while maintaining quality:
+
+```wgsl
+fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>,
+                   lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d,
+                   shadowSampler: sampler_comparison) -> f32 {
+
+    // Transform world position to light clip space
+    let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
+    var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
+
+    // Early rejection for out-of-bounds coordinates
+    if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0 ||
+        lightUVSpacePos.x < 0.0 || lightUVSpacePos.x > 1.0 ||
+        lightUVSpacePos.y < 0.0 || lightUVSpacePos.y > 1.0) {
+        return 0.0; // Outside shadow map = no shadow
+    }
+
+    // Single sample for optimal performance
+    return shadowsTap(lightUVSpacePos.xy, lightUVSpacePos.z, shadowMap, shadowSampler);
+}
+```
+
+#### **Optimized Shadow Tap Function**
+
+```wgsl
+fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, shadowMap: texture_depth_2d,
+              shadowSampler: sampler_comparison) -> f32 {
+
+    // GPU-friendly coordinate clamping (avoids branching)
+    let clamped_coord = clamp(homo_coord, vec2<f32>(0.0), vec2<f32>(1.0));
+
+    // Depth bias prevents shadow acne
+    let biased_depth = coord_z - 0.0005;
+
+    return textureSampleCompareLevel(shadowMap, shadowSampler, clamped_coord, biased_depth);
+}
+```
+
+### Performance Optimization Strategies
+
+#### **Rendering Pipeline Integration**
+
+```typescript
+public renderShadowMap(): void {
+  // 1. Configure shadow camera as active camera
+  RenderManager.getInstance().setCamera(this.camera);
+
+  // 2. Render only shadow-casting objects
+  RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
+}
+
+public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+  // 3. Apply shadows during lighting pass
+  pass.setBindGroup(2, this.directionalLightBindGroup);  // Shadow resources
+}
+```
+
+#### **Performance vs Quality Trade-offs**
+
+**Current Implementation (Optimized for Performance):**
+
+- ✅ **Single sample**: One depth comparison per fragment
+- ✅ **No PCF filtering**: Eliminates multiple texture lookups
+- ✅ **Clamp instead of branch**: GPU-friendly coordinate handling
+- ✅ **Early rejection**: Fast out-of-bounds testing
+
+**Alternative High-Quality Options (Higher Cost):**
+
+- **PCF (Percentage-Closer Filtering)**: 4-16 samples with Poisson disk
+- **PCSS (Percentage-Closer Soft Shadows)**: Variable filter size
+- **CSM (Cascaded Shadow Maps)**: Multiple resolution levels
+
+### Debugging and Troubleshooting
+
+#### **Common Shadow Issues and Solutions**
+
+**Problem: Shadows completely missing**
+
+```typescript
+// Solution: Verify ViewProjection matrix is properly calculated
+console.log('ViewProjection matrix:', camera.getViewProjection());
+// Should show non-zero values, not mostly zeros
+```
+
+**Problem: Shadows inverted (appearing on wrong side)**
+
+```typescript
+// Solution: Ensure Y-scale is negative and light direction is inverted
+mat4.scale(mtx_scale, mat4.create(), [0.5, -0.5, 1.0]); // -0.5 for Y
+const lightDirection = vec3.negate(vec3.create(), cameraDirection);
+```
+
+**Problem: Repeating patterns/artifacts**
+
+```typescript
+// Solution: Use clamp-to-edge addressing and avoid complex filtering
+addressModeU: 'clamp-to-edge',
+addressModeV: 'clamp-to-edge',
+```
+
+**Problem: Shadow acne (self-shadowing artifacts)**
+
+```wgsl
+// Solution: Apply appropriate depth bias
+let biased_depth = coord_z - 0.0005;  // Adjust bias as needed
+```
+
+#### **Matrix Debugging Techniques**
+
+```typescript
+// Debug orthographic projection setup
+console.log('Ortho params:', {
+  isOrtho: camera.isOrthographic(),
+  width: camera.getOrthoWidth(),
+  height: camera.getOrthoHeight(),
+  near: camera.getNear(),
+  far: camera.getFar(),
+});
+
+// Debug matrix components
+const proj = camera.getProjection();
+const view = camera.getView();
+const viewProj = camera.getViewProjection();
+
+console.log('Projection diagonal:', [proj[0], proj[5], proj[10], proj[15]]);
+console.log('View translation:', [view[12], view[13], view[14]]);
+```
+
+### Best Practices
+
+#### **Shadow Quality Guidelines**
+
+1. **Resolution**: Use 2048x2048 for good quality/performance balance
+2. **Camera Bounds**: Size orthographic bounds to tightly fit scene
+3. **Depth Range**: Use appropriate near/far planes (0.1 to 100.0)
+4. **Bias Values**: Start with 0.0005 and adjust based on scene scale
+
+#### **Performance Guidelines**
+
+1. **Single Sample**: Use one sample per fragment for best performance
+2. **Early Rejection**: Test bounds before expensive operations
+3. **Clamp Coordinates**: Prefer clamp() over branching
+4. **Minimize State Changes**: Cache bind groups and samplers
+
+This shadow system provides an excellent foundation for directional lighting in real-time applications, balancing visual quality with rendering performance through careful optimization and proper coordinate space handling.
