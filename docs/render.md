@@ -40,7 +40,6 @@ export class ModuleRender extends Module {
   public async start(): Promise<boolean> {
     await this.deferred.load();
     this.onResolutionUpdated();
-    await this.initializePresentationData();
 
     // Initialize GPU Frustum Culling
     await RenderManager.getInstance().initialize();

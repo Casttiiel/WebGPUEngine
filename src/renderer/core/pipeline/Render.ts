@@ -1,8 +1,3 @@
-import { AmbientOcclusionComponent } from '../../../components/render/AmbientOcclusionComponent';
-import { AntialiasingComponent } from '../../../components/render/AntialiasingComponent';
-import { BloomComponent } from '../../../components/render/BloomComponent';
-import { CameraComponent } from '../../../components/render/CameraComponent';
-import { ToneMappingComponent } from '../../../components/render/ToneMappingComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
 import { Texture } from '../../resources/Texture';
@@ -177,33 +172,6 @@ export class Render {
   private resizeAndNotify(width: number, height: number): void {
     this.device.queue.onSubmittedWorkDone().then(() => {
       this.resizeBackBuffer(width, height);
-
-      const [w, h] = [Render.renderWidth, Render.renderHeight];
-
-      // Usa Render.getSize() en todos los componentes:
-      const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-      const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
-      if (cameraComponent) {
-        cameraComponent.getCamera().setViewport(w, h);
-      }
-
-      for (const comp of Engine.getEntities().getObjectManagerByName('tone_mapping')?.getList() ??
-        []) {
-        (comp as ToneMappingComponent).resize();
-      }
-      for (const comp of Engine.getEntities().getObjectManagerByName('antialiasing')?.getList() ??
-        []) {
-        (comp as AntialiasingComponent).resize();
-      }
-      for (const comp of Engine.getEntities()
-        .getObjectManagerByName('ambient_occlusion')
-        ?.getList() ?? []) {
-        (comp as AmbientOcclusionComponent).resize();
-      }
-
-      for (const comp of Engine.getEntities().getObjectManagerByName('bloom')?.getList() ?? []) {
-        (comp as BloomComponent).resize();
-      }
 
       Engine.getRender().onResolutionUpdated();
     });

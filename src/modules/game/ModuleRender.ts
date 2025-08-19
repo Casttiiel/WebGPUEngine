@@ -44,7 +44,8 @@ export class ModuleRender extends Module {
   public async start(): Promise<boolean> {
     await this.deferred.load();
     this.onResolutionUpdated();
-    await this.initializePresentationData();
+    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.presentationTechnique = await Technique.get('presentation.tech');
 
     // Initialize GPU Frustum Culling
     await RenderManager.getInstance().initialize();
@@ -53,6 +54,34 @@ export class ModuleRender extends Module {
   }
 
   public onResolutionUpdated(): void {
+    const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
+    if (!mainCameraEntity) {
+      console.warn('No main camera found');
+      return;
+    }
+    const cameraComponent = mainCameraEntity.getComponent('camera') as CameraComponent;
+    if (cameraComponent) {
+      cameraComponent.getCamera().setViewport(Render.width, Render.height);
+    }
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('tone_mapping')?.getList() ??
+      []) {
+      (comp as ToneMappingComponent).resize();
+    }
+    for (const comp of Engine.getEntities().getObjectManagerByName('antialiasing')?.getList() ??
+      []) {
+      (comp as AntialiasingComponent).resize();
+    }
+    for (const comp of Engine.getEntities()
+      .getObjectManagerByName('ambient_occlusion')
+      ?.getList() ?? []) {
+      (comp as AmbientOcclusionComponent).resize();
+    }
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('bloom')?.getList() ?? []) {
+      (comp as BloomComponent).resize();
+    }
+
     this.deferred.create(Render.width, Render.height);
     this.presentationBindGroup = null;
   }
@@ -308,12 +337,6 @@ export class ModuleRender extends Module {
 
   public renderDebug(): void {
     throw new Error('Method not implemented.');
-  }
-
-  private async initializePresentationData(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
-
-    this.presentationTechnique = await Technique.get('presentation.tech');
   }
 
   public getMainCameraBindGroup(): GPUBindGroup {
