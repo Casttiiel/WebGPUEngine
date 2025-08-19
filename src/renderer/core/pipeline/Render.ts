@@ -13,6 +13,10 @@ import { GPUUtils } from '../utils/GPUUtils';
 export class Render {
   private static instance: Render;
 
+  // Performance optimization: Maximum 2K render resolution
+  private static readonly MAX_RENDER_WIDTH = 2048;
+  private static readonly MAX_RENDER_HEIGHT = 1152; // 16:9 aspect ratio for 2K
+
   // Objetos principales de WebGPU
   private adapter!: GPUAdapter;
   private device!: GPUDevice;
@@ -106,12 +110,10 @@ export class Render {
     const qualitySettings = QualitySettings.getInstance();
     const renderRes = qualitySettings.getRenderResolution();
 
-    Render.renderWidth = Math.floor(Render.canvasWidth * renderRes);
-    Render.renderHeight = Math.floor(Render.canvasHeight * renderRes);
-
-    /*console.warn(
-      `Render resolution updated: ${Render.renderWidth}x${Render.renderHeight} (${(renderRes * 100).toFixed(0)}% of ${Render.canvasWidth}x${Render.canvasHeight})`,
-    );*/
+    Render.renderWidth =
+      Math.max(0, Math.min(Render.canvasWidth, Render.MAX_RENDER_WIDTH)) * renderRes;
+    Render.renderHeight =
+      Math.max(0, Math.min(Render.canvasHeight, Render.MAX_RENDER_HEIGHT)) * renderRes;
   }
 
   // Ajustar el tamaño del buffer de render

@@ -17,7 +17,7 @@ export interface GraphicsQualitySettings {
 
 export class QualitySettings {
   private static instance: QualitySettings | null = null;
-  private settings: GraphicsQualitySettings;
+  private settings: GraphicsQualitySettings | undefined;
   private currentPreset: keyof typeof QualitySettings.PRESETS = 'ULTRA';
 
   // Predefined quality presets
