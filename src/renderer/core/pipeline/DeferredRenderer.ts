@@ -1,4 +1,5 @@
 import { AmbientOcclusionComponent } from '../../../components/render/AmbientOcclusionComponent';
+import { ScreenSpaceReflections } from '../ScreenSpaceReflections';
 import { Entity } from '../../../core/ecs/Entity';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
@@ -27,7 +28,11 @@ export class DeferredRenderer {
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
+  private ssr!: ScreenSpaceReflections;
+  private ssrComposeTechnique!: Technique;
+  private fullscreenQuadMesh!: Mesh;
   private rtAccLight!: RenderTarget;
+  private rtFinalComposite!: RenderTarget;
   private rtAO!: RenderTarget;
   private rtAOBinding!: RenderTarget; // Copy target for binding
   private rtCopyAlbedos!: RenderTarget;
@@ -76,6 +81,17 @@ export class DeferredRenderer {
       height,
       postProcessingFormats.toneMappingTexture,
     );
+
+    if (!this.rtFinalComposite) {
+      this.rtFinalComposite = new RenderTarget();
+    }
+    this.rtFinalComposite.createRT(
+      'final_composite.dds',
+      width,
+      height,
+      postProcessingFormats.toneMappingTexture,
+    );
+
     if (!this.rtAO) {
       this.rtAO = new RenderTarget();
     }
@@ -239,6 +255,12 @@ export class DeferredRenderer {
     this.depthResolver = new DepthResolver();
     await this.depthResolver.load();
 
+    this.ssr = new ScreenSpaceReflections();
+    await this.ssr.load();
+
+    this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
+    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();
 
@@ -285,12 +307,13 @@ export class DeferredRenderer {
 
     this.renderAccLight();
 
-    // Execute transparent pass
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
-    const view = this.rtAccLight.getView();
+    const finalResult = this.renderSSR();
+
+    const view = finalResult;
     if (!view) {
-      throw new Error('Failed to get albedo render target view');
+      throw new Error('Failed to get final render target view');
     }
     return view;
   }
@@ -341,6 +364,111 @@ export class DeferredRenderer {
     this.copyAOTextureToBinding();
   }
 
+  private renderSSR(): GPUTextureView {
+    // Create a special bind group for SSR that has the lit scene in binding 0
+    const ssrGBufferBindGroup = this.createSSRGBufferBindGroup();
+    const ssrResult = this.ssr.apply(this.rtAccLight.getView(), ssrGBufferBindGroup);
+
+    // Compose SSR result with the scene using additive blending
+    this.composeSSRWithScene(ssrResult);
+
+    return this.rtFinalComposite.getView();
+  }
+
+  private composeSSRWithScene(ssrTexture: GPUTextureView): void {
+    const commandEncoder = Render.getInstance().getCommandEncoder();
+
+    // Create render pass that composes SSR with the lit scene
+    const renderPassDescriptor: GPURenderPassDescriptor = {
+      label: 'SSR Composition Pass',
+      colorAttachments: [
+        {
+          view: this.rtFinalComposite.getRenderView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+    };
+
+    const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
+
+    // Set pipeline for composition
+    this.ssrComposeTechnique.activatePipeline(renderPass);
+
+    // Create bind groups for scene and SSR textures
+    const sceneBindGroup = BindGroupFactory.createBindGroup(
+      'ssr_scene_bindgroup',
+      this.ssrComposeTechnique.getPipeline().getBindGroupLayout(0)!,
+      [
+        {
+          binding: 0,
+          resource: this.rtAccLight.getView()!,
+        },
+        {
+          binding: 1,
+          resource: this.whiteTexture.getSampler()!,
+        },
+      ],
+    );
+
+    const ssrBindGroup = BindGroupFactory.createBindGroup(
+      'ssr_reflection_bindgroup',
+      this.ssrComposeTechnique.getPipeline().getBindGroupLayout(1)!,
+      [
+        {
+          binding: 0,
+          resource: ssrTexture,
+        },
+        {
+          binding: 1,
+          resource: this.whiteTexture.getSampler()!,
+        },
+      ],
+    );
+
+    // Bind resources and render fullscreen quad
+    renderPass.setBindGroup(0, sceneBindGroup);
+    renderPass.setBindGroup(1, ssrBindGroup);
+
+    this.fullscreenQuadMesh.activate(renderPass);
+    this.fullscreenQuadMesh.renderGroup(renderPass);
+
+    renderPass.end();
+  }
+
+  private createSSRGBufferBindGroup(): GPUBindGroup {
+    const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
+
+    // Create bind group with lit scene in binding 0 (where albedo usually is)
+    return BindGroupFactory.createBindGroup('ssr_gbuffer_bindgroup', this.gBufferLayout, [
+      {
+        binding: 0,
+        resource: this.rtAccLight.getView()!, // Lit scene instead of albedo
+      },
+      {
+        binding: 1,
+        resource: gBufferRenderTargets.normals.getView()!,
+      },
+      {
+        binding: 2,
+        resource: gBufferRenderTargets.linearDepth.getView()!,
+      },
+      {
+        binding: 3,
+        resource: gBufferRenderTargets.selfIllum.getView()!,
+      },
+      {
+        binding: 4,
+        resource: this.rtAOBinding.getView()!,
+      },
+      {
+        binding: 5,
+        resource: this.whiteTexture.getSampler()!,
+      },
+    ]);
+  }
+
   private renderAccLight(): void {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
@@ -377,7 +505,9 @@ export class DeferredRenderer {
     if (this.rtAccLight) {
       this.rtAccLight.destroy();
     }
-
+    if (this.rtFinalComposite) {
+      this.rtFinalComposite.destroy();
+    }
     if (this.rtAO) {
       this.rtAO.destroy();
     }
