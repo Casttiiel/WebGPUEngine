@@ -18,7 +18,6 @@ export class RenderManagerV2 {
 
   // State
   private camera: Camera | null = null;
-  private culledKeys: RenderKey[] = [];
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
 
   private constructor() {
@@ -62,12 +61,14 @@ export class RenderManagerV2 {
     this.keyManager.removeKeys(owner);
   }
 
-  public performPreRenderCulling(): void {
-    if (!this.camera) return;
+  public performCulling(camera: Camera, category?: RenderCategory): void {
+    let keysToCull = this.keyManager.getAllKeys();
+    if (category) {
+      keysToCull = keysToCull.filter((key) => key.material.getCategory() === category);
+    }
 
-    const allKeys = this.keyManager.getAllKeys();
-
-    this.culledKeys = this.cpuCuller!.performCulling(allKeys, this.camera);
+    const culledKeys = this.cpuCuller!.performCulling(keysToCull, camera);
+    camera.setCulledKeys(culledKeys);
   }
 
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
@@ -77,10 +78,7 @@ export class RenderManagerV2 {
     this.stateManager.reset();
 
     // Filter culled keys by category
-    let keys = this.culledKeys;
-    if (category === RenderCategory.SHADOWS) {
-      keys = this.getAllKeys();
-    }
+    let keys = this.camera.getCulledKeys();
     const keysToDraw = keys.filter((key) => key.material.getCategory() === category);
 
     // Sort keys for optimal rendering
@@ -97,10 +95,6 @@ export class RenderManagerV2 {
 
   public getAllKeys(): RenderKey[] {
     return this.keyManager.getAllKeys();
-  }
-
-  public getCulledKeys(): RenderKey[] {
-    return this.culledKeys;
   }
 
   private renderKeys(keys: RenderKey[], pass: GPURenderPassEncoder): number {
@@ -168,7 +162,6 @@ export class RenderManagerV2 {
     this.stateManager.clear();
 
     this.camera = null;
-    this.culledKeys = [];
     this.drawCallsPerCategory.clear();
 
     RenderManagerV2.instance = null;

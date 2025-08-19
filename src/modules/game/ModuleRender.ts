@@ -12,7 +12,6 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
-import { QualitySettings } from '../../core/engine/QualitySettings';
 import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { Camera } from '../../core/math/Camera';
@@ -58,28 +57,26 @@ export class ModuleRender extends Module {
   }
 
   public generateFrame(): void {
-    Render.getInstance().beginFrame();
-
-    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
-    const camera = cameraComponent.getCamera();
-
-    //Generate shadow maps if needed
-    this.generateShadowMaps();
-
-    // Actualizar buffer uniforme global solo con view y projection
-    RenderManager.getInstance().setCamera(camera);
-
-    if (!mainCamera) {
+    const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
+    if (!mainCameraEntity) {
       console.warn('No main camera found');
       return;
     }
+    const cameraComponent = mainCameraEntity.getComponent('camera') as CameraComponent;
+    const camera = cameraComponent.getCamera();
+
+    Render.getInstance().beginFrame();
+
+    this.generateShadowMaps();
+    RenderManager.getInstance().performCulling(camera);
+
+    RenderManager.getInstance().setCamera(camera);
 
     this.mainCamera = camera;
 
-    let result = this.deferred.render(mainCamera);
+    let result = this.deferred.render(mainCameraEntity);
 
-    if (mainCamera?.hasComponent('bloom')) {
+    /*if (mainCamera?.hasComponent('bloom')) {
       const bloom = mainCamera.getComponent('bloom') as BloomComponent;
       const qualitySettings = QualitySettings.getInstance();
       const bloomConfig = qualitySettings.getBloomConfig();
@@ -100,7 +97,7 @@ export class ModuleRender extends Module {
     if (mainCamera?.hasComponent('antialiasing')) {
       const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
       result = antialiasing.apply(result);
-    }
+    }*/
 
     this.presentResult(result);
 

@@ -2,6 +2,7 @@ import { mat4, vec3, vec4 } from 'gl-matrix';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { RenderKey } from '../../renderer/core/managers/RenderKeyManager';
 
 export class Camera {
   private view: mat4 = mat4.create();
@@ -29,7 +30,9 @@ export class Camera {
   private orthoWidth: number = 1.0;
   private orthoHeight: number = 1.0;
   private orthoCentered: boolean = false;
+
   private isDirty: boolean = true;
+  private culledKeys: RenderKey[] = [];
 
   // Viewport
   private viewport = {
@@ -376,16 +379,15 @@ export class Camera {
     return this.isOrtho;
   }
 
-  public switchToOrthographic(
-    width: number = 20,
-    height: number = 20,
-    centered: boolean = true,
-  ): void {
-    this.setOrthoParams(centered, 0, width, 0, height);
+  public setCulledKeys(keys: RenderKey[]): void {
+    this.culledKeys = keys;
   }
 
-  public switchToPerspective(fov: number = 60, near: number = 0.1, far: number = 1000): void {
-    this.isOrtho = false;
-    this.setProjectionParams(fov, near, far);
+  public getCulledKeys(): RenderKey[] {
+    return this.culledKeys;
+  }
+
+  public getIsDirty(): boolean {
+    return this.isDirty;
   }
 }

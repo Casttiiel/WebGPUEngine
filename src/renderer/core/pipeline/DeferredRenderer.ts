@@ -3,7 +3,6 @@ import { ScreenSpaceReflections } from '../ScreenSpaceReflections';
 import { Entity } from '../../../core/ecs/Entity';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
-import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
 import { Mesh } from '../../resources/Mesh';
 import { RenderTarget } from '../../resources/RenderTarget';
 import { Technique } from '../../resources/Technique';
@@ -284,15 +283,12 @@ export class DeferredRenderer {
   }
 
   public render(camera: Entity): GPUTextureView {
-    // Pre-render GPU culling - do this BEFORE starting render passes
-    RenderManager.getInstance().performPreRenderCulling();
-
     // Execute G-Buffer pass using new render pass system
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
     // Execute Decal pass
     this.copyGBufferTexturesToBindGroup();
-    this.renderPassManager.executePass('decals', RenderCategory.DECALS);
+    //this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
     // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
@@ -307,11 +303,11 @@ export class DeferredRenderer {
 
     this.renderAccLight();
 
-    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    //this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
-    const finalResult = this.renderSSR();
+    //const finalResult = this.renderSSR();
 
-    const view = finalResult;
+    const view = this.rtAccLight.getView();
     if (!view) {
       throw new Error('Failed to get final render target view');
     }
@@ -473,12 +469,12 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
-    this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    /*this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
+    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);*/
   }
 
   private copyAOTextureToBinding(): void {
