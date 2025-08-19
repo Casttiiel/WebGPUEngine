@@ -67,7 +67,7 @@ export class ModuleRender extends Module {
 
     Render.getInstance().beginFrame();
 
-    this.generateShadowMaps();
+    this.deferred.generateShadowMaps();
     RenderManager.getInstance().performCulling(camera);
 
     RenderManager.getInstance().setCamera(camera);
@@ -102,10 +102,6 @@ export class ModuleRender extends Module {
     this.presentResult(result);
 
     Render.getInstance().endFrame();
-  }
-
-  public generateShadowMaps(): void {
-    this.deferred.generateShadowMaps();
   }
 
   public renderDistorsions(texture: GPUTextureView): void {

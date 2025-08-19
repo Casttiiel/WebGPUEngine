@@ -150,7 +150,7 @@ export class DirectionalLight {
   public renderShadowMap(): void {
     if (!this.camera.getIsDirty()) return;
 
-    RenderManager.getInstance().performCulling(this.camera);
+    RenderManager.getInstance().performCulling(this.camera, RenderCategory.SHADOWS);
     const render = Render.getInstance();
 
     // Solo renderizar a la textura de profundidad (sin color attachment)
