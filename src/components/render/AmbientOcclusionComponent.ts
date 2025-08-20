@@ -88,7 +88,7 @@ export class AmbientOcclusionComponent extends Component {
 
     this.ssaoParamsBindGroup = BindGroupFactory.createBindGroup(
       'ssao_params_bindgroup',
-      BindGroupFactory.getHBAOUniformsLayout(),
+      this.aoTechnique.getBindGroupLayout(2)!,
       [
         {
           binding: 0,

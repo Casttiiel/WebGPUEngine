@@ -163,11 +163,23 @@ export class BindGroupFactory {
     ]);
   }
 
-  /**
-   * Creates a single texture bind group layout
-   */
   public static getSingleTextureLayout(): GPUBindGroupLayout {
     return this.getLayout('single_texture', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
+  public static getSkyboxUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('skybox uniforms layout', [
       {
         binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
@@ -203,11 +215,8 @@ export class BindGroupFactory {
     ]);
   }
 
-  /**
-   * Creates a cubemap with BRDF LUT bind group layout
-   */
-  public static getCubemapWithBRDFLayout(): GPUBindGroupLayout {
-    return this.getLayout('cubemap_with_brdf', [
+  public static getAmbientUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('ambient uniforms layout', [
       {
         binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
@@ -220,27 +229,8 @@ export class BindGroupFactory {
       },
       {
         binding: 2,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          viewDimension: '2d',
-          sampleType: 'float',
-          multisampled: false,
-        },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
-      },
-      {
-        binding: 4,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: 'float' },
-      },
-      {
-        binding: 5,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
       },
     ]);
   }
@@ -305,8 +295,8 @@ export class BindGroupFactory {
     ]);
   }
 
-  public static getHBAOUniformsLayout(): GPUBindGroupLayout {
-    return this.getLayout('sampler', [
+  public static getAOUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('AO uniforms layout', [
       {
         binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
@@ -391,10 +381,12 @@ export class BindGroupFactory {
         return this.getMaterialTexturesLayout();
       case PipelineBindGroupLayouts.SINGLE_TEXTURE:
         return this.getSingleTextureLayout();
+      case PipelineBindGroupLayouts.SKYBOX_UNIFORMS:
+        return this.getSkyboxUniformsLayout();
       case PipelineBindGroupLayouts.CUBEMAP_TEXTURE:
         return this.getCubemapTextureLayout();
-      case PipelineBindGroupLayouts.CUBEMAP_WITH_BRDF:
-        return this.getCubemapWithBRDFLayout();
+      case PipelineBindGroupLayouts.AMBIENT_UNIFORMS:
+        return this.getAmbientUniformsLayout();
       case PipelineBindGroupLayouts.GBUFFER_UNIFORMS:
         return this.getGBufferLayout();
       case PipelineBindGroupLayouts.BUFFER_UNIFORM:
@@ -403,8 +395,8 @@ export class BindGroupFactory {
         return this.getDepthTextureLayout();
       case PipelineBindGroupLayouts.FOUR_TEXTURE:
         return this.getFourTextureLayout();
-      case PipelineBindGroupLayouts.HBAO_UNIFORMS:
-        return this.getHBAOUniformsLayout();
+      case PipelineBindGroupLayouts.AO_UNIFORMS:
+        return this.getAOUniformsLayout();
       case PipelineBindGroupLayouts.DIRECTIONAL_LIGHT_UNIFORMS:
         return this.getDirectionalLightUniformsLayout();
       default:

@@ -280,11 +280,11 @@ export class DeferredRenderer {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     }
 
-    //this.renderAO(camera, this.rtAO);
+    this.renderAO(camera, this.rtAO);
 
     this.renderAccLight();
 
-    //this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     //const finalResult = this.renderSSR();
 
@@ -450,12 +450,12 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
-    /*this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);*/
+    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
 
   private copyAOTextureToBinding(): void {

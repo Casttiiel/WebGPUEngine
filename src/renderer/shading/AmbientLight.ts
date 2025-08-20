@@ -5,19 +5,14 @@ import { Technique } from '../resources/Technique';
 import { Texture } from '../resources/Texture';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
-import { HDRTexture } from '../resources/HDRTexture';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
-  private environmentTexture!: HDRTexture;
-  private irradianceTexture!: HDRTexture;
-  private brdfLUTTexture!: Texture;
-  private brdfLUTSampler!: GPUSampler;
+  private whiteTexture!: Texture;
 
   private ambientTechnique!: Technique;
-  private environmentBindGroup!: GPUBindGroup;
-  private uniformBindGroup!: GPUBindGroup;
+  private ambientBindGroup!: GPUBindGroup;
   private ambientUniformBuffer!: GPUBuffer;
 
   private reflectionIntensity = 1.0;
@@ -29,58 +24,12 @@ export class AmbientLight {
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
-    this.environmentTexture = await HDRTexture.get('empty_workshop_1k.hdr');
-    this.irradianceTexture = await HDRTexture.get('empty_workshop_1k.hdr');
-    this.brdfLUTTexture = await Texture.get('brdfLUT.png');
-
-    this.brdfLUTSampler = SamplerLibrary.bloom;
-
-    this.environmentBindGroup = BindGroupFactory.createBindGroup(
-      'environment_with_brdf_bindgroup',
-      this.ambientTechnique.getPipeline().getBindGroupLayout(2),
-      [
-        {
-          binding: 0,
-          resource: this.environmentTexture.getTextureView()!,
-        },
-        {
-          binding: 1,
-          resource: this.environmentTexture.getSampler()!,
-        },
-        {
-          binding: 2,
-          resource: this.brdfLUTTexture.getTextureView()!,
-        },
-        {
-          binding: 3,
-          resource: this.brdfLUTSampler,
-        },
-        {
-          binding: 4,
-          resource: this.irradianceTexture.getTextureView()!,
-        },
-        {
-          binding: 5,
-          resource: this.irradianceTexture.getSampler()!,
-        },
-      ],
-    );
+    this.whiteTexture = await Texture.get('white.png');
 
     this.ambientUniformBuffer = GPUUtils.createBuffer(
       'ambient uniform buffer',
       16,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
-
-    this.uniformBindGroup = BindGroupFactory.createBindGroup(
-      'ambient light uniform bind group',
-      this.ambientTechnique.getPipeline().getBindGroupLayout(3),
-      [
-        {
-          binding: 0,
-          resource: { buffer: this.ambientUniformBuffer },
-        },
-      ],
     );
 
     GPUUtils.writeBuffer(
@@ -92,6 +41,25 @@ export class AmbientLight {
         this.globalAmbientBoost,
         0.0,
       ]),
+    );
+
+    this.ambientBindGroup = BindGroupFactory.createBindGroup(
+      'ambient_bindgroup',
+      this.ambientTechnique.getPipeline().getBindGroupLayout(2),
+      [
+        {
+          binding: 0,
+          resource: this.whiteTexture.getTextureView()!,
+        },
+        {
+          binding: 1,
+          resource: SamplerLibrary.simpleSampler!,
+        },
+        {
+          binding: 2,
+          resource: { buffer: this.ambientUniformBuffer },
+        },
+      ],
     );
   }
 
@@ -122,10 +90,9 @@ export class AmbientLight {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Set bind groups
-    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, gBufferBindGroup); // GBuffer textures
-    pass.setBindGroup(2, this.environmentBindGroup); // Environment texture
-    pass.setBindGroup(3, this.uniformBindGroup); // ambient parameters
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, gBufferBindGroup);
+    pass.setBindGroup(2, this.ambientBindGroup);
 
     // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);

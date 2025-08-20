@@ -166,8 +166,8 @@ export class GLTFLoader {
             fs: materialDef.alphaMode === 'MASK' ? 'gbuffer_mask.fs' : 'gbuffer.fs',
             uniforms: [
               PipelineBindGroupLayouts.CAMERA_UNIFORMS,
-              PipelineBindGroupLayouts.OBJECT_UNIFORMS,
               PipelineBindGroupLayouts.MATERIAL_TEXTURES,
+              PipelineBindGroupLayouts.OBJECT_UNIFORMS,
             ] as const,
             writesOn: FragmentShaderTargets.GBUFFER,
             rs: RasterizationMode.DOUBLE_SIDED,
