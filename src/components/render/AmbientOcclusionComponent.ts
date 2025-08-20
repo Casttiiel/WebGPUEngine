@@ -46,6 +46,15 @@ export class AmbientOcclusionComponent extends Component {
     this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
 
     this.createSSAOParamsBuffer();
+    this.createSSAOParamsBindGroup();
+  }
+
+  public resize(): void {
+    const aoFormat = QualitySettings.getInstance().getSettings().aoTexture;
+
+    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
+    this.bilateralFilterBindGroup = null;
+    this.ssaoParamsBindGroup = null;
   }
 
   private createSSAOParamsBuffer(): void {
@@ -70,14 +79,6 @@ export class AmbientOcclusionComponent extends Component {
 
     const paramsData = new Uint8Array(arrayBuffer);
     GPUUtils.writeBuffer(this.ssaoParamsBuffer, 0, paramsData);
-  }
-
-  public resize(): void {
-    const aoFormat = QualitySettings.getInstance().getSettings().aoTexture;
-
-    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
-    this.bilateralFilterBindGroup = null;
-    this.ssaoParamsBindGroup = null;
   }
 
   private createSSAOParamsBindGroup(): void {
@@ -131,13 +132,10 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
-    // If AO is disabled, render a white texture (no occlusion)
     if (!this.isEnabled) {
       this.renderDisabledAO(finalAOTarget);
       return;
     }
-
-    this.createSSAOParamsBindGroup();
 
     // Pass 1: Generate raw AO using SSAO with parameters
     this.renderPassManager.executeAmbientOcclusionPass(
