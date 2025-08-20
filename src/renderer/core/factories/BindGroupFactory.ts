@@ -154,15 +154,9 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
-      // AO texture
-      {
-        binding: 4,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: 'float' },
-      },
       // Shared sampler
       {
-        binding: 5,
+        binding: 4,
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'filtering' },
       },

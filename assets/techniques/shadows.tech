@@ -4,6 +4,7 @@
     "writesOn": "depth_only",
     "uniforms": [
         "CameraUniforms",
+        "MaterialTextures",
         "ObjectUniforms"
     ],
     "rs": "shadows"

@@ -11,8 +11,7 @@
 @group(1) @binding(1) var gNormals: texture_2d<f32>;     // World normals
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>; // Linear depth
 @group(1) @binding(3) var gSelfIllum: texture_2d<f32>;  // Self illumination
-@group(1) @binding(4) var gAO: texture_2d<f32>;         // Ambient occlusion
-@group(1) @binding(5) var samplerGBuffer: sampler;      // Shared sampler
+@group(1) @binding(4) var samplerGBuffer: sampler;      // Shared sampler
 
 // SSR Parameters
 @group(2) @binding(0) var<uniform> ssrParams: SSRUniforms;

@@ -3,8 +3,8 @@
     "fs": "decal.fs",
     "uniforms": [
         "CameraUniforms",
-        "ObjectUniforms",
         "MaterialTextures",
+        "ObjectUniforms",
         "GBufferUniforms"
     ],
     "rs": "reverse_culling",

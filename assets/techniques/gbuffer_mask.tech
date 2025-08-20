@@ -3,8 +3,8 @@
     "fs": "gbuffer_mask.fs",
     "uniforms": [
         "CameraUniforms",
-        "ObjectUniforms",
-        "MaterialTextures"
+        "MaterialTextures",
+        "ObjectUniforms"
     ],
     "writesOn": "gbuffer"
 }

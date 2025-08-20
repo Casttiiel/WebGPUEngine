@@ -16,15 +16,9 @@ import { RenderKey } from '../managers/RenderKeyManager';
 import { Mesh } from '../../resources/Mesh';
 import { Technique } from '../../resources/Technique';
 
-/**
- * Manager for coordinating multiple render passes in the deferred rendering pipeline
- */
 export class RenderPassManager {
   private renderPasses: Map<string, BaseRenderPass> = new Map();
 
-  /**
-   * Initialize all render passes for deferred rendering
-   */
   public initializeDeferredPasses(
     albedos: RenderTarget,
     normals: RenderTarget,
@@ -66,9 +60,6 @@ export class RenderPassManager {
     this.renderPasses.set('transparent', transparentPass);
   }
 
-  /**
-   * Execute a specific render pass
-   */
   public executePass(passName: string, category?: RenderCategory, renderKeys?: RenderKey[]): void {
     const pass = this.renderPasses.get(passName);
     if (!pass) {
@@ -79,48 +70,10 @@ export class RenderPassManager {
     pass.execute(encoder, category, renderKeys);
   }
 
-  /**
-   * Execute the complete deferred rendering pipeline
-   */
-  public executeDeferredPipeline(): void {
-    // Execute G-Buffer pass
-    this.executePass('gbuffer', RenderCategory.SOLIDS);
-
-    // Execute Decal pass
-    this.executePass('decals', RenderCategory.DECALS);
-  }
-
-  /**
-   * Get a render pass by name
-   */
-  public getPass(passName: string): BaseRenderPass | undefined {
-    return this.renderPasses.get(passName);
-  }
-
-  /**
-   * Add a custom render pass
-   */
-  public addPass(name: string, pass: BaseRenderPass): void {
-    this.renderPasses.set(name, pass);
-  }
-
-  /**
-   * Remove a render pass
-   */
-  public removePass(name: string): boolean {
-    return this.renderPasses.delete(name);
-  }
-
-  /**
-   * Clear all render passes
-   */
   public clear(): void {
     this.renderPasses.clear();
   }
 
-  /**
-   * Initialize lighting passes for deferred rendering
-   */
   public initializeLightingPasses(
     accLight: RenderTarget,
     singleDepthView: GPUTextureView,

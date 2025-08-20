@@ -113,15 +113,13 @@ export class RenderManagerV2 {
       // Use state manager to minimize state changes
       this.stateManager.setPipeline(pass, pipeline, () => technique.activatePipeline(pass));
       this.stateManager.setMeshBuffers(pass, key.mesh.getName(), () => key.mesh.activate(pass));
-      this.stateManager.setBindGroup(pass, 1, key.transform.getModelBindGroup());
-
-      // Set material bind group (cache aware)
       this.stateManager.setMaterialBindings(
         pass,
         key.material.getName(),
         key.material.getTextureBindGroup(),
-        2,
+        1,
       );
+      this.stateManager.setBindGroup(pass, 2, key.transform.getModelBindGroup());
 
       // Draw the mesh
       key.mesh.renderGroup(pass);

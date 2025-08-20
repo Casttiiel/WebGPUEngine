@@ -30,7 +30,7 @@ struct DecalVertexOutput {
 @group(3) @binding(1) var gBufferNormals: texture_2d<f32>;
 @group(3) @binding(2) var gLinearDepth: texture_2d<f32>;
 @group(3) @binding(3) var gBufferSelfIllum: texture_2d<f32>;
-@group(3) @binding(5) var samplerState2: sampler;
+@group(3) @binding(4) var samplerState2: sampler;
 
 
 @fragment

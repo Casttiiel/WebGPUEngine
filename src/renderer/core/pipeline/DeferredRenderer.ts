@@ -22,7 +22,7 @@ export class DeferredRenderer {
   private isLoaded = false;
   private skybox!: Skybox;
   private ambientLight!: AmbientLight;
-  public directionalLight!: DirectionalLight;
+  private directionalLight!: DirectionalLight;
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
@@ -33,6 +33,7 @@ export class DeferredRenderer {
   private rtFinalComposite!: RenderTarget;
   private rtAO!: RenderTarget;
   private rtAOBinding!: RenderTarget; // Copy target for binding
+
   private rtCopyAlbedos!: RenderTarget;
   private rtCopyNormals!: RenderTarget;
   private rtCopySelfIllum!: RenderTarget;
@@ -65,8 +66,6 @@ export class DeferredRenderer {
     // Create accumulation light render target
     const qualitySettings = QualitySettings.getInstance();
     const postProcessingFormats = qualitySettings.getPostProcessingFormats();
-    const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-    const enableMSAA = msaaLevel > 1;
 
     if (!this.rtAccLight) {
       this.rtAccLight = new RenderTarget();
@@ -120,10 +119,9 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().albedoTexture,
-      enableMSAA,
+      false,
       GPUTextureUsage.COPY_DST,
     );
-
     if (!this.rtCopyNormals) {
       this.rtCopyNormals = new RenderTarget();
     }
@@ -132,10 +130,9 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().normalTexture,
-      enableMSAA,
+      false,
       GPUTextureUsage.COPY_DST,
     );
-
     if (!this.rtCopySelfIllum) {
       this.rtCopySelfIllum = new RenderTarget();
     }
@@ -144,7 +141,7 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().selfIllumTexture,
-      enableMSAA,
+      false,
       GPUTextureUsage.COPY_DST,
     );
 
@@ -174,10 +171,6 @@ export class DeferredRenderer {
         },
         {
           binding: 4,
-          resource: this.whiteTexture.getTextureView()!,
-        },
-        {
-          binding: 5,
           resource: this.whiteTexture.getSampler()!,
         },
       ],
@@ -217,10 +210,6 @@ export class DeferredRenderer {
         },
         {
           binding: 4,
-          resource: this.rtAOBinding.getView()!, // Use binding texture instead
-        },
-        {
-          binding: 5,
           resource: this.whiteTexture.getSampler()!,
         },
       ],
@@ -280,26 +269,22 @@ export class DeferredRenderer {
   }
 
   public render(camera: Entity): GPUTextureView {
-    // Execute G-Buffer pass using new render pass system
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
-
-    // Execute Decal pass
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
     // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-
     if (msaaLevel > 1) {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     }
 
-    this.renderAO(camera, this.rtAO);
+    //this.renderAO(camera, this.rtAO);
 
     this.renderAccLight();
 
-    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    //this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     //const finalResult = this.renderSSR();
 
@@ -465,12 +450,12 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
-    this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    /*this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
+    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);*/
   }
 
   private copyAOTextureToBinding(): void {

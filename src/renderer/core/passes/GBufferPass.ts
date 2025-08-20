@@ -31,8 +31,6 @@ export class GBufferPass {
     const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
     const enableMSAA = msaaLevel > 1;
 
-    // Get optimal texture formats based on quality setting
-
     // Log quality settings for debugging
     console.log(`Creating G-Buffer `, {
       msaaLevel,
@@ -115,10 +113,10 @@ export class GBufferPass {
     renderCallback: (pass: GPURenderPassEncoder) => void,
   ): void {
     const colorAttachments: GPURenderPassColorAttachment[] = [
-      GPUUtils.createColorAttachment(this.rtAlbedos.getRenderView(), 'clear'),
-      GPUUtils.createColorAttachment(this.rtNormals.getRenderView(), 'clear'),
-      GPUUtils.createColorAttachment(this.rtSelfIllum.getRenderView(), 'clear'),
-      GPUUtils.createColorAttachment(this.rtLinearDepth.getRenderView(), 'clear'),
+      GPUUtils.createColorAttachment(this.rtAlbedos.getRenderView()),
+      GPUUtils.createColorAttachment(this.rtNormals.getRenderView()),
+      GPUUtils.createColorAttachment(this.rtSelfIllum.getRenderView()),
+      GPUUtils.createColorAttachment(this.rtLinearDepth.getRenderView()),
     ];
 
     // Add resolve targets for MSAA if available

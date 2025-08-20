@@ -3,12 +3,14 @@
 #include "common/utils"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(2) @binding(0) var txAlbedo: texture_2d<f32>;
-@group(2) @binding(1) var txNormal: texture_2d<f32>;
-@group(2) @binding(2) var txMetallic: texture_2d<f32>;
-@group(2) @binding(3) var txRoughness: texture_2d<f32>;
-@group(2) @binding(4) var txEmissive: texture_2d<f32>;
-@group(2) @binding(5) var samplerState: sampler;
+@group(1) @binding(0) var txAlbedo: texture_2d<f32>;
+@group(1) @binding(1) var txNormal: texture_2d<f32>;
+@group(1) @binding(2) var txMetallic: texture_2d<f32>;
+@group(1) @binding(3) var txRoughness: texture_2d<f32>;
+@group(1) @binding(4) var txEmissive: texture_2d<f32>;
+@group(1) @binding(5) var samplerState: sampler;
+@group(1) @binding(6) var<uniform> baseColorFactor: vec4<f32>;
+
 
 @fragment
 fn fs(input: VertexOutput) -> FragmentOutput {
@@ -20,7 +22,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
 
     var output: FragmentOutput;
 
-    output.albedo = albedo_color;
+    output.albedo = albedo_color * baseColorFactor;
     output.albedo.a = textureSample(txMetallic, samplerState, input.Uv).b;
 
     // Obtener la normal del normal map

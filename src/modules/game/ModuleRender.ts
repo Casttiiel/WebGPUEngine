@@ -107,18 +107,18 @@ export class ModuleRender extends Module {
 
     let result = this.deferred.render(mainCameraEntity);
 
-    if (mainCameraEntity.hasComponent('bloom')) {
+    /*if (mainCameraEntity.hasComponent('bloom')) {
       const bloom = mainCameraEntity.getComponent('bloom') as BloomComponent;
       const enableBloom = QualitySettings.getInstance().getSettings().enableBloom;
 
       if (enableBloom) {
         result = bloom.apply(result);
       }
-    }
+    }*/
 
     //this.renderDistorsions(result);
 
-    if (mainCameraEntity.hasComponent('tone_mapping')) {
+    /*if (mainCameraEntity.hasComponent('tone_mapping')) {
       const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
       result = toneMapping.apply(result);
     }
@@ -126,7 +126,7 @@ export class ModuleRender extends Module {
     if (mainCameraEntity.hasComponent('antialiasing')) {
       const antialiasing = mainCameraEntity.getComponent('antialiasing') as AntialiasingComponent;
       result = antialiasing.apply(result);
-    }
+    }*/
 
     this.presentResult(result);
 
