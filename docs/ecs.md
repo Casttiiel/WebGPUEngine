@@ -379,6 +379,66 @@ export class AntialiasingComponent extends Component {
 - Post-processing anti-aliasing (FXAA)
 - Improves visual quality without MSAA cost
 - Applied at end of pipeline
+- Uses optimized SamplerLibrary.simpleSampler for performance
+
+#### **AmbientOcclusionComponent**
+
+```typescript
+export class AmbientOcclusionComponent extends Component {
+  private aoTechnique: Technique; // SSAO shader
+  private bilateralFilterTechnique: Technique; // Bilateral filter for quality
+  private rawAOTarget: RenderTarget; // Raw AO result
+  private isEnabled: boolean; // Quality-based enablement
+}
+```
+
+**Purpose:**
+
+- Screen Space Ambient Occlusion (SSAO) for realistic shadowing
+- Two-pass process: Raw AO generation + bilateral filtering
+- Quality-adaptive configuration based on performance settings
+- Uses optimized SamplerLibrary.ambientOcclusionSampler
+
+**Features:**
+
+- **Quality Integration**: Automatically disabled on LOW quality setting
+- **Resolution Scaling**: AO computed at reduced resolution for performance
+- **Bilateral Filtering**: High-quality noise reduction pass
+- **WebGPU Optimization**: Separate command encoders prevent texture usage conflicts
+
+#### **ScreenSpaceReflections Component**
+
+```typescript
+export class ScreenSpaceReflections extends Component {
+  private technique: Technique; // SSR ray marching shader
+  private composeTechnique: Technique; // SSR compositing shader
+  private ssrResult: RenderTarget; // Reflection results
+  private reflectionMask: RenderTarget; // Reflection mask
+  private enabled: boolean; // Quality-based enablement
+
+  // SSR Parameters
+  private intensity: number; // Reflection intensity
+  private stepSize: number; // Ray marching step size
+  private maxSteps: number; // Maximum ray steps
+  private maxDistance: number; // Maximum reflection distance
+  private thickness: number; // Surface thickness
+}
+```
+
+**Purpose:**
+
+- Real-time Screen Space Reflections for realistic surface reflections
+- Ray marching in screen space for accurate reflection calculations
+- Compositing pipeline for proper integration with lighting
+- Quality-adaptive parameters for performance optimization
+
+**Features:**
+
+- **Ray Marching**: Efficient screen-space ray tracing implementation
+- **Quality Controls**: Adjustable parameters for performance vs quality balance
+- **Compositing Pipeline**: Proper blending with lighting and G-Buffer data
+- **Debug Integration**: Real-time parameter adjustment through debug UI
+- **Performance Optimization**: Early ray termination and optimized sampling
 
 #### **BloomComponent**
 

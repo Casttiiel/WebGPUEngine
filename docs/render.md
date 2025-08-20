@@ -8,9 +8,48 @@ The render module implements a modern deferred rendering pipeline with the follo
 
 - **Deferred Rendering**: G-Buffer based approach for efficient multi-light scenarios
 - **Physically-Based Rendering (PBR)**: Metallic-roughness workflow with Image-Based Lighting
-- **Modular Post-Processing**: Extensible effects pipeline including high-performance compute-based bloom, tone mapping, anti-aliasing, and ambient occlusion
-- **Performance Optimization**: CPU-based frustum culling for reliable object culling
-- **Quality Management**: Adaptive rendering quality based on performance requirements
+- **Modular Post-Processing**: Extensible effects pipeline including high-performance compute-based bloom, tone mapping, anti-aliasing, ambient occlusion, and Screen Space Reflections (SSR)
+- **Performance Optimization**: CPU-based frustum culling for reliable object culling and SamplerLibrary for GPU resource optimization
+- **Quality Management**: Adaptive rendering quality based on performance requirements with comprehensive quality presets
+- **WebGPU Optimization**: Optimized for 2K@60fps performance with dynamic resolution scaling and efficient resource management
+
+### SamplerLibrary - GPU Resource Optimization
+
+The engine features a comprehensive sampler library system that eliminates redundant GPU resource creation:
+
+- **Centralized Management**: Pre-created samplers for all common use cases
+- **Performance Optimization**: Avoids expensive GPU sampler creation during runtime
+- **15+ Specialized Samplers**: Optimized configurations for FXAA, bloom, tone mapping, 3D rendering, anisotropic filtering
+- **Quality Adaptive**: Anisotropic filtering levels (2x, 4x, 8x, 16x) based on quality settings
+- **Memory Efficient**: Proper initialization and cleanup lifecycle
+
+```typescript
+// SamplerLibrary usage examples
+SamplerLibrary.initialize(); // Called during engine startup
+const fxaaSampler = SamplerLibrary.simpleSampler; // For FXAA antialiasing
+const bloomSampler = SamplerLibrary.bloom; // For bloom post-processing
+const diffuseSampler = SamplerLibrary.diffuse; // For albedo textures
+const anisotropicSampler = SamplerLibrary.anisotropic8x; // High-quality filtering
+```
+
+### Quality Settings System
+
+The engine includes comprehensive quality management with four preset levels:
+
+- **LOW**: 75% resolution, no bloom/AO, MSAA 1x, optimized for lower-end hardware
+- **MEDIUM**: 85% resolution, limited effects, MSAA 2x, balanced performance
+- **HIGH**: 100% resolution, full effects, MSAA 4x, high-quality visuals
+- **ULTRA**: 100% resolution, maximum effects, MSAA 4x, highest visual quality
+
+### Screen Space Reflections (SSR)
+
+The engine implements a complete SSR system for realistic surface reflections:
+
+- **Ray Marching**: Screen-space ray tracing for accurate reflections
+- **Compositing Pipeline**: Proper integration with G-Buffer and lighting system
+- **Quality Controls**: Adjustable step size, max steps, distance, and thickness parameters
+- **Debug Integration**: Real-time parameter adjustment through debug UI
+- **Performance Optimization**: Efficient shader implementation with early termination
 
 ### Compute-Based Bloom System
 
@@ -65,7 +104,7 @@ public generateFrame(): void {
   // 2. Set up render manager with camera
   RenderManager.getInstance().setCamera(camera);
 
-  // 3. Deferred rendering (G-Buffer + Lighting)
+  // 3. Deferred rendering (G-Buffer + Lighting + SSR)
   let result = this.deferred.render(mainCamera);
 
   // 4. Post-processing chain
@@ -96,6 +135,25 @@ public generateFrame(): void {
 }
 ```
 
+if (mainCamera?.hasComponent('tone_mapping')) {
+const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
+result = toneMapping.apply(result);
+}
+
+// 7. Anti-aliasing (FXAA)
+if (mainCamera?.hasComponent('antialiasing')) {
+const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
+result = antialiasing.apply(result);
+}
+
+// 8. Final presentation
+this.presentResult(result);
+
+Render.getInstance().endFrame();
+}
+
+````
+
 #### 3. **Quality Management Integration**
 
 ModuleRender integrates with the quality settings system to adapt rendering parameters:
@@ -110,7 +168,7 @@ private applyBloomQualitySettings(bloom: BloomComponent): void {
     bloom.setIntensity(bloomConfig.intensity);
   }
 }
-```
+````
 
 **Bloom Integration:**
 The system includes advanced compute-based bloom that adapts to quality settings through:
@@ -119,6 +177,17 @@ The system includes advanced compute-based bloom that adapts to quality settings
 - **Compute Shader Performance**: Uses WebGPU compute pipelines for maximum efficiency
 - **Synchronization Architecture**: Separate command encoder submissions ensure proper execution order
 - **Memory Management**: Dynamic bind group creation and efficient texture reuse
+
+**SamplerLibrary Integration:**
+All post-processing effects now use optimized samplers from the centralized library:
+
+```typescript
+// Components use pre-created samplers for optimal performance
+const fxaaSampler = SamplerLibrary.simpleSampler; // For FXAA antialiasing
+const bloomSampler = SamplerLibrary.bloom; // For bloom post-processing
+const aoSampler = SamplerLibrary.ambientOcclusionSampler; // For ambient occlusion
+const bilateralSampler = SamplerLibrary.simpleSampler; // For bilateral filtering
+```
 
 #### 4. **Debug Information**
 
@@ -179,16 +248,20 @@ export class DeferredRenderer {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     }
 
-    // Ambient occlusion
+    // Ambient occlusion with optimized texture usage
     this.renderAO(camera, this.rtAO);
 
     // Lighting accumulation
     this.renderAccLight();
 
+    // Screen Space Reflections
+    this.renderSSR(camera);
+
     // Transparent objects
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
-    return this.rtAccLight.getView();
+    // Final composition with SSR
+    return this.composeSSR();
   }
 }
 ```
@@ -199,14 +272,43 @@ The deferred renderer manages multiple render targets and GPU resources:
 
 ```typescript
 private rtAccLight!: RenderTarget;        // Accumulated lighting
+private rtFinalComposite!: RenderTarget;  // Final composite with SSR
 private rtAO!: RenderTarget;              // Ambient occlusion
 private rtAOBinding!: RenderTarget;       // AO binding copy
 private rtCopyAlbedos!: RenderTarget;     // G-Buffer copies for decals
 private rtCopyNormals!: RenderTarget;
 private rtCopySelfIllum!: RenderTarget;
+private ssr!: ScreenSpaceReflections;     // SSR system
 ```
 
-#### 4. **Lighting System Integration**
+#### 4. **Screen Space Reflections Integration**
+
+The renderer includes a complete SSR pipeline:
+
+```typescript
+private renderSSR(camera: Entity): void {
+  if (!this.ssr || !this.ssr.isEnabled()) return;
+
+  // Execute SSR pass with G-Buffer and lighting data
+  this.ssr.executeSSRPass(this.gBufferBindGroup, this.rtAccLight.getView());
+}
+
+private composeSSR(): GPUTextureView {
+  if (!this.ssr || !this.ssr.isEnabled()) {
+    return this.rtAccLight.getView();
+  }
+
+  // Compose SSR with lighting
+  this.ssr.composeSSR(
+    this.rtAccLight.getView(),    // Lighting result
+    this.rtFinalComposite.getView() // Final output
+  );
+
+  return this.rtFinalComposite.getView();
+}
+```
+
+#### 5. **Lighting System Integration**
 
 The renderer integrates multiple lighting systems:
 
@@ -844,3 +946,295 @@ console.log('View translation:', [view[12], view[13], view[14]]);
 4. **Minimize State Changes**: Cache bind groups and samplers
 
 This shadow system provides an excellent foundation for directional lighting in real-time applications, balancing visual quality with rendering performance through careful optimization and proper coordinate space handling.
+
+---
+
+## SamplerLibrary System
+
+The WebGPU Engine implements a comprehensive sampler library system that provides centralized management of GPU sampling resources, eliminating redundant sampler creation and optimizing performance across all rendering components.
+
+### System Architecture
+
+#### **Core Concept**
+
+GPU samplers are expensive resources to create and configure. The SamplerLibrary creates all commonly used samplers once during engine initialization and provides static access throughout the application lifecycle.
+
+```typescript
+/**
+ * Biblioteca de samplers precreados para optimizar performance.
+ * Los samplers son recursos costosos de crear, por lo que los reutilizamos.
+ */
+export class SamplerLibrary {
+  private static initialized = false;
+
+  // Specialized samplers for post-processing
+  private static _simpleSampler: GPUSampler; // FXAA, bilateral filtering
+  private static _bloomSampler: GPUSampler; // Bloom post-processing
+  private static _ambientOcclusionSampler: GPUSampler; // AO techniques
+
+  // Basic addressing modes
+  private static _linearClamp: GPUSampler; // Linear with clamp-to-edge
+  private static _linearRepeat: GPUSampler; // Linear with repeat
+  private static _nearestClamp: GPUSampler; // Nearest with clamp-to-edge
+
+  // 3D rendering optimized samplers
+  private static _diffuseSampler: GPUSampler; // Albedo textures
+  private static _normalMapSampler: GPUSampler; // Normal maps
+  private static _skyboxSampler: GPUSampler; // Cubemap sampling
+  private static _shadowMapSampler: GPUSampler; // Shadow depth comparison
+
+  // Anisotropic filtering levels
+  private static _anisotropic2x: GPUSampler; // 2x anisotropic
+  private static _anisotropic4x: GPUSampler; // 4x anisotropic
+  private static _anisotropic8x: GPUSampler; // 8x anisotropic
+  private static _anisotropic16x: GPUSampler; // 16x anisotropic
+}
+```
+
+### Initialization and Lifecycle
+
+#### **Engine Integration**
+
+The SamplerLibrary is initialized early in the engine startup process and cleaned up during shutdown:
+
+```typescript
+// In Render.ts - Engine initialization
+export class Render {
+  public async initialize(canvas: HTMLCanvasElement): Promise<void> {
+    // ... WebGPU setup ...
+
+    // Initialize sampler library after device creation
+    SamplerLibrary.initialize();
+  }
+
+  public destroy(): void {
+    // Cleanup samplers during engine shutdown
+    SamplerLibrary.destroy();
+  }
+}
+```
+
+#### **Initialization Process**
+
+```typescript
+public static initialize(): void {
+  if (SamplerLibrary.initialized) {
+    console.warn('SamplerLibrary already initialized');
+    return;
+  }
+
+  console.log('SamplerLibrary: Creating reusable samplers...');
+
+  // Post-processing samplers
+  SamplerLibrary._simpleSampler = GPUUtils.createSampler({
+    label: 'fxaa_sampler',
+    magFilter: 'linear',
+    minFilter: 'linear',
+    mipmapFilter: 'nearest',
+    addressModeU: 'clamp-to-edge',
+    addressModeV: 'clamp-to-edge',
+    maxAnisotropy: 1,
+  });
+
+  SamplerLibrary._bloomSampler = GPUUtils.createSampler({
+    label: 'bloom_sampler',
+    magFilter: 'linear',
+    minFilter: 'linear',
+    mipmapFilter: 'linear',
+    addressModeU: 'clamp-to-edge',
+    addressModeV: 'clamp-to-edge',
+    maxAnisotropy: 1,
+  });
+
+  // ... additional samplers ...
+
+  SamplerLibrary.initialized = true;
+  console.log('SamplerLibrary: All samplers created successfully');
+}
+```
+
+### Sampler Categories
+
+#### **1. Post-Processing Samplers**
+
+**FXAA/Simple Sampler:**
+
+```typescript
+public static get simpleSampler(): GPUSampler {
+  // Used for: FXAA antialiasing, bilateral filtering, simple post-processing
+  // Configuration: Linear filtering, clamp-to-edge, no mipmaps
+}
+```
+
+**Bloom Sampler:**
+
+```typescript
+public static get bloom(): GPUSampler {
+  // Used for: Bloom downsampling, upsampling, and composition
+  // Configuration: Linear filtering, clamp-to-edge, with mipmaps
+}
+```
+
+**Ambient Occlusion Sampler:**
+
+```typescript
+public static get ambientOcclusionSampler(): GPUSampler {
+  // Used for: SSAO noise textures, AO parameter sampling
+  // Configuration: Nearest filtering, clamp-to-edge, optimized for noise
+}
+```
+
+#### **2. 3D Rendering Samplers**
+
+**Diffuse/Albedo Sampler:**
+
+```typescript
+public static get diffuse(): GPUSampler {
+  // Used for: Albedo textures, diffuse maps
+  // Configuration: Linear filtering, repeat addressing, 4x anisotropic
+}
+```
+
+**Normal Map Sampler:**
+
+```typescript
+public static get normalMap(): GPUSampler {
+  // Used for: Normal maps, bump maps
+  // Configuration: Linear filtering, repeat addressing, 8x anisotropic
+}
+```
+
+**Shadow Map Sampler:**
+
+```typescript
+public static get shadowMap(): GPUSampler {
+  // Used for: Shadow depth comparison
+  // Configuration: Linear filtering, clamp-to-edge, depth comparison enabled
+}
+```
+
+#### **3. Quality-Adaptive Samplers**
+
+**Anisotropic Filtering Levels:**
+
+```typescript
+public static getAnisotropicByLevel(level: number): GPUSampler {
+  if (level >= 16) return SamplerLibrary.anisotropic16x;
+  if (level >= 8) return SamplerLibrary.anisotropic8x;
+  if (level >= 4) return SamplerLibrary.anisotropic4x;
+  if (level >= 2) return SamplerLibrary.anisotropic2x;
+  return SamplerLibrary.linearRepeat;
+}
+```
+
+### Component Integration
+
+#### **Before SamplerLibrary (Inefficient)**
+
+```typescript
+// Old approach - creating samplers in each component
+export class AntialiasingComponent extends Component {
+  private createBindGroup(): void {
+    // ❌ Creates new sampler every time
+    const sampler = device.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+      // ... configuration ...
+    });
+
+    this.bindGroup = device.createBindGroup({
+      layout: this.layout,
+      entries: [{ binding: 1, resource: sampler }],
+    });
+  }
+}
+```
+
+#### **After SamplerLibrary (Optimized)**
+
+```typescript
+// New approach - using pre-created samplers
+export class AntialiasingComponent extends Component {
+  private createBindGroup(): void {
+    // ✅ Uses pre-created optimized sampler
+    const sampler = SamplerLibrary.simpleSampler;
+
+    this.bindGroup = device.createBindGroup({
+      layout: this.layout,
+      entries: [{ binding: 1, resource: sampler }],
+    });
+  }
+}
+```
+
+### Performance Benefits
+
+#### **Resource Optimization**
+
+- **Memory Efficiency**: 15+ reusable samplers instead of hundreds of duplicates
+- **Creation Cost**: One-time initialization instead of per-component creation
+- **GPU Resource Management**: Reduces GPU memory fragmentation
+- **Initialization Speed**: Faster component loading due to pre-created resources
+
+#### **Quality Consistency**
+
+- **Standardized Configurations**: Consistent filtering across all components
+- **Optimized Settings**: Each sampler optimized for its specific use case
+- **Quality Adaptation**: Automatic anisotropic filtering based on quality settings
+- **Debug Consistency**: All samplers have descriptive labels for debugging
+
+### Usage Patterns
+
+#### **Post-Processing Components**
+
+```typescript
+// Bloom component using specialized bloom sampler
+const bloomSampler = SamplerLibrary.bloom;
+
+// FXAA using simple linear sampler
+const fxaaSampler = SamplerLibrary.simpleSampler;
+
+// Ambient occlusion using noise-optimized sampler
+const aoSampler = SamplerLibrary.ambientOcclusionSampler;
+```
+
+#### **Material System Integration**
+
+```typescript
+// Materials automatically select appropriate samplers
+export class Material extends GPUResource {
+  private createTextureBindGroup(): void {
+    const diffuseSampler = SamplerLibrary.diffuse; // For albedo
+    const normalSampler = SamplerLibrary.normalMap; // For normals
+
+    // Bind group creation with optimized samplers...
+  }
+}
+```
+
+#### **Quality Settings Integration**
+
+```typescript
+// Automatic anisotropic filtering based on quality
+const qualitySettings = QualitySettings.getInstance();
+const anisotropicLevel = qualitySettings.getSettings().anisotropicFiltering;
+const sampler = SamplerLibrary.getAnisotropicByLevel(anisotropicLevel);
+```
+
+### Best Practices
+
+#### **Sampler Selection Guidelines**
+
+1. **Post-Processing**: Use `simpleSampler` for most effects, `bloom` for bloom-specific operations
+2. **3D Textures**: Use specialized samplers (`diffuse`, `normalMap`) for material textures
+3. **Shadows**: Always use `shadowMap` sampler for depth comparison
+4. **Quality Adaptation**: Use `getAnisotropicByLevel()` for quality-adaptive sampling
+
+#### **Performance Guidelines**
+
+1. **Never Create Samplers**: Always use SamplerLibrary instead of manual creation
+2. **Check Initialization**: Verify library is initialized before accessing samplers
+3. **Consistent Usage**: Use the same sampler type for the same texture purpose
+4. **Memory Management**: SamplerLibrary handles all cleanup automatically
+
+The SamplerLibrary system provides significant performance improvements while maintaining code clarity and consistency across the entire rendering pipeline.

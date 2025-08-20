@@ -30,7 +30,7 @@ For detailed implementation patterns and technical specifications, always consul
 
 **All changes and implementations must be optimized for WebGPU web deployment:**
 
-- **Performance**: Optimize for browser GPU limitations and web performance constraints
+- **Performance**: Optimize for browser GPU limitations and web performance constraints targeting 2K@60fps
 - **Memory Management**: Efficient GPU resource usage with proper cleanup (destroy() calls)
 - **Bundle Size**: Minimize JavaScript bundle size for web delivery
 - **Browser Compatibility**: Ensure WebGPU compatibility across supported browsers
@@ -38,6 +38,8 @@ For detailed implementation patterns and technical specifications, always consul
 - **Async Loading**: Use asynchronous patterns for resource loading to avoid blocking main thread
 - **GPU Limits**: Respect WebGPU device limits and capabilities
 - **Shader Optimization**: Write efficient WGSL shaders optimized for web GPU drivers
+- **Resource Reuse**: Always use SamplerLibrary for GPU samplers to avoid redundant creation
+- **Quality Adaptation**: Leverage QualitySettings for dynamic performance scaling
 
 ## Essential Development Patterns
 
@@ -98,6 +100,28 @@ export class CustomPostProcessComponent extends Component {
 }
 ```
 
+### SamplerLibrary Integration Pattern
+
+```typescript
+export class OptimizedComponent extends Component {
+  private createBindGroup(): void {
+    // ✅ Always use pre-created samplers from SamplerLibrary
+    const sampler = SamplerLibrary.simpleSampler; // For FXAA, bilateral filtering
+    const bloomSampler = SamplerLibrary.bloom; // For bloom operations
+    const diffuseSampler = SamplerLibrary.diffuse; // For albedo textures
+    const aoSampler = SamplerLibrary.ambientOcclusionSampler; // For AO techniques
+
+    // ❌ Never create samplers manually in components
+    // const sampler = device.createSampler({ /* config */ });
+
+    this.bindGroup = device.createBindGroup({
+      layout: this.layout,
+      entries: [{ binding: 1, resource: sampler }],
+    });
+  }
+}
+```
+
 ### Resource Loading Pattern
 
 ```typescript
@@ -130,6 +154,47 @@ public static async get(pathOrData: string | DataType): Promise<ResourceType> {
 - **Debug UI**: Use Engine.getDebugUI() for all debug controls
 - **GPU Resources**: Always implement proper dispose() methods
 - **Enum Extensions**: Update corresponding switch statements when extending enums
+- **SamplerLibrary Required**: Always use SamplerLibrary for GPU samplers, never create manually
+- **Quality Settings Integration**: Use QualitySettings for adaptive rendering parameters
+
+### Quality Settings Integration Pattern
+
+```typescript
+export class QualityAwareComponent extends Component {
+  async load(): Promise<void> {
+    const qualitySettings = QualitySettings.getInstance();
+    const settings = qualitySettings.getSettings();
+
+    // Adapt based on quality level
+    this.isEnabled = settings.enableAO; // For AO component
+    this.numMips = settings.bloomNumMips; // For bloom component
+    this.resolution = settings.renderResolution; // For resolution scaling
+
+    // Use quality-adaptive samplers
+    const anisotropicLevel = settings.anisotropicFiltering || 4;
+    const sampler = SamplerLibrary.getAnisotropicByLevel(anisotropicLevel);
+  }
+}
+```
+
+### WebGPU Optimization Patterns
+
+```typescript
+// ✅ Separate command encoders for compute/render conflicts
+const computeEncoder = device.createCommandEncoder({ label: 'Compute Pass' });
+// ... compute operations ...
+device.queue.submit([computeEncoder.finish()]);
+
+// ✅ Use quality-adaptive resolution
+const settings = QualitySettings.getInstance().getSettings();
+const scaledWidth = Math.floor(baseWidth * settings.renderResolution);
+
+// ✅ Efficient resource management
+public dispose(): void {
+  this.uniformBuffer?.destroy();
+  // SamplerLibrary handles sampler cleanup automatically
+}
+```
 
 ### File Organization
 
