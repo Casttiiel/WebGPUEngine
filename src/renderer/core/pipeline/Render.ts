@@ -107,8 +107,7 @@ export class Render {
 
   // Update render dimensions based on quality settings
   private static updateRenderDimensions(): void {
-    const qualitySettings = QualitySettings.getInstance();
-    const renderRes = qualitySettings.getRenderResolution();
+    const renderRes = QualitySettings.getInstance().getSettings().renderResolution;
 
     Render.renderWidth =
       Math.max(0, Math.min(Render.canvasWidth, Render.MAX_RENDER_WIDTH)) * renderRes;

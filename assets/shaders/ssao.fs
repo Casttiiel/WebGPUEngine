@@ -7,9 +7,7 @@
 struct SSAOParams {
     sampleCount: u32,
     radius: f32,
-    bias: f32,
     aoStrength: f32,
-    maxDistance: f32,
     noiseScale: f32,
 }
 

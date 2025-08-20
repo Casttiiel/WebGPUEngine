@@ -7,16 +7,16 @@ import { GPUUtils } from './GPUUtils';
 export class SamplerLibrary {
   private static initialized = false;
 
+  private static _simpleSampler: GPUSampler;
+  private static _bloomSampler: GPUSampler;
+  private static _ambientOcclusionSampler: GPUSampler;
+
   // Common samplers for different use cases
   private static _linearClamp: GPUSampler;
   private static _linearRepeat: GPUSampler;
   private static _linearMirror: GPUSampler;
   private static _nearestClamp: GPUSampler;
   private static _nearestRepeat: GPUSampler;
-
-  // Specialized samplers for post-processing
-  private static _simpleSampler: GPUSampler;
-  private static _bloomSampler: GPUSampler;
 
   // Specialized samplers for 3D rendering
   private static _diffuseSampler: GPUSampler;
@@ -40,6 +40,36 @@ export class SamplerLibrary {
     }
 
     console.log('SamplerLibrary: Creating reusable samplers...');
+
+    SamplerLibrary._simpleSampler = GPUUtils.createSampler({
+      label: 'fxaa_sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'nearest',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      maxAnisotropy: 1,
+    });
+
+    SamplerLibrary._bloomSampler = GPUUtils.createSampler({
+      label: 'bloom_sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      maxAnisotropy: 1,
+    });
+
+    SamplerLibrary._ambientOcclusionSampler = GPUUtils.createSampler({
+      label: 'aambient_occlusion_sampler',
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      maxAnisotropy: 1,
+    });
 
     // Basic samplers
     SamplerLibrary._linearClamp = GPUUtils.createSampler({
@@ -89,27 +119,6 @@ export class SamplerLibrary {
       mipmapFilter: 'nearest',
       addressModeU: 'repeat',
       addressModeV: 'repeat',
-      maxAnisotropy: 1,
-    });
-
-    // Post-processing samplers
-    SamplerLibrary._simpleSampler = GPUUtils.createSampler({
-      label: 'fxaa_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'nearest',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      maxAnisotropy: 1,
-    });
-
-    SamplerLibrary._bloomSampler = GPUUtils.createSampler({
-      label: 'bloom_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear', // Bloom uses mip chain
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
       maxAnisotropy: 1,
     });
 
@@ -211,13 +220,15 @@ export class SamplerLibrary {
 
     // Note: WebGPU samplers are automatically cleaned up when device is destroyed
     // But we set references to null for explicit cleanup
+    SamplerLibrary._simpleSampler = null as any;
+    SamplerLibrary._bloomSampler = null as any;
+    SamplerLibrary._ambientOcclusionSampler = null as any;
+
     SamplerLibrary._linearClamp = null as any;
     SamplerLibrary._linearRepeat = null as any;
     SamplerLibrary._linearMirror = null as any;
     SamplerLibrary._nearestClamp = null as any;
     SamplerLibrary._nearestRepeat = null as any;
-    SamplerLibrary._simpleSampler = null as any;
-    SamplerLibrary._bloomSampler = null as any;
     SamplerLibrary._diffuseSampler = null as any;
     SamplerLibrary._normalMapSampler = null as any;
     SamplerLibrary._skyboxSampler = null as any;
@@ -228,6 +239,27 @@ export class SamplerLibrary {
     SamplerLibrary._anisotropic16x = null as any;
 
     SamplerLibrary.initialized = false;
+  }
+
+  public static get bloom(): GPUSampler {
+    if (!SamplerLibrary.initialized) {
+      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
+    }
+    return SamplerLibrary._bloomSampler;
+  }
+
+  public static get simpleSampler(): GPUSampler {
+    if (!SamplerLibrary.initialized) {
+      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
+    }
+    return SamplerLibrary._simpleSampler;
+  }
+
+  public static get ambientOcclusionSampler(): GPUSampler {
+    if (!SamplerLibrary.initialized) {
+      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
+    }
+    return SamplerLibrary._ambientOcclusionSampler;
   }
 
   // ========== BASIC SAMPLERS ==========
@@ -270,24 +302,6 @@ export class SamplerLibrary {
       throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
     }
     return SamplerLibrary._nearestRepeat;
-  }
-
-  // ========== POST-PROCESSING SAMPLERS ==========
-
-  /** Optimized sampler for bloom post-processing */
-  public static get bloom(): GPUSampler {
-    if (!SamplerLibrary.initialized) {
-      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
-    }
-    return SamplerLibrary._bloomSampler;
-  }
-
-  /** Optimized sampler for final presentation */
-  public static get simpleSampler(): GPUSampler {
-    if (!SamplerLibrary.initialized) {
-      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
-    }
-    return SamplerLibrary._simpleSampler;
   }
 
   // ========== 3D RENDERING SAMPLERS ==========

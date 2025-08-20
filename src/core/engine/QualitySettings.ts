@@ -1,5 +1,3 @@
-import { AmbientOcclusionQualityConfig } from '../../renderer/core/config/AmbientOcclusionQualityConfig';
-import { BloomQualityConfigProvider } from '../../renderer/core/config/BloomQualityConfig';
 import { PostProcessingQualityConfig } from '../../renderer/core/config/PostProcessingQualityConfig';
 
 export interface GraphicsQualitySettings {
@@ -9,9 +7,14 @@ export interface GraphicsQualitySettings {
   bloomTexture: GPUTextureFormat;
   enableBloom: boolean;
   bloomNumMips: number;
+  enableAO: boolean;
+  aoTexture: GPUTextureFormat;
+  aoSampleCount: number;
+  aoRadius: number;
+  aoStrength: number;
+  aoNoiseScale: number;
 
-  msaaLevel: number; // 1, 4
-  ambientOcclusionQuality: 'off' | 'low' | 'medium' | 'high';
+  msaaLevel: number;
   gBufferTextureQuality: 'low' | 'medium' | 'high';
 }
 
@@ -24,49 +27,69 @@ export class QualitySettings {
   public static readonly PRESETS = {
     LOW: {
       renderResolution: 0.75,
-      aliasingTexture: 'rgba16float', // Used
-      toneMappingTexture: 'rgba16float', // Used
-      bloomTexture: 'rgba16float', // Used
-      enableBloom: false, // Used
-      bloomNumMips: 0, // Used
+      aliasingTexture: 'rgba16float',
+      toneMappingTexture: 'rgba16float',
+      bloomTexture: 'rgba16float',
+      enableBloom: false,
+      bloomNumMips: 0,
+      enableAO: false,
+      aoTexture: 'r16float',
+      aoSampleCount: 0,
+      aoRadius: 0,
+      aoStrength: 0,
+      aoNoiseScale: 0,
       msaaLevel: 1,
-      ambientOcclusionQuality: 'low',
       gBufferTextureQuality: 'low',
     } as GraphicsQualitySettings,
 
     MEDIUM: {
       renderResolution: 0.85,
-      aliasingTexture: 'rgba16float', // Used
-      toneMappingTexture: 'rgba16float', // Used
-      bloomTexture: 'rgba16float', // Used
-      enableBloom: true, // Used
-      bloomNumMips: 3, // Used
+      aliasingTexture: 'rgba16float',
+      toneMappingTexture: 'rgba16float',
+      bloomTexture: 'rgba16float',
+      enableBloom: true,
+      bloomNumMips: 3,
+      enableAO: true,
+      aoTexture: 'r16float',
+      aoSampleCount: 8,
+      aoRadius: 0.1,
+      aoStrength: 3.0,
+      aoNoiseScale: 0.01,
       msaaLevel: 4,
-      ambientOcclusionQuality: 'medium',
       gBufferTextureQuality: 'medium',
     } as GraphicsQualitySettings,
 
     HIGH: {
       renderResolution: 1.0,
-      aliasingTexture: 'rgba16float', // Used
-      toneMappingTexture: 'rgba16float', // Used
-      bloomTexture: 'rgba16float', // Used
-      enableBloom: true, // Used
-      bloomNumMips: 6, // Used
+      aliasingTexture: 'rgba16float',
+      toneMappingTexture: 'rgba16float',
+      bloomTexture: 'rgba16float',
+      enableBloom: true,
+      bloomNumMips: 6,
+      enableAO: true,
+      aoTexture: 'r16float',
+      aoSampleCount: 8,
+      aoRadius: 0.1,
+      aoStrength: 3.0,
+      aoNoiseScale: 0.01,
       msaaLevel: 4,
-      ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
     } as GraphicsQualitySettings,
 
     ULTRA: {
-      renderResolution: 1.0, // Used
-      aliasingTexture: 'rgba16float', // Used
-      toneMappingTexture: 'rgba16float', // Used
-      bloomTexture: 'rgba16float', // Used
-      enableBloom: true, // Used
-      bloomNumMips: 8, // Used
+      renderResolution: 1.0,
+      aliasingTexture: 'rgba16float',
+      toneMappingTexture: 'rgba16float',
+      bloomTexture: 'rgba16float',
+      enableBloom: true,
+      bloomNumMips: 8,
+      enableAO: true,
+      aoTexture: 'r16float',
+      aoSampleCount: 16,
+      aoRadius: 0.1,
+      aoStrength: 3.0,
+      aoNoiseScale: 0.01,
       msaaLevel: 4,
-      ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
     } as GraphicsQualitySettings,
   };
@@ -105,23 +128,12 @@ export class QualitySettings {
     return this.currentPreset;
   }
 
-  public updateSettings(newSettings: Partial<GraphicsQualitySettings>): void {
-    this.settings = { ...this.settings, ...newSettings };
-    // Mark as custom when individual settings are changed
-    this.currentPreset = 'CUSTOM' as any;
-    this.onSettingsChanged();
-  }
-
   public applyPreset(presetName: keyof typeof QualitySettings.PRESETS): void {
     console.log(`Applied ${presetName} quality preset`);
 
     this.currentPreset = presetName;
     this.settings = { ...QualitySettings.PRESETS[presetName] };
     this.onSettingsChanged();
-  }
-
-  public getRenderResolution(): number {
-    return this.settings.renderResolution;
   }
 
   public getMSAALevel(): number {
@@ -132,16 +144,8 @@ export class QualitySettings {
     return this.settings.gBufferTextureQuality;
   }
 
-  public getAmbientOcclusionConfig() {
-    return AmbientOcclusionQualityConfig.getConfig('high');
-  }
-
   public getPostProcessingFormats() {
     return PostProcessingQualityConfig.getFormats('high');
-  }
-
-  public getBloomConfig() {
-    return BloomQualityConfigProvider.getConfig('high');
   }
 
   private onSettingsChanged(): void {
