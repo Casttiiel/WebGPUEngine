@@ -16,6 +16,7 @@ import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer'
 import { Render } from '../../renderer/core/pipeline/Render';
 import { Camera } from '../../core/math/Camera';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -54,6 +55,9 @@ export class ModuleRender extends Module {
   }
 
   public onResolutionUpdated(): void {
+    this.deferred.create(Render.width, Render.height);
+    this.presentationBindGroup = null;
+
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
     if (!mainCameraEntity) {
       console.warn('No main camera found');
@@ -81,9 +85,6 @@ export class ModuleRender extends Module {
     for (const comp of Engine.getEntities().getObjectManagerByName('bloom')?.getList() ?? []) {
       (comp as BloomComponent).resize();
     }
-
-    this.deferred.create(Render.width, Render.height);
-    this.presentationBindGroup = null;
   }
 
   public generateFrame(): void {
@@ -106,16 +107,14 @@ export class ModuleRender extends Module {
 
     let result = this.deferred.render(mainCameraEntity);
 
-    /*if (mainCamera?.hasComponent('bloom')) {
-      const bloom = mainCamera.getComponent('bloom') as BloomComponent;
-      const qualitySettings = QualitySettings.getInstance();
-      const bloomConfig = qualitySettings.getBloomConfig();
+    if (mainCameraEntity.hasComponent('bloom')) {
+      const bloom = mainCameraEntity.getComponent('bloom') as BloomComponent;
+      const enableBloom = QualitySettings.getInstance().getSettings().enableBloom;
 
-      if (bloomConfig.enabled) {
-        // Apply quality-based bloom settings and apply bloom effect
+      if (enableBloom) {
         result = bloom.apply(result);
       }
-    }*/
+    }
 
     //this.renderDistorsions(result);
 

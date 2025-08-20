@@ -6,15 +6,13 @@ export interface GraphicsQualitySettings {
   renderResolution: number;
   aliasingTexture: GPUTextureFormat;
   toneMappingTexture: GPUTextureFormat;
+  bloomTexture: GPUTextureFormat;
+  enableBloom: boolean;
+  bloomNumMips: number;
+
   msaaLevel: number; // 1, 4
   ambientOcclusionQuality: 'off' | 'low' | 'medium' | 'high';
   gBufferTextureQuality: 'low' | 'medium' | 'high';
-  postProcessingQuality: 'low' | 'medium' | 'high'; // For post-processing texture formats
-  bloomQuality: 'off' | 'low' | 'medium' | 'high'; // Bloom quality setting
-  aliasingQuality: 'none' | 'fxaa' | 'msaa' | 'taa';
-  cullingMode: 'cpu' | 'gpu' | 'hybrid';
-  enableBloom: boolean; // Deprecated: use bloomQuality instead
-  // Future: shadowQuality, anisotropicFiltering
 }
 
 export class QualitySettings {
@@ -28,56 +26,48 @@ export class QualitySettings {
       renderResolution: 0.75,
       aliasingTexture: 'rgba16float', // Used
       toneMappingTexture: 'rgba16float', // Used
+      bloomTexture: 'rgba16float', // Used
+      enableBloom: false, // Used
+      bloomNumMips: 0, // Used
       msaaLevel: 1,
       ambientOcclusionQuality: 'low',
       gBufferTextureQuality: 'low',
-      postProcessingQuality: 'low',
-      bloomQuality: 'low',
-      aliasingQuality: 'fxaa',
-      cullingMode: 'cpu',
-      enableBloom: true,
     } as GraphicsQualitySettings,
 
     MEDIUM: {
       renderResolution: 0.85,
       aliasingTexture: 'rgba16float', // Used
       toneMappingTexture: 'rgba16float', // Used
+      bloomTexture: 'rgba16float', // Used
+      enableBloom: true, // Used
+      bloomNumMips: 3, // Used
       msaaLevel: 4,
       ambientOcclusionQuality: 'medium',
       gBufferTextureQuality: 'medium',
-      postProcessingQuality: 'medium',
-      bloomQuality: 'medium',
-      aliasingQuality: 'fxaa',
-      cullingMode: 'gpu',
-      enableBloom: true,
     } as GraphicsQualitySettings,
 
     HIGH: {
       renderResolution: 1.0,
       aliasingTexture: 'rgba16float', // Used
       toneMappingTexture: 'rgba16float', // Used
+      bloomTexture: 'rgba16float', // Used
+      enableBloom: true, // Used
+      bloomNumMips: 6, // Used
       msaaLevel: 4,
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
-      postProcessingQuality: 'high',
-      bloomQuality: 'high',
-      aliasingQuality: 'msaa',
-      cullingMode: 'gpu',
-      enableBloom: true,
     } as GraphicsQualitySettings,
 
     ULTRA: {
       renderResolution: 1.0, // Used
       aliasingTexture: 'rgba16float', // Used
       toneMappingTexture: 'rgba16float', // Used
+      bloomTexture: 'rgba16float', // Used
+      enableBloom: true, // Used
+      bloomNumMips: 8, // Used
       msaaLevel: 4,
       ambientOcclusionQuality: 'high',
       gBufferTextureQuality: 'high',
-      postProcessingQuality: 'high',
-      bloomQuality: 'high',
-      aliasingQuality: 'taa',
-      cullingMode: 'gpu',
-      enableBloom: true,
     } as GraphicsQualitySettings,
   };
 
@@ -143,18 +133,15 @@ export class QualitySettings {
   }
 
   public getAmbientOcclusionConfig() {
-    return AmbientOcclusionQualityConfig.getConfig(this.settings.ambientOcclusionQuality);
+    return AmbientOcclusionQualityConfig.getConfig('high');
   }
 
   public getPostProcessingFormats() {
-    return PostProcessingQualityConfig.getFormats(this.settings.postProcessingQuality);
+    return PostProcessingQualityConfig.getFormats('high');
   }
 
   public getBloomConfig() {
-    if (this.settings.bloomQuality === 'off') {
-      return BloomQualityConfigProvider.getDisabledConfig();
-    }
-    return BloomQualityConfigProvider.getConfig(this.settings.bloomQuality);
+    return BloomQualityConfigProvider.getConfig('high');
   }
 
   private onSettingsChanged(): void {

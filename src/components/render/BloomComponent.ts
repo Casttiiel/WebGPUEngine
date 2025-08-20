@@ -7,11 +7,9 @@ import {
   PipelineFactory,
   ComputePipelineConfig,
 } from '../../renderer/core/factories/PipelineFactory';
+import { QualitySettings } from '../../core/engine/QualitySettings';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
-/**
- * High-performance Bloom Component using Compute Shaders
- * Implements Call of Duty: Advanced Warfare technique with GPU optimization
- */
 export class BloomComponent extends Component {
   private device: GPUDevice;
   private isLoaded = false;
@@ -34,7 +32,7 @@ export class BloomComponent extends Component {
   private accumChain: RenderTarget[] = []; // Accumulation textures for upsample
   private fullSizeResult: RenderTarget | null = null; // Final full-size bloom result
   private finalCombinedResult: RenderTarget | null = null; // Final combined result (original + bloom)
-  private numMips = 6; // Default number of mips (3-8 range)
+  private numMips = 0;
 
   // Uniform buffers
   private downsampleParamsBuffer!: GPUBuffer;
@@ -53,6 +51,7 @@ export class BloomComponent extends Component {
   }
 
   public async load(): Promise<void> {
+    this.numMips = QualitySettings.getInstance().getSettings().bloomNumMips;
     await this.initializeComputeShaders();
     await this.createComputePipelines();
     this.createUniformBuffers();
@@ -68,6 +67,20 @@ export class BloomComponent extends Component {
 
     // Recreate with new dimensions
     this.initializeMipChain();
+  }
+
+  public apply(sourceTexture: GPUTextureView): GPUTextureView {
+    if (!this.isLoaded || this.mipChain.length === 0) {
+      return sourceTexture;
+    }
+
+    // Execute complete bloom pipeline with guaranteed synchronization
+    this.performDownsample(sourceTexture);
+    this.performUpsample();
+    this.performCombine(sourceTexture);
+
+    // Return the final combined result
+    return this.finalCombinedResult!.getView();
   }
 
   private async initializeComputeShaders(): Promise<void> {
@@ -221,12 +234,7 @@ export class BloomComponent extends Component {
 
   private createUniformBuffers(): void {
     // Create linear sampler for texture sampling
-    this.linearSampler = GPUUtils.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    });
+    this.linearSampler = SamplerLibrary.bloom;
 
     // Downsample parameters: srcResolution (vec2) + padding
     this.downsampleParamsBuffer = GPUUtils.createBuffer(
@@ -238,7 +246,7 @@ export class BloomComponent extends Component {
 
   private initializeMipChain(): void {
     // Use rgba16float for compute shader compatibility
-    const bloomFormat: GPUTextureFormat = 'rgba16float';
+    const bloomFormat = QualitySettings.getInstance().getSettings().bloomTexture;
 
     const baseWidth = Render.width;
     const baseHeight = Render.height;
@@ -363,20 +371,6 @@ export class BloomComponent extends Component {
     ]);
 
     GPUUtils.writeBuffer(this.downsampleParamsBuffer, 0, paramsData);
-  }
-
-  public apply(sourceTexture: GPUTextureView): GPUTextureView {
-    if (!this.isLoaded || this.mipChain.length === 0) {
-      return sourceTexture;
-    }
-
-    // Execute complete bloom pipeline with guaranteed synchronization
-    this.performDownsample(sourceTexture);
-    this.performUpsample();
-    this.performCombine(sourceTexture);
-
-    // Return the final combined result
-    return this.finalCombinedResult!.getView();
   }
 
   private performDownsample(sourceTexture: GPUTextureView): void {
