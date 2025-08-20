@@ -8,6 +8,7 @@ import { SpotLightComponentData } from '../../types/SpotLightComponentData.type'
 import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { RenderCategory } from '../../types/RenderCategory.enum';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
@@ -94,14 +95,7 @@ export class SpotLightComponent extends CameraComponent {
     });
 
     // Crear sampler de comparación para shadow mapping
-    this.shadowSampler = Render.getInstance().getDevice().createSampler({
-      label: 'spot_light_shadow_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      compare: 'less', // Función de comparación para shadows
-    });
+    this.shadowSampler = SamplerLibrary.shadows;
 
     this.technique = await Technique.get(
       this._hasShadows ? 'spot_light_shadows.tech' : 'spot_light.tech',

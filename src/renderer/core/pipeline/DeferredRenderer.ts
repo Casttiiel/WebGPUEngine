@@ -288,7 +288,7 @@ export class DeferredRenderer {
 
     // Execute Decal pass
     this.copyGBufferTexturesToBindGroup();
-    //this.renderPassManager.executePass('decals', RenderCategory.DECALS);
+    this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
     // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
@@ -302,7 +302,7 @@ export class DeferredRenderer {
 
     this.renderAccLight();
 
-    //this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     //const finalResult = this.renderSSR();
 
@@ -468,12 +468,12 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
     // Use new render pass system for lights
-    /*this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);*/
+    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
 
   private copyAOTextureToBinding(): void {

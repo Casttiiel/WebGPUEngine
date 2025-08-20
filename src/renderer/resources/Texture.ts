@@ -4,17 +4,12 @@ import { ResourceManager } from '../../core/engine/ResourceManager';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { MipmapGenerator } from '../core/processing/MipmapGenerator';
+import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
   format?: GPUTextureFormat;
   usage?: GPUTextureUsageFlags;
-  magFilter?: GPUFilterMode;
-  minFilter?: GPUFilterMode;
-  mipmapFilter?: GPUMipmapFilterMode;
-  addressModeU?: GPUAddressMode;
-  addressModeV?: GPUAddressMode;
-  maxAnisotropy?: number;
 }
 
 export class Texture extends GPUResource {
@@ -24,12 +19,6 @@ export class Texture extends GPUResource {
   private genMipmaps: boolean;
   private format: GPUTextureFormat;
   private usage: GPUTextureUsageFlags;
-  private magFilter: GPUFilterMode;
-  private minFilter: GPUFilterMode;
-  private mipmapFilter: GPUMipmapFilterMode;
-  private addressModeU: GPUAddressMode;
-  private addressModeV: GPUAddressMode;
-  private maxAnisotropy: number;
   private static mipmapGenerator: MipmapGenerator | null = null;
 
   constructor(options: TextureOptions) {
@@ -53,12 +42,6 @@ export class Texture extends GPUResource {
         GPUTextureUsage.COPY_DST |
         GPUTextureUsage.RENDER_ATTACHMENT |
         GPUTextureUsage.STORAGE_BINDING;
-    this.magFilter = options.magFilter ?? 'linear';
-    this.minFilter = options.minFilter ?? 'linear';
-    this.mipmapFilter = options.mipmapFilter ?? 'linear';
-    this.addressModeU = options.addressModeU ?? 'repeat';
-    this.addressModeV = options.addressModeV ?? 'repeat';
-    this.maxAnisotropy = options.maxAnisotropy ?? 16;
   }
 
   public static async get(path: string): Promise<Texture> {
@@ -124,18 +107,7 @@ export class Texture extends GPUResource {
       mipLevelCount,
     });
 
-    const samplerDescriptor: GPUSamplerDescriptor = {
-      label: `${this.label}_sampler`,
-      magFilter: this.magFilter,
-      minFilter: this.minFilter,
-      addressModeU: this.addressModeU,
-      addressModeV: this.addressModeV,
-      maxAnisotropy: this.maxAnisotropy,
-    };
-    if (this.genMipmaps) {
-      samplerDescriptor.mipmapFilter = this.mipmapFilter;
-    }
-    this.sampler = GPUUtils.createSampler(samplerDescriptor);
+    this.sampler = SamplerLibrary.anisotropic16x;
   }
 
   public getTextureView(): GPUTextureView | undefined {

@@ -5,6 +5,7 @@ import { TransformComponent } from '../core/TransformComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { PointLightComponentData } from '../../types/PointLightComponentData.type';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
 export class PointLightComponent extends Component {
   private color = vec4.create();
@@ -55,11 +56,7 @@ export class PointLightComponent extends Component {
       'depth32float',
       GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
     );
-    const dummyShadowSampler = GPUUtils.getDevice().createSampler({
-      compare: 'less',
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
+    const dummyShadowSampler = SamplerLibrary.shadows;
 
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
       `point light uniform bind group`,

@@ -151,7 +151,7 @@ export class Cubemap extends GPUResource {
         baseMipLevel: 0,
         mipLevelCount: mipLevelCount,
       });
-      // Crear el sampler
+
       this.gpuSampler = GPUUtils.createSampler({
         label: `${this.label}_sampler`,
         magFilter: this.magFilter,

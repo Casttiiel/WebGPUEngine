@@ -8,6 +8,7 @@ import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/R
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Camera } from '../../core/math/Camera';
 import { mat4, vec3 } from 'gl-matrix';
+import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export class DirectionalLight {
   private fullscreenQuadMesh!: Mesh;
@@ -45,14 +46,7 @@ export class DirectionalLight {
     });
 
     // Crear sampler de comparación para shadow mapping
-    this.shadowSampler = Render.getInstance().getDevice().createSampler({
-      label: 'directional_light_shadow_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      compare: 'less', // Función de comparación para shadows
-    });
+    this.shadowSampler = SamplerLibrary.shadows;
 
     this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
       `directional_light_bindgroup`,

@@ -6,6 +6,7 @@ import { Texture } from '../resources/Texture';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { HDRTexture } from '../resources/HDRTexture';
+import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
@@ -32,15 +33,7 @@ export class AmbientLight {
     this.irradianceTexture = await HDRTexture.get('empty_workshop_1k.hdr');
     this.brdfLUTTexture = await Texture.get('brdfLUT.png');
 
-    // Create specific sampler for BRDF LUT (clamp-to-edge, linear filtering)
-    this.brdfLUTSampler = GPUUtils.createSampler({
-      label: 'BRDF LUT Sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    });
+    this.brdfLUTSampler = SamplerLibrary.bloom;
 
     this.environmentBindGroup = BindGroupFactory.createBindGroup(
       'environment_with_brdf_bindgroup',

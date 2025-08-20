@@ -3,7 +3,8 @@ import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResour
 import { ResourceType } from '../../types/ResourceType.enum';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { decodeRGBE } from '@derschmale/io-rgbe';
-import { Float16Array, encode } from '@petamoriken/float16';
+import { Float16Array } from '@petamoriken/float16';
+import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export interface HDRTextureOptions extends IGPUResourceOptions {
   magFilter?: GPUFilterMode;
@@ -93,13 +94,7 @@ export class HDRTexture extends GPUResource {
       label: `${this.label}_textureView`,
     });
 
-    const samplerDescriptor: GPUSamplerDescriptor = {
-      label: `${this.label}_sampler`,
-      magFilter: 'linear',
-      minFilter: 'linear',
-    };
-
-    this.sampler = GPUUtils.createSampler(samplerDescriptor);
+    this.sampler = SamplerLibrary.bloom;
   }
 
   public getTextureView(): GPUTextureView | undefined {

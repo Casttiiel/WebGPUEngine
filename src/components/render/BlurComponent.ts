@@ -6,6 +6,7 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Technique } from '../../renderer/resources/Technique';
 import { Mesh } from '../../renderer/resources/Mesh';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
 export class BlurStep {
   public halfYTarget: RenderTarget; // Horizontal blur result (xres x yres/2)
@@ -97,13 +98,7 @@ export class BlurComponent extends Component {
     );
 
     // Create sampler for texture sampling
-    this.sampler = GPUUtils.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    });
+    this.sampler = SamplerLibrary.bloom;
 
     this.createBlurSteps();
     this.updateGaussianBlurParams();
