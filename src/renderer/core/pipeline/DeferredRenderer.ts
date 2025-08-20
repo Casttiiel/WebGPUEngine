@@ -14,7 +14,6 @@ import { GBufferPass } from '../passes/GBufferPass';
 import { RenderPassManager } from '../passes/RenderPassManager';
 import { DepthResolver } from '../processing/DepthResolver';
 import { Render } from './Render';
-import { GBufferQualityConfig } from '../config/GBufferQualityConfig';
 import { DirectionalLight } from '../../shading/DirectionalLight';
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
@@ -67,9 +66,7 @@ export class DeferredRenderer {
     const qualitySettings = QualitySettings.getInstance();
     const postProcessingFormats = qualitySettings.getPostProcessingFormats();
     const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
     const enableMSAA = msaaLevel > 1;
-    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
 
     if (!this.rtAccLight) {
       this.rtAccLight = new RenderTarget();
@@ -122,7 +119,7 @@ export class DeferredRenderer {
       'gbuffer_copy_albedos',
       width,
       height,
-      formats.albedo,
+      QualitySettings.getInstance().getSettings().albedoTexture,
       enableMSAA,
       GPUTextureUsage.COPY_DST,
     );
@@ -134,7 +131,7 @@ export class DeferredRenderer {
       'gbuffer_copy_normals',
       width,
       height,
-      formats.normal,
+      QualitySettings.getInstance().getSettings().normalTexture,
       enableMSAA,
       GPUTextureUsage.COPY_DST,
     );
@@ -146,7 +143,7 @@ export class DeferredRenderer {
       'gbuffer_copy_selfillum',
       width,
       height,
-      formats.selfIllum,
+      QualitySettings.getInstance().getSettings().selfIllumTexture,
       enableMSAA,
       GPUTextureUsage.COPY_DST,
     );

@@ -32,9 +32,7 @@ export class Texture extends GPUResource {
     if (options.format) {
       this.format = options.format;
     } else {
-      const qualitySettings = QualitySettings.getInstance();
-      const postProcessingFormats = qualitySettings.getPostProcessingFormats();
-      this.format = postProcessingFormats.skyboxTexture; // Use skybox format as default for general textures
+      this.format = QualitySettings.getInstance().getSettings().generalTexture;
     }
     this.usage =
       options.usage ??

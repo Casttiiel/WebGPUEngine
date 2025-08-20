@@ -13,9 +13,12 @@ export interface GraphicsQualitySettings {
   aoRadius: number;
   aoStrength: number;
   aoNoiseScale: number;
-
   msaaLevel: number;
-  gBufferTextureQuality: 'low' | 'medium' | 'high';
+  albedoTexture: GPUTextureFormat;
+  normalTexture: GPUTextureFormat;
+  selfIllumTexture: GPUTextureFormat;
+  linearDepthTexture: GPUTextureFormat;
+  generalTexture: GPUTextureFormat;
 }
 
 export class QualitySettings {
@@ -26,7 +29,7 @@ export class QualitySettings {
   // Predefined quality presets
   public static readonly PRESETS = {
     LOW: {
-      renderResolution: 0.75,
+      renderResolution: 0.7,
       aliasingTexture: 'rgba16float',
       toneMappingTexture: 'rgba16float',
       bloomTexture: 'rgba16float',
@@ -39,11 +42,15 @@ export class QualitySettings {
       aoStrength: 0,
       aoNoiseScale: 0,
       msaaLevel: 1,
-      gBufferTextureQuality: 'low',
+      albedoTexture: 'rgba8unorm',
+      normalTexture: 'rgba8unorm',
+      selfIllumTexture: 'rgba8unorm',
+      linearDepthTexture: 'rg16float',
+      generalTexture: 'rgba8unorm',
     } as GraphicsQualitySettings,
 
     MEDIUM: {
-      renderResolution: 0.85,
+      renderResolution: 0.8,
       aliasingTexture: 'rgba16float',
       toneMappingTexture: 'rgba16float',
       bloomTexture: 'rgba16float',
@@ -56,11 +63,15 @@ export class QualitySettings {
       aoStrength: 3.0,
       aoNoiseScale: 0.01,
       msaaLevel: 4,
-      gBufferTextureQuality: 'medium',
+      albedoTexture: 'rgba16float',
+      normalTexture: 'rgba16float',
+      selfIllumTexture: 'rgba16float',
+      linearDepthTexture: 'rg16float',
+      generalTexture: 'rgba16float',
     } as GraphicsQualitySettings,
 
     HIGH: {
-      renderResolution: 1.0,
+      renderResolution: 0.9,
       aliasingTexture: 'rgba16float',
       toneMappingTexture: 'rgba16float',
       bloomTexture: 'rgba16float',
@@ -73,7 +84,11 @@ export class QualitySettings {
       aoStrength: 3.0,
       aoNoiseScale: 0.01,
       msaaLevel: 4,
-      gBufferTextureQuality: 'high',
+      albedoTexture: 'rgba16float',
+      normalTexture: 'rgba16float',
+      selfIllumTexture: 'rgba16float',
+      linearDepthTexture: 'rg16float',
+      generalTexture: 'rgba16float',
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -90,7 +105,11 @@ export class QualitySettings {
       aoStrength: 3.0,
       aoNoiseScale: 0.01,
       msaaLevel: 4,
-      gBufferTextureQuality: 'high',
+      albedoTexture: 'rgba16float',
+      normalTexture: 'rgba16float',
+      selfIllumTexture: 'rgba16float',
+      linearDepthTexture: 'rg16float',
+      generalTexture: 'rgba16float',
     } as GraphicsQualitySettings,
   };
 
@@ -128,20 +147,16 @@ export class QualitySettings {
     return this.currentPreset;
   }
 
+  public getPostProcessingFormats() {
+    return PostProcessingQualityConfig.getFormats('high');
+  }
+
   public applyPreset(presetName: keyof typeof QualitySettings.PRESETS): void {
     console.log(`Applied ${presetName} quality preset`);
 
     this.currentPreset = presetName;
     this.settings = { ...QualitySettings.PRESETS[presetName] };
     this.onSettingsChanged();
-  }
-
-  public getGBufferTextureQuality(): 'low' | 'medium' | 'high' {
-    return this.settings.gBufferTextureQuality;
-  }
-
-  public getPostProcessingFormats() {
-    return PostProcessingQualityConfig.getFormats('high');
   }
 
   private onSettingsChanged(): void {

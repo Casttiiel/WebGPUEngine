@@ -2,7 +2,6 @@ import { RenderTarget } from '../../resources/RenderTarget';
 import { GPUUtils } from '../utils/GPUUtils';
 import { Render } from '../pipeline/Render';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
-import { GBufferQualityConfig } from '../config/GBufferQualityConfig';
 
 /**
  * G-Buffer render pass for deferred rendering
@@ -30,18 +29,14 @@ export class GBufferPass {
     const width = Render.width;
     const height = Render.height;
     const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-    const gBufferQuality = QualitySettings.getInstance().getGBufferTextureQuality();
     const enableMSAA = msaaLevel > 1;
 
     // Get optimal texture formats based on quality setting
-    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
 
     // Log quality settings for debugging
-    console.log(`Creating G-Buffer with quality: ${gBufferQuality}`, {
-      formats,
+    console.log(`Creating G-Buffer `, {
       msaaLevel,
       resolution: `${width}x${height}`,
-      estimatedMemory: `${GBufferQualityConfig.getMemoryUsage(width, height, gBufferQuality, msaaLevel).toFixed(1)} MB`,
     });
 
     // Create G-Buffer render targets with dynamic formats
@@ -50,7 +45,7 @@ export class GBufferPass {
       'gbuffer_albedos',
       width,
       height,
-      formats.albedo,
+      QualitySettings.getInstance().getSettings().albedoTexture,
       enableMSAA,
       GPUTextureUsage.COPY_SRC,
     );
@@ -60,7 +55,7 @@ export class GBufferPass {
       'gbuffer_normals',
       width,
       height,
-      formats.normal,
+      QualitySettings.getInstance().getSettings().normalTexture,
       enableMSAA,
       GPUTextureUsage.COPY_SRC,
     );
@@ -70,7 +65,7 @@ export class GBufferPass {
       'gbuffer_selfillum',
       width,
       height,
-      formats.selfIllum,
+      QualitySettings.getInstance().getSettings().selfIllumTexture,
       enableMSAA,
       GPUTextureUsage.COPY_SRC,
     );
@@ -80,7 +75,7 @@ export class GBufferPass {
       'gbuffer_linear_depth',
       width,
       height,
-      formats.linearDepth,
+      QualitySettings.getInstance().getSettings().linearDepthTexture,
       enableMSAA,
     );
 

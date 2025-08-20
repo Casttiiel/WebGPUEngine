@@ -107,8 +107,7 @@ export class Cubemap extends GPUResource {
       // Calcular niveles de mipmap
       const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1; // Crear la textura en GPU
 
-      const qualitySettings = QualitySettings.getInstance();
-      const skyboxFormat = qualitySettings.getPostProcessingFormats().skyboxTexture;
+      const skyboxFormat = QualitySettings.getInstance().getSettings().generalTexture;
 
       this.gpuTexture = GPUUtils.createCubemapTexture(
         `${this.label}_texture`,

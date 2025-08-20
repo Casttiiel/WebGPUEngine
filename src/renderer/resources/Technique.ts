@@ -10,7 +10,6 @@ import { Mesh } from './Mesh';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { GBufferQualityConfig } from '../core/config/GBufferQualityConfig';
 import { Render } from '../core/pipeline/Render';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
@@ -283,29 +282,22 @@ export class Technique extends GPUResource {
   }
 
   private createGBufferTargets(): GPUColorTargetState[] {
-    // Get current G-Buffer texture formats based on quality settings
-    const qualitySettings = QualitySettings.getInstance();
-    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
-    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
-
+    // Get current G-Buffer texture formats based on quality settings;
     return [
-      { format: formats.albedo }, // Albedo + metallic
-      { format: formats.normal }, // Normal + roughness
-      { format: formats.selfIllum }, // Self illumination
-      { format: formats.linearDepth }, // Linear depth
+      { format: QualitySettings.getInstance().getSettings().albedoTexture }, // Albedo + metallic
+      { format: QualitySettings.getInstance().getSettings().normalTexture }, // Normal + roughness
+      { format: QualitySettings.getInstance().getSettings().selfIllumTexture }, // Self illumination
+      { format: QualitySettings.getInstance().getSettings().linearDepthTexture }, // Linear depth
     ];
   }
 
   private createPartialGBufferTargets(): GPUColorTargetState[] {
     // Get current G-Buffer texture formats for partial G-Buffer
-    const qualitySettings = QualitySettings.getInstance();
-    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
-    const formats = GBufferQualityConfig.getFormats(gBufferQuality);
 
     return [
-      { format: formats.albedo }, // Albedo + metallic
-      { format: formats.normal }, // Normal + roughness
-      { format: formats.selfIllum }, // Normal + roughness
+      { format: QualitySettings.getInstance().getSettings().albedoTexture }, // Albedo + metallic
+      { format: QualitySettings.getInstance().getSettings().normalTexture }, // Normal + roughness
+      { format: QualitySettings.getInstance().getSettings().selfIllumTexture }, // Self illumination
     ];
   }
 
