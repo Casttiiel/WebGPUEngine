@@ -66,7 +66,7 @@ export class DeferredRenderer {
     // Create accumulation light render target
     const qualitySettings = QualitySettings.getInstance();
     const postProcessingFormats = qualitySettings.getPostProcessingFormats();
-    const msaaLevel = qualitySettings.getMSAALevel();
+    const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
     const gBufferQuality = qualitySettings.getGBufferTextureQuality();
     const enableMSAA = msaaLevel > 1;
     const formats = GBufferQualityConfig.getFormats(gBufferQuality);
@@ -292,8 +292,7 @@ export class DeferredRenderer {
 
     // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    const qualitySettings = QualitySettings.getInstance();
-    const msaaLevel = qualitySettings.getMSAALevel();
+    const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
 
     if (msaaLevel > 1) {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);

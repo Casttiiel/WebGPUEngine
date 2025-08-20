@@ -219,7 +219,7 @@ export class Technique extends GPUResource {
     }
     // Add multisample based on quality settings for MSAA passes
     if (this.needsMSAA()) {
-      const msaaLevel = QualitySettings.getInstance().getMSAALevel();
+      const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
       pipelineConfig.multisample = { count: msaaLevel };
     }
 

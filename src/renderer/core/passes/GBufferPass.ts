@@ -29,9 +29,8 @@ export class GBufferPass {
   private createRenderTargets(): void {
     const width = Render.width;
     const height = Render.height;
-    const qualitySettings = QualitySettings.getInstance();
-    const msaaLevel = qualitySettings.getMSAALevel();
-    const gBufferQuality = qualitySettings.getGBufferTextureQuality();
+    const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
+    const gBufferQuality = QualitySettings.getInstance().getGBufferTextureQuality();
     const enableMSAA = msaaLevel > 1;
 
     // Get optimal texture formats based on quality setting

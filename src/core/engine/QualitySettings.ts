@@ -136,10 +136,6 @@ export class QualitySettings {
     this.onSettingsChanged();
   }
 
-  public getMSAALevel(): number {
-    return this.settings.msaaLevel;
-  }
-
   public getGBufferTextureQuality(): 'low' | 'medium' | 'high' {
     return this.settings.gBufferTextureQuality;
   }
