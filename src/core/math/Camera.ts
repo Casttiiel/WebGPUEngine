@@ -157,6 +157,7 @@ export class Camera {
     this.viewport.height = height;
 
     this.aspectRatio = width / height;
+    this.isDirty = true;
 
     if (!this.isOrtho) {
       this.updateProjection();

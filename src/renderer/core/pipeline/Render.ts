@@ -10,8 +10,8 @@ export class Render {
   private static instance: Render;
 
   // Performance optimization: Maximum 2K render resolution
-  private static readonly MAX_RENDER_WIDTH = 2048;
-  private static readonly MAX_RENDER_HEIGHT = 1152; // 16:9 aspect ratio for 2K
+  private static readonly MAX_RENDER_WIDTH = 2560;
+  private static readonly MAX_RENDER_HEIGHT = 1440;
 
   // Objetos principales de WebGPU
   private adapter!: GPUAdapter;
@@ -53,7 +53,7 @@ export class Render {
     Render.updateRenderDimensions();
 
     console.warn(
-      `Canvas initialized: ${width}x${height} (DPR: ${dpr}, Client: ${canvas.clientWidth}x${canvas.clientHeight})`,
+      `Canvas initialized: ${width}x${height} (Resolution: ${Render.renderWidth}x${Render.renderHeight})`,
     );
 
     try {
@@ -109,10 +109,23 @@ export class Render {
   private static updateRenderDimensions(): void {
     const renderRes = QualitySettings.getInstance().getSettings().renderResolution;
 
-    Render.renderWidth =
-      Math.max(0, Math.min(Render.canvasWidth, Render.MAX_RENDER_WIDTH)) * renderRes;
-    Render.renderHeight =
-      Math.max(0, Math.min(Render.canvasHeight, Render.MAX_RENDER_HEIGHT)) * renderRes;
+    // Calculate the scaling factor to fit within 2K limits while maintaining aspect ratio
+    let scaledWidth = Render.canvasWidth;
+    let scaledHeight = Render.canvasHeight;
+
+    // If canvas exceeds 2K limits, scale down while preserving aspect ratio
+    if (scaledWidth > Render.MAX_RENDER_WIDTH || scaledHeight > Render.MAX_RENDER_HEIGHT) {
+      const widthScale = Render.MAX_RENDER_WIDTH / scaledWidth;
+      const heightScale = Render.MAX_RENDER_HEIGHT / scaledHeight;
+      const scale = Math.min(widthScale, heightScale); // Use the smaller scale to fit both dimensions
+
+      scaledWidth = Math.floor(scaledWidth * scale);
+      scaledHeight = Math.floor(scaledHeight * scale);
+    }
+
+    // Apply quality render resolution scaling
+    Render.renderWidth = Math.max(1, Math.floor(scaledWidth * renderRes));
+    Render.renderHeight = Math.max(1, Math.floor(scaledHeight * renderRes));
   }
 
   // Ajustar el tamaño del buffer de render
