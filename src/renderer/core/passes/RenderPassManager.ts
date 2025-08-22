@@ -189,7 +189,9 @@ export class RenderPassManager {
       ssaoParamsBindGroup,
     );
     this.executeDynamicPass(pass);
-  } /**
+  }
+
+  /**
    * Create and execute an AO bilateral filter pass dynamically
    */
   public executeAOBilateralFilterPass(

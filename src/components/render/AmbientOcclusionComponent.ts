@@ -18,11 +18,12 @@ export class AmbientOcclusionComponent extends Component {
 
   // Render targets for the two-pass process
   private rawAOTarget!: RenderTarget;
-  private bilateralFilterBindGroup!: GPUBindGroup | null;
+  private finalAOResult!: RenderTarget;
 
   // Uniform buffer for SSAO parameters
   private ssaoParamsBuffer!: GPUBuffer;
   private ssaoParamsBindGroup!: GPUBindGroup | null;
+  private bilateralFilterBindGroup!: GPUBindGroup | null;
   private isEnabled = true;
   private noiseTexture!: Texture;
 
@@ -30,8 +31,7 @@ export class AmbientOcclusionComponent extends Component {
     super();
     this.renderPassManager = new RenderPassManager();
 
-    const qualitySettings = QualitySettings.getInstance().getSettings();
-    this.isEnabled = qualitySettings.enableAO;
+    this.isEnabled = QualitySettings.getInstance().getSettings().enableAO;
   }
 
   public async load(): Promise<void> {
@@ -45,6 +45,9 @@ export class AmbientOcclusionComponent extends Component {
     this.rawAOTarget = new RenderTarget();
     this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
 
+    this.finalAOResult = new RenderTarget();
+    this.finalAOResult.createRT('final_ao_result.dds', Render.width, Render.height, aoFormat);
+
     this.createSSAOParamsBuffer();
     this.createSSAOParamsBindGroup();
   }
@@ -55,6 +58,9 @@ export class AmbientOcclusionComponent extends Component {
     this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
     this.bilateralFilterBindGroup = null;
     this.ssaoParamsBindGroup = null;
+
+    this.finalAOResult = new RenderTarget();
+    this.finalAOResult.createRT('final_ao_result.dds', Render.width, Render.height, aoFormat);
   }
 
   private createSSAOParamsBuffer(): void {
@@ -108,18 +114,19 @@ export class AmbientOcclusionComponent extends Component {
     );
   }
 
-  private renderDisabledAO(finalAOTarget: RenderTarget): void {
+  private renderDisabledAO(): GPUTextureView {
     // When AO is disabled, we need to fill the target with white (no occlusion)
     // This ensures the lighting calculations work correctly
-    const commandEncoder = GPUUtils.getDevice().createCommandEncoder({
-      label: 'Disabled AO Clear Pass',
-    });
 
+    /*const commandEncoder = GPUUtils.getDevice().createCommandEncoder({
+      label: 'Disabled AO Clear Pass',
+    });*/
+    const commandEncoder = Render.getInstance().getCommandEncoder();
     const renderPass = commandEncoder.beginRenderPass({
       label: 'Clear AO Target',
       colorAttachments: [
         {
-          view: finalAOTarget.getView(),
+          view: this.rawAOTarget.getView(),
           clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, // White = no occlusion
           loadOp: 'clear',
           storeOp: 'store',
@@ -128,13 +135,14 @@ export class AmbientOcclusionComponent extends Component {
     });
 
     renderPass.end();
-    GPUUtils.getDevice().queue.submit([commandEncoder.finish()]);
+
+    return this.rawAOTarget.getView();
+    //GPUUtils.getDevice().queue.submit([commandEncoder.finish()]);
   }
 
-  public compute(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
+  public compute(gBufferBindGroup: GPUBindGroup): GPUTextureView {
     if (!this.isEnabled) {
-      this.renderDisabledAO(finalAOTarget);
-      return;
+      return this.renderDisabledAO();
     }
 
     // Pass 1: Generate raw AO using SSAO with parameters
@@ -147,10 +155,10 @@ export class AmbientOcclusionComponent extends Component {
     );
 
     // Pass 2: Apply bilateral filter to the raw AO
-    this.applyBilateralFilter(gBufferBindGroup, finalAOTarget);
+    return this.applyBilateralFilter(gBufferBindGroup);
   }
 
-  private applyBilateralFilter(gBufferBindGroup: GPUBindGroup, finalAOTarget: RenderTarget): void {
+  private applyBilateralFilter(gBufferBindGroup: GPUBindGroup): GPUTextureView {
     this.setupBilateralFilterBindGroup();
 
     // Use RenderPassManager to execute bilateral filter pass with both bind groups
@@ -158,9 +166,11 @@ export class AmbientOcclusionComponent extends Component {
       this.fullscreenQuadMesh,
       this.bilateralFilterTechnique,
       gBufferBindGroup, // G-Buffer bind group (group 1)
-      this.bilateralFilterBindGroup!, // AO texture bind group (group 2)
-      finalAOTarget,
+      this.bilateralFilterBindGroup!,
+      this.finalAOResult,
     );
+
+    return this.finalAOResult.getView();
   }
 
   private setupBilateralFilterBindGroup(): void {

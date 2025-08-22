@@ -26,13 +26,15 @@ export class DeferredRenderer {
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
-  private ssr!: ScreenSpaceReflections;
-  private ssrComposeTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private rtAccLight!: RenderTarget;
+  private aoResult!: GPUTextureView;
+
+  //???
+  private ssr!: ScreenSpaceReflections;
+  private ssrComposeTechnique!: Technique;
   private rtFinalComposite!: RenderTarget;
-  private rtAO!: RenderTarget;
-  private rtAOBinding!: RenderTarget; // Copy target for binding
+  //???
 
   private rtCopyAlbedos!: RenderTarget;
   private rtCopyNormals!: RenderTarget;
@@ -83,30 +85,6 @@ export class DeferredRenderer {
       height,
       QualitySettings.getInstance().getSettings().hdrTexture,
     );
-
-    if (!this.rtAO) {
-      this.rtAO = new RenderTarget();
-    }
-    this.rtAO.createRT(
-      'ambient_occlusion_result.dds',
-      width,
-      height,
-      QualitySettings.getInstance().getSettings().aoTexture,
-      false,
-      GPUTextureUsage.COPY_SRC,
-    ); // Add COPY_SRC
-
-    if (!this.rtAOBinding) {
-      this.rtAOBinding = new RenderTarget();
-    }
-    this.rtAOBinding.createRT(
-      'ambient_occlusion_binding.dds',
-      width,
-      height,
-      QualitySettings.getInstance().getSettings().aoTexture,
-      false,
-      GPUTextureUsage.COPY_DST,
-    ); // Add COPY_DST
 
     if (!this.rtCopyAlbedos) {
       this.rtCopyAlbedos = new RenderTarget();
@@ -277,7 +255,7 @@ export class DeferredRenderer {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     }
 
-    this.renderAO(camera, this.rtAO);
+    this.aoResult = this.renderAO(camera);
 
     this.renderAccLight();
 
@@ -330,12 +308,11 @@ export class DeferredRenderer {
     );
   }
 
-  private renderAO(camera: Entity, ao: RenderTarget): void {
+  private renderAO(camera: Entity): GPUTextureView {
     const ambientOcclusionComponent = camera.getComponent(
       'ambient_occlusion',
     ) as AmbientOcclusionComponent;
-    ambientOcclusionComponent.compute(this.gBufferBindGroup, ao);
-    this.copyAOTextureToBinding();
+    return ambientOcclusionComponent.compute(this.gBufferBindGroup);
   }
 
   private renderSSR(): GPUTextureView {
@@ -434,17 +411,13 @@ export class DeferredRenderer {
       },
       {
         binding: 4,
-        resource: this.rtAOBinding.getView()!,
-      },
-      {
-        binding: 5,
         resource: this.whiteTexture.getSampler()!,
       },
     ]);
   }
 
   private renderAccLight(): void {
-    this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup, this.aoResult);
 
     // Use new render pass system for lights
     this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
@@ -453,21 +426,6 @@ export class DeferredRenderer {
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
-  }
-
-  private copyAOTextureToBinding(): void {
-    // Copy AO result to binding texture using GPU
-    const encoder = Render.getInstance().getCommandEncoder();
-
-    encoder.copyTextureToTexture(
-      { texture: this.rtAO.getTexture() },
-      { texture: this.rtAOBinding.getTexture() },
-      {
-        width: this.rtAO.getWidth(),
-        height: this.rtAO.getHeight(),
-        depthOrArrayLayers: 1,
-      },
-    );
   }
 
   public update(_dt: number): void {}
@@ -481,13 +439,6 @@ export class DeferredRenderer {
     }
     if (this.rtFinalComposite) {
       this.rtFinalComposite.destroy();
-    }
-    if (this.rtAO) {
-      this.rtAO.destroy();
-    }
-
-    if (this.rtAOBinding) {
-      this.rtAOBinding.destroy();
     }
   }
 

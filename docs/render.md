@@ -542,23 +542,6 @@ public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
 
 ### Performance Optimizations
 
-#### 1. **GPU-Based Frustum Culling**
-
-Uses compute shaders for parallel frustum testing:
-
-```typescript
-export class GPUFrustumCuller {
-  private computeShader: string = /* WGSL compute shader */;
-
-  public async cullObjects(camera: Camera, objects: CullableObject[]): Promise<CullResult> {
-    // Upload object data to GPU buffers
-    // Execute compute shader for parallel frustum testing
-    // Read back visibility results
-    return { visibleIndices, culledCount };
-  }
-}
-```
-
 #### 2. **Temporal Cache Management**
 
 Intelligent caching system with motion-based validation:

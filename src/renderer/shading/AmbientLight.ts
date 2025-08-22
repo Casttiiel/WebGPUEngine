@@ -9,7 +9,6 @@ import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
-  private whiteTexture!: Texture;
 
   private ambientTechnique!: Technique;
   private ambientBindGroup!: GPUBindGroup;
@@ -24,7 +23,6 @@ export class AmbientLight {
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
-    this.whiteTexture = await Texture.get('white.png');
 
     this.ambientUniformBuffer = GPUUtils.createBuffer(
       'ambient uniform buffer',
@@ -42,28 +40,16 @@ export class AmbientLight {
         0.0,
       ]),
     );
-
-    this.ambientBindGroup = BindGroupFactory.createBindGroup(
-      'ambient_bindgroup',
-      this.ambientTechnique.getPipeline().getBindGroupLayout(2),
-      [
-        {
-          binding: 0,
-          resource: this.whiteTexture.getTextureView()!,
-        },
-        {
-          binding: 1,
-          resource: SamplerLibrary.simpleSampler!,
-        },
-        {
-          binding: 2,
-          resource: { buffer: this.ambientUniformBuffer },
-        },
-      ],
-    );
   }
 
-  public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+  public render(
+    rtAccLight: GPUTextureView,
+    gBufferBindGroup: GPUBindGroup,
+    aoResult: GPUTextureView,
+  ): void {
+    if (!this.ambientBindGroup) {
+      this.createAmbientBindGroup(aoResult);
+    }
     const render = Render.getInstance();
 
     // Use GPUUtils for consistent render pass descriptor creation
@@ -98,6 +84,27 @@ export class AmbientLight {
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();
+  }
+
+  private createAmbientBindGroup(aoResult: GPUTextureView): void {
+    this.ambientBindGroup = BindGroupFactory.createBindGroup(
+      'ambient_bindgroup',
+      this.ambientTechnique.getPipeline().getBindGroupLayout(2),
+      [
+        {
+          binding: 0,
+          resource: aoResult,
+        },
+        {
+          binding: 1,
+          resource: SamplerLibrary.simpleSampler!,
+        },
+        {
+          binding: 2,
+          resource: { buffer: this.ambientUniformBuffer },
+        },
+      ],
+    );
   }
 
   public update(_dt: number): void {}
