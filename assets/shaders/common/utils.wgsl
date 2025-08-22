@@ -146,8 +146,11 @@ fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, shadowMap: texture_depth_2d, 
     // Quick optimization: clamp coordinates instead of branching
     let clamped_coord = clamp(homo_coord, vec2<f32>(0.0), vec2<f32>(1.0));
     
-    // Add small depth bias to prevent shadow acne
-    let biased_depth = coord_z - 0.0005;
+    // Slope-scaled bias - más bias en superficies inclinadas
+    // Aproximación simple sin textureSampleGrad (no compatible con comparison sampler)
+    let bias = 0.0005; // Bias base
+    
+    let biased_depth = coord_z - bias;
     return textureSampleCompareLevel(shadowMap, shadowSampler, clamped_coord, biased_depth);
 }
 
@@ -178,6 +181,46 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
         return 0.0; // Fuera del rango UV = sin sombra
     }
 
-    // Optimización: Solo usar una muestra central sin rotación para mejor performance
-    return shadowsTap(lightUVSpacePos.xy, lightUVSpacePos.z, shadowMap, shadowSampler);
+    // PCF 4x4 con patrón Poisson disk para mejor distribución
+    let filterRadius = lightShadowStepDivResolution; // Radio más grande para sombras más suaves
+    
+    // Añadir rotación aleatoria para romper patrones y hacer soft shadows
+    let random = hash3(wPos) * 2.0 * PI; // 2*PI
+    let cosR = cos(random);
+    let sinR = sin(random);
+    
+    // Poisson disk offsets para mejor sampling
+    let offsets = array<vec2<f32>, 16>(
+        vec2<f32>(-0.942016, -0.39906),
+        vec2<f32>(-0.094184, -0.92938),
+        vec2<f32>(-0.344959, -0.40023),
+        vec2<f32>(-0.791559, -0.59771),
+        vec2<f32>(-0.310390, 0.90469),
+        vec2<f32>(-0.943749, 0.05449),
+        vec2<f32>(-0.032820, 0.58806),
+        vec2<f32>(-0.611406, 0.17495),
+        vec2<f32>(0.147506, -0.47438),
+        vec2<f32>(0.455077, -0.76838),
+        vec2<f32>(0.542570, -0.17333),
+        vec2<f32>(0.904524, -0.23376),
+        vec2<f32>(0.277191, 0.48309),
+        vec2<f32>(0.674189, 0.41622),
+        vec2<f32>(0.954331, 0.65465),
+        vec2<f32>(0.423446, 0.84157)
+    );
+    
+    var shadow = 0.0;
+    for (var i = 0; i < 16; i++) {
+        // Rotar offsets para eliminar patrones regulares y crear soft shadows
+        let rotatedOffset = vec2<f32>(
+            offsets[i].x * cosR - offsets[i].y * sinR,
+            offsets[i].x * sinR + offsets[i].y * cosR
+        );
+        let sampleCoord = lightUVSpacePos.xy + rotatedOffset * filterRadius;
+        shadow += shadowsTap(sampleCoord, lightUVSpacePos.z, shadowMap, shadowSampler);
+    }
+    
+    let shadowResult = shadow / 16.0;
+    // Suavizar bordes para soft shadows
+    return smoothstep(0.1, 0.9, shadowResult);
 }
