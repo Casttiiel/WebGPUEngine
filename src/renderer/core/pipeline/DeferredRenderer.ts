@@ -64,9 +64,6 @@ export class DeferredRenderer {
     }
 
     // Create accumulation light render target
-    const qualitySettings = QualitySettings.getInstance();
-    const postProcessingFormats = qualitySettings.getPostProcessingFormats();
-
     if (!this.rtAccLight) {
       this.rtAccLight = new RenderTarget();
     }
@@ -74,7 +71,7 @@ export class DeferredRenderer {
       'acc_light.dds',
       width,
       height,
-      postProcessingFormats.toneMappingTexture,
+      QualitySettings.getInstance().getSettings().hdrTexture,
     );
 
     if (!this.rtFinalComposite) {
@@ -84,7 +81,7 @@ export class DeferredRenderer {
       'final_composite.dds',
       width,
       height,
-      postProcessingFormats.toneMappingTexture,
+      QualitySettings.getInstance().getSettings().hdrTexture,
     );
 
     if (!this.rtAO) {
@@ -94,7 +91,7 @@ export class DeferredRenderer {
       'ambient_occlusion_result.dds',
       width,
       height,
-      postProcessingFormats.aoTexture,
+      QualitySettings.getInstance().getSettings().aoTexture,
       false,
       GPUTextureUsage.COPY_SRC,
     ); // Add COPY_SRC
@@ -106,7 +103,7 @@ export class DeferredRenderer {
       'ambient_occlusion_binding.dds',
       width,
       height,
-      postProcessingFormats.aoTexture,
+      QualitySettings.getInstance().getSettings().aoTexture,
       false,
       GPUTextureUsage.COPY_DST,
     ); // Add COPY_DST

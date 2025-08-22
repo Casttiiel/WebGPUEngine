@@ -302,21 +302,16 @@ export class Technique extends GPUResource {
   }
 
   private createTextureTarget(): GPUColorTargetState[] {
-    const qualitySettings = QualitySettings.getInstance();
-    const postProcessingFormat = qualitySettings.getPostProcessingFormats().toneMappingTexture;
-
     return [
       {
-        format: postProcessingFormat,
+        format: QualitySettings.getInstance().getSettings().hdrTexture,
         blend: this.getBlendState(),
       },
     ];
   }
 
   private createSingleChannelTarget(): GPUColorTargetState[] {
-    const qualitySettings = QualitySettings.getInstance();
-    const aoFormat = qualitySettings.getPostProcessingFormats().aoTexture;
-    return [{ format: aoFormat }];
+    return [{ format: QualitySettings.getInstance().getSettings().aoTexture }];
   }
 
   private createScreenTarget(): GPUColorTargetState[] {

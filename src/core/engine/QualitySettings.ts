@@ -1,5 +1,3 @@
-import { PostProcessingQualityConfig } from '../../renderer/core/config/PostProcessingQualityConfig';
-
 export interface GraphicsQualitySettings {
   renderResolution: number;
   aliasingTexture: GPUTextureFormat;
@@ -19,6 +17,7 @@ export interface GraphicsQualitySettings {
   selfIllumTexture: GPUTextureFormat;
   linearDepthTexture: GPUTextureFormat;
   generalTexture: GPUTextureFormat;
+  hdrTexture: GPUTextureFormat;
 }
 
 export class QualitySettings {
@@ -47,6 +46,7 @@ export class QualitySettings {
       selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'rg16float',
       generalTexture: 'rgba8unorm',
+      hdrTexture: 'rgba16float',
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -63,11 +63,12 @@ export class QualitySettings {
       aoStrength: 3.0,
       aoNoiseScale: 0.01,
       msaaLevel: 4,
-      albedoTexture: 'rgba16float',
-      normalTexture: 'rgba16float',
-      selfIllumTexture: 'rgba16float',
+      albedoTexture: 'rgba8unorm',
+      normalTexture: 'rgba8unorm',
+      selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'rg16float',
-      generalTexture: 'rgba16float',
+      generalTexture: 'rgba8unorm',
+      hdrTexture: 'rgba16float',
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -84,11 +85,12 @@ export class QualitySettings {
       aoStrength: 3.0,
       aoNoiseScale: 0.01,
       msaaLevel: 4,
-      albedoTexture: 'rgba16float',
-      normalTexture: 'rgba16float',
-      selfIllumTexture: 'rgba16float',
+      albedoTexture: 'rgba8unorm',
+      normalTexture: 'rgba8unorm',
+      selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'rg16float',
-      generalTexture: 'rgba16float',
+      generalTexture: 'rgba8unorm',
+      hdrTexture: 'rgba16float',
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -105,11 +107,12 @@ export class QualitySettings {
       aoStrength: 3.0,
       aoNoiseScale: 0.01,
       msaaLevel: 4,
-      albedoTexture: 'rgba16float',
-      normalTexture: 'rgba16float',
-      selfIllumTexture: 'rgba16float',
+      albedoTexture: 'rgba8unorm',
+      normalTexture: 'rgba8unorm',
+      selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'rg16float',
-      generalTexture: 'rgba16float',
+      generalTexture: 'rgba8unorm',
+      hdrTexture: 'rgba16float',
     } as GraphicsQualitySettings,
   };
 
@@ -145,10 +148,6 @@ export class QualitySettings {
     }
 
     return this.currentPreset;
-  }
-
-  public getPostProcessingFormats() {
-    return PostProcessingQualityConfig.getFormats('high');
   }
 
   public applyPreset(presetName: keyof typeof QualitySettings.PRESETS): void {

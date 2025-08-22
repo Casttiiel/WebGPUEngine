@@ -125,8 +125,7 @@ export class BlurComponent extends Component {
   }
 
   private createBlurSteps(): void {
-    const qualitySettings = QualitySettings.getInstance();
-    const bloomFormat = qualitySettings.getPostProcessingFormats().bloomTexture;
+    const bloomFormat = QualitySettings.getInstance().getSettings().bloomTexture;
 
     // Clear existing steps
     this.steps.forEach((step) => step.dispose());
