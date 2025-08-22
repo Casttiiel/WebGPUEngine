@@ -1,6 +1,3 @@
-// G-Buffer decoding functions
-// This file contains common functions for decoding G-Buffer data
-
 fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     var g: GBuffer;
     
@@ -9,15 +6,14 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     g.zlinear = zlinear;
     g.worldPos = getWorldCoords(uv, zlinear, camera);
     
-    // Get normal
-    let normalData = textureSample(gNormals, samplerGBuffer, uv);
-    g.normal = normalize(decodeNormal(normalData.xyz));
+    let normalRoughnessData = textureSample(gNormals, samplerGBuffer, uv);
+    let encodedNormal = normalRoughnessData.xy;
+    g.normal = octahedral01ToNormal(encodedNormal);
+    g.roughness = normalRoughnessData.z;
     
     // Get albedo and metallic
     let albedo = textureSample(gAlbedo, samplerGBuffer, uv);
     g.metallic = albedo.a;
-    g.roughness = normalData.a;
-    //g.metallic = max(clamp(1.0 - normalData.a, 0.0, 1.0), g.metallic);
     
     // Gamma correction for albedo
     g.albedo = pow(abs(albedo.rgb), vec3<f32>(2.2));

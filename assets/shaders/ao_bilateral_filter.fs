@@ -1,6 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
+#include "common/octahedral"
 
 // Constantes para bilateral filter
 const BILATERAL_RADIUS = 2u;      // Radio del filtro bilateral
@@ -27,8 +28,8 @@ fn bilateralFilter(centerUV: vec2<f32>) -> f32 {
     let texelSize = 1.0 / camera.screenSize;
       // Obtener datos del pixel central
     let centerDepth = textureSample(gLinearDepth, samplerGBuffer, centerUV).x;
-    let centerNormalData = textureSample(gNormals, samplerGBuffer, centerUV);
-    let centerNormal = normalize(decodeNormal(centerNormalData.xyz));
+    let normalRoughnessData = textureSample(gNormals, samplerGBuffer, centerUV);
+    let centerNormal = octahedral01ToNormal(normalRoughnessData.xy);
     let centerAO = textureSample(aoTexture, samplerAO, centerUV).r;
     
     // Muestrear en un patrón 5x5 alrededor del pixel central
@@ -39,8 +40,8 @@ fn bilateralFilter(centerUV: vec2<f32>) -> f32 {
             
             // Obtener datos de la muestra
             let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUV).x;
-            let sampleNormalData = textureSample(gNormals, samplerGBuffer, sampleUV);
-            let sampleNormal = normalize(decodeNormal(sampleNormalData.xyz));
+            let normalRoughnessData2 = textureSample(gNormals, samplerGBuffer, sampleUV);
+            let sampleNormal = octahedral01ToNormal(normalRoughnessData2.xy);
             let sampleAO = textureSample(aoTexture, samplerAO, sampleUV).r;
             
             // Calcular pesos basados en similitud de profundidad y normal

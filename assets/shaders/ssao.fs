@@ -1,6 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
+#include "common/octahedral"
 #include "common/gbuffer"
 
 // Estructura para parámetros SSAO solamente
@@ -97,7 +98,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) f32 {
     }
 
     let normalData = textureSampleLevel(gNormals, hbaoSampler, uv, 0.0);
-    let normalWorld = normalize(decodeNormal(normalData.xyz));
+    let normalWorld = octahedral01ToNormal(normalData.xy);
     var viewNormal = normalize((camera.viewMatrix * vec4(normalWorld, 0.0)).xyz);
     viewNormal *= vec3<f32>(1.0, -1.0, 1.0);
 
