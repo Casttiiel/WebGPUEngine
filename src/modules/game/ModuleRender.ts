@@ -85,6 +85,12 @@ export class ModuleRender extends Module {
     for (const comp of Engine.getEntities().getObjectManagerByName('bloom')?.getList() ?? []) {
       (comp as BloomComponent).resize();
     }
+
+    for (const comp of Engine.getEntities()
+      .getObjectManagerByName('ambient_occlusion')
+      ?.getList() ?? []) {
+      (comp as AmbientOcclusionComponent).resize();
+    }
   }
 
   public generateFrame(): void {

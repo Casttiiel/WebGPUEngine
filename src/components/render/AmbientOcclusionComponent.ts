@@ -65,13 +65,20 @@ export class AmbientOcclusionComponent extends Component {
     const aoWidth = Math.floor(Render.width * aoScale);
     const aoHeight = Math.floor(Render.height * aoScale);
 
+    if (this.rawAOTarget) {
+      this.rawAOTarget.destroy();
+    }
+    if (this.finalAOResult) {
+      this.finalAOResult.destroy();
+    }
     // Recreate both targets at reduced resolution
+    this.rawAOTarget = new RenderTarget();
     this.rawAOTarget.createRT('raw_ao_result.dds', aoWidth, aoHeight, aoFormat);
+    this.finalAOResult = new RenderTarget();
     this.finalAOResult.createRT('final_ao_result.dds', aoWidth, aoHeight, aoFormat);
 
     // Invalidate bind groups so they get recreated with new textures
     this.bilateralFilterBindGroup = null;
-    this.ssaoParamsBindGroup = null;
   }
 
   private createSSAOParamsBuffer(): void {

@@ -2,7 +2,6 @@ import { Engine } from '../../core/engine/Engine';
 import { Render } from '../core/pipeline/Render';
 import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
-import { Texture } from '../resources/Texture';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
@@ -108,4 +107,8 @@ export class AmbientLight {
   }
 
   public update(_dt: number): void {}
+
+  public destroy(): void {
+    this.ambientBindGroup = null!;
+  }
 }

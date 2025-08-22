@@ -41,8 +41,12 @@ export class CameraComponent extends Component {
       this.camera.setFarPlane(data.far);
     }
 
+    // This ensures correct aspect ratio from the start
     if (data.viewport) {
       this.camera.setViewport(data.viewport.width, data.viewport.height);
+    } else {
+      // If no viewport specified, use current render dimensions
+      this.camera.setViewport(Render.width, Render.height);
     }
 
     if (data.controllable) {

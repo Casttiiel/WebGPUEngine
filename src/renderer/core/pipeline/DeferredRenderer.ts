@@ -455,8 +455,13 @@ export class DeferredRenderer {
       this.depthResolver.destroy();
     }
 
+    if (this.ambientLight) {
+      this.ambientLight.destroy();
+    }
+
     this.gBufferBindGroup = null as any;
     this.gBufferLayout = null as any;
+    this.aoResult = null as any;
     this.isLoaded = false;
   }
 
