@@ -54,7 +54,6 @@ export class DeferredRenderer {
   public create(width: number, height: number) {
     if (!this.isLoaded) return;
     this.dispose();
-
     this.gBufferLayout = BindGroupFactory.getGBufferLayout();
 
     // Create G-Buffer pass with specified dimensions by resizing
@@ -254,9 +253,7 @@ export class DeferredRenderer {
     if (msaaLevel > 1) {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     }
-
     this.aoResult = this.renderAO(camera);
-
     this.renderAccLight();
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
@@ -440,6 +437,12 @@ export class DeferredRenderer {
     if (this.rtFinalComposite) {
       this.rtFinalComposite.destroy();
     }
+
+    if (this.ambientLight) {
+      this.ambientLight.destroy();
+    }
+
+    this.aoResult = null as any;
   }
 
   public destroy(): void {
@@ -453,10 +456,6 @@ export class DeferredRenderer {
     // Clean up depth resolver
     if (this.depthResolver) {
       this.depthResolver.destroy();
-    }
-
-    if (this.ambientLight) {
-      this.ambientLight.destroy();
     }
 
     this.gBufferBindGroup = null as any;
