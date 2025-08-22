@@ -44,8 +44,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
 
     let camb2obj = input.WorldPos - camera.cameraPosition;
     let linear_depth = dot(camb2obj, camera.cameraFront) / camera.cameraZFar;
-    // Write depth to .r channel for rg16float format compatibility
-    output.depth = vec2<f32>(linear_depth, 0.0);
+    output.depth = linear_depth;
 
     return output;
 }
