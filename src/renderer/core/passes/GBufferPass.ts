@@ -10,7 +10,6 @@ import { QualitySettings } from '../../../core/engine/QualitySettings';
 export class GBufferPass {
   private rtAlbedos!: RenderTarget;
   private rtNormals!: RenderTarget;
-  private rtSelfIllum!: RenderTarget;
   private rtLinearDepth!: RenderTarget;
   private depthStencil!: GPUTexture;
   private depthStencilView!: GPUTextureView;
@@ -54,16 +53,6 @@ export class GBufferPass {
       width,
       height,
       QualitySettings.getInstance().getSettings().normalTexture,
-      enableMSAA,
-      GPUTextureUsage.COPY_SRC,
-    );
-
-    this.rtSelfIllum = new RenderTarget();
-    this.rtSelfIllum.createRT(
-      'gbuffer_selfillum',
-      width,
-      height,
-      QualitySettings.getInstance().getSettings().selfIllumTexture,
       enableMSAA,
       GPUTextureUsage.COPY_SRC,
     );
@@ -115,18 +104,15 @@ export class GBufferPass {
     const colorAttachments: GPURenderPassColorAttachment[] = [
       GPUUtils.createColorAttachment(this.rtAlbedos.getRenderView()),
       GPUUtils.createColorAttachment(this.rtNormals.getRenderView()),
-      GPUUtils.createColorAttachment(this.rtSelfIllum.getRenderView()),
       GPUUtils.createColorAttachment(this.rtLinearDepth.getRenderView()),
     ];
 
     // Add resolve targets for MSAA if available
     const albedoResolve = this.rtAlbedos.getResolveTarget();
     const normalResolve = this.rtNormals.getResolveTarget();
-    const selfIllumResolve = this.rtSelfIllum.getResolveTarget();
     const linearDepthResolve = this.rtLinearDepth.getResolveTarget();
     if (albedoResolve) colorAttachments[0]!.resolveTarget = albedoResolve;
     if (normalResolve) colorAttachments[1]!.resolveTarget = normalResolve;
-    if (selfIllumResolve) colorAttachments[2]!.resolveTarget = selfIllumResolve;
     if (linearDepthResolve) colorAttachments[3]!.resolveTarget = linearDepthResolve;
 
     const depthStencilAttachment = GPUUtils.createDepthStencilAttachment(
@@ -153,13 +139,11 @@ export class GBufferPass {
   public getRenderTargets(): {
     albedos: RenderTarget;
     normals: RenderTarget;
-    selfIllum: RenderTarget;
     linearDepth: RenderTarget;
   } {
     return {
       albedos: this.rtAlbedos,
       normals: this.rtNormals,
-      selfIllum: this.rtSelfIllum,
       linearDepth: this.rtLinearDepth,
     };
   }

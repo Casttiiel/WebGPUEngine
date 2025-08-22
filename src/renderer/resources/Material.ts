@@ -104,8 +104,8 @@ export class Material extends GPUResource {
       textures,
       category: materialData?.category,
       baseColorFactor: materialData?.baseColorFactor || [1.0, 1.0, 1.0, 1.0],
-      castsShadows: materialData?.casts_shadows,
-      shadows: materialData?.shadows,
+      castsShadows: materialData?.casts_shadows !== undefined ? materialData.casts_shadows : true,
+      shadows: materialData?.shadows !== undefined ? materialData.shadows : false,
     });
 
     await material.load();

@@ -285,8 +285,7 @@ export class Technique extends GPUResource {
     // Get current G-Buffer texture formats based on quality settings;
     return [
       { format: QualitySettings.getInstance().getSettings().albedoTexture }, // Albedo + metallic
-      { format: QualitySettings.getInstance().getSettings().normalTexture }, // Normal + roughness
-      { format: QualitySettings.getInstance().getSettings().selfIllumTexture }, // Self illumination
+      { format: QualitySettings.getInstance().getSettings().normalTexture }, // Normal + roughness + emissive
       { format: QualitySettings.getInstance().getSettings().linearDepthTexture }, // Linear depth
     ];
   }
@@ -296,8 +295,7 @@ export class Technique extends GPUResource {
 
     return [
       { format: QualitySettings.getInstance().getSettings().albedoTexture }, // Albedo + metallic
-      { format: QualitySettings.getInstance().getSettings().normalTexture }, // Normal + roughness
-      { format: QualitySettings.getInstance().getSettings().selfIllumTexture }, // Self illumination
+      { format: QualitySettings.getInstance().getSettings().normalTexture }, // Normal + roughness + emissive
     ];
   }
 

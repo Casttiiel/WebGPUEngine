@@ -23,7 +23,6 @@ export class RenderPassManager {
   public initializeDeferredPasses(
     albedos: RenderTarget,
     normals: RenderTarget,
-    selfIllum: RenderTarget,
     linearDepth: RenderTarget,
     accLight: RenderTarget,
     msaaDepthView: GPUTextureView,
@@ -34,7 +33,6 @@ export class RenderPassManager {
     const gBufferConfig = RenderPassFactory.createGBufferPassConfig(
       albedos,
       normals,
-      selfIllum,
       linearDepth,
       msaaDepthView,
     );
@@ -42,12 +40,7 @@ export class RenderPassManager {
     this.renderPasses.set('gbuffer', gBufferPass);
 
     // Create Decal pass
-    const decalConfig = RenderPassFactory.createDecalPassConfig(
-      albedos,
-      normals,
-      selfIllum,
-      msaaDepthView,
-    );
+    const decalConfig = RenderPassFactory.createDecalPassConfig(albedos, normals, msaaDepthView);
     const decalPass = new DecalRenderPass(decalConfig);
     decalPass.setCustomBindGroup(copyPartialGBufferBindGroup);
     this.renderPasses.set('decals', decalPass);

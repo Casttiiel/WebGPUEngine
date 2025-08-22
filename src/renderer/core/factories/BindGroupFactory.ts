@@ -148,15 +148,9 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
-      // Self illumination texture
-      {
-        binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: 'float' },
-      },
       // Shared sampler
       {
-        binding: 4,
+        binding: 3,
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'filtering' },
       },

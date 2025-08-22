@@ -16,8 +16,7 @@ struct AmbientUniforms {
 @group(1) @binding(0) var gAlbedo: texture_2d<f32>;
 @group(1) @binding(1) var gNormals: texture_2d<f32>;
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
-@group(1) @binding(3) var gSelfIllum: texture_2d<f32>;
-@group(1) @binding(4) var samplerGBuffer: sampler;
+@group(1) @binding(3) var samplerGBuffer: sampler;
 
 @group(2) @binding(0) var gAO: texture_2d<f32>;
 @group(2) @binding(1) var samplerEnv: sampler;

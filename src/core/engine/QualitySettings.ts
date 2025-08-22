@@ -15,7 +15,6 @@ export interface GraphicsQualitySettings {
   msaaLevel: number;
   albedoTexture: GPUTextureFormat;
   normalTexture: GPUTextureFormat;
-  selfIllumTexture: GPUTextureFormat;
   linearDepthTexture: GPUTextureFormat;
   generalTexture: GPUTextureFormat;
   hdrTexture: GPUTextureFormat;
@@ -45,7 +44,6 @@ export class QualitySettings {
       msaaLevel: 1,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
-      selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
@@ -68,7 +66,6 @@ export class QualitySettings {
       msaaLevel: 4,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
-      selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
@@ -91,7 +88,6 @@ export class QualitySettings {
       msaaLevel: 4,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
-      selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
@@ -114,7 +110,6 @@ export class QualitySettings {
       msaaLevel: 4,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
-      selfIllumTexture: 'rgba8unorm',
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',

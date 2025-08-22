@@ -38,7 +38,6 @@ export class DeferredRenderer {
 
   private rtCopyAlbedos!: RenderTarget;
   private rtCopyNormals!: RenderTarget;
-  private rtCopySelfIllum!: RenderTarget;
 
   private gBufferBindGroup!: GPUBindGroup;
   private gBufferLayout!: GPUBindGroupLayout;
@@ -107,17 +106,6 @@ export class DeferredRenderer {
       false,
       GPUTextureUsage.COPY_DST,
     );
-    if (!this.rtCopySelfIllum) {
-      this.rtCopySelfIllum = new RenderTarget();
-    }
-    this.rtCopySelfIllum.createRT(
-      'gbuffer_copy_selfillum',
-      width,
-      height,
-      QualitySettings.getInstance().getSettings().selfIllumTexture,
-      false,
-      GPUTextureUsage.COPY_DST,
-    );
 
     // Initialize render passes with GBufferPass render targets
     const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
@@ -141,10 +129,6 @@ export class DeferredRenderer {
         },
         {
           binding: 3,
-          resource: this.rtCopySelfIllum.getView()!,
-        },
-        {
-          binding: 4,
           resource: this.whiteTexture.getSampler()!,
         },
       ],
@@ -153,7 +137,6 @@ export class DeferredRenderer {
     this.renderPassManager.initializeDeferredPasses(
       gBufferRenderTargets.albedos,
       gBufferRenderTargets.normals,
-      gBufferRenderTargets.selfIllum,
       gBufferRenderTargets.linearDepth,
       this.rtAccLight,
       gBufferDepthTextures.msaaDepthView,
@@ -180,10 +163,6 @@ export class DeferredRenderer {
         },
         {
           binding: 3,
-          resource: gBufferRenderTargets.selfIllum.getView()!,
-        },
-        {
-          binding: 4,
           resource: this.whiteTexture.getSampler()!,
         },
       ],
@@ -289,17 +268,6 @@ export class DeferredRenderer {
       {
         width: this.rtCopyNormals.getWidth(),
         height: this.rtCopyNormals.getHeight(),
-        depthOrArrayLayers: 1,
-      },
-    );
-
-    // Copiar selfIllum
-    encoder.copyTextureToTexture(
-      { texture: gBufferRenderTargets.selfIllum.getTexture() },
-      { texture: this.rtCopySelfIllum.getTexture() },
-      {
-        width: this.rtCopySelfIllum.getWidth(),
-        height: this.rtCopySelfIllum.getHeight(),
         depthOrArrayLayers: 1,
       },
     );

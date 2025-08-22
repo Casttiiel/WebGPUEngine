@@ -1,6 +1,8 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
+#include "common/octahedral"
+
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var txAlbedo: texture_2d<f32>;
@@ -30,12 +32,20 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     
     // Calcular TBN y transformar la normal
     let TBN = computeTBN(normalize(input.N), input.T);
-    let N = normalize(TBN * N_tangent_space.xyz);
-    let roughness = textureSample(txRoughness, samplerState, input.Uv).g;
-    output.normal = encodeNormal(N, roughness);
+    let N = normalize(TBN * N_tangent_space.xyz);    
     
-    output.selfIllum = textureSample(txEmissive, samplerState, input.Uv);
-    output.selfIllum *= output.selfIllum.a;
+    let roughness = textureSample(txRoughness, samplerState, input.Uv).g;
+    let encodedNormal = normalToOctahedral01(N);
+
+    let emissive = textureSample(txEmissive, samplerState, input.Uv).x;
+
+    // Pack octahedral normal + roughness en RGBA8
+    output.normal = vec4<f32>(
+        encodedNormal.x,
+        encodedNormal.y,
+        roughness,
+        emissive
+    );
 
     let camb2obj = input.WorldPos - camera.cameraPosition;
     let linear_depth = dot(camb2obj, camera.cameraFront) / camera.cameraZFar;

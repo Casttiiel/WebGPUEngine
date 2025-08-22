@@ -77,8 +77,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
 @group(1) @binding(0) var gAlbedo: texture_2d<f32>;
 @group(1) @binding(1) var gNormals: texture_2d<f32>;
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
-@group(1) @binding(3) var gSelfIllum: texture_2d<f32>;
-@group(1) @binding(4) var samplerGBuffer: sampler;
+@group(1) @binding(3) var samplerGBuffer: sampler;
 
 @group(3) @binding(0) var<uniform> light: LightUniforms;
 @group(3) @binding(1) var gShadowMap: texture_depth_2d;

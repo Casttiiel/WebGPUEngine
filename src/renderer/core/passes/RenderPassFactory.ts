@@ -11,7 +11,6 @@ export class RenderPassFactory {
   public static createGBufferPassConfig(
     albedos: RenderTarget,
     normals: RenderTarget,
-    selfIllum: RenderTarget,
     linearDepth: RenderTarget,
     msaaDepthView: GPUTextureView,
     viewport?: { width: number; height: number },
@@ -31,13 +30,6 @@ export class RenderPassFactory {
         loadOp: 'clear',
         storeOp: 'store',
         ...(normals.getResolveTarget() && { resolveTarget: normals.getResolveTarget()! }),
-      },
-      {
-        view: selfIllum.getRenderView()!,
-        clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        loadOp: 'clear',
-        storeOp: 'store',
-        ...(selfIllum.getResolveTarget() && { resolveTarget: selfIllum.getResolveTarget()! }),
       },
       {
         view: linearDepth.getRenderView()!,
@@ -67,7 +59,6 @@ export class RenderPassFactory {
   public static createDecalPassConfig(
     albedos: RenderTarget,
     normals: RenderTarget,
-    selfIllum: RenderTarget,
     msaaDepthView: GPUTextureView,
     viewport?: { width: number; height: number },
   ): RenderPassConfig {
@@ -84,12 +75,6 @@ export class RenderPassFactory {
         loadOp: 'load',
         storeOp: 'store',
         ...(normals.getResolveTarget() && { resolveTarget: normals.getResolveTarget()! }),
-      },
-      {
-        view: selfIllum.getRenderView()!,
-        loadOp: 'load',
-        storeOp: 'store',
-        ...(selfIllum.getResolveTarget() && { resolveTarget: selfIllum.getResolveTarget()! }),
       },
     ];
 

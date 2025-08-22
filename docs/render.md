@@ -218,8 +218,7 @@ The G-Buffer stores geometry information across multiple render targets:
 struct FragmentOutput {
   @location(0) albedo: vec4<f32>;     // RGB: albedo, A: metallic
   @location(1) normal: vec4<f32>;     // RGB: world normal, A: roughness
-  @location(2) selfIllum: vec4<f32>;  // RGB: emissive, A: unused
-  @location(3) depth: f32;            // Linear depth (0-1)
+  @location(2) depth: f32;            // Linear depth (0-1)
 }
 ```
 

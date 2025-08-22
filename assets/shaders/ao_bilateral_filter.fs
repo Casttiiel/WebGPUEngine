@@ -14,8 +14,7 @@ const BILATERAL_SIGMA_NORMAL = 0.5; // Sensibilidad a diferencias de normales
 @group(1) @binding(0) var gAlbedo: texture_2d<f32>;        // No se usa pero está en el layout
 @group(1) @binding(1) var gNormals: texture_2d<f32>;
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
-@group(1) @binding(3) var gSelfIllum: texture_2d<f32>;     // No se usa pero está en el layout
-@group(1) @binding(4) var samplerGBuffer: sampler;
+@group(1) @binding(3) var samplerGBuffer: sampler;
 
 // AO texture sin filtrar (input)
 @group(2) @binding(0) var aoTexture: texture_2d<f32>;
