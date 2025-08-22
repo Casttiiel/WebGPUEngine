@@ -10,11 +10,5 @@
   },
   {
     "prefab": "main_camera.prefab"
-  },
-  {
-    "prefab": "point_light.prefab"
-  },
-  {
-    "prefab": "blood_decal.prefab"
   }
 ]

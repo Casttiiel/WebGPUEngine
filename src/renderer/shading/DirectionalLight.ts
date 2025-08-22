@@ -19,6 +19,7 @@ export class DirectionalLight {
   private shadowDepthView!: GPUTextureView;
   private shadowSampler!: GPUSampler;
   private camera!: Camera;
+  private shadowsDirty: boolean = true;
 
   constructor() {}
 
@@ -142,7 +143,9 @@ export class DirectionalLight {
   }
 
   public renderShadowMap(): void {
-    if (!this.camera.getIsDirty()) return;
+    if (!this.shadowsDirty) {
+      return;
+    }
 
     RenderManager.getInstance().performCulling(this.camera, RenderCategory.SHADOWS);
     const render = Render.getInstance();
@@ -164,6 +167,8 @@ export class DirectionalLight {
     RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
 
     pass.end();
+
+    this.shadowsDirty = false;
   }
 
   public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
