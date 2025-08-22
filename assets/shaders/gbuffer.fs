@@ -27,7 +27,8 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     
     // Calcular TBN y transformar la normal
     let TBN = computeTBN(normalize(input.N), input.T);
-    let N = normalize(TBN * N_tangent_space.xyz);
+    let N = normalize(TBN * N_tangent_space.xyz);    
+    
     let roughness = textureSample(txRoughness, samplerState, input.Uv).g;
     let encodedNormal = normalToOctahedral01(N);
 

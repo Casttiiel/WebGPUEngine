@@ -28,7 +28,7 @@ export class QualitySettings {
   // Predefined quality presets
   public static readonly PRESETS = {
     LOW: {
-      renderResolution: 0.7,
+      renderResolution: 0.8,
       aliasingTexture: 'rgba16float',
       toneMappingTexture: 'rgba16float',
       bloomTexture: 'rgba16float',

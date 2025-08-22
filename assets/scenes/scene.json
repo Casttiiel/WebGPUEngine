@@ -16,5 +16,8 @@
   },
   {
     "prefab": "blood_decal.prefab"
+  },
+  {
+    "prefab": "sphere_metal.prefab"
   }
 ]
