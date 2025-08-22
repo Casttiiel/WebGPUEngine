@@ -42,11 +42,17 @@ export class AmbientOcclusionComponent extends Component {
 
     const aoFormat = QualitySettings.getInstance().getSettings().aoTexture;
 
-    this.rawAOTarget = new RenderTarget();
-    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
+    const aoScale = QualitySettings.getInstance().getSettings().aoScale;
+    const aoWidth = Math.floor(Render.width * aoScale);
+    const aoHeight = Math.floor(Render.height * aoScale);
 
+    // Raw AO at reduced resolution (50%)
+    this.rawAOTarget = new RenderTarget();
+    this.rawAOTarget.createRT('raw_ao_result.dds', aoWidth, aoHeight, aoFormat);
+
+    // Bilateral filter also at reduced resolution (50%)
     this.finalAOResult = new RenderTarget();
-    this.finalAOResult.createRT('final_ao_result.dds', Render.width, Render.height, aoFormat);
+    this.finalAOResult.createRT('final_ao_result.dds', aoWidth, aoHeight, aoFormat);
 
     this.createSSAOParamsBuffer();
     this.createSSAOParamsBindGroup();
@@ -55,12 +61,17 @@ export class AmbientOcclusionComponent extends Component {
   public resize(): void {
     const aoFormat = QualitySettings.getInstance().getSettings().aoTexture;
 
-    this.rawAOTarget.createRT('raw_ao_result.dds', Render.width, Render.height, aoFormat);
+    const aoScale = QualitySettings.getInstance().getSettings().aoScale;
+    const aoWidth = Math.floor(Render.width * aoScale);
+    const aoHeight = Math.floor(Render.height * aoScale);
+
+    // Recreate both targets at reduced resolution
+    this.rawAOTarget.createRT('raw_ao_result.dds', aoWidth, aoHeight, aoFormat);
+    this.finalAOResult.createRT('final_ao_result.dds', aoWidth, aoHeight, aoFormat);
+
+    // Invalidate bind groups so they get recreated with new textures
     this.bilateralFilterBindGroup = null;
     this.ssaoParamsBindGroup = null;
-
-    this.finalAOResult = new RenderTarget();
-    this.finalAOResult.createRT('final_ao_result.dds', Render.width, Render.height, aoFormat);
   }
 
   private createSSAOParamsBuffer(): void {
@@ -118,9 +129,6 @@ export class AmbientOcclusionComponent extends Component {
     // When AO is disabled, we need to fill the target with white (no occlusion)
     // This ensures the lighting calculations work correctly
 
-    /*const commandEncoder = GPUUtils.getDevice().createCommandEncoder({
-      label: 'Disabled AO Clear Pass',
-    });*/
     const commandEncoder = Render.getInstance().getCommandEncoder();
     const renderPass = commandEncoder.beginRenderPass({
       label: 'Clear AO Target',
@@ -137,7 +145,6 @@ export class AmbientOcclusionComponent extends Component {
     renderPass.end();
 
     return this.rawAOTarget.getView();
-    //GPUUtils.getDevice().queue.submit([commandEncoder.finish()]);
   }
 
   public compute(gBufferBindGroup: GPUBindGroup): GPUTextureView {

@@ -6,6 +6,7 @@ export interface GraphicsQualitySettings {
   enableBloom: boolean;
   bloomNumMips: number;
   enableAO: boolean;
+  aoScale: number;
   aoTexture: GPUTextureFormat;
   aoSampleCount: number;
   aoRadius: number;
@@ -35,6 +36,7 @@ export class QualitySettings {
       enableBloom: false,
       bloomNumMips: 0,
       enableAO: false,
+      aoScale: 0.5,
       aoTexture: 'r16float',
       aoSampleCount: 0,
       aoRadius: 0,
@@ -57,6 +59,7 @@ export class QualitySettings {
       enableBloom: true,
       bloomNumMips: 3,
       enableAO: true,
+      aoScale: 0.5,
       aoTexture: 'r16float',
       aoSampleCount: 8,
       aoRadius: 0.1,
@@ -79,6 +82,7 @@ export class QualitySettings {
       enableBloom: true,
       bloomNumMips: 6,
       enableAO: true,
+      aoScale: 0.5,
       aoTexture: 'r16float',
       aoSampleCount: 8,
       aoRadius: 0.1,
@@ -101,6 +105,7 @@ export class QualitySettings {
       enableBloom: true,
       bloomNumMips: 8,
       enableAO: true,
+      aoScale: 0.5,
       aoTexture: 'r16float',
       aoSampleCount: 16,
       aoRadius: 0.1,

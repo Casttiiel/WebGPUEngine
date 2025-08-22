@@ -15,6 +15,7 @@ import { Render } from '../pipeline/Render';
 import { RenderKey } from '../managers/RenderKeyManager';
 import { Mesh } from '../../resources/Mesh';
 import { Technique } from '../../resources/Technique';
+import { QualitySettings } from '../../../core/engine/QualitySettings';
 
 export class RenderPassManager {
   private renderPasses: Map<string, BaseRenderPass> = new Map();
@@ -180,7 +181,11 @@ export class RenderPassManager {
     ssaoParamsBindGroup: GPUBindGroup | undefined,
     result: RenderTarget,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const aoScale = QualitySettings.getInstance().getSettings().aoScale;
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
+      width: Render.width * aoScale,
+      height: Render.height * aoScale,
+    });
     const pass = new AmbientOcclusionRenderPass(
       passConfig,
       mesh,
@@ -201,7 +206,11 @@ export class RenderPassManager {
     aoBindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const aoScale = QualitySettings.getInstance().getSettings().aoScale;
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
+      width: Render.width * aoScale,
+      height: Render.height * aoScale,
+    });
     const pass = new AOBilateralFilterRenderPass(
       passConfig,
       mesh,
