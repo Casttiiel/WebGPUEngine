@@ -780,18 +780,24 @@ this.shadowSampler = device.createSampler({
 
 ### WGSL Shadow Sampling
 
-#### **Optimized Shadow Factor Calculation**
+#### **Enhanced Shadow Factor Calculation with Soft Shadows**
 
-The shadow sampling in WGSL is optimized for performance while maintaining quality:
+The shadow sampling has been enhanced with soft shadows, adaptive bias, and PCF filtering for modern shadow quality:
 
 ```wgsl
-fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>,
-                   lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d,
-                   shadowSampler: sampler_comparison) -> f32 {
+fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>,
+                   lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32,
+                   shadowMap: texture_depth_2d, shadowSampler: sampler_comparison,
+                   adaptUVs: bool) -> f32 {
 
     // Transform world position to light clip space
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
+
+    if(adaptUVs){
+        lightUVSpacePos.x = lightUVSpacePos.x * 0.5 + 0.5;
+        lightUVSpacePos.y = lightUVSpacePos.y * -0.5 + 0.5;
+    }
 
     // Early rejection for out-of-bounds coordinates
     if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0 ||
@@ -800,26 +806,82 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>,
         return 0.0; // Outside shadow map = no shadow
     }
 
-    // Single sample for optimal performance
-    return shadowsTap(lightUVSpacePos.xy, lightUVSpacePos.z, shadowMap, shadowSampler);
+    // Enhanced filter radius for softer shadows
+    let filterRadius = lightShadowStepDivResolution * 1.2;
+
+    // Random rotation per pixel to break regular patterns
+    let random = hash3(wPos) * 6.28318530718; // 2*PI
+    let cosR = cos(random);
+    let sinR = sin(random);
+
+    // Poisson disk pattern for better sample distribution
+    let offsets = array<vec2<f32>, 16>(
+        vec2<f32>(-0.8, -0.4), vec2<f32>(-0.6, -0.9),
+        vec2<f32>(-0.3, -0.6), vec2<f32>(-0.1, -0.3),
+        // ... 12 more optimized samples ...
+    );
+
+    var shadow = 0.0;
+    for (var i = 0; i < 16; i++) {
+        // Rotate offsets to eliminate aliasing patterns
+        let rotatedOffset = vec2<f32>(
+            offsets[i].x * cosR - offsets[i].y * sinR,
+            offsets[i].x * sinR + offsets[i].y * cosR
+        );
+        let sampleCoord = lightUVSpacePos.xy + rotatedOffset * filterRadius;
+        shadow += shadowsTap(sampleCoord, lightUVSpacePos.z, normal, lightDir, shadowMap, shadowSampler);
+    }
+
+    let shadowResult = shadow / 16.0;
+    // Apply smoothstep for natural soft shadow transitions
+    return smoothstep(0.1, 0.9, shadowResult);
 }
 ```
 
-#### **Optimized Shadow Tap Function**
+#### **Adaptive Bias Shadow Tap Function**
+
+The shadow tap function now includes adaptive bias based on surface angle to eliminate shadow acne:
 
 ```wgsl
-fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, shadowMap: texture_depth_2d,
-              shadowSampler: sampler_comparison) -> f32 {
+fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, normal: vec3<f32>, lightDir: vec3<f32>,
+              shadowMap: texture_depth_2d, shadowSampler: sampler_comparison) -> f32 {
 
     // GPU-friendly coordinate clamping (avoids branching)
     let clamped_coord = clamp(homo_coord, vec2<f32>(0.0), vec2<f32>(1.0));
 
-    // Depth bias prevents shadow acne
-    let biased_depth = coord_z - 0.0005;
+    // Adaptive bias based on surface angle to light
+    let cosTheta = clamp(dot(normal, -lightDir), 0.001, 1.0);
+    let tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
 
+    // Slope-scaled bias: more bias on surfaces angled away from light
+    let slopeBias = clamp(tanTheta * 0.002, 0.0, 0.01);
+    let baseBias = 0.0002;
+    let totalBias = baseBias + slopeBias;
+
+    let biased_depth = coord_z - totalBias;
     return textureSampleCompareLevel(shadowMap, shadowSampler, clamped_coord, biased_depth);
 }
 ```
+
+### Modern Shadow Quality Features
+
+#### **Soft Shadows Implementation**
+
+The current implementation provides high-quality soft shadows through:
+
+- **16-sample PCF**: Poisson disk pattern for natural shadow edges
+- **Per-pixel rotation**: Hash-based rotation eliminates regular aliasing patterns
+- **Adaptive filter radius**: Larger filter kernel (1.2x) for softer transitions
+- **Smoothstep filtering**: Natural shadow edge transitions instead of hard cutoffs
+
+#### **Adaptive Bias System**
+
+The adaptive bias system prevents shadow acne while maintaining shadow accuracy:
+
+- **Surface angle detection**: Uses surface normal and light direction
+- **Dynamic bias calculation**: More bias on grazing angles, less on perpendicular surfaces
+- **Conservative base bias**: Minimum bias (0.0002) for flat surfaces
+- **Slope-scaled bias**: Up to 0.01 bias for extremely angled surfaces
 
 ### Performance Optimization Strategies
 
@@ -835,25 +897,35 @@ public renderShadowMap(): void {
 }
 
 public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
-  // 3. Apply shadows during lighting pass
+  // 3. Apply shadows during lighting pass with normal and light direction
   pass.setBindGroup(2, this.directionalLightBindGroup);  // Shadow resources
 }
 ```
 
 #### **Performance vs Quality Trade-offs**
 
-**Current Implementation (Optimized for Performance):**
+**Current Implementation (High Quality Soft Shadows):**
 
-- ✅ **Single sample**: One depth comparison per fragment
-- ✅ **No PCF filtering**: Eliminates multiple texture lookups
-- ✅ **Clamp instead of branch**: GPU-friendly coordinate handling
-- ✅ **Early rejection**: Fast out-of-bounds testing
+- ✅ **16-sample PCF**: Multiple depth comparisons for soft edges
+- ✅ **Adaptive bias**: Eliminates shadow acne without over-biasing
+- ✅ **Per-pixel rotation**: Breaks aliasing patterns for natural appearance
+- ✅ **Smoothstep filtering**: Natural shadow transitions
+- ⚠️ **Higher GPU cost**: 16x more texture samples than single-sample approach
 
-**Alternative High-Quality Options (Higher Cost):**
+**Alternative High-Quality Options (Future Enhancements):**
 
-- **PCF (Percentage-Closer Filtering)**: 4-16 samples with Poisson disk
-- **PCSS (Percentage-Closer Soft Shadows)**: Variable filter size
-- **CSM (Cascaded Shadow Maps)**: Multiple resolution levels
+- ✅ **PCF (Percentage-Closer Filtering)**: **IMPLEMENTED** - 16 samples with Poisson disk
+- ⏳ **PCSS (Percentage-Closer Soft Shadows)**: Variable filter size based on blocker distance
+- ⏳ **CSM (Cascaded Shadow Maps)**: Multiple resolution levels for large scenes
+- ⏳ **VSM (Variance Shadow Maps)**: Soft shadows with pre-filtering
+- ⏳ **ESM (Exponential Shadow Maps)**: Reduced aliasing and memory efficient
+
+**Shadow Quality Achievements:**
+
+- ✅ **Soft Shadow Edges**: Implemented via 16-sample PCF with Poisson disk
+- ✅ **Eliminates Shadow Acne**: Adaptive bias based on surface angle
+- ✅ **Reduces Aliasing**: Per-pixel rotation breaks regular patterns
+- ✅ **Natural Transitions**: Smoothstep filtering for organic shadow falloff
 
 ### Debugging and Troubleshooting
 
@@ -918,16 +990,119 @@ console.log('View translation:', [view[12], view[13], view[14]]);
 1. **Resolution**: Use 2048x2048 for good quality/performance balance
 2. **Camera Bounds**: Size orthographic bounds to tightly fit scene
 3. **Depth Range**: Use appropriate near/far planes (0.1 to 100.0)
-4. **Bias Values**: Start with 0.0005 and adjust based on scene scale
+4. **Adaptive Bias**: Use surface normal and light direction for automatic bias calculation
+5. **Soft Shadows**: Enable PCF filtering with Poisson disk sampling for natural edges
 
 #### **Performance Guidelines**
 
-1. **Single Sample**: Use one sample per fragment for best performance
+1. **PCF Sample Count**: Use 16 samples for high quality, 4 samples for performance
 2. **Early Rejection**: Test bounds before expensive operations
-3. **Clamp Coordinates**: Prefer clamp() over branching
+3. **Per-pixel Rotation**: Use hash function to eliminate aliasing patterns
 4. **Minimize State Changes**: Cache bind groups and samplers
+5. **Adaptive Filter Radius**: Scale filter radius based on distance for better quality
+
+#### **Modern Shadow Implementation Guidelines**
+
+1. **Adaptive Bias**: Always use surface angle-based bias to prevent shadow acne
+2. **Soft Shadow Edges**: Implement PCF with rotated Poisson disk samples
+3. **Quality Scaling**: Provide multiple sample count options based on performance requirements
+4. **Smooth Transitions**: Use smoothstep() for natural shadow edge falloff
 
 This shadow system provides an excellent foundation for directional lighting in real-time applications, balancing visual quality with rendering performance through careful optimization and proper coordinate space handling.
+
+---
+
+## Shadow System Improvements (2025)
+
+The WebGPU Engine shadow system has been significantly enhanced to provide modern, high-quality soft shadows with adaptive bias correction. These improvements address the common issues of pixelated shadow edges and shadow acne.
+
+### **Implemented Enhancements**
+
+#### **1. Soft Shadows with PCF Filtering**
+
+**Problem Solved**: Hard, pixelated shadow edges that looked unrealistic.
+
+**Implementation**:
+
+- **16-sample PCF**: Uses Poisson disk pattern for natural shadow distribution
+- **Per-pixel rotation**: Hash-based rotation eliminates regular aliasing patterns
+- **Enhanced filter radius**: 1.2x scaling for softer shadow transitions
+- **Smoothstep filtering**: Natural edge transitions instead of hard cutoffs
+
+**Technical Details**:
+
+```wgsl
+// Enhanced PCF with rotated Poisson samples
+let random = hash3(wPos) * 6.28318530718; // Random rotation per pixel
+let rotatedOffset = vec2<f32>(
+    offsets[i].x * cosR - offsets[i].y * sinR,
+    offsets[i].x * sinR + offsets[i].y * cosR
+);
+let shadowResult = shadow / 16.0;
+return smoothstep(0.1, 0.9, shadowResult); // Soft transitions
+```
+
+#### **2. Adaptive Bias System**
+
+**Problem Solved**: Static bias causing shadow acne on angled surfaces.
+
+**Implementation**:
+
+- **Surface angle detection**: Uses dot product between surface normal and light direction
+- **Dynamic bias calculation**: Automatically adjusts bias based on surface slope
+- **Conservative base bias**: Minimum bias (0.0002) for flat surfaces
+- **Slope-scaled bias**: Up to 0.01 bias for grazing angle surfaces
+
+**Technical Details**:
+
+```wgsl
+// Adaptive bias based on surface angle
+let cosTheta = clamp(dot(normal, -lightDir), 0.001, 1.0);
+let tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
+let slopeBias = clamp(tanTheta * 0.002, 0.0, 0.01);
+let totalBias = baseBias + slopeBias;
+```
+
+#### **3. Enhanced Function Signatures**
+
+**Updated Parameters**: Shadow functions now receive surface normal and light direction for adaptive bias calculation.
+
+**Function Changes**:
+
+```wgsl
+// Old signature (static bias)
+fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, ...);
+
+// New signature (adaptive bias + soft shadows)
+fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>,
+                   lightViewProjOffset: mat4x4<f32>, ...);
+```
+
+### **Quality Improvements Achieved**
+
+1. **✅ Eliminated Hard Shadow Edges**: PCF filtering with Poisson disk creates natural, soft shadow boundaries
+2. **✅ Reduced Shadow Acne**: Adaptive bias prevents self-shadowing artifacts on angled surfaces
+3. **✅ Removed Aliasing Patterns**: Per-pixel rotation breaks regular sampling patterns
+4. **✅ Natural Shadow Transitions**: Smoothstep filtering creates organic shadow falloff
+5. **✅ Maintained Performance**: 16-sample PCF provides excellent quality-to-performance ratio
+
+### **Performance Considerations**
+
+- **Sample Count**: 16 samples per shadow test (vs 1 sample previously)
+- **GPU Cost**: ~16x increase in texture samples, but still performant on modern hardware
+- **Quality Scaling**: Can be reduced to 4-sample PCF for performance-critical scenarios
+- **Memory Impact**: No additional memory usage, only computational overhead
+
+### **Integration with Existing Systems**
+
+The enhanced shadow system maintains full compatibility with:
+
+- **Deferred Rendering Pipeline**: Works seamlessly with G-Buffer lighting
+- **Multiple Light Types**: Directional lights fully implemented, point/spot lights compatible
+- **Quality Settings**: Can be scaled based on performance requirements
+- **Debug UI**: Shadow parameters remain adjustable through debug interface
+
+This modernized shadow system brings the WebGPU Engine's shadow quality up to current industry standards while maintaining the engine's performance-focused architecture.
 
 ---
 

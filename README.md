@@ -8,6 +8,7 @@ A modern 3D rendering engine built on **WebGPU** technology, implementing physic
 
 - **Deferred Rendering Pipeline** - G-Buffer based approach for efficient multi-light scenarios
 - **Physically-Based Rendering (PBR)** - Metallic-roughness workflow with Image-Based Lighting
+- **Advanced Shadow System** - Modern soft shadows with PCF filtering and adaptive bias
 - **Advanced Post-Processing** - Bloom, tone mapping, FXAA anti-aliasing, and ambient occlusion
 - **MSAA Support** - Multisample anti-aliasing with manual depth resolve
 - **Modular Render Passes** - Extensible effects pipeline without manual `beginRenderPass` logic
@@ -209,6 +210,9 @@ npm run lint         # ESLint code checking
 ### Advanced Effects
 
 - **Deferred Shading** - Efficient multi-light rendering
+- **Modern Shadow Mapping** - High-quality directional light shadows with soft edges
+- **Soft Shadows with PCF** - 16-sample Percentage-Closer Filtering for natural shadow edges
+- **Adaptive Shadow Bias** - Surface angle-based bias prevents shadow acne automatically
 - **Screen-Space Ambient Occlusion** - Contact shadowing
 - **HDR Tone Mapping** - High dynamic range imaging
 - **Temporal Anti-Aliasing** - Smooth edge rendering

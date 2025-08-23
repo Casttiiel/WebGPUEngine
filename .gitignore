@@ -33,6 +33,3 @@ build/
 
 # TypeScript
 *.tsbuildinfo
-
-# Project files
-TODO.md
