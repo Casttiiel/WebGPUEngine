@@ -20,6 +20,7 @@ export interface GraphicsQualitySettings {
   hdrTexture: GPUTextureFormat;
   ssrEnabled: boolean;
   ssrScale: number;
+  directionalShadowMapResolution: number;
 }
 
 export class QualitySettings {
@@ -51,6 +52,7 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: false,
       ssrScale: 0.5,
+      directionalShadowMapResolution: 256,
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -75,6 +77,7 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
+      directionalShadowMapResolution: 512,
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -99,6 +102,7 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
+      directionalShadowMapResolution: 1024,
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -123,6 +127,7 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
+      directionalShadowMapResolution: 2048,
     } as GraphicsQualitySettings,
   };
 
