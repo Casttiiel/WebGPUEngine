@@ -18,6 +18,7 @@ export interface GraphicsQualitySettings {
   linearDepthTexture: GPUTextureFormat;
   generalTexture: GPUTextureFormat;
   hdrTexture: GPUTextureFormat;
+  directionalShadowMapResolution: number;
 }
 
 export class QualitySettings {
@@ -47,6 +48,7 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      directionalShadowMapResolution: 256
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -69,6 +71,7 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      directionalShadowMapResolution: 512
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -91,6 +94,7 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      directionalShadowMapResolution: 1024
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -113,6 +117,7 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      directionalShadowMapResolution: 2048
     } as GraphicsQualitySettings,
   };
 

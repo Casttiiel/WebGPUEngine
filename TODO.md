@@ -1,6 +1,6 @@
 FIXES------------------------------------------
 
-1. Directional light shadows quality
+1. 
 2. OnResizeEnd event
 3. Screen Space Reflections (Resolution)
 4. Fix Spot Lights
