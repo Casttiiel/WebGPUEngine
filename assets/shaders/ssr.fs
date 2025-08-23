@@ -14,7 +14,10 @@
 @group(1) @binding(3) var samplerGBuffer: sampler;      // Shared sampler
 
 // SSR Parameters
-@group(2) @binding(0) var<uniform> ssrParams: SSRUniforms;
+@group(2) @binding(0) var accLight: texture_2d<f32>;
+@group(2) @binding(1) var accLightSampler: sampler;
+@group(2) @binding(2) var<uniform> ssrParams: SSRUniforms;
+
 
 struct SSRUniforms {
     intensity: f32,
@@ -28,61 +31,36 @@ struct SSRUniforms {
 }
 
 @fragment
-fn fs(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
-    let iPosition = position.xy / camera.screenSize;
+fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {    
     
     // Early exit if SSR is disabled
     if (ssrParams.enabled < 0.5) {
-        return textureSampleLevel(gAlbedo, samplerGBuffer, iPosition, 0.0);
+        return textureSampleLevel(gAlbedo, samplerGBuffer, uv, 0.0);
     }
     
-    // Sample G-Buffer
-    let albedo = textureSampleLevel(gAlbedo, samplerGBuffer, iPosition, 0.0);
-    let normal = textureSampleLevel(gNormals, samplerGBuffer, iPosition, 0.0).xyz * 2.0 - 1.0; // Unpack normal
-    let depth = textureSampleLevel(gLinearDepth, samplerGBuffer, iPosition, 0.0).r;
-    
-    // Sample original color
-    let originalColor = albedo;
-    
-    // Early exit for non-reflective surfaces
-    let metallic = albedo.a; // Assuming metallic is stored in alpha
-    let roughness = textureSampleLevel(gNormals, samplerGBuffer, iPosition, 0.0).a; // Assuming roughness is in normal alpha
-    
-    if (metallic < 0.1 || roughness > 0.8) {
-        return originalColor;
+    let g = decodeGBuffer(uv);
+
+    if (g.metallic < 0.1 || g.roughness > 0.8) {
+        return vec4<f32>(g.albedo, 1.0); // ??????
     }
-    
-    // Reconstruct world position from depth
-    let worldPos = reconstructWorldPosition(iPosition, depth);
-    
-    // Calculate reflection vector
-    let viewDir = normalize(camera.cameraPosition - worldPos);
-    let reflectionDir = reflect(-viewDir, normal);
+
     
     // Perform ray marching in screen space
     let reflectionColor = performScreenSpaceRayMarching(
-        worldPos,
-        reflectionDir,
-        iPosition,
-        depth
+        g.worldPos,
+        g.reflectedDir,
+        uv,
+        g.zlinear
     );
     
     // Calculate reflection strength based on metallic/roughness
-    let reflectionStrength = metallic * (1.0 - roughness) * ssrParams.intensity;
+    let reflectionStrength = g.metallic * (1.0 - g.roughness) * ssrParams.intensity;
     
     // Return only the reflection contribution (will be composited later)
     let reflectionContribution = reflectionColor.rgb * reflectionStrength;
     return vec4<f32>(reflectionContribution, reflectionColor.a * reflectionStrength);
 }
 
-fn reconstructWorldPosition(uv: vec2<f32>, depth: f32) -> vec3<f32> {
-    // Convert UV to NDC
-    let ndc = vec3<f32>(uv * 2.0 - 1.0, depth);
-    
-    // Transform to world space
-    let worldPos4 = camera.invViewProjection * vec4<f32>(ndc, 1.0);
-    return worldPos4.xyz / worldPos4.w;
-}
 
 fn performScreenSpaceRayMarching(
     startPos: vec3<f32>,
@@ -127,7 +105,7 @@ fn performScreenSpaceRayMarching(
         // Check for intersection
         if (currentDepth > sampledDepth && (currentDepth - sampledDepth) < ssrParams.thickness) {
             // Hit! Sample color at this position
-            let hitColor = textureSampleLevel(gAlbedo, samplerGBuffer, screenUV, 0.0);
+            let hitColor = textureSampleLevel(accLight, accLightSampler, screenUV, 0.0);
             
             // Fade based on distance and edge proximity
             let distanceFade = 1.0 - (length(currentPos - startPos) / maxDistance);

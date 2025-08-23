@@ -172,6 +172,26 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getSSRUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('ssr_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   public static getSkyboxUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('skybox uniforms layout', [
       {
@@ -375,6 +395,8 @@ export class BindGroupFactory {
         return this.getMaterialTexturesLayout();
       case PipelineBindGroupLayouts.SINGLE_TEXTURE:
         return this.getSingleTextureLayout();
+      case PipelineBindGroupLayouts.SSR_UNIFORMS:
+        return this.getSSRUniformsLayout();
       case PipelineBindGroupLayouts.SKYBOX_UNIFORMS:
         return this.getSkyboxUniformsLayout();
       case PipelineBindGroupLayouts.CUBEMAP_TEXTURE:

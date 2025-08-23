@@ -18,6 +18,8 @@ export interface GraphicsQualitySettings {
   linearDepthTexture: GPUTextureFormat;
   generalTexture: GPUTextureFormat;
   hdrTexture: GPUTextureFormat;
+  ssrEnabled: boolean;
+  ssrScale: number;
 }
 
 export class QualitySettings {
@@ -47,6 +49,8 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      ssrEnabled: false,
+      ssrScale: 0.5,
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -69,6 +73,8 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      ssrEnabled: true,
+      ssrScale: 0.5,
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -91,6 +97,8 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      ssrEnabled: true,
+      ssrScale: 0.5,
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -113,6 +121,8 @@ export class QualitySettings {
       linearDepthTexture: 'r16float',
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
+      ssrEnabled: true,
+      ssrScale: 0.5,
     } as GraphicsQualitySettings,
   };
 

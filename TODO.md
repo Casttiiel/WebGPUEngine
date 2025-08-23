@@ -1,14 +1,34 @@
 FIXES------------------------------------------
 
-1. Directional light shadows quality
+1. Screen Space Reflections (Disabled SSR -> fallback) (Uniform from quality)
 2. OnResizeEnd event
-3. Screen Space Reflections (Resolution)
-4. Fix Spot Lights
-5. Fix spot lights with shadows (shadow quality on component info)
-6. Tweakpane
-7. Github pages
-8. Lens Flare
-9. Compute-based distortion
+3. Fix Spot Lights
+4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+5. Tweakpane
+6. Github pages
+7. Compute-based distortion
+
+HIGH-END-FEATURES------------------------------
+
+1. Indirect light (Indirect diffuse/Specular)
+2. Everything is so plain?
+3. Volumetric lighting
+4. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
+5. Lens Flare
+6. Motion Blur
+7. Temporal Anti-Aliasing (TAA) / Aliasing quality
+8. Decals selective writing
+9. Particles
+10. CSM: 3-cascade system
+11. Move objects with mouse
+12. Volumetric fog
+13. Area Light
+14. Atmospheric scattering
+15. Global Ilumination
+16. Adaptive Bias: Surface angle-based slope-scaled bias
+17. Multiple Lights: Shadow atlas system
+18. PCSS: Variable filter size
+19. VSM: Variance Shadow Maps
 
 MAJOR-UPGRADES------------------------------------------
 
@@ -26,26 +46,6 @@ MAJOR-UPGRADES------------------------------------------
 5. GPU-Driven Rendering
 6. Mesh LOD
 7. Buffer Reuse y Pooling
-
-HIGH-END-FEATURES------------------------------
-
-1. Volumetric lighting
-2. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-3. Motion Blur
-4. Temporal Anti-Aliasing (TAA) / Aliasing quality
-5. Decals selective writing
-6. Particles
-7. CSM: 3-cascade system
-8. Move objects with mouse
-9. Volumetric fog
-10. Area Light
-11. Atmospheric scattering
-12. Global Ilumination
-13. Indirect light
-14. Adaptive Bias: Surface angle-based slope-scaled bias
-15. Multiple Lights: Shadow atlas system
-16. PCSS: Variable filter size
-17. VSM: Variance Shadow Maps
 
 GAME-----------------------------------
 
