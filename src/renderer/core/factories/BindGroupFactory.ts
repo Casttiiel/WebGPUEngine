@@ -182,10 +182,20 @@ export class BindGroupFactory {
       {
         binding: 1,
         visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
+        texture: { sampleType: 'float' },
       },
       {
         binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 4,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },

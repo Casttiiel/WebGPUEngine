@@ -7,6 +7,7 @@ import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { Mesh } from '../resources/Mesh';
 import { RenderTarget } from '../resources/RenderTarget';
 import { Technique } from '../resources/Technique';
+import { Texture } from '../resources/Texture';
 
 export class ScreenSpaceReflections {
   private isInitialized: boolean = false;
@@ -17,6 +18,7 @@ export class ScreenSpaceReflections {
   private ssrBindGroup!: GPUBindGroup;
   private ssrComposeBindGroup!: GPUBindGroup;
   private ssrUniformBuffer!: GPUBuffer;
+  private brdfLUT!: Texture;
 
   constructor() {}
 
@@ -26,6 +28,7 @@ export class ScreenSpaceReflections {
       this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
       this.ssrTechnique = await Technique.get('ssr.tech');
       this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
+      this.brdfLUT = await Texture.get('brdfLUT.png');
 
       this.createRenderTarget();
 
@@ -41,7 +44,7 @@ export class ScreenSpaceReflections {
         this.ssrUniformBuffer,
         0,
         new Float32Array([
-          1.0,
+          0.4,
           qualitySettings.ssrStepSize,
           qualitySettings.ssrMaxSteps,
           50.0,
@@ -69,12 +72,16 @@ export class ScreenSpaceReflections {
     );
   }
 
-  public render(accLights: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+  public render(
+    accLights: GPUTextureView,
+    ao: GPUTextureView,
+    gBufferBindGroup: GPUBindGroup,
+  ): void {
     if (!this.isInitialized) {
       return;
     }
     if (!this.ssrBindGroup) {
-      this.createSSRBindGroup(accLights);
+      this.createSSRBindGroup(accLights, ao);
     }
     if (!this.ssrComposeBindGroup) {
       this.createSSRComposeBindGroup(this.ssrResult.getView());
@@ -158,7 +165,7 @@ export class ScreenSpaceReflections {
     pass.end();
   }
 
-  private createSSRBindGroup(accLights: GPUTextureView) {
+  private createSSRBindGroup(accLights: GPUTextureView, ao: GPUTextureView) {
     this.ssrBindGroup = BindGroupFactory.createBindGroup(
       'ssr_bindgroup',
       this.ssrTechnique.getPipeline().getBindGroupLayout(2),
@@ -169,10 +176,18 @@ export class ScreenSpaceReflections {
         },
         {
           binding: 1,
-          resource: SamplerLibrary.simpleSampler!,
+          resource: ao,
         },
         {
           binding: 2,
+          resource: this.brdfLUT.getTextureView()!,
+        },
+        {
+          binding: 3,
+          resource: SamplerLibrary.simpleSampler!,
+        },
+        {
+          binding: 4,
           resource: { buffer: this.ssrUniformBuffer },
         },
       ],

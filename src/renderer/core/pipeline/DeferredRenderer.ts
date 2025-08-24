@@ -220,7 +220,7 @@ export class DeferredRenderer {
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
-    this.ssr.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    this.ssr.render(this.rtAccLight.getView(), this.aoResult, this.gBufferBindGroup);
 
     const view = this.rtAccLight.getView();
     if (!view) {

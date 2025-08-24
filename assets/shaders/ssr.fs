@@ -15,12 +15,14 @@
 
 // SSR Parameters
 @group(2) @binding(0) var accLight: texture_2d<f32>;
-@group(2) @binding(1) var accLightSampler: sampler;
-@group(2) @binding(2) var<uniform> ssrParams: SSRUniforms;
+@group(2) @binding(1) var aoTexture: texture_2d<f32>;
+@group(2) @binding(2) var brdfLUT: texture_2d<f32>;
+@group(2) @binding(3) var texSampler: sampler;
+@group(2) @binding(4) var<uniform> ssrParams: SSRUniforms;
 
 
 struct SSRUniforms {
-    intensity: f32,
+    globalAmbientBoost: f32,
     stepSize: f32,
     maxSteps: f32,
     maxDistance: f32,
@@ -33,15 +35,13 @@ struct SSRUniforms {
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {    
     
-    // Early exit if SSR is disabled
-    if (ssrParams.enabled < 0.5) {
-        return vec4<f32>(0.0);//FALLBACK
-    }
-    
     let g = decodeGBuffer(uv);
 
-    if (g.metallic < 0.1 || g.roughness > 0.8) {
-        return vec4<f32>(0.0);//FALLBACK
+    // Early exit if SSR is disabled
+    if (ssrParams.enabled < 0.5 || g.metallic < 0.1 || g.roughness > 0.8) {
+        var color = applyFresnelBRDF(vec3<f32>(0.0), g);
+        color = applyAmbientOcclusion(color, uv);
+        return vec4<f32>(color, 1.0);//FALLBACK
     }
     
     // Perform ray marching in screen space
@@ -49,15 +49,30 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         g.worldPos,
         g.reflectedDir,
         uv,
-        g.zlinear
+        g.zlinear,
+        g
     );
 
     // Calculate reflection strength based on metallic/roughness
-    let reflectionStrength = g.metallic * (1.0 - g.roughness) * ssrParams.intensity;
-    
-    // Return only the reflection contribution (will be composited later)
-    let reflectionContribution = reflectionColor.rgb * reflectionStrength;
+    let reflectionStrength = g.metallic * (1.0 - g.roughness);
+    let reflectionContribution = applyFresnelBRDF(reflectionColor.rgb, g) * reflectionStrength;
     return vec4<f32>(reflectionContribution, reflectionColor.a * reflectionStrength);
+}
+
+fn applyAmbientOcclusion(color: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
+    let ao = textureSampleLevel(aoTexture, texSampler, uv, 0.0).r;
+    return color * ao * ssrParams.globalAmbientBoost;
+}
+
+fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
+    let N = normalize(g.normal);
+    let V = normalize(g.viewDir);    
+    let NdotV = max(dot(N, V), 0.0);
+    let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic);
+    let F = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
+    let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NdotV, 0.0, 1.0));
+    let brdf = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
+    return color * (F * brdf.x + brdf.y);
 }
 
 
@@ -65,7 +80,8 @@ fn performScreenSpaceRayMarching(
     startPos: vec3<f32>,
     rayDir: vec3<f32>,
     startUV: vec2<f32>,
-    startDepth: f32
+    startDepth: f32,
+    g: GBuffer
 ) -> vec4<f32> {
     
     let stepSize = ssrParams.stepSize;
@@ -111,7 +127,7 @@ fn performScreenSpaceRayMarching(
         // Check for intersection
         if ((currentDepth > sampledDepth && (currentDepth - sampledDepth) < ssrParams.thickness) || sampledDepth == 1.0) {
             // Hit! Sample color at this position
-            let hitColor = textureSampleLevel(accLight, accLightSampler, screenUV, 0.0);
+            let hitColor = textureSampleLevel(accLight, texSampler, screenUV, 0.0);
             
             // Fade based on distance and edge proximity
             let distanceFade = 1.0 - (currentDistance / maxDistance);
@@ -124,7 +140,9 @@ fn performScreenSpaceRayMarching(
     }
     
     // No hit found
-    return vec4<f32>(0.0);//FALLBACK
+    var color = applyFresnelBRDF(vec3<f32>(0.0), g);
+    color = applyAmbientOcclusion(color, startUV);
+    return vec4<f32>(color, 1.0);//FALLBACK
 }
 
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
