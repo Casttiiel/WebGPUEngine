@@ -2,10 +2,9 @@
     "vs": "presentation.vs",
     "fs": "ssr_compose.fs",
     "writesOn": "texture",
-    "blend": "opaque",
+    "blend": "additive_by_src_alpha",
     "z": "disable_all",
     "uniforms": [
-        "SingleTexture",
         "SingleTexture"
     ]
 }

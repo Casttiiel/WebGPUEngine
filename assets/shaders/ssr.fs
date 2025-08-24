@@ -35,13 +35,13 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     
     // Early exit if SSR is disabled
     if (ssrParams.enabled < 0.5) {
-        return vec4<f32>(0.0);
+        return vec4<f32>(0.0);//FALLBACK
     }
     
     let g = decodeGBuffer(uv);
 
     if (g.metallic < 0.1 || g.roughness > 0.8) {
-        return vec4<f32>(0.0);
+        return vec4<f32>(0.0);//FALLBACK
     }
     
     // Perform ray marching in screen space
@@ -100,7 +100,6 @@ fn performScreenSpaceRayMarching(
 
         // Check if ray is outside screen
         if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) {
-            return vec4<f32>(0.0);
             break;
         }
         
@@ -118,15 +117,14 @@ fn performScreenSpaceRayMarching(
             let distanceFade = 1.0 - (currentDistance / maxDistance);
             let edgeFade = calculateEdgeFade(screenUV);
             let stepFade = 1.0 - (f32(i) / f32(maxSteps));
+            let finalFade = clamp(distanceFade * edgeFade * stepFade, 0.0, 1.0);
             
-            let finalFade = distanceFade * edgeFade * stepFade;
-            
-            return vec4<f32>(hitColor.rgb, finalFade);// ALPHA DOES NOTHING!
+            return vec4<f32>(hitColor.rgb, finalFade);
         }
     }
     
     // No hit found
-    return vec4<f32>(0.0);
+    return vec4<f32>(0.0);//FALLBACK
 }
 
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {

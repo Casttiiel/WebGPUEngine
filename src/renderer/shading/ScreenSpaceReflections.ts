@@ -12,8 +12,10 @@ export class ScreenSpaceReflections {
   private isInitialized: boolean = false;
   private fullscreenQuadMesh!: Mesh;
   private ssrTechnique!: Technique;
+  private ssrComposeTechnique!: Technique;
   public ssrResult!: RenderTarget;
   private ssrBindGroup!: GPUBindGroup;
+  private ssrComposeBindGroup!: GPUBindGroup;
   private ssrUniformBuffer!: GPUBuffer;
 
   constructor() {}
@@ -23,6 +25,7 @@ export class ScreenSpaceReflections {
       this.isInitialized = true;
       this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
       this.ssrTechnique = await Technique.get('ssr.tech');
+      this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
       if (!this.ssrResult) {
         this.ssrResult = new RenderTarget();
       }
@@ -42,7 +45,7 @@ export class ScreenSpaceReflections {
       GPUUtils.writeBuffer(
         this.ssrUniformBuffer,
         0,
-        new Float32Array([1.0, 0.05, 640.0, 100.0, 0.03, 1.0]),
+        new Float32Array([1.0, 0.05, 640.0, 50.0, 0.03, 1.0]),
       );
 
       console.log('SSR loaded successfully');
@@ -58,6 +61,9 @@ export class ScreenSpaceReflections {
     }
     if (!this.ssrBindGroup) {
       this.createSSRBindGroup(accLights);
+    }
+    if (!this.ssrComposeBindGroup) {
+      this.createSSRComposeBindGroup(this.ssrResult.getView());
     }
 
     this.executeSSRPass(gBufferBindGroup);
@@ -108,8 +114,34 @@ export class ScreenSpaceReflections {
     pass.end();
   }
 
-  public composeSSR(_lightingResult: GPUTextureView): void {
-    // TODO: Compose SSR with lighting result
+  public composeSSR(accLights: GPUTextureView): void {
+    if (!this.isInitialized) return;
+    const render = Render.getInstance();
+
+    const colorAttachment = GPUUtils.createColorAttachment(accLights, 'load', 'store');
+
+    const pass = render
+      .getCommandEncoder()
+      .beginRenderPass(
+        GPUUtils.createRenderPassDescriptor('ssr compose render pass', [colorAttachment]),
+      );
+
+    // Configure viewport and scissor using GPUUtils
+    GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
+
+    // 1. Activate pipeline
+    this.ssrComposeTechnique.activatePipeline(pass);
+
+    // 2. Activate mesh data
+    this.fullscreenQuadMesh.activate(pass);
+
+    // 3. Set bind groups
+    pass.setBindGroup(0, this.ssrComposeBindGroup);
+
+    // 4. Draw the mesh
+    this.fullscreenQuadMesh.renderGroup(pass);
+
+    pass.end();
   }
 
   private createSSRBindGroup(accLights: GPUTextureView) {
@@ -128,6 +160,23 @@ export class ScreenSpaceReflections {
         {
           binding: 2,
           resource: { buffer: this.ssrUniformBuffer },
+        },
+      ],
+    );
+  }
+
+  private createSSRComposeBindGroup(ssr: GPUTextureView) {
+    this.ssrComposeBindGroup = BindGroupFactory.createBindGroup(
+      'ssr_compose_bindgroup',
+      this.ssrComposeTechnique.getPipeline().getBindGroupLayout(0),
+      [
+        {
+          binding: 0,
+          resource: ssr,
+        },
+        {
+          binding: 1,
+          resource: SamplerLibrary.simpleSampler!,
         },
       ],
     );
