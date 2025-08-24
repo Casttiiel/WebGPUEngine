@@ -27,7 +27,6 @@ export class DeferredRenderer {
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
-  private fullscreenQuadMesh!: Mesh;
   private rtAccLight!: RenderTarget;
   private aoResult!: GPUTextureView;
 
@@ -163,6 +162,8 @@ export class DeferredRenderer {
       this.unitFrustum,
       this.gBufferBindGroup,
     );
+
+    this.ssr.dispose();
   }
 
   public async load(): Promise<void> {
@@ -180,8 +181,6 @@ export class DeferredRenderer {
 
     this.ssr = new ScreenSpaceReflections();
     await this.ssr.load();
-
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
 
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();
@@ -228,6 +227,7 @@ export class DeferredRenderer {
       throw new Error('Failed to get final render target view');
     }
     return view;
+    //return this.ssr.ssrResult.getView()!;
   }
 
   private copyGBufferTexturesToBindGroup(): void {

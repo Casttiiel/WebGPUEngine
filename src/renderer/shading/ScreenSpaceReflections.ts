@@ -26,15 +26,8 @@ export class ScreenSpaceReflections {
       this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
       this.ssrTechnique = await Technique.get('ssr.tech');
       this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
-      if (!this.ssrResult) {
-        this.ssrResult = new RenderTarget();
-      }
-      this.ssrResult.createRT(
-        'ssr_result.dds',
-        Render.width * QualitySettings.getInstance().getSettings().ssrScale,
-        Render.height * QualitySettings.getInstance().getSettings().ssrScale,
-        QualitySettings.getInstance().getSettings().hdrTexture,
-      );
+
+      this.createRenderTarget();
 
       this.ssrUniformBuffer = GPUUtils.createBuffer(
         'ssr uniform buffer',
@@ -62,6 +55,18 @@ export class ScreenSpaceReflections {
       console.warn('Failed to load SSR, disabling feature:', error);
       this.isInitialized = false;
     }
+  }
+
+  private createRenderTarget(): void {
+    if (!this.ssrResult) {
+      this.ssrResult = new RenderTarget();
+    }
+    this.ssrResult.createRT(
+      'ssr_result.dds',
+      Render.width * QualitySettings.getInstance().getSettings().ssrScale,
+      Render.height * QualitySettings.getInstance().getSettings().ssrScale,
+      QualitySettings.getInstance().getSettings().hdrTexture,
+    );
   }
 
   public render(accLights: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
@@ -192,6 +197,9 @@ export class ScreenSpaceReflections {
   }
 
   public dispose(): void {
-    this.isInitialized = false;
+    this.ssrBindGroup = null as any;
+    this.ssrComposeBindGroup = null as any;
+    this.ssrResult = null as any;
+    this.createRenderTarget();
   }
 }
