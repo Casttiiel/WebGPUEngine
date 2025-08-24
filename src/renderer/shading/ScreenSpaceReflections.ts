@@ -12,7 +12,7 @@ export class ScreenSpaceReflections {
   private isInitialized: boolean = false;
   private fullscreenQuadMesh!: Mesh;
   private ssrTechnique!: Technique;
-  private ssrResult!: RenderTarget;
+  public ssrResult!: RenderTarget;
   private ssrBindGroup!: GPUBindGroup;
   private ssrUniformBuffer!: GPUBuffer;
 
@@ -42,7 +42,7 @@ export class ScreenSpaceReflections {
       GPUUtils.writeBuffer(
         this.ssrUniformBuffer,
         0,
-        new Float32Array([1.0, 0.2, 64.0, 100.0, 0.03, 1.0]),
+        new Float32Array([1.0, 0.05, 640.0, 100.0, 0.03, 1.0]),
       );
 
       console.log('SSR loaded successfully');

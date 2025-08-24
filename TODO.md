@@ -1,6 +1,6 @@
 FIXES------------------------------------------
 
-1. Screen Space Reflections (Disabled SSR -> fallback) (Uniform from quality)
+1. Screen Space Reflections (I use fallback) (Disabled SSR -> fallback) (How it is combined) (What happens with specular calcs) (Uniform from quality)
 2. OnResizeEnd event
 3. Fix Spot Lights
 4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)

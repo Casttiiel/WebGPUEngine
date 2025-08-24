@@ -35,15 +35,14 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     
     // Early exit if SSR is disabled
     if (ssrParams.enabled < 0.5) {
-        return textureSampleLevel(gAlbedo, samplerGBuffer, uv, 0.0);
+        return vec4<f32>(0.0);
     }
     
     let g = decodeGBuffer(uv);
 
     if (g.metallic < 0.1 || g.roughness > 0.8) {
-        return vec4<f32>(g.albedo, 1.0); // ??????
+        return vec4<f32>(0.0);
     }
-
     
     // Perform ray marching in screen space
     let reflectionColor = performScreenSpaceRayMarching(
@@ -52,7 +51,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         uv,
         g.zlinear
     );
-    
+
     // Calculate reflection strength based on metallic/roughness
     let reflectionStrength = g.metallic * (1.0 - g.roughness) * ssrParams.intensity;
     
@@ -72,59 +71,62 @@ fn performScreenSpaceRayMarching(
     let stepSize = ssrParams.stepSize;
     let maxSteps = i32(ssrParams.maxSteps);
     let maxDistance = ssrParams.maxDistance;
+    let thickness = ssrParams.thickness;
     
     var currentPos = startPos;
-    var steps = 0;
     
     // Ray marching loop
     for (var i = 0; i < maxSteps; i++) {
-        steps = i;
         
         // Advance ray
         currentPos += rayDir * stepSize;
+
+        let currentDistance = length(currentPos - startPos);
+        if (currentDistance > maxDistance) {
+            break; // Early exit - save GPU cycles
+        }
+
+        let viewPos = camera.viewMatrix * vec4<f32>(currentPos, 1.0);
         
-        // Project to screen space
-        let clipPos = camera.viewMatrix * camera.projectionMatrix * vec4<f32>(currentPos, 1.0);
-        
-        if (clipPos.w <= 0.0) {
-            break; // Behind camera
+        if (viewPos.z > 0.0) {
+            break;
         }
         
-        let ndc = clipPos.xyz / clipPos.w;
-        let screenUV = ndc.xy * 0.5 + 0.5;
-        
+        // Project to screen space
+        let clipPos = camera.projectionMatrix * viewPos;
+        let ndc = clipPos.xyz / clipPos.w;        
+        var screenUV = ndc.xy * 0.5 + 0.5;
+        screenUV.y = 1.0 - screenUV.y;
+
         // Check if ray is outside screen
         if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) {
+            return vec4<f32>(0.0);
             break;
         }
         
         // Sample depth at current screen position
         let sampledDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, screenUV, 0.0).r;
-        let currentDepth = ndc.z;
+        let camb2obj = currentPos - camera.cameraPosition;
+        let currentDepth = dot(camb2obj, camera.cameraFront) / camera.cameraZFar;
         
         // Check for intersection
-        if (currentDepth > sampledDepth && (currentDepth - sampledDepth) < ssrParams.thickness) {
+        if ((currentDepth > sampledDepth && (currentDepth - sampledDepth) < ssrParams.thickness) || sampledDepth == 1.0) {
             // Hit! Sample color at this position
             let hitColor = textureSampleLevel(accLight, accLightSampler, screenUV, 0.0);
             
             // Fade based on distance and edge proximity
-            let distanceFade = 1.0 - (length(currentPos - startPos) / maxDistance);
+            let distanceFade = 1.0 - (currentDistance / maxDistance);
             let edgeFade = calculateEdgeFade(screenUV);
-            let stepFade = 1.0 - (f32(steps) / f32(maxSteps));
+            let stepFade = 1.0 - (f32(i) / f32(maxSteps));
             
             let finalFade = distanceFade * edgeFade * stepFade;
             
-            return vec4<f32>(hitColor.rgb, finalFade);
-        }
-        
-        // Check max distance
-        if (length(currentPos - startPos) > maxDistance) {
-            break;
+            return vec4<f32>(hitColor.rgb, finalFade);// ALPHA DOES NOTHING!
         }
     }
     
     // No hit found
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    return vec4<f32>(0.0);
 }
 
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {

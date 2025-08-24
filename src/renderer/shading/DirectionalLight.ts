@@ -37,7 +37,7 @@ export class DirectionalLight {
     // Crear textura de profundidad para shadow mapping
     this.shadowDepthTexture = GPUUtils.createTexture(
       'directional_light_shadow_depth_map',
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution, // Resolución más alta para mejores sombras
+      QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
       QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
       'depth32float',
       GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -126,11 +126,13 @@ export class DirectionalLight {
     GPUUtils.writeBuffer(this.uniformBuffer, 100, new Float32Array([shadowStep]));
 
     // shadowInverseResolution (f32) - bytes 104-107
-    const shadowInverseResolution = 1.0 / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
+    const shadowInverseResolution =
+      1.0 / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
     GPUUtils.writeBuffer(this.uniformBuffer, 104, new Float32Array([shadowInverseResolution]));
 
     // shadowStepDivResolution (f32) - bytes 108-111
-    const shadowStepDivResolution = shadowStep / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
+    const shadowStepDivResolution =
+      shadowStep / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
     GPUUtils.writeBuffer(this.uniformBuffer, 108, new Float32Array([shadowStepDivResolution]));
 
     // startFalloff (f32) - bytes 112-115 (no se usa para directional light)
@@ -161,7 +163,11 @@ export class DirectionalLight {
         depthStencilAttachment,
       ),
     );
-    GPUUtils.configureViewportAndScissor(pass, QualitySettings.getInstance().getSettings().directionalShadowMapResolution, QualitySettings.getInstance().getSettings().directionalShadowMapResolution); // Usar resolución de shadow map
+    GPUUtils.configureViewportAndScissor(
+      pass,
+      QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
+      QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
+    ); // Usar resolución de shadow map
 
     RenderManager.getInstance().setCamera(this.camera);
 
