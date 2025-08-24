@@ -42,10 +42,19 @@ export class ScreenSpaceReflections {
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
 
+      const qualitySettings = QualitySettings.getInstance().getSettings();
+
       GPUUtils.writeBuffer(
         this.ssrUniformBuffer,
         0,
-        new Float32Array([1.0, 0.05, 640.0, 50.0, 0.03, 1.0]),
+        new Float32Array([
+          1.0,
+          qualitySettings.ssrStepSize,
+          qualitySettings.ssrMaxSteps,
+          50.0,
+          0.03,
+          1.0,
+        ]),
       );
 
       console.log('SSR loaded successfully');

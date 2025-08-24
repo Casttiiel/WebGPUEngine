@@ -20,6 +20,8 @@ export interface GraphicsQualitySettings {
   hdrTexture: GPUTextureFormat;
   ssrEnabled: boolean;
   ssrScale: number;
+  ssrStepSize: number;
+  ssrMaxSteps: number;
   directionalShadowMapResolution: number;
 }
 
@@ -52,6 +54,8 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: false,
       ssrScale: 0.5,
+      ssrStepSize: 0.2,
+      ssrMaxSteps: 160.0,
       directionalShadowMapResolution: 256,
     } as GraphicsQualitySettings,
 
@@ -77,6 +81,8 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
+      ssrStepSize: 0.1,
+      ssrMaxSteps: 320.0,
       directionalShadowMapResolution: 512,
     } as GraphicsQualitySettings,
 
@@ -102,6 +108,8 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
+      ssrStepSize: 0.05,
+      ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 1024,
     } as GraphicsQualitySettings,
 
@@ -127,6 +135,8 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
+      ssrStepSize: 0.05,
+      ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
     } as GraphicsQualitySettings,
   };
