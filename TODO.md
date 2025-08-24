@@ -1,9 +1,9 @@
 FIXES------------------------------------------
 
-1. Irradiance ambient
-2. OnResizeEnd event
+1. Diffuse IBL (irradiance map, prefiltered cube)
+2. Specular Occlusion
 3. (Metallic/Roughness good? Check other sponzas- Reflectance)
-4. Tweakpane
+4. OnResizeEnd event
 5. Github pages
 6. Fix Spot Lights
 7. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
@@ -11,32 +11,29 @@ FIXES------------------------------------------
 
 HIGH-END-FEATURES------------------------------
 
-1. Physically Based BRDF (Cook-Torrance, GGX NDF, Schlick Fresnel, Smith geometry)
-2. Diffuse IBL (irradiance map, prefiltered cube)
-3. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
-4. Screen Space Ambient Occlusion (SSAO / GTAO / HBAO+)
-5. Specular Occlusion
-6. Transparencias / Subsurface Scattering (SSS)
-7. Decals selective writing / Parallax / Detail maps
-8. Volumetric lighting
-9. Auto exposure(HAY BRANCH)
-10. Color Grading
-11. Depth of Field (DOF)
-12. Motion Blur
-13. Volumetric effects: Fog, volumetric lighting, light shafts.
-14. TAA / MSAA: Anti-aliasing temporal o multi-sample.
-15. Sharpening / Upscaling: FidelityFX CAS, DLSS/FSR/XeSS si es posible.
-16. Particles
-17. Lens Flare
-18. CSM: 3-cascade system
-19. Move objects with mouse
-20. Indirect light (Indirect diffuse/Specular)
-21. Volumetric fog
-22. Area Light
-23. Atmospheric scattering
-24. Global Ilumination
-25. Multiple Lights: Shadow atlas system
-26. Shadow mapping (PCF/PCSS, cascaded for directional)
+1. Volumetric lighting
+2. Auto exposure(HAY BRANCH)
+3. Motion Blur
+4. Tweakpane
+5. Light shafts
+6. Particles
+7. CSM: 3-cascade system
+8. Move objects with mouse
+9. Indirect light (Indirect diffuse/Specular)
+10. Volumetric fog
+11. Shadow mapping (PCF/PCSS, cascaded for directional)
+12. Lens Flare
+13. Area Light
+14. Atmospheric scattering
+15. Global Ilumination
+
+IMPROVEMENTS------------------------------------------
+
+1. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
+2. Screen Space Ambient Occlusion (GTAO / HBAO+)
+3. Subsurface Scattering (SSS)
+4. Decals selective writing / Parallax / Detail maps
+5. TAA / MSAA: Anti-aliasing temporal o multi-sample.
 
 MAJOR-UPGRADES------------------------------------------
 
@@ -71,3 +68,4 @@ Paralax Mapping (Needs height map!)
 Grain
 Camera Lens Dirt
 God rays
+Depth of Field (DOF)

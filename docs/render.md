@@ -41,15 +41,53 @@ The engine includes comprehensive quality management with four preset levels:
 - **HIGH**: 100% resolution, full effects, MSAA 4x, high-quality visuals
 - **ULTRA**: 100% resolution, maximum effects, MSAA 4x, highest visual quality
 
+### Note on Specular Reflections and Ambient Pass
+
+**Specular IBL is not implemented in the ambient light shader pass.** Instead, specular reflections are handled in a later stage by the SSR (Screen Space Reflections) system. If a valid SSR reflection is found, it is composited as the physically-based specular. If no SSR hit is found, the fallback is to compute a generic specular value (not using the environment map). This means the ambient pass only provides diffuse (irradiance) lighting, and all specular environment or reflection effects are deferred to the SSR/compositing stage. This approach matches the engine's current implementation and is important for understanding the separation of responsibilities in the PBR pipeline.
+
+---
+
 ### Screen Space Reflections (SSR)
 
-The engine implements a complete SSR system for realistic surface reflections:
+The engine implements a physically-based SSR system for realistic surface reflections, fully integrated with the deferred PBR pipeline and designed for UE5-level quality. Key features and implementation details:
 
-- **Ray Marching**: Screen-space ray tracing for accurate reflections
-- **Compositing Pipeline**: Proper integration with G-Buffer and lighting system
-- **Quality Controls**: Adjustable step size, max steps, distance, and thickness parameters
-- **Debug Integration**: Real-time parameter adjustment through debug UI
-- **Performance Optimization**: Efficient shader implementation with early termination
+- **Hierarchical Ray Marching**: Efficient screen-space ray tracing using hierarchical steps for fast and robust intersection with the scene depth buffer. The SSR shader performs multiple steps per ray, with early exit on hit or max steps.
+- **PBR/BRDF Integration**: Reflections use the same Cook-Torrance BRDF as direct lighting, including GGX NDF, Smith geometry, and Schlick Fresnel. The SSR shader samples the BRDF LUT using correct UE5-style coordinates (NdotV, roughness²) for energy-conserving reflection color.
+- **Roughness and Fresnel**: Reflection strength and sharpness are modulated by surface roughness (using roughness² for correct microfacet distribution) and Schlick Fresnel, matching UE5's approach. This ensures physically plausible blending between mirror and diffuse.
+- **BRDF LUT Usage**: The SSR shader uses the precomputed BRDF LUT for split-sum approximation, with correct input coordinates (NdotV, roughness²) for specular response. This matches the PBR pipeline and ensures energy conservation.
+- **Environment Fallback/Blending**: When SSR rays miss or hit invalid regions, the shader blends with the environment map (skybox or IBL) using a physically-based Fresnel factor. This avoids harsh cutoffs and ensures smooth transitions between SSR and environment reflections.
+- **Compositing Pipeline**: SSR is composited after lighting accumulation, using a dedicated pass that blends SSR results with the lighting buffer. The result is then passed to post-processing (bloom, tone mapping, FXAA).
+- **Quality Controls**: All SSR parameters (step size, max steps, max distance, thickness, intensity) are exposed via the debug UI and adapt to quality settings. Lower quality reduces steps and distance for performance.
+- **Debug UI Integration**: Real-time adjustment of SSR parameters is available through the engine's debug UI, allowing for rapid tuning and visual debugging. Reflection mask and result can be visualized for development.
+- **Performance Optimizations**: The SSR shader uses early ray termination, hierarchical stepping, and optimized texture sampling. Separate command encoders are used to avoid resource conflicts. All samplers are sourced from the SamplerLibrary for optimal reuse.
+- **WebGPU Best Practices**: The SSR system is fully asynchronous, respects device limits, and is optimized for 2K@60fps on modern browsers. All GPU resources are properly managed and disposed.
+
+**SSR Pipeline Overview:**
+
+1. **SSR Pass**: Ray marching in screen space using G-Buffer (position, normal, roughness, metallic, depth) and lighting buffer. Reflection color is computed using PBR math and BRDF LUT.
+2. **Reflection Mask**: A mask is generated to indicate valid SSR hits, used for compositing and debug visualization.
+3. **Compositing**: SSR result is blended with the lighting buffer and environment using Fresnel and roughness. The final output is passed to post-processing.
+4. **Debug/Quality**: All parameters are exposed in the debug UI and adapt to quality settings.
+
+**SSR Shader Highlights:**
+
+- Hierarchical ray marching with early exit
+- Cook-Torrance BRDF (GGX, Smith, Schlick Fresnel)
+- Correct BRDF LUT sampling (NdotV, roughness²)
+- Reflection strength modulated by roughness and Fresnel
+- Environment fallback with smooth blending
+- Reflection mask for compositing and debug
+
+**Best Practices:**
+
+- Always use the SamplerLibrary for SSR samplers
+- Expose all SSR parameters in the debug UI for tuning
+- Use roughness² for all BRDF and reflection calculations
+- Ensure SSR compositing occurs after lighting and before post-processing
+
+This SSR implementation provides physically-based, high-quality reflections that match modern engines like Unreal Engine 5, with full integration into the deferred PBR pipeline and robust performance on the web.
+
+---
 
 ### Compute-Based Bloom System
 
