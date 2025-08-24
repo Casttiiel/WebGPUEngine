@@ -15,7 +15,6 @@ HIGH-END-FEATURES------------------------------
 2. Auto exposure(HAY BRANCH)
 3. Motion Blur
 4. Tweakpane
-5. Light shafts
 6. Particles
 7. CSM: 3-cascade system
 8. Move objects with mouse
@@ -67,5 +66,4 @@ Physics Grass
 Paralax Mapping (Needs height map!)
 Grain
 Camera Lens Dirt
-God rays
 Depth of Field (DOF)
