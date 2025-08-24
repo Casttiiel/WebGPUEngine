@@ -4,6 +4,7 @@ import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { Render } from '../core/pipeline/Render';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
+import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { RenderTarget } from '../resources/RenderTarget';
 import { Technique } from '../resources/Technique';
@@ -14,11 +15,12 @@ export class ScreenSpaceReflections {
   private fullscreenQuadMesh!: Mesh;
   private ssrTechnique!: Technique;
   private ssrComposeTechnique!: Technique;
-  public ssrResult!: RenderTarget;
+  private ssrResult!: RenderTarget;
   private ssrBindGroup!: GPUBindGroup;
   private ssrComposeBindGroup!: GPUBindGroup;
   private ssrUniformBuffer!: GPUBuffer;
   private brdfLUT!: Texture;
+  private environmentTexture!: Cubemap;
 
   constructor() {}
 
@@ -29,6 +31,7 @@ export class ScreenSpaceReflections {
       this.ssrTechnique = await Technique.get('ssr.tech');
       this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
       this.brdfLUT = await Texture.get('brdfLUT.png');
+      this.environmentTexture = await Cubemap.get('skybox.png');
 
       this.createRenderTarget();
 
@@ -188,6 +191,14 @@ export class ScreenSpaceReflections {
         },
         {
           binding: 4,
+          resource: this.environmentTexture.getTextureView()!,
+        },
+        {
+          binding: 5,
+          resource: SamplerLibrary.bloom!,
+        },
+        {
+          binding: 6,
           resource: { buffer: this.ssrUniformBuffer },
         },
       ],

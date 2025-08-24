@@ -1,6 +1,6 @@
 FIXES------------------------------------------
 
-1. Screen Space Reflections (Fallback/Disabled SSR -> fallback) (Metallic/Roughness good? Check other sponzas- Reflectance)
+1. Screen Space Reflections (Metallic/Roughness good? Check other sponzas- Reflectance)
 2. OnResizeEnd event
 3. Fix Spot Lights
 4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)

@@ -18,7 +18,9 @@
 @group(2) @binding(1) var aoTexture: texture_2d<f32>;
 @group(2) @binding(2) var brdfLUT: texture_2d<f32>;
 @group(2) @binding(3) var texSampler: sampler;
-@group(2) @binding(4) var<uniform> ssrParams: SSRUniforms;
+@group(2) @binding(4) var txEnvironment: texture_cube<f32>;
+@group(2) @binding(5) var envSampler: sampler;
+@group(2) @binding(6) var<uniform> ssrParams: SSRUniforms;
 
 
 struct SSRUniforms {
@@ -36,12 +38,18 @@ struct SSRUniforms {
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {    
     
     let g = decodeGBuffer(uv);
+    // Calculate reflection strength based on metallic/roughness
+    let reflectionStrength = g.metallic * (1.0 - g.roughness);
 
     // Early exit if SSR is disabled
-    if (ssrParams.enabled < 0.5 || g.metallic < 0.1 || g.roughness > 0.8) {
-        var color = applyFresnelBRDF(vec3<f32>(0.0), g);
+    if (ssrParams.enabled < 0.5 || g.metallic < 0.1 || g.roughness > 0.9) {
+        let R = normalize(g.reflectedDir);
+        let maxMipLevel = 7.0;
+        let mipLevel = g.roughness * maxMipLevel;
+        let prefilteredColor = vec3<f32>(g.albedo) * 0.75;//textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+        var color = applyFresnelBRDF(prefilteredColor, g);
         color = applyAmbientOcclusion(color, uv);
-        return vec4<f32>(color, 1.0);//FALLBACK
+        return vec4<f32>(color, reflectionStrength);
     }
     
     // Perform ray marching in screen space
@@ -53,9 +61,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         g
     );
 
-    // Calculate reflection strength based on metallic/roughness
-    let reflectionStrength = g.metallic * (1.0 - g.roughness);
-    let reflectionContribution = applyFresnelBRDF(reflectionColor.rgb, g) * reflectionStrength;
+    let reflectionContribution = applyFresnelBRDF(reflectionColor.rgb, g);
     return vec4<f32>(reflectionContribution, reflectionColor.a * reflectionStrength);
 }
 
@@ -140,9 +146,12 @@ fn performScreenSpaceRayMarching(
     }
     
     // No hit found
-    var color = applyFresnelBRDF(vec3<f32>(0.0), g);
-    color = applyAmbientOcclusion(color, startUV);
-    return vec4<f32>(color, 1.0);//FALLBACK
+    let R = normalize(g.reflectedDir);
+    let maxMipLevel = 7.0;
+    let mipLevel = g.roughness * maxMipLevel;
+    let prefilteredColor = vec3<f32>(g.albedo) * 0.75;//textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+    let color = applyAmbientOcclusion(prefilteredColor, startUV);
+    return vec4<f32>(prefilteredColor, 1.0);
 }
 
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {

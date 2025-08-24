@@ -227,7 +227,6 @@ export class DeferredRenderer {
       throw new Error('Failed to get final render target view');
     }
     return view;
-    //return this.ssr.ssrResult.getView()!;
   }
 
   private copyGBufferTexturesToBindGroup(): void {
