@@ -2,29 +2,28 @@ FIXES------------------------------------------
 
 1. Diffuse IBL (irradiance map, prefiltered cube)
 2. Specular Occlusion
-3. (Metallic/Roughness good? Check other sponzas- Reflectance)
+3. Check other sponzas
 4. OnResizeEnd event
 5. Github pages
-6. Fix Spot Lights
-7. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-8. Compute-based distortion
+6. Compute-based distortion
+7. New sponza, gltf loader
+8. Fix Spot Lights
+9. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 HIGH-END-FEATURES------------------------------
 
-1. Volumetric lighting
+1. Volumetric lighting/fog
 2. Auto exposure(HAY BRANCH)
 3. Motion Blur
-4. Tweakpane
-6. Particles
-7. CSM: 3-cascade system
-8. Move objects with mouse
-9. Indirect light (Indirect diffuse/Specular)
-10. Volumetric fog
-11. Shadow mapping (PCF/PCSS, cascaded for directional)
-12. Lens Flare
-13. Area Light
-14. Atmospheric scattering
-15. Global Ilumination
+4. Tweakpane (scenes/cleanup)
+5. Particles
+6. CSM: 3-cascade system
+7. Move objects with mouse
+8. Shadow mapping (PCF/PCSS, cascaded for directional)
+9. Lens Flare
+10. Area Light
+11. Atmospheric scattering
+12. Global Ilumination
 
 IMPROVEMENTS------------------------------------------
 
@@ -33,6 +32,7 @@ IMPROVEMENTS------------------------------------------
 3. Subsurface Scattering (SSS)
 4. Decals selective writing / Parallax / Detail maps
 5. TAA / MSAA: Anti-aliasing temporal o multi-sample.
+6. SSR raymarching algorithm
 
 MAJOR-UPGRADES------------------------------------------
 
