@@ -60,7 +60,8 @@ fn saturate(x: f32) -> f32 {
 
 // PBR helper functions
 fn NormalDistribution_GGX(NdotH: f32, roughness: f32) -> f32 {
-    let a2 = roughness;
+    let a = roughness * roughness;
+    let a2 = a * a;
     let NdotH2 = NdotH * NdotH;
     
     let num = a2;
@@ -85,16 +86,18 @@ fn Fresnel_Schlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
 }
 
 fn Fresnel_Schlick_Roughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
-    return F0 + (max(vec3f(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+    let oneMinusRoughness = 1.0 - roughness;
+    return F0 + (max(vec3f(oneMinusRoughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-fn Specular(specularColor: vec3<f32>, h: vec3<f32>, v: vec3<f32>, l: vec3<f32>, a: f32, NdL: f32, NdV: f32, NdH: f32, VdH: f32, LdV: f32) -> vec3<f32> {
+fn Specular(specularColor: vec3<f32>, h: vec3<f32>, v: vec3<f32>, l: vec3<f32>, roughnessSquared: f32, NdL: f32, NdV: f32, NdH: f32, VdH: f32, LdV: f32) -> vec3<f32> {
     let F0 = specularColor;
+
+    let roughness = sqrt(roughnessSquared);
     
-    // Cook-Torrance BRDF
-    let NDF = NormalDistribution_GGX(NdH, a);
-    let G = Geometric_Smith_Schlick_GGX(NdV, NdL, a);
-    let F = Fresnel_Schlick_Roughness(VdH, F0, a);
+    let NDF = NormalDistribution_GGX(NdH, roughness);
+    let G = Geometric_Smith_Schlick_GGX(NdV, NdL, roughness);
+    let F = Fresnel_Schlick(VdH, F0);
     
     let numerator = NDF * G * F;
     let denominator = 4.0 * NdV * NdL + 0.0001; // Prevent division by zero

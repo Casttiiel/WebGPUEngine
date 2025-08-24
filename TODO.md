@@ -1,34 +1,42 @@
 FIXES------------------------------------------
 
-1. Screen Space Reflections (Metallic/Roughness good? Check other sponzas- Reflectance)
+1. Irradiance ambient
 2. OnResizeEnd event
-3. Fix Spot Lights
-4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-5. Tweakpane
-6. Github pages
-7. Compute-based distortion
+3. (Metallic/Roughness good? Check other sponzas- Reflectance)
+4. Tweakpane
+5. Github pages
+6. Fix Spot Lights
+7. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+8. Compute-based distortion
 
 HIGH-END-FEATURES------------------------------
 
-1. Indirect light (Indirect diffuse/Specular)
-2. Everything is so plain?
-3. Volumetric lighting
-4. Light Exposure (For now is immediate, but wrong)(HAY BRANCH)
-5. Lens Flare
-6. Motion Blur
-7. Temporal Anti-Aliasing (TAA) / Aliasing quality
-8. Decals selective writing
-9. Particles
-10. CSM: 3-cascade system
-11. Move objects with mouse
-12. Volumetric fog
-13. Area Light
-14. Atmospheric scattering
-15. Global Ilumination
-16. Adaptive Bias: Surface angle-based slope-scaled bias
-17. Multiple Lights: Shadow atlas system
-18. PCSS: Variable filter size
-19. VSM: Variance Shadow Maps
+1. Physically Based BRDF (Cook-Torrance, GGX NDF, Schlick Fresnel, Smith geometry)
+2. Diffuse IBL (irradiance map, prefiltered cube)
+3. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
+4. Screen Space Ambient Occlusion (SSAO / GTAO / HBAO+)
+5. Specular Occlusion
+6. Transparencias / Subsurface Scattering (SSS)
+7. Decals selective writing / Parallax / Detail maps
+8. Volumetric lighting
+9. Auto exposure(HAY BRANCH)
+10. Color Grading
+11. Depth of Field (DOF)
+12. Motion Blur
+13. Volumetric effects: Fog, volumetric lighting, light shafts.
+14. TAA / MSAA: Anti-aliasing temporal o multi-sample.
+15. Sharpening / Upscaling: FidelityFX CAS, DLSS/FSR/XeSS si es posible.
+16. Particles
+17. Lens Flare
+18. CSM: 3-cascade system
+19. Move objects with mouse
+20. Indirect light (Indirect diffuse/Specular)
+21. Volumetric fog
+22. Area Light
+23. Atmospheric scattering
+24. Global Ilumination
+25. Multiple Lights: Shadow atlas system
+26. Shadow mapping (PCF/PCSS, cascaded for directional)
 
 MAJOR-UPGRADES------------------------------------------
 

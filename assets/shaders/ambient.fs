@@ -25,9 +25,15 @@ struct AmbientUniforms {
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let N = normalize(g.normal);
-    let irradiance = vec3<f32>(1.0); //textureSample(irradianceMap, samplerIrradiance, direction_to_equirect_uv(N)).rgb;
-
-    let kD = 1.0 - g.metallic; // Only non-metals get diffuse
+    let V = normalize(g.viewDir);
+    let NdotV = max(dot(N, V), 0.0);
+    
+    let irradiance = vec3<f32>(0.3); //let irradiance = vec3<f32>(1.0); //textureSample(irradianceMap, samplerIrradiance, direction_to_equirect_uv(N)).rgb;
+    
+    let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic);
+    let F = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
+    let kS = F;
+    let kD = (1.0 - kS) * (1.0 - g.metallic);
     let diffuse = kD * Diffuse(g.albedo) * irradiance;
 
     return diffuse * ambient.ambientLightIntensity * ambient.globalAmbientBoost * ao;

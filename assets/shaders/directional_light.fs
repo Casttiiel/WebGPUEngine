@@ -55,14 +55,14 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     let cDiff = Diffuse(g.albedo);
     let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
-    // Energy conservation: specular contribution reduces diffuse
-    let F = Fresnel_Schlick_Roughness(VdH, g.specularColor, a);
+    // Energy conservation: especular ya incluye Fresnel, solo calculamos kD
+    let F = Fresnel_Schlick(VdH, g.specularColor); // Para calcular kD
     let kS = F; // Specular contribution
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse contribution
     
     // Aplicar energy conservation correctamente
     let diffuse_contrib = kD * cDiff;
-    let specular_contrib = cSpec;
+    let specular_contrib = cSpec; // cSpec ya incluye Fresnel
 
     let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * light.intensity * shadow_factor;
     return vec4<f32>(final_color, 1.0);
