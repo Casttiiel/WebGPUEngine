@@ -12,12 +12,12 @@ FIXES------------------------------------------
 
 HIGH-END-FEATURES------------------------------
 
-1. Volumetric lighting/fog
-2. Auto exposure(HAY BRANCH)
-3. Motion Blur
-4. Tweakpane (scenes/cleanup)
-5. Particles
-6. CSM: 3-cascade system
+1. Auto exposure(HAY BRANCH)
+2. CSM: 3-cascade system
+3. Volumetric lighting/fog
+4. Motion Blur
+5. Tweakpane (scenes/cleanup)
+6. Particles
 7. Move objects with mouse
 8. Shadow mapping (PCF/PCSS, cascaded for directional)
 9. Lens Flare
