@@ -2,7 +2,9 @@ export class ShaderPreprocessor {
   private static cache: Map<string, string> = new Map();
 
   private static async readShaderFile(path: string): Promise<string> {
-    return await fetch(`/assets/shaders/${path}`).then((res) => res.text());
+    return await fetch(`${import.meta.env.BASE_URL}assets/shaders/${path}`).then((res) =>
+      res.text(),
+    );
   }
 
   private static async processIncludes(

@@ -66,7 +66,7 @@ export class Texture extends GPUResource {
   private async createTexture(): Promise<void> {
     // Load image
     const img = new Image();
-    img.src = `/assets/textures/${this.path}`;
+    img.src = `${import.meta.env.BASE_URL}assets/textures/${this.path}`;
     await img.decode();
 
     const imageBitmap = await createImageBitmap(img);

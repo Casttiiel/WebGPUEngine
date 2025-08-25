@@ -72,7 +72,7 @@ Boot module that loads the initial scene and configures the engine's base state.
 
 ```typescript
 public async start(): Promise<boolean> {
-    const response = await fetch('/assets/scenes/scene.json');
+    const response = await fetch(`${import.meta.env.BASE_URL}/assets/scenes/scene.json`);
     const jsonData = await response.json();
     await Loader.loadSceneFromJSON(jsonData);
     return true;

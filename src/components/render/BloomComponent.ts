@@ -85,7 +85,9 @@ export class BloomComponent extends Component {
 
   private async initializeComputeShaders(): Promise<void> {
     // Load downsample compute shader
-    const downsampleResponse = await fetch('/assets/shaders/bloom_downsample.cs');
+    const downsampleResponse = await fetch(
+      `${import.meta.env.BASE_URL}assets/shaders/bloom_downsample.cs`,
+    );
     const downsampleCode = await downsampleResponse.text();
 
     this.downsampleShader = this.device.createShaderModule({
@@ -94,7 +96,9 @@ export class BloomComponent extends Component {
     });
 
     // Load upsample compute shader
-    const upsampleResponse = await fetch('/assets/shaders/bloom_upsample.cs');
+    const upsampleResponse = await fetch(
+      `${import.meta.env.BASE_URL}assets/shaders/bloom_upsample.cs`,
+    );
     const upsampleCode = await upsampleResponse.text();
 
     this.upsampleShader = this.device.createShaderModule({
@@ -103,7 +107,9 @@ export class BloomComponent extends Component {
     });
 
     // Load combine compute shader
-    const combineResponse = await fetch('/assets/shaders/bloom_combine.cs');
+    const combineResponse = await fetch(
+      `${import.meta.env.BASE_URL}assets/shaders/bloom_combine.cs`,
+    );
     const combineCode = await combineResponse.text();
 
     this.combineShader = this.device.createShaderModule({

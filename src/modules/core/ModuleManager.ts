@@ -103,7 +103,8 @@ export class ModuleManager {
   }
 
   public async loadConfig(): Promise<void> {
-    const response = await fetch('/data/modules.json');
+    const url = `${import.meta.env.BASE_URL}data/modules.json`;
+    const response = await fetch(url);
     const jsonData = await response.json();
 
     this.updateModules = [];
@@ -125,7 +126,8 @@ export class ModuleManager {
   }
 
   public async loadGamestates(): Promise<void> {
-    const response = await fetch('/data/gamestates.json');
+    const url = `${import.meta.env.BASE_URL}data/gamestates.json`;
+    const response = await fetch(url);
     const jsonData = await response.json();
     const jsonGamestates = jsonData['gamestates'];
 

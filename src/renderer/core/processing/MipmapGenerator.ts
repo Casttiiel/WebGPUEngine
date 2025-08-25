@@ -33,7 +33,9 @@ export class MipmapGenerator {
     this.device = GPUUtils.getDevice();
 
     // Load the base shader template
-    const shaderResponse = await fetch('/assets/shaders/generate_mipmap.wgsl');
+    const shaderResponse = await fetch(
+      `${import.meta.env.BASE_URL}assets/shaders/generate_mipmap.wgsl`,
+    );
     this.baseShaderCode = await shaderResponse.text();
 
     this.isInitialized = true;

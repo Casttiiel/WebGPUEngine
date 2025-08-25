@@ -28,14 +28,16 @@ export class GLTFLoader {
   public static async loadGLTF(path: string): Promise<Array<EntityDataType>> {
     const folderName = path.split('.')[0];
     // 1. Cargar el archivo GLTF
-    const gltfResponse = await fetch(`/assets/meshes/${folderName}/${path}`);
+    const gltfResponse = await fetch(
+      `${import.meta.env.BASE_URL}assets/meshes/${folderName}/${path}`,
+    );
     const gltf: GLTF = await gltfResponse.json();
 
     // 2. Cargar el archivo .bin asociado si existe
     let binData: ArrayBuffer | null = null;
     if (gltf.buffers?.[0]?.uri) {
       const binPath = gltf.buffers[0].uri;
-      const fullBinPath = `/assets/meshes/${folderName}/${binPath}`;
+      const fullBinPath = `${import.meta.env.BASE_URL}assets/meshes/${folderName}/${binPath}`;
       binData = await this.loadBinaryFile(fullBinPath);
     }
 

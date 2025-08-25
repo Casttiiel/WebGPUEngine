@@ -1,6 +1,6 @@
 FIXES------------------------------------------
 
-1. Github pages.
+1. Github pages
 2. Check other sponzas
 3. Compute-based distortion
 4. New sponza, gltf loader

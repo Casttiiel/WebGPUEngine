@@ -51,20 +51,28 @@ export class ResourceManager {
 
   // Data loading utilities
   public static async loadPrefab(prefabName: string): Promise<EntityDataType> {
-    const prefab = await fetch(`/assets/prefabs/${prefabName}`).then((res) => res.json());
+    const prefab = await fetch(`${import.meta.env.BASE_URL}assets/prefabs/${prefabName}`).then(
+      (res) => res.json(),
+    );
     return prefab;
   }
 
   public static async loadMeshData(meshPath: string): Promise<string> {
-    return await fetch(`/assets/meshes/${meshPath}`).then((res) => res.text());
+    return await fetch(`${import.meta.env.BASE_URL}assets/meshes/${meshPath}`).then((res) =>
+      res.text(),
+    );
   }
 
   public static async loadMaterialData(materialPath: string): Promise<MaterialDataType> {
-    return await fetch(`/assets/materials/${materialPath}`).then((res) => res.json());
+    return await fetch(`${import.meta.env.BASE_URL}assets/materials/${materialPath}`).then((res) =>
+      res.json(),
+    );
   }
 
   public static async loadTechniqueData(techniquePath: string): Promise<TechniqueDataType> {
-    return await fetch(`/assets/techniques/${techniquePath}`).then((res) => res.json());
+    return await fetch(`${import.meta.env.BASE_URL}assets/techniques/${techniquePath}`).then(
+      (res) => res.json(),
+    );
   }
 
   public static async loadShader(shaderPath: string): Promise<string> {

@@ -68,7 +68,7 @@ export class ModuleEntities extends Module {
   }
 
   public async start(): Promise<boolean> {
-    const response = await fetch('/data/components.json');
+    const response = await fetch(`${import.meta.env.BASE_URL}data/components.json`);
     const jsonData = await response.json();
 
     this.loadListOfManagers(jsonData);
