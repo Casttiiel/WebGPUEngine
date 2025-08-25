@@ -1,0 +1,6 @@
+{
+    "technique": "shadows.tech",
+    "textures":{},
+    "casts_shadows": false,
+    "category": "shadows"
+}

@@ -1,0 +1,7 @@
+{
+    "vs": "gaussian_blur.vs",
+    "fs": "gaussian_blur.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": ["SingleTexture", "BufferUniform"]
+}
