@@ -54,7 +54,7 @@ export class Material extends GPUResource {
     this.shadows = options.shadows ?? false;
     this.technique = options.technique;
     this.textureFiles = options.textures;
-    this.baseColorFactor = options.baseColorFactor;
+    this.baseColorFactor = options.baseColorFactor ?? [1, 1, 1, 1];
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {

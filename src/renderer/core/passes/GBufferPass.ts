@@ -170,7 +170,6 @@ export class GBufferPass {
   public dispose(): void {
     this.rtAlbedos?.destroy();
     this.rtNormals?.destroy();
-    this.rtSelfIllum?.destroy();
     this.rtLinearDepth?.destroy();
     this.depthStencil?.destroy();
     this.msaaDepthStencil?.destroy();

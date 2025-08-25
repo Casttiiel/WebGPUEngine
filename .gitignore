@@ -8,7 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Build output
-dist/
 dist-ssr
 build/
 

@@ -6,19 +6,19 @@ declare global {
     cancelAnimationFrame(handle: number): void;
   }
 
-  var window: Window;
-  var document: Document;
-  var navigator: Navigator;
-  var performance: Performance;
-  var console: Console;
-  var fetch: typeof fetch;
-  var requestAnimationFrame: typeof window.requestAnimationFrame;
-  var cancelAnimationFrame: typeof window.cancelAnimationFrame;
-  var createImageBitmap: typeof window.createImageBitmap;
-  var Image: typeof window.Image;
-  var OffscreenCanvas: typeof window.OffscreenCanvas;
-  var ImageBitmap: typeof window.ImageBitmap;
-  var ResizeObserver: typeof window.ResizeObserver;
+  let window: Window;
+  let document: Document;
+  let navigator: Navigator;
+  let performance: Performance;
+  let console: Console;
+  let fetch: typeof fetch;
+  let requestAnimationFrame: typeof window.requestAnimationFrame;
+  let cancelAnimationFrame: typeof window.cancelAnimationFrame;
+  let createImageBitmap: typeof window.createImageBitmap;
+  let Image: typeof window.Image;
+  let OffscreenCanvas: typeof window.OffscreenCanvas;
+  let ImageBitmap: typeof window.ImageBitmap;
+  let ResizeObserver: typeof window.ResizeObserver;
 }
 
 export {};

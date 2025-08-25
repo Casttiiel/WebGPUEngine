@@ -1,4 +1,4 @@
-import { mat4, vec3, vec4 } from 'gl-matrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';

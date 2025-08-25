@@ -79,7 +79,7 @@ export class SpotLightComponent extends CameraComponent {
       );
     }
 
-    this.camera.lookAt(data.position, data.target);
+    this.camera.lookAt(data.position ?? [0, 0, 0], data.target ?? [0, 0, 1]);
 
     // Crear textura de profundidad para shadow mapping
     this.shadowDepthTexture = GPUUtils.createTexture(

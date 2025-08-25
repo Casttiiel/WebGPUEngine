@@ -153,7 +153,34 @@ export class QualitySettings {
   }
 
   public getSettings(): GraphicsQualitySettings {
-    return { ...this.settings };
+    // Ensure all required fields are present for GraphicsQualitySettings
+    const defaults: GraphicsQualitySettings = {
+      renderResolution: 1.0,
+      aliasingTexture: 'rgba16float',
+      toneMappingTexture: 'rgba16float',
+      bloomTexture: 'rgba16float',
+      enableBloom: true,
+      bloomNumMips: 8,
+      enableAO: true,
+      aoScale: 0.5,
+      aoTexture: 'r16float',
+      aoSampleCount: 16,
+      aoRadius: 0.1,
+      aoStrength: 3.0,
+      aoNoiseScale: 0.01,
+      msaaLevel: 4,
+      albedoTexture: 'rgba8unorm',
+      normalTexture: 'rgba8unorm',
+      linearDepthTexture: 'r16float',
+      generalTexture: 'rgba8unorm',
+      hdrTexture: 'rgba16float',
+      ssrEnabled: true,
+      ssrScale: 0.5,
+      ssrStepSize: 0.05,
+      ssrMaxSteps: 640.0,
+      directionalShadowMapResolution: 2048,
+    };
+    return { ...defaults, ...this.settings };
   }
 
   public getCurrentQualityName(): string {

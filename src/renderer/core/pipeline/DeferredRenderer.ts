@@ -287,9 +287,6 @@ export class DeferredRenderer {
     if (this.rtAccLight) {
       this.rtAccLight.destroy();
     }
-    if (this.rtFinalComposite) {
-      this.rtFinalComposite.destroy();
-    }
 
     if (this.ambientLight) {
       this.ambientLight.destroy();

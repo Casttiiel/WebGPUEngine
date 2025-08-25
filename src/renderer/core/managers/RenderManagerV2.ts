@@ -78,7 +78,7 @@ export class RenderManagerV2 {
     this.stateManager.reset();
 
     // Filter culled keys by category
-    let keys = this.camera.getCulledKeys();
+    const keys = this.camera.getCulledKeys();
     const keysToDraw = keys.filter((key) => key.material.getCategory() === category);
 
     // Sort keys for optimal rendering

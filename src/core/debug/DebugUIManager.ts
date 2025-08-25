@@ -88,7 +88,7 @@ export class DebugUIManager {
     // Skip creating duplicate controls, but don't return
     // This allows values to still be updated for existing controls
     if (!this.controlRegistry.has(controlKey)) {
-      let folder = this.getOrCreateFolder(folderName);
+      const folder = this.getOrCreateFolder(folderName);
       if (!folder) return;
 
       folder.addBinding(object as Record<string, unknown>, propertyKey, {
@@ -129,7 +129,7 @@ export class DebugUIManager {
     // Skip creating duplicate controls, but don't return
     // This allows values to still be updated for existing controls
     if (!this.controlRegistry.has(controlKey)) {
-      let folder = this.getOrCreateFolder(folderName);
+      const folder = this.getOrCreateFolder(folderName);
       if (!folder) return;
 
       const bindingOptions: Record<string, unknown> = {
@@ -171,7 +171,7 @@ export class DebugUIManager {
     const fullKey = `${parentFolderName}_${subFolderName}`;
 
     // Check if subfolder already exists
-    let existingSubFolder = this.debugFolders.get(fullKey);
+    const existingSubFolder = this.debugFolders.get(fullKey);
     if (existingSubFolder) {
       return existingSubFolder; // Return existing subfolder
     }
@@ -292,7 +292,7 @@ export class DebugUIManager {
 
     // Skip creating duplicate buttons
     if (!this.controlRegistry.has(buttonKey)) {
-      let folder = this.getOrCreateFolder(folderName);
+      const folder = this.getOrCreateFolder(folderName);
       if (!folder) return;
 
       folder.addButton({ title: label }).on('click', callback);

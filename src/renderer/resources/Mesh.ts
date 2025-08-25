@@ -3,8 +3,8 @@ import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { MeshData } from '../../types/MeshData.type';
 import { Engine } from '../../core/engine/Engine';
-import { AABB } from '../culling/GPUFrustumCuller';
 import { GPUUtils } from '../core/utils/GPUUtils';
+import { AABB } from '../../types/AABB';
 
 export interface MeshOptions extends IGPUResourceOptions {
   meshData?: MeshData;

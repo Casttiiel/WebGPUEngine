@@ -6115,9 +6115,7 @@
       "alphaCutoff": 0.5,
       "doubleSided": true,
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 0
         },
@@ -6131,9 +6129,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 3
         },
@@ -6147,9 +6143,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "metallicFactor": 0,
         "baseColorTexture": {
           "index": 6
@@ -6161,9 +6155,7 @@
       "alphaCutoff": 0.5,
       "doubleSided": true,
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 7
         },
@@ -6177,9 +6169,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 10
         },
@@ -6193,9 +6183,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 13
         },
@@ -6209,9 +6197,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 16
         },
@@ -6225,9 +6211,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 19
         },
@@ -6241,9 +6225,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 22
         },
@@ -6257,9 +6239,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 25
         },
@@ -6273,9 +6253,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 28
         },
@@ -6289,9 +6267,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 31
         },
@@ -6305,9 +6281,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 34
         },
@@ -6321,9 +6295,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 37
         },
@@ -6337,9 +6309,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 40
         },
@@ -6353,9 +6323,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 43
         },
@@ -6369,9 +6337,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 45
         },
@@ -6385,9 +6351,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 47
         },
@@ -6401,9 +6365,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 50
         },
@@ -6417,9 +6379,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 52
         },
@@ -6436,9 +6396,7 @@
       "alphaCutoff": 0.5,
       "doubleSided": true,
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 54
         },
@@ -6452,9 +6410,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 57
         },
@@ -6468,9 +6424,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 60
         },
@@ -6484,9 +6438,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 63
         },
@@ -6500,9 +6452,7 @@
     },
     {
       "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1
-        ],
+        "baseColorFactor": [0.5879999995231628, 0.5879999995231628, 0.5879999995231628, 1],
         "baseColorTexture": {
           "index": 66
         },

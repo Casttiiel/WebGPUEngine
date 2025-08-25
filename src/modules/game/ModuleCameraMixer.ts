@@ -85,7 +85,7 @@ export class ModuleCameraMixer extends Module {
   private blendCameras(camera1: Camera, camera2: Camera, ratio: number): Camera {
     if (!camera1 || !camera2 || ratio <= 0.0) throw new Error('Invalid cameras or ratio');
 
-    let output = new Camera();
+    const output = new Camera();
 
     const newPosition = vec3.lerp(
       vec3.create(),

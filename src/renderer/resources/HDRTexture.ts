@@ -62,9 +62,9 @@ export class HDRTexture extends GPUResource {
     const pixelCount = data.length / 3;
     const tgt = new Float16Array(pixelCount * 4); // RGBA16 -> 4 componentes 16 bits
     for (let i = 0, j = 0; i < data.length; i += 3, j += 4) {
-      tgt[j] = data[i];
-      tgt[j + 1] = data[i + 1];
-      tgt[j + 2] = data[i + 2];
+      tgt[j] = data[i] ?? 0;
+      tgt[j + 1] = data[i + 1] ?? 0;
+      tgt[j + 2] = data[i + 2] ?? 0;
       tgt[j + 3] = 1.0;
     }
 

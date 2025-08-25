@@ -1,5 +1,6 @@
 import { mat4, vec3 } from 'gl-matrix';
 
+//@Deprecated
 export class AABB {
   min: vec3;
   max: vec3;
