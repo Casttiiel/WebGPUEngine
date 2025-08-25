@@ -1,0 +1,7 @@
+{
+    "vs": "presentation.vs",
+    "fs": "presentation.fs",
+    "writesOn": "screen",
+    "z": "disable_all",
+    "uniforms": ["SingleTexture"]
+}

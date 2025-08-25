@@ -1,0 +1,14 @@
+[
+  {
+    "components": {
+      "name": "Sponza",
+      "transform": {
+        "rotation": [0, 90, 0]
+      }
+    },
+    "gltf": "sponza.gltf"
+  },
+  {
+    "prefab": "main_camera.prefab"
+  }
+]
