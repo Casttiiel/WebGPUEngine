@@ -1,5 +1,6 @@
 import { Engine } from '../../../core/engine/Engine';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
+import { setupResizeEvents } from '../../../utils/ResizeEvents';
 import { Texture } from '../../resources/Texture';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { MipmapGenerator } from '../processing/MipmapGenerator';
@@ -170,15 +171,17 @@ export class Render {
   }
 
   private setupResizeObserver(): void {
-    const observer = new ResizeObserver(() => {
-      const dpr = window.devicePixelRatio || 1;
-      const width = Math.floor(Math.max(1, this.canvas.clientWidth * dpr));
-      const height = Math.floor(Math.max(1, this.canvas.clientHeight * dpr));
+    setupResizeEvents(
+      this.canvas,
+      () => {},
+      () => {
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.floor(Math.max(1, this.canvas.clientWidth * dpr));
+        const height = Math.floor(Math.max(1, this.canvas.clientHeight * dpr));
 
-      this.resizeAndNotify(width, height);
-    });
-
-    observer.observe(this.canvas);
+        this.resizeAndNotify(width, height);
+      },
+    );
   }
 
   private resizeAndNotify(width: number, height: number): void {
