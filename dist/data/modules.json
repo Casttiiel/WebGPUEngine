@@ -1,0 +1,4 @@
+{
+  "update": ["entities", "input", "render"],
+  "render_debug": []
+}
