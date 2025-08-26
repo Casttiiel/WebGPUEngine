@@ -1,7 +1,0 @@
-{
-    "vs": "presentation.vs",
-    "fs": "ao_bilateral_filter.fs",
-    "writesOn": "single_channel",
-    "z": "disable_all",
-    "uniforms":["CameraUniforms", "GBufferUniforms", "SingleTexture"]
-}
