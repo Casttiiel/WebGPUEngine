@@ -1,10 +1,10 @@
 FIXES------------------------------------------
 
-1. Github pages
-2. Compute-based distortion
-3. New sponza, gltf loader
-4. Fix Spot Lights
-5. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+1. Compute-based distortion
+2. New sponza, gltf loader
+3. Fix Spot Lights
+4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+5. Care how we merge downscaled textures
 
 HIGH-END-FEATURES------------------------------
 
