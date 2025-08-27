@@ -1,3 +1,4 @@
+import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Loader } from '../../core/loaders/Loader';
 import { Module } from '../core/Module';
 
@@ -7,7 +8,7 @@ export class ModuleBoot extends Module {
   }
 
   public async start(): Promise<boolean> {
-    const response = await fetch(`${import.meta.env.BASE_URL}assets/scenes/scene.json`);
+    const response = await ResourceManager.fetch(`assets/scenes/scene.json`);
     const jsonData = await response.json();
 
     await Loader.loadSceneFromJSON(jsonData);

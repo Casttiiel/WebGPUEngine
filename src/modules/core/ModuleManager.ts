@@ -1,3 +1,4 @@
+import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Gamestate } from '../../core/engine/Gamestate';
 import { Module } from './Module';
 
@@ -103,8 +104,8 @@ export class ModuleManager {
   }
 
   public async loadConfig(): Promise<void> {
-    const url = `${import.meta.env.BASE_URL}data/modules.json`;
-    const response = await fetch(url);
+    const url = `data/modules.json`;
+    const response = await ResourceManager.fetch(url);
     const jsonData = await response.json();
 
     this.updateModules = [];
@@ -126,8 +127,8 @@ export class ModuleManager {
   }
 
   public async loadGamestates(): Promise<void> {
-    const url = `${import.meta.env.BASE_URL}data/gamestates.json`;
-    const response = await fetch(url);
+    const url = `data/gamestates.json`;
+    const response = await ResourceManager.fetch(url);
     const jsonData = await response.json();
     const jsonGamestates = jsonData['gamestates'];
 

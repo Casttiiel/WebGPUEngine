@@ -60,9 +60,7 @@ export class Cubemap extends GPUResource {
   public async load(): Promise<void> {
     try {
       const image = await createImageBitmap(
-        await fetch(`${import.meta.env.BASE_URL}assets/textures/${this.path}`).then((r) =>
-          r.blob(),
-        ),
+        await ResourceManager.fetch(`assets/textures/${this.path}`).then((r) => r.blob()),
       );
 
       const faceSize = image.width / 4; // Asumimos imagen 4x3 caras

@@ -1,3 +1,4 @@
+import { ResourceManager } from '../engine/ResourceManager';
 import { vec3 } from 'gl-matrix';
 import { EntityDataType } from '../../types/SceneData.type';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
@@ -21,23 +22,21 @@ import {
 
 export class GLTFLoader {
   private static async loadBinaryFile(url: string): Promise<ArrayBuffer> {
-    const response = await fetch(url);
+    const response = await ResourceManager.fetch(url);
     return response.arrayBuffer();
   }
 
   public static async loadGLTF(path: string): Promise<Array<EntityDataType>> {
     const folderName = path.split('.')[0];
     // 1. Cargar el archivo GLTF
-    const gltfResponse = await fetch(
-      `${import.meta.env.BASE_URL}assets/meshes/${folderName}/${path}`,
-    );
+    const gltfResponse = await ResourceManager.fetch(`assets/meshes/${folderName}/${path}`);
     const gltf: GLTF = await gltfResponse.json();
 
     // 2. Cargar el archivo .bin asociado si existe
     let binData: ArrayBuffer | null = null;
     if (gltf.buffers?.[0]?.uri) {
       const binPath = gltf.buffers[0].uri;
-      const fullBinPath = `${import.meta.env.BASE_URL}assets/meshes/${folderName}/${binPath}`;
+      const fullBinPath = `assets/meshes/${folderName}/${binPath}`;
       binData = await this.loadBinaryFile(fullBinPath);
     }
 

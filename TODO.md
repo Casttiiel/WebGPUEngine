@@ -1,25 +1,29 @@
 FIXES------------------------------------------
 
-1. Compute-based distortion
-2. New sponza, gltf loader
-3. Fix Spot Lights
-4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-5. Care how we merge downscaled textures
+1. Resource manager as single point for download
+2. Compute-based distortion
+3. New sponza, gltf loader
+4. Care how we merge downscaled textures
+5. Fix Spot Lights
+6. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 HIGH-END-FEATURES------------------------------
 
 1. Auto exposure(HAY BRANCH)
-2. CSM: 3-cascade system
-3. Volumetric lighting/fog
-4. Motion Blur
-5. Tweakpane (scenes/cleanup)
-6. Particles
-7. Move objects with mouse
-8. Shadow mapping (PCF/PCSS, cascaded for directional)
-9. Lens Flare
-10. Area Light
-11. Atmospheric scattering
-12. Global Ilumination
+2. Volumetric lighting/fog
+3. CSM: 3-cascade system
+4. Atmospheric shadowing
+5. Faked indirect lighting
+6. Motion Blur
+7. Tweakpane (scenes/cleanup)
+8. Particles
+9. Automatic geometry instancing
+10. Move objects with mouse
+11. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
+12. Lens Flare
+13. Area Light
+14. Atmospheric scattering
+15. Global Ilumination
 
 IMPROVEMENTS------------------------------------------
 

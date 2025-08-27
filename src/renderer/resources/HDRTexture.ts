@@ -52,7 +52,7 @@ export class HDRTexture extends GPUResource {
 
   private async createTexture(): Promise<void> {
     // 1. Descargar el archivo .hdr
-    const resp = await fetch(`${import.meta.env.BASE_URL}assets/textures/${this.path}`);
+    const resp = await ResourceManager.fetch(`assets/textures/${this.path}`);
     const buf = await resp.arrayBuffer();
 
     // 2. Decodificar usando io-rgbe

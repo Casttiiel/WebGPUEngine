@@ -1,3 +1,4 @@
+import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Component } from '../../core/ecs/Component';
 import { Entity } from '../../core/ecs/Entity';
 import { ComponentDataType } from '../../types/ComponentData.type';
@@ -68,7 +69,7 @@ export class ModuleEntities extends Module {
   }
 
   public async start(): Promise<boolean> {
-    const response = await fetch(`${import.meta.env.BASE_URL}data/components.json`);
+    const response = await ResourceManager.fetch(`data/components.json`);
     const jsonData = await response.json();
 
     this.loadListOfManagers(jsonData);
