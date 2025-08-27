@@ -333,6 +333,8 @@ export class Technique extends GPUResource {
         return PipelineFactory.getPureAdditiveBlending();
       case BlendModes.COMBINATIVE_GBUFFER:
         return PipelineFactory.getAlphaBlending();
+      case BlendModes.COMBINATIVE:
+        return PipelineFactory.getAlphaBlending();
       default:
         return PipelineFactory.getOpaqueBlending();
     }

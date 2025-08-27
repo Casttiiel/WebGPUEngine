@@ -5,7 +5,8 @@
     "z": "test_but_no_write",
     "uniforms": [
         "CameraUniforms",
+        "MaterialTextures",
         "ObjectUniforms",
-        "MaterialTextures"
+        "SingleTexture"
     ]
 }

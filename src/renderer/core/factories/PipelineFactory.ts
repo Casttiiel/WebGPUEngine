@@ -85,7 +85,9 @@ export class PipelineFactory {
       label,
       bindGroupLayouts,
     });
-  } /**
+  }
+
+  /**
    * Gets alpha blending state
    */
   public static getAlphaBlending(): GPUBlendState {

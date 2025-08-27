@@ -17,9 +17,11 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { Camera } from '../../core/math/Camera';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
+import { Distorsions } from '../../renderer/shading/Distorsions';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
+  private distorsions!: Distorsions;
 
   //Presentation data
   private presentationTechnique!: Technique;
@@ -40,10 +42,12 @@ export class ModuleRender extends Module {
   constructor(name: string) {
     super(name);
     this.deferred = new DeferredRenderer();
+    this.distorsions = new Distorsions();
   }
 
   public async start(): Promise<boolean> {
     await this.deferred.load();
+    await this.distorsions.load();
     this.onResolutionUpdated();
     this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
     this.presentationTechnique = await Technique.get('presentation.tech');
@@ -56,6 +60,7 @@ export class ModuleRender extends Module {
 
   public onResolutionUpdated(): void {
     this.deferred.create(Render.width, Render.height);
+    this.distorsions.resize();
     this.presentationBindGroup = null;
 
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
@@ -122,7 +127,7 @@ export class ModuleRender extends Module {
       }
     }
 
-    //this.renderDistorsions(result);
+    this.distorsions.render(result, this.deferred.getDepthStencilView()!);
 
     if (mainCameraEntity.hasComponent('tone_mapping')) {
       const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
@@ -137,33 +142,6 @@ export class ModuleRender extends Module {
     this.presentResult(result);
 
     Render.getInstance().endFrame();
-  }
-
-  public renderDistorsions(texture: GPUTextureView): void {
-    const render = Render.getInstance();
-
-    const colorAttachment = GPUUtils.createColorAttachment(texture, 'load', 'store');
-    const depthAttachment = GPUUtils.createDepthStencilAttachment(
-      this.deferred.getDepthStencilView()!,
-      'load',
-      'discard',
-    );
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor(
-          'Distorsions Render pass',
-          [colorAttachment],
-          depthAttachment,
-        ),
-      );
-
-    // Configure viewport and scissor using GPUUtils
-    GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
-
-    RenderManager.getInstance().render(RenderCategory.DISTORSIONS, pass);
-
-    pass.end();
   }
 
   private presentResult(result: GPUTextureView): void {
@@ -225,6 +203,11 @@ export class ModuleRender extends Module {
       if (this.deferred) {
         this.deferred.destroy();
         this.deferred = null as any;
+      }
+
+      if (this.distorsions) {
+        this.distorsions.destroy();
+        this.distorsions = null as any;
       }
 
       this.presentationBindGroup = null;

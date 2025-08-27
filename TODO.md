@@ -1,11 +1,9 @@
 FIXES------------------------------------------
 
-1. Resource manager as single point for download
-2. Compute-based distortion
-3. New sponza, gltf loader
-4. Care how we merge downscaled textures
-5. Fix Spot Lights
-6. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+1. New sponza, gltf loader
+2. Care how we merge downscaled textures
+3. Fix Spot Lights
+4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 HIGH-END-FEATURES------------------------------
 
