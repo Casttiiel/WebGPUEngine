@@ -1,7 +1,7 @@
 FIXES------------------------------------------
 
 1. Care how we merge the SSR
-2. ASYNC LOADING SYSTEM
+2. glTF-Transform
 3. Fix Spot Lights
 4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
