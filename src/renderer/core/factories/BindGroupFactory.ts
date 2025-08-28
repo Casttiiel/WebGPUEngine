@@ -216,6 +216,55 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getSSRComposeUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('ssr_compose_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          viewDimension: 'cube',
+          sampleType: 'float',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 7,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   public static getSkyboxUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('skybox uniforms layout', [
       {
@@ -421,6 +470,8 @@ export class BindGroupFactory {
         return this.getSingleTextureLayout();
       case PipelineBindGroupLayouts.SSR_UNIFORMS:
         return this.getSSRUniformsLayout();
+      case PipelineBindGroupLayouts.SSR_COMPOSE_UNIFORMS:
+        return this.getSSRComposeUniformsLayout();
       case PipelineBindGroupLayouts.SKYBOX_UNIFORMS:
         return this.getSkyboxUniformsLayout();
       case PipelineBindGroupLayouts.CUBEMAP_TEXTURE:

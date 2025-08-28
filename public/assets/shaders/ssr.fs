@@ -22,34 +22,17 @@
 @group(2) @binding(5) var envSampler: sampler;
 @group(2) @binding(6) var<uniform> ssrParams: SSRUniforms;
 
-
-struct SSRUniforms {
-    globalAmbientBoost: f32,
-    stepSize: f32,
-    maxSteps: f32,
-    maxDistance: f32,
-    thickness: f32,
-    enabled: f32,
-    padding1: f32,
-    padding2: f32,
-}
-
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {    
     
     let g = decodeGBuffer(uv);
+
     // Calculate reflection strength based on metallic/roughness
     let reflectionStrength = g.metallic * (1.0 - g.roughness);
 
     // Early exit if SSR is disabled
     if (ssrParams.enabled < 0.5 || g.metallic < 0.1 || g.roughness > 0.9) {
-        let R = normalize(g.reflectedDir);
-        let maxMipLevel = 7.0;
-        let mipLevel = g.roughness * maxMipLevel;
-        let prefilteredColor = vec3<f32>(g.albedo) * 0.75;//textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
-        var color = applyFresnelBRDF(prefilteredColor, g);
-        color = applyAmbientOcclusion(color, uv);
-        return vec4<f32>(color, reflectionStrength);
+        return vec4<f32>(0.0);
     }
     
     // Perform ray marching in screen space
@@ -65,11 +48,6 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     return vec4<f32>(reflectionContribution, reflectionColor.a * reflectionStrength);
 }
 
-fn applyAmbientOcclusion(color: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
-    let ao = textureSampleLevel(aoTexture, texSampler, uv, 0.0).r;
-    return color * ao * ssrParams.globalAmbientBoost;
-}
-
 fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     let N = normalize(g.normal);
     let V = normalize(g.viewDir);    
@@ -80,7 +58,6 @@ fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     let brdf = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
     return color * (F * brdf.x + brdf.y);
 }
-
 
 fn performScreenSpaceRayMarching(
     startPos: vec3<f32>,
@@ -146,12 +123,7 @@ fn performScreenSpaceRayMarching(
     }
     
     // No hit found
-    let R = normalize(g.reflectedDir);
-    let maxMipLevel = 7.0;
-    let mipLevel = g.roughness * maxMipLevel;
-    let prefilteredColor = vec3<f32>(g.albedo) * 0.75;//textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
-    let color = applyAmbientOcclusion(prefilteredColor, startUV);
-    return vec4<f32>(prefilteredColor, 1.0);
+    return vec4<f32>(0.0);
 }
 
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {

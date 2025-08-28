@@ -87,11 +87,11 @@ export class ScreenSpaceReflections {
       this.createSSRBindGroup(accLights, ao);
     }
     if (!this.ssrComposeBindGroup) {
-      this.createSSRComposeBindGroup(this.ssrResult.getView());
+      this.createSSRComposeBindGroup(this.ssrResult.getView(), ao);
     }
 
     this.executeSSRPass(gBufferBindGroup);
-    this.composeSSR(accLights);
+    this.composeSSR(accLights, gBufferBindGroup);
   }
 
   public executeSSRPass(gBufferBindGroup: GPUBindGroup): void {
@@ -138,7 +138,7 @@ export class ScreenSpaceReflections {
     pass.end();
   }
 
-  public composeSSR(accLights: GPUTextureView): void {
+  public composeSSR(accLights: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     if (!this.isInitialized) return;
     const render = Render.getInstance();
 
@@ -160,7 +160,9 @@ export class ScreenSpaceReflections {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Set bind groups
-    pass.setBindGroup(0, this.ssrComposeBindGroup);
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, gBufferBindGroup);
+    pass.setBindGroup(2, this.ssrComposeBindGroup);
 
     // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
@@ -205,10 +207,10 @@ export class ScreenSpaceReflections {
     );
   }
 
-  private createSSRComposeBindGroup(ssr: GPUTextureView) {
+  private createSSRComposeBindGroup(ssr: GPUTextureView, ao: GPUTextureView) {
     this.ssrComposeBindGroup = BindGroupFactory.createBindGroup(
       'ssr_compose_bindgroup',
-      this.ssrComposeTechnique.getPipeline().getBindGroupLayout(0),
+      this.ssrComposeTechnique.getPipeline().getBindGroupLayout(2),
       [
         {
           binding: 0,
@@ -217,6 +219,30 @@ export class ScreenSpaceReflections {
         {
           binding: 1,
           resource: SamplerLibrary.simpleSampler!,
+        },
+        {
+          binding: 2,
+          resource: ao,
+        },
+        {
+          binding: 3,
+          resource: this.brdfLUT.getTextureView()!,
+        },
+        {
+          binding: 4,
+          resource: SamplerLibrary.simpleSampler!,
+        },
+        {
+          binding: 5,
+          resource: this.environmentTexture.getTextureView()!,
+        },
+        {
+          binding: 6,
+          resource: SamplerLibrary.bloom!,
+        },
+        {
+          binding: 7,
+          resource: { buffer: this.ssrUniformBuffer },
         },
       ],
     );

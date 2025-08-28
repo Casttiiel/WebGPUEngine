@@ -1,13 +1,12 @@
 FIXES------------------------------------------
 
-1. Care how we merge the SSR
-2. glTF-Transform
-3. Fix Spot Lights
-4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+1. glTF-Transform
+2. Fix Spot Lights
+3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 HIGH-END-FEATURES------------------------------
 
-1. Auto exposure(HAY BRANCH)
+1. Auto exposure
 2. CSM: 3-cascade system
 3. Volumetric lighting/fog
 4. Atmospheric shadowing

@@ -5,6 +5,8 @@
     "blend": "additive_by_src_alpha",
     "z": "disable_all",
     "uniforms": [
-        "SingleTexture"
+        "CameraUniforms",
+        "GBufferUniforms",
+        "SSRComposeUniforms"
     ]
 }
