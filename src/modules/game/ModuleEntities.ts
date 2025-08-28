@@ -86,7 +86,7 @@ export class ModuleEntities extends Module {
   }
 
   public override renderInMenu(): void {
-    if (this.debugControlsAdded) return;
+    /*if (this.debugControlsAdded) return;
 
     this.addDebugControl(
       this.debugValues.numberEntities,
@@ -98,7 +98,7 @@ export class ModuleEntities extends Module {
       entity.renderInMenu();
     }
 
-    this.debugControlsAdded = true;
+    this.debugControlsAdded = true;*/
   }
 
   public renderDebug(): void {

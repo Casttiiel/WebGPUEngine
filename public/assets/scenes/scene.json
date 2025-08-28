@@ -10,8 +10,5 @@
   },
   {
     "prefab": "main_camera.prefab"
-  },
-  {
-    "prefab": "cube_distorsion.prefab"
   }
 ]

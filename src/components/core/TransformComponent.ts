@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { Transform } from '../../core/math/Transform';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
@@ -48,11 +48,37 @@ export class TransformComponent extends Component {
 
     if (data.rotation) {
       this.transform.setAngles(data.rotation[1], data.rotation[0], data.rotation[2]);
+    } else if (data.quaternion) {
+      this.transform.setLocalRotation(data.quaternion);
     }
 
     if (data.scale) {
       const scale = vec3.fromValues(data.scale[0] ?? 1, data.scale[1] ?? 1, data.scale[2] ?? 1);
       this.transform.setLocalScale(scale);
+    }
+    if (data.matrix) {
+      this.transform.fromMatrix(
+        mat4.fromValues(
+          ...(data.matrix as [
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+            number,
+          ]),
+        ),
+      );
     }
 
     this.updateWorldTransform();

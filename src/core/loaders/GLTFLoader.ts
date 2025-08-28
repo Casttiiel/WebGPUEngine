@@ -1,5 +1,5 @@
 import { ResourceManager } from '../engine/ResourceManager';
-import { vec3 } from 'gl-matrix';
+import { vec3, vec4 } from 'gl-matrix';
 import { EntityDataType } from '../../types/SceneData.type';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
 import {
@@ -46,39 +46,71 @@ export class GLTFLoader {
     if (gltf.scenes?.[0]?.nodes) {
       for (const nodeIndex of gltf.scenes[0].nodes) {
         const node = gltf.nodes?.[nodeIndex];
-        if (!node || node.mesh === undefined || !gltf.meshes?.[node.mesh]) {
+        if (
+          !node ||
+          ((node.mesh === undefined || !gltf.meshes?.[node.mesh]) &&
+            (!node.children || node.children.length === 0))
+        ) {
           continue;
         }
 
-        const mesh = gltf.meshes[node.mesh];
-        if (!mesh) continue;
-        const primitiveList = mesh.primitives;
-        const transform = this.getNodeTransform(node);
-
-        const meshes: RenderComponentMeshDataType[] = [];
-
-        for (const primitive of primitiveList) {
-          if (binData) {
-            meshes.push(this.processPrimitive(gltf, binData, primitive));
-          }
+        const res = GLTFLoader.processNode(gltf, binData, node);
+        if (res) {
+          gltfNodes.push(res);
         }
-
-        const render: RenderComponentDataType = {
-          meshes,
-        };
-
-        const res: EntityDataType = {
-          children: [],
-          components: {
-            transform,
-            render,
-          },
-        };
-        gltfNodes.push(res);
       }
     }
 
     return gltfNodes;
+  }
+
+  private static processNode(
+    gltf: GLTF,
+    binData: ArrayBuffer,
+    node: GLTFNode,
+  ): EntityDataType | null {
+    if (node.mesh != undefined) {
+      const mesh = gltf.meshes[node.mesh];
+      if (!mesh) return null;
+      const primitiveList = mesh.primitives;
+      const transform = this.getNodeTransform(node);
+      const meshes: RenderComponentMeshDataType[] = [];
+
+      for (const primitive of primitiveList) {
+        if (binData) {
+          meshes.push(this.processPrimitive(gltf, binData, primitive));
+        }
+      }
+
+      const render: RenderComponentDataType = {
+        meshes,
+      };
+
+      const res: EntityDataType = {
+        children: [],
+        components: {
+          transform,
+          render,
+        },
+      };
+      return res;
+    } else if (node.children) {
+      const transform = this.getNodeTransform(node);
+      const res: EntityDataType = {
+        children: [],
+        components: {
+          transform,
+        },
+      };
+      for (const childIndex of node.children) {
+        const childNode = gltf.nodes?.[childIndex];
+        if (childNode) {
+          const nodeRes = this.processNode(gltf, binData, childNode);
+          if (nodeRes) res.children?.push(nodeRes);
+        }
+      }
+      return res;
+    }
   }
 
   private static processPrimitive(
@@ -124,11 +156,11 @@ export class GLTFLoader {
     const materialDef =
       primitive.material !== undefined ? gltf.materials?.[primitive.material] : undefined;
     const pbr = materialDef?.pbrMetallicRoughness ?? {};
-    const category = RenderCategory.SOLIDS;
+    const category =
+      materialDef?.alphaMode === 'BLEND' ? RenderCategory.TRANSPARENT : RenderCategory.SOLIDS;
     const textures: Record<string, string> = {
-      txEmissive: 'black.png',
+      txEmissive: materialDef.emissiveFactor ? 'white.png' : 'black.png',
     };
-
     if (pbr.baseColorTexture?.index !== undefined && gltf.textures?.[pbr.baseColorTexture.index]) {
       const texture = gltf.textures[pbr.baseColorTexture.index];
       if (texture) {
@@ -157,28 +189,48 @@ export class GLTFLoader {
       }
     }
 
+    let technique = 'gbuffer.tech';
+    if (materialDef?.alphaMode === 'MASK') {
+      technique = 'gbuffer_mask.tech';
+    } else if (materialDef?.alphaMode === 'BLEND') {
+      technique = 'transparent.tech';
+    }
+    let fs = 'gbuffer.fs';
+    if (materialDef.alphaMode === 'MASK') {
+      fs = 'gbuffer_mask.fs';
+    } else if (materialDef?.alphaMode === 'BLEND') {
+      fs = 'transparent.fs';
+    }
+
     const material: MaterialDataType = materialDef?.doubleSided
       ? {
           category: category,
           textures,
           baseColorFactor: pbr.baseColorFactor || [1, 1, 1, 1],
+          metallicFactor: pbr.metallicFactor || 1,
+          roughnessFactor: pbr.roughnessFactor || 1,
           techniqueData: {
             vs: 'gbuffer.vs',
-            fs: materialDef.alphaMode === 'MASK' ? 'gbuffer_mask.fs' : 'gbuffer.fs',
+            fs,
             uniforms: [
               PipelineBindGroupLayouts.CAMERA_UNIFORMS,
               PipelineBindGroupLayouts.MATERIAL_TEXTURES,
               PipelineBindGroupLayouts.OBJECT_UNIFORMS,
             ] as const,
-            writesOn: FragmentShaderTargets.GBUFFER,
+            writesOn:
+              materialDef?.alphaMode === 'BLEND'
+                ? FragmentShaderTargets.TEXTURE
+                : FragmentShaderTargets.GBUFFER,
             rs: RasterizationMode.DOUBLE_SIDED,
           },
         }
       : {
           category: category,
           baseColorFactor: pbr.baseColorFactor || [1, 1, 1, 1],
+          metallicFactor: pbr.metallicFactor || 1,
+          roughnessFactor: pbr.roughnessFactor || 1,
           textures,
-          technique: materialDef?.alphaMode === 'MASK' ? 'gbuffer_mask.tech' : 'gbuffer.tech',
+          technique,
         };
 
     // Crear la estructura compatible con RenderComponentMeshDataType
@@ -202,7 +254,7 @@ export class GLTFLoader {
     const transform: Partial<TransformComponentDataType> = {};
 
     if (node.matrix) {
-      throw new Error('GLTF Node Matrix needs to be parsed!');
+      transform.matrix = node.matrix;
     } else {
       if (node.translation) {
         const position = vec3.create();
@@ -215,7 +267,15 @@ export class GLTFLoader {
         transform.position = position;
       }
       if (node.rotation) {
-        transform.rotation = GLTFLoader.getEuler(node.rotation);
+        const rotation = vec4.create();
+        vec4.set(
+          rotation,
+          node.rotation[0] || 0,
+          node.rotation[1] || 0,
+          node.rotation[2] || 0,
+          node.rotation[3] || 0,
+        );
+        transform.quaternion = rotation;
       }
       if (node.scale) {
         const scale = vec3.create();

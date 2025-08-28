@@ -155,12 +155,15 @@ export class Distorsions {
   public update(_dt: number): void {}
 
   public destroy(): void {
-    this.distorsionsBuffer.createRT(
-      'distorsions_buffer',
-      Render.width,
-      Render.height,
-      QualitySettings.getInstance().getSettings().hdrTexture,
-    );
+    if (this.distorsionsBuffer) {
+      this.distorsionsBuffer.createRT(
+        'distorsions_buffer',
+        Render.width,
+        Render.height,
+        QualitySettings.getInstance().getSettings().hdrTexture,
+      );
+    }
+
     this.distorsionsBindGroup = null!;
     this.distorsionsCombineBindGroup = null!;
   }

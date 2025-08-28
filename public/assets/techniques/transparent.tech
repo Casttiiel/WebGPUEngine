@@ -6,7 +6,7 @@
     "blend": "additive_by_src_alpha",
     "uniforms": [
         "CameraUniforms",
-        "ObjectUniforms",
-        "MaterialTextures"
+        "MaterialTextures",
+        "ObjectUniforms"
     ]
 }

@@ -30,3 +30,11 @@ struct GBuffer {
     metallic: f32,
     zlinear: f32,
 }
+
+struct MaterialFactors {
+    baseColorFactor: vec4<f32>,
+    roughnessFactor: f32,
+    metallicFactor: f32,
+    padding1: f32,
+    padding2: f32,
+}

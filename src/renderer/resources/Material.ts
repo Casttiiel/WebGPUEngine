@@ -25,6 +25,8 @@ export interface MaterialBaseOptions {
   textures?: MaterialTexturesOptions;
   technique?: Technique;
   baseColorFactor?: number[];
+  roughnessFactor?: number;
+  metallicFactor?: number;
 }
 
 export type MaterialCreateOptions = MaterialBaseOptions & Omit<IGPUResourceOptions, 'type'>;
@@ -36,6 +38,8 @@ export class Material extends GPUResource {
   private technique?: Technique;
   private textures: Map<string, Texture> = new Map();
   private baseColorFactor!: number[];
+  private roughnessFactor!: number;
+  private metallicFactor!: number;
   private category: RenderCategory;
   private castsShadows: boolean;
   private shadows: boolean;
@@ -55,6 +59,8 @@ export class Material extends GPUResource {
     this.technique = options.technique;
     this.textureFiles = options.textures;
     this.baseColorFactor = options.baseColorFactor ?? [1, 1, 1, 1];
+    this.roughnessFactor = options.roughnessFactor ?? 1;
+    this.metallicFactor = options.metallicFactor ?? 1;
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
@@ -104,6 +110,10 @@ export class Material extends GPUResource {
       textures,
       category: materialData?.category,
       baseColorFactor: materialData?.baseColorFactor || [1.0, 1.0, 1.0, 1.0],
+      roughnessFactor:
+        materialData?.roughnessFactor !== undefined ? materialData.roughnessFactor : 1.0,
+      metallicFactor:
+        materialData?.metallicFactor !== undefined ? materialData.metallicFactor : 1.0,
       castsShadows: materialData?.casts_shadows !== undefined ? materialData.casts_shadows : true,
       shadows: materialData?.shadows !== undefined ? materialData.shadows : false,
     });
@@ -177,11 +187,16 @@ export class Material extends GPUResource {
 
     const uniformBuffer = GPUUtils.createBuffer(
       'material uniform buffer',
-      16,
+      32,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
     GPUUtils.writeBuffer(uniformBuffer, 0, new Float32Array(this.baseColorFactor));
+    GPUUtils.writeBuffer(
+      uniformBuffer,
+      16,
+      new Float32Array([this.roughnessFactor, this.metallicFactor, 0, 0]),
+    );
 
     entries.push({
       binding: 6,
