@@ -76,31 +76,31 @@ export class Mesh extends GPUResource {
   }
 
   public setData(meshData: MeshData): void {
-    if (Array.isArray(meshData.attributes.POSITION.data)) {
-      this.vertices = new Float32Array(meshData.attributes.POSITION.data);
+    if (Array.isArray(meshData.attributes.POSITION)) {
+      this.vertices = new Float32Array(meshData.attributes.POSITION);
     } else {
-      this.vertices = meshData.attributes.POSITION.data;
+      this.vertices = meshData.attributes.POSITION;
     }
 
-    if (Array.isArray(meshData.attributes.NORMAL.data)) {
-      this.normals = new Float32Array(meshData.attributes.NORMAL.data);
+    if (Array.isArray(meshData.attributes.NORMAL)) {
+      this.normals = new Float32Array(meshData.attributes.NORMAL);
     } else {
-      this.normals = meshData.attributes.NORMAL.data;
+      this.normals = meshData.attributes.NORMAL;
     }
 
-    if (Array.isArray(meshData.attributes.TEXCOORD_0.data)) {
-      this.uvs = new Float32Array(meshData.attributes.TEXCOORD_0.data);
+    if (Array.isArray(meshData.attributes.TEXCOORD_0)) {
+      this.uvs = new Float32Array(meshData.attributes.TEXCOORD_0);
     } else {
-      this.uvs = meshData.attributes.TEXCOORD_0.data;
+      this.uvs = meshData.attributes.TEXCOORD_0;
     }
 
-    if (Array.isArray(meshData.indices.data)) {
-      this.indices = new Uint16Array(meshData.indices.data);
+    if (Array.isArray(meshData.indices)) {
+      this.indices = new Uint16Array(meshData.indices);
     } else {
-      this.indices = meshData.indices.data as Uint16Array;
+      this.indices = meshData.indices as Uint16Array;
     }
     this.tangents = this.computeMeshTangents();
-    this.indexCount = meshData.indices.count;
+    this.indexCount = meshData.indices.length;
     this.aabb = this.calculateAABB();
 
     this.setHasData();

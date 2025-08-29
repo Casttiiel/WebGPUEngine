@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@derschmale/io-rgbe": "^0.1.1",
+    "@gltf-transform/core": "^4.2.1",
     "@petamoriken/float16": "^3.9.2",
     "@tweakpane/plugin-essentials": "^0.2.1",
     "gl-matrix": "^3.4.3",

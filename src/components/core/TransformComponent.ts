@@ -57,28 +57,7 @@ export class TransformComponent extends Component {
       this.transform.setLocalScale(scale);
     }
     if (data.matrix) {
-      this.transform.fromMatrix(
-        mat4.fromValues(
-          ...(data.matrix as [
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-            number,
-          ]),
-        ),
-      );
+      this.transform.fromMatrix(data.matrix);
     }
 
     this.updateWorldTransform();

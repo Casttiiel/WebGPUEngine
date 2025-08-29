@@ -1,3 +1,4 @@
+import { mat4 } from '@gltf-transform/core';
 import { vec3, vec4 } from 'gl-matrix';
 
 export type TransformComponentDataType = {
@@ -5,5 +6,5 @@ export type TransformComponentDataType = {
   rotation: vec3;
   quaternion: vec4;
   scale: vec3;
-  matrix: number[];
+  matrix: mat4;
 };
