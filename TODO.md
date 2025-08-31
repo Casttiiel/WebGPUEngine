@@ -18,7 +18,6 @@ HIGH-END-FEATURES------------------------------
 IMPROVEMENTS------------------------------------------
 
 1. Screen Space Ambient Occlusion (GTAO)
-   Visible Pattern
    Reproyeccion en Temporal accumulation
 2. Specular Occlusion
 3. Diffuse IBL (irradiance map, prefiltered cube)

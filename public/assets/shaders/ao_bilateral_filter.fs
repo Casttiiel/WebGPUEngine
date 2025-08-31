@@ -4,7 +4,7 @@
 #include "common/octahedral"
 
 // Constantes para bilateral filter
-const BILATERAL_RADIUS = 2u;      // Radio del filtro bilateral
+const BILATERAL_RADIUS = 4u;      // Radio del filtro bilateral
 const BILATERAL_SIGMA_DEPTH = 0.1; // Sensibilidad a diferencias de profundidad
 const BILATERAL_SIGMA_NORMAL = 0.5; // Sensibilidad a diferencias de normales
 
