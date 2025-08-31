@@ -1,14 +1,8 @@
-FIXES------------------------------------------
-
-1. glTF-Transform
-2. Fix Spot Lights
-3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-
 HIGH-END-FEATURES------------------------------
 
-1. Auto exposure
-2. CSM: 3-cascade system
-3. Volumetric lighting/fog
+1. Volumetric lighting/fog
+2. Auto exposure
+3. CSM: 3-cascade system
 4. Atmospheric shadowing
 5. Faked indirect lighting
 6. Motion Blur
@@ -23,15 +17,19 @@ HIGH-END-FEATURES------------------------------
 
 IMPROVEMENTS------------------------------------------
 
-1. Screen Space Ambient Occlusion (GTAO / HBAO+)
-2. Diffuse IBL (irradiance map, prefiltered cube)
-3. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
-4. Specular Occlusion
+1. Screen Space Ambient Occlusion (GTAO)
+   Visible Pattern
+   Reproyeccion en Temporal accumulation
+2. Specular Occlusion
+3. Diffuse IBL (irradiance map, prefiltered cube)
+4. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
 5. TAA / MSAA: Anti-aliasing temporal o multi-sample.
 6. Decals selective writing
 7. SSR raymarching algorithm
-8. Subsurface Scattering (SSS)
-9. Parallax / Detail maps
+8. Parallax / Detail maps
+9. Subsurface Scattering (SSS)
+10. Fix Spot Lights
+11. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 MAJOR-UPGRADES------------------------------------------
 

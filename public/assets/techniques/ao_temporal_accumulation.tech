@@ -1,0 +1,7 @@
+{
+    "vs": "presentation.vs",
+    "fs": "temporal_accumulation.fs",
+    "writesOn": "single_channel",
+    "z": "disable_all",
+    "uniforms":["SingleTexture", "SingleTexture"]
+}

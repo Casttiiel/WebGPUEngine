@@ -27,9 +27,8 @@ struct SSAOParams {
 @group(2) @binding(2) var noiseTexture: texture_2d<f32>;
 
 const PI_HALF: f32 = 1.5707963267948966192313216916398;
-const SSAO_SAMPLES      : i32 = 128;       // muestras por lado en cada slice (total 8 por slice)
-const SSAO_FALLOFF      : f32 = 1.5;     // caída lineal de influencia
-const SSAO_THICKNESSMIX : f32 = 0.2;     // mezcla para objetos finos
+const SSAO_FALLOFF      : f32 = 7.5;     // caída lineal de influencia
+const SSAO_THICKNESSMIX : f32 = 0.05;     // mezcla para objetos finos
 const SSAO_LIMIT        : f32 = 100.0;
 const SSAO_MAX_STRIDE   : f32 = 32.0;
 
@@ -52,7 +51,7 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
 
     let distCenter = max(length(ray), 1e-4);
     let stride = min((1.0 / distCenter) * SSAO_LIMIT, SSAO_MAX_STRIDE);
-    let texel = 2.0 / camera.screenSize;
+    let texel = 1.0 / camera.screenSize;
     let dirMult = texel * stride;
 
     let ix = i32(pos.x);
@@ -82,7 +81,7 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
 
 
     // lado “atrás”
-    for (var i: i32 = -1; i >= -SSAO_SAMPLES; i = i - 1) {
+    for (var i: i32 = -1; i >= -i32(ssaoParams.sampleCount); i = i - 1) {
         let uv    = tc_base + aoDir * f32(i);
         if (any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0))) {
             break;
@@ -95,7 +94,7 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
         c1 = val;
     }
     // lado “delante”
-    for (var i: i32 =  1; i <=  SSAO_SAMPLES; i = i + 1) {
+    for (var i: i32 =  1; i <=  i32(ssaoParams.sampleCount); i = i + 1) {
         let uv    = tc_base + aoDir * f32(i);
         if (any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0))) {
             break;
@@ -122,10 +121,8 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     let visibility = mix(1.0, sliceVis, clamp(projLen, 0.0, 1.0));
 
     // fuerza final y clamp
-    return clamp(visibility * ssaoParams.aoStrength, 0.0, 1.0);
+    return clamp(pow(visibility, ssaoParams.aoStrength), 0.0, 1.0);
 }
-
-// ---------- Funciones GTAO (Activision) ----------
 
 // [Eberly 2014] aprox acos rápida
 fn GTAOFastAcos(x: f32) -> f32 {
