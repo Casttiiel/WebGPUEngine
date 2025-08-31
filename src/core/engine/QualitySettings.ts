@@ -44,7 +44,7 @@ export class QualitySettings {
       aoTexture: 'r16float',
       aoSampleCount: 2,
       aoRadius: 3.5,
-      aoStrength: 1.5,
+      aoStrength: 2.0,
       aoNoiseScale: 0.01,
       msaaLevel: 1,
       albedoTexture: 'rgba8unorm',

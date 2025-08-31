@@ -27,7 +27,7 @@ struct SSAOParams {
 @group(2) @binding(2) var noiseTexture: texture_2d<f32>;
 
 const PI_HALF: f32 = 1.5707963267948966192313216916398;
-const SSAO_FALLOFF      : f32 = 7.5;     // caída lineal de influencia
+const SSAO_FALLOFF      : f32 = 5.5;     // caída lineal de influencia
 const SSAO_THICKNESSMIX : f32 = 0.05;     // mezcla para objetos finos
 const SSAO_LIMIT        : f32 = 100.0;
 const SSAO_MAX_STRIDE   : f32 = 32.0;
