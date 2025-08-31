@@ -84,7 +84,7 @@ export class AmbientOcclusionComponent extends Component {
     // 4 floats = 16
     this.ssaoParamsBuffer = GPUUtils.createBuffer(
       'SSAO Parameters Buffer',
-      16,
+      32,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
@@ -205,7 +205,13 @@ export class AmbientOcclusionComponent extends Component {
     );
   }
 
-  public update(_dt: number): void {}
+  public update(_dt: number): void {
+    GPUUtils.writeBuffer(
+      this.ssaoParamsBuffer,
+      16,
+      new Float32Array([Math.random() * 2 * Math.PI, Math.random() - 0.5, 0, 0]),
+    );
+  }
 
   public override renderInMenu(): void {}
 

@@ -122,7 +122,6 @@ export class GLTFLoader {
         },
         materialData: this.getPrimitiveMaterial(prim),
       };
-      console.log(primitiveInfo);
       res.meshes.push(primitiveInfo);
     }
 

@@ -278,7 +278,19 @@ export class DeferredRenderer {
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
 
-  public update(_dt: number): void {}
+  public update(_dt: number): void {
+    const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
+    if (!mainCameraEntity) {
+      console.warn('No main camera found');
+      return;
+    }
+    const ambientOcclusionComponent = mainCameraEntity.getComponent(
+      'ambient_occlusion',
+    ) as AmbientOcclusionComponent;
+    if (ambientOcclusionComponent) {
+      ambientOcclusionComponent.update(_dt);
+    }
+  }
 
   private dispose(): void {
     if (this.gBufferPass) {
