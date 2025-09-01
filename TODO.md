@@ -15,10 +15,6 @@ DIRECT LIGHTING PASS------------------------------
 6. Atmospheric shadowing
 
 AMBIENT OCCLUSION------------------------------
-
-1. (PRIMERO)Screen Space Ambient Occlusion (GTAO)
-   Reproyeccion en Temporal accumulation
-
 FAKED INDIRECT LIGHTING------------------------------
 
 1. Faked indirect lighting

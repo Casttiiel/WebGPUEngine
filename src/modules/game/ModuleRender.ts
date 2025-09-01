@@ -330,4 +330,8 @@ export class ModuleRender extends Module {
   public getMainCameraBindGroup(): GPUBindGroup {
     return this.mainCamera.getBindGroup();
   }
+
+  public getMainCamera(): Camera {
+    return this.mainCamera;
+  }
 }

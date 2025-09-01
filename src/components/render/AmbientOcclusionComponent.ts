@@ -9,6 +9,8 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { Render } from '../../renderer/core/pipeline/Render';
 import { Texture } from '../../renderer/resources/Texture';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { Engine } from '../../core/engine/Engine';
+import { mat4 } from 'gl-matrix';
 
 export class AmbientOcclusionComponent extends Component {
   private aoTechnique!: Technique;
@@ -31,9 +33,12 @@ export class AmbientOcclusionComponent extends Component {
   private temporalAccumulationResultBindGroup!: GPUBindGroup | null;
   private isEnabled = true;
   private noiseTexture!: Texture;
+  private oldCameraBuffer!: GPUBuffer;
+  private oldViewMatrix: mat4 = mat4.create();
+  private oldProjectionMatrix: mat4 = mat4.create();
 
   private jitterIndex = 0;
-  private jitterSequence = [
+  private jitterSequence: [number, number][] = [
     [0.0, 0.0],
     [1.1, -0.7],
     [2.2, 0.2],
@@ -86,6 +91,12 @@ export class AmbientOcclusionComponent extends Component {
       aoWidth,
       aoHeight,
       aoFormat,
+    );
+
+    this.oldCameraBuffer = GPUUtils.createBuffer(
+      'old camera uniform buffer',
+      128,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
     this.createSSAOParamsBuffer();
@@ -218,13 +229,13 @@ export class AmbientOcclusionComponent extends Component {
       this.rawAOTarget,
     );
 
-    this.renderTemporalAccumulation();
+    this.renderTemporalAccumulation(gBufferBindGroup);
 
     // Pass 2: Apply bilateral filter to the raw AO
     return this.applyBilateralFilter(gBufferBindGroup);
   }
 
-  private renderTemporalAccumulation(): void {
+  private renderTemporalAccumulation(gBufferBindGroup: GPUBindGroup): void {
     this.setupRawAOBindGroup();
     this.setupTemporalAccumulationResultBindGroup();
     const render = Render.getInstance();
@@ -253,8 +264,10 @@ export class AmbientOcclusionComponent extends Component {
     this.fullscreenQuadMesh.activate(pass);
 
     // 3. Set bind groups
-    pass.setBindGroup(0, this.rawAOBindGroup);
-    pass.setBindGroup(1, this.temporalAccumulationResultBindGroup);
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.rawAOBindGroup);
+    pass.setBindGroup(2, this.temporalAccumulationResultBindGroup);
+    pass.setBindGroup(3, gBufferBindGroup);
 
     // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
@@ -265,6 +278,11 @@ export class AmbientOcclusionComponent extends Component {
     const temp = this.temporalAccumulationResult;
     this.temporalAccumulationResult = this.temporalAccumulationTarget;
     this.temporalAccumulationTarget = temp;
+
+    // CRITICAL FIX: Update old matrices AFTER rendering, so next frame has correct previous matrices
+    const camera = Engine.getRender().getMainCamera();
+    mat4.copy(this.oldViewMatrix, camera.getView());
+    mat4.copy(this.oldProjectionMatrix, camera.getProjection());
   }
 
   private applyBilateralFilter(gBufferBindGroup: GPUBindGroup): GPUTextureView {
@@ -327,10 +345,15 @@ export class AmbientOcclusionComponent extends Component {
   private setupTemporalAccumulationResultBindGroup(): void {
     const sampler = SamplerLibrary.simpleSampler;
 
+    const uniformData = new Float32Array(32);
+    uniformData.set(this.oldViewMatrix, 0);
+    uniformData.set(this.oldProjectionMatrix, 16);
+    GPUUtils.writeBuffer(this.oldCameraBuffer, 0, uniformData);
+
     // Create bind group for AO texture using SingleTexture layout
     this.temporalAccumulationResultBindGroup = BindGroupFactory.createBindGroup(
       `temporalAccumulationResult_bindgroup`,
-      BindGroupFactory.getSingleTextureLayout(),
+      this.temporalAccumulationTechnique.getBindGroupLayout(2)!,
       [
         {
           binding: 0,
@@ -340,12 +363,19 @@ export class AmbientOcclusionComponent extends Component {
           binding: 1,
           resource: sampler,
         },
+        {
+          binding: 2,
+          resource: { buffer: this.oldCameraBuffer },
+        },
       ],
     );
   }
 
   public update(_dt: number): void {
-    const [angle, spacial] = this.jitterSequence[this.jitterIndex];
+    // Safe access to jitter sequence with fallback
+    const jitter = this.jitterSequence[this.jitterIndex] || [0.0, 0.0];
+    const angle = jitter[0];
+    const spacial = jitter[1];
     this.jitterIndex = (this.jitterIndex + 1) % this.jitterSequence.length;
     GPUUtils.writeBuffer(this.ssaoParamsBuffer, 16, new Float32Array([angle, spacial, 0, 0]));
   }
