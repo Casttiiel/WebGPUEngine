@@ -97,45 +97,6 @@ export class GBufferPass {
     }
   }
 
-  public execute(
-    encoder: GPUCommandEncoder,
-    renderCallback: (pass: GPURenderPassEncoder) => void,
-  ): void {
-    const colorAttachments: GPURenderPassColorAttachment[] = [
-      GPUUtils.createColorAttachment(this.rtAlbedos.getRenderView()),
-      GPUUtils.createColorAttachment(this.rtNormals.getRenderView()),
-      GPUUtils.createColorAttachment(this.rtLinearDepth.getRenderView()),
-    ];
-
-    // Add resolve targets for MSAA if available
-    const albedoResolve = this.rtAlbedos.getResolveTarget();
-    const normalResolve = this.rtNormals.getResolveTarget();
-    const linearDepthResolve = this.rtLinearDepth.getResolveTarget();
-    if (albedoResolve) colorAttachments[0]!.resolveTarget = albedoResolve;
-    if (normalResolve) colorAttachments[1]!.resolveTarget = normalResolve;
-    if (linearDepthResolve) colorAttachments[3]!.resolveTarget = linearDepthResolve;
-
-    const depthStencilAttachment = GPUUtils.createDepthStencilAttachment(
-      this.msaaDepthStencilView!,
-      'clear',
-      'store',
-    );
-
-    const passDescriptor: GPURenderPassDescriptor = {
-      label: 'G-Buffer Pass',
-      colorAttachments,
-      depthStencilAttachment,
-    };
-
-    const pass = encoder.beginRenderPass(passDescriptor);
-
-    // Configure viewport and scissor using GPUUtils
-    GPUUtils.configureViewportAndScissor(pass);
-
-    renderCallback(pass);
-    pass.end();
-  }
-
   public getRenderTargets(): {
     albedos: RenderTarget;
     normals: RenderTarget;

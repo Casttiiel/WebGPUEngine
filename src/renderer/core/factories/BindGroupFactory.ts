@@ -456,6 +456,26 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getTemporalAccumulationUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('temporal accumulation uniforms layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
@@ -490,6 +510,8 @@ export class BindGroupFactory {
         return this.getAOUniformsLayout();
       case PipelineBindGroupLayouts.DIRECTIONAL_LIGHT_UNIFORMS:
         return this.getDirectionalLightUniformsLayout();
+      case PipelineBindGroupLayouts.TEMPORAL_ACCUMULATION_UNIFORMS:
+        return this.getTemporalAccumulationUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

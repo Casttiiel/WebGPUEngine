@@ -14,4 +14,5 @@ export enum PipelineBindGroupLayouts {
   DIRECTIONAL_LIGHT_UNIFORMS = 'DirectionalLightUniforms',
   SSR_UNIFORMS = 'SSRUniforms',
   SSR_COMPOSE_UNIFORMS = 'SSRComposeUniforms',
+  TEMPORAL_ACCUMULATION_UNIFORMS = 'TemporalAccumulationUniforms',
 }

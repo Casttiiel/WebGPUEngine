@@ -1,43 +1,61 @@
-HIGH-END-FEATURES------------------------------
+GBUFFER------------------------------
 
-1. Volumetric lighting/fog
-2. Auto exposure
-3. CSM: 3-cascade system
-4. Atmospheric shadowing
-5. Faked indirect lighting
-6. Motion Blur
-7. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
-8. Particles
-9. Automatic geometry instancing
-10. Move objects with mouse
-11. Lens Flare
-12. Area Light
-13. Atmospheric scattering
-14. Global Ilumination
+1. (TERCERO)Decals selective writing
+2. Parallax / Detail maps
+3. Mesh LOD
+4. Subsurface Scattering (SSS)
 
-IMPROVEMENTS------------------------------------------
+DIRECT LIGHTING PASS------------------------------
 
-1. Screen Space Ambient Occlusion (GTAO)
+1. Fix Spot Lights
+2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+3. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
+4. CSM: 3-cascade system
+5. Area Light
+6. Atmospheric shadowing
+
+AMBIENT OCCLUSION------------------------------
+
+1. (PRIMERO)Screen Space Ambient Occlusion (GTAO)
    Reproyeccion en Temporal accumulation
-2. Specular Occlusion
-3. Diffuse IBL (irradiance map, prefiltered cube)
-4. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
-5. TAA / MSAA: Anti-aliasing temporal o multi-sample.
-6. Decals selective writing
-7. SSR raymarching algorithm
-8. Parallax / Detail maps
-9. Subsurface Scattering (SSS)
-10. Fix Spot Lights
-11. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
-MAJOR-UPGRADES------------------------------------------
+FAKED INDIRECT LIGHTING------------------------------
 
-1. Scene selector on Tweakpane
-2. Light Clustered culling + instancing
-3. Occlusion culling / Multi-Strategy Culling System
-4. GPU-Driven Rendering
-5. Mesh LOD
-6. Buffer Reuse y Pooling
+1. Faked indirect lighting
+2. Global Ilumination
+
+IBL / SKYLIGHT------------------------------
+
+1. Diffuse IBL (irradiance map, prefiltered cube)
+2. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
+3. Atmospheric scattering
+
+SPECULAR / REFLECTION PASS------------------------------
+
+1. (SEGUNDO)Specular Occlusion
+2. SSR raymarching algorithm
+
+VOLUMETRIC FOG / LIGHT SHAFTS------------------------------
+
+1. (CUARTO)Volumetric lighting/fog
+2. Atmospheric shadowing
+
+POST PROCESSING------------------------------
+
+1. (QUINTO)Auto exposure
+2. TAA: Anti-aliasing temporal o multi-sample.
+3. Motion Blur
+4. Lens Flare
+
+OTHER------------------------------
+
+1. Particles
+2. GPU-Driven Rendering
+3. Automatic geometry instancing
+4. Scene selector on Tweakpane
+5. Light Clustered culling + instancing
+6. Occlusion culling / Multi-Strategy Culling System
+7. Buffer Reuse y Pooling
 
 GAME-----------------------------------
 

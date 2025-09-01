@@ -106,6 +106,10 @@ export class RenderTarget {
     return this.texture;
   }
 
+  public getName(): string {
+    return this.name;
+  }
+
   public destroy(): void {
     if (this.texture) {
       this.texture.destroy();

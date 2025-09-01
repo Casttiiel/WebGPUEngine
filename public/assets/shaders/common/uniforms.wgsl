@@ -9,6 +9,11 @@ struct CameraUniforms {
     invProjection: mat4x4<f32>,
 }
 
+struct OldCameraUniforms {
+    viewMatrix: mat4x4<f32>,
+    projectionMatrix: mat4x4<f32>,
+}
+
 struct ObjectUniforms {
     modelMatrix: mat4x4<f32>,
 }
