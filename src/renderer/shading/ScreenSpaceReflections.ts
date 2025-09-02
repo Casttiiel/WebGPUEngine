@@ -31,7 +31,7 @@ export class ScreenSpaceReflections {
       this.ssrTechnique = await Technique.get('ssr.tech');
       this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
       this.brdfLUT = await Texture.get('brdfLUT.png');
-      this.environmentTexture = await Cubemap.get('skybox.png');
+      this.environmentTexture = await Cubemap.get('environment_cubemap.png');
 
       this.createRenderTarget();
 
@@ -193,14 +193,6 @@ export class ScreenSpaceReflections {
         },
         {
           binding: 4,
-          resource: this.environmentTexture.getTextureView()!,
-        },
-        {
-          binding: 5,
-          resource: SamplerLibrary.bloom!,
-        },
-        {
-          binding: 6,
           resource: { buffer: this.ssrUniformBuffer },
         },
       ],
@@ -238,7 +230,7 @@ export class ScreenSpaceReflections {
         },
         {
           binding: 6,
-          resource: SamplerLibrary.bloom!,
+          resource: this.environmentTexture.getSampler()!,
         },
         {
           binding: 7,

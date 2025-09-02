@@ -18,9 +18,7 @@
 @group(2) @binding(1) var aoTexture: texture_2d<f32>;
 @group(2) @binding(2) var brdfLUT: texture_2d<f32>;
 @group(2) @binding(3) var texSampler: sampler;
-@group(2) @binding(4) var txEnvironment: texture_cube<f32>;
-@group(2) @binding(5) var envSampler: sampler;
-@group(2) @binding(6) var<uniform> ssrParams: SSRUniforms;
+@group(2) @binding(4) var<uniform> ssrParams: SSRUniforms;
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {    
@@ -49,7 +47,7 @@ fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     let N = normalize(g.normal);
     let V = normalize(g.viewDir);    
     let NdotV = max(dot(N, V), 0.0);
-    let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic);
+    let F0 = g.specularColor;
     let F = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
     let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NdotV, 0.0, 1.0));
     let brdf = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;

@@ -27,7 +27,7 @@ fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     let N = normalize(g.normal);
     let V = normalize(g.viewDir);    
     let NdotV = max(dot(N, V), 0.0);
-    let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic);
+    let F0 = g.specularColor;
     let F = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
     let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NdotV, 0.0, 1.0));
     let brdf = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
@@ -57,13 +57,14 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let ssrAlpha = ssrColor.a;
 
     // Fallback: IBL/env map
-    let R = normalize(g.reflectedDir);
+    var R = normalize(g.reflectedDir);
     let maxMipLevel = 7.0;
     let mipLevel = g.roughness * maxMipLevel;
-    let fallbackColor = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+    let fallbackColorRaw = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+    let envTint = vec3<f32>(0.77, 0.7, 0.6); // Un leve tinte cálido, ajustable
+    let fallbackColor = clamp(fallbackColorRaw * envTint, vec3<f32>(0.0), vec3<f32>(10.0));
     var fallbackSpecular = applyFresnelBRDF(fallbackColor, g);
     fallbackSpecular *= so;
-
     // SSR specular (también atenuado por SO)
     let ssrSpecular = ssrColor.rgb * so;
 

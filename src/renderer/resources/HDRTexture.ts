@@ -1,10 +1,10 @@
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResource';
 import { ResourceType } from '../../types/ResourceType.enum';
-import { GPUUtils } from '../core/utils/GPUUtils';
 import { decodeRGBE } from '@derschmale/io-rgbe';
 import { Float16Array } from '@petamoriken/float16';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
+import { MipmapGenerator } from '../core/processing/MipmapGenerator';
 
 export interface HDRTextureOptions extends IGPUResourceOptions {
   magFilter?: GPUFilterMode;
@@ -20,6 +20,7 @@ export class HDRTexture extends GPUResource {
   private texture?: GPUTexture;
   private textureView?: GPUTextureView;
   private sampler?: GPUSampler;
+  private static mipmapGenerator: MipmapGenerator | null = null;
 
   constructor(options: HDRTextureOptions) {
     super({
@@ -68,33 +69,68 @@ export class HDRTexture extends GPUResource {
       tgt[j + 3] = 1.0;
     }
 
-    // Create GPU texture
-    this.texture = GPUUtils.createTexture(
-      `${this.label}_texture`,
-      width,
-      height,
-      'rgba16float',
-      GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT,
-    );
+    // Calculate mip levels for HDR texture
+    const mipLevelCount = Math.floor(Math.log2(Math.max(width, height))) + 1;
 
+    // Create GPU texture with mipmaps
+    this.texture = this.device.createTexture({
+      label: `${this.label}_texture`,
+      size: { width, height, depthOrArrayLayers: 1 },
+      mipLevelCount: mipLevelCount,
+      format: 'rgba16float',
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.STORAGE_BINDING,
+    });
+
+    // Upload the HDR data to mip level 0
     this.device.queue.writeTexture(
-      { texture: this.texture },
+      { texture: this.texture, mipLevel: 0 },
       tgt.buffer,
       {
         offset: 0,
-        bytesPerRow: width * 4 * 2,
+        bytesPerRow: width * 4 * 2, // 4 channels * 2 bytes per f16
         rowsPerImage: height,
       },
       { width, height, depthOrArrayLayers: 1 },
     );
-    // Create view and sampler
+
+    await this.generateMipmaps();
+
+    // Create view and sampler AFTER mipmap generation
     this.textureView = this.texture.createView({
       label: `${this.label}_textureView`,
+      format: 'rgba16float',
+      mipLevelCount: this.texture.mipLevelCount,
     });
 
     this.sampler = SamplerLibrary.bloom;
+  }
+
+  public async generateMipmaps(): Promise<void> {
+    await HDRTexture.initMipmapGenerator();
+
+    if (!this.texture) {
+      throw new Error('Texture is not initialized.');
+    }
+
+    if (!HDRTexture.mipmapGenerator) {
+      throw new Error('MipmapGenerator is not initialized.');
+    }
+
+    const mipLevelCount = this.texture.mipLevelCount;
+
+    // Use the MipmapGenerator for 2D textures
+    await HDRTexture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount);
+  }
+
+  private static async initMipmapGenerator() {
+    if (this.mipmapGenerator) return;
+
+    this.mipmapGenerator = MipmapGenerator.getInstance();
+    await this.mipmapGenerator.initialize();
   }
 
   public getTextureView(): GPUTextureView | undefined {

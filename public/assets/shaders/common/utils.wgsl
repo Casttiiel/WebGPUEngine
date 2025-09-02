@@ -139,9 +139,10 @@ fn get_world_dir(view_dir: vec3<f32>) -> vec3<f32> {
 }
 
 fn direction_to_equirect_uv(dir: vec3<f32>) -> vec2<f32> {
-    let dir_n = normalize(dir);
-    let u = (atan2(dir_n.z, dir_n.x) / (2.0 * 3.1415926535)) + 0.5;
-    let v = (asin(dir_n.y) / 3.1415926535) + 0.5;
+    let theta = atan2(dir.x, dir.z); // [-PI, PI]
+    let phi = acos(clamp(dir.y, -1.0, 1.0)); // [0, PI]
+    let u = (theta + PI) / (2.0 * PI); // [0, 1]
+    let v = phi / PI; // [0, 1]
     return vec2<f32>(u, v);
 }
 

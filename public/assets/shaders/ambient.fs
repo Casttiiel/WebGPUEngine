@@ -21,21 +21,20 @@ struct AmbientUniforms {
 @group(2) @binding(0) var gAO: texture_2d<f32>;
 @group(2) @binding(1) var samplerEnv: sampler;
 @group(2) @binding(2) var<uniform> ambient: AmbientUniforms;
+@group(2) @binding(3) var irradianceMap: texture_cube<f32>;
+@group(2) @binding(4) var samplerIrradiance: sampler;
 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
-    let N = normalize(g.normal);
+    var N = normalize(g.normal);
     let V = normalize(g.viewDir);
     let NdotV = max(dot(N, V), 0.0);
-    
-    let irradiance = vec3<f32>(0.3); //let irradiance = vec3<f32>(1.0); //textureSample(irradianceMap, samplerIrradiance, direction_to_equirect_uv(N)).rgb;
-    
-    let F0 = mix(vec3<f32>(0.04), g.albedo, g.metallic);
+    let irradiance = textureSample(irradianceMap, samplerIrradiance, N).rgb;
+    let F0 = g.specularColor;
     let F = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
     let kS = F;
     let kD = (1.0 - kS) * (1.0 - g.metallic);
     let diffuse = kD * Diffuse(g.albedo) * irradiance;
-
     return diffuse * ambient.ambientLightIntensity * ambient.globalAmbientBoost * ao;
 }
 

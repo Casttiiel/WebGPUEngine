@@ -1,9 +1,6 @@
-1. ENvironment map hdr and uv mapping
-2. Light Probes (Spherical Harmonics)
-
 GBUFFER------------------------------
 
-1. Decals selective writing
+1. Decals
 2. Parallax / Detail maps
 3. Mesh LOD
 4. Subsurface Scattering (SSS)
@@ -30,9 +27,9 @@ VOLUMETRIC FOG / LIGHT SHAFTS------------------------------
 
 POST PROCESSING------------------------------
 
-1. Auto exposure
-2. TAA: Anti-aliasing temporal o multi-sample.
-3. Motion Blur
+1. TAA: Anti-aliasing temporal o multi-sample.
+2. Motion Blur
+3. Auto exposure
 4. Lens Flare
 
 OTHER------------------------------
