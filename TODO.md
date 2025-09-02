@@ -1,6 +1,9 @@
+1. ENvironment map hdr and uv mapping
+2. Light Probes (Spherical Harmonics)
+
 GBUFFER------------------------------
 
-1. (TERCERO)Decals selective writing
+1. Decals selective writing
 2. Parallax / Detail maps
 3. Mesh LOD
 4. Subsurface Scattering (SSS)
@@ -16,29 +19,18 @@ DIRECT LIGHTING PASS------------------------------
 
 AMBIENT OCCLUSION------------------------------
 FAKED INDIRECT LIGHTING------------------------------
-
-1. Faked indirect lighting
-2. Global Ilumination
-
 IBL / SKYLIGHT------------------------------
 
-1. Diffuse IBL (irradiance map, prefiltered cube)
-2. Specular IBL (pre-filtered envmap mip chain + BRDF LUT for Fresnel/roughness integration)
-3. Atmospheric scattering
+1. Atmospheric scattering (Simular skybox y cielo)
 
 SPECULAR / REFLECTION PASS------------------------------
-
-1. (SEGUNDO)Specular Occlusion
-2. SSR raymarching algorithm
-
 VOLUMETRIC FOG / LIGHT SHAFTS------------------------------
 
-1. (CUARTO)Volumetric lighting/fog
-2. Atmospheric shadowing
+1. Volumetric lighting/fog
 
 POST PROCESSING------------------------------
 
-1. (QUINTO)Auto exposure
+1. Auto exposure
 2. TAA: Anti-aliasing temporal o multi-sample.
 3. Motion Blur
 4. Lens Flare
@@ -69,3 +61,4 @@ Paralax Mapping (Needs height map!)
 Grain
 Camera Lens Dirt
 Depth of Field (DOF)
+Atmospheric shadowing

@@ -23,11 +23,6 @@
 @group(2) @binding(6) var envSampler: sampler;
 @group(2) @binding(7) var<uniform> ssrParams: SSRUniforms;
 
-fn applyAmbientOcclusion(color: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {
-    let ao = textureSampleLevel(aoTexture, texSampler, uv, 0.0).r;
-    return color * ao * ssrParams.globalAmbientBoost;
-}
-
 fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     let N = normalize(g.normal);
     let V = normalize(g.viewDir);    
@@ -39,27 +34,42 @@ fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     return color * (F * brdf.x + brdf.y);
 }
 
+fn computeSpecularOcclusion(ao: f32, NoV: f32, roughness: f32) -> f32 {
+    let exponent: f32 = exp2((-16.0 * roughness) - 1.0);
+    let so: f32 = clamp((pow((NoV + ao), exponent) - 1.0) + ao, 0.0, 1.0);
+    return so;
+}
+
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-
     let g = decodeGBuffer(uv);
+    let ao = textureSampleLevel(aoTexture, texSampler, uv, 0.0).r;
+    let N = normalize(g.normal);
+    let V = normalize(g.viewDir);
+    let NoV = max(dot(N, V), 0.0);
+    let so = computeSpecularOcclusion(ao, NoV, g.roughness);
 
-    // Calculate reflection strength based on metallic/roughness
-    let reflectionStrength = g.metallic * (1.0 - g.roughness);
+    // Specular strength
+    let specularStrength = g.metallic * (1.0 - g.roughness);
 
+    // SSR color y alpha
     let ssrColor = textureSample(ssrTexture, ssrSampler, uv);
+    let ssrAlpha = ssrColor.a;
 
+    // Fallback: IBL/env map
+    let R = normalize(g.reflectedDir);
+    let maxMipLevel = 7.0;
+    let mipLevel = g.roughness * maxMipLevel;
+    let fallbackColor = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+    var fallbackSpecular = applyFresnelBRDF(fallbackColor, g);
+    fallbackSpecular *= so;
 
-    // Early exit if SSR is disabled or almost no reflection or no hit found on SSR
-    if (ssrParams.enabled < 0.5 || g.metallic < 0.1 || g.roughness > 0.9 || ssrColor.a < 0.01) {
-        let R = normalize(g.reflectedDir);
-        let maxMipLevel = 7.0;
-        let mipLevel = g.roughness * maxMipLevel;
-        let prefilteredColor = vec3<f32>(g.albedo) * 0.75;//textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
-        var color = applyFresnelBRDF(prefilteredColor, g);
-        color = applyAmbientOcclusion(color, uv);
-        return vec4<f32>(color, reflectionStrength);
-    }
+    // SSR specular (también atenuado por SO)
+    let ssrSpecular = ssrColor.rgb * so;
 
-    return vec4<f32>(ssrColor);
+    // Mezcla SSR y fallback según alpha
+    var finalSpecular = mix(fallbackSpecular, ssrSpecular, ssrAlpha);
+
+    // Composición final: suma a la escena base fuera de este shader
+    return vec4<f32>(finalSpecular, specularStrength * 1.0);
 }

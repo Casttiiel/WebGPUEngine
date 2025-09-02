@@ -27,9 +27,6 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     
     let g = decodeGBuffer(uv);
 
-    // Calculate reflection strength based on metallic/roughness
-    let reflectionStrength = g.metallic * (1.0 - g.roughness);
-
     // Early exit if SSR is disabled
     if (ssrParams.enabled < 0.5 || g.metallic < 0.1 || g.roughness > 0.9) {
         return vec4<f32>(0.0);
@@ -45,7 +42,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     );
 
     let reflectionContribution = applyFresnelBRDF(reflectionColor.rgb, g);
-    return vec4<f32>(reflectionContribution, reflectionColor.a * reflectionStrength);
+    return vec4<f32>(reflectionContribution, reflectionColor.a);
 }
 
 fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
