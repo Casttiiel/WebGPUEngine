@@ -1,18 +1,20 @@
+1. Loading async changes
+2. Fix Spot Lights
+3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+
 GBUFFER------------------------------
 
-1. Decals
-2. Parallax / Detail maps
+1. Specular value for gbuffer (0.04)
+2. Parallax
 3. Mesh LOD
 4. Subsurface Scattering (SSS)
 
 DIRECT LIGHTING PASS------------------------------
 
-1. Fix Spot Lights
-2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-3. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
-4. CSM: 3-cascade system
-5. Area Light
-6. Atmospheric shadowing
+1. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
+2. Area Light (LTC (Linearly Transformed Cosines) for shadows)
+3. CSM: 3-cascade system
+4. Atmospheric shadowing
 
 AMBIENT OCCLUSION------------------------------
 FAKED INDIRECT LIGHTING------------------------------
@@ -23,11 +25,11 @@ IBL / SKYLIGHT------------------------------
 SPECULAR / REFLECTION PASS------------------------------
 VOLUMETRIC FOG / LIGHT SHAFTS------------------------------
 
-1. Volumetric lighting/fog
+1. Volumetric scattering (lighting/fog)
 
 POST PROCESSING------------------------------
 
-1. TAA: Anti-aliasing temporal o multi-sample.
+1. TAA: Anti-aliasing temporal
 2. Motion Blur
 3. Auto exposure
 4. Lens Flare

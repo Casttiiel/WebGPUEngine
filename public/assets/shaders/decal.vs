@@ -42,10 +42,9 @@ fn vs(
     
     // Precompute decal projection data
     output.decal_top_left = center - decal_x * 0.5 - decal_z * 0.5;
-    let decal_inv_size = 1.0 / dot(decal_x, decal_x);
-    output.decal_axis_x = decal_x * decal_inv_size;
-    output.decal_axis_z = decal_z * decal_inv_size;
-    output.decal_axis_y = decal_y * decal_inv_size;
+    output.decal_axis_x = decal_x;
+    output.decal_axis_z = decal_z;
+    output.decal_axis_y = decal_y;
         
     return output;
 }
