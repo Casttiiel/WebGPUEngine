@@ -41,7 +41,7 @@ export class TransformComponent extends Component {
     );
   }
 
-  public async load(data: TransformComponentDataType): Promise<void> {
+  public load(data: TransformComponentDataType): void {
     if (data.position) {
       this.transform.setLocalPosition(data.position);
     }

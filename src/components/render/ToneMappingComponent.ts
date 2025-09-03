@@ -9,6 +9,7 @@ import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager'
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
 export class ToneMappingComponent extends Component {
+  private isLoaded = false;
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
@@ -28,6 +29,8 @@ export class ToneMappingComponent extends Component {
 
     this.result = new RenderTarget();
     this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, toneMappingFormat);
+
+    this.isLoaded = true;
   }
 
   public resize(): void {
@@ -82,5 +85,9 @@ export class ToneMappingComponent extends Component {
 
   public renderDebug(): void {
     // Implement debug rendering if needed
+  }
+
+  public hasLoaded(): boolean {
+    return this.isLoaded;
   }
 }

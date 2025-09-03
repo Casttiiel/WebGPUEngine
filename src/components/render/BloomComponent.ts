@@ -639,4 +639,8 @@ export class BloomComponent extends Component {
 
     this.combineBindGroup = null;
   }
+
+  public hasLoaded(): boolean {
+    return this.isLoaded;
+  }
 }

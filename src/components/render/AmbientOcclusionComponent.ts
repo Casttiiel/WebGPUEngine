@@ -13,6 +13,7 @@ import { Engine } from '../../core/engine/Engine';
 import { mat4 } from 'gl-matrix';
 
 export class AmbientOcclusionComponent extends Component {
+  private loaded = false;
   private aoTechnique!: Technique;
   private bilateralFilterTechnique!: Technique;
   private temporalAccumulationTechnique!: Technique;
@@ -101,6 +102,8 @@ export class AmbientOcclusionComponent extends Component {
 
     this.createSSAOParamsBuffer();
     this.createSSAOParamsBindGroup();
+
+    this.loaded = true;
   }
 
   public resize(): void {
@@ -372,6 +375,7 @@ export class AmbientOcclusionComponent extends Component {
   }
 
   public update(_dt: number): void {
+    if (!this.loaded) return;
     // Safe access to jitter sequence with fallback
     const jitter = this.jitterSequence[this.jitterIndex] || [0.0, 0.0];
     const angle = jitter[0];
@@ -384,5 +388,9 @@ export class AmbientOcclusionComponent extends Component {
 
   public renderDebug(): void {
     // Implement debug rendering if needed
+  }
+
+  public hasLoaded(): boolean {
+    return this.loaded;
   }
 }

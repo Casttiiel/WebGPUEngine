@@ -5,7 +5,7 @@ export abstract class Component {
 
   constructor() {}
 
-  public abstract load(data: unknown): Promise<void>;
+  public abstract load(data: unknown): void;
   public abstract update(dt: number): void;
   public abstract renderDebug(): void;
 

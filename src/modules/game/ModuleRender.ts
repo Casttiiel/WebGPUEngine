@@ -101,7 +101,6 @@ export class ModuleRender extends Module {
   public generateFrame(): void {
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
     if (!mainCameraEntity) {
-      console.warn('No main camera found');
       return;
     }
     const cameraComponent = mainCameraEntity.getComponent('camera') as CameraComponent;
@@ -122,7 +121,7 @@ export class ModuleRender extends Module {
       const bloom = mainCameraEntity.getComponent('bloom') as BloomComponent;
       const enableBloom = QualitySettings.getInstance().getSettings().enableBloom;
 
-      if (enableBloom) {
+      if (enableBloom && bloom.hasLoaded()) {
         result = bloom.apply(result);
       }
     }
@@ -131,12 +130,16 @@ export class ModuleRender extends Module {
 
     if (mainCameraEntity.hasComponent('tone_mapping')) {
       const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
-      result = toneMapping.apply(result);
+      if (toneMapping.hasLoaded()) {
+        result = toneMapping.apply(result);
+      }
     }
 
     if (mainCameraEntity.hasComponent('antialiasing')) {
       const antialiasing = mainCameraEntity.getComponent('antialiasing') as AntialiasingComponent;
-      result = antialiasing.apply(result);
+      if (antialiasing.hasLoaded()) {
+        result = antialiasing.apply(result);
+      }
     }
 
     this.presentResult(result);

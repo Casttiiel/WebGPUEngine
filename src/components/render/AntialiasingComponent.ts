@@ -10,6 +10,7 @@ import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager'
 import { Engine } from '../../core/engine/Engine';
 
 export class AntialiasingComponent extends Component {
+  private loaded = false;
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private bindGroup!: GPUBindGroup | null;
@@ -37,6 +38,8 @@ export class AntialiasingComponent extends Component {
 
     this.result = new RenderTarget();
     this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
+
+    this.loaded = true;
   }
 
   public resize(): void {
@@ -124,5 +127,9 @@ export class AntialiasingComponent extends Component {
 
   public renderDebug(): void {
     // Implement debug rendering if needed
+  }
+
+  public hasLoaded(): boolean {
+    return this.loaded;
   }
 }

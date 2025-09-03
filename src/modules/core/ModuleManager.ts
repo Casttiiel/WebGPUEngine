@@ -13,8 +13,8 @@ export class ModuleManager {
   private requestedGamestate: Gamestate | null = null;
 
   public async start(): Promise<void> {
-    await this.loadConfig();
-    await this.loadGamestates();
+    this.loadConfig();
+    this.loadGamestates();
 
     await this.startModules(this.systemModules);
 
@@ -103,46 +103,61 @@ export class ModuleManager {
     }
   }
 
-  public async loadConfig(): Promise<void> {
+  public loadConfig(): void {
     const url = `data/modules.json`;
-    const response = await ResourceManager.fetch(url);
-    const jsonData = await response.json();
 
-    this.updateModules = [];
-    this.renderDebugModules = [];
+    const responsePromise = ResourceManager.fetchWithTracking(url);
 
-    for (const moduleName of jsonData['update']) {
-      const module = this.getModule(moduleName);
-      if (module) {
-        this.updateModules.push(module);
-      }
-    }
+    responsePromise
+      .then(async (response) => {
+        const jsonData = await response.json();
 
-    for (const moduleName of jsonData['render_debug']) {
-      const module = this.getModule(moduleName);
-      if (module) {
-        this.renderDebugModules.push(module);
-      }
-    }
+        this.updateModules = [];
+        this.renderDebugModules = [];
+
+        for (const moduleName of jsonData['update']) {
+          const module = this.getModule(moduleName);
+          if (module) {
+            this.updateModules.push(module);
+          }
+        }
+
+        for (const moduleName of jsonData['render_debug']) {
+          const module = this.getModule(moduleName);
+          if (module) {
+            this.renderDebugModules.push(module);
+          }
+        }
+      })
+      .catch((error) => {
+        console.error('Error loading modules config:', error);
+      });
   }
 
-  public async loadGamestates(): Promise<void> {
+  public loadGamestates(): void {
     const url = `data/gamestates.json`;
-    const response = await ResourceManager.fetch(url);
-    const jsonData = await response.json();
-    const jsonGamestates = jsonData['gamestates'];
+    const responsePromise = ResourceManager.fetchWithTracking(url);
 
-    for (const gamestateName of Object.keys(jsonGamestates)) {
-      const gamestate = new Gamestate(gamestateName);
-      for (const jsonModule of jsonGamestates[gamestateName]) {
-        const module = this.getModule(jsonModule['name']);
-        if (module) {
-          gamestate.push(module);
+    responsePromise
+      .then(async (response) => {
+        const jsonData = await response.json();
+        const jsonGamestates = jsonData['gamestates'];
+
+        for (const gamestateName of Object.keys(jsonGamestates)) {
+          const gamestate = new Gamestate(gamestateName);
+          for (const jsonModule of jsonGamestates[gamestateName]) {
+            const module = this.getModule(jsonModule['name']);
+            if (module) {
+              gamestate.push(module);
+            }
+          }
+          this.gamestates.push(gamestate);
         }
-      }
-      this.gamestates.push(gamestate);
-    }
-    this.startGamestate = jsonData['start'];
+        this.startGamestate = jsonData['start'];
+      })
+      .catch((error) => {
+        console.error('Error loading gamestates:', error);
+      });
   }
 
   public renderInMenu(): void {

@@ -15,14 +15,19 @@ try {
       then = now;
 
       // Solo ejecutar update/render si el engine no está reiniciando
-      if (!Engine.isEngineRestarting()) {
+      if (!Engine.isEngineRestarting() && !Engine.isLoadingResources()) {
         Engine.update(deltaTime);
         Engine.render();
         Time.updateFPSDisplay(deltaTime);
+      } else {
+        const fpsDisplay = document.getElementById('fps-display');
+        if (fpsDisplay) {
+          fpsDisplay.innerText = `Resources Loading: ${Engine.getLoadingResourcesCount()}`;
+        }
       }
 
-      // Ocultar el loader cuando el motor esté completamente listo
-      if (Engine.isReady()) {
+      // Ocultar el loader cuando el motor esté completamente listo y no hay recursos cargando
+      if (Engine.isReady() && !Engine.isLoadingResources()) {
         const loader = document.getElementById('loader');
         if (loader && !loader.classList.contains('hidden')) {
           loader.classList.add('hidden');

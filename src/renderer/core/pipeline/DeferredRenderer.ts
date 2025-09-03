@@ -260,7 +260,7 @@ export class DeferredRenderer {
     const ambientOcclusionComponent = camera.getComponent(
       'ambient_occlusion',
     ) as AmbientOcclusionComponent;
-    if (!ambientOcclusionComponent) {
+    if (!ambientOcclusionComponent || !ambientOcclusionComponent.hasLoaded()) {
       return this.whiteTexture.getTextureView()!;
     }
     return ambientOcclusionComponent.compute(this.gBufferBindGroup);
@@ -281,7 +281,6 @@ export class DeferredRenderer {
   public update(_dt: number): void {
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
     if (!mainCameraEntity) {
-      console.warn('No main camera found');
       return;
     }
     const ambientOcclusionComponent = mainCameraEntity.getComponent(

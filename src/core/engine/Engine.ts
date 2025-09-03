@@ -41,6 +41,9 @@ export class Engine {
     const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
     await Render.getInstance().initialize(canvas);
 
+    // Initialize ResourceManager loading tracking
+    ResourceManager.initialize();
+
     // Initialize debug UI
     this._debugUI.initialize();
 
@@ -211,6 +214,23 @@ export class Engine {
 
   public static getDebugUI(): DebugUIManager {
     return this._debugUI;
+  }
+
+  // Resource loading status methods
+  public static isLoadingResources(): boolean {
+    return ResourceManager.isLoading();
+  }
+
+  public static getLoadingResourcesCount(): number {
+    return ResourceManager.getLoadingCount();
+  }
+
+  public static getLoadingResourcesList(): string[] {
+    return ResourceManager.getLoadingResources();
+  }
+
+  public static async waitForAllResources(): Promise<void> {
+    return ResourceManager.waitForAllResources();
   }
 
   public static isEngineRestarting(): boolean {

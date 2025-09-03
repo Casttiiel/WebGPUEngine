@@ -7,7 +7,7 @@ export class NameComponent extends Component {
     super();
   }
 
-  public async load(data: string): Promise<void> {
+  public load(data: string): void {
     this.name = data;
   }
 

@@ -16,7 +16,7 @@ export class CameraComponent extends Component {
     this.camera = new Camera();
   }
 
-  public async load(data: CameraComponentDataType): Promise<void> {
+  public load(data: CameraComponentDataType): void {
     if (data.ortho) {
       // Configure orthographic camera
       const orthoWidth = data.orthoWidth || Render.width;

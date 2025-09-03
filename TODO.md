@@ -1,6 +1,11 @@
 1. Loading async changes
-2. Fix Spot Lights
-3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+   Module Boot sync
+   Components sync
+   Put amount of resources being loaded
+
+2. Decal set normal
+3. Fix Spot Lights
+4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 GBUFFER------------------------------
 
