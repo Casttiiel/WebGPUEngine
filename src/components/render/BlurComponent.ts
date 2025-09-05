@@ -88,7 +88,7 @@ export class BlurComponent extends Component {
   public async load(): Promise<void> {
     // Load Gaussian blur technique and mesh
     this.gaussianBlurTechnique = await Technique.get('gaussian_blur.tech');
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     // Create uniform buffer for Gaussian blur parameters
     this.gaussianBlurUniformBuffer = GPUUtils.createBuffer(

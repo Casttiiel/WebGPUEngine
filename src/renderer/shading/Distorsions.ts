@@ -20,7 +20,7 @@ export class Distorsions {
   constructor() {}
 
   public async load(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.distorsionsCombineTechnique = await Technique.get('distorsions_combine.tech');
     this.distorsionsBuffer = new RenderTarget();
     this.distorsionsBuffer.createRT(

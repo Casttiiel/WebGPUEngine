@@ -27,11 +27,11 @@ export class ScreenSpaceReflections {
   public async load(): Promise<void> {
     try {
       this.isInitialized = true;
-      this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+      this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
       this.ssrTechnique = await Technique.get('ssr.tech');
       this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
-      this.brdfLUT = await Texture.get('brdfLUT.png');
-      this.environmentTexture = await Cubemap.get('environment_cubemap.png');
+      this.brdfLUT = await Texture.getAsync('brdfLUT.png');
+      this.environmentTexture = await Cubemap.getAsync('environment_cubemap.png');
 
       this.createRenderTarget();
 

@@ -25,7 +25,7 @@ export class DirectionalLight {
   constructor() {}
 
   public async load(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.directionalLightTechnique = await Technique.get('directional_light.tech');
 
     this.uniformBuffer = GPUUtils.createBuffer(

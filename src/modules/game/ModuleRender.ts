@@ -49,7 +49,7 @@ export class ModuleRender extends Module {
     await this.deferred.load();
     await this.distorsions.load();
     this.onResolutionUpdated();
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.presentationTechnique = await Technique.get('presentation.tech');
 
     // Initialize GPU Frustum Culling

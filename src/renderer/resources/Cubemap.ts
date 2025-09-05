@@ -42,7 +42,7 @@ export class Cubemap extends GPUResource {
     this.maxAnisotropy = options.maxAnisotropy || 16;
   }
 
-  public static async get(path: string, options: Partial<CubemapOptions> = {}): Promise<Cubemap> {
+  public static get(path: string, options: Partial<CubemapOptions> = {}): Cubemap {
     try {
       return ResourceManager.getResource<Cubemap>(path);
     } catch {
@@ -51,13 +51,39 @@ export class Cubemap extends GPUResource {
         type: ResourceType.CUBEMAP,
         ...options,
       });
-      await cubemap.load();
+
+      // Register first to prevent race conditions
       ResourceManager.registerResource(cubemap);
+
+      // Start loading without await (non-blocking)
+      cubemap.load();
+
       return cubemap;
     }
   }
 
-  public async load(): Promise<void> {
+  public static async getAsync(
+    path: string,
+    options: Partial<CubemapOptions> = {},
+  ): Promise<Cubemap> {
+    try {
+      return ResourceManager.getResource<Cubemap>(path);
+    } catch {
+      const cubemap = new Cubemap({
+        path,
+        type: ResourceType.CUBEMAP,
+        ...options,
+      });
+
+      // Register first to prevent race conditions
+      ResourceManager.registerResource(cubemap);
+
+      await cubemap.loadAsync();
+      return cubemap;
+    }
+  }
+
+  public async loadAsync(): Promise<void> {
     try {
       const image = await createImageBitmap(
         await ResourceManager.fetch(`assets/textures/${this.path}`).then((r) => r.blob()),
@@ -161,9 +187,19 @@ export class Cubemap extends GPUResource {
         addressModeW: this.addressModeW,
         maxAnisotropy: this.maxAnisotropy,
       });
+
+      // Mark as loaded when loadAsync completes
+      this.setHasData();
     } catch (error) {
       throw new Error(`Failed to create GPU resources for cubemap ${this.path}: ${error}`);
     }
+  }
+
+  public override load(): void {
+    // Síncrono: inicia la carga sin await
+    this.loadAsync().catch((error) => {
+      console.error(`Error loading cubemap ${this.path}:`, error);
+    });
   }
 
   public getTextureView(): GPUTextureView | undefined {

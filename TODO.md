@@ -1,18 +1,18 @@
 1. Loading async changes
-   Module Boot sync
-   Components sync
-   Put amount of resources being loaded
 
-2. Decal set normal
-3. Fix Spot Lights
-4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+   Put amount of resources being loaded
+   LightComponents
+
+2. CreateSampler still??
+3. Decal set normal
+4. Fix Spot Lights
+5. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 GBUFFER------------------------------
 
-1. Specular value for gbuffer (0.04)
-2. Parallax
-3. Mesh LOD
-4. Subsurface Scattering (SSS)
+1. Parallax
+2. Mesh LOD
+3. Subsurface Scattering (SSS)
 
 DIRECT LIGHTING PASS------------------------------
 
@@ -25,6 +25,7 @@ AMBIENT OCCLUSION------------------------------
 FAKED INDIRECT LIGHTING------------------------------
 IBL / SKYLIGHT------------------------------
 
+1. Screen space global illumination
 1. Atmospheric scattering (Simular skybox y cielo)
 
 SPECULAR / REFLECTION PASS------------------------------

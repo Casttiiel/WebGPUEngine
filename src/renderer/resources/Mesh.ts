@@ -37,7 +37,7 @@ export class Mesh extends GPUResource {
     }
   }
 
-  static async get(meshPath: string | MeshData): Promise<Mesh> {
+  static get(meshPath: string | MeshData): Mesh {
     let mesh = null;
 
     if (typeof meshPath === 'string') {
@@ -58,20 +58,71 @@ export class Mesh extends GPUResource {
       });
     }
 
-    await mesh.load();
+    // Register first to prevent race conditions
     ResourceManager.registerResource(mesh);
+
+    // Start loading without await (non-blocking)
+    mesh.load();
+
     return mesh;
   }
 
-  public override async load(): Promise<void> {
+  static async getAsync(meshPath: string | MeshData): Promise<Mesh> {
+    let mesh = null;
+
+    if (typeof meshPath === 'string') {
+      try {
+        return ResourceManager.getResource<Mesh>(meshPath);
+      } catch {
+        mesh = new Mesh({
+          path: meshPath,
+          type: ResourceType.MESH,
+        });
+      }
+    } else {
+      const dynamicId = Engine.generateDynamicId();
+      mesh = new Mesh({
+        path: `dynamic_mesh_${dynamicId}`,
+        type: ResourceType.MESH,
+        meshData: meshPath,
+      });
+    }
+
+    // Register first to prevent race conditions
+    ResourceManager.registerResource(mesh);
+
+    await mesh.loadAsync();
+    return mesh;
+  }
+
+  public async loadAsync(): Promise<void> {
     try {
       if (!this.hasData) {
         const data = await ResourceManager.loadMeshData(this.path);
         this.loadObj(data);
       }
       this.initBuffers();
+      this.setHasData();
     } catch (error) {
       throw new Error(`Failed to load mesh ${this.path}: ${error}`);
+    }
+  }
+
+  public override load(): void {
+    // Síncrono: inicia la carga sin await
+    if (!this.hasData) {
+      ResourceManager.loadMeshData(this.path)
+        .then((data) => {
+          this.loadObj(data);
+          this.initBuffers();
+          this.setHasData();
+        })
+        .catch((error) => {
+          console.error(`Error loading mesh ${this.path}:`, error);
+        });
+    } else {
+      this.initBuffers();
+      this.setHasData();
     }
   }
 
@@ -229,6 +280,9 @@ export class Mesh extends GPUResource {
     this.tangents = this.computeMeshTangents();
     this.indexCount = this.indices.length;
     this.aabb = this.calculateAABB();
+
+    // Mark as loaded when loadObj completes
+    this.setHasData();
   }
 
   private computeTangent(

@@ -42,7 +42,25 @@ export class Texture extends GPUResource {
         GPUTextureUsage.STORAGE_BINDING;
   }
 
-  public static async get(path: string): Promise<Texture> {
+  public static get(path: string): Texture {
+    // Check if texture is already registered
+    try {
+      return ResourceManager.getResource<Texture>(path);
+    } catch {
+      // Create new texture and register it before loading
+      const texture = new Texture({ path, type: ResourceType.TEXTURE });
+
+      // Register first to prevent race conditions
+      ResourceManager.registerResource(texture);
+
+      // Start loading without await (non-blocking)
+      texture.load();
+
+      return texture;
+    }
+  }
+
+  public static async getAsync(path: string): Promise<Texture> {
     // Check if texture is already registered
     try {
       return ResourceManager.getResource<Texture>(path);
@@ -54,13 +72,20 @@ export class Texture extends GPUResource {
       ResourceManager.registerResource(texture);
 
       // Then load the texture
-      await texture.load();
+      await texture.loadAsync();
       return texture;
     }
   }
 
-  public async load(): Promise<void> {
+  public async loadAsync(): Promise<void> {
     await this.createTexture();
+  }
+
+  public override load(): void {
+    // Síncrono: inicia la carga sin await
+    this.createTexture().catch((error) => {
+      console.error(`Error loading texture ${this.path}:`, error);
+    });
   }
 
   private async createTexture(): Promise<void> {
@@ -106,6 +131,9 @@ export class Texture extends GPUResource {
     });
 
     this.sampler = SamplerLibrary.anisotropic16x;
+
+    // Mark as loaded when createTexture completes
+    this.setHasData();
   }
 
   public getTextureView(): GPUTextureView | undefined {

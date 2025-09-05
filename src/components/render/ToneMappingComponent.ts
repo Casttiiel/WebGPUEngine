@@ -22,7 +22,7 @@ export class ToneMappingComponent extends Component {
   }
 
   public async load(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.get('tone_mapping.tech');
 
     const toneMappingFormat = QualitySettings.getInstance().getSettings().toneMappingTexture;

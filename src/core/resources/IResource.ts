@@ -25,7 +25,7 @@ export interface IResource {
   readonly dependencies: Set<string>;
   refCount: number;
 
-  load(): Promise<void>;
+  load(): void;
   getDependencies(): Set<string>;
   addDependency(path: string): void;
   removeDependency(path: string): void;
@@ -62,7 +62,7 @@ export abstract class BaseResource implements IResource {
     this._refCount = value;
   }
 
-  public abstract load(): Promise<void>;
+  public abstract load(): void;
 
   // Public load method that wraps the abstract load with tracking
   public async loadWithTracking(): Promise<void> {

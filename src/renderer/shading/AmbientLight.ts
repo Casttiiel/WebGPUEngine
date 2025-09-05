@@ -22,9 +22,9 @@ export class AmbientLight {
   constructor() {}
 
   public async load(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.get('fullscreenquad.obj');
+    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.ambientTechnique = await Technique.get('ambient.tech');
-    this.irradianceTexture = await Cubemap.get('irradiance_cubemap.png');
+    this.irradianceTexture = await Cubemap.getAsync('irradiance_cubemap.png');
 
     this.ambientUniformBuffer = GPUUtils.createBuffer(
       'ambient uniform buffer',

@@ -29,7 +29,27 @@ export class HDRTexture extends GPUResource {
     });
   }
 
-  public static async get(
+  public static get(path: string, options: Partial<HDRTextureOptions> = {}): HDRTexture {
+    try {
+      return ResourceManager.getResource<HDRTexture>(path);
+    } catch {
+      const texture = new HDRTexture({
+        path,
+        type: ResourceType.TEXTURE,
+        ...options,
+      });
+
+      // Register first to prevent race conditions
+      ResourceManager.registerResource(texture);
+
+      // Start loading without await (non-blocking)
+      texture.load();
+
+      return texture;
+    }
+  }
+
+  public static async getAsync(
     path: string,
     options: Partial<HDRTextureOptions> = {},
   ): Promise<HDRTexture> {
@@ -41,14 +61,24 @@ export class HDRTexture extends GPUResource {
         type: ResourceType.TEXTURE,
         ...options,
       });
-      await texture.load();
+
+      // Register first to prevent race conditions
       ResourceManager.registerResource(texture);
+
+      await texture.loadAsync();
       return texture;
     }
   }
 
-  public async load(): Promise<void> {
+  public async loadAsync(): Promise<void> {
     await this.createTexture();
+  }
+
+  public override load(): void {
+    // Síncrono: inicia la carga sin await
+    this.createTexture().catch((error) => {
+      console.error(`Error loading HDR texture ${this.path}:`, error);
+    });
   }
 
   private async createTexture(): Promise<void> {
@@ -107,6 +137,9 @@ export class HDRTexture extends GPUResource {
     });
 
     this.sampler = SamplerLibrary.bloom;
+
+    // Mark as loaded when createTexture completes
+    this.setHasData();
   }
 
   public async generateMipmaps(): Promise<void> {

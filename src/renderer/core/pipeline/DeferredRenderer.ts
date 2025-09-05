@@ -187,10 +187,10 @@ export class DeferredRenderer {
 
     this.pointLightTechnique = await Technique.get('point_light.tech');
     this.spotLightTechnique = await Technique.get('spot_light.tech');
-    this.unitSphere = await Mesh.get('unit_sphere.obj');
-    this.unitFrustum = await Mesh.get('unit_frustum.obj');
+    this.unitSphere = await Mesh.getAsync('unit_sphere.obj');
+    this.unitFrustum = await Mesh.getAsync('unit_frustum.obj');
 
-    this.whiteTexture = await Texture.get('white.png');
+    this.whiteTexture = await Texture.getAsync('white.png');
 
     this.isLoaded = true;
   }
