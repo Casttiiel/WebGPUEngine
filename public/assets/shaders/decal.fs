@@ -1,6 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
+#include "common/octahedral"
 
 struct DecalFragmentOutput {
   @location(0) albedo: vec4<f32>,     // RGB: albedo, A: metallic
@@ -69,7 +70,7 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
         discard;
     }
 
-    let roughness = textureSample(txRoughness, samplerState, decal_uv).g;
+    let decal_roughness = textureSample(txRoughness, samplerState, decal_uv).g;
     let emissive_color = textureSample(txEmissive, samplerState, decal_uv);
     
     var output: DecalFragmentOutput;
@@ -80,11 +81,21 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     let out_albedo_a = mix(orig_albedo.a, decal_albedo.a, final_alpha); // Mix metallic as well
 
     let orig_NRoughnessEmissive = textureSample(gBufferNormals, samplerState, screen_pos);
-    let blended_roughness = mix(orig_NRoughnessEmissive.z, roughness, final_alpha);
+
+    let orig_normal = octahedral01ToNormal(orig_NRoughnessEmissive.xy);
+    let up = vec3<f32>(0.0, 1.0, 0.0);
+    let tangent = normalize(cross(up, orig_normal));
+    let bitangent = cross(orig_normal, tangent);
+    let TBN = mat3x3<f32>(tangent, bitangent, orig_normal);
+    let decal_normal_ts = textureSample(txNormal, samplerState, decal_uv) * 2.0 - 1.0;
+    let decal_normal_ws = normalize(TBN * decal_normal_ts.xyz);
+    let encodedNormal = normalToOctahedral01(decal_normal_ws);
+
+    let blended_roughness = mix(orig_NRoughnessEmissive.z, decal_roughness, final_alpha);
 
     // Output with color modulation
     output.albedo = vec4<f32>(out_albedo_rgb, out_albedo_a);
-    output.normal = vec4<f32>(orig_NRoughnessEmissive.xy, blended_roughness, orig_NRoughnessEmissive.a);
+    output.normal = vec4<f32>(encodedNormal.xy, blended_roughness, orig_NRoughnessEmissive.a);
 
     return output;
 }

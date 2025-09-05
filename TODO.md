@@ -1,13 +1,11 @@
-1. Fix github pages
-2. Decal set normal
-3. Fix Spot Lights
-4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+1. Fix Spot Lights
+2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 GBUFFER------------------------------
 
 1. Parallax
 2. Mesh LOD
-3. Subsurface Scattering (SSS)
+3. Subsurface Scattering (SSS) (If we need to extend the gbuffer, work on decals normals)
 
 DIRECT LIGHTING PASS------------------------------
 
@@ -21,7 +19,7 @@ FAKED INDIRECT LIGHTING------------------------------
 IBL / SKYLIGHT------------------------------
 
 1. Screen space global illumination
-1. Atmospheric scattering (Simular skybox y cielo)
+2. Atmospheric scattering (Simular skybox y cielo)
 
 SPECULAR / REFLECTION PASS------------------------------
 VOLUMETRIC FOG / LIGHT SHAFTS------------------------------
