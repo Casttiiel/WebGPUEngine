@@ -13,7 +13,7 @@ export class DepthResolver {
   public async load(): Promise<void> {
     // Load fullscreen quad mesh and technique using existing classes
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.depthResolveTechnique = await Technique.get('depth_resolve.tech');
+    this.depthResolveTechnique = await Technique.getAsync('depth_resolve.tech');
 
     this.isLoaded = true;
   }

@@ -59,9 +59,9 @@ export class AmbientOcclusionComponent extends Component {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.aoTechnique = await Technique.get('ambient_occlusion.tech');
-    this.bilateralFilterTechnique = await Technique.get('ao_bilateral_filter.tech');
-    this.temporalAccumulationTechnique = await Technique.get('ao_temporal_accumulation.tech');
+    this.aoTechnique = await Technique.getAsync('ambient_occlusion.tech');
+    this.bilateralFilterTechnique = await Technique.getAsync('ao_bilateral_filter.tech');
+    this.temporalAccumulationTechnique = await Technique.getAsync('ao_temporal_accumulation.tech');
     this.noiseTexture = await Texture.getAsync('noiseRGB.jpg');
 
     const aoFormat = QualitySettings.getInstance().getSettings().aoTexture;

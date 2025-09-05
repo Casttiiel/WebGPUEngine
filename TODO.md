@@ -1,5 +1,4 @@
 1. Loading async changes
-
    Put amount of resources being loaded
    LightComponents
 

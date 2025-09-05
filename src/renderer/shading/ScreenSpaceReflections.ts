@@ -28,8 +28,8 @@ export class ScreenSpaceReflections {
     try {
       this.isInitialized = true;
       this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-      this.ssrTechnique = await Technique.get('ssr.tech');
-      this.ssrComposeTechnique = await Technique.get('ssr_compose.tech');
+      this.ssrTechnique = await Technique.getAsync('ssr.tech');
+      this.ssrComposeTechnique = await Technique.getAsync('ssr_compose.tech');
       this.brdfLUT = await Texture.getAsync('brdfLUT.png');
       this.environmentTexture = await Cubemap.getAsync('environment_cubemap.png');
 

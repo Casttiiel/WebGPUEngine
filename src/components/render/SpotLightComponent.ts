@@ -97,7 +97,7 @@ export class SpotLightComponent extends CameraComponent {
     // Crear sampler de comparación para shadow mapping
     this.shadowSampler = SamplerLibrary.shadows;
 
-    this.technique = await Technique.get(
+    this.technique = await Technique.getAsync(
       this._hasShadows ? 'spot_light_shadows.tech' : 'spot_light.tech',
     );
     this.uniformBuffer = GPUUtils.createBuffer(

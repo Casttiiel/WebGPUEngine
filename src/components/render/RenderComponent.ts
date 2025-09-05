@@ -51,9 +51,9 @@ export class RenderComponent extends Component {
       // Handle material loading - ensure we have material data
       let material: Material;
       if (data.material) {
-        material = Material.get(data.material);
+        material = await Material.get(data.material);
       } else if (data.materialData) {
-        material = Material.get(data.materialData);
+        material = await Material.get(data.materialData);
       } else {
         throw new Error('No material specified in RenderComponent data');
       }

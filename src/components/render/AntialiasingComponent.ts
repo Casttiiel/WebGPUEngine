@@ -32,7 +32,7 @@ export class AntialiasingComponent extends Component {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.technique = await Technique.get('antialiasing.tech');
+    this.technique = await Technique.getAsync('antialiasing.tech');
 
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 

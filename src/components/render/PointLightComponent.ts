@@ -41,7 +41,7 @@ export class PointLightComponent extends Component {
       this.startFallof = data.startFallof;
     }
 
-    this.technique = await Technique.get('point_light.tech');
+    this.technique = await Technique.getAsync('point_light.tech');
     this.uniformBuffer = GPUUtils.createBuffer(
       'point light uniform buffer',
       36 * 4,

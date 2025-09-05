@@ -64,7 +64,7 @@ export class Technique extends GPUResource {
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
   }
 
-  public static async get(
+  public static async getAsync(
     pathOrData: string | Partial<TechniqueCreateOptions>,
   ): Promise<Technique> {
     const path = this.generatePath(pathOrData);
@@ -79,7 +79,7 @@ export class Technique extends GPUResource {
     const techniqueData = await this.loadTechniqueData(pathOrData);
     const technique = this.createTechnique(path, techniqueData);
 
-    await technique.load();
+    await technique.loadAsync();
     ResourceManager.registerResource(technique);
     return technique;
   }
@@ -128,24 +128,27 @@ export class Technique extends GPUResource {
     return new Technique(options);
   }
 
-  public override async load(): Promise<void> {
+  public async loadAsync(): Promise<void> {
     await this.createShaderModules();
     this.createPipelineLayout();
     this.createPipeline();
   }
 
   private async createShaderModules(): Promise<void> {
-    // Load vertex shader
-    const vsCode = await ResourceManager.loadShader(this.vsFile);
+    // Load both shaders in parallel
+    const [vsCode, fsCode] = await Promise.all([
+      ResourceManager.loadShader(this.vsFile),
+      ResourceManager.loadShader(this.fsFile),
+    ]);
+
     if (!vsCode) throw new Error(`Failed to load vertex shader: ${this.vsFile}`);
+    if (!fsCode) throw new Error(`Failed to load fragment shader: ${this.fsFile}`);
+
     this.vsModule = this.device.createShaderModule({
       label: `${this.label}_vs`,
       code: vsCode,
     });
 
-    // Load fragment shader
-    const fsCode = await ResourceManager.loadShader(this.fsFile);
-    if (!fsCode) throw new Error(`Failed to load fragment shader: ${this.fsFile}`);
     this.fsModule = this.device.createShaderModule({
       label: `${this.label}_fs`,
       code: fsCode,

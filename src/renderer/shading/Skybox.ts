@@ -16,7 +16,7 @@ export class Skybox {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.skyboxTechnique = await Technique.get('skybox.tech');
+    this.skyboxTechnique = await Technique.getAsync('skybox.tech');
 
     this.skyboxTexture = await HDRTexture.getAsync('qwantani_mid_morning_puresky_1k.hdr');
 

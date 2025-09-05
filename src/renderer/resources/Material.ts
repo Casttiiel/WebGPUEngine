@@ -87,7 +87,7 @@ export class Material extends GPUResource {
       throw new Error(`Missing technique for material: ${pathOrData}`);
     }
 
-    const techniqueToUse = await Technique.get(techniqueSource);
+    const techniqueToUse = await Technique.getAsync(techniqueSource);
     if (!techniqueToUse) {
       throw new Error(`Missing technique for material: ${pathOrData}`);
     }
@@ -128,15 +128,17 @@ export class Material extends GPUResource {
       if (this.castsShadows) {
         this.shadowsMaterial = await Material.get('shadows_material.mat');
       }
-      // Load textures secuencialmente para evitar race conditions
-      await this.loadTexture('albedo', this.textureFiles.albedo);
-      await this.loadTexture('normal', this.textureFiles.normal);
-      await this.loadTexture('metallic', this.textureFiles.metallic);
-      await this.loadTexture('roughness', this.textureFiles.roughness);
-      await this.loadTexture('emissive', this.textureFiles.emissive);
 
-      // Note: Bind group will be created later when we have the pipeline
-      this.createBindGroup();
+      // Cargar todas las texturas en paralelo usando Promise.all
+      Promise.all([
+        this.loadTexture('albedo', this.textureFiles.albedo),
+        this.loadTexture('normal', this.textureFiles.normal),
+        this.loadTexture('metallic', this.textureFiles.metallic),
+        this.loadTexture('roughness', this.textureFiles.roughness),
+        this.loadTexture('emissive', this.textureFiles.emissive),
+      ]).then(() => {
+        this.createBindGroup();
+      });
     } catch (error) {
       throw new Error(`Failed to create GPU resources for material ${this.path}: ${error}`);
     }
@@ -215,9 +217,10 @@ export class Material extends GPUResource {
     );
   }
 
-  private async loadTexture(type: string, path: string): Promise<void> {
-    const texture = await Texture.get(path);
-    this.textures.set(type, texture);
+  private loadTexture(type: string, path: string): Promise<void> {
+    return Texture.getAsync(path).then((texture) => {
+      this.textures.set(type, texture);
+    });
   }
 
   public getCategory(): RenderCategory {
