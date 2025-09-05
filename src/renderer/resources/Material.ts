@@ -130,15 +130,14 @@ export class Material extends GPUResource {
       }
 
       // Cargar todas las texturas en paralelo usando Promise.all
-      Promise.all([
+      await Promise.all([
         this.loadTexture('albedo', this.textureFiles.albedo),
         this.loadTexture('normal', this.textureFiles.normal),
         this.loadTexture('metallic', this.textureFiles.metallic),
         this.loadTexture('roughness', this.textureFiles.roughness),
         this.loadTexture('emissive', this.textureFiles.emissive),
-      ]).then(() => {
-        this.createBindGroup();
-      });
+      ]);
+      this.createBindGroup();
     } catch (error) {
       throw new Error(`Failed to create GPU resources for material ${this.path}: ${error}`);
     }

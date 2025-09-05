@@ -4,6 +4,7 @@ import { GPUResource, IGPUResourceOptions } from '../../core/resources/GPUResour
 import { ResourceType } from '../../types/ResourceType.enum';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { MipmapGenerator } from '../core/processing/MipmapGenerator';
+import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export interface CubemapOptions extends IGPUResourceOptions {
   magFilter?: GPUFilterMode;
@@ -19,27 +20,12 @@ export class Cubemap extends GPUResource {
   private gpuTexture?: GPUTexture;
   private gpuTextureView?: GPUTextureView;
   private gpuSampler?: GPUSampler;
-  private magFilter: GPUFilterMode;
-  private minFilter: GPUFilterMode;
-  private mipmapFilter: GPUFilterMode;
-  private addressModeU: GPUAddressMode;
-  private addressModeV: GPUAddressMode;
-  private addressModeW: GPUAddressMode;
-  private maxAnisotropy: number;
 
   constructor(options: CubemapOptions) {
     super({
       ...options,
       type: ResourceType.CUBEMAP,
     });
-
-    this.magFilter = options.magFilter || 'linear';
-    this.minFilter = options.minFilter || 'linear';
-    this.mipmapFilter = options.mipmapFilter || 'linear';
-    this.addressModeU = options.addressModeU || 'clamp-to-edge';
-    this.addressModeV = options.addressModeV || 'clamp-to-edge';
-    this.addressModeW = options.addressModeW || 'clamp-to-edge';
-    this.maxAnisotropy = options.maxAnisotropy || 16;
   }
 
   public static get(path: string, options: Partial<CubemapOptions> = {}): Cubemap {
@@ -177,16 +163,7 @@ export class Cubemap extends GPUResource {
         mipLevelCount: mipLevelCount,
       });
 
-      this.gpuSampler = GPUUtils.createSampler({
-        label: `${this.label}_sampler`,
-        magFilter: this.magFilter,
-        minFilter: this.minFilter,
-        mipmapFilter: this.mipmapFilter,
-        addressModeU: this.addressModeU,
-        addressModeV: this.addressModeV,
-        addressModeW: this.addressModeW,
-        maxAnisotropy: this.maxAnisotropy,
-      });
+      this.gpuSampler = SamplerLibrary.bloom;
 
       // Mark as loaded when loadAsync completes
       this.setHasData();

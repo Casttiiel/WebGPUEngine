@@ -89,12 +89,10 @@ export class Texture extends GPUResource {
   }
 
   private async createTexture(): Promise<void> {
-    // Load image
-    const img = new Image();
-    img.src = `assets/textures/${this.path}`;
-    await img.decode();
-
-    const imageBitmap = await createImageBitmap(img);
+    // Load image with tracking
+    const response = await ResourceManager.fetch(`assets/textures/${this.path}`);
+    const blob = await response.blob();
+    const imageBitmap = await createImageBitmap(blob);
     const mipLevelCount = this.genMipmaps
       ? Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1
       : 1;

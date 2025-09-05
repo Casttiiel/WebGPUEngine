@@ -106,7 +106,7 @@ export class ModuleManager {
   public loadConfig(): void {
     const url = `data/modules.json`;
 
-    const responsePromise = ResourceManager.fetchWithTracking(url);
+    const responsePromise = ResourceManager.fetch(url);
 
     responsePromise
       .then(async (response) => {
@@ -136,7 +136,7 @@ export class ModuleManager {
 
   public loadGamestates(): void {
     const url = `data/gamestates.json`;
-    const responsePromise = ResourceManager.fetchWithTracking(url);
+    const responsePromise = ResourceManager.fetch(url);
 
     responsePromise
       .then(async (response) => {

@@ -18,13 +18,8 @@ try {
       if (!Engine.isEngineRestarting() && !Engine.isLoadingResources()) {
         Engine.update(deltaTime);
         Engine.render();
-        Time.updateFPSDisplay(deltaTime);
-      } else {
-        const fpsDisplay = document.getElementById('fps-display');
-        if (fpsDisplay) {
-          fpsDisplay.innerText = `Resources Loading: ${Engine.getLoadingResourcesCount()}`;
-        }
       }
+      Time.updateFPSDisplay(deltaTime);
 
       // Ocultar el loader cuando el motor esté completamente listo y no hay recursos cargando
       if (Engine.isReady() && !Engine.isLoadingResources()) {

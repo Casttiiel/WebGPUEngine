@@ -1,11 +1,7 @@
-1. Loading async changes
-   Put amount of resources being loaded
-   LightComponents
-
-2. CreateSampler still??
-3. Decal set normal
-4. Fix Spot Lights
-5. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+1. Fix github pages
+2. Decal set normal
+3. Fix Spot Lights
+4. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 
 GBUFFER------------------------------
 

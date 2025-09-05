@@ -71,7 +71,7 @@ export class Loader {
       entityChildrens = entityChildrens.concat(gltfJson);
     }
 
-    this.loadComponentFromJSON(json, entity);
+    await this.loadComponentFromJSON(json, entity);
 
     // Load children after parent is fully setup
     for (const children_json of entityChildrens) {
@@ -81,7 +81,7 @@ export class Loader {
     return entity;
   }
 
-  public static loadComponentFromJSON(json: EntityDataType, entity: Entity): void {
+  public static async loadComponentFromJSON(json: EntityDataType, entity: Entity): Promise<void> {
     // Cargar primero el componente name para que los logs tengan el nombre correcto
     if (json.components.name) {
       const nameComp = this.createComponentFromJSON('name');
@@ -95,7 +95,7 @@ export class Loader {
       if (type === 'name') continue; // Ya cargado
       const comp = this.createComponentFromJSON(type);
       entity.addComponent(type, comp);
-      comp.load(compData);
+      await comp.load(compData);
       Engine.getEntities().addComponentToManager(comp, type);
     }
   }

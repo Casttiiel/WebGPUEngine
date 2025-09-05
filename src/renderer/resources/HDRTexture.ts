@@ -82,7 +82,7 @@ export class HDRTexture extends GPUResource {
   }
 
   private async createTexture(): Promise<void> {
-    // 1. Descargar el archivo .hdr
+    // 1. Descargar el archivo .hdr con tracking
     const resp = await ResourceManager.fetch(`assets/textures/${this.path}`);
     const buf = await resp.arrayBuffer();
 
