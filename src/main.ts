@@ -15,14 +15,14 @@ try {
       then = now;
 
       // Solo ejecutar update/render si el engine no está reiniciando
-      if (!Engine.isEngineRestarting() && !Engine.isLoadingResources()) {
+      if (!Engine.isEngineRestarting()) {
         Engine.update(deltaTime);
         Engine.render();
       }
       Time.updateFPSDisplay(deltaTime);
 
       // Ocultar el loader cuando el motor esté completamente listo y no hay recursos cargando
-      if (Engine.isReady() && !Engine.isLoadingResources()) {
+      if (Engine.isReady()) {
         const loader = document.getElementById('loader');
         if (loader && !loader.classList.contains('hidden')) {
           loader.classList.add('hidden');
