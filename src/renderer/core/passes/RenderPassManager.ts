@@ -213,4 +213,26 @@ export class RenderPassManager {
     );
     this.executeDynamicPass(pass);
   }
+
+  public executeSSGIBilateralFilterPass(
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    aoBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const scale = QualitySettings.getInstance().getSettings().ssgiScale;
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
+      width: Render.width * scale,
+      height: Render.height * scale,
+    });
+    const pass = new AOBilateralFilterRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      gBufferBindGroup,
+      aoBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
 }

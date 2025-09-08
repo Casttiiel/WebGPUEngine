@@ -23,6 +23,7 @@ export interface GraphicsQualitySettings {
   ssrStepSize: number;
   ssrMaxSteps: number;
   directionalShadowMapResolution: number;
+  ssgiScale: number;
 }
 
 export class QualitySettings {
@@ -57,6 +58,7 @@ export class QualitySettings {
       ssrStepSize: 0.2,
       ssrMaxSteps: 160.0,
       directionalShadowMapResolution: 256,
+      ssgiScale: 0.25,
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -84,6 +86,7 @@ export class QualitySettings {
       ssrStepSize: 0.1,
       ssrMaxSteps: 320.0,
       directionalShadowMapResolution: 512,
+      ssgiScale: 0.25,
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -111,6 +114,7 @@ export class QualitySettings {
       ssrStepSize: 0.05,
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 1024,
+      ssgiScale: 0.25,
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -138,6 +142,7 @@ export class QualitySettings {
       ssrStepSize: 0.05,
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
+      ssgiScale: 0.25,
     } as GraphicsQualitySettings,
   };
 

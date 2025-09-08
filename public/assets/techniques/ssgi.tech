@@ -1,0 +1,10 @@
+{
+    "vs": "presentation.vs",
+    "fs": "ssgi.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferUniforms"
+    ]
+}

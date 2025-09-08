@@ -1,6 +1,3 @@
-1. Fix Spot Lights
-2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-
 GBUFFER------------------------------
 
 1. Parallax
@@ -9,10 +6,12 @@ GBUFFER------------------------------
 
 DIRECT LIGHTING PASS------------------------------
 
-1. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
-2. Area Light (LTC (Linearly Transformed Cosines) for shadows)
-3. CSM: 3-cascade system
-4. Atmospheric shadowing
+1. Fix Spot Lights
+2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+3. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
+4. Area Light (LTC (Linearly Transformed Cosines) for shadows)
+5. CSM: 3-cascade system
+6. Atmospheric shadowing
 
 AMBIENT OCCLUSION------------------------------
 FAKED INDIRECT LIGHTING------------------------------
