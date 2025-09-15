@@ -1,5 +1,5 @@
 import { AmbientOcclusionComponent } from '../../../components/render/AmbientOcclusionComponent';
-import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
+import { FroxelVolumetricScattering } from '../../shading/FroxelVolumetricScattering';
 import { Entity } from '../../../core/ecs/Entity';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
@@ -17,12 +17,14 @@ import { Render } from './Render';
 import { DirectionalLight } from '../../shading/DirectionalLight';
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
+import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
 
 export class DeferredRenderer {
   private isLoaded = false;
   private skybox!: Skybox;
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
+  private froxelVolumetrics!: FroxelVolumetricScattering;
   private directionalLight!: DirectionalLight;
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
@@ -182,6 +184,9 @@ export class DeferredRenderer {
     this.ssr = new ScreenSpaceReflections();
     await this.ssr.load();
 
+    this.froxelVolumetrics = new FroxelVolumetricScattering();
+    await this.froxelVolumetrics.load();
+
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();
 
@@ -221,6 +226,11 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     this.ssr.render(this.rtAccLight.getView(), this.aoResult, this.gBufferBindGroup);
+
+    if (this.froxelVolumetrics.isVolumetricEnabled()) {
+      this.froxelVolumetrics.updateFroxelData();
+      this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView());
+    }
 
     const view = this.rtAccLight.getView();
     if (!view) {

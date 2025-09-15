@@ -382,6 +382,262 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getFroxelUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_uniforms_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX,
+        buffer: { type: 'uniform' }, // Camera uniforms
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' }, // Froxel uniforms
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' }, // Volumetric uniforms
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+        }, // Froxel density texture (3D)
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'float',
+          viewDimension: '3d',
+        }, // Froxel scattering texture (3D)
+      },
+      {
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'non-filtering' }, // Non-filtering sampler for unfilterable textures
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for froxel density uniforms (group 0)
+   */
+  public static getFroxelDensityUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_density_uniforms_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' }, // Camera uniforms
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' }, // Froxel uniforms
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' }, // Volumetric uniforms
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for camera uniforms (compute version)
+   */
+  public static getCameraComputeLayout(): GPUBindGroupLayout {
+    return this.getLayout('camera_compute_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' }, // Camera uniforms
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for froxel parameters only (no camera)
+   */
+  public static getFroxelParametersLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_parameters_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' }, // Froxel uniforms
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' }, // Volumetric uniforms
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for froxel textures (compute version)
+   */
+  public static getFroxelTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_textures_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'r32float', // Match actual density texture format
+          viewDimension: '3d',
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float',
+          viewDimension: '2d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'non-filtering' },
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for froxel scattering textures (compute version)
+   */
+  public static getFroxelScatteringTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_scattering_textures_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float', // froxelDensityTexture is r32float (unfilterable)
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float', // This matches the rgba16float format used in shader and texture creation
+          viewDimension: '3d',
+        },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'non-filtering' },
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for froxel density textures (group 1)
+   */
+  public static getFroxelDensityTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_density_textures_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'r32float',
+          viewDimension: '3d',
+        }, // Output density texture
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float',
+          viewDimension: '2d',
+        }, // Noise texture (2D)
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'filtering' }, // Noise sampler
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for froxel scattering computation
+   */
+  public static getFroxelScatteringLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_scattering_layout', [
+      // Camera uniforms (binding 0)
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+      // Froxel uniforms (binding 1)
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+      // Volumetric uniforms (binding 2)
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+      // Froxel light texture - input (binding 3)
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float',
+          viewDimension: '3d',
+        },
+      },
+      // Froxel density texture - input (binding 4)
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+        },
+      },
+      // Froxel scattering texture - output (binding 5)
+      {
+        binding: 5,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+          viewDimension: '3d',
+        },
+      },
+      // Non-filtering sampler (binding 6) - required for unfilterable textures
+      {
+        binding: 6,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'non-filtering' },
+      },
+    ]);
+  }
+
   public static getAOUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('AO uniforms layout', [
       {
@@ -506,6 +762,8 @@ export class BindGroupFactory {
         return this.getDepthTextureLayout();
       case PipelineBindGroupLayouts.FOUR_TEXTURE:
         return this.getFourTextureLayout();
+      case PipelineBindGroupLayouts.FROXEL_UNIFORMS:
+        return this.getFroxelUniformsLayout();
       case PipelineBindGroupLayouts.AO_UNIFORMS:
         return this.getAOUniformsLayout();
       case PipelineBindGroupLayouts.DIRECTIONAL_LIGHT_UNIFORMS:

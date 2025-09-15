@@ -8,6 +8,7 @@ export class SamplerLibrary {
   private static _ambientOcclusionSampler: GPUSampler;
   private static _shadowsSampler: GPUSampler;
   private static _anisotropic16x: GPUSampler;
+  private static _nonFilteringSampler: GPUSampler;
 
   /**
    * Initialize all samplers. Must be called after WebGPU device is ready.
@@ -18,7 +19,7 @@ export class SamplerLibrary {
       return;
     }
 
-    console.log('SamplerLibrary: Creating reusable samplers...');
+    // Creating reusable samplers...
 
     SamplerLibrary._simpleSampler = GPUUtils.createSampler({
       label: 'fxaa_sampler',
@@ -69,8 +70,18 @@ export class SamplerLibrary {
       maxAnisotropy: 16,
     });
 
+    SamplerLibrary._nonFilteringSampler = GPUUtils.createSampler({
+      label: 'non_filtering_sampler',
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      mipmapFilter: 'nearest',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      maxAnisotropy: 1,
+    });
+
     SamplerLibrary.initialized = true;
-    console.log('SamplerLibrary: All samplers created successfully');
+    // All samplers created successfully
   }
 
   /**
@@ -79,7 +90,7 @@ export class SamplerLibrary {
   public static destroy(): void {
     if (!SamplerLibrary.initialized) return;
 
-    console.log('SamplerLibrary: Cleaning up samplers...');
+    // Cleaning up samplers...
 
     // Note: WebGPU samplers are automatically cleaned up when device is destroyed
     // But we set references to null for explicit cleanup
@@ -125,5 +136,12 @@ export class SamplerLibrary {
       throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
     }
     return SamplerLibrary._anisotropic16x;
+  }
+
+  public static get nonFilteringSampler(): GPUSampler {
+    if (!SamplerLibrary.initialized) {
+      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
+    }
+    return SamplerLibrary._nonFilteringSampler;
   }
 }

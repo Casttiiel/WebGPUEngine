@@ -376,6 +376,10 @@ export class Camera {
     return this.bindGroup;
   }
 
+  public getUniformBuffer(): GPUBuffer {
+    return this.uniformBuffer;
+  }
+
   public isOrthographic(): boolean {
     return this.isOrtho;
   }

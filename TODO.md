@@ -1,30 +1,27 @@
+Frame N:
+├── 🔄 2. Light Injection (Compute) - 0.3ms  
+│ └── ⏳ Inyecta luz directa de light sources
+
 GBUFFER------------------------------
 
-1. Parallax
-2. Mesh LOD
-3. Subsurface Scattering (SSS) (If we need to extend the gbuffer, work on decals normals)
+1. Parallax Mapping
+2. Subsurface Scattering (SSS) (If we need to extend the gbuffer, work on decals normals)
 
 DIRECT LIGHTING PASS------------------------------
 
 1. Fix Spot Lights
 2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
 3. Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
-4. Area Light (LTC (Linearly Transformed Cosines) for shadows)
-5. CSM: 3-cascade system
-6. Atmospheric shadowing
+4. CSM: 3-cascade system
 
 AMBIENT OCCLUSION------------------------------
 FAKED INDIRECT LIGHTING------------------------------
 IBL / SKYLIGHT------------------------------
 
-1. Screen space global illumination
-2. Atmospheric scattering (Simular skybox y cielo)
+1. Atmospheric scattering (Simular skybox y cielo)
 
 SPECULAR / REFLECTION PASS------------------------------
 VOLUMETRIC FOG / LIGHT SHAFTS------------------------------
-
-1. Volumetric scattering (lighting/fog)
-
 POST PROCESSING------------------------------
 
 1. TAA: Anti-aliasing temporal
@@ -44,18 +41,15 @@ OTHER------------------------------
 
 GAME-----------------------------------
 
-Terrain with perlin noise
+Sound
+Physics
 Weighted terrain
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-Music
-Physics
 Animations
-Skybox with Day/Night Cycle
-Day/Night Cycle
 Grass
 Physics Grass
-Paralax Mapping (Needs height map!)
 Grain
-Camera Lens Dirt
 Depth of Field (DOF)
 Atmospheric shadowing
+Area Light (LTC (Linearly Transformed Cosines) for shadows)
+Mesh LOD

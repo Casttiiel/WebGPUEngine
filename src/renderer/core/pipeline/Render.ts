@@ -10,9 +10,9 @@ import { SamplerLibrary } from '../utils/SamplerLibrary';
 export class Render {
   private static instance: Render;
 
-  // Performance optimization: Maximum 2K render resolution
-  private static readonly MAX_RENDER_WIDTH = 2560;
-  private static readonly MAX_RENDER_HEIGHT = 1440;
+  // Performance optimization: Maximum 4K render resolution
+  private static readonly MAX_RENDER_WIDTH = 3860;
+  private static readonly MAX_RENDER_HEIGHT = 2160;
 
   // Objetos principales de WebGPU
   private adapter!: GPUAdapter;

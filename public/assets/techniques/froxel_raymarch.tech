@@ -1,0 +1,10 @@
+{
+  "vs": "froxel_raymarch.vs",
+  "fs": "froxel_raymarch.fs",
+  "blend": "additive_by_src_alpha",
+  "z": "disable_all",
+  "writesOn": "texture",
+  "uniforms": [
+    "FroxelUniforms"
+  ]
+}
