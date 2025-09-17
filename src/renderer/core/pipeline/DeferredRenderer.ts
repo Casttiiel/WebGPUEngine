@@ -229,7 +229,7 @@ export class DeferredRenderer {
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
       this.froxelVolumetrics.updateFroxelData();
-      this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView());
+      this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
     }
 
     const view = this.rtAccLight.getView();

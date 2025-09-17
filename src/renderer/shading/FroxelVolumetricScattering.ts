@@ -487,7 +487,7 @@ export class FroxelVolumetricScattering {
    * Render volumetric effects directly onto the scene target using alpha blending
    * This should be called after deferred rendering is complete
    */
-  public renderVolumetrics(sceneTarget: GPUTextureView): void {
+  public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     const commandEncoder = this.device.createCommandEncoder({
       label: 'froxel_volumetrics_pass',
     });
@@ -549,6 +549,7 @@ export class FroxelVolumetricScattering {
 
     // Bind froxel data and uniforms
     renderPass.setBindGroup(0, rayMarchBindGroup);
+    renderPass.setBindGroup(1, gBufferBindGroup);
 
     // Render fullscreen quad - alpha blending composites automatically
     this.fullscreenQuadMesh.renderGroup(renderPass);
