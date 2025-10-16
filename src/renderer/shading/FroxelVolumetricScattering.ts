@@ -18,7 +18,7 @@ import { CameraComponent } from '../../components/render/CameraComponent';
  */
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
-  private isEnabled: boolean = true;
+  private isEnabled: boolean = false;
 
   // Froxel grid dimensions
   private froxelDimensions = {
@@ -47,7 +47,6 @@ export class FroxelVolumetricScattering {
 
   // 2D Result textures
   private volumetricTarget!: RenderTarget; // Final volumetric result
-  private depthSlicesTexture!: GPUTexture; // Z-slice depth values (for reconstruction)
 
   // Noise texture for density variation
   private noiseTexture!: Texture; // 2D noise texture from assets
@@ -177,9 +176,6 @@ export class FroxelVolumetricScattering {
     // Create 3D froxel textures
     this.createFroxelTextures();
 
-    // Create depth slices texture (for Z reconstruction)
-    this.createDepthSlicesTexture();
-
     const volumetricWidth = Math.floor(Render.width);
     const volumetricHeight = Math.floor(Render.height);
 
@@ -226,33 +222,6 @@ export class FroxelVolumetricScattering {
       format: 'rgba16float',
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
-  }
-
-  private createDepthSlicesTexture(): void {
-    // Create texture with Z-slice depth values for efficient ray marching
-    const depthSlicesData = new Float32Array(this.froxelDimensions.z);
-
-    // Logarithmic distribution for better quality near camera
-    for (let i = 0; i < this.froxelDimensions.z; i++) {
-      const t = i / (this.froxelDimensions.z - 1);
-      // Logarithmic interpolation between near and far planes
-      depthSlicesData[i] = this.nearPlane * Math.pow(this.farPlane / this.nearPlane, t);
-    }
-
-    this.depthSlicesTexture = this.device.createTexture({
-      label: 'froxel_depth_slices',
-      size: [this.froxelDimensions.z, 1, 1],
-      format: 'r32float',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-
-    // Upload depth slice data
-    this.device.queue.writeTexture(
-      { texture: this.depthSlicesTexture },
-      depthSlicesData.buffer,
-      { bytesPerRow: this.froxelDimensions.z * 4 },
-      [this.froxelDimensions.z, 1, 1],
-    );
   }
 
   private createUniformBuffers(): void {
@@ -604,7 +573,6 @@ export class FroxelVolumetricScattering {
     this.froxelDensityTexture?.destroy();
     this.froxelLightTexture?.destroy();
     this.froxelScatteringTexture?.destroy();
-    this.depthSlicesTexture?.destroy();
   }
 
   public isVolumetricEnabled(): boolean {
