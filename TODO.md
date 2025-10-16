@@ -1,17 +1,15 @@
-1. Physics
-   SpaceBar: Play sound
-2. Fix Spot Lights: Positioning/Rotation
-3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-4. Directional light shadows updated properly
-5. Directional light: POsitioning/Rotation
-6. Directional light: Shadows correctness
-7. Mesh LOD
-8. Console
-9. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-10. Load More models
-11. Particles
-12. GPU-Driven Rendering
-13. Automatic geometry instancing
+1. Fix Spot Lights: Positioning/Rotation
+2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+3. Directional light shadows updated properly
+4. Directional light: POsitioning/Rotation
+5. Directional light: Shadows correctness
+6. Mesh LOD
+7. Console
+8. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+9. Load More models
+10. Particles
+11. GPU-Driven Rendering
+12. Automatic geometry instancing
 
 Backlog-----------------------------------
 Grain

@@ -68,32 +68,13 @@ export class ModuleSound extends Module {
     this.cleanupFinishedSources();
   }
 
-  public renderDebug(): void {
-    const debugUI = Engine.getDebugUI();
-    if (!debugUI) return;
-
-    const folder = debugUI.addFolder('Audio System');
-
-    // Mostrar estadísticas
-    folder.add({
-      'Active Sources': this.activeSources.size,
-      'Loaded Sounds': this.sounds.size,
-      'Context State': this.audioContext?.state || 'closed',
-    });
-
-    // Control de volumen master
-    folder.addControl(this.masterGain.gain, 'value', 'Master Volume', {
-      min: 0,
-      max: 1,
-      step: 0.1,
-    });
-  }
+  public renderDebug(): void {}
 
   public async loadSound(path: string): Promise<void> {
     if (this.sounds.has(path)) return;
 
     try {
-      const response = await fetch(path);
+      const response = await fetch(`assets/sounds/${path}`);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
 
