@@ -83,11 +83,13 @@ export class GLTFLoader {
   private static processMeshNode(node: Node): EntityDataType {
     const transform = this.getNodeTransform(node);
     const render = this.getNodeRender(node);
+    const collider = this.getNodeCollider(render);
     const res: EntityDataType = {
       children: [],
       components: {
         transform,
         render,
+        mesh_collider: collider,
       },
     };
 
@@ -200,6 +202,13 @@ export class GLTFLoader {
     }
 
     return material;
+  }
+
+  private static getNodeCollider(render: RenderComponentDataType): any {
+    return {
+      vertices: render.meshes[0].meshData?.attributes.POSITION || [],
+      indices: render.meshes[0].meshData?.indices || [],
+    };
   }
 
   private static getCategory(material: Material): RenderCategory {

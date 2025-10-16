@@ -1,6 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { vec3 } from 'gl-matrix';
-import { TransformComponent } from './TransformComponent';
+import { TransformComponent } from '../core/TransformComponent';
 import * as CANNON from 'cannon-es';
 import { Engine } from '../../core/engine/Engine';
 

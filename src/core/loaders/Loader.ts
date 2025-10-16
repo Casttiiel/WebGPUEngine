@@ -19,7 +19,8 @@ import { AntialiasingComponent } from '../../components/render/AntialiasingCompo
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { RenderComponent } from '../../components/render/RenderComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
-import { InfinitePlaneColliderComponent } from '../../components/core/InfinitePlaneColliderComponent';
+import { InfinitePlaneColliderComponent } from '../../components/physics/InfinitePlaneColliderComponent';
+import { MeshColliderComponent } from '../../components/physics/MeshColliderComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -128,6 +129,8 @@ export class Loader {
         return new BoxColliderComponent();
       case 'infinite_plane_collider':
         return new InfinitePlaneColliderComponent();
+      case 'mesh_collider':
+        return new MeshColliderComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

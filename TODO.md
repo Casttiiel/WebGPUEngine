@@ -1,5 +1,4 @@
 1. Physics
-   Mesh collider
    SpaceBar: Play sound
 2. Fix Spot Lights: Positioning/Rotation
 3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
