@@ -146,9 +146,9 @@ export class DirectionalLight {
   }
 
   public renderShadowMap(): void {
-    if (!this.shadowsDirty) {
+    /*if (!this.shadowsDirty) {
       return;
-    }
+    }*/
 
     RenderManager.getInstance().performCulling(this.camera, RenderCategory.SHADOWS);
     const render = Render.getInstance();

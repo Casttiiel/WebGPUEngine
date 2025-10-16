@@ -1,25 +1,30 @@
 1. Physics
-2. Fix Spot Lights
+   Mesh collider
+   SpaceBar: Play sound
+2. Fix Spot Lights: Positioning/Rotation
 3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-4. Console
-5. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-6. Mesh LOD
-7. Load More models
-8. Particles
-9. GPU-Driven Rendering
-10. Automatic geometry instancing
+4. Directional light shadows updated properly
+5. Directional light: POsitioning/Rotation
+6. Directional light: Shadows correctness
+7. Mesh LOD
+8. Console
+9. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+10. Load More models
+11. Particles
+12. GPU-Driven Rendering
+13. Automatic geometry instancing
 
 Backlog-----------------------------------
 Grain
 Depth of Field (DOF)
 Lens Flare
 
-Occlusion culling / Multi-Strategy Culling System
-Light Clustered culling + instancing
 Auto exposure
 TAA: Anti-aliasing temporal
 Motion Blur
 Froxel Scattering
+Light Clustered culling + instancing
+Occlusion culling / Multi-Strategy Culling System
 Atmospheric shadowing
 Area Light (LTC (Linearly Transformed Cosines) for shadows)
 Parallax Mapping

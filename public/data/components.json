@@ -1,4 +1,4 @@
 {
-  "update": ["point_light", "transform", "camera", "ambient_occlusion"],
+  "update": ["point_light", "box_collider", "transform", "camera", "ambient_occlusion"],
   "render_debug": []
 }

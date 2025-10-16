@@ -18,6 +18,8 @@ import { TransformComponent } from '../../components/core/TransformComponent';
 import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { RenderComponent } from '../../components/render/RenderComponent';
+import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
+import { InfinitePlaneColliderComponent } from '../../components/core/InfinitePlaneColliderComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -122,6 +124,10 @@ export class Loader {
         return new SpotLightComponent();
       case 'bloom':
         return new BloomComponent();
+      case 'box_collider':
+        return new BoxColliderComponent();
+      case 'infinite_plane_collider':
+        return new InfinitePlaneColliderComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

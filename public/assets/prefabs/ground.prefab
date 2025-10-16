@@ -1,0 +1,17 @@
+{
+    "children": [],
+    "components": {
+      "name": "Ground",
+      "transform": {
+        "position": [0, -0.2, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "infinite_plane_collider": {
+        "material": {
+          "friction": 0.5,
+          "restitution": 0.1
+        }
+      }
+    }
+}

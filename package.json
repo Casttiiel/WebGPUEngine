@@ -32,6 +32,7 @@
     "@gltf-transform/core": "^4.2.1",
     "@petamoriken/float16": "^3.9.2",
     "@tweakpane/plugin-essentials": "^0.2.1",
+    "cannon-es": "^0.20.0",
     "gl-matrix": "^3.4.3",
     "hdr.js": "^0.2.0",
     "tweakpane": "^4.0.5"

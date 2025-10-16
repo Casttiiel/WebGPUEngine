@@ -3,6 +3,7 @@ import { ModuleBoot } from '../../modules/game/ModuleBoot';
 import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
 import { ModuleEntities } from '../../modules/game/ModuleEntities';
 import { ModuleInput } from '../../modules/game/ModuleInput';
+import { ModulePhysics } from '../../modules/game/ModulePhysics';
 import { ModuleRender } from '../../modules/game/ModuleRender';
 import { ModuleSound } from '../../modules/game/ModuleSound';
 import { Render } from '../../renderer/core/pipeline/Render';
@@ -21,6 +22,7 @@ export class Engine {
   private static _camera_mixer: ModuleCameraMixer;
   private static _sound: ModuleSound;
   private static _input: ModuleInput;
+  private static _physics: ModulePhysics;
   private static _timeScale: number = 1.0;
   private static _debugUI: DebugUIManager = DebugUIManager.getInstance();
 
@@ -52,12 +54,14 @@ export class Engine {
     this._camera_mixer = new ModuleCameraMixer('camera_mixer');
     this._input = new ModuleInput('input');
     this._sound = new ModuleSound('sound');
+    this._physics = new ModulePhysics('physics');
 
     this._modules.registerSystemModule(this._render);
     this._modules.registerSystemModule(this._entities);
     this._modules.registerSystemModule(this._camera_mixer);
     this._modules.registerSystemModule(this._input);
     this._modules.registerSystemModule(this._sound);
+    this._modules.registerSystemModule(this._physics);
     this._modules.registerSystemModule(new ModuleBoot('boot'));
 
     await this._modules.start();
@@ -215,6 +219,10 @@ export class Engine {
 
   public static getSound(): ModuleSound {
     return this._sound;
+  }
+
+  public static getPhysics(): ModulePhysics {
+    return this._physics;
   }
 
   public static getDebugUI(): DebugUIManager {
