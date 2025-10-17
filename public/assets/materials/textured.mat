@@ -7,7 +7,7 @@
         "txRoughness": "white.png",
         "txEmissive": "black.png"
     },
-    "casts_shadows": false,
+    "casts_shadows": true,
     "category": "solids",
     "shadows": false
 }

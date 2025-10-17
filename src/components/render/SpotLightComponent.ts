@@ -207,6 +207,12 @@ export class SpotLightComponent extends CameraComponent {
 
     // extraPadding (f32) - bytes 128-131
     GPUUtils.writeBuffer(this.uniformBuffer, 128, new Float32Array([0.0]));
+
+    GPUUtils.writeBuffer(
+      this.modelUniformBuffer,
+      0,
+      new Float32Array(this.camera.getInvViewProjectionMatrix()),
+    );
   }
 
   public generateShadowMap(): void {
@@ -234,11 +240,9 @@ export class SpotLightComponent extends CameraComponent {
     pass.end();
   }
 
-  public override update(_dt: number): void {}
+  public override update(dt: number): void {}
 
-  public debugInMenu(): void {
-    // Implement debug menu if needed
-  }
+  public override renderInMenu(): void {}
 
   public override renderDebug(): void {
     // Implement debug rendering if needed

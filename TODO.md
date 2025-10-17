@@ -1,15 +1,13 @@
-1. Fix Spot Lights: Positioning/Rotation
-2. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
-3. Directional light shadows updated properly
-4. Directional light: POsitioning/Rotation
-5. Directional light: Shadows correctness
-6. Mesh LOD
-7. Console
-8. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
-9. Load More models
-10. Particles
-11. GPU-Driven Rendering
-12. Automatic geometry instancing
+1. Directional light: Positioning/Rotation
+2. Directional light: Shadows correctness
+3. Fix spot lights with shadows (shadow quality on component info) (shadow tap reduced)
+4. Mesh LOD
+5. Console
+6. Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+7. Load More models
+8. Particles
+9. GPU-Driven Rendering
+10. Automatic geometry instancing
 
 Backlog-----------------------------------
 Grain

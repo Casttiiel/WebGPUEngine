@@ -1,7 +1,7 @@
 {
     "vs": "pbr.vs",
     "fs": "pbr.fs",
-    "fsEntryPoint": "PS_dir_lights_no_shadow",
+    "fsEntryPoint": "PS_dir_lights_shadow",
     "uniforms": [
         "CameraUniforms",
         "GBufferUniforms",
