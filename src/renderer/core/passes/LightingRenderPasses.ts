@@ -94,6 +94,54 @@ export class SpotLightRenderPass extends BaseRenderPass {
     // 4. Render all spot lights
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
       const spotLightComponent = comp as SpotLightComponent;
+      if (spotLightComponent.hasShadows()) {
+        continue;
+      }
+      spotLightComponent.setBindGroup(pass);
+
+      // Draw the mesh
+      this.mesh.renderGroup(pass);
+    }
+  }
+}
+
+export class SpotLightWithShadowsRenderPass extends BaseRenderPass {
+  private technique!: Technique;
+  private mesh!: Mesh;
+  private gBufferBindGroup!: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    technique: Technique,
+    mesh: Mesh,
+    gBufferBindGroup: GPUBindGroup,
+  ) {
+    super(config);
+    this.technique = technique;
+    this.mesh = mesh;
+    this.gBufferBindGroup = gBufferBindGroup;
+  }
+
+  protected render(pass: GPURenderPassEncoder): void {
+    // Configure viewport
+    GPUUtils.configureViewportAndScissor(pass);
+
+    // 1. Activate pipeline
+    this.technique.activatePipeline(pass);
+
+    // 2. Activate mesh data
+    this.mesh.activate(pass);
+
+    // 3. Set bind groups
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
+    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+
+    // 4. Render all spot lights
+    for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
+      const spotLightComponent = comp as SpotLightComponent;
+      if (!spotLightComponent.hasShadows()) {
+        continue;
+      }
       spotLightComponent.setBindGroup(pass);
 
       // Draw the mesh

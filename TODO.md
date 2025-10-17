@@ -1,7 +1,6 @@
-1. Fix spot lights with shadows
-2. Mesh LOD
-3. Particles / GPU-Driven Rendering
-4. Automatic geometry instancing
+1. Mesh LOD
+2. Particles / GPU-Driven Rendering
+3. Automatic geometry instancing
 
 Backlog-----------------------------------
 Mesh Collider

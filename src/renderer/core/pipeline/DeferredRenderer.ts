@@ -41,6 +41,7 @@ export class DeferredRenderer {
 
   private pointLightTechnique!: Technique;
   private spotLightTechnique!: Technique;
+  private spotLightWithShadowsTechnique!: Technique;
   private unitSphere!: Mesh;
   private unitFrustum!: Mesh;
 
@@ -160,6 +161,7 @@ export class DeferredRenderer {
       gBufferDepthTextures.singleDepthView,
       this.pointLightTechnique,
       this.spotLightTechnique,
+      this.spotLightWithShadowsTechnique,
       this.unitSphere,
       this.unitFrustum,
       this.gBufferBindGroup,
@@ -192,6 +194,7 @@ export class DeferredRenderer {
 
     this.pointLightTechnique = await Technique.getAsync('point_light.tech');
     this.spotLightTechnique = await Technique.getAsync('spot_light.tech');
+    this.spotLightWithShadowsTechnique = await Technique.getAsync('spot_light_shadows.tech');
     this.unitSphere = await Mesh.getAsync('unit_sphere.obj');
     this.unitFrustum = await Mesh.getAsync('unit_frustum.obj');
 
@@ -283,6 +286,7 @@ export class DeferredRenderer {
     this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
+    this.renderPassManager.executePass('spotLightsWithShadows');
 
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);

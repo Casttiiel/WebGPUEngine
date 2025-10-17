@@ -1,6 +1,10 @@
 import { BaseRenderPass } from './BaseRenderPass';
 import { GBufferRenderPass, DecalRenderPass, TransparentRenderPass } from './DeferredRenderPasses';
-import { PointLightRenderPass, SpotLightRenderPass } from './LightingRenderPasses';
+import {
+  PointLightRenderPass,
+  SpotLightRenderPass,
+  SpotLightWithShadowsRenderPass,
+} from './LightingRenderPasses';
 import {
   ToneMappingRenderPass,
   AntialiasingRenderPass,
@@ -73,6 +77,7 @@ export class RenderPassManager {
     singleDepthView: GPUTextureView,
     pointLightTechnique: Technique,
     spotLightTechnique: Technique,
+    spotLightWithShadowsTechnique: Technique,
     unitSphere: Mesh,
     unitFrustum: Mesh,
     gBufferBindGroup: GPUBindGroup,
@@ -99,6 +104,15 @@ export class RenderPassManager {
       gBufferBindGroup,
     );
     this.renderPasses.set('spotLights', spotLightPass);
+
+    // Create Spot Light with shadows pass
+    const spotLightWithShadowsPass = new SpotLightWithShadowsRenderPass(
+      spotLightConfig,
+      spotLightWithShadowsTechnique,
+      unitFrustum,
+      gBufferBindGroup,
+    );
+    this.renderPasses.set('spotLightsWithShadows', spotLightWithShadowsPass);
   }
 
   /**
