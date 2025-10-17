@@ -17,6 +17,8 @@ export class SpotLightComponent extends CameraComponent {
   private radius = 1.0;
   private startFallof = 0.0;
   private _hasShadows = false;
+  private shadowWidth = 256;
+  private shadowHeight = 256;
 
   private uniformBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
@@ -59,6 +61,16 @@ export class SpotLightComponent extends CameraComponent {
 
     if (data.viewport) {
       this.camera.setViewport(data.viewport.width, data.viewport.height);
+    } else {
+      this.camera.setViewport(this.shadowWidth, this.shadowHeight);
+    }
+
+    if (data.shadowWidth) {
+      this.shadowWidth = data.shadowWidth;
+    }
+
+    if (data.shadowHeight) {
+      this.shadowHeight = data.shadowHeight;
     }
 
     if (data.startFallof) {
@@ -84,8 +96,8 @@ export class SpotLightComponent extends CameraComponent {
     // Crear textura de profundidad para shadow mapping
     this.shadowDepthTexture = GPUUtils.createTexture(
       'spot_light_shadow_depth_map',
-      2048, // Resolución más alta para mejores sombras
-      2048,
+      this.shadowWidth,
+      this.shadowHeight,
       'depth32float',
       GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     );
@@ -188,11 +200,11 @@ export class SpotLightComponent extends CameraComponent {
     GPUUtils.writeBuffer(this.uniformBuffer, 100, new Float32Array([shadowStep]));
 
     // shadowInverseResolution (f32) - bytes 104-107
-    const shadowInverseResolution = 1.0 / 2048.0;
+    const shadowInverseResolution = 1.0 / this.shadowWidth;
     GPUUtils.writeBuffer(this.uniformBuffer, 104, new Float32Array([shadowInverseResolution]));
 
     // shadowStepDivResolution (f32) - bytes 108-111
-    const shadowStepDivResolution = shadowStep / 2048.0;
+    const shadowStepDivResolution = shadowStep / this.shadowWidth;
     GPUUtils.writeBuffer(this.uniformBuffer, 108, new Float32Array([shadowStepDivResolution]));
 
     // startFalloff (f32) - bytes 112-115 (no se usa para directional light)
@@ -216,8 +228,6 @@ export class SpotLightComponent extends CameraComponent {
   }
 
   public generateShadowMap(): void {
-    if (!this.camera.getIsDirty()) return;
-
     RenderManager.getInstance().performCulling(this.camera, RenderCategory.SHADOWS);
     const render = Render.getInstance();
 
@@ -231,7 +241,7 @@ export class SpotLightComponent extends CameraComponent {
         depthStencilAttachment,
       ),
     );
-    GPUUtils.configureViewportAndScissor(pass, 2048, 2048); // Usar resolución de shadow map
+    GPUUtils.configureViewportAndScissor(pass, this.shadowWidth, this.shadowHeight);
 
     RenderManager.getInstance().setCamera(this.camera);
 

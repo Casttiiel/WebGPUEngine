@@ -9,9 +9,9 @@
         "near": 0.1,
         "hasShadows": true,
         "far": 30,
-        "fov": 60,
+        "fov": 20,
         "position": [0, 2, 0],
-        "target": [1, 2, 1]
+        "target": [0, 2, 1]
       }
     }
   }

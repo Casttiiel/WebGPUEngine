@@ -18,7 +18,7 @@
     "prefab": "ground.prefab"
   },
   {
-    "prefab": "spot_light.prefab"
+    "prefab": "spot_light_shadows.prefab"
   },
   {
     "prefab": "cube.prefab",
@@ -36,6 +36,16 @@
         "position": [1, 7, 0],
         "rotation": [45, 0, 45],
         "scale": [0.3, 0.3, 0.3]
+      }
+    }
+  },
+  {
+    "prefab": "cube.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 2, 10],
+        "rotation": [45, 0, 45],
+        "scale": [0.5, 0.5, 0.5]
       }
     }
   }
