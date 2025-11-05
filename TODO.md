@@ -1,18 +1,18 @@
-1. Mesh LOD
-2. Particles / GPU-Driven Rendering
-3. Automatic geometry instancing
+1. Particles / GPU-Driven Rendering
+2. Change physics engine to ammo.js
 
 Backlog-----------------------------------
-Mesh Collider
 Auto exposure
-TAA: Anti-aliasing temporal
+New/Old Bloom
 Motion Blur
+TAA: Anti-aliasing temporal
 Froxel Scattering
-Light Clustered culling + instancing
-Occlusion culling / Multi-Strategy Culling System
 Directional light: Positioning/Rotation
 Directional light: Shadows correctness
 Fix skybox
+Automatic geometry instancing
+Light Clustered culling + instancing
+Occlusion culling / Multi-Strategy Culling System
 
 Grain
 Depth of Field (DOF)
@@ -30,3 +30,4 @@ Weighted terrain
 Animations
 Grass
 Physics Grass
+Mesh LOD

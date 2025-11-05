@@ -17,8 +17,8 @@ export class SpotLightComponent extends CameraComponent {
   private radius = 1.0;
   private startFallof = 0.0;
   private _hasShadows = false;
-  private shadowWidth = 256;
-  private shadowHeight = 256;
+  private shadowWidth = 128;
+  private shadowHeight = 128;
 
   private uniformBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;

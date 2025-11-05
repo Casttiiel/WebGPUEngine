@@ -21,6 +21,7 @@ import { RenderComponent } from '../../components/render/RenderComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
 import { InfinitePlaneColliderComponent } from '../../components/physics/InfinitePlaneColliderComponent';
 import { MeshColliderComponent } from '../../components/physics/MeshColliderComponent';
+import { ParticleSystemComponent } from '../../components/render/ParticleSystemComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -131,6 +132,8 @@ export class Loader {
         return new InfinitePlaneColliderComponent();
       case 'mesh_collider':
         return new MeshColliderComponent();
+      case 'particle_system':
+        return new ParticleSystemComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

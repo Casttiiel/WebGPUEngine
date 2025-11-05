@@ -15,6 +15,9 @@
     "prefab": "water_decal.prefab"
   },
   {
+    "prefab": "particles.prefab"
+  },
+  {
     "prefab": "ground.prefab"
   },
   {

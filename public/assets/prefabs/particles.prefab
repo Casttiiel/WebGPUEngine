@@ -1,0 +1,21 @@
+{
+    "name": "ParticleEffect",
+    "components": {
+        "transform": {
+            "position": [0, 0, 0]
+        },
+        "particle_system": {
+            "maxParticles": 100000,
+            "emissionRate": 1000,
+            "particleLife": 2.0,
+            "spawnRadius": 1.0,
+            "startColor": [1.0, 0.5, 0.0, 1.0],
+            "endColor": [1.0, 0.0, 0.0, 0.0],
+            "startSize": 0.1,
+            "endSize": 0.05,
+            "velocity": [0, 2, 0],
+            "randomness": 0.5,
+            "gravity": [0, -9.81, 0]
+        }
+    }
+}

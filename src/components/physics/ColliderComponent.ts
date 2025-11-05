@@ -15,9 +15,6 @@ export interface ColliderData {
   rotation?: quat;
 }
 
-/**
- * Componente base para todos los colliders
- */
 export abstract class ColliderComponent extends Component {
   protected body!: CANNON.Body;
   protected shape!: CANNON.Shape;
