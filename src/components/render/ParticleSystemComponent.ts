@@ -5,6 +5,7 @@ import { RenderManagerV2 } from '../../renderer/core/managers/RenderManagerV2';
 import { TransformComponent } from '../core/TransformComponent';
 import { RenderComponent } from './RenderComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { ResourceManager } from '../../core/engine/ResourceManager';
 
 /**
  * ParticleSystemComponent - Manages a basic instanced quad particle system
@@ -16,48 +17,136 @@ export class ParticleSystemComponent extends Component {
   private transform!: TransformComponent;
   private static readonly INSTANCE_COUNT: number = 4;
 
-  // Instance data
-  private instancePositions: Float32Array;
-  private instanceBuffer!: GPUBuffer;
+  // GPU Resources
+  private particleBuffer!: GPUBuffer; // Storage buffer for particles
+  private timeBuffer!: GPUBuffer; // Uniform buffer for deltaTime
+  private computePipeline!: GPUComputePipeline;
+  private computeBindGroup!: GPUBindGroup;
   private renderComponent!: RenderComponent;
+
+  // Particle data structure (matches compute shader)
+  private particleData: Float32Array;
 
   constructor() {
     super();
-    // Initialize instance positions in a 2x2 grid más cerca y más pequeño
-    this.instancePositions = new Float32Array([
-      -2,
-      0,
-      -2, // Instance 1: bottom-left
-      2,
-      0,
-      -2, // Instance 2: bottom-right
-      -2,
-      0,
-      2, // Instance 3: top-left
-      2,
-      0,
-      2, // Instance 4: top-right
+    // Initialize particles with just position
+    // Format: [pos.x, pos.y, pos.z] per particle
+    this.particleData = new Float32Array([
+      // Particle 1: esquina frontal izquierda
+      -1, 0, -1,
+
+      // Particle 2: esquina frontal derecha
+      1, 1, -1,
+
+      // Particle 3: esquina trasera derecha
+      2, 1, 1,
+
+      // Particle 4: esquina trasera izquierda
+      -1, 1, 1,
     ]);
   }
 
-  /**
-   * Creates and initializes the instance buffer with position data
-   */
-  private initializeInstanceBuffer(): void {
-    // Create instance buffer
-    this.instanceBuffer = GPUUtils.createBuffer(
-      'particle_instance_buffer',
-      this.instancePositions.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.instancePositions,
+  private async createComputePipeline(): Promise<void> {
+    const device = GPUUtils.getDevice();
+
+    // Load compute shader
+    const computeShaderCode = await ResourceManager.loadShader('particle_update.cs');
+    const computeShaderModule = device.createShaderModule({
+      label: 'particle_update_cs',
+      code: computeShaderCode,
+    });
+
+    // Create bind group layout
+    const bindGroupLayout = device.createBindGroupLayout({
+      label: 'particle_bind_group_layout',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'storage' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+
+    // Create pipeline layout
+    const pipelineLayout = device.createPipelineLayout({
+      label: 'particle_pipeline_layout',
+      bindGroupLayouts: [bindGroupLayout],
+    });
+
+    // Create compute pipeline
+    this.computePipeline = device.createComputePipeline({
+      label: 'particle_compute_pipeline',
+      layout: pipelineLayout,
+      compute: {
+        module: computeShaderModule,
+        entryPoint: 'cs',
+      },
+    });
+
+    // Create storage buffer for particles
+    this.particleBuffer = device.createBuffer({
+      label: 'particle_storage_buffer',
+      size: this.particleData.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+
+    // Write initial data
+    new Float32Array(this.particleBuffer.getMappedRange()).set(this.particleData);
+    this.particleBuffer.unmap();
+
+    // Create uniform buffer for time
+    this.timeBuffer = GPUUtils.createBuffer(
+      'particle_time_buffer',
+      4, // Just deltaTime as float32
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
+
+    // Create bind group
+    this.computeBindGroup = device.createBindGroup({
+      label: 'particle_compute_bind_group',
+      layout: bindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: this.particleBuffer },
+        },
+        {
+          binding: 1,
+          resource: { buffer: this.timeBuffer },
+        },
+      ],
+    });
   }
 
   /**
-   * Updates instance positions in the GPU buffer
+   * Updates particle positions using compute shader
    */
-  private updateInstanceBuffer(): void {
-    GPUUtils.writeBuffer(this.instanceBuffer, 0, this.instancePositions);
+  private updateParticles(deltaTime: number): void {
+    // Update time uniform
+    GPUUtils.writeBuffer(this.timeBuffer, 0, new Float32Array([deltaTime]));
+
+    // Begin compute pass
+    const device = GPUUtils.getDevice();
+    const commandEncoder = device.createCommandEncoder({ label: 'Particle Update Encoder' });
+    const computePass = commandEncoder.beginComputePass({ label: 'Particle Update Pass' });
+
+    // Set pipeline and bind group
+    computePass.setPipeline(this.computePipeline);
+    computePass.setBindGroup(0, this.computeBindGroup);
+
+    // Dispatch exactly one workgroup for our 4 particles
+    computePass.dispatchWorkgroups(1, 1, 1);
+
+    // End pass and submit commands
+    computePass.end();
+    device.queue.submit([commandEncoder.finish()]);
   }
 
   /**
@@ -73,14 +162,14 @@ export class ParticleSystemComponent extends Component {
       this.quadMesh = await Mesh.get('quad.obj'); // Usar un quad normal en lugar de fullscreen
       this.particleMaterial = await this.createParticleMaterial();
 
+      // Create compute pipeline and GPU resources
+      await this.createComputePipeline();
+
       // Get transform component from our entity
       this.transform = this.getOwner().getComponent('transform') as TransformComponent;
       if (!this.transform) {
         throw new Error('ParticleSystemComponent requires a TransformComponent');
       }
-
-      // Initialize instance data
-      this.initializeInstanceBuffer();
 
       // Register with RenderManager as instanced renderer
       const renderManager = RenderManagerV2.getInstance();
@@ -97,7 +186,7 @@ export class ParticleSystemComponent extends Component {
         this.transform,
         true, // isInstanced
         ParticleSystemComponent.INSTANCE_COUNT,
-        this.instanceBuffer, // Pass the instance buffer
+        this.particleBuffer, // Pass the storage buffer as instance buffer
       );
     } catch (error: any) {
       throw error;
@@ -105,21 +194,8 @@ export class ParticleSystemComponent extends Component {
   }
 
   public override update(deltaTime: number): void {
-    // Update particle positions here (example: rotate around Y axis)
-    const angle = deltaTime * 2.0; // Rotate 2 radians per second
-    for (let i = 0; i < this.instancePositions.length; i += 3) {
-      const x = this.instancePositions[i] || 0;
-      const z = this.instancePositions[i + 2] || 0;
-
-      // Apply rotation matrix
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      this.instancePositions[i] = x * cos - z * sin;
-      this.instancePositions[i + 2] = x * sin + z * cos;
-    }
-
-    // Update GPU buffer with new positions
-    this.updateInstanceBuffer();
+    // Update particle positions using compute shader
+    this.updateParticles(deltaTime);
   }
 
   public override renderInMenu(): void {
@@ -136,6 +212,7 @@ export class ParticleSystemComponent extends Component {
     RenderManagerV2.getInstance().delKeys(this.renderComponent);
 
     // Cleanup GPU resources
-    this.instanceBuffer?.destroy();
+    this.particleBuffer?.destroy();
+    this.timeBuffer?.destroy();
   }
 }

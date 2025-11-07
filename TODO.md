@@ -3,11 +3,12 @@
 
    1. El update de las particulas debe ser en gpu
    2. Sistema de particulas que usa compute shaders
-   3. Configurable: escoger radio de spawn de particulas, rango de color de particulas, tamaño, tiempo de vida, direccion de movimiento, velocidad de movimiento, ratio/tiempo de spawn de particulas
-   4. Debe generar particulas en base al ratio de spawn, ademas de actualizar las ya existentes y interpolar entre los valores iniciales/finales
-   5. Solo debe pintar las particulas activas/vivas
-   6. Spawn totalmente en GPU, usando acumulador interno
-   7. DrawIndirect para solo dibujar partículas activas
+   3. No culling on instanced objects
+   4. Configurable: escoger radio de spawn de particulas, rango de color de particulas, tamaño, tiempo de vida, direccion de movimiento, velocidad de movimiento, ratio/tiempo de spawn de particulas
+   5. Debe generar particulas en base al ratio de spawn, ademas de actualizar las ya existentes y interpolar entre los valores iniciales/finales
+   6. Solo debe pintar las particulas activas/vivas
+   7. Spawn totalmente en GPU, usando acumulador interno
+   8. DrawIndirect para solo dibujar partículas activas
 
 2. Change physics engine to ammo.js
 

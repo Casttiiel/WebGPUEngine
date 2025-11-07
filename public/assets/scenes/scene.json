@@ -27,7 +27,7 @@
     "prefab": "cube.prefab",
     "components": {
       "transform": {
-        "position": [-1.0, 4, 0],
+        "position": [-1.0, 4, 5],
         "scale": [0.3, 0.3, 0.3]
       }
     }
@@ -36,7 +36,7 @@
     "prefab": "cube.prefab",
     "components": {
       "transform": {
-        "position": [1, 7, 0],
+        "position": [1, 7, 5],
         "rotation": [45, 0, 45],
         "scale": [0.3, 0.3, 0.3]
       }
