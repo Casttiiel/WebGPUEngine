@@ -14,6 +14,8 @@ export interface RenderKey {
   transform: TransformComponent;
   aabb: AABB | null;
   isInstanced: boolean;
+  instanceCount: number; // Required for both instanced and non-instanced (defaults to 1)
+  instanceBuffer?: GPUBuffer; // Optional buffer containing instance data
   id: number;
 }
 
@@ -32,6 +34,9 @@ export class RenderKeyManager {
     mesh: Mesh,
     material: Material,
     transform: TransformComponent,
+    isInstanced: boolean = false,
+    instanceCount: number = 1,
+    instanceBuffer?: GPUBuffer,
   ): void {
     const key: RenderKey = {
       mesh,
@@ -39,7 +44,9 @@ export class RenderKeyManager {
       owner,
       transform,
       aabb: mesh.getAABB(),
-      isInstanced: false,
+      isInstanced,
+      instanceCount: isInstanced ? instanceCount : 1,
+      instanceBuffer,
       id: this.nextObjectId++,
     };
 

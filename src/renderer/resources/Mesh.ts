@@ -487,8 +487,8 @@ export class Mesh extends GPUResource {
     return this.aabb;
   }
 
-  public static getVertexBufferLayout(): GPUVertexBufferLayout[] {
-    return [
+  public static getVertexBufferLayout(isInstanced: boolean = false): GPUVertexBufferLayout[] {
+    const layouts: GPUVertexBufferLayout[] = [
       {
         // Position attribute
         arrayStride: 3 * 4, // 3 floats * 4 bytes
@@ -499,6 +499,7 @@ export class Mesh extends GPUResource {
             format: 'float32x3',
           },
         ],
+        stepMode: 'vertex',
       },
       {
         // Normal attribute
@@ -510,6 +511,7 @@ export class Mesh extends GPUResource {
             format: 'float32x3',
           },
         ],
+        stepMode: 'vertex',
       },
       {
         // UV attribute
@@ -521,6 +523,7 @@ export class Mesh extends GPUResource {
             format: 'float32x2',
           },
         ],
+        stepMode: 'vertex',
       },
       {
         // Tangent attribute
@@ -532,20 +535,45 @@ export class Mesh extends GPUResource {
             format: 'float32x4',
           },
         ],
+        stepMode: 'vertex',
       },
     ];
+
+    if (isInstanced) {
+      // Add instance position attribute
+      layouts.push({
+        arrayStride: 3 * 4, // vec3 position
+        attributes: [
+          {
+            shaderLocation: 4, // Instance position
+            offset: 0,
+            format: 'float32x3',
+          },
+        ],
+        stepMode: 'instance',
+      });
+    }
+
+    return layouts;
   }
 
-  public activate(pass: GPURenderPassEncoder): void {
+  public activate(pass: GPURenderPassEncoder, instanceBuffer?: GPUBuffer): void {
     pass.setVertexBuffer(0, this.vertexBuffer);
     pass.setVertexBuffer(1, this.normalBuffer);
     pass.setVertexBuffer(2, this.uvBuffer);
     pass.setVertexBuffer(3, this.tangentBuffer);
+    if (instanceBuffer) {
+      pass.setVertexBuffer(4, instanceBuffer);
+    }
     pass.setIndexBuffer(this.indexBuffer, 'uint16');
   }
 
   public renderGroup(pass: GPURenderPassEncoder): void {
     pass.drawIndexed(this.indexCount);
+  }
+
+  public renderGroupInstanced(pass: GPURenderPassEncoder, instanceCount: number): void {
+    pass.drawIndexed(this.indexCount, instanceCount);
   }
 
   public getName(): string {

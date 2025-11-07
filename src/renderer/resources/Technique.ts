@@ -22,6 +22,7 @@ export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'
   z?: DepthModes;
   writesOn?: FragmentShaderTargets;
   uniforms?: ReadonlyArray<PipelineBindGroupLayouts>;
+  instanced?: boolean;
 }
 
 export type TechniqueOptions = TechniqueCreateOptions & IGPUResourceOptions;
@@ -41,6 +42,7 @@ export class Technique extends GPUResource {
   private depthTest: DepthModes;
   private writesOn: FragmentShaderTargets;
   private uniformsLayout: ReadonlyArray<PipelineBindGroupLayouts>;
+  private isInstanced: boolean;
   private vsFile: string;
   private fsFile: string;
   private vsEntryPoint: string;
@@ -58,6 +60,7 @@ export class Technique extends GPUResource {
     this.depthTest = options.z || DepthModes.DEFAULT;
     this.writesOn = options.writesOn || FragmentShaderTargets.SCREEN;
     this.uniformsLayout = options.uniforms || [];
+    this.isInstanced = options.instanced || false;
     this.vsFile = options.vs;
     this.fsFile = options.fs;
     this.vsEntryPoint = options.vsEntryPoint || 'vs';
@@ -115,6 +118,7 @@ export class Technique extends GPUResource {
       z: techniqueData.z ?? DepthModes.DEFAULT,
       writesOn: techniqueData.writesOn ?? FragmentShaderTargets.SCREEN,
       uniforms: techniqueData.uniforms ?? [],
+      instanced: techniqueData.instanced ?? false,
     };
 
     // Add optional properties only if they exist
@@ -203,7 +207,7 @@ export class Technique extends GPUResource {
       vertex: {
         module: vsModule,
         entryPoint: this.vsEntryPoint,
-        buffers: Mesh.getVertexBufferLayout(),
+        buffers: Mesh.getVertexBufferLayout(this.isInstanced),
       },
       fragment: {
         module: fsModule,

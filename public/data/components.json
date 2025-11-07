@@ -1,4 +1,11 @@
 {
-  "update": ["point_light", "box_collider", "transform", "camera", "ambient_occlusion"],
+  "update": [
+    "point_light",
+    "box_collider",
+    "particle_system",
+    "transform",
+    "camera",
+    "ambient_occlusion"
+  ],
   "render_debug": []
 }
