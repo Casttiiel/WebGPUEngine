@@ -38,7 +38,7 @@ export class CPUCullingManager {
 
     // Test each object against frustum
     for (const key of keys) {
-      if (this.isVisibleInFrustum(key, frustumPlanes)) {
+      if (key.isInstanced || this.isVisibleInFrustum(key, frustumPlanes)) {
         visibleKeys.push(key);
       }
     }
