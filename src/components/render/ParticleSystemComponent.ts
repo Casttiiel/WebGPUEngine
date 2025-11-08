@@ -5,6 +5,7 @@ import { RenderManagerV2 } from '../../renderer/core/managers/RenderManagerV2';
 import { TransformComponent } from '../core/TransformComponent';
 import { RenderComponent } from './RenderComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { ResourceManager } from '../../core/engine/ResourceManager';
 
 /**
  * ParticleSystemComponent - GPU-driven particle system using indirect draw
@@ -19,6 +20,11 @@ export class ParticleSystemComponent extends Component {
   private indirectDrawBuffer!: GPUBuffer;
   private renderBindGroup!: GPUBindGroup;
   private renderComponent!: RenderComponent;
+
+  // Compute shader resources
+  private computePipeline!: GPUComputePipeline;
+  private computeBindGroup!: GPUBindGroup;
+  private simulationParamsBuffer!: GPUBuffer;
 
   constructor() {
     super();
@@ -118,7 +124,10 @@ export class ParticleSystemComponent extends Component {
         ],
       });
 
-      // 5. Registrar la key instanciada en el RenderManagerV2
+      // 5. Crear compute shader pipeline y recursos
+      await this.createComputePipeline();
+
+      // 6. Registrar la key instanciada en el RenderManagerV2
       this.renderComponent = new RenderComponent();
       this.renderComponent.setOwner(this.getOwner());
       RenderManagerV2.getInstance().addKey(
@@ -136,7 +145,70 @@ export class ParticleSystemComponent extends Component {
     }
   }
 
-  public override update(deltaTime: number): void {}
+  private async createComputePipeline(): Promise<void> {
+    const device = GPUUtils.getDevice();
+
+    // 1. Crear buffer para parámetros de simulación
+    this.simulationParamsBuffer = device.createBuffer({
+      label: 'simulation_params_buffer',
+      size: 32, // Mínimo 32 bytes para uniform buffer en WebGPU
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    // 2. Cargar el shader del compute
+
+    const shaderCode = await ResourceManager.loadShader('particle_update.cs');
+    const computeShader = device.createShaderModule({
+      label: 'particle_update_cs',
+      code: shaderCode,
+    });
+
+    // 3. Crear compute pipeline
+    this.computePipeline = device.createComputePipeline({
+      label: 'particle_update_pipeline',
+      layout: 'auto',
+      compute: {
+        module: computeShader,
+        entryPoint: 'main',
+      },
+    });
+
+    // 4. Crear bind group para el compute shader
+    this.computeBindGroup = device.createBindGroup({
+      layout: this.computePipeline.getBindGroupLayout(0),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: this.particleBuffer },
+        },
+        {
+          binding: 1,
+          resource: { buffer: this.simulationParamsBuffer },
+        },
+      ],
+    });
+  }
+
+  public override update(deltaTime: number): void {
+    // Actualizar parámetros de simulación (32 bytes = 8 floats)
+    const simParams = new Float32Array([deltaTime, 0, 0, 0, 0, 0, 0, 0]); // deltaTime + padding para 32 bytes
+    const device = GPUUtils.getDevice();
+    device.queue.writeBuffer(this.simulationParamsBuffer, 0, simParams);
+
+    // Ejecutar compute shader
+    const commandEncoder = device.createCommandEncoder({ label: 'Particle Update' });
+    const computePass = commandEncoder.beginComputePass({ label: 'Particle Update Pass' });
+
+    computePass.setPipeline(this.computePipeline);
+    computePass.setBindGroup(0, this.computeBindGroup);
+
+    // Dispatch workgroups (64 partículas por workgroup)
+    const numWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
+    computePass.dispatchWorkgroups(numWorkgroups);
+
+    computePass.end();
+    device.queue.submit([commandEncoder.finish()]);
+  }
 
   public override renderInMenu(): void {
     // TODO: Add debug controls for particle positions and animation speed

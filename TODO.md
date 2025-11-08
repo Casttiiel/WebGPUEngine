@@ -1,7 +1,5 @@
 1. Particles / GPU-Driven Rendering
-
-   Draw only the active
-   Update
+   Draw/Update only the active
    Spawn
 
 2. Change physics engine to ammo.js
