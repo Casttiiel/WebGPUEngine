@@ -2,8 +2,7 @@
     "name": "ParticleEffect",
     "components": {
         "transform": {
-            "position": [0, 0, 0],
-            "rotation": [0,180,0]
+            "position": [0, 0, 0]
         },
         "particle_system": {
             "particles": {

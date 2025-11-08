@@ -33,25 +33,48 @@ export class ParticleSystemComponent extends Component {
 
       this.transform = this.getOwner().getComponent('transform') as TransformComponent;
 
-      // 2. Crear storage buffer para datos de partículas (posición, etc.)
+      // 2. Crear storage buffer para datos de partículas (posición + velocidad)
       // IMPORTANTE: vec3 en storage buffer necesita alineamiento de 16 bytes (vec4)
       const particleData = new Float32Array([
+        // Partícula 0: pos(-2, 0, 2) + vel(1, 0, 0) = moviéndose hacia la derecha
         -2,
+        1,
+        2,
+        0, // position + padding
+        1,
+        0,
+        0,
+        0, // velocity + padding
+
+        // Partícula 1: pos(2, 0, 2) + vel(0, 0, -1) = moviéndose hacia atrás
+        2,
         0,
         2,
-        0, // Partícula 0 (x, y, z, padding)
-        2,
+        0, // position + padding
         0,
-        2,
-        0, // Partícula 1 (x, y, z, padding)
+        0,
+        -1,
+        0, // velocity + padding
+
+        // Partícula 2: pos(2, 0, -2) + vel(-1, 0, 0) = moviéndose hacia la izquierda
         2,
         0,
         -2,
-        0, // Partícula 2 (x, y, z, padding)
+        0, // position + padding
+        -1,
+        0,
+        0,
+        0, // velocity + padding
+
+        // Partícula 3: pos(-2, 0, -2) + vel(0, 0, 1) = moviéndose hacia adelante
         -2,
         0,
         -2,
-        0, // Partícula 3 (x, y, z, padding)
+        0, // position + padding
+        0,
+        0,
+        1,
+        0, // velocity + padding
       ]);
       this.particleBuffer = device.createBuffer({
         label: 'particle_storage_buffer',

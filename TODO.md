@@ -1,29 +1,8 @@
 1. Particles / GPU-Driven Rendering
-   Requirements:
 
-Spawneo de partículas
-
-Las partículas nacen con posición, velocidad y tiempo de vida configurables.
-El sistema puede emitir nuevas partículas en slots libres.
-El spawn puede ser controlado por parámetros (ratio, dirección, rango, color, tamaño, etc.).
-Actualización en GPU (Compute Shader)
-
-La posición, velocidad, edad y estado (viva/muerta) de cada partícula se actualizan en un compute shader.
-El shader gestiona el movimiento, la física y la muerte de partículas (cuando el tiempo de vida se agota).
-Renderizado eficiente
-
-Solo se dibujan las partículas vivas.
-Se usa instanced rendering y billboarding para que cada quad mire a la cámara.
-El vertex shader accede a los datos de cada partícula usando instanceIndex y un storage buffer.
-Para máxima eficiencia, se usa indirect draw calls (el compute shader actualiza el buffer de draw indirect con el número de partículas vivas).
-Acceso a todos los datos por partícula
-
-Cada partícula tiene: posición, velocidad, tiempo de vida, edad, estado activo, y opcionalmente color/tamaño.
-El sistema puede crecer en atributos sin límite de locations (usando storage buffer).
-Recursos GPU y arquitectura
-
-Storage Buffer: Array de partículas con todos los datos.
-Indirect Draw Buffer: Buffer con los parámetros de draw call (instanceCount = partículas vivas).
+   Draw only the active
+   Update
+   Spawn
 
 2. Change physics engine to ammo.js
 

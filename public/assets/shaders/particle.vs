@@ -3,7 +3,9 @@
 // Estructura de la partícula (alineada para storage buffer)
 struct Particle {
     position: vec3<f32>,
-    padding: f32, // Alineamiento requerido para vec3 en storage buffer
+    padding1: f32, // Alineamiento requerido para vec3 en storage buffer
+    velocity: vec3<f32>,
+    padding2: f32, // Alineamiento requerido para vec3 en storage buffer
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -28,11 +30,23 @@ struct VertexOutput {
 fn vs(input: VertexInput) -> VertexOutput {
     // Obtener la partícula actual usando el instance index
     let particle = particles[input.instanceIndex];
-    
-    var output: VertexOutput;
 
-    let worldPos = object.modelMatrix * vec4<f32>(input.position, 1.0);
-    output.position = camera.projectionMatrix * camera.viewMatrix * (worldPos + vec4<f32>(particle.position, 1.0));
+    // Billboarding: extraer vectores right y up de las matrices de cámara
+    // Usamos la matriz de vista para obtener los vectores de cámara
+    let cameraRight = normalize(vec3<f32>(camera.viewMatrix[0].x, camera.viewMatrix[1].x, camera.viewMatrix[2].x));
+    let cameraUp = normalize(vec3<f32>(camera.viewMatrix[0].y, camera.viewMatrix[1].y, camera.viewMatrix[2].y));
+
+    // Calcular offset del vértice del quad en espacio mundo usando billboarding
+    let quadOffset = (cameraRight * input.position.x + cameraUp * input.position.y);
+
+    // Posición final en mundo: posición de la partícula + offset del quad
+    let worldPos = object.modelMatrix * vec4<f32>(particle.position, 1.0);
+
+    // Transformar a espacio clip usando las matrices de cámara
+    let clipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(worldPos.xyz + quadOffset, 1.0);
+
+    var output: VertexOutput;
+    output.position = clipPos;
     output.uv = input.uv;
     
     return output;
