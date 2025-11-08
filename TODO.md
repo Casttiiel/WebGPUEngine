@@ -1,22 +1,23 @@
 1. Particles / GPU-Driven Rendering
-   Draw/Update only the active
+   Ordenar particulas a solo activas
    Spawn
 
 2. Change physics engine to ammo.js
 
-Backlog-----------------------------------
+-----------------------------------Graphics Engine Backlog-----------------------------------
 Auto exposure
-New/Old Bloom
-Motion Blur
-TAA: Anti-aliasing temporal
-Froxel Scattering
-Directional light: Positioning/Rotation
-Directional light: Shadows correctness
+More scenes
 Fix skybox
 Automatic geometry instancing
-Light Clustered culling + instancing
-Occlusion culling / Multi-Strategy Culling System
+Motion Blur
+Directional light: Positioning/Rotation
+Directional light: Shadows correctness
+TAA: Anti-aliasing temporal
+Froxel Scattering
 
+-----------------------------------Game Engine Backlog-----------------------------------
+Animations
+Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Grain
 Depth of Field (DOF)
 Lens Flare
@@ -28,9 +29,9 @@ Atmospheric scattering (Simular skybox y cielo)
 CSM: 3-cascade system
 Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
 Console
-Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Weighted terrain
-Animations
 Grass
 Physics Grass
 Mesh LOD
+Light Clustered culling + instancing
+Occlusion culling / Multi-Strategy Culling System

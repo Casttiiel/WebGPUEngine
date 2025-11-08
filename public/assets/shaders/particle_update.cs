@@ -3,7 +3,20 @@ struct Particle {
     position: vec3<f32>,
     padding1: f32,
     velocity: vec3<f32>,
-    padding2: f32,
+    lifetime: f32,    // Tiempo total de vida
+    age: f32,         // Edad actual
+    alive: u32,      // 1 = viva, 0 = muerta
+    padding2: u32,    // Alineamiento
+    padding3: u32,    // Alineamiento (total: 48 bytes)
+};
+
+// Buffer de argumentos para drawIndexedIndirect
+struct IndirectDrawArgs {
+    indexCount: u32,      // Número de índices (6 para un quad)
+    instanceCount: u32,   // Número de instancias (partículas vivas)
+    firstIndex: u32,      // Primer índice
+    baseVertex: i32,      // Vértice base
+    firstInstance: u32,   // Primera instancia
 };
 
 // Parámetros de simulación (32 bytes total)
@@ -20,6 +33,7 @@ struct SimulationParams {
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(1) var<uniform> simParams: SimulationParams;
+@group(0) @binding(2) var<storage, read_write> indirectArgs: IndirectDrawArgs;
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -33,18 +47,31 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Obtener la partícula actual
     var particle = particles[index];
     
-    // Actualizar posición basándose en velocidad y deltaTime
-    particle.position += particle.velocity * simParams.deltaTime;
-    
-    // Opcional: Aplicar gravedad
-    /*particle.velocity.y -= 9.8 * simParams.deltaTime;
-    
-    // Opcional: Rebote simple en el suelo
-    if (particle.position.y < 0.0) {
-        particle.position.y = 0.0;
-        particle.velocity.y = abs(particle.velocity.y) * 0.8; // Rebote con amortiguación
-    }*/
+    // Solo actualizar partículas vivas
+    if (particle.alive == 1u) {
+        // Incrementar edad
+        particle.age += simParams.deltaTime;
+        
+        // Actualizar posición basándose en velocidad y deltaTime
+        particle.position += particle.velocity * simParams.deltaTime;
+        
+        // Comprobar si ha superado su tiempo de vida
+        if (particle.age >= particle.lifetime) {
+            particle.alive = 0u; // Marcar como muerta
+        }
+    }
     
     // Escribir la partícula actualizada de vuelta al buffer
     particles[index] = particle;
+    
+    // Thread 0 cuenta las partículas vivas y actualiza instanceCount
+    if (index == 0u) {
+        var aliveCount: u32 = 0u;
+        for (var i = 0u; i < arrayLength(&particles); i++) {
+            if (particles[i].alive == 1u) {
+                aliveCount += 1u;
+            }
+        }
+        indirectArgs.instanceCount = aliveCount;
+    }
 }

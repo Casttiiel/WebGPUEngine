@@ -3,9 +3,13 @@
 // Estructura de la partícula (alineada para storage buffer)
 struct Particle {
     position: vec3<f32>,
-    padding1: f32, // Alineamiento requerido para vec3 en storage buffer
+    padding1: f32,    // Alineamiento
     velocity: vec3<f32>,
-    padding2: f32, // Alineamiento requerido para vec3 en storage buffer
+    lifetime: f32,    // Tiempo total de vida
+    age: f32,         // Edad actual
+    alive: u32,      // 1 = viva, 0 = muerta
+    padding2: u32,    // Alineamiento
+    padding3: u32,    // Alineamiento (total: 48 bytes)
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;

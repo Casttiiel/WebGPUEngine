@@ -39,49 +39,48 @@ export class ParticleSystemComponent extends Component {
 
       this.transform = this.getOwner().getComponent('transform') as TransformComponent;
 
-      // 2. Crear storage buffer para datos de partículas (posición + velocidad)
-      // IMPORTANTE: vec3 en storage buffer necesita alineamiento de 16 bytes (vec4)
-      const particleData = new Float32Array([
-        // Partícula 0: pos(-2, 0, 2) + vel(1, 0, 0) = moviéndose hacia la derecha
-        -2,
-        1,
-        2,
-        0, // position + padding
-        1,
-        0,
-        0,
-        0, // velocity + padding
+      // 2. Crear storage buffer para datos de partículas
+      // Estructura: position(vec3 + padding) + velocity(vec3) + lifetime(f32) + age(f32) + active(u32) + padding(u32 x2)
+      // Total: 48 bytes por partícula
+      const PARTICLE_SIZE_FLOATS = 12; // 48 bytes / 4 bytes por float
+      const particleData = new Float32Array(
+        ParticleSystemComponent.MAX_PARTICLES * PARTICLE_SIZE_FLOATS,
+      );
 
-        // Partícula 1: pos(2, 0, 2) + vel(0, 0, -1) = moviéndose hacia atrás
-        2,
-        0,
-        2,
-        0, // position + padding
-        0,
-        0,
-        -1,
-        0, // velocity + padding
+      // Inicializar primeras 4 partículas como vivas con diferentes configuraciones
+      const particles = [
+        { pos: [-1, 0, 2], vel: [0, 0, 0], lifetime: 10.0 }, // Partícula 0
+        { pos: [1, 1, 2], vel: [0, 0, 0], lifetime: 5.0 }, // Partícula 1
+        { pos: [1, 0, -2], vel: [0, 0, 0], lifetime: 10.0 }, // Partícula 2
+        { pos: [-1, 0, -2], vel: [0, 0, 0], lifetime: 10.0 }, // Partícula 3
+      ];
 
-        // Partícula 2: pos(2, 0, -2) + vel(-1, 0, 0) = moviéndose hacia la izquierda
-        2,
-        0,
-        -2,
-        0, // position + padding
-        -1,
-        0,
-        0,
-        0, // velocity + padding
+      for (let i = 0; i < particles.length; i++) {
+        const offset = i * PARTICLE_SIZE_FLOATS;
+        const p = particles[i]!; // Non-null assertion ya que sabemos que existe
 
-        // Partícula 3: pos(-2, 0, -2) + vel(0, 0, 1) = moviéndose hacia adelante
-        -2,
-        0,
-        -2,
-        0, // position + padding
-        0,
-        0,
-        1,
-        0, // velocity + padding
-      ]);
+        particleData[offset + 0] = p.pos[0]!; // position.x
+        particleData[offset + 1] = p.pos[1]!; // position.y
+        particleData[offset + 2] = p.pos[2]!; // position.z
+        particleData[offset + 3] = 0; // padding1
+
+        particleData[offset + 4] = p.vel[0]!; // velocity.x
+        particleData[offset + 5] = p.vel[1]!; // velocity.y
+        particleData[offset + 6] = p.vel[2]!; // velocity.z
+        particleData[offset + 7] = p.lifetime; // lifetime
+
+        particleData[offset + 8] = 0.0; // age (empieza en 0)
+
+        // active y padding como uint32, pero los escribimos en el Float32Array
+        const uint32View = new Uint32Array(particleData.buffer);
+        const uint32Offset = offset + 9;
+        uint32View[uint32Offset + 0] = 1; // active = 1 (viva)
+        uint32View[uint32Offset + 1] = 0; // padding2
+        uint32View[uint32Offset + 2] = 0; // padding3
+      }
+
+      // El resto de partículas quedan con active = 0 (muertas) por defecto
+
       this.particleBuffer = device.createBuffer({
         label: 'particle_storage_buffer',
         size: particleData.byteLength,
@@ -92,7 +91,7 @@ export class ParticleSystemComponent extends Component {
       // 3. Crear buffer indirecto (indexCount, instanceCount, firstIndex, baseVertex, firstInstance)
       const indirectArgs = new Uint32Array([
         6, // indexCount (quad)
-        ParticleSystemComponent.MAX_PARTICLES, // instanceCount
+        4, // instanceCount (empezamos con 4 partículas vivas)
         0, // firstIndex
         0, // baseVertex
         0, // firstInstance
@@ -100,7 +99,7 @@ export class ParticleSystemComponent extends Component {
       this.indirectDrawBuffer = device.createBuffer({
         label: 'particle_indirect_buffer',
         size: indirectArgs.byteLength,
-        usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+        usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       device.queue.writeBuffer(this.indirectDrawBuffer, 0, indirectArgs);
 
@@ -185,6 +184,10 @@ export class ParticleSystemComponent extends Component {
           binding: 1,
           resource: { buffer: this.simulationParamsBuffer },
         },
+        {
+          binding: 2,
+          resource: { buffer: this.indirectDrawBuffer },
+        },
       ],
     });
   }
@@ -210,6 +213,96 @@ export class ParticleSystemComponent extends Component {
     device.queue.submit([commandEncoder.finish()]);
   }
 
+  /**
+   * Spawn una nueva partícula en el primer slot muerto disponible
+   * @param position Posición inicial de la partícula
+   * @param velocity Velocidad inicial de la partícula
+   * @param lifetime Tiempo de vida en segundos
+   * @returns true si se pudo spawn, false si no hay slots disponibles
+   */
+  public spawnParticle(
+    position: [number, number, number],
+    velocity: [number, number, number],
+    lifetime: number,
+  ): boolean {
+    const device = GPUUtils.getDevice();
+    const PARTICLE_SIZE_FLOATS = 12; // 48 bytes / 4 bytes por float
+
+    // Crear buffer temporal para leer datos actuales de partículas
+    const readBuffer = device.createBuffer({
+      label: 'particle_read_buffer',
+      size: this.particleBuffer.size,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+
+    // Copiar datos del particle buffer al read buffer
+    const commandEncoder = device.createCommandEncoder({ label: 'Copy Particle Data' });
+    commandEncoder.copyBufferToBuffer(
+      this.particleBuffer,
+      0,
+      readBuffer,
+      0,
+      this.particleBuffer.size,
+    );
+    device.queue.submit([commandEncoder.finish()]);
+
+    // Mapear el buffer para lectura (asíncrono)
+    readBuffer.mapAsync(GPUMapMode.READ).then(() => {
+      const particleData = new Float32Array(readBuffer.getMappedRange());
+      const uint32View = new Uint32Array(particleData.buffer);
+
+      // Buscar primer slot muerto (active = 0)
+      let slotIndex = -1;
+      for (let i = 0; i < ParticleSystemComponent.MAX_PARTICLES; i++) {
+        const offset = i * PARTICLE_SIZE_FLOATS;
+        const uint32Offset = offset + 9;
+        const active = uint32View[uint32Offset];
+
+        if (active === 0) {
+          slotIndex = i;
+          break;
+        }
+      }
+
+      readBuffer.unmap();
+      readBuffer.destroy();
+
+      if (slotIndex === -1) {
+        console.warn('No hay slots disponibles para spawn de partícula');
+        return false;
+      }
+
+      // Escribir nueva partícula en el slot encontrado
+      const offset = slotIndex * PARTICLE_SIZE_FLOATS;
+      const newParticleData = new Float32Array(PARTICLE_SIZE_FLOATS);
+
+      newParticleData[0] = position[0]; // position.x
+      newParticleData[1] = position[1]; // position.y
+      newParticleData[2] = position[2]; // position.z
+      newParticleData[3] = 0; // padding1
+
+      newParticleData[4] = velocity[0]; // velocity.x
+      newParticleData[5] = velocity[1]; // velocity.y
+      newParticleData[6] = velocity[2]; // velocity.z
+      newParticleData[7] = lifetime; // lifetime
+
+      newParticleData[8] = 0.0; // age (empieza en 0)
+
+      const newUint32View = new Uint32Array(newParticleData.buffer);
+      newUint32View[9] = 1; // active = 1 (viva)
+      newUint32View[10] = 0; // padding2
+      newUint32View[11] = 0; // padding3
+
+      // Escribir al buffer GPU
+      device.queue.writeBuffer(this.particleBuffer, offset * 4, newParticleData);
+
+      console.log(`Partícula spawneada en slot ${slotIndex}`);
+      return true;
+    });
+
+    return true; // Retornar true inmediatamente (el spawn es asíncrono)
+  }
+
   public override renderInMenu(): void {
     // TODO: Add debug controls for particle positions and animation speed
   }
@@ -222,5 +315,6 @@ export class ParticleSystemComponent extends Component {
     // Cleanup GPU resources
     this.particleBuffer?.destroy();
     this.indirectDrawBuffer?.destroy();
+    this.simulationParamsBuffer?.destroy();
   }
 }
