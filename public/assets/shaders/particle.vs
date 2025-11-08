@@ -1,9 +1,9 @@
 #include "common/uniforms"
 
-// Estructura de la partícula (puedes ampliar con más atributos)
+// Estructura de la partícula (alineada para storage buffer)
 struct Particle {
     position: vec3<f32>,
-    // velocity: vec3<f32>, // Si lo necesitas para animación
+    padding: f32, // Alineamiento requerido para vec3 en storage buffer
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
