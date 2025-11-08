@@ -1,15 +1,23 @@
 #include "common/uniforms"
 
-struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) normal: vec3<f32>,
-    @location(2) uv: vec2<f32>,
-    @location(3) tangent: vec4<f32>,
-    @location(4) instancePosition: vec3<f32>,
+// Estructura de la partícula (puedes ampliar con más atributos)
+struct Particle {
+    position: vec3<f32>,
+    // velocity: vec3<f32>, // Si lo necesitas para animación
 };
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(2) @binding(0) var<uniform> object: ObjectUniforms;
+@group(3) @binding(0) var<storage, read> particles: array<Particle>;
+
+// Vertex attributes del quad mesh
+struct VertexInput {
+    @location(0) position: vec3<f32>, // posición del vértice del quad
+    @location(1) normal: vec3<f32>,   // normal del quad (no se usa pero está en el mesh)
+    @location(2) uv: vec2<f32>,       // UV del quad
+    @location(3) tangent: vec4<f32>,  // tangent del quad (no se usa pero está en el mesh)
+    @builtin(instance_index) instanceIndex: u32,
+};
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -17,26 +25,15 @@ struct VertexOutput {
 };
 
 @vertex
-fn vs(vertex: VertexInput) -> VertexOutput {
+fn vs(input: VertexInput) -> VertexOutput {
+    // Obtener la partícula actual usando el instance index
+    let particle = particles[input.instanceIndex];
+    
     var output: VertexOutput;
-    
-    // Get the camera right and up vectors from the view matrix
-    let cameraRight = vec3<f32>(camera.viewMatrix[0].x, camera.viewMatrix[1].x, camera.viewMatrix[2].x);
-    let cameraUp = vec3<f32>(camera.viewMatrix[0].y, camera.viewMatrix[1].y, camera.viewMatrix[2].y);
-    
-    // Scale the billboard vectors by the original vertex position (which defines quad corners)
-    let rightOffset = cameraRight * vertex.position.x;
-    let upOffset = cameraUp * vertex.position.y;
-    
-    // Calculate world position = instancePosition + billboarded quad offset
-    let worldPos = vec4<f32>(
-        vertex.instancePosition + rightOffset + upOffset,
-        1.0
-    );
-    
-    // Transform to clip space
-    output.position = camera.projectionMatrix * camera.viewMatrix * object.modelMatrix * worldPos;
-    output.uv = vertex.uv;
+
+    let worldPos = object.modelMatrix * vec4<f32>(input.position, 1.0);
+    output.position = camera.projectionMatrix * camera.viewMatrix * (worldPos + vec4<f32>(particle.position, 1.0));
+    output.uv = input.uv;
     
     return output;
 }

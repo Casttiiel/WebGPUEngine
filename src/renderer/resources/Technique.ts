@@ -207,7 +207,7 @@ export class Technique extends GPUResource {
       vertex: {
         module: vsModule,
         entryPoint: this.vsEntryPoint,
-        buffers: Mesh.getVertexBufferLayout(this.isInstanced),
+        buffers: Mesh.getVertexBufferLayout(),
       },
       fragment: {
         module: fsModule,

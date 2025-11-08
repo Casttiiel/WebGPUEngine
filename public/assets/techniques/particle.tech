@@ -7,7 +7,8 @@
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",
-        "ObjectUniforms"
+        "ObjectUniforms",
+        "ParticleUniforms"
     ],
     "instanced": true
 }

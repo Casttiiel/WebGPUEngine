@@ -52,7 +52,8 @@ export class RenderManagerV2 {
     transform: TransformComponent,
     isInstanced: boolean = false,
     instanceCount: number = 1,
-    instanceBuffer?: GPUBuffer,
+    instanceBindGroup?: GPUBindGroup,
+    indirectDrawBuffer?: GPUBuffer,
   ): void {
     this.keyManager.addKey(
       owner,
@@ -61,7 +62,8 @@ export class RenderManagerV2 {
       transform,
       isInstanced,
       instanceCount,
-      instanceBuffer,
+      instanceBindGroup,
+      indirectDrawBuffer,
     );
     if (material.getCastsShadows()) {
       this.keyManager.addKey(
@@ -71,7 +73,8 @@ export class RenderManagerV2 {
         transform,
         isInstanced,
         instanceCount,
-        instanceBuffer,
+        instanceBindGroup,
+        indirectDrawBuffer,
       );
     }
   }
@@ -140,12 +143,14 @@ export class RenderManagerV2 {
       );
       this.stateManager.setBindGroup(pass, 2, key.transform.getModelBindGroup());
 
-      // Set instance buffer and draw
-      if (key.isInstanced && key.instanceBuffer) {
-        key.mesh.activate(pass, key.instanceBuffer);
-        key.mesh.renderGroupInstanced(pass, key.instanceCount);
+      if (key.indirectDrawBuffer) {
+        this.stateManager.setBindGroup(pass, 3, key.renderBindGroup!);
+        pass.drawIndexedIndirect(key.indirectDrawBuffer, 0);
+      } else if (key.isInstanced) {
+        //key.mesh.activate(pass);
+        key.mesh.renderInstance(pass, key.instanceCount);
       } else {
-        key.mesh.activate(pass);
+        //key.mesh.activate(pass);
         key.mesh.renderGroup(pass);
       }
       drawCalls++;
