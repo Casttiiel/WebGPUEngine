@@ -321,8 +321,6 @@ export class ParticleSystemComponent extends Component {
       const counterData = new Uint32Array([this.particlesPerSpawn]);
       device.queue.writeBuffer(this.spawnCounterBuffer, 0, counterData);
 
-      console.log(`[ParticleSystem] 🔵 Spawning ${this.particlesPerSpawn} particles`);
-
       // IMPORTANTE: Los writeBuffer se ejecutan en la queue, pero necesitamos
       // asegurarnos de que se completen ANTES del compute shader
       // Sin embargo, WebGPU garantiza el orden de operaciones en la misma queue

@@ -30,6 +30,7 @@
   "dependencies": {
     "@derschmale/io-rgbe": "^0.1.1",
     "@gltf-transform/core": "^4.2.1",
+    "@gltf-transform/extensions": "^4.2.1",
     "@petamoriken/float16": "^3.9.2",
     "@tweakpane/plugin-essentials": "^0.2.1",
     "cannon-es": "^0.20.0",

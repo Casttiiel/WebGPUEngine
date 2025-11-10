@@ -19,7 +19,7 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     g.albedo = pow(abs(albedo.rgb), vec3<f32>(2.2));
     
     // Get self illumination
-    g.emissive = normalRoughnessData.a * 5.0;
+    g.emissive = normalRoughnessData.a;
     g.selfIllum = g.albedo * g.emissive;
     
     // Default specular for dielectrics is 0.04

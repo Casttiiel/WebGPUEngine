@@ -7,7 +7,10 @@ import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { FragmentShaderTargets } from '../../types/FragmentShaderTargets.enum';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { Node, WebIO, Material, Primitive, Texture } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { mat4 } from 'gl-matrix';
+import { BlendModes } from '../../types/BlendModes.enum';
+import { DepthModes } from '../../types/DepthModes.enum';
 
 export class GLTFLoader {
   private static gltfBaseName: string = '';
@@ -16,8 +19,8 @@ export class GLTFLoader {
     const folderName = path.split('.')[0];
     this.gltfBaseName = folderName;
 
-    // 1. Crear IO para navegador
-    const io = new WebIO();
+    // 1. Crear IO para navegador con soporte para todas las extensiones
+    const io = new WebIO().registerExtensions(ALL_EXTENSIONS);
 
     // 2. Leer desde URL remota o local (assets/)
     const doc = await io.read(`assets/meshes/${folderName}/${path}`);
@@ -68,7 +71,12 @@ export class GLTFLoader {
       if (mesh) {
         nodeEntity = this.processMeshNode(node);
       } else {
-        throw new Error('unidentified node type');
+        nodeEntity = {
+          children: [],
+          components: {
+            transform: {},
+          },
+        };
       }
 
       if (node.listChildren().length > 0) {
@@ -136,6 +144,9 @@ export class GLTFLoader {
       throw new Error('Primitive has no material');
     }
 
+    const emissiveFactor = materialData.getEmissiveFactor();
+    const hasEmissive = emissiveFactor.some((value) => value !== 0);
+
     let material: MaterialDataType = {
       category: this.getCategory(materialData),
       textures: {
@@ -147,13 +158,15 @@ export class GLTFLoader {
           : 'no-normal.jpg',
         txMetallic: materialData.getMetallicRoughnessTexture()
           ? this.getTextureName(materialData.getMetallicRoughnessTexture()!, this.gltfBaseName)
-          : 'white.png',
+          : 'black.png',
         txRoughness: materialData.getMetallicRoughnessTexture()
           ? this.getTextureName(materialData.getMetallicRoughnessTexture()!, this.gltfBaseName)
           : 'white.png',
         txEmissive: materialData.getEmissiveTexture()
           ? this.getTextureName(materialData.getEmissiveTexture()!, this.gltfBaseName)
-          : 'black.png',
+          : hasEmissive
+            ? 'white.png'
+            : 'black.png',
       },
       baseColorFactor: materialData.getBaseColorFactor() || [1, 1, 1, 1],
       metallicFactor: materialData.getMetallicFactor() || 1,
@@ -161,7 +174,6 @@ export class GLTFLoader {
     };
 
     material = this.addTechniqueData(materialData, material);
-
     return material;
   }
 
@@ -196,6 +208,14 @@ export class GLTFLoader {
             ? FragmentShaderTargets.TEXTURE
             : FragmentShaderTargets.GBUFFER,
         rs: RasterizationMode.DOUBLE_SIDED,
+        z:
+          materialData.getAlphaMode() === 'BLEND'
+            ? DepthModes.TEST_BUT_NO_WRITE
+            : DepthModes.DEFAULT,
+        blend:
+          materialData.getAlphaMode() === 'BLEND'
+            ? BlendModes.ADDITIVE_BY_SRC_ALPHA
+            : BlendModes.DEFAULT,
       };
     } else {
       material.technique = technique;

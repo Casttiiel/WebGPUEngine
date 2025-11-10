@@ -1,18 +1,18 @@
-1. Change physics engine to ammo.js
-
+Change physics engine to ammo.js
 -----------------------------------Graphics Engine Backlog-----------------------------------
-More scenes
-Directional light: Positioning/Rotation
-Directional light: Shadows correctness
-Automatic geometry instancing
+Froxel Scattering
+Spawn particles on GPU
 Motion Blur
 TAA: Anti-aliasing temporal
 Auto exposure
-Froxel Scattering
+Directional light: Positioning/Rotation
+Directional light: Shadows correctness
+GLTF Loader: Alpha Cutoff/Transparent number -> Should be a distorsion, pero que pasa con metallic/roughness/reflejos?
 
------------------------------------Game Engine Backlog-----------------------------------
-Animations
+--------------------------------Game Engine Backlog-----------------------------------
+Automatic geometry instancing
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
+Animations
 Grain
 Depth of Field (DOF)
 Lens Flare
