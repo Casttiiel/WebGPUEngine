@@ -44,10 +44,10 @@ fn vs(input: VertexInput) -> VertexOutput {
     let quadOffset = (cameraRight * input.position.x + cameraUp * input.position.y);
 
     // Posición final en mundo: posición de la partícula + offset del quad
-    let worldPos = object.modelMatrix * vec4<f32>(particle.position, 1.0);
+    let worldPos = object.modelMatrix * vec4<f32>(quadOffset, 1.0);
 
     // Transformar a espacio clip usando las matrices de cámara
-    let clipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(worldPos.xyz + quadOffset, 1.0);
+    let clipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(worldPos.xyz + particle.position, 1.0);
 
     var output: VertexOutput;
     output.position = clipPos;

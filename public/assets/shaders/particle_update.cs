@@ -32,8 +32,9 @@ struct SimulationParams {
 };
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
-@group(0) @binding(1) var<uniform> simParams: SimulationParams;
-@group(0) @binding(2) var<storage, read_write> indirectArgs: IndirectDrawArgs;
+@group(0) @binding(1) var<storage, read_write> indirectArgs: IndirectDrawArgs;
+@group(0) @binding(2) var<uniform> simParams: SimulationParams;
+@group(0) @binding(3) var<storage, read_write> spawnCounter: atomic<u32>; // Dummy para layout compartido
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -64,14 +65,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Escribir la partícula actualizada de vuelta al buffer
     particles[index] = particle;
     
-    // Thread 0 cuenta las partículas vivas y actualiza instanceCount
-    if (index == 0u) {
-        var aliveCount: u32 = 0u;
-        for (var i = 0u; i < arrayLength(&particles); i++) {
-            if (particles[i].alive == 1u) {
-                aliveCount += 1u;
-            }
-        }
-        indirectArgs.instanceCount = aliveCount;
-    }
+    // Ya NO contamos partículas vivas aquí - el shader compact lo hace
 }

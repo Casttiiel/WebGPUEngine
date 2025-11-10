@@ -12,7 +12,7 @@ import { ResourceManager } from '../../core/engine/ResourceManager';
  * for efficient rendering of dynamic particle counts
  */
 export class ParticleSystemComponent extends Component {
-  private static readonly MAX_PARTICLES = 4; // ejemplo sencillo
+  private static readonly MAX_PARTICLES = 1024; // Aumentado para spawn system
   private quadMesh!: Mesh;
   private particleMaterial!: Material;
   private transform!: TransformComponent;
@@ -21,10 +21,22 @@ export class ParticleSystemComponent extends Component {
   private renderBindGroup!: GPUBindGroup;
   private renderComponent!: RenderComponent;
 
-  // Compute shader resources
-  private computePipeline!: GPUComputePipeline;
-  private computeBindGroup!: GPUBindGroup;
+  // Compute shader resources (update particles)
+  private updatePipeline!: GPUComputePipeline;
+  private updateBindGroup!: GPUBindGroup;
   private simulationParamsBuffer!: GPUBuffer;
+
+  // Spawn/compact shader resources
+  private spawnPipeline!: GPUComputePipeline;
+  private compactPipeline!: GPUComputePipeline;
+  private spawnCompactBindGroup!: GPUBindGroup;
+  private spawnParamsBuffer!: GPUBuffer;
+  private spawnCounterBuffer!: GPUBuffer;
+
+  // Spawn timing
+  private spawnTimer: number = 0;
+  private spawnInterval: number = 0.5; // Spawn cada 0.5 segundos
+  private particlesPerSpawn: number = 5; // 5 partículas por spawn
 
   constructor() {
     super();
@@ -47,39 +59,17 @@ export class ParticleSystemComponent extends Component {
         ParticleSystemComponent.MAX_PARTICLES * PARTICLE_SIZE_FLOATS,
       );
 
-      // Inicializar primeras 4 partículas como vivas con diferentes configuraciones
-      const particles = [
-        { pos: [-1, 0, 2], vel: [0, 0, 0], lifetime: 10.0 }, // Partícula 0
-        { pos: [1, 1, 2], vel: [0, 0, 0], lifetime: 5.0 }, // Partícula 1
-        { pos: [1, 0, -2], vel: [0, 0, 0], lifetime: 10.0 }, // Partícula 2
-        { pos: [-1, 0, -2], vel: [0, 0, 0], lifetime: 10.0 }, // Partícula 3
-      ];
-
-      for (let i = 0; i < particles.length; i++) {
+      // Inicializar TODAS las partículas como muertas (alive = 0)
+      // El sistema de spawn las irá activando automáticamente
+      const uint32View = new Uint32Array(particleData.buffer);
+      for (let i = 0; i < ParticleSystemComponent.MAX_PARTICLES; i++) {
         const offset = i * PARTICLE_SIZE_FLOATS;
-        const p = particles[i]!; // Non-null assertion ya que sabemos que existe
+        // position, velocity, lifetime, age = 0 por defecto (Float32Array inicia en 0)
 
-        particleData[offset + 0] = p.pos[0]!; // position.x
-        particleData[offset + 1] = p.pos[1]!; // position.y
-        particleData[offset + 2] = p.pos[2]!; // position.z
-        particleData[offset + 3] = 0; // padding1
-
-        particleData[offset + 4] = p.vel[0]!; // velocity.x
-        particleData[offset + 5] = p.vel[1]!; // velocity.y
-        particleData[offset + 6] = p.vel[2]!; // velocity.z
-        particleData[offset + 7] = p.lifetime; // lifetime
-
-        particleData[offset + 8] = 0.0; // age (empieza en 0)
-
-        // active y padding como uint32, pero los escribimos en el Float32Array
-        const uint32View = new Uint32Array(particleData.buffer);
+        // active = 0 (muerta)
         const uint32Offset = offset + 9;
-        uint32View[uint32Offset + 0] = 1; // active = 1 (viva)
-        uint32View[uint32Offset + 1] = 0; // padding2
-        uint32View[uint32Offset + 2] = 0; // padding3
+        uint32View[uint32Offset + 0] = 0; // alive = 0
       }
-
-      // El resto de partículas quedan con active = 0 (muertas) por defecto
 
       this.particleBuffer = device.createBuffer({
         label: 'particle_storage_buffer',
@@ -91,7 +81,7 @@ export class ParticleSystemComponent extends Component {
       // 3. Crear buffer indirecto (indexCount, instanceCount, firstIndex, baseVertex, firstInstance)
       const indirectArgs = new Uint32Array([
         6, // indexCount (quad)
-        4, // instanceCount (empezamos con 4 partículas vivas)
+        0, // instanceCount (empezamos con 0, el spawn las irá creando)
         0, // firstIndex
         0, // baseVertex
         0, // firstInstance
@@ -147,34 +137,103 @@ export class ParticleSystemComponent extends Component {
   private async createComputePipeline(): Promise<void> {
     const device = GPUUtils.getDevice();
 
-    // 1. Crear buffer para parámetros de simulación
+    // 1. Crear buffers para parámetros de simulación y spawn
     this.simulationParamsBuffer = device.createBuffer({
       label: 'simulation_params_buffer',
-      size: 32, // Mínimo 32 bytes para uniform buffer en WebGPU
+      size: 32, // deltaTime + padding
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // 2. Cargar el shader del compute
-
-    const shaderCode = await ResourceManager.loadShader('particle_update.cs');
-    const computeShader = device.createShaderModule({
-      label: 'particle_update_cs',
-      code: shaderCode,
+    this.spawnParamsBuffer = device.createBuffer({
+      label: 'spawn_params_buffer',
+      size: 16, // spawnCount, randomSeed, padding x2
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // 3. Crear compute pipeline
-    this.computePipeline = device.createComputePipeline({
+    this.spawnCounterBuffer = device.createBuffer({
+      label: 'spawn_counter_buffer',
+      size: 4, // atomic<u32>
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    // 2. Crear SHARED bind group layout explícito para evitar incompatibilidades
+    const sharedBindGroupLayout = device.createBindGroupLayout({
+      label: 'shared_particle_layout',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'storage' }, // read_write particles
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'storage' }, // read_write indirectArgs
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' }, // spawn/sim params (dual purpose)
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'storage' }, // spawnCounter (atomic)
+        },
+      ],
+    });
+
+    // 3. Crear pipeline layout compartido
+    const sharedPipelineLayout = device.createPipelineLayout({
+      label: 'shared_particle_pipeline_layout',
+      bindGroupLayouts: [sharedBindGroupLayout],
+    });
+
+    // 4. Cargar shaders
+    const updateShaderCode = await ResourceManager.loadShader('particle_update.cs');
+    const spawnCompactShaderCode = await ResourceManager.loadShader('particle_spawn_compact.cs');
+
+    const updateShader = device.createShaderModule({
+      label: 'particle_update_cs',
+      code: updateShaderCode,
+    });
+
+    const spawnCompactShader = device.createShaderModule({
+      label: 'particle_spawn_compact_cs',
+      code: spawnCompactShaderCode,
+    });
+
+    // 5. Crear pipelines con el layout compartido
+    this.updatePipeline = device.createComputePipeline({
       label: 'particle_update_pipeline',
-      layout: 'auto',
+      layout: sharedPipelineLayout,
       compute: {
-        module: computeShader,
+        module: updateShader,
         entryPoint: 'main',
       },
     });
 
-    // 4. Crear bind group para el compute shader
-    this.computeBindGroup = device.createBindGroup({
-      layout: this.computePipeline.getBindGroupLayout(0),
+    this.spawnPipeline = device.createComputePipeline({
+      label: 'particle_spawn_pipeline',
+      layout: sharedPipelineLayout,
+      compute: {
+        module: spawnCompactShader,
+        entryPoint: 'spawn',
+      },
+    });
+
+    this.compactPipeline = device.createComputePipeline({
+      label: 'particle_compact_pipeline',
+      layout: sharedPipelineLayout,
+      compute: {
+        module: spawnCompactShader,
+        entryPoint: 'compact',
+      },
+    });
+
+    // 6. Crear bind groups (uno para update, otro para spawn/compact)
+    this.updateBindGroup = device.createBindGroup({
+      layout: sharedBindGroupLayout,
       entries: [
         {
           binding: 0,
@@ -182,125 +241,108 @@ export class ParticleSystemComponent extends Component {
         },
         {
           binding: 1,
-          resource: { buffer: this.simulationParamsBuffer },
+          resource: { buffer: this.indirectDrawBuffer },
         },
         {
           binding: 2,
+          resource: { buffer: this.simulationParamsBuffer },
+        },
+        {
+          binding: 3,
+          resource: { buffer: this.spawnCounterBuffer },
+        },
+      ],
+    });
+
+    this.spawnCompactBindGroup = device.createBindGroup({
+      layout: sharedBindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: this.particleBuffer },
+        },
+        {
+          binding: 1,
           resource: { buffer: this.indirectDrawBuffer },
+        },
+        {
+          binding: 2,
+          resource: { buffer: this.spawnParamsBuffer }, // Usa spawnParams en lugar de simParams
+        },
+        {
+          binding: 3,
+          resource: { buffer: this.spawnCounterBuffer },
         },
       ],
     });
   }
 
   public override update(deltaTime: number): void {
-    // Actualizar parámetros de simulación (32 bytes = 8 floats)
-    const simParams = new Float32Array([deltaTime, 0, 0, 0, 0, 0, 0, 0]); // deltaTime + padding para 32 bytes
     const device = GPUUtils.getDevice();
+
+    // 1. Actualizar timer de spawn
+    this.spawnTimer += deltaTime;
+
+    // 2. Preparar parámetros de simulación (update shader)
+    const simParams = new Float32Array([deltaTime, 0, 0, 0, 0, 0, 0, 0]);
     device.queue.writeBuffer(this.simulationParamsBuffer, 0, simParams);
 
-    // Ejecutar compute shader
-    const commandEncoder = device.createCommandEncoder({ label: 'Particle Update' });
-    const computePass = commandEncoder.beginComputePass({ label: 'Particle Update Pass' });
+    // 3. Ejecutar UPDATE shader (actualiza física y lifetime)
+    const updateEncoder = device.createCommandEncoder({ label: 'Particle Update' });
+    const updatePass = updateEncoder.beginComputePass({ label: 'Update Pass' });
 
-    computePass.setPipeline(this.computePipeline);
-    computePass.setBindGroup(0, this.computeBindGroup);
+    updatePass.setPipeline(this.updatePipeline);
+    updatePass.setBindGroup(0, this.updateBindGroup);
 
-    // Dispatch workgroups (64 partículas por workgroup)
-    const numWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
-    computePass.dispatchWorkgroups(numWorkgroups);
+    const updateWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
+    updatePass.dispatchWorkgroups(updateWorkgroups);
 
-    computePass.end();
-    device.queue.submit([commandEncoder.finish()]);
-  }
+    updatePass.end();
+    device.queue.submit([updateEncoder.finish()]);
 
-  /**
-   * Spawn una nueva partícula en el primer slot muerto disponible
-   * @param position Posición inicial de la partícula
-   * @param velocity Velocidad inicial de la partícula
-   * @param lifetime Tiempo de vida en segundos
-   * @returns true si se pudo spawn, false si no hay slots disponibles
-   */
-  public spawnParticle(
-    position: [number, number, number],
-    velocity: [number, number, number],
-    lifetime: number,
-  ): boolean {
-    const device = GPUUtils.getDevice();
-    const PARTICLE_SIZE_FLOATS = 12; // 48 bytes / 4 bytes por float
+    // 4. Verificar si es momento de spawn
+    if (this.spawnTimer >= this.spawnInterval) {
+      this.spawnTimer = 0;
 
-    // Crear buffer temporal para leer datos actuales de partículas
-    const readBuffer = device.createBuffer({
-      label: 'particle_read_buffer',
-      size: this.particleBuffer.size,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    });
+      // Preparar parámetros de spawn
+      const spawnParams = new Uint32Array(4);
+      spawnParams[0] = this.particlesPerSpawn; // spawnCount
+      // randomSeed como float32
+      const seedFloat = Math.random() * 10000.0;
+      const seedView = new Float32Array(spawnParams.buffer);
+      seedView[1] = seedFloat;
 
-    // Copiar datos del particle buffer al read buffer
-    const commandEncoder = device.createCommandEncoder({ label: 'Copy Particle Data' });
-    commandEncoder.copyBufferToBuffer(
-      this.particleBuffer,
-      0,
-      readBuffer,
-      0,
-      this.particleBuffer.size,
-    );
-    device.queue.submit([commandEncoder.finish()]);
+      device.queue.writeBuffer(this.spawnParamsBuffer, 0, spawnParams);
 
-    // Mapear el buffer para lectura (asíncrono)
-    readBuffer.mapAsync(GPUMapMode.READ).then(() => {
-      const particleData = new Float32Array(readBuffer.getMappedRange());
-      const uint32View = new Uint32Array(particleData.buffer);
+      // Resetear contador atómico
+      const counterData = new Uint32Array([this.particlesPerSpawn]);
+      device.queue.writeBuffer(this.spawnCounterBuffer, 0, counterData);
 
-      // Buscar primer slot muerto (active = 0)
-      let slotIndex = -1;
-      for (let i = 0; i < ParticleSystemComponent.MAX_PARTICLES; i++) {
-        const offset = i * PARTICLE_SIZE_FLOATS;
-        const uint32Offset = offset + 9;
-        const active = uint32View[uint32Offset];
+      // 5. Ejecutar SPAWN shader
+      const spawnEncoder = device.createCommandEncoder({ label: 'Particle Spawn' });
+      const spawnPass = spawnEncoder.beginComputePass({ label: 'Spawn Pass' });
 
-        if (active === 0) {
-          slotIndex = i;
-          break;
-        }
-      }
+      spawnPass.setPipeline(this.spawnPipeline);
+      spawnPass.setBindGroup(0, this.spawnCompactBindGroup);
 
-      readBuffer.unmap();
-      readBuffer.destroy();
+      const spawnWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
+      spawnPass.dispatchWorkgroups(spawnWorkgroups);
 
-      if (slotIndex === -1) {
-        console.warn('No hay slots disponibles para spawn de partícula');
-        return false;
-      }
+      spawnPass.end();
+      device.queue.submit([spawnEncoder.finish()]);
+    }
 
-      // Escribir nueva partícula en el slot encontrado
-      const offset = slotIndex * PARTICLE_SIZE_FLOATS;
-      const newParticleData = new Float32Array(PARTICLE_SIZE_FLOATS);
+    // 6. Ejecutar COMPACT shader (compactar partículas vivas)
+    const compactEncoder = device.createCommandEncoder({ label: 'Particle Compact' });
+    const compactPass = compactEncoder.beginComputePass({ label: 'Compact Pass' });
 
-      newParticleData[0] = position[0]; // position.x
-      newParticleData[1] = position[1]; // position.y
-      newParticleData[2] = position[2]; // position.z
-      newParticleData[3] = 0; // padding1
+    compactPass.setPipeline(this.compactPipeline);
+    compactPass.setBindGroup(0, this.spawnCompactBindGroup);
 
-      newParticleData[4] = velocity[0]; // velocity.x
-      newParticleData[5] = velocity[1]; // velocity.y
-      newParticleData[6] = velocity[2]; // velocity.z
-      newParticleData[7] = lifetime; // lifetime
+    compactPass.dispatchWorkgroups(1); // Single-threaded para evitar race conditions
 
-      newParticleData[8] = 0.0; // age (empieza en 0)
-
-      const newUint32View = new Uint32Array(newParticleData.buffer);
-      newUint32View[9] = 1; // active = 1 (viva)
-      newUint32View[10] = 0; // padding2
-      newUint32View[11] = 0; // padding3
-
-      // Escribir al buffer GPU
-      device.queue.writeBuffer(this.particleBuffer, offset * 4, newParticleData);
-
-      console.log(`Partícula spawneada en slot ${slotIndex}`);
-      return true;
-    });
-
-    return true; // Retornar true inmediatamente (el spawn es asíncrono)
+    compactPass.end();
+    device.queue.submit([compactEncoder.finish()]);
   }
 
   public override renderInMenu(): void {
@@ -316,5 +358,7 @@ export class ParticleSystemComponent extends Component {
     this.particleBuffer?.destroy();
     this.indirectDrawBuffer?.destroy();
     this.simulationParamsBuffer?.destroy();
+    this.spawnParamsBuffer?.destroy();
+    this.spawnCounterBuffer?.destroy();
   }
 }

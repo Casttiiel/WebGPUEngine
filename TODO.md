@@ -5,14 +5,14 @@
 2. Change physics engine to ammo.js
 
 -----------------------------------Graphics Engine Backlog-----------------------------------
-Auto exposure
 More scenes
 Fix skybox
 Automatic geometry instancing
-Motion Blur
 Directional light: Positioning/Rotation
 Directional light: Shadows correctness
+Motion Blur
 TAA: Anti-aliasing temporal
+Auto exposure
 Froxel Scattering
 
 -----------------------------------Game Engine Backlog-----------------------------------
