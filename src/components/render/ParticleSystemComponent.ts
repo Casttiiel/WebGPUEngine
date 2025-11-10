@@ -6,6 +6,7 @@ import { TransformComponent } from '../core/TransformComponent';
 import { RenderComponent } from './RenderComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { ResourceManager } from '../../core/engine/ResourceManager';
+import { Engine } from '../../core/engine/Engine';
 
 /**
  * ParticleSystemComponent - GPU-driven particle system using indirect draw
@@ -35,8 +36,8 @@ export class ParticleSystemComponent extends Component {
 
   // Spawn timing
   private spawnTimer: number = 0;
-  private spawnInterval: number = 0.5; // Spawn cada 0.5 segundos
-  private particlesPerSpawn: number = 5; // 5 partículas por spawn
+  private spawnInterval: number = 1.5; // Spawn cada 0.5 segundos
+  private particlesPerSpawn: number = 20; // 5 partículas por spawn
 
   constructor() {
     super();
@@ -304,19 +305,27 @@ export class ParticleSystemComponent extends Component {
     if (this.spawnTimer >= this.spawnInterval) {
       this.spawnTimer = 0;
 
-      // Preparar parámetros de spawn
-      const spawnParams = new Uint32Array(4);
-      spawnParams[0] = this.particlesPerSpawn; // spawnCount
-      // randomSeed como float32
-      const seedFloat = Math.random() * 10000.0;
-      const seedView = new Float32Array(spawnParams.buffer);
-      seedView[1] = seedFloat;
+      // Preparar parámetros de spawn - struct tiene: u32 spawnCount, f32 randomSeed, f32 padding1, f32 padding2
+      const spawnParamsBuffer = new ArrayBuffer(16); // 4 floats = 16 bytes
+      const uint32View = new Uint32Array(spawnParamsBuffer);
+      const float32View = new Float32Array(spawnParamsBuffer);
 
-      device.queue.writeBuffer(this.spawnParamsBuffer, 0, spawnParams);
+      uint32View[0] = this.particlesPerSpawn; // spawnCount (u32)
+      float32View[1] = Math.random() * 10000.0; // randomSeed (f32)
+      float32View[2] = 0; // padding1
+      float32View[3] = 0; // padding2
+
+      device.queue.writeBuffer(this.spawnParamsBuffer, 0, spawnParamsBuffer);
 
       // Resetear contador atómico
       const counterData = new Uint32Array([this.particlesPerSpawn]);
       device.queue.writeBuffer(this.spawnCounterBuffer, 0, counterData);
+
+      console.log(`[ParticleSystem] 🔵 Spawning ${this.particlesPerSpawn} particles`);
+
+      // IMPORTANTE: Los writeBuffer se ejecutan en la queue, pero necesitamos
+      // asegurarnos de que se completen ANTES del compute shader
+      // Sin embargo, WebGPU garantiza el orden de operaciones en la misma queue
 
       // 5. Ejecutar SPAWN shader
       const spawnEncoder = device.createCommandEncoder({ label: 'Particle Spawn' });
@@ -332,7 +341,7 @@ export class ParticleSystemComponent extends Component {
       device.queue.submit([spawnEncoder.finish()]);
     }
 
-    // 6. Ejecutar COMPACT shader (compactar partículas vivas)
+    // 6. Ejecutar COMPACT shader (ahora solo cuenta partículas vivas, no compacta)
     const compactEncoder = device.createCommandEncoder({ label: 'Particle Compact' });
     const compactPass = compactEncoder.beginComputePass({ label: 'Compact Pass' });
 
@@ -346,7 +355,25 @@ export class ParticleSystemComponent extends Component {
   }
 
   public override renderInMenu(): void {
-    // TODO: Add debug controls for particle positions and animation speed
+    const debugUI = Engine.getDebugUI();
+    const folderName = `Particle System (${this.getOwner().getName()})`;
+
+    // Spawn controls
+    debugUI.addInteractiveControl(folderName, this, 'spawnInterval', 'Spawn Interval (s)', {
+      min: 0.1,
+      max: 5.0,
+      step: 0.1,
+    });
+
+    debugUI.addInteractiveControl(folderName, this, 'particlesPerSpawn', 'Particles per Spawn', {
+      min: 1,
+      max: 50,
+      step: 1,
+    });
+
+    // Info (read-only)
+    const stats = { maxParticles: ParticleSystemComponent.MAX_PARTICLES };
+    debugUI.addDebugControl(folderName, stats, 'maxParticles', 'Max Particles');
   }
 
   public override renderDebug(): void {

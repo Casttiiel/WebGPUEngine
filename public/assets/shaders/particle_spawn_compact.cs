@@ -55,18 +55,22 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
     
-    // Si esta partícula está muerta y aún quedan spawns por hacer
-    if (particles[index].alive == 0u && atomicLoad(&spawnCounter) > 0u) {
-        // Intentar decrementar el contador atómicamente
+    // Solo spawneamos si esta partícula está muerta
+    if (particles[index].alive == 0u) {
+        // Decrementar contador atómicamente PRIMERO
         let oldCount = atomicSub(&spawnCounter, 1u);
         
-        if (oldCount > 0u) {
+        // CRÍTICO: Verificar que oldCount era >= 1 ANTES del decremento
+        // Si oldCount era 0, el resultado de atomicSub es 4294967295 (underflow)
+        // Por lo tanto, necesitamos verificar que oldCount <= spawnCount original
+        // para evitar false positives por underflow
+        if (oldCount > 0u && oldCount <= 1024u) {  // 1024 = MAX_PARTICLES, límite razonable
             // Generamos números aleatorios basados en el índice y seed
             let seedBase = u32(spawnParams.randomSeed * 1000.0) + index;
             
-            let randomX = (randomFloat(seedBase) - 0.5) * 8.0;
-            let randomZ = (randomFloat(seedBase + 1000u) - 0.5) * 8.0;
-            let randomLifetime = 3.0 + randomFloat(seedBase + 2000u) * 7.0; // 3-10 segundos
+            let randomX = (randomFloat(seedBase) - 0.5) * 2.0;
+            let randomZ = (randomFloat(seedBase + 1000u) - 0.5) * 2.0;
+            let randomLifetime = 3.0 + randomFloat(seedBase + 2000u) * 2.0; // 3-5 segundos
             
             // Inicializar nueva partícula
             particles[index].position = vec3<f32>(randomX, 5.0, randomZ);
@@ -75,7 +79,7 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
             particles[index].age = 0.0;
             particles[index].alive = 1u;
         } else {
-            // No pudimos decrementar, restaurar el contador
+            // No había spawns disponibles o underflow detectado, restaurar el contador
             atomicAdd(&spawnCounter, 1u);
         }
     }
