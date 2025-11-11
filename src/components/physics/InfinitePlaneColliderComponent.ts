@@ -1,14 +1,28 @@
+import RAPIER from '@dimforge/rapier3d';
 import { Component } from '../../core/ecs/Component';
-import { vec3 } from 'gl-matrix';
+import { vec3, quat } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
-import * as CANNON from 'cannon-es';
 import { Engine } from '../../core/engine/Engine';
 
+export interface InfinitePlaneColliderData {
+  normal?: vec3; // Normal del plano (por defecto [0, 1, 0] = suelo)
+  friction?: number;
+  restitution?: number;
+  position?: vec3;
+  rotation?: quat;
+}
+
+/**
+ * InfinitePlaneColliderComponent - Collider de plano infinito
+ *
+ * Usa un halfspace de Rapier para simular un plano infinito.
+ * IMPORTANTE: Los planos infinitos siempre son estáticos.
+ */
 export class InfinitePlaneColliderComponent extends Component {
-  private body!: CANNON.Body;
+  private rigidBody!: RAPIER.RigidBody;
+  private collider!: RAPIER.Collider;
   private transform!: TransformComponent;
   private normal: vec3;
-  private material!: CANNON.Material;
 
   constructor() {
     super();
@@ -16,81 +30,96 @@ export class InfinitePlaneColliderComponent extends Component {
     this.normal = vec3.fromValues(0, 1, 0);
   }
 
-  public async load(data: any): Promise<void> {
+  public async load(data: InfinitePlaneColliderData): Promise<void> {
     this.transform = this.getOwner().getComponent('transform') as TransformComponent;
     if (!this.transform) {
       throw new Error('InfinitePlaneCollider requires a TransformComponent');
     }
 
-    // Crear material físico
-    this.material = new CANNON.Material();
-    if (data.material) {
-      this.material.friction = data.material.friction || 0.3;
-      this.material.restitution = data.material.restitution || 0.3;
+    // Configurar normal del plano
+    if (data.normal) {
+      vec3.copy(this.normal, data.normal);
+      vec3.normalize(this.normal, this.normal);
     }
 
     // Obtener transformación mundial
-    const worldPosition = this.transform.getTransform().getWorldPosition();
-    const worldRotation = this.transform.getTransform().getWorldRotation();
+    const worldPosition = data.position || this.transform.getTransform().getWorldPosition();
+    const worldRotation = data.rotation || this.transform.getTransform().getWorldRotation();
 
-    // El plano en CANNON.js por defecto mira en dirección Z (0,0,1)
-    // Primero rotamos -90 grados en X para que mire hacia arriba
-    const baseRotation = new CANNON.Quaternion();
-    baseRotation.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+    const physics = Engine.getPhysics();
 
-    // Luego aplicamos la rotación del objeto
-    const objectRotation = new CANNON.Quaternion(
-      worldRotation[0],
-      worldRotation[1],
-      worldRotation[2],
-      worldRotation[3],
+    // Los planos infinitos son siempre estáticos
+    this.rigidBody = physics.createStaticBody(this.getOwner().id, worldPosition);
+
+    // Aplicar rotación
+    this.rigidBody.setRotation(
+      { x: worldRotation[0], y: worldRotation[1], z: worldRotation[2], w: worldRotation[3] },
+      true,
     );
 
-    // Combinar rotaciones: primero la base, luego la del objeto
-    const finalRotation = objectRotation.mult(baseRotation);
+    // Crear un cuboid muy grande y plano para simular un plano infinito
+    // En Rapier no hay halfspace, así que usamos un box de 1000x0.1x1000
+    const colliderDesc = RAPIER.ColliderDesc.cuboid(
+      1000.0, // Ancho enorme
+      0.1, // Altura muy pequeña
+      1000.0, // Profundidad enorme
+    );
 
-    // Crear cuerpo físico
-    this.body = new CANNON.Body({
-      mass: 0, // Los planos infinitos siempre son estáticos
-      material: this.material,
-      shape: new CANNON.Plane(),
-      position: new CANNON.Vec3(worldPosition[0], worldPosition[1], worldPosition[2]),
-      quaternion: finalRotation, // Rotación combinada: -90º en X + rotación del objeto
-    });
-
-    // Registrar en el sistema de física
-    const physics = Engine.getPhysics();
-    if (physics) {
-      physics.addBody(this.body, this.getOwner().id);
+    // Configurar propiedades físicas
+    if (data.friction !== undefined) {
+      colliderDesc.setFriction(data.friction);
+    } else {
+      colliderDesc.setFriction(0.3); // Fricción por defecto
     }
+
+    if (data.restitution !== undefined) {
+      colliderDesc.setRestitution(data.restitution);
+    } else {
+      colliderDesc.setRestitution(0.3); // Rebote por defecto
+    }
+
+    // Crear el collider
+    this.collider = physics.getWorld().createCollider(colliderDesc, this.rigidBody);
+
+    // Registrar collider manualmente
+    const entityId = this.getOwner().id;
+    const colliders = physics['colliders'] as Map<number, RAPIER.Collider[]>;
+    if (!colliders.has(entityId)) {
+      colliders.set(entityId, []);
+    }
+    colliders.get(entityId)!.push(this.collider);
   }
 
-  public update(deltaTime: number): void {
+  public update(_deltaTime: number): void {
     // Los planos infinitos son estáticos, no necesitan actualización
   }
 
   public dispose(): void {
     // Limpiar el cuerpo físico del mundo
     const physics = Engine.getPhysics();
-    if (physics && this.body) {
+    if (physics && this.rigidBody) {
       physics.removeBody(this.getOwner().id);
     }
   }
 
   // Getters útiles
-  public getBody(): CANNON.Body {
-    return this.body;
+  public getRigidBody(): RAPIER.RigidBody {
+    return this.rigidBody;
+  }
+
+  public getCollider(): RAPIER.Collider {
+    return this.collider;
   }
 
   public getNormal(): vec3 {
     return this.normal;
   }
 
-  public getMaterial(): CANNON.Material {
-    return this.material;
+  public override renderDebug(): void {
+    // TODO: Implementar debug rendering (visualización del plano)
   }
 
-  public renderDebug(): void {}
-
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void {
+    // TODO: Implementar debug UI
+  }
 }

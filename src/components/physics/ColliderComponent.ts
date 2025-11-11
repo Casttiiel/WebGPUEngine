@@ -1,155 +1,341 @@
-import * as CANNON from 'cannon-es';
+import RAPIER from '@dimforge/rapier3d';
 import { vec3, quat } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
 
-export interface ColliderData {
-  mass?: number;
-  material?: {
-    friction?: number;
-    restitution?: number;
-  };
-  isTrigger?: boolean;
-  position?: vec3;
-  rotation?: quat;
+/**
+ * Tipo de cuerpo rígido
+ */
+export enum RigidBodyType {
+  DYNAMIC = 'dynamic', // Cuerpo dinámico (afectado por física)
+  STATIC = 'static', // Cuerpo estático (no se mueve)
+  KINEMATIC = 'kinematic', // Cuerpo cinemático (plataformas móviles)
 }
 
-export abstract class ColliderComponent extends Component {
-  protected body!: CANNON.Body;
-  protected shape!: CANNON.Shape;
-  protected isTrigger: boolean = false;
-  protected material!: CANNON.Material;
+/**
+ * Tipo de collider
+ */
+export enum ColliderType {
+  CUBOID = 'cuboid', // Caja
+  SPHERE = 'sphere', // Esfera
+  CAPSULE = 'capsule', // Cápsula (ideal para personajes)
+}
+
+/**
+ * Datos de configuración del collider
+ */
+export interface ColliderData {
+  // Tipo de cuerpo rígido
+  bodyType?: RigidBodyType;
+
+  // Tipo de collider
+  colliderType: ColliderType;
+
+  // Propiedades físicas
+  mass?: number;
+  friction?: number;
+  restitution?: number; // Rebote (0 = no rebota, 1 = rebota completamente)
+  density?: number; // Densidad (alternativa a mass)
+
+  // Trigger (sensor que no genera colisión física)
+  isSensor?: boolean;
+
+  // CCD (Continuous Collision Detection) para objetos rápidos
+  enableCCD?: boolean;
+
+  // Dimensiones del collider según el tipo
+  // Para CUBOID: halfExtents [x, y, z]
+  // Para SPHERE: radius
+  // Para CAPSULE: [halfHeight, radius]
+  dimensions: number[];
+
+  // Posición y rotación inicial (opcional)
+  position?: vec3;
+  rotation?: quat;
+
+  // Collision groups (para filtrado de colisiones)
+  collisionGroups?: number;
+  collisionMask?: number;
+}
+
+/**
+ * ColliderComponent - Componente base para física con Rapier
+ *
+ * Maneja la integración entre el ECS y el sistema de físicas Rapier.
+ * Sincroniza transformaciones entre entidades y cuerpos rígidos.
+ */
+export class ColliderComponent extends Component {
+  protected rigidBody!: RAPIER.RigidBody;
+  protected collider!: RAPIER.Collider;
+  protected bodyType: RigidBodyType = RigidBodyType.DYNAMIC;
+  protected colliderType: ColliderType = ColliderType.CUBOID;
+  protected isSensor: boolean = false;
+  protected enableCCD: boolean = false;
 
   constructor() {
     super();
   }
 
   public async load(data: ColliderData): Promise<void> {
-    // Crear material físico
-    this.material = new CANNON.Material({
-      friction: data.material?.friction ?? 0.3,
-      restitution: data.material?.restitution ?? 0.3,
-    });
+    this.bodyType = data.bodyType || RigidBodyType.DYNAMIC;
+    this.colliderType = data.colliderType;
+    this.isSensor = data.isSensor || false;
+    this.enableCCD = data.enableCCD || false;
 
-    // Crear cuerpo físico
-    this.body = new CANNON.Body({
-      mass: data.mass || 0,
-      type: data.mass && data.mass > 0 ? CANNON.Body.DYNAMIC : CANNON.Body.STATIC,
-      material: this.material,
-    });
-
-    // Configurar si es trigger
-    this.isTrigger = data.isTrigger || false;
-    if (this.isTrigger) {
-      this.body.collisionResponse = false;
-    }
-
-    // Si hay una forma definida en las clases hijas, añadirla
-    if (this.shape) {
-      this.body.addShape(this.shape);
-    }
-
-    // Obtener el transform del entity
+    // Obtener transform del entity
     const transformComponent = this.getOwner().getComponent('transform') as TransformComponent;
-    if (transformComponent) {
-      const position = data.position || transformComponent.getTransform().getWorldPosition();
-      const rotation = data.rotation || transformComponent.getTransform().getWorldRotation();
+    const position = data.position || transformComponent.getTransform().getWorldPosition();
+    const rotation = data.rotation || transformComponent.getTransform().getWorldRotation();
 
-      this.body.position.set(position[0], position[1], position[2]);
-      this.body.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+    const physics = Engine.getPhysics();
+
+    // Crear cuerpo rígido según el tipo
+    switch (this.bodyType) {
+      case RigidBodyType.DYNAMIC:
+        this.rigidBody = physics.createDynamicBody(this.getOwner().id, position, this.enableCCD);
+        if (data.mass !== undefined) {
+          // La masa se establece a través del collider en Rapier
+        }
+        break;
+
+      case RigidBodyType.STATIC:
+        this.rigidBody = physics.createStaticBody(this.getOwner().id, position);
+        break;
+
+      case RigidBodyType.KINEMATIC:
+        this.rigidBody = physics.createKinematicBody(this.getOwner().id, position);
+        break;
     }
 
-    // Añadir al mundo físico
-    Engine.getPhysics().addBody(this.body, this.getOwner().id);
+    // Aplicar rotación inicial
+    this.rigidBody.setRotation(
+      { x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] },
+      true,
+    );
 
-    // Configurar eventos de colisión si es trigger
-    if (this.isTrigger) {
-      this.setupCollisionEvents();
+    // Crear collider según el tipo
+    this.createCollider(data, physics);
+
+    // Configurar propiedades físicas del collider
+    if (data.friction !== undefined) {
+      this.collider.setFriction(data.friction);
+    }
+    if (data.restitution !== undefined) {
+      this.collider.setRestitution(data.restitution);
+    }
+    if (data.density !== undefined) {
+      this.collider.setDensity(data.density);
+    }
+
+    // Configurar collision groups (para filtrado)
+    if (data.collisionGroups !== undefined || data.collisionMask !== undefined) {
+      this.collider.setCollisionGroups(data.collisionGroups || 0xffffffff);
+      // TODO: Implementar collision mask cuando sea necesario
     }
   }
 
-  public update(deltaTime: number): void {
-    if (!this.body) return;
+  /**
+   * Crea el collider según el tipo especificado
+   */
+  private createCollider(data: ColliderData, physics: any): void {
+    const entityId = this.getOwner().id;
+
+    switch (this.colliderType) {
+      case ColliderType.CUBOID:
+        // dimensions = [halfX, halfY, halfZ]
+        if (data.dimensions.length !== 3) {
+          throw new Error('Cuboid collider requires 3 dimensions [halfX, halfY, halfZ]');
+        }
+        this.collider = physics.addCuboidCollider(
+          entityId,
+          this.rigidBody,
+          vec3.fromValues(data.dimensions[0]!, data.dimensions[1]!, data.dimensions[2]!),
+          this.isSensor,
+        );
+        break;
+
+      case ColliderType.SPHERE:
+        // dimensions = [radius]
+        if (data.dimensions.length !== 1) {
+          throw new Error('Sphere collider requires 1 dimension [radius]');
+        }
+        this.collider = physics.addSphereCollider(
+          entityId,
+          this.rigidBody,
+          data.dimensions[0]!,
+          this.isSensor,
+        );
+        break;
+
+      case ColliderType.CAPSULE:
+        // dimensions = [halfHeight, radius]
+        if (data.dimensions.length !== 2) {
+          throw new Error('Capsule collider requires 2 dimensions [halfHeight, radius]');
+        }
+        this.collider = physics.addCapsuleCollider(
+          entityId,
+          this.rigidBody,
+          data.dimensions[0]!, // halfHeight
+          data.dimensions[1]!, // radius
+          this.isSensor,
+        );
+        break;
+
+      default:
+        throw new Error(`Unknown collider type: ${this.colliderType}`);
+    }
+  }
+
+  public update(_deltaTime: number): void {
+    if (!this.rigidBody) return;
 
     const transformComponent = this.getOwner().getComponent('transform') as TransformComponent;
     if (!transformComponent) return;
 
-    if (this.body.mass > 0) {
+    if (this.bodyType === RigidBodyType.DYNAMIC) {
       // Si es dinámico, actualizar transform desde física
-      const pos = this.body.position;
-      const rot = this.body.quaternion;
+      const translation = this.rigidBody.translation();
+      const rotation = this.rigidBody.rotation();
 
-      transformComponent.getTransform().setLocalPosition(vec3.fromValues(pos.x, pos.y, pos.z));
-      transformComponent.getTransform().setLocalRotation([rot.x, rot.y, rot.z, rot.w]);
-    } else {
-      // Si es estático, actualizar física desde transform
+      transformComponent
+        .getTransform()
+        .setLocalPosition(vec3.fromValues(translation.x, translation.y, translation.z));
+      transformComponent
+        .getTransform()
+        .setLocalRotation([rotation.x, rotation.y, rotation.z, rotation.w]);
+    } else if (this.bodyType === RigidBodyType.KINEMATIC) {
+      // Si es cinemático, actualizar física desde transform
+      // (para mover plataformas desde código)
       const pos = transformComponent.getTransform().getWorldPosition();
       const rot = transformComponent.getTransform().getWorldRotation();
 
-      this.body.position.set(pos[0], pos[1], pos[2]);
-      this.body.quaternion.set(rot[0], rot[1], rot[2], rot[3]);
+      this.rigidBody.setNextKinematicTranslation({ x: pos[0], y: pos[1], z: pos[2] });
+      this.rigidBody.setNextKinematicRotation({ x: rot[0], y: rot[1], z: rot[2], w: rot[3] });
     }
+    // Si es estático, no necesita sincronización (no se mueve)
+  }
+
+  public renderDebug(): void {
+    // TODO: Implementar debug rendering del collider
   }
 
   public dispose(): void {
-    if (this.body) {
+    if (this.rigidBody) {
       Engine.getPhysics().removeBody(this.getOwner().id);
     }
   }
 
-  private setupCollisionEvents(): void {
-    this.body.addEventListener('collide', (event: any) => {
-      if (!this.isTrigger) return;
+  // ==================== Getters ====================
 
-      // TODO: Implementar sistema de eventos para triggers
-      console.log('Trigger collision:', event);
-    });
+  public getRigidBody(): RAPIER.RigidBody {
+    return this.rigidBody;
   }
 
-  // Getters útiles
-  public getBody(): CANNON.Body {
-    return this.body;
+  public getCollider(): RAPIER.Collider {
+    return this.collider;
   }
 
-  public getShape(): CANNON.Shape {
-    return this.shape;
+  public getBodyType(): RigidBodyType {
+    return this.bodyType;
   }
 
-  public setMass(mass: number): void {
-    if (this.body) {
-      this.body.mass = mass;
-      this.body.updateMassProperties();
-      this.body.type = mass > 0 ? CANNON.Body.DYNAMIC : CANNON.Body.STATIC;
+  public isSensorCollider(): boolean {
+    return this.isSensor;
+  }
+
+  // ==================== Physics API ====================
+
+  /**
+   * Aplica una fuerza al cuerpo rígido
+   */
+  public applyForce(force: vec3, wake: boolean = true): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
+
+    this.rigidBody.addForce({ x: force[0], y: force[1], z: force[2] }, wake);
+  }
+
+  /**
+   * Aplica un impulso al cuerpo rígido (cambio instantáneo de velocidad)
+   */
+  public applyImpulse(impulse: vec3, wake: boolean = true): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
+
+    this.rigidBody.applyImpulse({ x: impulse[0], y: impulse[1], z: impulse[2] }, wake);
+  }
+
+  /**
+   * Aplica torque (rotación)
+   */
+  public applyTorque(torque: vec3, wake: boolean = true): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
+
+    this.rigidBody.addTorque({ x: torque[0], y: torque[1], z: torque[2] }, wake);
+  }
+
+  /**
+   * Establece la velocidad lineal del cuerpo
+   */
+  public setLinearVelocity(velocity: vec3, wake: boolean = true): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
+
+    this.rigidBody.setLinvel({ x: velocity[0], y: velocity[1], z: velocity[2] }, wake);
+  }
+
+  /**
+   * Obtiene la velocidad lineal del cuerpo
+   */
+  public getLinearVelocity(): vec3 {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) {
+      return vec3.create();
     }
+
+    const vel = this.rigidBody.linvel();
+    return vec3.fromValues(vel.x, vel.y, vel.z);
   }
 
-  public applyForce(force: vec3, worldPoint?: vec3): void {
-    if (!this.body || this.body.mass === 0) return;
+  /**
+   * Establece la velocidad angular del cuerpo
+   */
+  public setAngularVelocity(velocity: vec3, wake: boolean = true): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
 
-    if (worldPoint) {
-      this.body.applyForce(
-        new CANNON.Vec3(force[0], force[1], force[2]),
-        new CANNON.Vec3(worldPoint[0], worldPoint[1], worldPoint[2]),
-      );
-    } else {
-      this.body.applyForce(new CANNON.Vec3(force[0], force[1], force[2]), new CANNON.Vec3(0, 0, 0));
-    }
+    this.rigidBody.setAngvel({ x: velocity[0], y: velocity[1], z: velocity[2] }, wake);
   }
 
-  public applyImpulse(impulse: vec3, worldPoint?: vec3): void {
-    if (!this.body || this.body.mass === 0) return;
+  /**
+   * Bloquea rotaciones en ciertos ejes (útil para personajes)
+   */
+  public lockRotations(lockX: boolean, lockY: boolean, lockZ: boolean): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
 
-    if (worldPoint) {
-      this.body.applyImpulse(
-        new CANNON.Vec3(impulse[0], impulse[1], impulse[2]),
-        new CANNON.Vec3(worldPoint[0], worldPoint[1], worldPoint[2]),
-      );
-    } else {
-      this.body.applyImpulse(
-        new CANNON.Vec3(impulse[0], impulse[1], impulse[2]),
-        new CANNON.Vec3(0, 0, 0),
-      );
-    }
+    this.rigidBody.setEnabledRotations(!lockX, !lockY, !lockZ, true);
+  }
+
+  /**
+   * Habilita/deshabilita el cuerpo rígido
+   */
+  public setEnabled(enabled: boolean): void {
+    if (!this.rigidBody) return;
+
+    this.rigidBody.setEnabled(enabled);
+  }
+
+  /**
+   * Pone el cuerpo en modo sleeping (ahorro de CPU)
+   */
+  public sleep(): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
+
+    this.rigidBody.sleep();
+  }
+
+  /**
+   * Despierta el cuerpo del modo sleeping
+   */
+  public wakeUp(): void {
+    if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
+
+    this.rigidBody.wakeUp();
   }
 }
