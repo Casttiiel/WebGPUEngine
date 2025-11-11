@@ -1,6 +1,4 @@
-1. Que pasa con particulas emisivas?
-2. GLTF Loader: Alpha Cutoff/Transparent number -> Should be a distorsion, pero que pasa con metallic/roughness/reflejos?
-
+New Bloom
 -----------------------------------Graphics Engine Backlog-----------------------------------
 Directional light: Shadows correctness
 Directional light: Positioning/Rotation
@@ -33,3 +31,4 @@ Occlusion culling / Multi-Strategy Culling System
 Auto exposure
 TAA: Anti-aliasing temporal
 Mesh Collider
+Pre-multiplied Alpha Solids (Cristal)
