@@ -35,6 +35,8 @@ struct SimulationParams {
 @group(0) @binding(1) var<storage, read_write> indirectArgs: IndirectDrawArgs;
 @group(0) @binding(2) var<uniform> simParams: SimulationParams;
 @group(0) @binding(3) var<storage, read_write> spawnCounter: atomic<u32>; // Dummy para layout compartido
+@group(0) @binding(4) var<storage, read_write> freeList: array<u32>; // Stack de índices libres
+@group(0) @binding(5) var<storage, read_write> freeListCount: atomic<u32>; // Contador de slots libres
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -59,11 +61,20 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         // Comprobar si ha superado su tiempo de vida
         if (particle.age >= particle.lifetime) {
             particle.alive = 0u; // Marcar como muerta
+            
+            // OPTIMIZACIÓN: Push a free list cuando muere
+            // Esto permite que spawn haga O(1) lookups en vez de O(n) scan.
+            // Incrementar contador atómicamente para obtener slot en free list
+            let freeSlot = atomicAdd(&freeListCount, 1u);
+            
+            // Validar que no excedemos el tamaño del array
+            if (freeSlot < arrayLength(&freeList)) {
+                // Push del índice de esta partícula a la free list (stack push)
+                freeList[freeSlot] = index;
+            }
         }
     }
     
     // Escribir la partícula actualizada de vuelta al buffer
     particles[index] = particle;
-    
-    // Ya NO contamos partículas vivas aquí - el shader compact lo hace
 }

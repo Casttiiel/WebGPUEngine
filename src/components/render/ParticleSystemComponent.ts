@@ -33,6 +33,12 @@ export class ParticleSystemComponent extends Component {
   private spawnParamsBuffer!: GPUBuffer;
   private spawnCounterBuffer!: GPUBuffer;
 
+  // OPTIMIZACIÓN: Dead Particle Free List
+  // En lugar de scan linear O(n) para encontrar slots muertos,
+  // mantenemos una stack de índices disponibles para O(1) lookups.
+  private freeListBuffer!: GPUBuffer; // Array de índices libres (u32 x 1024)
+  private freeListCountBuffer!: GPUBuffer; // Contador atómico de slots libres
+
   // Spawn timing
   private spawnTimer: number = 0;
   private spawnInterval: number = 1.5; // Spawn cada 0.5 segundos
@@ -110,7 +116,33 @@ export class ParticleSystemComponent extends Component {
       });
       device.queue.writeBuffer(this.indirectDrawBuffer, 0, indirectArgs);
 
-      // 4. Crear bind group para el storage buffer (group 3, binding 0)
+      // 4. OPTIMIZACIÓN: Crear Dead Particle Free List
+      // Free list es un stack de índices de partículas muertas.
+      // Permite O(1) spawn lookups en vez de O(n) scan linear.
+      // Inicialmente todas las partículas están muertas, así que la free list
+      // contiene todos los índices [0, 1, 2, ..., 1023].
+      const freeListData = new Uint32Array(ParticleSystemComponent.MAX_PARTICLES);
+      for (let i = 0; i < ParticleSystemComponent.MAX_PARTICLES; i++) {
+        freeListData[i] = i; // Índice de la partícula
+      }
+
+      this.freeListBuffer = device.createBuffer({
+        label: 'particle_free_list',
+        size: freeListData.byteLength, // 1024 × 4 bytes = 4096 bytes
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      device.queue.writeBuffer(this.freeListBuffer, 0, freeListData);
+
+      // Contador de slots libres (inicialmente = MAX_PARTICLES)
+      const freeListCount = new Uint32Array([ParticleSystemComponent.MAX_PARTICLES]);
+      this.freeListCountBuffer = device.createBuffer({
+        label: 'particle_free_list_count',
+        size: 4, // 1 × u32 = 4 bytes
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      device.queue.writeBuffer(this.freeListCountBuffer, 0, freeListCount);
+
+      // 5. Crear bind group para el storage buffer (group 3, binding 0)
       const renderBindGroupLayout = device.createBindGroupLayout({
         entries: [
           {
@@ -174,6 +206,7 @@ export class ParticleSystemComponent extends Component {
     });
 
     // 2. Crear SHARED bind group layout explícito para evitar incompatibilidades
+    // ACTUALIZADO: Ahora incluye free list buffers para O(1) spawn lookups
     const sharedBindGroupLayout = device.createBindGroupLayout({
       label: 'shared_particle_layout',
       entries: [
@@ -196,6 +229,16 @@ export class ParticleSystemComponent extends Component {
           binding: 3,
           visibility: GPUShaderStage.COMPUTE,
           buffer: { type: 'storage' }, // spawnCounter (atomic)
+        },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'storage' }, // freeList (array<u32>)
+        },
+        {
+          binding: 5,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'storage' }, // freeListCount (atomic<u32>)
         },
       ],
     });
@@ -244,6 +287,7 @@ export class ParticleSystemComponent extends Component {
     // Esto es 10-50% más rápido que compactar el array cada frame.
 
     // 6. Crear bind groups (uno para update, otro para spawn)
+    // ACTUALIZADO: Ahora incluye free list buffers
     this.updateBindGroup = device.createBindGroup({
       layout: sharedBindGroupLayout,
       entries: [
@@ -262,6 +306,14 @@ export class ParticleSystemComponent extends Component {
         {
           binding: 3,
           resource: { buffer: this.spawnCounterBuffer },
+        },
+        {
+          binding: 4,
+          resource: { buffer: this.freeListBuffer },
+        },
+        {
+          binding: 5,
+          resource: { buffer: this.freeListCountBuffer },
         },
       ],
     });
@@ -284,6 +336,14 @@ export class ParticleSystemComponent extends Component {
         {
           binding: 3,
           resource: { buffer: this.spawnCounterBuffer },
+        },
+        {
+          binding: 4,
+          resource: { buffer: this.freeListBuffer },
+        },
+        {
+          binding: 5,
+          resource: { buffer: this.freeListCountBuffer },
         },
       ],
     });

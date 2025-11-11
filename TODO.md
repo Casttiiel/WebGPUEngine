@@ -1,9 +1,3 @@
-Particles Improvement:
-
-1. Dead Particle Free List
-   O(1) spawn lookups
-   Elimina scan linear
-
 -----------------------------------Graphics Engine Backlog-----------------------------------
 Change physics engine to ammo.js
 Directional light: Positioning/Rotation
@@ -13,7 +7,9 @@ Motion Blur
 Froxel Scattering
 Voxel Global Illumination
 
----------------------------------------Game Engine Backlog-----------------------------------
+---
+
+------------------------------------Game Engine Backlog-----------------------------------
 Automatic geometry instancing
 Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Animations
