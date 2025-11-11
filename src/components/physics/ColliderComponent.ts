@@ -20,6 +20,7 @@ export enum ColliderType {
   CUBOID = 'cuboid', // Caja
   SPHERE = 'sphere', // Esfera
   CAPSULE = 'capsule', // Cápsula (ideal para personajes)
+  TRIMESH = 'trimesh', // Malla triangular (solo estático)
 }
 
 /**
@@ -48,7 +49,12 @@ export interface ColliderData {
   // Para CUBOID: halfExtents [x, y, z]
   // Para SPHERE: radius
   // Para CAPSULE: [halfHeight, radius]
+  // Para TRIMESH: se ignora (usa vertices e indices)
   dimensions: number[];
+
+  // Datos para TRIMESH (solo si colliderType === TRIMESH)
+  vertices?: number[];
+  indices?: number[];
 
   // Posición y rotación inicial (opcional)
   position?: vec3;
@@ -94,9 +100,6 @@ export class ColliderComponent extends Component {
     switch (this.bodyType) {
       case RigidBodyType.DYNAMIC:
         this.rigidBody = physics.createDynamicBody(this.getOwner().id, position, this.enableCCD);
-        if (data.mass !== undefined) {
-          // La masa se establece a través del collider en Rapier
-        }
         break;
 
       case RigidBodyType.STATIC:
@@ -141,16 +144,26 @@ export class ColliderComponent extends Component {
   private createCollider(data: ColliderData, physics: any): void {
     const entityId = this.getOwner().id;
 
+    // Obtener la escala del transform para aplicarla al collider
+    const transformComponent = this.getOwner().getComponent('transform') as TransformComponent;
+    const scale = transformComponent.getTransform().getLocalScale();
+
     switch (this.colliderType) {
       case ColliderType.CUBOID:
         // dimensions = [halfX, halfY, halfZ]
         if (data.dimensions.length !== 3) {
           throw new Error('Cuboid collider requires 3 dimensions [halfX, halfY, halfZ]');
         }
+        // Aplicar escala del transform a las dimensiones del collider
+        const scaledHalfExtents = vec3.fromValues(
+          data.dimensions[0]! * scale[0],
+          data.dimensions[1]! * scale[1],
+          data.dimensions[2]! * scale[2],
+        );
         this.collider = physics.addCuboidCollider(
           entityId,
           this.rigidBody,
-          vec3.fromValues(data.dimensions[0]!, data.dimensions[1]!, data.dimensions[2]!),
+          scaledHalfExtents,
           this.isSensor,
         );
         break;
@@ -160,10 +173,12 @@ export class ColliderComponent extends Component {
         if (data.dimensions.length !== 1) {
           throw new Error('Sphere collider requires 1 dimension [radius]');
         }
+        // Aplicar escala promedio (para esferas, tomar el mayor componente)
+        const scaledRadius = data.dimensions[0]! * Math.max(scale[0], scale[1], scale[2]);
         this.collider = physics.addSphereCollider(
           entityId,
           this.rigidBody,
-          data.dimensions[0]!,
+          scaledRadius,
           this.isSensor,
         );
         break;
@@ -173,13 +188,71 @@ export class ColliderComponent extends Component {
         if (data.dimensions.length !== 2) {
           throw new Error('Capsule collider requires 2 dimensions [halfHeight, radius]');
         }
+        // Aplicar escala: Y para altura, X/Z para radio
+        const scaledHalfHeight = data.dimensions[0]! * scale[1]; // Y axis
+        const scaledCapsuleRadius = data.dimensions[1]! * Math.max(scale[0], scale[2]); // X/Z axis
         this.collider = physics.addCapsuleCollider(
           entityId,
           this.rigidBody,
-          data.dimensions[0]!, // halfHeight
-          data.dimensions[1]!, // radius
+          scaledHalfHeight,
+          scaledCapsuleRadius,
           this.isSensor,
         );
+        break;
+
+      case ColliderType.TRIMESH:
+        // TRIMESH: datos de vértices e índices
+        if (!data.vertices || data.vertices.length === 0) {
+          console.warn('MeshCollider: No vertices data, skipping collider creation');
+          return;
+        }
+        if (!data.indices || data.indices.length === 0) {
+          console.warn('MeshCollider: No indices data, skipping collider creation');
+          return;
+        }
+
+        // Validar que los índices sean múltiplos de 3 (triángulos)
+        if (data.indices.length % 3 !== 0) {
+          console.error('MeshCollider: Indices must be multiple of 3 (triangles)');
+          return;
+        }
+
+        // Aplicar la escala del transform a los vértices del trimesh
+        const scaledVertices = new Float32Array(data.vertices.length);
+        for (let i = 0; i < data.vertices.length; i += 3) {
+          scaledVertices[i] = data.vertices[i]! * scale[0]; // X
+          scaledVertices[i + 1] = data.vertices[i + 1]! * scale[1]; // Y
+          scaledVertices[i + 2] = data.vertices[i + 2]! * scale[2]; // Z
+        }
+
+        const indices = new Uint32Array(data.indices);
+
+        // Crear descriptor de trimesh con vértices escalados
+        const trimeshDesc = RAPIER.ColliderDesc.trimesh(scaledVertices, indices);
+
+        // Configurar propiedades
+        if (this.isSensor) {
+          trimeshDesc.setSensor(this.isSensor);
+        }
+        if (data.friction !== undefined) {
+          trimeshDesc.setFriction(data.friction);
+        }
+        if (data.restitution !== undefined) {
+          trimeshDesc.setRestitution(data.restitution);
+        }
+        if (data.collisionGroups !== undefined) {
+          trimeshDesc.setCollisionGroups(data.collisionGroups);
+        }
+
+        // Crear collider
+        this.collider = physics.getWorld().createCollider(trimeshDesc, this.rigidBody);
+
+        // Registrar manualmente en el mapa de colliders
+        const colliders = physics['colliders'] as Map<number, RAPIER.Collider[]>;
+        if (!colliders.has(entityId)) {
+          colliders.set(entityId, []);
+        }
+        colliders.get(entityId)!.push(this.collider);
         break;
 
       default:

@@ -225,9 +225,26 @@ export class GLTFLoader {
   }
 
   private static getNodeCollider(render: RenderComponentDataType): any {
+    const meshData = render.meshes[0]?.meshData;
+
+    if (!meshData) {
+      return {
+        vertices: [],
+        indices: [],
+      };
+    }
+
+    // Los datos ya vienen como TypedArrays directamente desde getArray()
+    const positionArray = meshData.attributes.POSITION as any;
+    const indexArray = meshData.indices as any;
+
+    // Convertir TypedArrays a arrays normales para Rapier
+    const vertices = positionArray ? Array.from(positionArray) : [];
+    const indices = indexArray ? Array.from(indexArray) : [];
+
     return {
-      vertices: render.meshes[0].meshData?.attributes.POSITION || [],
-      indices: render.meshes[0].meshData?.indices || [],
+      vertices,
+      indices,
     };
   }
 

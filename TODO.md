@@ -1,6 +1,6 @@
 1. Change physics engine to Rapier
-   Problema de escala de motores
-   Mesh Collider
+   Rotacion incorrecta en box?
+
 2. Emissive strength, que pasa con particulas emisivas?
 3. GLTF Loader: Alpha Cutoff/Transparent number -> Should be a distorsion, pero que pasa con metallic/roughness/reflejos?
 
@@ -35,3 +35,4 @@ Light Clustered culling + instancing
 Occlusion culling / Multi-Strategy Culling System
 Auto exposure
 TAA: Anti-aliasing temporal
+Mesh Collider

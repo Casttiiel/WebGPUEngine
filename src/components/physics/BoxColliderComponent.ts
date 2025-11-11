@@ -17,11 +17,11 @@ export class BoxColliderComponent extends ColliderComponent {
     const halfExtents = vec3.fromValues(data.size[0] / 2, data.size[1] / 2, data.size[2] / 2);
 
     // Crear configuración del collider con tipo CUBOID
-    const colliderData: ColliderData = {
+    const colliderData = {
       ...data,
       colliderType: ColliderType.CUBOID,
       dimensions: [halfExtents[0], halfExtents[1], halfExtents[2]],
-    };
+    } as ColliderData;
 
     // Llamar al load del componente base
     await super.load(colliderData);

@@ -20,12 +20,10 @@
         ]
       },
       "box_collider": {
-        "size": [1, 1, 1],
+        "size": [2, 2, 2],
         "mass": 1,
-        "material": {
-          "friction": 0.3,
-          "restitution": 0.3
-        }
+        "friction": 0.3,
+        "restitution": 0.3
       },
       "render": {
         "meshes": [
