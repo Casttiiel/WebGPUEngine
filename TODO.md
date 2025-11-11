@@ -1,4 +1,4 @@
-1. Emissive strength, que pasa con particulas emisivas?
+1. Que pasa con particulas emisivas?
 2. GLTF Loader: Alpha Cutoff/Transparent number -> Should be a distorsion, pero que pasa con metallic/roughness/reflejos?
 
 -----------------------------------Graphics Engine Backlog-----------------------------------

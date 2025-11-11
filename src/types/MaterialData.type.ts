@@ -7,6 +7,7 @@ export type MaterialDataType = Readonly<{
   baseColorFactor?: number[];
   metallicFactor?: number;
   roughnessFactor?: number;
+  emissiveFactor?: number;
   textures: MaterialTextureDataType;
   casts_shadows?: boolean;
   category: RenderCategory;

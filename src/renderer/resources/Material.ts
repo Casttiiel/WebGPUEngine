@@ -27,6 +27,7 @@ export interface MaterialBaseOptions {
   baseColorFactor?: number[];
   roughnessFactor?: number;
   metallicFactor?: number;
+  emissiveFactor?: number;
 }
 
 export type MaterialCreateOptions = MaterialBaseOptions & Omit<IGPUResourceOptions, 'type'>;
@@ -40,6 +41,7 @@ export class Material extends GPUResource {
   private baseColorFactor!: number[];
   private roughnessFactor!: number;
   private metallicFactor!: number;
+  private emissiveFactor!: number;
   private category: RenderCategory;
   private castsShadows: boolean;
   private shadows: boolean;
@@ -61,6 +63,7 @@ export class Material extends GPUResource {
     this.baseColorFactor = options.baseColorFactor ?? [1, 1, 1, 1];
     this.roughnessFactor = options.roughnessFactor ?? 1;
     this.metallicFactor = options.metallicFactor ?? 1;
+    this.emissiveFactor = options.emissiveFactor ?? 1;
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
@@ -114,6 +117,8 @@ export class Material extends GPUResource {
         materialData?.roughnessFactor !== undefined ? materialData.roughnessFactor : 1.0,
       metallicFactor:
         materialData?.metallicFactor !== undefined ? materialData.metallicFactor : 1.0,
+      emissiveFactor:
+        materialData?.emissiveFactor !== undefined ? materialData.emissiveFactor : 1.0,
       castsShadows: materialData?.casts_shadows !== undefined ? materialData.casts_shadows : true,
       shadows: materialData?.shadows !== undefined ? materialData.shadows : false,
     });
@@ -196,7 +201,7 @@ export class Material extends GPUResource {
     GPUUtils.writeBuffer(
       uniformBuffer,
       16,
-      new Float32Array([this.roughnessFactor, this.metallicFactor, 0, 0]),
+      new Float32Array([this.roughnessFactor, this.metallicFactor, this.emissiveFactor, 0]),
     );
 
     entries.push({
