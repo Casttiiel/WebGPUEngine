@@ -1,16 +1,16 @@
-SSR Mal
 -----------------------------------Graphics Engine Backlog-----------------------------------
+Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Froxel Scattering
 Motion Blur
 Directional light: Shadows correctness
 Directional light: Positioning/Rotation
-Automatic geometry instancing
-Test Camera Mixer/Use Correct camera again/TweakPane for Camera Mixer
 Animations
-Compresion de texturas? Agilizar mas la carga del motor?
-Shadow mapping (PCF/PCSS, cascaded for directional)(Unbounded number of shadow-casting point lights using shadow map cache)
+Progressive texture streaming o mip streaming
 
----------------------------------------Wishlist Backlog-----------------------------------
+---
+
+------------------------------------Wishlist Backlog-----------------------------------
+Automatic geometry instancing
 Grain
 Depth of Field (DOF)
 Lens Flare

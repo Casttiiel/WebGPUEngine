@@ -103,7 +103,7 @@ fn performScreenSpaceRayMarching(
         let currentDepth = dot(camb2obj, camera.cameraFront) / camera.cameraZFar;
         
         // Check for intersection
-        if ((currentDepth > sampledDepth && (currentDepth - sampledDepth) < ssrParams.thickness) || sampledDepth == 1.0) {
+        if ((currentDepth > sampledDepth && (currentDepth - sampledDepth) < ssrParams.thickness) && sampledDepth > startDepth) {
             // Hit! Sample color at this position
             let hitColor = textureSampleLevel(accLight, texSampler, screenUV, 0.0);
             
