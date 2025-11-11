@@ -4,9 +4,6 @@ CRÍTICO (10-50% performance gain)
 1. Eliminar Compaction Serial
    Implementar parallel stream compaction
    O usar instanced rendering sin compaction (skip dead particles en shader)
-2. Batch Command Submissions
-   1 encoder, múltiples passes
-   Reduce latency ~150-200μs/frame
 
 🟠 ALTO (5-15% gain)
 

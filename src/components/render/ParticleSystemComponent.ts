@@ -303,21 +303,10 @@ export class ParticleSystemComponent extends Component {
     // Solo escribimos el primer float (4 bytes) en lugar de todo el buffer (32 bytes)
     device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray, 0, 1);
 
-    // 3. Ejecutar UPDATE shader (actualiza física y lifetime)
-    const updateEncoder = device.createCommandEncoder({ label: 'Particle Update' });
-    const updatePass = updateEncoder.beginComputePass({ label: 'Update Pass' });
+    // Verificar si es momento de spawn
+    const shouldSpawn = this.spawnTimer >= this.spawnInterval;
 
-    updatePass.setPipeline(this.updatePipeline);
-    updatePass.setBindGroup(0, this.updateBindGroup);
-
-    const updateWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
-    updatePass.dispatchWorkgroups(updateWorkgroups);
-
-    updatePass.end();
-    device.queue.submit([updateEncoder.finish()]);
-
-    // 4. Verificar si es momento de spawn
-    if (this.spawnTimer >= this.spawnInterval) {
+    if (shouldSpawn) {
       this.spawnTimer = 0;
 
       // OPTIMIZACIÓN: Reutilizar buffer en lugar de crear nuevo cada spawn
@@ -342,36 +331,51 @@ export class ParticleSystemComponent extends Component {
       // Resetear contador atómico (reutilizar array)
       const counterData = new Uint32Array([this.particlesPerSpawn]);
       device.queue.writeBuffer(this.spawnCounterBuffer, 0, counterData);
-
-      // IMPORTANTE: Los writeBuffer se ejecutan en la queue, pero necesitamos
-      // asegurarnos de que se completen ANTES del compute shader
-      // Sin embargo, WebGPU garantiza el orden de operaciones en la misma queue
-
-      // 5. Ejecutar SPAWN shader
-      const spawnEncoder = device.createCommandEncoder({ label: 'Particle Spawn' });
-      const spawnPass = spawnEncoder.beginComputePass({ label: 'Spawn Pass' });
-
-      spawnPass.setPipeline(this.spawnPipeline);
-      spawnPass.setBindGroup(0, this.spawnCompactBindGroup);
-
-      const spawnWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
-      spawnPass.dispatchWorkgroups(spawnWorkgroups);
-
-      spawnPass.end();
-      device.queue.submit([spawnEncoder.finish()]);
     }
 
-    // 6. Ejecutar COMPACT shader (ahora solo cuenta partículas vivas, no compacta)
-    const compactEncoder = device.createCommandEncoder({ label: 'Particle Compact' });
-    const compactPass = compactEncoder.beginComputePass({ label: 'Compact Pass' });
+    // OPTIMIZACIÓN CRÍTICA: Batch Command Submissions
+    // En lugar de 3 submissions separadas (update, spawn?, compact), usamos 1 encoder
+    // con múltiples compute passes. Esto reduce latencia GPU y CPU overhead.
+    //
+    // ANTES:
+    //   - Submit 1: UPDATE  (~50-100μs overhead)
+    //   - Submit 2: SPAWN   (~50-100μs overhead)
+    //   - Submit 3: COMPACT (~50-100μs overhead)
+    //   Total overhead: 150-300μs
+    //
+    // DESPUÉS:
+    //   - Submit 1: UPDATE + SPAWN + COMPACT (~50-100μs overhead)
+    //   Total overhead: 50-100μs
+    //   Ganancia: ~100-200μs por frame
+    const encoder = device.createCommandEncoder({ label: 'Particle System' });
 
+    // Pass 1: UPDATE (actualiza física y lifetime)
+    const updatePass = encoder.beginComputePass({ label: 'Update Pass' });
+    updatePass.setPipeline(this.updatePipeline);
+    updatePass.setBindGroup(0, this.updateBindGroup);
+    const updateWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
+    updatePass.dispatchWorkgroups(updateWorkgroups);
+    updatePass.end();
+
+    // Pass 2: SPAWN (solo si toca) - crea nuevas partículas
+    if (shouldSpawn) {
+      const spawnPass = encoder.beginComputePass({ label: 'Spawn Pass' });
+      spawnPass.setPipeline(this.spawnPipeline);
+      spawnPass.setBindGroup(0, this.spawnCompactBindGroup);
+      const spawnWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
+      spawnPass.dispatchWorkgroups(spawnWorkgroups);
+      spawnPass.end();
+    }
+
+    // Pass 3: COMPACT - cuenta partículas vivas para instanceCount
+    const compactPass = encoder.beginComputePass({ label: 'Compact Pass' });
     compactPass.setPipeline(this.compactPipeline);
     compactPass.setBindGroup(0, this.spawnCompactBindGroup);
-
     compactPass.dispatchWorkgroups(1); // Single-threaded para evitar race conditions
-
     compactPass.end();
-    device.queue.submit([compactEncoder.finish()]);
+
+    // SINGLE SUBMISSION - todos los passes en un solo command buffer
+    device.queue.submit([encoder.finish()]);
   }
 
   public override renderInMenu(): void {
