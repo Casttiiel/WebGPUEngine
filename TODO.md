@@ -1,18 +1,8 @@
 Particles Improvement:
-CRÍTICO (10-50% performance gain)
-
-1. Eliminar Compaction Serial
-   Implementar parallel stream compaction
-   O usar instanced rendering sin compaction (skip dead particles en shader)
-
-🟠 ALTO (5-15% gain)
 
 1. Dead Particle Free List
    O(1) spawn lookups
    Elimina scan linear
-2. Reuse CPU Buffers
-   No allocar Float32Array cada frame
-   Reduce GC pressure
 
 -----------------------------------Graphics Engine Backlog-----------------------------------
 Change physics engine to ammo.js
