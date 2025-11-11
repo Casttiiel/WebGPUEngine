@@ -10,5 +10,5 @@
     "casts_shadows": true,
     "category": "solids",
     "shadows": false,
-    "emissiveFactor": 16
+    "emissiveFactor": 5
 }

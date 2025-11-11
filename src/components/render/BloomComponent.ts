@@ -1,646 +1,396 @@
-import { ResourceManager } from '../../core/engine/ResourceManager';
-import { Component } from '../../core/ecs/Component';
-import { Render } from '../../renderer/core/pipeline/Render';
-import { RenderTarget } from '../../renderer/resources/RenderTarget';
-import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
-import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
-import {
-  PipelineFactory,
-  ComputePipelineConfig,
-} from '../../renderer/core/factories/PipelineFactory';
+import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { BloomCombineRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
+import { RenderPassFactory } from '../../renderer/core/passes/RenderPassFactory';
+import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
+import { Render } from '../../renderer/core/pipeline/Render';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { RenderTarget } from '../../renderer/resources/RenderTarget';
+import { Texture } from '../../renderer/resources/Texture';
+import { Mesh } from '../../renderer/resources/Mesh';
+import { Technique } from '../../renderer/resources/Technique';
+import { BlurComponent } from './BlurComponent';
 
-export class BloomComponent extends Component {
-  private device: GPUDevice;
-  private isLoaded = false;
+export class BloomComponent extends BlurComponent {
+  private whiteTexture!: Texture;
+  private technique!: Technique;
+  private combineTechnique!: Technique;
+  private result!: RenderTarget;
+  private renderPassManager!: RenderPassManager;
 
-  // Compute shaders and pipelines
-  private downsampleShader!: GPUShaderModule;
-  private upsampleShader!: GPUShaderModule;
-  private combineShader!: GPUShaderModule;
-  private downsamplePipeline!: GPUComputePipeline;
-  private upsamplePipeline!: GPUComputePipeline;
-  private combinePipeline!: GPUComputePipeline;
+  // Bloom filter parameters (controlables desde Tweakpane)
+  private thresholdMin: number = 12.0; // Más alto para evitar specular común
+  private thresholdMax: number = 0.7; // Threshold más alto para HDR
+  private emissiveFactor: number = 2.0;
 
-  // Bind group layouts
-  private downsampleBindGroupLayout!: GPUBindGroupLayout;
-  private upsampleBindGroupLayout!: GPUBindGroupLayout;
-  private combineBindGroupLayout!: GPUBindGroupLayout;
+  // Additional bind groups for bloom combine operation
+  private inputTextureBindGroup!: GPUBindGroup | null;
 
-  // Mip chain and result textures
-  private mipChain: RenderTarget[] = [];
-  private accumChain: RenderTarget[] = []; // Accumulation textures for upsample
-  private fullSizeResult: RenderTarget | null = null; // Final full-size bloom result
-  private finalCombinedResult: RenderTarget | null = null; // Final combined result (original + bloom)
-  private numMips = 0;
+  private bloomCombineParamsBuffer!: GPUBuffer; // Buffer específico para parámetros del combine
+  private bloomCombineParamsBindGroup!: GPUBindGroup | null;
+  private bloomFiltersParamsBuffer!: GPUBuffer; // Buffer específico para parámetros del filter
+  private bloomFilterParamsBindGroup!: GPUBindGroup | null;
 
-  // Uniform buffers
-  private downsampleParamsBuffer!: GPUBuffer;
-
-  // Bind groups for each mip level
-  private downsampleBindGroups: GPUBindGroup[] = [];
-  private upsampleBindGroups: GPUBindGroup[] = [];
-  private combineBindGroup: GPUBindGroup | null = null;
-
-  // Sampler
-  private linearSampler!: GPUSampler;
+  private bloomTexturesBindGroup!: GPUBindGroup | null;
 
   constructor() {
     super();
-    this.device = Render.getInstance().getDevice();
+    this.renderPassManager = new RenderPassManager();
   }
 
-  public async load(): Promise<void> {
-    this.numMips = QualitySettings.getInstance().getSettings().bloomNumMips;
-    await this.initializeComputeShaders();
-    await this.createComputePipelines();
-    this.createUniformBuffers();
-    this.initializeMipChain();
-    this.isLoaded = true;
-  }
+  public override async load(): Promise<void> {
+    // Load parent blur component first
+    await super.load();
 
-  public resize(): void {
-    if (!this.isLoaded) return;
+    this.whiteTexture = await Texture.getAsync('white.png');
+    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
+    this.technique = await Technique.getAsync('bloom_filter.tech');
+    this.combineTechnique = await Technique.getAsync('bloom_combine.tech');
 
-    // Destroy existing mip chain
-    this.destroyMipChain();
+    const qualitySettings = QualitySettings.getInstance();
+    const bloomFormat = qualitySettings.getSettings().bloomTexture;
 
-    // Recreate with new dimensions
-    this.initializeMipChain();
-  }
+    this.result = new RenderTarget();
+    this.result.createRT('bloom_filter_result.dds', Render.width, Render.height, bloomFormat);
 
-  public apply(sourceTexture: GPUTextureView): GPUTextureView {
-    if (!this.isLoaded || this.mipChain.length === 0) {
-      return sourceTexture;
-    }
-
-    // Execute complete bloom pipeline with guaranteed synchronization
-    this.performDownsample(sourceTexture);
-    this.performUpsample();
-    this.performCombine(sourceTexture);
-
-    // Return the final combined result
-    return this.finalCombinedResult!.getView();
-  }
-
-  private async initializeComputeShaders(): Promise<void> {
-    // Load downsample compute shader
-    const downsampleResponse = await ResourceManager.fetch(`assets/shaders/bloom_downsample.cs`);
-    const downsampleCode = await downsampleResponse.text();
-
-    this.downsampleShader = this.device.createShaderModule({
-      label: 'Bloom Downsample Compute Shader',
-      code: downsampleCode,
-    });
-
-    // Load upsample compute shader
-    const upsampleResponse = await ResourceManager.fetch(`assets/shaders/bloom_upsample.cs`);
-    const upsampleCode = await upsampleResponse.text();
-
-    this.upsampleShader = this.device.createShaderModule({
-      label: 'Bloom Upsample Compute Shader',
-      code: upsampleCode,
-    });
-
-    // Load combine compute shader
-    const combineResponse = await ResourceManager.fetch(`assets/shaders/bloom_combine.cs`);
-    const combineCode = await combineResponse.text();
-
-    this.combineShader = this.device.createShaderModule({
-      label: 'Bloom Combine Compute Shader',
-      code: combineCode,
-    });
-  }
-
-  private async createComputePipelines(): Promise<void> {
-    // Create downsample bind group layout
-    this.downsampleBindGroupLayout = BindGroupFactory.getLayout('bloom_downsample_compute', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' }, // downsample params
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float' }, // source texture
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        sampler: { type: 'filtering' }, // filtering sampler
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-        }, // destination texture
-      },
-    ]);
-
-    // Create upsample bind group layout
-    this.upsampleBindGroupLayout = BindGroupFactory.getLayout('bloom_upsample_compute', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float' }, // source texture (smaller mip)
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        sampler: { type: 'filtering' }, // filtering sampler
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-        }, // destination texture (larger mip)
-      },
-    ]);
-
-    // Create combine bind group layout
-    this.combineBindGroupLayout = BindGroupFactory.getLayout('bloom_combine_compute', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float' }, // original texture
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        texture: { sampleType: 'float' }, // bloom texture
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        sampler: { type: 'filtering' }, // texture sampler
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-        }, // result texture
-      },
-    ]);
-
-    // Create downsample compute pipeline
-    const downsampleConfig: ComputePipelineConfig = {
-      label: 'Bloom Downsample Compute Pipeline',
-      layout: PipelineFactory.createPipelineLayout('bloom_downsample_pipeline_layout', [
-        this.downsampleBindGroupLayout,
-      ]),
-      compute: {
-        module: this.downsampleShader,
-        entryPoint: 'cs',
-      },
-    };
-
-    this.downsamplePipeline = PipelineFactory.createComputePipeline(downsampleConfig);
-
-    // Create upsample compute pipeline
-    const upsampleConfig: ComputePipelineConfig = {
-      label: 'Bloom Upsample Compute Pipeline',
-      layout: PipelineFactory.createPipelineLayout('bloom_upsample_pipeline_layout', [
-        this.upsampleBindGroupLayout,
-      ]),
-      compute: {
-        module: this.upsampleShader,
-        entryPoint: 'cs',
-      },
-    };
-
-    this.upsamplePipeline = PipelineFactory.createComputePipeline(upsampleConfig);
-
-    // Create combine compute pipeline
-    const combineConfig: ComputePipelineConfig = {
-      label: 'Bloom Combine Compute Pipeline',
-      layout: PipelineFactory.createPipelineLayout('bloom_combine_pipeline_layout', [
-        this.combineBindGroupLayout,
-      ]),
-      compute: {
-        module: this.combineShader,
-        entryPoint: 'cs',
-      },
-    };
-
-    this.combinePipeline = PipelineFactory.createComputePipeline(combineConfig);
-  }
-
-  private createUniformBuffers(): void {
-    // Create linear sampler for texture sampling
-    this.linearSampler = SamplerLibrary.bloom;
-
-    // Downsample parameters: srcResolution (vec2) + padding
-    this.downsampleParamsBuffer = GPUUtils.createBuffer(
-      'bloom_downsample_compute_params',
-      16, // 2 floats + 2 padding = 16 bytes (vec4<f32>)
+    // Create uniform buffer specifically for bloom filter parameters
+    this.bloomFiltersParamsBuffer = GPUUtils.createBuffer(
+      'bloom_filter_params_buffer',
+      16, // 4 floats * 4 bytes (threshold_min, threshold_max, emissive_factor, padding)
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-  }
 
-  private initializeMipChain(): void {
-    // Use rgba16float for compute shader compatibility
-    const bloomFormat = QualitySettings.getInstance().getSettings().bloomTexture;
-
-    const baseWidth = Render.width;
-    const baseHeight = Render.height;
-
-    // Create mip chain (each level is half the resolution)
-    for (let i = 0; i < this.numMips; i++) {
-      const mipWidth = Math.max(1, Math.floor(baseWidth / Math.pow(2, i + 1)));
-      const mipHeight = Math.max(1, Math.floor(baseHeight / Math.pow(2, i + 1)));
-
-      // Create downsample target
-      const renderTarget = new RenderTarget();
-      renderTarget.createRT(
-        `bloom_mip_${i}`,
-        mipWidth,
-        mipHeight,
-        bloomFormat,
-        false, // No MSAA for bloom textures
-        GPUTextureUsage.STORAGE_BINDING, // Allow use as storage texture in compute shaders
-      );
-      this.mipChain.push(renderTarget);
-
-      // Create accumulation target (same size as mip level)
-      const accumTarget = new RenderTarget();
-      accumTarget.createRT(
-        `bloom_accum_${i}`,
-        mipWidth,
-        mipHeight,
-        bloomFormat,
-        false, // No MSAA for bloom textures
-        GPUTextureUsage.STORAGE_BINDING, // Allow use as storage texture in compute shaders
-      );
-
-      this.accumChain.push(accumTarget);
-
-      // Create bind groups for this mip level
-      this.createBindGroupsForMip(i);
-    }
-
-    // Create full-size result texture for final bloom
-    this.fullSizeResult = new RenderTarget();
-    this.fullSizeResult.createRT(
-      'bloom_full_size_result',
-      baseWidth,
-      baseHeight,
-      bloomFormat,
-      false,
-      GPUTextureUsage.STORAGE_BINDING,
+    // Create uniform buffer specifically for bloom combine parameters
+    this.bloomCombineParamsBuffer = GPUUtils.createBuffer(
+      'bloom_combine_params_buffer',
+      16, // 4 floats * 4 bytes (threshold_min, threshold_max, emissive_factor, padding)
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
-    // Create final combined result texture (original + bloom)
-    this.finalCombinedResult = new RenderTarget();
-    this.finalCombinedResult.createRT(
-      'bloom_final_combined_result',
-      baseWidth,
-      baseHeight,
-      bloomFormat,
-      false,
-      GPUTextureUsage.STORAGE_BINDING,
-    );
+    this.updateBloomFilterParams();
+    this.updateBloomCombineParams();
   }
 
-  private createBindGroupsForMip(mipIndex: number): void {
-    // Create downsample bind group only for mipIndex > 0
-    // mipIndex === 0 always uses dynamic bind group with source texture
-    if (mipIndex > 0) {
-      const downsampleBindGroup = BindGroupFactory.createBindGroup(
-        `bloom_downsample_mip_${mipIndex}`,
-        this.downsampleBindGroupLayout,
-        [
-          {
-            binding: 0,
-            resource: { buffer: this.downsampleParamsBuffer },
-          },
-          {
-            binding: 1,
-            resource: this.mipChain[mipIndex - 1]!.getTexture().createView(), // Previous mip as source
-          },
-          {
-            binding: 2,
-            resource: this.linearSampler,
-          },
-          {
-            binding: 3,
-            resource: this.mipChain[mipIndex]!.getStorageView(), // Current mip as destination
-          },
-        ],
-      );
-      this.downsampleBindGroups[mipIndex] = downsampleBindGroup;
-    }
+  public override resize(): void {
+    super.resize();
 
-    // Create upsample bind group (for progressive upsampling)
-    if (mipIndex > 0) {
-      const upsampleBindGroup = BindGroupFactory.createBindGroup(
-        `bloom_upsample_mip_${mipIndex}`,
-        this.upsampleBindGroupLayout,
-        [
-          {
-            binding: 0,
-            resource: this.accumChain[mipIndex]!.getTexture().createView(), // Source (accumulated smaller mip)
-          },
-          {
-            binding: 1,
-            resource: this.linearSampler,
-          },
-          {
-            binding: 2,
-            resource: this.accumChain[mipIndex - 1]!.getStorageView(), // Destination (larger accumulation texture)
-          },
-        ],
-      );
+    const qualitySettings = QualitySettings.getInstance();
+    const bloomFormat = qualitySettings.getSettings().bloomTexture;
 
-      this.upsampleBindGroups[mipIndex] = upsampleBindGroup;
-    }
+    this.result.createRT('bloom_filter_result.dds', Render.width, Render.height, bloomFormat);
+    this.inputTextureBindGroup = null;
+    this.bloomTexturesBindGroup = null;
   }
 
-  private updateDownsampleParams(resolution: number[]): void {
+  private updateBloomFilterParams(): void {
+    // Update bloom filter parameters buffer
     const paramsData = new Float32Array([
-      resolution[0] || 0, // srcResolution.x
-      resolution[1] || 0, // srcResolution.y
-      0.0, // padding
+      this.thresholdMin,
+      this.thresholdMax,
+      this.emissiveFactor,
       0.0, // padding
     ]);
 
-    GPUUtils.writeBuffer(this.downsampleParamsBuffer, 0, paramsData);
+    GPUUtils.writeBuffer(this.bloomFiltersParamsBuffer, 0, paramsData);
   }
 
-  private performDownsample(sourceTexture: GPUTextureView): void {
-    // Execute each mip with separate submissions for guaranteed ordering
-    for (let i = 0; i < this.mipChain.length; i++) {
-      // Create individual command encoder for complete isolation
-      const device = Render.getInstance().getDevice();
-      const commandEncoder = device.createCommandEncoder({
-        label: `bloom_downsample_mip_${i}`,
-      });
+  private updateBloomCombineParams(): void {
+    // Update bloom combine parameters buffer
+    const paramsData = new Float32Array([
+      1.0,
+      this.maxBlurSteps > 1 ? 0.8 : 0.0,
+      this.maxBlurSteps > 2 ? 0.64 : 0.0,
+      this.maxBlurSteps > 3 ? 0.512 : 0.0,
+    ]);
 
-      // Determine source resolution and texture
-      const srcResolution =
-        i === 0
-          ? [Render.width, Render.height]
-          : [this.mipChain[i - 1]!.getWidth(), this.mipChain[i - 1]!.getHeight()];
-
-      const sourceTextureForThisPass = i === 0 ? sourceTexture : this.mipChain[i - 1]!.getView();
-
-      // Update parameters for this specific mip
-      this.updateDownsampleParams(srcResolution);
-
-      // Create compute pass
-      const computePass = commandEncoder.beginComputePass({
-        label: `bloom_downsample_mip_${i}`,
-      });
-
-      computePass.setPipeline(this.downsamplePipeline);
-
-      // Create bind group for this specific pass
-      const bindGroup = BindGroupFactory.createBindGroup(
-        `bloom_downsample_mip_${i}_separate`,
-        this.downsampleBindGroupLayout,
-        [
-          {
-            binding: 0,
-            resource: { buffer: this.downsampleParamsBuffer },
-          },
-          {
-            binding: 1,
-            resource: sourceTextureForThisPass,
-          },
-          {
-            binding: 2,
-            resource: this.linearSampler,
-          },
-          {
-            binding: 3,
-            resource: this.mipChain[i]!.getStorageView(),
-          },
-        ],
-      );
-
-      computePass.setBindGroup(0, bindGroup);
-
-      // Calculate dispatch size
-      const mipWidth = this.mipChain[i]!.getWidth();
-      const mipHeight = this.mipChain[i]!.getHeight();
-      const dispatchX = Math.ceil(mipWidth / 8);
-      const dispatchY = Math.ceil(mipHeight / 8);
-
-      computePass.dispatchWorkgroups(dispatchX, dispatchY, 1);
-      computePass.end();
-
-      // CRITICAL: Submit this command encoder immediately and wait for completion
-      const commandBuffer = commandEncoder.finish();
-      device.queue.submit([commandBuffer]);
-    }
+    GPUUtils.writeBuffer(this.bloomCombineParamsBuffer, 0, paramsData);
   }
 
-  private performUpsample(): void {
-    // Simplified progressive upsample: use mip chain directly for upsampling
-    // Start from the smallest mip and progressively upsample to larger sizes
+  public generateHighlights(
+    gBufferBindGroup: GPUBindGroup,
+    inputTexture: GPUTextureView,
+  ): GPUTextureView {
+    this.setInputTextureBindGroup(inputTexture);
+    this.createBloomFilterParamsBindGroup();
 
-    for (let i = this.mipChain.length - 1; i > 0; i--) {
-      const device = Render.getInstance().getDevice();
-      const commandEncoder = device.createCommandEncoder({
-        label: `bloom_upsample_step_${i}`,
-      });
-
-      const computePass = commandEncoder.beginComputePass({
-        label: `bloom_upsample_step_${i}`,
-      });
-
-      computePass.setPipeline(this.upsamplePipeline);
-
-      // Create bind group dynamically for this step
-      // Source: smaller mip (mipChain[i])
-      // Destination: larger mip (mipChain[i-1]) - we'll overwrite it with upsampled + original
-      const bindGroup = BindGroupFactory.createBindGroup(
-        `bloom_upsample_step_${i}_dynamic`,
-        this.upsampleBindGroupLayout,
-        [
-          {
-            binding: 0,
-            resource: this.mipChain[i]!.getView(), // Source (smaller mip)
-          },
-          {
-            binding: 1,
-            resource: this.linearSampler,
-          },
-          {
-            binding: 2,
-            resource: this.mipChain[i - 1]!.getStorageView(), // Destination (larger mip, will be overwritten)
-          },
-        ],
-      );
-
-      computePass.setBindGroup(0, bindGroup);
-
-      // Calculate dispatch size for destination (larger) texture
-      const dstWidth = this.mipChain[i - 1]!.getWidth();
-      const dstHeight = this.mipChain[i - 1]!.getHeight();
-      const dispatchX = Math.ceil(dstWidth / 8);
-      const dispatchY = Math.ceil(dstHeight / 8);
-
-      computePass.dispatchWorkgroups(dispatchX, dispatchY, 1);
-      computePass.end();
-
-      // Submit immediately for guaranteed ordering
-      const commandBuffer = commandEncoder.finish();
-      device.queue.submit([commandBuffer]);
-    }
-
-    // Final upsample from mip[0] to full size
-    this.performFinalUpsample();
-  }
-
-  private performFinalUpsample(): void {
-    // Final upsample from mip[0] to full size result
-    const device = Render.getInstance().getDevice();
-    const commandEncoder = device.createCommandEncoder({
-      label: 'bloom_final_upsample',
-    });
-
-    const computePass = commandEncoder.beginComputePass({
-      label: 'bloom_final_upsample',
-    });
-
-    computePass.setPipeline(this.upsamplePipeline);
-
-    // Create dynamic bind group for final upsample
-    const finalBindGroup = BindGroupFactory.createBindGroup(
-      'bloom_final_upsample_dynamic',
-      this.upsampleBindGroupLayout,
-      [
-        {
-          binding: 0,
-          resource: this.mipChain[0]!.getView(), // Source (mip 0)
-        },
-        {
-          binding: 1,
-          resource: this.linearSampler,
-        },
-        {
-          binding: 2,
-          resource: this.fullSizeResult!.getStorageView(), // Destination (full size)
-        },
-      ],
+    // Use RenderPassManager to execute bloom filter pass with parameters
+    this.renderPassManager.executeBloomFilteringPass(
+      this.fullscreenQuadMesh,
+      this.technique,
+      gBufferBindGroup,
+      this.inputTextureBindGroup!,
+      this.result,
+      this.bloomFilterParamsBindGroup!,
     );
 
-    computePass.setBindGroup(0, finalBindGroup);
+    const highlightsResult = this.result.getView();
+    this.applyBlur(highlightsResult);
 
-    const dstWidth = this.fullSizeResult!.getWidth();
-    const dstHeight = this.fullSizeResult!.getHeight();
-    const dispatchX = Math.ceil(dstWidth / 8);
-    const dispatchY = Math.ceil(dstHeight / 8);
-
-    computePass.dispatchWorkgroups(dispatchX, dispatchY, 1);
-    computePass.end();
-
-    const commandBuffer = commandEncoder.finish();
-    device.queue.submit([commandBuffer]);
+    return this.result.getView();
   }
 
-  private performCombine(originalTexture: GPUTextureView): void {
-    // Execute combine with separate submission
-    const device = Render.getInstance().getDevice();
-    const commandEncoder = device.createCommandEncoder({
-      label: 'bloom_combine',
-    });
+  public apply(inputTexture: GPUTextureView, gBufferBindGroup: GPUBindGroup): GPUTextureView {
+    // Generate bloom highlights from input texture using G-Buffer data
+    this.generateHighlights(gBufferBindGroup, inputTexture);
 
-    // Create bind group for combine pass
-    this.combineBindGroup = BindGroupFactory.createBindGroup(
-      'bloom_combine_final',
-      this.combineBindGroupLayout,
-      [
-        {
-          binding: 0,
-          resource: originalTexture, // Original texture
-        },
-        {
-          binding: 1,
-          resource: this.fullSizeResult!.getView(), // Bloom texture
-        },
-        {
-          binding: 2,
-          resource: this.linearSampler,
-        },
-        {
-          binding: 3,
-          resource: this.finalCombinedResult!.getStorageView(), // Final result
-        },
-      ],
-    );
+    // Add bloom to original texture
+    this.addBloom(inputTexture);
 
-    const computePass = commandEncoder.beginComputePass({
-      label: 'bloom_combine',
-    });
-
-    computePass.setPipeline(this.combinePipeline);
-    computePass.setBindGroup(0, this.combineBindGroup);
-
-    const dispatchX = Math.ceil(this.finalCombinedResult!.getWidth() / 8);
-    const dispatchY = Math.ceil(this.finalCombinedResult!.getHeight() / 8);
-
-    computePass.dispatchWorkgroups(dispatchX, dispatchY, 1);
-    computePass.end();
-
-    // Submit immediately
-    const commandBuffer = commandEncoder.finish();
-    device.queue.submit([commandBuffer]);
-  }
-
-  public update(_dt: number): void {
-    // Update logic if needed
-  }
-
-  public dispose(): void {
-    this.destroyMipChain();
-
-    if (this.downsampleParamsBuffer) {
-      this.downsampleParamsBuffer.destroy();
-    }
-
-    // Clear bind group arrays
-    this.downsampleBindGroups = [];
-    this.upsampleBindGroups = [];
-  }
-
-  public override renderDebug(): void {
-    // Debug implementation if needed
-  }
-
-  private destroyMipChain(): void {
-    for (const renderTarget of this.mipChain) {
-      renderTarget.destroy();
-    }
-    this.mipChain = [];
-
-    for (const renderTarget of this.accumChain) {
-      renderTarget.destroy();
-    }
-    this.accumChain = [];
-
-    if (this.fullSizeResult) {
-      this.fullSizeResult.destroy();
-      this.fullSizeResult = null;
-    }
-
-    if (this.finalCombinedResult) {
-      this.finalCombinedResult.destroy();
-      this.finalCombinedResult = null;
-    }
-
-    this.combineBindGroup = null;
+    // Return the original texture (bloom is applied directly to it)
+    return inputTexture;
   }
 
   public hasLoaded(): boolean {
-    return this.isLoaded;
+    return (
+      this.technique !== undefined &&
+      this.combineTechnique !== undefined &&
+      this.whiteTexture !== undefined &&
+      this.fullscreenQuadMesh !== undefined &&
+      this.result !== undefined
+    );
+  }
+
+  public addBloom(originalTexture: GPUTextureView): void {
+    // Create bind groups for the combine operation
+    this.setupCombineBindGroups();
+
+    // Use the RenderPassFactory to create a post-process pass config
+    const passConfig = RenderPassFactory.createBloomCombinePassConfig(originalTexture);
+
+    // Create a bloom combine render pass
+    const pass = new BloomCombineRenderPass(
+      passConfig,
+      this.fullscreenQuadMesh,
+      this.combineTechnique,
+      this.bloomCombineParamsBindGroup!,
+      this.bloomTexturesBindGroup!,
+    );
+
+    // Execute the custom pass directly using RenderPassManager
+    this.renderPassManager.executeDynamicPass(pass);
+  }
+
+  private createBloomFilterParamsBindGroup(): void {
+    if (this.bloomFilterParamsBindGroup) return;
+
+    this.bloomFilterParamsBindGroup = BindGroupFactory.createBindGroup(
+      'bloom_filter_params_bindgroup',
+      BindGroupFactory.getBufferUniformLayout(),
+      [
+        {
+          binding: 0,
+          resource: {
+            buffer: this.bloomFiltersParamsBuffer,
+          },
+        },
+      ],
+    );
+  }
+
+  private setupCombineBindGroups(): void {
+    // Create a sampler for texture sampling
+    const sampler = GPUUtils.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
+
+    this.bloomCombineParamsBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_combine_params_bindgroup`,
+      this.combineTechnique.getPipeline().getBindGroupLayout(0),
+      [
+        {
+          binding: 0,
+          resource: {
+            buffer: this.bloomCombineParamsBuffer,
+          },
+        },
+      ],
+    );
+
+    const bindGroupData = [
+      { binding: 0, resource: sampler },
+      {
+        binding: 1,
+        resource: this.steps[0]
+          ? this.steps[0].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 2,
+        resource: this.steps[1]
+          ? this.steps[1].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 3,
+        resource: this.steps[2]
+          ? this.steps[2].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 4,
+        resource: this.steps[3]
+          ? this.steps[3].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+    ];
+
+    this.bloomTexturesBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_textures_bindgroup`,
+      this.combineTechnique.getPipeline().getBindGroupLayout(1),
+      bindGroupData,
+    );
+  }
+
+  private setInputTextureBindGroup(texture: GPUTextureView): void {
+    if (this.inputTextureBindGroup) return;
+
+    const sampler = GPUUtils.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
+
+    this.inputTextureBindGroup = BindGroupFactory.createBindGroup(
+      `bloom_bindgroup`,
+      this.technique.getPipeline().getBindGroupLayout(2),
+      [
+        {
+          binding: 0,
+          resource: texture,
+        },
+        {
+          binding: 1,
+          resource: sampler,
+        },
+      ],
+    );
+  }
+
+  // Inherit blur parameter controls from parent
+  public override setMaxBlurSteps(steps: number): void {
+    super.setMaxBlurSteps(steps);
+    this.updateBloomCombineParams();
+  }
+
+  public override setBlurStrength(strength: number): void {
+    super.setBlurStrength(strength);
+  }
+
+  public override update(_dt: number): void {
+    // Update bloom parameters if needed
+  }
+
+  public debugInMenu(): void {
+    // Implement debug menu for bloom parameters
+  }
+
+  public override renderInMenu(): void {
+    const debugUI = Engine.getDebugUI();
+    const parentFolder = 'render';
+    const subfolderKey = 'Camera Components';
+    const componentName = 'Bloom';
+
+    // Declare self at the beginning to avoid reference errors
+    const self = this;
+
+    // Add controls to the Camera Components subfolder
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Add controls for bloom filter parameters
+    const thresholdMinWrapper = {
+      get thresholdMin() {
+        return self.thresholdMin;
+      },
+      set thresholdMin(value) {
+        self.thresholdMin = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    const thresholdMaxWrapper = {
+      get thresholdMax() {
+        return self.thresholdMax;
+      },
+      set thresholdMax(value) {
+        self.thresholdMax = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    const emissiveFactorWrapper = {
+      get emissiveFactor() {
+        return self.emissiveFactor;
+      },
+      set emissiveFactor(value) {
+        self.emissiveFactor = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    addControl(thresholdMinWrapper, 'thresholdMin', `${componentName} Filter Threshold Min`, {
+      min: 0.0,
+      max: 50.0,
+      step: 0.1,
+    });
+    addControl(thresholdMaxWrapper, 'thresholdMax', `${componentName} Filter Threshold Max`, {
+      min: 0.5,
+      max: 100.0,
+      step: 0.1,
+    });
+    addControl(emissiveFactorWrapper, 'emissiveFactor', `${componentName} Emissive Factor`, {
+      min: 0.1,
+      max: 10.0,
+      step: 0.1,
+    });
+
+    const blurStrengthWrapper = {
+      get blurStrength() {
+        return self.getBlurStrength();
+      },
+      set blurStrength(value) {
+        self.setBlurStrength(value);
+      },
+    };
+
+    const maxBlurStepsWrapper = {
+      get maxBlurSteps() {
+        return self.getMaxBlurSteps();
+      },
+      set maxBlurSteps(value) {
+        self.setMaxBlurSteps(value);
+      },
+    };
+
+    addControl(blurStrengthWrapper, 'blurStrength', `${componentName} Blur Strength`, {
+      min: 0.0,
+      max: 10.0,
+      step: 0.1,
+    });
+    addControl(maxBlurStepsWrapper, 'maxBlurSteps', `${componentName} Max Blur Steps`, {
+      min: 1,
+      max: 20,
+      step: 1,
+    });
+  }
+
+  public override renderDebug(): void {
+    // Implement debug rendering if needed
+  }
+
+  public override dispose(): void {
+    super.dispose();
+
+    if (this.result) {
+      this.result.destroy();
+    }
   }
 }

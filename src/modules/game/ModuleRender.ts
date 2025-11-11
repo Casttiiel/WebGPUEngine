@@ -122,7 +122,7 @@ export class ModuleRender extends Module {
       const enableBloom = QualitySettings.getInstance().getSettings().enableBloom;
 
       if (enableBloom && bloom.hasLoaded()) {
-        result = bloom.apply(result);
+        result = bloom.apply(result, this.deferred.getGBufferBindGroup());
       }
     }
 

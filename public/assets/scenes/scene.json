@@ -24,7 +24,7 @@
     "prefab": "spot_light_shadows.prefab"
   },
   {
-    "prefab": "cube.prefab",
+    "prefab": "cube_emissive.prefab",
     "components": {
       "transform": {
         "position": [-1.0, 4, 5],
