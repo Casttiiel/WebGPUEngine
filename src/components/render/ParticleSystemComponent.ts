@@ -39,8 +39,21 @@ export class ParticleSystemComponent extends Component {
   private spawnInterval: number = 1.5; // Spawn cada 0.5 segundos
   private particlesPerSpawn: number = 20; // 5 partículas por spawn
 
+  // OPTIMIZACIÓN: Reuse buffers CPU para evitar allocations
+  private simParamsArray = new Float32Array(8); // Reutilizable
+  private spawnParamsArray = new ArrayBuffer(16); // Reutilizable
+  private spawnParamsFloat32View!: Float32Array;
+  private spawnParamsUint32View!: Uint32Array;
+
+  // Cache de valores previos para conditional writes
+  private lastSpawnInterval: number = 0;
+  private lastParticlesPerSpawn: number = 0;
+
   constructor() {
     super();
+    // Inicializar views reutilizables
+    this.spawnParamsFloat32View = new Float32Array(this.spawnParamsArray);
+    this.spawnParamsUint32View = new Uint32Array(this.spawnParamsArray);
   }
 
   public override async load(_data: unknown): Promise<void> {
@@ -284,9 +297,11 @@ export class ParticleSystemComponent extends Component {
     // 1. Actualizar timer de spawn
     this.spawnTimer += deltaTime;
 
-    // 2. Preparar parámetros de simulación (update shader)
-    const simParams = new Float32Array([deltaTime, 0, 0, 0, 0, 0, 0, 0]);
-    device.queue.writeBuffer(this.simulationParamsBuffer, 0, simParams);
+    // 2. OPTIMIZACIÓN: Reutilizar buffer y solo escribir deltaTime (4 bytes)
+    // En lugar de crear Float32Array nuevo cada frame
+    this.simParamsArray[0] = deltaTime;
+    // Solo escribimos el primer float (4 bytes) en lugar de todo el buffer (32 bytes)
+    device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray, 0, 1);
 
     // 3. Ejecutar UPDATE shader (actualiza física y lifetime)
     const updateEncoder = device.createCommandEncoder({ label: 'Particle Update' });
@@ -305,19 +320,26 @@ export class ParticleSystemComponent extends Component {
     if (this.spawnTimer >= this.spawnInterval) {
       this.spawnTimer = 0;
 
+      // OPTIMIZACIÓN: Reutilizar buffer en lugar de crear nuevo cada spawn
+      // Detectar cambios en spawn params desde debug UI
+      const paramsChanged =
+        this.lastSpawnInterval !== this.spawnInterval ||
+        this.lastParticlesPerSpawn !== this.particlesPerSpawn;
+
+      if (paramsChanged) {
+        this.lastSpawnInterval = this.spawnInterval;
+        this.lastParticlesPerSpawn = this.particlesPerSpawn;
+      }
+
       // Preparar parámetros de spawn - struct tiene: u32 spawnCount, f32 randomSeed, f32 padding1, f32 padding2
-      const spawnParamsBuffer = new ArrayBuffer(16); // 4 floats = 16 bytes
-      const uint32View = new Uint32Array(spawnParamsBuffer);
-      const float32View = new Float32Array(spawnParamsBuffer);
+      this.spawnParamsUint32View[0] = this.particlesPerSpawn; // spawnCount (u32)
+      this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // randomSeed (f32) - siempre cambia
+      this.spawnParamsFloat32View[2] = 0; // padding1
+      this.spawnParamsFloat32View[3] = 0; // padding2
 
-      uint32View[0] = this.particlesPerSpawn; // spawnCount (u32)
-      float32View[1] = Math.random() * 10000.0; // randomSeed (f32)
-      float32View[2] = 0; // padding1
-      float32View[3] = 0; // padding2
+      device.queue.writeBuffer(this.spawnParamsBuffer, 0, this.spawnParamsArray);
 
-      device.queue.writeBuffer(this.spawnParamsBuffer, 0, spawnParamsBuffer);
-
-      // Resetear contador atómico
+      // Resetear contador atómico (reutilizar array)
       const counterData = new Uint32Array([this.particlesPerSpawn]);
       device.queue.writeBuffer(this.spawnCounterBuffer, 0, counterData);
 

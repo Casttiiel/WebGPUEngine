@@ -51,6 +51,13 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
     let totalParticles = arrayLength(&particles);
     
+    // OPTIMIZACIÓN: Early exit si no hay spawns pendientes
+    // Evita procesar 1024 partículas cuando contador = 0
+    let remainingSpawns = atomicLoad(&spawnCounter);
+    if (remainingSpawns == 0u) {
+        return; // Workgroup completo sale early
+    }
+    
     if (index >= totalParticles) {
         return;
     }
