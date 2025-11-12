@@ -105,7 +105,7 @@ export class Camera {
 
   public setProjectionParams(fov: number, zNear: number, zFar: number): void {
     this.isOrtho = false;
-    this.fovRadians = (fov * Math.PI) / 180;
+    this.fovRadians = fov;
     this.zNear = zNear;
     this.zFar = zFar;
     this.updateProjection();
@@ -394,5 +394,9 @@ export class Camera {
 
   public getIsDirty(): boolean {
     return this.isDirty;
+  }
+
+  public setIsDirty(dirty: boolean): void {
+    this.isDirty = dirty;
   }
 }

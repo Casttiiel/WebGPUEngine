@@ -1,5 +1,3 @@
-Camera Mixer / Culling bien?
-
 -----------------------------------Backlog-----------------------------------
 Directional light: Positioning/Rotation
 Configure render on json

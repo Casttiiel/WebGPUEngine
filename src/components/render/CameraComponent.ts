@@ -5,6 +5,7 @@ import { Engine } from '../../core/engine/Engine';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { LinearInterpolator } from '../../core/math/Interpolators';
 
 export class CameraComponent extends Component {
   protected camera: Camera;
@@ -61,34 +62,40 @@ export class CameraComponent extends Component {
   }
 
   public update(dt: number): void {
-    if (!this.isControllable) return;
+    if (this.isControllable) {
+      const input = Engine.getInput();
+      const multiplier = input.isKeyPressed(KeyCode.SHIFT) ? 10.0 : 1.0;
+      if (input.isKeyJustPressed(KeyCode.SPACE)) {
+        Engine.getCameraMixer().blendCamera(
+          Engine.getEntities().getEntityByName('NextCamera')!,
+          10.0,
+          new LinearInterpolator(),
+        );
+      }
+      // Movimiento de la cámara
+      if (input.isKeyPressed(KeyCode.A)) {
+        this.camera.move(Array.from(this.camera.getLocalVector([4.0 * multiplier * dt, 0, 0])));
+      }
+      if (input.isKeyPressed(KeyCode.D)) {
+        this.camera.move(Array.from(this.camera.getLocalVector([-4.0 * multiplier * dt, 0, 0])));
+      }
+      if (input.isKeyPressed(KeyCode.W)) {
+        this.camera.move(Array.from(this.camera.getLocalVector([0, 0, 4.0 * multiplier * dt])));
+      }
+      if (input.isKeyPressed(KeyCode.S)) {
+        this.camera.move(Array.from(this.camera.getLocalVector([0, 0, -4.0 * multiplier * dt])));
+      }
 
-    const input = Engine.getInput();
-    const multiplier = input.isKeyPressed(KeyCode.SHIFT) ? 10.0 : 1.0;
+      // Rotación de la cámara con el ratón
+      if (input.isMouseButtonPressed(MouseButton.RIGHT)) {
+        const mouseDelta = input.getMouseDelta();
+        this.camera.rotate(-mouseDelta.x * this.rotationSpeed, -mouseDelta.y * this.rotationSpeed);
+      }
 
-    // Movimiento de la cámara
-    if (input.isKeyPressed(KeyCode.A)) {
-      this.camera.move(Array.from(this.camera.getLocalVector([4.0 * multiplier * dt, 0, 0])));
-    }
-    if (input.isKeyPressed(KeyCode.D)) {
-      this.camera.move(Array.from(this.camera.getLocalVector([-4.0 * multiplier * dt, 0, 0])));
-    }
-    if (input.isKeyPressed(KeyCode.W)) {
-      this.camera.move(Array.from(this.camera.getLocalVector([0, 0, 4.0 * multiplier * dt])));
-    }
-    if (input.isKeyPressed(KeyCode.S)) {
-      this.camera.move(Array.from(this.camera.getLocalVector([0, 0, -4.0 * multiplier * dt])));
-    }
-
-    // Rotación de la cámara con el ratón
-    if (input.isMouseButtonPressed(MouseButton.RIGHT)) {
-      const mouseDelta = input.getMouseDelta();
-      this.camera.rotate(-mouseDelta.x * this.rotationSpeed, -mouseDelta.y * this.rotationSpeed);
-    }
-
-    const mouseWheelDelta = input.getMouseWheelDelta();
-    if (mouseWheelDelta !== 0) {
-      this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
+      const mouseWheelDelta = input.getMouseWheelDelta();
+      if (mouseWheelDelta !== 0) {
+        this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
+      }
     }
 
     this.camera.updateUniforms();

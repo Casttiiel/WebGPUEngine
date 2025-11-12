@@ -6,7 +6,6 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { Interpolator } from '../../types/Interpolator.interface';
 import { MixedCamera } from '../../types/MixedCamera.type';
 import { Module } from '../core/Module';
-import { LinearInterpolator } from '../../core/math/Interpolators';
 import { Engine } from '../../core/engine/Engine';
 
 export class ModuleCameraMixer extends Module {
@@ -22,7 +21,6 @@ export class ModuleCameraMixer extends Module {
     this.setDefaultCamera(Engine.getEntities().getEntityByName('PlayerCamera')!);
     this.setOutputCamera(Engine.getEntities().getEntityByName('MainCamera')!);
 
-    this.blendCamera(this.defaultCamera, 0.0, new LinearInterpolator());
     return true;
   }
 
