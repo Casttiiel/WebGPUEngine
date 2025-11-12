@@ -1,4 +1,4 @@
 {
-  "update": ["entities", "physics", "input", "render", "sound"],
+  "update": ["camera_mixer", "entities", "physics", "input", "render", "sound"],
   "render_debug": []
 }

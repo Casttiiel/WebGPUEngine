@@ -6,6 +6,8 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { Interpolator } from '../../types/Interpolator.interface';
 import { MixedCamera } from '../../types/MixedCamera.type';
 import { Module } from '../core/Module';
+import { LinearInterpolator } from '../../core/math/Interpolators';
+import { Engine } from '../../core/engine/Engine';
 
 export class ModuleCameraMixer extends Module {
   private mixedCameras: MixedCamera[] = [];
@@ -17,6 +19,10 @@ export class ModuleCameraMixer extends Module {
   }
 
   public async start(): Promise<boolean> {
+    this.setDefaultCamera(Engine.getEntities().getEntityByName('PlayerCamera')!);
+    this.setOutputCamera(Engine.getEntities().getEntityByName('MainCamera')!);
+
+    this.blendCamera(this.defaultCamera, 0.0, new LinearInterpolator());
     return true;
   }
 
@@ -42,12 +48,7 @@ export class ModuleCameraMixer extends Module {
     this.mixedCameras = this.mixedCameras.filter((mc) => mc.appliedWeight > 0.0);
 
     // Blend all active cameras
-    let result = new Camera();
-
-    const defaultCameraComponent = this.getCameraComponentFromEntity(this.defaultCamera);
-    if (defaultCameraComponent) {
-      defaultCameraComponent.setCamera(result);
-    }
+    let result = this.getCameraComponentFromEntity(this.defaultCamera)!.getCamera();
 
     for (const mc of this.mixedCameras) {
       const cameraComponent = this.getCameraComponentFromEntity(mc.cameraEntity);
@@ -115,6 +116,13 @@ export class ModuleCameraMixer extends Module {
 
   private clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
+  }
+
+  private setDefaultCamera(camera: Entity) {
+    this.defaultCamera = camera;
+  }
+  private setOutputCamera(camera: Entity) {
+    this.outputCamera = camera;
   }
 
   public renderDebug(): void {}

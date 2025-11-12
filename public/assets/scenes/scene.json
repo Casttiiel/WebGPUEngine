@@ -12,6 +12,9 @@
     "prefab": "main_camera.prefab"
   },
   {
+    "prefab": "player_camera.prefab"
+  },
+  {
     "prefab": "water_decal.prefab"
   },
   {

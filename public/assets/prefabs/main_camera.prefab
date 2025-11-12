@@ -1,18 +1,7 @@
 {
     "components": {
       "name": "MainCamera",
-      "camera": {
-        "controllable": true,
-        "fov": 60,
-        "position": [
-          0,
-          2,
-          -7
-        ],
-        "target":[
-          0,2,1
-        ]
-      },
+      "camera": {},
       "tone_mapping": {},
       "antialiasing": {},
       "ambient_occlusion": {},

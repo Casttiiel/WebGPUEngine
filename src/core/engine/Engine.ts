@@ -58,11 +58,11 @@ export class Engine {
 
     this._modules.registerSystemModule(this._render);
     this._modules.registerSystemModule(this._entities);
-    this._modules.registerSystemModule(this._camera_mixer);
     this._modules.registerSystemModule(this._input);
     this._modules.registerSystemModule(this._sound);
     this._modules.registerSystemModule(this._physics);
     this._modules.registerSystemModule(new ModuleBoot('boot'));
+    this._modules.registerSystemModule(this._camera_mixer);
 
     await this._modules.start();
     this.initialized = true;
@@ -223,6 +223,10 @@ export class Engine {
 
   public static getPhysics(): ModulePhysics {
     return this._physics;
+  }
+
+  public static getCameraMixer(): ModuleCameraMixer {
+    return this._camera_mixer;
   }
 
   public static getDebugUI(): DebugUIManager {
