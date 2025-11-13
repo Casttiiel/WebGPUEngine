@@ -66,11 +66,11 @@ export class CameraComponent extends Component {
       const input = Engine.getInput();
       const multiplier = input.isKeyPressed(KeyCode.SHIFT) ? 10.0 : 1.0;
       if (input.isKeyJustPressed(KeyCode.SPACE)) {
-        Engine.getCameraMixer().blendCamera(
+        /*Engine.getCameraMixer().blendCamera(
           Engine.getEntities().getEntityByName('NextCamera')!,
           10.0,
           new LinearInterpolator(),
-        );
+        );*/
       }
       // Movimiento de la cámara
       if (input.isKeyPressed(KeyCode.A)) {

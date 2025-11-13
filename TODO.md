@@ -1,4 +1,3 @@
-Environment Manager Blend new ambient light values
 Environment Manager use textures
 Environment Manager swap textures
 -----------------------------------Backlog-----------------------------------
@@ -10,3 +9,4 @@ Directional light: Shadows correctness
 Froxel Scattering
 Motion Blur
 Gamestates -> Different scenes -> Progressive texture streaming o mip streaming -> Load screen?
+Spawn objects
