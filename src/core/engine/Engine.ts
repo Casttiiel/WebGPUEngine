@@ -2,6 +2,7 @@ import { ModuleManager } from '../../modules/core/ModuleManager';
 import { ModuleBoot } from '../../modules/game/ModuleBoot';
 import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
 import { ModuleEntities } from '../../modules/game/ModuleEntities';
+import { ModuleEnvironmentManager } from '../../modules/game/ModuleEnvironmentManager';
 import { ModuleInput } from '../../modules/game/ModuleInput';
 import { ModulePhysics } from '../../modules/game/ModulePhysics';
 import { ModuleRender } from '../../modules/game/ModuleRender';
@@ -23,6 +24,7 @@ export class Engine {
   private static _sound: ModuleSound;
   private static _input: ModuleInput;
   private static _physics: ModulePhysics;
+  private static _environment_manager: ModuleEnvironmentManager;
   private static _timeScale: number = 1.0;
   private static _debugUI: DebugUIManager = DebugUIManager.getInstance();
 
@@ -49,6 +51,7 @@ export class Engine {
     this._debugUI.initialize();
 
     this._modules = new ModuleManager();
+    this._environment_manager = new ModuleEnvironmentManager('environment_manager');
     this._render = new ModuleRender('render');
     this._entities = new ModuleEntities('entities');
     this._camera_mixer = new ModuleCameraMixer('camera_mixer');
@@ -56,6 +59,7 @@ export class Engine {
     this._sound = new ModuleSound('sound');
     this._physics = new ModulePhysics('physics');
 
+    this._modules.registerSystemModule(this._environment_manager);
     this._modules.registerSystemModule(this._render);
     this._modules.registerSystemModule(this._entities);
     this._modules.registerSystemModule(this._input);
@@ -227,6 +231,10 @@ export class Engine {
 
   public static getCameraMixer(): ModuleCameraMixer {
     return this._camera_mixer;
+  }
+
+  public static getEnvironmentManager(): ModuleEnvironmentManager {
+    return this._environment_manager;
   }
 
   public static getDebugUI(): DebugUIManager {

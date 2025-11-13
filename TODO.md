@@ -1,9 +1,12 @@
+Environment Manager Blend new ambient light values
+Environment Manager use textures
+Environment Manager swap textures
 -----------------------------------Backlog-----------------------------------
-Directional light: Positioning/Rotation
-Configure render on json
-Gamestates -> Different scenes -> Progressive texture streaming o mip streaming -> Load screen?
-Directional light: Shadows correctness
+Automatic geometry instancing
+Luces direccionales: scene.json
 Animations
+Directional light: Positioning/Rotation
+Directional light: Shadows correctness
 Froxel Scattering
 Motion Blur
-Automatic geometry instancing
+Gamestates -> Different scenes -> Progressive texture streaming o mip streaming -> Load screen?

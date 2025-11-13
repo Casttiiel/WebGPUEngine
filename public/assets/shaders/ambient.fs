@@ -5,10 +5,10 @@
 #include "common/gbuffer"
 
 struct AmbientUniforms {
-    reflectionIntensity: f32,
-    ambientLightIntensity: f32,
     globalAmbientBoost: f32,
+    diffuseBoost: f32,
     padding: f32,
+    padding2: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -35,7 +35,7 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let kS = F;
     let kD = (1.0 - kS) * (1.0 - g.metallic);
     let diffuse = kD * Diffuse(g.albedo) * irradiance;
-    return diffuse * ambient.ambientLightIntensity * ambient.globalAmbientBoost * ao;
+    return diffuse * ambient.diffuseBoost * ambient.globalAmbientBoost * ao;
 }
 
 @fragment

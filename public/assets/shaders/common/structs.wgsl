@@ -46,6 +46,6 @@ struct SSRUniforms {
     maxDistance: f32,
     thickness: f32,
     enabled: f32,
-    padding1: f32,
-    padding2: f32,
+    specularBoost: f32,
+    padding: f32,
 }

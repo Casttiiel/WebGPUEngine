@@ -303,6 +303,9 @@ export class DeferredRenderer {
     if (ambientOcclusionComponent) {
       ambientOcclusionComponent.update(_dt);
     }
+
+    this.ambientLight.update(_dt);
+    this.ssr.update(_dt);
   }
 
   private dispose(): void {

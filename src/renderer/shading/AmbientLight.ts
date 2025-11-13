@@ -15,10 +15,6 @@ export class AmbientLight {
   private ambientBindGroup!: GPUBindGroup;
   private ambientUniformBuffer!: GPUBuffer;
 
-  private reflectionIntensity = 1.0;
-  private ambientLightIntensity = 1.0;
-  private globalAmbientBoost = 1.0;
-
   constructor() {}
 
   public async load(): Promise<void> {
@@ -30,17 +26,6 @@ export class AmbientLight {
       'ambient uniform buffer',
       16,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
-
-    GPUUtils.writeBuffer(
-      this.ambientUniformBuffer,
-      0,
-      new Float32Array([
-        this.reflectionIntensity,
-        this.ambientLightIntensity,
-        this.globalAmbientBoost,
-        0.0,
-      ]),
     );
   }
 
@@ -117,7 +102,18 @@ export class AmbientLight {
     );
   }
 
-  public update(_dt: number): void {}
+  public update(_dt: number): void {
+    GPUUtils.writeBuffer(
+      this.ambientUniformBuffer,
+      0,
+      new Float32Array([
+        Engine.getEnvironmentManager().getAmbientLightData().globalFactor,
+        Engine.getEnvironmentManager().getAmbientLightData().diffuseFactor,
+        0.0,
+        0.0,
+      ]),
+    );
+  }
 
   public destroy(): void {
     this.ambientBindGroup = null!;

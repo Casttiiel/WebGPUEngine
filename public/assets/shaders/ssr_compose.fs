@@ -60,7 +60,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     var R = normalize(g.reflectedDir);
     let maxMipLevel = 7.0;
     let mipLevel = g.roughness * maxMipLevel;
-    let fallbackColorRaw = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+    let fallbackColorRaw = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb * ssrParams.globalAmbientBoost;
     let envTint = vec3<f32>(0.77, 0.7, 0.6); // Un leve tinte cálido, ajustable
     let fallbackColor = clamp(fallbackColorRaw * envTint, vec3<f32>(0.0), vec3<f32>(10.0));
     var fallbackSpecular = applyFresnelBRDF(fallbackColor, g);
@@ -69,7 +69,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let ssrSpecular = ssrColor.rgb * so;
 
     // Mezcla SSR y fallback según alpha
-    var finalSpecular = mix(fallbackSpecular, ssrSpecular, ssrAlpha);
+    var finalSpecular = mix(fallbackSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost;
 
     // Composición final: suma a la escena base fuera de este shader
     return vec4<f32>(finalSpecular, specularStrength * 1.0);

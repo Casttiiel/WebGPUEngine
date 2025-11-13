@@ -41,21 +41,6 @@ export class ScreenSpaceReflections {
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
 
-      const qualitySettings = QualitySettings.getInstance().getSettings();
-
-      GPUUtils.writeBuffer(
-        this.ssrUniformBuffer,
-        0,
-        new Float32Array([
-          0.4,
-          qualitySettings.ssrStepSize,
-          qualitySettings.ssrMaxSteps,
-          50.0,
-          0.03,
-          1.0,
-        ]),
-      );
-
       console.log('SSR loaded successfully');
     } catch (error) {
       console.warn('Failed to load SSR, disabling feature:', error);
@@ -237,6 +222,24 @@ export class ScreenSpaceReflections {
           resource: { buffer: this.ssrUniformBuffer },
         },
       ],
+    );
+  }
+
+  public update(dt: number): void {
+    const qualitySettings = QualitySettings.getInstance().getSettings();
+
+    GPUUtils.writeBuffer(
+      this.ssrUniformBuffer,
+      0,
+      new Float32Array([
+        Engine.getEnvironmentManager().getAmbientLightData().globalFactor,
+        qualitySettings.ssrStepSize,
+        qualitySettings.ssrMaxSteps,
+        50.0,
+        0.03,
+        1.0,
+        Engine.getEnvironmentManager().getAmbientLightData().reflectionFactor,
+      ]),
     );
   }
 
