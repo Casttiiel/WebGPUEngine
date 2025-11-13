@@ -5,7 +5,8 @@
 #include "common/gbuffer"
 
 struct LightUniforms {
-    color: vec4<f32>,
+    color: vec3<f32>,
+    hasShadows: f32,
     position: vec3<f32>, //This will be the direction
     intensity: f32,
     viewProjOffset: mat4x4<f32>,
@@ -38,7 +39,10 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     }
 
     // Shadow factor entre 0 (totalmente en sombra) y 1 (no ocluido)
-    var shadow_factor = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, false);
+    var shadow_factor = 1.0;
+    if (light.hasShadows > 0.5) {
+        shadow_factor = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, false);
+    }
 
     let light_dir = normalize(light.position);//this will be used as a directional light
     

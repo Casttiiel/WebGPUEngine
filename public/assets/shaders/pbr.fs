@@ -5,7 +5,8 @@
 #include "common/gbuffer"
 
 struct LightUniforms {
-    color: vec4<f32>,            // 16 bytes (0-15)
+    color: vec3<f32>,
+    hasShadows: f32,// 16 bytes (0-15)
     position: vec3<f32>,         // 12 bytes (16-27)
     intensity: f32,              // 4 bytes  (28-31)
     viewProjOffset: mat4x4<f32>, // 64 bytes (32-95)

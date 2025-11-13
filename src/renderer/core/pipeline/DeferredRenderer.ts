@@ -14,7 +14,7 @@ import { GBufferPass } from '../passes/GBufferPass';
 import { RenderPassManager } from '../passes/RenderPassManager';
 import { DepthResolver } from '../processing/DepthResolver';
 import { Render } from './Render';
-import { DirectionalLight } from '../../shading/DirectionalLight';
+import { DirectionalLightComponent } from '../../../components/render/DirectionalLightComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
@@ -25,7 +25,6 @@ export class DeferredRenderer {
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
   private froxelVolumetrics!: FroxelVolumetricScattering;
-  private directionalLight!: DirectionalLight;
   private depthResolver!: DepthResolver;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
@@ -177,9 +176,6 @@ export class DeferredRenderer {
     this.ambientLight = new AmbientLight();
     await this.ambientLight.load();
 
-    this.directionalLight = new DirectionalLight();
-    await this.directionalLight.load();
-
     this.depthResolver = new DepthResolver();
     await this.depthResolver.load();
 
@@ -204,7 +200,12 @@ export class DeferredRenderer {
   }
 
   public generateShadowMaps(): void {
-    this.directionalLight.renderShadowMap();
+    for (const comp of Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList() ?? []) {
+      const directionalLightComponent = comp as DirectionalLightComponent;
+      directionalLightComponent.generateShadowMap();
+    }
 
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
       const spotLightComponent = comp as SpotLightComponent;
@@ -283,7 +284,12 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup, this.aoResult);
 
     // Use new render pass system for lights
-    this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    for (const comp of Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList() ?? []) {
+      const directionalLightComponent = comp as DirectionalLightComponent;
+      directionalLightComponent.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+    }
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
     this.renderPassManager.executePass('spotLightsWithShadows');

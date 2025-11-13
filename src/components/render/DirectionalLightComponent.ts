@@ -1,17 +1,30 @@
 import { Engine } from '../../core/engine/Engine';
-import { Render } from '../core/pipeline/Render';
-import { Mesh } from '../resources/Mesh';
-import { Technique } from '../resources/Technique';
-import { GPUUtils } from '../core/utils/GPUUtils';
-import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { Render } from '../../renderer/core/pipeline/Render';
+import { Mesh } from '../../renderer/resources/Mesh';
+import { Technique } from '../../renderer/resources/Technique';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Camera } from '../../core/math/Camera';
 import { mat4, vec3 } from 'gl-matrix';
-import { SamplerLibrary } from '../core/utils/SamplerLibrary';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
+import { Component } from '../../core/ecs/Component';
 
-export class DirectionalLight {
+interface DirectionalLightData {
+  near?: number;
+  far?: number;
+  orthoWidth?: number;
+  orthoHeight?: number;
+  hasShadows?: boolean;
+  color?: number[];
+  intensity?: number;
+  position: number[];
+  target: number[];
+}
+
+export class DirectionalLightComponent extends Component {
   private fullscreenQuadMesh!: Mesh;
   private directionalLightTechnique!: Technique;
   private directionalLightBindGroup!: GPUBindGroup;
@@ -20,10 +33,15 @@ export class DirectionalLight {
   private shadowDepthView!: GPUTextureView;
   private shadowSampler!: GPUSampler;
   private camera!: Camera;
+  private hasShadows!: boolean;
+  private color!: number[];
+  private intensity!: number;
 
-  constructor() {}
+  constructor() {
+    super();
+  }
 
-  public async load(): Promise<void> {
+  public async load(lightData: DirectionalLightData): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.directionalLightTechnique = await Technique.getAsync('directional_light.tech');
 
@@ -69,18 +87,26 @@ export class DirectionalLight {
     );
 
     this.camera = new Camera();
-    this.camera.setNearPlane(0.1);
-    this.camera.setFarPlane(100.0);
-    this.camera.setOrthoParams(true, 0, 20, 0, 20);
-    this.camera.lookAt([0.0, 15.0, 0.0], [-3.0, 0.0, 3.0]);
+    this.camera.setNearPlane(lightData.near || 0.1);
+    this.camera.setFarPlane(lightData.far || 100.0);
+    this.camera.setOrthoParams(true, 0, lightData.orthoWidth || 20, 0, lightData.orthoHeight || 20);
+    this.camera.lookAt(lightData.position, lightData.target);
     this.camera.updateUniforms();
+
+    this.hasShadows = lightData.hasShadows ?? false;
+    this.color = lightData.color ?? [1.0, 1.0, 1.0];
+    this.intensity = lightData.intensity ?? 1.0;
 
     this.updateLightUniforms();
   }
 
   private updateLightUniforms(): void {
     // color (vec4) - bytes 0-15
-    GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array([1.0, 0.956, 0.878, 1.0]));
+    GPUUtils.writeBuffer(
+      this.uniformBuffer,
+      0,
+      new Float32Array([this.color[0], this.color[1], this.color[2], this.hasShadows ? 1.0 : 0.0]),
+    );
 
     // Para luz direccional: la dirección debe ser HACIA la fuente de luz
     // Si la cámara mira hacia abajo [0, -1, 0], la luz viene de arriba [0, 1, 0]
@@ -95,7 +121,7 @@ export class DirectionalLight {
     GPUUtils.writeBuffer(
       this.uniformBuffer,
       16,
-      new Float32Array([lightDirection[0], lightDirection[1], lightDirection[2], 10.0]),
+      new Float32Array([lightDirection[0], lightDirection[1], lightDirection[2], this.intensity]),
     );
 
     // Crear matriz de transformación de clip space a UV space
@@ -144,7 +170,7 @@ export class DirectionalLight {
     GPUUtils.writeBuffer(this.uniformBuffer, 128, new Float32Array([0.0]));
   }
 
-  public renderShadowMap(): void {
+  public generateShadowMap(): void {
     RenderManager.getInstance().performCulling(this.camera, RenderCategory.SHADOWS);
     const render = Render.getInstance();
 
@@ -202,4 +228,10 @@ export class DirectionalLight {
 
     pass.end();
   }
+
+  public override update(dt: number): void {
+    this.updateLightUniforms();
+  }
+
+  public override renderDebug(): void {}
 }

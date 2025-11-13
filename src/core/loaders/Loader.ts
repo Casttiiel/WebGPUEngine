@@ -22,6 +22,7 @@ import { BoxColliderComponent } from '../../components/physics/BoxColliderCompon
 import { InfinitePlaneColliderComponent } from '../../components/physics/InfinitePlaneColliderComponent';
 import { MeshColliderComponent } from '../../components/physics/MeshColliderComponent';
 import { ParticleSystemComponent } from '../../components/render/ParticleSystemComponent';
+import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -124,6 +125,8 @@ export class Loader {
         return new PointLightComponent();
       case 'spot_light':
         return new SpotLightComponent();
+      case 'directional_light':
+        return new DirectionalLightComponent();
       case 'bloom':
         return new BloomComponent();
       case 'box_collider':

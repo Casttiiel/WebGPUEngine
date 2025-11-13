@@ -1,6 +1,7 @@
 {
   "update": [
     "point_light",
+    "directional_light",
     "box_collider",
     "particle_system",
     "transform",

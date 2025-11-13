@@ -60,7 +60,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     var R = normalize(g.reflectedDir);
     let maxMipLevel = 7.0;
     let mipLevel = g.roughness * maxMipLevel;
-    let fallbackColorRaw = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb * ssrParams.globalAmbientBoost;
+    let fallbackColorRaw = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb * ssrParams.globalAmbientBoost * ssrParams.diffuseBoost;
     let envTint = vec3<f32>(0.77, 0.7, 0.6); // Un leve tinte cálido, ajustable
     let fallbackColor = clamp(fallbackColorRaw * envTint, vec3<f32>(0.0), vec3<f32>(10.0));
     var fallbackSpecular = applyFresnelBRDF(fallbackColor, g);

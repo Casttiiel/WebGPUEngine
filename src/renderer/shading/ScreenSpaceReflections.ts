@@ -239,6 +239,7 @@ export class ScreenSpaceReflections {
         0.03,
         1.0,
         Engine.getEnvironmentManager().getAmbientLightData().reflectionFactor,
+        Engine.getEnvironmentManager().getAmbientLightData().diffuseFactor,
       ]),
     );
   }

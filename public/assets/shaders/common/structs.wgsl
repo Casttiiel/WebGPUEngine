@@ -47,5 +47,5 @@ struct SSRUniforms {
     thickness: f32,
     enabled: f32,
     specularBoost: f32,
-    padding: f32,
+    diffuseBoost: f32,
 }
