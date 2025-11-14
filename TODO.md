@@ -1,4 +1,3 @@
-Environment Manager swap textures
 -----------------------------------Backlog-----------------------------------
 Automatic geometry instancing
 Directional light: Shadows correctness

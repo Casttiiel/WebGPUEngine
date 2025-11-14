@@ -83,6 +83,20 @@ export class ModuleEnvironmentManager extends Module {
     };
   }
 
+  public changeIrradianceTexture(newTexture: string): void {
+    Cubemap.getAsync(newTexture).then((cubemap) => {
+      this.ambientLightData.irradianceCubemap = cubemap;
+      //Delete de ambient light class blind group
+    });
+  }
+
+  public changeSSREnvironmentTexture(newTexture: string): void {
+    Cubemap.getAsync(newTexture).then((cubemap) => {
+      this.ssrEnvironmentTexture = cubemap;
+      //Delete de SSR class blind group
+    });
+  }
+
   public renderDebug(): void {}
 
   public stop(): void {
