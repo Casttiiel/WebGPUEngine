@@ -5,11 +5,9 @@ import { Technique } from '../resources/Technique';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
-import { Cubemap } from '../resources/Cubemap';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
-  private irradianceTexture!: Cubemap;
 
   private ambientTechnique!: Technique;
   private ambientBindGroup!: GPUBindGroup;
@@ -20,7 +18,6 @@ export class AmbientLight {
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.ambientTechnique = await Technique.getAsync('ambient.tech');
-    this.irradianceTexture = await Cubemap.getAsync('irradiance_cubemap.png');
 
     this.ambientUniformBuffer = GPUUtils.createBuffer(
       'ambient uniform buffer',
@@ -92,11 +89,15 @@ export class AmbientLight {
         },
         {
           binding: 3,
-          resource: this.irradianceTexture.getTextureView()!,
+          resource: Engine.getEnvironmentManager()
+            .getAmbientLightData()
+            .irradianceCubemap.getTextureView()!,
         },
         {
           binding: 4,
-          resource: this.irradianceTexture.getSampler()!,
+          resource: Engine.getEnvironmentManager()
+            .getAmbientLightData()
+            .irradianceCubemap.getSampler()!,
         },
       ],
     );

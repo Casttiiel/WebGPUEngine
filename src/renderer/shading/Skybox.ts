@@ -4,13 +4,11 @@ import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
-import { HDRTexture } from '../resources/HDRTexture';
 
 export class Skybox {
   private fullscreenQuadMesh!: Mesh;
   private skyboxTechnique!: Technique;
   private skyboxBindGroup!: GPUBindGroup;
-  private skyboxTexture!: HDRTexture;
 
   constructor() {}
 
@@ -18,24 +16,17 @@ export class Skybox {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.skyboxTechnique = await Technique.getAsync('skybox.tech');
 
-    this.skyboxTexture = await HDRTexture.getAsync('qwantani_mid_morning_puresky_1k.hdr');
-
-    const textureView = this.skyboxTexture.getTextureView();
-    const sampler = this.skyboxTexture.getSampler();
-    if (!textureView || !sampler) {
-      throw new Error('Failed to get skybox texture view or sampler');
-    }
     this.skyboxBindGroup = BindGroupFactory.createBindGroup(
       `skybox_bindgroup`,
       this.skyboxTechnique.getPipeline().getBindGroupLayout(1)!,
       [
         {
           binding: 0,
-          resource: textureView,
+          resource: Engine.getEnvironmentManager().getSkyboxTexture().getTextureView()!,
         },
         {
           binding: 1,
-          resource: sampler,
+          resource: Engine.getEnvironmentManager().getSkyboxTexture().getSampler()!,
         },
       ],
     );

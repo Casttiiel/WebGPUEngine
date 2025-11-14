@@ -4,7 +4,6 @@ import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { Render } from '../core/pipeline/Render';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
-import { Cubemap } from '../resources/Cubemap';
 import { Mesh } from '../resources/Mesh';
 import { RenderTarget } from '../resources/RenderTarget';
 import { Technique } from '../resources/Technique';
@@ -20,7 +19,6 @@ export class ScreenSpaceReflections {
   private ssrComposeBindGroup!: GPUBindGroup;
   private ssrUniformBuffer!: GPUBuffer;
   private brdfLUT!: Texture;
-  private environmentTexture!: Cubemap;
 
   constructor() {}
 
@@ -31,7 +29,6 @@ export class ScreenSpaceReflections {
       this.ssrTechnique = await Technique.getAsync('ssr.tech');
       this.ssrComposeTechnique = await Technique.getAsync('ssr_compose.tech');
       this.brdfLUT = await Texture.getAsync('brdfLUT.png');
-      this.environmentTexture = await Cubemap.getAsync('environment_cubemap.png');
 
       this.createRenderTarget();
 
@@ -211,11 +208,11 @@ export class ScreenSpaceReflections {
         },
         {
           binding: 5,
-          resource: this.environmentTexture.getTextureView()!,
+          resource: Engine.getEnvironmentManager().getSSREnvironmentTexture().getTextureView()!,
         },
         {
           binding: 6,
-          resource: this.environmentTexture.getSampler()!,
+          resource: Engine.getEnvironmentManager().getSSREnvironmentTexture().getSampler()!,
         },
         {
           binding: 7,

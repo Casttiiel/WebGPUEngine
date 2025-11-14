@@ -1,9 +1,6 @@
-Automatic geometry instancing
------------------------------------Backlog-----------------------------------
-Environment Manager use textures
 Environment Manager swap textures
-Animations
-Directional light: Positioning/Rotation
+-----------------------------------Backlog-----------------------------------
+Automatic geometry instancing
 Directional light: Shadows correctness
 Froxel Scattering
 Motion Blur

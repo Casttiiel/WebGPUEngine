@@ -1,4 +1,6 @@
 import { ResourceManager } from '../../core/engine/ResourceManager';
+import { Cubemap } from '../../renderer/resources/Cubemap';
+import { HDRTexture } from '../../renderer/resources/HDRTexture';
 import { AmbientEnvironmentData } from '../../types/AmbientEnvironmentData.type';
 import { Interpolator } from '../../types/Interpolator.interface';
 import { Module } from '../core/Module';
@@ -12,8 +14,8 @@ interface EnvironmentBlendState {
 }
 
 export class ModuleEnvironmentManager extends Module {
-  private ssrEnvironmentTexture!: GPUTexture;
-  private skyboxTexture!: GPUTexture;
+  private ssrEnvironmentTexture!: Cubemap;
+  private skyboxTexture!: HDRTexture;
   private ambientLightData!: AmbientEnvironmentData;
 
   private blendState: EnvironmentBlendState | null = null;
@@ -30,8 +32,11 @@ export class ModuleEnvironmentManager extends Module {
       globalFactor: jsonData.ambient.globalFactor,
       diffuseFactor: jsonData.ambient.diffuseFactor,
       reflectionFactor: jsonData.ambient.reflectionFactor,
-      irradianceCubemap: jsonData.ambient.irradianceCubemap,
+      irradianceCubemap: await Cubemap.getAsync(jsonData.ambient.irradianceCubemap),
     };
+
+    this.skyboxTexture = await HDRTexture.getAsync(jsonData.skybox);
+    this.ssrEnvironmentTexture = await Cubemap.getAsync(jsonData.ssrEnvironment);
 
     return true;
   }
@@ -86,5 +91,13 @@ export class ModuleEnvironmentManager extends Module {
 
   public getAmbientLightData(): AmbientEnvironmentData {
     return this.ambientLightData;
+  }
+
+  public getSkyboxTexture(): HDRTexture {
+    return this.skyboxTexture;
+  }
+
+  public getSSREnvironmentTexture(): Cubemap {
+    return this.ssrEnvironmentTexture;
   }
 }
