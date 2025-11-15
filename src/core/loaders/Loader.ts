@@ -33,16 +33,17 @@ export class Loader {
     }
   }
 
-  public static async loadEntityFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
-    const entity = new Entity();
-
-    // Set parent relationship first
-    if (parent) {
-      parent.addChildren(entity);
+  public static async parseSceneJSON(json: SceneDataType): Promise<SceneDataType> {
+    const parsedEntities: EntityDataType[] = [];
+    for (var i = 0; i < json.length; i++) {
+      const entityJson = json[i];
+      const parsedEntity = await this.parseEntityFromJSON(entityJson);
+      parsedEntities.push(parsedEntity);
     }
+    return parsedEntities;
+  }
 
-    Engine.getEntities().addEntity(entity);
-
+  public static async parseEntityFromJSON(json: EntityDataType): Promise<EntityDataType> {
     let entityChildrens = json.children ?? [];
 
     if (json.prefab) {
@@ -75,6 +76,29 @@ export class Loader {
       const gltfJson = await GLTFLoader.loadGLTF(json.gltf);
       entityChildrens = entityChildrens.concat(gltfJson);
     }
+
+    // Load children after parent is fully setup
+    const parsedEntities: EntityDataType[] = [];
+    for (const children_json of entityChildrens) {
+      const parsedEntityJson = await this.parseEntityFromJSON(children_json);
+      parsedEntities.push(parsedEntityJson);
+    }
+    json.children = parsedEntities;
+
+    return json;
+  }
+
+  public static async loadEntityFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
+    const entity = new Entity();
+
+    // Set parent relationship first
+    if (parent) {
+      parent.addChildren(entity);
+    }
+
+    Engine.getEntities().addEntity(entity);
+
+    let entityChildrens = json.children ?? [];
 
     await this.loadComponentFromJSON(json, entity);
 

@@ -139,6 +139,10 @@ export class ModuleEntities extends Module {
     return null;
   }
 
+  public getAllEntities(): Entity[] {
+    return this.omEntities;
+  }
+
   public stop(): void {
     // Clear entities array (entities will be recreated on restart)
     this.omEntities = [];
