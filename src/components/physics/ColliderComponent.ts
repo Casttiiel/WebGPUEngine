@@ -103,6 +103,7 @@ export class ColliderComponent extends Component {
         break;
 
       case RigidBodyType.STATIC:
+      default:
         this.rigidBody = physics.createStaticBody(this.getOwner().id, position);
         break;
 

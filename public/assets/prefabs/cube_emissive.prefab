@@ -2,6 +2,13 @@
     "children": [],
     "components": {
       "name": "Emissive Cube",
+      "box_collider": {
+        "bodyType": "dynamic",
+        "size": [2, 2, 2],
+        "mass": 1,
+        "friction": 0.3,
+        "restitution": 0.3
+      },
       "transform": {
         "position": [
           0,

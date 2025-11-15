@@ -8,6 +8,7 @@
         "scale": [1, 1, 1]
       },
       "infinite_plane_collider": {
+        "bodyType": "static",
         "material": {
           "friction": 0.5,
           "restitution": 0.1
