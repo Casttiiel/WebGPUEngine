@@ -1,0 +1,9 @@
+{
+  "vs": "pbr_instanced.vs",
+  "fs": "pbr.fs",
+  "blend": "OPAQUE",
+  "z": "LESS_EQUAL",
+  "rs": "FILL",
+  "writesOn": "GBUFFER",
+  "uniforms": ["CAMERA_UNIFORMS", "MATERIAL_TEXTURES", "INSTANCE_STORAGE"]
+}

@@ -131,7 +131,21 @@ export class Material extends GPUResource {
   public override async load(): Promise<void> {
     try {
       if (this.castsShadows) {
-        this.shadowsMaterial = await Material.get('shadows_material.mat');
+        // Si este material usa una técnica instanciada, el shadowsMaterial también debe usarla
+        const isInstancedTechnique = this.technique?.path.includes('_instanced.tech');
+
+        if (isInstancedTechnique) {
+          // Crear material de sombras con técnica instanciada
+          const shadowsMaterialData = {
+            technique: 'shadows_instanced.tech',
+            textures: {},
+            category: 'shadows' as any,
+            casts_shadows: false,
+          };
+          this.shadowsMaterial = await Material.get(shadowsMaterialData);
+        } else {
+          this.shadowsMaterial = await Material.get('shadows.mat');
+        }
       }
 
       // Cargar todas las texturas en paralelo usando Promise.all
@@ -249,6 +263,10 @@ export class Material extends GPUResource {
 
   public getTextureBindGroup(): GPUBindGroup | undefined {
     return this.textureBindGroup;
+  }
+
+  public getTextureFiles(): MaterialTexturesOptions {
+    return this.textureFiles;
   }
 
   public getName(): string {

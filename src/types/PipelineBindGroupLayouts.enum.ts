@@ -17,4 +17,5 @@ export enum PipelineBindGroupLayouts {
   TEMPORAL_ACCUMULATION_UNIFORMS = 'TemporalAccumulationUniforms',
   FROXEL_UNIFORMS = 'FroxelUniforms',
   PARTICLE_UNIFORMS = 'ParticleUniforms',
+  INSTANCE_STORAGE = 'InstanceStorage',
 }

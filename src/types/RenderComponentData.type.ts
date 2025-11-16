@@ -2,6 +2,8 @@ import { MaterialDataType } from './MaterialData.type';
 
 export type RenderComponentDataType = Readonly<{
   meshes: ReadonlyArray<RenderComponentMeshDataType>;
+  isInstanced?: boolean; // Flag indicating this entity is instanced
+  instanceGroup?: string; // Group identifier for instancing
 }>;
 
 export type RenderComponentMeshDataType = Readonly<{
@@ -17,7 +19,6 @@ export type RenderComponentMeshDataType = Readonly<{
   };
   material?: string;
   materialData?: MaterialDataType;
-  instances_group?: number;
   visible?: boolean;
   state?: number;
 }>;

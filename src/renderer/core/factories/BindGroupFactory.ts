@@ -746,6 +746,19 @@ export class BindGroupFactory {
   }
 
   /**
+   * Creates a storage buffer layout for instancing
+   */
+  public static getInstanceStorageLayout(): GPUBindGroupLayout {
+    return this.getLayout('instance_storage', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'read-only-storage' },
+      },
+    ]);
+  }
+
+  /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
     switch (layout) {
@@ -785,6 +798,8 @@ export class BindGroupFactory {
         return this.getTemporalAccumulationUniformsLayout();
       case PipelineBindGroupLayouts.PARTICLE_UNIFORMS:
         return this.getParticleUniformsLayout();
+      case PipelineBindGroupLayouts.INSTANCE_STORAGE:
+        return this.getInstanceStorageLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

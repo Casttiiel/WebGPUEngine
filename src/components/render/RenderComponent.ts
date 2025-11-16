@@ -15,18 +15,37 @@ export class RenderComponent extends Component {
   private isVisible: boolean = true;
   private parts: MeshPartType[] = [];
 
+  // Instancing support
+  private isInstanced: boolean = false;
+  private instanceGroup: string = '';
+
   constructor() {
     super();
   }
 
   public async load(data: RenderComponentDataType): Promise<void> {
+    // Detectar si esta entity está marcada para instancing
+    if (data.isInstanced === true && data.instanceGroup) {
+      this.isInstanced = true;
+      this.instanceGroup = data.instanceGroup;
+      console.log(`RenderComponent: Entity flagged for instancing (group: ${this.instanceGroup})`);
+    }
+
     if (data.meshes) {
       for (const meshData of data.meshes) {
         await this.readMesh(meshData);
       }
     }
 
-    this.updateRenderManager();
+    // Solo actualizar RenderManager si NO es instanciada
+    // Las entities instanciadas NO crean RenderKeys individuales
+    if (!this.isInstanced) {
+      this.updateRenderManager();
+    } else {
+      console.log(
+        `RenderComponent: Skipping RenderKey creation for instanced entity (${this.instanceGroup})`,
+      );
+    }
   }
 
   private async readMesh(data: RenderComponentMeshDataType): Promise<void> {
@@ -86,6 +105,19 @@ export class RenderComponent extends Component {
       if (!part.isVisible || !this.isVisible) continue;
       renderManager.addKey(this, part.mesh, part.material, transformComponent);
     }
+  }
+
+  // Getters para acceso público (necesarios para InstanceManager)
+  public getIsInstanced(): boolean {
+    return this.isInstanced;
+  }
+
+  public getInstanceGroup(): string {
+    return this.instanceGroup;
+  }
+
+  public getParts(): MeshPartType[] {
+    return this.parts;
   }
 
   public update(_dt: number): void {

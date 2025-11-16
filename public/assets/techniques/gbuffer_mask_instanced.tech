@@ -1,0 +1,10 @@
+{
+    "vs": "pbr_instanced.vs",
+    "fs": "gbuffer_mask.fs",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "InstanceStorage"
+    ],
+    "writesOn": "gbuffer"
+}

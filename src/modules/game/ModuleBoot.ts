@@ -1,6 +1,8 @@
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Loader } from '../../core/loaders/Loader';
 import { Module } from '../core/Module';
+import { InstanceManager } from '../../renderer/core/managers/InstanceManager';
+import { Engine } from '../../core/engine/Engine';
 
 export class ModuleBoot extends Module {
   constructor(name: string) {
@@ -11,7 +13,18 @@ export class ModuleBoot extends Module {
     const response = await ResourceManager.fetch(`assets/scenes/scene.json`);
     const jsonData = await response.json();
 
-    await Loader.loadSceneFromJSON(jsonData);
+    // 1. Parsear el JSON (expandir prefabs, GLTF, etc.)
+    const parsedJson = await Loader.parseSceneJSON(jsonData);
+
+    // 2. Flagear entidades que pueden ser instanciadas
+    const flaggedJson = InstanceManager.flagInstanceableEntities(parsedJson);
+
+    // 3. Cargar la escena con las entidades flaggeadas
+    await Loader.loadSceneFromJSON(flaggedJson);
+
+    // 4. Crear grupos de instancias (después de que todas las entities estén cargadas)
+    const allEntities = Engine.getEntities().getAllEntities();
+    await InstanceManager.createInstanceGroups(allEntities);
 
     return true;
   }

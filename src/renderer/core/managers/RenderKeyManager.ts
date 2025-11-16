@@ -15,6 +15,7 @@ export interface RenderKey {
   aabb: AABB | null;
   isInstanced: boolean;
   instanceCount: number; // Required for both instanced and non-instanced (defaults to 1)
+  instanceBindGroup?: GPUBindGroup | undefined; // Bind group with storage buffer for instanced rendering (@group(2))
   renderBindGroup?: GPUBindGroup | undefined; // Optional bind group for custom rendering (e.g. particles)
   indirectDrawBuffer?: GPUBuffer | undefined; // Optional indirect draw buffer for GPU-driven rendering
   id: number;
@@ -37,6 +38,7 @@ export class RenderKeyManager {
     transform: TransformComponent,
     isInstanced: boolean = false,
     instanceCount: number = 1,
+    instanceBindGroup?: GPUBindGroup,
     renderBindGroup?: GPUBindGroup,
     indirectDrawBuffer?: GPUBuffer,
   ): void {
@@ -48,6 +50,7 @@ export class RenderKeyManager {
       aabb: mesh.getAABB(),
       isInstanced,
       instanceCount: isInstanced ? instanceCount : 1,
+      instanceBindGroup,
       renderBindGroup,
       indirectDrawBuffer,
       id: this.nextObjectId++,

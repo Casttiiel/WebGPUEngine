@@ -18,7 +18,9 @@ Grass
 Physics Grass
 Mesh LOD
 Light Clustered culling + instancing
-Occlusion culling / Multi-Strategy Culling System
+Occlusion culling
 TAA: Anti-aliasing temporal
 Pre-multiplied Alpha Solids (Cristal)
 Voxel Global Illumination
+GPUDrivenRendering with indirect draw calls and frustum culling on GPU
+TrimSheets

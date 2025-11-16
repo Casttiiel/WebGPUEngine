@@ -173,9 +173,10 @@ export class ParticleSystemComponent extends Component {
         this.quadMesh,
         this.particleMaterial,
         this.transform,
-        true, // instanciado
+        false, // NO es instancing de storage buffer (es indirect draw)
         ParticleSystemComponent.MAX_PARTICLES,
-        this.renderBindGroup,
+        undefined, // instanceBindGroup no se usa
+        this.renderBindGroup, // renderBindGroup para @group(2) del sistema de partículas
         this.indirectDrawBuffer,
       );
     } catch (error: any) {
