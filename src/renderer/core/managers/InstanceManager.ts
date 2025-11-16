@@ -92,7 +92,7 @@ export class InstanceManager {
 
   /**
    * Determina si una entidad puede ser instanciada.
-   * Ahora permite colliders y otros componentes que no afectan el renderizado.
+   * Solo permite objetos estáticos: sin collider o con collider estático.
    */
   private static canBeInstanced(entity: EntityDataType): boolean {
     const components = entity.components;
@@ -110,7 +110,6 @@ export class InstanceManager {
     }
 
     // No debe tener componentes que requieran datos únicos por instancia EN EL RENDERIZADO
-    // Nota: Ahora SÍ permitimos colliders (box_collider, etc.) porque cada entity los mantendrá
     const uniqueComponents = [
       'camera',
       'point_light',
@@ -129,6 +128,41 @@ export class InstanceManager {
       }
     }
 
+    if (!this.isStaticEntity(entity)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Verifica si una entidad es estática (sin collider o con collider no dinámico).
+   */
+  private static isStaticEntity(entity: EntityDataType): boolean {
+    const components = entity.components;
+    if (!components) return true; // Sin componentes = estático
+
+    // mesh_collider e infinite_plane_collider siempre son estáticos por naturaleza de Rapier
+    // Solo necesitamos verificar bodyType en box_collider
+
+    if ('box_collider' in components) {
+      const boxColliderData = (components as any).box_collider;
+
+      if (boxColliderData) {
+        const bodyType = boxColliderData.bodyType || 'dynamic'; // Default es dynamic
+
+        // Rechazar si es dinámico
+        if (bodyType === 'dynamic') {
+          console.log(
+            `InstanceManager: Entity "${components?.name || 'unnamed'}" has dynamic box_collider, cannot be instanced`,
+          );
+          return false;
+        }
+      }
+    }
+
+    // mesh_collider y infinite_plane_collider no necesitan verificación (siempre estáticos)
+    // Si tiene estos colliders o ninguno, es válido para instancing
     return true;
   }
 

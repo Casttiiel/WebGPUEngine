@@ -12,6 +12,11 @@ export class Time {
         const currentQuality = QualitySettings.getInstance().getCurrentQualityName();
         fpsDisplay.innerText = `FPS: ${(1 / deltaTime).toFixed(1)} | CPU: ${deltaTime.toFixed(2)}ms | Quality: ${currentQuality}`;
       }
+      if (1 / deltaTime < 40) {
+        console.log(
+          'Low FPS detected! Consider lowering the graphics quality settings for a better experience.',
+        );
+      }
     }
   }
 }
