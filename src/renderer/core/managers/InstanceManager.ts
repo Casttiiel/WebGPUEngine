@@ -33,27 +33,17 @@ export class InstanceManager {
    * NO elimina entities, solo añade flags en el componente render.
    *
    * Proceso:
-   * 1. Agrupa entities por mesh+material
+   * 1. Agrupa entities por mesh+material (recursivamente, incluyendo children)
    * 2. Para grupos con 2+ entities, marca cada una con flags de instancing
    * 3. Retorna el mismo JSON modificado (todas las entities intactas)
    */
   public static flagInstanceableEntities(parsedJson: SceneDataType): SceneDataType {
     const groups = new Map<string, EntityDataType[]>();
 
-    console.log(`InstanceManager: Analyzing ${parsedJson.length} entities for instancing...`);
+    console.log(`InstanceManager: Analyzing scene for instancing (including children)...`);
 
-    // 1. Clasificar y agrupar entities potencialmente instanciables
-    for (const entity of parsedJson) {
-      if (this.canBeInstanced(entity)) {
-        const key = this.getInstanceKey(entity);
-        if (key) {
-          if (!groups.has(key)) {
-            groups.set(key, []);
-          }
-          groups.get(key)!.push(entity);
-        }
-      }
-    }
+    // 1. Clasificar y agrupar entities potencialmente instanciables RECURSIVAMENTE
+    this.collectInstanceableEntitiesRecursive([...parsedJson], groups);
 
     // 2. Marcar entities en grupos con 2+ elementos
     let totalInstancedGroups = 0;
@@ -79,15 +69,55 @@ export class InstanceManager {
       // Si solo hay 1 entity en el grupo, no se marca (no vale la pena instanciar)
     }
 
+    const totalEntities = this.countTotalEntitiesRecursive([...parsedJson]);
     console.log(
       `InstanceManager: Flagged ${totalInstancedGroups} instance groups with ${totalInstancedEntities} total entities`,
     );
     console.log(
-      `InstanceManager: ${parsedJson.length - totalInstancedEntities} entities will render normally`,
+      `InstanceManager: ${totalInstancedEntities} entities will be instanced, ${totalEntities - totalInstancedEntities} will render normally`,
     );
 
     // Retornar el JSON original con las entities modificadas (flags añadidos)
     return parsedJson;
+  }
+
+  /**
+   * Recolecta recursivamente todas las entidades instanciables, incluyendo children.
+   */
+  private static collectInstanceableEntitiesRecursive(
+    entities: EntityDataType[],
+    groups: Map<string, EntityDataType[]>,
+  ): void {
+    for (const entity of entities) {
+      // Verificar si esta entidad puede ser instanciada
+      if (this.canBeInstanced(entity)) {
+        const key = this.getInstanceKey(entity);
+        if (key) {
+          if (!groups.has(key)) {
+            groups.set(key, []);
+          }
+          groups.get(key)!.push(entity);
+        }
+      }
+
+      // Procesar recursivamente los children
+      if (entity.children && entity.children.length > 0) {
+        this.collectInstanceableEntitiesRecursive(entity.children, groups);
+      }
+    }
+  }
+
+  /**
+   * Cuenta el total de entidades en el árbol, incluyendo children.
+   */
+  private static countTotalEntitiesRecursive(entities: EntityDataType[]): number {
+    let count = entities.length;
+    for (const entity of entities) {
+      if (entity.children && entity.children.length > 0) {
+        count += this.countTotalEntitiesRecursive(entity.children);
+      }
+    }
+    return count;
   }
 
   /**
