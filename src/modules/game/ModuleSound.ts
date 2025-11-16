@@ -52,7 +52,7 @@ export class ModuleSound extends Module {
 
   public stop(): void {
     // Detener todos los sonidos activos
-    this.stopAll();
+    this.stopAllAudio();
 
     // Cerrar contexto de audio
     if (this.audioContext) {
