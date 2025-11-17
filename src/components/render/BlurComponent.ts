@@ -9,32 +9,38 @@ import { Mesh } from '../../renderer/resources/Mesh';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
 export class BlurStep {
-  public halfYTarget: RenderTarget; // Horizontal blur result (xres x yres/2)
-  public outputTarget: RenderTarget; // Final result (xres/2 x yres/2)
+  public halfYTarget: RenderTarget; // Horizontal blur result
+  public outputTarget: RenderTarget; // Final result after downsampling
   public inputWidth: number;
   public inputHeight: number;
 
-  constructor(name: string, inputWidth: number, inputHeight: number, format: GPUTextureFormat) {
+  constructor(
+    name: string,
+    inputWidth: number,
+    inputHeight: number,
+    format: GPUTextureFormat,
+    downscaleFactor: number = 0.5,
+  ) {
     this.inputWidth = inputWidth;
     this.inputHeight = inputHeight;
 
-    // Horizontal blur target (same width, half height)
+    // Horizontal blur target (same width, scaled height)
     this.halfYTarget = new RenderTarget();
     this.halfYTarget.createRT(
       `blur_step_${name}_y`,
       this.inputWidth,
-      Math.max(1, Math.floor(this.inputHeight / 2)),
+      Math.max(1, Math.floor(this.inputHeight * downscaleFactor)),
       format,
       false,
       GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     );
 
-    // Final output target (half width, half height)
+    // Final output target (scaled width and height)
     this.outputTarget = new RenderTarget();
     this.outputTarget.createRT(
       `blur_step_${name}_xy`,
-      Math.max(1, Math.floor(this.inputWidth / 2)),
-      Math.max(1, Math.floor(this.inputHeight / 2)),
+      Math.max(1, Math.floor(this.inputWidth * downscaleFactor)),
+      Math.max(1, Math.floor(this.inputHeight * downscaleFactor)),
       format,
       false,
       GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -58,6 +64,7 @@ export class BlurComponent extends Component {
   protected steps: BlurStep[] = [];
   protected sampler!: GPUSampler;
   protected maxBlurSteps: number = 3;
+  private bloomSize: number = 2.0; // ✅ Bloom size multiplier (1.0 = default, 2.0 = double, 0.5 = half)
 
   // Gaussian blur properties following C++ blur.fx pattern
   private gaussianBlurTechnique!: Technique;
@@ -169,18 +176,30 @@ export class BlurComponent extends Component {
     // ✅ Clear bind group cache when recreating steps (resolution change)
     this.textureBindGroupsCache.clear();
 
-    // Create blur steps with progressively smaller input resolutions
-    // Each step takes input at one resolution and outputs at half resolution
+    // ✅ Adaptive downsampling: maintain consistent bloom size regardless of step count
+    // bloomSize controls spread: smaller value = larger bloom (1/8 = double size, 1/32 = 4x size)
+    // Formula: downscaleFactor = targetScale^(1/numSteps)
+    const baseScale = 1.0 / 16.0; // Base resolution target
+    const targetFinalScale = baseScale / this.bloomSize; // Adjust by bloom size multiplier
+    const downscalePerStep = Math.pow(targetFinalScale, 1.0 / this.maxBlurSteps);
+
+    // Create blur steps with adaptive downsampling
     let inputWidth = Render.width / 2;
     let inputHeight = Render.height / 2;
 
     for (let i = 0; i < this.maxBlurSteps; i++) {
-      const step = new BlurStep(`step_${i}`, inputWidth, inputHeight, bloomFormat);
+      const step = new BlurStep(
+        `step_${i}`,
+        inputWidth,
+        inputHeight,
+        bloomFormat,
+        downscalePerStep,
+      );
       this.steps.push(step);
 
-      // Next step takes the output of this step as input
-      inputWidth = Math.max(1, Math.floor(inputWidth / 2));
-      inputHeight = Math.max(1, Math.floor(inputHeight / 2));
+      // Next step uses adaptive downscale factor
+      inputWidth = Math.max(1, Math.floor(inputWidth * downscalePerStep));
+      inputHeight = Math.max(1, Math.floor(inputHeight * downscalePerStep));
     }
   }
 
@@ -207,6 +226,22 @@ export class BlurComponent extends Component {
     }
 
     return currentInput;
+  }
+
+  /**
+   * Set bloom size multiplier
+   * @param size - Bloom size (1.0 = default, 2.0 = double spread, 0.5 = half spread)
+   */
+  public setBloomSize(size: number): void {
+    const newSize = Math.max(0.25, Math.min(4.0, size)); // Clamp to [0.25, 4.0]
+    if (Math.abs(this.bloomSize - newSize) > 0.01) {
+      this.bloomSize = newSize;
+      this.createBlurSteps(); // Recreate steps with new size
+    }
+  }
+
+  public getBloomSize(): number {
+    return this.bloomSize;
   }
 
   private applyGaussianBlurHorizontal(

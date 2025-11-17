@@ -173,7 +173,7 @@ export class ParticleSystemComponent extends Component {
         this.quadMesh,
         this.particleMaterial,
         this.transform,
-        false, // NO es instancing de storage buffer (es indirect draw)
+        true, // ✅ Skip CPU frustum culling (particles are dynamic, indirect draw handles visibility)
         ParticleSystemComponent.MAX_PARTICLES,
         undefined, // instanceBindGroup no se usa
         this.renderBindGroup, // renderBindGroup para @group(2) del sistema de partículas

@@ -394,6 +394,22 @@ export class BloomComponent extends BlurComponent {
       max: 20,
       step: 1,
     });
+
+    // ✅ Add bloom size control
+    const bloomSizeWrapper = {
+      get bloomSize() {
+        return self.getBloomSize();
+      },
+      set bloomSize(value) {
+        self.setBloomSize(value);
+      },
+    };
+
+    addControl(bloomSizeWrapper, 'bloomSize', `${componentName} Size`, {
+      min: 0.25,
+      max: 4.0,
+      step: 0.05,
+    });
   }
 
   public override renderDebug(): void {
