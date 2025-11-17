@@ -200,6 +200,13 @@ export class Camera {
     return result;
   }
 
+  // ✅ Zero-allocation version: writes result to output parameter
+  public getLocalVectorTo(vec: number[], out: vec3): void {
+    vec3.scale(out, this.left, vec[0] || 0);
+    vec3.scaleAndAdd(out, out, this.up, vec[1] || 0);
+    vec3.scaleAndAdd(out, out, this.front, vec[2] || 0);
+  }
+
   private initializeUniformBuffers(): void {
     // Crear buffer uniforme global para las matrices de la cámara
     this.uniformBuffer = GPUUtils.createBuffer(

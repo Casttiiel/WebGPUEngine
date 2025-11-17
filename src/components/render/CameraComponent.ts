@@ -6,11 +6,16 @@ import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { LinearInterpolator } from '../../core/math/Interpolators';
+import { vec3 } from 'gl-matrix';
 
 export class CameraComponent extends Component {
   protected camera: Camera;
   private isControllable: boolean = false;
   private rotationSpeed: number = 0.005;
+
+  // ✅ Reusable temp vectors to avoid allocations in update()
+  private tempMovement: vec3 = vec3.create();
+  private tempInput: number[] = [0, 0, 0];
 
   constructor() {
     super();
@@ -65,6 +70,8 @@ export class CameraComponent extends Component {
     if (this.isControllable) {
       const input = Engine.getInput();
       const multiplier = input.isKeyPressed(KeyCode.SHIFT) ? 10.0 : 1.0;
+      const moveSpeed = 4.0 * multiplier * dt;
+
       if (input.isKeyJustPressed(KeyCode.SPACE)) {
         /*Engine.getCameraMixer().blendCamera(
           Engine.getEntities().getEntityByName('NextCamera')!,
@@ -72,18 +79,36 @@ export class CameraComponent extends Component {
           new LinearInterpolator(),
         );*/
       }
+
+      // ✅ Zero-allocation camera movement using reusable vectors
       // Movimiento de la cámara
       if (input.isKeyPressed(KeyCode.A)) {
-        this.camera.move(Array.from(this.camera.getLocalVector([4.0 * multiplier * dt, 0, 0])));
+        this.tempInput[0] = moveSpeed;
+        this.tempInput[1] = 0;
+        this.tempInput[2] = 0;
+        this.camera.getLocalVectorTo(this.tempInput, this.tempMovement);
+        this.camera.move(this.tempMovement);
       }
       if (input.isKeyPressed(KeyCode.D)) {
-        this.camera.move(Array.from(this.camera.getLocalVector([-4.0 * multiplier * dt, 0, 0])));
+        this.tempInput[0] = -moveSpeed;
+        this.tempInput[1] = 0;
+        this.tempInput[2] = 0;
+        this.camera.getLocalVectorTo(this.tempInput, this.tempMovement);
+        this.camera.move(this.tempMovement);
       }
       if (input.isKeyPressed(KeyCode.W)) {
-        this.camera.move(Array.from(this.camera.getLocalVector([0, 0, 4.0 * multiplier * dt])));
+        this.tempInput[0] = 0;
+        this.tempInput[1] = 0;
+        this.tempInput[2] = moveSpeed;
+        this.camera.getLocalVectorTo(this.tempInput, this.tempMovement);
+        this.camera.move(this.tempMovement);
       }
       if (input.isKeyPressed(KeyCode.S)) {
-        this.camera.move(Array.from(this.camera.getLocalVector([0, 0, -4.0 * multiplier * dt])));
+        this.tempInput[0] = 0;
+        this.tempInput[1] = 0;
+        this.tempInput[2] = -moveSpeed;
+        this.camera.getLocalVectorTo(this.tempInput, this.tempMovement);
+        this.camera.move(this.tempMovement);
       }
 
       // Rotación de la cámara con el ratón
@@ -94,7 +119,10 @@ export class CameraComponent extends Component {
 
       const mouseWheelDelta = input.getMouseWheelDelta();
       if (mouseWheelDelta !== 0) {
-        this.camera.move(Array.from([0, -0.05 * multiplier * mouseWheelDelta * dt, 0]));
+        this.tempMovement[0] = 0;
+        this.tempMovement[1] = -0.05 * multiplier * mouseWheelDelta * dt;
+        this.tempMovement[2] = 0;
+        this.camera.move(this.tempMovement);
       }
     }
 

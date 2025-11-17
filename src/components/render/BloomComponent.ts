@@ -11,6 +11,7 @@ import { Texture } from '../../renderer/resources/Texture';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { BlurComponent } from './BlurComponent';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 
 export class BloomComponent extends BlurComponent {
   private whiteTexture!: Texture;
@@ -34,6 +35,10 @@ export class BloomComponent extends BlurComponent {
 
   private bloomTexturesBindGroup!: GPUBindGroup | null;
 
+  // ✅ Cached samplers to avoid recreation every frame
+  private cachedLinearSampler!: GPUSampler;
+  private inputTextureCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+
   constructor() {
     super();
     this.renderPassManager = new RenderPassManager();
@@ -47,6 +52,12 @@ export class BloomComponent extends BlurComponent {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.getAsync('bloom_filter.tech');
     this.combineTechnique = await Technique.getAsync('bloom_combine.tech');
+
+    // ✅ Create cached sampler once
+    this.cachedLinearSampler = GPUUtils.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
 
     const qualitySettings = QualitySettings.getInstance();
     const bloomFormat = qualitySettings.getSettings().bloomTexture;
@@ -79,7 +90,11 @@ export class BloomComponent extends BlurComponent {
     const bloomFormat = qualitySettings.getSettings().bloomTexture;
 
     this.result.createRT('bloom_filter_result.dds', Render.width, Render.height, bloomFormat);
+
+    // ✅ Clear caches on resize (textures recreated)
+    this.inputTextureCache.clear();
     this.inputTextureBindGroup = null;
+    this.bloomCombineParamsBindGroup = null;
     this.bloomTexturesBindGroup = null;
   }
 
@@ -189,11 +204,8 @@ export class BloomComponent extends BlurComponent {
   }
 
   private setupCombineBindGroups(): void {
-    // Create a sampler for texture sampling
-    const sampler = GPUUtils.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
+    // ✅ Skip if already created
+    if (this.bloomCombineParamsBindGroup && this.bloomTexturesBindGroup) return;
 
     this.bloomCombineParamsBindGroup = BindGroupFactory.createBindGroup(
       `bloom_combine_params_bindgroup`,
@@ -209,7 +221,7 @@ export class BloomComponent extends BlurComponent {
     );
 
     const bindGroupData = [
-      { binding: 0, resource: sampler },
+      { binding: 0, resource: SamplerLibrary.simpleSampler },
       {
         binding: 1,
         resource: this.steps[0]
@@ -243,28 +255,30 @@ export class BloomComponent extends BlurComponent {
     );
   }
 
+  /**
+   * ✅ Get or create cached input texture bind group
+   */
   private setInputTextureBindGroup(texture: GPUTextureView): void {
-    if (this.inputTextureBindGroup) return;
-
-    const sampler = GPUUtils.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
-
-    this.inputTextureBindGroup = BindGroupFactory.createBindGroup(
-      `bloom_bindgroup`,
-      this.technique.getPipeline().getBindGroupLayout(2),
-      [
-        {
-          binding: 0,
-          resource: texture,
-        },
-        {
-          binding: 1,
-          resource: sampler,
-        },
-      ],
-    );
+    // Check cache first
+    let cached = this.inputTextureCache.get(texture);
+    if (!cached) {
+      cached = BindGroupFactory.createBindGroup(
+        `bloom_input_texture_cached`,
+        this.technique.getPipeline().getBindGroupLayout(2),
+        [
+          {
+            binding: 0,
+            resource: texture,
+          },
+          {
+            binding: 1,
+            resource: this.cachedLinearSampler, // ✅ Use cached sampler
+          },
+        ],
+      );
+      this.inputTextureCache.set(texture, cached);
+    }
+    this.inputTextureBindGroup = cached;
   }
 
   // Inherit blur parameter controls from parent

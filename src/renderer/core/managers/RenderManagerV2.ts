@@ -88,8 +88,16 @@ export class RenderManagerV2 {
 
   public performCulling(camera: Camera, category?: RenderCategory): void {
     let keysToCull = this.keyManager.getAllKeys();
-    if (category) {
-      keysToCull = keysToCull.filter((key) => key.material.getCategory() === category);
+
+    // ✅ Manual loop instead of filter() to avoid array allocation
+    if (category !== undefined) {
+      const filteredKeys: RenderKey[] = [];
+      for (let i = 0; i < keysToCull.length; i++) {
+        if (keysToCull[i]!.material.getCategory() === category) {
+          filteredKeys.push(keysToCull[i]!);
+        }
+      }
+      keysToCull = filteredKeys;
     }
 
     const culledKeys = this.cpuCuller!.performCulling(keysToCull, camera);
@@ -102,9 +110,14 @@ export class RenderManagerV2 {
     // Reset render state for this pass
     this.stateManager.reset();
 
-    // Filter culled keys by category
+    // ✅ Manual loop instead of filter() to avoid array allocation
     const keys = this.camera.getCulledKeys();
-    const keysToDraw = keys.filter((key) => key.material.getCategory() === category);
+    const keysToDraw: RenderKey[] = [];
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i]!.material.getCategory() === category) {
+        keysToDraw.push(keys[i]!);
+      }
+    }
 
     // Sort keys for optimal rendering
     this.keyManager.sortKeys(keysToDraw, category, this.camera);

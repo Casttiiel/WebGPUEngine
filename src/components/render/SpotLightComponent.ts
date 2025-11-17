@@ -30,6 +30,17 @@ export class SpotLightComponent extends CameraComponent {
 
   private technique!: Technique;
 
+  // ✅ Reusable buffers for GPU writes (zero allocations in updateLightUniforms)
+  private colorBuffer = new Float32Array(4);
+  private positionBuffer = new Float32Array(4);
+  private radiusBuffer = new Float32Array(1);
+  private shadowStepBuffer = new Float32Array(1);
+  private shadowInvResBuffer = new Float32Array(1);
+  private shadowStepDivResBuffer = new Float32Array(1);
+  private falloffBuffer = new Float32Array(4);
+  private paddingBuffer = new Float32Array(3);
+  private extraPaddingBuffer = new Float32Array(1);
+
   constructor() {
     super();
   }
@@ -171,54 +182,49 @@ export class SpotLightComponent extends CameraComponent {
   }
 
   private updateLightUniforms(): void {
-    GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
-    GPUUtils.writeBuffer(
-      this.uniformBuffer,
-      16,
-      new Float32Array(
-        vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
-      ),
-    );
+    // ✅ Update reusable buffers instead of creating new Float32Arrays
+    this.colorBuffer[0] = this.color[0];
+    this.colorBuffer[1] = this.color[1];
+    this.colorBuffer[2] = this.color[2];
+    this.colorBuffer[3] = this.color[3];
 
-    // Calculate LightViewProjOffset matrix
-    const mtx_scale = mat4.create();
-    const mtx_translation = mat4.create();
-    const mtx_offset = mat4.create();
-    const lightViewProjOffset = mat4.create();
+    this.positionBuffer[0] = this.position[0];
+    this.positionBuffer[1] = this.position[1];
+    this.positionBuffer[2] = this.position[2];
+    this.positionBuffer[3] = this.intensity;
 
-    mat4.scale(mtx_scale, mat4.create(), [0.5, -0.5, 1.0]);
-    mat4.translate(mtx_translation, mat4.create(), [0.5, 0.5, 0.0]);
-    mat4.multiply(mtx_offset, mtx_scale, mtx_translation);
-    mat4.multiply(lightViewProjOffset, this.camera.getViewProjection(), mtx_offset);
+    this.radiusBuffer[0] = this.radius;
 
-    // Escribir la matriz lightViewProjOffset completa (NO solo ViewProjection)
-    GPUUtils.writeBuffer(this.uniformBuffer, 32, new Float32Array(this.camera.getViewProjection())); // radius (f32) - bytes 96-99 (no se usa para directional light)
-    GPUUtils.writeBuffer(this.uniformBuffer, 96, new Float32Array([this.radius]));
-
-    // shadowStep (f32) - bytes 100-103
     const shadowStep = 2.0;
-    GPUUtils.writeBuffer(this.uniformBuffer, 100, new Float32Array([shadowStep]));
+    this.shadowStepBuffer[0] = shadowStep;
 
-    // shadowInverseResolution (f32) - bytes 104-107
     const shadowInverseResolution = 1.0 / this.shadowWidth;
-    GPUUtils.writeBuffer(this.uniformBuffer, 104, new Float32Array([shadowInverseResolution]));
+    this.shadowInvResBuffer[0] = shadowInverseResolution;
 
-    // shadowStepDivResolution (f32) - bytes 108-111
     const shadowStepDivResolution = shadowStep / this.shadowWidth;
-    GPUUtils.writeBuffer(this.uniformBuffer, 108, new Float32Array([shadowStepDivResolution]));
+    this.shadowStepDivResBuffer[0] = shadowStepDivResolution;
 
-    // startFalloff (f32) - bytes 112-115 (no se usa para directional light)
-    GPUUtils.writeBuffer(
-      this.uniformBuffer,
-      112,
-      new Float32Array(vec4.fromValues(this.startFallof, 0.0, 0.0, 0.0)),
-    );
+    this.falloffBuffer[0] = this.startFallof;
+    this.falloffBuffer[1] = 0.0;
+    this.falloffBuffer[2] = 0.0;
+    this.falloffBuffer[3] = 0.0;
 
-    // padding (vec3) - bytes 116-127
-    GPUUtils.writeBuffer(this.uniformBuffer, 116, new Float32Array([0.0, 0.0, 0.0]));
+    this.paddingBuffer[0] = 0.0;
+    this.paddingBuffer[1] = 0.0;
+    this.paddingBuffer[2] = 0.0;
 
-    // extraPadding (f32) - bytes 128-131
-    GPUUtils.writeBuffer(this.uniformBuffer, 128, new Float32Array([0.0]));
+    this.extraPaddingBuffer[0] = 0.0;
+
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, this.colorBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 16, this.positionBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 32, new Float32Array(this.camera.getViewProjection()));
+    GPUUtils.writeBuffer(this.uniformBuffer, 96, this.radiusBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 100, this.shadowStepBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 104, this.shadowInvResBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 108, this.shadowStepDivResBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 112, this.falloffBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 116, this.paddingBuffer);
+    GPUUtils.writeBuffer(this.uniformBuffer, 128, this.extraPaddingBuffer);
 
     GPUUtils.writeBuffer(
       this.modelUniformBuffer,

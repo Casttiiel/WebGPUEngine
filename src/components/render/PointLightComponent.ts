@@ -20,6 +20,12 @@ export class PointLightComponent extends Component {
 
   private technique!: Technique;
 
+  // ✅ Reusable buffers for GPU writes (zero allocations in update)
+  private colorBuffer = new Float32Array(4);
+  private positionBuffer = new Float32Array(4);
+  private radiusBuffer = new Float32Array(4);
+  private falloffBuffer = new Float32Array(4);
+
   constructor() {
     super();
   }
@@ -91,26 +97,32 @@ export class PointLightComponent extends Component {
         .setLocalScale(vec3.fromValues(this.radius + 1.0, this.radius + 1.0, this.radius + 1.0));
       vec3.copy(this.position, transform.getTransform().getWorldPosition());
 
-      GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.color));
-      GPUUtils.writeBuffer(
-        this.uniformBuffer,
-        16,
-        new Float32Array(
-          vec4.fromValues(this.position[0], this.position[1], this.position[2], this.intensity),
-        ),
-      );
+      // ✅ Update reusable buffers instead of creating new Float32Arrays
+      this.colorBuffer[0] = this.color[0];
+      this.colorBuffer[1] = this.color[1];
+      this.colorBuffer[2] = this.color[2];
+      this.colorBuffer[3] = this.color[3];
 
-      GPUUtils.writeBuffer(
-        this.uniformBuffer,
-        96,
-        new Float32Array(vec4.fromValues(this.radius, 0.0, 0.0, 0.0)),
-      );
+      this.positionBuffer[0] = this.position[0];
+      this.positionBuffer[1] = this.position[1];
+      this.positionBuffer[2] = this.position[2];
+      this.positionBuffer[3] = this.intensity;
 
-      GPUUtils.writeBuffer(
-        this.uniformBuffer,
-        112,
-        new Float32Array(vec4.fromValues(this.startFallof, 0.0, 0.0, 0.0)),
-      );
+      this.radiusBuffer[0] = this.radius;
+      this.radiusBuffer[1] = 0.0;
+      this.radiusBuffer[2] = 0.0;
+      this.radiusBuffer[3] = 0.0;
+
+      this.falloffBuffer[0] = this.startFallof;
+      this.falloffBuffer[1] = 0.0;
+      this.falloffBuffer[2] = 0.0;
+      this.falloffBuffer[3] = 0.0;
+
+      GPUUtils.writeBuffer(this.uniformBuffer, 0, this.colorBuffer);
+      GPUUtils.writeBuffer(this.uniformBuffer, 16, this.positionBuffer);
+      GPUUtils.writeBuffer(this.uniformBuffer, 96, this.radiusBuffer);
+      GPUUtils.writeBuffer(this.uniformBuffer, 112, this.falloffBuffer);
+
       this.isDirty = false;
     }
   }

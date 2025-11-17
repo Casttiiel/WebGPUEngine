@@ -11,7 +11,7 @@ export class Render {
   private static instance: Render;
 
   // Performance optimization: Maximum 4K render resolution
-  private static readonly MAX_RENDER_WIDTH = 3860;
+  private static readonly MAX_RENDER_WIDTH = 3840;
   private static readonly MAX_RENDER_HEIGHT = 2160;
 
   // Objetos principales de WebGPU

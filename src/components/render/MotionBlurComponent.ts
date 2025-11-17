@@ -39,14 +39,14 @@ export class MotionBlurComponent extends Component {
   // mat4x4 (64 bytes) + mat4x4 (64 bytes) + 4 floats (16 bytes) = 144 bytes
   private paramsBuffer!: GPUBuffer;
   private _blurStrength: number = 1.0; // Blur intensity
-  private _numSamples: number = 16; // Sample count
+  private _numSamples: number = 6; // Sample count
 
   // Previous frame matrices for velocity calculation
   private previousViewProjection: mat4 = mat4.create();
   private currentInvViewProjection: mat4 = mat4.create();
 
-  // Bind groups
-  private paramsBindGroup!: GPUBindGroup | null;
+  // ✅ Cache bind groups per texture to avoid incorrect reuse
+  private bindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
   constructor() {
     super();
@@ -82,17 +82,6 @@ export class MotionBlurComponent extends Component {
 
     // Initial update
     this.updateParams();
-  }
-
-  public resize(): void {
-    const qualitySettings = QualitySettings.getInstance();
-    const hdrTexture = qualitySettings.getSettings().hdrTexture;
-
-    // Recreate render target with new resolution
-    this.result.createRT('motion_blur_result.dds', Render.width, Render.height, hdrTexture, false);
-
-    // Invalidate bind groups
-    this.paramsBindGroup = null;
   }
 
   /**
@@ -151,10 +140,11 @@ export class MotionBlurComponent extends Component {
     // Update camera matrices before rendering
     this.updateCameraMatrices();
 
-    // Create params bind group (group 1) if not cached
-    if (!this.paramsBindGroup) {
-      this.paramsBindGroup = BindGroupFactory.createBindGroup(
-        'motion_blur_params',
+    // ✅ Get or create cached bind group for this texture
+    let cachedBindGroup = this.bindGroupCache.get(inputTexture);
+    if (!cachedBindGroup) {
+      cachedBindGroup = BindGroupFactory.createBindGroup(
+        'motion_blur_params_cached',
         this.technique.getPipeline().getBindGroupLayout(2),
         [
           {
@@ -173,18 +163,29 @@ export class MotionBlurComponent extends Component {
           },
         ],
       );
+      this.bindGroupCache.set(inputTexture, cachedBindGroup);
     }
 
     // Execute motion blur pass using custom pass execution
     this.renderPassManager.executeMotionBlurPass(
       this.fullscreenQuadMesh,
       this.technique,
-      this.paramsBindGroup,
+      cachedBindGroup, // ✅ Use cached bind group
       gBufferBindGroup,
       this.result,
     );
 
     return this.result.getView();
+  }
+
+  public resize(): void {
+    const qualitySettings = QualitySettings.getInstance();
+    const hdrTexture = qualitySettings.getSettings().hdrTexture;
+
+    this.result.createRT('motion_blur_result.dds', Render.width, Render.height, hdrTexture, false);
+
+    // ✅ Clear cache on resize (textures recreated)
+    this.bindGroupCache.clear();
   }
 
   /**

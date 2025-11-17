@@ -42,8 +42,13 @@ export class ModuleCameraMixer extends Module {
       }
     }
 
-    // Remove dead cameras
-    this.mixedCameras = this.mixedCameras.filter((mc) => mc.appliedWeight > 0.0);
+    // ✅ Remove dead cameras without creating new array
+    // Remove in reverse to avoid index shifting issues
+    for (let i = this.mixedCameras.length - 1; i >= 0; i--) {
+      if (this.mixedCameras[i]!.appliedWeight <= 0.0) {
+        this.mixedCameras.splice(i, 1);
+      }
+    }
 
     // Blend all active cameras
     let result = this.getCameraComponentFromEntity(this.defaultCamera)!.getCamera();

@@ -12,9 +12,11 @@ export class ToneMappingComponent extends Component {
   private isLoaded = false;
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
-  private bindGroup!: GPUBindGroup | null;
   private result!: RenderTarget;
   private renderPassManager!: RenderPassManager;
+
+  // ✅ Cache bind groups per texture to avoid recreation every frame
+  private bindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
   constructor() {
     super();
@@ -37,41 +39,49 @@ export class ToneMappingComponent extends Component {
     const toneMappingFormat = QualitySettings.getInstance().getSettings().toneMappingTexture;
 
     this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, toneMappingFormat);
-    this.bindGroup = null;
+    // ✅ Clear cache on resize (textures recreated)
+    this.bindGroupCache.clear();
   }
 
   public apply(texture: GPUTextureView): GPUTextureView {
-    this.createBindGroup(texture);
+    const bindGroup = this.getOrCreateBindGroup(texture);
 
     // Use RenderPassManager to execute tone mapping pass dynamically
     this.renderPassManager.executeToneMappingPass(
       this.fullscreenQuadMesh,
       this.technique,
-      this.bindGroup!,
+      bindGroup,
       this.result,
     );
 
     return this.result.getView();
   }
-  private createBindGroup(texture: GPUTextureView): void {
-    if (this.bindGroup) return;
 
-    const sampler = SamplerLibrary.simpleSampler;
+  /**
+   * ✅ Get or create cached bind group for texture (avoids recreation every frame)
+   */
+  private getOrCreateBindGroup(texture: GPUTextureView): GPUBindGroup {
+    let bindGroup = this.bindGroupCache.get(texture);
+    if (!bindGroup) {
+      const sampler = SamplerLibrary.simpleSampler;
 
-    this.bindGroup = BindGroupFactory.createBindGroup(
-      `tonemapping_bindgroup`,
-      this.technique.getPipeline().getBindGroupLayout(0),
-      [
-        {
-          binding: 0,
-          resource: texture,
-        },
-        {
-          binding: 1,
-          resource: sampler,
-        },
-      ],
-    );
+      bindGroup = BindGroupFactory.createBindGroup(
+        `tonemapping_bindgroup`,
+        this.technique.getPipeline().getBindGroupLayout(0),
+        [
+          {
+            binding: 0,
+            resource: texture,
+          },
+          {
+            binding: 1,
+            resource: sampler,
+          },
+        ],
+      );
+      this.bindGroupCache.set(texture, bindGroup);
+    }
+    return bindGroup;
   }
   public update(_dt: number): void {
     throw new Error('Method not implemented.');

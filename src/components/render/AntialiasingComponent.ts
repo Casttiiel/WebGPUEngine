@@ -13,9 +13,11 @@ export class AntialiasingComponent extends Component {
   private loaded = false;
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
-  private bindGroup!: GPUBindGroup | null;
   private result!: RenderTarget;
   private renderPassManager!: RenderPassManager;
+
+  // ✅ Cache bind groups per texture to avoid recreation every frame
+  private bindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
   // FXAA parameters that can be tweaked
   private fxaaParams = {
@@ -46,42 +48,49 @@ export class AntialiasingComponent extends Component {
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
     this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
-    this.bindGroup = null;
+    // ✅ Clear cache on resize
+    this.bindGroupCache.clear();
   }
 
   public apply(texture: GPUTextureView): GPUTextureView {
-    this.createBindGroup(texture);
+    const bindGroup = this.getOrCreateBindGroup(texture);
 
     // Use RenderPassManager to execute antialiasing pass dynamically
     this.renderPassManager.executeAntialiasingPass(
       this.fullscreenQuadMesh,
       this.technique,
-      this.bindGroup!,
+      bindGroup,
       this.result,
     );
 
     return this.result.getView();
   }
 
-  private createBindGroup(texture: GPUTextureView): void {
-    if (this.bindGroup) return;
+  /**
+   * ✅ Get or create cached bind group for texture (avoids recreation every frame)
+   */
+  private getOrCreateBindGroup(texture: GPUTextureView): GPUBindGroup {
+    let bindGroup = this.bindGroupCache.get(texture);
+    if (!bindGroup) {
+      const sampler = SamplerLibrary.simpleSampler;
 
-    const sampler = SamplerLibrary.simpleSampler;
-
-    this.bindGroup = BindGroupFactory.createBindGroup(
-      `antialiasing_bindgroup`,
-      this.technique.getPipeline().getBindGroupLayout(1),
-      [
-        {
-          binding: 0,
-          resource: texture,
-        },
-        {
-          binding: 1,
-          resource: sampler,
-        },
-      ],
-    );
+      bindGroup = BindGroupFactory.createBindGroup(
+        `antialiasing_bindgroup`,
+        this.technique.getPipeline().getBindGroupLayout(1),
+        [
+          {
+            binding: 0,
+            resource: texture,
+          },
+          {
+            binding: 1,
+            resource: sampler,
+          },
+        ],
+      );
+      this.bindGroupCache.set(texture, bindGroup);
+    }
+    return bindGroup;
   }
 
   public update(_dt: number): void {

@@ -17,6 +17,19 @@ export class CPUCullingManager {
     lastCullTime: 0,
   };
 
+  // ✅ Reusable frustum planes array (6 planes, 4 floats each)
+  private frustumPlanes: Float32Array[] = [
+    new Float32Array(4), // Left
+    new Float32Array(4), // Right
+    new Float32Array(4), // Bottom
+    new Float32Array(4), // Top
+    new Float32Array(4), // Near
+    new Float32Array(4), // Far
+  ];
+
+  // ✅ Reusable matrix for view-projection calculation
+  private viewProjMatrix: mat4 = mat4.create();
+
   constructor() {
     // Simple constructor - no complex initialization needed
   }
@@ -33,12 +46,12 @@ export class CPUCullingManager {
     this.stats.totalObjects = keys.length;
     const visibleKeys: RenderKey[] = [];
 
-    // Get camera frustum planes
-    const frustumPlanes = this.extractFrustumPlanes(camera);
+    // Get camera frustum planes (zero-allocation version)
+    this.extractFrustumPlanes(camera);
 
     // Test each object against frustum
     for (const key of keys) {
-      if (key.isInstanced || this.isVisibleInFrustum(key, frustumPlanes)) {
+      if (key.isInstanced || this.isVisibleInFrustum(key, this.frustumPlanes)) {
         visibleKeys.push(key);
       }
     }
@@ -53,88 +66,62 @@ export class CPUCullingManager {
 
   /**
    * Extract frustum planes from camera view-projection matrix
+   * ✅ Zero-allocation version using reusable Float32Arrays
    */
-  private extractFrustumPlanes(camera: Camera): Float32Array[] {
-    const viewProjMatrix = mat4.create();
-    mat4.multiply(viewProjMatrix, camera.getProjection(), camera.getView());
+  private extractFrustumPlanes(camera: Camera): void {
+    mat4.multiply(this.viewProjMatrix, camera.getProjection(), camera.getView());
 
-    // Extract 6 frustum planes (left, right, bottom, top, near, far)
-    const planes: Float32Array[] = [];
+    const m = this.viewProjMatrix;
 
     // Left plane: matrix[3] + matrix[0]
-    planes.push(
-      new Float32Array([
-        viewProjMatrix[3] + viewProjMatrix[0],
-        viewProjMatrix[7] + viewProjMatrix[4],
-        viewProjMatrix[11] + viewProjMatrix[8],
-        viewProjMatrix[15] + viewProjMatrix[12],
-      ]),
-    );
+    this.frustumPlanes[0]![0] = m[3] + m[0];
+    this.frustumPlanes[0]![1] = m[7] + m[4];
+    this.frustumPlanes[0]![2] = m[11] + m[8];
+    this.frustumPlanes[0]![3] = m[15] + m[12];
 
     // Right plane: matrix[3] - matrix[0]
-    planes.push(
-      new Float32Array([
-        viewProjMatrix[3] - viewProjMatrix[0],
-        viewProjMatrix[7] - viewProjMatrix[4],
-        viewProjMatrix[11] - viewProjMatrix[8],
-        viewProjMatrix[15] - viewProjMatrix[12],
-      ]),
-    );
+    this.frustumPlanes[1]![0] = m[3] - m[0];
+    this.frustumPlanes[1]![1] = m[7] - m[4];
+    this.frustumPlanes[1]![2] = m[11] - m[8];
+    this.frustumPlanes[1]![3] = m[15] - m[12];
 
     // Bottom plane: matrix[3] + matrix[1]
-    planes.push(
-      new Float32Array([
-        viewProjMatrix[3] + viewProjMatrix[1],
-        viewProjMatrix[7] + viewProjMatrix[5],
-        viewProjMatrix[11] + viewProjMatrix[9],
-        viewProjMatrix[15] + viewProjMatrix[13],
-      ]),
-    );
+    this.frustumPlanes[2]![0] = m[3] + m[1];
+    this.frustumPlanes[2]![1] = m[7] + m[5];
+    this.frustumPlanes[2]![2] = m[11] + m[9];
+    this.frustumPlanes[2]![3] = m[15] + m[13];
 
     // Top plane: matrix[3] - matrix[1]
-    planes.push(
-      new Float32Array([
-        viewProjMatrix[3] - viewProjMatrix[1],
-        viewProjMatrix[7] - viewProjMatrix[5],
-        viewProjMatrix[11] - viewProjMatrix[9],
-        viewProjMatrix[15] - viewProjMatrix[13],
-      ]),
-    );
+    this.frustumPlanes[3]![0] = m[3] - m[1];
+    this.frustumPlanes[3]![1] = m[7] - m[5];
+    this.frustumPlanes[3]![2] = m[11] - m[9];
+    this.frustumPlanes[3]![3] = m[15] - m[13];
 
     // Near plane: matrix[3] + matrix[2]
-    planes.push(
-      new Float32Array([
-        viewProjMatrix[3] + viewProjMatrix[2],
-        viewProjMatrix[7] + viewProjMatrix[6],
-        viewProjMatrix[11] + viewProjMatrix[10],
-        viewProjMatrix[15] + viewProjMatrix[14],
-      ]),
-    );
+    this.frustumPlanes[4]![0] = m[3] + m[2];
+    this.frustumPlanes[4]![1] = m[7] + m[6];
+    this.frustumPlanes[4]![2] = m[11] + m[10];
+    this.frustumPlanes[4]![3] = m[15] + m[14];
 
     // Far plane: matrix[3] - matrix[2]
-    planes.push(
-      new Float32Array([
-        viewProjMatrix[3] - viewProjMatrix[2],
-        viewProjMatrix[7] - viewProjMatrix[6],
-        viewProjMatrix[11] - viewProjMatrix[10],
-        viewProjMatrix[15] - viewProjMatrix[14],
-      ]),
-    );
+    this.frustumPlanes[5]![0] = m[3] - m[2];
+    this.frustumPlanes[5]![1] = m[7] - m[6];
+    this.frustumPlanes[5]![2] = m[11] - m[10];
+    this.frustumPlanes[5]![3] = m[15] - m[14];
 
     // Normalize planes
-    for (const plane of planes) {
+    for (const plane of this.frustumPlanes) {
       const length = Math.sqrt(
         plane[0]! * plane[0]! + plane[1]! * plane[1]! + plane[2]! * plane[2]!,
       );
       if (length > 0) {
-        plane[0]! /= length;
-        plane[1]! /= length;
-        plane[2]! /= length;
-        plane[3]! /= length;
+        const invLength = 1.0 / length;
+        plane[0]! *= invLength;
+        plane[1]! *= invLength;
+        plane[2]! *= invLength;
+        plane[3]! *= invLength;
       }
     }
-
-    return planes;
   }
 
   /**

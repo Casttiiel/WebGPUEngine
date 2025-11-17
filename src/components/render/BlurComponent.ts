@@ -57,7 +57,7 @@ export class BlurStep {
 export class BlurComponent extends Component {
   protected steps: BlurStep[] = [];
   protected sampler!: GPUSampler;
-  protected maxBlurSteps: number = 4;
+  protected maxBlurSteps: number = 3;
 
   // Gaussian blur properties following C++ blur.fx pattern
   private gaussianBlurTechnique!: Technique;
@@ -81,6 +81,13 @@ export class BlurComponent extends Component {
     third: 3,
   };
 
+  // ✅ Reusable buffer to avoid allocations in update loop
+  private directionData: Float32Array = new Float32Array(4);
+
+  // ✅ Cached bind groups to avoid creation every frame (CRITICAL for performance)
+  private uniformBindGroup!: GPUBindGroup;
+  private textureBindGroupsCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+
   constructor() {
     super();
   }
@@ -99,6 +106,13 @@ export class BlurComponent extends Component {
 
     // Create sampler for texture sampling
     this.sampler = SamplerLibrary.bloom;
+
+    // ✅ Create cached uniform bind group (reused every frame)
+    this.uniformBindGroup = BindGroupFactory.createBindGroup(
+      'gaussian_blur_uniform_cached',
+      this.gaussianBlurTechnique.getBindGroupLayout(1)!,
+      [{ binding: 0, resource: { buffer: this.gaussianBlurUniformBuffer } }],
+    );
 
     this.createBlurSteps();
     this.updateGaussianBlurParams();
@@ -124,12 +138,36 @@ export class BlurComponent extends Component {
     GPUUtils.writeBuffer(this.gaussianBlurUniformBuffer, 0, uniformData);
   }
 
+  /**
+   * ✅ Get or create cached texture bind group (avoids 16 BindGroup creations per frame)
+   */
+  private getOrCreateTextureBindGroup(texture: GPUTextureView): GPUBindGroup {
+    // Check cache first
+    let bindGroup = this.textureBindGroupsCache.get(texture);
+    if (!bindGroup) {
+      // Create and cache new bind group
+      bindGroup = BindGroupFactory.createBindGroup(
+        'gaussian_blur_texture_cached',
+        this.gaussianBlurTechnique.getBindGroupLayout(0)!,
+        [
+          { binding: 0, resource: texture },
+          { binding: 1, resource: this.sampler },
+        ],
+      );
+      this.textureBindGroupsCache.set(texture, bindGroup);
+    }
+    return bindGroup;
+  }
+
   private createBlurSteps(): void {
     const bloomFormat = QualitySettings.getInstance().getSettings().bloomTexture;
 
     // Clear existing steps
     this.steps.forEach((step) => step.dispose());
     this.steps = [];
+
+    // ✅ Clear bind group cache when recreating steps (resolution change)
+    this.textureBindGroupsCache.clear();
 
     // Create blur steps with progressively smaller input resolutions
     // Each step takes input at one resolution and outputs at half resolution
@@ -197,24 +235,10 @@ export class BlurComponent extends Component {
     const pipeline = this.gaussianBlurTechnique.getPipeline();
     renderPass.setPipeline(pipeline);
 
-    // Bind texture and uniform resources
-    const textureBindGroup = BindGroupFactory.createBindGroup(
-      'gaussian_blur_h_texture',
-      this.gaussianBlurTechnique.getBindGroupLayout(0)!,
-      [
-        { binding: 0, resource: inputTexture },
-        { binding: 1, resource: this.sampler },
-      ],
-    );
-
-    const uniformBindGroup = BindGroupFactory.createBindGroup(
-      'gaussian_blur_h_uniform',
-      this.gaussianBlurTechnique.getBindGroupLayout(1)!,
-      [{ binding: 0, resource: { buffer: this.gaussianBlurUniformBuffer } }],
-    );
-
+    // ✅ Use cached bind groups instead of creating new ones every frame
+    const textureBindGroup = this.getOrCreateTextureBindGroup(inputTexture);
     renderPass.setBindGroup(0, textureBindGroup);
-    renderPass.setBindGroup(1, uniformBindGroup);
+    renderPass.setBindGroup(1, this.uniformBindGroup);
 
     // Render fullscreen quad
     this.fullscreenQuadMesh.activate(renderPass);
@@ -250,24 +274,10 @@ export class BlurComponent extends Component {
     const pipeline = this.gaussianBlurTechnique.getPipeline();
     renderPass.setPipeline(pipeline);
 
-    // Bind texture and uniform resources
-    const textureBindGroup = BindGroupFactory.createBindGroup(
-      'gaussian_blur_v_texture',
-      this.gaussianBlurTechnique.getBindGroupLayout(0)!,
-      [
-        { binding: 0, resource: inputTexture },
-        { binding: 1, resource: this.sampler },
-      ],
-    );
-
-    const uniformBindGroup = BindGroupFactory.createBindGroup(
-      'gaussian_blur_v_uniform',
-      this.gaussianBlurTechnique.getBindGroupLayout(1)!,
-      [{ binding: 0, resource: { buffer: this.gaussianBlurUniformBuffer } }],
-    );
-
+    // ✅ Use cached bind groups instead of creating new ones every frame
+    const textureBindGroup = this.getOrCreateTextureBindGroup(inputTexture);
     renderPass.setBindGroup(0, textureBindGroup);
-    renderPass.setBindGroup(1, uniformBindGroup);
+    renderPass.setBindGroup(1, this.uniformBindGroup);
 
     // Render fullscreen quad
     this.fullscreenQuadMesh.activate(renderPass);
@@ -279,11 +289,15 @@ export class BlurComponent extends Component {
 
   /**
    * Update the direction in the Gaussian blur uniform buffer
+   * ✅ Zero-allocation version using reusable Float32Array
    */
   private updateGaussianBlurDirection(dirX: number, dirY: number): void {
     // Update only the direction part of the uniform buffer (offset 32 bytes = 8 floats)
-    const directionData = new Float32Array([dirX, dirY, 0.0, 0.0]);
-    GPUUtils.writeBuffer(this.gaussianBlurUniformBuffer, 32, directionData);
+    this.directionData[0] = dirX;
+    this.directionData[1] = dirY;
+    this.directionData[2] = 0.0;
+    this.directionData[3] = 0.0;
+    GPUUtils.writeBuffer(this.gaussianBlurUniformBuffer, 32, this.directionData);
   }
 
   // Gaussian blur parameter setters
