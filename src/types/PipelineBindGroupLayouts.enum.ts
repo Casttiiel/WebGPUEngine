@@ -21,4 +21,5 @@ export enum PipelineBindGroupLayouts {
   DOF_PARAMS = 'DOFParams',
   DOF_BLUR_TEXTURES = 'DOFBlurTextures',
   DOF_COMPOSITE_TEXTURES = 'DOFCompositeTextures',
+  MOTION_BLUR_PARAMS = 'MotionBlurParams',
 }

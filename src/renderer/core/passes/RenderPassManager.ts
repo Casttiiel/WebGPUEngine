@@ -11,6 +11,7 @@ import {
   AmbientOcclusionRenderPass,
   AOBilateralFilterRenderPass,
   BloomFilteringRenderPass,
+  MotionBlurRenderPass,
 } from './PostProcessingRenderPasses';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderTarget } from '../../resources/RenderTarget';
@@ -246,6 +247,27 @@ export class RenderPassManager {
       technique,
       gBufferBindGroup,
       aoBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Create and execute a motion blur pass dynamically
+   */
+  public executeMotionBlurPass(
+    mesh: Mesh,
+    technique: Technique,
+    paramsBindGroup: GPUBindGroup,
+    texturesBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const pass = new MotionBlurRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      paramsBindGroup,
+      texturesBindGroup,
     );
     this.executeDynamicPass(pass);
   }
