@@ -758,8 +758,24 @@ export class BindGroupFactory {
     ]);
   }
 
-  public static getDOFUniformsLayout(): GPUBindGroupLayout {
-    return this.getLayout('dof_uniforms', [
+  /**
+   * DOF parameters (focus_distance, aperture, focal_length, sensor_height)
+   */
+  public static getDOFParamsLayout(): GPUBindGroupLayout {
+    return this.getLayout('dof_params', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
+  /**
+   * DOF blur textures (inputTexture, cocTexture, sampler)
+   */
+  public static getDOFBlurTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('dof_blur_textures', [
       {
         binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
@@ -773,7 +789,40 @@ export class BindGroupFactory {
       {
         binding: 2,
         visibility: GPUShaderStage.FRAGMENT,
-        buffer: { type: 'uniform' },
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
+  /**
+   * DOF composite textures (originalTexture, nearBlurTexture, farBlurTexture, cocTexture)
+   */
+  public static getDOFCompositeTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('dof_composite_textures', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
       },
     ]);
   }
@@ -820,8 +869,12 @@ export class BindGroupFactory {
         return this.getParticleUniformsLayout();
       case PipelineBindGroupLayouts.INSTANCE_STORAGE:
         return this.getInstanceStorageLayout();
-      case PipelineBindGroupLayouts.DOF_UNIFORMS:
-        return this.getDOFUniformsLayout();
+      case PipelineBindGroupLayouts.DOF_PARAMS:
+        return this.getDOFParamsLayout();
+      case PipelineBindGroupLayouts.DOF_BLUR_TEXTURES:
+        return this.getDOFBlurTexturesLayout();
+      case PipelineBindGroupLayouts.DOF_COMPOSITE_TEXTURES:
+        return this.getDOFCompositeTexturesLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

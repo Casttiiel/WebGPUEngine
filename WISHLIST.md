@@ -1,4 +1,10 @@
 ---------------------------------------Wishlist Backlog-----------------------------------
+Animations
+TAA Anti-aliasing temporal
+UI
+Auto exposure
+GPUDrivenRendering with indirect draw calls and frustum culling on GPU
+Tool for asset creation (Pregenerar AABBs y tangentes)
 Froxel Scattering
 Grain
 Lens Flare

@@ -1,46 +1,60 @@
-#include "common/uniforms"
-
-struct DOFUniforms {
-    focus_z_center_in_focus: f32,
-    focus_z_margin_in_focus: f32,
-    focus_transition_distance: f32,
-    focus_modifier: f32,
+struct CameraUniforms {
+    viewMatrix: mat4x4<f32>,
+    projectionMatrix: mat4x4<f32>,
+    invViewProjection: mat4x4<f32>,
+    cameraPosition: vec3<f32>,
+    screenSize: vec2<f32>,
+    cameraFront: vec3<f32>,
+    cameraZFar: f32,
+    invProjection: mat4x4<f32>,
 }
-
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
-// G-Buffer textures - using the standard G-Buffer layout
-@group(1) @binding(0) var gAlbedo: texture_2d<f32>;     // Input texture (lit scene)
-@group(1) @binding(1) var gNormals: texture_2d<f32>;     // World normals
-@group(1) @binding(2) var gLinearDepth: texture_2d<f32>; // Linear depth
-@group(1) @binding(3) var samplerGBuffer: sampler;      // Shared sampler
+// G-Buffer textures
+@group(1) @binding(0) var gAlbedo: texture_2d<f32>;
+@group(1) @binding(1) var gNormals: texture_2d<f32>;
+@group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
+@group(1) @binding(3) var samplerGBuffer: sampler;
 
-// DOF Parameters
-@group(2) @binding(0) var focusTexture: texture_2d<f32>;
-@group(2) @binding(1) var blurTexture: texture_2d<f32>;
-@group(2) @binding(2) var<uniform> dofParams: DOFUniforms;
+// DOF Textures: Original, Near blur, Far blur, CoC
+@group(2) @binding(0) var originalTexture: texture_2d<f32>;
+@group(2) @binding(1) var nearBlurTexture: texture_2d<f32>;
+@group(2) @binding(2) var farBlurTexture: texture_2d<f32>;
+@group(2) @binding(3) var cocTexture: texture_2d<f32>;
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-  var in_focus  = textureSample(focusTexture, samplerGBuffer, uv);
-  var out_focus  = textureSample(blurTexture, samplerGBuffer, uv);
-  var zlinear = textureSample(gLinearDepth, samplerGBuffer, uv).x * camera.cameraZFar;
-
-  // if focus_z_center_in_focus   = 300;
-  // if focus_z_margin_in_focus   =  50;
-  // if focus_transition_distance = 100;
-
-  // We want for z between 250 and 350 => all_in_focus     ++++++++++
-  // We want for z between 350 and 450 => mix between in_focus and out_Focus   XXXXX
-  // We want for z between 150 and 250 => mix between in_focus and out_Focus   XXXXX
-  // We want for z beyond  450 or <150 => all out_Focus    ----------
-  //                        300
-  // ---------XXXXXXXXXX+++++F+++++XXXXXXXXXX-------------
-  var distance_to_focus = abs( zlinear - dofParams.focus_z_center_in_focus );
-  var amount_of_out_blur = smoothstep( dofParams.focus_z_margin_in_focus, dofParams.focus_z_margin_in_focus + dofParams.focus_transition_distance, distance_to_focus );
-  amount_of_out_blur = pow( amount_of_out_blur, dofParams.focus_modifier);
-  
-  //return amount_of_out_blur;
-  return amount_of_out_blur * out_focus + ( 1. - amount_of_out_blur) * in_focus;
+    let original = textureSample(originalTexture, samplerGBuffer, uv);
+    let nearBlur = textureSample(nearBlurTexture, samplerGBuffer, uv);
+    let farBlur = textureSample(farBlurTexture, samplerGBuffer, uv);
+    let cocData = textureSample(cocTexture, samplerGBuffer, uv);
+    
+    let farCoC = cocData.r;   // Background blur amount
+    let nearCoC = cocData.g;  // Foreground blur amount
+    let fullCoC = cocData.b;  // Signed CoC
+    
+    var result: vec4<f32>;
+    
+    // Skybox detection (CoC = 0 siempre)
+    let linearDepth = textureSample(gLinearDepth, samplerGBuffer, uv).r;
+    if (linearDepth >= 0.9999) {
+        return original; // Skybox siempre sharp
+    }
+    
+    // Decisión de composición basada en CoC
+    if (abs(fullCoC) < 0.5) {
+        // In focus - usar imagen original
+        result = original;
+    } else if (fullCoC < 0.0) {
+        // Near blur (foreground)
+        let blendFactor = smoothstep(0.0, 10.0, nearCoC);
+        result = mix(original, nearBlur, blendFactor);
+    } else {
+        // Far blur (background)
+        let blendFactor = smoothstep(0.0, 10.0, farCoC);
+        result = mix(original, farBlur, blendFactor);
+    }
+    
+    return result;
 }

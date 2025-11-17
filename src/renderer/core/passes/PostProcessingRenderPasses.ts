@@ -244,14 +244,14 @@ export class BloomCombineRenderPass extends PostProcessingRenderPass {
 
 export class DOFRenderPass extends PostProcessingRenderPass {
   private paramsBindGroup: GPUBindGroup;
-  private gBufferBindGroup: GPUBindGroup;
+  private gBufferBindGroup: GPUBindGroup | null;
 
   constructor(
     config: RenderPassConfig,
     mesh: Mesh,
     technique: Technique,
     paramsBindGroup: GPUBindGroup,
-    gBufferBindGroup: GPUBindGroup,
+    gBufferBindGroup: GPUBindGroup | null = null,
   ) {
     super(config, mesh, technique);
     this.paramsBindGroup = paramsBindGroup;

@@ -1,11 +1,7 @@
 {
-    "vs": "presentation.vs",
-    "fs": "dof.fs",
-    "writesOn": "texture",
-    "z": "disable_all",
-    "uniforms": [
-        "CameraUniforms",
-        "GBufferUniforms",
-        "DOFUniforms"
-    ]
+  "vs": "presentation.vs",
+  "fs": "dof.fs",
+  "writesOn": "texture",
+  "z": "disable_all",
+  "uniforms": ["CameraUniforms", "GBufferUniforms", "DOFCompositeTextures"]
 }

@@ -1,0 +1,7 @@
+{
+  "vs": "presentation.vs",
+  "fs": "dof_far_blur.fs",
+  "uniforms": ["CameraUniforms", "GBufferUniforms", "DOFBlurTextures"],
+  "writesOn": "texture",
+  "z": "disable_all"
+}
