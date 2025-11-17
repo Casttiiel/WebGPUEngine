@@ -38,12 +38,14 @@ export class MotionBlurComponent extends Component {
   // Motion blur parameters (uniform buffer: 144 bytes)
   // mat4x4 (64 bytes) + mat4x4 (64 bytes) + 4 floats (16 bytes) = 144 bytes
   private paramsBuffer!: GPUBuffer;
-  private _blurStrength: number = 1.0; // Blur intensity
-  private _numSamples: number = 6; // Sample count
+  private _blurStrength: number = 0.5; // Blur intensity (user-set)
+  private _numSamples: number = 4; // Sample count
+  private translationDampening: number = 0.1; // Reduce blur on camera translation (0 = disable blur, 1 = no dampening)
 
   // Previous frame matrices for velocity calculation
   private previousViewProjection: mat4 = mat4.create();
   private currentInvViewProjection: mat4 = mat4.create();
+  private previousCameraPosition: Float32Array = new Float32Array(3);
 
   // ✅ Cache bind groups per texture to avoid incorrect reuse
   private bindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
@@ -97,8 +99,41 @@ export class MotionBlurComponent extends Component {
     // Copy current inverse ViewProjection (16 floats)
     bufferData.set(this.currentInvViewProjection, 16);
 
+    // ✅ Calculate adaptive blur strength based on camera movement type
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    let effectiveBlurStrength = this._blurStrength;
+
+    if (mainCamera) {
+      const cameraComponent = mainCamera.getComponent('camera');
+      if (cameraComponent) {
+        const camera = (cameraComponent as any).getCamera();
+        const currentPosition = camera.getPosition();
+
+        // Calculate translation distance from previous frame
+        const dx = currentPosition[0]! - this.previousCameraPosition[0]!;
+        const dy = currentPosition[1]! - this.previousCameraPosition[1]!;
+        const dz = currentPosition[2]! - this.previousCameraPosition[2]!;
+        const translationDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        // Dampen blur strength based on translation (AGGRESSIVE reduction)
+        // More translation = less blur (radial pattern looks bad)
+        // Use exponential falloff for faster reduction
+        const translationFactor = translationDistance * 100.0; // Much more aggressive
+        const dampeningFactor = Math.max(
+          0.0,
+          Math.pow(Math.max(0.0, 1.0 - translationFactor), 3.0) + this.translationDampening * 0.1,
+        );
+        effectiveBlurStrength *= dampeningFactor;
+
+        // Store current position for next frame
+        this.previousCameraPosition[0] = currentPosition[0]!;
+        this.previousCameraPosition[1] = currentPosition[1]!;
+        this.previousCameraPosition[2] = currentPosition[2]!;
+      }
+    }
+
     // Copy parameters (4 floats)
-    bufferData[32] = this._blurStrength;
+    bufferData[32] = effectiveBlurStrength;
     bufferData[33] = this._numSamples;
     bufferData[34] = 0.0; // padding
     bufferData[35] = 0.0; // padding
@@ -225,7 +260,74 @@ export class MotionBlurComponent extends Component {
     // Camera matrices updated in apply() before rendering
   }
 
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void {
+    const debugUI = Engine.getDebugUI();
+    const parentFolder = 'render';
+    const subfolderKey = 'Camera Components';
+    const componentName = 'Motion Blur';
+
+    const self = this;
+
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Blur strength control
+    const blurStrengthWrapper = {
+      get blurStrength() {
+        return self._blurStrength;
+      },
+      set blurStrength(value) {
+        self._blurStrength = value;
+      },
+    };
+
+    addControl(blurStrengthWrapper, 'blurStrength', `${componentName} Strength`, {
+      min: 0.0,
+      max: 2.0,
+      step: 0.05,
+    });
+
+    // Sample count control
+    const numSamplesWrapper = {
+      get numSamples() {
+        return self._numSamples;
+      },
+      set numSamples(value) {
+        self._numSamples = Math.floor(value);
+      },
+    };
+
+    addControl(numSamplesWrapper, 'numSamples', `${componentName} Sample Count`, {
+      min: 2,
+      max: 16,
+      step: 1,
+    });
+
+    // Translation dampening control
+    const translationDampeningWrapper = {
+      get translationDampening() {
+        return self.translationDampening;
+      },
+      set translationDampening(value) {
+        self.translationDampening = value;
+      },
+    };
+
+    addControl(
+      translationDampeningWrapper,
+      'translationDampening',
+      `${componentName} Translation Dampening`,
+      {
+        min: 0.0,
+        max: 1.0,
+        step: 0.05,
+      },
+    );
+  }
 
   public override renderDebug(): void {
     // Implement debug visualization if needed
