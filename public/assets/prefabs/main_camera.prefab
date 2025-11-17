@@ -5,6 +5,7 @@
       "tone_mapping": {},
       "antialiasing": {},
       "ambient_occlusion": {},
-      "bloom": {}
+      "bloom": {},
+      "depth_of_field":{}
     }
   }

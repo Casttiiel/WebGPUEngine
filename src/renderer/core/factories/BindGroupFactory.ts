@@ -758,6 +758,26 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getDOFUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('dof_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
@@ -800,6 +820,8 @@ export class BindGroupFactory {
         return this.getParticleUniformsLayout();
       case PipelineBindGroupLayouts.INSTANCE_STORAGE:
         return this.getInstanceStorageLayout();
+      case PipelineBindGroupLayouts.DOF_UNIFORMS:
+        return this.getDOFUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

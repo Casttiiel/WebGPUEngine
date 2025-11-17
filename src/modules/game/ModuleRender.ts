@@ -18,6 +18,7 @@ import { Camera } from '../../core/math/Camera';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Distorsions } from '../../renderer/shading/Distorsions';
+import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -91,6 +92,11 @@ export class ModuleRender extends Module {
       (comp as BloomComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('depth_of_field')?.getList() ??
+      []) {
+      (comp as DepthOfFieldComponent).resize();
+    }
+
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -127,6 +133,13 @@ export class ModuleRender extends Module {
     }
 
     this.distorsions.render(result, this.deferred.getDepthStencilView()!);
+
+    if (mainCameraEntity.hasComponent('depth_of_field')) {
+      const depthOfField = mainCameraEntity.getComponent('depth_of_field') as DepthOfFieldComponent;
+      if (depthOfField.hasLoaded()) {
+        result = depthOfField.apply(result, this.deferred.getGBufferBindGroup());
+      }
+    }
 
     if (mainCameraEntity.hasComponent('tone_mapping')) {
       const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;

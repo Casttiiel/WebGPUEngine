@@ -18,4 +18,5 @@ export enum PipelineBindGroupLayouts {
   FROXEL_UNIFORMS = 'FroxelUniforms',
   PARTICLE_UNIFORMS = 'ParticleUniforms',
   INSTANCE_STORAGE = 'InstanceStorage',
+  DOF_UNIFORMS = 'DOFUniforms',
 }

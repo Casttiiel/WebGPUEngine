@@ -1,11 +1,6 @@
 ---------------------------------------Wishlist Backlog-----------------------------------
-Animations
-CSM: 3-cascade system
-Auto exposure
-Mesh Collider
-UI
+Froxel Scattering
 Grain
-Depth of Field (DOF)
 Lens Flare
 Atmospheric shadowing
 Area Light (LTC (Linearly Transformed Cosines) for shadows)
@@ -19,8 +14,6 @@ Physics Grass
 Mesh LOD
 Light Clustered culling + instancing
 Occlusion culling
-TAA: Anti-aliasing temporal
 Pre-multiplied Alpha Solids (Cristal)
 Voxel Global Illumination
-GPUDrivenRendering with indirect draw calls and frustum culling on GPU
 TrimSheets

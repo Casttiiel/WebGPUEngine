@@ -157,6 +157,25 @@ export class RenderPassFactory {
     };
   }
 
+  public static createDOFPassConfig(
+    target: GPUTextureView,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    const colorAttachments: GPURenderPassColorAttachment[] = [
+      {
+        view: target,
+        loadOp: 'load',
+        storeOp: 'store',
+      },
+    ];
+
+    return {
+      label: 'DOF Pass',
+      colorAttachments,
+      viewport,
+    };
+  }
+
   /**
    * Creates a fullscreen post-processing pass configuration with MSAA support
    */
