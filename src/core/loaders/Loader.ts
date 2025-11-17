@@ -24,6 +24,7 @@ import { MeshColliderComponent } from '../../components/physics/MeshColliderComp
 import { ParticleSystemComponent } from '../../components/render/ParticleSystemComponent';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
+import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -164,6 +165,8 @@ export class Loader {
         return new ParticleSystemComponent();
       case 'depth_of_field':
         return new DepthOfFieldComponent();
+      case 'motion_blur':
+        return new MotionBlurComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

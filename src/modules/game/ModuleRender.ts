@@ -19,6 +19,7 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Distorsions } from '../../renderer/shading/Distorsions';
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
+import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -97,6 +98,11 @@ export class ModuleRender extends Module {
       (comp as DepthOfFieldComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('motion_blur')?.getList() ??
+      []) {
+      (comp as MotionBlurComponent).resize();
+    }
+
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -129,6 +135,15 @@ export class ModuleRender extends Module {
 
       if (enableBloom && bloom.hasLoaded()) {
         result = bloom.apply(result, this.deferred.getGBufferBindGroup());
+      }
+    }
+
+    if (mainCameraEntity.hasComponent('motion_blur')) {
+      const motionBlur = mainCameraEntity.getComponent('motion_blur') as MotionBlurComponent;
+      const enableMotionBlur = QualitySettings.getInstance().getSettings().enableMotionBlur;
+
+      if (enableMotionBlur && motionBlur.hasLoaded()) {
+        result = motionBlur.apply(result, this.deferred.getGBufferBindGroup());
       }
     }
 

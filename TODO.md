@@ -7,3 +7,4 @@ Motion Blur
 3. Spawn/Delete items having in mind Instancing
 4. Gamestates -> Different scenes -> Load screen?
 5. Progressive texture streaming o mip streaming
+6. DOF adaptative

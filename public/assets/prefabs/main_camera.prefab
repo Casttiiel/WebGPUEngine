@@ -6,6 +6,7 @@
       "antialiasing": {},
       "ambient_occlusion": {},
       "bloom": {},
-      "depth_of_field":{}
+      "depth_of_field":{},
+      "motion_blur": {}
     }
   }

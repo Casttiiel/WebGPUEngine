@@ -4,6 +4,7 @@ export interface GraphicsQualitySettings {
   toneMappingTexture: GPUTextureFormat;
   bloomTexture: GPUTextureFormat;
   enableBloom: boolean;
+  enableMotionBlur: boolean;
   bloomNumMips: number;
   enableAO: boolean;
   aoScale: number;
@@ -59,6 +60,7 @@ export class QualitySettings {
       ssrMaxSteps: 160.0,
       directionalShadowMapResolution: 256,
       ssgiScale: 0.25,
+      enableMotionBlur: false,
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -87,6 +89,7 @@ export class QualitySettings {
       ssrMaxSteps: 320.0,
       directionalShadowMapResolution: 512,
       ssgiScale: 0.25,
+      enableMotionBlur: true,
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -115,6 +118,7 @@ export class QualitySettings {
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 1024,
       ssgiScale: 0.25,
+      enableMotionBlur: true,
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -143,6 +147,7 @@ export class QualitySettings {
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
       ssgiScale: 0.25,
+      enableMotionBlur: true,
     } as GraphicsQualitySettings,
   };
 
@@ -184,6 +189,7 @@ export class QualitySettings {
       ssrStepSize: 0.05,
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
+      enableMotionBlur: true,
     };
     return { ...defaults, ...this.settings };
   }
