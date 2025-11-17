@@ -47,7 +47,7 @@ export class DepthOfFieldComponent extends Component {
   // Physical lens parameters (uniform buffer: 4 floats = 16 bytes)
   private dofParamsBuffer!: GPUBuffer;
   private _focusDistance: number = 10.0; // meters
-  private _aperture: number = 2.8; // f-number (f/2.8)
+  private _aperture: number = 16.0; // f-number (f/2.8)
   private _focalLength: number = 0.05; // meters (50mm)
   private _sensorHeight: number = 0.024; // meters (24mm full-frame)
 
