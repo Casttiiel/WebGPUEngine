@@ -12,10 +12,10 @@
     "prefab": "main_camera.prefab"
   },
   {
-    "prefab": "next_camera.prefab"
+    "prefab": "player_character.prefab"
   },
   {
-    "prefab": "player_camera.prefab"
+    "prefab": "next_camera.prefab"
   },
   {
     "prefab": "water_decal.prefab"

@@ -2,7 +2,7 @@
     "components": {
       "name": "NextCamera",
       "camera": {
-        "controllable": true,
+        "controllable": false,
         "fov": 30,
         "position": [
           0,

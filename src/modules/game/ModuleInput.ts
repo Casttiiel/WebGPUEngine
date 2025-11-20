@@ -11,6 +11,12 @@ export class ModuleInput extends Module {
   private keysLastFrame: Map<KeyCode, boolean> = new Map();
   private mouseWheelDelta: number = 0;
 
+  // Pointer Lock support
+  private pointerLockEnabled: boolean = true;
+  private pointerLockActive: boolean = false;
+  private pointerLockMovement: { x: number; y: number } = { x: 0, y: 0 };
+  private pointerLockScale: number = 5.0; // Factor de escala para igualar sensibilidad
+
   // Valores observables para Tweakpane
   private debugValues = {
     mouseLeft: { name: 'Mouse Left', value: false },
@@ -38,6 +44,17 @@ export class ModuleInput extends Module {
     window.addEventListener('wheel', this.handleMouseWheel.bind(this));
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
     window.addEventListener('keyup', this.handleKeyUp.bind(this));
+
+    // Pointer Lock setup
+    document.addEventListener('pointerlockchange', this.handlePointerLockChange.bind(this));
+
+    // Click listener para activar pointer lock (solo si está habilitado)
+    canvas.addEventListener('click', () => {
+      if (this.pointerLockEnabled && !this.pointerLockActive) {
+        canvas.requestPointerLock();
+      }
+    });
+
     return true;
   }
 
@@ -51,10 +68,23 @@ export class ModuleInput extends Module {
     window.removeEventListener('wheel', this.handleMouseWheel.bind(this));
     window.removeEventListener('keydown', this.handleKeyDown.bind(this));
     window.removeEventListener('keyup', this.handleKeyUp.bind(this));
+
+    // Cleanup Pointer Lock
+    document.removeEventListener('pointerlockchange', this.handlePointerLockChange.bind(this));
+    if (this.pointerLockActive) {
+      document.exitPointerLock();
+    }
   }
 
   private handleMouseMove(event: MouseEvent): void {
-    this.mousePosition = { x: event.clientX, y: event.clientY };
+    // Si pointer lock está activo, usar movementX/Y
+    if (this.pointerLockActive) {
+      this.pointerLockMovement.x = event.movementX;
+      this.pointerLockMovement.y = event.movementY;
+    } else {
+      // Modo normal: usar clientX/Y
+      this.mousePosition = { x: event.clientX, y: event.clientY };
+    }
   }
 
   private handleMouseDown(event: MouseEvent): void {
@@ -83,11 +113,24 @@ export class ModuleInput extends Module {
     event.preventDefault();
   };
 
+  private handlePointerLockChange(): void {
+    const canvas = Render.getInstance().getCanvas();
+    this.pointerLockActive = document.pointerLockElement === canvas;
+
+    if (this.pointerLockActive) {
+      console.log('Pointer Lock ACTIVADO (ESC para salir)');
+    } else {
+      console.log('Pointer Lock DESACTIVADO');
+      // Reset movement cuando se desactiva
+      this.pointerLockMovement = { x: 0, y: 0 };
+    }
+  }
+
   public update(): void {
     // Update last frame's key states
     this.keysLastFrame = new Map(this.keys);
 
-    // Calcular el delta del mouse antes de actualizar lastMousePosition
+    // Calcular el delta del mouse
     const mouseDelta = this.getMouseDelta();
     this.debugValues.mouseDeltaX.value = mouseDelta.x;
     this.debugValues.mouseDeltaY.value = mouseDelta.y;
@@ -98,6 +141,9 @@ export class ModuleInput extends Module {
     // Reset per-frame values
     this.lastMousePosition = { ...this.mousePosition };
     this.mouseWheelDelta = 0;
+
+    // Reset pointer lock movement (se acumula frame a frame)
+    this.pointerLockMovement = { x: 0, y: 0 };
 
     // Actualizar valores para Tweakpane
     this.debugValues.mouseLeft.value = this.isMouseButtonPressed(MouseButton.LEFT);
@@ -114,6 +160,26 @@ export class ModuleInput extends Module {
 
   public override renderInMenu(): void {
     // Llamado cada frame para mantener los valores actualizados
+
+    const self = this;
+
+    // Pointer Lock control
+    const pointerLockWrapper = {
+      get enabled() {
+        return self.pointerLockEnabled;
+      },
+      set enabled(value: boolean) {
+        self.pointerLockEnabled = value;
+        if (!value && self.pointerLockActive) {
+          document.exitPointerLock();
+        }
+      },
+    };
+    this.addDebugControl(
+      pointerLockWrapper,
+      'enabled',
+      'Pointer Lock Enabled (click canvas to activate)',
+    );
 
     // Mouse Buttons
     this.addDebugControl(this.debugValues.mouseLeft, 'value', this.debugValues.mouseLeft.name);
@@ -149,6 +215,15 @@ export class ModuleInput extends Module {
   }
 
   public getMouseDelta(): { x: number; y: number } {
+    // Si pointer lock está activo, usar movement acumulado con escala
+    if (this.pointerLockActive) {
+      return {
+        x: this.pointerLockMovement.x * this.pointerLockScale,
+        y: this.pointerLockMovement.y * this.pointerLockScale,
+      };
+    }
+
+    // Modo normal: calcular delta entre frames
     return {
       x: this.mousePosition.x - this.lastMousePosition.x,
       y: this.mousePosition.y - this.lastMousePosition.y,
@@ -157,5 +232,21 @@ export class ModuleInput extends Module {
 
   public getMouseWheelDelta(): number {
     return this.mouseWheelDelta;
+  }
+
+  // Pointer Lock state
+  public isPointerLockEnabled(): boolean {
+    return this.pointerLockEnabled;
+  }
+
+  public setPointerLockEnabled(enabled: boolean): void {
+    this.pointerLockEnabled = enabled;
+    if (!enabled && this.pointerLockActive) {
+      document.exitPointerLock();
+    }
+  }
+
+  public isPointerLockActive(): boolean {
+    return this.pointerLockActive;
   }
 }

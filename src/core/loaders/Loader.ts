@@ -19,6 +19,9 @@ import { AntialiasingComponent } from '../../components/render/AntialiasingCompo
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { RenderComponent } from '../../components/render/RenderComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
+import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
+import { CharacterControllerComponent } from '../../components/game/CharacterControllerComponent';
+import { CameraArmComponent } from '../../components/game/CameraArmComponent';
 import { InfinitePlaneColliderComponent } from '../../components/physics/InfinitePlaneColliderComponent';
 import { MeshColliderComponent } from '../../components/physics/MeshColliderComponent';
 import { ParticleSystemComponent } from '../../components/render/ParticleSystemComponent';
@@ -157,6 +160,12 @@ export class Loader {
         return new BloomComponent();
       case 'box_collider':
         return new BoxColliderComponent();
+      case 'capsule_collider':
+        return new CapsuleColliderComponent();
+      case 'character_controller':
+        return new CharacterControllerComponent();
+      case 'camera_arm':
+        return new CameraArmComponent();
       case 'infinite_plane_collider':
         return new InfinitePlaneColliderComponent();
       case 'mesh_collider':

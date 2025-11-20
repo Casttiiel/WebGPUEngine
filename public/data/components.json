@@ -4,6 +4,8 @@
     "directional_light",
     "box_collider",
     "particle_system",
+    "character_controller",
+    "camera_arm",
     "transform",
     "camera",
     "ambient_occlusion"

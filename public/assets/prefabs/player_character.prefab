@@ -1,0 +1,49 @@
+{
+  "children": [
+      {
+        "prefab": "player_camera.prefab",
+        "components": {
+          "transform": {
+            "position": [0, 1.6, 0]
+          }
+        }
+      }
+    ],
+  "components": {
+    "name": "Player Character",
+    "transform": {
+      "position": [0, 2, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "dynamic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "friction": 0.0,
+      "mass": 70.0
+    },
+    "camera_arm": {
+      "offset": [0, 1.6, 2],
+      "targetOffset": [0, 0, 1],
+      "smoothSpeed": 15.0,
+      "enableCollision": false,
+      "enableMouseLook": true,
+      "mouseSensitivity": 0.15
+    },
+    "character_controller": {
+      "moveSpeed": 5.0,
+      "jumpForce": 8.0
+    },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "textured.mat"
+          }
+        ]
+      }
+  }
+}
