@@ -12,7 +12,6 @@ export interface CameraArmComponentData {
   enableCollision?: boolean; // Activar raycast de colisión
   collisionRadius?: number; // Radio para el raycast
   mouseSensitivity?: number; // Sensibilidad del mouse para rotación
-  enableMouseLook?: boolean; // Activar control de rotación con mouse
 }
 
 /**
@@ -57,7 +56,6 @@ export class CameraArmComponent extends Component {
   private enableCollision: boolean = false; // Colisión con paredes
   private collisionRadius: number = 0.3; // Radio para raycast
   private mouseSensitivity: number = 0.15; // Sensibilidad del mouse
-  private enableMouseLook: boolean = true; // Control con mouse
 
   // Estado interno
   private currentPosition: vec3 = vec3.create();
@@ -97,9 +95,6 @@ export class CameraArmComponent extends Component {
     if (data.mouseSensitivity !== undefined) {
       this.mouseSensitivity = data.mouseSensitivity;
     }
-    if (data.enableMouseLook !== undefined) {
-      this.enableMouseLook = data.enableMouseLook;
-    }
 
     // Inicializar posición actual
     vec3.copy(this.currentPosition, this.offset);
@@ -131,21 +126,19 @@ export class CameraArmComponent extends Component {
     if (!cameraTransform || !cameraComponent) return;
 
     // Mouse look control
-    if (this.enableMouseLook) {
-      const input = Engine.getInput();
-      const mouseDelta = input.getMouseDelta();
+    const input = Engine.getInput();
+    const mouseDelta = input.getMouseDelta();
 
-      // Actualizar yaw (rotación horizontal) y pitch (rotación vertical)
-      this.yaw -= mouseDelta.x * this.mouseSensitivity;
-      this.pitch -= mouseDelta.y * this.mouseSensitivity;
+    // Actualizar yaw (rotación horizontal) y pitch (rotación vertical)
+    this.yaw -= mouseDelta.x * this.mouseSensitivity;
+    this.pitch -= mouseDelta.y * this.mouseSensitivity;
 
-      // Limitar pitch (evitar gimbal lock)
-      this.pitch = Math.max(-89, Math.min(89, this.pitch));
+    // Limitar pitch (evitar gimbal lock)
+    this.pitch = Math.max(-89, Math.min(89, this.pitch));
 
-      // Aplicar yaw al owner (rotar personaje en Y)
-      const ownerAngles = ownerTransform.getTransform().getAngles();
-      ownerTransform.getTransform().setAngles(this.yaw, ownerAngles.pitch, ownerAngles.roll);
-    }
+    // Aplicar yaw al owner (rotar personaje en Y)
+    const ownerAngles = ownerTransform.getTransform().getAngles();
+    ownerTransform.getTransform().setAngles(this.yaw, ownerAngles.pitch, ownerAngles.roll);
 
     // Obtener posición y rotación del owner
     const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
@@ -174,39 +167,28 @@ export class CameraArmComponent extends Component {
     // Actualizar posición de la cámara
     cameraTransform.getTransform().setWorldPosition(this.currentPosition);
 
-    // Actualizar orientación de la cámara usando pitch/yaw si mouse look está habilitado
+    // Actualizar orientación de la cámara usando pitch/yaw
     const camera = cameraComponent.getCamera();
 
-    if (this.enableMouseLook) {
-      // Calcular dirección de la cámara usando pitch y yaw
-      const pitchRad = (this.pitch * Math.PI) / 180;
-      const yawRad = (this.yaw * Math.PI) / 180;
+    // Calcular dirección de la cámara usando pitch y yaw
+    const pitchRad = (this.pitch * Math.PI) / 180;
+    const yawRad = (this.yaw * Math.PI) / 180;
 
-      // Calcular vector de dirección desde pitch/yaw
-      const forward = vec3.fromValues(
-        Math.cos(pitchRad) * Math.sin(yawRad),
-        Math.sin(pitchRad),
-        Math.cos(pitchRad) * Math.cos(yawRad),
-      );
+    // Calcular vector de dirección desde pitch/yaw
+    const forward = vec3.fromValues(
+      Math.cos(pitchRad) * Math.sin(yawRad),
+      Math.sin(pitchRad),
+      Math.cos(pitchRad) * Math.cos(yawRad),
+    );
 
-      // Target = posición de cámara + forward
-      const target = vec3.add(vec3.create(), this.currentPosition, forward);
+    // Target = posición de cámara + forward
+    const target = vec3.add(vec3.create(), this.currentPosition, forward);
 
-      camera.lookAt(
-        Array.from(this.currentPosition) as [number, number, number],
-        Array.from(target) as [number, number, number],
-        [0, 1, 0],
-      );
-    } else {
-      // Usar targetOffset transformado por matriz del owner
-      const targetPos = vec3.transformMat4(vec3.create(), this.targetOffset, ownerWorldMatrix);
-
-      camera.lookAt(
-        Array.from(this.currentPosition) as [number, number, number],
-        Array.from(targetPos) as [number, number, number],
-        [0, 1, 0],
-      );
-    }
+    camera.lookAt(
+      Array.from(this.currentPosition) as [number, number, number],
+      Array.from(target) as [number, number, number],
+      [0, 1, 0],
+    );
   }
 
   /**
@@ -349,18 +331,6 @@ export class CameraArmComponent extends Component {
       max: 1.0,
       step: 0.01,
     });
-
-    // Enable mouse look
-    const mouseLookWrapper = {
-      get enableMouseLook() {
-        return self.enableMouseLook;
-      },
-      set enableMouseLook(value) {
-        self.enableMouseLook = value;
-      },
-    };
-
-    addControl(mouseLookWrapper, 'enableMouseLook', 'Enable Mouse Look');
 
     // Enable collision
     const collisionWrapper = {

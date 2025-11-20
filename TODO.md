@@ -1,7 +1,7 @@
 ## Player
 
 -Camera Move
--Camera Lock
 -Jump
 -Coyote time
+-Camera Lock Issue
 -Slide

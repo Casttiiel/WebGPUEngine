@@ -25,6 +25,14 @@
       "friction": 0.0,
       "mass": 70.0
     },
+    "camera_arm": {
+      "offset": [0, 1.6, 2],
+      "targetOffset": [0, 0, 1],
+      "smoothSpeed": 15.0,
+      "enableCollision": false,
+      "enableMouseLook": true,
+      "mouseSensitivity": 0.15
+    },
     "character_controller": {
       "moveSpeed": 5.0,
       "jumpForce": 8.0
