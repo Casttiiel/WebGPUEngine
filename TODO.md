@@ -1,5 +1,7 @@
-Player
--Move with Camera
--Acceleration
+## Player
+
+-Camera Move
+-Camera Lock
+-Jump
 -Coyote time
 -Slide

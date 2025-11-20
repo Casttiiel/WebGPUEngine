@@ -3,6 +3,7 @@
     "point_light",
     "directional_light",
     "box_collider",
+    "capsule_collider",
     "particle_system",
     "character_controller",
     "camera_arm",

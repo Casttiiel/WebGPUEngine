@@ -28,9 +28,12 @@ export class CharacterControllerComponent extends Component {
   // Parámetros de movimiento
   private moveSpeed: number = 5.0; // Unidades por segundo
   private jumpForce: number = 8.0; // Velocidad inicial del salto
+  private accelerationTime: number = 1.0; // Tiempo para alcanzar velocidad máxima (segundos)
+  private decelerationTime: number = 0.15; // Tiempo para frenar completamente (segundos)
 
   // Estado
   private isGrounded: boolean = false;
+  private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
 
   constructor() {
     super();
@@ -56,12 +59,18 @@ export class CharacterControllerComponent extends Component {
     if (data.jumpForce !== undefined) {
       this.jumpForce = data.jumpForce;
     }
+    if (data.accelerationTime !== undefined) {
+      this.accelerationTime = data.accelerationTime;
+    }
+    if (data.decelerationTime !== undefined) {
+      this.decelerationTime = data.decelerationTime;
+    }
 
     // NO buscar cámara aquí - las entidades hijas aún no están cargadas
     // La buscaremos en el primer update()
   }
 
-  public update(_deltaTime: number): void {
+  public update(deltaTime: number): void {
     if (!this.capsuleCollider) return;
 
     // Lazy camera search: buscar en el primer update cuando los hijos ya están cargados
@@ -112,7 +121,7 @@ export class CharacterControllerComponent extends Component {
     }
 
     // 3. Transform movement to camera space (FPS movement)
-    const movement = vec3.create();
+    const targetMovement = vec3.create();
 
     if (this.camera) {
       const cameraObj = this.camera.getCamera();
@@ -134,27 +143,58 @@ export class CharacterControllerComponent extends Component {
       const forwardMovement = vec3.scale(vec3.create(), forwardXZ, -inputDir[2]);
       const rightMovement = vec3.scale(vec3.create(), rightXZ, -inputDir[0]);
 
-      vec3.add(movement, forwardMovement, rightMovement);
+      vec3.add(targetMovement, forwardMovement, rightMovement);
 
       // Normalize final movement
-      if (vec3.length(movement) > 0.01) {
-        vec3.normalize(movement, movement);
+      if (vec3.length(targetMovement) > 0.01) {
+        vec3.normalize(targetMovement, targetMovement);
       }
     } else {
       // Fallback to world-space movement if no camera
-      vec3.copy(movement, inputDir);
+      vec3.copy(targetMovement, inputDir);
     }
 
-    // Apply movement speed
-    vec3.scale(movement, movement, this.moveSpeed);
+    // Apply movement speed to get target velocity
+    vec3.scale(targetMovement, targetMovement, this.moveSpeed);
 
-    // 4. Handle jump
+    // 4. Smooth acceleration/deceleration basado en MAGNITUD, no dirección
+    const hasInput = vec3.length(targetMovement) > 0.01;
+    const currentSpeed = vec3.length(this.currentVelocity);
+
+    if (hasInput) {
+      // Si ya estamos en movimiento, cambiar dirección instantáneamente
+      if (currentSpeed > this.moveSpeed * 0.9) {
+        // Ya estamos a velocidad máxima, solo cambiar dirección
+        vec3.copy(this.currentVelocity, targetMovement);
+      } else {
+        // Acelerar desde parado hacia velocidad máxima
+        const accelRate = this.moveSpeed / this.accelerationTime;
+        const newSpeed = Math.min(currentSpeed + accelRate * deltaTime, this.moveSpeed);
+
+        // Aplicar nueva magnitud en la dirección objetivo
+        vec3.normalize(this.currentVelocity, targetMovement);
+        vec3.scale(this.currentVelocity, this.currentVelocity, newSpeed);
+      }
+    } else {
+      // Frenar suavemente hacia cero
+      const decelRate = this.moveSpeed / this.decelerationTime;
+      const newSpeed = Math.max(currentSpeed - decelRate * deltaTime, 0);
+
+      if (newSpeed > 0.01) {
+        vec3.normalize(this.currentVelocity, this.currentVelocity);
+        vec3.scale(this.currentVelocity, this.currentVelocity, newSpeed);
+      } else {
+        vec3.set(this.currentVelocity, 0, 0, 0);
+      }
+    }
+
+    // 5. Handle jump
     if (this.isGrounded && input.isKeyPressed(KeyCode.SPACE)) {
       this.applyJump();
     }
 
-    // 5. Apply horizontal velocity preservando Y (gravedad)
-    this.applyMovement(movement);
+    // 6. Apply horizontal velocity preservando Y (gravedad)
+    this.applyMovement(this.currentVelocity);
   }
 
   /**
