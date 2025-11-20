@@ -6,9 +6,10 @@ import { Engine } from '../../core/engine/Engine';
 import RAPIER from '@dimforge/rapier3d';
 
 export interface CameraArmComponentData {
-  offset?: number[]; // [x, y, z] - Offset en espacio local
-  targetOffset?: number[]; // [x, y, z] - Punto al que mira la cámara (relativo al owner)
-  smoothSpeed?: number; // Velocidad de interpolación
+  targetOffset?: number[]; // [x, y, z] - Posición del target relativo al owner (ej: [0, 1.6, 0] = cabeza)
+  distance?: number; // Distancia desde el target hasta la cámara (ej: 5.0 para TPS, 0.0 para FPS)
+  smoothSpeed?: number; // Velocidad de interpolación de posición
+  rotationSmoothSpeed?: number; // Velocidad de suavizado de rotación (0 = sin suavizado, ej: 10.0)
   enableCollision?: boolean; // Activar raycast de colisión
   collisionRadius?: number; // Radio para el raycast
   mouseSensitivity?: number; // Sensibilidad del mouse para rotación
@@ -19,39 +20,15 @@ export interface CameraArmComponentData {
  *
  * Funcionalidades:
  * - Posiciona la cámara con offset relativo al owner (personaje)
- * - Control de rotación con mouse (mouse look) opcional
+ * - Control de rotación de cámara con mouse (pitch/yaw independientes)
  * - Suavizado de movimiento (interpolación)
  * - Detección de colisión opcional (raycast para evitar atravesar paredes)
- * - Rotación del owner (personaje) en Y basado en mouse X
- *
- * Uso típico (tercera persona):
- * {
- *   "camera_arm": {
- *     "offset": [0, 2.5, -5.0],
- *     "targetOffset": [0, 1.0, 0],
- *     "smoothSpeed": 10.0,
- *     "enableCollision": true,
- *     "enableMouseLook": true,
- *     "mouseSensitivity": 0.2
- *   }
- * }
- *
- * Uso típico (primera persona):
- * {
- *   "camera_arm": {
- *     "offset": [0, 1.6, 0],
- *     "targetOffset": [0, 0, 1],
- *     "smoothSpeed": 15.0,
- *     "enableCollision": false,
- *     "enableMouseLook": true,
- *     "mouseSensitivity": 0.15
- *   }
- * }
+ * - NO rota el player entity, solo gestiona la cámara
  */
 export class CameraArmComponent extends Component {
   // Configuración
-  private offset: vec3 = vec3.fromValues(0, 1.6, 0); // Primera persona por defecto
-  private targetOffset: vec3 = vec3.fromValues(0, 0, 1); // Mira hacia adelante
+  private targetOffset: vec3 = vec3.fromValues(0, 1.6, 0); // Target a altura de cabeza
+  private distance: number = 0.0; // Distancia de cámara al target (0 = FPS)
   private smoothSpeed: number = 10.0; // Interpolación
   private enableCollision: boolean = false; // Colisión con paredes
   private collisionRadius: number = 0.3; // Radio para raycast
@@ -60,8 +37,11 @@ export class CameraArmComponent extends Component {
   // Estado interno
   private currentPosition: vec3 = vec3.create();
   private isFirstFrame: boolean = true;
-  private pitch: number = 0; // Rotación vertical (arriba/abajo)
-  private yaw: number = 0; // Rotación horizontal (izquierda/derecha)
+  private pitch: number = 0; // Rotación vertical actual (arriba/abajo)
+  private yaw: number = 0; // Rotación horizontal actual (izquierda/derecha)
+  private targetPitch: number = 0; // Rotación vertical objetivo
+  private targetYaw: number = 0; // Rotación horizontal objetivo
+  private rotationSmoothSpeed: number = 0.0; // Suavizado de rotación (0 = instantáneo)
 
   // Referencias
   private cameraEntity: any = null;
@@ -72,9 +52,6 @@ export class CameraArmComponent extends Component {
 
   public async load(data: CameraArmComponentData): Promise<void> {
     // Cargar configuración
-    if (data.offset && data.offset.length === 3) {
-      vec3.set(this.offset, data.offset[0]!, data.offset[1]!, data.offset[2]!);
-    }
     if (data.targetOffset && data.targetOffset.length === 3) {
       vec3.set(
         this.targetOffset,
@@ -82,6 +59,9 @@ export class CameraArmComponent extends Component {
         data.targetOffset[1]!,
         data.targetOffset[2]!,
       );
+    }
+    if (data.distance !== undefined) {
+      this.distance = data.distance;
     }
     if (data.smoothSpeed !== undefined) {
       this.smoothSpeed = data.smoothSpeed;
@@ -95,9 +75,12 @@ export class CameraArmComponent extends Component {
     if (data.mouseSensitivity !== undefined) {
       this.mouseSensitivity = data.mouseSensitivity;
     }
+    if (data.rotationSmoothSpeed !== undefined) {
+      this.rotationSmoothSpeed = data.rotationSmoothSpeed;
+    }
 
-    // Inicializar posición actual
-    vec3.copy(this.currentPosition, this.offset);
+    // Inicializar posición actual (se calculará en el primer update)
+    vec3.set(this.currentPosition, 0, 0, 0);
   }
 
   public update(dt: number): void {
@@ -121,33 +104,55 @@ export class CameraArmComponent extends Component {
     const ownerTransform = this.getOwner().getComponent('transform') as TransformComponent;
     if (!ownerTransform) return;
 
-    const cameraTransform = this.cameraEntity.getComponent('transform') as TransformComponent;
     const cameraComponent = this.cameraEntity.getComponent('camera') as CameraComponent;
-    if (!cameraTransform || !cameraComponent) return;
+    if (!cameraComponent) return;
 
-    // Mouse look control
+    // Mouse look control - SOLO afecta a la cámara, NO al player entity
     const input = Engine.getInput();
     const mouseDelta = input.getMouseDelta();
 
-    // Actualizar yaw (rotación horizontal) y pitch (rotación vertical)
-    this.yaw -= mouseDelta.x * this.mouseSensitivity;
-    this.pitch -= mouseDelta.y * this.mouseSensitivity;
+    // Actualizar rotación objetivo
+    this.targetYaw -= mouseDelta.x * this.mouseSensitivity;
+    this.targetPitch += mouseDelta.y * this.mouseSensitivity; // Invertido: + para arriba, - para abajo
 
-    // Limitar pitch (evitar gimbal lock)
-    this.pitch = Math.max(-89, Math.min(89, this.pitch));
+    // Limitar pitch objetivo (evitar gimbal lock)
+    this.targetPitch = Math.max(-89, Math.min(89, this.targetPitch));
 
-    // Aplicar yaw al owner (rotar personaje en Y)
-    const ownerAngles = ownerTransform.getTransform().getAngles();
-    ownerTransform.getTransform().setAngles(this.yaw, ownerAngles.pitch, ownerAngles.roll);
+    // Aplicar suavizado de rotación (si está habilitado)
+    if (this.rotationSmoothSpeed > 0.01) {
+      // Suavizado con lerp
+      const rotAlpha = Math.min(1.0, dt * this.rotationSmoothSpeed);
+      this.yaw += (this.targetYaw - this.yaw) * rotAlpha;
+      this.pitch += (this.targetPitch - this.pitch) * rotAlpha;
+    } else {
+      // Sin suavizado: rotación instantánea
+      this.yaw = this.targetYaw;
+      this.pitch = this.targetPitch;
+    }
 
-    // Obtener posición y rotación del owner
+    // Obtener posición del owner
     const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
-    const ownerWorldMatrix = ownerTransform.getTransform().getWorldMatrix();
 
-    // Calcular posición deseada de la cámara (offset en espacio local del owner)
-    const desiredPos = vec3.transformMat4(vec3.create(), this.offset, ownerWorldMatrix);
+    // Calcular posición del TARGET (punto al que siempre mira la cámara)
+    // El target es relativo al owner (ej: cabeza del personaje)
+    const targetPos = vec3.add(vec3.create(), ownerWorldPos, this.targetOffset);
 
-    // Aplicar colisión si está habilitado
+    // Calcular posición de la CÁMARA usando órbita esférica alrededor del target
+    // Convertir pitch/yaw a radianes
+    const yawRadians = (this.yaw * Math.PI) / 180;
+    const pitchRadians = (this.pitch * Math.PI) / 180;
+
+    // Coordenadas esféricas: (distance, pitch, yaw) -> (x, y, z)
+    // x = distance * cos(pitch) * sin(yaw)
+    // y = distance * sin(pitch)
+    // z = distance * cos(pitch) * cos(yaw)
+    const cameraOffset = vec3.fromValues(
+      this.distance * Math.cos(pitchRadians) * Math.sin(yawRadians),
+      this.distance * Math.sin(pitchRadians),
+      this.distance * Math.cos(pitchRadians) * Math.cos(yawRadians),
+    );
+
+    const desiredPos = vec3.add(vec3.create(), targetPos, cameraOffset); // Aplicar colisión si está habilitado
     let finalPos = vec3.clone(desiredPos);
     if (this.enableCollision) {
       finalPos = this.applyCollision(ownerWorldPos, desiredPos);
@@ -164,29 +169,14 @@ export class CameraArmComponent extends Component {
       vec3.lerp(this.currentPosition, this.currentPosition, finalPos, alpha);
     }
 
-    // Actualizar posición de la cámara
-    cameraTransform.getTransform().setWorldPosition(this.currentPosition);
-
-    // Actualizar orientación de la cámara usando pitch/yaw
+    // Actualizar posición y orientación de la cámara usando directamente Camera.lookAt()
     const camera = cameraComponent.getCamera();
 
-    // Calcular dirección de la cámara usando pitch y yaw
-    const pitchRad = (this.pitch * Math.PI) / 180;
-    const yawRad = (this.yaw * Math.PI) / 180;
-
-    // Calcular vector de dirección desde pitch/yaw
-    const forward = vec3.fromValues(
-      Math.cos(pitchRad) * Math.sin(yawRad),
-      Math.sin(pitchRad),
-      Math.cos(pitchRad) * Math.cos(yawRad),
-    );
-
-    // Target = posición de cámara + forward
-    const target = vec3.add(vec3.create(), this.currentPosition, forward);
-
+    // La cámara siempre mira al targetPos (cabeza del personaje)
+    // Aplicar posición y orientación directamente a la cámara (sin TransformComponent)
     camera.lookAt(
       Array.from(this.currentPosition) as [number, number, number],
-      Array.from(target) as [number, number, number],
+      Array.from(targetPos) as [number, number, number],
       [0, 1, 0],
     );
   }
@@ -248,33 +238,7 @@ export class CameraArmComponent extends Component {
       });
     };
 
-    // Offset X, Y, Z
-    const offsetWrapper = {
-      get x() {
-        return self.offset[0];
-      },
-      set x(value) {
-        self.offset[0] = value;
-      },
-      get y() {
-        return self.offset[1];
-      },
-      set y(value) {
-        self.offset[1] = value;
-      },
-      get z() {
-        return self.offset[2];
-      },
-      set z(value) {
-        self.offset[2] = value;
-      },
-    };
-
-    addControl(offsetWrapper, 'x', 'Offset X', { min: -10, max: 10, step: 0.1 });
-    addControl(offsetWrapper, 'y', 'Offset Y', { min: -10, max: 10, step: 0.1 });
-    addControl(offsetWrapper, 'z', 'Offset Z', { min: -10, max: 10, step: 0.1 });
-
-    // Target Offset
+    // Target Offset X, Y, Z
     const targetOffsetWrapper = {
       get x() {
         return self.targetOffset[0];
@@ -300,6 +264,18 @@ export class CameraArmComponent extends Component {
     addControl(targetOffsetWrapper, 'y', 'Target Y', { min: -10, max: 10, step: 0.1 });
     addControl(targetOffsetWrapper, 'z', 'Target Z', { min: -10, max: 10, step: 0.1 });
 
+    // Distance
+    const distanceWrapper = {
+      get distance() {
+        return self.distance;
+      },
+      set distance(value) {
+        self.distance = value;
+      },
+    };
+
+    addControl(distanceWrapper, 'distance', 'Distance', { min: 0.0, max: 20.0, step: 0.1 });
+
     // Smooth speed
     const smoothSpeedWrapper = {
       get smoothSpeed() {
@@ -312,6 +288,22 @@ export class CameraArmComponent extends Component {
 
     addControl(smoothSpeedWrapper, 'smoothSpeed', 'Smooth Speed', {
       min: 0.1,
+      max: 50.0,
+      step: 0.1,
+    });
+
+    // Rotation smooth speed
+    const rotationSmoothSpeedWrapper = {
+      get rotationSmoothSpeed() {
+        return self.rotationSmoothSpeed;
+      },
+      set rotationSmoothSpeed(value) {
+        self.rotationSmoothSpeed = value;
+      },
+    };
+
+    addControl(rotationSmoothSpeedWrapper, 'rotationSmoothSpeed', 'Rotation Smooth', {
+      min: 0.0,
       max: 50.0,
       step: 0.1,
     });

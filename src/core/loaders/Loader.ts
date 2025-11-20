@@ -22,6 +22,7 @@ import { BoxColliderComponent } from '../../components/physics/BoxColliderCompon
 import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
 import { CharacterControllerComponent } from '../../components/game/CharacterControllerComponent';
 import { CameraArmComponent } from '../../components/game/CameraArmComponent';
+import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { InfinitePlaneColliderComponent } from '../../components/physics/InfinitePlaneColliderComponent';
 import { MeshColliderComponent } from '../../components/physics/MeshColliderComponent';
 import { ParticleSystemComponent } from '../../components/render/ParticleSystemComponent';
@@ -166,6 +167,8 @@ export class Loader {
         return new CharacterControllerComponent();
       case 'camera_arm':
         return new CameraArmComponent();
+      case 'fps_camera_controller':
+        return new FPSCameraControllerComponent();
       case 'infinite_plane_collider':
         return new InfinitePlaneColliderComponent();
       case 'mesh_collider':

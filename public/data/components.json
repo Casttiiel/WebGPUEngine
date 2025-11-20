@@ -7,6 +7,7 @@
     "particle_system",
     "character_controller",
     "camera_arm",
+    "fps_camera_controller",
     "transform",
     "camera",
     "ambient_occlusion"
