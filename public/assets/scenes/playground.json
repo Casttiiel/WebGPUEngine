@@ -1,0 +1,36 @@
+[
+  {
+    "prefab": "main_camera.prefab"
+  },
+  {
+    "prefab": "player_character.prefab"
+  },
+  {
+    "prefab": "ground.prefab"
+  },
+  {
+    "prefab": "cube.prefab",
+    "components": {
+      "transform": {
+        "position": [100, 1, 0]
+      }
+    }
+  },
+  {
+    "prefab": "cube.prefab",
+    "components": {
+      "transform": {
+        "position": [1.5, 7, 0],
+        "rotation": [0, 90, 0]
+      }
+    }
+  },
+  {
+    "prefab": "capsule.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 0, 0]
+      }
+    }
+  }
+]

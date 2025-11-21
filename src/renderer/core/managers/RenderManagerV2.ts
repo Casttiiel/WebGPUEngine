@@ -185,6 +185,12 @@ export class RenderManagerV2 {
       return false;
     }
 
+    // Check if mesh GPU buffers are ready
+    if (!key.mesh.isGPUReady()) {
+      // Silent skip - mesh is still loading
+      return false;
+    }
+
     const technique = key.material.getTechnique();
     if (!technique) {
       console.warn('Invalid render key - missing technique');

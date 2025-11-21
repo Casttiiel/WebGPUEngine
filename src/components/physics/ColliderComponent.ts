@@ -63,6 +63,8 @@ export interface ColliderData {
   // Collision groups (para filtrado de colisiones)
   collisionGroups?: number;
   collisionMask?: number;
+
+  ignoreTransformScale?: boolean;
 }
 
 /**
@@ -147,7 +149,9 @@ export class ColliderComponent extends Component {
 
     // Obtener la escala del transform para aplicarla al collider
     const transformComponent = this.getOwner().getComponent('transform') as TransformComponent;
-    const scale = transformComponent.getTransform().getLocalScale();
+    const scale = data.ignoreTransformScale
+      ? [1, 1, 1]
+      : transformComponent.getTransform().getLocalScale();
 
     switch (this.colliderType) {
       case ColliderType.CUBOID:

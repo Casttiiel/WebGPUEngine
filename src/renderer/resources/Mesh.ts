@@ -448,6 +448,7 @@ export class Mesh extends GPUResource {
     );
 
     GPUUtils.writeBuffer(this.indexBuffer, 0, paddedArray);
+    console.log('Index buffer created with size:', paddedArray.byteLength);
   }
 
   private calculateAABB(): AABB {
@@ -485,6 +486,17 @@ export class Mesh extends GPUResource {
 
   public getAABB(): AABB {
     return this.aabb;
+  }
+
+  public isGPUReady(): boolean {
+    return (
+      this.hasData &&
+      this.vertexBuffer !== undefined &&
+      this.normalBuffer !== undefined &&
+      this.uvBuffer !== undefined &&
+      this.tangentBuffer !== undefined &&
+      this.indexBuffer !== undefined
+    );
   }
 
   public static getVertexBufferLayout(): GPUVertexBufferLayout[] {
@@ -543,6 +555,11 @@ export class Mesh extends GPUResource {
   }
 
   public activate(pass: GPURenderPassEncoder): void {
+    if (!this.isGPUReady()) {
+      console.warn(`Mesh ${this.path} is not ready for rendering. Buffers not initialized.`);
+      return;
+    }
+
     pass.setVertexBuffer(0, this.vertexBuffer);
     pass.setVertexBuffer(1, this.normalBuffer);
     pass.setVertexBuffer(2, this.uvBuffer);
@@ -551,10 +568,16 @@ export class Mesh extends GPUResource {
   }
 
   public renderGroup(pass: GPURenderPassEncoder): void {
+    if (!this.isGPUReady()) {
+      return;
+    }
     pass.drawIndexed(this.indexCount);
   }
 
   public renderInstance(pass: GPURenderPassEncoder, particleCount: number): void {
+    if (!this.isGPUReady()) {
+      return;
+    }
     pass.drawIndexed(this.indexCount, particleCount);
   }
 

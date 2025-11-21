@@ -5,13 +5,12 @@ import { Engine } from '../../core/engine/Engine';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
-import { LinearInterpolator } from '../../core/math/Interpolators';
 import { vec3 } from 'gl-matrix';
 
 export class CameraComponent extends Component {
   protected camera: Camera;
   private isControllable: boolean = false;
-  private rotationSpeed: number = 0.005;
+  private rotationSpeed: number = 0.025;
 
   // ✅ Reusable temp vectors to avoid allocations in update()
   private tempMovement: vec3 = vec3.create();
