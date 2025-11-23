@@ -1,8 +1,6 @@
 ## Player
 
 1. New scene
-   -Camera Lock Diagonal error
-   -Jump (Position of raycasts etc)
    -Coyote time
    -Camera rotation smoothing?
 

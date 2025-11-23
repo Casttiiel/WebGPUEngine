@@ -26,14 +26,14 @@
       "mass": 70.0
     },
     "character_controller": {
-      "moveSpeed": 5.0,
+      "moveSpeed": 8.0,
       "jumpForce": 8.0,
       "accelerationTime": 0.5,
       "decelerationTime": 0.15
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],
-      "mouseSensitivity": 1.5,
+      "mouseSensitivity": 0.5,
       "invertY": true
     }
   },

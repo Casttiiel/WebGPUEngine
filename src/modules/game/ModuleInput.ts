@@ -5,7 +5,8 @@ import { Render } from '../../renderer/core/pipeline/Render';
 
 export class ModuleInput extends Module {
   private mousePosition: { x: number; y: number } = { x: 0, y: 0 }; // Para UI (no usado en cámaras)
-  private mouseMovement: { x: number; y: number } = { x: 0, y: 0 }; // Siempre usa movementX/Y (hardware units)
+  private mouseMovement: { x: number; y: number } = { x: 0, y: 0 }; // Acumula movimiento durante el frame
+  private mouseMovementConsumed: { x: number; y: number } = { x: 0, y: 0 }; // Último delta consumido
   private mouseButtons: Map<MouseButton, boolean> = new Map();
   private keys: Map<KeyCode, boolean> = new Map();
   private keysLastFrame: Map<KeyCode, boolean> = new Map();
@@ -75,9 +76,9 @@ export class ModuleInput extends Module {
   }
 
   private handleMouseMove(event: MouseEvent): void {
-    // Siempre usar movementX/Y para consistencia (hardware mouse units)
-    this.mouseMovement.x = event.movementX;
-    this.mouseMovement.y = event.movementY;
+    // Acumular movimiento durante el frame (puede haber múltiples eventos por frame)
+    this.mouseMovement.x += event.movementX;
+    this.mouseMovement.y += event.movementY;
 
     // También trackear posición absoluta para UI (si se necesita)
     this.mousePosition = { x: event.clientX, y: event.clientY };
@@ -126,17 +127,14 @@ export class ModuleInput extends Module {
     // Update last frame's key states
     this.keysLastFrame = new Map(this.keys);
 
-    // Calcular el delta del mouse
-    const mouseDelta = this.getMouseDelta();
-    this.debugValues.mouseDeltaX.value = mouseDelta.x;
-    this.debugValues.mouseDeltaY.value = mouseDelta.y;
+    // Capturar el delta acumulado del frame ANTES de resetearlo
+    this.mouseMovementConsumed.x = this.mouseMovement.x;
+    this.mouseMovementConsumed.y = this.mouseMovement.y;
 
-    // Actualizar mouseWheelDelta antes de resetearlo
+    // Actualizar valores de debug
+    this.debugValues.mouseDeltaX.value = this.mouseMovementConsumed.x;
+    this.debugValues.mouseDeltaY.value = this.mouseMovementConsumed.y;
     this.debugValues.mouseWheel.value = this.mouseWheelDelta;
-
-    // Reset per-frame values
-    this.mouseWheelDelta = 0;
-    this.mouseMovement = { x: 0, y: 0 }; // Reset movement cada frame
 
     // Actualizar valores para Tweakpane
     this.debugValues.mouseLeft.value = this.isMouseButtonPressed(MouseButton.LEFT);
@@ -145,6 +143,10 @@ export class ModuleInput extends Module {
     this.debugValues.keyA.value = this.isKeyPressed(KeyCode.A);
     this.debugValues.keyS.value = this.isKeyPressed(KeyCode.S);
     this.debugValues.keyD.value = this.isKeyPressed(KeyCode.D);
+
+    // Reset per-frame values AL FINAL del update (después de que todos los módulos lo hayan consumido)
+    this.mouseWheelDelta = 0;
+    this.mouseMovement = { x: 0, y: 0 };
   }
 
   public renderDebug(): void {
@@ -193,9 +195,9 @@ export class ModuleInput extends Module {
   }
 
   public getMouseDelta(): { x: number; y: number } {
-    // Siempre devolver movementX/Y (hardware mouse units)
-    // Misma escala con y sin pointer lock
-    return this.mouseMovement;
+    // Devolver el delta acumulado del frame actual
+    // Este valor se acumula desde el último reset (al final del update anterior)
+    return { x: this.mouseMovement.x, y: this.mouseMovement.y };
   }
 
   public getMouseWheelDelta(): number {

@@ -104,18 +104,20 @@ export class CapsuleColliderComponent extends ColliderComponent {
     const pos = this.rigidBody.translation();
 
     // Raycast desde el centro de la cápsula hacia abajo
-    const ray = new RAPIER.Ray({ x: pos.x, y: pos.y, z: pos.z }, { x: 0, y: -1, z: 0 });
+    const ray = new RAPIER.Ray(
+      { x: pos.x, y: pos.y - this.capsuleHeight / 2.0, z: pos.z },
+      { x: 0, y: -1, z: 0 },
+    );
 
     // Excluir el propio collider del raycast
     const hit = physics.getWorld().castRay(
       ray,
-      castDistance + this.capsuleRadius,
+      castDistance,
       true, // solid
       undefined, // sin filtro de flags (permite todos los tipos)
       undefined, // sin filtro de grupos
       this.collider, // Excluir solo el propio collider
     );
-
     return hit !== null;
   }
 

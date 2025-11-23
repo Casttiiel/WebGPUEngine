@@ -189,7 +189,7 @@ export class CharacterControllerComponent extends Component {
     }
 
     // 5. Handle jump
-    if (this.isGrounded && input.isKeyPressed(KeyCode.SPACE)) {
+    if (this.isGrounded && input.isKeyJustPressed(KeyCode.SPACE)) {
       this.applyJump();
     }
 
