@@ -35,6 +35,10 @@ export class CharacterControllerComponent extends Component {
   private isGrounded: boolean = false;
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
 
+  // Coyote time - permite saltar justo después de dejar el suelo
+  private coyoteTime: number = 0.15; // Segundos de gracia después de dejar el suelo
+  private timeSinceGrounded: number = 0.0; // Tiempo desde que dejó de estar grounded
+
   constructor() {
     super();
   }
@@ -64,6 +68,9 @@ export class CharacterControllerComponent extends Component {
     }
     if (data.decelerationTime !== undefined) {
       this.decelerationTime = data.decelerationTime;
+    }
+    if (data.coyoteTime !== undefined) {
+      this.coyoteTime = data.coyoteTime;
     }
 
     // NO buscar cámara aquí - las entidades hijas aún no están cargadas
@@ -96,6 +103,13 @@ export class CharacterControllerComponent extends Component {
 
     // 1. Check if grounded usando el método del collider
     this.isGrounded = this.capsuleCollider.raycastGrounded(0.1);
+
+    // Update coyote time
+    if (this.isGrounded) {
+      this.timeSinceGrounded = 0.0;
+    } else {
+      this.timeSinceGrounded += deltaTime;
+    }
 
     // 2. Gather input
     const input = Engine.getInput();
@@ -188,9 +202,11 @@ export class CharacterControllerComponent extends Component {
       }
     }
 
-    // 5. Handle jump
-    if (this.isGrounded && input.isKeyJustPressed(KeyCode.SPACE)) {
+    // 5. Handle jump (con coyote time)
+    const canJump = this.timeSinceGrounded <= this.coyoteTime;
+    if (canJump && input.isKeyJustPressed(KeyCode.SPACE)) {
       this.applyJump();
+      this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
     }
 
     // 6. Apply horizontal velocity preservando Y (gravedad)
@@ -271,6 +287,22 @@ export class CharacterControllerComponent extends Component {
       step: 0.1,
     });
 
+    // Coyote time
+    const coyoteTimeWrapper = {
+      get coyoteTime() {
+        return self.coyoteTime;
+      },
+      set coyoteTime(value) {
+        self.coyoteTime = value;
+      },
+    };
+
+    addControl(coyoteTimeWrapper, 'coyoteTime', 'Coyote Time', {
+      min: 0.0,
+      max: 0.5,
+      step: 0.01,
+    });
+
     // Debug info (read-only)
     const groundedWrapper = {
       get isGrounded() {
@@ -295,6 +327,19 @@ export class CharacterControllerComponent extends Component {
       verticalVelWrapper,
       'verticalVelocity',
       'Vertical Velocity (Physics)',
+    );
+
+    const coyoteActiveWrapper = {
+      get coyoteActive() {
+        return self.timeSinceGrounded <= self.coyoteTime ? 'Active' : 'Inactive';
+      },
+    };
+
+    debugUI.addDebugControl(
+      parentFolder,
+      coyoteActiveWrapper,
+      'coyoteActive',
+      'Coyote Time Status',
     );
   }
 

@@ -29,6 +29,7 @@
       "moveSpeed": 8.0,
       "jumpForce": 8.0,
       "accelerationTime": 0.5,
+      "coyoteTime": 2.0,
       "decelerationTime": 0.15
     },
     "fps_camera_controller": {
