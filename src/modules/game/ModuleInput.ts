@@ -40,9 +40,9 @@ export class ModuleInput extends Module {
     window.addEventListener('mousemove', this.handleMouseMove.bind(this));
     window.addEventListener('mousedown', this.handleMouseDown.bind(this));
     window.addEventListener('mouseup', this.handleMouseUp.bind(this));
-    window.addEventListener('wheel', this.handleMouseWheel.bind(this));
-    window.addEventListener('keydown', this.handleKeyDown.bind(this));
-    window.addEventListener('keyup', this.handleKeyUp.bind(this));
+    window.addEventListener('wheel', this.handleMouseWheel.bind(this), { passive: false });
+    window.addEventListener('keydown', this.handleKeyDown.bind(this), { passive: false });
+    window.addEventListener('keyup', this.handleKeyUp.bind(this), { passive: false });
 
     // Pointer Lock setup
     document.addEventListener('pointerlockchange', this.handlePointerLockChange.bind(this));
@@ -93,15 +93,28 @@ export class ModuleInput extends Module {
   }
 
   private handleMouseWheel(event: WheelEvent): void {
+    event.preventDefault(); // Prevenir scroll del navegador
     this.mouseWheelDelta = event.deltaY;
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    // Prevenir atajos del navegador solo cuando estamos en modo juego (Pointer Lock activo)
+    if (this.pointerLockActive) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
     const key = event.code.toLowerCase() as KeyCode;
     this.keys.set(key, true);
   }
 
   private handleKeyUp(event: KeyboardEvent): void {
+    // Prevenir atajos del navegador solo cuando estamos en modo juego (Pointer Lock activo)
+    if (this.pointerLockActive) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
     const key = event.code.toLowerCase() as KeyCode;
     this.keys.set(key, false);
   }

@@ -5,4 +5,7 @@ export type CharacterControllerComponentDataType = {
   decelerationTime?: number; // Time to stop completely in seconds (default: 0.5)
   coyoteTime?: number; // Grace period to jump after leaving ground in seconds (default: 0.15)
   airControlMultiplier?: number; // Air control strength (0.0 = no control, 1.0 = full control, default: 0.3)
+  slideSpeedThreshold?: number; // Minimum speed to activate slide (default: 3.0)
+  slideDecelerationTime?: number; // Slide duration in seconds (default: 1.5)
+  slideHeightMultiplier?: number; // Height reduction during slide (0.5 = half height, default: 0.5)
 };

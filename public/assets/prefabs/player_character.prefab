@@ -28,10 +28,11 @@
     "character_controller": {
       "moveSpeed": 8.0,
       "jumpForce": 8.0,
+      "coyoteTime": 1.0,
       "accelerationTime": 0.5,
-      "coyoteTime": 2.0,
       "decelerationTime": 0.15,
-      "airControlMultiplier": 0.3
+      "airControlMultiplier": 0.3,
+      "slideDecelerationTime": 3.0
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],

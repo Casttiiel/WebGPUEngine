@@ -32,10 +32,22 @@ export class CharacterControllerComponent extends Component {
   private decelerationTime: number = 0.15; // Tiempo para frenar completamente (segundos)
   private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
 
+  // Slide parameters
+  private slideSpeedThreshold: number = 3.0; // Velocidad mínima para activar slide
+  private slideDecelerationTime: number = 1.5; // Tiempo de frenado del slide
+  private slideHeightMultiplier: number = 0.5; // Reducción de altura (0.5 = mitad de altura)
+
   // Estado
   private isGrounded: boolean = false;
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
   private airVelocity: vec3 = vec3.create(); // Velocidad horizontal al dejar el suelo (momentum preservation)
+
+  // Slide state
+  private isSliding: boolean = false;
+  private slideVelocity: vec3 = vec3.create(); // Velocidad capturada al inicio del slide
+  private slideTimer: number = 0.0; // Tiempo transcurrido en slide
+  private originalHeight: number = 0.0; // Altura original del collider
+  private originalRadius: number = 0.0; // Radio original del collider
 
   // Coyote time - permite saltar justo después de dejar el suelo
   private coyoteTime: number = 0.15; // Segundos de gracia después de dejar el suelo
@@ -77,6 +89,19 @@ export class CharacterControllerComponent extends Component {
     if (data.airControlMultiplier !== undefined) {
       this.airControlMultiplier = data.airControlMultiplier;
     }
+    if (data.slideSpeedThreshold !== undefined) {
+      this.slideSpeedThreshold = data.slideSpeedThreshold;
+    }
+    if (data.slideDecelerationTime !== undefined) {
+      this.slideDecelerationTime = data.slideDecelerationTime;
+    }
+    if (data.slideHeightMultiplier !== undefined) {
+      this.slideHeightMultiplier = data.slideHeightMultiplier;
+    }
+
+    // Guardar dimensiones originales del collider
+    this.originalHeight = this.capsuleCollider.getCapsuleHeight();
+    this.originalRadius = this.capsuleCollider.getCapsuleRadius();
 
     // NO buscar cámara aquí - las entidades hijas aún no están cargadas
     // La buscaremos en el primer update()
@@ -122,33 +147,58 @@ export class CharacterControllerComponent extends Component {
       this.timeSinceGrounded += deltaTime;
     }
 
-    // 2. Gather input
+    // 2. Handle slide activation and update
     const input = Engine.getInput();
+    const currentSpeed = vec3.length(this.currentVelocity);
+
+    if (!this.isSliding && input.isKeyJustPressed(KeyCode.CTRL)) {
+      // Activar slide si estamos en el suelo y con velocidad suficiente
+      if (this.isGrounded && currentSpeed >= this.slideSpeedThreshold) {
+        this.startSlide();
+      }
+    }
+
+    // Update slide state
+    if (this.isSliding) {
+      this.updateSlide(deltaTime);
+
+      // Terminar slide si soltamos la tecla o se acabó el tiempo/velocidad
+      if (
+        !input.isKeyPressed(KeyCode.CTRL) ||
+        this.slideTimer >= this.slideDecelerationTime ||
+        vec3.length(this.slideVelocity) < 0.5
+      ) {
+        this.endSlide();
+      }
+    }
+
+    // 3. Gather input (desactivado durante slide)
     const inputDir = vec3.create();
 
-    // WASD input (local space)
-    if (input.isKeyPressed(KeyCode.W)) {
-      inputDir[2] -= 1; // Forward
-    }
-    if (input.isKeyPressed(KeyCode.S)) {
-      inputDir[2] += 1; // Backward
-    }
-    if (input.isKeyPressed(KeyCode.A)) {
-      inputDir[0] -= 1; // Left
-    }
-    if (input.isKeyPressed(KeyCode.D)) {
-      inputDir[0] += 1; // Right
-    }
+    if (!this.isSliding) {
+      if (input.isKeyPressed(KeyCode.W)) {
+        inputDir[2] -= 1; // Forward
+      }
+      if (input.isKeyPressed(KeyCode.S)) {
+        inputDir[2] += 1; // Backward
+      }
+      if (input.isKeyPressed(KeyCode.A)) {
+        inputDir[0] -= 1; // Left
+      }
+      if (input.isKeyPressed(KeyCode.D)) {
+        inputDir[0] += 1; // Right
+      }
 
-    // Normalize input direction
-    if (vec3.length(inputDir) > 0.01) {
-      vec3.normalize(inputDir, inputDir);
-    }
+      // Normalize input direction
+      if (vec3.length(inputDir) > 0.01) {
+        vec3.normalize(inputDir, inputDir);
+      }
+    } // End !isSliding input block
 
-    // 3. Transform movement to camera space (FPS movement)
+    // 4. Transform movement to camera space (FPS movement)
     const targetMovement = vec3.create();
 
-    if (this.camera) {
+    if (!this.isSliding && this.camera) {
       const cameraObj = this.camera.getCamera();
       const forward = cameraObj.getFront();
       const up = vec3.fromValues(0, 1, 0); // World up
@@ -174,18 +224,20 @@ export class CharacterControllerComponent extends Component {
       if (vec3.length(targetMovement) > 0.01) {
         vec3.normalize(targetMovement, targetMovement);
       }
-    } else {
-      // Fallback to world-space movement if no camera
+    } else if (!this.isSliding) {
+      // Fallback to world-space movement if no camera (solo si no está sliding)
       vec3.copy(targetMovement, inputDir);
     }
 
-    // Apply movement speed to get target velocity
-    vec3.scale(targetMovement, targetMovement, this.moveSpeed);
+    // Apply movement speed to get target velocity (solo si no está sliding)
+    if (!this.isSliding) {
+      vec3.scale(targetMovement, targetMovement, this.moveSpeed);
+    }
 
-    // 4. Smooth acceleration/deceleration
+    // 5. Smooth acceleration/deceleration
     const hasInput = vec3.length(targetMovement) > 0.01;
 
-    if (this.isGrounded) {
+    if (!this.isSliding && this.isGrounded) {
       // EN SUELO: Control normal con aceleración suave
       if (hasInput) {
         const smoothFactor = Math.min(1.0, deltaTime / this.accelerationTime);
@@ -201,7 +253,7 @@ export class CharacterControllerComponent extends Component {
           vec3.set(this.currentVelocity, 0, 0, 0);
         }
       }
-    } else {
+    } else if (!this.isSliding) {
       // EN AIRE: Preservar momentum + pequeñas correcciones
       if (hasInput) {
         // Calcular la corrección deseada (diferencia entre input y momentum actual)
@@ -226,15 +278,16 @@ export class CharacterControllerComponent extends Component {
       }
     }
 
-    // 5. Handle jump (con coyote time)
-    const canJump = this.timeSinceGrounded <= this.coyoteTime;
+    // 6. Handle jump (con coyote time, no durante slide)
+    const canJump = this.timeSinceGrounded <= this.coyoteTime && !this.isSliding;
     if (canJump && input.isKeyJustPressed(KeyCode.SPACE)) {
       this.applyJump();
       this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
     }
 
-    // 6. Apply horizontal velocity preservando Y (gravedad)
-    this.applyMovement(this.currentVelocity);
+    // 7. Apply horizontal velocity preservando Y (gravedad)
+    const velocityToApply = this.isSliding ? this.slideVelocity : this.currentVelocity;
+    this.applyMovement(velocityToApply);
   }
 
   /**
@@ -263,6 +316,67 @@ export class CharacterControllerComponent extends Component {
     const jumpVel = vec3.fromValues(currentVel[0], this.jumpForce, currentVel[2]);
 
     this.capsuleCollider.setLinearVelocity(jumpVel);
+  }
+
+  /**
+   * Inicia el slide
+   */
+  private startSlide(): void {
+    this.isSliding = true;
+    this.slideTimer = 0.0;
+
+    // Capturar velocidad actual para el slide
+    vec3.copy(this.slideVelocity, this.currentVelocity);
+
+    // Reducir altura del collider
+    const newHeight = this.originalHeight * this.slideHeightMultiplier;
+    this.resizeCapsule(newHeight, this.originalRadius);
+
+    console.log('Slide started!', vec3.length(this.slideVelocity).toFixed(2), 'm/s');
+  }
+
+  /**
+   * Actualiza el slide cada frame
+   */
+  private updateSlide(deltaTime: number): void {
+    this.slideTimer += deltaTime;
+
+    // Decelerar progresivamente el slide
+    const t = Math.min(1.0, this.slideTimer / this.slideDecelerationTime);
+    const decelCurve = 1.0 - Math.pow(t, 2.0); // Curva cuadrática de frenado
+
+    // Aplicar deceleración manteniendo dirección
+    const slideSpeed = vec3.length(this.slideVelocity) * decelCurve;
+    const slideDirection = vec3.normalize(vec3.create(), this.slideVelocity);
+    vec3.scale(this.slideVelocity, slideDirection, slideSpeed);
+  }
+
+  /**
+   * Termina el slide y restaura el collider
+   */
+  private endSlide(): void {
+    if (!this.isSliding) return;
+
+    this.isSliding = false;
+    this.slideTimer = 0.0;
+
+    // Restaurar altura original del collider
+    this.resizeCapsule(this.originalHeight, this.originalRadius);
+
+    // Transferir velocidad del slide al movimiento normal
+    vec3.copy(this.currentVelocity, this.slideVelocity);
+
+    console.log('Slide ended!');
+  }
+
+  /**
+   * Redimensiona la cápsula del collider
+   */
+  private resizeCapsule(newHeight: number, radius: number): void {
+    // TODO: Implementar resize del collider en CapsuleColliderComponent
+    // Por ahora, esto es placeholder
+    // Necesitaremos recrear el collider con las nuevas dimensiones
+    console.log(`Resize capsule: height=${newHeight.toFixed(2)}, radius=${radius.toFixed(2)}`);
   }
 
   public override renderInMenu(): void {
@@ -343,6 +457,37 @@ export class CharacterControllerComponent extends Component {
       step: 0.05,
     });
 
+    // Slide parameters
+    const slideSpeedWrapper = {
+      get slideSpeedThreshold() {
+        return self.slideSpeedThreshold;
+      },
+      set slideSpeedThreshold(value) {
+        self.slideSpeedThreshold = value;
+      },
+    };
+
+    addControl(slideSpeedWrapper, 'slideSpeedThreshold', 'Slide Min Speed', {
+      min: 0.5,
+      max: 10.0,
+      step: 0.1,
+    });
+
+    const slideDecelWrapper = {
+      get slideDecelerationTime() {
+        return self.slideDecelerationTime;
+      },
+      set slideDecelerationTime(value) {
+        self.slideDecelerationTime = value;
+      },
+    };
+
+    addControl(slideDecelWrapper, 'slideDecelerationTime', 'Slide Duration', {
+      min: 0.5,
+      max: 3.0,
+      step: 0.1,
+    });
+
     // Debug info (read-only)
     const groundedWrapper = {
       get isGrounded() {
@@ -381,6 +526,14 @@ export class CharacterControllerComponent extends Component {
       'coyoteActive',
       'Coyote Time Status',
     );
+
+    const slideStatusWrapper = {
+      get slideStatus() {
+        return self.isSliding ? `Sliding (${self.slideTimer.toFixed(2)}s)` : 'Not Sliding';
+      },
+    };
+
+    debugUI.addDebugControl(parentFolder, slideStatusWrapper, 'slideStatus', 'Slide Status');
   }
 
   public renderDebug(): void {
