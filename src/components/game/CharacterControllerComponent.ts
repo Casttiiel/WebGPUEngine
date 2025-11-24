@@ -351,7 +351,7 @@ export class CharacterControllerComponent extends Component {
 
     // Decelerar progresivamente el slide
     const t = Math.min(1.0, this.slideTimer / this.slideDecelerationTime);
-    const decelCurve = 1.0 - t; // Curva lineal de frenado (más suave)
+    const decelCurve = 1.0 - Math.pow(t, 2.5); // Curva cuadrática de frenado
 
     // Aplicar deceleración manteniendo dirección
     const slideSpeed = vec3.length(this.slideVelocity) * decelCurve;
@@ -552,6 +552,14 @@ export class CharacterControllerComponent extends Component {
     // Retornar la magnitud de la velocidad horizontal (ignorar Y)
     const horizontalVelocity = vec3.fromValues(this.currentVelocity[0], 0, this.currentVelocity[2]);
     return vec3.length(horizontalVelocity);
+  }
+
+  /**
+   * Obtiene la velocidad máxima de movimiento configurada
+   * @returns Velocidad máxima (m/s)
+   */
+  public getMoveSpeed(): number {
+    return this.moveSpeed;
   }
 
   /**

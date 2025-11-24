@@ -36,11 +36,11 @@
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],
-      "mouseSensitivity": 0.5,
+      "mouseSensitivity": 0.25,
       "invertY": true
     },
     "camera_crouch": {
-      "slideCrouchHeight": 0.0,
+      "slideCrouchHeight": -0.3,
       "crouchSpeed": 8.0,
       "enabled": true
     },
@@ -49,6 +49,12 @@
       "verticalAmplitude": 0.05,
       "horizontalAmplitude": 0.05,
       "speedThreshold": 0.5,
+      "enabled": true
+    },
+    "camera_fov_modifier": {
+      "maxFOVIncrease": 10.0,
+      "speedThreshold": 1.0,
+      "lerpSpeed": 5.0,
       "enabled": true
     }
   },

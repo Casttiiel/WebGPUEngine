@@ -1,16 +1,16 @@
 ## Player
 
-1. Slide curve speed
+1.
 2. Camera follow
-3. Wall Jump
-4. Wall run
-5. Wall Coyote Time
-6. Vault
-7. FOV based on speed
-8. Grapple
-9. Input Buffer
-10. Slide interruption?
-11. Slide collider size change
+3. Movement on jump/ground is wrong
+4. Slide -> to air
+5. Slide min-time/interruption
+6. Slide collider size change
+7. Wall Jump
+8. Wall run
+9. Grapple
+10. Input Buffer
+11. Vault
 
 ---
 
@@ -26,4 +26,3 @@
 
 Control Mapping
 Borde raro en objetos
-Ambient occlusion?

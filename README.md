@@ -254,6 +254,7 @@ We welcome contributions! Please see our contributing guidelines:
 - Ensure proper GPU resource cleanup (`dispose()` methods)
 - Add debug UI controls for new parameters
 - Optimize for WebGPU web deployment
+- Ignore the renderInMenu functions, we will not use it at all!
 
 ## 🙏 Acknowledgments
 
