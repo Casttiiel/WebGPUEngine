@@ -48,7 +48,7 @@ export class FPSCameraControllerComponent extends Component {
     }
   }
 
-  public update(_dt: number): void {
+  public update(dt: number): void {
     // Buscar cámara hija (lazy search)
     if (!this.cameraEntity) {
       const children = this.getOwner().getChildren();
@@ -83,10 +83,6 @@ export class FPSCameraControllerComponent extends Component {
     // Limitar pitch (evitar gimbal lock)
     this.pitch = Math.max(-89, Math.min(89, this.pitch));
 
-    // Calcular posición de la cámara (ojos del personaje)
-    const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
-    const eyePos = vec3.add(vec3.create(), ownerWorldPos, this.eyeOffset);
-
     // Calcular dirección de mirada desde pitch/yaw
     const yawRadians = (this.yaw * Math.PI) / 180;
     const pitchRadians = (this.pitch * Math.PI) / 180;
@@ -97,6 +93,24 @@ export class FPSCameraControllerComponent extends Component {
       Math.sin(pitchRadians),
       Math.cos(pitchRadians) * Math.cos(yawRadians),
     );
+
+    // Calcular vectores de la cámara (right, up, forward)
+    const worldUp = vec3.fromValues(0, 1, 0);
+    const right = vec3.cross(vec3.create(), forward, worldUp);
+    vec3.normalize(right, right);
+    const up = vec3.cross(vec3.create(), right, forward);
+    vec3.normalize(up, up);
+
+    // Calcular posición de la cámara (ojos del personaje)
+    const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
+    const eyePos = vec3.add(vec3.create(), ownerWorldPos, this.eyeOffset);
+
+    // Aplicar head bob si el componente está presente
+    const headBobComponent = this.getOwner().getComponent('head_bob');
+    if (headBobComponent) {
+      const bobOffsetWorld = (headBobComponent as any).getHeadBobOffsetWorld(right, up);
+      vec3.add(eyePos, eyePos, bobOffsetWorld);
+    }
 
     // Punto de mira (1 metro adelante de la cámara)
     const lookAtTarget = vec3.add(vec3.create(), eyePos, forward);

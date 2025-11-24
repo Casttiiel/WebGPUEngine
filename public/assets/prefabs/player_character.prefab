@@ -26,18 +26,25 @@
       "mass": 70.0
     },
     "character_controller": {
-      "moveSpeed": 8.0,
+      "moveSpeed": 10.0,
       "jumpForce": 8.0,
       "coyoteTime": 1.0,
       "accelerationTime": 0.5,
       "decelerationTime": 0.15,
-      "airControlMultiplier": 0.3,
+      "airControlMultiplier": 0.5,
       "slideDecelerationTime": 3.0
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],
       "mouseSensitivity": 0.5,
       "invertY": true
+    },
+    "head_bob": {
+      "frequency": 1.0,
+      "verticalAmplitude": 0.05,
+      "horizontalAmplitude": 0.05,
+      "speedThreshold": 0.5,
+      "enabled": true
     }
   },
   "children": [

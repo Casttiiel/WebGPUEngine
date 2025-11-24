@@ -8,6 +8,7 @@
     "character_controller",
     "camera_arm",
     "fps_camera_controller",
+    "head_bob",
     "transform",
     "camera",
     "ambient_occlusion"

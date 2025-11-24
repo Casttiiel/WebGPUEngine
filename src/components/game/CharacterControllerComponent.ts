@@ -151,7 +151,7 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
     const currentSpeed = vec3.length(this.currentVelocity);
 
-    if (!this.isSliding && input.isKeyJustPressed(KeyCode.CTRL)) {
+    if (!this.isSliding && input.isKeyJustPressed(KeyCode.SHIFT)) {
       // Activar slide si estamos en el suelo y con velocidad suficiente
       if (this.isGrounded && currentSpeed >= this.slideSpeedThreshold) {
         this.startSlide();
@@ -164,7 +164,7 @@ export class CharacterControllerComponent extends Component {
 
       // Terminar slide si soltamos la tecla o se acabó el tiempo/velocidad
       if (
-        !input.isKeyPressed(KeyCode.CTRL) ||
+        !input.isKeyPressed(KeyCode.SHIFT) ||
         this.slideTimer >= this.slideDecelerationTime ||
         vec3.length(this.slideVelocity) < 0.5
       ) {
@@ -256,19 +256,27 @@ export class CharacterControllerComponent extends Component {
     } else if (!this.isSliding) {
       // EN AIRE: Preservar momentum + pequeñas correcciones
       if (hasInput) {
-        // Calcular la corrección deseada (diferencia entre input y momentum actual)
-        const correction = vec3.subtract(vec3.create(), targetMovement, this.airVelocity);
+        // Calcular velocidad de corrección basada en el input
+        const correctionVelocity = vec3.scale(
+          vec3.create(),
+          targetMovement,
+          this.airControlMultiplier,
+        );
 
-        // Limitar la corrección al air control multiplier
-        vec3.scale(correction, correction, this.airControlMultiplier);
+        // Añadir la corrección a la velocidad actual (acumulativa)
+        vec3.add(
+          this.currentVelocity,
+          this.currentVelocity,
+          vec3.scale(vec3.create(), correctionVelocity, deltaTime),
+        );
 
-        // Aplicar corrección gradualmente al momentum base
-        const airTarget = vec3.add(vec3.create(), this.airVelocity, correction);
-
-        // Interpolar suavemente hacia el objetivo ajustado
-        const smoothFactor = Math.min(1.0, deltaTime / this.accelerationTime);
-        const t = 1.0 - Math.pow(1.0 - smoothFactor, 10.0);
-        vec3.lerp(this.currentVelocity, this.currentVelocity, airTarget, t);
+        // Limitar la velocidad máxima para evitar aceleración infinita
+        const currentSpeed = vec3.length(this.currentVelocity);
+        const maxAirSpeed = this.moveSpeed * 1.2; // 20% más rápido que en suelo
+        if (currentSpeed > maxAirSpeed) {
+          vec3.normalize(this.currentVelocity, this.currentVelocity);
+          vec3.scale(this.currentVelocity, this.currentVelocity, maxAirSpeed);
+        }
       } else {
         // Sin input en el aire: mantener momentum (casi sin deceleración)
         // Solo una deceleración mínima por resistencia del aire
@@ -534,6 +542,32 @@ export class CharacterControllerComponent extends Component {
     };
 
     debugUI.addDebugControl(parentFolder, slideStatusWrapper, 'slideStatus', 'Slide Status');
+  }
+
+  /**
+   * Obtiene la velocidad horizontal actual del personaje (para head bob, efectos de sonido, etc.)
+   * @returns Magnitud de la velocidad horizontal en m/s
+   */
+  public getCurrentSpeed(): number {
+    // Retornar la magnitud de la velocidad horizontal (ignorar Y)
+    const horizontalVelocity = vec3.fromValues(this.currentVelocity[0], 0, this.currentVelocity[2]);
+    return vec3.length(horizontalVelocity);
+  }
+
+  /**
+   * Obtiene si el personaje está en el suelo
+   * @returns true si está en el suelo
+   */
+  public getIsGrounded(): boolean {
+    return this.isGrounded;
+  }
+
+  /**
+   * Obtiene si el personaje está haciendo slide
+   * @returns true si está en slide
+   */
+  public getIsSliding(): boolean {
+    return this.isSliding;
   }
 
   public renderDebug(): void {

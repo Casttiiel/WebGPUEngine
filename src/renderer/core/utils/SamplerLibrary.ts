@@ -42,7 +42,7 @@ export class SamplerLibrary {
     });
 
     SamplerLibrary._ambientOcclusionSampler = GPUUtils.createSampler({
-      label: 'aambient_occlusion_sampler',
+      label: 'ambient_occlusion_sampler',
       magFilter: 'nearest',
       minFilter: 'nearest',
       mipmapFilter: 'linear',

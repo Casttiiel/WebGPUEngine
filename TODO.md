@@ -1,15 +1,15 @@
 ## Player
 
-2. Head bob
-3. Slide move camera lower
-4. Camera follow
-5. Wall Jump
-6. Wall run
-7. Wall Coyote Time
-8. Vault
-9. Grapple
-10. Input Buffer
-11. Slide interruption?
+1. Camera follow
+2. Slide move camera lower
+3. Wall Jump
+4. Wall run
+5. Wall Coyote Time
+6. Vault
+7. FOV based on speed
+8. Grapple
+9. Input Buffer
+10. Slide interruption?
 
 ---
 
@@ -23,5 +23,6 @@
 8. Run-off Forgiveness
 9. Jump Hang Time
 
+Control Mapping
 Borde raro en objetos
 Ambient occlusion?
