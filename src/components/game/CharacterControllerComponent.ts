@@ -351,7 +351,7 @@ export class CharacterControllerComponent extends Component {
 
     // Decelerar progresivamente el slide
     const t = Math.min(1.0, this.slideTimer / this.slideDecelerationTime);
-    const decelCurve = 1.0 - Math.pow(t, 2.0); // Curva cuadrática de frenado
+    const decelCurve = 1.0 - t; // Curva lineal de frenado (más suave)
 
     // Aplicar deceleración manteniendo dirección
     const slideSpeed = vec3.length(this.slideVelocity) * decelCurve;

@@ -9,6 +9,7 @@
     "camera_arm",
     "fps_camera_controller",
     "head_bob",
+    "camera_crouch",
     "transform",
     "camera",
     "ambient_occlusion"

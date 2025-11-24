@@ -32,12 +32,17 @@
       "accelerationTime": 0.5,
       "decelerationTime": 0.15,
       "airControlMultiplier": 0.5,
-      "slideDecelerationTime": 3.0
+      "slideDecelerationTime": 2.5
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],
       "mouseSensitivity": 0.5,
       "invertY": true
+    },
+    "camera_crouch": {
+      "slideCrouchHeight": 0.0,
+      "crouchSpeed": 8.0,
+      "enabled": true
     },
     "head_bob": {
       "frequency": 1.0,

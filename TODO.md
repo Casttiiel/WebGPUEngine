@@ -1,7 +1,7 @@
 ## Player
 
-1. Camera follow
-2. Slide move camera lower
+1. Slide curve speed
+2. Camera follow
 3. Wall Jump
 4. Wall run
 5. Wall Coyote Time
@@ -10,6 +10,7 @@
 8. Grapple
 9. Input Buffer
 10. Slide interruption?
+11. Slide collider size change
 
 ---
 
