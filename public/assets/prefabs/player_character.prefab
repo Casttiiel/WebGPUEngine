@@ -30,7 +30,8 @@
       "jumpForce": 8.0,
       "accelerationTime": 0.5,
       "coyoteTime": 2.0,
-      "decelerationTime": 0.15
+      "decelerationTime": 0.15,
+      "airControlMultiplier": 0.3
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],

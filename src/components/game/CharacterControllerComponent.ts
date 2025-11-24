@@ -30,10 +30,12 @@ export class CharacterControllerComponent extends Component {
   private jumpForce: number = 8.0; // Velocidad inicial del salto
   private accelerationTime: number = 1.0; // Tiempo para alcanzar velocidad máxima (segundos)
   private decelerationTime: number = 0.15; // Tiempo para frenar completamente (segundos)
+  private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
 
   // Estado
   private isGrounded: boolean = false;
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
+  private airVelocity: vec3 = vec3.create(); // Velocidad horizontal al dejar el suelo (momentum preservation)
 
   // Coyote time - permite saltar justo después de dejar el suelo
   private coyoteTime: number = 0.15; // Segundos de gracia después de dejar el suelo
@@ -72,6 +74,9 @@ export class CharacterControllerComponent extends Component {
     if (data.coyoteTime !== undefined) {
       this.coyoteTime = data.coyoteTime;
     }
+    if (data.airControlMultiplier !== undefined) {
+      this.airControlMultiplier = data.airControlMultiplier;
+    }
 
     // NO buscar cámara aquí - las entidades hijas aún no están cargadas
     // La buscaremos en el primer update()
@@ -102,7 +107,13 @@ export class CharacterControllerComponent extends Component {
     }
 
     // 1. Check if grounded usando el método del collider
+    const wasGrounded = this.isGrounded;
     this.isGrounded = this.capsuleCollider.raycastGrounded(0.1);
+
+    // Capturar velocidad horizontal al dejar el suelo (momentum preservation)
+    if (wasGrounded && !this.isGrounded) {
+      vec3.copy(this.airVelocity, this.currentVelocity);
+    }
 
     // Update coyote time
     if (this.isGrounded) {
@@ -171,34 +182,47 @@ export class CharacterControllerComponent extends Component {
     // Apply movement speed to get target velocity
     vec3.scale(targetMovement, targetMovement, this.moveSpeed);
 
-    // 4. Smooth acceleration/deceleration basado en MAGNITUD, no dirección
+    // 4. Smooth acceleration/deceleration
     const hasInput = vec3.length(targetMovement) > 0.01;
-    const currentSpeed = vec3.length(this.currentVelocity);
 
-    if (hasInput) {
-      // Si ya estamos en movimiento, cambiar dirección instantáneamente
-      if (currentSpeed > this.moveSpeed * 0.9) {
-        // Ya estamos a velocidad máxima, solo cambiar dirección
-        vec3.copy(this.currentVelocity, targetMovement);
+    if (this.isGrounded) {
+      // EN SUELO: Control normal con aceleración suave
+      if (hasInput) {
+        const smoothFactor = Math.min(1.0, deltaTime / this.accelerationTime);
+        const t = 1.0 - Math.pow(1.0 - smoothFactor, 10.0);
+        vec3.lerp(this.currentVelocity, this.currentVelocity, targetMovement, t);
       } else {
-        // Acelerar desde parado hacia velocidad máxima
-        const accelRate = this.moveSpeed / this.accelerationTime;
-        const newSpeed = Math.min(currentSpeed + accelRate * deltaTime, this.moveSpeed);
+        // Deceleración en suelo
+        const smoothFactor = Math.min(1.0, deltaTime / this.decelerationTime);
+        const t = 1.0 - Math.pow(1.0 - smoothFactor, 5.0);
+        vec3.scale(this.currentVelocity, this.currentVelocity, 1.0 - t);
 
-        // Aplicar nueva magnitud en la dirección objetivo
-        vec3.normalize(this.currentVelocity, targetMovement);
-        vec3.scale(this.currentVelocity, this.currentVelocity, newSpeed);
+        if (vec3.length(this.currentVelocity) < 0.01) {
+          vec3.set(this.currentVelocity, 0, 0, 0);
+        }
       }
     } else {
-      // Frenar suavemente hacia cero
-      const decelRate = this.moveSpeed / this.decelerationTime;
-      const newSpeed = Math.max(currentSpeed - decelRate * deltaTime, 0);
+      // EN AIRE: Preservar momentum + pequeñas correcciones
+      if (hasInput) {
+        // Calcular la corrección deseada (diferencia entre input y momentum actual)
+        const correction = vec3.subtract(vec3.create(), targetMovement, this.airVelocity);
 
-      if (newSpeed > 0.01) {
-        vec3.normalize(this.currentVelocity, this.currentVelocity);
-        vec3.scale(this.currentVelocity, this.currentVelocity, newSpeed);
+        // Limitar la corrección al air control multiplier
+        vec3.scale(correction, correction, this.airControlMultiplier);
+
+        // Aplicar corrección gradualmente al momentum base
+        const airTarget = vec3.add(vec3.create(), this.airVelocity, correction);
+
+        // Interpolar suavemente hacia el objetivo ajustado
+        const smoothFactor = Math.min(1.0, deltaTime / this.accelerationTime);
+        const t = 1.0 - Math.pow(1.0 - smoothFactor, 10.0);
+        vec3.lerp(this.currentVelocity, this.currentVelocity, airTarget, t);
       } else {
-        vec3.set(this.currentVelocity, 0, 0, 0);
+        // Sin input en el aire: mantener momentum (casi sin deceleración)
+        // Solo una deceleración mínima por resistencia del aire
+        const airDrag = 0.02; // 2% de drag por segundo
+        const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
+        vec3.scale(this.currentVelocity, this.currentVelocity, dragFactor);
       }
     }
 
@@ -301,6 +325,22 @@ export class CharacterControllerComponent extends Component {
       min: 0.0,
       max: 0.5,
       step: 0.01,
+    });
+
+    // Air control
+    const airControlWrapper = {
+      get airControlMultiplier() {
+        return self.airControlMultiplier;
+      },
+      set airControlMultiplier(value) {
+        self.airControlMultiplier = value;
+      },
+    };
+
+    addControl(airControlWrapper, 'airControlMultiplier', 'Air Control', {
+      min: 0.0,
+      max: 1.0,
+      step: 0.05,
     });
 
     // Debug info (read-only)
