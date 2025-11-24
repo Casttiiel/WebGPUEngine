@@ -166,7 +166,8 @@ export class CharacterControllerComponent extends Component {
       if (
         !input.isKeyPressed(KeyCode.SHIFT) ||
         this.slideTimer >= this.slideDecelerationTime ||
-        vec3.length(this.slideVelocity) < 0.5
+        vec3.length(this.slideVelocity) < 0.5 ||
+        !this.isGrounded
       ) {
         this.endSlide();
       }
@@ -307,7 +308,7 @@ export class CharacterControllerComponent extends Component {
     // Preservar Y (gravedad), aplicar X/Z (movimiento)
     const newVel = vec3.fromValues(
       horizontalMovement[0],
-      currentVel[1], // ✅ Preservar velocidad vertical
+      currentVel[1], // Preservar velocidad vertical
       horizontalMovement[2],
     );
 
@@ -387,162 +388,7 @@ export class CharacterControllerComponent extends Component {
     console.log(`Resize capsule: height=${newHeight.toFixed(2)}, radius=${radius.toFixed(2)}`);
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'game';
-    const subfolderKey = 'Character Controller';
-
-    const self = this;
-
-    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
-      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
-        ...(options || {}),
-        readonly: false,
-      });
-    };
-
-    // Move speed
-    const moveSpeedWrapper = {
-      get moveSpeed() {
-        return self.moveSpeed;
-      },
-      set moveSpeed(value) {
-        self.moveSpeed = value;
-      },
-    };
-
-    addControl(moveSpeedWrapper, 'moveSpeed', 'Move Speed', {
-      min: 0.1,
-      max: 20.0,
-      step: 0.1,
-    });
-
-    // Jump force
-    const jumpForceWrapper = {
-      get jumpForce() {
-        return self.jumpForce;
-      },
-      set jumpForce(value) {
-        self.jumpForce = value;
-      },
-    };
-
-    addControl(jumpForceWrapper, 'jumpForce', 'Jump Force', {
-      min: 1.0,
-      max: 20.0,
-      step: 0.1,
-    });
-
-    // Coyote time
-    const coyoteTimeWrapper = {
-      get coyoteTime() {
-        return self.coyoteTime;
-      },
-      set coyoteTime(value) {
-        self.coyoteTime = value;
-      },
-    };
-
-    addControl(coyoteTimeWrapper, 'coyoteTime', 'Coyote Time', {
-      min: 0.0,
-      max: 0.5,
-      step: 0.01,
-    });
-
-    // Air control
-    const airControlWrapper = {
-      get airControlMultiplier() {
-        return self.airControlMultiplier;
-      },
-      set airControlMultiplier(value) {
-        self.airControlMultiplier = value;
-      },
-    };
-
-    addControl(airControlWrapper, 'airControlMultiplier', 'Air Control', {
-      min: 0.0,
-      max: 1.0,
-      step: 0.05,
-    });
-
-    // Slide parameters
-    const slideSpeedWrapper = {
-      get slideSpeedThreshold() {
-        return self.slideSpeedThreshold;
-      },
-      set slideSpeedThreshold(value) {
-        self.slideSpeedThreshold = value;
-      },
-    };
-
-    addControl(slideSpeedWrapper, 'slideSpeedThreshold', 'Slide Min Speed', {
-      min: 0.5,
-      max: 10.0,
-      step: 0.1,
-    });
-
-    const slideDecelWrapper = {
-      get slideDecelerationTime() {
-        return self.slideDecelerationTime;
-      },
-      set slideDecelerationTime(value) {
-        self.slideDecelerationTime = value;
-      },
-    };
-
-    addControl(slideDecelWrapper, 'slideDecelerationTime', 'Slide Duration', {
-      min: 0.5,
-      max: 3.0,
-      step: 0.1,
-    });
-
-    // Debug info (read-only)
-    const groundedWrapper = {
-      get isGrounded() {
-        return self.isGrounded ? 'Yes' : 'No';
-      },
-    };
-
-    debugUI.addDebugControl(parentFolder, groundedWrapper, 'isGrounded', 'Grounded');
-
-    const verticalVelWrapper = {
-      get verticalVelocity() {
-        if (!self.capsuleCollider) return '0.00';
-        const rigidBody = self.capsuleCollider.getRigidBody();
-        if (!rigidBody) return '0.00';
-        const velocity = rigidBody.linvel();
-        return velocity.y.toFixed(2);
-      },
-    };
-
-    debugUI.addDebugControl(
-      parentFolder,
-      verticalVelWrapper,
-      'verticalVelocity',
-      'Vertical Velocity (Physics)',
-    );
-
-    const coyoteActiveWrapper = {
-      get coyoteActive() {
-        return self.timeSinceGrounded <= self.coyoteTime ? 'Active' : 'Inactive';
-      },
-    };
-
-    debugUI.addDebugControl(
-      parentFolder,
-      coyoteActiveWrapper,
-      'coyoteActive',
-      'Coyote Time Status',
-    );
-
-    const slideStatusWrapper = {
-      get slideStatus() {
-        return self.isSliding ? `Sliding (${self.slideTimer.toFixed(2)}s)` : 'Not Sliding';
-      },
-    };
-
-    debugUI.addDebugControl(parentFolder, slideStatusWrapper, 'slideStatus', 'Slide Status');
-  }
+  public override renderInMenu(): void {}
 
   /**
    * Obtiene la velocidad horizontal actual del personaje (para head bob, efectos de sonido, etc.)

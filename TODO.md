@@ -1,16 +1,14 @@
 ## Player
 
-1.
-2. Camera follow
-3. Movement on jump/ground is wrong
-4. Slide -> to air
-5. Slide min-time/interruption
-6. Slide collider size change
-7. Wall Jump
-8. Wall run
-9. Grapple
-10. Input Buffer
-11. Vault
+1. Camera follow
+2. Movement on jump/ground is wrong
+3. Slide min-time/interruption
+4. Slide collider size change
+5. Wall Jump
+6. Wall run
+7. Grapple
+8. Input Buffer
+9. Vault
 
 ---
 
