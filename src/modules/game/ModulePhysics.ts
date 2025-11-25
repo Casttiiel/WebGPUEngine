@@ -204,15 +204,15 @@ export class ModulePhysics extends Module {
   }
 
   public createCharacterControllerPhysicsForCollider(): RAPIER.KinematicCharacterController {
-    let controller = this.world.createCharacterController(0.001); // min distance para evitar jitter
+    let controller = this.world.createCharacterController(0.01); // min distance para evitar jitter
 
     controller.enableSnapToGround(0.3);
     controller.setSlideEnabled(true);
 
     controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
-    controller.setMinSlopeSlideAngle((50 * Math.PI) / 180);
+    controller.setMinSlopeSlideAngle((30 * Math.PI) / 180);
     controller.setApplyImpulsesToDynamicBodies(true);
-    controller.enableSnapToGround(0.1);
+    controller.disableSnapToGround();
 
     return controller;
   }

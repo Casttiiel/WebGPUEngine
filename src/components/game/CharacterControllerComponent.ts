@@ -255,7 +255,7 @@ export class CharacterControllerComponent extends Component {
       // EN SUELO: Control normal con aceleración suave
       if (hasInput) {
         const smoothFactor = Math.min(1.0, deltaTime / this.accelerationTime);
-        const t = 1.0 - Math.pow(1.0 - smoothFactor, 10.0);
+        const t = Math.pow(smoothFactor, 0.5);
         vec3.lerp(this.currentVelocity, this.currentVelocity, targetMovement, t);
       } else {
         // Deceleración en suelo
@@ -267,7 +267,7 @@ export class CharacterControllerComponent extends Component {
           vec3.set(this.currentVelocity, 0, 0, 0);
         }
       }
-    } else if (!this.isSliding) {
+    } else if (!this.isSliding && !this.isGrounded) {
       // EN AIRE: Preservar momentum + pequeñas correcciones
       if (hasInput) {
         // Calcular velocidad de corrección basada en el input
@@ -329,7 +329,7 @@ export class CharacterControllerComponent extends Component {
 
     // 6.5. Apply wall slide gravity reduction
     if (this.isOnWall && !this.isGrounded) {
-      this.applyWallSlideGravity();
+      //this.applyWallSlideGravity();
     }
 
     // 7. Apply horizontal velocity preservando Y (gravedad)
@@ -371,7 +371,7 @@ export class CharacterControllerComponent extends Component {
       new RAPIER.Vector3(movement[0], movement[1], movement[2]),
     );
 
-    this.isGrounded = this.characterController.computedGrounded();
+    this.isGrounded = this.isGrounded = this.capsuleCollider.raycastGrounded(0.1); //this.characterController.computedGrounded();
     let correctedMovement = this.characterController.computedMovement();
 
     // Aplicar movimiento real
@@ -384,27 +384,32 @@ export class CharacterControllerComponent extends Component {
 
     for (var i = 0; i < this.characterController.numComputedCollisions(); i++) {
       const collision = this.characterController.computedCollision(i);
-      const a = 0;
-      /*const col = this.world.getCollider(hit.collider);
-      const rb = col.parent();
+      const rigidBody = collision.collider.parent();
+      const type = rigidBody.bodyType();
 
-      if (!rb) continue; // collider sin RB → tratar como estático
+      // Detectar si es suelo
+      const isFloor = collision.normal1.y > 0.6;
 
-      const type = rb.bodyType();
+      // Si es suelo → ignorar completamente para lógica de pared
+      if (isFloor) continue;
 
-      if (type === RAPIER.BodyType.Fixed) {
-        // sliding
-        this.removeVelocityIntoWall(this.velocity, hit.normal);
+      if (type === RAPIER.RigidBodyType.Fixed) {
+        this.removeVelocityIntoWall(collision.normal1);
       }
+    }
+  }
 
-      if (type === RAPIER.BodyType.Dynamic) {
-        // cajas movibles → NO tocar velocidad
-      }
+  private removeVelocityIntoWall(collisionNormal) {
+    const dot =
+      this.currentVelocity[0] * collisionNormal.x +
+      this.currentVelocity[1] * collisionNormal.y +
+      this.currentVelocity[2] * collisionNormal.z;
 
-      if (type === RAPIER.BodyType.KinematicPositionBased) {
-        // plataformas móviles → sliding suave
-        this.removeVelocityIntoWall(this.velocity, hit.normal);
-      }*/
+    // si el vector apunta hacia la pared (dot < 0):
+    if (dot < 0) {
+      this.currentVelocity[0] -= dot * collisionNormal.x;
+      this.currentVelocity[1] -= dot * collisionNormal.y;
+      this.currentVelocity[2] -= dot * collisionNormal.z;
     }
   }
 
