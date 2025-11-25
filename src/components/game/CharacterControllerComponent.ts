@@ -318,7 +318,7 @@ export class CharacterControllerComponent extends Component {
 
       // Actualizar velocidad vertical con gravedad
       if (!this.isGrounded) {
-        this.currentVelocity[1] += gravity;
+        this.currentVelocity[1] += gravity * deltaTime;
       } else {
         // En el suelo, resetear velocidad vertical
         if (this.currentVelocity[1] < 0) {
@@ -372,7 +372,6 @@ export class CharacterControllerComponent extends Component {
     );
 
     this.isGrounded = this.characterController.computedGrounded();
-
     let correctedMovement = this.characterController.computedMovement();
 
     // Aplicar movimiento real
