@@ -7,12 +7,24 @@ try {
     await Engine.start();
 
     let then = 0;
+    let isFirstFrame = true;
+    const MAX_DELTA_TIME = 0.1; // Limitar a 100ms (10 FPS mínimo)
 
     // Iniciar el bucle de renderizado
     function frame(now: number) {
       now *= 0.001;
-      const deltaTime = now - then;
+      let deltaTime = now - then;
       then = now;
+
+      // Saltar el primer frame para evitar big deltaTime
+      if (isFirstFrame) {
+        isFirstFrame = false;
+        requestAnimationFrame(frame);
+        return;
+      }
+
+      // Clamp deltaTime para evitar saltos grandes
+      deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
       // Solo ejecutar update/render si el engine no está reiniciando
       if (!Engine.isEngineRestarting()) {

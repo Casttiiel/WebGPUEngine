@@ -1,7 +1,7 @@
 ## Player
 
-1. Camera follow
-2. Movement on jump/ground is wrong
+1. Big dt on start engine breaks physics
+2. Movement with curves
 3. Slide min-time/interruption
 4. Slide collider size change
 5. Wall Jump
@@ -9,6 +9,7 @@
 7. Grapple
 8. Input Buffer
 9. Vault
+10. Jump to dynamic (what to do? big vs small objects)
 
 ---
 

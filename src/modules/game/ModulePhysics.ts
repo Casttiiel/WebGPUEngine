@@ -15,7 +15,6 @@ import { vec3 } from 'gl-matrix';
 export class ModulePhysics extends Module {
   private world!: RAPIER.World;
   private eventQueue!: RAPIER.EventQueue;
-  private fixedTimeStep: number = 1.0 / 60.0;
   private debugEnabled: boolean = false;
 
   // Mapeo de entity IDs a rigid bodies
@@ -65,7 +64,7 @@ export class ModulePhysics extends Module {
 
   public update(_deltaTime: number): void {
     // Actualizar la simulación física con timestep fijo
-    this.world.timestep = this.fixedTimeStep;
+    this.world.timestep = _deltaTime;
     this.world.step(this.eventQueue);
 
     // Procesar eventos de colisión
