@@ -2,8 +2,8 @@
   "update": [
     "camera_mixer",
     "environment_manager",
-    "entities",
     "physics",
+    "entities",
     "input",
     "render",
     "sound"

@@ -122,7 +122,7 @@ export class ModulePhysics extends Module {
    * El personaje se moverá junto con la plataforma
    */
   public createKinematicBody(entityId: number, position: vec3): RAPIER.RigidBody {
-    const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
+    const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicVelocityBased().setTranslation(
       position[0],
       position[1],
       position[2],
@@ -211,6 +211,8 @@ export class ModulePhysics extends Module {
 
     controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
     controller.setMinSlopeSlideAngle((50 * Math.PI) / 180);
+    controller.setApplyImpulsesToDynamicBodies(true);
+    controller.enableSnapToGround(0.1);
 
     return controller;
   }

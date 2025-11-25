@@ -2,8 +2,6 @@
   "update": [
     "point_light",
     "directional_light",
-    "box_collider",
-    "capsule_collider",
     "particle_system",
     "character_controller",
     "camera_arm",
@@ -11,6 +9,8 @@
     "head_bob",
     "camera_crouch",
     "camera_fov_modifier",
+    "box_collider",
+    "capsule_collider",
     "transform",
     "camera",
     "ambient_occlusion"

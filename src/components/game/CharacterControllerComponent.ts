@@ -5,6 +5,7 @@ import { CameraComponent } from '../render/CameraComponent';
 import { Engine } from '../../core/engine/Engine';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
+import RAPIER from '@dimforge/rapier3d';
 
 /**
  * CharacterControllerComponent - FPS Character Controller
@@ -22,6 +23,7 @@ import { CharacterControllerComponentDataType } from '../../types/CharacterContr
 export class CharacterControllerComponent extends Component {
   // Referencias
   private capsuleCollider!: CapsuleColliderComponent;
+  private characterController!: RAPIER.KinematicCharacterController;
   private camera: CameraComponent | null = null;
   private cameraSearched: boolean = false; // Flag para buscar solo una vez
 
@@ -36,6 +38,13 @@ export class CharacterControllerComponent extends Component {
   private slideSpeedThreshold: number = 3.0; // Velocidad mínima para activar slide
   private slideDecelerationTime: number = 1.5; // Tiempo de frenado del slide
   private slideHeightMultiplier: number = 0.5; // Reducción de altura (0.5 = mitad de altura)
+
+  // Wall jump parameters
+  private wallJumpForce: number = 8.0; // Fuerza del salto desde la pared (vertical)
+  private wallJumpAwayForce: number = 6.0; // Fuerza de empuje horizontal desde la pared
+  private wallJumpCooldown: number = 0.3; // Cooldown entre wall jumps (segundos)
+  private wallCheckDistance: number = 0.6; // Distancia máxima para detectar pared
+  private wallSlideGravityMultiplier: number = 0.3; // Reduce gravedad al deslizar en pared
 
   // Estado
   private isGrounded: boolean = false;
@@ -52,6 +61,11 @@ export class CharacterControllerComponent extends Component {
   // Coyote time - permite saltar justo después de dejar el suelo
   private coyoteTime: number = 0.15; // Segundos de gracia después de dejar el suelo
   private timeSinceGrounded: number = 0.0; // Tiempo desde que dejó de estar grounded
+
+  // Wall jump state
+  private isOnWall: boolean = false;
+  private wallNormal: vec3 = vec3.create(); // Normal de la pared detectada
+  private timeSinceWallJump: number = 999.0; // Tiempo desde el último wall jump
 
   constructor() {
     super();
@@ -98,6 +112,21 @@ export class CharacterControllerComponent extends Component {
     if (data.slideHeightMultiplier !== undefined) {
       this.slideHeightMultiplier = data.slideHeightMultiplier;
     }
+    if (data.wallJumpForce !== undefined) {
+      this.wallJumpForce = data.wallJumpForce;
+    }
+    if (data.wallJumpAwayForce !== undefined) {
+      this.wallJumpAwayForce = data.wallJumpAwayForce;
+    }
+    if (data.wallJumpCooldown !== undefined) {
+      this.wallJumpCooldown = data.wallJumpCooldown;
+    }
+    if (data.wallCheckDistance !== undefined) {
+      this.wallCheckDistance = data.wallCheckDistance;
+    }
+    if (data.wallSlideGravityMultiplier !== undefined) {
+      this.wallSlideGravityMultiplier = data.wallSlideGravityMultiplier;
+    }
 
     // Guardar dimensiones originales del collider
     this.originalHeight = this.capsuleCollider.getCapsuleHeight();
@@ -105,40 +134,14 @@ export class CharacterControllerComponent extends Component {
 
     // NO buscar cámara aquí - las entidades hijas aún no están cargadas
     // La buscaremos en el primer update()
+
+    this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 
   public update(deltaTime: number): void {
     if (!this.capsuleCollider) return;
 
-    // Lazy camera search: buscar en el primer update cuando los hijos ya están cargados
-    if (!this.cameraSearched) {
-      const children = this.getOwner().getChildren();
-      for (const child of children) {
-        const cam = child.getComponent('camera') as CameraComponent;
-        if (cam) {
-          this.camera = cam;
-          console.log('CharacterControllerComponent: Camera found in children!');
-          break;
-        }
-      }
-
-      if (!this.camera) {
-        console.warn(
-          'CharacterControllerComponent: No camera found in children. Movement will be world-space.',
-        );
-      }
-
-      this.cameraSearched = true; // Solo buscar una vez
-    }
-
-    // 1. Check if grounded usando el método del collider
-    const wasGrounded = this.isGrounded;
-    this.isGrounded = this.capsuleCollider.raycastGrounded(0.1);
-
-    // Capturar velocidad horizontal al dejar el suelo (momentum preservation)
-    if (wasGrounded && !this.isGrounded) {
-      vec3.copy(this.airVelocity, this.currentVelocity);
-    }
+    this.findCamera();
 
     // Update coyote time
     if (this.isGrounded) {
@@ -146,6 +149,16 @@ export class CharacterControllerComponent extends Component {
     } else {
       this.timeSinceGrounded += deltaTime;
     }
+
+    // Update wall jump cooldown
+    /*this.timeSinceWallJump += deltaTime;
+
+    // Wall detection (solo si no estamos en el suelo)
+    if (!this.isGrounded && !this.isSliding) {
+      this.checkWallContact();
+    } else {
+      this.isOnWall = false;
+    }*/
 
     // 2. Handle slide activation and update
     const input = Engine.getInput();
@@ -287,44 +300,212 @@ export class CharacterControllerComponent extends Component {
       }
     }
 
-    // 6. Handle jump (con coyote time, no durante slide)
-    const canJump = this.timeSinceGrounded <= this.coyoteTime && !this.isSliding;
-    if (canJump && input.isKeyJustPressed(KeyCode.SPACE)) {
-      this.applyJump();
-      this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+    // 6. Handle jump (con coyote time, wall jump, no durante slide)
+    const canGroundJump = this.timeSinceGrounded <= this.coyoteTime && !this.isSliding;
+    const canWallJump =
+      this.isOnWall && !this.isSliding && this.timeSinceWallJump > this.wallJumpCooldown;
+
+    if (input.isKeyJustPressed(KeyCode.SPACE)) {
+      if (canGroundJump) {
+        this.applyJump();
+        this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+      } else if (canWallJump) {
+        this.applyWallJump();
+      }
+    } else {
+      // Para cuerpos KINEMATIC, necesitamos simular gravedad manualmente
+      const gravity = -9.81; // m/s²
+
+      // Actualizar velocidad vertical con gravedad
+      if (!this.isGrounded) {
+        this.currentVelocity[1] += gravity;
+      } else {
+        // En el suelo, resetear velocidad vertical
+        if (this.currentVelocity[1] < 0) {
+          this.currentVelocity[1] = 0;
+        }
+      }
+    }
+
+    // 6.5. Apply wall slide gravity reduction
+    if (this.isOnWall && !this.isGrounded) {
+      this.applyWallSlideGravity();
     }
 
     // 7. Apply horizontal velocity preservando Y (gravedad)
     const velocityToApply = this.isSliding ? this.slideVelocity : this.currentVelocity;
-    this.applyMovement(velocityToApply);
+
+    this.applyMovement(velocityToApply, deltaTime);
+  }
+
+  private findCamera(): void {
+    // Lazy camera search: buscar en el primer update cuando los hijos ya están cargados
+    if (!this.cameraSearched) {
+      const children = this.getOwner().getChildren();
+      for (const child of children) {
+        const cam = child.getComponent('camera') as CameraComponent;
+        if (cam) {
+          this.camera = cam;
+          break;
+        }
+      }
+
+      if (!this.camera) {
+        console.warn(
+          'CharacterControllerComponent: No camera found in children. Movement will be world-space.',
+        );
+      }
+
+      this.cameraSearched = true; // Solo buscar una vez
+    }
   }
 
   /**
    * Aplica movimiento horizontal preservando velocidad vertical (gravedad)
    */
-  private applyMovement(horizontalMovement: vec3): void {
-    const currentVel = this.capsuleCollider.getLinearVelocity();
+  private applyMovement(velocity: vec3, dt: number): void {
+    const movement = vec3.fromValues(velocity[0] * dt, velocity[1] * dt, velocity[2] * dt);
 
-    // Preservar Y (gravedad), aplicar X/Z (movimiento)
-    const newVel = vec3.fromValues(
-      horizontalMovement[0],
-      currentVel[1], // Preservar velocidad vertical
-      horizontalMovement[2],
+    this.characterController.computeColliderMovement(
+      this.capsuleCollider.getCollider(),
+      new RAPIER.Vector3(movement[0], movement[1], movement[2]),
     );
 
-    this.capsuleCollider.setLinearVelocity(newVel);
+    this.isGrounded = this.characterController.computedGrounded();
+
+    let correctedMovement = this.characterController.computedMovement();
+
+    // Aplicar movimiento real
+    const newVel = {
+      x: correctedMovement.x / dt,
+      y: correctedMovement.y / dt,
+      z: correctedMovement.z / dt,
+    };
+    this.capsuleCollider.getRigidBody().setLinvel(newVel, true);
+
+    for (var i = 0; i < this.characterController.numComputedCollisions(); i++) {
+      const collision = this.characterController.computedCollision(i);
+      const a = 0;
+      /*const col = this.world.getCollider(hit.collider);
+      const rb = col.parent();
+
+      if (!rb) continue; // collider sin RB → tratar como estático
+
+      const type = rb.bodyType();
+
+      if (type === RAPIER.BodyType.Fixed) {
+        // sliding
+        this.removeVelocityIntoWall(this.velocity, hit.normal);
+      }
+
+      if (type === RAPIER.BodyType.Dynamic) {
+        // cajas movibles → NO tocar velocidad
+      }
+
+      if (type === RAPIER.BodyType.KinematicPositionBased) {
+        // plataformas móviles → sliding suave
+        this.removeVelocityIntoWall(this.velocity, hit.normal);
+      }*/
+    }
+  }
+
+  /**
+   * Detecta si hay una pared cerca usando raycasts
+   */
+  private checkWallContact(): void {
+    if (!this.capsuleCollider.getRigidBody()) return;
+
+    /*const physics = Engine.getPhysics();
+    if (!physics) return;
+
+    const translation = this.capsuleCollider.getRigidBody().translation();
+    const position = vec3.fromValues(translation.x, translation.y, translation.z);
+
+    const directions = [
+      vec3.fromValues(1, 0, 0), // Right
+      vec3.fromValues(-1, 0, 0), // Left
+      vec3.fromValues(0, 0, 1), // Forward
+      vec3.fromValues(0, 0, -1), // Back
+    ];
+
+    this.isOnWall = false;
+
+    for (const direction of directions) {
+      const rayOrigin = { x: position[0], y: position[1], z: position[2] };
+      const rayDir = { x: direction[0], y: direction[1], z: direction[2] };
+      const ray = new (window as any).RAPIER.Ray(rayOrigin, rayDir);
+
+      const hit = physics.getWorld().castRay(
+        ray,
+        this.wallCheckDistance,
+        true, // solid
+        undefined,
+        undefined,
+        this.capsuleCollider.getRigidBody().collider(0), // Excluir propio collider
+      );
+
+      if (hit) {
+        // Obtener normal de la superficie (aproximada como opuesta a la dirección del ray)
+        const hitNormal = vec3.fromValues(-direction[0], 0, -direction[2]);
+        vec3.normalize(hitNormal, hitNormal);
+
+        const verticalComponent = Math.abs(hitNormal[1]);
+
+        if (verticalComponent < 0.5) {
+          // Normal más horizontal que vertical
+          this.isOnWall = true;
+          vec3.copy(this.wallNormal, hitNormal);
+          return; // Encontramos una pared, salir
+        }
+      }
+    }*/
   }
 
   /**
    * Aplica impulso de salto
    */
   private applyJump(): void {
+    this.currentVelocity[1] = this.jumpForce;
+  }
+
+  /**
+   * Aplica impulso de wall jump (salto desde la pared)
+   */
+  private applyWallJump(): void {
+    // Empuje horizontal alejándose de la pared
+    const awayFromWall = vec3.scale(vec3.create(), this.wallNormal, this.wallJumpAwayForce);
+
+    // Velocidad vertical de salto
+    const upwardVelocity = vec3.fromValues(0, this.wallJumpForce, 0);
+
+    // Combinar ambas velocidades
+    const wallJumpVel = vec3.add(vec3.create(), awayFromWall, upwardVelocity);
+
+    // Aplicar la velocidad
+    this.capsuleCollider.setLinearVelocity(wallJumpVel);
+
+    // Actualizar currentVelocity para que el movimiento en aire sea correcto
+    vec3.set(this.currentVelocity, wallJumpVel[0], 0, wallJumpVel[2]);
+
+    // Reset wall jump cooldown
+    this.timeSinceWallJump = 0.0;
+    this.isOnWall = false;
+
+    console.log('Wall jump! Away force:', this.wallJumpAwayForce);
+  }
+
+  /**
+   * Reduce la gravedad mientras se desliza por una pared
+   */
+  private applyWallSlideGravity(): void {
     const currentVel = this.capsuleCollider.getLinearVelocity();
 
-    // Aplicar velocidad vertical de salto
-    const jumpVel = vec3.fromValues(currentVel[0], this.jumpForce, currentVel[2]);
-
-    this.capsuleCollider.setLinearVelocity(jumpVel);
+    // Solo reducir velocidad de caída, no afectar si ya estamos subiendo
+    if (currentVel[1] < 0) {
+      const reducedGravity = currentVel[1] * this.wallSlideGravityMultiplier;
+      const newVel = vec3.fromValues(currentVel[0], reducedGravity, currentVel[2]);
+      this.capsuleCollider.setLinearVelocity(newVel);
+    }
   }
 
   /**
@@ -422,6 +603,14 @@ export class CharacterControllerComponent extends Component {
    */
   public getIsSliding(): boolean {
     return this.isSliding;
+  }
+
+  /**
+   * Obtiene si el personaje está en una pared
+   * @returns true si está tocando una pared
+   */
+  public getIsOnWall(): boolean {
+    return this.isOnWall;
   }
 
   public renderDebug(): void {
