@@ -1,5 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { CharacterControllerComponent } from './CharacterControllerComponent';
 import { FPSCameraControllerComponent } from './FPSCameraControllerComponent';
 
 export interface CameraCrouchComponentData {
@@ -79,7 +80,7 @@ export class CameraCrouchComponent extends Component {
     const characterController = this.getOwner().getComponent('character_controller');
     if (!characterController) return;
 
-    const isSliding = (characterController as any).getIsSliding() || false;
+    const isSliding = (characterController as CharacterControllerComponent).getIsSliding() || false;
 
     // Altura objetivo: baja durante slide, normal el resto del tiempo
     const targetHeight = isSliding ? this.slideCrouchHeight : this.baseEyeHeight;

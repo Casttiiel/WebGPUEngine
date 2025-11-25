@@ -78,7 +78,6 @@ export class CameraFOVModifierComponent extends Component {
         const cam = child.getComponent('camera') as CameraComponent;
         if (cam) {
           this.cameraComponent = cam;
-          console.log('CameraFOVModifier: Camera found in children!');
           break;
         }
       }
@@ -104,15 +103,11 @@ export class CameraFOVModifierComponent extends Component {
       this.baseFOV = (fovRadians * 180.0) / Math.PI; // Convertir radianes a grados
       this.currentFOV = this.baseFOV;
       this.targetFOV = this.baseFOV;
-      console.log(
-        `CameraFOVModifier: Lazy loaded baseFOV = ${this.baseFOV.toFixed(2)}° (from ${fovRadians.toFixed(4)} rad)`,
-      );
     }
 
     // Lazy loading: obtener maxSpeed solo la primera vez que se necesita
     if (this.maxSpeed === undefined) {
       this.maxSpeed = (characterController as CharacterControllerComponent).getMoveSpeed();
-      console.log(`CameraFOVModifier: Lazy loaded maxSpeed = ${this.maxSpeed} m/s`);
     }
 
     const currentSpeed =
@@ -133,14 +128,6 @@ export class CameraFOVModifierComponent extends Component {
       // Calcular incremento de FOV
       const fovIncrease = normalizedSpeed * this.maxFOVIncrease;
       this.targetFOV = this.baseFOV + fovIncrease;
-
-      // Debug temporal
-      if (Math.random() < 0.01) {
-        // Log 1% del tiempo para no saturar
-        console.log(
-          `FOV Debug: speed=${currentSpeed.toFixed(2)}, normalized=${normalizedSpeed.toFixed(2)}, increase=${fovIncrease.toFixed(2)}, target=${this.targetFOV.toFixed(2)}, base=${this.baseFOV.toFixed(2)}`,
-        );
-      }
     }
 
     // Interpolar suavemente hacia el FOV objetivo

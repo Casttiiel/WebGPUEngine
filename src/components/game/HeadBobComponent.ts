@@ -1,6 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { CharacterControllerComponent } from './CharacterControllerComponent';
 
 export interface HeadBobComponentData {
   frequency?: number; // Frecuencia del bobbing (Hz)
@@ -69,9 +70,11 @@ export class HeadBobComponent extends Component {
       return;
     }
 
-    const currentSpeed = (characterController as any).getCurrentSpeed() || 0.0;
-    const isGrounded = (characterController as any).getIsGrounded() ?? false;
-    const isSliding = (characterController as any).getIsSliding() ?? false;
+    const currentSpeed =
+      (characterController as CharacterControllerComponent).getCurrentSpeed() || 0.0;
+    const isGrounded =
+      (characterController as CharacterControllerComponent).getIsGrounded() ?? false;
+    const isSliding = (characterController as CharacterControllerComponent).getIsSliding() ?? false;
 
     // Solo aplicar head bob si:
     // 1. Está en el suelo (no saltando)

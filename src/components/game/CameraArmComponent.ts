@@ -90,7 +90,6 @@ export class CameraArmComponent extends Component {
       for (const child of children) {
         if (child.hasComponent('camera')) {
           this.cameraEntity = child;
-          console.log('CameraArmComponent: Camera found in children!');
           break;
         }
       }

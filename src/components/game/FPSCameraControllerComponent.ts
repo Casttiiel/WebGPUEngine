@@ -55,7 +55,6 @@ export class FPSCameraControllerComponent extends Component {
       for (const child of children) {
         if (child.hasComponent('camera')) {
           this.cameraEntity = child;
-          console.log('FPSCameraComponent: Camera found in children!');
           break;
         }
       }

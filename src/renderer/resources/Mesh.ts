@@ -448,7 +448,6 @@ export class Mesh extends GPUResource {
     );
 
     GPUUtils.writeBuffer(this.indexBuffer, 0, paddedArray);
-    console.log('Index buffer created with size:', paddedArray.byteLength);
   }
 
   private calculateAABB(): AABB {
