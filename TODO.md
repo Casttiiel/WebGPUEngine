@@ -1,15 +1,13 @@
 ## Player
 
-1. Big dt on start engine breaks physics
-2. Movement with curves
-3. Slide min-time/interruption
-4. Slide collider size change
-5. Wall Jump
-6. Wall run
-7. Grapple
-8. Input Buffer
-9. Vault
-10. Jump to dynamic (what to do? big vs small objects)
+1. Slide only if walking forward to camera
+2. Wall Jump
+3. Wall run
+4. Movement with curves
+5. Grapple
+6. Input Buffer
+7. Vault
+8. Jump to dynamic (what to do? big vs small objects)
 
 ---
 
@@ -25,3 +23,4 @@
 
 Control Mapping
 Borde raro en objetos
+Loading bar

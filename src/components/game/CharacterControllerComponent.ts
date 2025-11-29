@@ -580,10 +580,14 @@ export class CharacterControllerComponent extends Component {
     if (!rigidBody) return;
 
     const world = Engine.getPhysics().getWorld();
-    const currentRadius = this.originalRadius;
+    var currentRadius = this.originalRadius;
 
     // Calcular halfHeight (altura del cilindro central, excluyendo semiesferas)
-    const halfHeight = Math.max(0.01, (newHeight - 2 * currentRadius) / 2);
+    var halfHeight = (newHeight - 2 * currentRadius) / 2;
+    if (halfHeight < 0) {
+      halfHeight = 0.01;
+      currentRadius = (newHeight - halfHeight) / 2;
+    }
 
     // 1. Eliminar el collider anterior
     const oldCollider = this.capsuleCollider.getCollider();
