@@ -8,6 +8,7 @@ export type CharacterControllerComponentDataType = {
   slideSpeedThreshold?: number; // Minimum speed to activate slide (default: 3.0)
   slideDecelerationTime?: number; // Slide duration in seconds (default: 1.5)
   slideHeightMultiplier?: number; // Height reduction during slide (0.5 = half height, default: 0.5)
+  slideMinDuration?: number; // Minimum slide duration before it can be cancelled in seconds (default: 0.5)
   wallJumpForce?: number; // Wall jump vertical force (default: 8.0)
   wallJumpAwayForce?: number; // Wall jump horizontal push away from wall (default: 6.0)
   wallJumpCooldown?: number; // Cooldown between wall jumps in seconds (default: 0.3)

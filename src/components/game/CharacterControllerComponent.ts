@@ -38,6 +38,7 @@ export class CharacterControllerComponent extends Component {
   private slideSpeedThreshold: number = 3.0; // Velocidad mínima para activar slide
   private slideDecelerationTime: number = 1.5; // Tiempo de frenado del slide
   private slideHeightMultiplier: number = 0.5; // Reducción de altura (0.5 = mitad de altura)
+  private slideMinDuration: number = 0.5; // Tiempo mínimo del slide en segundos (no se puede cancelar antes)
 
   // Wall jump parameters
   private wallJumpForce: number = 8.0; // Fuerza del salto desde la pared (vertical)
@@ -112,6 +113,9 @@ export class CharacterControllerComponent extends Component {
     if (data.slideHeightMultiplier !== undefined) {
       this.slideHeightMultiplier = data.slideHeightMultiplier;
     }
+    if (data.slideMinDuration !== undefined) {
+      this.slideMinDuration = data.slideMinDuration;
+    }
     if (data.wallJumpForce !== undefined) {
       this.wallJumpForce = data.wallJumpForce;
     }
@@ -175,13 +179,16 @@ export class CharacterControllerComponent extends Component {
     if (this.isSliding) {
       this.updateSlide(deltaTime);
 
-      // Terminar slide si soltamos la tecla o se acabó el tiempo/velocidad
-      if (
+      // Terminar slide solo si:
+      // 1. Ha pasado el tiempo mínimo Y (soltamos tecla O se acabó tiempo O velocidad baja)
+      // 2. O perdemos contacto con el suelo (cancelación forzada)
+      const minDurationPassed = this.slideTimer >= this.slideMinDuration;
+      const shouldEndSlide =
         !input.isKeyPressed(KeyCode.SHIFT) ||
         this.slideTimer >= this.slideDecelerationTime ||
-        vec3.length(this.slideVelocity) < 0.5 ||
-        !this.isGrounded
-      ) {
+        vec3.length(this.slideVelocity) < 0.5;
+
+      if (!this.isGrounded || (minDurationPassed && shouldEndSlide)) {
         this.endSlide();
       }
     }
@@ -524,7 +531,7 @@ export class CharacterControllerComponent extends Component {
 
     // Reducir altura del collider
     const newHeight = this.originalHeight * this.slideHeightMultiplier;
-    this.resizeCapsule(newHeight, this.originalRadius);
+    this.applyCapsuleHeight(newHeight);
 
     console.log('Slide started!', vec3.length(this.slideVelocity).toFixed(2), 'm/s');
   }
@@ -555,7 +562,7 @@ export class CharacterControllerComponent extends Component {
     this.slideTimer = 0.0;
 
     // Restaurar altura original del collider
-    this.resizeCapsule(this.originalHeight, this.originalRadius);
+    this.applyCapsuleHeight(this.originalHeight);
 
     // Transferir velocidad del slide al movimiento normal
     vec3.copy(this.currentVelocity, this.slideVelocity);
@@ -566,11 +573,43 @@ export class CharacterControllerComponent extends Component {
   /**
    * Redimensiona la cápsula del collider
    */
-  private resizeCapsule(newHeight: number, radius: number): void {
-    // TODO: Implementar resize del collider en CapsuleColliderComponent
-    // Por ahora, esto es placeholder
-    // Necesitaremos recrear el collider con las nuevas dimensiones
-    console.log(`Resize capsule: height=${newHeight.toFixed(2)}, radius=${radius.toFixed(2)}`);
+  private applyCapsuleHeight(newHeight: number): void {
+    if (!this.capsuleCollider) return;
+
+    const rigidBody = this.capsuleCollider.getRigidBody();
+    if (!rigidBody) return;
+
+    const world = Engine.getPhysics().getWorld();
+    const currentRadius = this.originalRadius;
+
+    // Calcular halfHeight (altura del cilindro central, excluyendo semiesferas)
+    const halfHeight = Math.max(0.01, (newHeight - 2 * currentRadius) / 2);
+
+    // 1. Eliminar el collider anterior
+    const oldCollider = this.capsuleCollider.getCollider();
+    if (oldCollider) {
+      world.removeCollider(oldCollider, false);
+    }
+
+    // 2. Crear nuevo collider con la nueva altura
+
+    const newCollider = Engine.getPhysics().addCapsuleCollider(
+      this.getOwner().id,
+      rigidBody,
+      halfHeight,
+      currentRadius,
+      false,
+    );
+
+    console.log('Applied new capsule height:', newHeight.toFixed(2), 'm');
+
+    // 3. Actualizar la referencia del collider en el componente
+    // Como CapsuleColliderComponent no expone un setter, accedemos directamente
+    (this.capsuleCollider as any).collider = newCollider; //!!!!!!!!!
+
+    // 4. Ajustar la posición del rigidbody para mantener los pies pegados al suelo
+    const oldHeight = this.originalHeight;
+    const heightDelta = (oldHeight - newHeight) / 2;
   }
 
   public override renderInMenu(): void {}

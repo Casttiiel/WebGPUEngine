@@ -13,9 +13,9 @@
     "components": {
       "name": "Static Cube",
       "transform": {
-        "position": [0, 0, 4],
+        "position": [0, 3, 4],
         "rotation": [0, 0, 0],
-        "scale": [4, 4, 4]
+        "scale": [18, 4, 2]
       },
       "box_collider": {
         "bodyType": "static",

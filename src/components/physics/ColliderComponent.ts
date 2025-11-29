@@ -331,6 +331,10 @@ export class ColliderComponent extends Component {
     return this.isSensor;
   }
 
+  public setCollider(collider: RAPIER.Collider): void {
+    this.collider = collider;
+  }
+
   // ==================== Physics API ====================
 
   /**

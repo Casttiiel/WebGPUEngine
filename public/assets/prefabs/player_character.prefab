@@ -33,6 +33,8 @@
       "decelerationTime": 0.25,
       "airControlMultiplier": 0.5,
       "slideDecelerationTime": 2.5,
+      "slideMinDuration": 0.75,
+      "slideHeightMultiplier": 0.1,
       "wallJumpForce": 8.0,
       "wallJumpAwayForce": 6.0,
       "wallJumpCooldown": 0.3,
@@ -40,7 +42,7 @@
       "wallSlideGravityMultiplier": 0.3
     },
     "fps_camera_controller": {
-      "eyeOffset": [0, 1.8, 0],
+      "eyeOffset": [0, 0.8, 0],
       "mouseSensitivity": 0.25,
       "invertY": true
     },
