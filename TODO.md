@@ -1,13 +1,16 @@
 ## Player
 
-1. Slide only if walking forward to camera
-2. Wall Jump
-3. Wall run
-4. Movement with curves
-5. Grapple
-6. Input Buffer
-7. Vault
-8. Jump to dynamic (what to do? big vs small objects)
+1. Swap camera/player controls
+2. Jump while run is higher? (because of code of colliding with static?) (I can jump when close to wall?)
+3. Follow of mesh with camera wrong
+4. Box Collider/Ground collider good?
+5. Wall Jump
+6. Wall run
+7. Movement with curves
+8. Grapple
+9. Input Buffer
+10. Vault
+11. Jump to dynamic (what to do? big vs small objects)
 
 ---
 

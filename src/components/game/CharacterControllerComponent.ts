@@ -169,8 +169,19 @@ export class CharacterControllerComponent extends Component {
     const currentSpeed = vec3.length(this.currentVelocity);
 
     if (!this.isSliding && input.isKeyJustPressed(KeyCode.SHIFT)) {
-      // Activar slide si estamos en el suelo y con velocidad suficiente
-      if (this.isGrounded && currentSpeed >= this.slideSpeedThreshold) {
+      // Activar slide solo si estamos en el suelo, con velocidad suficiente Y moviendo hacia adelante (W)
+      const isMovingForward = input.isKeyPressed(KeyCode.W);
+      const isMovingLeft = input.isKeyPressed(KeyCode.A);
+      const isMovingRight = input.isKeyPressed(KeyCode.D);
+      const isMovingBackward = input.isKeyPressed(KeyCode.S);
+      if (
+        this.isGrounded &&
+        currentSpeed >= this.slideSpeedThreshold &&
+        isMovingForward &&
+        !isMovingLeft &&
+        !isMovingRight &&
+        !isMovingBackward
+      ) {
         this.startSlide();
       }
     }

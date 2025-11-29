@@ -1,15 +1,16 @@
 ---------------------------------------Wishlist Backlog-----------------------------------
 
-1. Mesh Collider
-2. CSM 3-cascade system
-3. Spawn/Delete items having in mind Instancing
-4. Gamestates -> Different scenes -> Load screen?
-5. Progressive texture streaming o mip streaming
-6. DOF adaptative
+1. CSM 3-cascade system
+2. Light map generator
+3. Mesh Collider
+4. UI
+5. Spawn/Delete items having in mind Instancing
+6. Gamestates -> Different scenes -> Load screen?
+7. Progressive texture streaming o mip streaming
+8. DOF adaptative
    Froxel Scattering
    Animations
    TAA Anti-aliasing temporal
-   UI
    Auto exposure
    GPUDrivenRendering with indirect draw calls and frustum culling on GPU
    Tool for asset creation (Pregenerar AABBs y tangentes)
