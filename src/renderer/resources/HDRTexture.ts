@@ -136,7 +136,7 @@ export class HDRTexture extends GPUResource {
       mipLevelCount: this.texture.mipLevelCount,
     });
 
-    this.sampler = SamplerLibrary.bloom;
+    this.sampler = SamplerLibrary.skybox;
 
     // Mark as loaded when createTexture completes
     this.setHasData();

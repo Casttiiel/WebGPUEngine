@@ -8,6 +8,7 @@ export class SamplerLibrary {
   private static _ambientOcclusionSampler: GPUSampler;
   private static _shadowsSampler: GPUSampler;
   private static _anisotropic16x: GPUSampler;
+  private static _skyboxSampler: GPUSampler;
   private static _nonFilteringSampler: GPUSampler;
 
   /**
@@ -37,6 +38,16 @@ export class SamplerLibrary {
       minFilter: 'linear',
       mipmapFilter: 'linear',
       addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      maxAnisotropy: 1,
+    });
+
+    SamplerLibrary._skyboxSampler = GPUUtils.createSampler({
+      label: 'skybox_sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'repeat',
       addressModeV: 'clamp-to-edge',
       maxAnisotropy: 1,
     });
@@ -136,6 +147,13 @@ export class SamplerLibrary {
       throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
     }
     return SamplerLibrary._anisotropic16x;
+  }
+
+  public static get skybox(): GPUSampler {
+    if (!SamplerLibrary.initialized) {
+      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
+    }
+    return SamplerLibrary._skyboxSampler;
   }
 
   public static get nonFilteringSampler(): GPUSampler {
