@@ -2,7 +2,7 @@
   "components": {
     "name": "Player Character",
     "transform": {
-      "position": [0, 10.9, 3],
+      "position": [0, 0.9, 0],
       "scale": [0.6,
           1.8,
           0.6]
@@ -31,7 +31,7 @@
       "coyoteTime": 0.5,
       "accelerationFactor": 0.1,
       "decelerationFactor": 6.5,
-      "airControlMultiplier": 0.5,
+      "airControlMultiplier": 0.3,
       "slideSpeedThreshold": 7.0,
       "slideDecelerationTime": 2.5,
       "slideMinDuration": 0.75,
@@ -55,8 +55,8 @@
       "enabled": true
     },
     "camera_fov_modifier": {
-      "maxFOVIncrease": 10.0,
-      "speedThreshold": 1.0,
+      "maxFOVIncrease": 5.0,
+      "speedThreshold": 3.0,
       "lerpSpeed": 5.0,
       "enabled": true
     }

@@ -1,11 +1,10 @@
 ## Player
 
 1. Change size of UV based on size?
-2. Asegurar que hay mipmaping
+2. Swap camera/player controls
 3. Follow of mesh with camera wrong
-4. Loading Bar
-5. Swap camera/player controls
-6. Box Collider/Ground collider good?
+4. Box Collider/Ground collider good?
+5. Loading Bar
 
 ---
 

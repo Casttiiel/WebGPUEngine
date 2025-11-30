@@ -1,5 +1,4 @@
 import { Component } from '../../core/ecs/Component';
-import { Engine } from '../../core/engine/Engine';
 import { CameraComponent } from '../render/CameraComponent';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
 

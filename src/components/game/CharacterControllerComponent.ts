@@ -36,9 +36,10 @@ export class CharacterControllerComponent extends Component {
 
   // Jump
   private jumpForce: number = 8.0; // Velocidad inicial del salto
-  private jumpHoldForce: number = 3.0; // Fuerza adicional mientras se mantiene el botón (m/s²)
-  private jumpHoldThreshold: number = 0.3; // Tiempo máximo para aplicar jump hold (segundos)
+  private jumpHoldForce: number = 0.25; // Fuerza adicional mientras se mantiene el botón (m/s²)
+  private jumpHoldThreshold: number = 0.15; // Tiempo máximo para aplicar jump hold (segundos)
   private jumpHoldTimer: number = 0.0; // Timer para jump hold
+  private jumpCutFactor: number = 0.6; // Factor para reducir la velocidad al soltar la tecla de salto (0.0 = cortar totalmente, 1.0 = no cortar)
 
   // Coyote time - permite saltar justo después de dejar el suelo
   private coyoteTime: number = 0.15; // Segundos de gracia después de dejar el suelo
@@ -59,6 +60,7 @@ export class CharacterControllerComponent extends Component {
   private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
   private isSliding: boolean = false;
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
+  private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
 
   constructor() {
     super();
@@ -254,6 +256,7 @@ export class CharacterControllerComponent extends Component {
   private manageMovement(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
     const verticalVelocity = this.currentVelocity[1];
+    this.currentVelocity[1] = 0; // Ignorar componente Y para cálculos horizontales
 
     if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración suave
@@ -291,7 +294,7 @@ export class CharacterControllerComponent extends Component {
 
         // Limitar la velocidad máxima para evitar aceleración infinita
         const currentSpeed = vec3.length(this.currentVelocity);
-        const maxAirSpeed = this.moveSpeed * 1.2; // 20% más rápido que en suelo
+        const maxAirSpeed = this.moveSpeed * 1.1; // 10% más rápido que en suelo
         if (currentSpeed > maxAirSpeed) {
           vec3.normalize(this.currentVelocity, this.currentVelocity);
           vec3.scale(this.currentVelocity, this.currentVelocity, maxAirSpeed);
@@ -382,6 +385,7 @@ export class CharacterControllerComponent extends Component {
         this.isJumping = true; // Iniciar salto variable
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
         this.jumpHoldTimer = 0.0; // Reset jump hold timer
+        this.jumpCutFactorApplied = false;
       }
     } else if (
       this.isJumping &&
@@ -399,10 +403,11 @@ export class CharacterControllerComponent extends Component {
     } else if (
       this.isJumping &&
       !input.isKeyPressed(KeyCode.SPACE) &&
-      this.currentVelocity[1] > 0
+      this.currentVelocity[1] > 0 &&
+      !this.jumpCutFactorApplied
     ) {
-      this.currentVelocity[1] *= 0.4; // Reducir velocidad vertical al soltar la tecla
-      this.isJumping = false;
+      this.currentVelocity[1] *= this.jumpCutFactor; // Reducir velocidad vertical al soltar la tecla
+      this.jumpCutFactorApplied = true;
     }
   }
 
@@ -419,7 +424,6 @@ export class CharacterControllerComponent extends Component {
   private startSlide(): void {
     this.isSliding = true;
     this.slideTimer = 0.0;
-
     // Capturar velocidad actual para el slide
     vec3.copy(this.slideVelocity, this.currentVelocity);
 
@@ -435,7 +439,7 @@ export class CharacterControllerComponent extends Component {
     this.slideTimer += deltaTime;
 
     // Decelerar progresivamente el slide
-    const t = Math.min(1.0, this.slideTimer / this.slidedecelerationFactor);
+    const t = Math.min(1.0, this.slideTimer / this.slideDecelerationTime);
     const decelCurve = 1.0 - Math.pow(t, 2.5); // Curva cuadrática de frenado
 
     // Aplicar deceleración manteniendo dirección
@@ -449,7 +453,6 @@ export class CharacterControllerComponent extends Component {
    */
   private endSlide(): void {
     if (!this.isSliding) return;
-
     this.isSliding = false;
     this.slideTimer = 0.0;
 
