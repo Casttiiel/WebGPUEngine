@@ -2,7 +2,7 @@
     "technique": "gbuffer.tech",
     "textures":{
         "txAlbedo": "lee.jpg",
-        "txNormal": "lee_normal.jpg",
+        "txNormal": "no-normal.jpg",
         "txMetallic": "black.png",
         "txRoughness": "white.png",
         "txEmissive": "black.png"

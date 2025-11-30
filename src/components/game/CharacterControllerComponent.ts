@@ -30,6 +30,10 @@ export class CharacterControllerComponent extends Component {
   // Parámetros de movimiento
   private moveSpeed: number = 5.0; // Unidades por segundo
   private jumpForce: number = 8.0; // Velocidad inicial del salto
+  private jumpHoldForce: number = 2.0; // Fuerza adicional mientras se mantiene el botón (m/s²)
+  private jumpHoldThreshold: number = 0.2; // Tiempo máximo para aplicar jump hold (segundos)
+  private jumpHoldTimer: number = 0.0; // Timer para jump hold
+  private jumpCutVelocity: number = -2.0; // Velocidad vertical máxima al cortar el salto (negativa = cae)
   private accelerationTime: number = 1.0; // Tiempo para alcanzar velocidad máxima (segundos)
   private decelerationTime: number = 0.15; // Tiempo para frenar completamente (segundos)
   private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
@@ -49,6 +53,7 @@ export class CharacterControllerComponent extends Component {
 
   // Estado
   private isGrounded: boolean = false;
+  private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
   private airVelocity: vec3 = vec3.create(); // Velocidad horizontal al dejar el suelo (momentum preservation)
 
@@ -91,6 +96,12 @@ export class CharacterControllerComponent extends Component {
     }
     if (data.jumpForce !== undefined) {
       this.jumpForce = data.jumpForce;
+    }
+    if (data.jumpHoldForce !== undefined) {
+      this.jumpHoldForce = data.jumpHoldForce;
+    }
+    if (data.jumpCutVelocity !== undefined) {
+      this.jumpCutVelocity = data.jumpCutVelocity;
     }
     if (data.accelerationTime !== undefined) {
       this.accelerationTime = data.accelerationTime;
@@ -323,25 +334,49 @@ export class CharacterControllerComponent extends Component {
     const canWallJump =
       this.isOnWall && !this.isSliding && this.timeSinceWallJump > this.wallJumpCooldown;
 
+    // Detectar inicio del salto
     if (input.isKeyJustPressed(KeyCode.SPACE)) {
+      console.log(
+        'Jump key just pressed. canGroundJump:',
+        canGroundJump,
+        'canWallJump:',
+        canWallJump,
+      );
       if (canGroundJump) {
         this.applyJump();
+        this.isJumping = true; // Iniciar salto variable
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+        this.jumpHoldTimer = 0.0; // Reset jump hold timer
       } else if (canWallJump) {
         this.applyWallJump();
       }
-    } else {
-      // Para cuerpos KINEMATIC, necesitamos simular gravedad manualmente
-      const gravity = -9.81; // m/s²
+    } else if (
+      this.isJumping &&
+      input.isKeyPressed(KeyCode.SPACE) &&
+      this.currentVelocity[1] > 0 &&
+      this.jumpHoldTimer < this.jumpHoldThreshold
+    ) {
+      console.log('Applying variable jump height');
+      // Variable Jump Height: Aplicar impulso extra mientras se mantiene el botón y el personaje sube
+      // Aplicar fuerza adicional mientras se mantiene presionado (acelera hacia arriba)
+      this.currentVelocity[1] += this.jumpHoldForce * deltaTime;
+      this.jumpHoldTimer += deltaTime;
+      if (this.jumpHoldTimer > this.jumpHoldThreshold) {
+        this.isJumping = false; // Terminar salto variable después del tiempo máximo
+      }
+    }
 
-      // Actualizar velocidad vertical con gravedad
-      if (!this.isGrounded) {
-        this.currentVelocity[1] += gravity * deltaTime;
-      } else {
-        // En el suelo, resetear velocidad vertical
-        if (this.currentVelocity[1] < 0) {
-          this.currentVelocity[1] = 0;
-        }
+    // Para cuerpos KINEMATIC, necesitamos simular gravedad manualmente
+    const gravity = -9.81; // m/s²
+
+    // Actualizar velocidad vertical con gravedad
+    if (!this.isGrounded) {
+      this.currentVelocity[1] += gravity * deltaTime;
+    } else {
+      // En el suelo, resetear velocidad vertical
+      if (this.currentVelocity[1] < 0) {
+        this.currentVelocity[1] = 0;
+        this.isJumping = false;
       }
     }
 

@@ -1,6 +1,8 @@
 export type CharacterControllerComponentDataType = {
   moveSpeed?: number; // Movement speed in units per second (default: 5.0)
-  jumpForce?: number; // Jump force/initial velocity (default: 8.0)
+  jumpForce?: number; // Jump initial velocity (default: 8.0)
+  jumpHoldForce?: number; // Additional force while holding jump button (default: 20.0 m/s²)
+  jumpCutVelocity?: number; // Max vertical velocity when jump is cut (default: -2.0, negative = falls)
   accelerationTime?: number; // Time to reach max speed in seconds (default: 0.5)
   decelerationTime?: number; // Time to stop completely in seconds (default: 0.5)
   coyoteTime?: number; // Grace period to jump after leaving ground in seconds (default: 0.15)

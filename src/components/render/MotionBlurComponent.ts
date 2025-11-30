@@ -10,6 +10,7 @@ import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { Component } from '../../core/ecs/Component';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { CameraComponent } from './CameraComponent';
 
 /**
  * Camera Motion Blur Component
@@ -38,7 +39,7 @@ export class MotionBlurComponent extends Component {
   // Motion blur parameters (uniform buffer: 144 bytes)
   // mat4x4 (64 bytes) + mat4x4 (64 bytes) + 4 floats (16 bytes) = 144 bytes
   private paramsBuffer!: GPUBuffer;
-  private _blurStrength: number = 0.2; // Blur intensity (user-set)
+  private _blurStrength: number = 0.4; // Blur intensity (user-set)
   private _numSamples: number = 4; // Sample count
   private translationDampening: number = 0.1; // Reduce blur on camera translation (0 = disable blur, 1 = no dampening)
 
@@ -106,7 +107,7 @@ export class MotionBlurComponent extends Component {
     if (mainCamera) {
       const cameraComponent = mainCamera.getComponent('camera');
       if (cameraComponent) {
-        const camera = (cameraComponent as any).getCamera();
+        const camera = (cameraComponent as CameraComponent).getCamera();
         const currentPosition = camera.getPosition();
 
         // Calculate translation distance from previous frame
@@ -152,7 +153,7 @@ export class MotionBlurComponent extends Component {
     if (!cameraComponent) return;
 
     // Get current ViewProjection matrix
-    const camera = (cameraComponent as any).getCamera();
+    const camera = (cameraComponent as CameraComponent).getCamera();
     const currentVP = camera.getViewProjection();
 
     // Calculate inverse ViewProjection
