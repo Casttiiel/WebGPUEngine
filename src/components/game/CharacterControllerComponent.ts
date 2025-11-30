@@ -30,8 +30,8 @@ export class CharacterControllerComponent extends Component {
 
   // Movement
   private moveSpeed: number = 5.0; // Unidades por segundo
-  private accelerationTime: number = 1.0; // Tiempo para alcanzar velocidad máxima (segundos)
-  private decelerationTime: number = 0.15; // Tiempo para frenar completamente (segundos)
+  private accelerationFactor: number = 1.0; // Tiempo para alcanzar velocidad máxima (segundos)
+  private decelerationFactor: number = 0.15; // Tiempo para frenar completamente (segundos)
   private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
 
   // Jump
@@ -87,12 +87,16 @@ export class CharacterControllerComponent extends Component {
     if (data.jumpHoldForce !== undefined) {
       this.jumpHoldForce = data.jumpHoldForce;
     }
-    if (data.accelerationTime !== undefined) {
-      this.accelerationTime = data.accelerationTime;
+    if (data.accelerationFactor !== undefined) {
+      this.accelerationFactor = data.accelerationFactor;
     }
-    if (data.decelerationTime !== undefined) {
-      this.decelerationTime = data.decelerationTime;
+    if (data.accelerationFactor !== undefined) {
+      this.accelerationFactor = data.accelerationFactor;
     }
+    if (data.decelerationFactor !== undefined) {
+      this.decelerationFactor = data.decelerationFactor;
+    }
+
     if (data.coyoteTime !== undefined) {
       this.coyoteTime = data.coyoteTime;
     }
@@ -256,12 +260,12 @@ export class CharacterControllerComponent extends Component {
       // EN SUELO: Control normal con aceleración suave
       if (hasInput) {
         vec3.scale(targetMovement, targetMovement, this.moveSpeed);
-        const smoothFactor = Math.min(1.0, deltaTime / this.accelerationTime);
+        const smoothFactor = Math.min(1.0, deltaTime * this.accelerationFactor);
         const t = Math.pow(smoothFactor, 0.5);
         vec3.lerp(this.currentVelocity, this.currentVelocity, targetMovement, t);
       } else {
         // Deceleración en suelo
-        const smoothFactor = Math.min(1.0, deltaTime / this.decelerationTime);
+        const smoothFactor = Math.min(1.0, deltaTime * this.decelerationFactor);
         const t = 1.0 - Math.pow(1.0 - smoothFactor, 5.0);
         vec3.scale(this.currentVelocity, this.currentVelocity, 1.0 - t);
 
@@ -425,7 +429,7 @@ export class CharacterControllerComponent extends Component {
     this.slideTimer += deltaTime;
 
     // Decelerar progresivamente el slide
-    const t = Math.min(1.0, this.slideTimer / this.slideDecelerationTime);
+    const t = Math.min(1.0, this.slideTimer / this.slidedecelerationFactor);
     const decelCurve = 1.0 - Math.pow(t, 2.5); // Curva cuadrática de frenado
 
     // Aplicar deceleración manteniendo dirección
