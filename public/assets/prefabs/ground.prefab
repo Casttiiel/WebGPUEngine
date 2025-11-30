@@ -18,7 +18,7 @@
         "meshes": [
           {
             "mesh": "large_plane.obj",
-            "material": "textured.mat"
+            "material": "concrete.mat"
           }
         ]
       }

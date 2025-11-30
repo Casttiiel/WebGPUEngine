@@ -28,7 +28,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "textured.mat"
+            "material": "carbon.mat"
           }
         ]
       }
@@ -54,7 +54,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "textured.mat"
+            "material": "carbon.mat"
           }
         ]
       }
@@ -80,7 +80,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "textured.mat"
+            "material": "carbon.mat"
           }
         ]
       }
