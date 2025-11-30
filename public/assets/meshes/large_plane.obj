@@ -11,9 +11,9 @@ v -50.0 0.0  50.0
 
 # Texture coordinates (tiled 10x10)
 vt 0.0 0.0
-vt 10.0 0.0
-vt 10.0 10.0
-vt 0.0 10.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
 
 # Normals (pointing up: Y+)
 vn 0.0 1.0 0.0

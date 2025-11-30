@@ -1,12 +1,11 @@
 ## Player
 
-1. Change of material
-2. Cut Jump / Jump Cancel
-3. Asegurar que hay mipmaping
-4. Follow of mesh with camera wrong
-5. Loading Bar
-6. Swap camera/player controls
-7. Box Collider/Ground collider good?
+1. Change size of UV based on size?
+2. Asegurar que hay mipmaping
+3. Follow of mesh with camera wrong
+4. Loading Bar
+5. Swap camera/player controls
+6. Box Collider/Ground collider good?
 
 ---
 
@@ -31,5 +30,6 @@
 ---
 
 Weird blur
-Borde raro en objetos (Artefactos)
+Borde raro en objetos (Artefactos) (Dientes de sierra)
 Control Mapping
+Sunset overdrive decals

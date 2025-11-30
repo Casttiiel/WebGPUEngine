@@ -37,7 +37,7 @@ export class CharacterControllerComponent extends Component {
   // Jump
   private jumpForce: number = 8.0; // Velocidad inicial del salto
   private jumpHoldForce: number = 3.0; // Fuerza adicional mientras se mantiene el botón (m/s²)
-  private jumpHoldThreshold: number = 0.5; // Tiempo máximo para aplicar jump hold (segundos)
+  private jumpHoldThreshold: number = 0.3; // Tiempo máximo para aplicar jump hold (segundos)
   private jumpHoldTimer: number = 0.0; // Timer para jump hold
 
   // Coyote time - permite saltar justo después de dejar el suelo
@@ -96,7 +96,6 @@ export class CharacterControllerComponent extends Component {
     if (data.decelerationFactor !== undefined) {
       this.decelerationFactor = data.decelerationFactor;
     }
-
     if (data.coyoteTime !== undefined) {
       this.coyoteTime = data.coyoteTime;
     }
@@ -397,6 +396,13 @@ export class CharacterControllerComponent extends Component {
       if (this.jumpHoldTimer > this.jumpHoldThreshold) {
         this.isJumping = false; // Terminar salto variable después del tiempo máximo
       }
+    } else if (
+      this.isJumping &&
+      !input.isKeyPressed(KeyCode.SPACE) &&
+      this.currentVelocity[1] > 0
+    ) {
+      this.currentVelocity[1] *= 0.4; // Reducir velocidad vertical al soltar la tecla
+      this.isJumping = false;
     }
   }
 
