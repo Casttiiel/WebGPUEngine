@@ -2,7 +2,7 @@
   "components": {
     "name": "Player Character",
     "transform": {
-      "position": [0, 0.9, 0],
+      "position": [0, 10.9, 3],
       "scale": [0.6,
           1.8,
           0.6]
@@ -27,19 +27,15 @@
     },
     "character_controller": {
       "moveSpeed": 10.0,
-      "jumpForce": 8.0,
-      "coyoteTime": 1.0,
+      "jumpForce": 6.0,
+      "coyoteTime": 0.5,
       "accelerationTime": 10.25,
       "decelerationTime": 0.25,
       "airControlMultiplier": 0.5,
+      "slideSpeedThreshold": 7.0,
       "slideDecelerationTime": 2.5,
       "slideMinDuration": 0.75,
-      "slideHeightMultiplier": 0.1,
-      "wallJumpForce": 8.0,
-      "wallJumpAwayForce": 6.0,
-      "wallJumpCooldown": 0.3,
-      "wallCheckDistance": 0.6,
-      "wallSlideGravityMultiplier": 0.3
+      "slideHeightMultiplier": 0.1
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],

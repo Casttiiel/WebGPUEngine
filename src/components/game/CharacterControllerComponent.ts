@@ -7,6 +7,7 @@ import { KeyCode } from '../../types/KeyCode.enum';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import RAPIER from '@dimforge/rapier3d';
 
+const gravity = -9.81; // m/s²
 /**
  * CharacterControllerComponent - FPS Character Controller
  *
@@ -25,53 +26,39 @@ export class CharacterControllerComponent extends Component {
   private capsuleCollider!: CapsuleColliderComponent;
   private characterController!: RAPIER.KinematicCharacterController;
   private camera: CameraComponent | null = null;
-  private cameraSearched: boolean = false; // Flag para buscar solo una vez
+  private cameraFound: boolean = false;
 
-  // Parámetros de movimiento
+  // Movement
   private moveSpeed: number = 5.0; // Unidades por segundo
-  private jumpForce: number = 8.0; // Velocidad inicial del salto
-  private jumpHoldForce: number = 2.0; // Fuerza adicional mientras se mantiene el botón (m/s²)
-  private jumpHoldThreshold: number = 0.2; // Tiempo máximo para aplicar jump hold (segundos)
-  private jumpHoldTimer: number = 0.0; // Timer para jump hold
-  private jumpCutVelocity: number = -2.0; // Velocidad vertical máxima al cortar el salto (negativa = cae)
   private accelerationTime: number = 1.0; // Tiempo para alcanzar velocidad máxima (segundos)
   private decelerationTime: number = 0.15; // Tiempo para frenar completamente (segundos)
   private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
 
-  // Slide parameters
-  private slideSpeedThreshold: number = 3.0; // Velocidad mínima para activar slide
-  private slideDecelerationTime: number = 1.5; // Tiempo de frenado del slide
-  private slideHeightMultiplier: number = 0.5; // Reducción de altura (0.5 = mitad de altura)
-  private slideMinDuration: number = 0.5; // Tiempo mínimo del slide en segundos (no se puede cancelar antes)
-
-  // Wall jump parameters
-  private wallJumpForce: number = 8.0; // Fuerza del salto desde la pared (vertical)
-  private wallJumpAwayForce: number = 6.0; // Fuerza de empuje horizontal desde la pared
-  private wallJumpCooldown: number = 0.3; // Cooldown entre wall jumps (segundos)
-  private wallCheckDistance: number = 0.6; // Distancia máxima para detectar pared
-  private wallSlideGravityMultiplier: number = 0.3; // Reduce gravedad al deslizar en pared
-
-  // Estado
-  private isGrounded: boolean = false;
-  private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
-  private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
-  private airVelocity: vec3 = vec3.create(); // Velocidad horizontal al dejar el suelo (momentum preservation)
-
-  // Slide state
-  private isSliding: boolean = false;
-  private slideVelocity: vec3 = vec3.create(); // Velocidad capturada al inicio del slide
-  private slideTimer: number = 0.0; // Tiempo transcurrido en slide
-  private originalHeight: number = 0.0; // Altura original del collider
-  private originalRadius: number = 0.0; // Radio original del collider
+  // Jump
+  private jumpForce: number = 8.0; // Velocidad inicial del salto
+  private jumpHoldForce: number = 3.0; // Fuerza adicional mientras se mantiene el botón (m/s²)
+  private jumpHoldThreshold: number = 0.5; // Tiempo máximo para aplicar jump hold (segundos)
+  private jumpHoldTimer: number = 0.0; // Timer para jump hold
 
   // Coyote time - permite saltar justo después de dejar el suelo
   private coyoteTime: number = 0.15; // Segundos de gracia después de dejar el suelo
   private timeSinceGrounded: number = 0.0; // Tiempo desde que dejó de estar grounded
 
-  // Wall jump state
-  private isOnWall: boolean = false;
-  private wallNormal: vec3 = vec3.create(); // Normal de la pared detectada
-  private timeSinceWallJump: number = 999.0; // Tiempo desde el último wall jump
+  // Slide
+  private slideSpeedThreshold: number = 5.0; // Velocidad mínima para activar slide
+  private slideDecelerationTime: number = 1.5; // Tiempo de frenado del slide
+  private slideHeightMultiplier: number = 0.5; // Reducción de altura (0.5 = mitad de altura)
+  private slideMinDuration: number = 0.5; // Tiempo mínimo del slide en segundos (no se puede cancelar antes)
+  private slideVelocity: vec3 = vec3.create(); // Velocidad capturada al inicio del slide
+  private slideTimer: number = 0.0; // Tiempo transcurrido en slide
+  private originalHeight: number = 0.0; // Altura original del collider
+  private originalRadius: number = 0.0; // Radio original del collider
+
+  // Estado
+  private isGrounded: boolean = false;
+  private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
+  private isSliding: boolean = false;
+  private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
 
   constructor() {
     super();
@@ -100,9 +87,6 @@ export class CharacterControllerComponent extends Component {
     if (data.jumpHoldForce !== undefined) {
       this.jumpHoldForce = data.jumpHoldForce;
     }
-    if (data.jumpCutVelocity !== undefined) {
-      this.jumpCutVelocity = data.jumpCutVelocity;
-    }
     if (data.accelerationTime !== undefined) {
       this.accelerationTime = data.accelerationTime;
     }
@@ -127,21 +111,6 @@ export class CharacterControllerComponent extends Component {
     if (data.slideMinDuration !== undefined) {
       this.slideMinDuration = data.slideMinDuration;
     }
-    if (data.wallJumpForce !== undefined) {
-      this.wallJumpForce = data.wallJumpForce;
-    }
-    if (data.wallJumpAwayForce !== undefined) {
-      this.wallJumpAwayForce = data.wallJumpAwayForce;
-    }
-    if (data.wallJumpCooldown !== undefined) {
-      this.wallJumpCooldown = data.wallJumpCooldown;
-    }
-    if (data.wallCheckDistance !== undefined) {
-      this.wallCheckDistance = data.wallCheckDistance;
-    }
-    if (data.wallSlideGravityMultiplier !== undefined) {
-      this.wallSlideGravityMultiplier = data.wallSlideGravityMultiplier;
-    }
 
     // Guardar dimensiones originales del collider
     this.originalHeight = this.capsuleCollider.getCapsuleHeight();
@@ -154,37 +123,100 @@ export class CharacterControllerComponent extends Component {
   }
 
   public update(deltaTime: number): void {
-    if (!this.capsuleCollider) return;
-
     this.findCamera();
 
-    // Update coyote time
-    if (this.isGrounded) {
-      this.timeSinceGrounded = 0.0;
-    } else {
-      this.timeSinceGrounded += deltaTime;
+    if (!this.capsuleCollider || !this.camera) return;
+
+    const inputDir = this.getInputVector();
+    const targetMovement = this.getTargetMovement(inputDir);
+
+    this.manageSliding(deltaTime);
+    this.manageMovement(deltaTime, targetMovement);
+    this.applyGravity(deltaTime);
+    this.manageJump(deltaTime);
+
+    // Select velocity to apply
+    const velocityToApply = this.isSliding ? this.slideVelocity : this.currentVelocity;
+
+    this.applyMovement(velocityToApply, deltaTime);
+  }
+
+  private getInputVector(): vec3 {
+    const input = Engine.getInput();
+    const inputDir = vec3.create();
+
+    if (input.isKeyPressed(KeyCode.W)) {
+      inputDir[2] -= 1; // Forward
+    }
+    if (input.isKeyPressed(KeyCode.S)) {
+      inputDir[2] += 1; // Backward
+    }
+    if (input.isKeyPressed(KeyCode.A)) {
+      inputDir[0] -= 1; // Left
+    }
+    if (input.isKeyPressed(KeyCode.D)) {
+      inputDir[0] += 1; // Right
     }
 
-    // Update wall jump cooldown
-    /*this.timeSinceWallJump += deltaTime;
+    // Normalize input direction
+    if (vec3.length(inputDir) > 0.01) {
+      vec3.normalize(inputDir, inputDir);
+    }
 
-    // Wall detection (solo si no estamos en el suelo)
-    if (!this.isGrounded && !this.isSliding) {
-      this.checkWallContact();
+    return inputDir;
+  }
+
+  private getTargetMovement(inputDir: vec3): vec3 {
+    const targetMovement = vec3.create();
+
+    const cameraObj = this.camera!.getCamera();
+    const forward = cameraObj.getFront();
+    const up = vec3.fromValues(0, 1, 0); // World up
+
+    // Calculate right vector: right = up × forward (right-handed system)
+    const right = vec3.cross(vec3.create(), up, forward);
+    vec3.normalize(right, right);
+
+    // Project forward and right onto XZ plane (ignore Y for horizontal movement)
+    const forwardXZ = vec3.fromValues(forward[0], 0, forward[2]);
+    const rightXZ = vec3.fromValues(right[0], 0, right[2]);
+
+    vec3.normalize(forwardXZ, forwardXZ);
+    vec3.normalize(rightXZ, rightXZ);
+
+    // Combine input with camera directions
+    const forwardMovement = vec3.scale(vec3.create(), forwardXZ, -inputDir[2]);
+    const rightMovement = vec3.scale(vec3.create(), rightXZ, -inputDir[0]);
+
+    vec3.add(targetMovement, forwardMovement, rightMovement);
+
+    // Normalize final movement
+    if (vec3.length(targetMovement) > 0.01) {
+      vec3.normalize(targetMovement, targetMovement);
+    }
+
+    return targetMovement;
+  }
+
+  private applyGravity(deltaTime: number): void {
+    // Actualizar velocidad vertical con gravedad
+    if (this.isGrounded && this.currentVelocity[1] <= 0) {
+      this.currentVelocity[1] = 0;
+      this.isJumping = false;
     } else {
-      this.isOnWall = false;
-    }*/
+      this.currentVelocity[1] += gravity * deltaTime;
+    }
+  }
 
-    // 2. Handle slide activation and update
+  private manageSliding(deltaTime: number): void {
     const input = Engine.getInput();
-    const currentSpeed = vec3.length(this.currentVelocity);
-
     if (!this.isSliding && input.isKeyJustPressed(KeyCode.SHIFT)) {
       // Activar slide solo si estamos en el suelo, con velocidad suficiente Y moviendo hacia adelante (W)
       const isMovingForward = input.isKeyPressed(KeyCode.W);
       const isMovingLeft = input.isKeyPressed(KeyCode.A);
       const isMovingRight = input.isKeyPressed(KeyCode.D);
       const isMovingBackward = input.isKeyPressed(KeyCode.S);
+      const currentSpeed = vec3.length(this.currentVelocity);
       if (
         this.isGrounded &&
         currentSpeed >= this.slideSpeedThreshold &&
@@ -214,75 +246,16 @@ export class CharacterControllerComponent extends Component {
         this.endSlide();
       }
     }
+  }
 
-    // 3. Gather input (desactivado durante slide)
-    const inputDir = vec3.create();
-
-    if (!this.isSliding) {
-      if (input.isKeyPressed(KeyCode.W)) {
-        inputDir[2] -= 1; // Forward
-      }
-      if (input.isKeyPressed(KeyCode.S)) {
-        inputDir[2] += 1; // Backward
-      }
-      if (input.isKeyPressed(KeyCode.A)) {
-        inputDir[0] -= 1; // Left
-      }
-      if (input.isKeyPressed(KeyCode.D)) {
-        inputDir[0] += 1; // Right
-      }
-
-      // Normalize input direction
-      if (vec3.length(inputDir) > 0.01) {
-        vec3.normalize(inputDir, inputDir);
-      }
-    } // End !isSliding input block
-
-    // 4. Transform movement to camera space (FPS movement)
-    const targetMovement = vec3.create();
-
-    if (!this.isSliding && this.camera) {
-      const cameraObj = this.camera.getCamera();
-      const forward = cameraObj.getFront();
-      const up = vec3.fromValues(0, 1, 0); // World up
-
-      // Calculate right vector: right = up × forward (right-handed system)
-      const right = vec3.cross(vec3.create(), up, forward);
-      vec3.normalize(right, right);
-
-      // Project forward and right onto XZ plane (ignore Y for horizontal movement)
-      const forwardXZ = vec3.fromValues(forward[0], 0, forward[2]);
-      const rightXZ = vec3.fromValues(right[0], 0, right[2]);
-
-      vec3.normalize(forwardXZ, forwardXZ);
-      vec3.normalize(rightXZ, rightXZ);
-
-      // Combine input with camera directions
-      const forwardMovement = vec3.scale(vec3.create(), forwardXZ, -inputDir[2]);
-      const rightMovement = vec3.scale(vec3.create(), rightXZ, -inputDir[0]);
-
-      vec3.add(targetMovement, forwardMovement, rightMovement);
-
-      // Normalize final movement
-      if (vec3.length(targetMovement) > 0.01) {
-        vec3.normalize(targetMovement, targetMovement);
-      }
-    } else if (!this.isSliding) {
-      // Fallback to world-space movement if no camera (solo si no está sliding)
-      vec3.copy(targetMovement, inputDir);
-    }
-
-    // Apply movement speed to get target velocity (solo si no está sliding)
-    if (!this.isSliding) {
-      vec3.scale(targetMovement, targetMovement, this.moveSpeed);
-    }
-
-    // 5. Smooth acceleration/deceleration
+  private manageMovement(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
+    const verticalVelocity = this.currentVelocity[1];
 
-    if (!this.isSliding && this.isGrounded) {
+    if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración suave
       if (hasInput) {
+        vec3.scale(targetMovement, targetMovement, this.moveSpeed);
         const smoothFactor = Math.min(1.0, deltaTime / this.accelerationTime);
         const t = Math.pow(smoothFactor, 0.5);
         vec3.lerp(this.currentVelocity, this.currentVelocity, targetMovement, t);
@@ -299,13 +272,13 @@ export class CharacterControllerComponent extends Component {
     } else if (!this.isSliding && !this.isGrounded) {
       // EN AIRE: Preservar momentum + pequeñas correcciones
       if (hasInput) {
+        vec3.scale(targetMovement, targetMovement, this.moveSpeed);
         // Calcular velocidad de corrección basada en el input
         const correctionVelocity = vec3.scale(
           vec3.create(),
           targetMovement,
           this.airControlMultiplier,
         );
-
         // Añadir la corrección a la velocidad actual (acumulativa)
         vec3.add(
           this.currentVelocity,
@@ -323,94 +296,13 @@ export class CharacterControllerComponent extends Component {
       } else {
         // Sin input en el aire: mantener momentum (casi sin deceleración)
         // Solo una deceleración mínima por resistencia del aire
-        const airDrag = 0.02; // 2% de drag por segundo
+        const airDrag = 0.04; // 2% de drag por segundo
         const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
         vec3.scale(this.currentVelocity, this.currentVelocity, dragFactor);
       }
     }
 
-    // 6. Handle jump (con coyote time, wall jump, no durante slide)
-    const canGroundJump = this.timeSinceGrounded <= this.coyoteTime && !this.isSliding;
-    const canWallJump =
-      this.isOnWall && !this.isSliding && this.timeSinceWallJump > this.wallJumpCooldown;
-
-    // Detectar inicio del salto
-    if (input.isKeyJustPressed(KeyCode.SPACE)) {
-      console.log(
-        'Jump key just pressed. canGroundJump:',
-        canGroundJump,
-        'canWallJump:',
-        canWallJump,
-      );
-      if (canGroundJump) {
-        this.applyJump();
-        this.isJumping = true; // Iniciar salto variable
-        this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
-        this.jumpHoldTimer = 0.0; // Reset jump hold timer
-      } else if (canWallJump) {
-        this.applyWallJump();
-      }
-    } else if (
-      this.isJumping &&
-      input.isKeyPressed(KeyCode.SPACE) &&
-      this.currentVelocity[1] > 0 &&
-      this.jumpHoldTimer < this.jumpHoldThreshold
-    ) {
-      console.log('Applying variable jump height');
-      // Variable Jump Height: Aplicar impulso extra mientras se mantiene el botón y el personaje sube
-      // Aplicar fuerza adicional mientras se mantiene presionado (acelera hacia arriba)
-      this.currentVelocity[1] += this.jumpHoldForce * deltaTime;
-      this.jumpHoldTimer += deltaTime;
-      if (this.jumpHoldTimer > this.jumpHoldThreshold) {
-        this.isJumping = false; // Terminar salto variable después del tiempo máximo
-      }
-    }
-
-    // Para cuerpos KINEMATIC, necesitamos simular gravedad manualmente
-    const gravity = -9.81; // m/s²
-
-    // Actualizar velocidad vertical con gravedad
-    if (!this.isGrounded) {
-      this.currentVelocity[1] += gravity * deltaTime;
-    } else {
-      // En el suelo, resetear velocidad vertical
-      if (this.currentVelocity[1] < 0) {
-        this.currentVelocity[1] = 0;
-        this.isJumping = false;
-      }
-    }
-
-    // 6.5. Apply wall slide gravity reduction
-    if (this.isOnWall && !this.isGrounded) {
-      //this.applyWallSlideGravity();
-    }
-
-    // 7. Apply horizontal velocity preservando Y (gravedad)
-    const velocityToApply = this.isSliding ? this.slideVelocity : this.currentVelocity;
-
-    this.applyMovement(velocityToApply, deltaTime);
-  }
-
-  private findCamera(): void {
-    // Lazy camera search: buscar en el primer update cuando los hijos ya están cargados
-    if (!this.cameraSearched) {
-      const children = this.getOwner().getChildren();
-      for (const child of children) {
-        const cam = child.getComponent('camera') as CameraComponent;
-        if (cam) {
-          this.camera = cam;
-          break;
-        }
-      }
-
-      if (!this.camera) {
-        console.warn(
-          'CharacterControllerComponent: No camera found in children. Movement will be world-space.',
-        );
-      }
-
-      this.cameraSearched = true; // Solo buscar una vez
-    }
+    this.currentVelocity[1] = verticalVelocity; // Preservar velocidad vertical
   }
 
   /**
@@ -452,7 +344,7 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
-  private removeVelocityIntoWall(collisionNormal) {
+  private removeVelocityIntoWall(collisionNormal: RAPIER.Vector3): void {
     const dot =
       this.currentVelocity[0] * collisionNormal.x +
       this.currentVelocity[1] * collisionNormal.y +
@@ -466,56 +358,42 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
-  /**
-   * Detecta si hay una pared cerca usando raycasts
-   */
-  private checkWallContact(): void {
-    if (!this.capsuleCollider.getRigidBody()) return;
+  private manageJump(deltaTime: number): void {
+    const input = Engine.getInput();
+    const canGroundJump =
+      !this.isSliding &&
+      !this.isJumping &&
+      (this.timeSinceGrounded <= this.coyoteTime || this.isGrounded);
 
-    /*const physics = Engine.getPhysics();
-    if (!physics) return;
+    // Update coyote time
+    if (this.isGrounded) {
+      this.timeSinceGrounded = 0.0;
+    } else {
+      this.timeSinceGrounded += deltaTime;
+    }
 
-    const translation = this.capsuleCollider.getRigidBody().translation();
-    const position = vec3.fromValues(translation.x, translation.y, translation.z);
-
-    const directions = [
-      vec3.fromValues(1, 0, 0), // Right
-      vec3.fromValues(-1, 0, 0), // Left
-      vec3.fromValues(0, 0, 1), // Forward
-      vec3.fromValues(0, 0, -1), // Back
-    ];
-
-    this.isOnWall = false;
-
-    for (const direction of directions) {
-      const rayOrigin = { x: position[0], y: position[1], z: position[2] };
-      const rayDir = { x: direction[0], y: direction[1], z: direction[2] };
-      const ray = new (window as any).RAPIER.Ray(rayOrigin, rayDir);
-
-      const hit = physics.getWorld().castRay(
-        ray,
-        this.wallCheckDistance,
-        true, // solid
-        undefined,
-        undefined,
-        this.capsuleCollider.getRigidBody().collider(0), // Excluir propio collider
-      );
-
-      if (hit) {
-        // Obtener normal de la superficie (aproximada como opuesta a la dirección del ray)
-        const hitNormal = vec3.fromValues(-direction[0], 0, -direction[2]);
-        vec3.normalize(hitNormal, hitNormal);
-
-        const verticalComponent = Math.abs(hitNormal[1]);
-
-        if (verticalComponent < 0.5) {
-          // Normal más horizontal que vertical
-          this.isOnWall = true;
-          vec3.copy(this.wallNormal, hitNormal);
-          return; // Encontramos una pared, salir
-        }
+    // Detectar inicio del salto
+    if (input.isKeyJustPressed(KeyCode.SPACE)) {
+      if (canGroundJump) {
+        this.applyJump();
+        this.isJumping = true; // Iniciar salto variable
+        this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+        this.jumpHoldTimer = 0.0; // Reset jump hold timer
       }
-    }*/
+    } else if (
+      this.isJumping &&
+      input.isKeyPressed(KeyCode.SPACE) &&
+      this.currentVelocity[1] > 0 &&
+      this.jumpHoldTimer < this.jumpHoldThreshold
+    ) {
+      // Variable Jump Height: Aplicar impulso extra mientras se mantiene el botón y el personaje sube
+      // Aplicar fuerza adicional mientras se mantiene presionado (acelera hacia arriba)
+      this.currentVelocity[1] += this.jumpHoldForce * deltaTime;
+      this.jumpHoldTimer += deltaTime;
+      if (this.jumpHoldTimer > this.jumpHoldThreshold) {
+        this.isJumping = false; // Terminar salto variable después del tiempo máximo
+      }
+    }
   }
 
   /**
@@ -523,46 +401,6 @@ export class CharacterControllerComponent extends Component {
    */
   private applyJump(): void {
     this.currentVelocity[1] = this.jumpForce;
-  }
-
-  /**
-   * Aplica impulso de wall jump (salto desde la pared)
-   */
-  private applyWallJump(): void {
-    // Empuje horizontal alejándose de la pared
-    const awayFromWall = vec3.scale(vec3.create(), this.wallNormal, this.wallJumpAwayForce);
-
-    // Velocidad vertical de salto
-    const upwardVelocity = vec3.fromValues(0, this.wallJumpForce, 0);
-
-    // Combinar ambas velocidades
-    const wallJumpVel = vec3.add(vec3.create(), awayFromWall, upwardVelocity);
-
-    // Aplicar la velocidad
-    this.capsuleCollider.setLinearVelocity(wallJumpVel);
-
-    // Actualizar currentVelocity para que el movimiento en aire sea correcto
-    vec3.set(this.currentVelocity, wallJumpVel[0], 0, wallJumpVel[2]);
-
-    // Reset wall jump cooldown
-    this.timeSinceWallJump = 0.0;
-    this.isOnWall = false;
-
-    console.log('Wall jump! Away force:', this.wallJumpAwayForce);
-  }
-
-  /**
-   * Reduce la gravedad mientras se desliza por una pared
-   */
-  private applyWallSlideGravity(): void {
-    const currentVel = this.capsuleCollider.getLinearVelocity();
-
-    // Solo reducir velocidad de caída, no afectar si ya estamos subiendo
-    if (currentVel[1] < 0) {
-      const reducedGravity = currentVel[1] * this.wallSlideGravityMultiplier;
-      const newVel = vec3.fromValues(currentVel[0], reducedGravity, currentVel[2]);
-      this.capsuleCollider.setLinearVelocity(newVel);
-    }
   }
 
   /**
@@ -578,8 +416,6 @@ export class CharacterControllerComponent extends Component {
     // Reducir altura del collider
     const newHeight = this.originalHeight * this.slideHeightMultiplier;
     this.applyCapsuleHeight(newHeight);
-
-    console.log('Slide started!', vec3.length(this.slideVelocity).toFixed(2), 'm/s');
   }
 
   /**
@@ -612,8 +448,6 @@ export class CharacterControllerComponent extends Component {
 
     // Transferir velocidad del slide al movimiento normal
     vec3.copy(this.currentVelocity, this.slideVelocity);
-
-    console.log('Slide ended!');
   }
 
   /**
@@ -651,15 +485,27 @@ export class CharacterControllerComponent extends Component {
       false,
     );
 
-    console.log('Applied new capsule height:', newHeight.toFixed(2), 'm');
-
     // 3. Actualizar la referencia del collider en el componente
-    // Como CapsuleColliderComponent no expone un setter, accedemos directamente
-    (this.capsuleCollider as any).collider = newCollider; //!!!!!!!!!
+    (this.capsuleCollider as CapsuleColliderComponent).setCollider(newCollider);
+  }
 
-    // 4. Ajustar la posición del rigidbody para mantener los pies pegados al suelo
-    const oldHeight = this.originalHeight;
-    const heightDelta = (oldHeight - newHeight) / 2;
+  private findCamera(): void {
+    // Lazy camera search: buscar en el primer update cuando los hijos ya están cargados
+    if (!this.cameraFound) {
+      const children = this.getOwner().getChildren();
+      for (const child of children) {
+        const cam = child.getComponent('camera') as CameraComponent;
+        if (cam) {
+          this.camera = cam;
+          this.cameraFound = true;
+          break;
+        }
+      }
+
+      if (!this.camera) {
+        console.warn('CharacterControllerComponent: No camera found in children.');
+      }
+    }
   }
 
   public override renderInMenu(): void {}
