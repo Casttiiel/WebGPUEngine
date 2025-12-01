@@ -16,7 +16,9 @@
 
 @fragment
 fn fs(input: VertexOutput) -> FragmentOutput {
-    let albedo_color = textureSample(txAlbedo, samplerState, input.Uv);
+    let Uv = input.Uv * vec2<f32>(factors.uvXScale,factors.uvYScale);
+
+    let albedo_color = textureSample(txAlbedo, samplerState, Uv);
     
     if(albedo_color.a < 0.5){
         discard;
@@ -25,19 +27,19 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
 
     output.albedo = albedo_color * factors.baseColorFactor;
-    output.albedo.a = textureSample(txMetallic, samplerState, input.Uv).b * factors.metallicFactor;
+    output.albedo.a = textureSample(txMetallic, samplerState, Uv).b * factors.metallicFactor;
 
     // Obtener la normal del normal map
-    let N_tangent_space = textureSample(txNormal, samplerState, input.Uv) * 2.0 - 1.0;
+    let N_tangent_space = textureSample(txNormal, samplerState, Uv) * 2.0 - 1.0;
     
     // Calcular TBN y transformar la normal
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);    
     
-    let roughness = textureSample(txRoughness, samplerState, input.Uv).g * factors.roughnessFactor;
+    let roughness = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
     let encodedNormal = normalToOctahedral01(N);
 
-    let emissive = textureSample(txEmissive, samplerState, input.Uv).x;
+    let emissive = textureSample(txEmissive, samplerState, Uv).x;
 
     // Pack octahedral normal + roughness en RGBA8
     output.normal = vec4<f32>(

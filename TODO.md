@@ -1,10 +1,19 @@
 ## Player
 
-1. Change size of UV based on size?
-2. Swap camera/player controls
-3. Follow of mesh with camera wrong
-4. Box Collider/Ground collider good?
-5. Loading Bar
+1. Triplanar mapping world space
+2. Triplanar mapping local space
+3. Directional light follow
+4. Depth msaa?
+5. Resolve depth con promedio
+6. SMAA
+7. Resolution check
+8. Depth prepass
+9. Cascade shadow mapping (3 cascade)
+10. Reflection probes
+11. Swap camera/player controls
+12. Follow of mesh with camera wrong
+13. Box Collider/Ground collider good?
+14. Loading Bar
 
 ---
 
@@ -31,4 +40,5 @@
 Weird blur
 Borde raro en objetos (Artefactos) (Dientes de sierra)
 Control Mapping
-Sunset overdrive decals
+Sunset overdrive Brushstrokes
+Review AO

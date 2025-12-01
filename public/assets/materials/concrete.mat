@@ -7,6 +7,8 @@
         "txRoughness": "Asphalt01_Roughness.png",
         "txEmissive": "black.png"
     },
+    "uvXScale": 15.0,
+    "uvYScale": 15.0,
     "casts_shadows": true,
     "category": "solids",
     "shadows": false

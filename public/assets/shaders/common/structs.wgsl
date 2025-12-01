@@ -36,7 +36,11 @@ struct MaterialFactors {
     roughnessFactor: f32,
     metallicFactor: f32,
     emissiveFactor: f32,
+    padding: f32,
+    uvXScale: f32,
+    uvYScale: f32,
     padding2: f32,
+    padding3: f32
 }
 
 struct SSRUniforms {

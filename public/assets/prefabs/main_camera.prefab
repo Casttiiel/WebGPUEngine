@@ -3,10 +3,9 @@
       "name": "MainCamera",
       "camera": {},
       "tone_mapping": {},
-      "antialiasing": {},
+      "antialiasing": {}, 
       "ambient_occlusion": {},
       "bloom": {},
-      "depth_of_field":{},
-      "motion_blur": {}
+      "depth_of_field":{}
     }
   }

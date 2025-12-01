@@ -8,6 +8,8 @@ export type MaterialDataType = Readonly<{
   metallicFactor?: number;
   roughnessFactor?: number;
   emissiveFactor?: number;
+  uvXScale?: number;
+  uvYScale?: number;
   textures: MaterialTextureDataType;
   casts_shadows?: boolean;
   category: RenderCategory;
