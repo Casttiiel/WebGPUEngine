@@ -534,33 +534,6 @@ const samplerView = renderTarget.getView(); // For sampling (single-sample)
 const storageView = renderTarget.getStorageView(); // For compute shaders
 ```
 
-#### **MSAA Workflow:**
-
-```typescript
-public getRenderView(): GPUTextureView {
-    const msaaLevel = QualitySettings.getInstance().getMSAALevel();
-
-    // If MSAA is enabled, use MSAA texture for rendering
-    if (this.isMultisample && msaaLevel > 1) {
-        return this.msaaTextureView;
-    }
-
-    // Otherwise, use single-sample texture
-    return this.textureView;
-}
-
-public getResolveTarget(): GPUTextureView | undefined {
-    const msaaLevel = QualitySettings.getInstance().getMSAALevel();
-
-    // Only return resolve target if we're using MSAA
-    if (this.isMultisample && msaaLevel > 1) {
-        return this.getView(); // Single-sample texture as resolve target
-    }
-
-    return undefined;
-}
-```
-
 ---
 
 ## 🔄 Loading and Management Flows

@@ -1,18 +1,19 @@
 ## Player
 
-1. Borde raro en objetos (Artefactos) (Dientes de sierra)
-2. Triplanar with instanced?
-3. SMAA
-4. Emissive good?
-5. Depth prepass
-6. Directional light follow
-7. Error on directional light shadow mapping on plain surfaces
-8. Cascade shadow mapping (3 cascade)
-9. Reflection probes
-10. Swap camera/player controls
+1. Depth prepass, gbuffer uses it.
+2. Right order of ambient then skybox
+3. Emissive good?
+4. SMAA
+5. Triplanar with instanced?
+6. Swap camera/player controls
+7. Directional light follow
+8. Error on directional light shadow mapping on plain surfaces
+9. Cascade shadow mapping (3 cascade)
+10. Reflection probes
 11. Follow of mesh with camera wrong
 12. Box Collider/Ground collider good?
 13. Loading Bar
+14. Refactor of renderManager
 
 ---
 

@@ -215,7 +215,6 @@ Most systems adapt to quality settings automatically:
 
 ```typescript
 const qualitySettings = QualitySettings.getInstance();
-const msaaLevel = qualitySettings.getMSAALevel();
 const formats = qualitySettings.getPostProcessingFormats();
 ```
 

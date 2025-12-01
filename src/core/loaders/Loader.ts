@@ -15,7 +15,8 @@ import { BloomComponent } from '../../components/render/BloomComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { NameComponent } from '../../components/core/NameComponent';
 import { TransformComponent } from '../../components/core/TransformComponent';
-import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
+import { FXAAComponent } from '../../components/render/FXAAComponent';
+import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { RenderComponent } from '../../components/render/RenderComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
@@ -150,8 +151,12 @@ export class Loader {
         return new CameraComponent();
       case 'tone_mapping':
         return new ToneMappingComponent();
-      case 'antialiasing':
-        return new AntialiasingComponent();
+      case 'fxaa':
+        return new FXAAComponent();
+      case 'fxaa':
+        return new FXAAComponent();
+      case 'smaa':
+        return new SMAAComponent();
       case 'ambient_occlusion':
         return new AmbientOcclusionComponent();
       case 'point_light':

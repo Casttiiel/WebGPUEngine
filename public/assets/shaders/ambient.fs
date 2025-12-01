@@ -43,12 +43,6 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Decode GBuffer data
     let g = decodeGBuffer(uv);
     
-    // Discard skybox pixels (where depth == far plane / zlinear ~= 1.0)
-    // This preserves the skybox rendered in previous pass
-    if (g.zlinear >= 0.9999) {
-        discard;
-    }
-    
     // Get ambient occlusion
     let ao = textureSample(gAO, samplerEnv, uv).r;
 

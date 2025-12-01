@@ -9,7 +9,6 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 import { Module } from '../core/Module';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
-import { AntialiasingComponent } from '../../components/render/AntialiasingComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
@@ -20,6 +19,7 @@ import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Distorsions } from '../../renderer/shading/Distorsions';
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
+import { FXAAComponent } from '../../components/render/FXAAComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -79,9 +79,8 @@ export class ModuleRender extends Module {
       []) {
       (comp as ToneMappingComponent).resize();
     }
-    for (const comp of Engine.getEntities().getObjectManagerByName('antialiasing')?.getList() ??
-      []) {
-      (comp as AntialiasingComponent).resize();
+    for (const comp of Engine.getEntities().getObjectManagerByName('fxaa')?.getList() ?? []) {
+      (comp as FXAAComponent).resize();
     }
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
@@ -163,8 +162,8 @@ export class ModuleRender extends Module {
       }
     }
 
-    if (mainCameraEntity.hasComponent('antialiasing')) {
-      const antialiasing = mainCameraEntity.getComponent('antialiasing') as AntialiasingComponent;
+    if (mainCameraEntity.hasComponent('fxaa')) {
+      const antialiasing = mainCameraEntity.getComponent('fxaa') as FXAAComponent;
       if (antialiasing.hasLoaded()) {
         result = antialiasing.apply(result);
       }
@@ -330,12 +329,10 @@ export class ModuleRender extends Module {
       }
     }
 
-    if (mainCamera.hasComponent('antialiasing')) {
-      const antialiasingComponent = mainCamera.getComponent(
-        'antialiasing',
-      ) as AntialiasingComponent;
-      if (antialiasingComponent && typeof antialiasingComponent.renderInMenu === 'function') {
-        antialiasingComponent.renderInMenu();
+    if (mainCamera.hasComponent('fxaa')) {
+      const fxaaComponent = mainCamera.getComponent('fxaa') as FXAAComponent;
+      if (fxaaComponent && typeof fxaaComponent.renderInMenu === 'function') {
+        fxaaComponent.renderInMenu();
       }
     }
 

@@ -264,7 +264,6 @@ export class GlobalBloomComponent extends Component {
         mipWidth,
         mipHeight,
         bloomFormat,
-        false, // No MSAA for bloom textures
         GPUTextureUsage.STORAGE_BINDING, // Allow use as storage texture in compute shaders
       );
       this.mipChain.push(renderTarget);
@@ -276,7 +275,6 @@ export class GlobalBloomComponent extends Component {
         mipWidth,
         mipHeight,
         bloomFormat,
-        false, // No MSAA for bloom textures
         GPUTextureUsage.STORAGE_BINDING, // Allow use as storage texture in compute shaders
       );
 

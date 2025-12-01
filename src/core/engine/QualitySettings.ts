@@ -13,7 +13,6 @@ export interface GraphicsQualitySettings {
   aoRadius: number;
   aoStrength: number;
   aoNoiseScale: number;
-  msaaLevel: number;
   albedoTexture: GPUTextureFormat;
   normalTexture: GPUTextureFormat;
   linearDepthTexture: GPUTextureFormat;
@@ -48,7 +47,6 @@ export class QualitySettings {
       aoRadius: 3.5,
       aoStrength: 2.0,
       aoNoiseScale: 0.01,
-      msaaLevel: 1,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -77,7 +75,6 @@ export class QualitySettings {
       aoRadius: 3.5,
       aoStrength: 1.5,
       aoNoiseScale: 0.01,
-      msaaLevel: 4,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -106,7 +103,6 @@ export class QualitySettings {
       aoRadius: 3.5,
       aoStrength: 1.5,
       aoNoiseScale: 0.01,
-      msaaLevel: 4,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -135,7 +131,6 @@ export class QualitySettings {
       aoRadius: 3.5,
       aoStrength: 1.0,
       aoNoiseScale: 0.01,
-      msaaLevel: 4,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -178,7 +173,7 @@ export class QualitySettings {
       aoRadius: 0.1,
       aoStrength: 3.0,
       aoNoiseScale: 0.01,
-      msaaLevel: 4,
+      ssgiScale: 0.25,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
       linearDepthTexture: 'r16float',

@@ -1,0 +1,7 @@
+{
+    "vs": "presentation.vs",
+    "fs": "fxaa.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms":["CameraUniforms","SingleTexture"]
+}

@@ -9,7 +9,7 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { Engine } from '../../core/engine/Engine';
 
-export class AntialiasingComponent extends Component {
+export class FXAAComponent extends Component {
   private loaded = false;
   private technique!: Technique;
   private fullscreenQuadMesh!: Mesh;
@@ -34,12 +34,12 @@ export class AntialiasingComponent extends Component {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.technique = await Technique.getAsync('antialiasing.tech');
+    this.technique = await Technique.getAsync('fxaa.tech');
 
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
     this.result = new RenderTarget();
-    this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
+    this.result.createRT('fxaa_result.dds', Render.width, Render.height, aliasingFormat);
 
     this.loaded = true;
   }
@@ -47,7 +47,7 @@ export class AntialiasingComponent extends Component {
   public resize(): void {
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
-    this.result.createRT('antialiasing_result.dds', Render.width, Render.height, aliasingFormat);
+    this.result.createRT('fxaa_result.dds', Render.width, Render.height, aliasingFormat);
     // ✅ Clear cache on resize
     this.bindGroupCache.clear();
   }
@@ -55,7 +55,7 @@ export class AntialiasingComponent extends Component {
   public apply(texture: GPUTextureView): GPUTextureView {
     const bindGroup = this.getOrCreateBindGroup(texture);
 
-    // Use RenderPassManager to execute antialiasing pass dynamically
+    // Use RenderPassManager to execute FXAA pass dynamically
     this.renderPassManager.executeAntialiasingPass(
       this.fullscreenQuadMesh,
       this.technique,
@@ -75,7 +75,7 @@ export class AntialiasingComponent extends Component {
       const sampler = SamplerLibrary.simpleSampler;
 
       bindGroup = BindGroupFactory.createBindGroup(
-        `antialiasing_bindgroup`,
+        `fxaa_bindgroup`,
         this.technique.getPipeline().getBindGroupLayout(1),
         [
           {

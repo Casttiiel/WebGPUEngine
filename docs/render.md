@@ -280,11 +280,6 @@ export class DeferredRenderer {
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
-    // Resolve MSAA depth if needed
-    if (msaaLevel > 1) {
-      this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
-    }
-
     // Ambient occlusion with optimized texture usage
     this.renderAO(camera, this.rtAO);
 

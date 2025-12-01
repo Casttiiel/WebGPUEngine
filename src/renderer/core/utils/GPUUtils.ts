@@ -127,14 +127,12 @@ export class GPUUtils {
     height: number,
     format: GPUTextureFormat,
     usage: GPUTextureUsageFlags,
-    sampleCount = 1,
   ): GPUTexture {
     return this.device.createTexture({
       label,
       size: { width, height },
       format,
       usage,
-      sampleCount,
     });
   }
 
@@ -149,7 +147,6 @@ export class GPUUtils {
     usage: GPUTextureUsageFlags,
     mipLevelCount: number,
     depthOrArrayLayers = 1,
-    sampleCount = 1,
   ): GPUTexture {
     return this.device.createTexture({
       label,
@@ -161,7 +158,6 @@ export class GPUUtils {
       format,
       usage,
       mipLevelCount,
-      sampleCount,
     });
   }
 
