@@ -17,6 +17,7 @@ export class DepthResolver {
 
     this.isLoaded = true;
   }
+
   public resolve(msaaDepthTexture: GPUTexture, singleSampleDepthTexture: GPUTexture): void {
     if (!this.isLoaded) {
       console.error('DepthResolver not loaded');

@@ -31,7 +31,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "carbon.mat"
+            "material": "carbon_triplanar.mat"
           }
         ]
       }
