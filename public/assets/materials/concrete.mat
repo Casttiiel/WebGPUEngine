@@ -1,5 +1,5 @@
 {
-    "technique": "gbuffer.tech",
+    "technique": "gbuffer_triplanar_world.tech",
     "textures":{
         "txAlbedo": "Asphalt01_Color.png",
         "txNormal": "Asphalt01_Normal.png",
@@ -7,8 +7,7 @@
         "txRoughness": "Asphalt01_Roughness.png",
         "txEmissive": "black.png"
     },
-    "uvXScale": 15.0,
-    "uvYScale": 15.0,
+    "uvXScale": 0.5,
     "casts_shadows": true,
     "category": "solids",
     "shadows": false

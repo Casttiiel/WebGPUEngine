@@ -9,6 +9,9 @@
     "prefab": "ground.prefab"
   },
   {
+    "prefab": "directional_light.prefab"
+  },
+  {
     "children": [],
     "components": {
       "name": "Static Cube",

@@ -1,0 +1,10 @@
+{
+    "vs": "gbuffer.vs",
+    "fs": "gbuffer_triplanar_world.fs",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms"
+    ],
+    "writesOn": "gbuffer"
+}

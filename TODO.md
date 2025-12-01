@@ -1,19 +1,18 @@
 ## Player
 
-1. Triplanar mapping world space
-2. Triplanar mapping local space
-3. Directional light follow
-4. Depth msaa?
-5. Resolve depth con promedio
-6. SMAA
-7. Resolution check
-8. Depth prepass
-9. Cascade shadow mapping (3 cascade)
-10. Reflection probes
-11. Swap camera/player controls
-12. Follow of mesh with camera wrong
-13. Box Collider/Ground collider good?
-14. Loading Bar
+1. Depth msaa?
+2. Resolve depth con promedio
+3. SMAA
+4. Resolution check
+5. Depth prepass
+6. Triplanar with instanced?
+7. Directional light follow
+8. Cascade shadow mapping (3 cascade)
+9. Reflection probes
+10. Swap camera/player controls
+11. Follow of mesh with camera wrong
+12. Box Collider/Ground collider good?
+13. Loading Bar
 
 ---
 

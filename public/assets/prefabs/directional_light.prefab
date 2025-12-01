@@ -4,14 +4,14 @@
       "name": "Directional Light",
       "directional_light": {
         "color": [1.0, 0.956, 0.878],
-        "intensity": 10,
+        "intensity": 8,
         "near": 0.1,
         "hasShadows": true,
         "far": 100,
         "position": [0, 15, 0],
-        "target": [-3, 0, 3],
-        "orthoWidth": 20,
-        "orthoHeight": 20
+        "target": [0, 0, 10],
+        "orthoWidth": 50,
+        "orthoHeight": 50
       }
     }
   }
