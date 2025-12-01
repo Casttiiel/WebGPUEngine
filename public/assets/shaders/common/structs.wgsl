@@ -1,27 +1,27 @@
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) N: vec3<f32>,
-    @location(1) Uv: vec2<f32>,
-    @location(2) WorldPos: vec3<f32>,
-    @location(3) T: vec4<f32>,
+    @location(0) @interpolate(perspective, centroid) N: vec3<f32>,
+    @location(1) @interpolate(perspective, centroid) Uv: vec2<f32>,
+    @location(2) @interpolate(perspective, centroid) WorldPos: vec3<f32>,
+    @location(3) @interpolate(perspective, centroid) T: vec4<f32>,
 }
 
 struct VertexOutputTriplanarLocal {
     @builtin(position) position: vec4<f32>,
 
-    @location(0) localNormal: vec3<f32>,
-    @location(1) localPos: vec3<f32>,
-    @location(2) worldPos: vec3<f32>,
+    @location(0) @interpolate(perspective, centroid) localNormal: vec3<f32>,
+    @location(1) @interpolate(perspective, centroid) localPos: vec3<f32>,
+    @location(2) @interpolate(perspective, centroid) worldPos: vec3<f32>,
 
     // Normal matrix como 3 columnas (col0, col1, col2)
-    @location(3) normalMatrix0: vec3<f32>,
-    @location(4) normalMatrix1: vec3<f32>,
-    @location(5) normalMatrix2: vec3<f32>,
+    @location(3) @interpolate(perspective, centroid) normalMatrix0: vec3<f32>,
+    @location(4) @interpolate(perspective, centroid) normalMatrix1: vec3<f32>,
+    @location(5) @interpolate(perspective, centroid) normalMatrix2: vec3<f32>,
 }
 
 struct ShadowsVertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) worldPos: vec3<f32>,
+    @location(0) @interpolate(perspective, centroid) worldPos: vec3<f32>,
 }
 
 struct FragmentOutput {

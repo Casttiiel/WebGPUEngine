@@ -226,7 +226,10 @@ export class Technique extends GPUResource {
     // Add multisample based on quality settings for MSAA passes
     if (this.needsMSAA()) {
       const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-      pipelineConfig.multisample = { count: msaaLevel };
+      pipelineConfig.multisample = {
+        count: msaaLevel,
+        alphaToCoverageEnabled: false, // Desactivar alpha to coverage para evitar artefactos en bordes
+      };
     }
 
     this.pipeline = PipelineFactory.createPipeline(pipelineConfig);
@@ -379,6 +382,9 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'less',
+          depthBias: 0, // Sin bias para rendering normal
+          depthBiasSlopeScale: 0,
+          depthBiasClamp: 0,
         };
       }
       case DepthModes.ALWAYS: {

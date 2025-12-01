@@ -1,17 +1,22 @@
 ## Player
 
 1. Resolve depth con promedio
+   Usar un custom resolve shader que normalice las normales antes de promediar
+   Normal mapping agresivo: Las normales del normal map podrían estar causando que los samples de MSAA se vean inconsistentes
+   Tangentes incorrectos: Verificar que los tangentes estén bien calculados
+   Mip mapping: Niveles de mipmap generados incorrectamente
 2. SMAA
 3. Resolution check
 4. Depth prepass
 5. Triplanar with instanced?
 6. Directional light follow
-7. Cascade shadow mapping (3 cascade)
-8. Reflection probes
-9. Swap camera/player controls
-10. Follow of mesh with camera wrong
-11. Box Collider/Ground collider good?
-12. Loading Bar
+7. Error on directional light shadow mapping on plain surfaces
+8. Cascade shadow mapping (3 cascade)
+9. Reflection probes
+10. Swap camera/player controls
+11. Follow of mesh with camera wrong
+12. Box Collider/Ground collider good?
+13. Loading Bar
 
 ---
 
