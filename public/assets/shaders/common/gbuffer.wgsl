@@ -7,9 +7,8 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     g.worldPos = getWorldCoords(uv, zlinear, camera);
     
     let normalRoughnessData = textureSampleLevel(gNormals, samplerGBuffer, uv, 0.0);
-    let encodedNormal = normalRoughnessData.xy;
-    g.normal = octahedral01ToNormal(encodedNormal);
-    g.roughness = normalRoughnessData.z;
+    g.normal = normalize(normalRoughnessData.xyz); // RGB normal (MSAA compatible)
+    g.roughness = normalRoughnessData.w;
     
     // Get albedo and metallic
     let albedo = textureSampleLevel(gAlbedo, samplerGBuffer, uv, 0.0);
@@ -19,7 +18,7 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     g.albedo = pow(abs(albedo.rgb), vec3<f32>(2.2));
     
     // Get self illumination
-    g.emissive = normalRoughnessData.a;
+    //g.emissive = normalRoughnessData.a;
     g.selfIllum = g.albedo * g.emissive;
     
     // Default specular for dielectrics is 0.04

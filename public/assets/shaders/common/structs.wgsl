@@ -25,9 +25,9 @@ struct ShadowsVertexOutput {
 }
 
 struct FragmentOutput {
-    @location(0) albedo: vec4<f32>,
-    @location(1) normal: vec4<f32>,
-    @location(2) depth: f32,
+    @location(0) albedo: vec4<f32>,     // RGB: albedo, A: metallic
+    @location(1) normal: vec4<f32>,     // RGB: normal, A: roughness
+    @location(2) depth: f32,      // R: linear depth, G: emissive, BA: unused
 }
 
 struct GBuffer {

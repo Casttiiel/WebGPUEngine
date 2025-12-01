@@ -1,7 +1,6 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
-#include "common/octahedral"
 
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -37,22 +36,19 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let N = normalize(TBN * N_tangent_space.xyz);    
     
     let roughness = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
-    let encodedNormal = normalToOctahedral01(N);
-
     let emissive = textureSample(txEmissive, samplerState, Uv).x;
 
-    // Pack octahedral normal + roughness en RGBA8
+    // Pack RGB normal + roughness (compatible with MSAA averaging)
     output.normal = vec4<f32>(
-        encodedNormal.x,
-        encodedNormal.y,
-        roughness,
-        emissive
+        N.x,
+        N.y,
+        N.z,
+        roughness
     );
 
     let camb2obj = input.WorldPos - camera.cameraPosition;
     let linear_depth = dot(camb2obj, camera.cameraFront) / camera.cameraZFar;
     // Write depth to .r channel for rg16float format compatibility
     output.depth = linear_depth;
-
     return output;
 }

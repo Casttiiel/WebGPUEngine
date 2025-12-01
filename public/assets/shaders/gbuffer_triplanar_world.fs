@@ -1,7 +1,6 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/utils"
-#include "common/octahedral"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var txAlbedo: texture_2d<f32>;
@@ -110,24 +109,21 @@ fn fs(input: VertexOutput) -> FragmentOutput {
         scale
     );
 
-    // === Empaquetado de normal + roughness como ya hacías ===
-    let encodedNormal = normalToOctahedral01(N);
-
     var output: FragmentOutput;
 
     output.albedo = albedo_color * factors.baseColorFactor;
     output.albedo.a = metallic_value * factors.metallicFactor;
 
+    // Pack RGB normal + roughness (compatible with MSAA averaging)
     output.normal = vec4<f32>(
-        encodedNormal.x,
-        encodedNormal.y,
-        roughness_value * factors.roughnessFactor,
-        emissive_value * factors.emissiveFactor
+        N.x,
+        N.y,
+        N.z,
+        roughness_value * factors.roughnessFactor
     );
 
     let camb2obj = input.WorldPos - camera.cameraPosition;
     let linear_depth = dot(camb2obj, camera.cameraFront) / camera.cameraZFar;
     output.depth = linear_depth;
-
     return output;
 }

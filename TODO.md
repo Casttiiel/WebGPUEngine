@@ -1,10 +1,10 @@
 ## Player
 
 1. Borde raro en objetos (Artefactos) (Dientes de sierra)
-2. SMAA
-3. Resolution check
-4. Depth prepass
-5. Triplanar with instanced?
+2. Triplanar with instanced?
+3. SMAA
+4. Emissive good?
+5. Depth prepass
 6. Directional light follow
 7. Error on directional light shadow mapping on plain surfaces
 8. Cascade shadow mapping (3 cascade)
@@ -37,7 +37,6 @@
 ---
 
 Weird blur
-
 Control Mapping
 Sunset overdrive Brushstrokes
 Review AO

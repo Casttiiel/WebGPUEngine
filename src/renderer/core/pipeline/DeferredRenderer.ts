@@ -218,12 +218,13 @@ export class DeferredRenderer {
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
-    // Resolve MSAA depth to single-sample depth for skybox (only if MSAA is enabled)
+    // Resolve MSAA depth after G-Buffer (safe with RGB normals)
     const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
     const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
     if (msaaLevel > 1) {
       this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
     }
+
     this.aoResult = this.renderAO(camera);
     this.renderAccLight();
 
