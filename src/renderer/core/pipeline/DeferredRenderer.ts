@@ -281,6 +281,11 @@ export class DeferredRenderer {
   }
 
   private renderAccLight(): void {
+    // Render skybox FIRST as background (always passes depth test)
+    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
+    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
+
+    // Then accumulate lights on top (only where geometry exists)
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup, this.aoResult);
 
     // Use new render pass system for lights
@@ -293,9 +298,6 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
     this.renderPassManager.executePass('spotLightsWithShadows');
-
-    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
   }
 
   public update(_dt: number): void {

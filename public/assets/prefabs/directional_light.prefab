@@ -9,7 +9,7 @@
         "hasShadows": true,
         "far": 100,
         "position": [0, 15, 0],
-        "target": [0, 0, 10],
+        "target": [10, 0, 10],
         "orthoWidth": 50,
         "orthoHeight": 50
       }

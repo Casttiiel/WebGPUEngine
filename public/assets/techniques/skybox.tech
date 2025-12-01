@@ -2,7 +2,7 @@
     "vs": "skybox.vs",
     "fs": "skybox.fs",
     "writesOn": "texture",
-    "z": "test_equal",
+    "z": "always",
     "uniforms": [
         "CameraUniforms",
         "SkyboxUniforms"

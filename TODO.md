@@ -1,10 +1,6 @@
 ## Player
 
-1. Resolve depth con promedio
-   Usar un custom resolve shader que normalice las normales antes de promediar
-   Normal mapping agresivo: Las normales del normal map podrían estar causando que los samples de MSAA se vean inconsistentes
-   Tangentes incorrectos: Verificar que los tangentes estén bien calculados
-   Mip mapping: Niveles de mipmap generados incorrectamente
+1. Borde raro en objetos (Artefactos) (Dientes de sierra)
 2. SMAA
 3. Resolution check
 4. Depth prepass
@@ -41,7 +37,7 @@
 ---
 
 Weird blur
-Borde raro en objetos (Artefactos) (Dientes de sierra)
+
 Control Mapping
 Sunset overdrive Brushstrokes
 Review AO
