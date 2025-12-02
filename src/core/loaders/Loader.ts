@@ -153,8 +153,6 @@ export class Loader {
         return new ToneMappingComponent();
       case 'fxaa':
         return new FXAAComponent();
-      case 'fxaa':
-        return new FXAAComponent();
       case 'smaa':
         return new SMAAComponent();
       case 'ambient_occlusion':

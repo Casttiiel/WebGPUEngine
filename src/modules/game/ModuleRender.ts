@@ -83,6 +83,9 @@ export class ModuleRender extends Module {
     for (const comp of Engine.getEntities().getObjectManagerByName('fxaa')?.getList() ?? []) {
       (comp as FXAAComponent).resize();
     }
+    for (const comp of Engine.getEntities().getObjectManagerByName('smaa')?.getList() ?? []) {
+      (comp as SMAAComponent).resize();
+    }
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
