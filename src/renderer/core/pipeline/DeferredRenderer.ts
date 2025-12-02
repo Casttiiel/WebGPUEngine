@@ -11,8 +11,9 @@ import { AmbientLight } from '../../shading/AmbientLight';
 import { Skybox } from '../../shading/Skybox';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { GBufferPass } from '../passes/GBufferPass';
+import { DepthPrepass } from '../passes/DepthPrepass';
 import { RenderPassManager } from '../passes/RenderPassManager';
-import { DepthResolver } from '../processing/DepthResolver';
+import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
 import { Render } from './Render';
 import { DirectionalLightComponent } from '../../../components/render/DirectionalLightComponent';
 import { Engine } from '../../../core/engine/Engine';
@@ -25,7 +26,9 @@ export class DeferredRenderer {
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
   private froxelVolumetrics!: FroxelVolumetricScattering;
-  private depthResolver!: DepthResolver;
+  private depthPrepass!: DepthPrepass;
+  private depthPrepassTechnique!: Technique;
+  private depthPrepassInstancedTechnique!: Technique;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
   private rtAccLight!: RenderTarget;
@@ -50,6 +53,9 @@ export class DeferredRenderer {
     if (!this.isLoaded) return;
     this.dispose();
     this.gBufferLayout = BindGroupFactory.getGBufferLayout();
+
+    // Create depth prepass first (generates depth + linear depth)
+    this.depthPrepass.resize();
 
     // Create G-Buffer pass with specified dimensions by resizing
     this.gBufferPass.resize();
@@ -78,7 +84,6 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().albedoTexture,
-      false,
       GPUTextureUsage.COPY_DST,
     );
     if (!this.rtCopyNormals) {
@@ -89,13 +94,15 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().normalTexture,
-      false,
       GPUTextureUsage.COPY_DST,
     );
 
     // Initialize render passes with GBufferPass render targets
     const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
-    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
+    const prepassDepthView = this.depthPrepass.getDepthTextureView();
+
+    // Initialize depth prepass
+    this.renderPassManager.initializeDepthPrepass(prepassDepthView);
 
     const copyPartialGBufferBindGroup = BindGroupFactory.createBindGroup(
       `gBuffer_copy_bind_group`,
@@ -111,7 +118,7 @@ export class DeferredRenderer {
         },
         {
           binding: 2,
-          resource: gBufferRenderTargets.linearDepth.getView()!,
+          resource: gBufferRenderTargets.linearDepth.getView()!, // From G-Buffer
         },
         {
           binding: 3,
@@ -120,17 +127,17 @@ export class DeferredRenderer {
       ],
     );
 
+    // Initialize deferred passes - all use prepass depth for depth testing
     this.renderPassManager.initializeDeferredPasses(
       gBufferRenderTargets.albedos,
       gBufferRenderTargets.normals,
       gBufferRenderTargets.linearDepth,
+      prepassDepthView,
       this.rtAccLight,
-      gBufferDepthTextures.msaaDepthView,
-      gBufferDepthTextures.singleDepthView,
       copyPartialGBufferBindGroup,
     );
 
-    // Create bind group with AO texture (now MSAA compatible)
+    // Create bind group with G-Buffer targets and linear depth from G-Buffer
     this.gBufferBindGroup = BindGroupFactory.createBindGroup(
       `gbuffer_bindgroup`,
       this.gBufferLayout,
@@ -145,7 +152,7 @@ export class DeferredRenderer {
         },
         {
           binding: 2,
-          resource: gBufferRenderTargets.linearDepth.getView()!,
+          resource: gBufferRenderTargets.linearDepth.getView()!, // From G-Buffer
         },
         {
           binding: 3,
@@ -155,9 +162,10 @@ export class DeferredRenderer {
     );
 
     // Initialize lighting passes after gBufferBindGroup is created
+    // Use depth from prepass for all lighting effects
     this.renderPassManager.initializeLightingPasses(
       this.rtAccLight,
-      gBufferDepthTextures.singleDepthView,
+      prepassDepthView,
       this.pointLightTechnique,
       this.spotLightTechnique,
       this.spotLightWithShadowsTechnique,
@@ -176,14 +184,17 @@ export class DeferredRenderer {
     this.ambientLight = new AmbientLight();
     await this.ambientLight.load();
 
-    this.depthResolver = new DepthResolver();
-    await this.depthResolver.load();
-
     this.ssr = new ScreenSpaceReflections();
     await this.ssr.load();
 
     this.froxelVolumetrics = new FroxelVolumetricScattering();
     await this.froxelVolumetrics.load();
+
+    this.depthPrepass = new DepthPrepass();
+    this.depthPrepass.load();
+
+    this.depthPrepassTechnique = await Technique.getAsync('depth_prepass.tech');
+    this.depthPrepassInstancedTechnique = await Technique.getAsync('depth_prepass_instanced.tech');
 
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();
@@ -214,28 +225,32 @@ export class DeferredRenderer {
   }
 
   public render(camera: Entity): GPUTextureView {
+    // 1. Depth prepass - generates depth + linear depth
+    // Use technique override to force all SOLIDS to use depth_prepass.tech (and instanced variant)
+    RenderManager.getInstance().setTechniqueOverride(
+      this.depthPrepassTechnique,
+      this.depthPrepassInstancedTechnique,
+    );
+    this.renderPassManager.executePass('depth_prepass');
+    RenderManager.getInstance().clearTechniqueOverride();
+
+    // 2. G-Buffer pass - uses depth from prepass
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
-    // Resolve MSAA depth after G-Buffer (safe with RGB normals)
-    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-    if (msaaLevel > 1) {
-      this.depthResolver.resolve(gBufferDepthTextures.msaaDepth, gBufferDepthTextures.singleDepth);
-    }
-
+    // 3. Render ambient occlusion and lighting
     this.aoResult = this.renderAO(camera);
     this.renderAccLight();
 
-    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    /*this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     this.ssr.render(this.rtAccLight.getView(), this.aoResult, this.gBufferBindGroup);
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
       this.froxelVolumetrics.updateFroxelData();
       this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
-    }
+    }*/
 
     const view = this.rtAccLight.getView();
     if (!view) {
@@ -282,15 +297,10 @@ export class DeferredRenderer {
   }
 
   private renderAccLight(): void {
-    // Render skybox FIRST as background (always passes depth test)
-    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
-
-    // Then accumulate lights on top (only where geometry exists)
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup, this.aoResult);
 
     // Use new render pass system for lights
-    for (const comp of Engine.getEntities()
+    /*for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
       const directionalLightComponent = comp as DirectionalLightComponent;
@@ -298,7 +308,10 @@ export class DeferredRenderer {
     }
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
-    this.renderPassManager.executePass('spotLightsWithShadows');
+    this.renderPassManager.executePass('spotLightsWithShadows');*/
+
+    const prepassDepthView = this.depthPrepass.getDepthTextureView();
+    this.skybox.render(this.rtAccLight.getView(), prepassDepthView);
   }
 
   public update(_dt: number): void {
@@ -340,11 +353,6 @@ export class DeferredRenderer {
       this.renderPassManager.clear();
     }
 
-    // Clean up depth resolver
-    if (this.depthResolver) {
-      this.depthResolver.destroy();
-    }
-
     this.gBufferBindGroup = null as any;
     this.gBufferLayout = null as any;
     this.aoResult = null as any;
@@ -352,8 +360,7 @@ export class DeferredRenderer {
   }
 
   public getDepthStencilView(): GPUTextureView | null {
-    const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-    return gBufferDepthTextures.singleDepthView;
+    return this.depthPrepass.getDepthTextureView();
   }
 
   public getGBufferBindGroup(): GPUBindGroup {

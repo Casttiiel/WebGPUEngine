@@ -223,24 +223,8 @@ export class Technique extends GPUResource {
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
       pipelineConfig.depthStencil = this.getDepthConfig();
     }
-    // Add multisample based on quality settings for MSAA passes
-    if (this.needsMSAA()) {
-      const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-      pipelineConfig.multisample = {
-        count: msaaLevel,
-        alphaToCoverageEnabled: false, // Desactivar alpha to coverage para evitar artefactos en bordes
-      };
-    }
 
     this.pipeline = PipelineFactory.createPipeline(pipelineConfig);
-  }
-
-  private needsMSAA(): boolean {
-    return (
-      this.writesOn === FragmentShaderTargets.GBUFFER ||
-      this.writesOn === FragmentShaderTargets.PARTIAL_GBUFFER ||
-      this.writesOn === FragmentShaderTargets.SINGLE_CHANNEL_MSAA
-    );
   }
 
   // ============================================================================
@@ -280,7 +264,6 @@ export class Technique extends GPUResource {
       case FragmentShaderTargets.TEXTURE:
         return this.createTextureTarget();
       case FragmentShaderTargets.SINGLE_CHANNEL:
-      case FragmentShaderTargets.SINGLE_CHANNEL_MSAA:
         return this.createSingleChannelTarget();
       case FragmentShaderTargets.SCREEN:
         return this.createScreenTarget();

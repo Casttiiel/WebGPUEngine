@@ -1,20 +1,15 @@
 import { RenderTarget } from '../../resources/RenderTarget';
-import { GPUUtils } from '../utils/GPUUtils';
 import { Render } from '../pipeline/Render';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
 
 /**
  * G-Buffer render pass for deferred rendering
- * Renders geometry to multiple render targets (albedo, normal, depth, etc.)
+ * Renders geometry to multiple render targets (albedo, normal octahedral, linear depth)
  */
 export class GBufferPass {
   private rtAlbedos!: RenderTarget;
   private rtNormals!: RenderTarget;
   private rtLinearDepth!: RenderTarget;
-  private depthStencil!: GPUTexture;
-  private depthStencilView!: GPUTextureView;
-  private msaaDepthStencil!: GPUTexture;
-  private msaaDepthStencilView!: GPUTextureView | null;
 
   constructor() {
     // Empty constructor
@@ -27,23 +22,16 @@ export class GBufferPass {
   private createRenderTargets(): void {
     const width = Render.width;
     const height = Render.height;
-    const msaaLevel = QualitySettings.getInstance().getSettings().msaaLevel;
-    const enableMSAA = msaaLevel > 1;
 
-    // Log quality settings for debugging
-    console.log(`Creating G-Buffer `, {
-      msaaLevel,
-      resolution: `${width}x${height}`,
-    });
+    console.log(`Creating G-Buffer targets at ${width}x${height}`);
 
-    // Create G-Buffer render targets with dynamic formats
+    // Create G-Buffer render targets
     this.rtAlbedos = new RenderTarget();
     this.rtAlbedos.createRT(
       'gbuffer_albedos',
       width,
       height,
       QualitySettings.getInstance().getSettings().albedoTexture,
-      enableMSAA,
       GPUTextureUsage.COPY_SRC,
     );
 
@@ -53,7 +41,6 @@ export class GBufferPass {
       width,
       height,
       QualitySettings.getInstance().getSettings().normalTexture,
-      enableMSAA,
       GPUTextureUsage.COPY_SRC,
     );
 
@@ -63,38 +50,8 @@ export class GBufferPass {
       width,
       height,
       QualitySettings.getInstance().getSettings().linearDepthTexture,
-      enableMSAA,
+      GPUTextureUsage.COPY_SRC,
     );
-
-    // Create depth buffers (both MSAA and single-sample)
-    this.depthStencil = GPUUtils.createTexture(
-      'gbuffer_depth_single',
-      width,
-      height,
-      'depth32float',
-      GPUTextureUsage.RENDER_ATTACHMENT,
-    );
-    this.depthStencilView = this.depthStencil.createView({
-      aspect: 'depth-only',
-    });
-
-    if (enableMSAA) {
-      this.msaaDepthStencil = GPUUtils.createTexture(
-        'gbuffer_depth_msaa',
-        width,
-        height,
-        'depth32float',
-        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-        msaaLevel,
-      );
-      this.msaaDepthStencilView = this.msaaDepthStencil.createView({
-        aspect: 'depth-only',
-      });
-    } else {
-      // When MSAA is disabled, use the single-sample depth texture for both
-      this.msaaDepthStencil = this.depthStencil;
-      this.msaaDepthStencilView = this.depthStencilView;
-    }
   }
 
   public getRenderTargets(): {
@@ -109,20 +66,6 @@ export class GBufferPass {
     };
   }
 
-  public getDepthTextures(): {
-    msaaDepth: GPUTexture;
-    singleDepth: GPUTexture;
-    msaaDepthView: GPUTextureView;
-    singleDepthView: GPUTextureView;
-  } {
-    return {
-      msaaDepth: this.msaaDepthStencil,
-      singleDepth: this.depthStencil,
-      msaaDepthView: this.msaaDepthStencilView!,
-      singleDepthView: this.depthStencilView,
-    };
-  }
-
   public resize(): void {
     this.dispose();
     this.createRenderTargets();
@@ -132,7 +75,5 @@ export class GBufferPass {
     this.rtAlbedos?.destroy();
     this.rtNormals?.destroy();
     this.rtLinearDepth?.destroy();
-    this.depthStencil?.destroy();
-    this.msaaDepthStencil?.destroy();
   }
 }

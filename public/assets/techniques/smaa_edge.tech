@@ -1,0 +1,7 @@
+{
+    "vs": "presentation.vs",
+    "fs": "smaa_edge_detection.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms":["CameraUniforms","SingleTexture"]
+}

@@ -37,7 +37,7 @@ export class AmbientLight {
     const render = Render.getInstance();
 
     // Use GPUUtils for consistent render pass descriptor creation
-    const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
+    const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'clear', 'store');
 
     const pass = render
       .getCommandEncoder()

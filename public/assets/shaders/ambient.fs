@@ -39,7 +39,7 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
 }
 
 @fragment
-fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {   
     // Decode GBuffer data
     let g = decodeGBuffer(uv);
     

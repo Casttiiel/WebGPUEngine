@@ -128,7 +128,7 @@ export class ModuleRender extends Module {
 
     let result = this.deferred.render(mainCameraEntity);
 
-    if (mainCameraEntity.hasComponent('bloom')) {
+    /*if (mainCameraEntity.hasComponent('bloom')) {
       const bloom = mainCameraEntity.getComponent('bloom') as BloomComponent;
       const enableBloom = QualitySettings.getInstance().getSettings().enableBloom;
 
@@ -160,7 +160,7 @@ export class ModuleRender extends Module {
       if (toneMapping.hasLoaded()) {
         result = toneMapping.apply(result);
       }
-    }
+    }*/
 
     if (mainCameraEntity.hasComponent('fxaa')) {
       const antialiasing = mainCameraEntity.getComponent('fxaa') as FXAAComponent;

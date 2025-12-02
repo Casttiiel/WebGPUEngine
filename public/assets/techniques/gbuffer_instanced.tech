@@ -2,5 +2,6 @@
   "vs": "pbr_instanced.vs",
   "fs": "gbuffer.fs",
   "writesOn": "gbuffer",
-  "uniforms": ["CameraUniforms", "MaterialTextures", "InstanceStorage"]
+  "uniforms": ["CameraUniforms", "MaterialTextures", "InstanceStorage"],
+  "z": "test_equal"
 }

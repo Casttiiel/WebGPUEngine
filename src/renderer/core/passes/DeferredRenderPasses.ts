@@ -6,6 +6,30 @@ import { GPUUtils } from '../utils/GPUUtils';
 import { RenderKey } from '../managers/RenderKeyManager';
 
 /**
+ * Depth prepass render pass
+ * Generates depth and linear depth textures before G-Buffer rendering
+ */
+export class DepthPrepassRenderPass extends BaseRenderPass {
+  constructor(config: RenderPassConfig) {
+    super(config);
+  }
+
+  protected render(pass: GPURenderPassEncoder, category?: RenderCategory): void {
+    // Configure viewport for the pass
+    const viewport = this.config.viewport;
+    if (viewport) {
+      GPUUtils.configureViewportAndScissor(pass, viewport.width, viewport.height);
+    } else {
+      GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
+    }
+
+    // Render solid geometry to depth prepass
+    const renderCategory = RenderCategory.SOLIDS;
+    RenderManager.getInstance().render(renderCategory, pass);
+  }
+}
+
+/**
  * G-Buffer render pass for deferred rendering using BaseRenderPass
  */
 export class GBufferRenderPass extends BaseRenderPass {

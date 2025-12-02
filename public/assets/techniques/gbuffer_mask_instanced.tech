@@ -6,5 +6,6 @@
         "MaterialTextures",
         "InstanceStorage"
     ],
-    "writesOn": "gbuffer"
+    "writesOn": "gbuffer",
+    "z": "test_equal"
 }

@@ -1,5 +1,10 @@
 import { BaseRenderPass } from './BaseRenderPass';
-import { GBufferRenderPass, DecalRenderPass, TransparentRenderPass } from './DeferredRenderPasses';
+import {
+  GBufferRenderPass,
+  DecalRenderPass,
+  TransparentRenderPass,
+  DepthPrepassRenderPass,
+} from './DeferredRenderPasses';
 import {
   PointLightRenderPass,
   SpotLightRenderPass,
@@ -25,35 +30,40 @@ import { QualitySettings } from '../../../core/engine/QualitySettings';
 export class RenderPassManager {
   private renderPasses: Map<string, BaseRenderPass> = new Map();
 
+  public initializeDepthPrepass(depthView: GPUTextureView): void {
+    const depthPrepassConfig = RenderPassFactory.createDepthPrepassConfig(depthView);
+    const depthPrepassPass = new DepthPrepassRenderPass(depthPrepassConfig);
+    this.renderPasses.set('depth_prepass', depthPrepassPass);
+  }
+
   public initializeDeferredPasses(
     albedos: RenderTarget,
     normals: RenderTarget,
     linearDepth: RenderTarget,
+    prepassDepthView: GPUTextureView,
     accLight: RenderTarget,
-    msaaDepthView: GPUTextureView,
-    singleDepthView: GPUTextureView,
     copyPartialGBufferBindGroup: GPUBindGroup,
   ): void {
-    // Create G-Buffer pass
+    // Create G-Buffer pass - uses prepass depth for depth testing
     const gBufferConfig = RenderPassFactory.createGBufferPassConfig(
       albedos,
       normals,
       linearDepth,
-      msaaDepthView,
+      prepassDepthView,
     );
     const gBufferPass = new GBufferRenderPass(gBufferConfig);
     this.renderPasses.set('gbuffer', gBufferPass);
 
-    // Create Decal pass
-    const decalConfig = RenderPassFactory.createDecalPassConfig(albedos, normals, msaaDepthView);
+    // Create Decal pass - uses prepass depth
+    const decalConfig = RenderPassFactory.createDecalPassConfig(albedos, normals, prepassDepthView);
     const decalPass = new DecalRenderPass(decalConfig);
     decalPass.setCustomBindGroup(copyPartialGBufferBindGroup);
     this.renderPasses.set('decals', decalPass);
 
-    // Create Transparent pass
+    // Create Transparent pass - uses prepass depth
     const transparentConfig = RenderPassFactory.createTransparentPassConfig(
       accLight,
-      singleDepthView,
+      prepassDepthView,
     );
     const transparentPass = new TransparentRenderPass(transparentConfig);
     this.renderPasses.set('transparent', transparentPass);

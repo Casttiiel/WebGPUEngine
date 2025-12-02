@@ -6,37 +6,57 @@ import { RenderTarget } from '../../resources/RenderTarget';
  */
 export class RenderPassFactory {
   /**
+   * Creates a depth prepass render pass configuration
+   */
+  public static createDepthPrepassConfig(
+    depthView: GPUTextureView,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    // Create color attachment for linear depth output
+    const colorAttachments: GPURenderPassColorAttachment[] = [];
+
+    return {
+      label: 'Depth Prepass',
+      colorAttachments,
+      depthStencilAttachment: {
+        view: depthView,
+        depthClearValue: 1.0,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      },
+      viewport,
+    };
+  }
+
+  /**
    * Creates a G-Buffer render pass configuration
    */
   public static createGBufferPassConfig(
     albedos: RenderTarget,
     normals: RenderTarget,
     linearDepth: RenderTarget,
-    msaaDepthView: GPUTextureView,
+    prepassDepthView: GPUTextureView,
     viewport?: { width: number; height: number },
   ): RenderPassConfig {
-    // Create color attachments with proper MSAA support
+    // Create color attachments for albedo, normal (octahedral), and linear depth
     const colorAttachments: GPURenderPassColorAttachment[] = [
       {
         view: albedos.getRenderView()!,
-        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        clearValue: { r: 1, g: 1, b: 1, a: 1 }, // White for albedo
         loadOp: 'clear',
         storeOp: 'store',
-        ...(albedos.getResolveTarget() && { resolveTarget: albedos.getResolveTarget()! }),
       },
       {
         view: normals.getRenderView()!,
-        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        clearValue: { r: 0.5, g: 0.5, b: 0.0, a: 0.0 }, // Neutral octahedral normal
         loadOp: 'clear',
         storeOp: 'store',
-        ...(normals.getResolveTarget() && { resolveTarget: normals.getResolveTarget()! }),
       },
       {
         view: linearDepth.getRenderView()!,
-        clearValue: { r: 1, g: 0, b: 0, a: 0 },
+        clearValue: { r: 1.0, g: 0.0, b: 0.0, a: 0.0 }, // Far depth
         loadOp: 'clear',
         storeOp: 'store',
-        ...(linearDepth.getResolveTarget() && { resolveTarget: linearDepth.getResolveTarget()! }),
       },
     ];
 
@@ -44,10 +64,9 @@ export class RenderPassFactory {
       label: 'G-Buffer Pass',
       colorAttachments,
       depthStencilAttachment: {
-        view: msaaDepthView,
-        depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
+        view: prepassDepthView,
+        depthLoadOp: 'load', // Load - depth comes from prepass
+        depthStoreOp: 'store', // Keep for next passes
       },
       viewport,
     };
@@ -59,22 +78,21 @@ export class RenderPassFactory {
   public static createDecalPassConfig(
     albedos: RenderTarget,
     normals: RenderTarget,
-    msaaDepthView: GPUTextureView,
+    prepassDepthView: GPUTextureView,
     viewport?: { width: number; height: number },
   ): RenderPassConfig {
-    // Create color attachments with proper MSAA support
+    // Create color attachments for albedo and normal only
+    // Linear depth is read-only via bind group, not written
     const colorAttachments: GPURenderPassColorAttachment[] = [
       {
         view: albedos.getRenderView()!,
         loadOp: 'load',
         storeOp: 'store',
-        ...(albedos.getResolveTarget() && { resolveTarget: albedos.getResolveTarget()! }),
       },
       {
         view: normals.getRenderView()!,
         loadOp: 'load',
         storeOp: 'store',
-        ...(normals.getResolveTarget() && { resolveTarget: normals.getResolveTarget()! }),
       },
     ];
 
@@ -82,7 +100,7 @@ export class RenderPassFactory {
       label: 'Decal Pass',
       colorAttachments,
       depthStencilAttachment: {
-        view: msaaDepthView,
+        view: prepassDepthView,
         depthLoadOp: 'load',
         depthStoreOp: 'store',
       },
@@ -127,7 +145,6 @@ export class RenderPassFactory {
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
         loadOp: 'clear',
         storeOp: 'store',
-        ...(target.getResolveTarget() && { resolveTarget: target.getResolveTarget()! }),
       },
     ];
 
@@ -172,28 +189,6 @@ export class RenderPassFactory {
     return {
       label: 'DOF Pass',
       colorAttachments,
-      viewport,
-    };
-  }
-
-  /**
-   * Creates a fullscreen post-processing pass configuration with MSAA support
-   */
-  public static createPostProcessPassConfigMSAA(
-    target: RenderTarget,
-    viewport?: { width: number; height: number },
-  ): RenderPassConfig {
-    return {
-      label: 'Post Process Pass (MSAA)',
-      colorAttachments: [
-        {
-          view: target.getRenderView()!,
-          clearValue: { r: 1, g: 1, b: 1, a: 1 },
-          loadOp: 'clear',
-          storeOp: 'store',
-          ...(target.getResolveTarget() && { resolveTarget: target.getResolveTarget()! }),
-        },
-      ],
       viewport,
     };
   }

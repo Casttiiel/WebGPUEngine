@@ -6,5 +6,6 @@
         "MaterialTextures",
         "ObjectUniforms"
     ],
-    "writesOn": "gbuffer"
+    "writesOn": "gbuffer",
+    "z": "test_equal"
 }

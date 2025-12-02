@@ -4,6 +4,7 @@ import { Camera } from '../../../core/math/Camera';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { Material } from '../../resources/Material';
 import { Mesh } from '../../resources/Mesh';
+import { Technique } from '../../resources/Technique';
 import { CPUCullingManager } from '../culling/CPUCullingManager';
 import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
@@ -19,6 +20,8 @@ export class RenderManagerV2 {
   // State
   private camera: Camera | null = null;
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
+  private techniqueOverride: Technique | null = null;
+  private techniqueOverrideInstanced: Technique | null = null;
 
   private constructor() {
     this.keyManager = new RenderKeyManager();
@@ -43,6 +46,16 @@ export class RenderManagerV2 {
 
   public setCamera(camera: Camera): void {
     this.camera = camera;
+  }
+
+  public setTechniqueOverride(technique: Technique, instancedTechnique?: Technique): void {
+    this.techniqueOverride = technique;
+    this.techniqueOverrideInstanced = instancedTechnique || null;
+  }
+
+  public clearTechniqueOverride(): void {
+    this.techniqueOverride = null;
+    this.techniqueOverrideInstanced = null;
   }
 
   public addKey(
@@ -145,7 +158,24 @@ export class RenderManagerV2 {
         continue;
       }
 
-      const technique = key.material.getTechnique()!;
+      // Select technique based on override and instancing
+      let technique: Technique;
+      if (this.techniqueOverride) {
+        // Use override technique for depth prepass, etc.
+        if (key.isInstanced && this.techniqueOverrideInstanced) {
+          technique = this.techniqueOverrideInstanced;
+        } else if (key.isInstanced) {
+          // No instanced override available, skip this object
+          console.warn('Instanced object skipped - no instanced technique override available');
+          continue;
+        } else {
+          technique = this.techniqueOverride;
+        }
+      } else {
+        // Normal rendering - use material's technique
+        technique = key.material.getTechnique()!;
+      }
+
       const pipeline = technique.getPipeline()!;
 
       // Use state manager to minimize state changes
