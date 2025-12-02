@@ -162,12 +162,12 @@ export class ModuleRender extends Module {
       }
     }*/
 
-    if (mainCameraEntity.hasComponent('fxaa')) {
+    /*if (mainCameraEntity.hasComponent('fxaa')) {
       const antialiasing = mainCameraEntity.getComponent('fxaa') as FXAAComponent;
       if (antialiasing.hasLoaded()) {
         result = antialiasing.apply(result);
       }
-    }
+    }*/
 
     this.presentResult(result);
 

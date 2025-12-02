@@ -26,15 +26,13 @@ struct AmbientUniforms {
 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
-    var N = normalize(g.normal);
-    let V = normalize(g.viewDir);
-    let NdotV = max(dot(N, V), 0.0);
+    let N = normalize(g.normal);
     let irradiance = textureSample(irradianceMap, samplerIrradiance, N).rgb;
     let F0 = g.specularColor;
-    let F = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
-    let kS = F;
+    let kS = F0;
     let kD = (1.0 - kS) * (1.0 - g.metallic);
     let diffuse = kD * Diffuse(g.albedo) * irradiance;
+    
     return diffuse * ambient.diffuseBoost * ambient.globalAmbientBoost * ao;
 }
 

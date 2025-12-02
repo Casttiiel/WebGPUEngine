@@ -5,7 +5,7 @@
       "transform": {
         "position": [0, 0, 0],
         "rotation": [0, 0, 0],
-        "scale": [1, 1, 1]
+        "scale": [50, 1, 50]
       },
       "infinite_plane_collider": {
         "bodyType": "static",
@@ -17,7 +17,7 @@
       "render": {
         "meshes": [
           {
-            "mesh": "large_plane.obj",
+            "mesh": "plane.obj",
             "material": "concrete.mat"
           }
         ]

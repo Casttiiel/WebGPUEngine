@@ -1,19 +1,19 @@
 ## Player
 
-1. FXAA
-2. Weird line on corners
-3. SMAA
-4. Triplanar with instanced?
-5. Swap camera/player controls
-6. MSAA
-7. Directional light follow
-8. AO Wrong
-9. Error on directional light shadow mapping on plain surfaces
-10. Cascade shadow mapping (3 cascade)
-11. Reflection probes
-12. Follow of mesh with camera wrong
-13. Box Collider/Ground collider good?
-14. Loading Bar
+1. Triplanar with instanced?
+2. Swap camera/player controls
+3. FXAA
+4. SMAA
+5. MSAA
+6. Directional light follow
+7. AO Wrong
+8. Error on directional light shadow mapping on plain surfaces
+9. Cascade shadow mapping (3 cascade)
+10. Reflection probes
+11. Follow of mesh with camera wrong
+12. Box Collider/Ground collider good?
+13. Loading Bar
+14. Weird line on corners is irradiance because of normals
 15. Refactor of renderManager
 
 ---
