@@ -1,7 +1,5 @@
-import { RenderTarget } from '../../resources/RenderTarget';
 import { GPUUtils } from '../utils/GPUUtils';
 import { Render } from '../pipeline/Render';
-import { QualitySettings } from '../../../core/engine/QualitySettings';
 
 /**
  * Depth prepass for deferred rendering
@@ -26,10 +24,6 @@ export class DepthPrepass {
   private createResources(): void {
     const width = Render.width;
     const height = Render.height;
-
-    console.log(`Creating Depth Prepass`, {
-      resolution: `${width}x${height}`,
-    });
 
     // Create depth texture
     this.depthTexture = GPUUtils.createTexture(

@@ -23,8 +23,6 @@ export class GBufferPass {
     const width = Render.width;
     const height = Render.height;
 
-    console.log(`Creating G-Buffer targets at ${width}x${height}`);
-
     // Create G-Buffer render targets
     this.rtAlbedos = new RenderTarget();
     this.rtAlbedos.createRT(

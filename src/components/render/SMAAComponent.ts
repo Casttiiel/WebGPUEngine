@@ -89,7 +89,6 @@ export class SMAAComponent extends Component {
     // Create render targets
     this.edgesRT = new RenderTarget();
     this.edgesRT.createRT('smaa_edges.dds', Render.width, Render.height, aliasingFormat);
-    console.log(Render.width, Render.height, aliasingFormat);
 
     this.blendRT = new RenderTarget();
     this.blendRT.createRT('smaa_blend.dds', Render.width, Render.height, aliasingFormat);
