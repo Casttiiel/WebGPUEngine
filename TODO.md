@@ -1,11 +1,5 @@
 ## Player
 
-1. Depth prepass, gbuffer uses it.
-2. Right order of ambient then skybox
-3. Emissive good?
-
----
-
 1. FXAA
 2. Weird line on corners
 3. SMAA
