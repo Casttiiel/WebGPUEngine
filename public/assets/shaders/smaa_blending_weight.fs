@@ -19,10 +19,10 @@ struct VSOut {
     @location(0) uv: vec2<f32>,
 };
 
-// SMAA configuration constants
-const SMAA_THRESHOLD: f32 = 0.1;
-const SMAA_MAX_SEARCH_STEPS: i32 = 16;
-const SMAA_MAX_SEARCH_STEPS_DIAG: i32 = 8;
+// SMAA configuration constants - Optimized for diagonal detection
+const SMAA_THRESHOLD: f32 = 0.05;              // Lower = more sensitive
+const SMAA_MAX_SEARCH_STEPS: i32 = 32;         // Longer edge search
+const SMAA_MAX_SEARCH_STEPS_DIAG: i32 = 16;    // Better diagonal quality
 const SMAA_CORNER_ROUNDING: f32 = 25.0;
 const SMAA_CORNER_ROUNDING_NORM: f32 = SMAA_CORNER_ROUNDING / 100.0;
 
@@ -67,7 +67,7 @@ fn fs(@builtin(position) position: vec4<f32>,
         
         // We give priority to diagonals, so if we find a diagonal we skip
         // horizontal/vertical processing.
-        if (weights.r == -weights.g) { // weights.r + weights.g == 0.0
+        if (weights.r + weights.g == 0.0) { // No diagonal found
             
             var d: vec2<f32>;
             

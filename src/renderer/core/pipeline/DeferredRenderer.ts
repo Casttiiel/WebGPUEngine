@@ -300,7 +300,7 @@ export class DeferredRenderer {
     this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup, this.aoResult);
 
     // Use new render pass system for lights
-    /*for (const comp of Engine.getEntities()
+    for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
       const directionalLightComponent = comp as DirectionalLightComponent;
@@ -308,7 +308,7 @@ export class DeferredRenderer {
     }
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('spotLights');
-    this.renderPassManager.executePass('spotLightsWithShadows');*/
+    this.renderPassManager.executePass('spotLightsWithShadows');
 
     const prepassDepthView = this.depthPrepass.getDepthTextureView();
     this.skybox.render(this.rtAccLight.getView(), prepassDepthView);

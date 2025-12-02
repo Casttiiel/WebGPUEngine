@@ -1,13 +1,13 @@
 ## Player
 
 1. Depth prepass good?
-2. Directional light follow
-3. Error on directional light shadow mapping on plain surfaces
-4. Cascade shadow mapping (3 cascade)
-5. AO Wrong
-6. Reflection probes
-7. Follow of mesh with camera wrong
-8. Box Collider/Ground collider good?
+2. Box Collider/Ground collider good?
+3. Directional light follow
+4. Error on directional light shadow mapping on plain surfaces
+5. Cascade shadow mapping (3 cascade)
+6. AO Wrong
+7. Reflection probes
+8. Follow of mesh with camera wrong
 9. Loading Bar
 10. Weird line on corners is irradiance because of normals
 11. Refactor of renderManager (WHAT)

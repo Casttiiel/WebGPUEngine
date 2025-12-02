@@ -340,7 +340,7 @@ export class ModuleRender extends Module {
       }
     }
 
-    /*if (mainCamera.hasComponent('ambient_occlusion')) {
+    if (mainCamera.hasComponent('ambient_occlusion')) {
       const aoComponent = mainCamera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
       if (aoComponent && typeof aoComponent.renderInMenu === 'function') {
         aoComponent.renderInMenu();
@@ -366,7 +366,7 @@ export class ModuleRender extends Module {
       if (bloomComponent && typeof bloomComponent.renderInMenu === 'function') {
         bloomComponent.renderInMenu();
       }
-    }*/
+    }
   }
 
   public renderDebug(): void {
