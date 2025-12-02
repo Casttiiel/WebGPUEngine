@@ -4,11 +4,11 @@
 @group(1) @binding(0) var inputTexture: texture_2d<f32>;
 @group(1) @binding(1) var inputSampler: sampler;
 
-// FXAA parameters - maximum quality for 4K
-const EDGE_THRESHOLD_MIN: f32 = 0.0078;  // Ultra sensible (casi 4x más que default)
-const EDGE_THRESHOLD_MAX: f32 = 0.031;   // Detecta incluso bordes muy sutiles
-const SUBPIXEL_QUALITY: f32 = 1.0;       // Máximo subpixel AA
-const ITERATIONS: i32 = 12;              // Iteraciones para bordes largos
+// FXAA parameters - NVIDIA FXAA 3.11 Quality preset
+const EDGE_THRESHOLD_MIN: f32 = 0.0312;  // Default quality (1/32)
+const EDGE_THRESHOLD_MAX: f32 = 0.125;   // Default quality (1/8)
+const SUBPIXEL_QUALITY: f32 = 0.75;      // Standard subpixel AA
+const ITERATIONS: i32 = 12;              // Maximum quality iterations
 
 fn rgb2luma(rgb: vec3<f32>) -> f32 {
     return dot(rgb, vec3<f32>(0.299, 0.587, 0.114));

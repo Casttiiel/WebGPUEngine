@@ -1,20 +1,17 @@
 ## Player
 
-1. Triplanar with instanced?
-2. Swap camera/player controls
-3. FXAA
-4. SMAA
-5. MSAA
-6. Directional light follow
-7. AO Wrong
-8. Error on directional light shadow mapping on plain surfaces
-9. Cascade shadow mapping (3 cascade)
-10. Reflection probes
-11. Follow of mesh with camera wrong
-12. Box Collider/Ground collider good?
-13. Loading Bar
-14. Weird line on corners is irradiance because of normals
-15. Refactor of renderManager
+1. SMAA
+2. Directional light follow
+3. AO Wrong
+4. Error on directional light shadow mapping on plain surfaces
+5. Cascade shadow mapping (3 cascade)
+6. Reflection probes
+7. Follow of mesh with camera wrong
+8. Box Collider/Ground collider good?
+9. Loading Bar
+10. Weird line on corners is irradiance because of normals
+11. Refactor of renderManager (WHAT)
+12. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
 
 ---
 
