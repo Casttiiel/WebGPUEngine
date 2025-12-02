@@ -1,67 +1,100 @@
 #include "common/uniforms"
 
-// SMAA Edge Detection Fragment Shader (Pass 1)
-// Basic SMAA algorithm: detects horizontal and vertical edges using luma differences
+// -----------------------------------------------------------------------------
+// SMAA Edge Detection Pass (WGSL) — Accurate SMAA 1x Implementation
+// Based on: "Enhanced Subpixel Morphological Antialiasing" - Jimenez et al.
+// -----------------------------------------------------------------------------
 
 struct SMAAParams {
-    edgeThreshold: f32,
-};
+    threshold: f32,           // 0.05–0.15 típico
+    predicationStrength: f32, // 0.0–1.0 (0 = sin adaptativo, 0.5–1.0 = más adaptativo)
+}
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var colorTex: texture_2d<f32>;
 @group(1) @binding(1) var colorSampler: sampler;
-@group(1) @binding(2) var<uniform> smaaParams: SMAAParams;
+@group(1) @binding(2) var<uniform> params: SMAAParams;
 
-// Calculate luma from RGB (Rec. 709 coefficients)
-fn RGBToLuma(color: vec3<f32>) -> f32 {
-    return dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
+// SMAA parameters
+const SMAA_THRESHOLD: f32 = 0.1;
+const SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR: f32 = 2.0;
+
+// Edge detection function
+fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
+    let c = textureSample(colorTex, colorSampler, uv).rgb;
+
+    // Neighbors
+    let cL = textureSample(colorTex, colorSampler, offset[0].xy).rgb;
+    var t = abs(c - cL);
+    let deltaX = max(max(t.r, t.g), t.b);
+
+    let cT = textureSample(colorTex, colorSampler, offset[0].zw).rgb;
+    t = abs(c - cT);
+    let deltaY = max(max(t.r, t.g), t.b);
+
+    var edges = vec2<f32>(step(SMAA_THRESHOLD,deltaX),step(SMAA_THRESHOLD,deltaY));
+
+    if(dot(edges, vec2<f32>(1.0)) == 0.0){
+        discard;
+    }
+
+    let cR = textureSample(colorTex, colorSampler, offset[1].xy).rgb;
+    t = abs(c - cR);
+    var deltaZ = max(max(t.r, t.g), t.b);
+
+    let cB = textureSample(colorTex, colorSampler, offset[1].zw).rgb;
+    t = abs(c - cB);
+    var deltaW = max(max(t.r, t.g), t.b);
+
+    // Calculate the maximum delta in the direct neighborhood:
+    var maxDelta = max(vec2<f32>(deltaX, deltaY), vec2<f32>(deltaZ, deltaW));
+
+    // Calculate left-left and top-top deltas:
+    let cLL = textureSample(colorTex, colorSampler, offset[2].xy).rgb;
+    t = abs(c - cLL);
+    deltaZ = max(max(t.r, t.g), t.b);
+
+    let cTT = textureSample(colorTex, colorSampler, offset[2].zw).rgb;
+    t = abs(c - cTT);
+    deltaW = max(max(t.r, t.g), t.b);
+
+    maxDelta = max(maxDelta.xy, vec2<f32>(deltaZ, deltaW));
+    let finalDelta = max(maxDelta.x, maxDelta.y);
+
+    let contrast = step(vec2<f32>(finalDelta), SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR * vec2<f32>(deltaX, deltaY));
+    edges = edges * contrast;
+
+    return edges;
 }
 
 @fragment
 fn fs(@builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     
-    let texSize = textureDimensions(colorTex);
-    let texelSize = 1.0 / vec2<f32>(texSize);
+    // Calculate texel size
+    let texelSize = 1.0 / camera.screenSize;
     
-    // Sample only what we need: center, left, and top
-    let colorC = textureSample(colorTex, colorSampler, uv).rgb;
-    let colorL = textureSample(colorTex, colorSampler, uv + vec2<f32>(-texelSize.x, 0.0)).rgb;
-    let colorT = textureSample(colorTex, colorSampler, uv + vec2<f32>(0.0, texelSize.y)).rgb;
+    // Calculate offsets in fragment shader
+    var offset: array<vec4<f32>, 3>;
     
-    // Convert to luma
-    let lumaC = RGBToLuma(colorC);
-    let lumaL = RGBToLuma(colorL);
-    let lumaT = RGBToLuma(colorT);
+    // offset[0]: xy = left (-1,0), zw = top (0,-1)
+    offset[0] = vec4<f32>(
+        uv.x - texelSize.x, uv.y,
+        uv.x, uv.y - texelSize.y
+    );
     
-    // Calculate deltas
-    let deltaH = abs(lumaC - lumaT);  // Horizontal edge (vertical change)
-    let deltaV = abs(lumaC - lumaL);  // Vertical edge (horizontal change)
+    // offset[1]: xy = right (1,0), zw = bottom (0,1)
+    offset[1] = vec4<f32>(
+        uv.x + texelSize.x, uv.y,
+        uv.x, uv.y + texelSize.y
+    );
     
-    // Optional: local contrast to avoid detecting noise/texture detail
-    // Sample right and bottom for contrast calculation
-    let colorR = textureSample(colorTex, colorSampler, uv + vec2<f32>(texelSize.x, 0.0)).rgb;
-    let colorB = textureSample(colorTex, colorSampler, uv + vec2<f32>(0.0, -texelSize.y)).rgb;
-    let lumaR = RGBToLuma(colorR);
-    let lumaB = RGBToLuma(colorB);
+    // offset[2]: xy = far-left (-2,0), zw = far-top (0,-2)
+    offset[2] = vec4<f32>(
+        uv.x - 2.0 * texelSize.x, uv.y,
+        uv.x, uv.y - 2.0 * texelSize.y
+    );
     
-    // Local contrast: max difference in 2x2 neighborhood
-    let maxLuma = max(max(lumaC, lumaL), max(lumaT, max(lumaR, lumaB)));
-    let minLuma = min(min(lumaC, lumaL), min(lumaT, min(lumaR, lumaB)));
-    let localContrast = maxLuma - minLuma;
-    
-    // Use local contrast as additional threshold multiplier
-    // This prevents detecting edges in very low-contrast areas (noise)
-    let threshold = smaaParams.edgeThreshold;
-    let contrastFactor = localContrast / max(maxLuma, 0.001); // Avoid division by zero
-    
-    // Only detect edges if there's sufficient local contrast
-    let hasContrast = contrastFactor > 0.1; // 10% contrast minimum
-    
-    // Simple threshold comparison
-    let edgeH = select(0.0, 1.0, hasContrast && (deltaH > threshold));
-    let edgeV = select(0.0, 1.0, hasContrast && (deltaV > threshold));
-    
-    // Output: R = horizontal edge, G = vertical edge
-    return vec4<f32>(edgeH, edgeV, 0.0, 1.0);
+    let edges = colorEdgeDetection(uv, offset);
+    return vec4<f32>(edges.x, edges.y, 0.0, 1.0);
 }
