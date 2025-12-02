@@ -3,5 +3,5 @@
     "fs": "smaa_blending_weight.fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["CameraUniforms","SingleTexture"]
+    "uniforms":["CameraUniforms","SMAABlendTextures"]
 }

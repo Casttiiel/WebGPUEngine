@@ -1,10 +1,10 @@
 ## Player
 
-1. SMAA
+1. Depth prepass good?
 2. Directional light follow
-3. AO Wrong
-4. Error on directional light shadow mapping on plain surfaces
-5. Cascade shadow mapping (3 cascade)
+3. Error on directional light shadow mapping on plain surfaces
+4. Cascade shadow mapping (3 cascade)
+5. AO Wrong
 6. Reflection probes
 7. Follow of mesh with camera wrong
 8. Box Collider/Ground collider good?

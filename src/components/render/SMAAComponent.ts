@@ -5,6 +5,7 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
+import { Texture } from '../../renderer/resources/Texture';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
@@ -33,6 +34,10 @@ export class SMAAComponent extends Component {
   private blendRT!: RenderTarget; // Blending weights texture
   private finalRT!: RenderTarget; // Final anti-aliased result
 
+  // SMAA lookup textures
+  private areaTex!: Texture; // Area texture LUT for pattern matching
+  private searchTex!: Texture; // Search texture for edge length calculation
+
   // Uniform buffer for SMAA parameters
   private uniformBuffer!: GPUBuffer;
 
@@ -44,7 +49,7 @@ export class SMAAComponent extends Component {
   // SMAA parameters
   private smaaParams = {
     enabled: true,
-    edgeThreshold: 0.05,
+    edgeThreshold: 0.08,
   };
 
   constructor() {
@@ -61,6 +66,10 @@ export class SMAAComponent extends Component {
     this.blendTechnique = await Technique.getAsync('smaa_blend.tech');
     this.neighborhoodTechnique = await Technique.getAsync('smaa_neighborhood.tech');
 
+    // Load SMAA lookup textures
+    this.areaTex = await Texture.get('AreaTex.png');
+    this.searchTex = await Texture.get('SearchTex.png');
+
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
     // Create uniform buffer for SMAA parameters
@@ -74,7 +83,7 @@ export class SMAAComponent extends Component {
     this.device.queue.writeBuffer(
       this.uniformBuffer,
       0,
-      new Float32Array([this.smaaParams.edgeThreshold]),
+      new Float32Array([this.smaaParams.edgeThreshold, 0.6]),
     );
 
     // Create render targets
@@ -109,13 +118,6 @@ export class SMAAComponent extends Component {
    * Executes the 3-pass algorithm
    */
   public apply(inputTexture: GPUTextureView): GPUTextureView {
-    if (!this.smaaParams.enabled) {
-      console.warn('SMAA is DISABLED');
-      return inputTexture;
-    }
-
-    console.log('SMAA: Applying anti-aliasing...'); // DEBUG
-
     // Update uniform buffer with current parameters
     this.device.queue.writeBuffer(
       this.uniformBuffer,
@@ -292,6 +294,22 @@ export class SMAAComponent extends Component {
           {
             binding: 1,
             resource: sampler,
+          },
+          {
+            binding: 2,
+            resource: this.areaTex.getTextureView()!,
+          },
+          {
+            binding: 3,
+            resource: sampler, // Same sampler for areaTex
+          },
+          {
+            binding: 4,
+            resource: this.searchTex.getTextureView()!,
+          },
+          {
+            binding: 5,
+            resource: sampler, // Same sampler for searchTex
           },
         ],
       );
