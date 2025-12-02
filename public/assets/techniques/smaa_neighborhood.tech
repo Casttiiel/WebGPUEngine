@@ -3,5 +3,5 @@
     "fs": "smaa_neighborhood_blending.fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["CameraUniforms","SingleTexture", "BlendTexture"]
+    "uniforms":["CameraUniforms","SingleTexture", "SingleTexture"]
 }

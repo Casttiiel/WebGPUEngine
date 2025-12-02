@@ -1,6 +1,8 @@
-// SMAA Neighborhood Blending Fragment Shader
-// Final blending pass that applies anti-aliasing based on calculated weights
-// This is the third and final pass of the SMAA algorithm
+#include "common/uniforms"
+
+// SMAA Neighborhood Blending Fragment Shader (Pass 3)
+// Final pass: applies the blend weights calculated in Pass 2
+// Does NOT invent weights, does NOT normalize - just applies what Pass 2 decided
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var colorTex: texture_2d<f32>;
@@ -8,64 +10,87 @@
 @group(2) @binding(0) var blendTex: texture_2d<f32>;
 @group(2) @binding(1) var blendSampler: sampler;
 
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-
 @fragment
-fn main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let texSize = textureDimensions(colorTex);
-    let texelSize = 1.0 / vec2<f32>(texSize);
+fn fs(@builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     
-    // Sample blending weights
-    let weights = textureSample(blendTex, blendSampler, in.uv);
+    let texSize = vec2<f32>(textureDimensions(colorTex));
+    let texelSize = 1.0 / texSize;
     
-    // If no blending needed, return original color
-    if (dot(weights, vec4<f32>(1.0)) < 0.01) {
-        return textureSample(colorTex, colorSampler, in.uv);
+    // Read blend weights from Pass 2
+    // R = left weight, G = right weight, B = up weight, A = down weight
+    let weights = textureSampleLevel(blendTex, blendSampler, uv, 0.0);
+    
+    // Early out: if no significant weights, return original color
+    let totalWeight = weights.r + weights.g + weights.b + weights.a;
+    if (totalWeight < 0.001) {
+        return textureSampleLevel(colorTex, colorSampler, uv, 0.0);
     }
     
-    // Sample colors from neighbors based on weights
-    var color = vec4<f32>(0.0);
-    var totalWeight = 0.0;
+    // Sample original color
+    let colorCenter = textureSampleLevel(colorTex, colorSampler, uv, 0.0);
     
-    // Horizontal blending (left and right)
-    if (weights.x > 0.0) {
-        let leftColor = textureSample(colorTex, colorSampler, in.uv + vec2<f32>(-texelSize.x, 0.0));
-        color += leftColor * weights.x;
-        totalWeight += weights.x;
-    }
-    if (weights.y > 0.0) {
-        let rightColor = textureSample(colorTex, colorSampler, in.uv + vec2<f32>(texelSize.x, 0.0));
-        color += rightColor * weights.y;
-        totalWeight += weights.y;
-    }
+    // === HORIZONTAL BLENDING ===
+    var colorH = colorCenter;
+    let hasHorizontal = (weights.r + weights.g) > 0.001;
     
-    // Vertical blending (top and bottom)
-    if (weights.z > 0.0) {
-        let topColor = textureSample(colorTex, colorSampler, in.uv + vec2<f32>(0.0, texelSize.y));
-        color += topColor * weights.z;
-        totalWeight += weights.z;
-    }
-    if (weights.w > 0.0) {
-        let bottomColor = textureSample(colorTex, colorSampler, in.uv + vec2<f32>(0.0, -texelSize.y));
-        color += bottomColor * weights.w;
-        totalWeight += weights.w;
+    if (hasHorizontal) {
+        // Sample left and right neighbors
+        let colorLeft = textureSampleLevel(colorTex, colorSampler, uv + vec2<f32>(-texelSize.x, 0.0), 0.0);
+        let colorRight = textureSampleLevel(colorTex, colorSampler, uv + vec2<f32>(texelSize.x, 0.0), 0.0);
+        
+        // Blend according to Pass 2 weights
+        // If weights.r > weights.g, bias toward left
+        // If weights.g > weights.r, bias toward right
+        let totalH = weights.r + weights.g;
+        let t = weights.g / totalH; // Interpolation factor [0,1]
+        
+        colorH = mix(colorLeft, colorRight, t);
     }
     
-    // Add center color with remaining weight
-    let centerColor = textureSample(colorTex, colorSampler, in.uv);
-    let centerWeight = max(0.0, 1.0 - totalWeight);
-    color += centerColor * centerWeight;
-    totalWeight += centerWeight;
+    // === VERTICAL BLENDING ===
+    var colorV = colorCenter;
+    let hasVertical = (weights.b + weights.a) > 0.001;
     
-    // Normalize
-    if (totalWeight > 0.0) {
-        color /= totalWeight;
-    } else {
-        color = centerColor;
+    if (hasVertical) {
+        // Sample top and bottom neighbors
+        let colorUp = textureSampleLevel(colorTex, colorSampler, uv + vec2<f32>(0.0, texelSize.y), 0.0);
+        let colorDown = textureSampleLevel(colorTex, colorSampler, uv + vec2<f32>(0.0, -texelSize.y), 0.0);
+        
+        // Blend according to Pass 2 weights
+        let totalV = weights.b + weights.a;
+        let t = weights.a / totalV; // Interpolation factor [0,1]
+        
+        colorV = mix(colorUp, colorDown, t);
     }
     
-    return color;
+    // === FINAL COMBINATION ===
+    // If both H and V edges: combine them
+    // If only one: use that one
+    // The exact combination depends on edge strength
+    
+    if (hasHorizontal && hasVertical) {
+        // Both edges present (corner/crossing)
+        // Weight by total strength of each direction
+        let strengthH = weights.r + weights.g;
+        let strengthV = weights.b + weights.a;
+        let totalStrength = strengthH + strengthV;
+        
+        // Blend between horizontal and vertical results
+        let tCombine = strengthV / totalStrength;
+        return mix(colorH, colorV, tCombine);
+    }
+    else if (hasHorizontal) {
+        // Only horizontal edge
+        let strengthH = weights.r + weights.g;
+        return mix(colorCenter, colorH, strengthH);
+    }
+    else if (hasVertical) {
+        // Only vertical edge
+        let strengthV = weights.b + weights.a;
+        return mix(colorCenter, colorV, strengthV);
+    }
+    
+    // Fallback (shouldn't reach here due to early out)
+    return colorCenter;
 }

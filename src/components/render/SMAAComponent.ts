@@ -18,6 +18,7 @@ import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager'
  */
 export class SMAAComponent extends Component {
   private loaded = false;
+  private device!: GPUDevice;
 
   // Techniques for the 3 passes
   private edgeTechnique!: Technique;
@@ -32,6 +33,9 @@ export class SMAAComponent extends Component {
   private blendRT!: RenderTarget; // Blending weights texture
   private finalRT!: RenderTarget; // Final anti-aliased result
 
+  // Uniform buffer for SMAA parameters
+  private uniformBuffer!: GPUBuffer;
+
   // Bind group caches
   private edgeBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
   private blendBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
@@ -40,7 +44,7 @@ export class SMAAComponent extends Component {
   // SMAA parameters
   private smaaParams = {
     enabled: true,
-    edgeThreshold: 0.1,
+    edgeThreshold: 0.05,
   };
 
   constructor() {
@@ -49,6 +53,7 @@ export class SMAAComponent extends Component {
   }
 
   public async load(): Promise<void> {
+    this.device = Render.getInstance().getDevice();
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     // Load the 3 techniques
@@ -58,9 +63,24 @@ export class SMAAComponent extends Component {
 
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
+    // Create uniform buffer for SMAA parameters
+    this.uniformBuffer = this.device.createBuffer({
+      label: 'smaa_params_uniform_buffer',
+      size: 16, // 1 float (edgeThreshold) + padding to 16 bytes
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    // Initialize with default values
+    this.device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      new Float32Array([this.smaaParams.edgeThreshold]),
+    );
+
     // Create render targets
     this.edgesRT = new RenderTarget();
     this.edgesRT.createRT('smaa_edges.dds', Render.width, Render.height, aliasingFormat);
+    console.log(Render.width, Render.height, aliasingFormat);
 
     this.blendRT = new RenderTarget();
     this.blendRT.createRT('smaa_blend.dds', Render.width, Render.height, aliasingFormat);
@@ -90,8 +110,18 @@ export class SMAAComponent extends Component {
    */
   public apply(inputTexture: GPUTextureView): GPUTextureView {
     if (!this.smaaParams.enabled) {
+      console.warn('SMAA is DISABLED');
       return inputTexture;
     }
+
+    console.log('SMAA: Applying anti-aliasing...'); // DEBUG
+
+    // Update uniform buffer with current parameters
+    this.device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      new Float32Array([this.smaaParams.edgeThreshold]),
+    );
 
     // Pass 1: Edge Detection
     const edgeBindGroup = this.getOrCreateEdgeBindGroup(inputTexture);
@@ -137,13 +167,10 @@ export class SMAAComponent extends Component {
       label: 'SMAA Neighborhood Blending',
       colorAttachments: [
         {
-          view: this.finalRT.getRenderView()!,
+          view: this.finalRT.getView(), // Use getView() instead of getRenderView() - no MSAA
           clearValue: { r: 0, g: 0, b: 0, a: 1 },
           loadOp: 'clear',
           storeOp: 'store',
-          ...(this.finalRT.getResolveTarget() && {
-            resolveTarget: this.finalRT.getResolveTarget()!,
-          }),
         },
       ],
     });
@@ -221,7 +248,6 @@ export class SMAAComponent extends Component {
     let bindGroup = this.edgeBindGroupCache.get(texture);
     if (!bindGroup) {
       const sampler = SamplerLibrary.simpleSampler;
-
       bindGroup = BindGroupFactory.createBindGroup(
         `smaa_edge_bindgroup`,
         this.edgeTechnique.getPipeline().getBindGroupLayout(1),
@@ -233,6 +259,12 @@ export class SMAAComponent extends Component {
           {
             binding: 1,
             resource: sampler,
+          },
+          {
+            binding: 2,
+            resource: {
+              buffer: this.uniformBuffer,
+            },
           },
         ],
       );
@@ -273,7 +305,15 @@ export class SMAAComponent extends Component {
   }
 
   public override renderInMenu(): void {
-    // TODO: Add debug UI controls for SMAA parameters
+    const debugUI = Engine.getDebugUI();
+
+    debugUI.addInteractiveControl('SMAA', this.smaaParams, 'enabled', 'Enabled');
+
+    debugUI.addInteractiveControl('SMAA', this.smaaParams, 'edgeThreshold', 'Edge Threshold', {
+      min: 0.01,
+      max: 0.5,
+      step: 0.01,
+    });
   }
 
   public renderDebug(): void {

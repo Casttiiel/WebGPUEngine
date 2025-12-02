@@ -20,6 +20,7 @@ import { Distorsions } from '../../renderer/shading/Distorsions';
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 import { FXAAComponent } from '../../components/render/FXAAComponent';
+import { SMAAComponent } from '../../components/render/SMAAComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -164,6 +165,13 @@ export class ModuleRender extends Module {
 
     if (mainCameraEntity.hasComponent('fxaa')) {
       const antialiasing = mainCameraEntity.getComponent('fxaa') as FXAAComponent;
+      if (antialiasing.hasLoaded()) {
+        result = antialiasing.apply(result);
+      }
+    }
+
+    if (mainCameraEntity.hasComponent('smaa')) {
+      const antialiasing = mainCameraEntity.getComponent('smaa') as SMAAComponent;
       if (antialiasing.hasLoaded()) {
         result = antialiasing.apply(result);
       }
@@ -322,7 +330,14 @@ export class ModuleRender extends Module {
 
     // Render each component in its own subfolder
 
-    if (mainCamera.hasComponent('ambient_occlusion')) {
+    if (mainCamera.hasComponent('smaa')) {
+      const aoComponent = mainCamera.getComponent('smaa') as SMAAComponent;
+      if (aoComponent && typeof aoComponent.renderInMenu === 'function') {
+        aoComponent.renderInMenu();
+      }
+    }
+
+    /*if (mainCamera.hasComponent('ambient_occlusion')) {
       const aoComponent = mainCamera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
       if (aoComponent && typeof aoComponent.renderInMenu === 'function') {
         aoComponent.renderInMenu();
@@ -348,7 +363,7 @@ export class ModuleRender extends Module {
       if (bloomComponent && typeof bloomComponent.renderInMenu === 'function') {
         bloomComponent.renderInMenu();
       }
-    }
+    }*/
   }
 
   public renderDebug(): void {

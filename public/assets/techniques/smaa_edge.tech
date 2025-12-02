@@ -3,5 +3,5 @@
     "fs": "smaa_edge_detection.fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["CameraUniforms","SingleTexture"]
+    "uniforms":["CameraUniforms","SMAAParams"]
 }
