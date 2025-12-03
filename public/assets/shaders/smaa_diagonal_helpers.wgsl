@@ -90,8 +90,8 @@ fn SMAASearchDiag1(
     var coord = vec4<f32>(texcoord, -1.0, 1.0);
     let t = vec3<f32>(texelSize, 1.0);
     
-    for (var i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
-        if (!(coord.z < f32(SMAA_MAX_SEARCH_STEPS_DIAG - 1) && coord.w > 0.9)) { break; }
+    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
+        if (!(coord.z < f32(blendParams.maxSearchStepsDiag - 1) && coord.w > 0.9)) { break; }
         coord = vec4<f32>(mad_vec2(t.xy, dir, coord.xy), mad_f32(t.z, 1.0, coord.z), coord.w);
         let e = textureSampleLevel(edgesTex, edgesSampler, coord.xy, 0.0).rg;
         coord.w = dot(e, vec2<f32>(0.5, 0.5));
@@ -113,8 +113,8 @@ fn SMAASearchDiag2(
     coord.x += 0.25 * texelSize.x;
     let t = vec3<f32>(texelSize, 1.0);
     
-    for (var i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
-        if (!(coord.z < f32(SMAA_MAX_SEARCH_STEPS_DIAG - 1) && coord.w > 0.9)) { break; }
+    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
+        if (!(coord.z < f32(blendParams.maxSearchStepsDiag - 1) && coord.w > 0.9)) { break; }
         coord = vec4<f32>(mad_vec2(t.xy, dir, coord.xy), mad_f32(t.z, 1.0, coord.z), coord.w);
         
         // @SearchDiag2Optimization
@@ -223,7 +223,7 @@ fn SMAASearchXLeft(
     var tc = texcoord;
     var e = vec2<f32>(0.0, 1.0);
     
-    for (var i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
         if (!(tc.x > end && e.g > 0.8281 && e.r == 0.0)) { break; }
         e = textureSampleLevel(edgesTex, edgesSampler, tc, 0.0).rg;
         tc = mad_vec2(-vec2<f32>(2.0, 0.0), texelSize, tc);
@@ -245,7 +245,7 @@ fn SMAASearchXRight(
     var tc = texcoord;
     var e = vec2<f32>(0.0, 1.0);
     
-    for (var i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
         if (!(tc.x < end && e.g > 0.8281 && e.r == 0.0)) { break; }
         e = textureSampleLevel(edgesTex, edgesSampler, tc, 0.0).rg;
         tc = mad_vec2(vec2<f32>(2.0, 0.0), texelSize, tc);
@@ -267,7 +267,7 @@ fn SMAASearchYUp(
     var tc = texcoord;
     var e = vec2<f32>(1.0, 0.0);
     
-    for (var i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
         if (!(tc.y > end && e.r > 0.8281 && e.g == 0.0)) { break; }
         e = textureSampleLevel(edgesTex, edgesSampler, tc, 0.0).rg;
         tc = mad_vec2(-vec2<f32>(0.0, 2.0), texelSize, tc);
@@ -289,7 +289,7 @@ fn SMAASearchYDown(
     var tc = texcoord;
     var e = vec2<f32>(1.0, 0.0);
     
-    for (var i = 0; i < SMAA_MAX_SEARCH_STEPS; i++) {
+    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
         if (!(tc.y < end && e.r > 0.8281 && e.g == 0.0)) { break; }
         e = textureSampleLevel(edgesTex, edgesSampler, tc, 0.0).rg;
         tc = mad_vec2(vec2<f32>(0.0, 2.0), texelSize, tc);
@@ -407,7 +407,8 @@ fn SMAADetectHorizontalCornerPattern(
 ) {
     // This can be disabled with SMAA_DISABLE_CORNER_DETECTION
     let leftRight = step(d.xy, d.yx);
-    var rounding = (1.0 - SMAA_CORNER_ROUNDING_NORM) * leftRight;
+    // CRITICAL: Normalize cornerRounding (divide by 100) to match GLSL implementation
+    var rounding = (1.0 - blendParams.cornerRounding / 100.0) * leftRight;
     
     rounding /= leftRight.x + leftRight.y; // Reduce blending for pixels in the center of a line.
     
@@ -430,7 +431,8 @@ fn SMAADetectVerticalCornerPattern(
 ) {
     // This can be disabled with SMAA_DISABLE_CORNER_DETECTION
     let leftRight = step(d.xy, d.yx);
-    var rounding = (1.0 - SMAA_CORNER_ROUNDING_NORM) * leftRight;
+    // CRITICAL: Normalize cornerRounding (divide by 100) to match GLSL implementation
+    var rounding = (1.0 - blendParams.cornerRounding / 100.0) * leftRight;
     
     rounding /= leftRight.x + leftRight.y;
     

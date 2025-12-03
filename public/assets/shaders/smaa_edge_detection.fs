@@ -7,7 +7,7 @@
 
 struct SMAAParams {
     threshold: f32,           // 0.05–0.15 típico
-    predicationStrength: f32, // 0.0–1.0 (0 = sin adaptativo, 0.5–1.0 = más adaptativo)
+    contrastAdaptationFactor: f32, // 0.0–1.0 (0 = sin adaptativo, 0.5–1.0 = más adaptativo)
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -15,9 +15,6 @@ struct SMAAParams {
 @group(1) @binding(1) var colorSampler: sampler;
 @group(1) @binding(2) var<uniform> params: SMAAParams;
 
-// SMAA parameters
-const SMAA_THRESHOLD: f32 = 0.1;
-const SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR: f32 = 2.0;
 
 // Edge detection function
 fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
@@ -32,9 +29,10 @@ fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
     t = abs(c - cT);
     let deltaY = max(max(t.r, t.g), t.b);
 
-    var edges = vec2<f32>(step(SMAA_THRESHOLD,deltaX),step(SMAA_THRESHOLD,deltaY));
+    var edges = vec2<f32>(step(params.threshold, deltaX), step(params.threshold, deltaY));
 
-    if(dot(edges, vec2<f32>(1.0)) == 0.0){
+    // Then discard if there is no edge:
+    if (dot(edges, vec2<f32>(1.0)) == 0.0) {
         discard;
     }
 
@@ -58,11 +56,12 @@ fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
     t = abs(c - cTT);
     deltaW = max(max(t.r, t.g), t.b);
 
+    // Calculate the final maximum delta:
     maxDelta = max(maxDelta.xy, vec2<f32>(deltaZ, deltaW));
     let finalDelta = max(maxDelta.x, maxDelta.y);
 
-    let contrast = step(vec2<f32>(finalDelta), SMAA_LOCAL_CONTRAST_ADAPTATION_FACTOR * vec2<f32>(deltaX, deltaY));
-    edges = edges * contrast;
+    // Local contrast adaptation:
+    edges = edges * step(vec2<f32>(finalDelta), params.contrastAdaptationFactor * vec2<f32>(deltaX, deltaY));
 
     return edges;
 }

@@ -24,4 +24,5 @@ export enum PipelineBindGroupLayouts {
   MOTION_BLUR_PARAMS = 'MotionBlurParams',
   SMAA_PARAMS = 'SMAAParams',
   SMAA_BLEND_TEXTURES = 'SMAABlendTextures',
+  SMAA_BLEND_PARAMS = 'SMAABlendParams',
 }

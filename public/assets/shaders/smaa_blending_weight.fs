@@ -14,24 +14,31 @@
 @group(1) @binding(4) var searchTex: texture_2d<f32>;
 @group(1) @binding(5) var searchSampler: sampler;
 
+struct SMAABlendParams {
+    maxSearchSteps: f32,
+    maxSearchStepsDiag: f32,
+    cornerRounding: f32,
+    disableDiagDetection: f32,
+    useDirectWeights: f32,
+}
+
+@group(2) @binding(0) var<uniform> blendParams: SMAABlendParams;
+
 struct VSOut {
     @builtin(position) pos: vec4<f32>,
     @location(0) uv: vec2<f32>,
 };
 
-// SMAA configuration constants - Optimized for diagonal detection
-const SMAA_THRESHOLD: f32 = 0.05;              // Lower = more sensitive
-const SMAA_MAX_SEARCH_STEPS: i32 = 32;         // Longer edge search
-const SMAA_MAX_SEARCH_STEPS_DIAG: i32 = 16;    // Better diagonal quality
-const SMAA_CORNER_ROUNDING: f32 = 25.0;
-const SMAA_CORNER_ROUNDING_NORM: f32 = SMAA_CORNER_ROUNDING / 100.0;
+// Dynamic parameters from uniform buffer (overwrite constants if needed)
+// These are accessed via blendParams.* in the shader
 
+// SMAA configuration constants - Static values (texture properties)
 const SMAA_AREATEX_MAX_DISTANCE: f32 = 16.0;
 const SMAA_AREATEX_MAX_DISTANCE_DIAG: f32 = 20.0;
 const SMAA_AREATEX_PIXEL_SIZE: vec2<f32> = vec2(1.0/160.0, 1.0/560.0);
 const SMAA_AREATEX_SUBTEX_SIZE: f32 = 1.0 / 7.0;
-const SMAA_SEARCHTEX_SIZE: vec2<f32> = vec2(66.0, 33.0);
-const SMAA_SEARCHTEX_PACKED_SIZE: vec2<f32> = vec2(64.0, 16.0);
+const SMAA_SEARCHTEX_SIZE: vec2<f32> = vec2(64.0, 16.0);        // Must match actual texture dimensions
+const SMAA_SEARCHTEX_PACKED_SIZE: vec2<f32> = vec2(64.0, 16.0); // Same as SIZE for this texture
 
 // Include all SMAA helper functions
 #include "smaa_diagonal_helpers"
@@ -47,11 +54,16 @@ fn fs(@builtin(position) position: vec4<f32>,
     // Calculate offsets (CROSSING_OFFSET = -0.25 * texelSize)
     // vOffset[0] = mad(vec4(-0.25, -0.125, 1.25, -0.125), texelSize.xyxy, uv.xyxy)
     // vOffset[1] = mad(vec4(-0.125, -0.25, -0.125, 1.25), texelSize.xyxy, uv.xyxy)
-    // vOffset[2] = mad(vec4(-2.0, 2.0, -2.0, 2.0), texelSize.xxyy, uv.xxyy)
+    // vOffset[2] = mad(vec4(-2.0, 2.0, -2.0, 2.0) * maxSearchSteps, texelSize.xxyy, vOffset[0].xz + vOffset[1].yw)
     var vOffset: array<vec4<f32>, 3>;
     vOffset[0] = mad_vec4(vec4<f32>(-0.25, -0.125, 1.25, -0.125), vec4<f32>(texelSize, texelSize), vec4<f32>(uv, uv));
     vOffset[1] = mad_vec4(vec4<f32>(-0.125, -0.25, -0.125, 1.25), vec4<f32>(texelSize, texelSize), vec4<f32>(uv, uv));
-    vOffset[2] = mad_vec4(vec4<f32>(-2.0, 2.0, -2.0, 2.0), vec4<f32>(texelSize.x, texelSize.x, texelSize.y, texelSize.y), vec4<f32>(uv.x, uv.x, uv.y, uv.y));
+    // CRITICAL: Multiply by maxSearchSteps to set proper search boundaries
+    vOffset[2] = mad_vec4(
+        vec4<f32>(-2.0, 2.0, -2.0, 2.0) * blendParams.maxSearchSteps,
+        vec4<f32>(texelSize.x, texelSize.x, texelSize.y, texelSize.y),
+        vec4<f32>(vOffset[0].x, vOffset[0].z, vOffset[1].y, vOffset[1].w)
+    );
     
     let subsampleIndices = vec4<f32>(0.0); // Just pass zero for SMAA 1x
     var weights = vec4<f32>(0.0);
@@ -59,16 +71,19 @@ fn fs(@builtin(position) position: vec4<f32>,
     
     if (e.g > 0.0) { // Edge at north
         
+        // DIAGONAL DETECTION (if enabled)
         // Diagonals have both north and west edges, so searching for them in
         // one of the boundaries is enough.
-        let diagWeights = SMAACalculateDiagWeights(edgesTex, edgesSampler, areaTex, areaSampler, uv, e, subsampleIndices, texelSize);
-        weights.r = diagWeights.x;
-        weights.g = diagWeights.y;
+        if (blendParams.disableDiagDetection < 0.5) {
+            weights = vec4<f32>(SMAACalculateDiagWeights(edgesTex, edgesSampler, areaTex, areaSampler, uv, e, subsampleIndices, texelSize), 0.0, 0.0);
+        }
         
         // We give priority to diagonals, so if we find a diagonal we skip
         // horizontal/vertical processing.
-        if (weights.r + weights.g == 0.0) { // No diagonal found
-            
+        // The condition checks if weights.r + weights.g == 0.0 (no diagonal found)
+        let noDiagonalFound = blendParams.disableDiagDetection > 0.5 || abs(weights.r + weights.g) < 0.0001;
+        
+        if (noDiagonalFound) {
             var d: vec2<f32>;
             
             // Find the distance to the left:
@@ -90,6 +105,9 @@ fn fs(@builtin(position) position: vec4<f32>,
             // better interleave arithmetic and memory accesses):
             d = abs(round(mad_vec2(camera.screenSize.xx, d, -pixCoord.xx)));
             
+            // Clamp distances to valid range for area texture lookup
+            d = clamp(d, vec2<f32>(0.0), vec2<f32>(SMAA_AREATEX_MAX_DISTANCE));
+            
             // SMAAArea below needs a sqrt, as the areas texture is compressed
             // quadratically:
             let sqrt_d = sqrt(d);
@@ -99,9 +117,17 @@ fn fs(@builtin(position) position: vec4<f32>,
             
             // Ok, we know how this pattern looks like, now it is time for getting
             // the actual area:
-            let areaWeights = SMAAArea(areaTex, areaSampler, sqrt_d, e1, e2, subsampleIndices.y);
-            weights.r = areaWeights.x;
-            weights.g = areaWeights.y;
+            if (blendParams.useDirectWeights > 0.5) {
+                // Direct weight calculation: longer edges = stronger antialiasing
+                // Maximum weight when edge extends full search distance
+                let maxDist = SMAA_AREATEX_MAX_DISTANCE;
+                weights.r = clamp((d.x / maxDist) * (e1 * 0.5 + 0.5), 0.0, 1.0);
+                weights.g = clamp((d.y / maxDist) * (e2 * 0.5 + 0.5), 0.0, 1.0);
+            } else {
+                let areaWeights = SMAAArea(areaTex, areaSampler, sqrt_d, e1, e2, subsampleIndices.y);
+                weights.r = areaWeights.x;
+                weights.g = areaWeights.y;
+            }
             
             // Fix corners:
             coords.y = uv.y;
@@ -111,7 +137,8 @@ fn fs(@builtin(position) position: vec4<f32>,
             weights.g = weightsRG.y;
         
         } else {
-            e.r = 0.0; // Skip vertical processing.
+            // Diagonal found, skip vertical processing
+            e.r = 0.0;
         }
     }
     
@@ -134,6 +161,9 @@ fn fs(@builtin(position) position: vec4<f32>,
         // We want the distances to be in pixel units:
         d = abs(round(mad_vec2(camera.screenSize.yy, d, -pixCoord.yy)));
         
+        // Clamp distances to valid range
+        d = clamp(d, vec2<f32>(0.0), vec2<f32>(SMAA_AREATEX_MAX_DISTANCE));
+        
         // SMAAArea below needs a sqrt, as the areas texture is compressed
         // quadratically:
         let sqrt_d = sqrt(d);
@@ -142,9 +172,16 @@ fn fs(@builtin(position) position: vec4<f32>,
         let e2 = SMAASampleLevelZeroOffset(edgesTex, edgesSampler, coords.xz, vec2<i32>(0, 1), texelSize).g;
         
         // Get the area for this direction:
-        let areaWeights = SMAAArea(areaTex, areaSampler, sqrt_d, e1, e2, subsampleIndices.x);
-        weights.b = areaWeights.x;
-        weights.a = areaWeights.y;
+        if (blendParams.useDirectWeights > 0.5) {
+            // Direct weight calculation for vertical edges
+            let maxDist = SMAA_AREATEX_MAX_DISTANCE;
+            weights.b = clamp((d.x / maxDist) * (e1 * 0.5 + 0.5), 0.0, 1.0);
+            weights.a = clamp((d.y / maxDist) * (e2 * 0.5 + 0.5), 0.0, 1.0);
+        } else {
+            let areaWeights = SMAAArea(areaTex, areaSampler, sqrt_d, e1, e2, subsampleIndices.x);
+            weights.b = areaWeights.x;
+            weights.a = areaWeights.y;
+        }
         
         // Fix corners:
         coords.x = uv.x;

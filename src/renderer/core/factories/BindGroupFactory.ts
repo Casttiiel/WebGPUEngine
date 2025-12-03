@@ -902,6 +902,16 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getSMAABlendParamsLayout(): GPUBindGroupLayout {
+    return this.getLayout('smaa_blend_params', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
@@ -956,6 +966,8 @@ export class BindGroupFactory {
         return this.getSMAAParamsLayout();
       case PipelineBindGroupLayouts.SMAA_BLEND_TEXTURES:
         return this.getSMAABlendTexturesLayout();
+      case PipelineBindGroupLayouts.SMAA_BLEND_PARAMS:
+        return this.getSMAABlendParamsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }
