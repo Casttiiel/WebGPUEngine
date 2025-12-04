@@ -72,7 +72,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let ssrSpecular = ssrColor.rgb * so;
 
     // Mezcla SSR y fallback según alpha
-    var finalSpecular = mix(fallbackSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost;
+    var finalSpecular = mix(fallbackSpecular, ssrSpecular, 0.0) * ssrParams.specularBoost;
 
     // Composición final: suma a la escena base fuera de este shader
     return vec4<f32>(finalSpecular, specularStrength * 1.0);

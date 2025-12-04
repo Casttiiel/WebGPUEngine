@@ -31,7 +31,7 @@
       "coyoteTime": 0.5,
       "accelerationFactor": 0.1,
       "decelerationFactor": 6.5,
-      "airControlMultiplier": 0.3,
+      "airControlMultiplier": 0.5,
       "slideSpeedThreshold": 7.0,
       "slideDecelerationTime": 2.5,
       "slideMinDuration": 0.75,

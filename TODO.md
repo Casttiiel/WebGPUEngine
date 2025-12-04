@@ -1,17 +1,15 @@
 ## Player
 
-1. Error on directional light shadow mapping on plain surfaces
-2. Cascade shadow mapping (3 cascade)
-3. SMAA t2x
-4. Decals wrong
-5. Follow of mesh with camera wrong
-6. AO Wrong
-7. Reflection probes
+1. SMAA t2x
+2. Error on directional light shadow mapping on plain surfaces
+3. Cascade shadow mapping (3 cascade)
+4. Follow of mesh with camera wrong
+5. AO Wrong (check another method without ghosting)
+6. Reflection probes + SSR (able to deactivate ssr)
+7. Revisit decals
 8. Loading Bar
-9. TAA
-10. Weird line on corners is irradiance because of normals
-11. Refactor of renderManager (WHAT)
-12. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+9. Weird line on corners is irradiance because of normals
+10. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
 
 ---
 
