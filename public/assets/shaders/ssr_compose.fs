@@ -43,6 +43,9 @@ fn computeSpecularOcclusion(ao: f32, NoV: f32, roughness: f32) -> f32 {
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let g = decodeGBuffer(uv);
+    if(g.zlinear > 0.999){
+        discard;
+    }
     let ao = textureSampleLevel(aoTexture, texSampler, uv, 0.0).r;
     let N = normalize(g.normal);
     let V = normalize(g.viewDir);

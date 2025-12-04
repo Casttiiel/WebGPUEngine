@@ -1,18 +1,17 @@
 ## Player
 
-1. Skybox wrong
-2. AO Wrong
-3. Error on directional light shadow mapping on plain surfaces
-4. Cascade shadow mapping (3 cascade)
-5. SMAA t2x
-6. Decals wrong
+1. Error on directional light shadow mapping on plain surfaces
+2. Cascade shadow mapping (3 cascade)
+3. SMAA t2x
+4. Decals wrong
+5. Follow of mesh with camera wrong
+6. AO Wrong
 7. Reflection probes
-8. Follow of mesh with camera wrong
-9. Loading Bar
-10. TAA
-11. Weird line on corners is irradiance because of normals
-12. Refactor of renderManager (WHAT)
-13. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+8. Loading Bar
+9. TAA
+10. Weird line on corners is irradiance because of normals
+11. Refactor of renderManager (WHAT)
+12. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
 
 ---
 
