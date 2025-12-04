@@ -34,6 +34,20 @@ export class Camera {
   private isDirty: boolean = true;
   private culledKeys: RenderKey[] = [];
 
+  // Jittering for temporal anti-aliasing (SMAA T2x, TAA, etc.)
+  private jitterEnabled: boolean = false;
+  private jitterIndex: number = 0;
+  private jitterOffsetX: number = 0;
+  private jitterOffsetY: number = 0;
+
+  // Jitter patterns
+  private static readonly JITTER_2X2: [number, number][] = [
+    [0.25, 0.25],
+    [0.75, 0.25],
+    [0.25, 0.75],
+    [0.75, 0.75],
+  ];
+
   // Viewport
   private viewport = {
     x0: 0,
@@ -90,6 +104,14 @@ export class Camera {
       }
     } else {
       mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
+
+      // Apply jittering to projection matrix if enabled
+      if (this.jitterEnabled) {
+        // Modify projection matrix to offset the projection center
+        // projection[8] and projection[9] are the (2,0) and (2,1) elements
+        this.projection[8] += this.jitterOffsetX;
+        this.projection[9] += this.jitterOffsetY;
+      }
     }
     this.calculateInvProjectionMatrix();
     this.updateViewProjection();
@@ -405,5 +427,48 @@ export class Camera {
 
   public setIsDirty(dirty: boolean): void {
     this.isDirty = dirty;
+  }
+
+  // Jittering methods for temporal anti-aliasing
+  public enableJitter(): void {
+    this.jitterEnabled = true;
+    this.jitterIndex = 0;
+    this.isDirty = true;
+  }
+
+  public disableJitter(): void {
+    this.jitterEnabled = false;
+    this.jitterOffsetX = 0;
+    this.jitterOffsetY = 0;
+    this.isDirty = true;
+    this.updateProjection();
+  }
+
+  public isJitterEnabled(): boolean {
+    return this.jitterEnabled;
+  }
+
+  public nextJitter(): void {
+    if (!this.jitterEnabled) return;
+
+    // Get next jitter offset from pattern
+    const pattern = Camera.JITTER_2X2[this.jitterIndex];
+    this.jitterIndex = (this.jitterIndex + 1) % Camera.JITTER_2X2.length;
+
+    // Convert from [0,1] range to NDC offset
+    // Subtract 0.5 to center the pattern around origin
+    const offsetX = (pattern[0] - 0.5) / this.viewport.width;
+    const offsetY = (pattern[1] - 0.5) / this.viewport.height;
+
+    // Store jitter offsets (multiplied by 2 for projection matrix)
+    this.jitterOffsetX = 2.0 * offsetX;
+    this.jitterOffsetY = 2.0 * offsetY;
+
+    this.isDirty = true;
+    this.updateProjection();
+  }
+
+  public getJitterOffset(): [number, number] {
+    return [this.jitterOffsetX / 2.0, this.jitterOffsetY / 2.0];
   }
 }

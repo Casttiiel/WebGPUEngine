@@ -1,9 +1,9 @@
 ## Player
 
 1. SMAA t2x
-2. Error on directional light shadow mapping on plain surfaces
+2. Follow of mesh with camera wrong
 3. Cascade shadow mapping (3 cascade)
-4. Follow of mesh with camera wrong
+4. Error on directional light shadow mapping on plain surfaces
 5. AO Wrong (check another method without ghosting)
 6. Reflection probes + SSR (able to deactivate ssr)
 7. Revisit decals

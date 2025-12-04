@@ -21,6 +21,8 @@ import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldCompo
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
+import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
+import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -58,6 +60,9 @@ export class ModuleRender extends Module {
     // Initialize GPU Frustum Culling
     await RenderManager.getInstance().initialize();
 
+    // Inicializar VelocityBufferManager
+    await VelocityBufferManager.getInstance().initialize(Render.width, Render.height);
+
     return true;
   }
 
@@ -65,6 +70,9 @@ export class ModuleRender extends Module {
     this.deferred.create(Render.width, Render.height);
     this.distorsions.resize();
     this.presentationBindGroup = null;
+
+    // Redimensionar VelocityBufferManager
+    VelocityBufferManager.getInstance().resize(Render.width, Render.height);
 
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
     if (!mainCameraEntity) {
@@ -121,6 +129,20 @@ export class ModuleRender extends Module {
     const cameraComponent = mainCameraEntity.getComponent('camera') as CameraComponent;
     const camera = cameraComponent.getCamera();
 
+    // Enable camera jittering if temporal AA components are present
+    const needsJitter = mainCameraEntity.hasComponent('smaa_t2x');
+
+    if (needsJitter && !camera.isJitterEnabled()) {
+      camera.enableJitter();
+    } else if (!needsJitter && camera.isJitterEnabled()) {
+      camera.disableJitter();
+    }
+
+    // Advance to next jitter offset if jittering is active
+    if (needsJitter) {
+      camera.nextJitter();
+    }
+
     Render.getInstance().beginFrame();
 
     this.deferred.generateShadowMaps();
@@ -131,6 +153,15 @@ export class ModuleRender extends Module {
     this.mainCamera = camera;
 
     let result = this.deferred.render(mainCameraEntity);
+
+    // Enable velocity buffer if any component needs it
+    const velocityMgr = VelocityBufferManager.getInstance();
+    const needsVelocity = mainCameraEntity.hasComponent('smaa_t2x');
+    velocityMgr.setEnabled(needsVelocity);
+    // Generar velocity buffer si está activo
+    if (velocityMgr.isEnabled()) {
+      velocityMgr.generate(camera, this.deferred.getGBufferBindGroup());
+    }
 
     if (mainCameraEntity.hasComponent('bloom')) {
       const bloom = mainCameraEntity.getComponent('bloom') as BloomComponent;
@@ -175,6 +206,13 @@ export class ModuleRender extends Module {
 
     if (mainCameraEntity.hasComponent('smaa')) {
       const antialiasing = mainCameraEntity.getComponent('smaa') as SMAAComponent;
+      if (antialiasing.hasLoaded()) {
+        result = antialiasing.apply(result);
+      }
+    }
+
+    if (mainCameraEntity.hasComponent('smaa_t2x')) {
+      const antialiasing = mainCameraEntity.getComponent('smaa_t2x') as SMAAT2xComponent;
       if (antialiasing.hasLoaded()) {
         result = antialiasing.apply(result);
       }

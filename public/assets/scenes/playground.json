@@ -15,9 +15,6 @@
     "prefab": "directional_light.prefab"
   },
   {
-    "prefab": "water_decal.prefab"
-  },
-  {
     "children": [],
     "components": {
       "name": "Static Cube",

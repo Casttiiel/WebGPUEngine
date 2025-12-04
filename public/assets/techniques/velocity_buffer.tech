@@ -1,0 +1,7 @@
+{
+  "vs": "presentation.vs",
+  "fs": "velocity_buffer.fs",
+  "z": "disable_all",
+  "writesOn": "texture",
+  "uniforms": ["CameraUniforms", "GBufferUniforms", "VelocityBufferUniforms"]
+}

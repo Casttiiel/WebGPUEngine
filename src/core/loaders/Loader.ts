@@ -33,6 +33,7 @@ import { ParticleSystemComponent } from '../../components/render/ParticleSystemC
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
+import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -155,6 +156,8 @@ export class Loader {
         return new FXAAComponent();
       case 'smaa':
         return new SMAAComponent();
+      case 'smaa_t2x':
+        return new SMAAT2xComponent();
       case 'ambient_occlusion':
         return new AmbientOcclusionComponent();
       case 'point_light':

@@ -913,6 +913,20 @@ export class BindGroupFactory {
   }
 
   /**
+   * Creates velocity buffer uniforms bind group layout
+   * @group(1) @binding(0) var<uniform> previousViewProjection: mat4x4<f32>;
+   */
+  public static getVelocityBufferUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('velocity_buffer_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
+  /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
     switch (layout) {
@@ -968,6 +982,8 @@ export class BindGroupFactory {
         return this.getSMAABlendTexturesLayout();
       case PipelineBindGroupLayouts.SMAA_BLEND_PARAMS:
         return this.getSMAABlendParamsLayout();
+      case PipelineBindGroupLayouts.VELOCITY_BUFFER_UNIFORMS:
+        return this.getVelocityBufferUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

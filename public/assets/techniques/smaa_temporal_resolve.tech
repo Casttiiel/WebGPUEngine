@@ -1,0 +1,7 @@
+{
+  "vs": "presentation.vs",
+  "fs": "smaa_temporal_resolve.fs",
+  "z": "disable_all",
+  "writesOn": "texture",
+  "uniforms": ["FourTexture", "BufferUniform"]
+}
