@@ -34,7 +34,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "concrete.mat"
+            "material": "carbon.mat"
           }
         ]
       }
@@ -45,7 +45,7 @@
     "components": {
       "name": "Cube",
       "transform": {
-        "position": [0, 10, 4],
+        "position": [4, 2, -1.2],
         "rotation": [0, 0, 0],
         "scale": [1, 1, 1]
       },

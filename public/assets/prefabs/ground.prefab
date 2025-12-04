@@ -3,21 +3,18 @@
     "components": {
       "name": "Ground",
       "transform": {
-        "position": [0, 0, 0],
+        "position": [0, -0.5, 0],
         "rotation": [0, 0, 0],
         "scale": [50, 1, 50]
       },
-      "infinite_plane_collider": {
+      "box_collider": {
         "bodyType": "static",
-        "material": {
-          "friction": 0.5,
-          "restitution": 0.0
-        }
+        "size": [1, 1, 1]
       },
       "render": {
         "meshes": [
           {
-            "mesh": "plane.obj",
+            "mesh": "cube.obj",
             "material": "concrete.mat"
           }
         ]

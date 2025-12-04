@@ -1,19 +1,18 @@
 ## Player
 
-1. Box Collider/Ground collider good?
-2. Error on directional light shadow mapping on plain surfaces
-3. Skybox wrong
-4. AO Wrong
-5. Cascade shadow mapping (3 cascade)
-6. SMAA t2x
-7. Decals wrong
-8. Reflection probes
-9. Follow of mesh with camera wrong
-10. Loading Bar
-11. TAA
-12. Weird line on corners is irradiance because of normals
-13. Refactor of renderManager (WHAT)
-14. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+1. Skybox wrong
+2. AO Wrong
+3. Error on directional light shadow mapping on plain surfaces
+4. Cascade shadow mapping (3 cascade)
+5. SMAA t2x
+6. Decals wrong
+7. Reflection probes
+8. Follow of mesh with camera wrong
+9. Loading Bar
+10. TAA
+11. Weird line on corners is irradiance because of normals
+12. Refactor of renderManager (WHAT)
+13. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
 
 ---
 
