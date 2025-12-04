@@ -24,9 +24,11 @@ fn vs(in: VertexInput) -> VertexOutput {
     // Pass world position for linear depth calculation
     out.WorldPos = worldPos.xyz;
     
-    // Fill required fields (not used but needed for VertexOutput compatibility)
+    // Pass UVs for alpha testing in fragment shader
+    out.Uv = in.uv;
+    
+    // Fill unused fields (needed for VertexOutput compatibility)
     out.N = vec3<f32>(0.0);
-    out.Uv = vec2<f32>(0.0);
     out.T = vec4<f32>(0.0);
     
     return out;

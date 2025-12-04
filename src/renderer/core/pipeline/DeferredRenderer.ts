@@ -243,14 +243,14 @@ export class DeferredRenderer {
     this.aoResult = this.renderAO(camera);
     this.renderAccLight();
 
-    /*this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+    this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     this.ssr.render(this.rtAccLight.getView(), this.aoResult, this.gBufferBindGroup);
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
       this.froxelVolumetrics.updateFroxelData();
       this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
-    }*/
+    }
 
     const view = this.rtAccLight.getView();
     if (!view) {

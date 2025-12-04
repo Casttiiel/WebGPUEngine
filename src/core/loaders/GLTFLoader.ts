@@ -212,7 +212,7 @@ export class GLTFLoader {
         z:
           materialData.getAlphaMode() === 'BLEND'
             ? DepthModes.TEST_BUT_NO_WRITE
-            : DepthModes.DEFAULT,
+            : DepthModes.TEST_EQUAL,
         blend:
           materialData.getAlphaMode() === 'BLEND'
             ? BlendModes.ADDITIVE_BY_SRC_ALPHA
