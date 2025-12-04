@@ -103,7 +103,7 @@ export class ModuleInput extends Module {
       event.preventDefault();
       event.stopPropagation();
     }
-    
+
     const key = event.code.toLowerCase() as KeyCode;
     this.keys.set(key, true);
   }
@@ -114,7 +114,7 @@ export class ModuleInput extends Module {
       event.preventDefault();
       event.stopPropagation();
     }
-    
+
     const key = event.code.toLowerCase() as KeyCode;
     this.keys.set(key, false);
   }

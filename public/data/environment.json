@@ -1,6 +1,6 @@
 {
   "ambient": {
-    "globalFactor": 5.0,
+    "globalFactor": 1.0,
     "diffuseFactor": 1.0,
     "reflectionFactor": 0.8,
     "irradianceCubemap": "irradiance_cubemap.png"

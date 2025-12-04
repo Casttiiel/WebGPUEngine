@@ -4,6 +4,7 @@
     "environment_manager",
     "physics",
     "entities",
+    "boot",
     "input",
     "render",
     "sound"

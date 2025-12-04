@@ -6,6 +6,9 @@
     "prefab": "player_character.prefab"
   },
   {
+    "prefab": "debug_camera.prefab"
+  },
+  {
     "prefab": "ground.prefab"
   },
   {
@@ -31,7 +34,7 @@
         "meshes": [
           {
             "mesh": "cube.obj",
-            "material": "carbon_triplanar.mat"
+            "material": "concrete.mat"
           }
         ]
       }

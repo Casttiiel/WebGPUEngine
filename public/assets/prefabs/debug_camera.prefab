@@ -1,13 +1,13 @@
 {
     "components": {
-      "name": "NextCamera",
+      "name": "DebugCamera",
       "camera": {
         "controllable": false,
-        "fov": 30,
+        "fov": 60,
         "position": [
           0,
-          10,
-          -7
+          3,
+          0
         ],
         "target":[
           0,2,1

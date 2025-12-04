@@ -56,6 +56,7 @@ export class CharacterControllerComponent extends Component {
   private originalRadius: number = 0.0; // Radio original del collider
 
   // Estado
+  private isActive: boolean = true;
   private isGrounded: boolean = false;
   private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
   private isSliding: boolean = false;
@@ -128,6 +129,7 @@ export class CharacterControllerComponent extends Component {
   }
 
   public update(deltaTime: number): void {
+    if (!this.isActive) return;
     this.findCamera();
 
     if (!this.capsuleCollider || !this.camera) return;
@@ -573,5 +575,9 @@ export class CharacterControllerComponent extends Component {
 
   public dispose(): void {
     // Cleanup if needed
+  }
+
+  public setActive(active: boolean): void {
+    this.isActive = active;
   }
 }

@@ -15,7 +15,7 @@
     "prefab": "player_character.prefab"
   },
   {
-    "prefab": "next_camera.prefab"
+    "prefab": "debug_camera.prefab"
   },
   {
     "prefab": "water_decal.prefab"

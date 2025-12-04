@@ -3,6 +3,7 @@ import { Component } from '../../core/ecs/Component';
 import { TransformComponent } from '../core/TransformComponent';
 import { CameraComponent } from '../render/CameraComponent';
 import { Engine } from '../../core/engine/Engine';
+import { Entity } from '../../core/ecs/Entity';
 
 export interface FPSCameraComponentData {
   eyeOffset?: number[]; // [x, y, z] - Offset de los ojos relativo al owner (ej: [0, 1.6, 0])
@@ -30,7 +31,8 @@ export class FPSCameraControllerComponent extends Component {
   private yaw: number = 0; // Rotación horizontal (izquierda/derecha)
 
   // Referencias
-  private cameraEntity: any = null;
+  private cameraEntity: Entity | null = null;
+  private isActive: boolean = true;
 
   constructor() {
     super();
@@ -49,6 +51,8 @@ export class FPSCameraControllerComponent extends Component {
   }
 
   public update(dt: number): void {
+    if (!this.isActive) return;
+
     // Buscar cámara hija (lazy search)
     if (!this.cameraEntity) {
       const children = this.getOwner().getChildren();
@@ -213,5 +217,9 @@ export class FPSCameraControllerComponent extends Component {
 
   public dispose(): void {
     // Limpieza si es necesario
+  }
+
+  public setActive(active: boolean): void {
+    this.isActive = active;
   }
 }

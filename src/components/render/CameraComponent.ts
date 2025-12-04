@@ -10,7 +10,7 @@ import { vec3 } from 'gl-matrix';
 export class CameraComponent extends Component {
   protected camera: Camera;
   private isControllable: boolean = false;
-  private rotationSpeed: number = 0.025;
+  private rotationSpeed: number = 0.015;
 
   // ✅ Reusable temp vectors to avoid allocations in update()
   private tempMovement: vec3 = vec3.create();
@@ -71,15 +71,6 @@ export class CameraComponent extends Component {
       const multiplier = input.isKeyPressed(KeyCode.SHIFT) ? 10.0 : 1.0;
       const moveSpeed = 4.0 * multiplier * dt;
 
-      if (input.isKeyJustPressed(KeyCode.SPACE)) {
-        /*Engine.getCameraMixer().blendCamera(
-          Engine.getEntities().getEntityByName('NextCamera')!,
-          10.0,
-          new LinearInterpolator(),
-        );*/
-      }
-
-      // ✅ Zero-allocation camera movement using reusable vectors
       // Movimiento de la cámara
       if (input.isKeyPressed(KeyCode.A)) {
         this.tempInput[0] = moveSpeed;
@@ -169,5 +160,9 @@ export class CameraComponent extends Component {
 
   public setCamera(camera: Camera): void {
     this.camera = camera;
+  }
+
+  public setActive(active: boolean): void {
+    this.isControllable = active;
   }
 }
