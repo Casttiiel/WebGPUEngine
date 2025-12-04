@@ -19,6 +19,7 @@ import { DirectionalLightComponent } from '../../../components/render/Directiona
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
+import { Camera } from '../../../core/math/Camera';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -210,11 +211,12 @@ export class DeferredRenderer {
     this.isLoaded = true;
   }
 
-  public generateShadowMaps(): void {
+  public generateShadowMaps(camera: Camera): void {
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
       const directionalLightComponent = comp as DirectionalLightComponent;
+      directionalLightComponent.updateCascades(camera);
       directionalLightComponent.generateShadowMap();
     }
 

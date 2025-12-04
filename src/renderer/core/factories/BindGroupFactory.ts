@@ -712,6 +712,51 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * Cascaded Shadow Mapping (CSM) layout with 3 shadow maps
+   */
+  public static getDirectionalLightCSMUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('directional_light_csm_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' }, // Light data + 3 lightViewProj matrices + cascadeSplits
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        }, // Shadow map cascade 0
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        }, // Shadow map cascade 1
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        }, // Shadow map cascade 2
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'comparison' }, // Shared comparison sampler
+      },
+    ]);
+  }
+
   public static getTemporalAccumulationUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('temporal accumulation uniforms layout', [
       {
@@ -962,6 +1007,8 @@ export class BindGroupFactory {
         return this.getAOUniformsLayout();
       case PipelineBindGroupLayouts.DIRECTIONAL_LIGHT_UNIFORMS:
         return this.getDirectionalLightUniformsLayout();
+      case PipelineBindGroupLayouts.DIRECTIONAL_LIGHT_CSM_UNIFORMS:
+        return this.getDirectionalLightCSMUniformsLayout();
       case PipelineBindGroupLayouts.TEMPORAL_ACCUMULATION_UNIFORMS:
         return this.getTemporalAccumulationUniformsLayout();
       case PipelineBindGroupLayouts.PARTICLE_UNIFORMS:

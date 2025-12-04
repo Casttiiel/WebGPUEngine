@@ -145,7 +145,7 @@ export class ModuleRender extends Module {
 
     Render.getInstance().beginFrame();
 
-    this.deferred.generateShadowMaps();
+    this.deferred.generateShadowMaps(camera);
     RenderManager.getInstance().performCulling(camera);
 
     RenderManager.getInstance().setCamera(camera);
