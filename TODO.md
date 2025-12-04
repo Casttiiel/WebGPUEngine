@@ -1,15 +1,15 @@
 ## Player
 
-1. SMAA t2x
-2. Follow of mesh with camera wrong
-3. Cascade shadow mapping (3 cascade)
-4. Error on directional light shadow mapping on plain surfaces
-5. AO Wrong (check another method without ghosting)
-6. Reflection probes + SSR (able to deactivate ssr)
+1. Denoise GTAO or Alchemy AO
+2. Reflection probes + SSR (able to deactivate ssr)
+3. Follow of mesh with camera wrong
+4. Cascade shadow mapping (3 cascade)
+5. Error on directional light shadow mapping on plain surfaces
+6. Develop game
 7. Revisit decals
-8. Loading Bar
-9. Weird line on corners is irradiance because of normals
-10. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+8. Weird line on corners is irradiance because of normals
+9. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+10. Loading Bar
 
 ---
 
@@ -33,6 +33,5 @@
 
 ---
 
-Weird blur
 Control Mapping
 Sunset overdrive Brushstrokes
