@@ -3,8 +3,8 @@
 1. Denoise GTAO or Alchemy AO
 2. Reflection probes + SSR (able to deactivate ssr)
 3. Follow of mesh with camera wrong
-4. Cascade shadow mapping (3 cascade)
-5. Error on directional light shadow mapping on plain surfaces
+4. Directional light with shadows doesnot apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+5. Revisit shadows
 6. Develop game
 7. Revisit decals
 8. Weird line on corners is irradiance because of normals
