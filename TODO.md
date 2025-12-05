@@ -1,15 +1,14 @@
 ## Player
 
-1. Denoise GTAO or Alchemy AO
-2. Reflection probes + SSR (able to deactivate ssr)
-3. Follow of mesh with camera wrong
-4. Directional light with shadows doesnot apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
-5. Revisit shadows
-6. Develop game
-7. Revisit decals
-8. Weird line on corners is irradiance because of normals
-9. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
-10. Loading Bar
+1. Reflection probes + SSR (able to deactivate ssr)
+2. Follow of mesh with camera wrong
+3. Directional light with shadows doesnot apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+4. Revisit shadows
+5. Develop game
+6. Revisit decals
+7. Weird line on corners is irradiance because of normals
+8. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+9. Loading Bar
 
 ---
 

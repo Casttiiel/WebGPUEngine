@@ -12,8 +12,7 @@
     "box_collider",
     "capsule_collider",
     "transform",
-    "camera",
-    "ambient_occlusion"
+    "camera"
   ],
   "render_debug": []
 }

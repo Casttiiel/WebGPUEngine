@@ -57,8 +57,7 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     let ix = i32(pos.x);
     let iy = i32(pos.y);
     let pattern = (((ix + iy) & 3) << 2) + (ix & 3);
-    let jitter = (hash12(uv * ssaoParams.noiseScale) - 0.5) * (PI / 16.0);
-    let dirAngle = (PI / 16.0) * f32(pattern) + ssaoParams.angleOffset + jitter;
+    let dirAngle = (PI / 16.0) * f32(pattern) + ssaoParams.angleOffset;
     let aoDir = dirMult * vec2<f32>(sin(dirAngle), cos(dirAngle));
 
     let toDirUnproj = getViewPosition(uv + aoDir);

@@ -18,19 +18,7 @@
     "prefab": "debug_camera.prefab"
   },
   {
-    "prefab": "water_decal.prefab"
-  },
-  {
-    "prefab": "particles.prefab"
-  },
-  {
     "prefab": "ground.prefab"
-  },
-  {
-    "prefab": "spot_light_shadows.prefab"
-  },
-  {
-    "prefab": "directional_light.prefab"
   },
   {
     "prefab": "cube_emissive.prefab",

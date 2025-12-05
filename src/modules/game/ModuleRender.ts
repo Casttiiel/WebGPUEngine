@@ -211,13 +211,6 @@ export class ModuleRender extends Module {
       }
     }
 
-    if (mainCameraEntity.hasComponent('smaa_t2x')) {
-      const antialiasing = mainCameraEntity.getComponent('smaa_t2x') as SMAAT2xComponent;
-      if (antialiasing.hasLoaded()) {
-        result = antialiasing.apply(result);
-      }
-    }
-
     this.presentResult(result);
 
     Render.getInstance().endFrame();
