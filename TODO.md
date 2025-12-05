@@ -2,7 +2,7 @@
 
 1. Reflection probes + SSR (able to deactivate ssr)
 2. Follow of mesh with camera wrong
-3. Directional light with shadows doesnot apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+3. Directional light with shadows does not apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
 4. Revisit shadows
 5. Develop game
 6. Revisit decals

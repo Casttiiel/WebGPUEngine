@@ -1,8 +1,11 @@
+import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
+import { Engine } from '../../core/engine/Engine';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Cubemap } from '../../renderer/resources/Cubemap';
 import { HDRTexture } from '../../renderer/resources/HDRTexture';
 import { AmbientEnvironmentData } from '../../types/AmbientEnvironmentData.type';
 import { Interpolator } from '../../types/Interpolator.interface';
+import { KeyCode } from '../../types/KeyCode.enum';
 import { Module } from '../core/Module';
 
 interface EnvironmentBlendState {
@@ -65,6 +68,16 @@ export class ModuleEnvironmentManager extends Module {
 
       if (this.blendState.blendedWeight >= 1.0) {
         this.blendState = null;
+      }
+    }
+
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F5)) {
+      for (const comp of Engine.getEntities()
+        .getObjectManagerByName('reflection_probe')
+        ?.getList() ?? []) {
+        const probe = comp as ReflectionProbeComponent;
+        const owner = probe.getOwner();
+        console.log(owner.getName());
       }
     }
   }

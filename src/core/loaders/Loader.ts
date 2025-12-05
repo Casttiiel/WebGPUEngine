@@ -34,6 +34,7 @@ import { DirectionalLightComponent } from '../../components/render/DirectionalLi
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
+import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -63,22 +64,24 @@ export class Loader {
         entityChildrens = entityChildrens.concat(prefabJson.children);
       }
 
+      if (json.components) {
+        if (json.components.name && prefabJson.components.name !== undefined) {
+          json.components.name += prefabJson.components.name;
+          delete prefabJson.components.name;
+        }
+        if (json.components.transform && prefabJson.components.transform) {
+          json.components.transform = this.combineTransforms(
+            json.components.transform,
+            prefabJson.components.transform,
+          );
+          delete prefabJson.components.transform;
+        }
+      }
+
       const mergedComponents = {
         ...json.components,
         ...prefabJson.components,
       };
-
-      if (json.components) {
-        if (json.components.name && prefabJson.components.name !== undefined) {
-          mergedComponents.name = prefabJson.components.name;
-        }
-        if (json.components.transform && prefabJson.components.transform) {
-          mergedComponents.transform = this.combineTransforms(
-            json.components.transform,
-            prefabJson.components.transform,
-          );
-        }
-      }
 
       json.components = mergedComponents;
     }
@@ -158,6 +161,8 @@ export class Loader {
         return new SMAAComponent();
       case 'smaa_t2x':
         return new SMAAT2xComponent();
+      case 'reflection_probe':
+        return new ReflectionProbeComponent();
       case 'ambient_occlusion':
         return new AmbientOcclusionComponent();
       case 'point_light':

@@ -1,0 +1,16 @@
+{
+    "children": [],
+    "components": {
+      "name": "Reflection Probe",
+      "transform": {},
+      "reflection_probe": {},
+      "render": {
+        "meshes": [
+          {
+            "mesh": "sphere.obj",
+            "material": "textured.mat"
+          }
+        ]
+      }
+    }
+  }
