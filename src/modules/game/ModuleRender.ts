@@ -22,11 +22,11 @@ import { MotionBlurComponent } from '../../components/render/MotionBlurComponent
 import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
-import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private distorsions!: Distorsions;
+  public pauseRendering: boolean = false; // Flag para pausar rendering durante probe capture
 
   //Presentation data
   private presentationTechnique!: Technique;
@@ -122,6 +122,11 @@ export class ModuleRender extends Module {
   }
 
   public generateFrame(): void {
+    // ⏸️ Salir temprano si el rendering está pausado (e.g., capturando probes)
+    if (this.pauseRendering) {
+      return;
+    }
+
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
     if (!mainCameraEntity) {
       return;
@@ -410,5 +415,27 @@ export class ModuleRender extends Module {
 
   public getMainCamera(): Camera {
     return this.mainCamera;
+  }
+
+  /**
+   * Temporalmente reemplaza la cámara principal (para reflection probes)
+   * IMPORTANTE: Llamar restoreMainCamera() después de usar
+   */
+  private originalMainCamera: Camera | null = null;
+  public setTemporaryMainCamera(camera: Camera): void {
+    if (!this.originalMainCamera) {
+      this.originalMainCamera = this.mainCamera;
+    }
+    this.mainCamera = camera;
+  }
+
+  /**
+   * Restaura la cámara principal original
+   */
+  public restoreMainCamera(): void {
+    if (this.originalMainCamera) {
+      this.mainCamera = this.originalMainCamera;
+      this.originalMainCamera = null;
+    }
   }
 }

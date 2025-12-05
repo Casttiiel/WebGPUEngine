@@ -74,6 +74,7 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().hdrTexture,
+      GPUTextureUsage.COPY_SRC, // TODO:DANI Necesario para copiar en reflection probes
     );
 
     if (!this.rtCopyAlbedos) {
@@ -224,13 +225,20 @@ export class DeferredRenderer {
     }
   }
 
-  public render(camera: Entity): GPUTextureView {
+  /**
+   * Renderiza la escena completa con el pipeline de deferred rendering
+   * @param camera - Entidad con CameraComponent
+   * @param skipPostProcessing - Si true, devuelve después de iluminación (sin SSR, volumetrics)
+   * @returns Vista de textura con el resultado final
+   */
+  public render(camera: Entity, skipPostProcessing: boolean = false): GPUTextureView {
     // 1. Depth prepass - generates depth + linear depth
     // Use technique override to force all SOLIDS to use depth_prepass.tech (and instanced variant)
     RenderManager.getInstance().setTechniqueOverride(
       this.depthPrepassTechnique,
       this.depthPrepassInstancedTechnique,
     );
+
     this.renderPassManager.executePass('depth_prepass');
     RenderManager.getInstance().clearTechniqueOverride();
 
@@ -245,6 +253,16 @@ export class DeferredRenderer {
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
+    // Si es para reflection probes, devolver aquí (sin SSR ni volumetrics)
+    if (skipPostProcessing) {
+      const view = this.rtAccLight.getView();
+      if (!view) {
+        throw new Error('Failed to get final render target view');
+      }
+      return view;
+    }
+
+    // Post-procesado (solo para renderizado normal)
     this.ssr.render(this.rtAccLight.getView(), this.aoResult, this.gBufferBindGroup);
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
@@ -365,5 +383,9 @@ export class DeferredRenderer {
 
   public getGBufferBindGroup(): GPUBindGroup {
     return this.gBufferBindGroup;
+  }
+
+  public getAccLightRenderTarget(): RenderTarget {
+    return this.rtAccLight;
   }
 }

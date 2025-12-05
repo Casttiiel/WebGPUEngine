@@ -215,6 +215,19 @@ export class Render {
     return { width: Render.renderWidth, height: Render.renderHeight };
   }
 
+  // Métodos para sobrescribir temporalmente las dimensiones (útil para reflection probes)
+  public static setTemporaryRenderSize(width: number, height: number): void {
+    Render.renderWidth = width;
+    Render.renderHeight = height;
+  }
+
+  public static restoreRenderSize(): void {
+    const qualitySettings = QualitySettings.getInstance();
+    const renderResolution = qualitySettings.getSettings().renderResolution;
+    Render.renderWidth = Math.floor(Render.canvasWidth * renderResolution);
+    Render.renderHeight = Math.floor(Render.canvasHeight * renderResolution);
+  }
+
   public getDevice(): GPUDevice {
     return this.device;
   }

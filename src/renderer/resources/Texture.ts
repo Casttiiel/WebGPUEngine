@@ -138,6 +138,10 @@ export class Texture extends GPUResource {
     return this.textureView;
   }
 
+  public getTexture(): GPUTexture | undefined {
+    return this.texture;
+  }
+
   public getSampler(): GPUSampler | undefined {
     return this.sampler;
   }

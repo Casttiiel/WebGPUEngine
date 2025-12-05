@@ -1,16 +1,41 @@
 ## Player
 
-1. Reflection probes + SSR (able to deactivate ssr)
-2. Follow of mesh with camera wrong
-3. Directional light with shadows does not apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
-4. Revisit shadows
-5. Develop game
-6. Revisit decals
-7. Weird line on corners is irradiance because of normals
-8. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
-9. Loading Bar
+1. Reflection probes
+   Activation/Switch
+2. SSR (able to deactivate ssr)
+3. Follow of mesh with camera wrong
+4. Develop game
+5. Directional light with shadows does not apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+6. Revisit shadows
+7. Revisit decals
+8. Weird line on corners is irradiance because of normals
+9. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+10. Loading Bar
 
 ---
+
+Reset de skill con matar / Tres skills o dash por reset
+Ataque/Empuje
+Q Lee sin
+Boost de movility
+SideStep
+Slide + Attack -> To Air enemy
+Puñetazo/dash hacia adelante con empuje
+Camille E
+Katarina
+Talon Q + MOvement
+Dash to enemy (Yasuo)
+Q of Irelia (chain)
+W Sivir (chain between nearby enemies)
+E+Q Jarvan
+
+---
+
+1. Salto / Doble
+2. Deslizarse
+3. Gancho (Balanceo)
+4. Melee
+5. Wall jump
 
 6. Wall Jump
 7. Wall run
