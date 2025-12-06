@@ -1,17 +1,16 @@
 ## Player
 
-1. Jumping on wall wrong (is grounded)
+1. HDR Environment map and irradiance maps
 2. SSR (able to deactivate ssr)
-3. HDR Environment map and irradiance mapsd
-4. Follow of mesh with camera wrong
-5. Design game
-6. Froxel Scattering
-7. DOF adaptative
-8. Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
-9. Revisit shadows quality
-10. Shadows on Light probes
-11. Revisit decals
-12. Loading Bar
+3. Follow of mesh with camera wrong
+4. Design game
+5. Froxel Scattering
+6. DOF adaptative
+7. Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+8. Revisit shadows quality
+9. Shadows on Light probes
+10. Revisit decals
+11. Loading Bar
 
 ---
 

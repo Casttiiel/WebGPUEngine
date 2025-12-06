@@ -325,7 +325,7 @@ export class CharacterControllerComponent extends Component {
       QueryFilterFlags.EXCLUDE_SENSORS,
     );
 
-    this.isGrounded = this.isGrounded = this.capsuleCollider.raycastGrounded(0.1); //this.characterController.computedGrounded();
+    this.isGrounded = this.capsuleCollider.raycastGrounded(0.1);
     let correctedMovement = this.characterController.computedMovement();
 
     // Aplicar movimiento real
