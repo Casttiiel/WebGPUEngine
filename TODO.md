@@ -1,13 +1,13 @@
 ## Player
 
-1. Follow of mesh with camera wrong
+1.
 2. Design game
-3. Froxel Scattering
-4. Stick Particles to entity
-5. Particles world position
-6. DOF adaptative
-7. Directional Lights follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
-8. Revisit shadows quality
+3. Stick Particles to entity
+4. Particles world/local position
+5. Directional Lights follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+6. Revisit shadows quality
+7. Froxel Scattering
+8. DOF adaptative
 9. Shadows on Light probes
 10. Revisit decals
 11. Loading Bar

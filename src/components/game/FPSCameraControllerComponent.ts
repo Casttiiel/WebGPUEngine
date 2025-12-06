@@ -4,6 +4,7 @@ import { TransformComponent } from '../core/TransformComponent';
 import { CameraComponent } from '../render/CameraComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
+import { HeadBobComponent } from './HeadBobComponent';
 
 export interface FPSCameraComponentData {
   eyeOffset?: number[]; // [x, y, z] - Offset de los ojos relativo al owner (ej: [0, 1.6, 0])
@@ -111,7 +112,10 @@ export class FPSCameraControllerComponent extends Component {
     // Aplicar head bob si el componente está presente
     const headBobComponent = this.getOwner().getComponent('head_bob');
     if (headBobComponent) {
-      const bobOffsetWorld = (headBobComponent as any).getHeadBobOffsetWorld(right, up);
+      const bobOffsetWorld = (headBobComponent as HeadBobComponent).getHeadBobOffsetWorld(
+        right,
+        up,
+      );
       vec3.add(eyePos, eyePos, bobOffsetWorld);
     }
 

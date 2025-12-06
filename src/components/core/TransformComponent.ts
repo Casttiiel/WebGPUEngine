@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { vec3 } from 'gl-matrix';
 import { Transform } from '../../core/math/Transform';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
