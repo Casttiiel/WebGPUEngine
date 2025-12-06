@@ -41,7 +41,7 @@ export class ParticleSystemComponent extends Component {
 
   // Spawn timing
   private spawnTimer: number = 0;
-  private spawnInterval: number = 1.5; // Spawn cada 0.5 segundos
+  private spawnInterval: number = 0.5; // Spawn cada 0.5 segundos
   private particlesPerSpawn: number = 20; // 5 partículas por spawn
 
   // OPTIMIZACIÓN: Reuse buffers CPU para evitar allocations

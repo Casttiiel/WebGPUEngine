@@ -1,16 +1,14 @@
 ## Player
 
-1.
+1. Particles world/local position
 2. Design game
-3. Stick Particles to entity
-4. Particles world/local position
-5. Directional Lights follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
-6. Revisit shadows quality
-7. Froxel Scattering
-8. DOF adaptative
-9. Shadows on Light probes
-10. Revisit decals
-11. Loading Bar
+3. Directional Lights follow player (If snap to camera frustum, what about shadows from outside of frustum)
+4. Revisit shadows quality
+5. Cascade shadow mapping (3 cascade)
+6. Froxel Scattering
+7. DOF adaptative
+8. Shadows on Light probes
+9. Loading Bar
 
 ---
 
