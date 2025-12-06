@@ -5,7 +5,7 @@ import { CameraComponent } from '../render/CameraComponent';
 import { Engine } from '../../core/engine/Engine';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
-import RAPIER from '@dimforge/rapier3d';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 
 const gravity = -9.81; // m/s²
 /**
@@ -322,6 +322,7 @@ export class CharacterControllerComponent extends Component {
     this.characterController.computeColliderMovement(
       this.capsuleCollider.getCollider(),
       new RAPIER.Vector3(movement[0], movement[1], movement[2]),
+      QueryFilterFlags.EXCLUDE_SENSORS,
     );
 
     this.isGrounded = this.isGrounded = this.capsuleCollider.raycastGrounded(0.1); //this.characterController.computedGrounded();

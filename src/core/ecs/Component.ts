@@ -12,6 +12,10 @@ export abstract class Component {
   // Base method for debug UI that components can override
   public renderInMenu(): void {}
 
+  // Called after the component is attached to an entity and loaded
+  // Override this to set up dependencies on other components
+  public async onAttach(): Promise<void> {}
+
   public setOwner(owner: Entity): void {
     this.owner = owner;
   }

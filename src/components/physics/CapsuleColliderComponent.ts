@@ -1,5 +1,5 @@
 import { vec3 } from 'gl-matrix';
-import RAPIER from '@dimforge/rapier3d';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { ColliderComponent, ColliderData, ColliderType, RigidBodyType } from './ColliderComponent';
 import { Engine } from '../../core/engine/Engine';
 
@@ -114,7 +114,7 @@ export class CapsuleColliderComponent extends ColliderComponent {
       ray,
       castDistance,
       true, // solid
-      undefined, // sin filtro de flags (permite todos los tipos)
+      QueryFilterFlags.EXCLUDE_SENSORS,
       undefined, // sin filtro de grupos
       this.collider, // Excluir solo el propio collider
     );

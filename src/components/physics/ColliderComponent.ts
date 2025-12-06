@@ -81,6 +81,10 @@ export class ColliderComponent extends Component {
   protected isSensor: boolean = false;
   protected enableCCD: boolean = false;
 
+  // Callbacks para triggers (sensores)
+  private _onTriggerEnter?: (otherEntityId: number) => void;
+  private _onTriggerExit?: (otherEntityId: number) => void;
+
   constructor() {
     super();
   }
@@ -428,5 +432,39 @@ export class ColliderComponent extends Component {
     if (!this.rigidBody || this.bodyType !== RigidBodyType.DYNAMIC) return;
 
     this.rigidBody.wakeUp();
+  }
+
+  /**
+   * Registra callback para cuando otro collider ENTRA en este trigger
+   * Solo funciona si isSensor = true
+   */
+  public onTriggerEnter(callback: (otherEntityId: number) => void): void {
+    this._onTriggerEnter = callback;
+  }
+
+  /**
+   * Registra callback para cuando otro collider SALE de este trigger
+   * Solo funciona si isSensor = true
+   */
+  public onTriggerExit(callback: (otherEntityId: number) => void): void {
+    this._onTriggerExit = callback;
+  }
+
+  /**
+   * Método interno llamado por ModulePhysics cuando se detecta entrada al trigger
+   */
+  public _notifyTriggerEnter(otherEntityId: number): void {
+    if (this._onTriggerEnter) {
+      this._onTriggerEnter(otherEntityId);
+    }
+  }
+
+  /**
+   * Método interno llamado por ModulePhysics cuando se detecta salida del trigger
+   */
+  public _notifyTriggerExit(otherEntityId: number): void {
+    if (this._onTriggerExit) {
+      this._onTriggerExit(otherEntityId);
+    }
   }
 }

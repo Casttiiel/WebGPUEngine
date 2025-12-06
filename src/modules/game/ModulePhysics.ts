@@ -1,6 +1,7 @@
 import { Module } from '../core/Module';
 import RAPIER from '@dimforge/rapier3d';
 import { vec3 } from 'gl-matrix';
+import { Engine } from '../../core/engine/Engine';
 
 /**
  * ModulePhysics - Sistema de físicas usando Rapier
@@ -20,6 +21,9 @@ export class ModulePhysics extends Module {
   // Mapeo de entity IDs a rigid bodies
   private bodies: Map<number, RAPIER.RigidBody> = new Map();
   private colliders: Map<number, RAPIER.Collider[]> = new Map();
+
+  // Mapeo de collider handles a entity IDs (para eventos de colisión)
+  private colliderHandleToEntityId: Map<number, number> = new Map();
 
   constructor(name: string) {
     super(name);
@@ -143,7 +147,10 @@ export class ModulePhysics extends Module {
     radius: number,
     isSensor: boolean = false,
   ): RAPIER.Collider {
-    const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius).setSensor(isSensor); // Sensor = trigger (no física, solo detección)
+    const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius).setSensor(isSensor);
+
+    colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    colliderDesc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
 
     const collider = this.world.createCollider(colliderDesc, body);
 
@@ -152,6 +159,9 @@ export class ModulePhysics extends Module {
       this.colliders.set(entityId, []);
     }
     this.colliders.get(entityId)!.push(collider);
+
+    // Registrar handle para eventos
+    this.colliderHandleToEntityId.set(collider.handle, entityId);
 
     return collider;
   }
@@ -178,6 +188,9 @@ export class ModulePhysics extends Module {
     }
     this.colliders.get(entityId)!.push(collider);
 
+    // Registrar handle para eventos
+    this.colliderHandleToEntityId.set(collider.handle, entityId);
+
     return collider;
   }
 
@@ -192,12 +205,18 @@ export class ModulePhysics extends Module {
   ): RAPIER.Collider {
     const colliderDesc = RAPIER.ColliderDesc.ball(radius).setSensor(isSensor);
 
+    colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    colliderDesc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
+
     const collider = this.world.createCollider(colliderDesc, body);
 
     if (!this.colliders.has(entityId)) {
       this.colliders.set(entityId, []);
     }
     this.colliders.get(entityId)!.push(collider);
+
+    // Registrar handle para eventos
+    this.colliderHandleToEntityId.set(collider.handle, entityId);
 
     return collider;
   }
@@ -267,19 +286,47 @@ export class ModulePhysics extends Module {
    * Procesa eventos de colisión de la cola de eventos
    */
   private processCollisionEvents(): void {
-    this.eventQueue.drainCollisionEvents((_handle1, _handle2, started) => {
-      // handle1 y handle2 son los colliders que colisionaron
-      // started = true si es el inicio de la colisión, false si es el fin
+    this.eventQueue.drainCollisionEvents((handle1, handle2, started) => {
+      const entityId1 = this.colliderHandleToEntityId.get(handle1);
+      const entityId2 = this.colliderHandleToEntityId.get(handle2);
 
-      // TODO: Implementar sistema de eventos para notificar a componentes
-      // Por ejemplo: disparar evento onCollisionEnter/onCollisionExit
+      if (entityId1 === undefined || entityId2 === undefined) {
+        return;
+      }
 
+      // Obtener colliders de Rapier
+      const collider1 = this.world.getCollider(handle1);
+      const collider2 = this.world.getCollider(handle2);
+
+      if (!collider1 || !collider2) {
+        return;
+      }
+
+      // Verificar si alguno es sensor (trigger)
+      const isSensor1 = collider1.isSensor();
+      const isSensor2 = collider2.isSensor();
+
+      if (!isSensor1 && !isSensor2) {
+        return; // Colisión normal, no es trigger
+      }
+
+      // Notificar a los componentes ColliderComponent
       if (started) {
-        // Colisión comenzó
-        // console.log('Collision started:', handle1, handle2);
+        // Trigger ENTER
+        if (isSensor1) {
+          this.notifyTriggerEnter(entityId1, entityId2);
+        }
+        if (isSensor2) {
+          this.notifyTriggerEnter(entityId2, entityId1);
+        }
       } else {
-        // Colisión terminó
-        // console.log('Collision ended:', handle1, handle2);
+        // Trigger EXIT
+        if (isSensor1) {
+          this.notifyTriggerExit(entityId1, entityId2);
+        }
+        if (isSensor2) {
+          this.notifyTriggerExit(entityId2, entityId1);
+        }
       }
     });
 
@@ -288,6 +335,68 @@ export class ModulePhysics extends Module {
       // event contiene información sobre fuerzas de contacto
       // Útil para detectar impactos fuertes, etc.
     });
+  }
+
+  /**
+   * Notifica a un ColliderComponent que otro collider entró en su trigger
+   */
+  private notifyTriggerEnter(triggerEntityId: number, otherEntityId: number): void {
+    const entity = this.getEntityById(triggerEntityId);
+    if (!entity) return;
+
+    // Buscar componentes collider (puede tener box_collider, capsule_collider, etc.)
+    const colliderComponents = [
+      entity.getComponent('box_collider'),
+      entity.getComponent('capsule_collider'),
+      entity.getComponent('sphere_collider'),
+      entity.getComponent('mesh_collider'),
+    ].filter((c) => c !== null);
+
+    for (const collider of colliderComponents) {
+      if (collider && typeof (collider as any)._notifyTriggerEnter === 'function') {
+        (collider as any)._notifyTriggerEnter(otherEntityId);
+      }
+    }
+  }
+
+  /**
+   * Notifica a un ColliderComponent que otro collider salió de su trigger
+   */
+  private notifyTriggerExit(triggerEntityId: number, otherEntityId: number): void {
+    const entity = this.getEntityById(triggerEntityId);
+    if (!entity) return;
+
+    // Buscar componentes collider
+    const colliderComponents = [
+      entity.getComponent('box_collider'),
+      entity.getComponent('capsule_collider'),
+      entity.getComponent('sphere_collider'),
+      entity.getComponent('mesh_collider'),
+    ].filter((c) => c !== null);
+
+    for (const collider of colliderComponents) {
+      if (collider && typeof (collider as any)._notifyTriggerExit === 'function') {
+        (collider as any)._notifyTriggerExit(otherEntityId);
+      }
+    }
+  }
+
+  /**
+   * Obtiene una entidad por su ID (helper para eventos)
+   */
+  private getEntityById(entityId: number): any {
+    // Importar Engine solo cuando sea necesario para evitar circular dependencies
+    const entities = Engine.getEntities();
+
+    // Buscar la entidad en todas las entidades registradas
+    const allEntities = entities.getAllEntities();
+    for (const entity of allEntities) {
+      if (entity.id === entityId) {
+        return entity;
+      }
+    }
+
+    return null;
   }
 
   /**

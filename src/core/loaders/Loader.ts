@@ -134,12 +134,20 @@ export class Loader {
     }
 
     // Luego cargar el resto de componentes
+    const componentsToAttach: Component[] = [];
     for (const [type, compData] of Object.entries(json.components)) {
       if (type === 'name') continue; // Ya cargado
       const comp = this.createComponentFromJSON(type);
       entity.addComponent(type, comp);
       await comp.load(compData);
       Engine.getEntities().addComponentToManager(comp, type);
+      componentsToAttach.push(comp);
+    }
+
+    // Llamar a onAttach() después de que todos los componentes estén cargados
+    // Esto permite que los componentes puedan obtener referencias a otros componentes
+    for (const comp of componentsToAttach) {
+      await comp.onAttach();
     }
   }
 

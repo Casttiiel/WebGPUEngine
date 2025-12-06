@@ -4,6 +4,11 @@
       "name": "Reflection Probe",
       "transform": {},
       "reflection_probe": {},
+      "box_collider": {
+        "isSensor": true,
+        "bodyType": "static",
+        "size": [2, 2, 2]
+      },
       "render": {
         "meshes": [
           {

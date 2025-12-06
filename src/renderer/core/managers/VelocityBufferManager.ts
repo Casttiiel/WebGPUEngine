@@ -80,7 +80,6 @@ export class VelocityBufferManager {
       0, // No extra usage
     );
 
-    console.log('[VelocityBufferManager] Initialized', width, 'x', height);
     this.isInitialized = true;
   }
 
@@ -252,8 +251,6 @@ export class VelocityBufferManager {
 
     // Reset history después de resize
     this.hasHistory = false;
-
-    console.log('[VelocityBufferManager] Resized to', width, 'x', height);
   }
 
   /**
@@ -261,6 +258,5 @@ export class VelocityBufferManager {
    */
   public destroy(): void {
     this.velocityRT.destroy();
-    console.log('[VelocityBufferManager] Destroyed');
   }
 }
