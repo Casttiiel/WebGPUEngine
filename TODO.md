@@ -1,12 +1,11 @@
 ## Player
 
-1. Reflection probes
-   Activation/Switch
+1. Irradiance Switch
 2. SSR (able to deactivate ssr)
 3. Follow of mesh with camera wrong
 4. Jumping on wall wrong (is grounded)
 5. Jump to techo
-6. Develop game
+6. Design game
 7. Directional light with shadows does not apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
 8. Revisit shadows
 9. Revisit decals

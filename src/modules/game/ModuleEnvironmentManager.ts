@@ -77,7 +77,7 @@ export class ModuleEnvironmentManager extends Module {
       }
     }
 
-    if (Engine.getInput().isKeyJustPressed(KeyCode.F5)) {
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F8)) {
       // ⏸️ Pausar el render loop principal para facilitar debugging
       const moduleRender = Engine.getRender();
       (moduleRender as any).pauseRendering = true;
@@ -411,7 +411,7 @@ export class ModuleEnvironmentManager extends Module {
   public changeSSREnvironmentTexture(newTexture: string): void {
     Cubemap.getAsync(newTexture).then((cubemap) => {
       this.ssrEnvironmentTexture = cubemap;
-      //Delete de SSR class blind group
+      Engine.getRender().getDeferredRenderer().resetSSRResources();
     });
   }
 

@@ -1,7 +1,7 @@
 {
     "children": [],
     "components": {
-      "name": "Reflection Probe",
+      "name": "ReflectionProbe",
       "transform": {},
       "reflection_probe": {},
       "box_collider": {

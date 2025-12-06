@@ -3,6 +3,8 @@ import { Camera } from '../../core/math/Camera';
 import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
 import { BoxColliderComponent } from '../physics/BoxColliderComponent';
+import { Engine } from '../../core/engine/Engine';
+import { Cubemap } from '../../renderer/resources/Cubemap';
 
 export class ReflectionProbeComponent extends Component {
   private radius: number = 10.0; // Radio de influencia
@@ -37,9 +39,6 @@ export class ReflectionProbeComponent extends Component {
     this.setupTriggerCallbacks();
   }
 
-  /**
-   * Configura los callbacks del box_collider para detectar entradas/salidas
-   */
   private setupTriggerCallbacks(): void {
     const boxCollider = this.getOwner().getComponent('box_collider') as BoxColliderComponent;
 
@@ -59,36 +58,21 @@ export class ReflectionProbeComponent extends Component {
     });
   }
 
-  /**
-   * Llamado cuando una entidad ENTRA en el área del reflection probe
-   */
   private onEntityEnter(entityId: number): void {
-    this.entitiesInside.add(entityId);
-
-    console.log(`🔵 ReflectionProbe: Entidad ${entityId} ENTRÓ en el área`);
-    console.log(`   Total entidades dentro: ${this.entitiesInside.size}`);
-
-    // AQUÍ puedes ejecutar tu código cuando algo entra:
-    // - Activar el cubemap en el material de la entidad
-    // - Comenzar a actualizar el cubemap
-    // - Aplicar efectos especiales
-    // - etc.
+    const entity = Engine.getPhysics().getEntityById(entityId);
+    if (entity && entity.hasComponent('character_controller')) {
+      this.entitiesInside.add(entityId);
+      Engine.getEnvironmentManager().changeSSREnvironmentTexture(
+        this.getOwner().getName() + '_cubemap_T.png',
+      );
+    }
   }
 
-  /**
-   * Llamado cuando una entidad SALE del área del reflection probe
-   */
   private onEntityExit(entityId: number): void {
-    this.entitiesInside.delete(entityId);
-
-    console.log(`🔴 ReflectionProbe: Entidad ${entityId} SALIÓ del área`);
-    console.log(`   Total entidades dentro: ${this.entitiesInside.size}`);
-
-    // AQUÍ puedes ejecutar tu código cuando algo sale:
-    // - Desactivar el cubemap en el material de la entidad
-    // - Parar de actualizar el cubemap
-    // - Restaurar estado previo
-    // - etc.
+    const entity = Engine.getPhysics().getEntityById(entityId);
+    if (entity && entity.hasComponent('character_controller')) {
+      this.entitiesInside.delete(entityId);
+    }
   }
 
   public update(): void {}
@@ -117,9 +101,6 @@ export class ReflectionProbeComponent extends Component {
     return (transform as TransformComponent).getTransform().getWorldPosition();
   }
 
-  /**
-   * Obtiene las entidades actualmente dentro del área del probe
-   */
   public getEntitiesInside(): Set<number> {
     return this.entitiesInside;
   }

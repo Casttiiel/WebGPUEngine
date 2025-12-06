@@ -2,6 +2,7 @@ import { Module } from '../core/Module';
 import RAPIER from '@dimforge/rapier3d';
 import { vec3 } from 'gl-matrix';
 import { Engine } from '../../core/engine/Engine';
+import { Entity } from '../../core/ecs/Entity';
 
 /**
  * ModulePhysics - Sistema de físicas usando Rapier
@@ -384,7 +385,7 @@ export class ModulePhysics extends Module {
   /**
    * Obtiene una entidad por su ID (helper para eventos)
    */
-  private getEntityById(entityId: number): any {
+  public getEntityById(entityId: number): Entity | null {
     // Importar Engine solo cuando sea necesario para evitar circular dependencies
     const entities = Engine.getEntities();
 

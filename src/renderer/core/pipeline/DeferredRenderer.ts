@@ -348,6 +348,12 @@ export class DeferredRenderer {
     this.ssr.update(_dt);
   }
 
+  public resetSSRResources(): void {
+    this.ssr.dispose();
+    this.ssr = new ScreenSpaceReflections();
+    this.ssr.load();
+  }
+
   private dispose(): void {
     if (this.gBufferPass) {
       this.gBufferPass.dispose();

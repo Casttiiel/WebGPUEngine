@@ -417,10 +417,10 @@ export class ModuleRender extends Module {
     return this.mainCamera;
   }
 
-  /**
-   * Temporalmente reemplaza la cámara principal (para reflection probes)
-   * IMPORTANTE: Llamar restoreMainCamera() después de usar
-   */
+  public getDeferredRenderer(): DeferredRenderer {
+    return this.deferred;
+  }
+
   private originalMainCamera: Camera | null = null;
   public setTemporaryMainCamera(camera: Camera): void {
     if (!this.originalMainCamera) {
@@ -429,9 +429,6 @@ export class ModuleRender extends Module {
     this.mainCamera = camera;
   }
 
-  /**
-   * Restaura la cámara principal original
-   */
   public restoreMainCamera(): void {
     if (this.originalMainCamera) {
       this.mainCamera = this.originalMainCamera;
