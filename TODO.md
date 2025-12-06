@@ -5,11 +5,15 @@
 3. Follow of mesh with camera wrong
 4. Jumping on wall wrong (is grounded)
 5. Jump to techo
-6. Design game
-7. Directional light with shadows does not apply shadows outside of frustum + Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
-8. Revisit shadows
-9. Revisit decals
-10. Loading Bar
+6. HDR Environment map and irradiance map
+7. Directional light should be on the sun
+8. Design game
+9. Froxel Scattering
+10. DOF adaptative
+11. Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+12. Revisit shadows quality
+13. Revisit decals
+14. Loading Bar
 
 ---
 

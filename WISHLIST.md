@@ -1,16 +1,14 @@
 ---------------------------------------Wishlist Backlog-----------------------------------
 
-1. CSM 3-cascade system
-2. Light map generator
-3. Mesh Collider
-4. UI
-5. Spawn/Delete items having in mind Instancing
-6. Gamestates -> Different scenes -> Load screen?
-7. Progressive texture streaming o mip streaming
-8. DOF adaptative
-   Froxel Scattering
+1. UI
+2. Spawn/Delete items having in mind Instancing
+3. Gamestates -> Different scenes -> Load screen?
+4. Parallax Mapping
+   5, Heigth map + compute shader para mas triangulos
+5. Mesh Collider
+6. Progressive texture streaming o mip streaming
    Animations
-   TAA Anti-aliasing temporal
+   Pre-multiplied Alpha Solids (Cristal)
    Auto exposure
    GPUDrivenRendering with indirect draw calls and frustum culling on GPU
    Tool for asset creation (Pregenerar AABBs y tangentes)
@@ -18,16 +16,13 @@
    Lens Flare
    Atmospheric shadowing
    Area Light (LTC (Linearly Transformed Cosines) for shadows)
-   Parallax Mapping
    Subsurface Scattering (SSS) (If we need to extend the gbuffer, work on decals normals)
    Atmospheric scattering (Simular skybox y cielo) / Fix Skybox
-   Console
    Weighted terrain
    Grass
    Physics Grass
    Mesh LOD
    Light Clustered culling + instancing
    Occlusion culling
-   Pre-multiplied Alpha Solids (Cristal)
    Voxel Global Illumination
    TrimSheets

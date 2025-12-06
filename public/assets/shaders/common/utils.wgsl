@@ -177,12 +177,12 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
 
     // Verificar que esté dentro del rango válido de la shadow map
     if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0) {
-        return 0.0; // Fuera del rango de profundidad = sin sombra
+        return 1.0; // Fuera del rango de profundidad = sin sombra
     }
 
     if (lightUVSpacePos.x < 0.0 || lightUVSpacePos.x > 1.0 || 
         lightUVSpacePos.y < 0.0 || lightUVSpacePos.y > 1.0) {
-        return 0.0; // Fuera del rango UV = sin sombra
+        return 1.0; // Fuera del rango UV = sin sombra
     }
 
     // PCF 4x4 con patrón Poisson disk para mejor distribución
