@@ -3,7 +3,7 @@
     "globalFactor": 1.0,
     "diffuseFactor": 1.0,
     "reflectionFactor": 0.8,
-    "irradianceCubemap": "irradiance_cubemap.png"
+    "irradianceCubemap": "1ReflectionProbe_irradiance_cubemap_T.png"
   },
   "skybox": "qwantani_mid_morning_puresky_1k.hdr",
   "ssrEnvironment": "1ReflectionProbe_cubemap_T.png"
