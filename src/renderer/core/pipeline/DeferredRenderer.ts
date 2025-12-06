@@ -354,6 +354,12 @@ export class DeferredRenderer {
     this.ssr.load();
   }
 
+  public resetAmbientLightResources(): void {
+    this.ambientLight.destroy();
+    this.ambientLight = new AmbientLight();
+    this.ambientLight.load();
+  }
+
   private dispose(): void {
     if (this.gBufferPass) {
       this.gBufferPass.dispose();

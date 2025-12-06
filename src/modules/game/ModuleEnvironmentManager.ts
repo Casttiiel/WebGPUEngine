@@ -480,7 +480,7 @@ export class ModuleEnvironmentManager extends Module {
   public changeIrradianceTexture(newTexture: string): void {
     Cubemap.getAsync(newTexture).then((cubemap) => {
       this.ambientLightData.irradianceCubemap = cubemap;
-      //Delete de ambient light class blind group
+      Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
     });
   }
 

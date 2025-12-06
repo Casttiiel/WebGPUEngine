@@ -64,6 +64,9 @@ export class ReflectionProbeComponent extends Component {
       Engine.getEnvironmentManager().changeSSREnvironmentTexture(
         this.getOwner().getName() + '_cubemap_T.png',
       );
+      Engine.getEnvironmentManager().changeIrradianceTexture(
+        this.getOwner().getName() + '_irradiance_cubemap_T.png',
+      );
     }
   }
 

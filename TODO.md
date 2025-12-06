@@ -1,20 +1,19 @@
 ## Player
 
-1. Irradiance Switch
-2. SSR (able to deactivate ssr)
-3. Follow of mesh with camera wrong
-4. Jumping on wall wrong (is grounded)
-5. Jump to techo
-6. HDR Environment map and irradiance map
-7. Directional light should be on the sun
-8. Design game
-9. Froxel Scattering
-10. DOF adaptative
-11. Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
-12. Revisit shadows quality
-13. Shadows on Light probes
-14. Revisit decals
-15. Loading Bar
+1. SSR (able to deactivate ssr)
+2. Follow of mesh with camera wrong
+3. Jumping on wall wrong (is grounded)
+4. Jump to techo
+5. HDR Environment map and irradiance map
+6. Directional light should be on the sun
+7. Design game
+8. Froxel Scattering
+9. DOF adaptative
+10. Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+11. Revisit shadows quality
+12. Shadows on Light probes
+13. Revisit decals
+14. Loading Bar
 
 ---
 

@@ -6,5 +6,5 @@
     "irradianceCubemap": "irradiance_cubemap.png"
   },
   "skybox": "qwantani_mid_morning_puresky_1k.hdr",
-  "ssrEnvironment": "environment_cubemap.png"
+  "ssrEnvironment": "1ReflectionProbe_cubemap_T.png"
 }
