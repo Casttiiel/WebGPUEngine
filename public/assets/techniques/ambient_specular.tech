@@ -1,6 +1,6 @@
 {
     "vs": "presentation.vs",
-    "fs": "ssr_compose.fs",
+    "fs": "ambient_specular.fs",
     "writesOn": "texture",
     "blend": "additive_by_src_alpha",
     "z": "disable_all",

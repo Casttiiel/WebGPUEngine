@@ -1,12 +1,12 @@
 ## Player
 
-1. HDR Environment map and irradiance maps
-2. SSR (able to deactivate ssr)
-3. Follow of mesh with camera wrong
-4. Design game
-5. Froxel Scattering
+1. Follow of mesh with camera wrong
+2. Design game
+3. Froxel Scattering
+4. Stick Particles to entity
+5. Particles world position
 6. DOF adaptative
-7. Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
+7. Directional Lights follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
 8. Revisit shadows quality
 9. Shadows on Light probes
 10. Revisit decals

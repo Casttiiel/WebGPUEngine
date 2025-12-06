@@ -263,7 +263,17 @@ export class DeferredRenderer {
     }
 
     // Post-procesado (solo para renderizado normal)
-    this.ssr.render(this.rtAccLight.getView(), this.aoResult, this.gBufferBindGroup);
+    const ssr = this.ssr.generateSSR(
+      this.rtAccLight.getView(),
+      this.aoResult,
+      this.gBufferBindGroup,
+    );
+    this.ambientLight.renderSpecular(
+      this.rtAccLight.getView(),
+      ssr,
+      this.aoResult,
+      this.gBufferBindGroup,
+    );
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
       this.froxelVolumetrics.updateFroxelData();
@@ -315,7 +325,11 @@ export class DeferredRenderer {
   }
 
   private renderAccLight(): void {
-    this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup, this.aoResult);
+    this.ambientLight.renderDiffuse(
+      this.rtAccLight.getView(),
+      this.gBufferBindGroup,
+      this.aoResult,
+    );
 
     // Use new render pass system for lights
     for (const comp of Engine.getEntities()

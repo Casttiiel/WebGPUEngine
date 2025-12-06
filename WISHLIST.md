@@ -4,9 +4,10 @@
 2. Spawn/Delete items having in mind Instancing
 3. Gamestates -> Different scenes -> Load screen?
 4. Parallax Mapping
-   5, Heigth map + compute shader para mas triangulos
-5. Mesh Collider
-6. Progressive texture streaming o mip streaming
+5. Heigth map + compute shader para mas triangulos
+6. HDR Environment map and irradiance maps
+7. Mesh Collider
+8. Progressive texture streaming o mip streaming
    Animations
    Pre-multiplied Alpha Solids (Cristal)
    Auto exposure

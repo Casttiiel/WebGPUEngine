@@ -13,10 +13,8 @@ export class ScreenSpaceReflections {
   private isInitialized: boolean = false;
   private fullscreenQuadMesh!: Mesh;
   private ssrTechnique!: Technique;
-  private ssrComposeTechnique!: Technique;
   private ssrResult!: RenderTarget;
   private ssrBindGroup!: GPUBindGroup;
-  private ssrComposeBindGroup!: GPUBindGroup;
   private ssrUniformBuffer!: GPUBuffer;
   private brdfLUT!: Texture;
 
@@ -27,7 +25,6 @@ export class ScreenSpaceReflections {
       this.isInitialized = true;
       this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
       this.ssrTechnique = await Technique.getAsync('ssr.tech');
-      this.ssrComposeTechnique = await Technique.getAsync('ssr_compose.tech');
       this.brdfLUT = await Texture.getAsync('brdfLUT.png');
 
       this.createRenderTarget();
@@ -57,23 +54,41 @@ export class ScreenSpaceReflections {
     );
   }
 
-  public render(
+  private renderDisabledSSR(): GPUTextureView {
+    const commandEncoder = Render.getInstance().getCommandEncoder();
+    const renderPass = commandEncoder.beginRenderPass({
+      label: 'Clear AO Target',
+      colorAttachments: [
+        {
+          view: this.ssrResult.getView(),
+          clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 0.0 }, // White = no reflection
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+    });
+
+    renderPass.end();
+
+    return this.ssrResult.getView();
+  }
+
+  public generateSSR(
     accLights: GPUTextureView,
     ao: GPUTextureView,
     gBufferBindGroup: GPUBindGroup,
-  ): void {
-    if (!this.isInitialized) {
-      return;
+  ): GPUTextureView {
+    if (!QualitySettings.getInstance().getSettings().ssrEnabled) {
+      return this.renderDisabledSSR();
     }
+
     if (!this.ssrBindGroup) {
       this.createSSRBindGroup(accLights, ao);
     }
-    if (!this.ssrComposeBindGroup) {
-      this.createSSRComposeBindGroup(this.ssrResult.getView(), ao);
-    }
 
     this.executeSSRPass(gBufferBindGroup);
-    this.composeSSR(accLights, gBufferBindGroup);
+
+    return this.ssrResult.getView();
   }
 
   public executeSSRPass(gBufferBindGroup: GPUBindGroup): void {
@@ -120,36 +135,8 @@ export class ScreenSpaceReflections {
     pass.end();
   }
 
-  public composeSSR(accLights: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+  public composeSSR(): void {
     if (!this.isInitialized) return;
-    const render = Render.getInstance();
-
-    const colorAttachment = GPUUtils.createColorAttachment(accLights, 'load', 'store');
-
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor('ssr compose render pass', [colorAttachment]),
-      );
-
-    // Configure viewport and scissor using GPUUtils
-    GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
-
-    // 1. Activate pipeline
-    this.ssrComposeTechnique.activatePipeline(pass);
-
-    // 2. Activate mesh data
-    this.fullscreenQuadMesh.activate(pass);
-
-    // 3. Set bind groups
-    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
-    pass.setBindGroup(1, gBufferBindGroup);
-    pass.setBindGroup(2, this.ssrComposeBindGroup);
-
-    // 4. Draw the mesh
-    this.fullscreenQuadMesh.renderGroup(pass);
-
-    pass.end();
   }
 
   private createSSRBindGroup(accLights: GPUTextureView, ao: GPUTextureView) {
@@ -181,47 +168,6 @@ export class ScreenSpaceReflections {
     );
   }
 
-  private createSSRComposeBindGroup(ssr: GPUTextureView, ao: GPUTextureView) {
-    this.ssrComposeBindGroup = BindGroupFactory.createBindGroup(
-      'ssr_compose_bindgroup',
-      this.ssrComposeTechnique.getPipeline().getBindGroupLayout(2),
-      [
-        {
-          binding: 0,
-          resource: ssr,
-        },
-        {
-          binding: 1,
-          resource: SamplerLibrary.simpleSampler!,
-        },
-        {
-          binding: 2,
-          resource: ao,
-        },
-        {
-          binding: 3,
-          resource: this.brdfLUT.getTextureView()!,
-        },
-        {
-          binding: 4,
-          resource: SamplerLibrary.simpleSampler!,
-        },
-        {
-          binding: 5,
-          resource: Engine.getEnvironmentManager().getSSREnvironmentTexture().getTextureView()!,
-        },
-        {
-          binding: 6,
-          resource: Engine.getEnvironmentManager().getSSREnvironmentTexture().getSampler()!,
-        },
-        {
-          binding: 7,
-          resource: { buffer: this.ssrUniformBuffer },
-        },
-      ],
-    );
-  }
-
   public update(dt: number): void {
     const qualitySettings = QualitySettings.getInstance().getSettings();
 
@@ -243,7 +189,6 @@ export class ScreenSpaceReflections {
 
   public dispose(): void {
     this.ssrBindGroup = null as any;
-    this.ssrComposeBindGroup = null as any;
     this.ssrResult = null as any;
     this.createRenderTarget();
   }
