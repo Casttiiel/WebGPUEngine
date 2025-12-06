@@ -13,6 +13,8 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
 import { Entity } from '../../core/ecs/Entity';
 import { CameraComponent } from '../../components/render/CameraComponent';
+import { IrradianceGenerator } from '../../renderer/core/IrradianceGenerator';
+import { ResourceType } from '../../types/ResourceType.enum';
 
 interface EnvironmentBlendState {
   startData: AmbientEnvironmentData;
@@ -28,6 +30,9 @@ export class ModuleEnvironmentManager extends Module {
   private ambientLightData!: AmbientEnvironmentData;
 
   private blendState: EnvironmentBlendState | null = null;
+
+  // Generador de irradiance
+  private irradianceGenerator: IrradianceGenerator | null = null;
 
   constructor(name: string) {
     super(name);
@@ -46,6 +51,10 @@ export class ModuleEnvironmentManager extends Module {
 
     this.skyboxTexture = await HDRTexture.getAsync(jsonData.skybox);
     this.ssrEnvironmentTexture = await Cubemap.getAsync(jsonData.ssrEnvironment);
+
+    // Inicializar generador de irradiance
+    this.irradianceGenerator = new IrradianceGenerator();
+    await this.irradianceGenerator.initialize();
 
     return true;
   }
@@ -220,11 +229,78 @@ export class ModuleEnvironmentManager extends Module {
     // ✅ Restaurar dimensiones originales del render
     Render.Render.restoreRenderSize();
 
-    // Descargar cubemap generado
+    // ✅ Generar irradiance cubemap a partir del reflection cubemap
+    await this.generateAndDownloadIrradiance(cubemapTexture, probeName, resolution);
+
+    // Descargar cubemap de reflection generado
     await this.downloadCubemap(cubemapTexture, probeName, resolution);
 
     // Limpiar
     cubemapTexture.destroy();
+  }
+
+  /**
+   * Genera un irradiance cubemap a partir del reflection cubemap y lo descarga
+   */
+  private async generateAndDownloadIrradiance(
+    reflectionTexture: GPUTexture,
+    probeName: string,
+    resolution: number,
+  ): Promise<void> {
+    if (!this.irradianceGenerator) {
+      console.error('❌ IrradianceGenerator no está inicializado');
+      return;
+    }
+
+    console.log(`🔶 Generando irradiance para ${probeName}...`);
+
+    // Crear un Cubemap temporal a partir de la textura de reflection
+    const tempReflectionCubemap = this.createCubemapFromTexture(
+      reflectionTexture,
+      `${probeName}_reflection_temp`,
+    );
+
+    // Generar irradiance
+    const irradianceCubemap =
+      await this.irradianceGenerator.generateIrradiance(tempReflectionCubemap);
+
+    // Descargar el irradiance cubemap (128x128)
+    const irradianceTexture = (irradianceCubemap as any).gpuTexture as GPUTexture;
+    await this.downloadCubemap(irradianceTexture, `${probeName}_irradiance`, 128);
+
+    console.log(`✅ Irradiance generado y descargado para ${probeName}`);
+  }
+
+  /**
+   * Crea un objeto Cubemap temporal a partir de una GPUTexture
+   */
+  private createCubemapFromTexture(texture: GPUTexture, name: string): Cubemap {
+    const device = GPUUtils.getDevice();
+
+    const cubemap = new Cubemap({
+      path: name,
+      type: ResourceType.CUBEMAP,
+      label: name,
+    });
+
+    // Inyectar la textura directamente
+    (cubemap as any).gpuTexture = texture;
+    (cubemap as any).gpuTextureView = texture.createView({
+      dimension: 'cube',
+    });
+    (cubemap as any).gpuSampler = device.createSampler({
+      label: `${name}_sampler`,
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      addressModeW: 'clamp-to-edge',
+    });
+
+    (cubemap as any)._hasData = true;
+
+    return cubemap;
   }
 
   /**

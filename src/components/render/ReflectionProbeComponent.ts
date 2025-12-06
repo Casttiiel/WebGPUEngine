@@ -4,11 +4,10 @@ import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
 import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
-import { Cubemap } from '../../renderer/resources/Cubemap';
 
 export class ReflectionProbeComponent extends Component {
   private radius: number = 10.0; // Radio de influencia
-  private resolution: number = 512; // Resolución del cubemap (512x512 por cara)
+  private resolution: number = 256; // Resolución del cubemap (512x512 por cara)
   private captureCamera: Camera | null = null;
 
   // Tracking de entidades dentro del trigger

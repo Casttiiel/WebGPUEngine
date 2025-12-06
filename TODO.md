@@ -12,8 +12,9 @@
 10. DOF adaptative
 11. Directional Lights configurable/follow player + Cascade shadow mapping (3 cascade) (If snap to camera frustum, what about shadows from outside of frustum)
 12. Revisit shadows quality
-13. Revisit decals
-14. Loading Bar
+13. Shadows on Light probes
+14. Revisit decals
+15. Loading Bar
 
 ---
 

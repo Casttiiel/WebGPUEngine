@@ -3,7 +3,9 @@
     "components": {
       "name": "ReflectionProbe",
       "transform": {},
-      "reflection_probe": {},
+      "reflection_probe": {
+        "resolution": 256
+      },
       "box_collider": {
         "isSensor": true,
         "bodyType": "static",
