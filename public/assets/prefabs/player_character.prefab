@@ -35,7 +35,8 @@
       "slideSpeedThreshold": 7.0,
       "slideDecelerationTime": 2.5,
       "slideMinDuration": 0.75,
-      "slideHeightMultiplier": 0.1
+      "slideHeightMultiplier": 0.1,
+      "kickCooldown": 1.5
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],

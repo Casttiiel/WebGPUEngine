@@ -103,7 +103,7 @@ export class CapsuleColliderComponent extends ColliderComponent {
 
     const pos = this.rigidBody.translation();
 
-    // Raycast desde el centro de la cápsula hacia abajo
+    // Raycast desde el suelo de la cápsula hacia abajo
     const ray = new RAPIER.Ray(
       { x: pos.x, y: pos.y - this.capsuleHeight / 2.0, z: pos.z },
       { x: 0, y: -1, z: 0 },

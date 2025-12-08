@@ -55,11 +55,16 @@ export class CharacterControllerComponent extends Component {
   private originalHeight: number = 0.0; // Altura original del collider
   private originalRadius: number = 0.0; // Radio original del collider
 
+  // Kick
+  private kickCooldown: number = 0.5; // Cooldown entre patadas en segundos
+  private lastKickTime: number = 0.0; // Tiempo desde la última patada
+
   // Estado
   private isActive: boolean = true;
   private isGrounded: boolean = false;
   private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
   private isSliding: boolean = false;
+  private canAirJump: boolean = false; // Permitir salto en aire tras wall kick
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
   private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
 
@@ -117,6 +122,9 @@ export class CharacterControllerComponent extends Component {
     if (data.slideMinDuration !== undefined) {
       this.slideMinDuration = data.slideMinDuration;
     }
+    if (data.kickCooldown !== undefined) {
+      this.kickCooldown = data.kickCooldown;
+    }
 
     // Guardar dimensiones originales del collider
     this.originalHeight = this.capsuleCollider.getCapsuleHeight();
@@ -138,6 +146,7 @@ export class CharacterControllerComponent extends Component {
     const targetMovement = this.getTargetMovement(inputDir);
 
     this.manageSliding(deltaTime);
+    this.manageKick();
     this.manageMovement(deltaTime, targetMovement);
     this.applyGravity(deltaTime);
     this.manageJump(deltaTime);
@@ -210,6 +219,7 @@ export class CharacterControllerComponent extends Component {
     if (this.isGrounded && this.currentVelocity[1] <= 0) {
       this.currentVelocity[1] = 0;
       this.isJumping = false;
+      this.canAirJump = false; // Reset air jump when grounded
     } else {
       this.currentVelocity[1] += gravity * deltaTime;
     }
@@ -253,6 +263,88 @@ export class CharacterControllerComponent extends Component {
         this.endSlide();
       }
     }
+  }
+
+  private manageKick(deltaTime: number): void {
+    const input = Engine.getInput();
+
+    // Actualizar cooldown de kick
+    if (this.lastKickTime > 0.0) {
+      this.lastKickTime -= deltaTime;
+      if (this.lastKickTime < 0.0) {
+        this.lastKickTime = 0.0;
+      }
+      return;
+    }
+
+    if (input.isKeyJustPressed(KeyCode.E)) {
+      const physics = Engine.getPhysics();
+
+      const cameraObj = this.camera!.getCamera();
+      let cameraForward = cameraObj.getFront();
+      vec3.normalize(cameraForward, cameraForward);
+      const cameraPos = cameraObj.getPosition();
+
+      // Raycast desde el centro de la cápsula hacia adelante
+      const ray = new RAPIER.Ray(
+        { x: cameraPos[0], y: cameraPos[1], z: cameraPos[2] },
+        { x: cameraForward[0], y: cameraForward[1], z: cameraForward[2] },
+      );
+
+      // Excluir el propio collider del raycast
+      const hit = physics.getWorld().castRay(
+        ray,
+        2.0,
+        true, // solid
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined, // sin filtro de grupos
+        this.capsuleCollider.getCollider(), // Excluir solo el propio collider
+      );
+      if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed) {
+        this.applyWallKick();
+        this.canAirJump = true;
+        this.lastKickTime = this.kickCooldown; // Iniciar cooldown
+      } else if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Dynamic) {
+        if (!this.isGrounded) {
+          this.applyWallKick(0.5);
+        }
+        this.kickObject(hit.collider.parent()!);
+        this.lastKickTime = this.kickCooldown; // Iniciar cooldown
+      }
+    }
+  }
+
+  private applyWallKick(factor: number = 1.0): void {
+    const cameraObj = this.camera!.getCamera();
+    let cameraForward = cameraObj.getFront();
+    cameraForward[1] = 0.0;
+    vec3.normalize(cameraForward, cameraForward);
+
+    let kickWallVelocity = vec3.create();
+    vec3.scale(kickWallVelocity, cameraForward, -4.0 * factor);
+    let kickWallJumpVelocity = vec3.fromValues(0, 5.0 * factor, 0);
+
+    vec3.add(kickWallVelocity, kickWallVelocity, kickWallJumpVelocity);
+
+    this.currentVelocity = kickWallVelocity;
+  }
+
+  private kickObject(rigidbody: RAPIER.RigidBody): void {
+    const cameraObj = this.camera!.getCamera();
+    let cameraForward = cameraObj.getFront();
+    cameraForward[1] = 0.0;
+    vec3.normalize(cameraForward, cameraForward);
+
+    let kickObjectVelocity = vec3.create();
+    vec3.scale(kickObjectVelocity, cameraForward, 8.0);
+    let kickObjectJumpVelocity = vec3.fromValues(0, 5.0, 0);
+
+    vec3.add(kickObjectVelocity, kickObjectVelocity, kickObjectJumpVelocity);
+
+    rigidbody.applyImpulse(
+      new RAPIER.Vector3(kickObjectVelocity[0], kickObjectVelocity[1], kickObjectVelocity[2]),
+      true,
+    );
   }
 
   private manageMovement(deltaTime: number, targetMovement: vec3): void {
@@ -383,9 +475,10 @@ export class CharacterControllerComponent extends Component {
 
     // Detectar inicio del salto
     if (input.isKeyJustPressed(KeyCode.SPACE)) {
-      if (canGroundJump) {
+      if (canGroundJump || this.canAirJump) {
         this.applyJump();
         this.isJumping = true; // Iniciar salto variable
+        this.canAirJump = false; // Consumir posible air jump
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
         this.jumpHoldTimer = 0.0; // Reset jump hold timer
         this.jumpCutFactorApplied = false;
@@ -400,9 +493,6 @@ export class CharacterControllerComponent extends Component {
       // Aplicar fuerza adicional mientras se mantiene presionado (acelera hacia arriba)
       this.currentVelocity[1] += this.jumpHoldForce * deltaTime;
       this.jumpHoldTimer += deltaTime;
-      if (this.jumpHoldTimer > this.jumpHoldThreshold) {
-        this.isJumping = false; // Terminar salto variable después del tiempo máximo
-      }
     } else if (
       this.isJumping &&
       !input.isKeyPressed(KeyCode.SPACE) &&

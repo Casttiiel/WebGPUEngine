@@ -16,4 +16,5 @@ export type CharacterControllerComponentDataType = {
   wallJumpCooldown?: number; // Cooldown between wall jumps in seconds (default: 0.3)
   wallCheckDistance?: number; // Distance to check for walls (default: 0.6)
   wallSlideGravityMultiplier?: number; // Gravity reduction when sliding on wall (default: 0.3)
+  kickCooldown?: number; // Cooldown between kicks in seconds (default: 0.5)
 };
