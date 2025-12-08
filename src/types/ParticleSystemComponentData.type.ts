@@ -10,4 +10,5 @@ export interface ParticleSystemComponentData {
   velocity?: number[]; // Velocidad base [x,y,z]
   randomness?: number; // Factor de aleatoriedad (0-1)
   gravity?: number[]; // Fuerza de gravedad [x,y,z]
+  worldSpace?: boolean; // Si true, las partículas se emiten en world space y no siguen al emisor
 }

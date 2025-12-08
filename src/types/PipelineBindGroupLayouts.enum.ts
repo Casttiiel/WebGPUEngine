@@ -17,6 +17,7 @@ export enum PipelineBindGroupLayouts {
   TEMPORAL_ACCUMULATION_UNIFORMS = 'TemporalAccumulationUniforms',
   FROXEL_UNIFORMS = 'FroxelUniforms',
   PARTICLE_UNIFORMS = 'ParticleUniforms',
+  PARTICLE_WORLDSPACE_UNIFORMS = 'ParticleWorldSpaceUniforms',
   INSTANCE_STORAGE = 'InstanceStorage',
   DOF_PARAMS = 'DOFParams',
   DOF_BLUR_TEXTURES = 'DOFBlurTextures',

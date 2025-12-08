@@ -1,0 +1,12 @@
+{
+    "components": {
+        "name": "Particles (World Space)",
+        "transform": {
+            "position": [0, 5, 0],
+            "scale": [0.1, 0.1, 0.1]
+        },
+        "particle_system": {
+            "worldSpace": true
+        }
+    }
+}

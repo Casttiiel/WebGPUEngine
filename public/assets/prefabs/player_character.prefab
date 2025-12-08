@@ -64,9 +64,6 @@
   "children": [
     {
       "prefab": "player_camera.prefab"
-    },
-    {
-    "prefab": "particles.prefab"
     }
   ]
 }

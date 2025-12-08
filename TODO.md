@@ -1,57 +1,38 @@
 ## Player
 
 1. Particles world/local position
-2. Design game
-3. Directional Lights follow player (If snap to camera frustum, what about shadows from outside of frustum)
-4. Revisit shadows quality
-5. Cascade shadow mapping (3 cascade)
-6. Froxel Scattering
-7. DOF adaptative
-8. Shadows on Light probes
-9. Loading Bar
+2. Jump
+3. Kick
+4. Vault
+5. Slide
+6. Revisit shadows quality
+7. Shadows on Light probes
+8. Directional Lights follow player (If snap to camera frustum, what about shadows from outside of frustum)
+9. Cascade shadow mapping (3 cascade)
+10. Froxel Scattering
+11. Loading Bar
+12. DOF adaptative
 
 ---
 
-Reset de skill con matar / Tres skills o dash por reset
-Ataque/Empuje
-Q Lee sin
-Boost de movility
-SideStep
-Slide + Attack -> To Air enemy
-Puñetazo/dash hacia adelante con empuje
-Camille E
-Katarina
-Talon Q + MOvement
-Dash to enemy (Yasuo)
-Q of Irelia (chain)
-W Sivir (chain between nearby enemies)
-E+Q Jarvan
+1. Salto
+2. Kick
+3. Vault
+4. Slide
+5. Dash (To Object)
+6. Jump Hang Time
+7. Hook
+8. Input Buffer
+9. Jump to dynamic (what to do? big vs small objects)
 
 ---
 
-1. Salto / Doble
-2. Deslizarse
-3. Gancho (Balanceo)
-4. Melee
-5. Wall jump
-
-6. Wall Jump
-7. Wall run
-8. Grapple
-9. Input Buffer
-10. Vault
-11. Jump to dynamic (what to do? big vs small objects)
-12. Raycast for the camera focus
-
----
-
-1. Jump Hang Time
-2. Input Leniency (Tolerance Windows)
-3. Forgiving Ledges (Auto-step o Edge Correction)
-4. Momentum Conservation
-5. Terminal Velocity Control
-6. Ledge Grab or Ledge Forgiveness
-7. Run-off Forgiveness
+1. Input Leniency (Tolerance Windows)
+2. Forgiving Ledges (Auto-step o Edge Correction)
+3. Momentum Conservation
+4. Terminal Velocity Control
+5. Ledge Grab or Ledge Forgiveness
+6. Run-off Forgiveness
 
 ---
 

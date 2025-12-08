@@ -7,6 +7,7 @@ import { RenderComponent } from './RenderComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Engine } from '../../core/engine/Engine';
+import { ParticleSystemComponentData } from '../../types/ParticleSystemComponentData.type';
 
 /**
  * ParticleSystemComponent - GPU-driven particle system using indirect draw
@@ -44,9 +45,13 @@ export class ParticleSystemComponent extends Component {
   private spawnInterval: number = 0.5; // Spawn cada 0.5 segundos
   private particlesPerSpawn: number = 20; // 5 partículas por spawn
 
+  // World space mode - determina qué técnica usar (particle.tech vs particle_worldspace.tech)
+  private worldSpace: boolean = false; // Si true, las partículas se emiten en world space
+  private spawnRadius: number = 2.0; // Radio de spawn de las partículas
+
   // OPTIMIZACIÓN: Reuse buffers CPU para evitar allocations
   private simParamsArray = new Float32Array(8); // Reutilizable
-  private spawnParamsArray = new ArrayBuffer(16); // Reutilizable
+  private spawnParamsArray = new ArrayBuffer(64); // Alineado a 16 bytes: u32 + f32 + u32 + f32 + vec3 + f32 + vec3 + f32 + f32 + padding = 64 bytes
   private spawnParamsFloat32View!: Float32Array;
   private spawnParamsUint32View!: Uint32Array;
   private counterDataArray = new Uint32Array(1); // Reutilizable para atomic counter
@@ -64,9 +69,18 @@ export class ParticleSystemComponent extends Component {
 
   public override async load(_data: unknown): Promise<void> {
     try {
-      // 1. Cargar mesh y material
+      // Leer configuración
+      const data = _data as ParticleSystemComponentData;
+      this.worldSpace = data?.worldSpace ?? false;
+      this.spawnRadius = data?.spawnRadius ?? 2.0;
+
+      // 1. Cargar mesh y material con la técnica apropiada según worldSpace
       this.quadMesh = await Mesh.get('quad.obj');
-      this.particleMaterial = await Material.get('particle.mat');
+
+      // Seleccionar material basado en el modo world space
+      const materialPath = this.worldSpace ? 'particle_worldspace.mat' : 'particle.mat';
+      this.particleMaterial = await Material.get(materialPath);
+
       const device = GPUUtils.getDevice();
 
       this.transform = this.getOwner().getComponent('transform') as TransformComponent;
@@ -152,6 +166,7 @@ export class ParticleSystemComponent extends Component {
           },
         ],
       });
+
       this.renderBindGroup = device.createBindGroup({
         layout: renderBindGroupLayout,
         entries: [
@@ -196,7 +211,7 @@ export class ParticleSystemComponent extends Component {
 
     this.spawnParamsBuffer = device.createBuffer({
       label: 'spawn_params_buffer',
-      size: 16, // spawnCount, randomSeed, padding x2
+      size: 64, // Alineado a 16 bytes según WebGPU uniform buffer requirements
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -379,11 +394,27 @@ export class ParticleSystemComponent extends Component {
         this.lastParticlesPerSpawn = this.particlesPerSpawn;
       }
 
-      // Preparar parámetros de spawn - struct tiene: u32 spawnCount, f32 randomSeed, f32 padding1, f32 padding2
+      // Preparar parámetros de spawn - struct tiene:
+      // u32 spawnCount, f32 randomSeed, u32 worldSpace, f32 padding1, vec3 emitterWorldPos, f32 padding2, vec3 emitterWorldScale, f32 padding3
       this.spawnParamsUint32View[0] = this.particlesPerSpawn; // spawnCount (u32)
-      this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // randomSeed (f32) - siempre cambia
-      this.spawnParamsFloat32View[2] = 0; // padding1
-      this.spawnParamsFloat32View[3] = 0; // padding2
+      this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // randomSeed (f32)
+      this.spawnParamsUint32View[2] = this.worldSpace ? 1 : 0; // worldSpace (u32)
+      this.spawnParamsFloat32View[3] = 0; // padding1
+
+      // Emitter world position (vec3)
+      const worldPos = this.transform.getTransform().getWorldPosition();
+      this.spawnParamsFloat32View[4] = worldPos[0]; // emitterWorldPos.x
+      this.spawnParamsFloat32View[5] = worldPos[1]; // emitterWorldPos.y
+      this.spawnParamsFloat32View[6] = worldPos[2]; // emitterWorldPos.z
+      this.spawnParamsFloat32View[7] = 0; // padding2
+
+      // Emitter world scale (vec3)
+      const worldScale = this.transform.getTransform().getWorldScale();
+      this.spawnParamsFloat32View[8] = worldScale[0]; // emitterWorldScale.x
+      this.spawnParamsFloat32View[9] = worldScale[1]; // emitterWorldScale.y
+      this.spawnParamsFloat32View[10] = worldScale[2]; // emitterWorldScale.z
+      this.spawnParamsFloat32View[11] = 0; // padding3
+      this.spawnParamsFloat32View[12] = this.spawnRadius; // spawnRadius
 
       device.queue.writeBuffer(this.spawnParamsBuffer, 0, this.spawnParamsArray);
 
@@ -441,6 +472,12 @@ export class ParticleSystemComponent extends Component {
     const folderName = `Particle System (${this.getOwner().getName()})`;
 
     // Spawn controls
+    debugUI.addInteractiveControl(folderName, this, 'spawnRadius', 'Spawn Radius', {
+      min: 0.1,
+      max: 10.0,
+      step: 0.1,
+    });
+
     debugUI.addInteractiveControl(folderName, this, 'spawnInterval', 'Spawn Interval (s)', {
       min: 0.1,
       max: 5.0,
@@ -469,5 +506,7 @@ export class ParticleSystemComponent extends Component {
     this.simulationParamsBuffer?.destroy();
     this.spawnParamsBuffer?.destroy();
     this.spawnCounterBuffer?.destroy();
+    this.freeListBuffer?.destroy();
+    this.freeListCountBuffer?.destroy();
   }
 }

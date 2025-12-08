@@ -1,0 +1,9 @@
+{
+  "technique": "particle_worldspace.tech",
+  "textures": {
+    "txAlbedo": "white.png"
+  },
+    "casts_shadows": false,
+    "category": "transparent",
+    "shadows": false
+}

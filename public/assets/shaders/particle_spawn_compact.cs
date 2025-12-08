@@ -24,8 +24,13 @@ struct IndirectDrawArgs {
 struct SpawnParams {
     spawnCount: u32,        // Cuántas partículas spawnear este frame
     randomSeed: f32,        // Seed para generación de números aleatorios
+    worldSpace: u32,        // 0 = local space, 1 = world space
     padding1: f32,
+    emitterWorldPos: vec3<f32>,  // Posición mundial del emisor (cuando worldSpace = 1)
     padding2: f32,
+    emitterWorldScale: vec3<f32>, // Escala mundial del emisor (cuando worldSpace = 1)
+    padding3: f32,
+    spawnRadius: f32,       // Radio de spawn de las partículas
 };
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
@@ -112,12 +117,24 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Generar números aleatorios basados en el thread y seed
     let seedBase = u32(spawnParams.randomSeed * 1000.0) + threadIndex;
     
-    let randomX = (randomFloat(seedBase) - 0.5) * 2.0;
-    let randomZ = (randomFloat(seedBase + 1000u) - 0.5) * 2.0;
-    let randomLifetime = 3.0 + randomFloat(seedBase + 2000u) * 2.0; // 3-5 segundos
+    let randomX = (randomFloat(seedBase) - 0.5) * 2.0 * spawnParams.spawnRadius;
+    let randomZ = (randomFloat(seedBase + 1000u) - 0.5) * 2.0 * spawnParams.spawnRadius;
+    let randomY = randomFloat(seedBase + 2000u) * spawnParams.spawnRadius;
+    let randomLifetime = 3.0 + randomFloat(seedBase + 3000u) * 2.0; // 3-5 segundos
+    
+    // Calcular posición de spawn (local o world space)
+    var spawnPosition: vec3<f32>;
+    if (spawnParams.worldSpace == 1u) {
+        // World space: usar posición absoluta del emisor + offset escalado
+        let offset = vec3<f32>(randomX, randomY, randomZ) * spawnParams.emitterWorldScale;
+        spawnPosition = spawnParams.emitterWorldPos + offset;
+    } else {
+        // Local space: posición relativa al emisor (comportamiento original)
+        spawnPosition = vec3<f32>(randomX, randomY, randomZ);
+    }
     
     // Spawn partícula directamente en el índice obtenido de free list
-    particles[particleIndex].position = vec3<f32>(randomX, 5.0, randomZ);
+    particles[particleIndex].position = spawnPosition;
     particles[particleIndex].velocity = vec3<f32>(0.0, -2.0, 0.0);
     particles[particleIndex].lifetime = randomLifetime;
     particles[particleIndex].age = 0.0;

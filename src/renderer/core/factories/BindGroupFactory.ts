@@ -966,6 +966,8 @@ export class BindGroupFactory {
         return this.getTemporalAccumulationUniformsLayout();
       case PipelineBindGroupLayouts.PARTICLE_UNIFORMS:
         return this.getParticleUniformsLayout();
+      case PipelineBindGroupLayouts.PARTICLE_WORLDSPACE_UNIFORMS:
+        return this.getParticleUniformsLayout();
       case PipelineBindGroupLayouts.INSTANCE_STORAGE:
         return this.getInstanceStorageLayout();
       case PipelineBindGroupLayouts.DOF_PARAMS:
