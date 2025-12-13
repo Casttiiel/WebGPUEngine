@@ -413,6 +413,10 @@ export class CharacterControllerComponent extends Component {
    * Aplica movimiento horizontal preservando velocidad vertical (gravedad)
    */
   private applyMovement(velocity: vec3, dt: number): void {
+    if (this.isGrounded && velocity[1] === 0.0) {
+      // Si estoy en el suelo y no hay velocidad vertical, aplicar un pequeño downward snap para el snap to ground
+      velocity[1] = -0.1;
+    }
     const movement = vec3.fromValues(velocity[0] * dt, velocity[1] * dt, velocity[2] * dt);
 
     this.characterController.computeColliderMovement(

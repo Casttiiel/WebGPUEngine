@@ -1,22 +1,21 @@
 ## Player
 
-1. Walk on slope
-2. Jump hang time
-3. Revisit shadows quality tengo (Percentage-Closer Filtering de 16 samples, soft shadows, filtro radius configurable)
+1. Jump hang time
+2. Revisit shadows quality tengo (Percentage-Closer Filtering de 16 samples, soft shadows, filtro radius configurable)
    Adaptive bias (elimina shadow acne en slopes)
    Normal offset (elimina peter-panning)
    Contact hardening básico (variable filterRadius)
-4. Mantling
-5. Shadows on Light probes
-6. Mesh follow wrong
-7. Sound
-8. Level design
-9. Improve particles
-10. Loading Bar
-11. Froxel Scattering
-12. DOF adaptative
-13. Directional Lights follow player (If snap to camera frustum, what about shadows from outside of frustum)
-14. Cascade shadow mapping (3 cascade)
+3. Mantling
+4. Shadows on Light probes
+5. Mesh follow wrong
+6. Sound
+7. Level design
+8. Improve particles
+9. Loading Bar
+10. Froxel Scattering
+11. DOF adaptative
+12. Directional Lights follow player (If snap to camera frustum, what about shadows from outside of frustum)
+13. Cascade shadow mapping (3 cascade)
 
 ---
 
