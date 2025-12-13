@@ -3,9 +3,9 @@ import { Component } from '../../core/ecs/Component';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { CameraComponent } from '../render/CameraComponent';
 import { Engine } from '../../core/engine/Engine';
-import { KeyCode } from '../../types/KeyCode.enum';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import { GameAction } from '../../types/GameAction.enum';
 
 const gravity = -9.81; // m/s²
 /**
@@ -37,7 +37,7 @@ export class CharacterControllerComponent extends Component {
   // Jump
   private jumpForce: number = 8.0; // Velocidad inicial del salto
   private jumpHoldForce: number = 0.25; // Fuerza adicional mientras se mantiene el botón (m/s²)
-  private jumpHoldThreshold: number = 0.15; // Tiempo máximo para aplicar jump hold (segundos)
+  private jumpHoldThreshold: number = 0.25; // Tiempo máximo para aplicar jump hold (segundos)
   private jumpHoldTimer: number = 0.0; // Timer para jump hold
   private jumpCutFactor: number = 0.6; // Factor para reducir la velocidad al soltar la tecla de salto (0.0 = cortar totalmente, 1.0 = no cortar)
 
@@ -146,7 +146,7 @@ export class CharacterControllerComponent extends Component {
     const targetMovement = this.getTargetMovement(inputDir);
 
     this.manageSliding(deltaTime);
-    this.manageKick();
+    this.manageKick(deltaTime);
     this.manageMovement(deltaTime, targetMovement);
     this.applyGravity(deltaTime);
     this.manageJump(deltaTime);
@@ -161,16 +161,16 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
     const inputDir = vec3.create();
 
-    if (input.isKeyPressed(KeyCode.W)) {
+    if (input.isActionPressed(GameAction.MOVE_FORWARD)) {
       inputDir[2] -= 1; // Forward
     }
-    if (input.isKeyPressed(KeyCode.S)) {
+    if (input.isActionPressed(GameAction.MOVE_BACKWARD)) {
       inputDir[2] += 1; // Backward
     }
-    if (input.isKeyPressed(KeyCode.A)) {
+    if (input.isActionPressed(GameAction.MOVE_LEFT)) {
       inputDir[0] -= 1; // Left
     }
-    if (input.isKeyPressed(KeyCode.D)) {
+    if (input.isActionPressed(GameAction.MOVE_RIGHT)) {
       inputDir[0] += 1; // Right
     }
 
@@ -227,12 +227,12 @@ export class CharacterControllerComponent extends Component {
 
   private manageSliding(deltaTime: number): void {
     const input = Engine.getInput();
-    if (!this.isSliding && input.isKeyJustPressed(KeyCode.SHIFT)) {
+    if (!this.isSliding && input.isActionJustPressed(GameAction.SLIDE)) {
       // Activar slide solo si estamos en el suelo, con velocidad suficiente Y moviendo hacia adelante (W)
-      const isMovingForward = input.isKeyPressed(KeyCode.W);
-      const isMovingLeft = input.isKeyPressed(KeyCode.A);
-      const isMovingRight = input.isKeyPressed(KeyCode.D);
-      const isMovingBackward = input.isKeyPressed(KeyCode.S);
+      const isMovingForward = input.isActionPressed(GameAction.MOVE_FORWARD);
+      const isMovingLeft = input.isActionPressed(GameAction.MOVE_LEFT);
+      const isMovingRight = input.isActionPressed(GameAction.MOVE_RIGHT);
+      const isMovingBackward = input.isActionPressed(GameAction.MOVE_BACKWARD);
       const currentSpeed = vec3.length(this.currentVelocity);
       if (
         this.isGrounded &&
@@ -255,7 +255,7 @@ export class CharacterControllerComponent extends Component {
       // 2. O perdemos contacto con el suelo (cancelación forzada)
       const minDurationPassed = this.slideTimer >= this.slideMinDuration;
       const shouldEndSlide =
-        !input.isKeyPressed(KeyCode.SHIFT) ||
+        !input.isActionPressed(GameAction.SLIDE) ||
         this.slideTimer >= this.slideDecelerationTime ||
         vec3.length(this.slideVelocity) < 0.5;
 
@@ -277,7 +277,8 @@ export class CharacterControllerComponent extends Component {
       return;
     }
 
-    if (input.isKeyJustPressed(KeyCode.E)) {
+    if (input.isActionBuffered(GameAction.KICK)) {
+      input.consumeBufferedAction(GameAction.KICK);
       const physics = Engine.getPhysics();
 
       const cameraObj = this.camera!.getCamera();
@@ -300,6 +301,7 @@ export class CharacterControllerComponent extends Component {
         undefined, // sin filtro de grupos
         this.capsuleCollider.getCollider(), // Excluir solo el propio collider
       );
+
       if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed) {
         this.applyWallKick();
         this.canAirJump = true;
@@ -307,6 +309,8 @@ export class CharacterControllerComponent extends Component {
       } else if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Dynamic) {
         if (!this.isGrounded) {
           this.applyWallKick(0.5);
+        } else {
+          this.currentVelocity = vec3.fromValues(0, 0, 0);
         }
         this.kickObject(hit.collider.parent()!);
         this.lastKickTime = this.kickCooldown; // Iniciar cooldown
@@ -474,7 +478,8 @@ export class CharacterControllerComponent extends Component {
     }
 
     // Detectar inicio del salto
-    if (input.isKeyJustPressed(KeyCode.SPACE)) {
+    if (input.isActionBuffered(GameAction.JUMP)) {
+      input.consumeBufferedAction(GameAction.JUMP);
       if (canGroundJump || this.canAirJump) {
         this.applyJump();
         this.isJumping = true; // Iniciar salto variable
@@ -485,7 +490,7 @@ export class CharacterControllerComponent extends Component {
       }
     } else if (
       this.isJumping &&
-      input.isKeyPressed(KeyCode.SPACE) &&
+      input.isActionPressed(GameAction.JUMP) &&
       this.currentVelocity[1] > 0 &&
       this.jumpHoldTimer < this.jumpHoldThreshold
     ) {
@@ -495,7 +500,7 @@ export class CharacterControllerComponent extends Component {
       this.jumpHoldTimer += deltaTime;
     } else if (
       this.isJumping &&
-      !input.isKeyPressed(KeyCode.SPACE) &&
+      !input.isActionBuffered(GameAction.JUMP) &&
       this.currentVelocity[1] > 0 &&
       !this.jumpCutFactorApplied
     ) {

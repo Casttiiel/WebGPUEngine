@@ -15,6 +15,7 @@ import { Entity } from '../../core/ecs/Entity';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { IrradianceGenerator } from '../../renderer/core/IrradianceGenerator';
 import { ResourceType } from '../../types/ResourceType.enum';
+import { Render } from '../../renderer/core/pipeline/Render';
 
 interface EnvironmentBlendState {
   startData: AmbientEnvironmentData;
@@ -118,11 +119,10 @@ export class ModuleEnvironmentManager extends Module {
     }
 
     const device = GPUUtils.getDevice();
-    const Render = await import('../../renderer/core/pipeline/Render');
 
     // ✅ IMPORTANTE: Sobrescribir dimensiones del render ANTES de crear el DeferredRenderer
     // para que todos los recursos (depth, G-Buffer, etc.) se creen con la resolución correcta
-    Render.Render.setTemporaryRenderSize(resolution, resolution);
+    Render.setTemporaryRenderSize(resolution, resolution);
 
     // Crear DeferredRenderer temporal para renderizar las 6 caras
     const tempRenderer = new DeferredRenderer();
@@ -151,8 +151,6 @@ export class ModuleEnvironmentManager extends Module {
       [vec3.fromValues(0, 0, 1), vec3.fromValues(0, -1, 0)], // +Z
       [vec3.fromValues(0, 0, -1), vec3.fromValues(0, -1, 0)], // -Z
     ];
-
-    const faceNames = ['right', 'left', 'top', 'bottom', 'front', 'back'];
 
     // Crear entidad temporal con la cámara del probe
     const tempCameraEntity = new Entity();

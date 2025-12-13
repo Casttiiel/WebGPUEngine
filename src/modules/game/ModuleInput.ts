@@ -2,6 +2,9 @@ import { Module } from '../core/Module';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { InputManager } from '../../core/input/InputManager';
+import { GameAction } from '../../types/GameAction.enum';
+import { ControlMappingConfig, InputBinding } from '../../types/ControlMapping.type';
 
 export class ModuleInput extends Module {
   private mousePosition: { x: number; y: number } = { x: 0, y: 0 }; // Para UI (no usado en cámaras)
@@ -137,8 +140,23 @@ export class ModuleInput extends Module {
   }
 
   public update(): void {
+    // Update InputManager first
+    const inputManager = InputManager.getInstance();
+
     // Update last frame's key states
     this.keysLastFrame = new Map(this.keys);
+
+    // Sync InputManager state with current inputs
+    for (const [key, pressed] of this.keys.entries()) {
+      inputManager.updateKeyState(key, pressed);
+    }
+    for (const [button, pressed] of this.mouseButtons.entries()) {
+      inputManager.updateMouseButtonState(button, pressed);
+    }
+    inputManager.updateMouseDelta(this.mouseMovement);
+
+    // Update InputManager (processes buffer, etc.)
+    inputManager.update();
 
     // Capturar el delta acumulado del frame ANTES de resetearlo
     this.mouseMovementConsumed.x = this.mouseMovement.x;
@@ -231,5 +249,135 @@ export class ModuleInput extends Module {
 
   public isPointerLockActive(): boolean {
     return this.pointerLockActive;
+  }
+
+  // ==================== INPUT MANAGER PROXY METHODS ====================
+
+  /**
+   * Verifica si una acción está actualmente presionada
+   */
+  public isActionPressed(action: GameAction): boolean {
+    return InputManager.getInstance().isActionPressed(action);
+  }
+
+  /**
+   * Verifica si una acción fue presionada este frame
+   */
+  public isActionJustPressed(action: GameAction): boolean {
+    return InputManager.getInstance().isActionJustPressed(action);
+  }
+
+  /**
+   * Obtiene el valor de una acción (útil para ejes/analógicos)
+   * @returns Valor entre -1 y 1 para ejes, 0 o 1 para botones
+   */
+  public getActionValue(action: GameAction): number {
+    return InputManager.getInstance().getActionValue(action);
+  }
+
+  /**
+   * Verifica si una acción está buffereada
+   */
+  public isActionBuffered(action: GameAction): boolean {
+    return InputManager.getInstance().isActionBuffered(action);
+  }
+
+  /**
+   * Consume una acción del buffer
+   * Útil cuando quieres procesar un input buffereado y eliminarlo
+   */
+  public consumeBufferedAction(action: GameAction): boolean {
+    return InputManager.getInstance().consumeBufferedAction(action);
+  }
+
+  /**
+   * Buffearea manualmente una acción
+   */
+  public bufferAction(action: GameAction): void {
+    InputManager.getInstance().bufferAction(action);
+  }
+
+  /**
+   * Limpia el buffer de inputs
+   */
+  public clearBuffer(): void {
+    InputManager.getInstance().clearBuffer();
+  }
+
+  /**
+   * Obtiene la ventana de buffer en milisegundos
+   */
+  public getBufferWindow(): number {
+    return InputManager.getInstance().getBufferWindow();
+  }
+
+  /**
+   * Establece la ventana de buffer en milisegundos
+   */
+  public setBufferWindow(ms: number): void {
+    InputManager.getInstance().setBufferWindow(ms);
+  }
+
+  /**
+   * Mapea una acción a un binding
+   */
+  public mapAction(action: GameAction, binding: InputBinding): void {
+    InputManager.getInstance().mapAction(action, binding);
+  }
+
+  /**
+   * Añade un binding adicional a una acción (múltiples teclas para la misma acción)
+   */
+  public addBinding(action: GameAction, binding: InputBinding): void {
+    InputManager.getInstance().addBinding(action, binding);
+  }
+
+  /**
+   * Elimina todos los bindings de una acción
+   */
+  public clearAction(action: GameAction): void {
+    InputManager.getInstance().clearAction(action);
+  }
+
+  /**
+   * Resetea el control mapping a los valores por defecto
+   */
+  public resetToDefaults(): void {
+    InputManager.getInstance().resetToDefaults();
+  }
+
+  /**
+   * Obtiene la configuración actual
+   */
+  public getInputConfig(): ControlMappingConfig {
+    return InputManager.getInstance().getConfig();
+  }
+
+  /**
+   * Carga una configuración
+   */
+  public loadInputConfig(config: ControlMappingConfig): void {
+    InputManager.getInstance().loadConfig(config);
+  }
+
+  /**
+   * Guarda la configuración en localStorage
+   */
+  public saveInputConfig(): void {
+    InputManager.getInstance().saveConfig();
+  }
+
+  /**
+   * Carga la configuración desde localStorage
+   */
+  public loadInputConfigFromStorage(): boolean {
+    return InputManager.getInstance().loadConfigFromStorage();
+  }
+
+  /**
+   * Acceso directo al InputManager (para casos avanzados)
+   */
+  public getInputManager(): InputManager {
+    return InputManager.getInstance();
   }
 }
