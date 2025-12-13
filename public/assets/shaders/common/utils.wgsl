@@ -146,16 +146,20 @@ fn direction_to_equirect_uv(dir: vec3<f32>) -> vec2<f32> {
     return vec2<f32>(u, v);
 }
 
-fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison) -> f32 {
+fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, normal: vec3<f32>, lightDir: vec3<f32>, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison) -> f32 {
     // Quick optimization: clamp coordinates instead of branching
-    let clamped_coord = clamp(homo_coord, vec2<f32>(0.0), vec2<f32>(1.0));
-    
-    // Slope-scaled bias - más bias en superficies inclinadas
-    // Aproximación simple sin textureSampleGrad (no compatible con comparison sampler)
-    let bias = 0.0005; // Bias base
-    
-    let biased_depth = coord_z - bias;
-    return textureSampleCompareLevel(shadowMap, shadowSampler, clamped_coord, biased_depth);
+    if (homo_coord.x < 0.0 || homo_coord.x > 1.0 ||
+        homo_coord.y < 0.0 || homo_coord.y > 1.0) {
+        return 1.0;
+    }
+    // Adaptive bias basado en el ángulo normal-luz
+    let cosTheta = clamp(dot(normal, -lightDir), 0.001, 1.0);
+    let tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
+    let slopeBias = clamp(tanTheta * 0.002, 0.0, 0.01);
+    let baseBias = 0.0002;
+    let totalBias = baseBias + slopeBias;
+    let biased_depth = coord_z - totalBias;
+    return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, biased_depth);
 }
 
 fn hash2(p: f32) -> vec2<f32> {
@@ -167,7 +171,7 @@ fn hash3(p: vec3<f32>) -> f32 {
     return fract(sin(dot(p, vec3<f32>(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 
-fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
+fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
     if(adaptUVs){
@@ -221,10 +225,9 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
             offsets[i].x * sinR + offsets[i].y * cosR
         );
         let sampleCoord = lightUVSpacePos.xy + rotatedOffset * filterRadius;
-        shadow += shadowsTap(sampleCoord, lightUVSpacePos.z, shadowMap, shadowSampler);
+        shadow += shadowsTap(sampleCoord, lightUVSpacePos.z, normal, lightDir, shadowMap, shadowSampler);
     }
     
     let shadowResult = shadow / 16.0;
-    // Suavizar bordes para soft shadows
-    return smoothstep(0.1, 0.9, shadowResult);
+    return shadowResult;
 }

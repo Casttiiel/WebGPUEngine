@@ -24,12 +24,15 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     
     // Shadow factor entre 0 (totalmente en sombra) y 1 (no ocluido)
     var shadow_factor = 1.0;
+    // From worldPos to Light (assuming light position is at origin for now)
+    let light_dir_full = light.position.xyz - g.worldPos;
+    let distance_to_light = abs(length(light_dir_full));
+    let light_dir = light_dir_full / distance_to_light;
     if (use_shadows) {
-        shadow_factor = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true);
+        shadow_factor = getShadowFactor(g.worldPos, g.normal, light_dir, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true);
     }
     
     let worldPos = vec4<f32>(g.worldPos, 1.0);
-    
     if (fix_shadows) {
         let almostScreenPos = light.viewProjOffset * worldPos;
         let screenPos = almostScreenPos.xyz / almostScreenPos.w;
@@ -37,12 +40,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
         if (screenPos.x < -1.0 || screenPos.x > 1.0 || screenPos.y < -1.0 || screenPos.y > 1.0 || screenPos.z < 0.0 || screenPos.z > 1.0) {
             shadow_factor = 0.0;
         }
-    }    
-    
-    // From worldPos to Light (assuming light position is at origin for now)
-    let light_dir_full = light.position.xyz - g.worldPos;
-    let distance_to_light = abs(length(light_dir_full));
-    let light_dir = light_dir_full / distance_to_light;
+    }
     
     let NdL = saturate(dot(g.normal, light_dir));
     let NdV = saturate(dot(g.normal, g.viewDir));

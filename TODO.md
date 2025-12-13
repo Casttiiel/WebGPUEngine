@@ -1,12 +1,11 @@
 ## Player
 
-1. Jump hang time
-2. Revisit shadows quality tengo (Percentage-Closer Filtering de 16 samples, soft shadows, filtro radius configurable)
-   Adaptive bias (elimina shadow acne en slopes)
+1. Revisit shadows quality tengo (Percentage-Closer Filtering de 16 samples, soft shadows, filtro radius configurable)
    Normal offset (elimina peter-panning)
    Contact hardening básico (variable filterRadius)
-3. Mantling
-4. Shadows on Light probes
+2. Mantling
+3. Shadows on Light probes
+4. Jump hang time
 5. Mesh follow wrong
 6. Sound
 7. Level design
@@ -23,3 +22,23 @@
 2. Sunset overdrive Brushstrokes
 3. Weird line on corners is irradiance because of normals
 4. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+
+Hash basado en world position ⚠️
+let random = hash3(wPos) _ 2.0 _ PI;
+
+Pros
+
+✔️ estable en el mundo
+✔️ no parpadea
+
+Contras
+
+patrones visibles en planos grandes
+
+aliasing temporal en movimiento rápido
+
+Alternativa pro
+
+Usar screen-space noise o blue noise texture:
+
+random = textureSample(noiseTex, noiseSampler, screenUV).r \* 2π;
