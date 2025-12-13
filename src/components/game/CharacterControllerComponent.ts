@@ -413,7 +413,7 @@ export class CharacterControllerComponent extends Component {
    * Aplica movimiento horizontal preservando velocidad vertical (gravedad)
    */
   private applyMovement(velocity: vec3, dt: number): void {
-    if (this.isGrounded && velocity[1] === 0.0) {
+    if (this.isGrounded && velocity[1] === 0.0 && vec3.length(velocity) > 0.01) {
       // Si estoy en el suelo y no hay velocidad vertical, aplicar un pequeño downward snap para el snap to ground
       velocity[1] = -0.1;
     }

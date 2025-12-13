@@ -7,8 +7,8 @@
         "intensity": 8,
         "near": 0.1,
         "hasShadows": true,
-        "far": 100,
-        "position": [40, 60, 55],
+        "far": 30,
+        "position": [10, 15, 14],
         "target": [0, 0, 0],
         "orthoWidth": 50,
         "orthoHeight": 50

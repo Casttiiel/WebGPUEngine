@@ -155,8 +155,8 @@ fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, normal: vec3<f32>, lightDir: 
     // Adaptive bias basado en el ángulo normal-luz
     let cosTheta = clamp(dot(normal, -lightDir), 0.001, 1.0);
     let tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
-    let slopeBias = clamp(tanTheta * 0.002, 0.0, 0.01);
-    let baseBias = 0.0002;
+    let slopeBias = clamp(tanTheta * 0.0001, 0.0, 0.001);
+    let baseBias = 0.000001;
     let totalBias = baseBias + slopeBias;
     let biased_depth = coord_z - totalBias;
     return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, biased_depth);
@@ -189,8 +189,7 @@ fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, ligh
         return 1.0; // Fuera del rango UV = sin sombra
     }
 
-    // PCF 4x4 con patrón Poisson disk para mejor distribución
-    let filterRadius = lightShadowStepDivResolution; // Radio más grande para sombras más suaves
+    let filterRadius = lightShadowStepDivResolution;
     
     // Añadir rotación aleatoria para romper patrones y hacer soft shadows
     let random = hash3(wPos) * 2.0 * PI; // 2*PI

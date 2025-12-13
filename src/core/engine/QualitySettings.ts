@@ -140,7 +140,7 @@ export class QualitySettings {
       ssrScale: 0.5,
       ssrStepSize: 0.05,
       ssrMaxSteps: 640.0,
-      directionalShadowMapResolution: 2048,
+      directionalShadowMapResolution: 4096,
       ssgiScale: 0.25,
       enableMotionBlur: true,
     } as GraphicsQualitySettings,
