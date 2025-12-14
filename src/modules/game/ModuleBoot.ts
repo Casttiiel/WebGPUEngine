@@ -68,7 +68,7 @@ export class ModuleBoot extends Module {
     }
 
     if (Engine.getInput().isKeyJustPressed(KeyCode.F1)) {
-      this.debugCameraComponent.setActive(false);
+      //this.debugCameraComponent.setActive(false);
       this.playerCameraControllerComponent.setActive(true);
       this.playerCharacterControllerComponent.setActive(true);
       Engine.getCameraMixer().blendCamera(
@@ -80,8 +80,8 @@ export class ModuleBoot extends Module {
 
     if (Engine.getInput().isKeyJustPressed(KeyCode.F2)) {
       this.debugCameraComponent.setActive(true);
-      this.playerCameraControllerComponent.setActive(false);
-      this.playerCharacterControllerComponent.setActive(false);
+      //this.playerCameraControllerComponent.setActive(false);
+      //this.playerCharacterControllerComponent.setActive(false);
       Engine.getCameraMixer().blendCamera(
         Engine.getEntities().getEntityByName('DebugCamera')!,
         1.0,

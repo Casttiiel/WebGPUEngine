@@ -59,6 +59,15 @@ export class CharacterControllerComponent extends Component {
   private kickCooldown: number = 0.5; // Cooldown entre patadas en segundos
   private lastKickTime: number = 0.0; // Tiempo desde la última patada
 
+  // Mantling (trepar)
+  private mantleDetectionDistance: number = 1.0; // Distancia para detectar obstáculos
+  private mantleMaxHeight: number = 4.5; // Altura máxima que puede trepar
+  private mantleDuration: number = 0.4; // Duración de la animación de trepar
+  private isMantling: boolean = false; // Si está actualmente trepando
+  private mantleTimer: number = 0.0; // Timer para la animación
+  private mantleStartPos: vec3 = vec3.create(); // Posición inicial del mantle
+  private mantleTargetPos: vec3 = vec3.create(); // Posición objetivo del mantle
+
   // Estado
   private isActive: boolean = true;
   private isGrounded: boolean = false;
@@ -142,11 +151,18 @@ export class CharacterControllerComponent extends Component {
 
     if (!this.capsuleCollider || !this.camera) return;
 
+    // Si estamos en mantling, solo actualizar la animación
+    if (this.isMantling) {
+      this.updateMantle(deltaTime);
+      return;
+    }
+
     const inputDir = this.getInputVector();
     const targetMovement = this.getTargetMovement(inputDir);
 
     this.manageSliding(deltaTime);
     this.manageKick(deltaTime);
+    this.manageMantling();
     this.manageMovement(deltaTime, targetMovement);
     this.applyGravity(deltaTime);
     this.manageJump(deltaTime);
@@ -316,6 +332,203 @@ export class CharacterControllerComponent extends Component {
         this.lastKickTime = this.kickCooldown; // Iniciar cooldown
       }
     }
+  }
+
+  private manageMantling(): void {
+    const input = Engine.getInput();
+
+    // Solo intentar mantle si presionamos salto en el aire cerca de una pared
+    if (!input.isActionBuffered(GameAction.JUMP) || this.isGrounded) {
+      return;
+    }
+
+    // No permitir mantle si ya estamos cayendo muy rápido
+    if (this.currentVelocity[1] < -5.0) {
+      return;
+    }
+
+    const mantleInfo = this.detectMantleOpportunity();
+    if (mantleInfo) {
+      input.consumeBufferedAction(GameAction.JUMP);
+      this.startMantle(mantleInfo.targetPosition);
+    }
+  }
+
+  /**
+   * Detecta si hay una oportunidad de hacer mantle (trepar)
+   * @returns Información del mantle si es posible, null si no
+   */
+  private detectMantleOpportunity(): { targetPosition: vec3 } | null {
+    const physics = Engine.getPhysics();
+    const cameraObj = this.camera!.getCamera();
+    const playerPos = this.capsuleCollider.getRigidBody().translation();
+
+    // Dirección horizontal hacia adelante (sin componente Y)
+    let forward = cameraObj.getFront();
+    forward[1] = 0;
+    vec3.normalize(forward, forward);
+
+    // 1. Raycast horizontal a altura de pecho para detectar obstáculo
+    const chestHeight = playerPos.y;
+    const ray1 = new RAPIER.Ray(
+      { x: playerPos.x, y: chestHeight, z: playerPos.z },
+      { x: forward[0], y: 0, z: forward[2] },
+    );
+
+    const wallHit = physics
+      .getWorld()
+      .castRay(
+        ray1,
+        this.mantleDetectionDistance,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        this.capsuleCollider.getCollider(),
+      );
+
+    // Si no hay pared enfrente, no hay mantle
+    if (!wallHit) return null;
+
+    // Solo permitir mantle en paredes estáticas
+    if (wallHit.collider.parent()!.bodyType() !== RAPIER.RigidBodyType.Fixed) {
+      return null;
+    }
+
+    // 2. Raycast vertical desde arriba de la pared hacia abajo para encontrar superficie
+    const wallDistance = wallHit.timeOfImpact;
+    const wallPoint = vec3.fromValues(
+      playerPos.x + forward[0] * wallDistance,
+      playerPos.y,
+      playerPos.z + forward[2] * wallDistance,
+    );
+
+    // Buscar superficie arriba de la pared en un rango de alturas
+    for (let heightOffset = this.mantleMaxHeight; heightOffset >= 0.5; heightOffset -= 0.2) {
+      const testHeight = playerPos.y + heightOffset;
+
+      // Raycast desde arriba hacia abajo
+      const ray2 = new RAPIER.Ray(
+        {
+          x: wallPoint[0] + forward[0] * 0.5,
+          y: testHeight,
+          z: wallPoint[2] + forward[2] * 0.5,
+        },
+        { x: 0, y: -1, z: 0 },
+      );
+
+      const groundHit = physics
+        .getWorld()
+        .castRay(
+          ray2,
+          2.0,
+          true,
+          QueryFilterFlags.EXCLUDE_SENSORS,
+          undefined,
+          this.capsuleCollider.getCollider(),
+        );
+
+      if (groundHit) {
+        const surfaceHeight = testHeight - groundHit.timeOfImpact + this.originalHeight / 2.0;
+
+        // Verificar que la superficie no esté muy alta
+        if (surfaceHeight - playerPos.y > this.mantleMaxHeight) {
+          continue;
+        }
+
+        // Verificar que hay espacio suficiente arriba para el jugador
+        const ray3 = new RAPIER.Ray(
+          {
+            x: wallPoint[0] + forward[0] * 0.5,
+            y: surfaceHeight + 0.1,
+            z: wallPoint[2] + forward[2] * 0.5,
+          },
+          { x: 0, y: 1, z: 0 },
+        );
+
+        const ceilingHit = physics
+          .getWorld()
+          .castRay(
+            ray3,
+            this.originalHeight + 0.5,
+            true,
+            QueryFilterFlags.EXCLUDE_SENSORS,
+            undefined,
+            this.capsuleCollider.getCollider(),
+          );
+
+        // Si hay techo muy cerca, no podemos trepar
+        if (ceilingHit && ceilingHit.timeOfImpact < this.originalHeight) {
+          continue;
+        }
+
+        // ¡Encontramos un lugar válido para trepar!
+        const targetPosition = vec3.fromValues(
+          wallPoint[0] + forward[0] * 0.0,
+          surfaceHeight,
+          wallPoint[2] + forward[2] * 0.0,
+        );
+        return { targetPosition };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Inicia la animación de mantle
+   */
+  private startMantle(targetPosition: vec3): void {
+    this.isMantling = true;
+    this.mantleTimer = 0.0;
+
+    const currentPos = this.capsuleCollider.getRigidBody().translation();
+    vec3.set(this.mantleStartPos, currentPos.x, currentPos.y, currentPos.z);
+    vec3.copy(this.mantleTargetPos, targetPosition);
+
+    // Detener velocidad actual (TODO: CONSERVAR COMPONENTE HORIZONTAL?)
+    this.currentVelocity = vec3.fromValues(0, 0, 0);
+    this.capsuleCollider.getRigidBody().setLinvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
+  /**
+   * Actualiza la animación de mantle cada frame
+   */
+  private updateMantle(deltaTime: number): void {
+    this.mantleTimer += deltaTime;
+
+    // Calcular progreso con ease-in-out
+    const t = Math.min(1.0, this.mantleTimer / this.mantleDuration);
+    const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    // Interpolar posición
+    const currentPos = vec3.create();
+    vec3.lerp(currentPos, this.mantleStartPos, this.mantleTargetPos, easedT);
+
+    // Aplicar posición al rigidbody
+    this.capsuleCollider
+      .getRigidBody()
+      .setTranslation({ x: currentPos[0], y: currentPos[1], z: currentPos[2] }, true);
+
+    // Terminar mantle cuando se completa la animación
+    if (t >= 1.0) {
+      this.endMantle();
+    }
+  }
+
+  /**
+   * Termina el mantle y restaura el control normal
+   */
+  private endMantle(): void {
+    this.isMantling = false;
+    this.mantleTimer = 0.0;
+
+    // Pequeño impulso hacia adelante al terminar
+    /*const cameraObj = this.camera!.getCamera();
+    let forward = cameraObj.getFront();
+    forward[1] = 0;
+    vec3.normalize(forward, forward);
+    vec3.scale(this.currentVelocity, forward, this.moveSpeed * 0.5);
+    this.currentVelocity[1] = 0;*/
   }
 
   private applyWallKick(factor: number = 1.0): void {
@@ -660,11 +873,11 @@ export class CharacterControllerComponent extends Component {
   }
 
   /**
-   * Obtiene si el personaje está en una pared
-   * @returns true si está tocando una pared
+   * Obtiene si el personaje está trepando
+   * @returns true si está en mantle
    */
-  public getIsOnWall(): boolean {
-    return this.isOnWall;
+  public getIsMantling(): boolean {
+    return this.isMantling;
   }
 
   public renderDebug(): void {

@@ -5,12 +5,12 @@
         "controllable": false,
         "fov": 60,
         "position": [
-          0,
-          3,
-          0
+          -2,
+          5,
+          2
         ],
         "target":[
-          0,2,1
+          -2,5,3
         ]
       }
     }

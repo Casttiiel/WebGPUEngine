@@ -299,11 +299,6 @@ export class InputManager {
       case InputType.KEYBOARD:
         const currentKey = this.currentKeys.get(binding.key!) || false;
         const previousKey = this.previousKeys.get(binding.key!) || false;
-        console.log(
-          '..................',
-          this.currentKeys.get(binding.key!),
-          this.previousKeys.get(binding.key!),
-        );
         return currentKey && !previousKey;
 
       case InputType.MOUSE_BUTTON:
