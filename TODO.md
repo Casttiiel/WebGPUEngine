@@ -1,15 +1,16 @@
 ## Player
 
-1. Shadows on Light probes
-2. Mesh follow wrong
-3. Jump hang time
+1. Mesh follow wrong
+2. Jump hang time
+3. Tune mechanics
 4. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-5. Sound
-6. Level design
-7. Improve particles
-8. Loading Bar
-9. Froxel Scattering
-10. DOF adaptative
+5. Multiple Light probes has good shadows?
+6. Sound
+7. Level design
+8. Improve particles
+9. Loading Bar
+10. Froxel Scattering
+11. DOF adaptative
 
 ---
 

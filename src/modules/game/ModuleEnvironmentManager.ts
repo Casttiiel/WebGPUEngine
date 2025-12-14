@@ -172,7 +172,7 @@ export class ModuleEnvironmentManager extends Module {
       camera.setViewport(resolution, resolution);
 
       // ✅ INICIAR NUEVO FRAME para el probe (encoder independiente)
-      Render.Render.getInstance().beginFrame('Reflection Probe Capture');
+      Render.getInstance().beginFrame();
       // ✅ CRÍTICO: Configurar la cámara del probe como cámara principal temporal
       // Esto hace que AmbientLight, DirectionalLight y otras luces usen esta cámara
       // en lugar de la cámara principal de la escena
@@ -198,7 +198,7 @@ export class ModuleEnvironmentManager extends Module {
       tempRenderer.render(tempCameraEntity, true);
 
       // ✅ Finalizar frame del probe
-      Render.Render.getInstance().endFrame();
+      Render.getInstance().endFrame();
 
       // ✅ Copiar resultado del rtAccLight al cubemap
       const encoder = device.createCommandEncoder({
@@ -225,7 +225,7 @@ export class ModuleEnvironmentManager extends Module {
     tempRenderer.destroy();
 
     // ✅ Restaurar dimensiones originales del render
-    Render.Render.restoreRenderSize();
+    Render.restoreRenderSize();
 
     // ✅ Generar irradiance cubemap a partir del reflection cubemap
     await this.generateAndDownloadIrradiance(cubemapTexture, probeName, resolution);
