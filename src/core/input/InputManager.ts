@@ -28,6 +28,7 @@ export class InputManager {
   private currentKeys: Map<KeyCode, boolean> = new Map();
   private previousKeys: Map<KeyCode, boolean> = new Map();
   private currentMouseButtons: Map<MouseButton, boolean> = new Map();
+  private previousMouseButtons: Map<MouseButton, boolean> = new Map();
   private mouseDelta: { x: number; y: number } = { x: 0, y: 0 };
 
   private constructor() {
@@ -51,9 +52,14 @@ export class InputManager {
 
     // Detectar acciones "just pressed" y añadirlas al buffer automáticamente
     this.autoBufferJustPressedActions();
+  }
 
-    // Copiar estado actual a estado anterior para el siguiente frame
+  /**
+   * Debe llamarse al INICIO del frame para copiar currentKeys a previousKeys
+   */
+  public beginFrame(): void {
     this.previousKeys = new Map(this.currentKeys);
+    this.previousMouseButtons = new Map(this.currentMouseButtons);
   }
 
   /**
@@ -291,13 +297,19 @@ export class InputManager {
   private isBindingJustPressed(binding: InputBinding): boolean {
     switch (binding.type) {
       case InputType.KEYBOARD:
-        const current = this.currentKeys.get(binding.key!) || false;
-        const previous = this.previousKeys.get(binding.key!) || false;
-        return current && !previous;
+        const currentKey = this.currentKeys.get(binding.key!) || false;
+        const previousKey = this.previousKeys.get(binding.key!) || false;
+        console.log(
+          '..................',
+          this.currentKeys.get(binding.key!),
+          this.previousKeys.get(binding.key!),
+        );
+        return currentKey && !previousKey;
 
       case InputType.MOUSE_BUTTON:
-        // Para mouse buttons, solo detectamos el frame actual (no tenemos histórico)
-        return this.currentMouseButtons.get(binding.button!) || false;
+        const currentButton = this.currentMouseButtons.get(binding.button!) || false;
+        const previousButton = this.previousMouseButtons.get(binding.button!) || false;
+        return currentButton && !previousButton;
 
       case InputType.MOUSE_AXIS:
         // Los ejes no tienen "just pressed"

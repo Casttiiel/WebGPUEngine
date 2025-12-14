@@ -2,16 +2,15 @@
 
 1. Mantling
 2. Shadows on Light probes
-3. Jump hang time
-4. Mesh follow wrong
-5. Directional Lights follow player (If snap to camera frustum, what about shadows from outside of frustum)
-6. Cascade shadow mapping (3 cascade)
-7. Sound
-8. Level design
-9. Improve particles
-10. Loading Bar
-11. Froxel Scattering
-12. DOF adaptative
+3. Mesh follow wrong
+4. Jump hang time
+5. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+6. Sound
+7. Level design
+8. Improve particles
+9. Loading Bar
+10. Froxel Scattering
+11. DOF adaptative
 
 ---
 

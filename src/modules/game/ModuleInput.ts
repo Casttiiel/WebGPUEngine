@@ -140,13 +140,11 @@ export class ModuleInput extends Module {
   }
 
   public update(): void {
-    // Update InputManager first
+    // 0. Copiar currentKeys a previousKeys al inicio del frame
     const inputManager = InputManager.getInstance();
+    inputManager.beginFrame();
 
-    // Update last frame's key states
-    this.keysLastFrame = new Map(this.keys);
-
-    // Sync InputManager state with current inputs
+    // 1. Sincronizar estados actuales con InputManager
     for (const [key, pressed] of this.keys.entries()) {
       inputManager.updateKeyState(key, pressed);
     }
@@ -155,19 +153,22 @@ export class ModuleInput extends Module {
     }
     inputManager.updateMouseDelta(this.mouseMovement);
 
-    // Update InputManager (processes buffer, etc.)
+    // 2. Actualizar InputManager (procesa buffer, pero ya NO copia current->previous)
     inputManager.update();
 
-    // Capturar el delta acumulado del frame ANTES de resetearlo
+    // 3. Copiar estado actual a lastFrame (para métodos locales tipo isKeyJustPressed)
+    this.keysLastFrame = new Map(this.keys);
+
+    // 4. Capturar el delta acumulado del frame ANTES de resetearlo
     this.mouseMovementConsumed.x = this.mouseMovement.x;
     this.mouseMovementConsumed.y = this.mouseMovement.y;
 
-    // Actualizar valores de debug
+    // 5. Actualizar valores de debug
     this.debugValues.mouseDeltaX.value = this.mouseMovementConsumed.x;
     this.debugValues.mouseDeltaY.value = this.mouseMovementConsumed.y;
     this.debugValues.mouseWheel.value = this.mouseWheelDelta;
 
-    // Actualizar valores para Tweakpane
+    // 6. Actualizar valores para Tweakpane
     this.debugValues.mouseLeft.value = this.isMouseButtonPressed(MouseButton.LEFT);
     this.debugValues.mouseRight.value = this.isMouseButtonPressed(MouseButton.RIGHT);
     this.debugValues.keyW.value = this.isKeyPressed(KeyCode.W);
@@ -175,7 +176,7 @@ export class ModuleInput extends Module {
     this.debugValues.keyS.value = this.isKeyPressed(KeyCode.S);
     this.debugValues.keyD.value = this.isKeyPressed(KeyCode.D);
 
-    // Reset per-frame values AL FINAL del update (después de que todos los módulos lo hayan consumido)
+    // 7. Reset per-frame values AL FINAL del update (después de que todos los módulos lo hayan consumido)
     this.mouseWheelDelta = 0;
     this.mouseMovement = { x: 0, y: 0 };
   }
