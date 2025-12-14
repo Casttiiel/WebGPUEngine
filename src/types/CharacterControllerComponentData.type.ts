@@ -13,8 +13,7 @@ export type CharacterControllerComponentDataType = {
   slideMinDuration?: number; // Minimum slide duration before it can be cancelled in seconds (default: 0.5)
   wallJumpForce?: number; // Wall jump vertical force (default: 8.0)
   wallJumpAwayForce?: number; // Wall jump horizontal push away from wall (default: 6.0)
-  wallJumpCooldown?: number; // Cooldown between wall jumps in seconds (default: 0.3)
   wallCheckDistance?: number; // Distance to check for walls (default: 0.6)
   wallSlideGravityMultiplier?: number; // Gravity reduction when sliding on wall (default: 0.3)
-  kickCooldown?: number; // Cooldown between kicks in seconds (default: 0.5)
+  wallJumpCooldown?: number; // Cooldown between wall jumps in seconds (default: 0.5)
 };

@@ -1,16 +1,24 @@
 ## Player
 
-1. Mesh follow wrong
-2. Jump hang time
-3. Tune mechanics
-4. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-5. Multiple Light probes has good shadows?
-6. Sound
-7. Level design
-8. Improve particles
+1. Tune simple mechanics
+   Dive
+   Slide on slope gain speed
+   Keep momentum on mantling
+
+   Keep Momentum on walljump?
+   Can change direction of slide?
+   Wall Jump change how it behaves?
+   Jump good? Jump hang time
+
+2. Camera Tilt
+3. Chain mecanics
+4. Level design
+5. Improve particles
+6. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+7. Sound
+8. Froxel Scattering
 9. Loading Bar
-10. Froxel Scattering
-11. DOF adaptative
+10. Multiple Light probes has good shadows?
 
 ---
 

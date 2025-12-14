@@ -41,10 +41,8 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
 
   // Actions
   jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
+  wall_jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
   slide: { type: InputType.KEYBOARD, key: KeyCode.SHIFT },
-  kick: { type: InputType.KEYBOARD, key: KeyCode.E },
-  crouch: { type: InputType.KEYBOARD, key: KeyCode.CTRL },
-  sprint: { type: InputType.KEYBOARD, key: KeyCode.SHIFT },
 
   // Combat
   fire: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },

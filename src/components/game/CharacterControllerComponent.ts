@@ -30,8 +30,6 @@ export class CharacterControllerComponent extends Component {
 
   // Movement
   private moveSpeed: number = 5.0; // Unidades por segundo
-  private accelerationFactor: number = 1.0; // Tiempo para alcanzar velocidad máxima (segundos)
-  private decelerationFactor: number = 0.15; // Tiempo para frenar completamente (segundos)
   private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
 
   // Jump
@@ -55,9 +53,9 @@ export class CharacterControllerComponent extends Component {
   private originalHeight: number = 0.0; // Altura original del collider
   private originalRadius: number = 0.0; // Radio original del collider
 
-  // Kick
-  private kickCooldown: number = 0.5; // Cooldown entre patadas en segundos
-  private lastKickTime: number = 0.0; // Tiempo desde la última patada
+  // WallJump
+  private wallJumpCooldown: number = 0.5; // Cooldown entre patadas en segundos
+  private lastWallJumpTime: number = 0.0; // Tiempo desde la última patada
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.0; // Distancia para detectar obstáculos
@@ -73,7 +71,7 @@ export class CharacterControllerComponent extends Component {
   private isGrounded: boolean = false;
   private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
   private isSliding: boolean = false;
-  private canAirJump: boolean = false; // Permitir salto en aire tras wall kick
+  private canAirJump: boolean = false; // Permitir salto en aire tras wall jump
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
   private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
 
@@ -104,15 +102,6 @@ export class CharacterControllerComponent extends Component {
     if (data.jumpHoldForce !== undefined) {
       this.jumpHoldForce = data.jumpHoldForce;
     }
-    if (data.accelerationFactor !== undefined) {
-      this.accelerationFactor = data.accelerationFactor;
-    }
-    if (data.accelerationFactor !== undefined) {
-      this.accelerationFactor = data.accelerationFactor;
-    }
-    if (data.decelerationFactor !== undefined) {
-      this.decelerationFactor = data.decelerationFactor;
-    }
     if (data.coyoteTime !== undefined) {
       this.coyoteTime = data.coyoteTime;
     }
@@ -131,8 +120,8 @@ export class CharacterControllerComponent extends Component {
     if (data.slideMinDuration !== undefined) {
       this.slideMinDuration = data.slideMinDuration;
     }
-    if (data.kickCooldown !== undefined) {
-      this.kickCooldown = data.kickCooldown;
+    if (data.wallJumpCooldown !== undefined) {
+      this.wallJumpCooldown = data.wallJumpCooldown;
     }
 
     // Guardar dimensiones originales del collider
@@ -156,12 +145,12 @@ export class CharacterControllerComponent extends Component {
       this.updateMantle(deltaTime);
       return;
     }
-
+    console.log('-------------');
     const inputDir = this.getInputVector();
     const targetMovement = this.getTargetMovement(inputDir);
 
     this.manageSliding(deltaTime);
-    this.manageKick(deltaTime);
+    this.manageWallJump(deltaTime);
     this.manageMantling();
     this.manageMovement(deltaTime, targetMovement);
     this.applyGravity(deltaTime);
@@ -281,20 +270,20 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
-  private manageKick(deltaTime: number): void {
+  private manageWallJump(deltaTime: number): void {
     const input = Engine.getInput();
 
-    // Actualizar cooldown de kick
-    if (this.lastKickTime > 0.0) {
-      this.lastKickTime -= deltaTime;
-      if (this.lastKickTime < 0.0) {
-        this.lastKickTime = 0.0;
+    // Actualizar cooldown de walljump
+    if (this.lastWallJumpTime > 0.0) {
+      this.lastWallJumpTime -= deltaTime;
+      if (this.lastWallJumpTime < 0.0) {
+        this.lastWallJumpTime = 0.0;
       }
       return;
     }
 
-    if (input.isActionBuffered(GameAction.KICK)) {
-      input.consumeBufferedAction(GameAction.KICK);
+    if (input.isActionBuffered(GameAction.WALL_JUMP)) {
+      input.consumeBufferedAction(GameAction.WALL_JUMP);
       const physics = Engine.getPhysics();
 
       const cameraObj = this.camera!.getCamera();
@@ -319,17 +308,18 @@ export class CharacterControllerComponent extends Component {
       );
 
       if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed) {
-        this.applyWallKick();
+        this.applyWallJump();
         this.canAirJump = true;
-        this.lastKickTime = this.kickCooldown; // Iniciar cooldown
+        console.log('enable air jump');
+        this.lastWallJumpTime = this.wallJumpCooldown; // Iniciar cooldown
       } else if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Dynamic) {
         if (!this.isGrounded) {
-          this.applyWallKick(0.5);
+          this.applyWallJump(0.5);
         } else {
           this.currentVelocity = vec3.fromValues(0, 0, 0);
         }
         this.kickObject(hit.collider.parent()!);
-        this.lastKickTime = this.kickCooldown; // Iniciar cooldown
+        this.lastWallJumpTime = this.wallJumpCooldown; // Iniciar cooldown
       }
     }
   }
@@ -337,20 +327,16 @@ export class CharacterControllerComponent extends Component {
   private manageMantling(): void {
     const input = Engine.getInput();
 
-    // Solo intentar mantle si presionamos salto en el aire cerca de una pared
-    if (!input.isActionBuffered(GameAction.JUMP) || this.isGrounded) {
+    // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
+    if (this.currentVelocity[1] < -5.0 || this.isGrounded) {
       return;
     }
 
-    // No permitir mantle si ya estamos cayendo muy rápido
-    if (this.currentVelocity[1] < -5.0) {
-      return;
-    }
-
-    const mantleInfo = this.detectMantleOpportunity();
-    if (mantleInfo) {
-      input.consumeBufferedAction(GameAction.JUMP);
-      this.startMantle(mantleInfo.targetPosition);
+    if (input.isActionPressed(GameAction.MOVE_FORWARD)) {
+      const mantleInfo = this.detectMantleOpportunity();
+      if (mantleInfo) {
+        this.startMantle(mantleInfo.targetPosition);
+      }
     }
   }
 
@@ -531,19 +517,19 @@ export class CharacterControllerComponent extends Component {
     this.currentVelocity[1] = 0;*/
   }
 
-  private applyWallKick(factor: number = 1.0): void {
+  private applyWallJump(factor: number = 1.0): void {
     const cameraObj = this.camera!.getCamera();
     let cameraForward = cameraObj.getFront();
     cameraForward[1] = 0.0;
     vec3.normalize(cameraForward, cameraForward);
 
-    let kickWallVelocity = vec3.create();
-    vec3.scale(kickWallVelocity, cameraForward, -4.0 * factor);
-    let kickWallJumpVelocity = vec3.fromValues(0, 5.0 * factor, 0);
+    let wallJumpVelocity = vec3.create();
+    vec3.scale(wallJumpVelocity, cameraForward, -4.0 * factor);
+    let wallJumpVerticalVelocity = vec3.fromValues(0, 5.0 * factor, 0);
 
-    vec3.add(kickWallVelocity, kickWallVelocity, kickWallJumpVelocity);
+    vec3.add(wallJumpVelocity, wallJumpVelocity, wallJumpVerticalVelocity);
 
-    this.currentVelocity = kickWallVelocity;
+    this.currentVelocity = wallJumpVelocity;
   }
 
   private kickObject(rigidbody: RAPIER.RigidBody): void {
@@ -572,19 +558,10 @@ export class CharacterControllerComponent extends Component {
     if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración suave
       if (hasInput) {
-        vec3.scale(targetMovement, targetMovement, this.moveSpeed);
-        const smoothFactor = Math.min(1.0, deltaTime * this.accelerationFactor);
-        const t = Math.pow(smoothFactor, 0.5);
-        vec3.lerp(this.currentVelocity, this.currentVelocity, targetMovement, t);
+        vec3.scale(this.currentVelocity, targetMovement, this.moveSpeed);
       } else {
         // Deceleración en suelo
-        const smoothFactor = Math.min(1.0, deltaTime * this.decelerationFactor);
-        const t = 1.0 - Math.pow(1.0 - smoothFactor, 5.0);
-        vec3.scale(this.currentVelocity, this.currentVelocity, 1.0 - t);
-
-        if (vec3.length(this.currentVelocity) < 0.01) {
-          vec3.set(this.currentVelocity, 0, 0, 0);
-        }
+        vec3.set(this.currentVelocity, 0, 0, 0);
       }
     } else if (!this.isSliding && !this.isGrounded) {
       // EN AIRE: Preservar momentum + pequeñas correcciones
@@ -605,7 +582,7 @@ export class CharacterControllerComponent extends Component {
 
         // Limitar la velocidad máxima para evitar aceleración infinita
         const currentSpeed = vec3.length(this.currentVelocity);
-        const maxAirSpeed = this.moveSpeed * 1.1; // 10% más rápido que en suelo
+        const maxAirSpeed = this.moveSpeed * 1.0;
         if (currentSpeed > maxAirSpeed) {
           vec3.normalize(this.currentVelocity, this.currentVelocity);
           vec3.scale(this.currentVelocity, this.currentVelocity, maxAirSpeed);
@@ -701,6 +678,7 @@ export class CharacterControllerComponent extends Component {
         this.applyJump();
         this.isJumping = true; // Iniciar salto variable
         this.canAirJump = false; // Consumir posible air jump
+        console.log('disable air jump');
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
         this.jumpHoldTimer = 0.0; // Reset jump hold timer
         this.jumpCutFactorApplied = false;
