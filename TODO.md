@@ -1,24 +1,24 @@
 ## Player
 
 1. Tune simple mechanics
-   Dive
    Slide on slope gain speed
    Keep momentum on mantling
 
    Keep Momentum on walljump?
    Can change direction of slide?
    Wall Jump change how it behaves?
-   Jump good? Jump hang time
 
 2. Camera Tilt
 3. Chain mecanics
 4. Level design
-5. Improve particles
-6. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-7. Sound
-8. Froxel Scattering
-9. Loading Bar
-10. Multiple Light probes has good shadows?
+5. Test
+6. VFX
+7. Improve particles
+8. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+9. Sound
+10. Froxel Scattering
+11. Loading Bar
+12. Multiple Light probes has good shadows?
 
 ---
 

@@ -59,18 +59,22 @@ export class CharacterControllerComponent extends Component {
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.0; // Distancia para detectar obstáculos
-  private mantleMaxHeight: number = 4.5; // Altura máxima que puede trepar
+  private mantleMaxHeight: number = 2.5; // Altura máxima que puede trepar
   private mantleDuration: number = 0.4; // Duración de la animación de trepar
   private isMantling: boolean = false; // Si está actualmente trepando
   private mantleTimer: number = 0.0; // Timer para la animación
   private mantleStartPos: vec3 = vec3.create(); // Posición inicial del mantle
   private mantleTargetPos: vec3 = vec3.create(); // Posición objetivo del mantle
 
+  // Diving
+  private divingGravityMultiplier: number = 4.0; // Multiplicador de gravedad al caer en picado
+
   // Estado
   private isActive: boolean = true;
   private isGrounded: boolean = false;
   private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
   private isSliding: boolean = false;
+  private isDiving: boolean = false;
   private canAirJump: boolean = false; // Permitir salto en aire tras wall jump
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
   private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
@@ -152,6 +156,7 @@ export class CharacterControllerComponent extends Component {
     this.manageSliding(deltaTime);
     this.manageWallJump(deltaTime);
     this.manageMantling();
+    this.manageDiving();
     this.manageMovement(deltaTime, targetMovement);
     this.applyGravity(deltaTime);
     this.manageJump(deltaTime);
@@ -226,7 +231,8 @@ export class CharacterControllerComponent extends Component {
       this.isJumping = false;
       this.canAirJump = false; // Reset air jump when grounded
     } else {
-      this.currentVelocity[1] += gravity * deltaTime;
+      const multiplier = this.isDiving ? this.divingGravityMultiplier : 1.0;
+      this.currentVelocity[1] += gravity * deltaTime * multiplier;
     }
   }
 
@@ -270,6 +276,14 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
+  private manageDiving(): void {
+    const input = Engine.getInput();
+
+    if (input.isActionJustPressed(GameAction.DIVE) && !this.isGrounded) {
+      this.isDiving = true;
+    }
+  }
+
   private manageWallJump(deltaTime: number): void {
     const input = Engine.getInput();
 
@@ -310,11 +324,13 @@ export class CharacterControllerComponent extends Component {
       if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed) {
         this.applyWallJump();
         this.canAirJump = true;
+        this.isDiving = false;
         console.log('enable air jump');
         this.lastWallJumpTime = this.wallJumpCooldown; // Iniciar cooldown
       } else if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Dynamic) {
         if (!this.isGrounded) {
           this.applyWallJump(0.5);
+          this.isDiving = false;
         } else {
           this.currentVelocity = vec3.fromValues(0, 0, 0);
         }
@@ -328,7 +344,7 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
 
     // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
-    if (this.currentVelocity[1] < -5.0 || this.isGrounded) {
+    if (this.currentVelocity[1] < -5.0 || this.isGrounded || this.isDiving) {
       return;
     }
 
@@ -590,7 +606,7 @@ export class CharacterControllerComponent extends Component {
       } else {
         // Sin input en el aire: mantener momentum (casi sin deceleración)
         // Solo una deceleración mínima por resistencia del aire
-        const airDrag = 0.04; // 2% de drag por segundo
+        const airDrag = 0.1; // 10% de drag por segundo
         const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
         vec3.scale(this.currentVelocity, this.currentVelocity, dragFactor);
       }
@@ -616,6 +632,9 @@ export class CharacterControllerComponent extends Component {
     );
 
     this.isGrounded = this.capsuleCollider.raycastGrounded(0.1);
+    if (this.isGrounded) {
+      this.isDiving = false;
+    }
     let correctedMovement = this.characterController.computedMovement();
 
     // Aplicar movimiento real

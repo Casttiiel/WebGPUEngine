@@ -43,6 +43,7 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
   jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
   wall_jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
   slide: { type: InputType.KEYBOARD, key: KeyCode.SHIFT },
+  dive: { type: InputType.KEYBOARD, key: KeyCode.CTRL },
 
   // Combat
   fire: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },

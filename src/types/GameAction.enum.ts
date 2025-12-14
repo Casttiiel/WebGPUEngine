@@ -13,26 +13,11 @@ export enum GameAction {
   JUMP = 'jump',
   SLIDE = 'slide',
   WALL_JUMP = 'wall_jump',
-  CROUCH = 'crouch',
-  SPRINT = 'sprint',
-
-  // Combat
-  FIRE = 'fire',
-  AIM = 'aim',
-  RELOAD = 'reload',
-  MELEE = 'melee',
-
-  // Interaction
-  INTERACT = 'interact',
-  USE = 'use',
+  DIVE = 'dive',
 
   // Camera
   LOOK_UP = 'look_up',
   LOOK_DOWN = 'look_down',
   LOOK_LEFT = 'look_left',
   LOOK_RIGHT = 'look_right',
-
-  // UI
-  PAUSE = 'pause',
-  INVENTORY = 'inventory',
 }
