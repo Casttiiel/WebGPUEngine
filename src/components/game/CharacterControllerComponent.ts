@@ -59,7 +59,7 @@ export class CharacterControllerComponent extends Component {
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
-  private mantleMaxHeight: number = 1.0; // Altura máxima que puede trepar
+  private mantleMaxHeight: number = -0.025; // Altura máxima que puede trepar relativa a la camara
   private mantleDuration: number = 0.2; // Duración de la animación de trepar
   private isMantling: boolean = false; // Si está actualmente trepando
   private mantleTimer: number = 0.0; // Timer para la animación
@@ -395,7 +395,6 @@ export class CharacterControllerComponent extends Component {
     if (wallHit.collider.parent()!.bodyType() !== RAPIER.RigidBodyType.Fixed) {
       return null;
     }
-
     // 2. Raycast vertical desde arriba de la pared hacia abajo para encontrar superficie
     const wallDistance = wallHit.timeOfImpact;
     const wallPoint = vec3.fromValues(
@@ -404,73 +403,69 @@ export class CharacterControllerComponent extends Component {
       playerPos.z + forward[2] * wallDistance,
     );
 
-    // Buscar superficie arriba de la pared en un rango de alturas
-    for (let heightOffset = this.mantleMaxHeight; heightOffset >= 0.5; heightOffset -= 0.2) {
-      const testHeight = playerPos.y + heightOffset;
+    // Buscar superficie arriba de la pared
+    // Raycast desde arriba hacia abajo
+    const ray2 = new RAPIER.Ray(
+      {
+        x: wallPoint[0] + forward[0] * 0.5,
+        y: playerPos.y + this.originalHeight / 2.0 + this.originalRadius,
+        z: wallPoint[2] + forward[2] * 0.5,
+      },
+      { x: 0, y: -1, z: 0 },
+    );
 
-      // Raycast desde arriba hacia abajo
-      const ray2 = new RAPIER.Ray(
-        {
-          x: wallPoint[0] + forward[0] * 0.5,
-          y: testHeight,
-          z: wallPoint[2] + forward[2] * 0.5,
-        },
-        { x: 0, y: -1, z: 0 },
+    const groundHit = physics
+      .getWorld()
+      .castRay(
+        ray2,
+        this.originalHeight + this.originalRadius * 2.0,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        this.capsuleCollider.getCollider(),
       );
 
-      const groundHit = physics
+    if (groundHit) {
+      const surfaceHeight = ray2.origin.y - groundHit.timeOfImpact;
+
+      // Verificar que la superficie no esté muy alta
+      if (surfaceHeight > cameraObj.getPosition()[1] + this.mantleMaxHeight) {
+        return null;
+      }
+
+      // Verificar que hay espacio suficiente arriba para el jugador
+      const ray3 = new RAPIER.Ray(
+        {
+          x: wallPoint[0] + forward[0] * 0.5,
+          y: surfaceHeight + 0.1,
+          z: wallPoint[2] + forward[2] * 0.5,
+        },
+        { x: 0, y: 1, z: 0 },
+      );
+
+      const ceilingHit = physics
         .getWorld()
         .castRay(
-          ray2,
-          2.0,
+          ray3,
+          this.originalHeight + 0.5,
           true,
           QueryFilterFlags.EXCLUDE_SENSORS,
           undefined,
           this.capsuleCollider.getCollider(),
         );
 
-      if (groundHit) {
-        const surfaceHeight = testHeight - groundHit.timeOfImpact + this.originalHeight / 2.0;
-
-        // Verificar que la superficie no esté muy alta
-        if (surfaceHeight - playerPos.y > this.mantleMaxHeight) {
-          continue;
-        }
-
-        // Verificar que hay espacio suficiente arriba para el jugador
-        const ray3 = new RAPIER.Ray(
-          {
-            x: wallPoint[0] + forward[0] * 0.5,
-            y: surfaceHeight + 0.1,
-            z: wallPoint[2] + forward[2] * 0.5,
-          },
-          { x: 0, y: 1, z: 0 },
-        );
-
-        const ceilingHit = physics
-          .getWorld()
-          .castRay(
-            ray3,
-            this.originalHeight + 0.5,
-            true,
-            QueryFilterFlags.EXCLUDE_SENSORS,
-            undefined,
-            this.capsuleCollider.getCollider(),
-          );
-
-        // Si hay techo muy cerca, no podemos trepar
-        if (ceilingHit && ceilingHit.timeOfImpact < this.originalHeight) {
-          continue;
-        }
-
-        // ¡Encontramos un lugar válido para trepar!
-        const targetPosition = vec3.fromValues(
-          wallPoint[0] + forward[0] * 0.5,
-          surfaceHeight,
-          wallPoint[2] + forward[2] * 0.5,
-        );
-        return { targetPosition };
+      // Si hay techo muy cerca, no podemos trepar
+      if (ceilingHit && ceilingHit.timeOfImpact < this.originalHeight) {
+        return null;
       }
+
+      // ¡Encontramos un lugar válido para trepar!
+      const targetPosition = vec3.fromValues(
+        wallPoint[0] + forward[0] * 0.5,
+        surfaceHeight + this.originalHeight / 2.0,
+        wallPoint[2] + forward[2] * 0.5,
+      );
+      return { targetPosition };
     }
 
     return null;
