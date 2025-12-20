@@ -1,25 +1,28 @@
 ## Player
 
 1. Mechanics
-   Keep momentum on mantling (Mantling super fast. Boost after mantling. End speed of mantling.)
-   Mantling on diagonal wall?
-   Slide on slope gain speed (slide change implementation)
+   Mantling Edge Height correct
+   Mantling Target Position correct
+   End speed of mantling
+   Boost after mantling
+   Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
+   Walk/Slide based on ground slope
+   Slide on slope gain speed
 
 2. Camera Tilt
+   On walking
+   On Mantling
    Wall Jump change how it behaves?
 3. Level design
    Keep Momentum on walljump?
    Can change direction of slide?
-4. Test
-   Wall Jump
-   Wall Jump + Mantling
-5. VFX
-6. Improve particles
-7. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-8. Sound
-9. Froxel Scattering
-10. Loading Bar
-11. Multiple Light probes has good shadows?
+4. VFX
+5. Improve particles
+6. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+7. Sound
+8. Froxel Scattering
+9. Loading Bar
+10. Multiple Light probes has good shadows?
 
 ---
 
