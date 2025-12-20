@@ -58,9 +58,9 @@ export class CharacterControllerComponent extends Component {
   private lastWallJumpTime: number = 0.0; // Tiempo desde la última patada
 
   // Mantling (trepar)
-  private mantleDetectionDistance: number = 1.0; // Distancia para detectar obstáculos
-  private mantleMaxHeight: number = 2.5; // Altura máxima que puede trepar
-  private mantleDuration: number = 0.4; // Duración de la animación de trepar
+  private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
+  private mantleMaxHeight: number = 1.0; // Altura máxima que puede trepar
+  private mantleDuration: number = 0.2; // Duración de la animación de trepar
   private isMantling: boolean = false; // Si está actualmente trepando
   private mantleTimer: number = 0.0; // Timer para la animación
   private mantleStartPos: vec3 = vec3.create(); // Posición inicial del mantle
@@ -344,7 +344,7 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
 
     // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
-    if (this.currentVelocity[1] < -5.0 || this.isGrounded || this.isDiving) {
+    if (this.currentVelocity[1] < -5.0 || this.isDiving) {
       return;
     }
 
@@ -465,9 +465,9 @@ export class CharacterControllerComponent extends Component {
 
         // ¡Encontramos un lugar válido para trepar!
         const targetPosition = vec3.fromValues(
-          wallPoint[0] + forward[0] * 0.0,
+          wallPoint[0] + forward[0] * 0.5,
           surfaceHeight,
-          wallPoint[2] + forward[2] * 0.0,
+          wallPoint[2] + forward[2] * 0.5,
         );
         return { targetPosition };
       }
@@ -658,6 +658,7 @@ export class CharacterControllerComponent extends Component {
 
       if (type === RAPIER.RigidBodyType.Fixed) {
         this.removeVelocityIntoWall(collision.normal1);
+        this.slowDownOnWallCollision();
       }
     }
   }
@@ -674,6 +675,11 @@ export class CharacterControllerComponent extends Component {
       this.currentVelocity[1] -= dot * collisionNormal.y;
       this.currentVelocity[2] -= dot * collisionNormal.z;
     }
+  }
+
+  private slowDownOnWallCollision(): void {
+    this.currentVelocity[0] *= 0.8;
+    this.currentVelocity[2] *= 0.8;
   }
 
   private manageJump(deltaTime: number): void {
