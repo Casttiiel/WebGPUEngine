@@ -59,14 +59,19 @@ export class ReflectionProbeComponent extends Component {
 
   private onEntityEnter(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('character_controller')) {
+    const envTextureName = this.getOwner().getName() + '_env_cubemap_T.png';
+    const irrTextureName = this.getOwner().getName() + '_irradiance_cubemap_T.png';
+
+    if (
+      entity &&
+      entity.hasComponent('character_controller') &&
+      Engine.getEnvironmentManager().getSSREnvironmentTexture().getName() !== envTextureName &&
+      Engine.getEnvironmentManager().getAmbientLightData().irradianceCubemap.getName() !==
+        irrTextureName
+    ) {
       this.entitiesInside.add(entityId);
-      Engine.getEnvironmentManager().changeSSREnvironmentTexture(
-        this.getOwner().getName() + '_cubemap_T.png',
-      );
-      Engine.getEnvironmentManager().changeIrradianceTexture(
-        this.getOwner().getName() + '_irradiance_cubemap_T.png',
-      );
+      Engine.getEnvironmentManager().changeSSREnvironmentTexture(envTextureName);
+      Engine.getEnvironmentManager().changeIrradianceTexture(irrTextureName);
     }
   }
 

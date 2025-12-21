@@ -10,18 +10,17 @@
    On walking
    On Mantling
 3. Speed VFX
-4. Prevent same light probe to be activated repeated times
-5. Level design
+4. Level design
    Can change direction of slide?
    Wall Jump change how it behaves?
    Keep Momentum on walljump?
    Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
-6. Froxel Scattering
-7. Sound
-8. Improve particles
-9. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-10. Loading Bar
-11. Multiple Light probes has good shadows?
+5. Froxel Scattering
+6. Sound
+7. Improve particles
+8. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+9. Loading Bar
+10. Multiple Light probes has good shadows?
 
 ---
 

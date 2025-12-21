@@ -8,10 +8,16 @@ export interface IGPUResourceOptions extends IResourceOptions {
 export abstract class GPUResource extends BaseResource {
   protected device: GPUDevice;
   protected label: string;
+  protected name: string;
 
   constructor(options: IGPUResourceOptions) {
     super(options);
     this.device = GPUUtils.getDevice();
     this.label = options.label || options.path;
+    this.name = options.path;
+  }
+
+  public getName(): string {
+    return this.name;
   }
 }
