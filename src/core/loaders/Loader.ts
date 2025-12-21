@@ -35,6 +35,7 @@ import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldCompo
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
+import { HeadTiltComponent } from '../../components/game/HeadTiltComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -193,6 +194,8 @@ export class Loader {
         return new FPSCameraControllerComponent();
       case 'head_bob':
         return new HeadBobComponent();
+      case 'head_tilt':
+        return new HeadTiltComponent();
       case 'camera_crouch':
         return new CameraCrouchComponent();
       case 'camera_fov_modifier':

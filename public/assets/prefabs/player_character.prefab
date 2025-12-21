@@ -46,18 +46,16 @@
       "crouchSpeed": 8.0,
       "enabled": true
     },
-    "head_bob": {
-      "frequency": 1.0,
-      "verticalAmplitude": 0.05,
-      "horizontalAmplitude": 0.05,
-      "speedThreshold": 0.5,
+    "head_tilt": {
+      "maxTiltAmplitude" : 0.02,
+      "tiltSpeed": "0.3",
       "enabled": true
     },
     "camera_fov_modifier": {
       "maxFOVIncrease": 5.0,
       "speedThreshold": 3.0,
       "lerpSpeed": 5.0,
-      "enabled": true
+      "enabled": false
     }
   },
   "children": [

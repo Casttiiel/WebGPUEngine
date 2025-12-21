@@ -7,7 +7,6 @@
    Dash to dagger
 
 2. Camera Tilt
-   On walking
    On Mantling
 3. Speed VFX
 4. Level design
@@ -15,6 +14,7 @@
    Wall Jump change how it behaves?
    Keep Momentum on walljump?
    Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
+   Velocity curves?
 5. Froxel Scattering
 6. Sound
 7. Improve particles

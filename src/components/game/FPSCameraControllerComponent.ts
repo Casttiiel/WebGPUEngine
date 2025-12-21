@@ -5,6 +5,7 @@ import { CameraComponent } from '../render/CameraComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
 import { HeadBobComponent } from './HeadBobComponent';
+import { HeadTiltComponent } from './HeadTiltComponent';
 
 export interface FPSCameraComponentData {
   eyeOffset?: number[]; // [x, y, z] - Offset de los ojos relativo al owner (ej: [0, 1.6, 0])
@@ -119,15 +120,40 @@ export class FPSCameraControllerComponent extends Component {
       vec3.add(eyePos, eyePos, bobOffsetWorld);
     }
 
+    // Aplicar head tilt como rotación roll si el componente está presente
+    let roll = 0;
+    const headTiltComponent = this.getOwner().getComponent('head_tilt');
+    if (headTiltComponent) {
+      // El offset del tilt es en radianes (roll)
+      roll = (headTiltComponent as HeadTiltComponent).getTiltOffset?.() ?? 0;
+    }
+
+    // Calcular forward y up con roll aplicado
+    let finalForward = vec3.clone(forward);
+    let finalUp = vec3.clone(up);
+    if (roll !== 0) {
+      // Rotar up y right alrededor de forward (roll)
+      const cosR = Math.cos(roll);
+      const sinR = Math.sin(roll);
+      // up' = up * cos(roll) + right * sin(roll)
+      // right' = right * cos(roll) - up * sin(roll)
+      const upRot = vec3.create();
+      vec3.scale(upRot, up, cosR);
+      vec3.scaleAndAdd(upRot, upRot, right, sinR);
+      // vec3.scale(rightRot, right, cosR);
+      // vec3.scaleAndAdd(rightRot, rightRot, up, -sinR);
+      finalUp = upRot;
+    }
+
     // Punto de mira (1 metro adelante de la cámara)
-    const lookAtTarget = vec3.add(vec3.create(), eyePos, forward);
+    const lookAtTarget = vec3.add(vec3.create(), eyePos, finalForward);
 
     // Actualizar cámara directamente (sin TransformComponent)
     const camera = cameraComponent.getCamera();
     camera.lookAt(
       Array.from(eyePos) as [number, number, number],
       Array.from(lookAtTarget) as [number, number, number],
-      [0, 1, 0],
+      Array.from(finalUp) as [number, number, number],
     );
   }
 

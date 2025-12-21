@@ -6,6 +6,7 @@
     "character_controller",
     "camera_arm",
     "head_bob",
+    "head_tilt",
     "camera_crouch",
     "camera_fov_modifier",
     "box_collider",
