@@ -60,11 +60,10 @@ export class CharacterControllerComponent extends Component {
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
   private mantleMaxHeight: number = -0.025; // Altura máxima que puede trepar relativa a la camara
-  private mantleDuration: number = 0.2; // Duración de la animación de trepar
   private isMantling: boolean = false; // Si está actualmente trepando
-  private mantleTimer: number = 0.0; // Timer para la animación
-  private mantleStartPos: vec3 = vec3.create(); // Posición inicial del mantle
   private mantleTargetPos: vec3 = vec3.create(); // Posición objetivo del mantle
+  private mantleStoredVelocity: number = 0.0;
+  private minMantleVelocity: number = 10.0; // Velocidad mínima al iniciar mantle
 
   // Diving
   private divingGravityMultiplier: number = 4.0; // Multiplicador de gravedad al caer en picado
@@ -476,40 +475,35 @@ export class CharacterControllerComponent extends Component {
    */
   private startMantle(targetPosition: vec3): void {
     this.isMantling = true;
-    this.mantleTimer = 0.0;
 
-    const currentPos = this.capsuleCollider.getRigidBody().translation();
-    vec3.set(this.mantleStartPos, currentPos.x, currentPos.y, currentPos.z);
     vec3.copy(this.mantleTargetPos, targetPosition);
 
-    // Detener velocidad actual (TODO: CONSERVAR COMPONENTE HORIZONTAL?)
-    this.currentVelocity = vec3.fromValues(0, 0, 0);
-    this.capsuleCollider.getRigidBody().setLinvel({ x: 0, y: 0, z: 0 }, true);
+    // Guardar velocidad ANTES de cancelar el movimiento
+    this.mantleStoredVelocity = Math.max(vec3.length(this.currentVelocity), this.minMantleVelocity);
   }
 
   /**
    * Actualiza la animación de mantle cada frame
    */
   private updateMantle(deltaTime: number): void {
-    this.mantleTimer += deltaTime;
+    const currentPos = this.capsuleCollider.getRigidBody().translation();
+    const pos = vec3.fromValues(currentPos.x, currentPos.y, currentPos.z);
 
-    // Calcular progreso con ease-in-out
-    const t = Math.min(1.0, this.mantleTimer / this.mantleDuration);
-    const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-    // Interpolar posición
-    const currentPos = vec3.create();
-    vec3.lerp(currentPos, this.mantleStartPos, this.mantleTargetPos, easedT);
-
-    // Aplicar posición al rigidbody
-    this.capsuleCollider
-      .getRigidBody()
-      .setTranslation({ x: currentPos[0], y: currentPos[1], z: currentPos[2] }, true);
-
-    // Terminar mantle cuando se completa la animación
-    if (t >= 1.0) {
+    const vector = vec3.create();
+    vec3.subtract(vector, this.mantleTargetPos, pos);
+    const distance = vec3.length(vector);
+    if (distance < 0.3) {
       this.endMantle();
     }
+
+    let dir = vec3.fromValues(
+      this.mantleTargetPos[0] - pos[0],
+      (this.mantleTargetPos[1] - pos[1]) * 2.0,
+      this.mantleTargetPos[2] - pos[2],
+    );
+    vec3.normalize(dir, dir);
+    const dirScaled = vec3.scale(vec3.create(), dir, this.mantleStoredVelocity);
+    this.applyMovement(dirScaled, deltaTime);
   }
 
   /**
@@ -517,15 +511,6 @@ export class CharacterControllerComponent extends Component {
    */
   private endMantle(): void {
     this.isMantling = false;
-    this.mantleTimer = 0.0;
-
-    // Pequeño impulso hacia adelante al terminar
-    /*const cameraObj = this.camera!.getCamera();
-    let forward = cameraObj.getFront();
-    forward[1] = 0;
-    vec3.normalize(forward, forward);
-    vec3.scale(this.currentVelocity, forward, this.moveSpeed * 0.5);
-    this.currentVelocity[1] = 0;*/
   }
 
   private applyWallJump(factor: number = 1.0): void {
@@ -673,8 +658,8 @@ export class CharacterControllerComponent extends Component {
   }
 
   private slowDownOnWallCollision(): void {
-    this.currentVelocity[0] *= 0.8;
-    this.currentVelocity[2] *= 0.8;
+    this.currentVelocity[0] *= 0.9;
+    this.currentVelocity[2] *= 0.9;
   }
 
   private manageJump(deltaTime: number): void {

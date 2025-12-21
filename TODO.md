@@ -1,8 +1,7 @@
 ## Player
 
 1. Mechanics
-   End speed of mantling
-   Boost after mantling
+   I can hold space while on air for small boost (wrong)
    Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
    Walk/Slide based on ground slope
    Slide on slope gain speed
