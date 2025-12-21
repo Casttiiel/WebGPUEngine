@@ -1,8 +1,6 @@
 ## Player
 
 1. Mechanics
-   I can hold space while on air for small boost (wrong)
-   Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
    Walk/Slide based on ground slope
    Slide on slope gain speed
    Throw dagger
@@ -17,6 +15,7 @@
    Can change direction of slide?
    Wall Jump change how it behaves?
    Keep Momentum on walljump?
+   Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
 6. Froxel Scattering
 7. Sound
 8. Improve particles

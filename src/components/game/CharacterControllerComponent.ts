@@ -63,7 +63,7 @@ export class CharacterControllerComponent extends Component {
   private isMantling: boolean = false; // Si está actualmente trepando
   private mantleTargetPos: vec3 = vec3.create(); // Posición objetivo del mantle
   private mantleStoredVelocity: number = 0.0;
-  private minMantleVelocity: number = 10.0; // Velocidad mínima al iniciar mantle
+  private minMantleVelocity: number = 8.0; // Velocidad mínima al iniciar mantle
 
   // Diving
   private divingGravityMultiplier: number = 4.0; // Multiplicador de gravedad al caer en picado
@@ -148,7 +148,6 @@ export class CharacterControllerComponent extends Component {
       this.updateMantle(deltaTime);
       return;
     }
-    console.log('-------------');
     const inputDir = this.getInputVector();
     const targetMovement = this.getTargetMovement(inputDir);
 
@@ -343,7 +342,7 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
 
     // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
-    if (this.currentVelocity[1] < -5.0 || this.isDiving) {
+    if (this.currentVelocity[1] < -5.0 || this.isGrounded || this.isDiving) {
       return;
     }
 
@@ -498,7 +497,7 @@ export class CharacterControllerComponent extends Component {
 
     let dir = vec3.fromValues(
       this.mantleTargetPos[0] - pos[0],
-      (this.mantleTargetPos[1] - pos[1]) * 2.0,
+      this.mantleTargetPos[1] - pos[1],
       this.mantleTargetPos[2] - pos[2],
     );
     vec3.normalize(dir, dir);
@@ -670,7 +669,7 @@ export class CharacterControllerComponent extends Component {
       (this.timeSinceGrounded <= this.coyoteTime || this.isGrounded);
 
     // Update coyote time
-    if (this.isGrounded) {
+    if (this.isGrounded && !this.isJumping) {
       this.timeSinceGrounded = 0.0;
     } else {
       this.timeSinceGrounded += deltaTime;
@@ -683,7 +682,6 @@ export class CharacterControllerComponent extends Component {
         this.applyJump();
         this.isJumping = true; // Iniciar salto variable
         this.canAirJump = false; // Consumir posible air jump
-        console.log('disable air jump');
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
         this.jumpHoldTimer = 0.0; // Reset jump hold timer
         this.jumpCutFactorApplied = false;
@@ -700,12 +698,13 @@ export class CharacterControllerComponent extends Component {
       this.jumpHoldTimer += deltaTime;
     } else if (
       this.isJumping &&
-      !input.isActionBuffered(GameAction.JUMP) &&
+      !input.isActionPressed(GameAction.JUMP) &&
       this.currentVelocity[1] > 0 &&
       !this.jumpCutFactorApplied
     ) {
       this.currentVelocity[1] *= this.jumpCutFactor; // Reducir velocidad vertical al soltar la tecla
       this.jumpCutFactorApplied = true;
+      this.isJumping = false;
     }
   }
 
