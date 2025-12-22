@@ -1,26 +1,25 @@
 ## Player
 
 1. Mechanics
-   Walk/Slide based on ground slope
+   Walk based on ground slope
+   Slide based on ground slope
    Slide on slope gain speed
    Throw dagger
    Dash to dagger
-
-2. Camera Tilt
-   On Mantling
-3. Speed VFX
-4. Level design
+2. Speed VFX
+3. Level design
    Can change direction of slide?
    Wall Jump change how it behaves?
    Keep Momentum on walljump?
    Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
    Velocity curves?
-5. Froxel Scattering
-6. Sound
-7. Improve particles
-8. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-9. Loading Bar
-10. Multiple Light probes has good shadows?
+   Camera Tilt On walljump?
+4. Froxel Scattering
+5. Sound
+6. Improve particles
+7. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+8. Loading Bar
+9. Multiple Light probes has good shadows?
 
 ---
 

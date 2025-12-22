@@ -26,7 +26,7 @@
       "mass": 70.0
     },
     "character_controller": {
-      "moveSpeed": 6.5,
+      "moveSpeed": 8.5,
       "jumpForce": 5.0,
       "coyoteTime": 0.5,
       "airControlMultiplier": 1.5,
@@ -47,8 +47,10 @@
       "enabled": true
     },
     "head_tilt": {
-      "maxTiltAmplitude" : 0.02,
-      "tiltSpeed": "0.3",
+      "maxTiltAmplitude" : 0.03,
+      "tiltSpeed": 0.3,
+      "mantlingTiltAmplitude": 0.15,
+      "mantlingTiltSpeed": 1.0,
       "enabled": true
     },
     "camera_fov_modifier": {

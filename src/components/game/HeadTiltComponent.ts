@@ -1,4 +1,3 @@
-import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
@@ -7,6 +6,8 @@ import { GameAction } from '../../types/GameAction.enum';
 export interface HeadTiltComponentData {
   maxTiltAmplitude?: number; // Inclinacion maxima (radianes)
   tiltSpeed?: number; // Velocidad de inclinación (radianes por segundo)
+  mantlingTiltAmplitude?: number; // Inclinación máxima al hacer mantling
+  mantlingTiltSpeed?: number; // Velocidad de inclinación al hacer mantling
   enabled?: boolean; // Activar/desactivar head tilt
 }
 
@@ -24,6 +25,8 @@ export class HeadTiltComponent extends Component {
   // Configuración
   private maxTiltAmplitude: number = 0.5; // Inclinación máxima (radianes)
   private tiltSpeed: number = 1.0; // Velocidad de inclinación (radianes por segundo)
+  private mantlingTiltAmplitude: number = 0.3; // Inclinación máxima al hacer mantling
+  private mantlingTiltSpeed: number = 2.0; // Velocidad de inclinación al hacer mantling
   private enabled: boolean = true; // Activar head tilt
 
   // Estado
@@ -40,6 +43,14 @@ export class HeadTiltComponent extends Component {
 
     if (data.tiltSpeed !== undefined) {
       this.tiltSpeed = data.tiltSpeed;
+    }
+
+    if (data.mantlingTiltAmplitude !== undefined) {
+      this.mantlingTiltAmplitude = data.mantlingTiltAmplitude;
+    }
+
+    if (data.mantlingTiltSpeed !== undefined) {
+      this.mantlingTiltSpeed = data.mantlingTiltSpeed;
     }
 
     if (data.enabled !== undefined) {
@@ -61,26 +72,41 @@ export class HeadTiltComponent extends Component {
     }
 
     const isSliding = (characterController as CharacterControllerComponent).getIsSliding() ?? false;
-    const leftKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_LEFT);
-    const rightKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_RIGHT);
+    const isMantling =
+      (characterController as CharacterControllerComponent).getIsMantling() ?? false;
+    let leftKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_LEFT);
+    let rightKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_RIGHT);
 
     // Solo aplicar head tilt si:
     // 1. Está en el suelo (no saltando)
     // 2. No está sliding
-    if (isSliding || (leftKeyPressed && rightKeyPressed) || (!leftKeyPressed && !rightKeyPressed)) {
+    // 3. Se está moviendo lateralmente (izquierda o derecha)
+    // 4. No se presionan ambas teclas a la vez
+    // 5. Hace mantling
+    if (
+      isSliding ||
+      (leftKeyPressed && rightKeyPressed && !isMantling) ||
+      (!leftKeyPressed && !rightKeyPressed && !isMantling)
+    ) {
       // Fade out suave cuando se detiene, salta o hace slide
       this.headTiltOffset *= Math.max(0, 1.0 - dt * 10.0);
       return;
     }
 
+    let amplitude = this.maxTiltAmplitude;
+    let speed = this.tiltSpeed;
+    if (isMantling) {
+      // Si hace mantling, inclinar hacia la derecha
+      rightKeyPressed = true;
+      amplitude = this.mantlingTiltAmplitude;
+      speed = this.mantlingTiltSpeed;
+    }
+
     let sign = leftKeyPressed ? -1 : 1;
 
-    this.headTiltOffset = Math.min(
-      this.maxTiltAmplitude,
-      this.headTiltOffset + this.tiltSpeed * dt * sign,
-    );
+    this.headTiltOffset = Math.min(amplitude, this.headTiltOffset + speed * dt * sign);
 
-    this.headTiltOffset = Math.max(-this.maxTiltAmplitude, this.headTiltOffset);
+    this.headTiltOffset = Math.max(-amplitude, this.headTiltOffset);
   }
 
   /**
@@ -89,20 +115,6 @@ export class HeadTiltComponent extends Component {
    */
   public getTiltOffset(): number {
     return this.headTiltOffset;
-  }
-
-  /**
-   * Obtiene el offset del head bob transformado a coordenadas del mundo
-   * usando los vectores de dirección de la cámara
-   * @param right Vector derecho de la cámara
-   * @param up Vector arriba de la cámara
-   * @returns Vector3 con el offset en world space
-   */
-  public getHeadTilt(right: vec3, up: vec3): vec3 {
-    const bobOffsetWorld = vec3.create();
-    vec3.scaleAndAdd(bobOffsetWorld, bobOffsetWorld, right, this.headTiltOffset); // Horizontal
-    vec3.scaleAndAdd(bobOffsetWorld, bobOffsetWorld, up, 0); // Vertical
-    return bobOffsetWorld;
   }
 
   public override renderInMenu(): void {}

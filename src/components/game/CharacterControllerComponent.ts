@@ -497,7 +497,7 @@ export class CharacterControllerComponent extends Component {
 
     let dir = vec3.fromValues(
       this.mantleTargetPos[0] - pos[0],
-      this.mantleTargetPos[1] - pos[1],
+      (this.mantleTargetPos[1] - pos[1]) * 2.0,
       this.mantleTargetPos[2] - pos[2],
     );
     vec3.normalize(dir, dir);
