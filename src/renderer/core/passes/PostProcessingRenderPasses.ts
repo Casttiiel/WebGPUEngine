@@ -59,6 +59,28 @@ export class ToneMappingRenderPass extends PostProcessingRenderPass {
   }
 }
 
+export class SpeedLinesVFXRenderPass extends PostProcessingRenderPass {
+  private textureBindGroup: GPUBindGroup;
+  private bufferBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    textureBindGroup: GPUBindGroup,
+    bufferBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.textureBindGroup = textureBindGroup;
+    this.bufferBindGroup = bufferBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, this.textureBindGroup);
+    pass.setBindGroup(1, this.bufferBindGroup);
+  }
+}
+
 /**
  * Bloom Filtering post-processing render pass
  * This pass requires two bind groups: global camera uniforms and texture

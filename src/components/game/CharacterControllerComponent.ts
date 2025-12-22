@@ -826,7 +826,11 @@ export class CharacterControllerComponent extends Component {
    */
   public getCurrentSpeed(): number {
     // Retornar la magnitud de la velocidad horizontal (ignorar Y)
-    const horizontalVelocity = vec3.fromValues(this.currentVelocity[0], 0, this.currentVelocity[2]);
+    const horizontalVelocity = vec3.fromValues(
+      this.currentVelocity[0],
+      this.currentVelocity[1],
+      this.currentVelocity[2],
+    );
     return vec3.length(horizontalVelocity);
   }
 

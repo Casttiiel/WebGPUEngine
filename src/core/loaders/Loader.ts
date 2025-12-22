@@ -36,6 +36,7 @@ import { MotionBlurComponent } from '../../components/render/MotionBlurComponent
 import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { HeadTiltComponent } from '../../components/game/HeadTiltComponent';
+import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -210,6 +211,8 @@ export class Loader {
         return new DepthOfFieldComponent();
       case 'motion_blur':
         return new MotionBlurComponent();
+      case 'speed_lines_vfx':
+        return new SpeedLinesVFXComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

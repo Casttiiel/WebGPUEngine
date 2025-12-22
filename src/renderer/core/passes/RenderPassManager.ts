@@ -17,6 +17,7 @@ import {
   AOBilateralFilterRenderPass,
   BloomFilteringRenderPass,
   MotionBlurRenderPass,
+  SpeedLinesVFXRenderPass,
 } from './PostProcessingRenderPasses';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderTarget } from '../../resources/RenderTarget';
@@ -149,6 +150,27 @@ export class RenderPassManager {
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
     const pass = new ToneMappingRenderPass(passConfig, mesh, technique, bindGroup);
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Create and execute a tone mapping pass dynamically
+   */
+  public executeSpeedLinesVFXPass(
+    mesh: Mesh,
+    technique: Technique,
+    textureBindGroup: GPUBindGroup,
+    bufferBindGroup: GPUBindGroup,
+    result: GPUTextureView,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(result);
+    const pass = new SpeedLinesVFXRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      textureBindGroup,
+      bufferBindGroup,
+    );
     this.executeDynamicPass(pass);
   }
 

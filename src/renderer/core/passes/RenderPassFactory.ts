@@ -155,6 +155,25 @@ export class RenderPassFactory {
     };
   }
 
+  public static createPostProcessPassConfigBlended(
+    target: GPUTextureView,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    const colorAttachments: GPURenderPassColorAttachment[] = [
+      {
+        view: target,
+        loadOp: 'load',
+        storeOp: 'store',
+      },
+    ];
+
+    return {
+      label: 'Post Process Pass',
+      colorAttachments,
+      viewport,
+    };
+  }
+
   public static createBloomCombinePassConfig(
     target: GPUTextureView,
     viewport?: { width: number; height: number },

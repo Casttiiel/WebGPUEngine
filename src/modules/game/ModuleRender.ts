@@ -22,6 +22,7 @@ import { MotionBlurComponent } from '../../components/render/MotionBlurComponent
 import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
+import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -213,6 +214,13 @@ export class ModuleRender extends Module {
       const antialiasing = mainCameraEntity.getComponent('smaa') as SMAAComponent;
       if (antialiasing.hasLoaded()) {
         result = antialiasing.apply(result);
+      }
+    }
+
+    if (mainCameraEntity.hasComponent('speed_lines_vfx')) {
+      const speedLines = mainCameraEntity.getComponent('speed_lines_vfx') as SpeedLinesVFXComponent;
+      if (speedLines.hasLoaded()) {
+        speedLines.apply(result);
       }
     }
 

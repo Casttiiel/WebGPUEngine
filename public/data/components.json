@@ -13,7 +13,8 @@
     "capsule_collider",
     "transform",
     "fps_camera_controller",
-    "camera"
+    "camera",
+    "speed_lines_vfx"
   ],
   "render_debug": []
 }
