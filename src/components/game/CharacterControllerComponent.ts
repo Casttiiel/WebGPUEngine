@@ -31,6 +31,8 @@ export class CharacterControllerComponent extends Component {
   // Movement
   private moveSpeed: number = 5.0; // Unidades por segundo
   private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
+  private groundAcceleration: number = 20.0; // Aceleración en el suelo
+  private groundDeceleration: number = 30.0; // Deceleración en el suelo
 
   // Jump
   private jumpForce: number = 8.0; // Velocidad inicial del salto
@@ -40,8 +42,10 @@ export class CharacterControllerComponent extends Component {
 
   // Slide
   private slideSpeedThreshold: number = 5.0; // Velocidad mínima para activar slide
-  private slideDecelerationTime: number = 1.5; // Tiempo de frenado del slide
+  private slideDownhillAccel: number = 4.0; // Tiempo de frenado del slide
   private slideHeightMultiplier: number = 0.5; // Reducción de altura (0.5 = mitad de altura)
+  private slideFriction: number = 4.0; // Fricción base del slide
+  private slideUphillBrake: number = 5.0; // Fricción adicional al subir
   private slideMinDuration: number = 0.5; // Tiempo mínimo del slide en segundos (no se puede cancelar antes)
   private slideVelocity: number = 0.0; // Velocidad capturada al inicio del slide
   private slideDirection: vec3 = vec3.create();
@@ -71,6 +75,8 @@ export class CharacterControllerComponent extends Component {
   private isSliding: boolean = false;
   private isDiving: boolean = false;
   private canAirJump: boolean = false; // Permitir salto en aire tras wall jump
+  private horizontalSpeed: number = 0.0; // Velocidad horizontal actual
+  private horizontalDirection: vec3 = vec3.fromValues(0, 0, 1);
   private currentHorizontalVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
   private currentVerticalVelocity: number = 0.0; // Velocidad vertical actual
   private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
@@ -109,9 +115,6 @@ export class CharacterControllerComponent extends Component {
     if (data.slideSpeedThreshold !== undefined) {
       this.slideSpeedThreshold = data.slideSpeedThreshold;
     }
-    if (data.slideDecelerationTime !== undefined) {
-      this.slideDecelerationTime = data.slideDecelerationTime;
-    }
     if (data.slideHeightMultiplier !== undefined) {
       this.slideHeightMultiplier = data.slideHeightMultiplier;
     }
@@ -141,10 +144,6 @@ export class CharacterControllerComponent extends Component {
     this.getIsGroundedAndGroundNormal();
     this.manageMantling();
     this.manageSliding(deltaTime);
-    console.log('---------------');
-    console.log('isGrounded:', this.isGrounded);
-    console.log('isMantling:', this.isMantling);
-    console.log('isSliding:', this.isSliding);
     if (this.isMantling) {
       this.updateMantle(deltaTime);
     } else if (this.isSliding) {
@@ -158,13 +157,6 @@ export class CharacterControllerComponent extends Component {
       const finalVelocity = this.mergeMovements();
       this.applyMovement(finalVelocity, deltaTime);
     }
-
-    /*
-    this.manageWallJump(deltaTime);
-    */
-
-    // Select velocity to apply
-    //const velocityToApply = this.isSliding ? this.slideVelocity : this.currentVelocity;
   }
 
   private mergeMovements(): vec3 {
@@ -565,17 +557,30 @@ export class CharacterControllerComponent extends Component {
     );
   }
 
+  private approach(current: number, target: number, delta: number): number {
+    if (current < target) {
+      return Math.min(current + delta, target);
+    }
+    if (current > target) {
+      return Math.max(current - delta, target);
+    }
+    return target;
+  }
+
   private manageHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
 
     if (this.isGrounded) {
-      // EN SUELO: Control normal con aceleración suave
+      // EN SUELO: Control normal con aceleración/frenado suave
       if (hasInput) {
-        vec3.scale(this.currentHorizontalVelocity, targetMovement, this.moveSpeed);
-      } else {
-        // Deceleración en suelo
-        vec3.set(this.currentHorizontalVelocity, 0, 0, 0);
+        vec3.normalize(this.horizontalDirection, targetMovement);
       }
+      const targetSpeed = hasInput ? this.moveSpeed : 0.0;
+      const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
+      this.horizontalSpeed = this.approach(this.horizontalSpeed, targetSpeed, accel * deltaTime);
+
+      console.log(this.horizontalSpeed);
+      vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
     } else {
       // EN AIRE: Preservar momentum + pequeñas correcciones
       if (hasInput) {
@@ -733,27 +738,48 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
     this.slideTimer += deltaTime;
 
-    // Decelerar progresivamente el slide
-    const t = Math.min(1.0, this.slideTimer / this.slideDecelerationTime);
-    const decelCurve = 1.0 - Math.pow(t, 3.0); // Curva cuadrática de frenado
-
-    // Aplicar deceleración manteniendo dirección
-    this.slideVelocity *= decelCurve;
-
     const horizontal = this.slideDirection;
     const projected = this.projectOnPlane(horizontal, this.groundNormal);
 
     // Normalize final movement
     vec3.normalize(projected, projected);
 
+    const gravityDir = vec3.fromValues(0, -1, 0);
+    const downhill = this.projectOnPlane(gravityDir, this.groundNormal);
+    let downhillFactor = 0.0;
+    if (vec3.length(downhill) > 0.001) {
+      vec3.normalize(downhill, downhill);
+
+      // Cuánto apunta el slide hacia abajo
+      downhillFactor = vec3.dot(projected, downhill);
+    }
+    if (downhillFactor > 0) {
+      // BAJADA → acelerar
+      this.slideVelocity += this.slideDownhillAccel * deltaTime;
+    } else {
+      // SUBIDA → frenar más
+      // Decelerar progresivamente el slide
+      let friction = this.slideFriction;
+
+      if (downhillFactor < 0) {
+        friction += this.slideUphillBrake;
+      }
+
+      // Aplicar deceleración manteniendo dirección
+      this.slideVelocity -= friction * deltaTime;
+    }
+
     const result = vec3.scale(vec3.create(), projected, this.slideVelocity);
 
     // Terminar slide solo si:
     // 1. Ha pasado el tiempo mínimo Y (soltamos tecla O se acabó tiempo O velocidad baja)
     // 2. O perdemos contacto con el suelo (cancelación forzada)
-    const minDurationPassed = this.slideTimer >= this.slideMinDuration;
-    const shouldEndSlide = !input.isActionPressed(GameAction.SLIDE) || this.slideVelocity < 2.0;
-    if (!this.isGrounded || (minDurationPassed && shouldEndSlide)) {
+    const minDurationPassed =
+      this.slideTimer >= this.slideMinDuration && !input.isActionPressed(GameAction.SLIDE);
+    const shouldEndSlideBecauseVelocity = this.slideVelocity < 2.0;
+    if (!this.isGrounded || minDurationPassed || shouldEndSlideBecauseVelocity) {
+      console.log('minDurationPassed:', minDurationPassed);
+      console.log('shouldEndSlideBecauseVelocity:', shouldEndSlideBecauseVelocity);
       this.endSlide(result);
     }
 
