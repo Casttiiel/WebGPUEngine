@@ -579,9 +579,9 @@ export class CharacterControllerComponent extends Component {
       const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
       this.horizontalSpeed = this.approach(this.horizontalSpeed, targetSpeed, accel * deltaTime);
 
-      console.log(this.horizontalSpeed);
       vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
     } else {
+      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
       // EN AIRE: Preservar momentum + pequeñas correcciones
       if (hasInput) {
         vec3.scale(targetMovement, targetMovement, this.moveSpeed);
