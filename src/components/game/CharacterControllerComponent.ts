@@ -77,6 +77,7 @@ export class CharacterControllerComponent extends Component {
   private canAirJump: boolean = false; // Permitir salto en aire tras wall jump
   private currentVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
   private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
+  private groundNormal: vec3 = vec3.fromValues(0, 1, 0); // Normal del suelo actual
 
   constructor() {
     super();
@@ -190,6 +191,13 @@ export class CharacterControllerComponent extends Component {
     return inputDir;
   }
 
+  private projectOnPlane(v: vec3, normal: vec3): vec3 {
+    const dot = vec3.dot(v, normal);
+    const projected = vec3.create();
+    vec3.scaleAndAdd(projected, v, normal, -dot);
+    return projected;
+  }
+
   private getTargetMovement(inputDir: vec3): vec3 {
     const targetMovement = vec3.create();
 
@@ -213,6 +221,18 @@ export class CharacterControllerComponent extends Component {
     const rightMovement = vec3.scale(vec3.create(), rightXZ, -inputDir[0]);
 
     vec3.add(targetMovement, forwardMovement, rightMovement);
+
+    if (this.isGrounded) {
+      if (vec3.length(targetMovement) > 0.01) {
+        vec3.normalize(targetMovement, targetMovement);
+      }
+      const horizontal = vec3.fromValues(targetMovement[0], 0, targetMovement[2]);
+
+      const projected = this.projectOnPlane(horizontal, this.groundNormal);
+
+      targetMovement[0] = projected[0];
+      targetMovement[2] = projected[2];
+    }
 
     // Normalize final movement
     if (vec3.length(targetMovement) > 0.01) {
@@ -630,10 +650,18 @@ export class CharacterControllerComponent extends Component {
       const type = rigidBody.bodyType();
 
       // Detectar si es suelo
-      const isFloor = collision.normal1.y > 0.6;
+      const isFloor = collision.normal1.y > 0.1;
 
       // Si es suelo → ignorar completamente para lógica de pared
-      if (isFloor) continue;
+      if (isFloor) {
+        this.groundNormal = vec3.fromValues(
+          collision.normal1.x,
+          collision.normal1.y,
+          collision.normal1.z,
+        );
+        vec3.normalize(this.groundNormal, this.groundNormal);
+        continue;
+      }
 
       if (type === RAPIER.RigidBodyType.Fixed) {
         this.removeVelocityIntoWall(collision.normal1);
