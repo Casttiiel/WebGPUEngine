@@ -1,19 +1,15 @@
 ## Player
 
 1. Mechanics
-
-   Slide based on ground slope
-   Slide on slope gain speed
+   Slide on slope gain speed / Momentum
+   Acceleration curves
+   Wall Jump change how it behaves
+   Keep Momentum on walljump
+   Camera Tilt On walljump
    Throw dagger
    Dash to dagger
 
 2. Level design
-   Can change direction of slide?
-   Wall Jump change how it behaves?
-   Keep Momentum on walljump?
-   Check actions (is walljumping while mantling? Is slowing on wall while mantling?)
-   Velocity curves?
-   Camera Tilt On walljump?
 3. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
 4. Froxel Scattering
 5. Improve particles

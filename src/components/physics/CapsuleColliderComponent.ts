@@ -95,8 +95,8 @@ export class CapsuleColliderComponent extends ColliderComponent {
    * @param castDistance - Distancia del raycast hacia abajo
    * @returns true si detecta suelo
    */
-  public raycastGrounded(castDistance: number = 0.1): boolean {
-    if (!this.rigidBody || !this.collider) return false;
+  public raycastGrounded(castDistance: number = 0.1): RAPIER.RayColliderIntersection | null {
+    if (!this.rigidBody || !this.collider) return null;
 
     const physics = Engine.getPhysics();
     if (!physics) return false;
@@ -110,7 +110,7 @@ export class CapsuleColliderComponent extends ColliderComponent {
     );
 
     // Excluir el propio collider del raycast
-    const hit = physics.getWorld().castRay(
+    const hit = physics.getWorld().castRayAndGetNormal(
       ray,
       castDistance,
       true, // solid
@@ -118,7 +118,7 @@ export class CapsuleColliderComponent extends ColliderComponent {
       undefined, // sin filtro de grupos
       this.collider, // Excluir solo el propio collider
     );
-    return hit !== null;
+    return hit;
   }
 
   /**
