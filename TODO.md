@@ -1,7 +1,6 @@
 ## Player
 
 1. Mechanics
-   Slide on slope gain speed
    Wall Jump change how it behaves
    Keep Momentum on walljump
    Camera Tilt On walljump

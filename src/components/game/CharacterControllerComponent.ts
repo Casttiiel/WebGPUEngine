@@ -43,7 +43,6 @@ export class CharacterControllerComponent extends Component {
   // Slide
   private slideSpeedThreshold: number = 5.0; // Velocidad mínima para activar slide
   private slideDownhillAccel: number = 4.0; // Tiempo de frenado del slide
-  private slideHeightMultiplier: number = 0.5; // Reducción de altura (0.5 = mitad de altura)
   private slideFriction: number = 4.0; // Fricción base del slide
   private slideUphillBrake: number = 5.0; // Fricción adicional al subir
   private slideMinDuration: number = 0.5; // Tiempo mínimo del slide en segundos (no se puede cancelar antes)
@@ -114,9 +113,6 @@ export class CharacterControllerComponent extends Component {
     }
     if (data.slideSpeedThreshold !== undefined) {
       this.slideSpeedThreshold = data.slideSpeedThreshold;
-    }
-    if (data.slideHeightMultiplier !== undefined) {
-      this.slideHeightMultiplier = data.slideHeightMultiplier;
     }
     if (data.slideMinDuration !== undefined) {
       this.slideMinDuration = data.slideMinDuration;
@@ -343,7 +339,6 @@ export class CharacterControllerComponent extends Component {
         this.applyWallJump();
         this.canAirJump = true;
         this.isDiving = false;
-        console.log('enable air jump');
         this.lastWallJumpTime = this.wallJumpCooldown; // Iniciar cooldown
       } else if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Dynamic) {
         if (!this.isGrounded) {
@@ -728,10 +723,6 @@ export class CharacterControllerComponent extends Component {
       this.currentHorizontalVelocity[2],
     );
     vec3.copy(this.slideDirection, vec3.normalize(vec3.create(), horizontal));
-
-    // Reducir altura del collider
-    const newHeight = this.originalHeight * this.slideHeightMultiplier;
-    this.applyCapsuleHeight(newHeight);
   }
 
   private updateSlide(deltaTime: number): vec3 {
@@ -749,7 +740,6 @@ export class CharacterControllerComponent extends Component {
     let downhillFactor = 0.0;
     if (vec3.length(downhill) > 0.001) {
       vec3.normalize(downhill, downhill);
-
       // Cuánto apunta el slide hacia abajo
       downhillFactor = vec3.dot(projected, downhill);
     }
@@ -762,6 +752,7 @@ export class CharacterControllerComponent extends Component {
       let friction = this.slideFriction;
 
       if (downhillFactor < 0) {
+        console.log('uphill brake');
         friction += this.slideUphillBrake;
       }
 
@@ -778,8 +769,6 @@ export class CharacterControllerComponent extends Component {
       this.slideTimer >= this.slideMinDuration && !input.isActionPressed(GameAction.SLIDE);
     const shouldEndSlideBecauseVelocity = this.slideVelocity < 2.0;
     if (!this.isGrounded || minDurationPassed || shouldEndSlideBecauseVelocity) {
-      console.log('minDurationPassed:', minDurationPassed);
-      console.log('shouldEndSlideBecauseVelocity:', shouldEndSlideBecauseVelocity);
       this.endSlide(result);
     }
 
@@ -791,47 +780,8 @@ export class CharacterControllerComponent extends Component {
     this.isSliding = false;
     this.slideTimer = 0.0;
 
-    // Restaurar altura original del collider
-    this.applyCapsuleHeight(this.originalHeight);
-
     // Transferir velocidad del slide al movimiento normal
     vec3.copy(this.currentHorizontalVelocity, currentVelocity);
-  }
-
-  private applyCapsuleHeight(newHeight: number): void {
-    if (!this.capsuleCollider) return;
-
-    const rigidBody = this.capsuleCollider.getRigidBody();
-    if (!rigidBody) return;
-
-    const world = Engine.getPhysics().getWorld();
-    var currentRadius = this.originalRadius;
-
-    // Calcular halfHeight (altura del cilindro central, excluyendo semiesferas)
-    var halfHeight = (newHeight - 2 * currentRadius) / 2;
-    if (halfHeight < 0) {
-      halfHeight = 0.01;
-      currentRadius = (newHeight - halfHeight) / 2;
-    }
-
-    // 1. Eliminar el collider anterior
-    const oldCollider = this.capsuleCollider.getCollider();
-    if (oldCollider) {
-      world.removeCollider(oldCollider, false);
-    }
-
-    // 2. Crear nuevo collider con la nueva altura
-
-    const newCollider = Engine.getPhysics().addCapsuleCollider(
-      this.getOwner().id,
-      rigidBody,
-      halfHeight,
-      currentRadius,
-      false,
-    );
-
-    // 3. Actualizar la referencia del collider en el componente
-    (this.capsuleCollider as CapsuleColliderComponent).setCollider(newCollider);
   }
 
   private findCamera(): void {
