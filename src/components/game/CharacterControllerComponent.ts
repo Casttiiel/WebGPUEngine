@@ -153,7 +153,6 @@ export class CharacterControllerComponent extends Component {
       const finalVelocity = this.updateSlide(deltaTime);
       this.applyMovement(finalVelocity, deltaTime);
     } else if (this.isWallRunning) {
-      debugger;
       this.updateWallRun(deltaTime);
       const inputDir = this.getInputVector();
       const targetMovement = this.getTargetMovement(inputDir);
@@ -980,6 +979,14 @@ export class CharacterControllerComponent extends Component {
 
   public getIsMantling(): boolean {
     return this.isMantling;
+  }
+
+  public getIsWallRunning(): boolean {
+    return this.isWallRunning;
+  }
+
+  public getWallNormal(): vec3 {
+    return this.wallNormal;
   }
 
   public renderDebug(): void {

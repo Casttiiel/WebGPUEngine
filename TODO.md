@@ -2,7 +2,6 @@
 
 1. Mechanics
    Wallrunning detach from wall
-   Camera Tilt On wallrun
    Order functions
    Parametrizar todo
    Jump to roof

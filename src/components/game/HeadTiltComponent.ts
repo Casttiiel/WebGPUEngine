@@ -2,12 +2,16 @@ import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
 import { GameAction } from '../../types/GameAction.enum';
+import { vec3 } from 'gl-matrix';
+import { CameraComponent } from '../render/CameraComponent';
 
 export interface HeadTiltComponentData {
   maxTiltAmplitude?: number; // Inclinacion maxima (radianes)
   tiltSpeed?: number; // Velocidad de inclinación (radianes por segundo)
   mantlingTiltAmplitude?: number; // Inclinación máxima al hacer mantling
   mantlingTiltSpeed?: number; // Velocidad de inclinación al hacer mantling
+  wallRunningTiltAmplitude?: number; // Inclinación máxima al hacer wall running
+  wallRunningTiltSpeed?: number; // Velocidad de inclinación al hacer wall running
   enabled?: boolean; // Activar/desactivar head tilt
 }
 
@@ -27,6 +31,8 @@ export class HeadTiltComponent extends Component {
   private tiltSpeed: number = 1.0; // Velocidad de inclinación (radianes por segundo)
   private mantlingTiltAmplitude: number = 0.3; // Inclinación máxima al hacer mantling
   private mantlingTiltSpeed: number = 2.0; // Velocidad de inclinación al hacer mantling
+  private wallRunningTiltAmplitude: number = 0.1; // Inclinación máxima al hacer wall running
+  private wallRunningTiltSpeed: number = 1.0; // Velocidad de inclinación al hacer wall running
   private enabled: boolean = true; // Activar head tilt
 
   // Estado
@@ -53,6 +59,13 @@ export class HeadTiltComponent extends Component {
       this.mantlingTiltSpeed = data.mantlingTiltSpeed;
     }
 
+    if (data.wallRunningTiltAmplitude !== undefined) {
+      this.wallRunningTiltAmplitude = data.wallRunningTiltAmplitude;
+    }
+
+    if (data.wallRunningTiltSpeed !== undefined) {
+      this.wallRunningTiltSpeed = data.wallRunningTiltSpeed;
+    }
     if (data.enabled !== undefined) {
       this.enabled = data.enabled;
     }
@@ -71,9 +84,19 @@ export class HeadTiltComponent extends Component {
       return;
     }
 
+    const mainCamera = Engine.getEntities()
+      .getEntityByName('PlayerCamera')!
+      .getComponent('camera') as CameraComponent;
+    if (!characterController || !mainCamera) {
+      this.headTiltOffset = 0.0;
+      return;
+    }
+
     const isSliding = (characterController as CharacterControllerComponent).getIsSliding() ?? false;
     const isMantling =
       (characterController as CharacterControllerComponent).getIsMantling() ?? false;
+    const isWallRunning =
+      (characterController as CharacterControllerComponent).getIsWallRunning() ?? false;
     let leftKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_LEFT);
     let rightKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_RIGHT);
 
@@ -86,10 +109,10 @@ export class HeadTiltComponent extends Component {
     if (
       isSliding ||
       (leftKeyPressed && rightKeyPressed && !isMantling) ||
-      (!leftKeyPressed && !rightKeyPressed && !isMantling)
+      (!leftKeyPressed && !rightKeyPressed && !isMantling && !isWallRunning)
     ) {
       // Fade out suave cuando se detiene, salta o hace slide
-      this.headTiltOffset *= Math.max(0, 1.0 - dt * 10.0);
+      this.headTiltOffset *= Math.max(0, 1.0 - dt * 5.0);
       return;
     }
 
@@ -100,6 +123,23 @@ export class HeadTiltComponent extends Component {
       rightKeyPressed = true;
       amplitude = this.mantlingTiltAmplitude;
       speed = this.mantlingTiltSpeed;
+    } else if (isWallRunning) {
+      // Si está haciendo wall running, inclinar hacia el lado contrario a la pared
+      const wallNormal = (characterController as CharacterControllerComponent).getWallNormal();
+      const cam = mainCamera.getCamera();
+      const camLeft = cam.getLeft();
+      const d = vec3.dot(camLeft, wallNormal);
+      if (d > 0.1) {
+        // Pared a la derecha, inclinar a la izquierda
+        leftKeyPressed = true;
+        rightKeyPressed = false;
+      } else if (d < -0.1) {
+        // Pared a la izquierda, inclinar a la derecha
+        leftKeyPressed = false;
+        rightKeyPressed = true;
+      }
+      amplitude = this.wallRunningTiltAmplitude;
+      speed = this.wallRunningTiltSpeed;
     }
 
     let sign = leftKeyPressed ? -1 : 1;
