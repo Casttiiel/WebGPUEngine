@@ -55,6 +55,7 @@ export class CharacterControllerComponent extends Component {
   // WallRun
   private wallNormal: vec3 = vec3.create();
   private wallRunGravity: number = -5.0; // caída lenta
+  private wallRunAcceleration: number = 3.0;
 
   // WallJump
   private wallJumpCooldown: number = 0.5; // Cooldown entre patadas en segundos
@@ -146,17 +147,17 @@ export class CharacterControllerComponent extends Component {
     this.manageMantling();
     this.detectWall();
     this.manageSliding(deltaTime);
-    console.log(this.isWallRunning);
     if (this.isMantling) {
       this.updateMantle(deltaTime);
     } else if (this.isSliding) {
       const finalVelocity = this.updateSlide(deltaTime);
       this.applyMovement(finalVelocity, deltaTime);
     } else if (this.isWallRunning) {
+      debugger;
       this.updateWallRun(deltaTime);
       const inputDir = this.getInputVector();
       const targetMovement = this.getTargetMovement(inputDir);
-      this.manageHorizontalMovement(deltaTime, targetMovement);
+      this.manageHorizontalMovementForWallRun(deltaTime, targetMovement);
       this.manageVerticalMovement(deltaTime);
       const finalVelocity = this.mergeMovements();
       this.applyMovement(finalVelocity, deltaTime);
@@ -529,10 +530,12 @@ export class CharacterControllerComponent extends Component {
     this.isNearWall = false;
 
     const facingVector = this.isWallRunning
-      ? this.currentHorizontalVelocity
+      ? vec3.clone(this.currentHorizontalVelocity)
       : this.camera!.getCamera().getFront();
     facingVector[1] = 0;
     vec3.normalize(facingVector, facingVector);
+
+    const wallDistance = this.isWallRunning ? 1.0 : 0.5;
 
     const left = this.camera!.getCamera().getLeft();
     left[1] = 0;
@@ -548,7 +551,7 @@ export class CharacterControllerComponent extends Component {
     );
     const leftHit = physics.getWorld().castRayAndGetNormal(
       leftRay,
-      1.0,
+      wallDistance,
       true, // solid
       QueryFilterFlags.EXCLUDE_SENSORS,
       undefined, // sin filtro de grupos
@@ -573,7 +576,7 @@ export class CharacterControllerComponent extends Component {
     );
     const rightHit = physics.getWorld().castRayAndGetNormal(
       rightRay,
-      1.0,
+      wallDistance,
       true, // solid
       QueryFilterFlags.EXCLUDE_SENSORS,
       undefined, // sin filtro de grupos
@@ -726,6 +729,35 @@ export class CharacterControllerComponent extends Component {
         const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
         vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
       }
+    }
+  }
+
+  private manageHorizontalMovementForWallRun(deltaTime: number, targetMovement: vec3): void {
+    const hasInput = vec3.length(targetMovement) > 0.01;
+
+    // si empuja hacia la pared, lo quitamos
+    const d = vec3.dot(targetMovement, this.wallNormal);
+    if (d < 0.0) {
+      const correction = vec3.scale(vec3.create(), this.wallNormal, d);
+      targetMovement = vec3.subtract(vec3.create(), targetMovement, correction);
+      targetMovement = vec3.normalize(targetMovement, targetMovement);
+    }
+
+    if (hasInput) {
+      vec3.normalize(this.horizontalDirection, targetMovement);
+      this.horizontalSpeed = this.approach(
+        this.horizontalSpeed,
+        this.moveSpeed,
+        this.wallRunAcceleration * deltaTime,
+      );
+
+      vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
+    } else {
+      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+      const airDrag = 0.3; // 30% de drag por segundo
+      const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
+      vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
+      this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
     }
   }
 
