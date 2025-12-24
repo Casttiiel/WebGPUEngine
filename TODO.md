@@ -1,26 +1,25 @@
 ## Player
 
 1. Mechanics
+   Jump to roof
    Wallrunning detach from wall
+   Wall Jump to Right of camera
+   ---Keep Momentum on Walljump
+   ---Si el angulo de right of camera es muy 90 grados de la normal de la pared no saltar
    Order functions
    Parametrizar todo
-   Jump to roof
-   Wall Jump to Right of camera
-   Si el angulo de right of camera es muy 90 grados de la normal de la pared no saltar
-   Keep Momentum on walljump
-   Momentum after slide
-   Throw dagger
-   Dash to dagger
 
 2. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-3. Multiple Light probes has good shadows?
-4. Loading Bar
-5. Sound
-6. Level design
-7. Froxel Scattering
-8. Improve particles
-9. Gameplay elements
-10. Enemies
+3. Level design
+4. Sound
+5. Loading Bar
+6. Throw dagger
+7. Dash to dagger
+8. Visual style
+9. Multiple Light probes has good shadows?
+10. More Gameplay elements
+11. Froxel Scattering
+12. Improve particles
 
 ---
 
