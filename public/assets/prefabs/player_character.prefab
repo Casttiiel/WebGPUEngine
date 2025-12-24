@@ -27,7 +27,7 @@
     },
     "character_controller": {
       "moveSpeed": 8.5,
-      "jumpForce": 6.0,
+      "jumpForce": 5.0,
       "coyoteTime": 0.5,
       "airControlMultiplier": 1.5,
       "slideSpeedThreshold": 0.0,

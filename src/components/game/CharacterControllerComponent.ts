@@ -52,6 +52,10 @@ export class CharacterControllerComponent extends Component {
   private originalHeight: number = 0.0; // Altura original del collider
   private originalRadius: number = 0.0; // Radio original del collider
 
+  // WallRun
+  private wallNormal: vec3 = vec3.create();
+  private wallRunGravity: number = -5.0; // caída lenta
+
   // WallJump
   private wallJumpCooldown: number = 0.5; // Cooldown entre patadas en segundos
   private lastWallJumpTime: number = 0.0; // Tiempo desde la última patada
@@ -70,10 +74,11 @@ export class CharacterControllerComponent extends Component {
   // Estado
   private isActive: boolean = true;
   private isGrounded: boolean = false;
-  private isJumping: boolean = false; // True mientras el jugador mantiene presionada la barra espaciadora durante el salto
+  private isJumping: boolean = false;
   private isSliding: boolean = false;
   private isDiving: boolean = false;
-  private canAirJump: boolean = false; // Permitir salto en aire tras wall jump
+  private isWallRunning: boolean = false;
+  private isNearWall: boolean = false;
   private horizontalSpeed: number = 0.0; // Velocidad horizontal actual
   private horizontalDirection: vec3 = vec3.fromValues(0, 0, 1);
   private currentHorizontalVelocity: vec3 = vec3.create(); // Velocidad actual interpolada
@@ -139,11 +144,21 @@ export class CharacterControllerComponent extends Component {
 
     this.getIsGroundedAndGroundNormal();
     this.manageMantling();
+    this.detectWall();
     this.manageSliding(deltaTime);
+    console.log(this.isWallRunning);
     if (this.isMantling) {
       this.updateMantle(deltaTime);
     } else if (this.isSliding) {
       const finalVelocity = this.updateSlide(deltaTime);
+      this.applyMovement(finalVelocity, deltaTime);
+    } else if (this.isWallRunning) {
+      this.updateWallRun(deltaTime);
+      const inputDir = this.getInputVector();
+      const targetMovement = this.getTargetMovement(inputDir);
+      this.manageHorizontalMovement(deltaTime, targetMovement);
+      this.manageVerticalMovement(deltaTime);
+      const finalVelocity = this.mergeMovements();
       this.applyMovement(finalVelocity, deltaTime);
     } else {
       const inputDir = this.getInputVector();
@@ -266,7 +281,8 @@ export class CharacterControllerComponent extends Component {
     // Actualizar velocidad vertical con gravedad
     if (!this.isGrounded) {
       const multiplier = this.isDiving ? this.divingGravityMultiplier : 1.0;
-      this.currentVerticalVelocity += gravity * deltaTime * multiplier;
+      const finalGravity = this.isWallRunning ? this.wallRunGravity : gravity;
+      this.currentVerticalVelocity += finalGravity * deltaTime * multiplier;
     } else if (this.isGrounded && !this.isJumping) {
       this.currentVerticalVelocity = 0.0;
     }
@@ -293,9 +309,34 @@ export class CharacterControllerComponent extends Component {
   private manageDiving(): void {
     const input = Engine.getInput();
 
-    if (input.isActionJustPressed(GameAction.DIVE) && !this.isGrounded) {
+    if (input.isActionJustPressed(GameAction.DIVE) && !this.isGrounded && !this.isWallRunning) {
       this.isDiving = true;
     }
+  }
+
+  private startWallRun(): void {
+    this.isWallRunning = true;
+    this.removeVelocityIntoWall(this.wallNormal);
+  }
+
+  private updateWallRun(deltaTime: number): void {
+    const input = Engine.getInput();
+
+    // salir si nos alejamos de la pared
+    if (!this.isNearWall) {
+      this.endWallRun();
+      return;
+    }
+
+    // saltar fuera de la pared
+    /*if (input.isActionBuffered(GameAction.JUMP)) {
+      input.consumeBufferedAction(GameAction.JUMP);
+      this.wallJumpFromRun();
+    }*/
+  }
+
+  private endWallRun(): void {
+    this.isWallRunning = false;
   }
 
   private manageWallJump(deltaTime: number): void {
@@ -337,7 +378,6 @@ export class CharacterControllerComponent extends Component {
 
       if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed) {
         this.applyWallJump();
-        this.canAirJump = true;
         this.isDiving = false;
         this.lastWallJumpTime = this.wallJumpCooldown; // Iniciar cooldown
       } else if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Dynamic) {
@@ -357,7 +397,12 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
 
     // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
-    if (this.currentVerticalVelocity < -5.0 || this.isGrounded || this.isDiving) {
+    if (
+      this.currentVerticalVelocity < -5.0 ||
+      this.isGrounded ||
+      this.isDiving ||
+      this.isWallRunning
+    ) {
       return;
     }
 
@@ -478,6 +523,80 @@ export class CharacterControllerComponent extends Component {
     }
 
     return null;
+  }
+
+  private detectWall(): void {
+    this.isNearWall = false;
+
+    const facingVector = this.isWallRunning
+      ? this.currentHorizontalVelocity
+      : this.camera!.getCamera().getFront();
+    facingVector[1] = 0;
+    vec3.normalize(facingVector, facingVector);
+
+    const left = this.camera!.getCamera().getLeft();
+    left[1] = 0;
+    vec3.normalize(left, left);
+
+    const right = vec3.scale(vec3.create(), left, -1);
+    const origin = vec3.clone(this.camera!.getCamera().getPosition());
+
+    const physics = Engine.getPhysics();
+    const leftRay = new RAPIER.Ray(
+      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: left[0], y: left[1], z: left[2] },
+    );
+    const leftHit = physics.getWorld().castRayAndGetNormal(
+      leftRay,
+      1.0,
+      true, // solid
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined, // sin filtro de grupos
+      this.capsuleCollider.getCollider(), // Excluir solo el propio collider
+    );
+
+    if (
+      leftHit &&
+      leftHit.collider &&
+      leftHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
+    ) {
+      const n = vec3.fromValues(leftHit.normal.x, leftHit.normal.y, leftHit.normal.z);
+      const facing = vec3.dot(facingVector, n);
+      if (facing < -0.7) return;
+      this.isNearWall = true;
+      vec3.copy(this.wallNormal, n);
+    }
+
+    const rightRay = new RAPIER.Ray(
+      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: right[0], y: right[1], z: right[2] },
+    );
+    const rightHit = physics.getWorld().castRayAndGetNormal(
+      rightRay,
+      1.0,
+      true, // solid
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined, // sin filtro de grupos
+      this.capsuleCollider.getCollider(), // Excluir solo el propio collider
+    );
+
+    if (
+      rightHit &&
+      rightHit.collider &&
+      rightHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
+    ) {
+      const n = vec3.fromValues(rightHit.normal.x, rightHit.normal.y, rightHit.normal.z);
+      const facing = vec3.dot(facingVector, n);
+      if (facing < -0.7) return;
+      this.isNearWall = true;
+      vec3.copy(this.wallNormal, n);
+    }
+
+    if (this.isNearWall && !this.isGrounded && !this.isMantling && !this.isWallRunning) {
+      this.startWallRun();
+    } else if (this.isGrounded) {
+      this.isWallRunning = false;
+    }
   }
 
   private startMantle(targetPosition: vec3): void {
@@ -634,44 +753,43 @@ export class CharacterControllerComponent extends Component {
       z: correctedMovement.z / dt,
     };
     this.capsuleCollider.getRigidBody().setLinvel(newVel, true);
-
     for (var i = 0; i < this.characterController.numComputedCollisions(); i++) {
       const collision = this.characterController.computedCollision(i);
       const rigidBody = collision.collider.parent();
       const type = rigidBody.bodyType();
 
       // Detectar si es suelo
-      const isFloor = collision.normal1.y > 0.1;
-
+      const isFloor = Math.abs(collision.normal1.y) > 0.1;
       // Si es suelo → ignorar completamente para lógica de pared
       if (isFloor) {
         continue;
       }
 
+      const collisionNormal = vec3.fromValues(
+        collision.normal1.x,
+        collision.normal1.y,
+        collision.normal1.z,
+      );
+
       if (type === RAPIER.RigidBodyType.Fixed) {
-        this.removeVelocityIntoWall(collision.normal1);
-        this.slowDownOnWallCollision();
+        if (this.isGrounded) {
+          this.removeVelocityIntoWall(collisionNormal);
+        }
       }
     }
   }
 
-  private removeVelocityIntoWall(collisionNormal: RAPIER.Vector3): void {
+  private removeVelocityIntoWall(collisionNormal: vec3): void {
     const dot =
-      this.currentHorizontalVelocity[0] * collisionNormal.x +
-      this.currentHorizontalVelocity[1] * collisionNormal.y +
-      this.currentHorizontalVelocity[2] * collisionNormal.z;
-
+      this.currentHorizontalVelocity[0] * collisionNormal[0] +
+      this.currentHorizontalVelocity[1] * collisionNormal[1] +
+      this.currentHorizontalVelocity[2] * collisionNormal[2];
     // si el vector apunta hacia la pared (dot < 0):
     if (dot < 0) {
-      this.currentHorizontalVelocity[0] -= dot * collisionNormal.x;
-      this.currentHorizontalVelocity[1] -= dot * collisionNormal.y;
-      this.currentHorizontalVelocity[2] -= dot * collisionNormal.z;
+      this.currentHorizontalVelocity[0] -= dot * collisionNormal[0];
+      this.currentHorizontalVelocity[1] -= dot * collisionNormal[1];
+      this.currentHorizontalVelocity[2] -= dot * collisionNormal[2];
     }
-  }
-
-  private slowDownOnWallCollision(): void {
-    this.currentHorizontalVelocity[0] *= 0.9;
-    this.currentHorizontalVelocity[2] *= 0.9;
   }
 
   private manageJump(deltaTime: number): void {
@@ -689,10 +807,9 @@ export class CharacterControllerComponent extends Component {
     // Detectar inicio del salto
     if (input.isActionBuffered(GameAction.JUMP)) {
       input.consumeBufferedAction(GameAction.JUMP);
-      if (canGroundJump || this.canAirJump) {
+      if (canGroundJump) {
         this.applyJump();
         this.isJumping = true; // Iniciar salto variable
-        this.canAirJump = false; // Consumir posible air jump
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
         this.jumpCutFactorApplied = false;
       }

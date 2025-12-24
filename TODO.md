@@ -1,11 +1,18 @@
 ## Player
 
 1. Mechanics
-   Wall Jump change how it behaves
-   Keep Momentum on walljump
-   Camera Tilt On walljump
-   Momentum after slide
+   Wall Run movement
+   WallRun Mantiene velocidad vertical de entrada
+   WallRun mantiene momentum
+   WallRun sigue corriendo incluso sin input
+   Camera Tilt On wallrun
+   Order functions
    Parametrizar todo
+   Jump to roof
+   Wall Jump to Right of camera
+   Si el angulo de right of camera es muy 90 grados de la normal de la pared no saltar
+   Keep Momentum on walljump
+   Momentum after slide
    Throw dagger
    Dash to dagger
 
