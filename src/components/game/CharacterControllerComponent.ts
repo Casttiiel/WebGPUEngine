@@ -161,6 +161,7 @@ export class CharacterControllerComponent extends Component {
       const finalVelocity = this.mergeMovements();
       this.applyMovement(finalVelocity, deltaTime);
     } else {
+      console.log('Normal movement', this.isGrounded, this.currentHorizontalVelocity[1]);
       const inputDir = this.getInputVector();
       const targetMovement = this.getTargetMovement(inputDir);
       this.manageHorizontalMovement(deltaTime, targetMovement);
@@ -316,6 +317,7 @@ export class CharacterControllerComponent extends Component {
 
   private startWallRun(): void {
     this.isWallRunning = true;
+    this.horizontalDirection[1] = 0.0;
     this.removeVelocityIntoWall(this.wallNormal);
   }
 
@@ -337,60 +339,6 @@ export class CharacterControllerComponent extends Component {
 
   private endWallRun(): void {
     this.isWallRunning = false;
-  }
-
-  private manageWallJump(deltaTime: number): void {
-    const input = Engine.getInput();
-
-    // Actualizar cooldown de walljump
-    if (this.lastWallJumpTime > 0.0) {
-      this.lastWallJumpTime -= deltaTime;
-      if (this.lastWallJumpTime < 0.0) {
-        this.lastWallJumpTime = 0.0;
-      }
-      return;
-    }
-
-    if (input.isActionBuffered(GameAction.WALL_JUMP)) {
-      input.consumeBufferedAction(GameAction.WALL_JUMP);
-      const physics = Engine.getPhysics();
-
-      const cameraObj = this.camera!.getCamera();
-      let cameraForward = cameraObj.getFront();
-      vec3.normalize(cameraForward, cameraForward);
-      const cameraPos = cameraObj.getPosition();
-
-      // Raycast desde el centro de la cápsula hacia adelante
-      const ray = new RAPIER.Ray(
-        { x: cameraPos[0], y: cameraPos[1], z: cameraPos[2] },
-        { x: cameraForward[0], y: cameraForward[1], z: cameraForward[2] },
-      );
-
-      // Excluir el propio collider del raycast
-      const hit = physics.getWorld().castRay(
-        ray,
-        2.0,
-        true, // solid
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined, // sin filtro de grupos
-        this.capsuleCollider.getCollider(), // Excluir solo el propio collider
-      );
-
-      if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed) {
-        this.applyWallJump();
-        this.isDiving = false;
-        this.lastWallJumpTime = this.wallJumpCooldown; // Iniciar cooldown
-      } else if (hit && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Dynamic) {
-        if (!this.isGrounded) {
-          this.applyWallJump(0.5);
-          this.isDiving = false;
-        } else {
-          this.currentVelocity = vec3.fromValues(0, 0, 0);
-        }
-        this.kickObject(hit.collider.parent()!);
-        this.lastWallJumpTime = this.wallJumpCooldown; // Iniciar cooldown
-      }
-    }
   }
 
   private manageMantling(): void {
@@ -647,12 +595,15 @@ export class CharacterControllerComponent extends Component {
       // Pared a la izquierda, saltar a la derecha
       jumpDir = vec3.scale(vec3.create(), jumpDir, -1);
     }
+    jumpDir[1] = 0.0;
+    vec3.normalize(jumpDir, jumpDir);
 
     this.isNearWall = false;
     this.isWallRunning = false;
 
     this.currentVerticalVelocity = this.wallJumpForce;
-    vec3.add(this.horizontalDirection, jumpDir, this.horizontalDirection);
+    const direction = vec3.normalize(vec3.create(), this.currentHorizontalVelocity);
+    vec3.add(this.horizontalDirection, jumpDir, direction);
     vec3.normalize(this.horizontalDirection, this.horizontalDirection);
     vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
   }
