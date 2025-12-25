@@ -3,7 +3,7 @@
 1. Mechanics
    WallJump
    ---Si el angulo de right of camera es muy 90 grados de la normal de la pared no saltar
-   ---WallJump while pressing to wall direction
+   ---WallJump while pressing to wall direction -> Disable input for x seconds after walljump
    Jump to roof
    Order functions
    Parametrizar todo
@@ -16,7 +16,7 @@
 7. Dash to dagger
 8. Visual style
 9. Multiple Light probes has good shadows?
-10. More Gameplay elements
+10. More Gameplay elements: Momentum, Swing Bar, Enemy
 11. Froxel Scattering
 12. Improve particles
 

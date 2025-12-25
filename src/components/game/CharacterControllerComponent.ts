@@ -481,7 +481,7 @@ export class CharacterControllerComponent extends Component {
     facingVector[1] = 0;
     vec3.normalize(facingVector, facingVector);
 
-    const wallDistance = this.isWallRunning ? 1.0 : 0.5;
+    const wallDistance = 0.5;
 
     const left = this.camera!.getCamera().getLeft();
     left[1] = 0;
@@ -600,10 +600,10 @@ export class CharacterControllerComponent extends Component {
     this.isNearWall = false;
     this.isWallRunning = false;
 
+    vec3.scale(jumpDir, jumpDir, this.moveSpeed);
     this.currentVerticalVelocity = this.wallJumpForce;
-    const direction = vec3.normalize(vec3.create(), this.currentHorizontalVelocity);
-    vec3.add(this.horizontalDirection, jumpDir, direction);
-    vec3.normalize(this.horizontalDirection, this.horizontalDirection);
+    vec3.add(this.currentHorizontalVelocity, jumpDir, this.currentHorizontalVelocity);
+    vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
     vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
   }
 
