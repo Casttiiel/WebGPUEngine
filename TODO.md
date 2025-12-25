@@ -3,7 +3,6 @@
 1. Mechanics
    WallJump
    ---Si el angulo de right of camera es muy 90 grados de la normal de la pared no saltar
-   ---Aterrizaje en otra direccion aceleration
    ---WallJump while pressing to wall direction
    Jump to roof
    Order functions

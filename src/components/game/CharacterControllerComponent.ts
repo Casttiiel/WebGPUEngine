@@ -146,14 +146,14 @@ export class CharacterControllerComponent extends Component {
     this.getIsGroundedAndGroundNormal();
     this.manageMantling();
     this.detectWall();
-    this.manageSliding(deltaTime);
+    this.manageSliding();
     if (this.isMantling) {
       this.updateMantle(deltaTime);
     } else if (this.isSliding) {
       const finalVelocity = this.updateSlide(deltaTime);
       this.applyMovement(finalVelocity, deltaTime);
     } else if (this.isWallRunning) {
-      this.updateWallRun(deltaTime);
+      this.updateWallRun();
       const inputDir = this.getInputVector();
       const targetMovement = this.getTargetMovement(inputDir);
       this.manageHorizontalMovementForWallRun(deltaTime, targetMovement);
@@ -161,7 +161,6 @@ export class CharacterControllerComponent extends Component {
       const finalVelocity = this.mergeMovements();
       this.applyMovement(finalVelocity, deltaTime);
     } else {
-      console.log('Normal movement', this.isGrounded, this.currentHorizontalVelocity[1]);
       const inputDir = this.getInputVector();
       const targetMovement = this.getTargetMovement(inputDir);
       this.manageHorizontalMovement(deltaTime, targetMovement);
@@ -289,7 +288,7 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
-  private manageSliding(deltaTime: number): void {
+  private manageSliding(): void {
     const input = Engine.getInput();
     if (!this.isSliding && input.isActionJustPressed(GameAction.SLIDE)) {
       // Activar slide solo si estamos en el suelo, con velocidad suficiente Y moviendo hacia adelante (W)
@@ -321,7 +320,7 @@ export class CharacterControllerComponent extends Component {
     this.removeVelocityIntoWall(this.wallNormal);
   }
 
-  private updateWallRun(deltaTime: number): void {
+  private updateWallRun(): void {
     const input = Engine.getInput();
 
     // salir si nos alejamos de la pared
@@ -608,24 +607,6 @@ export class CharacterControllerComponent extends Component {
     vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
   }
 
-  private kickObject(rigidbody: RAPIER.RigidBody): void {
-    const cameraObj = this.camera!.getCamera();
-    let cameraForward = cameraObj.getFront();
-    cameraForward[1] = 0.0;
-    vec3.normalize(cameraForward, cameraForward);
-
-    let kickObjectVelocity = vec3.create();
-    vec3.scale(kickObjectVelocity, cameraForward, 8.0);
-    let kickObjectJumpVelocity = vec3.fromValues(0, 5.0, 0);
-
-    vec3.add(kickObjectVelocity, kickObjectVelocity, kickObjectJumpVelocity);
-
-    rigidbody.applyImpulse(
-      new RAPIER.Vector3(kickObjectVelocity[0], kickObjectVelocity[1], kickObjectVelocity[2]),
-      true,
-    );
-  }
-
   private approach(current: number, target: number, delta: number): number {
     if (current < target) {
       return Math.min(current + delta, target);
@@ -681,6 +662,8 @@ export class CharacterControllerComponent extends Component {
         const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
         vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
       }
+
+      this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
     }
   }
 
