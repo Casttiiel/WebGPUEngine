@@ -56,10 +56,10 @@ export class CharacterControllerComponent extends Component {
   private wallNormal: vec3 = vec3.create();
   private wallRunGravity: number = -5.0; // caída lenta
   private wallRunAcceleration: number = 3.0;
+  private wallRunBrake: number = 3.0;
 
   // WallJump
-  private wallJumpCooldown: number = 0.5; // Cooldown entre patadas en segundos
-  private lastWallJumpTime: number = 0.0; // Tiempo desde la última patada
+  private wallJumpForce: number = 6.0; // Fuerza aplicada al saltar desde la pared
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
@@ -329,10 +329,10 @@ export class CharacterControllerComponent extends Component {
     }
 
     // saltar fuera de la pared
-    /*if (input.isActionBuffered(GameAction.JUMP)) {
+    if (input.isActionBuffered(GameAction.JUMP)) {
       input.consumeBufferedAction(GameAction.JUMP);
-      this.wallJumpFromRun();
-    }*/
+      this.applyWallJump();
+    }
   }
 
   private endWallRun(): void {
@@ -640,19 +640,21 @@ export class CharacterControllerComponent extends Component {
     this.isMantling = false;
   }
 
-  private applyWallJump(factor: number = 1.0): void {
-    const cameraObj = this.camera!.getCamera();
-    let cameraForward = cameraObj.getFront();
-    cameraForward[1] = 0.0;
-    vec3.normalize(cameraForward, cameraForward);
+  private applyWallJump(): void {
+    let jumpDir = this.camera!.getCamera().getLeft();
+    const d = vec3.dot(jumpDir, this.wallNormal);
+    if (d < -0.1) {
+      // Pared a la izquierda, saltar a la derecha
+      jumpDir = vec3.scale(vec3.create(), jumpDir, -1);
+    }
 
-    let wallJumpVelocity = vec3.create();
-    vec3.scale(wallJumpVelocity, cameraForward, -4.0 * factor);
-    let wallJumpVerticalVelocity = vec3.fromValues(0, 5.0 * factor, 0);
+    this.isNearWall = false;
+    this.isWallRunning = false;
 
-    vec3.add(wallJumpVelocity, wallJumpVelocity, wallJumpVerticalVelocity);
-
-    this.currentVelocity = wallJumpVelocity;
+    this.currentVerticalVelocity = this.wallJumpForce;
+    vec3.add(this.horizontalDirection, jumpDir, this.horizontalDirection);
+    vec3.normalize(this.horizontalDirection, this.horizontalDirection);
+    vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
   }
 
   private kickObject(rigidbody: RAPIER.RigidBody): void {
@@ -731,24 +733,45 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
+  private projectOntoWallTangent(v: vec3, wallNormal: vec3): vec3 {
+    const dot = vec3.dot(v, wallNormal);
+    const projected = vec3.scale(vec3.create(), wallNormal, dot);
+    return vec3.subtract(vec3.create(), v, projected);
+  }
+
   private manageHorizontalMovementForWallRun(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
 
-    // si empuja hacia la pared, lo quitamos
-    const d = vec3.dot(targetMovement, this.wallNormal);
-    if (d < 0.0) {
-      const correction = vec3.scale(vec3.create(), this.wallNormal, d);
-      targetMovement = vec3.subtract(vec3.create(), targetMovement, correction);
-      targetMovement = vec3.normalize(targetMovement, targetMovement);
+    //Solo puedes ir hacia adelante o atras de la pared
+    let wallTangent = this.projectOntoWallTangent(targetMovement, this.wallNormal);
+    if (vec3.length(wallTangent) < 0.001) {
+      // input completamente perpendicular → ignorar
+      return;
     }
+    vec3.normalize(wallTangent, wallTangent);
+    vec3.copy(targetMovement, wallTangent);
 
     if (hasInput) {
-      vec3.normalize(this.horizontalDirection, targetMovement);
-      this.horizontalSpeed = this.approach(
-        this.horizontalSpeed,
-        this.moveSpeed,
-        this.wallRunAcceleration * deltaTime,
-      );
+      if (this.horizontalSpeed < 0.1) {
+        vec3.copy(this.horizontalDirection, targetMovement);
+      }
+      const alignment = vec3.dot(targetMovement, this.horizontalDirection);
+
+      if (alignment > 0.0) {
+        // 👉 MISMA DIRECCIÓN → ACELERAR
+        this.horizontalSpeed = this.approach(
+          this.horizontalSpeed,
+          this.moveSpeed,
+          this.wallRunAcceleration * deltaTime,
+        );
+      } else {
+        // 👉 DIRECCIÓN CONTRARIA → FRENAR
+        this.horizontalSpeed = this.approach(
+          this.horizontalSpeed,
+          0.0,
+          this.wallRunBrake * deltaTime,
+        );
+      }
 
       vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
     } else {

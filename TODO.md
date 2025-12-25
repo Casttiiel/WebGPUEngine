@@ -1,11 +1,10 @@
 ## Player
 
 1. Mechanics
-   Jump to roof
-   Wallrunning detach from wall
-   Wall Jump to Right of camera
+   WallJump to Right of camera
    ---Keep Momentum on Walljump
    ---Si el angulo de right of camera es muy 90 grados de la normal de la pared no saltar
+   Jump to roof
    Order functions
    Parametrizar todo
 
