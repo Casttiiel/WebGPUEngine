@@ -60,6 +60,8 @@ export class CharacterControllerComponent extends Component {
 
   // WallJump
   private wallJumpForce: number = 6.0; // Fuerza aplicada al saltar desde la pared
+  private disableInputAfterWallJumpTime: number = 0.2; // Tiempo que se deshabilita el input tras un wall jump
+  private wallJumpInputDisableTimer: number = 0.0;
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
@@ -143,6 +145,10 @@ export class CharacterControllerComponent extends Component {
 
     if (!this.capsuleCollider || !this.camera) return;
 
+    if (this.wallJumpInputDisableTimer > 0.0) {
+      this.wallJumpInputDisableTimer -= deltaTime;
+    }
+
     this.getIsGroundedAndGroundNormal();
     this.manageMantling();
     this.detectWall();
@@ -170,21 +176,7 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
-  private mergeMovements(): vec3 {
-    if (this.currentHorizontalVelocity[1] < 0 && this.currentVerticalVelocity > 0) {
-      return vec3.fromValues(
-        this.currentHorizontalVelocity[0],
-        this.currentVerticalVelocity,
-        this.currentHorizontalVelocity[2],
-      );
-    }
-    return vec3.fromValues(
-      this.currentHorizontalVelocity[0],
-      this.currentHorizontalVelocity[1] + this.currentVerticalVelocity,
-      this.currentHorizontalVelocity[2],
-    );
-  }
-
+  //MOVEMENT
   private getIsGroundedAndGroundNormal(): void {
     const hit = this.capsuleCollider.raycastGrounded(0.1);
     this.isGrounded = hit !== null;
@@ -206,6 +198,8 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
     const inputDir = vec3.create();
 
+    if (this.wallJumpInputDisableTimer > 0.0) return inputDir;
+
     if (input.isActionPressed(GameAction.MOVE_FORWARD)) {
       inputDir[2] -= 1; // Forward
     }
@@ -225,13 +219,6 @@ export class CharacterControllerComponent extends Component {
     }
 
     return inputDir;
-  }
-
-  private projectOnPlane(v: vec3, normal: vec3): vec3 {
-    const dot = vec3.dot(v, normal);
-    const projected = vec3.create();
-    vec3.scaleAndAdd(projected, v, normal, -dot);
-    return projected;
   }
 
   private getTargetMovement(inputDir: vec3): vec3 {
@@ -277,6 +264,62 @@ export class CharacterControllerComponent extends Component {
     return targetMovement;
   }
 
+  private manageHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
+    const hasInput = vec3.length(targetMovement) > 0.01;
+
+    if (this.isGrounded) {
+      // EN SUELO: Control normal con aceleración/frenado suave
+      if (hasInput) {
+        vec3.normalize(this.horizontalDirection, targetMovement);
+      }
+      const targetSpeed = hasInput ? this.moveSpeed : 0.0;
+      const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
+      this.horizontalSpeed = this.approach(this.horizontalSpeed, targetSpeed, accel * deltaTime);
+
+      vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
+    } else {
+      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+      // EN AIRE: Preservar momentum + pequeñas correcciones
+      if (hasInput) {
+        vec3.scale(targetMovement, targetMovement, this.moveSpeed);
+        // Calcular velocidad de corrección basada en el input
+        const correctionVelocity = vec3.scale(
+          vec3.create(),
+          targetMovement,
+          this.airControlMultiplier,
+        );
+        // Añadir la corrección a la velocidad actual (acumulativa)
+        vec3.add(
+          this.currentHorizontalVelocity,
+          this.currentHorizontalVelocity,
+          vec3.scale(vec3.create(), correctionVelocity, deltaTime),
+        );
+
+        // Limitar la velocidad máxima para evitar aceleración infinita
+        const currentSpeed = vec3.length(this.currentHorizontalVelocity);
+        const maxAirSpeed = this.moveSpeed * 1.0;
+        if (currentSpeed > maxAirSpeed) {
+          vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
+          vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, maxAirSpeed);
+        }
+      } else {
+        // Sin input en el aire: mantener momentum (casi sin deceleración)
+        // Solo una deceleración mínima por resistencia del aire
+        const airDrag = 0.1; // 10% de drag por segundo
+        const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
+        vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
+      }
+
+      this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
+    }
+  }
+
+  private manageVerticalMovement(deltaTime: number): void {
+    this.manageDiving();
+    this.applyGravity(deltaTime);
+    this.manageJump(deltaTime);
+  }
+
   private applyGravity(deltaTime: number): void {
     // Actualizar velocidad vertical con gravedad
     if (!this.isGrounded) {
@@ -288,29 +331,194 @@ export class CharacterControllerComponent extends Component {
     }
   }
 
-  private manageSliding(): void {
-    const input = Engine.getInput();
-    if (!this.isSliding && input.isActionJustPressed(GameAction.SLIDE)) {
-      // Activar slide solo si estamos en el suelo, con velocidad suficiente Y moviendo hacia adelante (W)
-      const isMovingForward = input.isActionPressed(GameAction.MOVE_FORWARD);
-      const isMovingBackward = input.isActionPressed(GameAction.MOVE_BACKWARD);
-      const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-      if (
-        this.isGrounded &&
-        currentSpeed >= this.slideSpeedThreshold &&
-        isMovingForward &&
-        !isMovingBackward
-      ) {
-        this.startSlide();
+  private mergeMovements(): vec3 {
+    if (this.currentHorizontalVelocity[1] < 0 && this.currentVerticalVelocity > 0) {
+      return vec3.fromValues(
+        this.currentHorizontalVelocity[0],
+        this.currentVerticalVelocity,
+        this.currentHorizontalVelocity[2],
+      );
+    }
+    return vec3.fromValues(
+      this.currentHorizontalVelocity[0],
+      this.currentHorizontalVelocity[1] + this.currentVerticalVelocity,
+      this.currentHorizontalVelocity[2],
+    );
+  }
+
+  private applyMovement(velocity: vec3, dt: number): void {
+    const movement = vec3.fromValues(velocity[0] * dt, velocity[1] * dt, velocity[2] * dt);
+
+    this.characterController.computeColliderMovement(
+      this.capsuleCollider.getCollider(),
+      new RAPIER.Vector3(movement[0], movement[1], movement[2]),
+      QueryFilterFlags.EXCLUDE_SENSORS,
+    );
+
+    let correctedMovement = this.characterController.computedMovement();
+
+    // Aplicar movimiento real
+    const newVel = {
+      x: correctedMovement.x / dt,
+      y: correctedMovement.y / dt,
+      z: correctedMovement.z / dt,
+    };
+    this.capsuleCollider.getRigidBody().setLinvel(newVel, true);
+    for (var i = 0; i < this.characterController.numComputedCollisions(); i++) {
+      const collision = this.characterController.computedCollision(i);
+      const rigidBody = collision.collider.parent();
+      const type = rigidBody.bodyType();
+
+      // Detectar si es suelo
+      const isFloor = Math.abs(collision.normal1.y) > 0.1;
+      // Si es suelo → ignorar completamente para lógica de pared
+      if (isFloor) {
+        continue;
+      }
+
+      const collisionNormal = vec3.fromValues(
+        collision.normal1.x,
+        collision.normal1.y,
+        collision.normal1.z,
+      );
+
+      if (type === RAPIER.RigidBodyType.Fixed) {
+        if (this.isGrounded) {
+          this.removeVelocityIntoWall(collisionNormal);
+        }
       }
     }
   }
 
-  private manageDiving(): void {
-    const input = Engine.getInput();
+  private removeVelocityIntoWall(collisionNormal: vec3): void {
+    const dot =
+      this.currentHorizontalVelocity[0] * collisionNormal[0] +
+      this.currentHorizontalVelocity[1] * collisionNormal[1] +
+      this.currentHorizontalVelocity[2] * collisionNormal[2];
+    // si el vector apunta hacia la pared (dot < 0):
+    if (dot < 0) {
+      this.currentHorizontalVelocity[0] -= dot * collisionNormal[0];
+      this.currentHorizontalVelocity[1] -= dot * collisionNormal[1];
+      this.currentHorizontalVelocity[2] -= dot * collisionNormal[2];
+    }
+  }
 
-    if (input.isActionJustPressed(GameAction.DIVE) && !this.isGrounded && !this.isWallRunning) {
-      this.isDiving = true;
+  //JUMP
+  private manageJump(deltaTime: number): void {
+    const input = Engine.getInput();
+    const canGroundJump =
+      !this.isJumping && (this.timeSinceGrounded <= this.coyoteTime || this.isGrounded);
+
+    // Update coyote time
+    if (this.isGrounded && !this.isJumping) {
+      this.timeSinceGrounded = 0.0;
+    } else {
+      this.timeSinceGrounded += deltaTime;
+    }
+
+    // Detectar inicio del salto
+    if (input.isActionBuffered(GameAction.JUMP)) {
+      input.consumeBufferedAction(GameAction.JUMP);
+      if (canGroundJump) {
+        this.applyJump();
+        this.isJumping = true; // Iniciar salto variable
+        this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+        this.jumpCutFactorApplied = false;
+      }
+    } else if (
+      this.isJumping &&
+      this.currentVerticalVelocity > 0 &&
+      this.currentVerticalVelocity < 1.0 &&
+      !this.jumpCutFactorApplied
+    ) {
+      this.currentVerticalVelocity *= this.jumpCutFactor; // Reducir velocidad vertical al llegar al apex
+      this.jumpCutFactorApplied = true;
+      this.isJumping = false;
+    }
+  }
+
+  private applyJump(): void {
+    this.currentVerticalVelocity = this.jumpForce;
+  }
+
+  //WALLRUN
+  private detectWall(): void {
+    this.isNearWall = false;
+
+    if (this.wallJumpInputDisableTimer > 0.0) {
+      return;
+    }
+
+    const facingVector = this.isWallRunning
+      ? vec3.clone(this.currentHorizontalVelocity)
+      : this.camera!.getCamera().getFront();
+    facingVector[1] = 0;
+    vec3.normalize(facingVector, facingVector);
+
+    const wallDistance = 0.6;
+
+    const left = this.camera!.getCamera().getLeft();
+    left[1] = 0;
+    vec3.normalize(left, left);
+
+    const right = vec3.scale(vec3.create(), left, -1);
+    const origin = vec3.clone(this.camera!.getCamera().getPosition());
+
+    const physics = Engine.getPhysics();
+    const leftRay = new RAPIER.Ray(
+      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: left[0], y: left[1], z: left[2] },
+    );
+    const leftHit = physics.getWorld().castRayAndGetNormal(
+      leftRay,
+      wallDistance,
+      true, // solid
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined, // sin filtro de grupos
+      this.capsuleCollider.getCollider(), // Excluir solo el propio collider
+    );
+
+    if (
+      leftHit &&
+      leftHit.collider &&
+      leftHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
+    ) {
+      const n = vec3.fromValues(leftHit.normal.x, leftHit.normal.y, leftHit.normal.z);
+      const facing = vec3.dot(facingVector, n);
+      if (facing < -0.9) return;
+      this.isNearWall = true;
+      vec3.copy(this.wallNormal, n);
+    }
+
+    const rightRay = new RAPIER.Ray(
+      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: right[0], y: right[1], z: right[2] },
+    );
+    const rightHit = physics.getWorld().castRayAndGetNormal(
+      rightRay,
+      wallDistance,
+      true, // solid
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined, // sin filtro de grupos
+      this.capsuleCollider.getCollider(), // Excluir solo el propio collider
+    );
+
+    if (
+      rightHit &&
+      rightHit.collider &&
+      rightHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
+    ) {
+      const n = vec3.fromValues(rightHit.normal.x, rightHit.normal.y, rightHit.normal.z);
+      const facing = vec3.dot(facingVector, n);
+      if (facing < -0.9) return;
+      this.isNearWall = true;
+      vec3.copy(this.wallNormal, n);
+    }
+
+    if (this.isNearWall && !this.isGrounded && !this.isMantling && !this.isWallRunning) {
+      this.startWallRun();
+    } else if (this.isGrounded) {
+      this.isWallRunning = false;
     }
   }
 
@@ -340,6 +548,173 @@ export class CharacterControllerComponent extends Component {
     this.isWallRunning = false;
   }
 
+  private manageHorizontalMovementForWallRun(deltaTime: number, targetMovement: vec3): void {
+    const hasInput = vec3.length(targetMovement) > 0.01;
+
+    //Solo puedes ir hacia adelante o atras de la pared
+    let wallTangent = this.projectOntoWallTangent(targetMovement, this.wallNormal);
+    if (vec3.length(wallTangent) < 0.001) {
+      // input completamente perpendicular → ignorar
+      return;
+    }
+    vec3.normalize(wallTangent, wallTangent);
+    vec3.copy(targetMovement, wallTangent);
+
+    if (hasInput) {
+      if (this.horizontalSpeed < 0.1) {
+        vec3.copy(this.horizontalDirection, targetMovement);
+      }
+      const alignment = vec3.dot(targetMovement, this.horizontalDirection);
+
+      if (alignment > 0.0) {
+        // 👉 MISMA DIRECCIÓN → ACELERAR
+        this.horizontalSpeed = this.approach(
+          this.horizontalSpeed,
+          this.moveSpeed,
+          this.wallRunAcceleration * deltaTime,
+        );
+      } else {
+        // 👉 DIRECCIÓN CONTRARIA → FRENAR
+        this.horizontalSpeed = this.approach(
+          this.horizontalSpeed,
+          0.0,
+          this.wallRunBrake * deltaTime,
+        );
+      }
+
+      vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
+    } else {
+      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+      const airDrag = 0.3; // 30% de drag por segundo
+      const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
+      vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
+      this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
+    }
+  }
+
+  //WALLJUMP
+  private applyWallJump(): void {
+    let jumpDir = this.camera!.getCamera().getLeft();
+    const d = vec3.dot(jumpDir, this.wallNormal);
+    if (d < -0.1) {
+      // Pared a la izquierda, saltar a la derecha
+      jumpDir = vec3.scale(vec3.create(), jumpDir, -1);
+    }
+    jumpDir[1] = 0.0;
+    vec3.normalize(jumpDir, jumpDir);
+
+    this.isNearWall = false;
+    this.isWallRunning = false;
+    this.wallJumpInputDisableTimer = this.disableInputAfterWallJumpTime;
+
+    vec3.scale(jumpDir, jumpDir, this.moveSpeed);
+    this.currentVerticalVelocity = this.wallJumpForce;
+    vec3.add(this.currentHorizontalVelocity, jumpDir, this.currentHorizontalVelocity);
+    vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+    vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
+  }
+
+  //DIVING
+  private manageDiving(): void {
+    const input = Engine.getInput();
+
+    if (input.isActionJustPressed(GameAction.DIVE) && !this.isGrounded && !this.isWallRunning) {
+      this.isDiving = true;
+    }
+  }
+
+  //SLIDING
+  private manageSliding(): void {
+    const input = Engine.getInput();
+    if (!this.isSliding && input.isActionJustPressed(GameAction.SLIDE)) {
+      // Activar slide solo si estamos en el suelo, con velocidad suficiente Y moviendo hacia adelante (W)
+      const isMovingForward = input.isActionPressed(GameAction.MOVE_FORWARD);
+      const isMovingBackward = input.isActionPressed(GameAction.MOVE_BACKWARD);
+      const currentSpeed = vec3.length(this.currentHorizontalVelocity);
+      if (
+        this.isGrounded &&
+        currentSpeed >= this.slideSpeedThreshold &&
+        isMovingForward &&
+        !isMovingBackward
+      ) {
+        this.startSlide();
+      }
+    }
+  }
+
+  private startSlide(): void {
+    this.isSliding = true;
+    this.slideTimer = 0.0;
+    // Capturar velocidad actual para el slide
+    this.slideVelocity = vec3.length(this.currentHorizontalVelocity);
+    const horizontal = vec3.fromValues(
+      this.currentHorizontalVelocity[0],
+      0,
+      this.currentHorizontalVelocity[2],
+    );
+    vec3.copy(this.slideDirection, vec3.normalize(vec3.create(), horizontal));
+  }
+
+  private updateSlide(deltaTime: number): vec3 {
+    const input = Engine.getInput();
+    this.slideTimer += deltaTime;
+
+    const horizontal = this.slideDirection;
+    const projected = this.projectOnPlane(horizontal, this.groundNormal);
+
+    // Normalize final movement
+    vec3.normalize(projected, projected);
+
+    const gravityDir = vec3.fromValues(0, -1, 0);
+    const downhill = this.projectOnPlane(gravityDir, this.groundNormal);
+    let downhillFactor = 0.0;
+    if (vec3.length(downhill) > 0.001) {
+      vec3.normalize(downhill, downhill);
+      // Cuánto apunta el slide hacia abajo
+      downhillFactor = vec3.dot(projected, downhill);
+    }
+    if (downhillFactor > 0) {
+      // BAJADA → acelerar
+      this.slideVelocity += this.slideDownhillAccel * deltaTime;
+    } else {
+      // SUBIDA → frenar más
+      // Decelerar progresivamente el slide
+      let friction = this.slideFriction;
+
+      if (downhillFactor < 0) {
+        console.log('uphill brake');
+        friction += this.slideUphillBrake;
+      }
+
+      // Aplicar deceleración manteniendo dirección
+      this.slideVelocity -= friction * deltaTime;
+    }
+
+    const result = vec3.scale(vec3.create(), projected, this.slideVelocity);
+
+    // Terminar slide solo si:
+    // 1. Ha pasado el tiempo mínimo Y (soltamos tecla O se acabó tiempo O velocidad baja)
+    // 2. O perdemos contacto con el suelo (cancelación forzada)
+    const minDurationPassed =
+      this.slideTimer >= this.slideMinDuration && !input.isActionPressed(GameAction.SLIDE);
+    const shouldEndSlideBecauseVelocity = this.slideVelocity < 2.0;
+    if (!this.isGrounded || minDurationPassed || shouldEndSlideBecauseVelocity) {
+      this.endSlide(result);
+    }
+
+    return result;
+  }
+
+  private endSlide(currentVelocity: vec3): void {
+    if (!this.isSliding) return;
+    this.isSliding = false;
+    this.slideTimer = 0.0;
+
+    // Transferir velocidad del slide al movimiento normal
+    vec3.copy(this.currentHorizontalVelocity, currentVelocity);
+  }
+
+  //MANTLING
   private manageMantling(): void {
     const input = Engine.getInput();
 
@@ -472,82 +847,6 @@ export class CharacterControllerComponent extends Component {
     return null;
   }
 
-  private detectWall(): void {
-    this.isNearWall = false;
-
-    const facingVector = this.isWallRunning
-      ? vec3.clone(this.currentHorizontalVelocity)
-      : this.camera!.getCamera().getFront();
-    facingVector[1] = 0;
-    vec3.normalize(facingVector, facingVector);
-
-    const wallDistance = 0.5;
-
-    const left = this.camera!.getCamera().getLeft();
-    left[1] = 0;
-    vec3.normalize(left, left);
-
-    const right = vec3.scale(vec3.create(), left, -1);
-    const origin = vec3.clone(this.camera!.getCamera().getPosition());
-
-    const physics = Engine.getPhysics();
-    const leftRay = new RAPIER.Ray(
-      { x: origin[0], y: origin[1], z: origin[2] },
-      { x: left[0], y: left[1], z: left[2] },
-    );
-    const leftHit = physics.getWorld().castRayAndGetNormal(
-      leftRay,
-      wallDistance,
-      true, // solid
-      QueryFilterFlags.EXCLUDE_SENSORS,
-      undefined, // sin filtro de grupos
-      this.capsuleCollider.getCollider(), // Excluir solo el propio collider
-    );
-
-    if (
-      leftHit &&
-      leftHit.collider &&
-      leftHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
-    ) {
-      const n = vec3.fromValues(leftHit.normal.x, leftHit.normal.y, leftHit.normal.z);
-      const facing = vec3.dot(facingVector, n);
-      if (facing < -0.7) return;
-      this.isNearWall = true;
-      vec3.copy(this.wallNormal, n);
-    }
-
-    const rightRay = new RAPIER.Ray(
-      { x: origin[0], y: origin[1], z: origin[2] },
-      { x: right[0], y: right[1], z: right[2] },
-    );
-    const rightHit = physics.getWorld().castRayAndGetNormal(
-      rightRay,
-      wallDistance,
-      true, // solid
-      QueryFilterFlags.EXCLUDE_SENSORS,
-      undefined, // sin filtro de grupos
-      this.capsuleCollider.getCollider(), // Excluir solo el propio collider
-    );
-
-    if (
-      rightHit &&
-      rightHit.collider &&
-      rightHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
-    ) {
-      const n = vec3.fromValues(rightHit.normal.x, rightHit.normal.y, rightHit.normal.z);
-      const facing = vec3.dot(facingVector, n);
-      if (facing < -0.7) return;
-      this.isNearWall = true;
-      vec3.copy(this.wallNormal, n);
-    }
-
-    if (this.isNearWall && !this.isGrounded && !this.isMantling && !this.isWallRunning) {
-      this.startWallRun();
-    } else if (this.isGrounded) {
-      this.isWallRunning = false;
-    }
-  }
-
   private startMantle(targetPosition: vec3): void {
     this.isMantling = true;
 
@@ -587,26 +886,7 @@ export class CharacterControllerComponent extends Component {
     this.isMantling = false;
   }
 
-  private applyWallJump(): void {
-    let jumpDir = this.camera!.getCamera().getLeft();
-    const d = vec3.dot(jumpDir, this.wallNormal);
-    if (d < -0.1) {
-      // Pared a la izquierda, saltar a la derecha
-      jumpDir = vec3.scale(vec3.create(), jumpDir, -1);
-    }
-    jumpDir[1] = 0.0;
-    vec3.normalize(jumpDir, jumpDir);
-
-    this.isNearWall = false;
-    this.isWallRunning = false;
-
-    vec3.scale(jumpDir, jumpDir, this.moveSpeed);
-    this.currentVerticalVelocity = this.wallJumpForce;
-    vec3.add(this.currentHorizontalVelocity, jumpDir, this.currentHorizontalVelocity);
-    vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
-    vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
-  }
-
+  //HELPERS
   private approach(current: number, target: number, delta: number): number {
     if (current < target) {
       return Math.min(current + delta, target);
@@ -617,276 +897,17 @@ export class CharacterControllerComponent extends Component {
     return target;
   }
 
-  private manageHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
-    const hasInput = vec3.length(targetMovement) > 0.01;
-
-    if (this.isGrounded) {
-      // EN SUELO: Control normal con aceleración/frenado suave
-      if (hasInput) {
-        vec3.normalize(this.horizontalDirection, targetMovement);
-      }
-      const targetSpeed = hasInput ? this.moveSpeed : 0.0;
-      const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
-      this.horizontalSpeed = this.approach(this.horizontalSpeed, targetSpeed, accel * deltaTime);
-
-      vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
-    } else {
-      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
-      // EN AIRE: Preservar momentum + pequeñas correcciones
-      if (hasInput) {
-        vec3.scale(targetMovement, targetMovement, this.moveSpeed);
-        // Calcular velocidad de corrección basada en el input
-        const correctionVelocity = vec3.scale(
-          vec3.create(),
-          targetMovement,
-          this.airControlMultiplier,
-        );
-        // Añadir la corrección a la velocidad actual (acumulativa)
-        vec3.add(
-          this.currentHorizontalVelocity,
-          this.currentHorizontalVelocity,
-          vec3.scale(vec3.create(), correctionVelocity, deltaTime),
-        );
-
-        // Limitar la velocidad máxima para evitar aceleración infinita
-        const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-        const maxAirSpeed = this.moveSpeed * 1.0;
-        if (currentSpeed > maxAirSpeed) {
-          vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
-          vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, maxAirSpeed);
-        }
-      } else {
-        // Sin input en el aire: mantener momentum (casi sin deceleración)
-        // Solo una deceleración mínima por resistencia del aire
-        const airDrag = 0.1; // 10% de drag por segundo
-        const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
-        vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
-      }
-
-      this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
-    }
+  private projectOnPlane(v: vec3, normal: vec3): vec3 {
+    const dot = vec3.dot(v, normal);
+    const projected = vec3.create();
+    vec3.scaleAndAdd(projected, v, normal, -dot);
+    return projected;
   }
 
   private projectOntoWallTangent(v: vec3, wallNormal: vec3): vec3 {
     const dot = vec3.dot(v, wallNormal);
     const projected = vec3.scale(vec3.create(), wallNormal, dot);
     return vec3.subtract(vec3.create(), v, projected);
-  }
-
-  private manageHorizontalMovementForWallRun(deltaTime: number, targetMovement: vec3): void {
-    const hasInput = vec3.length(targetMovement) > 0.01;
-
-    //Solo puedes ir hacia adelante o atras de la pared
-    let wallTangent = this.projectOntoWallTangent(targetMovement, this.wallNormal);
-    if (vec3.length(wallTangent) < 0.001) {
-      // input completamente perpendicular → ignorar
-      return;
-    }
-    vec3.normalize(wallTangent, wallTangent);
-    vec3.copy(targetMovement, wallTangent);
-
-    if (hasInput) {
-      if (this.horizontalSpeed < 0.1) {
-        vec3.copy(this.horizontalDirection, targetMovement);
-      }
-      const alignment = vec3.dot(targetMovement, this.horizontalDirection);
-
-      if (alignment > 0.0) {
-        // 👉 MISMA DIRECCIÓN → ACELERAR
-        this.horizontalSpeed = this.approach(
-          this.horizontalSpeed,
-          this.moveSpeed,
-          this.wallRunAcceleration * deltaTime,
-        );
-      } else {
-        // 👉 DIRECCIÓN CONTRARIA → FRENAR
-        this.horizontalSpeed = this.approach(
-          this.horizontalSpeed,
-          0.0,
-          this.wallRunBrake * deltaTime,
-        );
-      }
-
-      vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
-    } else {
-      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
-      const airDrag = 0.3; // 30% de drag por segundo
-      const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
-      vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
-      this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
-    }
-  }
-
-  private manageVerticalMovement(deltaTime: number): void {
-    this.manageDiving();
-    this.applyGravity(deltaTime);
-    this.manageJump(deltaTime);
-  }
-
-  private applyMovement(velocity: vec3, dt: number): void {
-    const movement = vec3.fromValues(velocity[0] * dt, velocity[1] * dt, velocity[2] * dt);
-
-    this.characterController.computeColliderMovement(
-      this.capsuleCollider.getCollider(),
-      new RAPIER.Vector3(movement[0], movement[1], movement[2]),
-      QueryFilterFlags.EXCLUDE_SENSORS,
-    );
-
-    let correctedMovement = this.characterController.computedMovement();
-
-    // Aplicar movimiento real
-    const newVel = {
-      x: correctedMovement.x / dt,
-      y: correctedMovement.y / dt,
-      z: correctedMovement.z / dt,
-    };
-    this.capsuleCollider.getRigidBody().setLinvel(newVel, true);
-    for (var i = 0; i < this.characterController.numComputedCollisions(); i++) {
-      const collision = this.characterController.computedCollision(i);
-      const rigidBody = collision.collider.parent();
-      const type = rigidBody.bodyType();
-
-      // Detectar si es suelo
-      const isFloor = Math.abs(collision.normal1.y) > 0.1;
-      // Si es suelo → ignorar completamente para lógica de pared
-      if (isFloor) {
-        continue;
-      }
-
-      const collisionNormal = vec3.fromValues(
-        collision.normal1.x,
-        collision.normal1.y,
-        collision.normal1.z,
-      );
-
-      if (type === RAPIER.RigidBodyType.Fixed) {
-        if (this.isGrounded) {
-          this.removeVelocityIntoWall(collisionNormal);
-        }
-      }
-    }
-  }
-
-  private removeVelocityIntoWall(collisionNormal: vec3): void {
-    const dot =
-      this.currentHorizontalVelocity[0] * collisionNormal[0] +
-      this.currentHorizontalVelocity[1] * collisionNormal[1] +
-      this.currentHorizontalVelocity[2] * collisionNormal[2];
-    // si el vector apunta hacia la pared (dot < 0):
-    if (dot < 0) {
-      this.currentHorizontalVelocity[0] -= dot * collisionNormal[0];
-      this.currentHorizontalVelocity[1] -= dot * collisionNormal[1];
-      this.currentHorizontalVelocity[2] -= dot * collisionNormal[2];
-    }
-  }
-
-  private manageJump(deltaTime: number): void {
-    const input = Engine.getInput();
-    const canGroundJump =
-      !this.isJumping && (this.timeSinceGrounded <= this.coyoteTime || this.isGrounded);
-
-    // Update coyote time
-    if (this.isGrounded && !this.isJumping) {
-      this.timeSinceGrounded = 0.0;
-    } else {
-      this.timeSinceGrounded += deltaTime;
-    }
-
-    // Detectar inicio del salto
-    if (input.isActionBuffered(GameAction.JUMP)) {
-      input.consumeBufferedAction(GameAction.JUMP);
-      if (canGroundJump) {
-        this.applyJump();
-        this.isJumping = true; // Iniciar salto variable
-        this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
-        this.jumpCutFactorApplied = false;
-      }
-    } else if (
-      this.isJumping &&
-      this.currentVerticalVelocity > 0 &&
-      this.currentVerticalVelocity < 1.0 &&
-      !this.jumpCutFactorApplied
-    ) {
-      this.currentVerticalVelocity *= this.jumpCutFactor; // Reducir velocidad vertical al llegar al apex
-      this.jumpCutFactorApplied = true;
-      this.isJumping = false;
-    }
-  }
-
-  private applyJump(): void {
-    this.currentVerticalVelocity = this.jumpForce;
-  }
-
-  private startSlide(): void {
-    this.isSliding = true;
-    this.slideTimer = 0.0;
-    // Capturar velocidad actual para el slide
-    this.slideVelocity = vec3.length(this.currentHorizontalVelocity);
-    const horizontal = vec3.fromValues(
-      this.currentHorizontalVelocity[0],
-      0,
-      this.currentHorizontalVelocity[2],
-    );
-    vec3.copy(this.slideDirection, vec3.normalize(vec3.create(), horizontal));
-  }
-
-  private updateSlide(deltaTime: number): vec3 {
-    const input = Engine.getInput();
-    this.slideTimer += deltaTime;
-
-    const horizontal = this.slideDirection;
-    const projected = this.projectOnPlane(horizontal, this.groundNormal);
-
-    // Normalize final movement
-    vec3.normalize(projected, projected);
-
-    const gravityDir = vec3.fromValues(0, -1, 0);
-    const downhill = this.projectOnPlane(gravityDir, this.groundNormal);
-    let downhillFactor = 0.0;
-    if (vec3.length(downhill) > 0.001) {
-      vec3.normalize(downhill, downhill);
-      // Cuánto apunta el slide hacia abajo
-      downhillFactor = vec3.dot(projected, downhill);
-    }
-    if (downhillFactor > 0) {
-      // BAJADA → acelerar
-      this.slideVelocity += this.slideDownhillAccel * deltaTime;
-    } else {
-      // SUBIDA → frenar más
-      // Decelerar progresivamente el slide
-      let friction = this.slideFriction;
-
-      if (downhillFactor < 0) {
-        console.log('uphill brake');
-        friction += this.slideUphillBrake;
-      }
-
-      // Aplicar deceleración manteniendo dirección
-      this.slideVelocity -= friction * deltaTime;
-    }
-
-    const result = vec3.scale(vec3.create(), projected, this.slideVelocity);
-
-    // Terminar slide solo si:
-    // 1. Ha pasado el tiempo mínimo Y (soltamos tecla O se acabó tiempo O velocidad baja)
-    // 2. O perdemos contacto con el suelo (cancelación forzada)
-    const minDurationPassed =
-      this.slideTimer >= this.slideMinDuration && !input.isActionPressed(GameAction.SLIDE);
-    const shouldEndSlideBecauseVelocity = this.slideVelocity < 2.0;
-    if (!this.isGrounded || minDurationPassed || shouldEndSlideBecauseVelocity) {
-      this.endSlide(result);
-    }
-
-    return result;
-  }
-
-  private endSlide(currentVelocity: vec3): void {
-    if (!this.isSliding) return;
-    this.isSliding = false;
-    this.slideTimer = 0.0;
-
-    // Transferir velocidad del slide al movimiento normal
-    vec3.copy(this.currentHorizontalVelocity, currentVelocity);
   }
 
   private findCamera(): void {
