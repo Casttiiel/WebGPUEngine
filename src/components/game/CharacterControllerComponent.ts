@@ -61,7 +61,7 @@ export class CharacterControllerComponent extends Component {
   // WallJump
   private wallJumpForce: number = 6.0; // Fuerza aplicada al saltar desde la pared
   private disableInputAfterWallJumpTime: number = 0.2; // Tiempo que se deshabilita el input tras un wall jump
-  private wallJumpInputDisableTimer: number = 0.0;
+  private wallJumpInputDisableTimer: number = -10.0;
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
@@ -153,6 +153,7 @@ export class CharacterControllerComponent extends Component {
     this.manageMantling();
     this.detectWall();
     this.manageSliding();
+
     if (this.isMantling) {
       this.updateMantle(deltaTime);
     } else if (this.isSliding) {
@@ -449,9 +450,7 @@ export class CharacterControllerComponent extends Component {
       return;
     }
 
-    const facingVector = this.isWallRunning
-      ? vec3.clone(this.currentHorizontalVelocity)
-      : this.camera!.getCamera().getFront();
+    const facingVector = this.camera!.getCamera().getFront();
     facingVector[1] = 0;
     vec3.normalize(facingVector, facingVector);
 
@@ -682,7 +681,6 @@ export class CharacterControllerComponent extends Component {
       let friction = this.slideFriction;
 
       if (downhillFactor < 0) {
-        console.log('uphill brake');
         friction += this.slideUphillBrake;
       }
 

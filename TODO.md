@@ -1,18 +1,20 @@
 ## Gameplay
 
-1. Parametrizar todo
-2. Throw dagger
-3. Dash to dagger
-4. More Gameplay elements: Momentum, Swing Bar, Enemy
-5. Jump to roof
-6. Run upward to wall -> wallrun (wrong)
+1. Test Land on slope with horizontal velocity
+2. Jump to roof
+3. Parametrizar todo
+4. Throw dagger
+5. Dash to dagger
+6. More Gameplay elements: Momentum, Swing Bar, Enemy
+7. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 
-1.  Level design
-2.  Sound
-3.  Visual style
-4.  Sunset overdrive Brushstrokes
+1. HeightMap
+2. Sunset overdrive Brushstrokes
+3. Visual style
+4. Level design
+5. Sound
 
 ### Engine
 
