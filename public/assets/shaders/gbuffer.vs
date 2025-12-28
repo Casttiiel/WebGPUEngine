@@ -48,9 +48,6 @@ fn vs(
 
     let displace_value = textureSampleLevel(txRoughness, samplerState, uv, 0).x;
 
-    worldPos.x += output.N.x * displace_value;
-    worldPos.y += output.N.y * displace_value;
-    worldPos.z += output.N.z * displace_value;
     output.WorldPos = worldPos.xyz;
     output.position = camera.projectionMatrix * camera.viewMatrix * worldPos;
 

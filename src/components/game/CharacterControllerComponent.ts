@@ -272,6 +272,9 @@ export class CharacterControllerComponent extends Component {
       // EN SUELO: Control normal con aceleración/frenado suave
       if (hasInput) {
         vec3.normalize(this.horizontalDirection, targetMovement);
+      } else {
+        vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+        this.horizontalDirection = this.projectOnPlane(this.horizontalDirection, this.groundNormal);
       }
       const targetSpeed = hasInput ? this.moveSpeed : 0.0;
       const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
