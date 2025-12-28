@@ -374,7 +374,7 @@ export class CharacterControllerComponent extends Component {
       const type = rigidBody.bodyType();
 
       // Detectar si es suelo
-      const isFloor = Math.abs(collision.normal1.y) > 0.1;
+      const isFloor = Math.abs(collision.normal1.y) > 0.1 && collision.normal1.y > 0.0;
       // Si es suelo → ignorar completamente para lógica de pared
       if (isFloor) {
         continue;
@@ -389,6 +389,12 @@ export class CharacterControllerComponent extends Component {
       if (type === RAPIER.RigidBodyType.Fixed) {
         if (this.isGrounded) {
           this.removeVelocityIntoWall(collisionNormal);
+        } else {
+          const isCeiling = collisionNormal[1] < -0.7;
+          if (isCeiling && this.currentVerticalVelocity > 0) {
+            this.currentVerticalVelocity = 0;
+            this.isJumping = false;
+          }
         }
       }
     }

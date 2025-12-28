@@ -1,11 +1,10 @@
 ## Gameplay
 
-1. Jump to roof
-2. Parametrizar todo
-3. Throw dagger
-4. Dash to dagger
-5. More Gameplay elements: Momentum, Swing Bar, Enemy
-6. Run upward to wall -> wallrun (wrong)
+1. Parametrizar todo
+2. Throw dagger
+3. Dash to dagger
+4. More Gameplay elements: Momentum, Swing Bar, Enemy
+5. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 
