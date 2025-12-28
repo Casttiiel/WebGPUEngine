@@ -16,7 +16,7 @@ fn vs(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     
     // Transform position to world space
-    let worldPos = object.modelMatrix * vec4<f32>(in.position, 1.0);
+    let worldPos = object.modelMatrix * vec4<f32>(in.position, 1.0)  + vec4<f32>(0, 5.0, 0, 0);
     
     // Transform to clip space
     out.position = camera.projectionMatrix * camera.viewMatrix * worldPos;

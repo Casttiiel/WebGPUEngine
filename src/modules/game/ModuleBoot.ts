@@ -19,7 +19,7 @@ export class ModuleBoot extends Module {
   }
 
   public async start(): Promise<boolean> {
-    const response = await ResourceManager.fetch(`assets/scenes/playground.json`);
+    const response = await ResourceManager.fetch(`assets/scenes/visual_style.json`);
     const jsonData = await response.json();
 
     // 1. Parsear el JSON (expandir prefabs, GLTF, etc.)

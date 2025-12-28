@@ -21,7 +21,8 @@
 1. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
 2. Loading Bar
 3. Multiple Light probes has good shadows?
-4. Froxel Scattering
-5. Improve particles
-6. Weird line on corners is irradiance because of normals
-7. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?
+4. Review AO
+5. Froxel Scattering
+6. Improve particles
+7. Weird line on corners is irradiance because of normals
+8. Triplanar with instanced fails (Ahora mismo necesitamos crear techniques para cada cosa, isntanced, triplanar, y combinaciones), esto se podria hacer automatico?

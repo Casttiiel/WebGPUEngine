@@ -1,5 +1,5 @@
 {
-  "vs": "pbr_instanced.vs",
+  "vs": "gbuffer_instanced.vs",
   "fs": "pbr.fs",
   "blend": "OPAQUE",
   "z": "LESS_EQUAL",

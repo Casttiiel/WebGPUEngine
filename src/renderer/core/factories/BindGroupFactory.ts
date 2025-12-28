@@ -84,42 +84,42 @@ export class BindGroupFactory {
       // Albedo texture
       {
         binding: 0,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
       // Normal texture
       {
         binding: 1,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
       // Metallic texture
       {
         binding: 2,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
       // Roughness texture
       {
         binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
       // Emissive texture
       {
         binding: 4,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
       // Shared sampler
       {
         binding: 5,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         sampler: { type: 'filtering' },
       },
       {
         binding: 6,
-        visibility: GPUShaderStage.FRAGMENT,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },
     ]);

@@ -74,7 +74,7 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().hdrTexture,
-      GPUTextureUsage.COPY_SRC, // TODO:DANI Necesario para copiar en reflection probes
+      GPUTextureUsage.COPY_SRC,
     );
 
     if (!this.rtCopyAlbedos) {
@@ -232,17 +232,7 @@ export class DeferredRenderer {
    * @returns Vista de textura con el resultado final
    */
   public render(camera: Entity, skipPostProcessing: boolean = false): GPUTextureView {
-    // 1. Depth prepass - generates depth + linear depth
-    // Use technique override to force all SOLIDS to use depth_prepass.tech (and instanced variant)
-    RenderManager.getInstance().setTechniqueOverride(
-      this.depthPrepassTechnique,
-      this.depthPrepassInstancedTechnique,
-    );
-
-    this.renderPassManager.executePass('depth_prepass');
-    RenderManager.getInstance().clearTechniqueOverride();
-
-    // 2. G-Buffer pass - uses depth from prepass
+    // 1. G-Buffer pass - uses depth from prepass
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);

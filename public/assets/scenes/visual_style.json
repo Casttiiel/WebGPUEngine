@@ -1,0 +1,40 @@
+[
+  {
+    "prefab": "main_camera.prefab"
+  },
+  {
+    "prefab": "player_character.prefab"
+  },
+  {
+    "prefab": "debug_camera.prefab"
+  },
+  {
+    "prefab": "ground.prefab"
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [0, 3, 6],
+        "rotation": [0, 0, 0],
+        "scale": [20, 8, 2]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "zaun.mat"
+          }
+        ]
+      }
+    }
+  }
+]
