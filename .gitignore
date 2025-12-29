@@ -34,3 +34,5 @@ build/
 # TypeScript
 *.tsbuildinfo
 high_sponza/
+
+VISUAL-GUIDE.md

@@ -13,7 +13,6 @@ import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { GBufferPass } from '../passes/GBufferPass';
 import { DepthPrepass } from '../passes/DepthPrepass';
 import { RenderPassManager } from '../passes/RenderPassManager';
-import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
 import { Render } from './Render';
 import { DirectionalLightComponent } from '../../../components/render/DirectionalLightComponent';
 import { Engine } from '../../../core/engine/Engine';
@@ -27,8 +26,6 @@ export class DeferredRenderer {
   private ssr!: ScreenSpaceReflections;
   private froxelVolumetrics!: FroxelVolumetricScattering;
   private depthPrepass!: DepthPrepass;
-  private depthPrepassTechnique!: Technique;
-  private depthPrepassInstancedTechnique!: Technique;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
   private rtAccLight!: RenderTarget;
@@ -193,9 +190,6 @@ export class DeferredRenderer {
 
     this.depthPrepass = new DepthPrepass();
     this.depthPrepass.load();
-
-    this.depthPrepassTechnique = await Technique.getAsync('depth_prepass.tech');
-    this.depthPrepassInstancedTechnique = await Technique.getAsync('depth_prepass_instanced.tech');
 
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();

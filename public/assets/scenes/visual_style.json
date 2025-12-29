@@ -9,6 +9,9 @@
     "prefab": "debug_camera.prefab"
   },
   {
+    "prefab": "directional_light.prefab"
+  },
+  {
     "prefab": "ground.prefab"
   },
   {
@@ -16,9 +19,9 @@
     "components": {
       "name": "Wall",
       "transform": {
-        "position": [0, 3, 6],
+        "position": [-3, 3, 10],
         "rotation": [0, 0, 0],
-        "scale": [20, 8, 2]
+        "scale": [5, 6, 2]
       },
       "box_collider": {
         "bodyType": "static",
@@ -30,8 +33,34 @@
       "render": {
         "meshes": [
           {
-            "mesh": "cube.obj",
-            "material": "zaun.mat"
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [3, 3, 10],
+        "rotation": [0, 0, 0],
+        "scale": [5, 6, 2]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
           }
         ]
       }

@@ -14,8 +14,8 @@
       "render": {
         "meshes": [
           {
-            "mesh": "cube.obj",
-            "material": "concrete.mat"
+            "mesh": "unit_cube.obj",
+            "material": "stone.mat"
           }
         ]
       }

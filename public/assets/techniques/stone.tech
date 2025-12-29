@@ -1,0 +1,10 @@
+{
+    "vs": "stone.vs",
+    "fs": "stone.fs",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms"
+    ],
+    "writesOn": "gbuffer"
+}
