@@ -61,7 +61,6 @@ export class CharacterControllerComponent extends Component {
   // WallJump
   private wallJumpForce: number = 6.0; // Fuerza aplicada al saltar desde la pared
   private disableInputAfterWallJumpTime: number = 0.2; // Tiempo que se deshabilita el input tras un wall jump
-  private wallJumpInputDisableTimer: number = -10.0;
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
@@ -88,6 +87,7 @@ export class CharacterControllerComponent extends Component {
   private currentVerticalVelocity: number = 0.0; // Velocidad vertical actual
   private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
   private groundNormal: vec3 = vec3.fromValues(0, 1, 0); // Normal del suelo actual
+  private inputDisableTimer: number = -10.0; // Temporizador para deshabilitar input
 
   constructor() {
     super();
@@ -145,9 +145,11 @@ export class CharacterControllerComponent extends Component {
 
     if (!this.capsuleCollider || !this.camera) return;
 
-    if (this.wallJumpInputDisableTimer > 0.0) {
-      this.wallJumpInputDisableTimer -= deltaTime;
+    if (this.inputDisableTimer > 0.0) {
+      this.inputDisableTimer -= deltaTime;
     }
+
+    console.log(this.isGrounded, this.currentVerticalVelocity, this.isJumping);
 
     this.getIsGroundedAndGroundNormal();
     this.manageMantling();
@@ -199,7 +201,7 @@ export class CharacterControllerComponent extends Component {
     const input = Engine.getInput();
     const inputDir = vec3.create();
 
-    if (this.wallJumpInputDisableTimer > 0.0) return inputDir;
+    if (this.inputDisableTimer > 0.0) return inputDir;
 
     if (input.isActionPressed(GameAction.MOVE_FORWARD)) {
       inputDir[2] -= 1; // Forward
@@ -444,6 +446,9 @@ export class CharacterControllerComponent extends Component {
       this.currentVerticalVelocity *= this.jumpCutFactor; // Reducir velocidad vertical al llegar al apex
       this.jumpCutFactorApplied = true;
       this.isJumping = false;
+    } else if (this.isJumping && this.currentVerticalVelocity <= 0) {
+      this.jumpCutFactorApplied = true;
+      this.isJumping = false;
     }
   }
 
@@ -455,7 +460,7 @@ export class CharacterControllerComponent extends Component {
   private detectWall(): void {
     this.isNearWall = false;
 
-    if (this.wallJumpInputDisableTimer > 0.0) {
+    if (this.inputDisableTimer > 0.0) {
       return;
     }
 
@@ -613,7 +618,7 @@ export class CharacterControllerComponent extends Component {
 
     this.isNearWall = false;
     this.isWallRunning = false;
-    this.wallJumpInputDisableTimer = this.disableInputAfterWallJumpTime;
+    this.inputDisableTimer = this.disableInputAfterWallJumpTime;
 
     vec3.scale(jumpDir, jumpDir, this.moveSpeed);
     this.currentVerticalVelocity = this.wallJumpForce;
@@ -891,6 +896,34 @@ export class CharacterControllerComponent extends Component {
 
   private endMantle(): void {
     this.isMantling = false;
+  }
+
+  //IMPULSE PAD
+  public applyImpulseFromPad(impulse: vec3): void {
+    debugger;
+    const force = impulse;
+    const up = vec3.fromValues(0, 1, 0);
+
+    // Proyección vertical
+    const verticalMag = vec3.dot(force, up);
+    const vertical = vec3.create();
+    vec3.scale(vertical, up, verticalMag);
+    this.currentVerticalVelocity = verticalMag;
+
+    // Componente horizontal
+    const horizontal = vec3.create();
+    vec3.subtract(horizontal, force, vertical);
+    this.horizontalSpeed = vec3.length(horizontal);
+    this.horizontalDirection = vec3.normalize(vec3.create(), horizontal);
+    this.currentHorizontalVelocity = vec3.scale(
+      this.currentHorizontalVelocity,
+      this.horizontalDirection,
+      this.horizontalSpeed,
+    );
+
+    this.isDiving = false; // Cancelar diving si lo teníamos activo
+    this.isJumping = true; // Marcar como saltando
+    this.inputDisableTimer = 0.5; // Deshabilitar input por un breve momento
   }
 
   //HELPERS

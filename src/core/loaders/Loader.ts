@@ -37,6 +37,7 @@ import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { HeadTiltComponent } from '../../components/game/HeadTiltComponent';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
+import { ImpulsePadComponent } from '../../components/render/ImpulsePadComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -213,6 +214,8 @@ export class Loader {
         return new MotionBlurComponent();
       case 'speed_lines_vfx':
         return new SpeedLinesVFXComponent();
+      case 'impulse_pad':
+        return new ImpulsePadComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }
