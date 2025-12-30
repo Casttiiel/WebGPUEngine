@@ -75,15 +75,13 @@ export class CharacterControllerComponent extends Component {
   private divingGravityMultiplier: number = 4.0; // Multiplicador de gravedad al caer en picado
 
   // SWING STATE
-  private swingAttachPoint: vec3 = vec3.create();
   private swingAxis: vec3 = vec3.create();
   private swingBase: vec3 = vec3.create(); // dirección "abajo" del arco
   private swingTangent: vec3 = vec3.create(); // eje tangencial
-  private swingMaxAngle: number = 0;
   private swingRadius: number = 0;
   private swingAngle: number = 0;
   private swingSpeed: number = 0;
-  private minSwingSpeed: number = 4.0;
+  private minSwingSpeed: number = 6.0;
   private swingAngularSpeed: number = 0;
   private swingEndAngle: number = 0;
   private swingDirection: number = 1;
@@ -963,6 +961,11 @@ export class CharacterControllerComponent extends Component {
     vec3.cross(this.swingTangent, this.swingAxis, this.swingBase);
     vec3.normalize(this.swingTangent, this.swingTangent);
 
+    // INVERTIR el arco si venimos del lado negativo
+    if (this.swingDirection < 0) {
+      vec3.scale(this.swingTangent, this.swingTangent, -1);
+    }
+
     this.currentVerticalVelocity = 0;
     this.isJumping = false;
   }
@@ -986,6 +989,10 @@ export class CharacterControllerComponent extends Component {
 
     const velocityDir = vec3.cross(vec3.create(), this.swingAxis, radial);
     vec3.normalize(velocityDir, velocityDir);
+
+    // Aplicar sentido SOLO en el plano horizontal (no en Y)
+    velocityDir[0] *= this.swingDirection;
+    velocityDir[2] *= this.swingDirection;
 
     vec3.scale(this.currentHorizontalVelocity, velocityDir, this.swingSpeed);
     this.currentVerticalVelocity = this.currentHorizontalVelocity[1];

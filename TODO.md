@@ -1,14 +1,12 @@
 ## Gameplay
 
-1. Swing Bar
-   Ambas direcciones
-2. Loading Bar
-3. Throw dagger
-4. Dash to dagger
-5. Momentum
-6. Parametrizar todo
-7. Enemy
-8. Run upward to wall -> wallrun (wrong)
+1. Loading Bar
+2. Throw dagger
+3. Dash to dagger
+4. Momentum
+5. Parametrizar todo
+6. Enemy
+7. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 

@@ -68,6 +68,7 @@ export class SwingBarComponent extends Component {
     const y = vec3.dot(radial, arcTangent);
 
     let initialAngle = Math.atan2(y, x);
+    const sideSign = -Math.sign(initialAngle) || 1;
 
     const minAngle = -this.maxSwingAngle;
     const maxAngle = this.maxSwingAngle;
@@ -94,6 +95,10 @@ export class SwingBarComponent extends Component {
     const tangent = vec3.cross(vec3.create(), this.barAxis, radial);
     vec3.normalize(tangent, tangent);
     const direction = vec3.dot(entryVelocity, tangent) >= 0 ? 1 : -1;
+
+    if (direction !== sideSign) {
+      return null;
+    }
 
     const endAngle = direction > 0 ? maxAngle : minAngle;
     const total = Math.abs(endAngle - initialAngle);
