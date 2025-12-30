@@ -12,7 +12,7 @@
       "box_collider": {
         "isSensor": true,
         "bodyType": "static",
-        "size": [3, 3, 2],
+        "size": [2, 2, 2],
         "ignoreTransformScale": true
       },
       "render": {

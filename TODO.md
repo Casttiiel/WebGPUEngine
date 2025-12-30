@@ -1,10 +1,7 @@
 ## Gameplay
 
 1. Swing Bar
-   Trayectoria
    Ambas direcciones
-   Limitar segun cuanto falta por recorrer
-   Limitar segun altura de coger
 2. Loading Bar
 3. Throw dagger
 4. Dash to dagger

@@ -5,6 +5,7 @@ import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
 import { Entity } from '../../core/ecs/Entity';
+import { SwingEntryData } from '../../types/SwingEntryData.type';
 
 export class SwingBarComponent extends Component {
   // Tracking de entidades dentro del trigger
@@ -12,6 +13,10 @@ export class SwingBarComponent extends Component {
   private barStart: vec3 = vec3.create();
   private barEnd: vec3 = vec3.create();
   private barAxis: vec3 = vec3.create();
+  private maxSwingAngle = Math.PI * 0.5; // 90°
+  private maxGrabHeightRatio = 0.85; // demasiado arriba
+  private minGrabHeightRatio = -0.85; // demasiado abajo
+  private maxProgressAllowed = 0.5; // pasada la mitad no engancha
 
   constructor() {
     super();
@@ -33,7 +38,7 @@ export class SwingBarComponent extends Component {
     this.barEnd = vec3.scaleAndAdd(vec3.create(), center, this.barAxis, halfLength);
   }
 
-  public computeSwingEntry(entity: Entity) {
+  private computeSwingEntry(entity: Entity): SwingEntryData | null {
     const playerTransform = entity.getComponent('transform') as TransformComponent;
     const playerPos = playerTransform.getTransform().getWorldPosition();
 
@@ -64,18 +69,49 @@ export class SwingBarComponent extends Component {
 
     let initialAngle = Math.atan2(y, x);
 
-    // 6. Clamp al arco permitido
-    initialAngle = Math.max(0, Math.min(initialAngle, this.maxSwingAngle));
+    const minAngle = -this.maxSwingAngle;
+    const maxAngle = this.maxSwingAngle;
+
+    if (initialAngle < minAngle || initialAngle > maxAngle) {
+      return null;
+    }
 
     // 7. Radio
     const radius = vec3.length(radial);
 
+    const up = vec3.fromValues(0, 1, 0);
+    const height = vec3.dot(radial, up);
+
+    const maxGrabHeight = radius * this.maxGrabHeightRatio;
+    const minGrabHeight = radius * this.minGrabHeightRatio;
+
+    if (height > maxGrabHeight || height < minGrabHeight) {
+      return null;
+    }
+
+    const controller = entity.getComponent('character_controller') as CharacterControllerComponent;
+    const entryVelocity = controller.getCurrentHorizontalVelocity();
+    const tangent = vec3.cross(vec3.create(), this.barAxis, radial);
+    vec3.normalize(tangent, tangent);
+    const direction = vec3.dot(entryVelocity, tangent) >= 0 ? 1 : -1;
+
+    const endAngle = direction > 0 ? maxAngle : minAngle;
+    const total = Math.abs(endAngle - initialAngle);
+    const remaining = Math.abs(endAngle - initialAngle);
+
+    const progress = total > 0 ? 1.0 - remaining / total : 1.0;
+
+    if (progress > this.maxProgressAllowed) {
+      return null;
+    }
+
     return {
       attachPoint,
       radius,
-      initialAngle,
+      startAngle: initialAngle,
+      endAngle: maxAngle * direction * 0.55,
+      direction,
       barAxis: vec3.clone(this.barAxis),
-      maxAngle: this.maxSwingAngle,
     };
   }
 
@@ -118,7 +154,9 @@ export class SwingBarComponent extends Component {
 
     if (entity && entity.hasComponent('character_controller')) {
       this.entitiesInside.add(entityId);
+      console.log(entityId, 'entered swing bar');
       const swingData = this.computeSwingEntry(entity);
+      if (!swingData) return;
       (entity.getComponent('character_controller') as CharacterControllerComponent)?.startSwing(
         swingData,
       );

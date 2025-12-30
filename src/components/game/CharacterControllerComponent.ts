@@ -6,6 +6,7 @@ import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { GameAction } from '../../types/GameAction.enum';
+import { SwingEntryData } from '../../types/SwingEntryData.type';
 
 const gravity = -9.81; // m/s²
 /**
@@ -74,13 +75,18 @@ export class CharacterControllerComponent extends Component {
   private divingGravityMultiplier: number = 4.0; // Multiplicador de gravedad al caer en picado
 
   // SWING STATE
-  private swingAngle: number = 0.0;
-  private swingRadius: number = 2.0;
-  private swingSpeed: number = 0.0; // velocidad lineal
-  private swingAngularSpeed: number = 0.0;
-  private swingPlaneNormal: vec3 = vec3.create();
-  private swingForward: vec3 = vec3.create(); // eje base del swing
-  private minSwingSpeed: number = 6.0;
+  private swingAttachPoint: vec3 = vec3.create();
+  private swingAxis: vec3 = vec3.create();
+  private swingBase: vec3 = vec3.create(); // dirección "abajo" del arco
+  private swingTangent: vec3 = vec3.create(); // eje tangencial
+  private swingMaxAngle: number = 0;
+  private swingRadius: number = 0;
+  private swingAngle: number = 0;
+  private swingSpeed: number = 0;
+  private minSwingSpeed: number = 4.0;
+  private swingAngularSpeed: number = 0;
+  private swingEndAngle: number = 0;
+  private swingDirection: number = 1;
 
   // Estado
   private isActive: boolean = true;
@@ -935,70 +941,53 @@ export class CharacterControllerComponent extends Component {
   }
 
   //SWING BAR
-  public startSwing(data: unknown): void {
-    if (!this.isGrounded && !this.isMantling && !this.isSwinging) {
-      this.isSwinging = true;
-      // Velocidad de entrada REAL
-      this.swingSpeed = vec3.length(this.currentHorizontalVelocity);
+  public startSwing(data: SwingEntryData): void {
+    if (this.isSwinging || this.isGrounded || this.isMantling) return;
 
-      // Forzar velocidad mínima
-      if (this.swingSpeed < this.minSwingSpeed) {
-        this.swingSpeed = this.minSwingSpeed;
-      }
+    this.isSwinging = true;
 
-      // Radio del swing
-      this.swingRadius = 5.0;
+    this.swingAngle = data.startAngle;
+    this.swingEndAngle = data.endAngle;
+    this.swingDirection = data.direction;
+    this.swingRadius = data.radius;
+    vec3.copy(this.swingAxis, data.barAxis);
 
-      // ω = v / R
-      this.swingAngularSpeed = this.swingSpeed / this.swingRadius;
+    this.swingSpeed = Math.max(vec3.length(this.currentHorizontalVelocity), this.minSwingSpeed);
 
-      // Plano del swing (normal)
-      const right = this.camera!.getCamera().getLeft();
-      vec3.normalize(this.swingPlaneNormal, right);
+    this.swingAngularSpeed = this.swingSpeed / this.swingRadius;
 
-      // Dirección base (forward del swing)
-      if (vec3.length(this.currentHorizontalVelocity) > 0.1) {
-        // Usar la dirección real de entrada
-        vec3.normalize(this.swingForward, this.currentHorizontalVelocity);
-      } else {
-        // Forzar dirección coherente si no había velocidad horizontal
-        const camForward = this.camera!.getCamera().getFront();
-        camForward[1] = 0;
-        vec3.normalize(camForward, camForward);
+    const down = vec3.fromValues(0, -1, 0);
+    vec3.copy(this.swingBase, this.projectOnPlane(down, this.swingAxis));
+    vec3.normalize(this.swingBase, this.swingBase);
 
-        vec3.copy(this.swingForward, camForward);
-      }
+    vec3.cross(this.swingTangent, this.swingAxis, this.swingBase);
+    vec3.normalize(this.swingTangent, this.swingTangent);
 
-      this.swingAngle = 0.0;
-
-      // Cancelar gravedad externa
-      this.currentVerticalVelocity = 0.0;
-    }
+    this.currentVerticalVelocity = 0;
+    this.isJumping = false;
   }
 
   private manageSwingMovement(dt: number): void {
-    // Avanzar ángulo según TU velocidad
-    this.swingAngle += this.swingAngularSpeed * dt;
+    this.swingAngle += this.swingDirection * this.swingAngularSpeed * dt;
 
-    // Limitar arco (90° por ejemplo)
-    if (this.swingAngle >= Math.PI * 0.5) {
+    const finished =
+      (this.swingDirection > 0 && this.swingAngle >= this.swingEndAngle) ||
+      (this.swingDirection < 0 && this.swingAngle <= this.swingEndAngle);
+
+    if (finished) {
       this.endSwing();
       return;
     }
 
-    // Dirección tangencial en el plano del swing
-    const horizontalDir = vec3.scale(vec3.create(), this.swingForward, Math.cos(this.swingAngle));
+    const radial = vec3.create();
+    vec3.scale(radial, this.swingBase, Math.cos(this.swingAngle));
+    vec3.scaleAndAdd(radial, radial, this.swingTangent, Math.sin(this.swingAngle));
+    vec3.normalize(radial, radial);
 
-    const verticalDir = vec3.fromValues(0, Math.sin(this.swingAngle), 0);
+    const velocityDir = vec3.cross(vec3.create(), this.swingAxis, radial);
+    vec3.normalize(velocityDir, velocityDir);
 
-    // Combinar dirección
-    const swingDir = vec3.add(vec3.create(), horizontalDir, verticalDir);
-    vec3.normalize(swingDir, swingDir);
-
-    // Aplicar VELOCIDAD ORIGINAL
-    vec3.scale(this.currentHorizontalVelocity, swingDir, this.swingSpeed);
-
-    // Extraer vertical explícito para tu sistema
+    vec3.scale(this.currentHorizontalVelocity, velocityDir, this.swingSpeed);
     this.currentVerticalVelocity = this.currentHorizontalVelocity[1];
     this.currentHorizontalVelocity[1] = 0;
   }
@@ -1006,13 +995,8 @@ export class CharacterControllerComponent extends Component {
   private endSwing(): void {
     this.isSwinging = false;
 
-    // Mantener momentum
-    vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
-    vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, this.swingSpeed);
-
-    // Boost vertical opcional
-    this.currentVerticalVelocity = Math.max(this.currentVerticalVelocity, 1.0);
-
+    // Mantener dirección de salida
+    this.currentVerticalVelocity = Math.max(this.currentVerticalVelocity, 1.5);
     this.isJumping = true;
   }
 
@@ -1038,22 +1022,6 @@ export class CharacterControllerComponent extends Component {
     const dot = vec3.dot(v, wallNormal);
     const projected = vec3.scale(vec3.create(), wallNormal, dot);
     return vec3.subtract(vec3.create(), v, projected);
-  }
-
-  private rotateAroundAxis(v: vec3, axis: vec3, angle: number): vec3 {
-    const result = vec3.create();
-
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-
-    const dot = vec3.dot(axis, v);
-    const cross = vec3.cross(vec3.create(), axis, v);
-
-    vec3.scale(result, v, cos);
-    vec3.scaleAndAdd(result, result, cross, sin);
-    vec3.scaleAndAdd(result, result, axis, dot * (1 - cos));
-
-    return result;
   }
 
   private findCamera(): void {
@@ -1111,6 +1079,10 @@ export class CharacterControllerComponent extends Component {
 
   public getWallNormal(): vec3 {
     return this.wallNormal;
+  }
+
+  public getCurrentHorizontalVelocity(): vec3 {
+    return this.currentHorizontalVelocity;
   }
 
   public renderDebug(): void {
