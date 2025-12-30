@@ -73,12 +73,22 @@ export class CharacterControllerComponent extends Component {
   // Diving
   private divingGravityMultiplier: number = 4.0; // Multiplicador de gravedad al caer en picado
 
+  // SWING STATE
+  private swingAngle: number = 0.0;
+  private swingRadius: number = 2.0;
+  private swingSpeed: number = 0.0; // velocidad lineal
+  private swingAngularSpeed: number = 0.0;
+  private swingPlaneNormal: vec3 = vec3.create();
+  private swingForward: vec3 = vec3.create(); // eje base del swing
+  private minSwingSpeed: number = 6.0;
+
   // Estado
   private isActive: boolean = true;
   private isGrounded: boolean = false;
   private isJumping: boolean = false;
   private isSliding: boolean = false;
   private isDiving: boolean = false;
+  private isSwinging: boolean = false;
   private isWallRunning: boolean = false;
   private isNearWall: boolean = false;
   private horizontalSpeed: number = 0.0; // Velocidad horizontal actual
@@ -125,9 +135,6 @@ export class CharacterControllerComponent extends Component {
     if (data.slideMinDuration !== undefined) {
       this.slideMinDuration = data.slideMinDuration;
     }
-    if (data.wallJumpCooldown !== undefined) {
-      this.wallJumpCooldown = data.wallJumpCooldown;
-    }
 
     // Guardar dimensiones originales del collider
     this.originalHeight = this.capsuleCollider.getCapsuleHeight();
@@ -149,8 +156,6 @@ export class CharacterControllerComponent extends Component {
       this.inputDisableTimer -= deltaTime;
     }
 
-    console.log(this.isGrounded, this.currentVerticalVelocity, this.isJumping);
-
     this.getIsGroundedAndGroundNormal();
     this.manageMantling();
     this.detectWall();
@@ -167,6 +172,10 @@ export class CharacterControllerComponent extends Component {
       const targetMovement = this.getTargetMovement(inputDir);
       this.manageHorizontalMovementForWallRun(deltaTime, targetMovement);
       this.manageVerticalMovement(deltaTime);
+      const finalVelocity = this.mergeMovements();
+      this.applyMovement(finalVelocity, deltaTime);
+    } else if (this.isSwinging) {
+      this.manageSwingMovement(deltaTime);
       const finalVelocity = this.mergeMovements();
       this.applyMovement(finalVelocity, deltaTime);
     } else {
@@ -900,7 +909,6 @@ export class CharacterControllerComponent extends Component {
 
   //IMPULSE PAD
   public applyImpulseFromPad(impulse: vec3): void {
-    debugger;
     const force = impulse;
     const up = vec3.fromValues(0, 1, 0);
 
@@ -926,6 +934,88 @@ export class CharacterControllerComponent extends Component {
     this.inputDisableTimer = 0.5; // Deshabilitar input por un breve momento
   }
 
+  //SWING BAR
+  public startSwing(data: unknown): void {
+    if (!this.isGrounded && !this.isMantling && !this.isSwinging) {
+      this.isSwinging = true;
+      // Velocidad de entrada REAL
+      this.swingSpeed = vec3.length(this.currentHorizontalVelocity);
+
+      // Forzar velocidad mínima
+      if (this.swingSpeed < this.minSwingSpeed) {
+        this.swingSpeed = this.minSwingSpeed;
+      }
+
+      // Radio del swing
+      this.swingRadius = 5.0;
+
+      // ω = v / R
+      this.swingAngularSpeed = this.swingSpeed / this.swingRadius;
+
+      // Plano del swing (normal)
+      const right = this.camera!.getCamera().getLeft();
+      vec3.normalize(this.swingPlaneNormal, right);
+
+      // Dirección base (forward del swing)
+      if (vec3.length(this.currentHorizontalVelocity) > 0.1) {
+        // Usar la dirección real de entrada
+        vec3.normalize(this.swingForward, this.currentHorizontalVelocity);
+      } else {
+        // Forzar dirección coherente si no había velocidad horizontal
+        const camForward = this.camera!.getCamera().getFront();
+        camForward[1] = 0;
+        vec3.normalize(camForward, camForward);
+
+        vec3.copy(this.swingForward, camForward);
+      }
+
+      this.swingAngle = 0.0;
+
+      // Cancelar gravedad externa
+      this.currentVerticalVelocity = 0.0;
+    }
+  }
+
+  private manageSwingMovement(dt: number): void {
+    // Avanzar ángulo según TU velocidad
+    this.swingAngle += this.swingAngularSpeed * dt;
+
+    // Limitar arco (90° por ejemplo)
+    if (this.swingAngle >= Math.PI * 0.5) {
+      this.endSwing();
+      return;
+    }
+
+    // Dirección tangencial en el plano del swing
+    const horizontalDir = vec3.scale(vec3.create(), this.swingForward, Math.cos(this.swingAngle));
+
+    const verticalDir = vec3.fromValues(0, Math.sin(this.swingAngle), 0);
+
+    // Combinar dirección
+    const swingDir = vec3.add(vec3.create(), horizontalDir, verticalDir);
+    vec3.normalize(swingDir, swingDir);
+
+    // Aplicar VELOCIDAD ORIGINAL
+    vec3.scale(this.currentHorizontalVelocity, swingDir, this.swingSpeed);
+
+    // Extraer vertical explícito para tu sistema
+    this.currentVerticalVelocity = this.currentHorizontalVelocity[1];
+    this.currentHorizontalVelocity[1] = 0;
+  }
+
+  private endSwing(): void {
+    this.isSwinging = false;
+
+    // Mantener momentum
+    vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
+    vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, this.swingSpeed);
+
+    // Boost vertical opcional
+    this.currentVerticalVelocity = Math.max(this.currentVerticalVelocity, 1.0);
+
+    this.isJumping = true;
+  }
+
   //HELPERS
   private approach(current: number, target: number, delta: number): number {
     if (current < target) {
@@ -948,6 +1038,22 @@ export class CharacterControllerComponent extends Component {
     const dot = vec3.dot(v, wallNormal);
     const projected = vec3.scale(vec3.create(), wallNormal, dot);
     return vec3.subtract(vec3.create(), v, projected);
+  }
+
+  private rotateAroundAxis(v: vec3, axis: vec3, angle: number): vec3 {
+    const result = vec3.create();
+
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    const dot = vec3.dot(axis, v);
+    const cross = vec3.cross(vec3.create(), axis, v);
+
+    vec3.scale(result, v, cos);
+    vec3.scaleAndAdd(result, result, cross, sin);
+    vec3.scaleAndAdd(result, result, axis, dot * (1 - cos));
+
+    return result;
   }
 
   private findCamera(): void {

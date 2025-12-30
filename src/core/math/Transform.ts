@@ -210,6 +210,12 @@ export class Transform {
     this.setAngles(angles.yaw, angles.pitch, angles.roll);
   }
 
+  public rotateVector(localVector: vec3): vec3 {
+    const out = vec3.create();
+    vec3.transformQuat(out, localVector, this.worldRotation);
+    return out;
+  }
+
   public lookAt(eye: vec3, target: vec3, up: vec3 = vec3.fromValues(0, 1, 0)): void {
     vec3.copy(this.localPosition, eye);
     const matrix = mat4.create();

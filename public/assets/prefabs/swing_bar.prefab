@@ -1,0 +1,27 @@
+{
+    "children": [],
+    "components": {
+      "name": "Impulse Pad",
+      "transform": {
+        "position": [6, 3, 0],
+        "rotation": [0, 0, 0],
+        "scale": [0.1, 0.1, 2]
+      },
+      "swing_bar":{
+      },
+      "box_collider": {
+        "isSensor": true,
+        "bodyType": "static",
+        "size": [3, 3, 2],
+        "ignoreTransformScale": true
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "textured.mat"
+          }
+        ]
+      }
+    }
+  }

@@ -1,12 +1,17 @@
 ## Gameplay
 
 1. Swing Bar
-2. Throw dagger
-3. Dash to dagger
-4. Momentum
-5. Parametrizar todo
-6. Enemy
-7. Run upward to wall -> wallrun (wrong)
+   Trayectoria
+   Ambas direcciones
+   Limitar segun cuanto falta por recorrer
+   Limitar segun altura de coger
+2. Loading Bar
+3. Throw dagger
+4. Dash to dagger
+5. Momentum
+6. Parametrizar todo
+7. Enemy
+8. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 
@@ -21,8 +26,7 @@
 
 1. Cascade shadow mapping (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
 2. Froxel Scattering
-3. Loading Bar
-4. Review AO
-5. Multiple Light probes has good shadows?
-6. Improve particles
-7. Weird line on corners is irradiance because of normals
+3. Review AO
+4. Multiple Light probes has good shadows?
+5. Improve particles
+6. Weird line on corners is irradiance because of normals
