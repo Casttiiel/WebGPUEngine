@@ -34,15 +34,18 @@ export class CharacterControllerComponent extends Component {
   private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
   private groundAcceleration: number = 20.0; // Aceleración en el suelo
   private groundDeceleration: number = 30.0; // Deceleración en el suelo
+  private airDrag: number = 0.1; // Resistencia del aire (10% por segundo)
 
   // Jump
   private jumpForce: number = 8.0; // Velocidad inicial del salto
   private jumpCutFactor: number = 0.6; // Factor para reducir la velocidad al soltar la tecla de salto (0.0 = cortar totalmente, 1.0 = no cortar)
   private coyoteTime: number = 0.15; // Segundos de gracia después de dejar el suelo
   private timeSinceGrounded: number = 0.0; // Tiempo desde que dejó de estar grounded
+  private jumpCutVerticalVelocityLimit: number = 1.0; // Velocidad vertical máxima para aplicar el corte de salto
 
   // Slide
-  private slideSpeedThreshold: number = 5.0; // Velocidad mínima para activar slide
+  private slideMinStartSpeedThreshold: number = 5.0; // Velocidad mínima para activar slide
+  private minSlideVelocityThreshold: number = 2.0; // Velocidad mínima para mantener el slide
   private slideDownhillAccel: number = 4.0; // Tiempo de frenado del slide
   private slideFriction: number = 4.0; // Fricción base del slide
   private slideUphillBrake: number = 5.0; // Fricción adicional al subir
@@ -58,6 +61,9 @@ export class CharacterControllerComponent extends Component {
   private wallRunGravity: number = -5.0; // caída lenta
   private wallRunAcceleration: number = 3.0;
   private wallRunBrake: number = 3.0;
+  private detectWallDistance: number = 0.6; // Distancia para detectar paredes
+  private wallRunMaxEntryAngle: number = 0.9; // Ángulo máximo (coseno) para iniciar wall run
+  private wallDrag: number = 0.3; // Resistencia al movimiento durante wall run
 
   // WallJump
   private wallJumpForce: number = 6.0; // Fuerza aplicada al saltar desde la pared
@@ -70,11 +76,12 @@ export class CharacterControllerComponent extends Component {
   private mantleTargetPos: vec3 = vec3.create(); // Posición objetivo del mantle
   private mantleStoredVelocity: number = 0.0;
   private minMantleVelocity: number = 8.0; // Velocidad mínima al iniciar mantle
+  private mantlingMinVerticalVelocity: number = -5.0; // Velocidad vertical mínima para permitir mantle
 
   // Diving
   private divingGravityMultiplier: number = 4.0; // Multiplicador de gravedad al caer en picado
 
-  // SWING STATE
+  // Swing Bar
   private swingAxis: vec3 = vec3.create();
   private swingBase: vec3 = vec3.create(); // dirección "abajo" del arco
   private swingTangent: vec3 = vec3.create(); // eje tangencial
@@ -85,6 +92,9 @@ export class CharacterControllerComponent extends Component {
   private swingAngularSpeed: number = 0;
   private swingEndAngle: number = 0;
   private swingDirection: number = 1;
+
+  //Impulse Pads
+  private impulsePadInputDisableTime: number = 0.5; // Tiempo para deshabilitar input tras un impulso
 
   // Estado
   private isActive: boolean = true;
@@ -120,25 +130,47 @@ export class CharacterControllerComponent extends Component {
       return;
     }
 
-    // Load parameters from data
-    if (data.moveSpeed !== undefined) {
-      this.moveSpeed = data.moveSpeed;
-    }
-    if (data.jumpForce !== undefined) {
-      this.jumpForce = data.jumpForce;
-    }
-    if (data.coyoteTime !== undefined) {
-      this.coyoteTime = data.coyoteTime;
-    }
-    if (data.airControlMultiplier !== undefined) {
+    // Leer todos los parámetros configurables del data
+    if (data.moveSpeed !== undefined) this.moveSpeed = data.moveSpeed;
+    if (data.airControlMultiplier !== undefined)
       this.airControlMultiplier = data.airControlMultiplier;
-    }
-    if (data.slideSpeedThreshold !== undefined) {
-      this.slideSpeedThreshold = data.slideSpeedThreshold;
-    }
-    if (data.slideMinDuration !== undefined) {
-      this.slideMinDuration = data.slideMinDuration;
-    }
+    if (data.groundAcceleration !== undefined) this.groundAcceleration = data.groundAcceleration;
+    if (data.groundDeceleration !== undefined) this.groundDeceleration = data.groundDeceleration;
+    if (data.airDrag !== undefined) this.airDrag = data.airDrag;
+    if (data.jumpForce !== undefined) this.jumpForce = data.jumpForce;
+    if (data.jumpCutFactor !== undefined) this.jumpCutFactor = data.jumpCutFactor;
+    if (data.jumpCutVerticalVelocityLimit !== undefined)
+      this.jumpCutVerticalVelocityLimit = data.jumpCutVerticalVelocityLimit;
+    if (data.coyoteTime !== undefined) this.coyoteTime = data.coyoteTime;
+    if (data.slideMinStartSpeedThreshold !== undefined)
+      this.slideMinStartSpeedThreshold = data.slideMinStartSpeedThreshold;
+    if (data.minSlideVelocityThreshold !== undefined)
+      this.minSlideVelocityThreshold = data.minSlideVelocityThreshold;
+    if (data.slideDownhillAccel !== undefined) this.slideDownhillAccel = data.slideDownhillAccel;
+    if (data.slideFriction !== undefined) this.slideFriction = data.slideFriction;
+    if (data.slideUphillBrake !== undefined) this.slideUphillBrake = data.slideUphillBrake;
+    if (data.slideMinDuration !== undefined) this.slideMinDuration = data.slideMinDuration;
+    if (data.wallRunGravity !== undefined) this.wallRunGravity = data.wallRunGravity;
+    if (data.wallRunAcceleration !== undefined) this.wallRunAcceleration = data.wallRunAcceleration;
+    if (data.wallRunBrake !== undefined) this.wallRunBrake = data.wallRunBrake;
+    if (data.detectWallDistance !== undefined) this.detectWallDistance = data.detectWallDistance;
+    if (data.wallRunMaxEntryAngle !== undefined)
+      this.wallRunMaxEntryAngle = data.wallRunMaxEntryAngle;
+    if (data.wallDrag !== undefined) this.wallDrag = data.wallDrag;
+    if (data.wallJumpForce !== undefined) this.wallJumpForce = data.wallJumpForce;
+    if (data.disableInputAfterWallJumpTime !== undefined)
+      this.disableInputAfterWallJumpTime = data.disableInputAfterWallJumpTime;
+    if (data.mantleDetectionDistance !== undefined)
+      this.mantleDetectionDistance = data.mantleDetectionDistance;
+    if (data.mantleMaxHeight !== undefined) this.mantleMaxHeight = data.mantleMaxHeight;
+    if (data.mantlingMinVerticalVelocity !== undefined)
+      this.mantlingMinVerticalVelocity = data.mantlingMinVerticalVelocity;
+    if (data.minMantleVelocity !== undefined) this.minMantleVelocity = data.minMantleVelocity;
+    if (data.divingGravityMultiplier !== undefined)
+      this.divingGravityMultiplier = data.divingGravityMultiplier;
+    if (data.minSwingSpeed !== undefined) this.minSwingSpeed = data.minSwingSpeed;
+    if (data.impulsePadInputDisableTime !== undefined)
+      this.impulsePadInputDisableTime = data.impulsePadInputDisableTime;
 
     // Guardar dimensiones originales del collider
     this.originalHeight = this.capsuleCollider.getCapsuleHeight();
@@ -316,7 +348,7 @@ export class CharacterControllerComponent extends Component {
 
         // Limitar la velocidad máxima para evitar aceleración infinita
         const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-        const maxAirSpeed = this.moveSpeed * 1.0;
+        const maxAirSpeed = this.moveSpeed;
         if (currentSpeed > maxAirSpeed) {
           vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
           vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, maxAirSpeed);
@@ -324,8 +356,7 @@ export class CharacterControllerComponent extends Component {
       } else {
         // Sin input en el aire: mantener momentum (casi sin deceleración)
         // Solo una deceleración mínima por resistencia del aire
-        const airDrag = 0.1; // 10% de drag por segundo
-        const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
+        const dragFactor = Math.pow(1.0 - this.airDrag, deltaTime);
         vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
       }
 
@@ -453,7 +484,7 @@ export class CharacterControllerComponent extends Component {
     } else if (
       this.isJumping &&
       this.currentVerticalVelocity > 0 &&
-      this.currentVerticalVelocity < 1.0 &&
+      this.currentVerticalVelocity < this.jumpCutVerticalVelocityLimit &&
       !this.jumpCutFactorApplied
     ) {
       this.currentVerticalVelocity *= this.jumpCutFactor; // Reducir velocidad vertical al llegar al apex
@@ -481,7 +512,7 @@ export class CharacterControllerComponent extends Component {
     facingVector[1] = 0;
     vec3.normalize(facingVector, facingVector);
 
-    const wallDistance = 0.6;
+    const wallDistance = this.detectWallDistance;
 
     const left = this.camera!.getCamera().getLeft();
     left[1] = 0;
@@ -511,7 +542,7 @@ export class CharacterControllerComponent extends Component {
     ) {
       const n = vec3.fromValues(leftHit.normal.x, leftHit.normal.y, leftHit.normal.z);
       const facing = vec3.dot(facingVector, n);
-      if (facing < -0.9) return;
+      if (facing < -this.wallRunMaxEntryAngle) return;
       this.isNearWall = true;
       vec3.copy(this.wallNormal, n);
     }
@@ -536,7 +567,7 @@ export class CharacterControllerComponent extends Component {
     ) {
       const n = vec3.fromValues(rightHit.normal.x, rightHit.normal.y, rightHit.normal.z);
       const facing = vec3.dot(facingVector, n);
-      if (facing < -0.9) return;
+      if (facing < -this.wallRunMaxEntryAngle) return;
       this.isNearWall = true;
       vec3.copy(this.wallNormal, n);
     }
@@ -611,8 +642,7 @@ export class CharacterControllerComponent extends Component {
       vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
     } else {
       vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
-      const airDrag = 0.3; // 30% de drag por segundo
-      const dragFactor = Math.pow(1.0 - airDrag, deltaTime);
+      const dragFactor = Math.pow(1.0 - this.wallDrag, deltaTime);
       vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
       this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
     }
@@ -631,6 +661,7 @@ export class CharacterControllerComponent extends Component {
 
     this.isNearWall = false;
     this.isWallRunning = false;
+    this.isJumping = true;
     this.inputDisableTimer = this.disableInputAfterWallJumpTime;
 
     vec3.scale(jumpDir, jumpDir, this.moveSpeed);
@@ -659,7 +690,7 @@ export class CharacterControllerComponent extends Component {
       const currentSpeed = vec3.length(this.currentHorizontalVelocity);
       if (
         this.isGrounded &&
-        currentSpeed >= this.slideSpeedThreshold &&
+        currentSpeed >= this.slideMinStartSpeedThreshold &&
         isMovingForward &&
         !isMovingBackward
       ) {
@@ -722,7 +753,7 @@ export class CharacterControllerComponent extends Component {
     // 2. O perdemos contacto con el suelo (cancelación forzada)
     const minDurationPassed =
       this.slideTimer >= this.slideMinDuration && !input.isActionPressed(GameAction.SLIDE);
-    const shouldEndSlideBecauseVelocity = this.slideVelocity < 2.0;
+    const shouldEndSlideBecauseVelocity = this.slideVelocity < this.minSlideVelocityThreshold;
     if (!this.isGrounded || minDurationPassed || shouldEndSlideBecauseVelocity) {
       this.endSlide(result);
     }
@@ -745,7 +776,7 @@ export class CharacterControllerComponent extends Component {
 
     // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
     if (
-      this.currentVerticalVelocity < -5.0 ||
+      this.currentVerticalVelocity < this.mantlingMinVerticalVelocity ||
       this.isGrounded ||
       this.isDiving ||
       this.isWallRunning
@@ -935,7 +966,7 @@ export class CharacterControllerComponent extends Component {
 
     this.isDiving = false; // Cancelar diving si lo teníamos activo
     this.isJumping = true; // Marcar como saltando
-    this.inputDisableTimer = 0.5; // Deshabilitar input por un breve momento
+    this.inputDisableTimer = this.impulsePadInputDisableTime; // Deshabilitar input por un breve momento
   }
 
   //SWING BAR

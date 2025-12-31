@@ -1,12 +1,11 @@
 ## Gameplay
 
-1. PARAMETRIZE
-2. Momentum
-3. Gameplay analysis
-4. Throw dagger
-5. Dash to dagger
-6. Enemy
-7. Run upward to wall -> wallrun (wrong)
+1. Momentum
+2. Gameplay analysis
+3. Throw dagger
+4. Dash to dagger
+5. Enemy
+6. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 
