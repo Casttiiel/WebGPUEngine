@@ -48,7 +48,7 @@ export class Engine {
     await Render.getInstance().initialize(canvas);
 
     // Initialize debug UI
-    this._debugUI.initialize();
+    //this._debugUI.initialize();
 
     this._modules = new ModuleManager();
     this._environment_manager = new ModuleEnvironmentManager('environment_manager');
@@ -78,7 +78,7 @@ export class Engine {
     }
     this._modules.update(dt * this._timeScale);
 
-    Engine.renderInMenu();
+    //Engine.renderInMenu();
   }
 
   public static render(): void {

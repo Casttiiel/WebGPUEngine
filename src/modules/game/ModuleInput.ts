@@ -79,6 +79,8 @@ export class ModuleInput extends Module {
   }
 
   private handleMouseMove(event: MouseEvent): void {
+    // Solo procesar si pointer lock está activo
+    if (!this.pointerLockActive) return;
     // Acumular movimiento durante el frame (puede haber múltiples eventos por frame)
     this.mouseMovement.x += event.movementX;
     this.mouseMovement.y += event.movementY;
@@ -88,36 +90,37 @@ export class ModuleInput extends Module {
   }
 
   private handleMouseDown(event: MouseEvent): void {
+    // Permitir siempre el click izquierdo para activar pointer lock
+    if (!this.pointerLockActive && event.button !== MouseButton.LEFT) return;
     this.mouseButtons.set(event.button as MouseButton, true);
   }
 
   private handleMouseUp(event: MouseEvent): void {
+    // Permitir siempre el click izquierdo para activar pointer lock
+    if (!this.pointerLockActive && event.button !== MouseButton.LEFT) return;
     this.mouseButtons.set(event.button as MouseButton, false);
   }
 
   private handleMouseWheel(event: WheelEvent): void {
+    if (!this.pointerLockActive) return;
     event.preventDefault(); // Prevenir scroll del navegador
     this.mouseWheelDelta = event.deltaY;
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
-    // Prevenir atajos del navegador solo cuando estamos en modo juego (Pointer Lock activo)
-    if (this.pointerLockActive) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
+    // Solo procesar input si pointer lock está activo
+    if (!this.pointerLockActive) return;
+    event.preventDefault();
+    event.stopPropagation();
     const key = event.code.toLowerCase() as KeyCode;
     this.keys.set(key, true);
   }
 
   private handleKeyUp(event: KeyboardEvent): void {
-    // Prevenir atajos del navegador solo cuando estamos en modo juego (Pointer Lock activo)
-    if (this.pointerLockActive) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
+    // Solo procesar input si pointer lock está activo
+    if (!this.pointerLockActive) return;
+    event.preventDefault();
+    event.stopPropagation();
     const key = event.code.toLowerCase() as KeyCode;
     this.keys.set(key, false);
   }

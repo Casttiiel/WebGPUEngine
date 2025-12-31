@@ -159,7 +159,6 @@ export class SwingBarComponent extends Component {
 
     if (entity && entity.hasComponent('character_controller')) {
       this.entitiesInside.add(entityId);
-      console.log(entityId, 'entered swing bar');
       const swingData = this.computeSwingEntry(entity);
       if (!swingData) return;
       (entity.getComponent('character_controller') as CharacterControllerComponent)?.startSwing(
