@@ -12,7 +12,6 @@ export enum GameAction {
   // Actions
   JUMP = 'jump',
   SLIDE = 'slide',
-  WALL_JUMP = 'wall_jump',
   DIVE = 'dive',
 
   // Camera

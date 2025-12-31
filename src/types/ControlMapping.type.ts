@@ -41,7 +41,6 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
 
   // Actions
   jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
-  wall_jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
   slide: { type: InputType.KEYBOARD, key: KeyCode.SHIFT },
   dive: { type: InputType.KEYBOARD, key: KeyCode.CTRL },
 

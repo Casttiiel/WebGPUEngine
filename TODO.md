@@ -1,19 +1,18 @@
 ## Gameplay
 
-1. Direction of wall jump -> where you look -> WallJump called twice
-2.
-3. Walk to wall then release button -> burst of movement
-4. Dash
-5. Momentum/Chain
-6. Eco
-7. Gameplay analysis
-8. Door
-9. Enemy
-10. Run upward to wall -> wallrun (wrong)
+1. Walk to wall then release button -> burst of movement
+2. Wall Jump into wall is going up
+3. Dash
+4. Momentum/Chain
+5. Eco
+6. Gameplay analysis
+7. Door
+8. Enemy
+9. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 
-1. If instance of material, no scale applied to none (more instance issues)
+1. IF MATERIAL INSTANCED THEN NO UV SCALE APPLIED ERROR
 2. Sound
 3. HeightMap
 4. Skybox

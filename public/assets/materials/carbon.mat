@@ -1,14 +1,15 @@
 {
-    "technique": "gbuffer.tech",
+    "technique": "stone.tech",
     "textures":{
-        "txAlbedo": "Carbon01_Color.png",
-        "txNormal": "Carbon01_Normal.png",
-        "txMetallic": "Carbon01_Metallic.png",
-        "txRoughness": "Carbon01_Roughness.png",
+        "txAlbedo": "wood_0034_color_1k.jpg",
+        "txNormal": "wood_0034_normal_directx_1k.png",
+        "txMetallic": "wood_0034_metallic_1k.jpg",
+        "txRoughness": "wood_0034_roughness_1k.jpg",
         "txEmissive": "black.png"
     },
     "casts_shadows": true,
-    "uvXScale": 1.0,
+    "uvXScale": 10.0,
+    "uvYScale": 10.0,
     "category": "solids",
     "shadows": false
 }

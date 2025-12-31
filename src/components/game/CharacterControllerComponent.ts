@@ -120,7 +120,7 @@ export class CharacterControllerComponent extends Component {
   public update(deltaTime: number): void {
     if (!this.isActive) return;
     this.findCamera();
-
+    console.log('-------------------');
     if (!this.capsuleCollider || !this.camera) return;
 
     if (this.inputDisableTimer > 0.0) {
@@ -128,9 +128,9 @@ export class CharacterControllerComponent extends Component {
     }
 
     this.getIsGroundedAndGroundNormal();
-    this.manageMantling();
-    this.detectWall();
-    this.manageSliding();
+    //this.manageMantling();
+    //this.detectWall();
+    //this.manageSliding();
 
     if (this.isMantling) {
       this.updateMantle(deltaTime);
@@ -252,9 +252,11 @@ export class CharacterControllerComponent extends Component {
 
     if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración/frenado suave
+      console.log(this.currentHorizontalVelocity, 'before applying anything');
       if (hasInput) {
         vec3.normalize(this.horizontalDirection, targetMovement);
       } else {
+        console.log('no input');
         vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
         this.horizontalDirection = this.projectOnPlane(this.horizontalDirection, this.groundNormal);
       }
@@ -369,14 +371,12 @@ export class CharacterControllerComponent extends Component {
       );
 
       if (type === RAPIER.RigidBodyType.Fixed) {
-        if (this.isGrounded) {
-          this.removeVelocityIntoWall(collisionNormal);
-        } else {
-          const isCeiling = collisionNormal[1] < -0.7;
-          if (isCeiling && this.currentVerticalVelocity > 0) {
-            this.currentVerticalVelocity = 0;
-            this.isJumping = false;
-          }
+        console.log('collision detected to remove speed');
+        this.removeVelocityIntoWall(collisionNormal);
+        const isCeiling = collisionNormal[1] < -0.7;
+        if (isCeiling && this.currentVerticalVelocity > 0) {
+          this.currentVerticalVelocity = 0;
+          this.isJumping = false;
         }
       }
     }
@@ -393,6 +393,7 @@ export class CharacterControllerComponent extends Component {
       this.currentHorizontalVelocity[1] -= dot * collisionNormal[1];
       this.currentHorizontalVelocity[2] -= dot * collisionNormal[2];
     }
+    console.log(this.currentHorizontalVelocity, 'after applying collision response');
   }
 
   //JUMP
@@ -513,12 +514,44 @@ export class CharacterControllerComponent extends Component {
     } else if (this.isGrounded) {
       this.isWallRunning = false;
     }
+
+    const backRay = new RAPIER.Ray(
+      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: -facingVector[0], y: -facingVector[1], z: -facingVector[2] },
+    );
+    const backHit = physics.getWorld().castRayAndGetNormal(
+      backRay,
+      wallDistance,
+      true, // solid
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined, // sin filtro de grupos
+      this.capsuleCollider.getCollider(), // Excluir solo el propio collider
+    );
+
+    if (
+      backHit &&
+      backHit.collider &&
+      backHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
+    ) {
+      const n = vec3.fromValues(backHit.normal.x, backHit.normal.y, backHit.normal.z);
+      this.isNearWall = true;
+      vec3.copy(this.wallNormal, n);
+    }
+
+    if (this.isNearWall && !this.isGrounded && !this.isMantling && !this.isWallRunning) {
+      this.startWallRun();
+    } else if (this.isGrounded) {
+      this.isWallRunning = false;
+    }
   }
 
   private startWallRun(): void {
     this.isWallRunning = true;
     this.horizontalDirection[1] = 0.0;
     this.removeVelocityIntoWall(this.wallNormal);
+    if (this.currentVerticalVelocity < 0.0) {
+      this.currentVerticalVelocity = 0.0;
+    }
   }
 
   private updateWallRun(): void {
@@ -587,17 +620,13 @@ export class CharacterControllerComponent extends Component {
   //WALLJUMP
   private applyWallJump(): void {
     let jumpDir = this.camera!.getCamera().getFront();
-    console.log(jumpDir);
-    const d = vec3.dot(jumpDir, this.wallNormal);
-    if (d < -0.1) {
-      // Pared a la izquierda, saltar a la derecha
-      jumpDir = vec3.scale(vec3.create(), jumpDir, -1);
-    }
-    vec3.add(jumpDir, jumpDir, this.wallNormal);
     jumpDir[1] = 0.0;
     vec3.normalize(jumpDir, jumpDir);
-
-    console.log(jumpDir);
+    const d = vec3.dot(jumpDir, this.wallNormal);
+    if (d < 0.2) {
+      vec3.add(jumpDir, jumpDir, this.wallNormal);
+      vec3.normalize(jumpDir, jumpDir);
+    }
 
     this.isNearWall = false;
     this.isWallRunning = false;
@@ -606,7 +635,8 @@ export class CharacterControllerComponent extends Component {
 
     vec3.scale(jumpDir, jumpDir, this.moveSpeed);
     this.currentVerticalVelocity = this.wallJumpForce;
-    vec3.add(this.currentHorizontalVelocity, jumpDir, this.currentHorizontalVelocity);
+    const currentSpeed = Math.max(vec3.length(this.currentHorizontalVelocity), this.moveSpeed);
+    vec3.scale(this.currentHorizontalVelocity, jumpDir, currentSpeed);
     vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
     vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
   }
