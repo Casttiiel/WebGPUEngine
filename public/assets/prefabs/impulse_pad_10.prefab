@@ -3,12 +3,12 @@
     "components": {
       "name": "Impulse Pad",
       "transform": {
-        "position": [-6, 0, 0],
-        "rotation": [30, 0, 0],
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
         "scale": [2, 1, 2]
       },
       "impulse_pad":{
-        "force": 20
+        "force": 10
       },
       "box_collider": {
         "isSensor": true,

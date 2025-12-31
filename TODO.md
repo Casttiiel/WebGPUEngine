@@ -1,20 +1,20 @@
 ## Gameplay
 
-1. Momentum
-2. Gameplay analysis
-3. Throw dagger
-4. Dash to dagger
-5. Enemy
-6. Run upward to wall -> wallrun (wrong)
+1. Dash
+2. Momentum/Chain
+3. Eco
+4. Gameplay analysis
+5. Door
+6. Enemy
+7. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 
-1. LEVEL DESIGN
-2. If instance of material, no scale applied to none (more instance issues)
-3. Sound
-4. HeightMap
-5. Skybox
-6. Triplanar mapping
+1. If instance of material, no scale applied to none (more instance issues)
+2. Sound
+3. HeightMap
+4. Skybox
+5. Triplanar mapping
 
 ### Engine
 

@@ -5,15 +5,15 @@
       "transform": {
         "position": [0, 0, 0],
         "rotation": [0, 0, 0],
-        "scale": [0.1, 0.1, 2]
+        "scale": [2, 1, 2]
       },
-      "swing_bar":{
+      "impulse_pad":{
+        "force": 15
       },
       "box_collider": {
         "isSensor": true,
         "bodyType": "static",
-        "size": [2, 2, 2],
-        "ignoreTransformScale": true
+        "size": [1, 1, 1]
       },
       "render": {
         "meshes": [
