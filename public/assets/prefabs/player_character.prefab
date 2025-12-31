@@ -44,7 +44,7 @@
       "wallRunGravity": -5.0,
       "wallRunAcceleration": 3.0,
       "wallRunBrake": 3.0,
-      "detectWallDistance": 0.6,
+      "detectWallDistance": 0.8,
       "wallRunMaxEntryAngle": 0.9,
       "wallDrag": 0.3,
       "wallJumpForce": 7.0,

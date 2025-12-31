@@ -117,71 +117,6 @@ export class CharacterControllerComponent extends Component {
     super();
   }
 
-  public async load(data: CharacterControllerComponentDataType): Promise<void> {
-    // Obtener referencia al capsule collider
-    this.capsuleCollider = this.getOwner().getComponent(
-      'capsule_collider',
-    ) as CapsuleColliderComponent;
-
-    if (!this.capsuleCollider) {
-      console.error(
-        'CharacterControllerComponent requires CapsuleColliderComponent on the same entity!',
-      );
-      return;
-    }
-
-    // Leer todos los parámetros configurables del data
-    if (data.moveSpeed !== undefined) this.moveSpeed = data.moveSpeed;
-    if (data.airControlMultiplier !== undefined)
-      this.airControlMultiplier = data.airControlMultiplier;
-    if (data.groundAcceleration !== undefined) this.groundAcceleration = data.groundAcceleration;
-    if (data.groundDeceleration !== undefined) this.groundDeceleration = data.groundDeceleration;
-    if (data.airDrag !== undefined) this.airDrag = data.airDrag;
-    if (data.jumpForce !== undefined) this.jumpForce = data.jumpForce;
-    if (data.jumpCutFactor !== undefined) this.jumpCutFactor = data.jumpCutFactor;
-    if (data.jumpCutVerticalVelocityLimit !== undefined)
-      this.jumpCutVerticalVelocityLimit = data.jumpCutVerticalVelocityLimit;
-    if (data.coyoteTime !== undefined) this.coyoteTime = data.coyoteTime;
-    if (data.slideMinStartSpeedThreshold !== undefined)
-      this.slideMinStartSpeedThreshold = data.slideMinStartSpeedThreshold;
-    if (data.minSlideVelocityThreshold !== undefined)
-      this.minSlideVelocityThreshold = data.minSlideVelocityThreshold;
-    if (data.slideDownhillAccel !== undefined) this.slideDownhillAccel = data.slideDownhillAccel;
-    if (data.slideFriction !== undefined) this.slideFriction = data.slideFriction;
-    if (data.slideUphillBrake !== undefined) this.slideUphillBrake = data.slideUphillBrake;
-    if (data.slideMinDuration !== undefined) this.slideMinDuration = data.slideMinDuration;
-    if (data.wallRunGravity !== undefined) this.wallRunGravity = data.wallRunGravity;
-    if (data.wallRunAcceleration !== undefined) this.wallRunAcceleration = data.wallRunAcceleration;
-    if (data.wallRunBrake !== undefined) this.wallRunBrake = data.wallRunBrake;
-    if (data.detectWallDistance !== undefined) this.detectWallDistance = data.detectWallDistance;
-    if (data.wallRunMaxEntryAngle !== undefined)
-      this.wallRunMaxEntryAngle = data.wallRunMaxEntryAngle;
-    if (data.wallDrag !== undefined) this.wallDrag = data.wallDrag;
-    if (data.wallJumpForce !== undefined) this.wallJumpForce = data.wallJumpForce;
-    if (data.disableInputAfterWallJumpTime !== undefined)
-      this.disableInputAfterWallJumpTime = data.disableInputAfterWallJumpTime;
-    if (data.mantleDetectionDistance !== undefined)
-      this.mantleDetectionDistance = data.mantleDetectionDistance;
-    if (data.mantleMaxHeight !== undefined) this.mantleMaxHeight = data.mantleMaxHeight;
-    if (data.mantlingMinVerticalVelocity !== undefined)
-      this.mantlingMinVerticalVelocity = data.mantlingMinVerticalVelocity;
-    if (data.minMantleVelocity !== undefined) this.minMantleVelocity = data.minMantleVelocity;
-    if (data.divingGravityMultiplier !== undefined)
-      this.divingGravityMultiplier = data.divingGravityMultiplier;
-    if (data.minSwingSpeed !== undefined) this.minSwingSpeed = data.minSwingSpeed;
-    if (data.impulsePadInputDisableTime !== undefined)
-      this.impulsePadInputDisableTime = data.impulsePadInputDisableTime;
-
-    // Guardar dimensiones originales del collider
-    this.originalHeight = this.capsuleCollider.getCapsuleHeight();
-    this.originalRadius = this.capsuleCollider.getCapsuleRadius();
-
-    // NO buscar cámara aquí - las entidades hijas aún no están cargadas
-    // La buscaremos en el primer update()
-
-    this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
-  }
-
   public update(deltaTime: number): void {
     if (!this.isActive) return;
     this.findCamera();
@@ -374,7 +309,8 @@ export class CharacterControllerComponent extends Component {
     // Actualizar velocidad vertical con gravedad
     if (!this.isGrounded) {
       const multiplier = this.isDiving ? this.divingGravityMultiplier : 1.0;
-      const finalGravity = this.isWallRunning ? this.wallRunGravity : gravity;
+      const finalGravity =
+        this.isWallRunning && this.currentVerticalVelocity < 0.0 ? this.wallRunGravity : gravity;
       this.currentVerticalVelocity += finalGravity * deltaTime * multiplier;
     } else if (this.isGrounded && !this.isJumping) {
       this.currentVerticalVelocity = 0.0;
@@ -650,14 +586,18 @@ export class CharacterControllerComponent extends Component {
 
   //WALLJUMP
   private applyWallJump(): void {
-    let jumpDir = this.camera!.getCamera().getLeft();
+    let jumpDir = this.camera!.getCamera().getFront();
+    console.log(jumpDir);
     const d = vec3.dot(jumpDir, this.wallNormal);
     if (d < -0.1) {
       // Pared a la izquierda, saltar a la derecha
       jumpDir = vec3.scale(vec3.create(), jumpDir, -1);
     }
+    vec3.add(jumpDir, jumpDir, this.wallNormal);
     jumpDir[1] = 0.0;
     vec3.normalize(jumpDir, jumpDir);
+
+    console.log(jumpDir);
 
     this.isNearWall = false;
     this.isWallRunning = false;
@@ -1135,5 +1075,70 @@ export class CharacterControllerComponent extends Component {
 
   public setActive(active: boolean): void {
     this.isActive = active;
+  }
+
+  public async load(data: CharacterControllerComponentDataType): Promise<void> {
+    // Obtener referencia al capsule collider
+    this.capsuleCollider = this.getOwner().getComponent(
+      'capsule_collider',
+    ) as CapsuleColliderComponent;
+
+    if (!this.capsuleCollider) {
+      console.error(
+        'CharacterControllerComponent requires CapsuleColliderComponent on the same entity!',
+      );
+      return;
+    }
+
+    // Leer todos los parámetros configurables del data
+    if (data.moveSpeed !== undefined) this.moveSpeed = data.moveSpeed;
+    if (data.airControlMultiplier !== undefined)
+      this.airControlMultiplier = data.airControlMultiplier;
+    if (data.groundAcceleration !== undefined) this.groundAcceleration = data.groundAcceleration;
+    if (data.groundDeceleration !== undefined) this.groundDeceleration = data.groundDeceleration;
+    if (data.airDrag !== undefined) this.airDrag = data.airDrag;
+    if (data.jumpForce !== undefined) this.jumpForce = data.jumpForce;
+    if (data.jumpCutFactor !== undefined) this.jumpCutFactor = data.jumpCutFactor;
+    if (data.jumpCutVerticalVelocityLimit !== undefined)
+      this.jumpCutVerticalVelocityLimit = data.jumpCutVerticalVelocityLimit;
+    if (data.coyoteTime !== undefined) this.coyoteTime = data.coyoteTime;
+    if (data.slideMinStartSpeedThreshold !== undefined)
+      this.slideMinStartSpeedThreshold = data.slideMinStartSpeedThreshold;
+    if (data.minSlideVelocityThreshold !== undefined)
+      this.minSlideVelocityThreshold = data.minSlideVelocityThreshold;
+    if (data.slideDownhillAccel !== undefined) this.slideDownhillAccel = data.slideDownhillAccel;
+    if (data.slideFriction !== undefined) this.slideFriction = data.slideFriction;
+    if (data.slideUphillBrake !== undefined) this.slideUphillBrake = data.slideUphillBrake;
+    if (data.slideMinDuration !== undefined) this.slideMinDuration = data.slideMinDuration;
+    if (data.wallRunGravity !== undefined) this.wallRunGravity = data.wallRunGravity;
+    if (data.wallRunAcceleration !== undefined) this.wallRunAcceleration = data.wallRunAcceleration;
+    if (data.wallRunBrake !== undefined) this.wallRunBrake = data.wallRunBrake;
+    if (data.detectWallDistance !== undefined) this.detectWallDistance = data.detectWallDistance;
+    if (data.wallRunMaxEntryAngle !== undefined)
+      this.wallRunMaxEntryAngle = data.wallRunMaxEntryAngle;
+    if (data.wallDrag !== undefined) this.wallDrag = data.wallDrag;
+    if (data.wallJumpForce !== undefined) this.wallJumpForce = data.wallJumpForce;
+    if (data.disableInputAfterWallJumpTime !== undefined)
+      this.disableInputAfterWallJumpTime = data.disableInputAfterWallJumpTime;
+    if (data.mantleDetectionDistance !== undefined)
+      this.mantleDetectionDistance = data.mantleDetectionDistance;
+    if (data.mantleMaxHeight !== undefined) this.mantleMaxHeight = data.mantleMaxHeight;
+    if (data.mantlingMinVerticalVelocity !== undefined)
+      this.mantlingMinVerticalVelocity = data.mantlingMinVerticalVelocity;
+    if (data.minMantleVelocity !== undefined) this.minMantleVelocity = data.minMantleVelocity;
+    if (data.divingGravityMultiplier !== undefined)
+      this.divingGravityMultiplier = data.divingGravityMultiplier;
+    if (data.minSwingSpeed !== undefined) this.minSwingSpeed = data.minSwingSpeed;
+    if (data.impulsePadInputDisableTime !== undefined)
+      this.impulsePadInputDisableTime = data.impulsePadInputDisableTime;
+
+    // Guardar dimensiones originales del collider
+    this.originalHeight = this.capsuleCollider.getCapsuleHeight();
+    this.originalRadius = this.capsuleCollider.getCapsuleRadius();
+
+    // NO buscar cámara aquí - las entidades hijas aún no están cargadas
+    // La buscaremos en el primer update()
+
+    this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 }
