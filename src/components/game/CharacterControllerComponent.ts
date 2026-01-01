@@ -551,6 +551,7 @@ export class CharacterControllerComponent extends Component {
     if (this.currentVerticalVelocity < 0.0) {
       this.currentVerticalVelocity = 0.0;
     }
+    this.removeVelocityIntoWall(this.wallNormal);
   }
 
   private updateWallRun(): void {
@@ -630,6 +631,7 @@ export class CharacterControllerComponent extends Component {
     this.isNearWall = false;
     this.isWallRunning = false;
     this.isJumping = true;
+    this.jumpCutFactorApplied = false;
     this.inputDisableTimer = this.disableInputAfterWallJumpTime;
     this.mantlingDisableTimer = this.disableMantleAfterWallJumpTime;
 
@@ -940,6 +942,7 @@ export class CharacterControllerComponent extends Component {
 
     this.isDiving = false; // Cancelar diving si lo teníamos activo
     this.isJumping = true; // Marcar como saltando
+    this.jumpCutFactorApplied = false;
     this.inputDisableTimer = this.impulsePadInputDisableTime; // Deshabilitar input por un breve momento
   }
 
@@ -1010,6 +1013,7 @@ export class CharacterControllerComponent extends Component {
     // Mantener dirección de salida
     this.currentVerticalVelocity = Math.max(this.currentVerticalVelocity, 1.5);
     this.isJumping = true;
+    this.jumpCutFactorApplied = false;
   }
 
   //HELPERS

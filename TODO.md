@@ -28,7 +28,4 @@
 
 ### Testing
 
-1. Wall Jump floaty?
-2. Less gravity while wall running?
-3. Wall running stabilices vertical speed to 0?
-4. Swing Bar too restrictive?
+1. Swing Bar too restrictive?

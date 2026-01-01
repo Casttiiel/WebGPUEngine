@@ -48,7 +48,7 @@
       "wallRunMaxEntryAngle": 0.9,
       "wallDrag": 0.3,
       "wallJumpForce": 7.0,
-      "disableInputAfterWallJumpTime": 0.4,
+      "disableInputAfterWallJumpTime": 0.3,
       "disableMantleAfterWallJumpTime": 0.3,
       "mantleDetectionDistance": 1.5,
       "mantleMaxHeight": -0.025,
