@@ -370,7 +370,9 @@ export class CharacterControllerComponent extends Component {
       );
 
       if (type === RAPIER.RigidBodyType.Fixed) {
-        this.removeVelocityIntoWall(collisionNormal);
+        if (!this.isWallRunning) {
+          this.removeVelocityIntoWall(collisionNormal);
+        }
         const isCeiling = collisionNormal[1] < -0.7;
         if (isCeiling && this.currentVerticalVelocity > 0) {
           this.currentVerticalVelocity = 0;
@@ -546,7 +548,6 @@ export class CharacterControllerComponent extends Component {
   private startWallRun(): void {
     this.isWallRunning = true;
     this.horizontalDirection[1] = 0.0;
-    this.removeVelocityIntoWall(this.wallNormal);
     if (this.currentVerticalVelocity < 0.0) {
       this.currentVerticalVelocity = 0.0;
     }

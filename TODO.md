@@ -1,13 +1,12 @@
 ## Gameplay
 
-1. WallRun no remove velocity into wall
-2. Dash
-3. Momentum/Chain
-4. Eco
-5. Gameplay analysis
-6. Door
-7. Enemy
-8. Run upward to wall -> wallrun (wrong)
+1. Dash
+2. Momentum/Chain
+3. Eco
+4. Gameplay analysis
+5. Door
+6. Enemy
+7. Run upward to wall -> wallrun (wrong)
 
 ## Visuals and Sound
 
