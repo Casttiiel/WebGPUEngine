@@ -124,7 +124,7 @@ export class QualitySettings {
       bloomTexture: 'rgba16float',
       enableBloom: true,
       bloomNumMips: 8,
-      enableAO: false,
+      enableAO: true,
       aoScale: 0.5,
       aoTexture: 'r16float',
       aoSampleCount: 8,

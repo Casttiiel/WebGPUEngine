@@ -17,14 +17,16 @@
 
 ### Engine
 
-1. CSM (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+1. CSM (3 cascade)
 2. LOADING BAR
-3. Froxel Scattering
-4. Review AO
-5. Multiple Light probes has good shadows?
-6. Improve particles
-7. Weird line on corners is irradiance because of normals
+3. Revisit shadows
+4. Alpha cutoff
+5. Froxel Scattering
+6. Multiple Light probes has good shadows?
+7. Improve particles
+8. Weird line on corners is irradiance because of normals
 
 ### Testing
 
 1. Swing Bar too restrictive?
+2. Run uphill fast makes not stick to ground

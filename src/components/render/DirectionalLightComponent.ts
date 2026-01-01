@@ -11,6 +11,7 @@ import { mat4, vec3 } from 'gl-matrix';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Component } from '../../core/ecs/Component';
+import { TransformComponent } from '../core/TransformComponent';
 
 interface DirectionalLightData {
   near?: number;
@@ -36,6 +37,8 @@ export class DirectionalLightComponent extends Component {
   private hasShadows!: boolean;
   private color!: number[];
   private intensity!: number;
+  private lightDirection!: vec3; // Dirección de la luz (normalizada)
+  private shadowCameraDistance: number = 25.0; // Distancia desde el jugador
 
   constructor() {
     super();
@@ -90,7 +93,15 @@ export class DirectionalLightComponent extends Component {
     this.camera.setNearPlane(lightData.near || 0.1);
     this.camera.setFarPlane(lightData.far || 100.0);
     this.camera.setOrthoParams(true, 0, lightData.orthoWidth || 20, 0, lightData.orthoHeight || 20);
-    this.camera.lookAt(lightData.position, lightData.target);
+
+    // Calcular y guardar la dirección de la luz (normalizada)
+    const initialDir = vec3.create();
+    vec3.subtract(initialDir, lightData.target, lightData.position);
+    vec3.normalize(initialDir, initialDir);
+    this.lightDirection = initialDir;
+
+    // Configuración inicial (se actualizará en update())
+    this.camera.lookAt(lightData.position, lightData.target, [0, 0, 1]);
     this.camera.updateUniforms();
 
     this.hasShadows = lightData.hasShadows ?? false;
@@ -98,6 +109,49 @@ export class DirectionalLightComponent extends Component {
     this.intensity = lightData.intensity ?? 1.0;
 
     this.updateLightUniforms();
+  }
+
+  /**
+   * Actualiza la posición de la shadow camera para seguir al jugador.
+   * La dirección de la luz permanece constante, pero la cámara se mueve
+   * para mantener al jugador centrado en el shadow map.
+   */
+  private updateShadowCamera(playerPos: vec3): void {
+    // 1. Calcular posición de la shadow camera
+    // La cámara se posiciona "hacia atrás" en la dirección OPUESTA a la luz
+    // (si la luz viene de [0, -1, 0], la cámara está en [0, +25, 0])
+    const shadowCameraPos = vec3.create();
+    const negLightDir = vec3.create();
+    vec3.negate(negLightDir, this.lightDirection);
+    vec3.scaleAndAdd(shadowCameraPos, playerPos, negLightDir, this.shadowCameraDistance);
+
+    // 2. La shadow camera mira hacia el jugador (siguiendo la dirección de la luz)
+    const targetPos = vec3.clone(playerPos);
+
+    // 3. Snap a texel grid para eliminar shadow shimmer (antes de lookAt)
+    this.snapToTexelGrid(shadowCameraPos);
+
+    // 4. Actualizar shadow camera manteniendo la dirección de la luz
+    // Usar [0, 0, 1] como up vector para evitar degeneración
+    this.camera.lookAt(shadowCameraPos, targetPos, [0, 0, 1]);
+
+    this.camera.updateUniforms();
+  }
+
+  /**
+   * Ajusta una posición a un grid de texels para eliminar el "shadow shimmer"
+   * cuando la cámara se mueve.
+   */
+  private snapToTexelGrid(position: vec3): void {
+    const shadowMapResolution =
+      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
+    const orthoSize = this.camera.getOrthoWidth();
+    const worldUnitsPerTexel = orthoSize / shadowMapResolution;
+
+    // Snap posición a múltiplos de worldUnitsPerTexel
+    position[0] = Math.floor(position[0] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    position[1] = Math.floor(position[1] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    position[2] = Math.floor(position[2] / worldUnitsPerTexel) * worldUnitsPerTexel;
   }
 
   private updateLightUniforms(): void {
@@ -230,6 +284,21 @@ export class DirectionalLightComponent extends Component {
   }
 
   public override update(dt: number): void {
+    if (this.hasShadows) {
+      // Obtener la cámara principal (jugador)
+      const playerEntity = Engine.getEntities().getEntityByName('Player');
+      if (playerEntity) {
+        const transformComponent = playerEntity.getComponent('transform') as TransformComponent;
+        if (transformComponent) {
+          const playerPos = transformComponent.getTransform().getWorldPosition();
+
+          // Actualizar posición de la shadow camera para seguir al jugador
+          this.updateShadowCamera(playerPos);
+        }
+      }
+    }
+
+    // Actualizar uniforms con la nueva posición
     this.updateLightUniforms();
   }
 
