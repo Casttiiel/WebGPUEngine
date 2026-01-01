@@ -68,6 +68,7 @@ export class CharacterControllerComponent extends Component {
   // WallJump
   private wallJumpForce: number = 6.0; // Fuerza aplicada al saltar desde la pared
   private disableInputAfterWallJumpTime: number = 0.2; // Tiempo que se deshabilita el input tras un wall jump
+  private disableMantleAfterWallJumpTime: number = 0.3; // Tiempo que se deshabilita el mantle tras un wall jump
 
   // Mantling (trepar)
   private mantleDetectionDistance: number = 1.5; // Distancia para detectar obstáculos
@@ -112,6 +113,7 @@ export class CharacterControllerComponent extends Component {
   private jumpCutFactorApplied: boolean = false; // Si el factor de corte de salto ya se ha aplicado
   private groundNormal: vec3 = vec3.fromValues(0, 1, 0); // Normal del suelo actual
   private inputDisableTimer: number = -10.0; // Temporizador para deshabilitar input
+  private mantlingDisableTimer: number = -10.0; // Temporizador para deshabilitar mantle
 
   constructor() {
     super();
@@ -120,7 +122,6 @@ export class CharacterControllerComponent extends Component {
   public update(deltaTime: number): void {
     if (!this.isActive) return;
     this.findCamera();
-    console.log('-------------------');
     if (!this.capsuleCollider || !this.camera) return;
 
     if (this.inputDisableTimer > 0.0) {
@@ -128,9 +129,9 @@ export class CharacterControllerComponent extends Component {
     }
 
     this.getIsGroundedAndGroundNormal();
-    //this.manageMantling();
-    //this.detectWall();
-    //this.manageSliding();
+    this.manageMantling(deltaTime);
+    this.detectWall();
+    this.manageSliding();
 
     if (this.isMantling) {
       this.updateMantle(deltaTime);
@@ -252,11 +253,9 @@ export class CharacterControllerComponent extends Component {
 
     if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración/frenado suave
-      console.log(this.currentHorizontalVelocity, 'before applying anything');
       if (hasInput) {
         vec3.normalize(this.horizontalDirection, targetMovement);
       } else {
-        console.log('no input');
         vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
         this.horizontalDirection = this.projectOnPlane(this.horizontalDirection, this.groundNormal);
       }
@@ -371,7 +370,6 @@ export class CharacterControllerComponent extends Component {
       );
 
       if (type === RAPIER.RigidBodyType.Fixed) {
-        console.log('collision detected to remove speed');
         this.removeVelocityIntoWall(collisionNormal);
         const isCeiling = collisionNormal[1] < -0.7;
         if (isCeiling && this.currentVerticalVelocity > 0) {
@@ -393,7 +391,7 @@ export class CharacterControllerComponent extends Component {
       this.currentHorizontalVelocity[1] -= dot * collisionNormal[1];
       this.currentHorizontalVelocity[2] -= dot * collisionNormal[2];
     }
-    console.log(this.currentHorizontalVelocity, 'after applying collision response');
+    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
   }
 
   //JUMP
@@ -632,6 +630,7 @@ export class CharacterControllerComponent extends Component {
     this.isWallRunning = false;
     this.isJumping = true;
     this.inputDisableTimer = this.disableInputAfterWallJumpTime;
+    this.mantlingDisableTimer = this.disableMantleAfterWallJumpTime;
 
     vec3.scale(jumpDir, jumpDir, this.moveSpeed);
     this.currentVerticalVelocity = this.wallJumpForce;
@@ -741,8 +740,12 @@ export class CharacterControllerComponent extends Component {
   }
 
   //MANTLING
-  private manageMantling(): void {
+  private manageMantling(deltaTime: number): void {
     const input = Engine.getInput();
+    if (this.mantlingDisableTimer > 0.0) {
+      this.mantlingDisableTimer -= deltaTime;
+      return;
+    }
 
     // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
     if (
@@ -1161,6 +1164,8 @@ export class CharacterControllerComponent extends Component {
     if (data.minSwingSpeed !== undefined) this.minSwingSpeed = data.minSwingSpeed;
     if (data.impulsePadInputDisableTime !== undefined)
       this.impulsePadInputDisableTime = data.impulsePadInputDisableTime;
+    if (data.disableMantleAfterWallJumpTime !== undefined)
+      this.disableMantleAfterWallJumpTime = data.disableMantleAfterWallJumpTime;
 
     // Guardar dimensiones originales del collider
     this.originalHeight = this.capsuleCollider.getCapsuleHeight();

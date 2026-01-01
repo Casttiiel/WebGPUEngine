@@ -26,6 +26,7 @@ export type CharacterControllerComponentDataType = {
 
   wallJumpForce?: number; // Wall jump vertical force (default: 8.0)
   disableInputAfterWallJumpTime?: number; // Time to disable input after wall jump in seconds (default: 0.2)
+  disableMantleAfterWallJumpTime?: number; // Time to disable mantling after wall jump in seconds (default: 0.3)
 
   mantleDetectionDistance?: number; // Distance to detect mantleable ledges (default: 1.5)
   mantleMaxHeight?: number; // Maximum height of mantleable ledges (default: 2.0)
