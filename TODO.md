@@ -17,14 +17,13 @@
 
 ### Engine
 
-1. IF MATERIAL INSTANCED THEN NO UV SCALE APPLIED ERROR
-2. LOADING BAR
-3. CSM (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
-4. Froxel Scattering
-5. Review AO
-6. Multiple Light probes has good shadows?
-7. Improve particles
-8. Weird line on corners is irradiance because of normals
+1. LOADING BAR
+2. CSM (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+3. Froxel Scattering
+4. Review AO
+5. Multiple Light probes has good shadows?
+6. Improve particles
+7. Weird line on corners is irradiance because of normals
 
 ### Testing
 

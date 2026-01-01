@@ -282,5 +282,29 @@ export class Material extends GPUResource {
     return this.path;
   }
 
+  public getBaseColorFactor(): number[] {
+    return this.baseColorFactor;
+  }
+
+  public getRoughnessFactor(): number {
+    return this.roughnessFactor;
+  }
+
+  public getMetallicFactor(): number {
+    return this.metallicFactor;
+  }
+
+  public getEmissiveFactor(): number {
+    return this.emissiveFactor;
+  }
+
+  public getUvXScale(): number {
+    return this.uvXScale;
+  }
+
+  public getUvYScale(): number {
+    return this.uvYScale;
+  }
+
   public override release(): void {}
 }

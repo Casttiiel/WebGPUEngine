@@ -346,6 +346,13 @@ export class InstanceManager {
         },
         category: material.getCategory(),
         casts_shadows: material.getCastsShadows(),
+        // Copiar todos los factores del material original
+        baseColorFactor: material.getBaseColorFactor(),
+        roughnessFactor: material.getRoughnessFactor(),
+        metallicFactor: material.getMetallicFactor(),
+        emissiveFactor: material.getEmissiveFactor(),
+        uvXScale: material.getUvXScale(),
+        uvYScale: material.getUvYScale(),
       };
 
       instancedMaterial = await Material.get(materialData);
