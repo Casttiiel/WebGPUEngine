@@ -17,8 +17,8 @@
 
 ### Engine
 
-1. LOADING BAR
-2. CSM (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+1. CSM (3 cascade)(If snap to camera frustum, what about shadows from outside of frustum)
+2. LOADING BAR
 3. Froxel Scattering
 4. Review AO
 5. Multiple Light probes has good shadows?
