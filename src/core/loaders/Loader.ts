@@ -3,6 +3,7 @@ import { Component } from '../ecs/Component';
 import { Entity } from '../ecs/Entity';
 import { Engine } from '../engine/Engine';
 import { ResourceManager } from '../engine/ResourceManager';
+import { LoadingStatus } from '../engine/LoadingStatus';
 import { GLTFLoader } from './GLTFLoader';
 
 import { SceneDataType, EntityDataType } from '../../types/SceneData.type';
@@ -43,19 +44,43 @@ import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 type Operation = 'add' | 'multiply';
 
 export class Loader {
+  // Contadores para tracking de progreso
+  private static totalEntitiesToLoad: number = 0;
+  private static entitiesLoaded: number = 0;
+
+  /**
+   * Cuenta recursivamente todas las entidades que se van a cargar
+   */
+  private static countEntities(json: EntityDataType): number {
+    let count = 1; // La entidad actual
+    const children = json.children ?? [];
+    for (const child of children) {
+      count += this.countEntities(child);
+    }
+    return count;
+  }
+
   public static async loadSceneFromJSON(json: SceneDataType): Promise<void> {
+    // Contar todas las entidades antes de empezar
+    this.totalEntitiesToLoad = 0;
+    this.entitiesLoaded = 0;
+    
+    for (const e of json) {
+      this.totalEntitiesToLoad += this.countEntities(e);
+    }
+
+    console.log(`[Loader] Total entities to load: ${this.totalEntitiesToLoad}`);
+
+    // Cargar entidades con progreso
     for (const e of json) {
       await this.loadEntityFromJSON(e);
     }
   }
 
   public static async parseSceneJSON(json: SceneDataType): Promise<SceneDataType> {
-    const parsedEntities: EntityDataType[] = [];
-    for (var i = 0; i < json.length; i++) {
-      const entityJson = json[i];
-      const parsedEntity = await this.parseEntityFromJSON(entityJson);
-      parsedEntities.push(parsedEntity);
-    }
+    // Procesar todas las entidades en paralelo para acelerar el parsing
+    const parsePromises = json.map(entityJson => this.parseEntityFromJSON(entityJson));
+    const parsedEntities = await Promise.all(parsePromises);
     return parsedEntities;
   }
 
@@ -95,12 +120,11 @@ export class Loader {
       entityChildrens = entityChildrens.concat(gltfJson);
     }
 
-    // Load children after parent is fully setup
-    const parsedEntities: EntityDataType[] = [];
-    for (const children_json of entityChildrens) {
-      const parsedEntityJson = await this.parseEntityFromJSON(children_json);
-      parsedEntities.push(parsedEntityJson);
-    }
+    // Load children after parent is fully setup - proceso en paralelo
+    const childrenPromises = entityChildrens.map(children_json => 
+      this.parseEntityFromJSON(children_json)
+    );
+    const parsedEntities = await Promise.all(childrenPromises);
     json.children = parsedEntities;
 
     return json;
@@ -120,6 +144,16 @@ export class Loader {
 
     await this.loadComponentFromJSON(json, entity);
 
+    // Incrementar contador y actualizar progreso
+    this.entitiesLoaded++;
+    const progress = this.entitiesLoaded / this.totalEntitiesToLoad;
+    const entityName = json.components?.name || `Entity ${this.entitiesLoaded}`;
+    
+    LoadingStatus.updateRangeProgress(
+      progress,
+      `Loading entities... (${this.entitiesLoaded}/${this.totalEntitiesToLoad})`
+    );
+
     // Load children after parent is fully setup
     for (const children_json of entityChildrens) {
       await this.loadEntityFromJSON(children_json, entity);
@@ -137,22 +171,31 @@ export class Loader {
       Engine.getEntities().addComponentToManager(nameComp, 'name');
     }
 
-    // Luego cargar el resto de componentes
-    const componentsToAttach: Component[] = [];
+    // Preparar todos los componentes en paralelo (creación + carga)
+    const componentPromises: Promise<{ type: string; comp: Component }>[] = [];
+    
     for (const [type, compData] of Object.entries(json.components)) {
       if (type === 'name') continue; // Ya cargado
-      const comp = this.createComponentFromJSON(type);
-      entity.addComponent(type, comp);
-      await comp.load(compData);
-      Engine.getEntities().addComponentToManager(comp, type);
-      componentsToAttach.push(comp);
+      
+      // Crear y cargar componentes en paralelo
+      const promise = (async () => {
+        const comp = this.createComponentFromJSON(type);
+        entity.addComponent(type, comp);
+        await comp.load(compData);
+        Engine.getEntities().addComponentToManager(comp, type);
+        return { type, comp };
+      })();
+      
+      componentPromises.push(promise);
     }
+
+    // Esperar a que todos los componentes se carguen
+    const loadedComponents = await Promise.all(componentPromises);
 
     // Llamar a onAttach() después de que todos los componentes estén cargados
     // Esto permite que los componentes puedan obtener referencias a otros componentes
-    for (const comp of componentsToAttach) {
-      await comp.onAttach();
-    }
+    const attachPromises = loadedComponents.map(({ comp }) => comp.onAttach());
+    await Promise.all(attachPromises);
   }
 
   public static createComponentFromJSON(type: string): Component {

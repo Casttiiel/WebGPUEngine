@@ -32,11 +32,11 @@ export class ModuleBoot extends Module {
     // 2. Flagear entidades que pueden ser instanciadas
     const flaggedJson = InstanceManager.flagInstanceableEntities(parsedJson);
 
-    LoadingStatus.updateStatus('Loading entities...', 80);
-    // 3. Cargar la escena con las entidades flaggeadas
+    // 3. Cargar la escena con las entidades flaggeadas (80% - 90%)
+    LoadingStatus.setProgressRange(80, 90);
     await Loader.loadSceneFromJSON(flaggedJson);
 
-    LoadingStatus.updateStatus('Creating instance groups...', 90);
+    LoadingStatus.updateStatus('Creating instance groups...', 92);
     // 4. Crear grupos de instancias (después de que todas las entities estén cargadas)
     const allEntities = Engine.getEntities().getAllEntities();
     await InstanceManager.createInstanceGroups(allEntities);
