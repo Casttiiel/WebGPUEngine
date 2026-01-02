@@ -23,6 +23,11 @@ interface DirectionalLightData {
   intensity?: number;
   position: number[];
   target: number[];
+  // CSM configuration
+  cascadeCount?: number; // 1, 2, or 3 cascades (default: 1)
+  cascadeSplits?: number[]; // [5.0, 15.0, 50.0] for 3 cascades
+  cascadeOrthoSizes?: number[]; // [10, 20, 40] ortho sizes per cascade
+  cascadeDistances?: number[]; // [15, 25, 40] camera distances per cascade
 }
 
 export class DirectionalLightComponent extends Component {
@@ -30,15 +35,20 @@ export class DirectionalLightComponent extends Component {
   private directionalLightTechnique!: Technique;
   private directionalLightBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
-  private shadowDepthTexture!: GPUTexture;
-  private shadowDepthView!: GPUTextureView;
+  private shadowDepthTextures!: GPUTexture[]; // Una por cascada
+  private shadowDepthViews!: GPUTextureView[]; // Una por cascada
   private shadowSampler!: GPUSampler;
-  private camera!: Camera;
+  private shadowCameras!: Camera[]; // Una por cascada
   private hasShadows!: boolean;
   private color!: number[];
   private intensity!: number;
   private lightDirection!: vec3; // Dirección de la luz (normalizada)
-  private shadowCameraDistance: number = 25.0; // Distancia desde el jugador
+
+  // CSM configuration
+  private cascadeCount: number = 1; // Number of cascades (1-3)
+  private cascadeSplits!: number[]; // Split distances
+  private cascadeOrthoSizes!: number[]; // Ortho sizes per cascade
+  private cascadeDistances!: number[]; // Camera distances per cascade
 
   constructor() {
     super();
@@ -46,63 +56,127 @@ export class DirectionalLightComponent extends Component {
 
   public async load(lightData: DirectionalLightData): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.directionalLightTechnique = await Technique.getAsync('directional_light.tech');
 
+    // Configurar CSM
+    this.cascadeCount = Math.min(3, Math.max(1, lightData.cascadeCount || 1));
+    this.cascadeSplits = lightData.cascadeSplits || [5.0, 10.0, 15.0];
+    this.cascadeOrthoSizes = lightData.cascadeOrthoSizes || [10, 15, 20];
+    this.cascadeDistances = lightData.cascadeDistances || [25, 25, 25];
+
+    // Cargar técnica apropiada (CSM o single shadow)
+    const techniquePath =
+      this.cascadeCount > 1 ? 'directional_light_csm.tech' : 'directional_light.tech';
+    this.directionalLightTechnique = await Technique.getAsync(techniquePath);
+
+    // Uniform buffer size: base (32 bytes) + 3 cascadas * 64 bytes (mat4x4) + cascadeSplits (16) + shadow params (16)
+    const uniformBufferSize = 32 + 3 * 64 + 16 + 16;
     this.uniformBuffer = GPUUtils.createBuffer(
       'directional light uniform buffer',
-      36 * 4,
+      uniformBufferSize,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
-    // Crear textura de profundidad para shadow mapping
-    this.shadowDepthTexture = GPUUtils.createTexture(
-      'directional_light_shadow_depth_map',
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
-      'depth32float',
-      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    );
+    // Crear texturas de profundidad para shadow mapping (una por cascada)
+    this.shadowDepthTextures = [];
+    this.shadowDepthViews = [];
+    const shadowResolution =
+      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
-    this.shadowDepthView = this.shadowDepthTexture.createView({
-      aspect: 'depth-only',
-    });
+    for (let i = 0; i < this.cascadeCount; i++) {
+      const shadowTexture = GPUUtils.createTexture(
+        `directional_light_shadow_depth_map_cascade_${i}`,
+        shadowResolution,
+        shadowResolution,
+        'depth32float',
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      );
+      this.shadowDepthTextures.push(shadowTexture);
+      this.shadowDepthViews.push(shadowTexture.createView({ aspect: 'depth-only' }));
+    }
 
     // Crear sampler de comparación para shadow mapping
     this.shadowSampler = SamplerLibrary.shadows;
 
-    this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
-      `directional_light_bindgroup`,
-      this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!,
-      [
+    // Crear bind group apropiado según el número de cascadas
+    let bindGroupEntries: GPUBindGroupEntry[];
+
+    if (this.cascadeCount > 1) {
+      // CSM: 3 shadow maps + sampler
+      bindGroupEntries = [
         {
           binding: 0,
           resource: { buffer: this.uniformBuffer },
         },
         {
           binding: 1,
-          resource: this.shadowDepthView, // Textura de profundidad
+          resource: this.shadowDepthViews[0],
         },
         {
           binding: 2,
-          resource: this.shadowSampler, // Sampler de comparación
+          resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)],
         },
-      ],
+        {
+          binding: 3,
+          resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)],
+        },
+        {
+          binding: 4,
+          resource: this.shadowSampler,
+        },
+      ];
+    } else {
+      // Single shadow map: 1 shadow map + sampler
+      bindGroupEntries = [
+        {
+          binding: 0,
+          resource: { buffer: this.uniformBuffer },
+        },
+        {
+          binding: 1,
+          resource: this.shadowDepthViews[0],
+        },
+        {
+          binding: 2,
+          resource: this.shadowSampler,
+        },
+      ];
+    }
+
+    this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
+      `directional_light_bindgroup`,
+      this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!,
+      bindGroupEntries,
     );
 
-    this.camera = new Camera();
-    this.camera.setNearPlane(lightData.near || 0.1);
-    this.camera.setFarPlane(lightData.far || 100.0);
-    this.camera.setOrthoParams(true, 0, lightData.orthoWidth || 20, 0, lightData.orthoHeight || 20);
+    // Crear shadow cameras (una por cascada)
+    this.shadowCameras = [];
+
+    // Near/Far IGUALES para todas las cascadas (crucial para consistencia de sombras)
+    const shadowNear = lightData.near || 0.1;
+    const shadowFar = lightData.far || 100.0;
+
+    for (let i = 0; i < this.cascadeCount; i++) {
+      const camera = new Camera();
+
+      // Mismo near/far para TODAS las cascadas
+      camera.setNearPlane(shadowNear);
+      camera.setFarPlane(shadowFar);
+
+      // Solo cambia el ortho size (área que cubre)
+      camera.setOrthoParams(true, 0, this.cascadeOrthoSizes[i], 0, this.cascadeOrthoSizes[i]);
+
+      // Configuración inicial (se actualizará en update())
+      camera.lookAt(lightData.position, lightData.target, [0, 0, 1]);
+      camera.updateUniforms();
+
+      this.shadowCameras.push(camera);
+    }
 
     // Calcular y guardar la dirección de la luz (normalizada)
     const initialDir = vec3.create();
     vec3.subtract(initialDir, lightData.target, lightData.position);
     vec3.normalize(initialDir, initialDir);
     this.lightDirection = initialDir;
-
-    // Configuración inicial (se actualizará en update())
-    this.camera.lookAt(lightData.position, lightData.target, [0, 0, 1]);
-    this.camera.updateUniforms();
 
     this.hasShadows = lightData.hasShadows ?? false;
     this.color = lightData.color ?? [1.0, 1.0, 1.0];
@@ -112,40 +186,44 @@ export class DirectionalLightComponent extends Component {
   }
 
   /**
-   * Actualiza la posición de la shadow camera para seguir al jugador.
-   * La dirección de la luz permanece constante, pero la cámara se mueve
-   * para mantener al jugador centrado en el shadow map.
+   * Actualiza la posición de las shadow cameras para seguir al jugador.
+   * La dirección de la luz permanece constante, pero las cámaras se mueven
+   * para mantener al jugador centrado en los shadow maps.
    */
-  private updateShadowCamera(playerPos: vec3): void {
-    // 1. Calcular posición de la shadow camera
-    // La cámara se posiciona "hacia atrás" en la dirección OPUESTA a la luz
-    // (si la luz viene de [0, -1, 0], la cámara está en [0, +25, 0])
-    const shadowCameraPos = vec3.create();
+  private updateShadowCameras(playerPos: vec3): void {
     const negLightDir = vec3.create();
     vec3.negate(negLightDir, this.lightDirection);
-    vec3.scaleAndAdd(shadowCameraPos, playerPos, negLightDir, this.shadowCameraDistance);
 
-    // 2. La shadow camera mira hacia el jugador (siguiendo la dirección de la luz)
-    const targetPos = vec3.clone(playerPos);
+    // TODAS las shadow cameras a la misma distancia del jugador
+    // Solo cambia el ortho size de cada una
+    const shadowCameraDistance = 30.0; // Distancia fija para todas las cascadas
 
-    // 3. Snap a texel grid para eliminar shadow shimmer (antes de lookAt)
-    this.snapToTexelGrid(shadowCameraPos);
+    // Actualizar cada cascada
+    for (let i = 0; i < this.cascadeCount; i++) {
+      // 1. Posicionar shadow camera detrás del jugador (MISMA posición para todas)
+      const shadowCameraPos = vec3.create();
+      vec3.scaleAndAdd(shadowCameraPos, playerPos, negLightDir, shadowCameraDistance);
 
-    // 4. Actualizar shadow camera manteniendo la dirección de la luz
-    // Usar [0, 0, 1] como up vector para evitar degeneración
-    this.camera.lookAt(shadowCameraPos, targetPos, [0, 0, 1]);
+      // 2. La shadow camera mira hacia el jugador
+      const targetPos = vec3.clone(playerPos);
 
-    this.camera.updateUniforms();
+      // 3. Snap a texel grid para eliminar shadow shimmer
+      this.snapToTexelGrid(shadowCameraPos, i);
+
+      // 4. Actualizar shadow camera
+      this.shadowCameras[i].lookAt(shadowCameraPos, targetPos, [0, 0, 1]);
+      this.shadowCameras[i].updateUniforms();
+    }
   }
 
   /**
    * Ajusta una posición a un grid de texels para eliminar el "shadow shimmer"
    * cuando la cámara se mueve.
    */
-  private snapToTexelGrid(position: vec3): void {
+  private snapToTexelGrid(position: vec3, cascadeIndex: number): void {
     const shadowMapResolution =
       QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-    const orthoSize = this.camera.getOrthoWidth();
+    const orthoSize = this.shadowCameras[cascadeIndex].getOrthoWidth();
     const worldUnitsPerTexel = orthoSize / shadowMapResolution;
 
     // Snap posición a múltiplos de worldUnitsPerTexel
@@ -163,8 +241,7 @@ export class DirectionalLightComponent extends Component {
     );
 
     // Para luz direccional: la dirección debe ser HACIA la fuente de luz
-    // Si la cámara mira hacia abajo [0, -1, 0], la luz viene de arriba [0, 1, 0]
-    const cameraDirection = this.camera.getFront();
+    const cameraDirection = this.shadowCameras[0].getFront();
     const lightDirection = vec3.fromValues(
       -cameraDirection[0],
       -cameraDirection[1],
@@ -178,77 +255,86 @@ export class DirectionalLightComponent extends Component {
       new Float32Array([lightDirection[0], lightDirection[1], lightDirection[2], this.intensity]),
     );
 
-    // Crear matriz de transformación de clip space a UV space
+    // Crear matrices de transformación para cada cascada (bytes 32-223)
     const mtx_scale = mat4.create();
     const mtx_translation = mat4.create();
     const mtx_offset = mat4.create();
-    const lightViewProjOffset = mat4.create();
 
-    // CORRECCIÓN: Escalar de [-1,1] a [0,1] y aplicar offset
     mat4.scale(mtx_scale, mat4.create(), [0.5, -0.5, 1.0]);
     mat4.translate(mtx_translation, mat4.create(), [0.5, 0.5, 0.0]);
-
-    // CORRECCIÓN: Orden correcto de transformaciones
-    // Primero escalar, luego trasladar: T * S (se lee de derecha a izquierda)
     mat4.multiply(mtx_offset, mtx_translation, mtx_scale);
 
-    // CORRECCIÓN: ViewProjection PRIMERO, luego la transformación a UV
-    // Orden: UV_Transform * ViewProjection * worldPos
-    mat4.multiply(lightViewProjOffset, mtx_offset, this.camera.getViewProjection());
+    // Escribir matrices para 3 cascadas (aunque solo usemos 1-3)
+    for (let i = 0; i < 3; i++) {
+      const lightViewProjOffset = mat4.create();
+      const cascadeIndex = Math.min(i, this.cascadeCount - 1);
+      mat4.multiply(
+        lightViewProjOffset,
+        mtx_offset,
+        this.shadowCameras[cascadeIndex].getViewProjection(),
+      );
+      GPUUtils.writeBuffer(this.uniformBuffer, 32 + i * 64, new Float32Array(lightViewProjOffset));
+    }
 
-    // Escribir la matriz lightViewProjOffset completa (NO solo ViewProjection)
-    GPUUtils.writeBuffer(this.uniformBuffer, 32, new Float32Array(lightViewProjOffset)); // radius (f32) - bytes 96-99 (no se usa para directional light)
-    GPUUtils.writeBuffer(this.uniformBuffer, 96, new Float32Array([0.0]));
+    // cascadeSplits (vec4) - bytes 224-239
+    GPUUtils.writeBuffer(
+      this.uniformBuffer,
+      224,
+      new Float32Array([
+        this.cascadeSplits[0] || 5.0,
+        this.cascadeSplits[1] || 15.0,
+        this.cascadeSplits[2] || 50.0,
+        this.cascadeCount,
+      ]),
+    );
 
-    // shadowStep (f32) - bytes 100-103
+    // Shadow parameters - bytes 240-255
     const shadowStep = 2.0;
-    GPUUtils.writeBuffer(this.uniformBuffer, 100, new Float32Array([shadowStep]));
-
-    // shadowInverseResolution (f32) - bytes 104-107
     const shadowInverseResolution =
       1.0 / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-    GPUUtils.writeBuffer(this.uniformBuffer, 104, new Float32Array([shadowInverseResolution]));
-
-    // shadowStepDivResolution (f32) - bytes 108-111
     const shadowStepDivResolution =
       shadowStep / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-    GPUUtils.writeBuffer(this.uniformBuffer, 108, new Float32Array([shadowStepDivResolution]));
 
-    // startFalloff (f32) - bytes 112-115 (no se usa para directional light)
-    GPUUtils.writeBuffer(this.uniformBuffer, 112, new Float32Array([0.0]));
-
-    // padding (vec3) - bytes 116-127
-    GPUUtils.writeBuffer(this.uniformBuffer, 116, new Float32Array([0.0, 0.0, 0.0]));
-
-    // extraPadding (f32) - bytes 128-131
-    GPUUtils.writeBuffer(this.uniformBuffer, 128, new Float32Array([0.0]));
+    GPUUtils.writeBuffer(
+      this.uniformBuffer,
+      240,
+      new Float32Array([shadowStep, shadowInverseResolution, shadowStepDivResolution, 0.0]),
+    );
   }
 
   public generateShadowMap(): void {
-    RenderManager.getInstance().performCulling(this.camera, RenderCategory.SHADOWS);
     const render = Render.getInstance();
+    const shadowResolution =
+      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
-    // Solo renderizar a la textura de profundidad (sin color attachment)
-    const depthStencilAttachment = GPUUtils.createDepthStencilAttachment(this.shadowDepthView!);
+    // Renderizar cada cascada
+    for (let i = 0; i < this.cascadeCount; i++) {
+      // Culling para esta cascada
+      RenderManager.getInstance().performCulling(this.shadowCameras[i], RenderCategory.SHADOWS);
 
-    const pass = render.getCommandEncoder().beginRenderPass(
-      GPUUtils.createRenderPassDescriptor(
-        'directional light shadow map render pass',
-        [], // Sin color attachments
-        depthStencilAttachment,
-      ),
-    );
-    GPUUtils.configureViewportAndScissor(
-      pass,
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution,
-    ); // Usar resolución de shadow map
+      // Crear render pass para esta cascada
+      const depthStencilAttachment = GPUUtils.createDepthStencilAttachment(
+        this.shadowDepthViews[i],
+      );
 
-    RenderManager.getInstance().setCamera(this.camera);
+      const pass = render.getCommandEncoder().beginRenderPass(
+        GPUUtils.createRenderPassDescriptor(
+          `directional light shadow map cascade ${i}`,
+          [], // Sin color attachments
+          depthStencilAttachment,
+        ),
+      );
 
-    RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
+      GPUUtils.configureViewportAndScissor(pass, shadowResolution, shadowResolution);
 
-    pass.end();
+      // Usar la cámara de esta cascada
+      RenderManager.getInstance().setCamera(this.shadowCameras[i]);
+
+      // Renderizar objetos con sombras
+      RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
+
+      pass.end();
+    }
   }
 
   public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
@@ -292,13 +378,13 @@ export class DirectionalLightComponent extends Component {
         if (transformComponent) {
           const playerPos = transformComponent.getTransform().getWorldPosition();
 
-          // Actualizar posición de la shadow camera para seguir al jugador
-          this.updateShadowCamera(playerPos);
+          // Actualizar posición de las shadow cameras para seguir al jugador
+          this.updateShadowCameras(playerPos);
         }
       }
     }
 
-    // Actualizar uniforms con la nueva posición
+    // Actualizar uniforms con las nuevas posiciones
     this.updateLightUniforms();
   }
 
