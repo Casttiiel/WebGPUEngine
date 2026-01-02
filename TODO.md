@@ -1,11 +1,11 @@
 ### Engine
 
-1. Alpha cutoff
-2. LOADING BAR
-3. Contact Shadows
-4. Revisit shadows bias + normal offset
-5. Froxel Scattering
-6. Multiple Light probes has good shadows?
+1. Contact Shadows
+2. Revisit shadows bias + normal offset
+3. Froxel Scattering
+4. Multiple Light probes has good shadows?
+5. Gamestates
+6. Loading Bar
 7. Improve particles
 8. Weird line on corners is irradiance because of normals
 
