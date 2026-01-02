@@ -216,12 +216,12 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
         return;
     }
     
-    // SIMPLIFIED: No scattering calculation - just write basic uniform light
-    // This eliminates all complex neighbor sampling and light propagation
+    // SIMPLIFIED: Just copy light injection result to scattering texture
+    // No complex neighbor sampling or light propagation for now
     
-    // Simple uniform light throughout the entire volume
-    let basicLight = vec3<f32>(0.5, 0.6, 0.8); // Soft blue-white light
+    // Read injected light (from ambient light injection pass)
+    let injectedLight = textureLoad(froxelLightTexture, vec3<i32>(globalId), 0).rgb;
     
-    // Write basic light to scattering texture (no complex calculations)
-    textureStore(froxelScatteringTexture, globalId, vec4<f32>(basicLight, 1.0));
+    // Write directly to scattering texture (passthrough for now)
+    textureStore(froxelScatteringTexture, globalId, vec4<f32>(injectedLight, 1.0));
 }

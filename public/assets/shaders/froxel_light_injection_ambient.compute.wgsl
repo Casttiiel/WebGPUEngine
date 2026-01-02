@@ -5,11 +5,12 @@
 // Fills scattering texture with ambient/skybox color based on density
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(0) @binding(1) var<uniform> froxelParams: FroxelUniforms;
-@group(0) @binding(2) var<uniform> volumetricSettings: VolumetricUniforms;
 
-@group(1) @binding(0) var froxelDensityTexture: texture_3d<f32>;
-@group(1) @binding(1) var froxelScatteringTexture: texture_storage_3d<rgba16float, write>;
+@group(1) @binding(0) var<uniform> froxelParams: FroxelUniforms;
+@group(1) @binding(1) var<uniform> volumetricSettings: VolumetricUniforms;
+
+@group(2) @binding(0) var froxelDensityTexture: texture_3d<f32>;
+@group(2) @binding(1) var froxelLightTexture: texture_storage_3d<rgba16float, write>; // Write to LIGHT texture, not scattering
 
 struct FroxelUniforms {
     dimensions: vec3<u32>,
@@ -51,18 +52,15 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
         return;
     }
     
-    // Read density from density texture
-    let density = textureLoad(froxelDensityTexture, froxelCoord, 0).r;
+    // Ambient light color (hardcoded for testing - should be sampled from irradiance map)
+    let ambientColor = vec3<f32>(1.0, 1.0, 1.0); // Pure red for testing
     
-    // Ambient light color (neutral white, tinted by IBL in practice)
-    let ambientColor = vec3<f32>(1.0, 1.0, 1.0);
+    // Scattering coefficient controls ambient light contribution
+    let ambientIntensity = volumetricSettings.scattering;
     
-    // Use volumetric intensity setting (should match ambient light settings)
-    let ambientIntensity = volumetricSettings.scattering; // Using scattering coefficient as intensity
+    // Scattering = ambient color * intensity (density is handled separately in ray march)
+    let scattering = ambientColor * ambientIntensity;
     
-    // Scattering = ambient color * density * intensity
-    let scattering = ambientColor * density * ambientIntensity;
-    
-    // Write to scattering texture
-    textureStore(froxelScatteringTexture, froxelCoord, vec4<f32>(scattering, 0.0));
+    // Write to LIGHT texture (will be processed by scattering pass)
+    textureStore(froxelLightTexture, froxelCoord, vec4<f32>(scattering, 0.0));
 }

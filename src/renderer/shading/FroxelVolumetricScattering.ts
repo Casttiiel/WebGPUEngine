@@ -49,9 +49,6 @@ export class FroxelVolumetricScattering {
   private froxelScatteringTexture!: GPUTexture; // 3D texture: scattered light per froxel
   private froxelLightTexture!: GPUTexture; // 3D texture: injected light per froxel
 
-  // 2D Result textures
-  private volumetricTarget!: RenderTarget; // Final volumetric result
-
   // Noise texture for density variation
   private noiseTexture!: Texture; // 2D noise texture from assets
 
@@ -104,11 +101,9 @@ export class FroxelVolumetricScattering {
   }
 
   private async initializeComputeShaders(): Promise<void> {
+    debugger;
     // Load density compute shader
-    const densityResponse = await ResourceManager.fetch(
-      `assets/shaders/froxel_density.compute.wgsl`,
-    );
-    const densityCode = await densityResponse.text();
+    const densityCode = await ResourceManager.loadShader('froxel_density.compute.wgsl');
 
     this.densityComputeShader = this.device.createShaderModule({
       label: 'Froxel Density Compute Shader',
@@ -116,10 +111,7 @@ export class FroxelVolumetricScattering {
     });
 
     // Load scattering compute shader
-    const scatteringResponse = await ResourceManager.fetch(
-      `assets/shaders/froxel_scattering.compute.wgsl`,
-    );
-    const scatteringCode = await scatteringResponse.text();
+    const scatteringCode = await ResourceManager.loadShader('froxel_scattering.compute.wgsl');
 
     this.scatteringComputeShader = this.device.createShaderModule({
       label: 'Froxel Scattering Compute Shader',
@@ -127,10 +119,9 @@ export class FroxelVolumetricScattering {
     });
 
     // Load ambient light injection compute shader
-    const ambientLightResponse = await ResourceManager.fetch(
-      `assets/shaders/froxel_light_injection_ambient.compute.wgsl`,
+    const ambientLightCode = await ResourceManager.loadShader(
+      'froxel_light_injection_ambient.compute.wgsl',
     );
-    const ambientLightCode = await ambientLightResponse.text();
 
     this.ambientLightInjectionShader = this.device.createShaderModule({
       label: 'Froxel Ambient Light Injection Compute Shader',
@@ -212,19 +203,6 @@ export class FroxelVolumetricScattering {
   public create(): void {
     // Create 3D froxel textures
     this.createFroxelTextures();
-
-    const volumetricWidth = Math.floor(Render.width);
-    const volumetricHeight = Math.floor(Render.height);
-
-    this.volumetricTarget = new RenderTarget();
-    this.volumetricTarget.createRT(
-      'froxel_volumetric_result',
-      volumetricWidth,
-      volumetricHeight,
-      'rgba16float',
-      false,
-      GPUTextureUsage.STORAGE_BINDING,
-    );
 
     // Create bind groups
     this.createBindGroups();
@@ -439,7 +417,7 @@ export class FroxelVolumetricScattering {
         },
         {
           binding: 1,
-          resource: this.froxelScatteringTexture.createView(), // Output: scattering
+          resource: this.froxelLightTexture.createView(), // Output: light (not scattering!)
         },
       ],
     );
@@ -650,7 +628,7 @@ export class FroxelVolumetricScattering {
   private updateUniforms(): void {
     // Sync scattering coefficient with ambient light settings for consistency
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
-    this.scatteringCoeff = ambientData.globalFactor;
+    this.scatteringCoeff = ambientData.globalFactor * ambientData.diffuseFactor;
 
     // Volumetric parameters
     let offset = 0;

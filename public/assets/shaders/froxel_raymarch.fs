@@ -106,7 +106,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     // Skip sky pixels (no geometry to intersect)
     if (sceneDepth > 0.999) {
-        return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        return vec4<f32>(0.0);
     }
 
     // Camera setup
@@ -120,7 +120,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     
     // Check for invalid view direction
     if (viewDirLength < 0.001) {
-        //return vec4<f32>(0.0);
+        return vec4<f32>(0.0);
     }
 
     // Ray marching setup
@@ -163,28 +163,29 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
             i32(clamp(froxelCoord.z * 64.0, 0.0, 63.0))
         );
         
-        // Load density directly
-        let density = textureLoad(froxelDensityTexture, texelCoord, 0).r * 0.01; // Scale 0.4 -> 0.004
-        
-        // Load scattering color from light injection
+        // Load density and scattering from froxels
+        let density = textureLoad(froxelDensityTexture, texelCoord, 0).r;
         let scattering = textureSampleLevel(froxelScatteringTexture, linearSampler, froxelCoord, 0.0).rgb;
         
-        // Accumulate scattering
-        scatteredLight += scattering * transmittance * stepSize;
+        // Calculate extinction coefficient (density affects how much light is absorbed)
+        let extinction = density * volumetricSettings.absorption;
         
-        // Update transmittance
-        let extinction = density * stepSize;
-        transmittance *= exp(-extinction);
+        // Accumulate in-scattered light (multiply by density - more particles = more scattering)
+        scatteredLight += scattering * density * transmittance * stepSize;
+        
+        // Update transmittance (Beer's law: T = e^(-extinction * distance))
+        transmittance *= exp(-extinction * stepSize);
     }
     
-    // Final volumetric rendering (simplificado para testing)
-    let finalScattering = scatteredLight * 2.0; // Amplificar para visibilidad
+    // Final volumetric rendering
+    // scatteredLight already contains accumulated in-scattering from all steps
+    // transmittance represents how much light passes through the volume
     let finalAlpha = (1.0 - transmittance);
     
-    // Safety clamping
-    let clampedScattering = clamp(finalScattering, vec3<f32>(0.0), vec3<f32>(10.0));
+    // Clamp for safety (HDR values are allowed for bloom)
+    let clampedScattering = clamp(scatteredLight, vec3<f32>(0.0), vec3<f32>(100.0));
     let clampedAlpha = clamp(finalAlpha, 0.0, 1.0);
     
-    // Return visible volumetric color
+    // Return volumetric contribution (will be additively blended)
     return vec4<f32>(clampedScattering, clampedAlpha);
 }
