@@ -22,7 +22,8 @@
 ### Testing
 
 1. Swing Bar too restrictive?
-2. Run uphill fast makes not stick to ground
+2. On Wallrun remve velocity into wall removes mostly all horizontal speed
+3. Run uphill fast makes not stick to ground
 
 ## Visuals and Sound
 
