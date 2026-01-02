@@ -1,9 +1,9 @@
 ### Engine
 
 1. Alpha cutoff
-2. Revisit shadows bias + normal offset
-3. LOADING BAR
-4. Contact Shadows
+2. LOADING BAR
+3. Contact Shadows
+4. Revisit shadows bias + normal offset
 5. Froxel Scattering
 6. Multiple Light probes has good shadows?
 7. Improve particles
