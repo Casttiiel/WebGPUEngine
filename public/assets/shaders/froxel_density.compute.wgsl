@@ -59,7 +59,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   }
 
   // DEBUG: Higher density for visibility testing
-  let density = 0.02; // Higher density to ensure visibility
+  let density = 0.01; // Higher density to ensure visibility
   
   // Store density in 3D texture (R32F format)
   textureStore(froxelDensityTexture, froxelCoord, vec4<f32>(density, 0.0, 0.0, 0.0));

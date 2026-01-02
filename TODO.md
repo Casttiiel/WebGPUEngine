@@ -1,16 +1,17 @@
 ### Engine
 
-1. Revisit shadows bias + normal offset
+1. Loading Bar
 2. Froxel Scattering
    Light injection Directional Light
    Light Injection Point Light
    Light Injection Spot Light
    Scattering propagation (luz rebota entre froxels) Implementar el segundo compute pass que ya tienes preparado Hace que la luz se propague volumétricamente
 3. Gamestates
-4. Loading Bar
-5. Multiple Light probes has good shadows?
-6. Improve particles
-7. Weird line on corners is irradiance because of normals
+   Start Screen
+   Pause Screen
+4. Multiple Light probes has good shadows?
+5. Improve particles
+6. Weird line on corners is irradiance because of normals
 
 ## Gameplay
 
