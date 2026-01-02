@@ -165,7 +165,9 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         
         // Load density directly
         let density = textureLoad(froxelDensityTexture, texelCoord, 0).r * 0.01; // Scale 0.4 -> 0.004
-        let scattering = vec3<f32>(0.5, 0.6, 0.8); // Blue fog
+        
+        // Load scattering color from light injection
+        let scattering = textureSampleLevel(froxelScatteringTexture, linearSampler, froxelCoord, 0.0).rgb;
         
         // Accumulate scattering
         scatteredLight += scattering * transmittance * stepSize;

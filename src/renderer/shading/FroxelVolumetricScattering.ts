@@ -31,6 +31,10 @@ export class FroxelVolumetricScattering {
   private densityComputeShader!: GPUShaderModule; // Density compute shader
   private densityComputePipeline!: GPUComputePipeline; // Density compute pipeline
 
+  // Ambient light injection pass resources
+  private ambientLightInjectionShader!: GPUShaderModule; // Ambient light injection shader
+  private ambientLightInjectionPipeline!: GPUComputePipeline; // Ambient light injection pipeline
+
   // Scattering pass resources
   private scatteringComputeShader!: GPUShaderModule; // Scattering compute shader
   private scatteringComputePipeline!: GPUComputePipeline; // Scattering compute pipeline
@@ -122,6 +126,17 @@ export class FroxelVolumetricScattering {
       code: scatteringCode,
     });
 
+    // Load ambient light injection compute shader
+    const ambientLightResponse = await ResourceManager.fetch(
+      `assets/shaders/froxel_light_injection_ambient.compute.wgsl`,
+    );
+    const ambientLightCode = await ambientLightResponse.text();
+
+    this.ambientLightInjectionShader = this.device.createShaderModule({
+      label: 'Froxel Ambient Light Injection Compute Shader',
+      code: ambientLightCode,
+    });
+
     // Create compute pipelines
     this.createComputePipelines();
   }
@@ -148,6 +163,28 @@ export class FroxelVolumetricScattering {
     };
 
     this.densityComputePipeline = PipelineFactory.createComputePipeline(densityConfig);
+
+    // Create ambient light injection pipeline layout
+    const ambientLightPipelineLayout = PipelineFactory.createPipelineLayout(
+      'froxel_ambient_light_injection_pipeline_layout',
+      [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
+      ],
+    );
+
+    // Create ambient light injection compute pipeline
+    const ambientLightConfig: ComputePipelineConfig = {
+      label: 'Froxel Ambient Light Injection Compute Pipeline',
+      layout: ambientLightPipelineLayout,
+      compute: {
+        module: this.ambientLightInjectionShader,
+        entryPoint: 'main',
+      },
+    };
+
+    this.ambientLightInjectionPipeline = PipelineFactory.createComputePipeline(ambientLightConfig);
 
     // Create scattering pipeline layout - 3 bind groups: camera, parameters, textures
     const scatteringPipelineLayout = PipelineFactory.createPipelineLayout(
@@ -271,10 +308,13 @@ export class FroxelVolumetricScattering {
     // 1. Density Pass: Calculate fog density in each froxel
     this.executeDensityPass();
 
-    // 2. Light Injection Pass: Inject light from light sources into froxels
+    // 2. Ambient Light Injection Pass: Inject ambient light color into froxels
+    this.executeAmbientLightInjectionPass();
+
+    // 3. Light Injection Pass: Inject light from light sources into froxels (TODO)
     //this.executeLightInjectionPass(shadowMapBindGroup, lightBufferBindGroup);
 
-    // 3. Scattering Pass: Propagate light between froxels
+    // 4. Scattering Pass: Propagate light between froxels
     this.executeScatteringPass();
   }
 
@@ -331,6 +371,87 @@ export class FroxelVolumetricScattering {
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;
     const dispatchX = Math.ceil(x / 8); // Workgroup size: 8x8x4
+    const dispatchY = Math.ceil(y / 8);
+    const dispatchZ = Math.ceil(z / 4);
+
+    computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
+    computePass.end();
+
+    this.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  /**
+   * Phase 2a: Ambient Light Injection - inject ambient/skybox color into froxels
+   */
+  private executeAmbientLightInjectionPass(): void {
+    const commandEncoder = this.device.createCommandEncoder({
+      label: 'froxel_ambient_light_injection_pass',
+    });
+
+    const computePass = commandEncoder.beginComputePass({
+      label: 'froxel_ambient_light_injection_compute',
+    });
+
+    // Set compute pipeline
+    computePass.setPipeline(this.ambientLightInjectionPipeline);
+
+    // Create camera bind group
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+    const camera = cameraComponent.getCamera();
+    const cameraBuffer = camera.getUniformBuffer();
+
+    const cameraBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_ambient_light_camera_bind_group',
+      BindGroupFactory.getCameraComputeLayout(),
+      [
+        {
+          binding: 0,
+          resource: { buffer: cameraBuffer },
+        },
+      ],
+    );
+
+    // Create parameters bind group
+    const parametersBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_ambient_light_parameters_bind_group',
+      BindGroupFactory.getFroxelParametersLayout(),
+      [
+        {
+          binding: 0,
+          resource: { buffer: this.froxelUniformBuffer },
+        },
+        {
+          binding: 1,
+          resource: { buffer: this.volumetricUniformBuffer },
+        },
+      ],
+    );
+
+    // Create textures bind group (@group(1) in shader)
+    const texturesBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_ambient_light_textures_bind_group',
+      BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
+      [
+        {
+          binding: 0,
+          resource: this.froxelDensityTexture.createView(), // Input: density
+        },
+        {
+          binding: 1,
+          resource: this.froxelScatteringTexture.createView(), // Output: scattering
+        },
+      ],
+    );
+
+    // Bind all resources
+    computePass.setBindGroup(0, cameraBindGroup);
+    computePass.setBindGroup(1, parametersBindGroup);
+    computePass.setBindGroup(2, texturesBindGroup);
+
+    // Dispatch compute workgroups
+    const { x, y, z } = this.froxelDimensions;
+    const dispatchX = Math.ceil(x / 8);
     const dispatchY = Math.ceil(y / 8);
     const dispatchZ = Math.ceil(z / 4);
 
@@ -527,6 +648,10 @@ export class FroxelVolumetricScattering {
   }
 
   private updateUniforms(): void {
+    // Sync scattering coefficient with ambient light settings for consistency
+    const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
+    this.scatteringCoeff = ambientData.globalFactor;
+
     // Volumetric parameters
     let offset = 0;
     this.volumetricUniformData[offset++] = this.fogDensity;

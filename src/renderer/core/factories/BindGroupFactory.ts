@@ -549,6 +549,32 @@ export class BindGroupFactory {
   }
 
   /**
+   * Create bind group layout for ambient light injection textures
+   */
+  public static getAmbientLightInjectionTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('ambient_light_injection_textures_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float', // froxelDensityTexture is r32float (unfilterable)
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float', // froxelScatteringTexture output
+          viewDimension: '3d',
+        },
+      },
+    ]);
+  }
+
+  /**
    * Create bind group layout for froxel density textures (group 1)
    */
   public static getFroxelDensityTexturesLayout(): GPUBindGroupLayout {
