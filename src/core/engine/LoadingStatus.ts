@@ -7,7 +7,7 @@ export class LoadingStatus {
   private static progressBarFill: HTMLElement | null = null;
   private static progressBarText: HTMLElement | null = null;
   private static currentProgress: number = 0;
-  
+
   // Sistema de rango de progreso para tareas granulares
   private static progressRangeStart: number = 0;
   private static progressRangeEnd: number = 100;
@@ -78,8 +78,9 @@ export class LoadingStatus {
    */
   public static updateRangeProgress(progress: number, message?: string): void {
     progress = Math.max(0, Math.min(1, progress));
-    const actualProgress = this.progressRangeStart + (this.progressRangeEnd - this.progressRangeStart) * progress;
-    
+    const actualProgress =
+      this.progressRangeStart + (this.progressRangeEnd - this.progressRangeStart) * progress;
+
     if (message) {
       this.updateStatus(message, actualProgress);
     } else {

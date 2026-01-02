@@ -64,7 +64,7 @@ export class Loader {
     // Contar todas las entidades antes de empezar
     this.totalEntitiesToLoad = 0;
     this.entitiesLoaded = 0;
-    
+
     for (const e of json) {
       this.totalEntitiesToLoad += this.countEntities(e);
     }
@@ -79,7 +79,7 @@ export class Loader {
 
   public static async parseSceneJSON(json: SceneDataType): Promise<SceneDataType> {
     // Procesar todas las entidades en paralelo para acelerar el parsing
-    const parsePromises = json.map(entityJson => this.parseEntityFromJSON(entityJson));
+    const parsePromises = json.map((entityJson) => this.parseEntityFromJSON(entityJson));
     const parsedEntities = await Promise.all(parsePromises);
     return parsedEntities;
   }
@@ -121,8 +121,8 @@ export class Loader {
     }
 
     // Load children after parent is fully setup - proceso en paralelo
-    const childrenPromises = entityChildrens.map(children_json => 
-      this.parseEntityFromJSON(children_json)
+    const childrenPromises = entityChildrens.map((children_json) =>
+      this.parseEntityFromJSON(children_json),
     );
     const parsedEntities = await Promise.all(childrenPromises);
     json.children = parsedEntities;
@@ -148,10 +148,10 @@ export class Loader {
     this.entitiesLoaded++;
     const progress = this.entitiesLoaded / this.totalEntitiesToLoad;
     const entityName = json.components?.name || `Entity ${this.entitiesLoaded}`;
-    
+
     LoadingStatus.updateRangeProgress(
       progress,
-      `Loading entities... (${this.entitiesLoaded}/${this.totalEntitiesToLoad})`
+      `Loading entities... (${this.entitiesLoaded}/${this.totalEntitiesToLoad})`,
     );
 
     // Load children after parent is fully setup
@@ -173,10 +173,10 @@ export class Loader {
 
     // Preparar todos los componentes en paralelo (creación + carga)
     const componentPromises: Promise<{ type: string; comp: Component }>[] = [];
-    
+
     for (const [type, compData] of Object.entries(json.components)) {
       if (type === 'name') continue; // Ya cargado
-      
+
       // Crear y cargar componentes en paralelo
       const promise = (async () => {
         const comp = this.createComponentFromJSON(type);
@@ -185,7 +185,7 @@ export class Loader {
         Engine.getEntities().addComponentToManager(comp, type);
         return { type, comp };
       })();
-      
+
       componentPromises.push(promise);
     }
 
