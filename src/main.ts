@@ -1,9 +1,13 @@
 import { Engine } from './core/engine/Engine';
 import { Time } from './core/engine/Time';
+import { LoadingStatus } from './core/engine/LoadingStatus';
 
 // Esperar a que el motor cargue
 try {
   (async () => {
+    // Inicializar el sistema de estado de carga
+    LoadingStatus.initialize();
+
     await Engine.start();
 
     let then = 0;
@@ -35,10 +39,7 @@ try {
 
       // Ocultar el loader cuando el motor esté completamente listo y no hay recursos cargando
       if (Engine.isReady()) {
-        const loader = document.getElementById('loader');
-        if (loader && !loader.classList.contains('hidden')) {
-          loader.classList.add('hidden');
-        }
+        LoadingStatus.hide();
       }
 
       requestAnimationFrame(frame);

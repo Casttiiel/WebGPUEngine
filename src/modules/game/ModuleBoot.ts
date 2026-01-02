@@ -8,6 +8,7 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { CharacterControllerComponent } from '../../components/game/CharacterControllerComponent';
 import { LinearInterpolator } from '../../core/math/Interpolators';
+import { LoadingStatus } from '../../core/engine/LoadingStatus';
 
 export class ModuleBoot extends Module {
   private playerCameraControllerComponent!: FPSCameraControllerComponent;
@@ -19,18 +20,23 @@ export class ModuleBoot extends Module {
   }
 
   public async start(): Promise<boolean> {
+    LoadingStatus.updateStatus('Loading scene...', 65);
     const response = await ResourceManager.fetch(`assets/scenes/playground.json`);
     const jsonData = await response.json();
 
+    LoadingStatus.updateStatus('Parsing scene data...', 70);
     // 1. Parsear el JSON (expandir prefabs, GLTF, etc.)
     const parsedJson = await Loader.parseSceneJSON(jsonData);
 
+    LoadingStatus.updateStatus('Processing instances...', 75);
     // 2. Flagear entidades que pueden ser instanciadas
     const flaggedJson = InstanceManager.flagInstanceableEntities(parsedJson);
 
+    LoadingStatus.updateStatus('Loading entities...', 80);
     // 3. Cargar la escena con las entidades flaggeadas
     await Loader.loadSceneFromJSON(flaggedJson);
 
+    LoadingStatus.updateStatus('Creating instance groups...', 90);
     // 4. Crear grupos de instancias (después de que todas las entities estén cargadas)
     const allEntities = Engine.getEntities().getAllEntities();
     await InstanceManager.createInstanceGroups(allEntities);

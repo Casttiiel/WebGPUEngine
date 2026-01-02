@@ -1,5 +1,6 @@
 import { Engine } from '../../../core/engine/Engine';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
+import { LoadingStatus } from '../../../core/engine/LoadingStatus';
 import { setupResizeEvents } from '../../../utils/ResizeEvents';
 import { Texture } from '../../resources/Texture';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
@@ -58,6 +59,7 @@ export class Render {
     );
 
     try {
+      LoadingStatus.updateStatus('Requesting GPU adapter...', 5);
       // 1. Obtener el adaptador WebGPU que representa el hardware gráfico
       if (!navigator.gpu) {
         throw new Error('WebGPU no está soportado en este navegador');
@@ -69,6 +71,7 @@ export class Render {
       }
       this.adapter = adapter;
 
+      LoadingStatus.updateStatus('Creating GPU device...', 10);
       // 2. Crear el dispositivo lógico con las características requeridas
       this.device = await this.adapter.requestDevice({
         label: `${Date.now()}`,
@@ -78,6 +81,7 @@ export class Render {
         },
       });
 
+      LoadingStatus.updateStatus('Configuring canvas context...', 15);
       // 3. Configurar el contexto del canvas para WebGPU
       const context = canvas.getContext('webgpu');
       if (!context) {
@@ -91,10 +95,12 @@ export class Render {
       });
       this.setupResizeObserver();
 
+      LoadingStatus.updateStatus('Initializing GPU utilities...', 20);
       // Initialize GPUUtils with the WebGPU device
       GPUUtils.initialize(this.device);
       console.warn('GPUUtils initialized with WebGPU device');
 
+      LoadingStatus.updateStatus('Creating sampler library...', 23);
       // Initialize SamplerLibrary with reusable samplers
       SamplerLibrary.initialize();
       console.warn('SamplerLibrary initialized with reusable samplers');

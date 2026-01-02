@@ -23,6 +23,7 @@ import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
+import { LoadingStatus } from '../../core/engine/LoadingStatus';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -52,12 +53,19 @@ export class ModuleRender extends Module {
   }
 
   public async start(): Promise<boolean> {
+    LoadingStatus.updateStatus('Initializing deferred renderer...', 45);
     await this.deferred.load();
+
+    LoadingStatus.updateStatus('Loading distortion system...', 50);
     await this.distorsions.load();
+
     this.onResolutionUpdated();
+
+    LoadingStatus.updateStatus('Loading presentation resources...', 55);
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.presentationTechnique = await Technique.getAsync('presentation.tech');
 
+    LoadingStatus.updateStatus('Initializing render manager...', 60);
     // Initialize GPU Frustum Culling
     await RenderManager.getInstance().initialize();
 

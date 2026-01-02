@@ -9,6 +9,7 @@ import { ModuleRender } from '../../modules/game/ModuleRender';
 import { ModuleSound } from '../../modules/game/ModuleSound';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { DebugUIManager } from '../debug/DebugUIManager';
+import { LoadingStatus } from './LoadingStatus';
 import { QualitySettings } from './QualitySettings';
 import { ResourceManager } from './ResourceManager';
 
@@ -44,13 +45,22 @@ export class Engine {
     }
     this.debugControlsInitialized = false;
     console.warn('Engine started.');
+
+    // WebGPU Initialization: 0% -> 25%
+    LoadingStatus.updateStatus('Initializing WebGPU...', 0);
     const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
     await Render.getInstance().initialize(canvas);
+    LoadingStatus.updateStatus('WebGPU initialized', 25);
 
     // Initialize debug UI
     //this._debugUI.initialize();
 
+    // Module Creation: 25% -> 30%
+    LoadingStatus.updateStatus('Creating module manager...', 30);
     this._modules = new ModuleManager();
+
+    // Module Registration: 30% -> 35%
+    LoadingStatus.updateStatus('Registering system modules...', 35);
     this._environment_manager = new ModuleEnvironmentManager('environment_manager');
     this._render = new ModuleRender('render');
     this._entities = new ModuleEntities('entities');
@@ -68,7 +78,11 @@ export class Engine {
     this._modules.registerSystemModule(new ModuleBoot('boot'));
     this._modules.registerSystemModule(this._camera_mixer);
 
+    // Module Initialization: 35% -> 100%
+    LoadingStatus.updateStatus('Starting modules...', 40);
     await this._modules.start();
+
+    LoadingStatus.updateStatus('Engine ready!', 100);
     this.initialized = true;
   }
 
