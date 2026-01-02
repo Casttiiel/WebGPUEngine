@@ -1,9 +1,11 @@
 ### Engine
 
-1. Froxel Scattering
-   Light injection (que las luces afecten la niebla) Point lights y spot lights inyectan color en los froxels Crear compute shader para procesar luces
+1. Revisit shadows bias + normal offset
+2. Froxel Scattering
+   Light injection Directional Light
+   Light Injection Point Light
+   Light Injection Spot Light
    Scattering propagation (luz rebota entre froxels) Implementar el segundo compute pass que ya tienes preparado Hace que la luz se propague volumétricamente
-2. Revisit shadows bias + normal offset
 3. Gamestates
 4. Loading Bar
 5. Multiple Light probes has good shadows?

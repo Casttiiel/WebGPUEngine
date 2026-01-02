@@ -1,6 +1,5 @@
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { Technique } from '../resources/Technique';
-import { RenderTarget } from '../resources/RenderTarget';
 import { Mesh } from '../resources/Mesh';
 import { Texture } from '../resources/Texture';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
@@ -10,6 +9,7 @@ import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { Render } from '../core/pipeline/Render';
 import { Engine } from '../../core/engine/Engine';
 import { CameraComponent } from '../../components/render/CameraComponent';
+import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -34,6 +34,10 @@ export class FroxelVolumetricScattering {
   // Ambient light injection pass resources
   private ambientLightInjectionShader!: GPUShaderModule; // Ambient light injection shader
   private ambientLightInjectionPipeline!: GPUComputePipeline; // Ambient light injection pipeline
+
+  // Directional light injection pass resources
+  private directionalLightInjectionShader!: GPUShaderModule; // Directional light injection shader
+  private directionalLightInjectionPipeline!: GPUComputePipeline; // Directional light injection pipeline
 
   // Scattering pass resources
   private scatteringComputeShader!: GPUShaderModule; // Scattering compute shader
@@ -127,7 +131,15 @@ export class FroxelVolumetricScattering {
       label: 'Froxel Ambient Light Injection Compute Shader',
       code: ambientLightCode,
     });
+    // Load directional light injection compute shader
+    const directionalLightCode = await ResourceManager.loadShader(
+      'froxel_light_injection_directional.compute.wgsl',
+    );
 
+    this.directionalLightInjectionShader = this.device.createShaderModule({
+      label: 'Froxel Directional Light Injection Compute Shader',
+      code: directionalLightCode,
+    });
     // Create compute pipelines
     this.createComputePipelines();
   }
@@ -176,6 +188,30 @@ export class FroxelVolumetricScattering {
     };
 
     this.ambientLightInjectionPipeline = PipelineFactory.createComputePipeline(ambientLightConfig);
+
+    // Create directional light injection pipeline layout
+    const directionalLightPipelineLayout = PipelineFactory.createPipelineLayout(
+      'froxel_directional_light_injection_pipeline_layout',
+      [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getDirectionalLightInjectionTexturesLayout(),
+        BindGroupFactory.getDirectionalLightDataLayout(),
+      ],
+    );
+
+    // Create directional light injection compute pipeline
+    const directionalLightConfig: ComputePipelineConfig = {
+      label: 'Froxel Directional Light Injection Compute Pipeline',
+      layout: directionalLightPipelineLayout,
+      compute: {
+        module: this.directionalLightInjectionShader,
+        entryPoint: 'main',
+      },
+    };
+
+    this.directionalLightInjectionPipeline =
+      PipelineFactory.createComputePipeline(directionalLightConfig);
 
     // Create scattering pipeline layout - 3 bind groups: camera, parameters, textures
     const scatteringPipelineLayout = PipelineFactory.createPipelineLayout(
@@ -289,11 +325,16 @@ export class FroxelVolumetricScattering {
     // 2. Ambient Light Injection Pass: Inject ambient light color into froxels
     this.executeAmbientLightInjectionPass();
 
-    // 3. Light Injection Pass: Inject light from light sources into froxels (TODO)
-    //this.executeLightInjectionPass(shadowMapBindGroup, lightBufferBindGroup);
+    // 3. Directional Light Injection Pass: Inject directional light with shadows
+    // Note: This pass reads from froxelLightTexture (ambient) and writes to froxelScatteringTexture (final)
+    this.executeDirectionalLightInjectionPass();
 
-    // 4. Scattering Pass: Propagate light between froxels
-    this.executeScatteringPass();
+    // 4. Point/Spot Light Injection Pass: Inject dynamic lights (TODO)
+    //this.executePointLightInjectionPass();
+
+    // 5. Scattering Pass: DISABLED - directional light already writes to final texture
+    // TODO: Re-enable when implementing proper multi-bounce scattering
+    // this.executeScatteringPass();
   }
 
   private executeDensityPass(): void {
@@ -426,6 +467,125 @@ export class FroxelVolumetricScattering {
     computePass.setBindGroup(0, cameraBindGroup);
     computePass.setBindGroup(1, parametersBindGroup);
     computePass.setBindGroup(2, texturesBindGroup);
+
+    // Dispatch compute workgroups
+    const { x, y, z } = this.froxelDimensions;
+    const dispatchX = Math.ceil(x / 8);
+    const dispatchY = Math.ceil(y / 8);
+    const dispatchZ = Math.ceil(z / 4);
+
+    computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
+    computePass.end();
+
+    this.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  /**
+   * Phase 2b: Directional Light Injection - inject directional light with shadow testing into froxels
+   */
+  private executeDirectionalLightInjectionPass(): void {
+    console.log('🔶 EXECUTING DIRECTIONAL LIGHT INJECTION PASS');
+
+    // Get directional light component
+    const directionalLightComponent = Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList()[0] as DirectionalLightComponent;
+
+    if (!directionalLightComponent || !directionalLightComponent.getHasShadows()) {
+      console.log('  ⚠️ No directional light with shadows found, skipping');
+      return; // No directional light or no shadows
+    }
+
+    const commandEncoder = this.device.createCommandEncoder({
+      label: 'froxel_directional_light_injection_pass',
+    });
+
+    const computePass = commandEncoder.beginComputePass({
+      label: 'froxel_directional_light_injection_compute',
+    });
+
+    // Set compute pipeline
+    computePass.setPipeline(this.directionalLightInjectionPipeline);
+
+    // @group(0): Camera bind group
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+    const camera = cameraComponent.getCamera();
+    const cameraBuffer = camera.getUniformBuffer();
+
+    const cameraBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_directional_light_camera_bind_group',
+      BindGroupFactory.getCameraComputeLayout(),
+      [
+        {
+          binding: 0,
+          resource: { buffer: cameraBuffer },
+        },
+      ],
+    );
+
+    // @group(1): Parameters bind group (froxel + volumetric)
+    const parametersBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_directional_light_parameters_bind_group',
+      BindGroupFactory.getFroxelParametersLayout(),
+      [
+        {
+          binding: 0,
+          resource: { buffer: this.froxelUniformBuffer },
+        },
+        {
+          binding: 1,
+          resource: { buffer: this.volumetricUniformBuffer },
+        },
+      ],
+    );
+
+    // @group(2): Textures bind group (density input, light input, light output)
+    // Note: We read from froxelLightTexture (ambient) and write to froxelScatteringTexture to avoid read/write conflict
+    const texturesBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_directional_light_textures_bind_group',
+      BindGroupFactory.getDirectionalLightInjectionTexturesLayout(),
+      [
+        {
+          binding: 0,
+          resource: this.froxelDensityTexture.createView(), // Input: density (unfilterable)
+        },
+        {
+          binding: 1,
+          resource: this.froxelLightTexture.createView(), // Input: existing ambient light (filterable)
+        },
+        {
+          binding: 2,
+          resource: this.froxelScatteringTexture.createView(), // Output: accumulated light (storage)
+        },
+      ],
+    );
+
+    // @group(3): Directional light data bind group (uniforms + shadow map + sampler)
+    const directionalLightDataBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_directional_light_data_bind_group',
+      BindGroupFactory.getDirectionalLightDataLayout(),
+      [
+        {
+          binding: 0,
+          resource: { buffer: directionalLightComponent.getUniformBuffer() }, // DirectionalLightUniforms
+        },
+        {
+          binding: 1,
+          resource: directionalLightComponent.getShadowDepthView(0), // Shadow map (cascade 0)
+        },
+        {
+          binding: 2,
+          resource: directionalLightComponent.getShadowSampler(), // Comparison sampler
+        },
+      ],
+    );
+
+    // Bind all resources
+    computePass.setBindGroup(0, cameraBindGroup);
+    computePass.setBindGroup(1, parametersBindGroup);
+    computePass.setBindGroup(2, texturesBindGroup);
+    computePass.setBindGroup(3, directionalLightDataBindGroup);
 
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;

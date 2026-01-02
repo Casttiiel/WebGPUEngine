@@ -601,4 +601,26 @@ export class DirectionalLightComponent extends Component {
   }
 
   public override renderDebug(): void {}
+
+  // Getters for volumetric lighting integration
+  public getUniformBuffer(): GPUBuffer {
+    return this.uniformBuffer;
+  }
+
+  public getShadowDepthView(cascadeIndex: number = 0): GPUTextureView {
+    const index = Math.min(cascadeIndex, this.cascadeCount - 1);
+    const view = this.shadowDepthViews[index];
+    if (!view) {
+      throw new Error(`Shadow depth view not found for cascade ${index}`);
+    }
+    return view;
+  }
+
+  public getShadowSampler(): GPUSampler {
+    return this.shadowSampler;
+  }
+
+  public getHasShadows(): boolean {
+    return this.hasShadows;
+  }
 }

@@ -575,6 +575,78 @@ export class BindGroupFactory {
   }
 
   /**
+   * Create bind group layout for directional light injection textures (@group(2))
+   * Binding 0: density (input, unfilterable)
+   * Binding 1: light (input, filterable for reading existing light)
+   * Binding 2: light (output, storage for writing accumulated light)
+   */
+  public static getDirectionalLightInjectionTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('directional_light_injection_textures_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float', // froxelDensityTexture is r32float (unfilterable)
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float', // froxelLightTexture is rgba16float (filterable)
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float', // froxelLightTexture output
+          viewDimension: '3d',
+        },
+      },
+    ]);
+  }
+
+  /**
+   * Create bind group layout for directional light data (@group(3))
+   * Binding 0: DirectionalLightUniforms buffer
+   * Binding 1: Shadow map depth texture
+   * Binding 2: Shadow sampler (comparison sampler)
+   */
+  public static getDirectionalLightDataLayout(): GPUBindGroupLayout {
+    return this.getLayout('directional_light_data_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'uniform',
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: {
+          type: 'comparison',
+        },
+      },
+    ]);
+  }
+
+  /**
    * Create bind group layout for froxel density textures (group 1)
    */
   public static getFroxelDensityTexturesLayout(): GPUBindGroupLayout {

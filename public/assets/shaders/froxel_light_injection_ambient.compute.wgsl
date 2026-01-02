@@ -59,7 +59,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     let ambientIntensity = volumetricSettings.scattering;
     
     // Scattering = ambient color * intensity (density is handled separately in ray march)
-    let scattering = ambientColor * ambientIntensity;
+    let scattering = ambientColor * ambientIntensity * 0.0;
     
     // Write to LIGHT texture (will be processed by scattering pass)
     textureStore(froxelLightTexture, froxelCoord, vec4<f32>(scattering, 0.0));
