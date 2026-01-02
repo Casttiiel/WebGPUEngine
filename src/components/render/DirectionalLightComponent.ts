@@ -11,7 +11,6 @@ import { mat4, vec3 } from 'gl-matrix';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Component } from '../../core/ecs/Component';
-import { TransformComponent } from '../core/TransformComponent';
 import { DirectionalLightComponentData } from '../../types/DirectionalLightComponentData.type';
 
 interface AABB {
@@ -41,6 +40,7 @@ export class DirectionalLightComponent extends Component {
   private cascadeCount: number = 1; // Number of cascades (1-3)
   private cascadeSplits: number[] = []; // Split distances (calculadas dinámicamente)
   private cascadeLambda: number = 0.5; // 0=uniform, 1=logarithmic
+  private maxShadowDistance: number = 50.0; // Distancia máxima de sombras (no usar full frustum)
   private mainCamera!: Camera; // Referencia a la cámara principal
 
   constructor() {
@@ -53,6 +53,7 @@ export class DirectionalLightComponent extends Component {
     // Configurar CSM
     this.cascadeCount = Math.min(3, Math.max(1, lightData.cascadeCount || 1));
     this.cascadeLambda = lightData.cascadeLambda ?? 0.5; // 0=uniforme, 1=logarítmico
+    this.maxShadowDistance = lightData.maxShadowDistance ?? 50.0; // Limitar sombras a 50m por defecto
 
     // Cargar técnica apropiada (CSM o single shadow)
     const techniquePath =
@@ -195,11 +196,7 @@ export class DirectionalLightComponent extends Component {
   /**
    * Extrae los 8 corners de un frustum entre near y far en world space.
    */
-  private extractFrustumCorners(
-    camera: Camera,
-    nearDist: number,
-    farDist: number,
-  ): vec3[] {
+  private extractFrustumCorners(camera: Camera, nearDist: number, farDist: number): vec3[] {
     const corners: vec3[] = [];
 
     // Obtener inverse view-projection
@@ -302,9 +299,9 @@ export class DirectionalLightComponent extends Component {
   private updateShadowCameras(mainCamera: Camera): void {
     this.mainCamera = mainCamera;
 
-    // 1. Calcular split distances basados en el frustum de la cámara principal
+    // 1. Calcular split distances basados en maxShadowDistance (NO full frustum)
     const near = mainCamera.getNear();
-    const far = mainCamera.getFar();
+    const far = Math.min(this.maxShadowDistance, mainCamera.getFar()); // ⚠️ Limitar a maxShadowDistance
     this.cascadeSplits = this.calculateCascadeSplits(near, far);
 
     // 2. Calcular light view matrix (mismo para todas las cascadas)
