@@ -1,14 +1,13 @@
 ### Engine
 
-1. CSM (3 cascade)
-2. Alpha cutoff
-3. Revisit shadows bias + normal offset
-4. LOADING BAR
-5. Contact Shadows
-6. Froxel Scattering
-7. Multiple Light probes has good shadows?
-8. Improve particles
-9. Weird line on corners is irradiance because of normals
+1. Alpha cutoff
+2. Revisit shadows bias + normal offset
+3. LOADING BAR
+4. Contact Shadows
+5. Froxel Scattering
+6. Multiple Light probes has good shadows?
+7. Improve particles
+8. Weird line on corners is irradiance because of normals
 
 ## Gameplay
 

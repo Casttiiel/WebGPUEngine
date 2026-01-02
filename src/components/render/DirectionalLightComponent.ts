@@ -41,7 +41,6 @@ export class DirectionalLightComponent extends Component {
   private cascadeSplits: number[] = []; // Split distances (calculadas dinámicamente)
   private cascadeLambda: number = 0.5; // 0=uniform, 1=logarithmic
   private maxShadowDistance: number = 50.0; // Distancia máxima de sombras (no usar full frustum)
-  private mainCamera!: Camera; // Referencia a la cámara principal
 
   constructor() {
     super();
@@ -265,8 +264,9 @@ export class DirectionalLightComponent extends Component {
 
   /**
    * Calcula el AABB en light space de un conjunto de corners.
+   * IMPORTANTE: Estabiliza el AABB redondeándolo a múltiplos de texel size.
    */
-  private calculateAABBInLightSpace(corners: vec3[], lightView: mat4): AABB {
+  private calculateAABBInLightSpace(corners: vec3[], lightView: mat4, cascadeIndex: number): AABB {
     const aabb: AABB = {
       minX: Infinity,
       maxX: -Infinity,
@@ -290,6 +290,35 @@ export class DirectionalLightComponent extends Component {
     }
 
     return aabb;
+  }
+
+  /**
+   * Estabiliza el AABB redondeándolo a múltiplos del tamaño de texel.
+   * Esto previene el "shadow swimming" cuando la cámara se mueve.
+   */
+  private stabilizeAABB(aabb: AABB, cascadeIndex: number): AABB {
+    const shadowMapResolution =
+      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
+
+    // Calcular el tamaño actual del AABB
+    const width = aabb.maxX - aabb.minX;
+    const height = aabb.maxY - aabb.minY;
+
+    // Calcular world units per texel
+    const worldUnitsPerTexelX = width / shadowMapResolution;
+    const worldUnitsPerTexelY = height / shadowMapResolution;
+
+    // Redondear el AABB a múltiplos de texel size
+    const stabilized: AABB = {
+      minX: Math.floor(aabb.minX / worldUnitsPerTexelX) * worldUnitsPerTexelX,
+      maxX: Math.ceil(aabb.maxX / worldUnitsPerTexelX) * worldUnitsPerTexelX,
+      minY: Math.floor(aabb.minY / worldUnitsPerTexelY) * worldUnitsPerTexelY,
+      maxY: Math.ceil(aabb.maxY / worldUnitsPerTexelY) * worldUnitsPerTexelY,
+      minZ: aabb.minZ, // Z no necesita snapping (es profundidad)
+      maxZ: aabb.maxZ,
+    };
+
+    return stabilized;
   }
 
   /**
@@ -325,7 +354,7 @@ export class DirectionalLightComponent extends Component {
       const frustumCorners = this.extractFrustumCorners(mainCamera, prevSplit, currentSplit);
 
       // 3.2. Calcular AABB en light space
-      let aabb = this.calculateAABBInLightSpace(frustumCorners, lightView);
+      let aabb = this.calculateAABBInLightSpace(frustumCorners, lightView, i);
 
       // 3.3. Extensión adaptativa del AABB
       const cascadeSize = Math.sqrt(
@@ -349,19 +378,25 @@ export class DirectionalLightComponent extends Component {
       aabb.minY -= lateralMargin;
       aabb.maxY += lateralMargin;
 
-      // 3.4. Configurar la shadow camera para esta cascade
+      // 3.4. ESTABILIZAR el AABB (snap a texel grid) - PREVIENE SHADOW SHIMMER
+      aabb = this.stabilizeAABB(aabb, i);
+
+      // 3.4. ESTABILIZAR el AABB (snap a texel grid) - PREVIENE SHADOW SHIMMER
+      aabb = this.stabilizeAABB(aabb, i);
+
+      // 3.5. Configurar la shadow camera para esta cascade
       const shadowCamera = this.shadowCameras[i];
 
-      // Near/Far planes basados en el AABB extendido
+      // Near/Far planes basados en el AABB estabilizado
       shadowCamera.setNearPlane(aabb.minZ);
       shadowCamera.setFarPlane(aabb.maxZ);
 
-      // Ortho bounds basados en el AABB
+      // Ortho bounds basados en el AABB estabilizado
       const orthoWidth = aabb.maxX - aabb.minX;
       const orthoHeight = aabb.maxY - aabb.minY;
       shadowCamera.setOrthoParams(true, 0, orthoWidth, 0, orthoHeight);
 
-      // Calcular el centro del AABB en light space
+      // Calcular el centro del AABB estabilizado en light space
       const aabbCenter = vec3.fromValues(
         (aabb.minX + aabb.maxX) * 0.5,
         (aabb.minY + aabb.maxY) * 0.5,
@@ -382,8 +417,8 @@ export class DirectionalLightComponent extends Component {
       const shadowTarget = vec3.create();
       vec3.add(shadowTarget, shadowCameraPos, this.lightDirection);
 
-      // Texel snapping para eliminar shimmer
-      this.snapToTexelGrid(shadowCameraPos, i);
+      // NO hacer texel snapping aquí - ya está hecho en stabilizeAABB()
+      // El AABB estabilizado garantiza que la shadow camera está alineada a texels
 
       // Actualizar shadow camera
       shadowCamera.lookAt(shadowCameraPos, shadowTarget, lightUp);
