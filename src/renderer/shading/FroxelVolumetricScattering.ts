@@ -18,7 +18,7 @@ import { CameraComponent } from '../../components/render/CameraComponent';
  */
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
-  private isEnabled: boolean = false;
+  private isEnabled: boolean = true;
 
   // Froxel grid dimensions
   private froxelDimensions = {
@@ -457,9 +457,8 @@ export class FroxelVolumetricScattering {
    * This should be called after deferred rendering is complete
    */
   public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
-    const commandEncoder = this.device.createCommandEncoder({
-      label: 'froxel_volumetrics_pass',
-    });
+    const render = Render.getInstance();
+    const commandEncoder = render.getCommandEncoder(); // Use global command encoder
 
     const renderPass = commandEncoder.beginRenderPass({
       label: 'froxel_volumetrics_render',
@@ -524,7 +523,7 @@ export class FroxelVolumetricScattering {
     this.fullscreenQuadMesh.renderGroup(renderPass);
 
     renderPass.end();
-    this.device.queue.submit([commandEncoder.finish()]);
+    // No submit here - the global command encoder will be submitted at end of frame
   }
 
   private updateUniforms(): void {

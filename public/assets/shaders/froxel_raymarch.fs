@@ -104,8 +104,9 @@ fn sampleFroxelData(froxelCoord: vec3<f32>) -> vec4<f32> {
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let sceneDepth = textureSample(gLinearDepth, samplerGBuffer, uv).x;
 
+    // Skip sky pixels (no geometry to intersect)
     if (sceneDepth > 0.999) {
-        return vec4<f32>(1.0);
+        return vec4<f32>(0.0, 0.0, 0.0, 0.0);
     }
 
     // Camera setup
@@ -119,7 +120,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     
     // Check for invalid view direction
     if (viewDirLength < 0.001) {
-        return vec4<f32>(0.0);
+        //return vec4<f32>(0.0);
     }
 
     // Ray marching setup
@@ -146,46 +147,40 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         if (transmittance < 0.01) {
             break;
         }
-                
+        
         // Convert to froxel coordinates
         let froxelCoord = worldSpaceToFroxel(samplePos);
         
-        // Bounds checking
-        if (froxelCoord.x < 0.0 || froxelCoord.x > 1.0 ||
-            froxelCoord.y < 0.0 || froxelCoord.y > 1.0 ||
-            froxelCoord.z < 0.0 || froxelCoord.z > 1.0) {
-            continue;
+        // Bounds checking - skip invalid coordinates
+        if (froxelCoord.x < 0.0) {
+            continue; // Invalid coordinate marker
         }
         
-        let froxelData = sampleFroxelData(froxelCoord);
-        let density = froxelData.a;
-        let scattering = froxelData.rgb;
+        // Convert normalized [0,1] to texel coordinates [0, dimensions-1]
+        let texelCoord = vec3<i32>(
+            i32(clamp(froxelCoord.x * 160.0, 0.0, 159.0)),
+            i32(clamp(froxelCoord.y * 90.0, 0.0, 89.0)),
+            i32(clamp(froxelCoord.z * 64.0, 0.0, 63.0))
+        );
         
-        // Validate sample data for NaN/Inf
-        if (density != density || any(scattering != scattering)) {
-            continue;
-        }
-        
-        // Clamp extreme values
-        let clampedDensity = clamp(density, 0.0, 10.0);
-        let clampedScattering = clamp(scattering, vec3<f32>(0.0), vec3<f32>(10.0));
-        
-
+        // Load density directly
+        let density = textureLoad(froxelDensityTexture, texelCoord, 0).r * 0.01; // Scale 0.4 -> 0.004
+        let scattering = vec3<f32>(0.5, 0.6, 0.8); // Blue fog
         
         // Accumulate scattering
-        scatteredLight += clampedScattering * transmittance * stepSize;
+        scatteredLight += scattering * transmittance * stepSize;
         
-        // Update transmittance with clamped density
-        let extinction = clampedDensity * stepSize;
+        // Update transmittance
+        let extinction = density * stepSize;
         transmittance *= exp(-extinction);
     }
     
-    // Final volumetric rendering
-    let finalScattering = scatteredLight * volumetricSettings.scattering;
+    // Final volumetric rendering (simplificado para testing)
+    let finalScattering = scatteredLight * 2.0; // Amplificar para visibilidad
     let finalAlpha = (1.0 - transmittance);
     
     // Safety clamping
-    let clampedScattering = clamp(finalScattering, vec3<f32>(0.0), vec3<f32>(1.0));
+    let clampedScattering = clamp(finalScattering, vec3<f32>(0.0), vec3<f32>(10.0));
     let clampedAlpha = clamp(finalAlpha, 0.0, 1.0);
     
     // Return visible volumetric color

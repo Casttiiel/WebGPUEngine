@@ -56,6 +56,8 @@ debugUI.addInteractiveControl(folderName, object, propertyKey, label, options);
 debugUI.addDebugControl(folderName, object, propertyKey, label); // read-only
 ```
 
+Ignore this as it will no be used!
+
 ### Component Development Template
 
 ```typescript
