@@ -12,22 +12,15 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponent } from '../core/TransformComponent';
+import { DirectionalLightComponentData } from '../../types/DirectionalLightComponentData.type';
 
-interface DirectionalLightData {
-  near?: number;
-  far?: number;
-  orthoWidth?: number;
-  orthoHeight?: number;
-  hasShadows?: boolean;
-  color?: number[];
-  intensity?: number;
-  position: number[];
-  target: number[];
-  // CSM configuration
-  cascadeCount?: number; // 1, 2, or 3 cascades (default: 1)
-  cascadeSplits?: number[]; // [5.0, 15.0, 50.0] for 3 cascades
-  cascadeOrthoSizes?: number[]; // [10, 20, 40] ortho sizes per cascade
-  cascadeDistances?: number[]; // [15, 25, 40] camera distances per cascade
+interface AABB {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
 }
 
 export class DirectionalLightComponent extends Component {
@@ -46,22 +39,20 @@ export class DirectionalLightComponent extends Component {
 
   // CSM configuration
   private cascadeCount: number = 1; // Number of cascades (1-3)
-  private cascadeSplits!: number[]; // Split distances
-  private cascadeOrthoSizes!: number[]; // Ortho sizes per cascade
-  private cascadeDistances!: number[]; // Camera distances per cascade
+  private cascadeSplits: number[] = []; // Split distances (calculadas dinámicamente)
+  private cascadeLambda: number = 0.5; // 0=uniform, 1=logarithmic
+  private mainCamera!: Camera; // Referencia a la cámara principal
 
   constructor() {
     super();
   }
 
-  public async load(lightData: DirectionalLightData): Promise<void> {
+  public async load(lightData: DirectionalLightComponentData): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     // Configurar CSM
     this.cascadeCount = Math.min(3, Math.max(1, lightData.cascadeCount || 1));
-    this.cascadeSplits = lightData.cascadeSplits || [5.0, 10.0, 15.0];
-    this.cascadeOrthoSizes = lightData.cascadeOrthoSizes || [10, 15, 20];
-    this.cascadeDistances = lightData.cascadeDistances || [25, 25, 25];
+    this.cascadeLambda = lightData.cascadeLambda ?? 0.5; // 0=uniforme, 1=logarítmico
 
     // Cargar técnica apropiada (CSM o single shadow)
     const techniquePath =
@@ -151,21 +142,11 @@ export class DirectionalLightComponent extends Component {
     // Crear shadow cameras (una por cascada)
     this.shadowCameras = [];
 
-    // Near/Far IGUALES para todas las cascadas (crucial para consistencia de sombras)
-    const shadowNear = lightData.near || 0.1;
-    const shadowFar = lightData.far || 100.0;
-
     for (let i = 0; i < this.cascadeCount; i++) {
       const camera = new Camera();
 
-      // Mismo near/far para TODAS las cascadas
-      camera.setNearPlane(shadowNear);
-      camera.setFarPlane(shadowFar);
-
-      // Solo cambia el ortho size (área que cubre)
-      camera.setOrthoParams(true, 0, this.cascadeOrthoSizes[i], 0, this.cascadeOrthoSizes[i]);
-
-      // Configuración inicial (se actualizará en update())
+      // Se configurará dinámicamente en updateShadowCameras()
+      // basado en el frustum de la cámara principal
       camera.lookAt(lightData.position, lightData.target, [0, 0, 1]);
       camera.updateUniforms();
 
@@ -186,33 +167,232 @@ export class DirectionalLightComponent extends Component {
   }
 
   /**
-   * Actualiza la posición de las shadow cameras para seguir al jugador.
-   * La dirección de la luz permanece constante, pero las cámaras se mueven
-   * para mantener al jugador centrado en los shadow maps.
+   * Calcula las distancias de split para las cascadas usando interpolación logarítmica.
+   * Lambda = 0: división uniforme
+   * Lambda = 1: división logarítmica
+   * Lambda = 0.5: híbrido (recomendado)
    */
-  private updateShadowCameras(playerPos: vec3): void {
-    const negLightDir = vec3.create();
-    vec3.negate(negLightDir, this.lightDirection);
+  private calculateCascadeSplits(near: number, far: number): number[] {
+    const splits: number[] = [];
 
-    // TODAS las shadow cameras a la misma distancia del jugador
-    // Solo cambia el ortho size de cada una
-    const shadowCameraDistance = 30.0; // Distancia fija para todas las cascadas
+    for (let i = 1; i <= this.cascadeCount; i++) {
+      const ratio = i / this.cascadeCount;
 
-    // Actualizar cada cascada
+      // Split uniforme
+      const uniform = near + (far - near) * ratio;
+
+      // Split logarítmico
+      const logarithmic = near * Math.pow(far / near, ratio);
+
+      // Interpolación entre uniforme y logarítmico
+      const split = this.cascadeLambda * logarithmic + (1 - this.cascadeLambda) * uniform;
+      splits.push(split);
+    }
+
+    return splits;
+  }
+
+  /**
+   * Extrae los 8 corners de un frustum entre near y far en world space.
+   */
+  private extractFrustumCorners(
+    camera: Camera,
+    nearDist: number,
+    farDist: number,
+  ): vec3[] {
+    const corners: vec3[] = [];
+
+    // Obtener inverse view-projection
+    const invViewProj = camera.getInvViewProjectionMatrix();
+
+    // 8 corners en NDC space (normalized device coordinates)
+    const ndcCorners = [
+      [-1, -1, 0], // near bottom-left
+      [1, -1, 0], // near bottom-right
+      [1, 1, 0], // near top-right
+      [-1, 1, 0], // near top-left
+      [-1, -1, 1], // far bottom-left
+      [1, -1, 1], // far bottom-right
+      [1, 1, 1], // far top-right
+      [-1, 1, 1], // far top-left
+    ];
+
+    // Transformar de NDC a world space
+    for (const ndc of ndcCorners) {
+      const worldCorner = vec3.create();
+      const ndcVec4 = [ndc[0], ndc[1], ndc[2], 1.0];
+
+      // Transformar a world space
+      const worldVec4 = [0, 0, 0, 0];
+      for (let i = 0; i < 4; i++) {
+        for (let j = 0; j < 4; j++) {
+          worldVec4[i] += invViewProj[j * 4 + i] * ndcVec4[j];
+        }
+      }
+
+      // Perspective divide
+      worldCorner[0] = worldVec4[0] / worldVec4[3];
+      worldCorner[1] = worldVec4[1] / worldVec4[3];
+      worldCorner[2] = worldVec4[2] / worldVec4[3];
+
+      corners.push(worldCorner);
+    }
+
+    // Ajustar corners según las distancias near/far específicas
+    const cameraPos = camera.getCameraPosition();
+    const cameraDir = camera.getFront();
+
+    const originalNear = camera.getNear();
+    const originalFar = camera.getFar();
+
+    // Escalar corners del near plane
+    const nearScale = nearDist / originalNear;
+    for (let i = 0; i < 4; i++) {
+      const dir = vec3.create();
+      vec3.subtract(dir, corners[i], cameraPos);
+      vec3.scale(dir, dir, nearScale);
+      vec3.add(corners[i], cameraPos, dir);
+    }
+
+    // Escalar corners del far plane
+    const farScale = farDist / originalFar;
+    for (let i = 4; i < 8; i++) {
+      const dir = vec3.create();
+      vec3.subtract(dir, corners[i], cameraPos);
+      vec3.scale(dir, dir, farScale);
+      vec3.add(corners[i], cameraPos, dir);
+    }
+
+    return corners;
+  }
+
+  /**
+   * Calcula el AABB en light space de un conjunto de corners.
+   */
+  private calculateAABBInLightSpace(corners: vec3[], lightView: mat4): AABB {
+    const aabb: AABB = {
+      minX: Infinity,
+      maxX: -Infinity,
+      minY: Infinity,
+      maxY: -Infinity,
+      minZ: Infinity,
+      maxZ: -Infinity,
+    };
+
+    // Transformar cada corner a light space y expandir AABB
+    for (const corner of corners) {
+      const lightSpaceCorner = vec3.create();
+      vec3.transformMat4(lightSpaceCorner, corner, lightView);
+
+      aabb.minX = Math.min(aabb.minX, lightSpaceCorner[0]);
+      aabb.maxX = Math.max(aabb.maxX, lightSpaceCorner[0]);
+      aabb.minY = Math.min(aabb.minY, lightSpaceCorner[1]);
+      aabb.maxY = Math.max(aabb.maxY, lightSpaceCorner[1]);
+      aabb.minZ = Math.min(aabb.minZ, lightSpaceCorner[2]);
+      aabb.maxZ = Math.max(aabb.maxZ, lightSpaceCorner[2]);
+    }
+
+    return aabb;
+  }
+
+  /**
+   * Actualiza las shadow cameras basándose en el frustum de la cámara principal.
+   * Calcula los splits, extrae los corners, y configura cada cascade con tight-fitting AABB.
+   */
+  private updateShadowCameras(mainCamera: Camera): void {
+    this.mainCamera = mainCamera;
+
+    // 1. Calcular split distances basados en el frustum de la cámara principal
+    const near = mainCamera.getNear();
+    const far = mainCamera.getFar();
+    this.cascadeSplits = this.calculateCascadeSplits(near, far);
+
+    // 2. Calcular light view matrix (mismo para todas las cascadas)
+    const lightView = mat4.create();
+    const lightPos = vec3.create();
+    const lightTarget = vec3.create();
+    const lightUp = vec3.fromValues(0, 0, 1); // Perpendicular a la dirección de la luz
+
+    // Posicionar la luz "mirando" en la dirección de la luz
+    vec3.set(lightPos, 0, 0, 0);
+    vec3.add(lightTarget, lightPos, this.lightDirection);
+    mat4.lookAt(lightView, lightPos, lightTarget, lightUp);
+
+    // 3. Configurar cada cascada
+    let prevSplit = near;
+
     for (let i = 0; i < this.cascadeCount; i++) {
-      // 1. Posicionar shadow camera detrás del jugador (MISMA posición para todas)
+      const currentSplit = this.cascadeSplits[i];
+
+      // 3.1. Extraer los 8 corners del sub-frustum
+      const frustumCorners = this.extractFrustumCorners(mainCamera, prevSplit, currentSplit);
+
+      // 3.2. Calcular AABB en light space
+      let aabb = this.calculateAABBInLightSpace(frustumCorners, lightView);
+
+      // 3.3. Extensión adaptativa del AABB
+      const cascadeSize = Math.sqrt(
+        Math.pow(aabb.maxX - aabb.minX, 2) +
+          Math.pow(aabb.maxY - aabb.minY, 2) +
+          Math.pow(aabb.maxZ - aabb.minZ, 2),
+      );
+
+      // Más extensión para cascades lejanas (tienen menos resolución anyway)
+      const extensionFactor = 0.3 + i * 0.1;
+      const margin = cascadeSize * extensionFactor;
+
+      // ⚠️ CRÍTICO: Triple extensión en Z (hacia la luz) para capturar shadow casters detrás
+      aabb.minZ -= margin * 3.0;
+      aabb.maxZ += margin * 0.5; // Poca extensión adelante
+
+      // Extensión lateral moderada
+      const lateralMargin = margin * 1.5;
+      aabb.minX -= lateralMargin;
+      aabb.maxX += lateralMargin;
+      aabb.minY -= lateralMargin;
+      aabb.maxY += lateralMargin;
+
+      // 3.4. Configurar la shadow camera para esta cascade
+      const shadowCamera = this.shadowCameras[i];
+
+      // Near/Far planes basados en el AABB extendido
+      shadowCamera.setNearPlane(aabb.minZ);
+      shadowCamera.setFarPlane(aabb.maxZ);
+
+      // Ortho bounds basados en el AABB
+      const orthoWidth = aabb.maxX - aabb.minX;
+      const orthoHeight = aabb.maxY - aabb.minY;
+      shadowCamera.setOrthoParams(true, 0, orthoWidth, 0, orthoHeight);
+
+      // Calcular el centro del AABB en light space
+      const aabbCenter = vec3.fromValues(
+        (aabb.minX + aabb.maxX) * 0.5,
+        (aabb.minY + aabb.maxY) * 0.5,
+        (aabb.minZ + aabb.maxZ) * 0.5,
+      );
+
+      // Transformar el centro de vuelta a world space
+      const invLightView = mat4.create();
+      mat4.invert(invLightView, lightView);
+      const worldCenter = vec3.create();
+      vec3.transformMat4(worldCenter, aabbCenter, invLightView);
+
+      // Posicionar la shadow camera en el centro del AABB (en world space)
+      // La cámara mira en la dirección de la luz
       const shadowCameraPos = vec3.create();
-      vec3.scaleAndAdd(shadowCameraPos, playerPos, negLightDir, shadowCameraDistance);
+      vec3.scaleAndAdd(shadowCameraPos, worldCenter, this.lightDirection, -aabb.maxZ);
 
-      // 2. La shadow camera mira hacia el jugador
-      const targetPos = vec3.clone(playerPos);
+      const shadowTarget = vec3.create();
+      vec3.add(shadowTarget, shadowCameraPos, this.lightDirection);
 
-      // 3. Snap a texel grid para eliminar shadow shimmer
+      // Texel snapping para eliminar shimmer
       this.snapToTexelGrid(shadowCameraPos, i);
 
-      // 4. Actualizar shadow camera
-      this.shadowCameras[i].lookAt(shadowCameraPos, targetPos, [0, 0, 1]);
-      this.shadowCameras[i].updateUniforms();
+      // Actualizar shadow camera
+      shadowCamera.lookAt(shadowCameraPos, shadowTarget, lightUp);
+      shadowCamera.updateUniforms();
+
+      prevSplit = currentSplit;
     }
   }
 
@@ -371,15 +551,15 @@ export class DirectionalLightComponent extends Component {
 
   public override update(dt: number): void {
     if (this.hasShadows) {
-      // Obtener la cámara principal (jugador)
-      const playerEntity = Engine.getEntities().getEntityByName('Player');
-      if (playerEntity) {
-        const transformComponent = playerEntity.getComponent('transform') as TransformComponent;
-        if (transformComponent) {
-          const playerPos = transformComponent.getTransform().getWorldPosition();
+      // Obtener la cámara principal del render module
+      const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
+      if (mainCameraEntity && mainCameraEntity.hasComponent('camera')) {
+        const cameraComponent = mainCameraEntity.getComponent('camera');
+        const mainCamera = (cameraComponent as any).getCamera(); // CameraComponent tiene getCamera()
 
-          // Actualizar posición de las shadow cameras para seguir al jugador
-          this.updateShadowCameras(playerPos);
+        if (mainCamera) {
+          // Actualizar shadow cameras basadas en el frustum de la cámara principal
+          this.updateShadowCameras(mainCamera);
         }
       }
     }

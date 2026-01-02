@@ -5,14 +5,11 @@
       "directional_light": {
         "color": [1.0, 0.956, 0.878],
         "intensity": 8,
-        "near": 0.1,
         "hasShadows": true,
-        "far": 30,
         "position": [2, 30, 0],
         "target": [0, 0, 0],
-        "orthoWidth": 50,
-        "orthoHeight": 50,
-        "cascadeCount": 3
+        "cascadeCount": 3,
+        "cascadeLambda": 0.5
       }
     }
   }

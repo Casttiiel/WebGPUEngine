@@ -365,6 +365,10 @@ export class Camera {
     return this.eye;
   }
 
+  public getCameraPosition(): vec3 {
+    return this.eye;
+  }
+
   public getTarget(): vec3 {
     return this.target;
   }
