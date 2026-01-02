@@ -38,11 +38,11 @@ export class LoadingStatus {
    */
   private static updateProgressBar(progress: number): void {
     this.currentProgress = Math.max(0, Math.min(100, progress));
-    
+
     if (this.progressBarFill) {
       this.progressBarFill.style.width = `${this.currentProgress}%`;
     }
-    
+
     if (this.progressBarText) {
       this.progressBarText.textContent = `${Math.floor(this.currentProgress)}%`;
     }
