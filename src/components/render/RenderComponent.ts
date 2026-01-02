@@ -28,7 +28,6 @@ export class RenderComponent extends Component {
     if (data.isInstanced === true && data.instanceGroup) {
       this.isInstanced = true;
       this.instanceGroup = data.instanceGroup;
-      console.log(`RenderComponent: Entity flagged for instancing (group: ${this.instanceGroup})`);
     }
 
     if (data.meshes) {
@@ -41,10 +40,6 @@ export class RenderComponent extends Component {
     // Las entities instanciadas NO crean RenderKeys individuales
     if (!this.isInstanced) {
       this.updateRenderManager();
-    } else {
-      console.log(
-        `RenderComponent: Skipping RenderKey creation for instanced entity (${this.instanceGroup})`,
-      );
     }
   }
 

@@ -18,7 +18,7 @@ import { DirectionalLightComponent } from '../../components/render/DirectionalLi
  */
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
-  private isEnabled: boolean = true;
+  private isEnabled: boolean = false;
 
   // Froxel grid dimensions
   private froxelDimensions = {
@@ -105,7 +105,6 @@ export class FroxelVolumetricScattering {
   }
 
   private async initializeComputeShaders(): Promise<void> {
-    debugger;
     // Load density compute shader
     const densityCode = await ResourceManager.loadShader('froxel_density.compute.wgsl');
 

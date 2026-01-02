@@ -40,8 +40,6 @@ export class InstanceManager {
   public static flagInstanceableEntities(parsedJson: SceneDataType): SceneDataType {
     const groups = new Map<string, EntityDataType[]>();
 
-    console.log(`InstanceManager: Analyzing scene for instancing (including children)...`);
-
     // 1. Clasificar y agrupar entities potencialmente instanciables RECURSIVAMENTE
     this.collectInstanceableEntitiesRecursive([...parsedJson], groups);
 
@@ -62,20 +60,9 @@ export class InstanceManager {
 
         totalInstancedGroups++;
         totalInstancedEntities += entities.length;
-        console.log(
-          `InstanceManager: Flagged instance group "${key}" with ${entities.length} entities`,
-        );
       }
       // Si solo hay 1 entity en el grupo, no se marca (no vale la pena instanciar)
     }
-
-    const totalEntities = this.countTotalEntitiesRecursive([...parsedJson]);
-    console.log(
-      `InstanceManager: Flagged ${totalInstancedGroups} instance groups with ${totalInstancedEntities} total entities`,
-    );
-    console.log(
-      `InstanceManager: ${totalInstancedEntities} entities will be instanced, ${totalEntities - totalInstancedEntities} will render normally`,
-    );
 
     // Retornar el JSON original con las entities modificadas (flags añadidos)
     return parsedJson;
@@ -223,7 +210,6 @@ export class InstanceManager {
    */
   public static async createInstanceGroups(allEntities: Entity[]): Promise<void> {
     this.device = GPUUtils.getDevice();
-    console.log('InstanceManager: Creating instance groups from loaded entities...');
 
     // 1. Filtrar entities con RenderComponent.isInstanced === true
     const instancedEntities: Entity[] = [];
@@ -235,11 +221,8 @@ export class InstanceManager {
     }
 
     if (instancedEntities.length === 0) {
-      console.log('InstanceManager: No instanced entities found');
       return;
     }
-
-    console.log(`InstanceManager: Found ${instancedEntities.length} instanced entities`);
 
     // 2. Agrupar por instanceGroup
     const groups = new Map<string, Entity[]>();
@@ -253,14 +236,10 @@ export class InstanceManager {
       groups.get(groupKey)!.push(entity);
     }
 
-    console.log(`InstanceManager: Creating ${groups.size} instance groups`);
-
     // 3. Crear buffers y RenderKeys para cada grupo
     for (const [key, entities] of groups) {
       await this.createInstanceGroup(key, entities);
     }
-
-    console.log('InstanceManager: Instance groups creation complete');
   }
 
   /**
@@ -268,14 +247,10 @@ export class InstanceManager {
    */
   private static async createInstanceGroup(key: string, entities: Entity[]): Promise<void> {
     if (entities.length === 0) {
-      console.warn(`InstanceManager: Empty entity array for group "${key}"`);
       return;
     }
 
     const instanceCount = entities.length;
-    console.log(
-      `InstanceManager: Creating instance group "${key}" with ${instanceCount} instances`,
-    );
 
     // a. Recolectar datos
     const firstEntity = entities[0]!;
@@ -283,7 +258,6 @@ export class InstanceManager {
     const parts = renderComp.getParts();
 
     if (parts.length === 0) {
-      console.warn(`InstanceManager: No mesh parts found for group "${key}"`);
       return;
     }
 
@@ -356,7 +330,6 @@ export class InstanceManager {
       };
 
       instancedMaterial = await Material.get(materialData);
-      console.log(`InstanceManager: Loaded instanced material for "${key}"`);
 
       // El material instanciado cargará automáticamente su shadowsMaterial con la técnica instanciada
       // porque Material.get() crea el shadowsMaterial basado en la técnica principal
@@ -393,8 +366,6 @@ export class InstanceManager {
       instanceBindGroup,
       instanceCount,
     });
-
-    console.log(`InstanceManager: Instance group "${key}" created successfully`);
   }
 
   /**
@@ -424,14 +395,12 @@ export class InstanceManager {
     }
 
     if (!targetGroup || entityIndex === -1) {
-      console.warn('InstanceManager: Entity not found in any instance group');
       return;
     }
 
     // 2. Obtener la nueva matriz de transformación
     const transformComponent = entity.getComponent('transform') as TransformComponent;
     if (!transformComponent) {
-      console.warn('InstanceManager: Entity has no transform component');
       return;
     }
 
@@ -471,7 +440,6 @@ export class InstanceManager {
     }
 
     if (!targetGroup || entityIndex === -1) {
-      console.warn('InstanceManager: Entity not found in any instance group');
       return;
     }
 
@@ -508,8 +476,6 @@ export class InstanceManager {
 
     // 4. Remover del Map (ya no es actualizable)
     targetGroup.entityToIndex.delete(entity);
-
-    console.log(`InstanceManager: Entity removed from instance group "${targetGroup.key}"`);
 
     // Nota: El instanceCount NO se reduce para evitar reconfigurar RenderKey
     // La GPU seguirá renderizando todas las instancias, pero esta será invisible

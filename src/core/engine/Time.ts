@@ -10,7 +10,7 @@ export class Time {
       const fpsDisplay = document.getElementById('fps-display');
       if (fpsDisplay) {
         const currentQuality = QualitySettings.getInstance().getCurrentQualityName();
-        fpsDisplay.innerText = `FPS: ${(1 / deltaTime).toFixed(1)} | CPU: ${deltaTime.toFixed(2)}ms | Quality: ${currentQuality}`;
+        fpsDisplay.innerText = `FPS: ${(1 / deltaTime).toFixed(1)} | Quality: ${currentQuality}`;
       }
       if (1 / deltaTime < 40) {
         console.log(
