@@ -6,6 +6,7 @@ export class LoadingStatus {
   private static textElement: HTMLElement | null = null;
   private static progressBarFill: HTMLElement | null = null;
   private static progressBarText: HTMLElement | null = null;
+  private static errorElement: HTMLElement | null = null;
   private static currentProgress: number = 0;
 
   // Sistema de rango de progreso para tareas granulares
@@ -20,6 +21,7 @@ export class LoadingStatus {
     this.textElement = document.getElementById('loader-text');
     this.progressBarFill = document.getElementById('progress-bar-fill');
     this.progressBarText = document.getElementById('progress-bar-text');
+    this.errorElement = document.getElementById('error-message');
     this.currentProgress = 0;
     this.progressRangeStart = 0;
     this.progressRangeEnd = 100;
@@ -32,7 +34,6 @@ export class LoadingStatus {
   public static updateStatus(message: string, progress?: number): void {
     if (this.textElement) {
       this.textElement.textContent = message;
-      console.log(`[Loading] ${message} ${progress !== undefined ? `(${progress}%)` : ''}`);
     }
     if (progress !== undefined) {
       this.updateProgressBar(progress);
@@ -103,6 +104,35 @@ export class LoadingStatus {
   public static show(): void {
     if (this.loaderElement) {
       this.loaderElement.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Muestra un mensaje de error y detiene el loader
+   * @param error El error a mostrar
+   */
+  public static showError(error: Error | string): void {
+    const errorMessage = error instanceof Error ? error.message : error;
+    const errorStack = error instanceof Error ? error.stack : '';
+
+    console.error('[Loading Error]', error);
+
+    // Ocultar GIF y barra de progreso
+    const loaderGif = document.getElementById('loader-gif');
+    const progressBar = document.getElementById('progress-bar-container');
+    if (loaderGif) loaderGif.style.display = 'none';
+    if (progressBar) progressBar.style.display = 'none';
+
+    // Actualizar texto principal
+    if (this.textElement) {
+      this.textElement.textContent = '❌ Engine Initialization Failed';
+      this.textElement.style.color = '#ff0000';
+    }
+
+    // Mostrar mensaje de error detallado
+    if (this.errorElement) {
+      this.errorElement.innerHTML = `<strong>Error:</strong> ${errorMessage}\n\nPlease check the console for more details.`;
+      this.errorElement.classList.remove('hidden');
     }
   }
 }

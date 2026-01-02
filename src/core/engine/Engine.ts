@@ -46,44 +46,55 @@ export class Engine {
     this.debugControlsInitialized = false;
     console.warn('Engine started.');
 
-    // WebGPU Initialization: 0% -> 25%
-    LoadingStatus.updateStatus('Initializing WebGPU...', 0);
-    const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
-    await Render.getInstance().initialize(canvas);
-    LoadingStatus.updateStatus('WebGPU initialized', 25);
+    try {
+      // WebGPU Initialization: 0% -> 25%
+      LoadingStatus.updateStatus('Initializing WebGPU...', 0);
+      const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
+      const initialized = await Render.getInstance().initialize(canvas);
 
-    // Initialize debug UI
-    //this._debugUI.initialize();
+      if (!initialized) {
+        throw new Error('Failed to initialize WebGPU. Your browser may not support WebGPU.');
+      }
 
-    // Module Creation: 25% -> 30%
-    LoadingStatus.updateStatus('Creating module manager...', 30);
-    this._modules = new ModuleManager();
+      LoadingStatus.updateStatus('WebGPU initialized', 25);
 
-    // Module Registration: 30% -> 35%
-    LoadingStatus.updateStatus('Registering system modules...', 35);
-    this._environment_manager = new ModuleEnvironmentManager('environment_manager');
-    this._render = new ModuleRender('render');
-    this._entities = new ModuleEntities('entities');
-    this._camera_mixer = new ModuleCameraMixer('camera_mixer');
-    this._input = new ModuleInput('input');
-    this._sound = new ModuleSound('sound');
-    this._physics = new ModulePhysics('physics');
+      // Initialize debug UI
+      //this._debugUI.initialize();
 
-    this._modules.registerSystemModule(this._environment_manager);
-    this._modules.registerSystemModule(this._render);
-    this._modules.registerSystemModule(this._entities);
-    this._modules.registerSystemModule(this._input);
-    this._modules.registerSystemModule(this._sound);
-    this._modules.registerSystemModule(this._physics);
-    this._modules.registerSystemModule(new ModuleBoot('boot'));
-    this._modules.registerSystemModule(this._camera_mixer);
+      // Module Creation: 25% -> 30%
+      LoadingStatus.updateStatus('Creating module manager...', 30);
+      this._modules = new ModuleManager();
 
-    // Module Initialization: 35% -> 100%
-    LoadingStatus.updateStatus('Starting modules...', 40);
-    await this._modules.start();
+      // Module Registration: 30% -> 35%
+      LoadingStatus.updateStatus('Registering system modules...', 35);
+      this._environment_manager = new ModuleEnvironmentManager('environment_manager');
+      this._render = new ModuleRender('render');
+      this._entities = new ModuleEntities('entities');
+      this._camera_mixer = new ModuleCameraMixer('camera_mixer');
+      this._input = new ModuleInput('input');
+      this._sound = new ModuleSound('sound');
+      this._physics = new ModulePhysics('physics');
 
-    LoadingStatus.updateStatus('Engine ready!', 100);
-    this.initialized = true;
+      this._modules.registerSystemModule(this._environment_manager);
+      this._modules.registerSystemModule(this._render);
+      this._modules.registerSystemModule(this._entities);
+      this._modules.registerSystemModule(this._input);
+      this._modules.registerSystemModule(this._sound);
+      this._modules.registerSystemModule(this._physics);
+      this._modules.registerSystemModule(new ModuleBoot('boot'));
+      this._modules.registerSystemModule(this._camera_mixer);
+
+      // Module Initialization: 35% -> 100%
+      LoadingStatus.updateStatus('Starting modules...', 40);
+      await this._modules.start();
+
+      LoadingStatus.updateStatus('Engine ready!', 100);
+      this.initialized = true;
+    } catch (error) {
+      console.error('Error during engine initialization:', error);
+      LoadingStatus.showError(error as Error);
+      throw error; // Re-throw para que main.ts lo capture también
+    }
   }
 
   public static update(dt: number): void {

@@ -69,8 +69,6 @@ export class Loader {
       this.totalEntitiesToLoad += this.countEntities(e);
     }
 
-    console.log(`[Loader] Total entities to load: ${this.totalEntitiesToLoad}`);
-
     // Cargar entidades con progreso
     for (const e of json) {
       await this.loadEntityFromJSON(e);
