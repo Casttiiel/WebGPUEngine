@@ -371,7 +371,6 @@ export class Technique extends GPUResource {
         };
       }
       case DepthModes.SHADOWS: {
-        debugger;
         return {
           format: 'depth32float',
           depthWriteEnabled: true,

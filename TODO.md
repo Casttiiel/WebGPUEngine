@@ -1,11 +1,11 @@
 ### Play Testing
 
-1. Shadows vibrating
-2. Gamestates
-3. Pause Screen (Mouse sensivity and quality settings)
-4. Dash
-5. Level Design
-6. Start Screen (Quality Settings)
+1. Gamestates -> Different scenes -> Load screen?
+2. Pause Screen (Mouse sensivity and quality settings)
+3. Dash
+4. Level Design
+5. Start Screen (Quality Settings)
+6. TAA
 
 ### Engine
 

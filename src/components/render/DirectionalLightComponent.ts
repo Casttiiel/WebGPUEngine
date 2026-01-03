@@ -43,7 +43,7 @@ export class DirectionalLightComponent extends Component {
   private maxShadowDistance: number = 50.0; // Distancia máxima de sombras (no usar full frustum)
 
   // Shadow camera configuration
-  private static readonly LIGHT_DISTANCE = 500.0; // Distancia fija CONSTANTE de la shadow camera
+  private static readonly LIGHT_DISTANCE = 100.0; // Distancia fija CONSTANTE de la shadow camera
 
   constructor() {
     super();
@@ -325,9 +325,7 @@ export class DirectionalLightComponent extends Component {
     // CRÍTICO: lightUp debe cambiar cuando la luz está casi vertical para evitar flips
     // Si lightDirection está casi paralelo a Z, usar Y como up vector
     const lightUp =
-      Math.abs(this.lightDirection[2]) > 0.9
-        ? vec3.fromValues(0, 1, 0)
-        : vec3.fromValues(0, 0, 1);
+      Math.abs(this.lightDirection[2]) > 0.9 ? vec3.fromValues(0, 1, 0) : vec3.fromValues(0, 0, 1);
 
     // 2. Configurar cada cascada CON lightView centrado por slice
     let prevSplit = near;
@@ -387,7 +385,7 @@ export class DirectionalLightComponent extends Component {
       aabb.maxY += lateralMargin;
 
       // 2.6. ESTABILIZAR el AABB (snap a texel grid)
-      aabb = this.stabilizeAABB(aabb, i);
+      aabb = this.stabilizeAABB(aabb);
 
       // 2.7. Configurar la shadow camera con el MISMO lightView usado para el AABB
       const shadowCamera = this.shadowCameras[i];
