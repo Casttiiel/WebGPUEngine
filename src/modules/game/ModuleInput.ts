@@ -15,6 +15,11 @@ export class ModuleInput extends Module {
   private keysLastFrame: Map<KeyCode, boolean> = new Map();
   private mouseWheelDelta: number = 0;
 
+  // Mouse smoothing (exponential filter)
+  private mouseSmoothing: boolean = true;
+  private mouseSmoothFactor: number = 0.01; // 0-1 (menor = más suave, 1 = sin smoothing)
+  private smoothedMouseDelta: { x: number; y: number } = { x: 0, y: 0 };
+
   // Pointer Lock support
   private pointerLockEnabled: boolean = true;
   private pointerLockActive: boolean = false;
@@ -147,31 +152,43 @@ export class ModuleInput extends Module {
     const inputManager = InputManager.getInstance();
     inputManager.beginFrame();
 
-    // 1. Sincronizar estados actuales con InputManager
+    // 1. Aplicar smoothing al mouse delta (exponential filter)
+    let finalMouseDelta = this.mouseMovement;
+    if (this.mouseSmoothing && this.mouseSmoothFactor > 0.001) {
+      this.smoothedMouseDelta.x =
+        this.smoothedMouseDelta.x * (1 - this.mouseSmoothFactor) +
+        this.mouseMovement.x * this.mouseSmoothFactor;
+      this.smoothedMouseDelta.y =
+        this.smoothedMouseDelta.y * (1 - this.mouseSmoothFactor) +
+        this.mouseMovement.y * this.mouseSmoothFactor;
+      finalMouseDelta = this.smoothedMouseDelta;
+    }
+
+    // 2. Sincronizar estados actuales con InputManager
     for (const [key, pressed] of this.keys.entries()) {
       inputManager.updateKeyState(key, pressed);
     }
     for (const [button, pressed] of this.mouseButtons.entries()) {
       inputManager.updateMouseButtonState(button, pressed);
     }
-    inputManager.updateMouseDelta(this.mouseMovement);
+    inputManager.updateMouseDelta(finalMouseDelta);
 
-    // 2. Actualizar InputManager (procesa buffer, pero ya NO copia current->previous)
+    // 3. Actualizar InputManager (procesa buffer, pero ya NO copia current->previous)
     inputManager.update();
 
-    // 3. Copiar estado actual a lastFrame (para métodos locales tipo isKeyJustPressed)
+    // 4. Copiar estado actual a lastFrame (para métodos locales tipo isKeyJustPressed)
     this.keysLastFrame = new Map(this.keys);
 
-    // 4. Capturar el delta acumulado del frame ANTES de resetearlo
+    // 5. Capturar el delta acumulado del frame ANTES de resetearlo (raw, antes de smoothing)
     this.mouseMovementConsumed.x = this.mouseMovement.x;
     this.mouseMovementConsumed.y = this.mouseMovement.y;
 
-    // 5. Actualizar valores de debug
-    this.debugValues.mouseDeltaX.value = this.mouseMovementConsumed.x;
-    this.debugValues.mouseDeltaY.value = this.mouseMovementConsumed.y;
+    // 6. Actualizar valores de debug (mostrar delta suavizado)
+    this.debugValues.mouseDeltaX.value = finalMouseDelta.x;
+    this.debugValues.mouseDeltaY.value = finalMouseDelta.y;
     this.debugValues.mouseWheel.value = this.mouseWheelDelta;
 
-    // 6. Actualizar valores para Tweakpane
+    // 7. Actualizar valores para Tweakpane
     this.debugValues.mouseLeft.value = this.isMouseButtonPressed(MouseButton.LEFT);
     this.debugValues.mouseRight.value = this.isMouseButtonPressed(MouseButton.RIGHT);
     this.debugValues.keyW.value = this.isKeyPressed(KeyCode.W);
@@ -179,7 +196,7 @@ export class ModuleInput extends Module {
     this.debugValues.keyS.value = this.isKeyPressed(KeyCode.S);
     this.debugValues.keyD.value = this.isKeyPressed(KeyCode.D);
 
-    // 7. Reset per-frame values AL FINAL del update (después de que todos los módulos lo hayan consumido)
+    // 8. Reset per-frame values AL FINAL del update (después de que todos los módulos lo hayan consumido)
     this.mouseWheelDelta = 0;
     this.mouseMovement = { x: 0, y: 0 };
   }

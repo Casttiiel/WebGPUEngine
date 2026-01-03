@@ -1,6 +1,6 @@
 ### Engine
 
-1. Loading Bar
+1. Mouse input smoothness
 2. Shadows still vibrating a bit
 3. Froxel Scattering
    Light injection Directional Light

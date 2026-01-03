@@ -9,8 +9,8 @@
         "position": [10, 15, 14],
         "target": [0, 0, 0],
         "cascadeCount": 3,
-        "cascadeLambda": 0.9,
-        "maxShadowDistance": 500
+        "cascadeLambda": 0.3,
+        "maxShadowDistance": 100
       }
     }
   }
