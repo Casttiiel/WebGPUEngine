@@ -198,6 +198,17 @@ fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, ligh
     // Esto elimina micro-shifts subpixel cuando la cámara se mueve
     let texelSize = lightShadowStepDivResolution / 1.5; // Aproximadamente 1/resolution
     let snappedUV = (floor(lightUVSpacePos.xy / texelSize) + 0.5) * texelSize;
+
+    // PCF adaptativo por cascada para mejor performance
+    // Cascada 0 (cerca): 16 samples - máxima calidad
+    // Cascada 1 (media): 9 samples - calidad media
+    // Cascada 2 (lejos): 1 samples - performance
+    var numSamples = 16;
+    if (cascadeIndex == 1) {
+        numSamples = 9;
+    } else if (cascadeIndex == 2) {
+        return shadowsTap(snappedUV, lightUVSpacePos.z, normal, lightDir, shadowMap, shadowSampler);
+    }
     
     // Poisson disk offsets FIJOS para PCF estable (sin rotación aleatoria)
     // IMPORTANTE: NO rotar per-fragment para evitar temporal noise/shimmering
@@ -219,18 +230,7 @@ fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, ligh
         vec2<f32>(0.954331, 0.65465),
         vec2<f32>(0.423446, 0.84157)
     );
-    
-    // PCF adaptativo por cascada para mejor performance
-    // Cascada 0 (cerca): 16 samples - máxima calidad
-    // Cascada 1 (media): 9 samples - calidad media
-    // Cascada 2 (lejos): 4 samples - performance
-    var numSamples = 16;
-    if (cascadeIndex == 1) {
-        numSamples = 9;
-    } else if (cascadeIndex == 2) {
-        numSamples = 4;
-    }
-    
+
     var shadow = 0.0;
     for (var i = 0; i < numSamples; i++) {
         // Aplicar kernel desde UV snapeado - no desde lightUVSpacePos directamente
