@@ -59,7 +59,7 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32
     // Seleccionar cascada
     let cascadeIndex = selectCascade(viewSpaceDepth);
     
-    // Llamar a getShadowFactor con la cascada apropiada
+    // Llamar a getShadowFactor con la cascada apropiada + cascadeIndex para PCF adaptativo
     if (cascadeIndex == 0) {
         return getShadowFactor(
             worldPos,
@@ -69,7 +69,8 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32
             light.shadowParams.z,
             gShadowMap0,
             gShadowSampler,
-            false
+            false,
+            0 // Cascada 0: 16 samples
         );
     } else if (cascadeIndex == 1) {
         return getShadowFactor(
@@ -80,7 +81,8 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32
             light.shadowParams.z,
             gShadowMap1,
             gShadowSampler,
-            false
+            false,
+            1 // Cascada 1: 9 samples
         );
     } else {
         return getShadowFactor(
@@ -91,7 +93,8 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32
             light.shadowParams.z,
             gShadowMap2,
             gShadowSampler,
-            false
+            false,
+            2 // Cascada 2: 4 samples
         );
     }
 }
@@ -112,7 +115,8 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: v
             light.shadowParams.z,
             gShadowMap0,
             gShadowSampler,
-            false
+            false,
+            0 // Cascada 0
         );
     }
     

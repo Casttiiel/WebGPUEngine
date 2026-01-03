@@ -29,7 +29,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let distance_to_light = abs(length(light_dir_full));
     let light_dir = light_dir_full / distance_to_light;
     if (use_shadows) {
-        shadow_factor = getShadowFactor(g.worldPos, g.normal, light_dir, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true);
+        shadow_factor = getShadowFactor(g.worldPos, g.normal, light_dir, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true, 0);
     }
     
     let worldPos = vec4<f32>(g.worldPos, 1.0);

@@ -42,6 +42,9 @@ export class DirectionalLightComponent extends Component {
   private cascadeLambda: number = 0.5; // 0=uniform, 1=logarithmic
   private maxShadowDistance: number = 50.0; // Distancia máxima de sombras (no usar full frustum)
 
+  // Shadow camera configuration
+  private static readonly LIGHT_DISTANCE = 500.0; // Distancia fija CONSTANTE de la shadow camera
+
   constructor() {
     super();
   }
@@ -248,7 +251,7 @@ export class DirectionalLightComponent extends Component {
    * Calcula el AABB en light space de un conjunto de corners.
    * IMPORTANTE: Estabiliza el AABB redondeándolo a múltiplos de texel size.
    */
-  private calculateAABBInLightSpace(corners: vec3[], lightView: mat4, cascadeIndex: number): AABB {
+  private calculateAABBInLightSpace(corners: vec3[], lightView: mat4): AABB {
     const aabb: AABB = {
       minX: Infinity,
       maxX: -Infinity,
@@ -275,37 +278,33 @@ export class DirectionalLightComponent extends Component {
   }
 
   /**
-   * Estabiliza el AABB redondeándolo a múltiplos del tamaño de texel.
-   * Esto previene el "shadow swimming" cuando la cámara se mueve.
-   * TÉCNICA: Snapear el CENTRO (no los bordes) y mantener tamaño constante.
+   * Estabiliza el AABB snapeándolo a la grilla de texeles en light space.
+   * CRÍTICO: Snapear min/max del AABB, NO el centro - esto es clave para estabilidad.
+   * El tamaño NO debe cambiar, solo la posición debe moverse en incrementos discretos.
    */
-  private stabilizeAABB(aabb: AABB, cascadeIndex: number): AABB {
+  private stabilizeAABB(aabb: AABB): AABB {
     const shadowMapResolution =
       QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
-    // Calcular el tamaño actual del AABB (mantener constante)
+    // Calcular el tamaño actual del AABB (MANTENER CONSTANTE)
     const width = aabb.maxX - aabb.minX;
     const height = aabb.maxY - aabb.minY;
 
-    // Calcular el centro del AABB
-    const centerX = (aabb.minX + aabb.maxX) * 0.5;
-    const centerY = (aabb.minY + aabb.maxY) * 0.5;
+    // Calcular world units per texel (texel size en light space)
+    const texelSizeX = width / shadowMapResolution;
+    const texelSizeY = height / shadowMapResolution;
 
-    // Calcular world units per texel
-    const worldUnitsPerTexelX = width / shadowMapResolution;
-    const worldUnitsPerTexelY = height / shadowMapResolution;
+    // CRÍTICO: Snapear minX/minY a la grilla de texeles
+    // Esto es lo que hacen los motores reales - no snapear el centro
+    const snappedMinX = Math.floor(aabb.minX / texelSizeX) * texelSizeX;
+    const snappedMinY = Math.floor(aabb.minY / texelSizeY) * texelSizeY;
 
-    // Snapear el CENTRO del AABB a la grilla de texeles (no los bordes)
-    // Esto mantiene el tamaño constante y solo traslada el AABB en incrementos discretos
-    const snappedCenterX = Math.round(centerX / worldUnitsPerTexelX) * worldUnitsPerTexelX;
-    const snappedCenterY = Math.round(centerY / worldUnitsPerTexelY) * worldUnitsPerTexelY;
-
-    // Reconstruir AABB con centro snapeado y tamaño exactamente constante
+    // Reconstruir AABB manteniendo el tamaño EXACTAMENTE igual
     const stabilized: AABB = {
-      minX: snappedCenterX - width * 0.5,
-      maxX: snappedCenterX + width * 0.5,
-      minY: snappedCenterY - height * 0.5,
-      maxY: snappedCenterY + height * 0.5,
+      minX: snappedMinX,
+      maxX: snappedMinX + width,
+      minY: snappedMinY,
+      maxY: snappedMinY + height,
       minZ: aabb.minZ, // Z no necesita snapping (es profundidad)
       maxZ: aabb.maxZ,
     };
@@ -323,7 +322,12 @@ export class DirectionalLightComponent extends Component {
     const far = Math.min(this.maxShadowDistance, mainCamera.getFar());
     this.cascadeSplits = this.calculateCascadeSplits(near, far);
 
-    const lightUp = vec3.fromValues(0, 0, 1);
+    // CRÍTICO: lightUp debe cambiar cuando la luz está casi vertical para evitar flips
+    // Si lightDirection está casi paralelo a Z, usar Y como up vector
+    const lightUp =
+      Math.abs(this.lightDirection[2]) > 0.9
+        ? vec3.fromValues(0, 1, 0)
+        : vec3.fromValues(0, 0, 1);
 
     // 2. Configurar cada cascada CON lightView centrado por slice
     let prevSplit = near;
@@ -355,14 +359,17 @@ export class DirectionalLightComponent extends Component {
       vec3.scale(worldCenter, worldCenter, 1.0 / frustumCorners.length);
 
       // 2.3. Construir lightView con posición FINAL desde el principio
-      // Retrocedemos una distancia fija grande desde el centro del slice
-      // Esta será la posición definitiva - NO se cambia después
+      // CRÍTICO: Usar distancia CONSTANTE GLOBAL - NO depende del slice ni del AABB
+      // Esto garantiza estabilidad temporal completa
       const lightPos = vec3.create();
-      vec3.scaleAndAdd(lightPos, worldCenter, this.lightDirection, -100.0); // Retroceder 100m
+      vec3.scaleAndAdd(
+        lightPos,
+        worldCenter,
+        this.lightDirection,
+        -DirectionalLightComponent.LIGHT_DISTANCE,
+      );
       const lightView = mat4.create();
       mat4.lookAt(lightView, lightPos, worldCenter, lightUp);
-
-      console.log(vec3.transformMat4(vec3.create(), vec3.fromValues(0, 1.69999, 10.05), lightView));
 
       // 2.4. Calcular AABB en light space usando TODOS los corners (originales + extendidos)
       // Este es el ÚNICO cálculo de AABB - no se recalcula después

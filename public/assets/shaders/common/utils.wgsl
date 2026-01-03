@@ -152,11 +152,12 @@ fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, normal: vec3<f32>, lightDir: 
         homo_coord.y < 0.0 || homo_coord.y > 1.0) {
         return 1.0;
     }
-    // Adaptive bias basado en el ángulo normal-luz
+    // Bias adaptativo más conservador (reducido para evitar peter-panning)
+    // Con depth bias en el pipeline, el bias en shader puede ser mucho menor
     let cosTheta = clamp(dot(normal, -lightDir), 0.001, 1.0);
     let tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
-    let slopeBias = clamp(tanTheta * 0.0001, 0.0, 0.001);
-    let baseBias = 0.000001;
+    let slopeBias = clamp(tanTheta * 0.00005, 0.0, 0.0005);
+    let baseBias = 0.0000005;
     let totalBias = baseBias + slopeBias;
     let biased_depth = coord_z - totalBias;
     return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, biased_depth);
@@ -171,7 +172,7 @@ fn hash3(p: vec3<f32>) -> f32 {
     return fract(sin(dot(p, vec3<f32>(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 
-fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
+fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool, cascadeIndex: i32) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
     if(adaptUVs){
@@ -189,14 +190,17 @@ fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, ligh
         return 1.0; // Fuera del rango UV = sin sombra
     }
 
-    let filterRadius = lightShadowStepDivResolution;
+    // CRÍTICO: Filter radius fijo alineado a texeles (no usar wPos-dependent)
+    // lightShadowStepDivResolution = stepSize / resolution (en texel space)
+    let filterRadius = lightShadowStepDivResolution * 1.5;
     
-    // Añadir rotación aleatoria para romper patrones y hacer soft shadows
-    let random = hash3(wPos) * 2.0 * PI; // 2*PI
-    let cosR = cos(random);
-    let sinR = sin(random);
+    // CRÍTICO: Snapear UV base al centro de texel ANTES del PCF kernel
+    // Esto elimina micro-shifts subpixel cuando la cámara se mueve
+    let texelSize = lightShadowStepDivResolution / 1.5; // Aproximadamente 1/resolution
+    let snappedUV = (floor(lightUVSpacePos.xy / texelSize) + 0.5) * texelSize;
     
-    // Poisson disk offsets para mejor sampling
+    // Poisson disk offsets FIJOS para PCF estable (sin rotación aleatoria)
+    // IMPORTANTE: NO rotar per-fragment para evitar temporal noise/shimmering
     let offsets = array<vec2<f32>, 16>(
         vec2<f32>(-0.942016, -0.39906),
         vec2<f32>(-0.094184, -0.92938),
@@ -216,17 +220,24 @@ fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, ligh
         vec2<f32>(0.423446, 0.84157)
     );
     
+    // PCF adaptativo por cascada para mejor performance
+    // Cascada 0 (cerca): 16 samples - máxima calidad
+    // Cascada 1 (media): 9 samples - calidad media
+    // Cascada 2 (lejos): 4 samples - performance
+    var numSamples = 16;
+    if (cascadeIndex == 1) {
+        numSamples = 9;
+    } else if (cascadeIndex == 2) {
+        numSamples = 4;
+    }
+    
     var shadow = 0.0;
-    for (var i = 0; i < 16; i++) {
-        // Rotar offsets para eliminar patrones regulares y crear soft shadows
-        let rotatedOffset = vec2<f32>(
-            offsets[i].x * cosR - offsets[i].y * sinR,
-            offsets[i].x * sinR + offsets[i].y * cosR
-        );
-        let sampleCoord = lightUVSpacePos.xy + rotatedOffset * filterRadius;
+    for (var i = 0; i < numSamples; i++) {
+        // Aplicar kernel desde UV snapeado - no desde lightUVSpacePos directamente
+        let sampleCoord = snappedUV + offsets[i] * filterRadius;
         shadow += shadowsTap(sampleCoord, lightUVSpacePos.z, normal, lightDir, shadowMap, shadowSampler);
     }
     
-    let shadowResult = shadow / 16.0;
+    let shadowResult = shadow / f32(numSamples);
     return shadowResult;
 }

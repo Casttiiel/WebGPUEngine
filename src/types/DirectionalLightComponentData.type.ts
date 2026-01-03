@@ -10,6 +10,6 @@ export interface DirectionalLightComponentData {
   target: number[];
   // CSM configuration
   cascadeCount?: number; // 1, 2, or 3 cascades (default: 1)
-  cascadeLambda?: number; // 0-1: 0=uniform, 1=logarithmic (default: 0.5)
+  cascadeLambda?: number; // 0-1: 0=uniform, 1=logarithmic (default: 0.7)
   maxShadowDistance?: number; // Maximum distance for shadows (default: 50.0)
 }

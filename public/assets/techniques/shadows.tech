@@ -7,5 +7,6 @@
         "MaterialTextures",
         "ObjectUniforms"
     ],
-    "rs": "shadows"
+    "rs": "shadows",
+    "z": "shadows"
 }

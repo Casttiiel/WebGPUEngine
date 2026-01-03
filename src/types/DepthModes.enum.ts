@@ -7,4 +7,5 @@ export enum DepthModes {
   TEST_EQUAL = 'test_equal',
   DEFAULT = 'default',
   ALWAYS = 'always',
+  SHADOWS = 'shadows',
 }

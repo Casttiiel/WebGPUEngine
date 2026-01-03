@@ -7,5 +7,6 @@
         "MaterialTextures",
         "InstanceStorage"
     ],
-    "rs": "shadows"
+    "rs": "shadows",
+    "z": "shadows"
 }
