@@ -343,9 +343,9 @@ export class Camera {
     this.updateProjection();
   }
 
-  public setFovRadians(fovRadiuans: number): void {
+  public setFovRadians(fovRadians: number): void {
     this.isDirty = true;
-    this.fovRadians = fovRadiuans;
+    this.fovRadians = fovRadians;
     this.updateProjection();
   }
 

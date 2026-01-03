@@ -10,7 +10,7 @@
         "target": [0, 0, 0],
         "cascadeCount": 3,
         "cascadeLambda": 0.3,
-        "maxShadowDistance": 100
+        "maxShadowDistance": 50
       }
     }
   }

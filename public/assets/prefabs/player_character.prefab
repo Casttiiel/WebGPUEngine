@@ -60,7 +60,7 @@
     },
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],
-      "mouseSensitivity": 0.25,
+      "mouseSensitivity": 0.1,
       "invertY": true
     },
     "camera_crouch": {

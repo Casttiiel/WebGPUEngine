@@ -181,10 +181,11 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Determinar cascada
     let cascadeIndex = selectCascade(viewSpaceDepth);
     
+    var cascadeColor = vec3<f32>(1.0);
     // DEBUG: Mostrar colores de cascada si está activado
     if (DEBUG_CASCADE_COLORS) {
-        let cascadeColor = getCascadeDebugColor(cascadeIndex);
-        return vec4<f32>(cascadeColor * g.albedo * 0.5 + cascadeColor * 0.5, 1.0);
+        cascadeColor = getCascadeDebugColor(cascadeIndex);
+        //return vec4<f32>(cascadeColor * g.albedo * 0.5 + cascadeColor * 0.5, 1.0);
     }
     
     // Shadow factor con CSM blending
@@ -217,5 +218,5 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * light.intensity * shadow_factor;
     
-    return vec4<f32>(final_color, 1.0);
+    return vec4<f32>(final_color * cascadeColor, 1.0);
 }

@@ -154,10 +154,12 @@ export class DirectionalLightComponent extends Component {
     }
 
     // Calcular y guardar la dirección de la luz (normalizada)
+    // IMPORTANTE: Para luz direccional, la dirección es desde la FUENTE hacia el TARGET
+    // position = donde está la fuente, target = hacia dónde apunta
     const initialDir = vec3.create();
-    vec3.subtract(initialDir, lightData.target, lightData.position);
+    vec3.subtract(initialDir, lightData.target, lightData.position); // target - position
     vec3.normalize(initialDir, initialDir);
-    this.lightDirection = initialDir;
+    this.lightDirection = initialDir; // Esta es la dirección HACIA donde va la luz
 
     this.hasShadows = lightData.hasShadows ?? false;
     this.color = lightData.color ?? [1.0, 1.0, 1.0];
@@ -194,69 +196,49 @@ export class DirectionalLightComponent extends Component {
 
   /**
    * Extrae los 8 corners de un frustum entre near y far en world space.
+   * CORRECTO: Construye corners directamente en view space con nearDist/farDist.
    */
   private extractFrustumCorners(camera: Camera, nearDist: number, farDist: number): vec3[] {
     const corners: vec3[] = [];
 
-    // Obtener inverse view-projection
-    const invViewProj = camera.getInvViewProjectionMatrix();
+    // Obtener matriz inversa de view
+    const viewMatrix = camera.getView();
+    const invView = mat4.create();
+    mat4.invert(invView, viewMatrix);
 
-    // 8 corners en NDC space (normalized device coordinates)
-    const ndcCorners = [
-      [-1, -1, 0], // near bottom-left
-      [1, -1, 0], // near bottom-right
-      [1, 1, 0], // near top-right
-      [-1, 1, 0], // near top-left
-      [-1, -1, 1], // far bottom-left
-      [1, -1, 1], // far bottom-right
-      [1, 1, 1], // far top-right
-      [-1, 1, 1], // far top-left
+    // Calcular corners en view space directamente con nearDist/farDist
+    // IMPORTANTE: camera.getFov() devuelve FOV en RADIANES (no grados)
+    const fovRadians = camera.getFov(); // FOV en radianes
+    const tanHalfFov = Math.tan(fovRadians / 2.0); // Tangente del medio ángulo
+    const aspect = camera.getAspectRatio();
+
+    // Near plane corners en view space
+    const nearHeight = 2.0 * tanHalfFov * nearDist;
+    const nearWidth = nearHeight * aspect;
+
+    // Far plane corners en view space
+    const farHeight = 2.0 * tanHalfFov * farDist;
+    const farWidth = farHeight * aspect;
+
+    // 8 corners en view space (cámara mira hacia -Z)
+    const viewCorners = [
+      // Near plane
+      vec3.fromValues(-nearWidth * 0.5, -nearHeight * 0.5, -nearDist),
+      vec3.fromValues(nearWidth * 0.5, -nearHeight * 0.5, -nearDist),
+      vec3.fromValues(nearWidth * 0.5, nearHeight * 0.5, -nearDist),
+      vec3.fromValues(-nearWidth * 0.5, nearHeight * 0.5, -nearDist),
+      // Far plane
+      vec3.fromValues(-farWidth * 0.5, -farHeight * 0.5, -farDist),
+      vec3.fromValues(farWidth * 0.5, -farHeight * 0.5, -farDist),
+      vec3.fromValues(farWidth * 0.5, farHeight * 0.5, -farDist),
+      vec3.fromValues(-farWidth * 0.5, farHeight * 0.5, -farDist),
     ];
 
-    // Transformar de NDC a world space
-    for (const ndc of ndcCorners) {
+    // Transformar de view space a world space
+    for (const viewCorner of viewCorners) {
       const worldCorner = vec3.create();
-      const ndcVec4 = [ndc[0], ndc[1], ndc[2], 1.0];
-
-      // Transformar a world space
-      const worldVec4 = [0, 0, 0, 0];
-      for (let i = 0; i < 4; i++) {
-        for (let j = 0; j < 4; j++) {
-          worldVec4[i] += invViewProj[j * 4 + i] * ndcVec4[j];
-        }
-      }
-
-      // Perspective divide
-      worldCorner[0] = worldVec4[0] / worldVec4[3];
-      worldCorner[1] = worldVec4[1] / worldVec4[3];
-      worldCorner[2] = worldVec4[2] / worldVec4[3];
-
+      vec3.transformMat4(worldCorner, viewCorner, invView);
       corners.push(worldCorner);
-    }
-
-    // Ajustar corners según las distancias near/far específicas
-    const cameraPos = camera.getCameraPosition();
-    const cameraDir = camera.getFront();
-
-    const originalNear = camera.getNear();
-    const originalFar = camera.getFar();
-
-    // Escalar corners del near plane
-    const nearScale = nearDist / originalNear;
-    for (let i = 0; i < 4; i++) {
-      const dir = vec3.create();
-      vec3.subtract(dir, corners[i], cameraPos);
-      vec3.scale(dir, dir, nearScale);
-      vec3.add(corners[i], cameraPos, dir);
-    }
-
-    // Escalar corners del far plane
-    const farScale = farDist / originalFar;
-    for (let i = 4; i < 8; i++) {
-      const dir = vec3.create();
-      vec3.subtract(dir, corners[i], cameraPos);
-      vec3.scale(dir, dir, farScale);
-      vec3.add(corners[i], cameraPos, dir);
     }
 
     return corners;
@@ -295,25 +277,35 @@ export class DirectionalLightComponent extends Component {
   /**
    * Estabiliza el AABB redondeándolo a múltiplos del tamaño de texel.
    * Esto previene el "shadow swimming" cuando la cámara se mueve.
+   * TÉCNICA: Snapear el CENTRO (no los bordes) y mantener tamaño constante.
    */
   private stabilizeAABB(aabb: AABB, cascadeIndex: number): AABB {
     const shadowMapResolution =
       QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
-    // Calcular el tamaño actual del AABB
+    // Calcular el tamaño actual del AABB (mantener constante)
     const width = aabb.maxX - aabb.minX;
     const height = aabb.maxY - aabb.minY;
+
+    // Calcular el centro del AABB
+    const centerX = (aabb.minX + aabb.maxX) * 0.5;
+    const centerY = (aabb.minY + aabb.maxY) * 0.5;
 
     // Calcular world units per texel
     const worldUnitsPerTexelX = width / shadowMapResolution;
     const worldUnitsPerTexelY = height / shadowMapResolution;
 
-    // Redondear el AABB a múltiplos de texel size
+    // Snapear el CENTRO del AABB a la grilla de texeles (no los bordes)
+    // Esto mantiene el tamaño constante y solo traslada el AABB en incrementos discretos
+    const snappedCenterX = Math.round(centerX / worldUnitsPerTexelX) * worldUnitsPerTexelX;
+    const snappedCenterY = Math.round(centerY / worldUnitsPerTexelY) * worldUnitsPerTexelY;
+
+    // Reconstruir AABB con centro snapeado y tamaño exactamente constante
     const stabilized: AABB = {
-      minX: Math.floor(aabb.minX / worldUnitsPerTexelX) * worldUnitsPerTexelX,
-      maxX: Math.ceil(aabb.maxX / worldUnitsPerTexelX) * worldUnitsPerTexelX,
-      minY: Math.floor(aabb.minY / worldUnitsPerTexelY) * worldUnitsPerTexelY,
-      maxY: Math.ceil(aabb.maxY / worldUnitsPerTexelY) * worldUnitsPerTexelY,
+      minX: snappedCenterX - width * 0.5,
+      maxX: snappedCenterX + width * 0.5,
+      minY: snappedCenterY - height * 0.5,
+      maxY: snappedCenterY + height * 0.5,
       minZ: aabb.minZ, // Z no necesita snapping (es profundidad)
       maxZ: aabb.maxZ,
     };
@@ -326,122 +318,91 @@ export class DirectionalLightComponent extends Component {
    * Calcula los splits, extrae los corners, y configura cada cascade con tight-fitting AABB.
    */
   private updateShadowCameras(mainCamera: Camera): void {
-    this.mainCamera = mainCamera;
-
-    // 1. Calcular split distances basados en maxShadowDistance (NO full frustum)
+    // 1. Calcular split distances basados en maxShadowDistance
     const near = mainCamera.getNear();
-    const far = Math.min(this.maxShadowDistance, mainCamera.getFar()); // ⚠️ Limitar a maxShadowDistance
+    const far = Math.min(this.maxShadowDistance, mainCamera.getFar());
     this.cascadeSplits = this.calculateCascadeSplits(near, far);
 
-    // 2. Calcular light view matrix (mismo para todas las cascadas)
-    const lightView = mat4.create();
-    const lightPos = vec3.create();
-    const lightTarget = vec3.create();
-    const lightUp = vec3.fromValues(0, 0, 1); // Perpendicular a la dirección de la luz
+    const lightUp = vec3.fromValues(0, 0, 1);
 
-    // Posicionar la luz "mirando" en la dirección de la luz
-    vec3.set(lightPos, 0, 0, 0);
-    vec3.add(lightTarget, lightPos, this.lightDirection);
-    mat4.lookAt(lightView, lightPos, lightTarget, lightUp);
-
-    // 3. Configurar cada cascada
+    // 2. Configurar cada cascada CON lightView centrado por slice
     let prevSplit = near;
 
     for (let i = 0; i < this.cascadeCount; i++) {
       const currentSplit = this.cascadeSplits[i];
 
-      // 3.1. Extraer los 8 corners del sub-frustum
+      // 2.1. Extraer los 8 corners del sub-frustum en world space
       const frustumCorners = this.extractFrustumCorners(mainCamera, prevSplit, currentSplit);
 
-      // 3.2. Calcular AABB en light space
-      let aabb = this.calculateAABBInLightSpace(frustumCorners, lightView, i);
+      // 2.1b. Extender frustum corners en world space hacia atrás (dirección -lightDir)
+      // Esto garantiza que capturamos shadow casters detrás del frustum
+      // CRÍTICO: La extensión debe escalar con el tamaño del cascade
+      const sliceDepth = currentSplit - prevSplit;
+      const extensionDistance = sliceDepth * 1.5; // 150% de la profundidad del slice
+      const extendedCorners = frustumCorners.map((corner) => {
+        const extended = vec3.create();
+        vec3.scaleAndAdd(extended, corner, this.lightDirection, -extensionDistance);
+        return extended;
+      });
+      // Combinar corners originales + extendidos = 16 corners totales
+      const allCorners = [...frustumCorners, ...extendedCorners];
 
-      // 3.3. Extensión adaptativa del AABB
+      // 2.2. Calcular el centro del frustum slice en world space
+      const worldCenter = vec3.create();
+      for (const corner of frustumCorners) {
+        vec3.add(worldCenter, worldCenter, corner);
+      }
+      vec3.scale(worldCenter, worldCenter, 1.0 / frustumCorners.length);
+
+      // 2.3. Construir lightView con posición FINAL desde el principio
+      // Retrocedemos una distancia fija grande desde el centro del slice
+      // Esta será la posición definitiva - NO se cambia después
+      const lightPos = vec3.create();
+      vec3.scaleAndAdd(lightPos, worldCenter, this.lightDirection, -100.0); // Retroceder 100m
+      const lightView = mat4.create();
+      mat4.lookAt(lightView, lightPos, worldCenter, lightUp);
+
+      console.log(vec3.transformMat4(vec3.create(), vec3.fromValues(0, 1.69999, 10.05), lightView));
+
+      // 2.4. Calcular AABB en light space usando TODOS los corners (originales + extendidos)
+      // Este es el ÚNICO cálculo de AABB - no se recalcula después
+      let aabb = this.calculateAABBInLightSpace(allCorners, lightView, i);
+
+      // 2.5. Extensión lateral adicional (la extensión en Z ya está hecha en world space)
       const cascadeSize = Math.sqrt(
-        Math.pow(aabb.maxX - aabb.minX, 2) +
-          Math.pow(aabb.maxY - aabb.minY, 2) +
-          Math.pow(aabb.maxZ - aabb.minZ, 2),
+        Math.pow(aabb.maxX - aabb.minX, 2) + Math.pow(aabb.maxY - aabb.minY, 2),
       );
 
-      // Más extensión para cascades lejanas (tienen menos resolución anyway)
-      const extensionFactor = 0.3 + i * 0.1;
-      const margin = cascadeSize * extensionFactor;
-
-      // ⚠️ CRÍTICO: Triple extensión en Z (hacia la luz) para capturar shadow casters detrás
-      aabb.minZ -= margin * 3.0;
-      aabb.maxZ += margin * 0.5; // Poca extensión adelante
-
-      // Extensión lateral moderada
-      const lateralMargin = margin * 1.5;
+      const lateralMargin = cascadeSize * (0.1 + i * 0.05);
       aabb.minX -= lateralMargin;
       aabb.maxX += lateralMargin;
       aabb.minY -= lateralMargin;
       aabb.maxY += lateralMargin;
 
-      // 3.4. ESTABILIZAR el AABB (snap a texel grid) - PREVIENE SHADOW SHIMMER
+      // 2.6. ESTABILIZAR el AABB (snap a texel grid)
       aabb = this.stabilizeAABB(aabb, i);
 
-      // 3.4. ESTABILIZAR el AABB (snap a texel grid) - PREVIENE SHADOW SHIMMER
-      aabb = this.stabilizeAABB(aabb, i);
-
-      // 3.5. Configurar la shadow camera para esta cascade
+      // 2.7. Configurar la shadow camera con el MISMO lightView usado para el AABB
       const shadowCamera = this.shadowCameras[i];
 
-      // Near/Far planes basados en el AABB estabilizado
-      shadowCamera.setNearPlane(aabb.minZ);
-      shadowCamera.setFarPlane(aabb.maxZ);
-
-      // Ortho bounds basados en el AABB estabilizado
+      // Dimensiones del AABB estabilizado
       const orthoWidth = aabb.maxX - aabb.minX;
       const orthoHeight = aabb.maxY - aabb.minY;
+
+      // Near/Far: usar el rango del AABB en light space
+      // Como la cámara está a 100m de distancia, aabb.minZ será el near y aabb.maxZ el far
+      shadowCamera.setNearPlane(-aabb.maxZ);
+      shadowCamera.setFarPlane(-aabb.minZ);
+
+      // Ortho bounds: usar las dimensiones del AABB
       shadowCamera.setOrthoParams(true, 0, orthoWidth, 0, orthoHeight);
 
-      // Calcular el centro del AABB estabilizado en light space
-      const aabbCenter = vec3.fromValues(
-        (aabb.minX + aabb.maxX) * 0.5,
-        (aabb.minY + aabb.maxY) * 0.5,
-        (aabb.minZ + aabb.maxZ) * 0.5,
-      );
-
-      // Transformar el centro de vuelta a world space
-      const invLightView = mat4.create();
-      mat4.invert(invLightView, lightView);
-      const worldCenter = vec3.create();
-      vec3.transformMat4(worldCenter, aabbCenter, invLightView);
-
-      // Posicionar la shadow camera en el centro del AABB (en world space)
-      // La cámara mira en la dirección de la luz
-      const shadowCameraPos = vec3.create();
-      vec3.scaleAndAdd(shadowCameraPos, worldCenter, this.lightDirection, -aabb.maxZ);
-
-      const shadowTarget = vec3.create();
-      vec3.add(shadowTarget, shadowCameraPos, this.lightDirection);
-
-      // NO hacer texel snapping aquí - ya está hecho en stabilizeAABB()
-      // El AABB estabilizado garantiza que la shadow camera está alineada a texels
-
-      // Actualizar shadow camera
-      shadowCamera.lookAt(shadowCameraPos, shadowTarget, lightUp);
+      // Actualizar shadow camera con la MISMA posición usada para calcular el AABB
+      shadowCamera.lookAt(lightPos, worldCenter, lightUp);
       shadowCamera.updateUniforms();
 
       prevSplit = currentSplit;
     }
-  }
-
-  /**
-   * Ajusta una posición a un grid de texels para eliminar el "shadow shimmer"
-   * cuando la cámara se mueve.
-   */
-  private snapToTexelGrid(position: vec3, cascadeIndex: number): void {
-    const shadowMapResolution =
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-    const orthoSize = this.shadowCameras[cascadeIndex].getOrthoWidth();
-    const worldUnitsPerTexel = orthoSize / shadowMapResolution;
-
-    // Snap posición a múltiplos de worldUnitsPerTexel
-    position[0] = Math.floor(position[0] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    position[1] = Math.floor(position[1] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    position[2] = Math.floor(position[2] / worldUnitsPerTexel) * worldUnitsPerTexel;
   }
 
   private updateLightUniforms(): void {
@@ -452,19 +413,22 @@ export class DirectionalLightComponent extends Component {
       new Float32Array([this.color[0], this.color[1], this.color[2], this.hasShadows ? 1.0 : 0.0]),
     );
 
-    // Para luz direccional: la dirección debe ser HACIA la fuente de luz
-    const cameraDirection = this.shadowCameras[0].getFront();
-    const lightDirection = vec3.fromValues(
-      -cameraDirection[0],
-      -cameraDirection[1],
-      -cameraDirection[2],
-    );
+    // Para luz direccional: usar la dirección CONSTANTE calculada en load()
+    // this.lightDirection ya apunta hacia donde VA la luz (e.g., downward [0, -1, 0])
+    // En el shader necesitamos la dirección HACIA la fuente (upward [0, 1, 0])
+    const lightDirectionToSource = vec3.create();
+    vec3.negate(lightDirectionToSource, this.lightDirection);
 
     // position (vec3) + intensity (f32) - bytes 16-31
     GPUUtils.writeBuffer(
       this.uniformBuffer,
       16,
-      new Float32Array([lightDirection[0], lightDirection[1], lightDirection[2], this.intensity]),
+      new Float32Array([
+        lightDirectionToSource[0],
+        lightDirectionToSource[1],
+        lightDirectionToSource[2],
+        this.intensity,
+      ]),
     );
 
     // Crear matrices de transformación para cada cascada (bytes 32-223)
@@ -489,13 +453,15 @@ export class DirectionalLightComponent extends Component {
     }
 
     // cascadeSplits (vec4) - bytes 224-239
+    // Si una cascade no existe, usar el último split (far)
+    const lastSplit = this.cascadeSplits[this.cascadeCount - 1] || this.maxShadowDistance;
     GPUUtils.writeBuffer(
       this.uniformBuffer,
       224,
       new Float32Array([
-        this.cascadeSplits[0] || 5.0,
-        this.cascadeSplits[1] || 15.0,
-        this.cascadeSplits[2] || 50.0,
+        this.cascadeSplits[0] || lastSplit,
+        this.cascadeSplits[1] || lastSplit,
+        this.cascadeSplits[2] || lastSplit,
         this.cascadeCount,
       ]),
     );
