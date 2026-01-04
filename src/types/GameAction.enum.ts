@@ -19,4 +19,7 @@ export enum GameAction {
   LOOK_DOWN = 'look_down',
   LOOK_LEFT = 'look_left',
   LOOK_RIGHT = 'look_right',
+
+  // UI
+  PAUSE = 'pause',
 }

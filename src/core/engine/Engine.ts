@@ -1,6 +1,8 @@
 import { ModuleManager } from '../../modules/core/ModuleManager';
 import { ModuleBoot } from '../../modules/game/ModuleBoot';
 import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
+import { ModuleGamePaused } from '../../modules/game/ModuleGamePaused';
+import { ModuleGameController } from '../../modules/game/ModuleGameController';
 import { ModuleEntities } from '../../modules/core/ModuleEntities';
 import { ModuleEnvironmentManager } from '../../modules/core/ModuleEnvironmentManager';
 import { ModuleInput } from '../../modules/core/ModuleInput';
@@ -87,6 +89,8 @@ export class Engine {
 
       this._modules.registerGameModule(this._camera_mixer);
       this._modules.registerGameModule(new ModuleBoot('boot'));
+      this._modules.registerGameModule(new ModuleGameController('game_controller'));
+      this._modules.registerGameModule(new ModuleGamePaused('game_paused'));
 
       // Module Initialization: 35% -> 100%
       LoadingStatus.updateStatus('Starting modules...', 40);

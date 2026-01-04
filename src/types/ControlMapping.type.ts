@@ -61,6 +61,6 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
   look_right: { type: InputType.MOUSE_AXIS, axis: 'x', scale: 1.0 },
 
   // UI
-  pause: { type: InputType.KEYBOARD, key: KeyCode.ESCAPE },
+  pause: { type: InputType.KEYBOARD, key: KeyCode.P },
   inventory: { type: InputType.KEYBOARD, key: KeyCode.TAB },
 };

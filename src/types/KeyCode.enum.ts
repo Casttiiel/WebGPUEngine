@@ -9,6 +9,7 @@ export enum KeyCode {
   SHIFT = 'shiftleft',
   CTRL = 'controlleft',
   ALT = 'altleft',
+  P = 'keyp',
 
   // Numbers
   NUM_0 = 'digit0',

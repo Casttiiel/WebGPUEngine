@@ -12,7 +12,7 @@ try {
       await Engine.start();
 
       let then = 0;
-      let isFirstFrame = true;
+      let isFirstFrame = false;
       const MAX_DELTA_TIME = 0.1; // Limitar a 100ms (10 FPS mínimo)
 
       // Iniciar el bucle de renderizado
@@ -31,9 +31,12 @@ try {
         // Clamp deltaTime para evitar saltos grandes
         deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
+        // Aplicar timeScale (para pausas, slow-motion, etc.)
+        const scaledDeltaTime = deltaTime * Time.getTimeScale();
+
         // Solo ejecutar update/render si el engine no está reiniciando
         if (!Engine.isEngineRestarting()) {
-          Engine.update(deltaTime);
+          Engine.update(scaledDeltaTime);
           Engine.render();
         }
         Time.updateFPSDisplay(deltaTime);

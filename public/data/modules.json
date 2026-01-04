@@ -5,6 +5,8 @@
     "physics",
     "entities",
     "boot",
+    "game_controller",
+    "game_paused",
     "input",
     "render",
     "sound"
