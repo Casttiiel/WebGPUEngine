@@ -1,11 +1,10 @@
 ---------------------------------------Wishlist Backlog-----------------------------------
 
-1. UI
-2. Spawn/Delete items having in mind Instancing
-3. Parallax Mapping
-4. Progressive texture streaming o mip streaming
-5. Mesh Collider
-6. DOF adaptative
+1. Spawn/Delete items having in mind Instancing
+2. Parallax Mapping
+3. Progressive texture streaming o mip streaming
+4. Mesh Collider
+5. DOF adaptative
    Animations
    Clouds
    Pre-multiplied Alpha Solids (Cristal)

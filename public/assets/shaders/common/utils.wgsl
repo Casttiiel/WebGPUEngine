@@ -156,8 +156,8 @@ fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, normal: vec3<f32>, lightDir: 
     // Con depth bias en el pipeline, el bias en shader puede ser mucho menor
     let cosTheta = clamp(dot(normal, -lightDir), 0.001, 1.0);
     let tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
-    let slopeBias = clamp(tanTheta * 0.00005, 0.0, 0.0005);
-    let baseBias = 0.0000005;
+    let slopeBias = clamp(tanTheta * 0.0001, 0.0, 0.001);
+    let baseBias = 0.000001;
     let totalBias = baseBias + slopeBias;
     let biased_depth = coord_z - totalBias;
     return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, biased_depth);

@@ -26,7 +26,6 @@ export class ModuleSound extends Module {
     super(name);
     this.sounds = new Map();
     this.activeSources = new Set();
-    this.listenerPosition = vec3.create();
   }
 
   public async start(): Promise<boolean> {
@@ -61,9 +60,6 @@ export class ModuleSound extends Module {
   }
 
   public update(deltaTime: number): void {
-    // Actualizar posición del listener basado en la cámara principal
-    this.updateListenerPosition();
-
     // Limpiar fuentes completadas
     this.cleanupFinishedSources();
   }
@@ -218,29 +214,6 @@ export class ModuleSound extends Module {
       this.audioContext.suspend();
     } else {
       this.audioContext.resume();
-    }
-  }
-
-  private updateListenerPosition(): void {
-    // TODO: Obtener posición de la cámara principal
-    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
-    const camera = cameraComponent.getCamera();
-    if (camera) {
-      const position = camera.getPosition();
-      const front = camera.getFront();
-      const up = camera.getUp();
-
-      const listener = this.audioContext.listener;
-      listener.setPosition(position[0], position[1], position[2]);
-      listener.setOrientation(
-        front[0],
-        front[1],
-        front[2], // Forward
-        up[0],
-        up[1],
-        up[2], // Up
-      );
     }
   }
 

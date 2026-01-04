@@ -83,10 +83,12 @@ export class HeadTiltComponent extends Component {
       this.headTiltOffset = 0.0;
       return;
     }
+    const cameraEntity = Engine.getEntities().getEntityByName('PlayerCamera');
+    if (!cameraEntity) {
+      return;
+    }
 
-    const mainCamera = Engine.getEntities()
-      .getEntityByName('PlayerCamera')!
-      .getComponent('camera') as CameraComponent;
+    const mainCamera = cameraEntity.getComponent('camera') as CameraComponent;
     if (!characterController || !mainCamera) {
       this.headTiltOffset = 0.0;
       return;

@@ -1,6 +1,9 @@
 {
-  "start": "gs_playground",
+  "start": "gs_gameplay",
   "gamestates": {
-    "gs_playground": []
+    "gs_main_menu": [],
+    "gs_gameplay": ["boot", "camera_mixer"],
+    "gs_loading": [],
+    "gs_paused": []
   }
 }

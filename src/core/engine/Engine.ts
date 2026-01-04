@@ -1,12 +1,12 @@
 import { ModuleManager } from '../../modules/core/ModuleManager';
 import { ModuleBoot } from '../../modules/game/ModuleBoot';
 import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
-import { ModuleEntities } from '../../modules/game/ModuleEntities';
-import { ModuleEnvironmentManager } from '../../modules/game/ModuleEnvironmentManager';
-import { ModuleInput } from '../../modules/game/ModuleInput';
-import { ModulePhysics } from '../../modules/game/ModulePhysics';
-import { ModuleRender } from '../../modules/game/ModuleRender';
-import { ModuleSound } from '../../modules/game/ModuleSound';
+import { ModuleEntities } from '../../modules/core/ModuleEntities';
+import { ModuleEnvironmentManager } from '../../modules/core/ModuleEnvironmentManager';
+import { ModuleInput } from '../../modules/core/ModuleInput';
+import { ModulePhysics } from '../../modules/core/ModulePhysics';
+import { ModuleRender } from '../../modules/core/ModuleRender';
+import { ModuleSound } from '../../modules/core/ModuleSound';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { DebugUIManager } from '../debug/DebugUIManager';
 import { LoadingStatus } from './LoadingStatus';
@@ -67,13 +67,16 @@ export class Engine {
 
       // Module Registration: 30% -> 35%
       LoadingStatus.updateStatus('Registering system modules...', 35);
-      this._environment_manager = new ModuleEnvironmentManager('environment_manager');
       this._render = new ModuleRender('render');
-      this._entities = new ModuleEntities('entities');
-      this._camera_mixer = new ModuleCameraMixer('camera_mixer');
-      this._input = new ModuleInput('input');
-      this._sound = new ModuleSound('sound');
       this._physics = new ModulePhysics('physics');
+      this._camera_mixer = new ModuleCameraMixer('camera_mixer');
+      this._sound = new ModuleSound('sound');
+      this._input = new ModuleInput('input');
+      this._entities = new ModuleEntities('entities');
+      this._environment_manager = new ModuleEnvironmentManager('environment_manager');
+
+      //UI Module
+      //Game controler Module
 
       this._modules.registerSystemModule(this._environment_manager);
       this._modules.registerSystemModule(this._render);
@@ -81,8 +84,9 @@ export class Engine {
       this._modules.registerSystemModule(this._input);
       this._modules.registerSystemModule(this._sound);
       this._modules.registerSystemModule(this._physics);
-      this._modules.registerSystemModule(new ModuleBoot('boot'));
-      this._modules.registerSystemModule(this._camera_mixer);
+
+      this._modules.registerGameModule(this._camera_mixer);
+      this._modules.registerGameModule(new ModuleBoot('boot'));
 
       // Module Initialization: 35% -> 100%
       LoadingStatus.updateStatus('Starting modules...', 40);

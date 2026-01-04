@@ -331,7 +331,6 @@ export class SMAAComponent extends Component {
     let bindGroup = this.blendBindGroupCache.get(edgesTexture);
     if (!bindGroup) {
       const sampler = SamplerLibrary.simpleSampler;
-
       bindGroup = BindGroupFactory.createBindGroup(
         `smaa_blend_bindgroup`,
         this.blendTechnique.getPipeline().getBindGroupLayout(1),

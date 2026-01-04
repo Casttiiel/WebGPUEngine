@@ -1,22 +1,26 @@
 ### Play Testing
 
-1. Gamestates -> Different scenes -> Load screen?
-2. Pause Screen (Mouse sensivity and quality settings)
-3. Dash
-4. Level Design
-5. Start Screen (Quality Settings)
-6. TAA
+1. Pause Screen
+2. Engine Loading Screen
+3. Different scenes
+4. Start Screen
+5. Game Loading Screen
+6. Dash
+7. Level Design
+8. UI
+9. Quality settings
 
 ### Engine
 
-1. Multiple Light probes has good shadows?
-2. Froxel Scattering
+1. Froxel Scattering
    Light injection Directional Light
    Light Injection Point Light
    Light Injection Spot Light
    Scattering propagation (luz rebota entre froxels) Implementar el segundo compute pass que ya tienes preparado Hace que la luz se propague volumétricamente
-3. Improve particles
-4. Weird line on corners is irradiance because of normals
+2. Multiple Light probes has good shadows?
+3. TAA
+4. Improve particles
+5. Weird line on corners is irradiance because of normals
 
 ## Gameplay
 
@@ -25,13 +29,14 @@
 3. Gameplay analysis
 4. Door
 5. Enemy
-6. Run upward to wall -> wallrun (wrong)
 
 ### Testing
 
-1. Run uphill fast makes not stick to ground
-2. On Wallrun remove velocity into wall removes mostly all horizontal speed
-3. Swing Bar too restrictive?
+1. Control en el aire
+2. Run uphill fast makes not stick to ground
+3. On Wallrun remove velocity into wall removes mostly all horizontal speed
+4. Jump floaty
+5. Swing Bar too restrictive
 
 ## Visuals and Sound
 

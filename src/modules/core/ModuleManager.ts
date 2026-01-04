@@ -11,6 +11,7 @@ export class ModuleManager {
   private currentGamestate: Gamestate | null = null;
   private gamestates: Gamestate[] = [];
   private requestedGamestate: Gamestate | null = null;
+  private isTransitioning: boolean = false; // Flag para indicar transición en progreso
 
   public async start(): Promise<void> {
     this.loadConfig();
@@ -18,13 +19,19 @@ export class ModuleManager {
 
     await this.startModules(this.systemModules);
 
-    if (!this.startGamestate.length) {
+    if (this.startGamestate.length > 0) {
       this.changeToGamestate(this.startGamestate);
     }
   }
 
   public update(dt: number): void {
     this.updateGamestate();
+
+    // No actualizar módulos durante transición de gamestate
+    // Esto previene race conditions con datos parcialmente cargados
+    if (this.isTransitioning) {
+      return;
+    }
 
     for (const module of this.updateModules) {
       if (!module.isActive()) continue;
@@ -94,13 +101,94 @@ export class ModuleManager {
   }
 
   public updateGamestate(): void {
-    //TODO
+    // Si ya estamos en transición, no hacer nada
+    if (this.isTransitioning) {
+      return;
+    }
+
     if (!this.requestedGamestate) {
       return;
     }
 
-    if (this.currentGamestate) {
+    // Marcar que estamos en transición
+    this.isTransitioning = true;
+
+    // Ejecutar la transición de forma asíncrona sin bloquear el update
+    this.performGamestateTransition(this.requestedGamestate)
+      .then(() => {
+        console.log(`Gamestate transition completed: ${this.currentGamestate?.name}`);
+      })
+      .catch((error) => {
+        console.error('Error during gamestate transition:', error);
+        this.isTransitioning = false;
+      });
+
+    // Limpiar requestedGamestate inmediatamente para evitar múltiples transiciones
+    this.requestedGamestate = null;
+  }
+
+  private async performGamestateTransition(newGamestate: Gamestate): Promise<void> {
+    // Mostrar loader si existe
+    const loader = document.getElementById('loader');
+    if (loader) {
+      loader.style.display = 'flex';
     }
+
+    // PARAR SOLO LOS MÓDULOS QUE NO ESTÁN EN EL NUEVO GAMESTATE
+    if (this.currentGamestate) {
+      const modulesToStop: Module[] = [];
+
+      for (const currentModule of this.currentGamestate) {
+        let found = false;
+        for (const requestedModule of newGamestate) {
+          if (requestedModule.getName() === currentModule.getName()) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          modulesToStop.push(currentModule);
+        }
+      }
+
+      if (modulesToStop.length > 0) {
+        console.log(`Stopping ${modulesToStop.length} modules`);
+        this.stopModules(modulesToStop);
+      }
+    }
+
+    // INICIAR LOS MÓDULOS QUE NO ESTABAN EN EL ANTERIOR GAMESTATE
+    const modulesToStart: Module[] = [];
+    for (const requestedModule of newGamestate) {
+      let found = false;
+      if (this.currentGamestate) {
+        for (const currentModule of this.currentGamestate) {
+          if (requestedModule.getName() === currentModule.getName()) {
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) {
+        modulesToStart.push(requestedModule);
+      }
+    }
+
+    if (modulesToStart.length > 0) {
+      console.log(`Starting ${modulesToStart.length} modules (async loading...)`);
+      await this.startModules(modulesToStart); // AQUÍ sí podemos usar await
+    }
+
+    // Actualizar el gamestate actual
+    this.currentGamestate = newGamestate;
+
+    // Ocultar loader si existe
+    if (loader) {
+      loader.style.display = 'none';
+    }
+
+    // Finalizar transición
+    this.isTransitioning = false;
   }
 
   public loadConfig(): void {
@@ -146,7 +234,8 @@ export class ModuleManager {
         for (const gamestateName of Object.keys(jsonGamestates)) {
           const gamestate = new Gamestate(gamestateName);
           for (const jsonModule of jsonGamestates[gamestateName]) {
-            const module = this.getModule(jsonModule['name']);
+            const moduleName = typeof jsonModule === 'string' ? jsonModule : jsonModule['name'];
+            const module = this.getModule(moduleName);
             if (module) {
               gamestate.push(module);
             }
@@ -180,5 +269,10 @@ export class ModuleManager {
     this.currentGamestate = null;
     this.gamestates = [];
     this.requestedGamestate = null;
+    this.isTransitioning = false;
+  }
+
+  public isInTransition(): boolean {
+    return this.isTransitioning;
   }
 }
