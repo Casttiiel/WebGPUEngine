@@ -27,7 +27,7 @@
     },
     "character_controller": {
       "moveSpeed": 8.5,
-      "airAcceleration": 10.0,
+      "airAcceleration": 8.0,
       "groundAcceleration": 20.0,
       "groundDeceleration": 30.0,
       "airDrag": 0.3,

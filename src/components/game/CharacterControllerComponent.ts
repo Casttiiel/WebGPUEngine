@@ -553,7 +553,7 @@ export class CharacterControllerComponent extends Component {
     if (this.currentVerticalVelocity < 0.0) {
       this.currentVerticalVelocity = 0.0;
     }
-    this.removeVelocityIntoWall(this.wallNormal);
+    this.removeVelocityIntoWallForWallRun(this.wallNormal);
   }
 
   private updateWallRun(): void {
@@ -617,6 +617,31 @@ export class CharacterControllerComponent extends Component {
       vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
       this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
     }
+  }
+
+  private removeVelocityIntoWallForWallRun(collisionNormal: vec3): void {
+    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
+
+    const dot =
+      this.currentHorizontalVelocity[0] * collisionNormal[0] +
+      this.currentHorizontalVelocity[1] * collisionNormal[1] +
+      this.currentHorizontalVelocity[2] * collisionNormal[2];
+    // si el vector apunta hacia la pared (dot < 0):
+    if (dot < 0) {
+      this.currentHorizontalVelocity[0] -= dot * collisionNormal[0];
+      this.currentHorizontalVelocity[1] -= dot * collisionNormal[1];
+      this.currentHorizontalVelocity[2] -= dot * collisionNormal[2];
+    }
+
+    this.horizontalDirection = vec3.normalize(
+      this.horizontalDirection,
+      this.currentHorizontalVelocity,
+    );
+    this.currentHorizontalVelocity = vec3.scale(
+      this.currentHorizontalVelocity,
+      this.horizontalDirection,
+      this.horizontalSpeed,
+    );
   }
 
   //WALLJUMP

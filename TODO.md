@@ -7,14 +7,11 @@
 
 ### Feedback
 
-1. On Wallrun end keeps moving on original direction (bad)
-2. On Wallrun remove velocity into wall removes mostly all horizontal speed
-3. Run uphill fast makes not stick to ground
-4. Swing Bar too restrictive
-5. Jump floaty
-6. Mantle lose speed?
-7. Test WallRun into impulse pad
-8. Test more time input disabled after wall jump?
+1. Run uphill fast makes not stick to ground
+2. Swing Bar too restrictive
+3. After Impulse pad direction weird
+4. Jump floaty
+5. Mantle lose speed?
 
 ### Engine
 
@@ -48,3 +45,11 @@
 3. Skybox
 4. Triplanar mapping
 5. Check neon white for textures
+
+## Questions
+
+Visuals
+Controls
+-Jump too floaty?
+-Air control?
+Camera
