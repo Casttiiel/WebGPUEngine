@@ -147,8 +147,8 @@ export class Loader {
     const progress = this.entitiesLoaded / this.totalEntitiesToLoad;
     const entityName = json.components?.name || `Entity ${this.entitiesLoaded}`;
 
-    LoadingStatus.updateRangeProgress(
-      progress,
+    // Actualizar solo el mensaje, mantener el progreso del módulo Boot
+    LoadingStatus.updateStatus(
       `Loading entities... (${this.entitiesLoaded}/${this.totalEntitiesToLoad})`,
     );
 

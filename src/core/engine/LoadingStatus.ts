@@ -13,6 +13,12 @@ export class LoadingStatus {
   private static progressRangeStart: number = 0;
   private static progressRangeEnd: number = 100;
 
+  // Sistema dinámico de tracking de módulos
+  private static totalModulesToLoad: number = 0;
+  private static modulesLoaded: number = 0;
+  private static moduleLoadingStartProgress: number = 40; // Dónde empieza la carga de módulos
+  private static moduleLoadingEndProgress: number = 100; // Dónde termina
+
   /**
    * Inicializa los elementos del DOM
    */
@@ -25,12 +31,43 @@ export class LoadingStatus {
     this.currentProgress = 0;
     this.progressRangeStart = 0;
     this.progressRangeEnd = 100;
+    this.resetModuleTracking();
     this.updateProgressBar(0);
   }
 
   /**
-   * Actualiza el texto de carga y el progreso
+   * Configura cuántos módulos se cargarán en total
    */
+  public static setTotalModules(systemModules: number, gamestateModules: number): void {
+    this.totalModulesToLoad = systemModules + gamestateModules;
+    this.modulesLoaded = 0;
+    console.log(
+      `Loading ${this.totalModulesToLoad} modules (${systemModules} system + ${gamestateModules} gamestate)`,
+    );
+  }
+
+  /**
+   * Reporta que un módulo ha terminado de cargar
+   */
+  public static moduleLoaded(moduleName: string): void {
+    this.modulesLoaded++;
+    const moduleProgress = this.modulesLoaded / this.totalModulesToLoad;
+    const progressRange = this.moduleLoadingEndProgress - this.moduleLoadingStartProgress;
+    const currentProgress = this.moduleLoadingStartProgress + moduleProgress * progressRange;
+
+    this.updateStatus(
+      `Loading module: ${moduleName} (${this.modulesLoaded}/${this.totalModulesToLoad})`,
+      Math.floor(currentProgress),
+    );
+  }
+
+  /**
+   * Reinicia el contador de módulos
+   */
+  public static resetModuleTracking(): void {
+    this.totalModulesToLoad = 0;
+    this.modulesLoaded = 0;
+  }
   public static updateStatus(message: string, progress?: number): void {
     if (this.textElement) {
       this.textElement.textContent = message;

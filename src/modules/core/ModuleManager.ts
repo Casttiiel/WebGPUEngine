@@ -1,6 +1,7 @@
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Gamestate } from '../../core/engine/Gamestate';
 import { Module } from './Module';
+import { LoadingStatus } from '../../core/engine/LoadingStatus';
 
 export class ModuleManager {
   private allModules: Module[] = [];
@@ -17,10 +18,24 @@ export class ModuleManager {
     this.loadConfig();
     this.loadGamestates();
 
-    await this.startModules(this.systemModules);
+    // Esperar a que se carguen las configuraciones
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    if (this.startGamestate.length > 0) {
-      this.changeToGamestate(this.startGamestate);
+    // Contar módulos del gamestate inicial
+    const initialGamestate = this.getGamestate(this.startGamestate);
+    const gamestateModuleCount = initialGamestate ? initialGamestate.modules.length : 0;
+
+    // Configurar tracking dinámico de progreso
+    LoadingStatus.setTotalModules(this.systemModules.length, gamestateModuleCount);
+
+    // Cargar módulos del sistema
+    await this.startModules(this.systemModules, true);
+
+    // Cargar gamestate inicial de forma síncrona para garantizar carga completa
+    if (this.startGamestate.length > 0 && initialGamestate) {
+      console.log(`Loading initial gamestate: ${this.startGamestate}`);
+      await this.performGamestateTransition(initialGamestate);
+      this.currentGamestate = initialGamestate;
     }
   }
 
@@ -65,11 +80,16 @@ export class ModuleManager {
     return null;
   }
 
-  public async startModules(modules: Module[]): Promise<void> {
+  public async startModules(modules: Module[], reportProgress: boolean = false): Promise<void> {
     for (const module of modules) {
       if (module.isActive()) continue;
       await module.start();
       module.setActive(true);
+
+      // Reportar progreso si está habilitado
+      if (reportProgress) {
+        LoadingStatus.moduleLoaded(module.getName());
+      }
     }
   }
 
@@ -128,12 +148,6 @@ export class ModuleManager {
   }
 
   private async performGamestateTransition(newGamestate: Gamestate): Promise<void> {
-    // Mostrar loader si existe
-    const loader = document.getElementById('loader');
-    if (loader) {
-      loader.style.display = 'flex';
-    }
-
     // PARAR SOLO LOS MÓDULOS QUE NO ESTÁN EN EL NUEVO GAMESTATE
     if (this.currentGamestate) {
       const modulesToStop: Module[] = [];
@@ -176,16 +190,11 @@ export class ModuleManager {
 
     if (modulesToStart.length > 0) {
       console.log(`Starting ${modulesToStart.length} modules (async loading...)`);
-      await this.startModules(modulesToStart); // AQUÍ sí podemos usar await
+      await this.startModules(modulesToStart, true); // Reportar progreso durante carga inicial
     }
 
     // Actualizar el gamestate actual
     this.currentGamestate = newGamestate;
-
-    // Ocultar loader si existe
-    if (loader) {
-      loader.style.display = 'none';
-    }
 
     // Finalizar transición
     this.isTransitioning = false;

@@ -67,8 +67,8 @@ export class Engine {
       LoadingStatus.updateStatus('Creating module manager...', 30);
       this._modules = new ModuleManager();
 
-      // Module Registration: 30% -> 35%
-      LoadingStatus.updateStatus('Registering system modules...', 35);
+      // Module Registration: 30% -> 40%
+      LoadingStatus.updateStatus('Registering modules...', 35);
       this._render = new ModuleRender('render');
       this._physics = new ModulePhysics('physics');
       this._camera_mixer = new ModuleCameraMixer('camera_mixer');
@@ -92,7 +92,7 @@ export class Engine {
       this._modules.registerGameModule(new ModuleGameController('game_controller'));
       this._modules.registerGameModule(new ModuleGamePaused('game_paused'));
 
-      // Module Initialization: 35% -> 100%
+      // Module Initialization: 40% -> 100% (dinámico según módulos)
       LoadingStatus.updateStatus('Starting modules...', 40);
       await this._modules.start();
 

@@ -1,38 +1,37 @@
 ### Alpha Roadmap
 
-1. Engine Loading Screen
+1. FEEDBACK
 2. Dash
-3. FEEDBACK
-4. Start Screen
-5. Game Loading Screen
-6. Remove en main.ts el skip first frame?
-7. Intermitent error on SMAA when start engine
-8. Level Design
+3. Level Design
+4. ...
 
 ### Feedback
 
 1. Control en el aire
-2. Run uphill fast makes not stick to ground
-3. On Wallrun end keeps moving on original direction (bad)
-4. On Wallrun remove velocity into wall removes mostly all horizontal speed
-5. Swing Bar too restrictive
-6. On resize, changes the light intensity or something
+2. On Wallrun end keeps moving on original direction (bad)
+3. On Wallrun remove velocity into wall removes mostly all horizontal speed
+4. Mantle small edges? and without on air?
+5. Run uphill fast makes not stick to ground
+6. Swing Bar too restrictive
 7. Jump floaty
-8. Mantle small edges? and without on air?
+8. Mantle lose speed?
 
 ### Engine
 
-1. UI
-2. Quality settings selection
-3. Multiple Light probes has good shadows?
-4. Froxel Scattering
+1. Start Screen
+2. Game Loading Screen
+3. Remove en main.ts el skip first frame?
+4. UI
+5. Quality settings selection
+6. Multiple Light probes has good shadows?
+7. Froxel Scattering
    Light injection Directional Light
    Light Injection Point Light
    Light Injection Spot Light
    Scattering propagation (luz rebota entre froxels) Implementar el segundo compute pass que ya tienes preparado Hace que la luz se propague volumétricamente
-5. Improve particles
-6. Weird line on corners is irradiance because of normals
-7. TAA?
+8. Improve particles
+9. Weird line on corners is irradiance because of normals
+10. TAA?
 
 ## Gameplay
 

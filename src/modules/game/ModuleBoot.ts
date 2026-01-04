@@ -20,8 +20,11 @@ export class ModuleBoot extends Module {
   }
 
   public async start(): Promise<boolean> {
-    LoadingStatus.updateStatus('Loading scene...', 65);
-    const response = await ResourceManager.fetch(`data/boot.json`); //`assets/scenes/playground.json`
+    // El progreso del módulo Boot se gestiona dentro de su propio rango
+    // No usamos porcentajes absolutos porque el sistema es dinámico
+
+    LoadingStatus.updateStatus('Loading scene files...');
+    const response = await ResourceManager.fetch(`data/boot.json`);
     const jsonData = await response.json();
     const finalScene = [];
 
@@ -34,19 +37,20 @@ export class ModuleBoot extends Module {
       finalScene.push(...jsonSceneData);
     }
 
-    LoadingStatus.updateStatus('Parsing scene data...', 70);
+    LoadingStatus.updateStatus('Parsing scene data...');
     // 1. Parsear el JSON (expandir prefabs, GLTF, etc.)
     const parsedJson = await Loader.parseSceneJSON(finalScene);
 
-    LoadingStatus.updateStatus('Processing instances...', 75);
+    LoadingStatus.updateStatus('Processing instances...');
     // 2. Flagear entidades que pueden ser instanciadas
     const flaggedJson = InstanceManager.flagInstanceableEntities(parsedJson);
 
-    // 3. Cargar la escena con las entidades flaggeadas (80% - 90%)
-    LoadingStatus.setProgressRange(80, 90);
+    // 3. Cargar la escena con las entidades flaggeadas
+    // El Loader usa updateRangeProgress internamente para mostrar progreso por entidad
+    LoadingStatus.updateStatus('Loading entities...');
     await Loader.loadSceneFromJSON(flaggedJson);
 
-    LoadingStatus.updateStatus('Creating instance groups...', 92);
+    LoadingStatus.updateStatus('Creating instance groups...');
     // 4. Crear grupos de instancias (después de que todas las entities estén cargadas)
     const allEntities = Engine.getEntities().getAllEntities();
     await InstanceManager.createInstanceGroups(allEntities);
