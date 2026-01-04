@@ -21,12 +21,22 @@ export class ModuleBoot extends Module {
 
   public async start(): Promise<boolean> {
     LoadingStatus.updateStatus('Loading scene...', 65);
-    const response = await ResourceManager.fetch(`assets/scenes/playground.json`);
+    const response = await ResourceManager.fetch(`data/boot.json`); //`assets/scenes/playground.json`
     const jsonData = await response.json();
+    const finalScene = [];
+
+    // Mergear todas las escenas en finalScene
+    for (let sceneName of jsonData.scenes_to_load) {
+      const sceneResponse = await ResourceManager.fetch(`assets/scenes/${sceneName}`);
+      const jsonSceneData = await sceneResponse.json();
+
+      // Mergear el array de la escena actual con finalScene
+      finalScene.push(...jsonSceneData);
+    }
 
     LoadingStatus.updateStatus('Parsing scene data...', 70);
     // 1. Parsear el JSON (expandir prefabs, GLTF, etc.)
-    const parsedJson = await Loader.parseSceneJSON(jsonData);
+    const parsedJson = await Loader.parseSceneJSON(finalScene);
 
     LoadingStatus.updateStatus('Processing instances...', 75);
     // 2. Flagear entidades que pueden ser instanciadas

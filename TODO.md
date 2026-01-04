@@ -1,15 +1,13 @@
 ### Alpha Roadmap
 
-1. Pause Screen
-2. Different scenes
-3. Engine Loading Screen
-4. Dash
-5. FEEDBACK
-6. Start Screen
-7. Game Loading Screen
-8. Remove en main.ts el skip first frame?
-9. Intermitent error on SMAA when start engine
-10. Level Design
+1. Engine Loading Screen
+2. Dash
+3. FEEDBACK
+4. Start Screen
+5. Game Loading Screen
+6. Remove en main.ts el skip first frame?
+7. Intermitent error on SMAA when start engine
+8. Level Design
 
 ### Feedback
 
