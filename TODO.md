@@ -7,11 +7,10 @@
 
 ### Feedback
 
-1. Run uphill fast makes not stick to ground
-2. Swing Bar too restrictive
-3. After Impulse pad direction weird
-4. Jump floaty
-5. Mantle lose speed?
+1.  Swing Bar too restrictive
+2.  After Impulse pad direction weird
+3.  Jump floaty
+4.  Mantle lose speed?
 
 ### Engine
 

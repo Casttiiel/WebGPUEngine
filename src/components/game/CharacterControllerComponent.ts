@@ -162,8 +162,13 @@ export class CharacterControllerComponent extends Component {
 
   //MOVEMENT
   private getIsGroundedAndGroundNormal(): void {
-    const hit = this.capsuleCollider.raycastGrounded(0.1);
+    const baseDistance = 0.05; // Distancia mínima del suelo
+    const snapDistance = 0.3; // Distancia extra para snap-to-ground
+
+    // Raycast más largo para detectar suelo en rampas rápidas
+    const hit = this.capsuleCollider.raycastGrounded(snapDistance);
     this.isGrounded = hit !== null;
+
     if (this.isGrounded) {
       this.isDiving = false;
       const isFloor = hit.normal.y > 0.1;
@@ -172,6 +177,27 @@ export class CharacterControllerComponent extends Component {
       if (isFloor) {
         this.groundNormal = vec3.fromValues(hit.normal.x, hit.normal.y, hit.normal.z);
         vec3.normalize(this.groundNormal, this.groundNormal);
+
+        // SNAP-TO-GROUND: Pegar al suelo si está flotando
+        const shouldSnapDown =
+          hit.timeOfImpact > baseDistance && // Está por encima del suelo base
+          hit.timeOfImpact <= snapDistance && // Pero dentro del rango de snap
+          !this.isJumping && // No está saltando intencionalmente
+          !this.isWallRunning && // No está en wall run
+          this.currentVerticalVelocity <= 0; // No está subiendo
+
+        if (shouldSnapDown) {
+          // Empujar personaje hacia abajo hasta el suelo
+          const snapAmount = hit.timeOfImpact - baseDistance;
+          const currentPos = this.capsuleCollider.getRigidBody().translation();
+          this.capsuleCollider
+            .getRigidBody()
+            .setTranslation(
+              { x: currentPos.x, y: currentPos.y - snapAmount, z: currentPos.z },
+              true,
+            );
+          this.currentVerticalVelocity = 0; // Cancelar velocidad vertical
+        }
       }
     } else {
       this.groundNormal = vec3.fromValues(0, 1, 0);
