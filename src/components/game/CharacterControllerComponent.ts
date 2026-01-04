@@ -31,7 +31,7 @@ export class CharacterControllerComponent extends Component {
 
   // Movement
   private moveSpeed: number = 5.0; // Unidades por segundo
-  private airControlMultiplier: number = 0.3; // Control en el aire (0.0 = sin control, 1.0 = control total)
+  private airAcceleration: number = 10.0; // Control en el aire (0.0 = sin control, 1.0 = control total)
   private groundAcceleration: number = 20.0; // Aceleración en el suelo
   private groundDeceleration: number = 30.0; // Deceleración en el suelo
   private airDrag: number = 0.1; // Resistencia del aire (10% por segundo)
@@ -265,24 +265,26 @@ export class CharacterControllerComponent extends Component {
 
       vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.horizontalSpeed);
     } else {
-      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
-      // EN AIRE: Preservar momentum + pequeñas correcciones
+      // EN AIRE: Aceleración directa hacia velocidad objetivo
       if (hasInput) {
+        // Velocidad objetivo en la dirección de input
         vec3.scale(targetMovement, targetMovement, this.moveSpeed);
-        // Calcular velocidad de corrección basada en el input
-        const correctionVelocity = vec3.scale(
-          vec3.create(),
-          targetMovement,
-          this.airControlMultiplier,
+
+        const airAcceleration = this.airAcceleration;
+
+        // Interpolar componentes X y Z hacia velocidad objetivo
+        this.currentHorizontalVelocity[0] = this.approach(
+          this.currentHorizontalVelocity[0],
+          targetMovement[0],
+          airAcceleration * deltaTime,
         );
-        // Añadir la corrección a la velocidad actual (acumulativa)
-        vec3.add(
-          this.currentHorizontalVelocity,
-          this.currentHorizontalVelocity,
-          vec3.scale(vec3.create(), correctionVelocity, deltaTime),
+        this.currentHorizontalVelocity[2] = this.approach(
+          this.currentHorizontalVelocity[2],
+          targetMovement[2],
+          airAcceleration * deltaTime,
         );
 
-        // Limitar la velocidad máxima para evitar aceleración infinita
+        // Limitar velocidad total (permitir un poco más que en suelo)
         const currentSpeed = vec3.length(this.currentHorizontalVelocity);
         const maxAirSpeed = this.moveSpeed;
         if (currentSpeed > maxAirSpeed) {
@@ -290,12 +292,12 @@ export class CharacterControllerComponent extends Component {
           vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, maxAirSpeed);
         }
       } else {
-        // Sin input en el aire: mantener momentum (casi sin deceleración)
-        // Solo una deceleración mínima por resistencia del aire
+        // Sin input: aplicar resistencia del aire
         const dragFactor = Math.pow(1.0 - this.airDrag, deltaTime);
         vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, dragFactor);
       }
 
+      vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
       this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
     }
   }
@@ -1130,8 +1132,7 @@ export class CharacterControllerComponent extends Component {
 
     // Leer todos los parámetros configurables del data
     if (data.moveSpeed !== undefined) this.moveSpeed = data.moveSpeed;
-    if (data.airControlMultiplier !== undefined)
-      this.airControlMultiplier = data.airControlMultiplier;
+    if (data.airAcceleration !== undefined) this.airAcceleration = data.airAcceleration;
     if (data.groundAcceleration !== undefined) this.groundAcceleration = data.groundAcceleration;
     if (data.groundDeceleration !== undefined) this.groundDeceleration = data.groundDeceleration;
     if (data.airDrag !== undefined) this.airDrag = data.airDrag;

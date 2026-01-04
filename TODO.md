@@ -7,14 +7,15 @@
 
 ### Feedback
 
-1. Control en el aire
-2. On Wallrun end keeps moving on original direction (bad)
-3. On Wallrun remove velocity into wall removes mostly all horizontal speed
-4. Mantle small edges? and without on air?
-5. Run uphill fast makes not stick to ground
-6. Swing Bar too restrictive
-7. Jump floaty
-8. Mantle lose speed?
+1. On Wallrun end keeps moving on original direction (bad)
+2. On Wallrun remove velocity into wall removes mostly all horizontal speed
+3. Mantle small edges? and without on air?
+4. Run uphill fast makes not stick to ground
+5. Swing Bar too restrictive
+6. Jump floaty
+7. Mantle lose speed?
+8. Test WallRun into impulse pad
+9. Test more time input disabled after wall jump?
 
 ### Engine
 

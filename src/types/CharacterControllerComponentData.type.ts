@@ -1,6 +1,6 @@
 export type CharacterControllerComponentDataType = {
   moveSpeed?: number; // Movement speed in units per second (default: 5.0)
-  airControlMultiplier?: number; // Air control strength (0.0 = no control, 1.0 = full control, default: 0.3)
+  airAcceleration?: number; // Air control strength (0.0 = no control, 1.0 = full control, default: 0.3)
   groundAcceleration: number; // Time to reach max speed on ground in seconds (default: 0.1)
   groundDeceleration: number; // Time to stop completely on ground in seconds (default: 0.1)
   airDrag: number; // Air drag factor (0.0 = no drag, 1.0 = full stop, default: 0.1)
