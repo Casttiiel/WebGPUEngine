@@ -78,6 +78,7 @@ export class ModuleEntities extends Module {
   }
 
   public update(delta: number): void {
+    if (delta <= 0) return;
     for (const [, om] of this.omToUpdate) {
       om.updateAll(delta);
     }

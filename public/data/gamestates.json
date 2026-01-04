@@ -2,8 +2,10 @@
   "start": "gs_gameplay",
   "gamestates": {
     "gs_main_menu": [],
-    "gs_gameplay": ["boot", "camera_mixer", "game_controller"],
     "gs_loading": [],
-    "gs_paused": ["boot", "camera_mixer", "game_paused"]
+    "gs_gameplay": ["boot", "camera_mixer", "game_controller"],
+    "gs_paused": ["boot", "camera_mixer", "game_paused"],
+    "gs_gameover": [],
+    "gs_win": []
   }
 }
