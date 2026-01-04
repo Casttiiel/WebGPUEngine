@@ -755,7 +755,6 @@ export class CharacterControllerComponent extends Component {
     // No permitir mantle si ya estamos cayendo muy rápido o si estamos en el suelo
     if (
       this.currentVerticalVelocity < this.mantlingMinVerticalVelocity ||
-      this.isGrounded ||
       this.isDiving ||
       this.isWallRunning
     ) {
