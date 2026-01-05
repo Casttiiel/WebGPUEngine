@@ -1,12 +1,30 @@
 {
-    "children": [],
-    "components": {
-      "name": "Impulse Pad",
-      "transform": {
-        "position": [0, 0, 0],
-        "rotation": [0, 0, 0],
-        "scale": [0.1, 0.1, 2]
+    "children": [
+      {
+        "prefab": "dash_trigger.prefab"
       },
+      {
+        "components": {
+        "name": "Swing Bar Mesh",
+        "transform": {
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0],
+          "scale": [0.1, 0.1, 2]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "textured.mat"
+            }
+          ]
+        }
+      }
+      }
+    ],
+    "components": {
+      "name": "Swing Bar",
+      "transform": {},
       "swing_bar":{
       },
       "box_collider": {
@@ -14,14 +32,6 @@
         "bodyType": "static",
         "size": [2, 2, 2],
         "ignoreTransformScale": true
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "unit_cube.obj",
-            "material": "textured.mat"
-          }
-        ]
       }
     }
   }

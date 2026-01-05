@@ -23,7 +23,9 @@
       "lockRotationZ": true,
       "ignoreTransformScale": true,
       "friction": 0.0,
-      "mass": 70.0
+      "mass": 70.0,
+      "collisionGroups": "PLAYER",
+      "collisionMask": "PLAYER"
     },
     "character_controller": {
       "moveSpeed": 8.5,

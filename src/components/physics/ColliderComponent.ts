@@ -7,23 +7,40 @@ import { CollisionGroups, CollisionMasks } from '../../types/CollisionGroups.enu
 
 /**
  * Convierte un string del enum CollisionGroups a su valor numérico
- * También acepta CollisionMasks predefinidos
+ * Para collisionGroups (membership)
  */
-function parseCollisionGroup(value: number | string | undefined): number | undefined {
+function parseCollisionGroups(value: number | string | undefined): number | undefined {
   if (value === undefined) return undefined;
   if (typeof value === 'number') return value;
 
-  // Intentar primero con CollisionGroups
+  // Para groups, buscar solo en CollisionGroups
   if (value in CollisionGroups) {
     return CollisionGroups[value as keyof typeof CollisionGroups];
   }
 
-  // Intentar con CollisionMasks
+  console.warn(`Unknown collision group: "${value}". Using default.`);
+  return undefined;
+}
+
+/**
+ * Convierte un string de CollisionMasks a su valor numérico
+ * Para collisionMask (filter) - busca PRIMERO en máscaras predefinidas
+ */
+function parseCollisionMask(value: number | string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'number') return value;
+
+  // Para masks, buscar PRIMERO en CollisionMasks (máscaras predefinidas)
   if (value in CollisionMasks) {
     return CollisionMasks[value as keyof typeof CollisionMasks];
   }
 
-  console.warn(`Unknown collision group/mask: "${value}". Using default.`);
+  // Si no existe como máscara, buscar en CollisionGroups
+  if (value in CollisionGroups) {
+    return CollisionGroups[value as keyof typeof CollisionGroups];
+  }
+
+  console.warn(`Unknown collision mask: "${value}". Using default.`);
   return undefined;
 }
 
@@ -169,12 +186,13 @@ export class ColliderComponent extends Component {
     // - 16 bits BAJOS (right-most): filter (con qué grupos puede interactuar)
     // Formato: (membership << 16) | filter
     // Por defecto: ENVIRONMENT que interactúa con PLAYER | ENVIRONMENT | ENEMY
-    const parsedGroups = parseCollisionGroup(data.collisionGroups);
-    const parsedMask = parseCollisionGroup(data.collisionMask);
+    const parsedGroups = parseCollisionGroups(data.collisionGroups);
+    const parsedMask = parseCollisionMask(data.collisionMask);
 
     const membership = parsedGroups !== undefined ? parsedGroups : CollisionGroups.ENVIRONMENT;
     const filter = parsedMask !== undefined ? parsedMask : CollisionMasks.ENVIRONMENT;
     const combinedGroups = ((membership & 0xffff) << 16) | (filter & 0xffff);
+
     this.collider.setCollisionGroups(combinedGroups);
   }
 
@@ -284,8 +302,8 @@ export class ColliderComponent extends Component {
         }
         // Siempre configurar collision groups, incluso con valores por defecto
         // Por defecto: ENVIRONMENT que interactúa con PLAYER | ENVIRONMENT | ENEMY
-        const parsedGroups = parseCollisionGroup(data.collisionGroups);
-        const parsedMask = parseCollisionGroup(data.collisionMask);
+        const parsedGroups = parseCollisionGroups(data.collisionGroups);
+        const parsedMask = parseCollisionMask(data.collisionMask);
 
         const membership = parsedGroups !== undefined ? parsedGroups : CollisionGroups.ENVIRONMENT;
         const filter = parsedMask !== undefined ? parsedMask : CollisionMasks.ENVIRONMENT;

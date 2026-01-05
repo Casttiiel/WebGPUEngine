@@ -2,12 +2,11 @@
 
 1. Dash to Swing Bar
 2. Dash to Wall
-3. Dash to Enemy
-4. Momentum/Chain
-5. Eco
-6. Slide -> Roll
-7. FEEDBACK
-8. Level Design
+3. Momentum/Chain
+4. Eco
+5. Slide -> Roll
+6. FEEDBACK
+7. Level Design
 
 ### Feedback
 

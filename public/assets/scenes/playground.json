@@ -15,9 +15,6 @@
     "prefab": "ground.prefab"
   },
   {
-    "prefab": "dash_trigger.prefab"
-  },
-  {
     "prefab": "impulse_pad_15.prefab",
     "components": {
       "transform": {
