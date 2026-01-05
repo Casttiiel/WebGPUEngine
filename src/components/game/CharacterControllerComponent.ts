@@ -97,6 +97,13 @@ export class CharacterControllerComponent extends Component {
   //Impulse Pads
   private impulsePadInputDisableTime: number = 0.5; // Tiempo para deshabilitar input tras un impulso
 
+  // Dash
+  private dashDetectionDistance: number = 50.0; // Distancia máxima para detectar punto de dash
+  private dashSpeed: number = 50.0; // Velocidad del dash
+  private dashStopDistance: number = 0.5; // Distancia al objetivo para detener el dash
+  private isDashing: boolean = false;
+  private dashTargetPos: vec3 = vec3.create();
+
   // Estado
   private isActive: boolean = true;
   private isGrounded: boolean = false;
@@ -130,10 +137,13 @@ export class CharacterControllerComponent extends Component {
 
     this.getIsGroundedAndGroundNormal();
     this.manageMantling(deltaTime);
+    this.manageDashing();
     this.detectWall();
     this.manageSliding();
 
-    if (this.isMantling) {
+    if (this.isDashing) {
+      this.updateDash(deltaTime);
+    } else if (this.isMantling) {
       this.updateMantle(deltaTime);
     } else if (this.isSliding) {
       const finalVelocity = this.updateSlide(deltaTime);
@@ -164,7 +174,7 @@ export class CharacterControllerComponent extends Component {
   private getIsGroundedAndGroundNormal(): void {
     const baseDistance = 0.05; // Distancia mínima del suelo
     const snapDistance = 0.3; // Distancia extra para snap-to-ground
-
+    if (this.isDashing) return;
     // Raycast más largo para detectar suelo en rampas rápidas
     const hit = this.capsuleCollider.raycastGrounded(snapDistance);
     this.isGrounded = hit !== null;
@@ -398,6 +408,7 @@ export class CharacterControllerComponent extends Component {
       );
 
       if (type === RAPIER.RigidBodyType.Fixed) {
+        this.isDashing = false;
         if (!this.isWallRunning && !this.isMantling) {
           this.removeVelocityIntoWall(collisionNormal);
         }
@@ -703,6 +714,97 @@ export class CharacterControllerComponent extends Component {
     if (input.isActionJustPressed(GameAction.DIVE) && !this.isGrounded && !this.isWallRunning) {
       this.isDiving = true;
     }
+  }
+
+  //DASHING
+  private manageDashing(): void {
+    const input = Engine.getInput();
+
+    // Solo permitir dash si no estamos en mantle, swing o con input deshabilitado
+    if (this.isDashing || this.isMantling || this.isSwinging || this.inputDisableTimer > 0.0) {
+      return;
+    }
+
+    // Detectar click derecho (MouseButton.RIGHT = 2)
+    if (input.isActionJustPressed(GameAction.DASH)) {
+      const dashPoint = this.detectDashPoint();
+      if (dashPoint) {
+        this.startDash(dashPoint);
+      }
+    }
+  }
+
+  private detectDashPoint(): vec3 | null {
+    const physics = Engine.getPhysics();
+    const cameraObj = this.camera!.getCamera();
+    const playerPos = this.capsuleCollider.getRigidBody().translation();
+
+    // Dirección de la cámara
+    const forward = cameraObj.getFront();
+
+    // Raycast desde la cámara hacia donde miramos
+    const ray = new RAPIER.Ray(
+      { x: playerPos.x, y: playerPos.y, z: playerPos.z },
+      { x: forward[0], y: forward[1], z: forward[2] },
+    );
+
+    const hit = physics
+      .getWorld()
+      .castRay(
+        ray,
+        this.dashDetectionDistance,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        this.capsuleCollider.getCollider(),
+      );
+
+    if (!hit) return null;
+
+    // Calcular el punto de impacto
+    const hitDistance = hit.timeOfImpact;
+    const hitPoint = vec3.fromValues(
+      playerPos.x + forward[0] * hitDistance,
+      playerPos.y + forward[1] * hitDistance,
+      playerPos.z + forward[2] * hitDistance,
+    );
+
+    return hitPoint;
+  }
+
+  private startDash(targetPoint: vec3): void {
+    this.isDashing = true;
+    vec3.copy(this.dashTargetPos, targetPoint);
+
+    // Cancelar otras velocidades
+    this.currentVerticalVelocity = 0.0;
+    this.isJumping = false;
+    this.isWallRunning = false;
+    this.isDiving = false;
+  }
+
+  private updateDash(deltaTime: number): void {
+    const currentPos = this.capsuleCollider.getRigidBody().translation();
+    const pos = vec3.fromValues(currentPos.x, currentPos.y, currentPos.z);
+
+    // Calcular dirección hacia el objetivo
+    const direction = vec3.sub(vec3.create(), this.dashTargetPos, pos);
+    const distanceToTarget = vec3.length(direction);
+
+    // Si estamos cerca del objetivo, detener el dash
+    if (distanceToTarget < this.dashStopDistance) {
+      this.isDashing = false;
+      vec3.set(this.currentHorizontalVelocity, 0, 0, 0);
+      this.currentVerticalVelocity = 0;
+      return;
+    }
+
+    // Normalizar dirección y aplicar velocidad de dash
+    vec3.normalize(direction, direction);
+    const dashVelocity = vec3.scale(vec3.create(), direction, this.dashSpeed);
+
+    // Aplicar movimiento
+    this.applyMovement(dashVelocity, deltaTime);
   }
 
   //SLIDING

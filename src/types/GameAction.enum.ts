@@ -13,6 +13,7 @@ export enum GameAction {
   JUMP = 'jump',
   SLIDE = 'slide',
   DIVE = 'dive',
+  DASH = 'dash',
 
   // Camera
   LOOK_UP = 'look_up',
