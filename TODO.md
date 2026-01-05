@@ -8,10 +8,9 @@
 
 ### Feedback
 
-2. After Impulse pad direction weird
-3. Mantle lose speed?
-4. Test mantle on small slope/places
-5. Jump floaty
+1. Mantle lose speed?
+2. Test mantle on small slope/places
+3. Jump floaty
 
 ### Engine
 

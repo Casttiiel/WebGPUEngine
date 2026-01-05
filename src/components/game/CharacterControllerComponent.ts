@@ -973,24 +973,14 @@ export class CharacterControllerComponent extends Component {
   //IMPULSE PAD
   public applyImpulseFromPad(impulse: vec3): void {
     const force = impulse;
-    const up = vec3.fromValues(0, 1, 0);
 
-    // Proyección vertical
-    const verticalMag = vec3.dot(force, up);
-    const vertical = vec3.create();
-    vec3.scale(vertical, up, verticalMag);
-    this.currentVerticalVelocity = verticalMag;
+    const horizontal = vec3.fromValues(force[0], 0, force[2]);
+    const vertical = vec3.fromValues(0, force[1], 0);
+    this.currentVerticalVelocity = vec3.length(vertical);
 
-    // Componente horizontal
-    const horizontal = vec3.create();
-    vec3.subtract(horizontal, force, vertical);
     this.horizontalSpeed = vec3.length(horizontal);
+    this.currentHorizontalVelocity = vec3.clone(horizontal);
     this.horizontalDirection = vec3.normalize(vec3.create(), horizontal);
-    this.currentHorizontalVelocity = vec3.scale(
-      this.currentHorizontalVelocity,
-      this.horizontalDirection,
-      this.horizontalSpeed,
-    );
 
     this.isDiving = false; // Cancelar diving si lo teníamos activo
     this.isJumping = true; // Marcar como saltando
