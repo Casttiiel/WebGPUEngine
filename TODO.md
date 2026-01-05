@@ -8,9 +8,8 @@
 
 ### Feedback
 
-1. Mantle lose speed?
-2. Test mantle on small slope/places
-3. Jump floaty
+1. Test mantle on small slope/places
+2. Jump floaty
 
 ### Engine
 

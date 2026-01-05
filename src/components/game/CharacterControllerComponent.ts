@@ -127,7 +127,7 @@ export class CharacterControllerComponent extends Component {
     if (this.inputDisableTimer > 0.0) {
       this.inputDisableTimer -= deltaTime;
     }
-
+    console.log(vec3.length(this.currentHorizontalVelocity));
     this.getIsGroundedAndGroundNormal();
     this.manageMantling(deltaTime);
     this.detectWall();
@@ -398,7 +398,7 @@ export class CharacterControllerComponent extends Component {
       );
 
       if (type === RAPIER.RigidBodyType.Fixed) {
-        if (!this.isWallRunning) {
+        if (!this.isWallRunning && !this.isMantling) {
           this.removeVelocityIntoWall(collisionNormal);
         }
         const isCeiling = collisionNormal[1] < -0.7;
