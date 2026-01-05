@@ -24,14 +24,18 @@ function parseCollisionGroups(value: number | string | undefined): number | unde
 
 /**
  * Convierte un string de CollisionMasks a su valor numérico
- * Para collisionMask (filter) - busca PRIMERO en máscaras predefinidas
+ * Para collisionMask (filter) - busca primero en CollisionGroups, luego en CollisionMasks
  */
 function parseCollisionMask(value: number | string | undefined): number | undefined {
   if (value === undefined) return undefined;
   if (typeof value === 'number') return value;
 
-  // Si no existe como grupo, buscar en CollisionMasks (máscaras predefinidas)
-  // Esto permite usar nombres especiales como "PLAYER_MASK" si existiera
+  // Buscar PRIMERO en CollisionGroups (grupos individuales como "PLAYER" -> 0x0001)
+  if (value in CollisionGroups) {
+    return CollisionGroups[value as keyof typeof CollisionGroups];
+  }
+
+  // Si no existe como grupo, buscar en CollisionMasks (máscaras predefinidas como "PLAYER_INTERACTIONS")
   if (value in CollisionMasks) {
     return CollisionMasks[value as keyof typeof CollisionMasks];
   }
