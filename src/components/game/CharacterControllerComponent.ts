@@ -127,7 +127,7 @@ export class CharacterControllerComponent extends Component {
     if (this.inputDisableTimer > 0.0) {
       this.inputDisableTimer -= deltaTime;
     }
-    console.log(vec3.length(this.currentHorizontalVelocity));
+
     this.getIsGroundedAndGroundNormal();
     this.manageMantling(deltaTime);
     this.detectWall();
@@ -807,7 +807,8 @@ export class CharacterControllerComponent extends Component {
     if (
       this.currentVerticalVelocity < this.mantlingMinVerticalVelocity ||
       this.isDiving ||
-      this.isWallRunning
+      this.isWallRunning ||
+      this.isGrounded
     ) {
       return;
     }
@@ -829,6 +830,10 @@ export class CharacterControllerComponent extends Component {
     let forward = cameraObj.getFront();
     forward[1] = 0;
     vec3.normalize(forward, forward);
+    // Calcular distancia dinámica basada en velocidad horizontal
+    const currentSpeed = vec3.length(this.currentHorizontalVelocity);
+    const speedRatio = Math.min(currentSpeed / (this.moveSpeed * 2.0), 2.0); // Máximo 2x a velocidad de correr
+    const dynamicDetectionDistance = this.mantleDetectionDistance * (1.0 + speedRatio * 0.8); // Hasta 1.8x la distancia base
 
     // 1. Raycast horizontal a altura de pecho para detectar obstáculo
     const chestHeight = playerPos.y;
@@ -841,7 +846,7 @@ export class CharacterControllerComponent extends Component {
       .getWorld()
       .castRay(
         ray1,
-        this.mantleDetectionDistance,
+        dynamicDetectionDistance,
         true,
         QueryFilterFlags.EXCLUDE_SENSORS,
         undefined,

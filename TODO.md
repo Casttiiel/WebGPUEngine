@@ -1,10 +1,11 @@
 ### Alpha Roadmap
 
-1. FEEDBACK
-2. Dash
-3. Slide -> Roll
-4. Level Design
-5. ...
+1. Dash
+2. Momentum/Chain
+3. Eco
+4. Slide -> Roll
+5. FEEDBACK
+6. Level Design
 
 ### Feedback
 
@@ -30,11 +31,9 @@
 
 ## Gameplay
 
-1. Momentum/Chain
-2. Eco
-3. Gameplay analysis
-4. Door
-5. Enemy
+1. Gameplay analysis
+2. Door
+3. Enemy
 
 ## Visuals and Sound
 
