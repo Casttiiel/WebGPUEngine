@@ -1000,7 +1000,12 @@ export class CharacterControllerComponent extends Component {
 
   //SWING BAR
   public startSwing(data: SwingEntryData): void {
-    if (this.isSwinging || this.isGrounded || this.isMantling) return;
+    if (
+      this.isSwinging ||
+      (this.isGrounded && this.currentVerticalVelocity <= 0.0) ||
+      this.isMantling
+    )
+      return;
 
     this.isSwinging = true;
 

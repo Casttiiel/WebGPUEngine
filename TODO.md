@@ -2,22 +2,23 @@
 
 1. FEEDBACK
 2. Dash
-3. Level Design
-4. ...
+3. Slide -> Roll
+4. Level Design
+5. ...
 
 ### Feedback
 
-1.  Swing Bar too restrictive
-2.  After Impulse pad direction weird
-3.  Jump floaty
-4.  Mantle lose speed?
+2. After Impulse pad direction weird
+3. Mantle lose speed?
+4. Test mantle on small slope/places
+5. Jump floaty
 
 ### Engine
 
-1. Start Screen
-2. Game Loading Screen
-3. Remove en main.ts el skip first frame?
-4. UI
+1. UI
+2. Start Screen
+3. Game Loading Screen
+4. Remove en main.ts el skip first frame?
 5. Quality settings selection
 6. Multiple Light probes has good shadows?
 7. Froxel Scattering

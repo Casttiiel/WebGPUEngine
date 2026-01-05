@@ -4,6 +4,7 @@
     "directional_light",
     "particle_system",
     "character_controller",
+    "swing_bar",
     "camera_arm",
     "head_bob",
     "head_tilt",
