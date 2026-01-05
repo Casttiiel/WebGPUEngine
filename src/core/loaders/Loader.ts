@@ -40,6 +40,7 @@ import { HeadTiltComponent } from '../../components/game/HeadTiltComponent';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
+import { SphereColliderComponent } from '../../components/physics/SphereColliderComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -144,8 +145,6 @@ export class Loader {
 
     // Incrementar contador y actualizar progreso
     this.entitiesLoaded++;
-    const progress = this.entitiesLoaded / this.totalEntitiesToLoad;
-    const entityName = json.components?.name || `Entity ${this.entitiesLoaded}`;
 
     // Actualizar solo el mensaje, mantener el progreso del módulo Boot
     LoadingStatus.updateStatus(
@@ -230,6 +229,8 @@ export class Loader {
         return new BoxColliderComponent();
       case 'capsule_collider':
         return new CapsuleColliderComponent();
+      case 'sphere_collider':
+        return new SphereColliderComponent();
       case 'character_controller':
         return new CharacterControllerComponent();
       case 'camera_arm':

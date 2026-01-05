@@ -3,6 +3,29 @@ import { vec3, quat } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
+import { CollisionGroups, CollisionMasks } from '../../types/CollisionGroups.enum';
+
+/**
+ * Convierte un string del enum CollisionGroups a su valor numérico
+ * También acepta CollisionMasks predefinidos
+ */
+function parseCollisionGroup(value: number | string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'number') return value;
+
+  // Intentar primero con CollisionGroups
+  if (value in CollisionGroups) {
+    return CollisionGroups[value as keyof typeof CollisionGroups];
+  }
+
+  // Intentar con CollisionMasks
+  if (value in CollisionMasks) {
+    return CollisionMasks[value as keyof typeof CollisionMasks];
+  }
+
+  console.warn(`Unknown collision group/mask: "${value}". Using default.`);
+  return undefined;
+}
 
 /**
  * Tipo de cuerpo rígido
@@ -61,8 +84,9 @@ export interface ColliderData {
   rotation?: quat;
 
   // Collision groups (para filtrado de colisiones)
-  collisionGroups?: number;
-  collisionMask?: number;
+  // Puede ser un número o un string del enum (ej: "DASH_TRIGGER", "PLAYER", "ENVIRONMENT")
+  collisionGroups?: number | string;
+  collisionMask?: number | string;
 
   ignoreTransformScale?: boolean;
 }
@@ -138,11 +162,20 @@ export class ColliderComponent extends Component {
       this.collider.setDensity(data.density);
     }
 
-    // Configurar collision groups (para filtrado)
-    if (data.collisionGroups !== undefined || data.collisionMask !== undefined) {
-      this.collider.setCollisionGroups(data.collisionGroups || 0xffffffff);
-      // TODO: Implementar collision mask cuando sea necesario
-    }
+    // Configurar collision groups y mask (para filtrado)
+    // Siempre configurar, incluso si no se especifica en data
+    // Rapier usa un número de 32 bits:
+    // - 16 bits ALTOS (left-most): membership (a qué grupos pertenece este collider)
+    // - 16 bits BAJOS (right-most): filter (con qué grupos puede interactuar)
+    // Formato: (membership << 16) | filter
+    // Por defecto: ENVIRONMENT que interactúa con PLAYER | ENVIRONMENT | ENEMY
+    const parsedGroups = parseCollisionGroup(data.collisionGroups);
+    const parsedMask = parseCollisionGroup(data.collisionMask);
+
+    const membership = parsedGroups !== undefined ? parsedGroups : CollisionGroups.ENVIRONMENT;
+    const filter = parsedMask !== undefined ? parsedMask : CollisionMasks.ENVIRONMENT;
+    const combinedGroups = ((membership & 0xffff) << 16) | (filter & 0xffff);
+    this.collider.setCollisionGroups(combinedGroups);
   }
 
   /**
@@ -249,9 +282,15 @@ export class ColliderComponent extends Component {
         if (data.restitution !== undefined) {
           trimeshDesc.setRestitution(data.restitution);
         }
-        if (data.collisionGroups !== undefined) {
-          trimeshDesc.setCollisionGroups(data.collisionGroups);
-        }
+        // Siempre configurar collision groups, incluso con valores por defecto
+        // Por defecto: ENVIRONMENT que interactúa con PLAYER | ENVIRONMENT | ENEMY
+        const parsedGroups = parseCollisionGroup(data.collisionGroups);
+        const parsedMask = parseCollisionGroup(data.collisionMask);
+
+        const membership = parsedGroups !== undefined ? parsedGroups : CollisionGroups.ENVIRONMENT;
+        const filter = parsedMask !== undefined ? parsedMask : CollisionMasks.ENVIRONMENT;
+        const combinedGroups = ((membership & 0xffff) << 16) | (filter & 0xffff);
+        trimeshDesc.setCollisionGroups(combinedGroups);
 
         // Crear collider
         this.collider = physics.getWorld().createCollider(trimeshDesc, this.rigidBody);

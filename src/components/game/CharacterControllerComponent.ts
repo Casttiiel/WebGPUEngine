@@ -7,6 +7,7 @@ import { CharacterControllerComponentDataType } from '../../types/CharacterContr
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { GameAction } from '../../types/GameAction.enum';
 import { SwingEntryData } from '../../types/SwingEntryData.type';
+import { CollisionGroups } from '../../types/CollisionGroups.enum';
 
 const gravity = -9.81; // m/s²
 /**
@@ -742,34 +743,41 @@ export class CharacterControllerComponent extends Component {
     // Dirección de la cámara
     const forward = cameraObj.getFront();
 
-    // Raycast desde la cámara hacia donde miramos
+    // Raycast desde la posición del jugador hacia donde mira la cámara
     const ray = new RAPIER.Ray(
       { x: playerPos.x, y: playerPos.y, z: playerPos.z },
       { x: forward[0], y: forward[1], z: forward[2] },
     );
 
-    const hit = physics
-      .getWorld()
-      .castRay(
-        ray,
-        this.dashDetectionDistance,
-        true,
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined,
-        this.capsuleCollider.getCollider(),
-      );
+    // InteractionGroups: Ray del PLAYER que busca solo DASH_TRIGGER
+    // Formato Rapier: 16 bits ALTOS = membership, 16 bits BAJOS = filter
+    // membership: PLAYER (el ray pertenece al grupo PLAYER)
+    // filter: DASH_TRIGGER (el ray solo detecta objetos con grupo DASH_TRIGGER)
+    const interactionGroups =
+      ((CollisionGroups.PLAYER & 0xffff) << 16) | (CollisionGroups.DASH_TRIGGER & 0xffff);
+
+    const hit = physics.getWorld().castRay(
+      ray,
+      this.dashDetectionDistance,
+      true,
+      undefined,
+      interactionGroups, // Solo detectar grupo DASH_TRIGGER
+      this.capsuleCollider.getCollider(),
+    );
 
     if (!hit) return null;
 
-    // Calcular el punto de impacto
-    const hitDistance = hit.timeOfImpact;
-    const hitPoint = vec3.fromValues(
-      playerPos.x + forward[0] * hitDistance,
-      playerPos.y + forward[1] * hitDistance,
-      playerPos.z + forward[2] * hitDistance,
-    );
+    // El raycast ya garantiza que el collider es un DASH_TRIGGER sensor
+    // No necesitamos verificación adicional
+    const rigidBody = hit.collider.parent();
+    if (!rigidBody) return null;
 
-    return hitPoint;
+    // Obtener el centro del rigid body (que es el centro del trigger)
+    // Esto ignora el punto exacto de impacto del raycast y va directo al centro
+    const centerPos = rigidBody.translation();
+    const centerPoint = vec3.fromValues(centerPos.x, centerPos.y, centerPos.z);
+
+    return centerPoint;
   }
 
   private startDash(targetPoint: vec3): void {

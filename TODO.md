@@ -1,11 +1,13 @@
 ### Alpha Roadmap
 
-1. Dash
-2. Momentum/Chain
-3. Eco
-4. Slide -> Roll
-5. FEEDBACK
-6. Level Design
+1. Dash to Swing Bar
+2. Dash to Wall
+3. Dash to Enemy
+4. Momentum/Chain
+5. Eco
+6. Slide -> Roll
+7. FEEDBACK
+8. Level Design
 
 ### Feedback
 
