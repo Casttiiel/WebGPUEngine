@@ -175,7 +175,7 @@ export class CharacterControllerComponent extends Component {
   private getIsGroundedAndGroundNormal(): void {
     const baseDistance = 0.05; // Distancia mínima del suelo
     const snapDistance = 0.3; // Distancia extra para snap-to-ground
-    if (this.isDashing) return;
+
     // Raycast más largo para detectar suelo en rampas rápidas
     const hit = this.capsuleCollider.raycastGrounded(snapDistance);
     this.isGrounded = hit !== null;
@@ -195,6 +195,7 @@ export class CharacterControllerComponent extends Component {
           hit.timeOfImpact <= snapDistance && // Pero dentro del rango de snap
           !this.isJumping && // No está saltando intencionalmente
           !this.isWallRunning && // No está en wall run
+          !this.isDashing && // No está dashing
           this.currentVerticalVelocity <= 0; // No está subiendo
 
         if (shouldSnapDown) {
@@ -801,9 +802,7 @@ export class CharacterControllerComponent extends Component {
 
     // Si estamos cerca del objetivo, detener el dash
     if (distanceToTarget < this.dashStopDistance) {
-      this.isDashing = false;
-      vec3.set(this.currentHorizontalVelocity, 0, 0, 0);
-      this.currentVerticalVelocity = 0;
+      this.endDash();
       return;
     }
 
@@ -813,6 +812,10 @@ export class CharacterControllerComponent extends Component {
 
     // Aplicar movimiento
     this.applyMovement(dashVelocity, deltaTime);
+  }
+
+  private endDash(): void {
+    this.isDashing = false;
   }
 
   //SLIDING

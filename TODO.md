@@ -1,17 +1,18 @@
 ### Alpha Roadmap
 
-1. Dash to Swing Bar
-2. Dash to Wall
-3. Momentum/Chain
-4. Eco
-5. Slide -> Roll
-6. FEEDBACK
-7. Level Design
+1. Dash to Wall
+2. Momentum/Chain
+3. Eco
+4. Slide -> Roll
+5. FEEDBACK
+6. Level Design
 
 ### Feedback
 
 1. Test mantle on small slope/places
-2. Jump floaty
+2. Jump floaty?
+3. Dash distance
+4. Deactivate dash on close range
 
 ### Engine
 

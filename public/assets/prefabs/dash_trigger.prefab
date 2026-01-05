@@ -12,16 +12,7 @@
       "radius": 1,
       "isSensor": true,
       "collisionGroups": "DASH_TRIGGER",
-      "collisionMask": 1
-    },
-    "render": {
-      "meshes": [
-        {
-          "mesh": "sphere.obj",
-          "material": "emissive.mat"
-        }
-      ],
-      "visible": false
+      "collisionMask": "PLAYER"
     }
   }
 }

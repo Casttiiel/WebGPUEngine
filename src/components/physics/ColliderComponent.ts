@@ -30,14 +30,10 @@ function parseCollisionMask(value: number | string | undefined): number | undefi
   if (value === undefined) return undefined;
   if (typeof value === 'number') return value;
 
-  // Para masks, buscar PRIMERO en CollisionMasks (máscaras predefinidas)
+  // Si no existe como grupo, buscar en CollisionMasks (máscaras predefinidas)
+  // Esto permite usar nombres especiales como "PLAYER_MASK" si existiera
   if (value in CollisionMasks) {
     return CollisionMasks[value as keyof typeof CollisionMasks];
-  }
-
-  // Si no existe como máscara, buscar en CollisionGroups
-  if (value in CollisionGroups) {
-    return CollisionGroups[value as keyof typeof CollisionGroups];
   }
 
   console.warn(`Unknown collision mask: "${value}". Using default.`);

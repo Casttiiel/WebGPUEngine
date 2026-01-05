@@ -35,7 +35,7 @@ export enum CollisionGroups {
  */
 export const CollisionMasks = {
   // Player interactúa con todo excepto otros players
-  PLAYER:
+  PLAYER_INTERACTIONS:
     CollisionGroups.ENVIRONMENT |
     CollisionGroups.ENEMY |
     CollisionGroups.PROJECTILE |
@@ -48,6 +48,7 @@ export const CollisionMasks = {
   ENVIRONMENT: CollisionGroups.PLAYER | CollisionGroups.ENEMY | CollisionGroups.PROJECTILE,
 
   // Triggers solo detectan al player (sin colisión física)
+  TRIGGER_PLAYER: CollisionGroups.PLAYER,
   TRIGGER: CollisionGroups.PLAYER,
 
   // Todo (default)

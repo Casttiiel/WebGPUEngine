@@ -14,7 +14,8 @@ export class SwingBarComponent extends Component {
   private barStart: vec3 = vec3.create();
   private barEnd: vec3 = vec3.create();
   private barAxis: vec3 = vec3.create();
-  private maxSwingAngle = 1.7; // 90°
+  private maxStartSwingAngle = 2.0; // 90°
+  private maxSwingAngle = 1.6; // 90°
   private maxGrabHeight = 0.65; // demasiado arriba
   private maxProgressAllowed = 0.5; // pasada la mitad no engancha
 
@@ -79,8 +80,8 @@ export class SwingBarComponent extends Component {
 
     let initialAngle = Math.atan2(y, x);
 
-    const minAngle = -this.maxSwingAngle;
-    const maxAngle = this.maxSwingAngle;
+    const minAngle = -this.maxStartSwingAngle;
+    const maxAngle = this.maxStartSwingAngle;
     if (initialAngle < minAngle || initialAngle > maxAngle) {
       console.log('descarte por angulo');
       return null;
@@ -96,7 +97,7 @@ export class SwingBarComponent extends Component {
 
     const direction = initialAngle > 0 ? -1 : 1;
 
-    const endAngle = initialAngle > 0 ? maxAngle : minAngle;
+    const endAngle = initialAngle > 0 ? this.maxSwingAngle : -this.maxSwingAngle;
     const total = Math.abs(endAngle - initialAngle);
     const remaining = Math.abs(endAngle - initialAngle);
 

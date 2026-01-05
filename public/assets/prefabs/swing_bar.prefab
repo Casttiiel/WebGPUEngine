@@ -1,25 +1,30 @@
 {
     "children": [
       {
-        "prefab": "dash_trigger.prefab"
+        "prefab": "dash_trigger.prefab",
+        "components": {
+          "transform": {
+            "position": [0, -1, 0]
+          }
+        }
       },
       {
         "components": {
-        "name": "Swing Bar Mesh",
-        "transform": {
-          "position": [0, 0, 0],
-          "rotation": [0, 0, 0],
-          "scale": [0.1, 0.1, 2]
-        },
-        "render": {
-          "meshes": [
-            {
-              "mesh": "unit_cube.obj",
-              "material": "textured.mat"
-            }
-          ]
+          "name": "Swing Bar Mesh",
+          "transform": {
+            "position": [0, 0, 0],
+            "rotation": [0, 0, 0],
+            "scale": [0.1, 0.1, 2]
+          },
+          "render": {
+            "meshes": [
+              {
+                "mesh": "unit_cube.obj",
+                "material": "textured.mat"
+              }
+            ]
+          }
         }
-      }
       }
     ],
     "components": {
@@ -31,7 +36,9 @@
         "isSensor": true,
         "bodyType": "static",
         "size": [2, 2, 2],
-        "ignoreTransformScale": true
+        "ignoreTransformScale": true,
+        "collisionGroups": "SWING_TRIGGER",
+        "collisionMask": "PLAYER"
       }
     }
   }
