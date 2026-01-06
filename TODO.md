@@ -1,11 +1,10 @@
 ### Alpha Roadmap
 
-1. Roll Cooldown
-2. Jump after Roll
-3. Roll velocity transformation
-4. Flow Concept -> Eco Powerup -> Flow applied
-5. Flow gains
-6. Level Design
+1. Jump after Roll
+2. Roll velocity transformation
+3. Flow Concept -> Eco Powerup -> Flow applied
+4. Flow gains
+5. Level Design
    ----Dash to Wall
    ----Dash distance
 
@@ -13,10 +12,11 @@
 
 1. Jump floaty?
 2. WallRun angle needs to be amplified?
-3. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
-4. Deactivate dash on close range?
-5. Test floaty jump when dashing (no jump cut factor applied)
-6. Test mantle on small slope/places
+3. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion
+4. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
+5. Deactivate dash on close range?
+6. Test floaty jump when dashing (no jump cut factor applied)
+7. Test mantle on small slope/places
 
 ### Engine
 

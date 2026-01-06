@@ -51,6 +51,8 @@ export class CharacterControllerComponent extends Component {
   private rollSpeed: number = 0.0; // Velocidad del roll (capturada al inicio)
   private rollDirection: vec3 = vec3.create(); // Dirección fija del roll
   private rollTimer: number = 0.0; // Tiempo transcurrido en el roll
+  private rollCooldown: number = 0.4; // Tiempo de espera entre rolls (en segundos)
+  private rollCooldownTimer: number = 0.0; // Temporizador del cooldown
   private originalHeight: number = 0.0; // Altura original del collider
   private originalRadius: number = 0.0; // Radio original del collider
 
@@ -131,6 +133,10 @@ export class CharacterControllerComponent extends Component {
 
     if (this.inputDisableTimer > 0.0) {
       this.inputDisableTimer -= deltaTime;
+    }
+
+    if (this.rollCooldownTimer > 0.0) {
+      this.rollCooldownTimer -= deltaTime;
     }
 
     this.getIsGroundedAndGroundNormal();
@@ -819,7 +825,12 @@ export class CharacterControllerComponent extends Component {
   //ROLLING
   private manageRolling(): void {
     const input = Engine.getInput();
-    if (!this.isRolling && this.isGrounded && input.isActionJustPressed(GameAction.SLIDE)) {
+    if (
+      !this.isRolling &&
+      this.isGrounded &&
+      this.rollCooldownTimer <= 0.0 &&
+      input.isActionJustPressed(GameAction.SLIDE)
+    ) {
       this.startRoll();
     }
   }
@@ -878,6 +889,7 @@ export class CharacterControllerComponent extends Component {
     if (!this.isRolling) return;
     this.isRolling = false;
     this.rollTimer = 0.0;
+    this.rollCooldownTimer = this.rollCooldown; // Iniciar cooldown
 
     // Transferir velocidad del roll al movimiento normal
     vec3.copy(this.currentHorizontalVelocity, currentVelocity);
