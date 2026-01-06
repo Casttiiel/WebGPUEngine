@@ -80,10 +80,10 @@ export class CameraCrouchComponent extends Component {
     const characterController = this.getOwner().getComponent('character_controller');
     if (!characterController) return;
 
-    const isSliding = (characterController as CharacterControllerComponent).getIsSliding() || false;
+    const isRolling = (characterController as CharacterControllerComponent).getIsRolling() || false;
 
     // Altura objetivo: baja durante slide, normal el resto del tiempo
-    const targetHeight = isSliding ? this.slideCrouchHeight : this.baseEyeHeight;
+    const targetHeight = isRolling ? this.slideCrouchHeight : this.baseEyeHeight;
 
     // Interpolación suave hacia la altura objetivo
     const heightDiff = targetHeight - this.currentEyeHeight;

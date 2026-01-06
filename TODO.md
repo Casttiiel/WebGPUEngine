@@ -1,18 +1,22 @@
 ### Alpha Roadmap
 
-1. Dash to Wall
-2. Momentum/Chain
-3. Eco
-4. Slide -> Roll
-5. FEEDBACK
+1. Roll Cooldown
+2. Jump after Roll
+3. Roll velocity transformation
+4. Flow Concept -> Eco Powerup -> Flow applied
+5. Flow gains
 6. Level Design
+   ----Dash to Wall
+   ----Dash distance
 
 ### Feedback
 
-1. Test mantle on small slope/places
-2. Jump floaty?
-3. Dash distance
-4. Deactivate dash on close range
+1. Jump floaty?
+2. WallRun angle needs to be amplified?
+3. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
+4. Deactivate dash on close range?
+5. Test floaty jump when dashing (no jump cut factor applied)
+6. Test mantle on small slope/places
 
 ### Engine
 
@@ -33,9 +37,8 @@
 
 ## Gameplay
 
-1. Gameplay analysis
-2. Door
-3. Enemy
+1. Door
+2. Enemy
 
 ## Visuals and Sound
 

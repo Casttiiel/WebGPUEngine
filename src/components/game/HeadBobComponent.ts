@@ -74,13 +74,13 @@ export class HeadBobComponent extends Component {
       (characterController as CharacterControllerComponent).getCurrentSpeed() || 0.0;
     const isGrounded =
       (characterController as CharacterControllerComponent).getIsGrounded() ?? false;
-    const isSliding = (characterController as CharacterControllerComponent).getIsSliding() ?? false;
+    const isRolling = (characterController as CharacterControllerComponent).getIsRolling() ?? false;
 
     // Solo aplicar head bob si:
     // 1. Está en el suelo (no saltando)
-    // 2. No está sliding
+    // 2. No está rolling
     // 3. La velocidad supera el threshold
-    if (!isGrounded || isSliding || currentSpeed < this.speedThreshold) {
+    if (!isGrounded || isRolling || currentSpeed < this.speedThreshold) {
       // Fade out suave cuando se detiene, salta o hace slide
       vec3.scale(this.headBobOffset, this.headBobOffset, Math.max(0, 1.0 - dt * 5.0));
       this.headBobTimer = 0.0;

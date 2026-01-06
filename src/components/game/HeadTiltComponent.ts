@@ -94,7 +94,7 @@ export class HeadTiltComponent extends Component {
       return;
     }
 
-    const isSliding = (characterController as CharacterControllerComponent).getIsSliding() ?? false;
+    const isRolling = (characterController as CharacterControllerComponent).getIsRolling() ?? false;
     const isMantling =
       (characterController as CharacterControllerComponent).getIsMantling() ?? false;
     const isWallRunning =
@@ -104,12 +104,12 @@ export class HeadTiltComponent extends Component {
 
     // Solo aplicar head tilt si:
     // 1. Está en el suelo (no saltando)
-    // 2. No está sliding
+    // 2. No está rolling
     // 3. Se está moviendo lateralmente (izquierda o derecha)
     // 4. No se presionan ambas teclas a la vez
     // 5. Hace mantling
     if (
-      isSliding ||
+      isRolling ||
       (leftKeyPressed && rightKeyPressed && !isMantling) ||
       (!leftKeyPressed && !rightKeyPressed && !isMantling && !isWallRunning)
     ) {

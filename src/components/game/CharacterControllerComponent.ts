@@ -44,16 +44,13 @@ export class CharacterControllerComponent extends Component {
   private timeSinceGrounded: number = 0.0; // Tiempo desde que dejó de estar grounded
   private jumpCutVerticalVelocityLimit: number = 1.0; // Velocidad vertical máxima para aplicar el corte de salto
 
-  // Slide
-  private slideMinStartSpeedThreshold: number = 5.0; // Velocidad mínima para activar slide
-  private minSlideVelocityThreshold: number = 2.0; // Velocidad mínima para mantener el slide
-  private slideDownhillAccel: number = 4.0; // Tiempo de frenado del slide
-  private slideFriction: number = 4.0; // Fricción base del slide
-  private slideUphillBrake: number = 5.0; // Fricción adicional al subir
-  private slideMinDuration: number = 0.5; // Tiempo mínimo del slide en segundos (no se puede cancelar antes)
-  private slideVelocity: number = 0.0; // Velocidad capturada al inicio del slide
-  private slideDirection: vec3 = vec3.create();
-  private slideTimer: number = 0.0; // Tiempo transcurrido en slide
+  // Roll
+  private rollDuration: number = 0.3; // Duración fija del roll en segundos
+  private rollSpeedMultiplier: number = 1.4; // Multiplicador de velocidad durante el roll (40% más rápido)
+  private rollMinStartSpeed: number = 0.01; // Velocidad mínima para activar el roll
+  private rollSpeed: number = 0.0; // Velocidad del roll (capturada al inicio)
+  private rollDirection: vec3 = vec3.create(); // Dirección fija del roll
+  private rollTimer: number = 0.0; // Tiempo transcurrido en el roll
   private originalHeight: number = 0.0; // Altura original del collider
   private originalRadius: number = 0.0; // Radio original del collider
 
@@ -109,7 +106,7 @@ export class CharacterControllerComponent extends Component {
   private isActive: boolean = true;
   private isGrounded: boolean = false;
   private isJumping: boolean = false;
-  private isSliding: boolean = false;
+  private isRolling: boolean = false;
   private isDiving: boolean = false;
   private isSwinging: boolean = false;
   private isWallRunning: boolean = false;
@@ -140,14 +137,14 @@ export class CharacterControllerComponent extends Component {
     this.manageMantling(deltaTime);
     this.manageDashing();
     this.detectWall();
-    this.manageSliding();
+    this.manageRolling();
 
     if (this.isDashing) {
       this.updateDash(deltaTime);
     } else if (this.isMantling) {
       this.updateMantle(deltaTime);
-    } else if (this.isSliding) {
-      const finalVelocity = this.updateSlide(deltaTime);
+    } else if (this.isRolling) {
+      const finalVelocity = this.updateRoll(deltaTime);
       this.applyMovement(finalVelocity, deltaTime);
     } else if (this.isWallRunning) {
       this.updateWallRun();
@@ -411,6 +408,7 @@ export class CharacterControllerComponent extends Component {
 
       if (type === RAPIER.RigidBodyType.Fixed) {
         this.isDashing = false;
+        this.isRolling = false;
         if (!this.isWallRunning && !this.isMantling) {
           this.removeVelocityIntoWall(collisionNormal);
         }
@@ -818,94 +816,72 @@ export class CharacterControllerComponent extends Component {
     this.isDashing = false;
   }
 
-  //SLIDING
-  private manageSliding(): void {
+  //ROLLING
+  private manageRolling(): void {
     const input = Engine.getInput();
-    if (!this.isSliding && input.isActionJustPressed(GameAction.SLIDE)) {
-      // Activar slide solo si estamos en el suelo, con velocidad suficiente Y moviendo hacia adelante (W)
-      const isMovingForward = input.isActionPressed(GameAction.MOVE_FORWARD);
-      const isMovingBackward = input.isActionPressed(GameAction.MOVE_BACKWARD);
-      const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-      if (
-        this.isGrounded &&
-        currentSpeed >= this.slideMinStartSpeedThreshold &&
-        isMovingForward &&
-        !isMovingBackward
-      ) {
-        this.startSlide();
-      }
+    if (!this.isRolling && this.isGrounded && input.isActionJustPressed(GameAction.SLIDE)) {
+      this.startRoll();
     }
   }
 
-  private startSlide(): void {
-    this.isSliding = true;
-    this.slideTimer = 0.0;
-    // Capturar velocidad actual para el slide
-    this.slideVelocity = vec3.length(this.currentHorizontalVelocity);
-    const horizontal = vec3.fromValues(
-      this.currentHorizontalVelocity[0],
-      0,
-      this.currentHorizontalVelocity[2],
-    );
-    vec3.copy(this.slideDirection, vec3.normalize(vec3.create(), horizontal));
+  private startRoll(): void {
+    this.isRolling = true;
+    this.rollTimer = 0.0;
+
+    // Capturar velocidad actual
+    const currentSpeed = vec3.length(this.currentHorizontalVelocity);
+
+    // Si estás parado o muy lento, usar velocidad máxima de caminar
+    // Si ya te mueves, aplicar multiplicador para ir más rápido
+    if (currentSpeed < this.rollMinStartSpeed) {
+      this.rollSpeed = this.moveSpeed * this.rollSpeedMultiplier;
+    } else {
+      this.rollSpeed = Math.max(currentSpeed, this.moveSpeed) * this.rollSpeedMultiplier;
+    }
+
+    // Fijar dirección del roll
+    // Si estás parado, usar la dirección de la cámara (forward)
+    if (currentSpeed <= this.rollMinStartSpeed) {
+      const cameraObj = this.camera!.getCamera();
+      const forward = cameraObj.getFront();
+      // Proyectar forward en el plano horizontal (XZ) y normalizar
+      this.rollDirection[0] = forward[0];
+      this.rollDirection[1] = 0;
+      this.rollDirection[2] = forward[2];
+
+      vec3.normalize(this.rollDirection, this.rollDirection);
+    } else {
+      // Si te mueves, usar la dirección actual del movimiento
+      vec3.normalize(this.rollDirection, this.horizontalDirection);
+    }
   }
 
-  private updateSlide(deltaTime: number): vec3 {
-    const input = Engine.getInput();
-    this.slideTimer += deltaTime;
+  private updateRoll(deltaTime: number): vec3 {
+    this.rollTimer += deltaTime;
 
-    const horizontal = this.slideDirection;
-    const projected = this.projectOnPlane(horizontal, this.groundNormal);
-
-    // Normalize final movement
+    // Proyectar la dirección fija del roll sobre el plano del suelo
+    const projected = this.projectOnPlane(this.rollDirection, this.groundNormal);
     vec3.normalize(projected, projected);
 
-    const gravityDir = vec3.fromValues(0, -1, 0);
-    const downhill = this.projectOnPlane(gravityDir, this.groundNormal);
-    let downhillFactor = 0.0;
-    if (vec3.length(downhill) > 0.001) {
-      vec3.normalize(downhill, downhill);
-      // Cuánto apunta el slide hacia abajo
-      downhillFactor = vec3.dot(projected, downhill);
-    }
-    if (downhillFactor > 0) {
-      // BAJADA → acelerar
-      this.slideVelocity += this.slideDownhillAccel * deltaTime;
-    } else {
-      // SUBIDA → frenar más
-      // Decelerar progresivamente el slide
-      let friction = this.slideFriction;
+    // Mantener velocidad constante durante todo el roll (sin cambios)
+    const result = vec3.scale(vec3.create(), projected, this.rollSpeed);
 
-      if (downhillFactor < 0) {
-        friction += this.slideUphillBrake;
-      }
-
-      // Aplicar deceleración manteniendo dirección
-      this.slideVelocity -= friction * deltaTime;
-    }
-
-    const result = vec3.scale(vec3.create(), projected, this.slideVelocity);
-
-    // Terminar slide solo si:
-    // 1. Ha pasado el tiempo mínimo Y (soltamos tecla O se acabó tiempo O velocidad baja)
-    // 2. O perdemos contacto con el suelo (cancelación forzada)
-    const minDurationPassed =
-      this.slideTimer >= this.slideMinDuration && !input.isActionPressed(GameAction.SLIDE);
-    const shouldEndSlideBecauseVelocity = this.slideVelocity < this.minSlideVelocityThreshold;
-    if (!this.isGrounded || minDurationPassed || shouldEndSlideBecauseVelocity) {
-      this.endSlide(result);
+    // Terminar roll cuando se acaba la duración O perdemos contacto con el suelo
+    if (this.rollTimer >= this.rollDuration || !this.isGrounded) {
+      this.endRoll(result);
     }
 
     return result;
   }
 
-  private endSlide(currentVelocity: vec3): void {
-    if (!this.isSliding) return;
-    this.isSliding = false;
-    this.slideTimer = 0.0;
+  private endRoll(currentVelocity: vec3): void {
+    if (!this.isRolling) return;
+    this.isRolling = false;
+    this.rollTimer = 0.0;
 
-    // Transferir velocidad del slide al movimiento normal
+    // Transferir velocidad del roll al movimiento normal
     vec3.copy(this.currentHorizontalVelocity, currentVelocity);
+    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
   }
 
   //MANTLING
@@ -1116,6 +1092,7 @@ export class CharacterControllerComponent extends Component {
       return;
 
     this.isSwinging = true;
+    this.isDashing = false;
 
     this.swingAngle = data.startAngle;
     this.swingEndAngle = data.endAngle;
@@ -1124,7 +1101,6 @@ export class CharacterControllerComponent extends Component {
     vec3.copy(this.swingAxis, data.barAxis);
 
     this.swingSpeed = Math.max(vec3.length(this.currentHorizontalVelocity), this.minSwingSpeed);
-
     this.swingAngularSpeed = this.swingSpeed / this.swingRadius;
 
     const down = vec3.fromValues(0, -1, 0);
@@ -1246,8 +1222,8 @@ export class CharacterControllerComponent extends Component {
     return this.isGrounded;
   }
 
-  public getIsSliding(): boolean {
-    return this.isSliding;
+  public getIsRolling(): boolean {
+    return this.isRolling;
   }
 
   public getIsMantling(): boolean {
