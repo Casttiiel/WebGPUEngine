@@ -33,7 +33,7 @@ export class InputManager {
 
   private constructor() {
     this.controlMapping = { ...DEFAULT_CONTROL_MAPPING };
-    this.inputBuffer = new InputBuffer(150); // 150ms buffer window
+    this.inputBuffer = new InputBuffer(250); // 150ms buffer window
   }
 
   public static getInstance(): InputManager {

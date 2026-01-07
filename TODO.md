@@ -1,18 +1,20 @@
 ### Alpha Roadmap
 
-1. Jump after Roll
-2. Roll velocity transformation
+1. Roll velocity transformation
+2. Roll head animation
 3. Flow Concept -> Eco Powerup -> Flow applied
 4. Flow gains
 5. Level Design
    ----Dash to Wall
    ----Dash distance
 
+Si no limito la velocidad en el aire, el jugador saltara todo el tiempo, si al aterrizar no limito la velocidad, gana flow solo saltando no?
+
 ### Feedback
 
 1. Jump floaty?
 2. WallRun angle needs to be amplified?
-3. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion
+3. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
 4. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
 5. Deactivate dash on close range?
 6. Test floaty jump when dashing (no jump cut factor applied)

@@ -45,16 +45,20 @@ export class CharacterControllerComponent extends Component {
   private jumpCutVerticalVelocityLimit: number = 1.0; // Velocidad vertical máxima para aplicar el corte de salto
 
   // Roll
-  private rollDuration: number = 0.3; // Duración fija del roll en segundos
+  private rollDuration: number = 0.4; // Duración fija del roll en segundos
   private rollSpeedMultiplier: number = 1.4; // Multiplicador de velocidad durante el roll (40% más rápido)
   private rollMinStartSpeed: number = 0.01; // Velocidad mínima para activar el roll
   private rollSpeed: number = 0.0; // Velocidad del roll (capturada al inicio)
   private rollDirection: vec3 = vec3.create(); // Dirección fija del roll
   private rollTimer: number = 0.0; // Tiempo transcurrido en el roll
-  private rollCooldown: number = 0.4; // Tiempo de espera entre rolls (en segundos)
+  private rollCooldown: number = 0.5; // Tiempo de espera entre rolls (en segundos)
   private rollCooldownTimer: number = 0.0; // Temporizador del cooldown
   private originalHeight: number = 0.0; // Altura original del collider
   private originalRadius: number = 0.0; // Radio original del collider
+  private rollJumpWindowTime: number = 0.25; // Ventana de tiempo para salto especial después del roll
+  private timeSinceLastRoll: number = 999.0; // Tiempo desde que terminó el último roll
+  private rollJumpVerticalForce: number = 6.0; // Fuerza vertical del salto especial (mayor que salto normal)
+  private rollJumpHorizontalBoost: number = 15.0; // Impulso horizontal del salto especial
 
   // WallRun
   private wallNormal: vec3 = vec3.create();
@@ -138,6 +142,8 @@ export class CharacterControllerComponent extends Component {
     if (this.rollCooldownTimer > 0.0) {
       this.rollCooldownTimer -= deltaTime;
     }
+
+    this.timeSinceLastRoll += deltaTime;
 
     this.getIsGroundedAndGroundNormal();
     this.manageMantling(deltaTime);
@@ -326,12 +332,12 @@ export class CharacterControllerComponent extends Component {
         );
 
         // Limitar velocidad total (permitir un poco más que en suelo)
-        const currentSpeed = vec3.length(this.currentHorizontalVelocity);
+        /*const currentSpeed = vec3.length(this.currentHorizontalVelocity);
         const maxAirSpeed = this.moveSpeed;
         if (currentSpeed > maxAirSpeed) {
           vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
           vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, maxAirSpeed);
-        }
+        }*/
       } else {
         // Sin input: aplicar resistencia del aire
         const dragFactor = Math.pow(1.0 - this.airDrag, deltaTime);
@@ -458,7 +464,11 @@ export class CharacterControllerComponent extends Component {
     if (input.isActionBuffered(GameAction.JUMP)) {
       input.consumeBufferedAction(GameAction.JUMP);
       if (canGroundJump) {
-        this.applyJump();
+        if (this.timeSinceLastRoll < this.rollJumpWindowTime) {
+          this.applySpecialRollJump();
+        } else {
+          this.applyJump();
+        }
         this.isJumping = true; // Iniciar salto variable
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
         this.jumpCutFactorApplied = false;
@@ -480,6 +490,40 @@ export class CharacterControllerComponent extends Component {
 
   private applyJump(): void {
     this.currentVerticalVelocity = this.jumpForce;
+  }
+
+  /**
+   * Salto especial activado al presionar salto justo después del roll
+   * Proporciona mayor altura e impulso horizontal para alcanzar lugares más lejanos
+   */
+  private applySpecialRollJump(): void {
+    // Aplicar fuerza vertical aumentada
+    this.currentVerticalVelocity = this.rollJumpVerticalForce;
+
+    // Determinar dirección del impulso horizontal
+    let boostDirection = vec3.create();
+
+    // Si hay velocidad horizontal actual, usar esa dirección
+    if (vec3.length(this.currentHorizontalVelocity) > 0.1) {
+      vec3.normalize(boostDirection, this.currentHorizontalVelocity);
+    }
+    // Si no hay movimiento, usar la dirección de la cámara (forward)
+    else {
+      const forward = this.camera!.getCamera().getFront();
+      boostDirection[0] = forward[0];
+      boostDirection[1] = 0;
+      boostDirection[2] = forward[2];
+      vec3.normalize(boostDirection, boostDirection);
+    }
+
+    // Aplicar impulso horizontal en la dirección determinada
+    vec3.scale(this.currentHorizontalVelocity, boostDirection, this.rollJumpHorizontalBoost);
+    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
+    vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+
+    this.isJumping = true; // Iniciar salto variable
+    this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+    this.jumpCutFactorApplied = false;
   }
 
   //WALLRUN
@@ -829,8 +873,9 @@ export class CharacterControllerComponent extends Component {
       !this.isRolling &&
       this.isGrounded &&
       this.rollCooldownTimer <= 0.0 &&
-      input.isActionJustPressed(GameAction.SLIDE)
+      input.isActionBuffered(GameAction.ROLL)
     ) {
+      input.consumeBufferedAction(GameAction.ROLL);
       this.startRoll();
     }
   }
@@ -890,6 +935,7 @@ export class CharacterControllerComponent extends Component {
     this.isRolling = false;
     this.rollTimer = 0.0;
     this.rollCooldownTimer = this.rollCooldown; // Iniciar cooldown
+    this.timeSinceLastRoll = 0.0; // Marcar el momento en que terminó el roll
 
     // Transferir velocidad del roll al movimiento normal
     vec3.copy(this.currentHorizontalVelocity, currentVelocity);
@@ -1236,6 +1282,10 @@ export class CharacterControllerComponent extends Component {
 
   public getIsRolling(): boolean {
     return this.isRolling;
+  }
+
+  public getIsSpecialRollJumpAvailable(): boolean {
+    return this.timeSinceLastRoll < this.rollJumpWindowTime;
   }
 
   public getIsMantling(): boolean {
