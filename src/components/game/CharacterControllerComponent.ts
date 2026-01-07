@@ -1284,6 +1284,14 @@ export class CharacterControllerComponent extends Component {
     return this.isRolling;
   }
 
+  public getRollTimer(): number {
+    return this.rollTimer;
+  }
+
+  public getRollDuration(): number {
+    return this.rollDuration;
+  }
+
   public getIsSpecialRollJumpAvailable(): boolean {
     return this.timeSinceLastRoll < this.rollJumpWindowTime;
   }

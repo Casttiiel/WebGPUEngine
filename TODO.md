@@ -1,10 +1,9 @@
 ### Alpha Roadmap
 
 1. Roll velocity transformation
-2. Roll head animation
-3. Flow Concept -> Eco Powerup -> Flow applied
-4. Flow gains
-5. Level Design
+2. Flow Concept -> Eco Powerup -> Flow applied
+3. Flow gains
+4. Level Design
    ----Dash to Wall
    ----Dash distance
 

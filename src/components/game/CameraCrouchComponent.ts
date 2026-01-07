@@ -80,14 +80,32 @@ export class CameraCrouchComponent extends Component {
     const characterController = this.getOwner().getComponent('character_controller');
     if (!characterController) return;
 
-    const isRolling = (characterController as CharacterControllerComponent).getIsRolling() || false;
+    const charCtrl = characterController as CharacterControllerComponent;
+    const isRolling = charCtrl.getIsRolling();
 
-    // Altura objetivo: baja durante slide, normal el resto del tiempo
-    const targetHeight = isRolling ? this.slideCrouchHeight : this.baseEyeHeight;
+    // Si está haciendo roll, calcular altura basada en función seno negada
+    if (isRolling) {
+      const rollTimer = charCtrl.getRollTimer();
+      const rollDuration = charCtrl.getRollDuration();
 
-    // Interpolación suave hacia la altura objetivo
-    const heightDiff = targetHeight - this.currentEyeHeight;
-    this.currentEyeHeight += heightDiff * Math.min(1.0, dt * this.crouchSpeed);
+      // Progreso del roll (0.0 a 1.0)
+      const rollProgress = Math.min(rollTimer / rollDuration, 1.0);
+
+      // Función seno negada: empieza en 0, baja a -1 en el medio (PI/2), vuelve a 0 al final (PI)
+      // -sin(progress * PI) da valores de 0 -> -1 -> 0
+      const sineValue = -Math.sin(rollProgress * Math.PI);
+
+      // Interpolación entre altura base y altura de crouch usando el seno
+      // Cuando sineValue = 0 -> baseEyeHeight
+      // Cuando sineValue = -1 -> slideCrouchHeight
+      const heightDifference = this.baseEyeHeight - this.slideCrouchHeight;
+      this.currentEyeHeight = this.baseEyeHeight + sineValue * heightDifference;
+    }
+    // Si no está haciendo roll, volver suavemente a la altura base
+    else {
+      const heightDiff = this.baseEyeHeight - this.currentEyeHeight;
+      this.currentEyeHeight += heightDiff * Math.min(1.0, dt * this.crouchSpeed);
+    }
 
     // Actualizar eyeOffset Y del FPSCamera
     const eyeOffset = (this.fpsCamera as any).eyeOffset;
