@@ -27,7 +27,7 @@ export interface FlowComponentData {
  */
 export class FlowComponent extends Component {
   // Estado
-  private flowLevel: number = 0; // 0-5
+  private flowLevel: number = 5; // 0-5
   private flowEnergy: number = 0.0; // Acumulador suave para subir de nivel
   private previousVelocity: vec3 = vec3.create(); // Para detectar conservación de dirección
 

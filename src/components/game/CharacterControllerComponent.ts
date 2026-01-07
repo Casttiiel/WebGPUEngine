@@ -33,7 +33,7 @@ export class CharacterControllerComponent extends Component {
   private flowComponent: FlowComponent | null = null;
 
   // Movement
-  private moveSpeed: number = 5.0; // Unidades por segundo
+  private baseMoveSpeed: number = 5.0; // Velocidad base (sin flow)
   private airAcceleration: number = 10.0; // Control en el aire (0.0 = sin control, 1.0 = control total)
   private groundAcceleration: number = 20.0; // Aceleración en el suelo
   private groundDeceleration: number = 30.0; // Deceleración en el suelo
@@ -304,6 +304,7 @@ export class CharacterControllerComponent extends Component {
 
   private manageHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
+    const effectiveMoveSpeed = this.getEffectiveMoveSpeed();
 
     if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración/frenado suave
@@ -313,7 +314,7 @@ export class CharacterControllerComponent extends Component {
         vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
         this.horizontalDirection = this.projectOnPlane(this.horizontalDirection, this.groundNormal);
       }
-      const targetSpeed = hasInput ? this.moveSpeed : 0.0;
+      const targetSpeed = hasInput ? effectiveMoveSpeed : 0.0;
       const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
       this.horizontalSpeed = this.approach(this.horizontalSpeed, targetSpeed, accel * deltaTime);
 
@@ -322,7 +323,7 @@ export class CharacterControllerComponent extends Component {
       // EN AIRE: Aceleración directa hacia velocidad objetivo
       if (hasInput) {
         // Velocidad objetivo en la dirección de input
-        vec3.scale(targetMovement, targetMovement, this.moveSpeed);
+        vec3.scale(targetMovement, targetMovement, effectiveMoveSpeed);
 
         const airAcceleration = this.airAcceleration;
 
@@ -340,7 +341,7 @@ export class CharacterControllerComponent extends Component {
 
         // Limitar velocidad total (permitir un poco más que en suelo)
         /*const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-        const maxAirSpeed = this.moveSpeed;
+        const maxAirSpeed = effectiveMoveSpeed;
         if (currentSpeed > maxAirSpeed) {
           vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
           vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, maxAirSpeed);
@@ -672,6 +673,7 @@ export class CharacterControllerComponent extends Component {
 
   private manageHorizontalMovementForWallRun(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
+    const effectiveMoveSpeed = this.getEffectiveMoveSpeed();
 
     //Solo puedes ir hacia adelante o atras de la pared
     let wallTangent = this.projectOntoWallTangent(targetMovement, this.wallNormal);
@@ -692,7 +694,7 @@ export class CharacterControllerComponent extends Component {
         // 👉 MISMA DIRECCIÓN → ACELERAR
         this.horizontalSpeed = this.approach(
           this.horizontalSpeed,
-          this.moveSpeed,
+          effectiveMoveSpeed,
           this.wallRunAcceleration * deltaTime,
         );
       } else {
@@ -756,12 +758,13 @@ export class CharacterControllerComponent extends Component {
     this.inputDisableTimer = this.disableInputAfterWallJumpTime;
     this.mantlingDisableTimer = this.disableMantleAfterWallJumpTime;
 
-    vec3.scale(jumpDir, jumpDir, this.moveSpeed);
+    const effectiveMoveSpeed = this.getEffectiveMoveSpeed();
+    vec3.scale(jumpDir, jumpDir, effectiveMoveSpeed);
     this.currentVerticalVelocity = this.wallJumpForce;
-    const currentSpeed = Math.max(vec3.length(this.currentHorizontalVelocity), this.moveSpeed);
+    const currentSpeed = Math.max(vec3.length(this.currentHorizontalVelocity), effectiveMoveSpeed);
     vec3.scale(this.currentHorizontalVelocity, jumpDir, currentSpeed);
     vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
-    vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, this.moveSpeed);
+    vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, effectiveMoveSpeed);
   }
 
   //DIVING
@@ -893,13 +896,14 @@ export class CharacterControllerComponent extends Component {
 
     // Capturar velocidad actual
     const currentSpeed = vec3.length(this.currentHorizontalVelocity);
+    const effectiveMoveSpeed = this.getEffectiveMoveSpeed();
 
     // Si estás parado o muy lento, usar velocidad máxima de caminar
     // Si ya te mueves, aplicar multiplicador para ir más rápido
     if (currentSpeed < this.rollMinStartSpeed) {
-      this.rollSpeed = this.moveSpeed * this.rollSpeedMultiplier;
+      this.rollSpeed = effectiveMoveSpeed * this.rollSpeedMultiplier;
     } else {
-      this.rollSpeed = Math.max(currentSpeed, this.moveSpeed) * this.rollSpeedMultiplier;
+      this.rollSpeed = Math.max(currentSpeed, effectiveMoveSpeed) * this.rollSpeedMultiplier;
     }
 
     // Fijar dirección del roll
@@ -986,7 +990,8 @@ export class CharacterControllerComponent extends Component {
     vec3.normalize(forward, forward);
     // Calcular distancia dinámica basada en velocidad horizontal
     const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-    const speedRatio = Math.min(currentSpeed / (this.moveSpeed * 2.0), 2.0); // Máximo 2x a velocidad de correr
+    const effectiveMoveSpeed = this.getEffectiveMoveSpeed();
+    const speedRatio = Math.min(currentSpeed / (effectiveMoveSpeed * 2.0), 2.0); // Máximo 2x a velocidad de correr
     const dynamicDetectionDistance = this.mantleDetectionDistance * (1.0 + speedRatio * 0.8); // Hasta 1.8x la distancia base
 
     // 1. Raycast horizontal a altura de pecho para detectar obstáculo
@@ -1280,7 +1285,16 @@ export class CharacterControllerComponent extends Component {
   }
 
   public getMoveSpeed(): number {
-    return this.moveSpeed;
+    return this.baseMoveSpeed;
+  }
+
+  /**
+   * Obtiene la velocidad de movimiento efectiva con el multiplicador de FLOW aplicado
+   * FLOW solo afecta el cap de velocidad, no las aceleraciones
+   */
+  private getEffectiveMoveSpeed(): number {
+    const flowMultiplier = this.flowComponent?.getSpeedMultiplier() ?? 1.0;
+    return this.baseMoveSpeed * flowMultiplier;
   }
 
   public getIsGrounded(): boolean {
@@ -1347,7 +1361,7 @@ export class CharacterControllerComponent extends Component {
     }
 
     // Leer todos los parámetros configurables del data
-    if (data.moveSpeed !== undefined) this.moveSpeed = data.moveSpeed;
+    if (data.moveSpeed !== undefined) this.baseMoveSpeed = data.moveSpeed;
     if (data.airAcceleration !== undefined) this.airAcceleration = data.airAcceleration;
     if (data.groundAcceleration !== undefined) this.groundAcceleration = data.groundAcceleration;
     if (data.groundDeceleration !== undefined) this.groundDeceleration = data.groundDeceleration;

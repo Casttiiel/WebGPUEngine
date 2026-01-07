@@ -1,11 +1,14 @@
 ### Alpha Roadmap
 
-1. Flow Concept -> Eco Powerup -> Flow applied
-2. Flow gains
+1. Flow gains
+2. Flow reduce
 3. Roll velocity transformation
-4. Level Design
+4. Revisit everything
+5. Load variables update
+6. Level Design
    ----Dash to Wall
    ----Dash distance
+7. Eco Powerup
 
 Si no limito la velocidad en el aire, el jugador saltara todo el tiempo, si al aterrizar no limito la velocidad, gana flow solo saltando no?
 
