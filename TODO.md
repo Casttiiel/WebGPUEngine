@@ -1,14 +1,20 @@
 ### Alpha Roadmap
 
-1. Flow gains
+1. Flow gains (if repeated action no gain flow)
+   Roll to ground, roll + jump, wall jump, Dash give 1 flow
 2. Flow reduce
-3. Roll velocity transformation
-4. Revisit everything
-5. Load variables update
-6. Level Design
+   Hit ground no roll
+3. Flow reset
+   Hit wall
+   Stop
+4. Load variables update
+5. Speed lines not showing
+6. Revisit everything
+7. Roll velocity transformation
+8. Level Design
    ----Dash to Wall
    ----Dash distance
-7. Eco Powerup
+9. Eco Powerup
 
 Si no limito la velocidad en el aire, el jugador saltara todo el tiempo, si al aterrizar no limito la velocidad, gana flow solo saltando no?
 
@@ -16,10 +22,10 @@ Si no limito la velocidad en el aire, el jugador saltara todo el tiempo, si al a
 
 1. Jump floaty?
 2. WallRun angle needs to be amplified?
-3. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
+3. Test floaty jump when dashing (no jump cut factor applied)
 4. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
 5. Deactivate dash on close range?
-6. Test floaty jump when dashing (no jump cut factor applied)
+6. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
 7. Test mantle on small slope/places
 
 ### Engine

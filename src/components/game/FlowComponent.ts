@@ -1,6 +1,5 @@
 import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
-import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
 
 export interface FlowComponentData {
@@ -27,20 +26,16 @@ export interface FlowComponentData {
  */
 export class FlowComponent extends Component {
   // Estado
-  private flowLevel: number = 5; // 0-5
+  private flowLevel: number = 0; // 0-4
   private flowEnergy: number = 0.0; // Acumulador suave para subir de nivel
-  private previousVelocity: vec3 = vec3.create(); // Para detectar conservación de dirección
 
   // Configuración
-  private flowDecayRate: number = 1.0; // FLOW/segundo de decay pasivo
-  private flowGainThreshold: number = 8.0; // Velocidad mínima para empezar a ganar flow
   private energyThresholdPerLevel: number = 100.0; // Energía acumulada necesaria para subir nivel
   private enabled: boolean = true;
 
   // Multiplicadores por nivel (tabla de diseño)
-  // FLOW 0: 100%, FLOW 1: 110%, FLOW 2: 125%, FLOW 3: 145%, FLOW 4: 170%, FLOW 5: 200%
-  private speedMultipliers: number[] = [1.0, 1.1, 1.25, 1.45, 1.7, 2.0];
-  private jumpMultipliers: number[] = [1.0, 1.1, 1.2, 1.35, 1.5, 1.7];
+  private speedMultipliers: number[] = [1.0, 1.1, 1.25, 1.45, 1.7];
+  private startingActions: string[] = ['mantle', 'impulse_pad', 'swing_bar'];
 
   // Referencias
   private characterController: CharacterControllerComponent | null = null;
@@ -51,12 +46,6 @@ export class FlowComponent extends Component {
   }
 
   public async load(data: FlowComponentData): Promise<void> {
-    if (data.flowDecayRate !== undefined) {
-      this.flowDecayRate = data.flowDecayRate;
-    }
-    if (data.flowGainThreshold !== undefined) {
-      this.flowGainThreshold = data.flowGainThreshold;
-    }
     if (data.energyThresholdPerLevel !== undefined) {
       this.energyThresholdPerLevel = data.energyThresholdPerLevel;
     }
@@ -84,53 +73,80 @@ export class FlowComponent extends Component {
 
     if (!this.characterController) return;
 
-    // TODO: Implementar lógica de flow
-    // - evaluateFlowGain()
-    // - evaluateFlowLoss(dt)
-    // - updateFlowLevel()
-
-    // Guardar velocidad actual para próximo frame
-    vec3.copy(this.previousVelocity, this.characterController.getCurrentHorizontalVelocity());
+    //this.updateFlowLevel();
   }
 
-  // ==================== GETTERS PÚBLICOS ====================
+  /*private evaluateFlowLoss(dt: number): void {
+    const currentSpeed = this.characterController!.getCurrentSpeed();
+
+    // Pérdida rápida si te detienes
+    if (currentSpeed < 1.0) {
+      this.flowEnergy -= this.flowDecayRate * dt * 20; // Decay rápido al parar
+    }
+
+    // Decay pasivo siempre activo (lento)
+    this.flowEnergy -= this.flowDecayRate * dt;
+
+    // No permitir energía negativa
+    this.flowEnergy = Math.max(0, this.flowEnergy);
+  }*/
+
+  private updateFlowLevel(): void {
+    // Subir de nivel
+    while (
+      this.flowLevel < 5 &&
+      this.flowEnergy >= (this.flowLevel + 1) * this.energyThresholdPerLevel
+    ) {
+      this.flowLevel++;
+      console.log(`💨 FLOW UP! Nivel ${this.flowLevel}`);
+    }
+
+    // Bajar de nivel
+    while (this.flowLevel > 0 && this.flowEnergy < this.flowLevel * this.energyThresholdPerLevel) {
+      this.flowLevel--;
+      console.log(`💧 FLOW DOWN! Nivel ${this.flowLevel}`);
+    }
+  }
+
+  // ==================== NOTIFICACIONES DE ACCIONES ====================
 
   /**
-   * Obtiene el multiplicador de velocidad según el nivel de flow actual
+   * Notifica que se ha realizado una acción especial que debe dar flow
+   * Si flow = 0, estas acciones dan +1 flow instantáneo
+   * Si flow > 0, dan energía progresiva
    */
+  public notifyAction(actionType: string): void {
+    if (!this.enabled) return;
+
+    // Si flow es 0, dar 1 flow instantáneo
+    if (this.flowLevel === 0 && this.startingActions.includes(actionType)) {
+      this.flowLevel = 1;
+      this.flowEnergy = 0.0;
+      console.log(`✨ FLOW INICIADO por ${actionType}! Nivel 1`);
+    } else {
+      // Si ya tienes flow, añadir energía progresiva
+      const energyGain = this.energyThresholdPerLevel * 0.3; // 30% de umbral por acción
+      this.flowEnergy += energyGain;
+      console.log(`🔥 Flow boost por ${actionType}! +${energyGain.toFixed(0)} energía`);
+    }
+  }
+
+  public resetFlow(reason: string): void {
+    if (this.flowLevel > 0 || this.flowEnergy > 0) {
+      console.log(`💥 FLOW PERDIDO: ${reason}`);
+      this.flowLevel = 0;
+      this.flowEnergy = 0;
+    }
+  }
+
+  public penalizeFlow(reason: string, amount: number): void {
+    this.flowEnergy = Math.max(0, this.flowEnergy - amount);
+    console.log(`⚠️ Flow penalizado: ${reason} (-${amount})`);
+  }
+
   public getSpeedMultiplier(): number {
     return this.speedMultipliers[this.flowLevel] ?? 1.0;
   }
-
-  /**
-   * Obtiene el multiplicador de salto según el nivel de flow actual
-   */
-  public getJumpMultiplier(): number {
-    return this.jumpMultipliers[this.flowLevel] ?? 1.0;
-  }
-
-  /**
-   * Obtiene el nivel de flow actual (0-5)
-   */
-  public getFlowLevel(): number {
-    return this.flowLevel;
-  }
-
-  /**
-   * Obtiene la energía acumulada actual
-   */
-  public getFlowEnergy(): number {
-    return this.flowEnergy;
-  }
-
-  /**
-   * Verifica si el sistema está habilitado
-   */
-  public isEnabled(): boolean {
-    return this.enabled;
-  }
-
-  // ==================== DEBUG UI ====================
 
   public override renderInMenu(): void {}
 

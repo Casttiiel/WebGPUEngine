@@ -427,12 +427,15 @@ export class CharacterControllerComponent extends Component {
       );
 
       if (type === RAPIER.RigidBodyType.Fixed) {
+        // Detectar colisión con pared (no suelo, no techo)
+        const isCeiling = collisionNormal[1] < -0.7;
+        const isWall = Math.abs(collisionNormal[1]) < 0.5; // Normal mayormente horizontal
+
         this.isDashing = false;
         this.isRolling = false;
-        if (!this.isWallRunning && !this.isMantling) {
+        if (!this.isWallRunning && !this.isMantling && isWall) {
           this.removeVelocityIntoWall(collisionNormal);
         }
-        const isCeiling = collisionNormal[1] < -0.7;
         if (isCeiling && this.currentVerticalVelocity > 0) {
           this.currentVerticalVelocity = 0;
           this.isJumping = false;
@@ -966,7 +969,8 @@ export class CharacterControllerComponent extends Component {
       this.currentVerticalVelocity < this.mantlingMinVerticalVelocity ||
       this.isDiving ||
       this.isWallRunning ||
-      this.isGrounded
+      this.isGrounded ||
+      this.isMantling
     ) {
       return;
     }
@@ -1098,6 +1102,8 @@ export class CharacterControllerComponent extends Component {
   private startMantle(targetPosition: vec3): void {
     this.isMantling = true;
 
+    this.flowComponent?.notifyAction('mantle');
+
     vec3.copy(this.mantleTargetPos, targetPosition);
 
     // Guardar velocidad ANTES de cancelar el movimiento
@@ -1150,6 +1156,8 @@ export class CharacterControllerComponent extends Component {
     this.isJumping = true; // Marcar como saltando
     this.jumpCutFactorApplied = false;
     this.inputDisableTimer = this.impulsePadInputDisableTime; // Deshabilitar input por un breve momento
+
+    this.flowComponent?.notifyAction('impulse_pad');
   }
 
   //SWING BAR
@@ -1163,6 +1171,8 @@ export class CharacterControllerComponent extends Component {
 
     this.isSwinging = true;
     this.isDashing = false;
+
+    this.flowComponent?.notifyAction('swing_bar');
 
     this.swingAngle = data.startAngle;
     this.swingEndAngle = data.endAngle;
