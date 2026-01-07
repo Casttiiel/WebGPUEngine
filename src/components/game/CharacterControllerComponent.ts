@@ -8,6 +8,7 @@ import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { GameAction } from '../../types/GameAction.enum';
 import { SwingEntryData } from '../../types/SwingEntryData.type';
 import { CollisionGroups } from '../../types/CollisionGroups.enum';
+import { FlowComponent } from './FlowComponent';
 
 const gravity = -9.81; // m/s²
 /**
@@ -29,6 +30,7 @@ export class CharacterControllerComponent extends Component {
   private characterController!: RAPIER.KinematicCharacterController;
   private camera: CameraComponent | null = null;
   private cameraFound: boolean = false;
+  private flowComponent: FlowComponent | null = null;
 
   // Movement
   private moveSpeed: number = 5.0; // Unidades por segundo
@@ -134,6 +136,11 @@ export class CharacterControllerComponent extends Component {
     if (!this.isActive) return;
     this.findCamera();
     if (!this.capsuleCollider || !this.camera) return;
+
+    // Buscar FlowComponent si existe (lazy)
+    if (!this.flowComponent) {
+      this.flowComponent = this.getOwner().getComponent('flow') as FlowComponent;
+    }
 
     if (this.inputDisableTimer > 0.0) {
       this.inputDisableTimer -= deltaTime;

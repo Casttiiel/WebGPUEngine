@@ -60,6 +60,7 @@
       "minSwingSpeed": 8.5,
       "impulsePadInputDisableTime": 0.3
     },
+    "flow":{},
     "fps_camera_controller": {
       "eyeOffset": [0, 0.8, 0],
       "mouseSensitivity": 0.1,

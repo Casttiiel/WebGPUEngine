@@ -41,6 +41,7 @@ import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXCompon
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { SphereColliderComponent } from '../../components/physics/SphereColliderComponent';
+import { FlowComponent } from '../../components/game/FlowComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -261,6 +262,8 @@ export class Loader {
         return new ImpulsePadComponent();
       case 'swing_bar':
         return new SwingBarComponent();
+      case 'flow':
+        return new FlowComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }
