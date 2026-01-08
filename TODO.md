@@ -2,21 +2,17 @@
 
 1. Flow gains
    Roll to ground boost
-2. Flow reset
-   Hit wall
-   Stop
-3. Flow reduce
+2. Flow reduce
    Hit ground no roll
-   Speed reduced by something (On air what)
-4. Load variables update
-5. Level Design
+3. Load variables update
+4. Level Design
    Dash boost (if component Y not too big)
    ----Dash to Wall
    ----Dash distance
    ----Dash to jumper
    ----Dash to bouncer
-6. Eco Powerup
-7. Feedback
+5. Eco Powerup
+6. Feedback
 
 ### Feedback
 
@@ -24,10 +20,11 @@
 2. WallRun angle needs to be amplified?
 3. Swing Bar needs to be picked with some angle
 4. Test floaty jump when dashing (no jump cut factor applied)
-5. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
-6. Deactivate dash on close range?
-7. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
-8. Test mantle on small slope/places
+5. Mantling reduce time disabled after walljump
+6. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
+7. Deactivate dash on close range?
+8. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
+9. Test mantle on small slope/places
 
 ### Engine
 

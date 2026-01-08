@@ -174,6 +174,7 @@ export class CharacterControllerComponent extends Component {
     } else {
       const inputDir = this.getInputVector();
       const targetMovement = this.getTargetMovement(inputDir);
+      this.checkIfStopped(targetMovement);
       this.manageHorizontalMovement(deltaTime, targetMovement);
       this.manageVerticalMovement(deltaTime);
       const finalVelocity = this.mergeMovements();
@@ -223,6 +224,34 @@ export class CharacterControllerComponent extends Component {
       }
     } else {
       this.groundNormal = vec3.fromValues(0, 1, 0);
+    }
+  }
+
+  private checkIfStopped(targetMovement: vec3): void {
+    // Solo chequear si el jugador está en el suelo
+    if (!this.isGrounded) return;
+    if (!this.flowComponent) return;
+
+    // Si el jugador no está en estados especiales
+    if (
+      this.isRolling ||
+      this.isMantling ||
+      this.isWallRunning ||
+      this.isSwinging ||
+      this.isDashing
+    ) {
+      return;
+    }
+
+    // No resetear flow si el input está deshabilitado (impulse pads, etc)
+    if (this.inputDisableTimer > 0.0) return;
+
+    const currentSpeed = this.getCurrentSpeed();
+    const stoppedThreshold = 0.5; // m/s - umbral para considerar que se paró
+    const hasInput = vec3.length(targetMovement) > 0.01;
+
+    if (currentSpeed < stoppedThreshold && !hasInput) {
+      this.flowComponent.resetFlow('player stopped');
     }
   }
 
@@ -299,7 +328,7 @@ export class CharacterControllerComponent extends Component {
   private manageHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
     const effectiveMoveSpeed = this.getEffectiveMoveSpeed();
-    console.log(this.horizontalSpeed);
+
     if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración/frenado suave
       if (hasInput) {
@@ -332,14 +361,6 @@ export class CharacterControllerComponent extends Component {
           targetMovement[2],
           airAcceleration * deltaTime,
         );
-
-        // Limitar velocidad total (permitir un poco más que en suelo)
-        /*const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-        const maxAirSpeed = effectiveMoveSpeed;
-        if (currentSpeed > maxAirSpeed) {
-          vec3.normalize(this.currentHorizontalVelocity, this.currentHorizontalVelocity);
-          vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, maxAirSpeed);
-        }*/
       } else {
         // Sin input: aplicar resistencia del aire
         const dragFactor = Math.pow(1.0 - this.airDrag, deltaTime);
@@ -429,10 +450,12 @@ export class CharacterControllerComponent extends Component {
         this.isRolling = false;
         if (!this.isWallRunning && !this.isMantling && isWall) {
           this.removeVelocityIntoWall(collisionNormal);
+          this.flowComponent?.resetFlow('hit_wall');
         }
         if (isCeiling && this.currentVerticalVelocity > 0) {
           this.currentVerticalVelocity = 0;
           this.isJumping = false;
+          this.flowComponent?.resetFlow('hit_wall');
         }
       }
     }
