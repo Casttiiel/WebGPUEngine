@@ -1,32 +1,33 @@
 ### Alpha Roadmap
 
-1. Flow gains (if repeated action no gain flow)
-   Roll to ground, roll + jump, wall jump, Dash give 1 flow
-2. Flow reduce
-   Hit ground no roll
-3. Flow reset
+1. Flow gains
+   Roll to ground boost
+2. Flow reset
    Hit wall
    Stop
+3. Flow reduce
+   Hit ground no roll
+   Speed reduced by something (On air what)
 4. Load variables update
-5. Speed lines not showing
-6. Revisit everything
-7. Roll velocity transformation
-8. Level Design
+5. Level Design
+   Dash boost (if component Y not too big)
    ----Dash to Wall
    ----Dash distance
-9. Eco Powerup
-
-Si no limito la velocidad en el aire, el jugador saltara todo el tiempo, si al aterrizar no limito la velocidad, gana flow solo saltando no?
+   ----Dash to jumper
+   ----Dash to bouncer
+6. Eco Powerup
+7. Feedback
 
 ### Feedback
 
 1. Jump floaty?
 2. WallRun angle needs to be amplified?
-3. Test floaty jump when dashing (no jump cut factor applied)
-4. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
-5. Deactivate dash on close range?
-6. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
-7. Test mantle on small slope/places
+3. Swing Bar needs to be picked with some angle
+4. Test floaty jump when dashing (no jump cut factor applied)
+5. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
+6. Deactivate dash on close range?
+7. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
+8. Test mantle on small slope/places
 
 ### Engine
 
@@ -65,3 +66,4 @@ Controls
 -Jump too floaty?
 -Air control?
 Camera
+Sensacion de velocidad?

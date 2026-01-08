@@ -108,8 +108,8 @@ export class SpeedLinesVFXComponent extends Component {
       .getEntityByName('Player')
       ?.getComponent('character_controller');
     if (!characterController) return;
-    const speed =
-      ((characterController as CharacterControllerComponent).getCurrentSpeed() ?? 0.0) / 30.0; //TODO THIS NUMBER CHANGE
+    let speed = (characterController as CharacterControllerComponent).getCurrentSpeed() ?? 0.0;
+    speed = Math.max(1 + ((speed - 8) * 9.0) / 6.0, 0.0);
     this.time += dt;
     Render.getInstance()
       .getDevice()

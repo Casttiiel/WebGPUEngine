@@ -28,9 +28,13 @@ export class FlowComponent extends Component {
   // Estado
   private flowLevel: number = 0; // 0-4
   private flowEnergy: number = 0.0; // Acumulador suave para subir de nivel
+  private lastAction: string = ''; // Última acción realizada (para prevenir spam)
 
   // Configuración
-  private energyThresholdPerLevel: number = 100.0; // Energía acumulada necesaria para subir nivel
+  // Umbrales de energía por nivel (cada acción da 50 energía)
+  // Nivel 0→1: 100 (2 acciones), 1→2: 150 (3 acciones), 2→3: 200 (4 acciones), 3→4: 250 (5 acciones)
+  private energyThresholdsPerLevel: number[] = [100, 150, 200, 250]; // Índice = nivel actual
+  private energyPerAction: number = 50.0; // Energía que da cada acción
   private enabled: boolean = true;
 
   // Multiplicadores por nivel (tabla de diseño)
@@ -46,9 +50,6 @@ export class FlowComponent extends Component {
   }
 
   public async load(data: FlowComponentData): Promise<void> {
-    if (data.energyThresholdPerLevel !== undefined) {
-      this.energyThresholdPerLevel = data.energyThresholdPerLevel;
-    }
     if (data.enabled !== undefined) {
       this.enabled = data.enabled;
     }
@@ -93,18 +94,10 @@ export class FlowComponent extends Component {
 
   private updateFlowLevel(): void {
     // Subir de nivel
-    while (
-      this.flowLevel < 5 &&
-      this.flowEnergy >= (this.flowLevel + 1) * this.energyThresholdPerLevel
-    ) {
+    if (this.flowEnergy >= this.energyThresholdsPerLevel[this.flowLevel]) {
+      this.flowEnergy = 0.0;
       this.flowLevel++;
-      console.log(`💨 FLOW UP! Nivel ${this.flowLevel}`);
-    }
-
-    // Bajar de nivel
-    while (this.flowLevel > 0 && this.flowEnergy < this.flowLevel * this.energyThresholdPerLevel) {
-      this.flowLevel--;
-      console.log(`💧 FLOW DOWN! Nivel ${this.flowLevel}`);
+      console.log(`🚀 FLOW SUBIÓ a nivel ${this.flowLevel}!`);
     }
   }
 
@@ -114,20 +107,34 @@ export class FlowComponent extends Component {
    * Notifica que se ha realizado una acción especial que debe dar flow
    * Si flow = 0, estas acciones dan +1 flow instantáneo
    * Si flow > 0, dan energía progresiva
+   * NO se gana flow si se repite la misma acción consecutivamente
    */
   public notifyAction(actionType: string): void {
     if (!this.enabled) return;
 
-    // Si flow es 0, dar 1 flow instantáneo
+    // Prevenir spam de la misma acción
+    if (this.lastAction === actionType) {
+      console.log(`⛔ No flow gain: repeated action "${actionType}"`);
+      return;
+    }
+
+    // Actualizar última acción
+    this.lastAction = actionType;
+
+    // Si flow es 0 y es una acción inicial, dar nivel 1 instantáneo
     if (this.flowLevel === 0 && this.startingActions.includes(actionType)) {
       this.flowLevel = 1;
       this.flowEnergy = 0.0;
-      console.log(`✨ FLOW INICIADO por ${actionType}! Nivel 1`);
+      console.log(`✨ FLOW INICIADO por ${actionType}! Nivel 1 (saltando requisito de 2 acciones)`);
     } else {
       // Si ya tienes flow, añadir energía progresiva
-      const energyGain = this.energyThresholdPerLevel * 0.3; // 30% de umbral por acción
-      this.flowEnergy += energyGain;
-      console.log(`🔥 Flow boost por ${actionType}! +${energyGain.toFixed(0)} energía`);
+      this.flowEnergy += this.energyPerAction;
+      console.log(
+        `🔥 Flow boost por ${actionType}! +${this.energyPerAction.toFixed(0)} energía (Total: ${this.flowEnergy.toFixed(0)})`,
+      );
+
+      // Actualizar nivel basado en energía
+      this.updateFlowLevel();
     }
   }
 
@@ -136,12 +143,16 @@ export class FlowComponent extends Component {
       console.log(`💥 FLOW PERDIDO: ${reason}`);
       this.flowLevel = 0;
       this.flowEnergy = 0;
+      this.lastAction = ''; // Resetear última acción también
     }
   }
 
   public penalizeFlow(reason: string, amount: number): void {
-    this.flowEnergy = Math.max(0, this.flowEnergy - amount);
+    this.flowEnergy -= amount;
     console.log(`⚠️ Flow penalizado: ${reason} (-${amount})`);
+
+    // Actualizar nivel si la energía bajó suficiente
+    this.updateFlowLevel();
   }
 
   public getSpeedMultiplier(): number {

@@ -146,17 +146,11 @@ export class CharacterControllerComponent extends Component {
       this.inputDisableTimer -= deltaTime;
     }
 
-    if (this.rollCooldownTimer > 0.0) {
-      this.rollCooldownTimer -= deltaTime;
-    }
-
-    this.timeSinceLastRoll += deltaTime;
-
     this.getIsGroundedAndGroundNormal();
     this.manageMantling(deltaTime);
     this.manageDashing();
     this.detectWall();
-    this.manageRolling();
+    this.manageRolling(deltaTime);
 
     if (this.isDashing) {
       this.updateDash(deltaTime);
@@ -305,7 +299,7 @@ export class CharacterControllerComponent extends Component {
   private manageHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
     const effectiveMoveSpeed = this.getEffectiveMoveSpeed();
-
+    console.log(this.horizontalSpeed);
     if (this.isGrounded) {
       // EN SUELO: Control normal con aceleración/frenado suave
       if (hasInput) {
@@ -476,9 +470,9 @@ export class CharacterControllerComponent extends Component {
       input.consumeBufferedAction(GameAction.JUMP);
       if (canGroundJump) {
         if (this.timeSinceLastRoll < this.rollJumpWindowTime) {
-          this.applySpecialRollJump();
+          this.applyRollJump();
         } else {
-          this.applyJump();
+          this.currentVerticalVelocity = this.jumpForce;
         }
         this.isJumping = true; // Iniciar salto variable
         this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
@@ -497,44 +491,6 @@ export class CharacterControllerComponent extends Component {
       this.jumpCutFactorApplied = true;
       this.isJumping = false;
     }
-  }
-
-  private applyJump(): void {
-    this.currentVerticalVelocity = this.jumpForce;
-  }
-
-  /**
-   * Salto especial activado al presionar salto justo después del roll
-   * Proporciona mayor altura e impulso horizontal para alcanzar lugares más lejanos
-   */
-  private applySpecialRollJump(): void {
-    // Aplicar fuerza vertical aumentada
-    this.currentVerticalVelocity = this.rollJumpVerticalForce;
-
-    // Determinar dirección del impulso horizontal
-    let boostDirection = vec3.create();
-
-    // Si hay velocidad horizontal actual, usar esa dirección
-    if (vec3.length(this.currentHorizontalVelocity) > 0.1) {
-      vec3.normalize(boostDirection, this.currentHorizontalVelocity);
-    }
-    // Si no hay movimiento, usar la dirección de la cámara (forward)
-    else {
-      const forward = this.camera!.getCamera().getFront();
-      boostDirection[0] = forward[0];
-      boostDirection[1] = 0;
-      boostDirection[2] = forward[2];
-      vec3.normalize(boostDirection, boostDirection);
-    }
-
-    // Aplicar impulso horizontal en la dirección determinada
-    vec3.scale(this.currentHorizontalVelocity, boostDirection, this.rollJumpHorizontalBoost);
-    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
-    vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
-
-    this.isJumping = true; // Iniciar salto variable
-    this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
-    this.jumpCutFactorApplied = false;
   }
 
   //WALLRUN
@@ -768,6 +724,8 @@ export class CharacterControllerComponent extends Component {
     vec3.scale(this.currentHorizontalVelocity, jumpDir, currentSpeed);
     vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
     vec3.scale(this.currentHorizontalVelocity, this.horizontalDirection, effectiveMoveSpeed);
+
+    this.flowComponent?.notifyAction('wall_jump');
   }
 
   //DIVING
@@ -876,12 +834,20 @@ export class CharacterControllerComponent extends Component {
   }
 
   private endDash(): void {
+    this.flowComponent?.notifyAction('dash');
     this.isDashing = false;
   }
 
   //ROLLING
-  private manageRolling(): void {
+  private manageRolling(deltaTime: number): void {
     const input = Engine.getInput();
+
+    if (this.rollCooldownTimer > 0.0) {
+      this.rollCooldownTimer -= deltaTime;
+    }
+
+    this.timeSinceLastRoll += deltaTime;
+
     if (
       !this.isRolling &&
       this.isGrounded &&
@@ -954,6 +920,37 @@ export class CharacterControllerComponent extends Component {
     // Transferir velocidad del roll al movimiento normal
     vec3.copy(this.currentHorizontalVelocity, currentVelocity);
     this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
+  }
+
+  private applyRollJump(): void {
+    // Aplicar fuerza vertical aumentada
+    this.currentVerticalVelocity = this.rollJumpVerticalForce;
+
+    // Determinar dirección del impulso horizontal
+    let boostDirection = vec3.create();
+
+    // Si hay velocidad horizontal actual, usar esa dirección
+    if (vec3.length(this.currentHorizontalVelocity) > 0.1) {
+      vec3.normalize(boostDirection, this.currentHorizontalVelocity);
+    }
+    // Si no hay movimiento, usar la dirección de la cámara (forward)
+    else {
+      const forward = this.camera!.getCamera().getFront();
+      boostDirection[0] = forward[0];
+      boostDirection[1] = 0;
+      boostDirection[2] = forward[2];
+      vec3.normalize(boostDirection, boostDirection);
+    }
+
+    // Aplicar impulso horizontal en la dirección determinada
+    vec3.scale(this.currentHorizontalVelocity, boostDirection, this.rollJumpHorizontalBoost);
+    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
+    vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+
+    this.isJumping = true; // Iniciar salto variable
+    this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+    this.jumpCutFactorApplied = false;
+    this.flowComponent?.notifyAction('roll');
   }
 
   //MANTLING
@@ -1102,8 +1099,6 @@ export class CharacterControllerComponent extends Component {
   private startMantle(targetPosition: vec3): void {
     this.isMantling = true;
 
-    this.flowComponent?.notifyAction('mantle');
-
     vec3.copy(this.mantleTargetPos, targetPosition);
 
     // Guardar velocidad ANTES de cancelar el movimiento
@@ -1138,6 +1133,13 @@ export class CharacterControllerComponent extends Component {
 
   private endMantle(): void {
     this.isMantling = false;
+    this.flowComponent?.notifyAction('mantle');
+    this.horizontalSpeed = this.getEffectiveMoveSpeed();
+    this.currentHorizontalVelocity = vec3.scale(
+      this.currentHorizontalVelocity,
+      this.horizontalDirection,
+      this.horizontalSpeed,
+    );
   }
 
   //IMPULSE PAD
@@ -1171,8 +1173,6 @@ export class CharacterControllerComponent extends Component {
 
     this.isSwinging = true;
     this.isDashing = false;
-
-    this.flowComponent?.notifyAction('swing_bar');
 
     this.swingAngle = data.startAngle;
     this.swingEndAngle = data.endAngle;
@@ -1208,6 +1208,7 @@ export class CharacterControllerComponent extends Component {
 
     if (finished) {
       this.endSwing();
+      console.log('Swing ended', this.horizontalSpeed);
       return;
     }
 
@@ -1224,6 +1225,7 @@ export class CharacterControllerComponent extends Component {
     velocityDir[2] *= this.swingDirection;
 
     vec3.scale(this.currentHorizontalVelocity, velocityDir, this.swingSpeed);
+    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
     this.currentVerticalVelocity = this.currentHorizontalVelocity[1];
     this.currentHorizontalVelocity[1] = 0;
   }
@@ -1231,9 +1233,21 @@ export class CharacterControllerComponent extends Component {
   private endSwing(): void {
     this.isSwinging = false;
 
+    this.flowComponent?.notifyAction('swing_bar');
     // Mantener dirección de salida
     this.currentVerticalVelocity = Math.max(this.currentVerticalVelocity, 1.5);
+    this.horizontalSpeed = this.getEffectiveMoveSpeed();
+    this.horizontalDirection = vec3.normalize(
+      this.horizontalDirection,
+      this.currentHorizontalVelocity,
+    );
+    this.currentHorizontalVelocity = vec3.scale(
+      this.currentHorizontalVelocity,
+      this.horizontalDirection,
+      this.horizontalSpeed,
+    );
     this.isJumping = true;
+    this.timeSinceGrounded = this.coyoteTime + 1.0;
     this.jumpCutFactorApplied = false;
   }
 
@@ -1298,10 +1312,6 @@ export class CharacterControllerComponent extends Component {
     return this.baseMoveSpeed;
   }
 
-  /**
-   * Obtiene la velocidad de movimiento efectiva con el multiplicador de FLOW aplicado
-   * FLOW solo afecta el cap de velocidad, no las aceleraciones
-   */
   private getEffectiveMoveSpeed(): number {
     const flowMultiplier = this.flowComponent?.getSpeedMultiplier() ?? 1.0;
     return this.baseMoveSpeed * flowMultiplier;
@@ -1381,14 +1391,6 @@ export class CharacterControllerComponent extends Component {
     if (data.jumpCutVerticalVelocityLimit !== undefined)
       this.jumpCutVerticalVelocityLimit = data.jumpCutVerticalVelocityLimit;
     if (data.coyoteTime !== undefined) this.coyoteTime = data.coyoteTime;
-    if (data.slideMinStartSpeedThreshold !== undefined)
-      this.slideMinStartSpeedThreshold = data.slideMinStartSpeedThreshold;
-    if (data.minSlideVelocityThreshold !== undefined)
-      this.minSlideVelocityThreshold = data.minSlideVelocityThreshold;
-    if (data.slideDownhillAccel !== undefined) this.slideDownhillAccel = data.slideDownhillAccel;
-    if (data.slideFriction !== undefined) this.slideFriction = data.slideFriction;
-    if (data.slideUphillBrake !== undefined) this.slideUphillBrake = data.slideUphillBrake;
-    if (data.slideMinDuration !== undefined) this.slideMinDuration = data.slideMinDuration;
     if (data.wallRunGravity !== undefined) this.wallRunGravity = data.wallRunGravity;
     if (data.wallRunAcceleration !== undefined) this.wallRunAcceleration = data.wallRunAcceleration;
     if (data.wallRunBrake !== undefined) this.wallRunBrake = data.wallRunBrake;
