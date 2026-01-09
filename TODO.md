@@ -1,8 +1,7 @@
 ### Alpha Roadmap
 
-Jump floaty/too heavy
 Surpass runSpeed
-WallRun lock after timer
+WallRun after timer can go to wallrun again
 Dash end speed/direction + Conserva 80% de velocidad previa
 WallRun angle needs to be amplified?
 WallJump direction?

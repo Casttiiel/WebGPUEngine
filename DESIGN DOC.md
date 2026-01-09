@@ -41,11 +41,7 @@
    Se resetea solo al tocar suelo
    con eco?
 
-8. Aterrizaje normal (sin Impulse Step)
-   Conservas ~85–90% de tu velocidad
-   Sigues corriendo normal
-
-9. Impulse Step
+8. Impulse Step
    Una pisada técnica que convierte desaceleración en energía vertical u horizontal.
    Input
    Soltar correr justo antes de aterrizar
@@ -56,67 +52,67 @@
    +20% altura de salto o
    +15% alcance horizontal (según input)
 
-10. Objetos
+9. Objetos
 
-    🔵 1. Anclas de Eco
-    Qué son
-    Orbes fijos flotantes
-    Siempre visibles
-    Claramente “dashables”
-    Qué hacen
-    Permiten dash a objetos
-    Base del diseño de niveles
-    Para quién
-    Jugador normal: corrección de saltos
-    Speedrunner: rutas aéreas
-    🟠 2. Núcleos de Rebote
-    Qué son
-    Orbes más pequeños o móviles
-    En aire o sobre enemigos
-    Qué hacen
-    Dash → rebote
-    Rebote base:
-    +5 m vertical
-    Con Eco de Rebote:
-    +6 m vertical
-    90% velocidad conservada
-    Para qué sirven
-    Verticalidad
-    Skips
-    Encadenar sin suelo
-    🟣 3. Anclas Fásicas
-    Qué son
-    Anclas “avanzadas”
-    Visualmente distintas
-    Regla
-    Solo interactúan si:
-    Vas a >12 m/s
-    Diseño
-    Invisibles para casual
-    Ruta premium para expertos
-    🟢 4. Carriles de Inercia
-    Qué son
-    Suelo especial (no plataformas)
-    Se leen como “pista”
-    Qué hacen
-    +20% aceleración
-    No frenan al aterrizar
-    Uso
-    Preparar velocidad
-    Setups para saltos largos
+   🔵 1. Anclas de Eco
+   Qué son
+   Orbes fijos flotantes
+   Siempre visibles
+   Claramente “dashables”
+   Qué hacen
+   Permiten dash a objetos
+   Base del diseño de niveles
+   Para quién
+   Jugador normal: corrección de saltos
+   Speedrunner: rutas aéreas
+   🟠 2. Núcleos de Rebote
+   Qué son
+   Orbes más pequeños o móviles
+   En aire o sobre enemigos
+   Qué hacen
+   Dash → rebote
+   Rebote base:
+   +5 m vertical
+   Con Eco de Rebote:
+   +6 m vertical
+   90% velocidad conservada
+   Para qué sirven
+   Verticalidad
+   Skips
+   Encadenar sin suelo
+   🟣 3. Anclas Fásicas
+   Qué son
+   Anclas “avanzadas”
+   Visualmente distintas
+   Regla
+   Solo interactúan si:
+   Vas a >12 m/s
+   Diseño
+   Invisibles para casual
+   Ruta premium para expertos
+   🟢 4. Carriles de Inercia
+   Qué son
+   Suelo especial (no plataformas)
+   Se leen como “pista”
+   Qué hacen
+   +20% aceleración
+   No frenan al aterrizar
+   Uso
+   Preparar velocidad
+   Setups para saltos largos
 
-11. Al cambiar eco:
+10. Al cambiar eco:
     Tu velocidad se clampa a 7 m/s durante 0.3 s
     Se cancelan buffs temporales
     Se resetean cadenas perfectas
 
-12. Eco Cinético
+11. Eco Cinético
     Cada aterrizaje perfecto devuelve un dash aéreo
     Permite rutas sin tocar el suelo
     Si encadenas 3 acciones perfectas seguidas, obtienes:
     +15% velocidad durante 3 s
 
-13. Eco de Inercia
+12. Eco de Inercia
     El salto escala con la velocidad
     Fórmula:
     Altura base: 2.2 m
@@ -128,7 +124,7 @@
     Si fallas un salto (rompes flow):
     −30% velocidad instantánea
 
-14. Eco de Rebote
+13. Eco de Rebote
     Rebotar en enemigos o props
     Usado para skips avanzados
     Rebotas al:
@@ -141,7 +137,7 @@
     +6 m vertical
     90% velocidad conservada
 
-15. “Fallar un salto” — definición FINAL y clara
+14. “Fallar un salto” — definición FINAL y clara
     Esta es la parte más confusa, así que vamos con una definición binaria (true/false).
     ❌ Fallar un salto NO ES:
     No hacer Impulse Step

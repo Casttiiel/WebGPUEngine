@@ -9,7 +9,6 @@ import { GameAction } from '../../types/GameAction.enum';
 import { SwingEntryData } from '../../types/SwingEntryData.type';
 import { CollisionGroups } from '../../types/CollisionGroups.enum';
 
-const gravity = -31.3; // m/s²
 /**
  * CharacterControllerComponent - FPS Character Controller
  *
@@ -54,12 +53,16 @@ export class CharacterControllerComponent extends Component {
   private airDrag: number = 0.1;
 
   // Jump
-  private jumpForce: number = 11.7; // Velocidad inicial del salto
-  private jumpCutFactor: number = 0.6; // Factor para reducir la velocidad al soltar la tecla de salto (0.0 = cortar totalmente, 1.0 = no cortar)
+  private jumpHeight: number = 2.2;
+  private jumpTimeToPeak: number = 0.5;
+  private jumpTimeToDescent: number = 0.4;
+  private jumpVelocity: number = 0.0;
+  private jumpGravity: number = 0.0;
+  private fallGravity: number = 0.0;
+  private jumpCutFactor: number = 0.7; // Factor para reducir la velocidad al soltar la tecla de salto (0.0 = cortar totalmente, 1.0 = no cortar)
   private coyoteTime: number = 0.12; // Segundos de gracia después de dejar el suelo
   private timeSinceGrounded: number = 0.0; // Tiempo desde que dejó de estar grounded
-  private jumpCutVerticalVelocityLimit: number = 1.0; // Velocidad vertical máxima para aplicar el corte de salto
-  private jumpCutFactorApplied: boolean = false; // Si ya se aplicó el corte de salto en el salto actual
+  private jumpCutVerticalVelocityLimit: number = 0.25; // Velocidad vertical máxima para aplicar el corte de salto
 
   // WallRun
   private wallNormal: vec3 = vec3.create();
@@ -273,11 +276,19 @@ export class CharacterControllerComponent extends Component {
   }
 
   private applyGravity(deltaTime: number): void {
-    // Actualizar velocidad vertical con gravedad
     if (!this.isGrounded) {
+      const gravity = this.currentVerticalVelocity > 0 ? this.jumpGravity : this.fallGravity;
       const finalGravity =
         this.isWallRunning && this.currentVerticalVelocity < 0.0 ? this.wallRunGravity : gravity;
-      this.currentVerticalVelocity += finalGravity * deltaTime;
+      const jumpCutFactor =
+        this.isJumping &&
+        !this.isWallRunning &&
+        Math.abs(this.currentVerticalVelocity) > 0 &&
+        Math.abs(this.currentVerticalVelocity) < this.jumpCutVerticalVelocityLimit
+          ? this.jumpCutFactor
+          : 1.0;
+
+      this.currentVerticalVelocity += finalGravity * jumpCutFactor * deltaTime;
     } else if (this.isGrounded && !this.isJumping) {
       this.currentVerticalVelocity = 0.0;
     }
@@ -381,18 +392,12 @@ export class CharacterControllerComponent extends Component {
     // Detectar inicio del salto
     if (input.isActionBuffered(GameAction.JUMP) && canGroundJump) {
       input.consumeBufferedAction(GameAction.JUMP);
-      this.applyJump(this.jumpForce);
+      this.applyJump(this.jumpVelocity);
     } else if (
       this.isJumping &&
-      this.currentVerticalVelocity > 0 &&
-      this.currentVerticalVelocity < this.jumpCutVerticalVelocityLimit &&
-      !this.jumpCutFactorApplied
+      Math.abs(this.currentVerticalVelocity) > this.jumpCutVerticalVelocityLimit &&
+      this.currentVerticalVelocity < 0.0
     ) {
-      this.currentVerticalVelocity *= this.jumpCutFactor;
-      this.jumpCutFactorApplied = true;
-      this.isJumping = false;
-    } else if (this.isJumping && this.currentVerticalVelocity <= 0) {
-      this.jumpCutFactorApplied = true;
       this.isJumping = false;
     }
   }
@@ -401,7 +406,6 @@ export class CharacterControllerComponent extends Component {
     this.currentVerticalVelocity = jumpForce;
     this.isJumping = true; // Iniciar salto variable
     this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
-    this.jumpCutFactorApplied = false;
   }
 
   //WALLRUN
@@ -597,8 +601,7 @@ export class CharacterControllerComponent extends Component {
       0.4,
     );
     const wallJumpDir = vec3.create();
-    vec3.add(wallJumpDir, wallComponent, wallJumpDir);
-    vec3.add(wallJumpDir, wallJumpDir, momentumComponent);
+    vec3.add(wallJumpDir, wallComponent, momentumComponent);
     vec3.normalize(wallJumpDir, wallJumpDir);
     const speed = vec3.length(this.currentHorizontalVelocity);
     this.currentHorizontalVelocity = vec3.scale(
@@ -606,7 +609,7 @@ export class CharacterControllerComponent extends Component {
       wallJumpDir,
       speed * 0.85,
     );
-    this.applyJump(this.jumpForce);
+    this.applyJump(this.jumpVelocity);
   }
 
   //MANTLING
@@ -970,7 +973,6 @@ export class CharacterControllerComponent extends Component {
     this.currentVerticalVelocity = Math.max(this.currentVerticalVelocity, 1.5);
     this.isJumping = true;
     this.timeSinceGrounded = this.coyoteTime + 1.0;
-    this.jumpCutFactorApplied = false;
   }
 
   //HELPERS
@@ -1074,6 +1076,10 @@ export class CharacterControllerComponent extends Component {
     // Guardar dimensiones originales del collider
     this.originalHeight = this.capsuleCollider.getCapsuleHeight();
     this.originalRadius = this.capsuleCollider.getCapsuleRadius();
+
+    this.jumpVelocity = (2.0 * this.jumpHeight) / this.jumpTimeToPeak;
+    this.jumpGravity = (-2.0 * this.jumpHeight) / (this.jumpTimeToPeak * this.jumpTimeToPeak);
+    this.fallGravity = (-2.0 * this.jumpHeight) / (this.jumpTimeToDescent * this.jumpTimeToDescent);
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
