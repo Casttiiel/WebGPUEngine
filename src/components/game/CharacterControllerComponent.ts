@@ -69,7 +69,7 @@ export class CharacterControllerComponent extends Component {
   private minWallRunSpeed: number = 7.0; // Velocidad mínima para iniciar wall run
   private initialDragFactorDuringWallRun: number = 0.85; // Factor de reducción de velocidad al iniciar wall run
   private wallRunGravity: number = -4.0; // caída lenta
-  private detectWallDistance: number = 0.6; // Distancia para detectar paredes
+  private detectWallDistance: number = 0.7; // Distancia para detectar paredes
   private wallRunMaxEntryAngle: number = 0.9; // Ángulo máximo (coseno) para iniciar wall run
   private wallDrag: number = 0.05; // Resistencia al movimiento durante wall run
   private maxWallRunDuration: number = 2.5; // Duración máxima del wall run en segundos
@@ -126,7 +126,7 @@ export class CharacterControllerComponent extends Component {
     this.manageMantling();
     this.detectWall();
 
-    console.log(vec3.length(this.currentHorizontalVelocity));
+    //console.log(vec3.length(this.currentHorizontalVelocity));
 
     if (this.isDashing) {
       const targetMovement = this.manageDashMovement();

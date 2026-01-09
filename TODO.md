@@ -1,6 +1,5 @@
 ### Alpha Roadmap
 
-WallRun angle needs to be amplified?
 Surpass runSpeed
 WallRun after timer can go to wallrun again
 Dash end speed/direction + Conserva 80% de velocidad previa
