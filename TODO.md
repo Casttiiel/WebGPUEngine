@@ -1,15 +1,12 @@
 ### Alpha Roadmap
 
+WallRun angle needs to be amplified?
 Surpass runSpeed
 WallRun after timer can go to wallrun again
 Dash end speed/direction + Conserva 80% de velocidad previa
-WallRun angle needs to be amplified?
-WallJump direction?
-disableMantleAfterWallJumpTime?
 Swing Bar needs to be picked with some angle
+disableMantleAfterWallJumpTime?
 Snap to ground
-Better speed lines
-Radial blur?
 
 ### Engine
 
@@ -36,11 +33,13 @@ Radial blur?
 
 ## Visuals and Sound
 
-1. Sound
-2. HeightMap
-3. Skybox
-4. Triplanar mapping
-5. Check neon white for textures
+1. Better speed lines
+2. Radial blur?
+3. Sound
+4. HeightMap
+5. Skybox
+6. Triplanar mapping
+7. Check neon white for textures
 
 ## Questions
 

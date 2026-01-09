@@ -26,3 +26,4 @@
    Voxel Global Illumination
    Contact Shadows
    TrimSheets
+   CRT Shader

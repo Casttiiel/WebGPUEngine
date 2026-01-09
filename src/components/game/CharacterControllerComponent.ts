@@ -594,19 +594,19 @@ export class CharacterControllerComponent extends Component {
     this.isWallRunning = false;
     this.inputDisableTimer = this.disableInputAfterWallJumpTime;
 
-    const wallComponent = vec3.scale(vec3.create(), this.wallNormal, 0.6);
-    const momentumComponent = vec3.scale(
-      vec3.create(),
-      vec3.normalize(vec3.create(), this.currentHorizontalVelocity),
-      0.4,
-    );
-    const wallJumpDir = vec3.create();
-    vec3.add(wallJumpDir, wallComponent, momentumComponent);
-    vec3.normalize(wallJumpDir, wallJumpDir);
+    let jumpDir = this.camera!.getCamera().getFront();
+    jumpDir[1] = 0.0;
+    vec3.normalize(jumpDir, jumpDir);
+    const d = vec3.dot(jumpDir, this.wallNormal);
+    if (d < 0.2) {
+      vec3.add(jumpDir, jumpDir, this.wallNormal);
+      vec3.normalize(jumpDir, jumpDir);
+    }
+
     const speed = vec3.length(this.currentHorizontalVelocity);
     this.currentHorizontalVelocity = vec3.scale(
       this.currentHorizontalVelocity,
-      wallJumpDir,
+      jumpDir,
       speed * 0.85,
     );
     this.applyJump(this.jumpVelocity);
