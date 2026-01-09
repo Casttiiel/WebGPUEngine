@@ -36,6 +36,7 @@ export class CharacterControllerComponent extends Component {
   private isWallRunning: boolean = false;
   private isMantling: boolean = false;
   private isSwinging: boolean = false;
+  private isRolling: boolean = false;
   private isDashing: boolean = false;
   private isNearWall: boolean = false;
   private currentVerticalVelocity: number = 0.0;
@@ -43,6 +44,7 @@ export class CharacterControllerComponent extends Component {
   private inputDisableTimer: number = -10.0;
   private originalHeight: number = 0.0; // Altura original del collider
   private originalRadius: number = 0.0; // Radio original del collider
+  private groundNormal: vec3 = vec3.fromValues(0, 1, 0); // Normal del suelo actual
 
   // Movement
   private runSpeed: number = 9.0; // Velocidad base (sin flow)
@@ -108,6 +110,21 @@ export class CharacterControllerComponent extends Component {
   private swingEndAngle: number = 0;
   private swingDirection: number = 1;
 
+  // Roll
+  private rollDuration: number = 0.4; // Duración fija del roll en segundos
+  private rollSpeedMultiplier: number = 1.9; // Multiplicador de velocidad durante el roll (40% más rápido)
+  private rollMinStartSpeed: number = 0.01; // Velocidad mínima para activar el roll
+  private rollSpeed: number = 0.0; // Velocidad del roll (capturada al inicio)
+  private rollDirection: vec3 = vec3.create(); // Dirección fija del roll
+  private rollTimer: number = 0.0; // Tiempo transcurrido en el roll
+  private rollCooldown: number = 0.5; // Tiempo de espera entre rolls (en segundos)
+  private rollCooldownTimer: number = 0.0; // Temporizador del cooldown
+  private rollJumpWindowTime: number = 0.25; // Ventana de tiempo para salto especial después del roll
+  private timeSinceLastRoll: number = 999.0; // Tiempo desde que terminó el último roll
+  private rollJumpVerticalForce: number = 6.0; // Fuerza vertical del salto especial (mayor que salto normal)
+  private rollJumpHorizontalBoost: number = 15.0; // Impulso horizontal del salto especial
+  private initialRollSpeed: number = 0.0;
+
   constructor() {
     super();
   }
@@ -125,8 +142,9 @@ export class CharacterControllerComponent extends Component {
     this.manageDashing();
     this.manageMantling();
     this.detectWall();
+    this.manageRolling(deltaTime);
 
-    //console.log(vec3.length(this.currentHorizontalVelocity));
+    console.log(vec3.length(this.currentHorizontalVelocity));
 
     if (this.isDashing) {
       const targetMovement = this.manageDashMovement();
@@ -141,6 +159,9 @@ export class CharacterControllerComponent extends Component {
       this.manageHorizontalMovementForWallRun(deltaTime, targetMovement);
       this.manageVerticalMovement(deltaTime);
       const finalVelocity = this.mergeMovements();
+      this.applyMovement(finalVelocity, deltaTime);
+    } else if (this.isRolling) {
+      const finalVelocity = this.manageRollMovement(deltaTime);
       this.applyMovement(finalVelocity, deltaTime);
     } else if (this.isSwinging) {
       this.manageSwingMovement(deltaTime);
@@ -158,15 +179,23 @@ export class CharacterControllerComponent extends Component {
 
   //MOVEMENT
   private getIsGrounded(): void {
-    const snapDistance = 0.1; // Distancia extra para snap-to-ground
+    const snapDistance = 0.2; // Distancia extra para snap-to-ground
 
     // Raycast más largo para detectar suelo en rampas rápidas
     const hit = this.capsuleCollider.raycastGrounded(snapDistance);
     this.isGrounded = hit !== null;
 
-    // Recargar dash cuando toca el suelo
     if (this.isGrounded) {
       this.canDash = true;
+      const isFloor = hit.normal.y > 0.1;
+
+      // Si es suelo → ignorar completamente para lógica de pared
+      if (isFloor) {
+        this.groundNormal = vec3.fromValues(hit.normal.x, hit.normal.y, hit.normal.z);
+        vec3.normalize(this.groundNormal, this.groundNormal);
+      }
+    } else {
+      this.groundNormal = vec3.fromValues(0, 1, 0);
     }
   }
 
@@ -218,6 +247,17 @@ export class CharacterControllerComponent extends Component {
     const rightMovement = vec3.scale(vec3.create(), rightXZ, -inputDir[0]);
 
     vec3.add(targetMovement, forwardMovement, rightMovement);
+
+    if (this.isGrounded) {
+      if (vec3.length(targetMovement) > 0.01) {
+        vec3.normalize(targetMovement, targetMovement);
+      }
+      const horizontal = vec3.fromValues(targetMovement[0], 0, targetMovement[2]);
+
+      const projected = this.projectOnPlane(horizontal, this.groundNormal);
+
+      targetMovement = projected;
+    }
 
     // Normalize final movement
     if (vec3.length(targetMovement) > 0.01) {
@@ -351,6 +391,7 @@ export class CharacterControllerComponent extends Component {
         const isWall = Math.abs(collisionNormal[1]) < 0.5; // Normal mayormente horizontal
 
         this.isDashing = false;
+        this.isRolling = false;
 
         if (!this.isWallRunning && !this.isMantling && isWall) {
           this.removeVelocityIntoWall(collisionNormal);
@@ -408,6 +449,115 @@ export class CharacterControllerComponent extends Component {
     this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
   }
 
+  //ROLLING
+  private manageRolling(deltaTime: number): void {
+    const input = Engine.getInput();
+
+    if (this.rollCooldownTimer > 0.0) {
+      this.rollCooldownTimer -= deltaTime;
+    }
+
+    this.timeSinceLastRoll += deltaTime;
+
+    if (
+      !this.isRolling &&
+      this.isGrounded &&
+      this.rollCooldownTimer <= 0.0 &&
+      input.isActionBuffered(GameAction.ROLL)
+    ) {
+      input.consumeBufferedAction(GameAction.ROLL);
+      this.startRoll();
+    }
+  }
+
+  private startRoll(): void {
+    this.isRolling = true;
+    this.rollTimer = 0.0;
+
+    // Capturar velocidad actual
+    const currentSpeed = vec3.length(this.currentHorizontalVelocity);
+
+    this.initialRollSpeed = Math.max(currentSpeed, this.runSpeed);
+    this.rollSpeed = this.initialRollSpeed * this.rollSpeedMultiplier;
+
+    // Fijar dirección del roll
+    // Si estás parado, usar la dirección de la cámara (forward)
+    if (currentSpeed <= this.rollMinStartSpeed) {
+      const cameraObj = this.camera!.getCamera();
+      const forward = cameraObj.getFront();
+      // Proyectar forward en el plano horizontal (XZ) y normalizar
+      this.rollDirection[0] = forward[0];
+      this.rollDirection[1] = 0;
+      this.rollDirection[2] = forward[2];
+
+      vec3.normalize(this.rollDirection, this.rollDirection);
+    } else {
+      // Si te mueves, usar la dirección actual del movimiento
+      vec3.normalize(this.rollDirection, this.currentHorizontalVelocity);
+    }
+  }
+
+  private manageRollMovement(deltaTime: number): vec3 {
+    this.rollTimer += deltaTime;
+
+    // Proyectar la dirección fija del roll sobre el plano del suelo
+    const projected = this.projectOnPlane(this.rollDirection, this.groundNormal);
+    vec3.normalize(projected, projected);
+
+    // Mantener velocidad constante durante todo el roll (sin cambios)
+    const result = vec3.scale(vec3.create(), this.rollDirection, this.rollSpeed);
+
+    // Terminar roll cuando se acaba la duración O perdemos contacto con el suelo
+    if (this.rollTimer >= this.rollDuration || !this.isGrounded) {
+      this.endRoll();
+    }
+
+    return result;
+  }
+
+  private endRoll(): void {
+    if (!this.isRolling) return;
+    this.isRolling = false;
+    this.rollTimer = 0.0;
+    this.rollCooldownTimer = this.rollCooldown; // Iniciar cooldown
+    this.timeSinceLastRoll = 0.0; // Marcar el momento en que terminó el roll
+
+    // Transferir velocidad del roll al movimiento normal
+    const dir = vec3.normalize(vec3.create(), this.rollDirection);
+    vec3.scale(this.currentHorizontalVelocity, dir, this.initialRollSpeed);
+  }
+
+  private applyRollJump(): void {
+    // Aplicar fuerza vertical aumentada
+    this.currentVerticalVelocity = this.rollJumpVerticalForce;
+
+    // Determinar dirección del impulso horizontal
+    let boostDirection = vec3.create();
+
+    // Si hay velocidad horizontal actual, usar esa dirección
+    if (vec3.length(this.currentHorizontalVelocity) > 0.1) {
+      vec3.normalize(boostDirection, this.currentHorizontalVelocity);
+    }
+    // Si no hay movimiento, usar la dirección de la cámara (forward)
+    else {
+      const forward = this.camera!.getCamera().getFront();
+      boostDirection[0] = forward[0];
+      boostDirection[1] = 0;
+      boostDirection[2] = forward[2];
+      vec3.normalize(boostDirection, boostDirection);
+    }
+
+    // Aplicar impulso horizontal en la dirección determinada
+    vec3.scale(this.currentHorizontalVelocity, boostDirection, this.rollJumpHorizontalBoost);
+    this.horizontalSpeed = vec3.length(this.currentHorizontalVelocity);
+    vec3.normalize(this.horizontalDirection, this.currentHorizontalVelocity);
+
+    this.isJumping = true; // Iniciar salto variable
+    this.timeSinceGrounded = this.coyoteTime + 1.0; // Invalidar coyote time después del salto
+    this.jumpCutFactorApplied = false;
+    this.flowComponent?.notifyAction('roll');
+  }
+
   //WALLRUN
   private detectWall(): void {
     this.isNearWall = false;
@@ -423,11 +573,11 @@ export class CharacterControllerComponent extends Component {
     vec3.normalize(left, left);
 
     const right = vec3.scale(vec3.create(), left, -1);
-    const origin = vec3.clone(this.camera!.getCamera().getPosition());
+    const origin = this.capsuleCollider.getRigidBody().translation();
 
     const physics = Engine.getPhysics();
     const leftRay = new RAPIER.Ray(
-      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: origin.x, y: origin.y, z: origin.z },
       { x: left[0], y: left[1], z: left[2] },
     );
     const leftHit = physics.getWorld().castRayAndGetNormal(
@@ -452,7 +602,7 @@ export class CharacterControllerComponent extends Component {
     }
 
     const rightRay = new RAPIER.Ray(
-      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: origin.x, y: origin.y, z: origin.z },
       { x: right[0], y: right[1], z: right[2] },
     );
     const rightHit = physics.getWorld().castRayAndGetNormal(
@@ -483,7 +633,7 @@ export class CharacterControllerComponent extends Component {
     }
 
     const backRay = new RAPIER.Ray(
-      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: origin.x, y: origin.y, z: origin.z },
       { x: -facingVector[0], y: -facingVector[1], z: -facingVector[2] },
     );
     const backHit = physics.getWorld().castRayAndGetNormal(
@@ -1049,11 +1199,19 @@ export class CharacterControllerComponent extends Component {
   }
 
   public getIsRolling() {
-    return false;
+    return this.isRolling;
   }
 
   public getMaxSpeed(): number {
     return this.maxSpeed;
+  }
+
+  public getRollTimer(): number {
+    return this.rollTimer;
+  }
+
+  public getRollDuration(): number {
+    return this.rollDuration;
   }
 
   public getCurrentSpeed() {

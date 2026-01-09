@@ -1,11 +1,11 @@
 ### Alpha Roadmap
 
+Snap to ground
 Surpass runSpeed
+Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
 WallRun after timer can go to wallrun again
 Dash end speed/direction + Conserva 80% de velocidad previa
 Swing Bar needs to be picked with some angle
-disableMantleAfterWallJumpTime?
-Snap to ground
 
 ### Engine
 
