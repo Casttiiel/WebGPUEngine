@@ -106,7 +106,7 @@ export class CameraFOVModifierComponent extends Component {
 
     // Lazy loading: obtener maxSpeed solo la primera vez que se necesita
     if (this.maxSpeed === undefined) {
-      this.maxSpeed = (characterController as CharacterControllerComponent).getMoveSpeed();
+      this.maxSpeed = (characterController as CharacterControllerComponent).getMaxSpeed();
     }
 
     const currentSpeed =

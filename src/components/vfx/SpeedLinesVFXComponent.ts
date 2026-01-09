@@ -104,6 +104,7 @@ export class SpeedLinesVFXComponent extends Component {
     return bindGroup;
   }
   public update(dt: number): void {
+    return;
     const characterController = Engine.getEntities()
       .getEntityByName('Player')
       ?.getComponent('character_controller');

@@ -1,30 +1,16 @@
 ### Alpha Roadmap
 
-1. Flow gains
-   Roll to ground boost
-2. Flow reduce
-   Hit ground no roll
-3. Load variables update
-4. Level Design
-   Dash boost (if component Y not too big)
-   ----Dash to Wall
-   ----Dash distance
-   ----Dash to jumper
-   ----Dash to bouncer
-5. Eco Powerup
-6. Feedback
-
-### Feedback
-
-1. Jump floaty?
-2. WallRun angle needs to be amplified?
-3. Swing Bar needs to be picked with some angle
-4. Test floaty jump when dashing (no jump cut factor applied)
-5. Mantling reduce time disabled after walljump
-6. Qué velocidad deberia usar tras dash? SI uso el del dash, pues no necesito el Eco?
-7. Deactivate dash on close range?
-8. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
-9. Test mantle on small slope/places
+Jump floaty/too heavy
+Surpass runSpeed
+WallRun lock after timer
+Dash end speed/direction + Conserva 80% de velocidad previa
+WallRun angle needs to be amplified?
+WallJump direction?
+disableMantleAfterWallJumpTime?
+Swing Bar needs to be picked with some angle
+Snap to ground
+Better speed lines
+Radial blur?
 
 ### Engine
 
@@ -45,8 +31,9 @@
 
 ## Gameplay
 
-1. Door
-2. Enemy
+1. En roll y en swing, mirar en la direccion que toca y bloquear durante la duracion?
+2. Door
+3. Enemy
 
 ## Visuals and Sound
 
