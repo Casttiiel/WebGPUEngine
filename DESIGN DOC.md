@@ -52,42 +52,35 @@
    +20% altura de salto o
    +15% alcance horizontal (según input)
 
-9. Roll Jump
+9. Objetos
+   🔵 1. Anclas de Eco
+   Qué son
+   Orbes fijos flotantes
+   Siempre visibles
+   Claramente “dashables”
+   Qué hacen
+   Permiten dash a objetos
+   Base del diseño de niveles
+   Para quién
+   Jugador normal: corrección de saltos
+   Speedrunner: rutas aéreas
+   🟠 2. Núcleos de Rebote
+   Qué son
+   Orbes más pequeños o móviles
+   En aire o sobre enemigos
+   Qué hacen
+   Dash → rebote
+   Rebote base:
+   +5 m vertical
+   Con Eco de Rebote:
+   +6 m vertical
+   90% velocidad conservada
+   Para qué sirven
+   Verticalidad
+   Skips
+   Encadenar sin suelo
 
-10. Objetos
-    🔵 1. Anclas de Eco
-    Qué son
-    Orbes fijos flotantes
-    Siempre visibles
-    Claramente “dashables”
-    Qué hacen
-    Permiten dash a objetos
-    Base del diseño de niveles
-    Para quién
-    Jugador normal: corrección de saltos
-    Speedrunner: rutas aéreas
-    🟠 2. Núcleos de Rebote
-    Qué son
-    Orbes más pequeños o móviles
-    En aire o sobre enemigos
-    Qué hacen
-    Dash → rebote
-    Rebote base:
-    +5 m vertical
-    Con Eco de Rebote:
-    +6 m vertical
-    90% velocidad conservada
-    Para qué sirven
-    Verticalidad
-    Skips
-    Encadenar sin suelo
-
-11. Al cambiar eco:
-    Tu velocidad se clampa a 7 m/s durante 0.3 s
-    Se cancelan buffs temporales
-    Se resetean cadenas perfectas
-
-12. Eco de Inercia
+10. Eco de Inercia
     El salto escala con la velocidad
     Fórmula:
     Altura base: 2.2 m
@@ -99,7 +92,7 @@
     Si fallas un salto (rompes flow):
     −30% velocidad instantánea
 
-13. Eco de Rebote
+11. Eco de Rebote
     Rebotar en enemigos o props
     Usado para skips avanzados
     Rebotas al:
@@ -112,11 +105,18 @@
     +6 m vertical
     90% velocidad conservada
 
-14. Eco Cinético
+12. Eco Cinético
     Cada aterrizaje perfecto devuelve un dash aéreo
     Permite rutas sin tocar el suelo
     Si encadenas 3 acciones perfectas seguidas, obtienes:
     +15% velocidad durante 3 s
+
+13. Al cambiar eco:
+    Tu velocidad se clampa a 7 m/s durante 0.3 s
+    Se cancelan buffs temporales
+    Se resetean cadenas perfectas
+
+14. Roll Jump
 
 15. Objetos 2
     🟣 3. Anclas Fásicas
