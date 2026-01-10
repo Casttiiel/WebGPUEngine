@@ -113,7 +113,6 @@ export class CharacterControllerComponent extends Component {
   // Roll
   private rollDuration: number = 0.4; // Duración fija del roll en segundos
   private rollSpeedMultiplier: number = 1.9; // Multiplicador de velocidad durante el roll (40% más rápido)
-  private rollMinStartSpeed: number = 0.01; // Velocidad mínima para activar el roll
   private rollSpeed: number = 0.0; // Velocidad del roll (capturada al inicio)
   private rollDirection: vec3 = vec3.create(); // Dirección fija del roll
   private rollTimer: number = 0.0; // Tiempo transcurrido en el roll
@@ -124,6 +123,11 @@ export class CharacterControllerComponent extends Component {
   private rollJumpVerticalForce: number = 6.0; // Fuerza vertical del salto especial (mayor que salto normal)
   private rollJumpHorizontalBoost: number = 15.0; // Impulso horizontal del salto especial
   private initialRollSpeed: number = 0.0;
+  private rollFallSpeedConversionFactor: number = 0.7; // Factor de conversión de velocidad vertical a horizontal (70%)
+  private rollLandingCacheWindow: number = 0.2; // Ventana de tiempo después de aterrizar para cachear la caída
+  private timeSinceLanded: number = 999.0; // Tiempo desde que aterrizaste
+  private cachedFallSpeed: number = 0.0; // Velocidad de caída guardada al aterrizar
+  private wasGroundedLastFrame: boolean = false; // Para detectar el momento exacto del aterrizaje
 
   constructor() {
     super();
@@ -138,13 +142,15 @@ export class CharacterControllerComponent extends Component {
       this.inputDisableTimer -= deltaTime;
     }
 
+    //console.log(this.currentVerticalVelocity);
+
     this.getIsGrounded();
     this.manageDashing();
     this.manageMantling();
     this.detectWall();
     this.manageRolling(deltaTime);
 
-    console.log(vec3.length(this.currentHorizontalVelocity));
+    //console.log(vec3.length(this.currentHorizontalVelocity));
 
     if (this.isDashing) {
       const targetMovement = this.manageDashMovement();
@@ -184,6 +190,16 @@ export class CharacterControllerComponent extends Component {
     // Raycast más largo para detectar suelo en rampas rápidas
     const hit = this.capsuleCollider.raycastGrounded(snapDistance);
     this.isGrounded = hit !== null;
+
+    // CACHEO DE VELOCIDAD DE CAÍDA AL ATERRIZAR
+    // Si acabas de aterrizar (no estabas grounded el frame anterior y ahora sí)
+    if (this.isGrounded && !this.wasGroundedLastFrame) {
+      // Guardar la velocidad de caída (valor positivo)
+      this.cachedFallSpeed = Math.max(0, -this.currentVerticalVelocity);
+      this.timeSinceLanded = 0.0;
+    }
+
+    this.wasGroundedLastFrame = this.isGrounded;
 
     if (this.isGrounded) {
       this.canDash = true;
@@ -459,6 +475,16 @@ export class CharacterControllerComponent extends Component {
 
     this.timeSinceLastRoll += deltaTime;
 
+    // Actualizar tiempo desde que aterrizaste
+    if (this.isGrounded) {
+      this.timeSinceLanded += deltaTime;
+
+      // Si pasó la ventana de cacheo, resetear la velocidad guardada
+      if (this.timeSinceLanded > this.rollLandingCacheWindow) {
+        this.cachedFallSpeed = 0.0;
+      }
+    }
+
     if (
       !this.isRolling &&
       this.isGrounded &&
@@ -477,12 +503,27 @@ export class CharacterControllerComponent extends Component {
     // Capturar velocidad actual
     const currentSpeed = vec3.length(this.currentHorizontalVelocity);
 
-    this.initialRollSpeed = Math.max(currentSpeed, this.runSpeed);
+    // CONVERSIÓN DE VELOCIDAD VERTICAL A HORIZONTAL (CACHEO DE CAÍDA)
+    // Si estás dentro de la ventana de cacheo después de aterrizar, usar la velocidad guardada
+    let verticalSpeedBonus = 0.0;
+    if (this.timeSinceLanded <= this.rollLandingCacheWindow && this.cachedFallSpeed > 0) {
+      verticalSpeedBonus = this.cachedFallSpeed * this.rollFallSpeedConversionFactor;
+      // Consumir el bonus (solo se usa una vez)
+      this.cachedFallSpeed = 0.0;
+    }
+
+    // Calcular la velocidad base del roll (respetando límites)
+    this.initialRollSpeed = Math.max(currentSpeed + verticalSpeedBonus, this.runSpeed);
+
+    // Limitar la velocidad inicial para no sobrepasar maxSpeed
+    this.initialRollSpeed = Math.min(this.initialRollSpeed, this.maxSpeed);
+
+    // Aplicar multiplicador del roll
     this.rollSpeed = this.initialRollSpeed * this.rollSpeedMultiplier;
 
     // Fijar dirección del roll
     // Si estás parado, usar la dirección de la cámara (forward)
-    if (currentSpeed <= this.rollMinStartSpeed) {
+    if (currentSpeed <= 0.01) {
       const cameraObj = this.camera!.getCamera();
       const forward = cameraObj.getFront();
       // Proyectar forward en el plano horizontal (XZ) y normalizar

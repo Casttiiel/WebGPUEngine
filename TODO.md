@@ -1,7 +1,8 @@
 ### Alpha Roadmap
 
-Snap to ground
 Surpass runSpeed
+Si aterrizas sin roll, pierdes momentum
+Snap to ground
 Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
 WallRun after timer can go to wallrun again
 Dash end speed/direction + Conserva 80% de velocidad previa
