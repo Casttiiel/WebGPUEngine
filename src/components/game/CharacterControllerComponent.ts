@@ -49,6 +49,7 @@ export class CharacterControllerComponent extends Component {
   // Movement
   private runSpeed: number = 9.0; // Velocidad base (sin flow)
   private maxSpeed: number = 14.0; // Velocidad máxima con buffs
+  private boostedSpeed: number = 0.0; // Velocidad extra del roll que decae hacia runSpeed
   private groundAcceleration: number = 36.0;
   private groundDeceleration: number = 18.0;
   private airControl: number = 0.65;
@@ -290,9 +291,16 @@ export class CharacterControllerComponent extends Component {
       // EN SUELO: Control normal con aceleración/frenado suave
       if (!hasInput) {
         targetMovement = vec3.normalize(vec3.create(), this.currentHorizontalVelocity);
+        if (vec3.length(this.currentHorizontalVelocity) < 0.01) {
+          // Perder velocidad boosted si te paras
+          this.boostedSpeed = 0.0;
+        }
       }
       const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-      const targetSpeed = hasInput ? this.runSpeed : 0.0;
+
+      // Velocidad objetivo: usar boostedSpeed si es mayor que runSpeed, sino usar runSpeed
+      const baseTargetSpeed = hasInput ? Math.max(this.runSpeed, this.boostedSpeed) : 0.0;
+      const targetSpeed = hasInput ? baseTargetSpeed : 0.0;
       const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
       const newSpeed = this.approach(currentSpeed, targetSpeed, accel * deltaTime);
 
@@ -301,7 +309,10 @@ export class CharacterControllerComponent extends Component {
       // EN AIRE: Aceleración directa hacia velocidad objetivo
       if (hasInput) {
         // Velocidad objetivo en la dirección de input
-        vec3.scale(targetMovement, targetMovement, this.runSpeed);
+        // Velocidad objetivo: usar boostedSpeed si es mayor que runSpeed, sino usar runSpeed
+        const baseTargetSpeed = hasInput ? Math.max(this.runSpeed, this.boostedSpeed) : 0.0;
+        const targetSpeed = hasInput ? baseTargetSpeed : 0.0;
+        vec3.scale(targetMovement, targetMovement, targetSpeed);
 
         const disabler = this.inputDisableTimer > 0.0 ? 0.25 : 1.0;
 
@@ -411,6 +422,7 @@ export class CharacterControllerComponent extends Component {
 
         if (!this.isWallRunning && !this.isMantling && isWall) {
           this.removeVelocityIntoWall(collisionNormal);
+          this.boostedSpeed = 0.0;
         }
         if (isCeiling && this.currentVerticalVelocity > 0) {
           this.currentVerticalVelocity = 0;
@@ -479,8 +491,12 @@ export class CharacterControllerComponent extends Component {
     if (this.isGrounded) {
       this.timeSinceLanded += deltaTime;
 
-      // Si pasó la ventana de cacheo, resetear la velocidad guardada
+      // Si pasó la ventana de cacheo sin hacer roll, resetear todo
       if (this.timeSinceLanded > this.rollLandingCacheWindow) {
+        // Solo resetear boostedSpeed si NO se hizo un roll (cachedFallSpeed > 0 = no se consumió)
+        if (this.cachedFallSpeed > 0.0) {
+          this.boostedSpeed = 0.0;
+        }
         this.cachedFallSpeed = 0.0;
       }
     }
@@ -566,6 +582,9 @@ export class CharacterControllerComponent extends Component {
     // Transferir velocidad del roll al movimiento normal
     const dir = vec3.normalize(vec3.create(), this.rollDirection);
     vec3.scale(this.currentHorizontalVelocity, dir, this.initialRollSpeed);
+
+    // Setear velocidad boosted para que pueda mantener velocidad por encima de runSpeed
+    this.boostedSpeed = this.initialRollSpeed;
   }
 
   private applyRollJump(): void {
