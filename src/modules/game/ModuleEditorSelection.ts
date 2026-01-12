@@ -2,11 +2,10 @@ import { Module } from '../core/Module';
 import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
 import { CameraComponent } from '../../components/render/CameraComponent';
-import { vec3, mat4 } from 'gl-matrix';
+import { vec3, mat4, vec4 } from 'gl-matrix';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { RenderComponent } from '../../components/render/RenderComponent';
 import { TransformComponent } from '../../components/core/TransformComponent';
-import { WireframeMeshGenerator } from '../../utils/WireframeMeshGenerator';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { ResourceManager } from '../../core/engine/ResourceManager';
@@ -317,38 +316,43 @@ export class ModuleEditorSelection extends Module {
     const camera = cameraComponent.getCamera();
     const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
 
-    // Convertir a NDC (-1 to 1)
-    const x = (mousePos.x / canvas.width) * 2 - 1;
-    const y = -((mousePos.y / canvas.height) * 2 - 1); // Y invertido
+    // 1️⃣ Mouse (CSS px) → NDC
+    const rect = canvas.getBoundingClientRect();
 
-    // Ray en clip space
-    const rayClip = vec3.fromValues(x, y, -1);
+    const x = ((mousePos.x - rect.left) / rect.width) * 2 - 1;
+    const y = 1 - ((mousePos.y - rect.top) / rect.height) * 2;
 
-    // Invertir projection matrix
-    const projInverse = mat4.create();
-    mat4.invert(projInverse, camera.getProjection());
+    // 2️⃣ Clip space (far plane, WebGPU Z = 1)
+    const rayClip = vec4.fromValues(x, y, 1, 1);
 
-    // Ray en view space
-    const rayView = vec3.create();
-    vec3.transformMat4(rayView, rayClip, projInverse);
-    rayView[2] = -1; // Forward en view space
-    vec3.normalize(rayView, rayView);
+    // 3️⃣ Clip → View
+    const invProj = mat4.create();
+    mat4.invert(invProj, camera.getProjection());
 
-    // Invertir view matrix
-    const viewInverse = mat4.create();
-    mat4.invert(viewInverse, camera.getView());
+    const rayView = vec4.create();
+    vec4.transformMat4(rayView, rayClip, invProj);
 
-    // Ray origin (camera position)
-    const origin = vec3.create();
-    mat4.getTranslation(origin, viewInverse);
+    // Perspective divide
+    rayView[0] /= rayView[3];
+    rayView[1] /= rayView[3];
+    rayView[2] /= rayView[3];
+    rayView[3] = 0; // dirección
 
-    // Ray direction en world space
-    const direction = vec3.create();
-    vec3.transformMat4(direction, rayView, viewInverse);
-    vec3.subtract(direction, direction, origin);
-    vec3.normalize(direction, direction);
+    // 4️⃣ View → World
+    const invView = mat4.create();
+    mat4.invert(invView, camera.getView());
 
-    return { origin, direction };
+    const rayWorld4 = vec4.create();
+    vec4.transformMat4(rayWorld4, rayView, invView);
+
+    const worldDirection = vec3.fromValues(rayWorld4[0], rayWorld4[1], rayWorld4[2]);
+    vec3.normalize(worldDirection, worldDirection);
+
+    // 5️⃣ Origin = posición de cámara
+    const worldOrigin = vec3.create();
+    mat4.getTranslation(worldOrigin, invView);
+
+    return { origin: worldOrigin, direction: worldDirection };
   }
 
   public renderDebug(): void {
