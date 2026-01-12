@@ -14,6 +14,7 @@ export class ModuleBoot extends Module {
   private playerCameraControllerComponent!: FPSCameraControllerComponent;
   private debugCameraComponent!: CameraComponent;
   private playerCharacterControllerComponent!: CharacterControllerComponent;
+  private lastGamestate: string = '';
 
   constructor(name: string) {
     super(name);
@@ -63,7 +64,12 @@ export class ModuleBoot extends Module {
     console.log('ModuleBoot stopped.');
   }
 
-  public update(): void {
+  public update(dt: number): void {
+    // Check F1 para toggle entre gs_gameplay y gs_editor
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F1)) {
+      this.toggleEditorMode();
+    }
+
     if (!this.playerCameraControllerComponent) {
       const player = Engine.getEntities().getEntityByName('Player')!;
       if (player.hasComponent('fps_camera_controller')) {
@@ -108,9 +114,56 @@ export class ModuleBoot extends Module {
         new LinearInterpolator(),
       );
     }
+
+    // Detectar gamestate y ajustar cámaras automáticamente
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+
+    // Solo cambiar cámaras si el gamestate cambió
+    if (currentGamestate !== this.lastGamestate) {
+      this.lastGamestate = currentGamestate;
+
+      if (currentGamestate === 'gs_editor') {
+        // Modo editor: activar DebugCamera, desactivar PlayerController
+        this.debugCameraComponent.setActive(true);
+        this.playerCameraControllerComponent.setActive(false);
+        this.playerCharacterControllerComponent.setActive(false);
+        Engine.getCameraMixer().blendCamera(
+          Engine.getEntities().getEntityByName('DebugCamera')!,
+          1.0,
+          new LinearInterpolator(),
+        );
+        console.log('📷 DebugCamera activated (editor mode)');
+      } else if (currentGamestate === 'gs_gameplay') {
+        // Modo gameplay: activar PlayerCamera, activar PlayerController
+        this.debugCameraComponent.setActive(false);
+        this.playerCameraControllerComponent.setActive(true);
+        this.playerCharacterControllerComponent.setActive(true);
+        Engine.getCameraMixer().blendCamera(
+          Engine.getEntities().getEntityByName('PlayerCamera')!,
+          1.0,
+          new LinearInterpolator(),
+        );
+        console.log('📷 PlayerCamera activated (gameplay mode)');
+      }
+    }
   }
 
   public renderDebug(): void {
     // ModuleBoot doesn't have debug info to render
+  }
+
+  /**
+   * Toggle entre gs_gameplay y gs_editor
+   */
+  private toggleEditorMode(): void {
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+
+    if (currentGamestate === 'gs_gameplay') {
+      console.log('🎨 Switching to EDITOR mode');
+      Engine.getModules().changeToGamestate('gs_editor');
+    } else if (currentGamestate === 'gs_editor') {
+      console.log('🎮 Switching to GAMEPLAY mode');
+      Engine.getModules().changeToGamestate('gs_gameplay');
+    }
   }
 }

@@ -5,12 +5,14 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { InputManager } from '../../core/input/InputManager';
 import { GameAction } from '../../types/GameAction.enum';
 import { ControlMappingConfig, InputBinding } from '../../types/ControlMapping.type';
+import { Engine } from '../../core/engine/Engine';
 
 export class ModuleInput extends Module {
   private mousePosition: { x: number; y: number } = { x: 0, y: 0 }; // Para UI (no usado en cámaras)
   private mouseMovement: { x: number; y: number } = { x: 0, y: 0 }; // Acumula movimiento durante el frame
   private mouseMovementConsumed: { x: number; y: number } = { x: 0, y: 0 }; // Último delta consumido
   private mouseButtons: Map<MouseButton, boolean> = new Map();
+  private mouseButtonsLastFrame: Map<MouseButton, boolean> = new Map();
   private keys: Map<KeyCode, boolean> = new Map();
   private keysLastFrame: Map<KeyCode, boolean> = new Map();
   private mouseWheelDelta: number = 0;
@@ -23,6 +25,7 @@ export class ModuleInput extends Module {
   // Pointer Lock support
   private pointerLockEnabled: boolean = true;
   private pointerLockActive: boolean = false;
+  private lastGamestate: string = '';
 
   // Valores observables para Tweakpane
   private debugValues = {
@@ -55,9 +58,12 @@ export class ModuleInput extends Module {
     // Pointer Lock setup
     document.addEventListener('pointerlockchange', this.handlePointerLockChange.bind(this));
 
-    // Click listener para activar pointer lock (solo si está habilitado)
+    // Click listener para activar pointer lock (solo si está habilitado Y en modo gameplay)
     canvas.addEventListener('click', () => {
-      if (this.pointerLockEnabled && !this.pointerLockActive) {
+      const currentGamestate = Engine.getModules().getCurrentGamestate();
+      const isEditorMode = currentGamestate === 'gs_editor';
+
+      if (this.pointerLockEnabled && !this.pointerLockActive && !isEditorMode) {
         canvas.requestPointerLock();
       }
     });
@@ -84,8 +90,12 @@ export class ModuleInput extends Module {
   }
 
   private handleMouseMove(event: MouseEvent): void {
-    // Solo procesar si pointer lock está activo
-    if (!this.pointerLockActive) return;
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+    const isEditorMode = currentGamestate === 'gs_editor';
+
+    // En modo editor, procesar siempre. En gameplay, solo si hay pointer lock
+    if (!isEditorMode && !this.pointerLockActive) return;
+
     // Acumular movimiento durante el frame (puede haber múltiples eventos por frame)
     this.mouseMovement.x += event.movementX;
     this.mouseMovement.y += event.movementY;
@@ -95,26 +105,43 @@ export class ModuleInput extends Module {
   }
 
   private handleMouseDown(event: MouseEvent): void {
-    // Permitir siempre el click izquierdo para activar pointer lock
-    if (!this.pointerLockActive && event.button !== MouseButton.LEFT) return;
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+    const isEditorMode = currentGamestate === 'gs_editor';
+
+    // En modo editor, procesar siempre. En gameplay, permitir LEFT para activar lock
+    if (!isEditorMode && !this.pointerLockActive && event.button !== MouseButton.LEFT) return;
+
     this.mouseButtons.set(event.button as MouseButton, true);
   }
 
   private handleMouseUp(event: MouseEvent): void {
-    // Permitir siempre el click izquierdo para activar pointer lock
-    if (!this.pointerLockActive && event.button !== MouseButton.LEFT) return;
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+    const isEditorMode = currentGamestate === 'gs_editor';
+
+    // En modo editor, procesar siempre. En gameplay, permitir LEFT para activar lock
+    if (!isEditorMode && !this.pointerLockActive && event.button !== MouseButton.LEFT) return;
+
     this.mouseButtons.set(event.button as MouseButton, false);
   }
 
   private handleMouseWheel(event: WheelEvent): void {
-    if (!this.pointerLockActive) return;
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+    const isEditorMode = currentGamestate === 'gs_editor';
+
+    // En modo editor, procesar siempre. En gameplay, solo si hay pointer lock
+    if (!isEditorMode && !this.pointerLockActive) return;
+
     event.preventDefault(); // Prevenir scroll del navegador
     this.mouseWheelDelta = event.deltaY;
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
-    // Solo procesar input si pointer lock está activo
-    if (!this.pointerLockActive) return;
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+    const isEditorMode = currentGamestate === 'gs_editor';
+
+    // En modo editor, procesar siempre. En gameplay, solo si hay pointer lock
+    if (!isEditorMode && !this.pointerLockActive) return;
+
     event.preventDefault();
     event.stopPropagation();
     const key = event.code.toLowerCase() as KeyCode;
@@ -122,8 +149,12 @@ export class ModuleInput extends Module {
   }
 
   private handleKeyUp(event: KeyboardEvent): void {
-    // Solo procesar input si pointer lock está activo
-    if (!this.pointerLockActive) return;
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+    const isEditorMode = currentGamestate === 'gs_editor';
+
+    // En modo editor, procesar siempre. En gameplay, solo si hay pointer lock
+    if (!isEditorMode && !this.pointerLockActive) return;
+
     event.preventDefault();
     event.stopPropagation();
     const key = event.code.toLowerCase() as KeyCode;
@@ -148,7 +179,19 @@ export class ModuleInput extends Module {
   }
 
   public update(): void {
-    // 0. Copiar currentKeys a previousKeys al inicio del frame
+    // 0. Detectar cambio de gamestate y liberar pointer lock si entramos en modo editor
+    const currentGamestate = Engine.getModules().getCurrentGamestate();
+    if (currentGamestate !== this.lastGamestate) {
+      this.lastGamestate = currentGamestate;
+
+      // Si cambiamos a modo editor, liberar pointer lock
+      if (currentGamestate === 'gs_editor' && this.pointerLockActive) {
+        document.exitPointerLock();
+        console.log('🔓 Pointer lock released (entering editor mode)');
+      }
+    }
+
+    // 1. Copiar currentKeys a previousKeys al inicio del frame
     const inputManager = InputManager.getInstance();
     inputManager.beginFrame();
 
@@ -178,6 +221,7 @@ export class ModuleInput extends Module {
 
     // 4. Copiar estado actual a lastFrame (para métodos locales tipo isKeyJustPressed)
     this.keysLastFrame = new Map(this.keys);
+    this.mouseButtonsLastFrame = new Map(this.mouseButtons);
 
     // 5. Capturar el delta acumulado del frame ANTES de resetearlo (raw, antes de smoothing)
     this.mouseMovementConsumed.x = this.mouseMovement.x;
@@ -232,6 +276,12 @@ export class ModuleInput extends Module {
   // Utility methods for other modules
   public isMouseButtonPressed(button: MouseButton): boolean {
     return this.mouseButtons.get(button) || false;
+  }
+
+  public isMouseButtonJustPressed(button: MouseButton): boolean {
+    return (
+      (this.mouseButtons.get(button) || false) && !(this.mouseButtonsLastFrame.get(button) || false)
+    );
   }
 
   public isKeyPressed(key: KeyCode): boolean {

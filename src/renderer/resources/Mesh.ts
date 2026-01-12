@@ -580,7 +580,19 @@ export class Mesh extends GPUResource {
     pass.drawIndexed(this.indexCount, particleCount);
   }
 
-  public getName(): string {
+  public override getName(): string {
     return this.path;
+  }
+
+  public getVertexCount(): number {
+    return this.vertices ? this.vertices.length / 3 : 0;
+  }
+
+  public getIndices(): Uint16Array {
+    return this.indices;
+  }
+
+  public getIndexCount(): number {
+    return this.indexCount;
   }
 }

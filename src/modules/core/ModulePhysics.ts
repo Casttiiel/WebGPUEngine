@@ -1,5 +1,5 @@
 import { Module } from '../core/Module';
-import RAPIER from '@dimforge/rapier3d';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { vec3 } from 'gl-matrix';
 import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
@@ -276,10 +276,40 @@ export class ModulePhysics extends Module {
   }
 
   /**
+   * Realiza un raycast que devuelve el hit más cercano, ignorando sensores
+   * Útil para selección de objetos en editor
+   */
+  public raycastClosestNonSensor(
+    from: vec3,
+    direction: vec3,
+    maxDistance: number,
+  ): { hit: RAPIER.RayColliderHit; entityId: number } | null {
+    const ray = new RAPIER.Ray(
+      { x: from[0], y: from[1], z: from[2] },
+      { x: direction[0], y: direction[1], z: direction[2] },
+    );
+
+    const hit = this.world.castRay(ray, maxDistance, true, QueryFilterFlags.EXCLUDE_SENSORS);
+
+    if (hit) {
+      return { hit, entityId: this.colliderHandleToEntityId.get(hit.collider.handle)! };
+    }
+
+    return null;
+  }
+
+  /**
    * Obtiene el mundo físico de Rapier
    */
   public getWorld(): RAPIER.World {
     return this.world;
+  }
+
+  /**
+   * Obtiene el ID de la entidad asociada a un collider handle
+   */
+  public getEntityIdFromCollider(colliderHandle: number): number | undefined {
+    return this.colliderHandleToEntityId.get(colliderHandle);
   }
 
   /**

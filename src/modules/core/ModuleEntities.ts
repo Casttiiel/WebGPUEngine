@@ -140,6 +140,15 @@ export class ModuleEntities extends Module {
     return null;
   }
 
+  public getEntityById(id: number): Entity | null {
+    for (const entity of this.omEntities) {
+      if (entity.id === id) {
+        return entity;
+      }
+    }
+    return null;
+  }
+
   public getAllEntities(): Entity[] {
     return this.omEntities;
   }

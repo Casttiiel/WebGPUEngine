@@ -5,11 +5,12 @@
     "physics",
     "entities",
     "boot",
+    "editor_selection",
     "game_controller",
     "game_paused",
     "input",
     "render",
     "sound"
   ],
-  "render_debug": []
+  "render_debug": ["editor_selection"]
 }

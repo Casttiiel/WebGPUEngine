@@ -12,7 +12,7 @@ import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/R
 import { Engine } from '../../core/engine/Engine';
 
 export class RenderComponent extends Component {
-  private isVisible: boolean = true;
+  private _isVisible: boolean = true;
   private parts: MeshPartType[] = [];
 
   // Instancing support
@@ -97,7 +97,7 @@ export class RenderComponent extends Component {
     renderManager.delKeys(this);
 
     for (const part of this.parts) {
-      if (!part.isVisible || !this.isVisible) continue;
+      if (!part.isVisible || !this._isVisible) continue;
       renderManager.addKey(this, part.mesh, part.material, transformComponent);
     }
   }
@@ -113,6 +113,10 @@ export class RenderComponent extends Component {
 
   public getParts(): MeshPartType[] {
     return this.parts;
+  }
+
+  public isVisible(): boolean {
+    return this._isVisible;
   }
 
   public update(_dt: number): void {
@@ -154,10 +158,10 @@ export class RenderComponent extends Component {
       },
       set visible(value) {
         this._visible = value;
-        this.component.isVisible = value;
+        this.component._isVisible = value;
         this.component.updateRenderManager();
       },
-      _visible: this.isVisible,
+      _visible: this._isVisible,
       component: this,
     };
 

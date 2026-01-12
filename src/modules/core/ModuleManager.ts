@@ -284,4 +284,8 @@ export class ModuleManager {
   public isInTransition(): boolean {
     return this.isTransitioning;
   }
+
+  public getCurrentGamestate(): string {
+    return this.currentGamestate ? this.currentGamestate.name : '';
+  }
 }
