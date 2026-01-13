@@ -6,6 +6,8 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { Engine } from '../../core/engine/Engine';
+import { InstanceManager } from '../../renderer/core/managers/InstanceManager';
+import { RenderComponent } from '../render/RenderComponent';
 
 export class TransformComponent extends Component {
   private transform: Transform;
@@ -82,6 +84,12 @@ export class TransformComponent extends Component {
 
   private updateModelMatrix(): void {
     GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.transform.getWorldMatrix()));
+    // Si la entidad es instanciada, actualizar el buffer de instancias
+    const entity = this.getOwner();
+    const renderComp = entity.getComponent('render') as RenderComponent;
+    if (renderComp && renderComp.getIsInstanced()) {
+      InstanceManager.updateInstanceTransform(entity);
+    }
   }
 
   private updateChildrenTransforms(): void {

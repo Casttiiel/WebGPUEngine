@@ -9,7 +9,9 @@ import { TransformComponent } from '../../components/core/TransformComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { ResourceManager } from '../../core/engine/ResourceManager';
-import { Mesh } from '../../renderer/resources/Mesh';
+import { GizmoRenderer } from '../../renderer/editor/GizmoRenderer';
+import { GizmoMode } from '../../types/GizmoMode.enum';
+import { GizmoAxis } from '../../types/GizmoAxis.enum';
 
 export class ModuleEditorSelection extends Module {
   private selectedEntity: Entity | null = null;
@@ -30,6 +32,19 @@ export class ModuleEditorSelection extends Module {
     barycentricBuffer: GPUBuffer;
     vertexCount: number;
   } | null = null;
+
+  // Gizmo system
+  private gizmoRenderer!: GizmoRenderer;
+  private gizmoMode: GizmoMode = GizmoMode.TRANSLATE;
+  private gizmoScale: number = 1.0;
+
+  // Gizmo dragging state
+  private isDragging: boolean = false;
+  private draggedAxis: GizmoAxis = GizmoAxis.NONE;
+  private dragStartWorldPos: vec3 = vec3.create();
+  private dragStartMousePos: { x: number; y: number } = { x: 0, y: 0 };
+  private dragPlaneNormal: vec3 = vec3.create();
+  private dragPlanePoint: vec3 = vec3.create();
 
   constructor(name: string) {
     super(name);
@@ -165,21 +180,6 @@ export class ModuleEditorSelection extends Module {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Crear bind group para wireframe uniforms
-    this.wireframeBindGroup = device.createBindGroup({
-      label: 'wireframe_uniforms_bindgroup',
-      layout: this.wireframeBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: { buffer: this.wireframeUniformBuffer },
-        },
-      ],
-    });
-
-    // Cargar mesh del unit cube
-    this.cubeMesh = await Mesh.get('cube.obj');
-
     // Generar coordenadas baricéntricas para el cubo
     // El cubo tiene 36 vértices (6 caras x 2 triángulos x 3 vértices)
     const vertexCount = 36;
@@ -199,6 +199,11 @@ export class ModuleEditorSelection extends Module {
     });
     device.queue.writeBuffer(this.barycentricBuffer, 0, new Float32Array(barycentrics));
 
+    // Inicializar sistema de gizmos
+    this.gizmoRenderer = new GizmoRenderer();
+    await this.gizmoRenderer.initialize();
+    console.log('✅ Gizmo system initialized');
+
     return true;
   }
 
@@ -216,13 +221,29 @@ export class ModuleEditorSelection extends Module {
       this.currentWireframeMesh = null;
     }
 
+    // Limpiar gizmo
+    if (this.gizmoRenderer) {
+      this.gizmoRenderer.destroy();
+    }
+
     console.log('ModuleEditorSelection stopped');
   }
 
   public update(dt: number): void {
     const input = Engine.getInput();
 
-    // Click izquierdo para seleccionar
+    // Si estamos arrastrando, procesar el arrastre
+    if (this.isDragging) {
+      this.processDragging();
+
+      // Soltar al liberar el botón
+      if (input.isMouseButtonJustReleased(MouseButton.LEFT)) {
+        this.stopDragging();
+      }
+      return; // No procesar selección/hover mientras se arrastra
+    }
+
+    // Click izquierdo para seleccionar o iniciar arrastre
     if (input.isMouseButtonJustPressed(MouseButton.LEFT)) {
       this.performSelection();
     }
@@ -256,6 +277,27 @@ export class ModuleEditorSelection extends Module {
     // Convertir mouse position a ray en world space
     const ray = this.screenToWorldRay(mousePos, camera);
 
+    // 1. Primero verificar si se hizo clic en el gizmo (si hay objeto seleccionado)
+    if (this.selectedEntity) {
+      const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+      if (transformComp) {
+        const gizmoPosition = transformComp.getTransform().getWorldPosition();
+        const clickedAxis = this.gizmoRenderer.detectHover(
+          gizmoPosition,
+          ray.origin,
+          ray.direction,
+          this.gizmoScale,
+        );
+
+        // Si se hizo clic en un eje del gizmo, iniciar arrastre
+        if (clickedAxis !== GizmoAxis.NONE) {
+          this.startDragging(clickedAxis, gizmoPosition, mousePos, camera);
+          return;
+        }
+      }
+    }
+
+    // 2. Si no se hizo clic en el gizmo, hacer selección normal
     // Usar el módulo de physics para hacer raycast (ignora sensores, selecciona el más cercano)
     const physics = Engine.getPhysics();
     const result = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
@@ -286,6 +328,30 @@ export class ModuleEditorSelection extends Module {
     // Convertir mouse position a ray en world space
     const ray = this.screenToWorldRay(mousePos, camera);
 
+    // 1. Primero verificar hover sobre el gizmo (si hay objeto seleccionado)
+    if (this.selectedEntity) {
+      const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+      if (transformComp) {
+        const gizmoPosition = transformComp.getTransform().getWorldPosition();
+        const hoveredAxis = this.gizmoRenderer.detectHover(
+          gizmoPosition,
+          ray.origin,
+          ray.direction,
+          this.gizmoScale,
+        );
+
+        // Actualizar el estado de hover del gizmo
+        this.gizmoRenderer.setHoveredAxis(hoveredAxis);
+
+        // Si hay hover sobre el gizmo, no detectar hover sobre entidades
+        if (hoveredAxis !== GizmoAxis.NONE) {
+          this.hoveredEntity = null;
+          return;
+        }
+      }
+    }
+
+    // 2. Si no hay hover sobre el gizmo, detectar hover sobre entidades
     // Usar el módulo de physics para hacer raycast (ignora sensores, selecciona el más cercano)
     const physics = Engine.getPhysics();
     const result = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
@@ -300,6 +366,43 @@ export class ModuleEditorSelection extends Module {
 
       this.hoveredEntity = newHoveredEntity;
     }
+  }
+
+  /**
+   * Inicia el arrastre de un objeto usando un eje del gizmo
+   */
+  private startDragging(
+    axis: GizmoAxis,
+    gizmoPosition: vec3,
+    mousePos: { x: number; y: number },
+    camera: CameraComponent,
+  ): void {
+    this.isDragging = true;
+    this.draggedAxis = axis;
+    vec3.copy(this.dragStartWorldPos, gizmoPosition);
+    this.dragStartMousePos = { ...mousePos };
+
+    // Calcular plano de arrastre perpendicular al eje seleccionado
+    // El plano contiene el punto del gizmo y es perpendicular al eje
+    const axisDir = vec3.create();
+    switch (axis) {
+      case GizmoAxis.X:
+        vec3.set(axisDir, 1, 0, 0);
+        break;
+      case GizmoAxis.Y:
+        vec3.set(axisDir, 0, 1, 0);
+        break;
+      case GizmoAxis.Z:
+        vec3.set(axisDir, 0, 0, 1);
+        break;
+    }
+
+    // El plano de arrastre usa la dirección de la cámara proyectada en el eje
+    const cameraDir = camera.getCamera().getFront();
+    vec3.cross(this.dragPlaneNormal, axisDir, cameraDir);
+    vec3.cross(this.dragPlaneNormal, this.dragPlaneNormal, axisDir);
+    vec3.normalize(this.dragPlaneNormal, this.dragPlaneNormal);
+    vec3.copy(this.dragPlanePoint, gizmoPosition);
   }
 
   private getEditorCamera(): CameraComponent | null {
@@ -361,9 +464,34 @@ export class ModuleEditorSelection extends Module {
       this.renderWireframeInFrame(this.hoveredEntity, [0.0, 10.0, 0.0, 1.0]);
     }
 
-    // Renderizar wireframe del selected entity (rojo) si es diferente al hover
+    // Renderizar wireframe del selected entity (rojo)
     if (this.selectedEntity) {
       this.renderWireframeInFrame(this.selectedEntity, [10.0, 0.0, 0.0, 1.0]);
+
+      // Renderizar gizmo en la posición del objeto seleccionado
+      this.renderGizmo();
+    }
+  }
+
+  /**
+   * Renderiza el gizmo de transformación sobre el objeto seleccionado
+   */
+  private renderGizmo(): void {
+    if (!this.selectedEntity) return;
+
+    const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+    if (!transformComp) return;
+
+    const position = transformComp.getTransform().getWorldPosition();
+    const camera = this.getEditorCamera();
+    if (!camera) return;
+
+    // Renderizar según el modo activo
+    switch (this.gizmoMode) {
+      case GizmoMode.TRANSLATE:
+        this.gizmoRenderer.renderTranslateGizmo(position, camera.getCamera(), this.gizmoScale);
+        break;
+      // TODO: Implementar ROTATE y SCALE
     }
   }
 
@@ -504,5 +632,127 @@ export class ModuleEditorSelection extends Module {
 
   public getHoveredEntity(): Entity | null {
     return this.hoveredEntity;
+  }
+
+  /**
+   * Procesa el arrastre durante el movimiento del mouse
+   */
+  private processDragging(): void {
+    if (!this.selectedEntity) return;
+
+    const camera = this.getEditorCamera();
+    if (!camera) return;
+
+    const input = Engine.getInput();
+    const mousePos = input.getMousePosition();
+
+    // Crear rayo desde posición actual del mouse
+    const ray = this.screenToWorldRay(mousePos, camera);
+
+    // Intersectar rayo con plano de arrastre
+    const hitPoint = this.rayPlaneIntersection(
+      ray.origin,
+      ray.direction,
+      this.dragPlanePoint,
+      this.dragPlaneNormal,
+    );
+
+    if (!hitPoint) return;
+
+    // Proyectar el hit point en el eje de arrastre
+    const axisDir = vec3.create();
+    switch (this.draggedAxis) {
+      case GizmoAxis.X:
+        vec3.set(axisDir, 1, 0, 0);
+        break;
+      case GizmoAxis.Y:
+        vec3.set(axisDir, 0, 1, 0);
+        break;
+      case GizmoAxis.Z:
+        vec3.set(axisDir, 0, 0, 1);
+        break;
+    }
+
+    // Calcular desplazamiento a lo largo del eje
+    const dragVector = vec3.create();
+    vec3.subtract(dragVector, hitPoint, this.dragStartWorldPos);
+    const displacement = vec3.dot(dragVector, axisDir);
+
+    // Aplicar desplazamiento al objeto
+    const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+    if (transformComp) {
+      const newPos = vec3.create();
+      vec3.scaleAndAdd(newPos, this.dragStartWorldPos, axisDir, displacement);
+
+      // Actualizar posición
+      transformComp.getTransform().setLocalPosition(newPos);
+
+      // Sincronizar collider físico si existe y es cinemático
+      // Buscar collider por nombres comunes
+      const collider =
+        this.selectedEntity.getComponent('box_collider') ||
+        this.selectedEntity.getComponent('sphere_collider') ||
+        this.selectedEntity.getComponent('capsule_collider') ||
+        this.selectedEntity.getComponent('mesh_collider');
+
+      if (
+        collider &&
+        typeof collider.getRigidBody === 'function' &&
+        typeof collider.getBodyType === 'function'
+      ) {
+        const bodyType = collider.getBodyType();
+        if (bodyType === 'kinematic' || bodyType === 2) {
+          // 2 = RigidBodyType.KINEMATIC
+          // Obtener rotación actual
+          collider
+            .getRigidBody()
+            .setNextKinematicTranslation({ x: newPos[0], y: newPos[1], z: newPos[2] });
+        } else if (bodyType === 'static' || bodyType === 0) {
+          // 0 = RigidBodyType.STATIC
+          collider
+            .getRigidBody()
+            .setTranslation({ x: newPos[0], y: newPos[1], z: newPos[2] }, true);
+        }
+      }
+    }
+  }
+
+  /**
+   * Detiene el arrastre
+   */
+  private stopDragging(): void {
+    this.isDragging = false;
+    this.draggedAxis = GizmoAxis.NONE;
+  }
+
+  /**
+   * Calcula la intersección entre un rayo y un plano
+   * @returns Punto de intersección o null si no hay intersección
+   */
+  private rayPlaneIntersection(
+    rayOrigin: vec3,
+    rayDir: vec3,
+    planePoint: vec3,
+    planeNormal: vec3,
+  ): vec3 | null {
+    const denom = vec3.dot(planeNormal, rayDir);
+
+    // Si el rayo es paralelo al plano
+    if (Math.abs(denom) < 0.0001) {
+      return null;
+    }
+
+    const p0l0 = vec3.create();
+    vec3.subtract(p0l0, planePoint, rayOrigin);
+    const t = vec3.dot(p0l0, planeNormal) / denom;
+
+    // Si la intersección está detrás del rayo
+    if (t < 0) {
+      return null;
+    }
+
+    const hitPoint = vec3.create();
+    vec3.scaleAndAdd(hitPoint, rayOrigin, rayDir, t);
+    return hitPoint;
   }
 }

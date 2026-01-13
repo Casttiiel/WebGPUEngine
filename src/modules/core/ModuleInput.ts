@@ -284,6 +284,12 @@ export class ModuleInput extends Module {
     );
   }
 
+  public isMouseButtonJustReleased(button: MouseButton): boolean {
+    return (
+      !(this.mouseButtons.get(button) || false) && (this.mouseButtonsLastFrame.get(button) || false)
+    );
+  }
+
   public isKeyPressed(key: KeyCode): boolean {
     return this.keys.get(key) || false;
   }
