@@ -39,6 +39,9 @@ export class ModuleEditorSelection extends Module {
   private gizmoMode: GizmoMode = GizmoMode.TRANSLATE;
   private gizmoScale: number = 1.0;
 
+  // Store initial scale for drag (for scale gizmo)
+  private _dragStartScale: vec3 | null = null;
+
   // Gizmo dragging state
   private isDragging: boolean = false;
   private draggedAxis: GizmoAxis = GizmoAxis.NONE;
@@ -311,6 +314,7 @@ export class ModuleEditorSelection extends Module {
           ray.origin,
           ray.direction,
           adaptiveScale,
+          this.gizmoMode === GizmoMode.SCALE,
         );
 
         // Si se hizo clic en un eje del gizmo, iniciar arrastre
@@ -370,6 +374,7 @@ export class ModuleEditorSelection extends Module {
           ray.origin,
           ray.direction,
           adaptiveScale,
+          this.gizmoMode === GizmoMode.SCALE,
         );
 
         // Actualizar el estado de hover del gizmo
@@ -518,12 +523,18 @@ export class ModuleEditorSelection extends Module {
     const camera = this.getEditorCamera();
     if (!camera) return;
 
+    // Set the current transform for object space axes
+    this.gizmoRenderer.currentTransform = transformComp.getTransform();
+
     // Renderizar según el modo activo
     switch (this.gizmoMode) {
       case GizmoMode.TRANSLATE:
         this.gizmoRenderer.renderTranslateGizmo(position, camera.getCamera(), this.gizmoScale);
         break;
-      // TODO: Implementar ROTATE y SCALE
+      case GizmoMode.SCALE:
+        this.gizmoRenderer.renderScaleGizmo(position, camera.getCamera(), this.gizmoScale);
+        break;
+      // TODO: Implementar ROTATE
     }
   }
 
@@ -714,40 +725,72 @@ export class ModuleEditorSelection extends Module {
     const SNAP_STEP = 0.2;
     displacement = Math.round(displacement / SNAP_STEP) * SNAP_STEP;
 
-    // Aplicar desplazamiento al objeto
-    const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
-    if (transformComp) {
-      const newPos = vec3.create();
-      vec3.scaleAndAdd(newPos, this.dragStartWorldPos, axisDir, displacement);
+    // Obtener el modo de gizmo actual
+    if (this.gizmoMode === GizmoMode.SCALE) {
+      // Escalado en el eje correspondiente
+      const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+      if (transformComp) {
+        // Obtener escala inicial
+        const startScale = vec3.clone(transformComp.getTransform().getLocalScale());
+        // El valor base de escala en el eje es el valor inicial al comenzar el drag
+        // Para mantener la escala acumulativa, almacenamos el valor inicial al comenzar el drag
+        if (!this._dragStartScale) {
+          this._dragStartScale = vec3.clone(startScale);
+        }
+        const dragStartScale = this._dragStartScale;
 
-      // Actualizar posición
-      transformComp.getTransform().setLocalPosition(newPos);
+        // El desplazamiento se traduce en un factor multiplicativo
+        // Por ejemplo, 0 desplazamiento = 1.0, positivo = mayor, negativo = menor
+        // Aquí usamos: factor = 1 + desplazamiento
+        // Clamp para evitar escala negativa o cero
+        let factor = 1 + displacement;
+        factor = Math.max(0.05, factor);
 
-      // Sincronizar collider físico si existe y es cinemático
-      // Buscar collider por nombres comunes
-      const collider =
-        this.selectedEntity.getComponent('box_collider') ||
-        this.selectedEntity.getComponent('sphere_collider') ||
-        this.selectedEntity.getComponent('capsule_collider') ||
-        this.selectedEntity.getComponent('mesh_collider');
-
-      if (
-        collider &&
-        typeof collider.getRigidBody === 'function' &&
-        typeof collider.getBodyType === 'function'
-      ) {
-        const bodyType = collider.getBodyType();
-        if (bodyType === 'kinematic' || bodyType === 2) {
-          // 2 = RigidBodyType.KINEMATIC
-          // Obtener rotación actual
-          collider
-            .getRigidBody()
-            .setNextKinematicTranslation({ x: newPos[0], y: newPos[1], z: newPos[2] });
-        } else if (bodyType === 'static' || bodyType === 0) {
-          // 0 = RigidBodyType.STATIC
-          collider
-            .getRigidBody()
-            .setTranslation({ x: newPos[0], y: newPos[1], z: newPos[2] }, true);
+        // Nueva escala usando axisDir
+        const newScale = vec3.clone(dragStartScale);
+        // Aplicar el factor solo en la dirección de axisDir
+        // newScale = dragStartScale + axisDir * (dragStartScale * (factor - 1))
+        // Para cada componente:
+        for (let i = 0; i < 3; ++i) {
+          // Si axisDir[i] es 1, escalar ese eje; si es 0, dejar igual
+          if (Math.abs(axisDir[i]) > 0.5) {
+            newScale[i] = dragStartScale[i] * factor;
+          } else {
+            newScale[i] = dragStartScale[i];
+          }
+          // Clamp para evitar valores negativos o muy pequeños
+          newScale[i] = Math.max(0.05, newScale[i]);
+        }
+        transformComp.getTransform().setLocalScale(newScale);
+      }
+    } else {
+      // TRANSLATE (comportamiento original)
+      const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+      if (transformComp) {
+        const newPos = vec3.create();
+        vec3.scaleAndAdd(newPos, this.dragStartWorldPos, axisDir, displacement);
+        transformComp.getTransform().setLocalPosition(newPos);
+        // Sincronizar collider físico si existe y es cinemático
+        const collider =
+          this.selectedEntity.getComponent('box_collider') ||
+          this.selectedEntity.getComponent('sphere_collider') ||
+          this.selectedEntity.getComponent('capsule_collider') ||
+          this.selectedEntity.getComponent('mesh_collider');
+        if (
+          collider &&
+          typeof collider.getRigidBody === 'function' &&
+          typeof collider.getBodyType === 'function'
+        ) {
+          const bodyType = collider.getBodyType();
+          if (bodyType === 'kinematic' || bodyType === 2) {
+            collider
+              .getRigidBody()
+              .setNextKinematicTranslation({ x: newPos[0], y: newPos[1], z: newPos[2] });
+          } else if (bodyType === 'static' || bodyType === 0) {
+            collider
+              .getRigidBody()
+              .setTranslation({ x: newPos[0], y: newPos[1], z: newPos[2] }, true);
+          }
         }
       }
     }
@@ -759,6 +802,8 @@ export class ModuleEditorSelection extends Module {
   private stopDragging(): void {
     this.isDragging = false;
     this.draggedAxis = GizmoAxis.NONE;
+    // Limpiar escala inicial de drag para futuros drags
+    this._dragStartScale = null;
   }
 
   /**

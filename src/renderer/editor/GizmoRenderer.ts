@@ -1,10 +1,10 @@
-import { vec3 } from 'gl-matrix';
+import { vec3, mat4 } from 'gl-matrix';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { Render } from '../core/pipeline/Render';
-import { GizmoMode } from '../../types/GizmoMode.enum';
 import { GizmoAxis } from '../../types/GizmoAxis.enum';
 import { Camera } from '../../core/math/Camera';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { Transform } from '../../core/math/Transform';
 
 /**
  * GizmoRenderer - Renderiza gizmos de transformación (translate, rotate, scale)
@@ -37,6 +37,17 @@ export class GizmoRenderer {
   private axisLength: number = 1.0; // Longitud de cada eje
   private hoveredAxis: GizmoAxis = GizmoAxis.NONE;
   private hoverThreshold: number = 0.1; // Distancia mínima para considerar hover (world space)
+
+  // Store the current transform for object-space gizmo axes
+  private _currentTransform: Transform | null = null;
+
+  public get currentTransform(): Transform | null {
+    return this._currentTransform;
+  }
+
+  public set currentTransform(value: Transform | null) {
+    this._currentTransform = value;
+  }
 
   constructor() {
     this.device = GPUUtils.getDevice();
@@ -298,6 +309,91 @@ export class GizmoRenderer {
   }
 
   /**
+   * Renderiza el gizmo de escala (cubos en los extremos de los ejes)
+   */
+  public renderScaleGizmo(position: vec3, camera: Camera, scale: number = 1.0): void {
+    // Calcular escala adaptativa basada en distancia a cámara
+    const cameraPosition = camera.getPosition();
+    const adaptiveScale = this.calculateAdaptiveScale(position, cameraPosition, scale);
+    const effectiveScale = adaptiveScale * this.gizmoScale;
+    const device = this.device;
+
+    // Obtener la rotación del objeto en world space (como matriz)
+    // Se espera que el usuario pase la rotación (quat o mat4) si quiere ejes en object space
+    // Por compatibilidad, intentamos obtenerla de this._currentTransform si existe
+    // Pero aquí, para mantener la API, pedimos que se setee antes de llamar a renderScaleGizmo
+    // Si no, los ejes serán world space
+    let rotationMatrix: mat4 | null = null;
+    if (this._currentTransform && typeof this._currentTransform.getWorldRotation === 'function') {
+      const rot = this._currentTransform.getWorldRotation();
+      rotationMatrix = mat4.create();
+      mat4.fromQuat(rotationMatrix, rot);
+    }
+
+    // Ejes y colores
+    const axes = [
+      { dir: vec3.fromValues(1, 0, 0), axis: GizmoAxis.X, color: [1.0, 0.0, 0.0, 1.0] },
+      { dir: vec3.fromValues(0, 1, 0), axis: GizmoAxis.Y, color: [0.0, 1.0, 0.0, 1.0] },
+      { dir: vec3.fromValues(0, 0, 1), axis: GizmoAxis.Z, color: [0.0, 0.0, 1.0, 1.0] },
+    ];
+
+    // Dibujar líneas de los ejes en object space
+    const allVertices = new Float32Array(18); // 6 vertices × 3 floats
+    let offset = 0;
+    for (const { dir } of axes) {
+      let axisDir = vec3.clone(dir);
+      if (rotationMatrix) {
+        vec3.transformMat4(axisDir, axisDir, rotationMatrix);
+      }
+      const end = vec3.create();
+      vec3.scaleAndAdd(end, position, axisDir, this.axisLength * effectiveScale);
+      // Start point
+      allVertices[offset++] = position[0];
+      allVertices[offset++] = position[1];
+      allVertices[offset++] = position[2];
+      // End point
+      allVertices[offset++] = end[0];
+      allVertices[offset++] = end[1];
+      allVertices[offset++] = end[2];
+    }
+    device.queue.writeBuffer(this.vertexBuffer, 0, allVertices);
+
+    // Renderizar líneas
+    const encoder = device.createCommandEncoder({ label: 'gizmo_encoder_scale' });
+    const renderPass = encoder.beginRenderPass({
+      label: 'gizmo_render_pass_scale',
+      colorAttachments: [
+        {
+          view: Render.getInstance().getContext().getCurrentTexture().createView(),
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+    });
+    renderPass.setPipeline(this.linePipeline);
+    renderPass.setBindGroup(0, camera.getBindGroup());
+    renderPass.setVertexBuffer(0, this.vertexBuffer);
+
+    const bindGroups = [this.uniformBindGroupX, this.uniformBindGroupY, this.uniformBindGroupZ];
+    const uniformBuffers = [this.uniformBufferX, this.uniformBufferY, this.uniformBufferZ];
+    for (let i = 0; i < 3; i++) {
+      const { axis } = axes[i]!;
+      // Color hover
+      if (this.hoveredAxis === axis) {
+        const brightColor = this.brightenColor(axes[i]!.color);
+        device.queue.writeBuffer(uniformBuffers[i]!, 0, new Float32Array(brightColor));
+      } else {
+        device.queue.writeBuffer(uniformBuffers[i]!, 0, new Float32Array(axes[i]!.color));
+      }
+      renderPass.setBindGroup(1, bindGroups[i]!);
+      renderPass.draw(2, 1, i * 2, 0);
+    }
+
+    renderPass.end();
+    device.queue.submit([encoder.finish()]);
+  }
+
+  /**
    * Detecta qué eje del gizmo está en hover dado un rayo desde la cámara
    * @param gizmoPosition - Posición del gizmo en world space
    * @param rayOrigin - Origen del rayo (posición de cámara)
@@ -305,26 +401,50 @@ export class GizmoRenderer {
    * @param scale - Escala efectiva del gizmo
    * @returns El eje en hover o NONE
    */
+  /**
+   * Detecta qué eje del gizmo está en hover dado un rayo desde la cámara
+   * @param gizmoPosition - Posición del gizmo en world space
+   * @param rayOrigin - Origen del rayo (posición de cámara)
+   * @param rayDirection - Dirección normalizada del rayo
+   * @param scale - Escala efectiva del gizmo
+   * @param useObjectSpaceAxes - Si true, aplica la rotación del objeto (modo SCALE)
+   */
   public detectHover(
     gizmoPosition: vec3,
     rayOrigin: vec3,
     rayDirection: vec3,
     scale: number = 1.0,
+    useObjectSpaceAxes: boolean = false,
   ): GizmoAxis {
     const effectiveScale = scale * this.gizmoScale;
     let closestAxis = GizmoAxis.NONE;
     let minDistance = this.hoverThreshold;
 
-    // Definir los tres ejes
+    // Solo aplicar rotación si se solicita (modo SCALE)
+    let rotationMatrix: mat4 | null = null;
+    if (
+      useObjectSpaceAxes &&
+      this._currentTransform &&
+      typeof this._currentTransform.getWorldRotation === 'function'
+    ) {
+      const rot = this._currentTransform.getWorldRotation();
+      rotationMatrix = mat4.create();
+      mat4.fromQuat(rotationMatrix, rot);
+    }
+
     const axes = [
       { dir: vec3.fromValues(1, 0, 0), axis: GizmoAxis.X },
       { dir: vec3.fromValues(0, 1, 0), axis: GizmoAxis.Y },
       { dir: vec3.fromValues(0, 0, 1), axis: GizmoAxis.Z },
     ];
     for (const { dir, axis } of axes) {
+      let axisDir = vec3.clone(dir);
+      if (rotationMatrix) {
+        vec3.transformMat4(axisDir, axisDir, rotationMatrix);
+      }
       // Calcular punto final del eje
       const axisEnd = vec3.create();
-      vec3.scaleAndAdd(axisEnd, gizmoPosition, dir, this.axisLength * effectiveScale);
+      vec3.scaleAndAdd(axisEnd, gizmoPosition, axisDir, this.axisLength * effectiveScale);
 
       // Calcular distancia mínima entre rayo y segmento de línea
       const distance = this.rayToSegmentDistance(rayOrigin, rayDirection, gizmoPosition, axisEnd);
