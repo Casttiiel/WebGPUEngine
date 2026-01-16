@@ -437,7 +437,7 @@ export class GizmoRenderer {
    * @param baseScale - Escala base (opcional)
    * @returns Escala adaptativa calculada
    */
-  private calculateAdaptiveScale(
+  public calculateAdaptiveScale(
     gizmoPosition: vec3,
     cameraPosition: vec3,
     baseScale: number = 1.0,

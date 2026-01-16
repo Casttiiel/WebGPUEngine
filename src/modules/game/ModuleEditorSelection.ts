@@ -298,11 +298,19 @@ export class ModuleEditorSelection extends Module {
       const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
       if (transformComp) {
         const gizmoPosition = transformComp.getTransform().getWorldPosition();
+        // Obtener cámara real para calcular adaptiveScale
+        const cameraObj = camera.getCamera();
+        const cameraPos = cameraObj.getPosition();
+        const adaptiveScale = this.gizmoRenderer.calculateAdaptiveScale(
+          gizmoPosition,
+          cameraPos,
+          this.gizmoScale,
+        );
         const clickedAxis = this.gizmoRenderer.detectHover(
           gizmoPosition,
           ray.origin,
           ray.direction,
-          this.gizmoScale,
+          adaptiveScale,
         );
 
         // Si se hizo clic en un eje del gizmo, iniciar arrastre
@@ -349,11 +357,19 @@ export class ModuleEditorSelection extends Module {
       const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
       if (transformComp) {
         const gizmoPosition = transformComp.getTransform().getWorldPosition();
+        // Obtener cámara real para calcular adaptiveScale
+        const cameraObj = camera.getCamera();
+        const cameraPos = cameraObj.getPosition();
+        const adaptiveScale = this.gizmoRenderer.calculateAdaptiveScale(
+          gizmoPosition,
+          cameraPos,
+          this.gizmoScale,
+        );
         const hoveredAxis = this.gizmoRenderer.detectHover(
           gizmoPosition,
           ray.origin,
           ray.direction,
-          this.gizmoScale,
+          adaptiveScale,
         );
 
         // Actualizar el estado de hover del gizmo
