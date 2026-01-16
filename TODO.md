@@ -14,9 +14,8 @@
    Scattering propagation (luz rebota entre froxels) Implementar el segundo compute pass que ya tienes preparado Hace que la luz se propague volumétricamente
 9. Improve particles
 10. Weird line on corners is irradiance because of normals
-11. TAA?
 
-### Alpha Roadmap
+### Improvements
 
 Snap to ground
 Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
