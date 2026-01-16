@@ -12,6 +12,7 @@ import { ResourceManager } from '../../core/engine/ResourceManager';
 import { GizmoRenderer } from '../../renderer/editor/GizmoRenderer';
 import { GizmoMode } from '../../types/GizmoMode.enum';
 import { GizmoAxis } from '../../types/GizmoAxis.enum';
+import { KeyCode } from '../../types/KeyCode.enum';
 
 export class ModuleEditorSelection extends Module {
   private selectedEntity: Entity | null = null;
@@ -235,12 +236,16 @@ export class ModuleEditorSelection extends Module {
     // Si estamos arrastrando, procesar el arrastre
     if (this.isDragging) {
       this.processDragging();
-
       // Soltar al liberar el botón
       if (input.isMouseButtonJustReleased(MouseButton.LEFT)) {
         this.stopDragging();
       }
       return; // No procesar selección/hover mientras se arrastra
+    }
+
+    // Cambiar modo de gizmo con Space si hay selección y no estamos arrastrando
+    if (this.selectedEntity && !this.isDragging && input.isKeyJustPressed(KeyCode.SPACE)) {
+      this.cycleGizmoMode();
     }
 
     // Click izquierdo para seleccionar o iniciar arrastre
@@ -262,6 +267,17 @@ export class ModuleEditorSelection extends Module {
       this.lastMousePosition = { ...mousePos };
       this.performHoverDetection();
     }
+  }
+
+  /**
+   * Cambia el modo de gizmo (TRANSLATE, SCALE, ROTATE, ...)
+   */
+  private cycleGizmoMode(): void {
+    // El orden será: TRANSLATE → SCALE → ROTATE → TRANSLATE ...
+    const modes = [GizmoMode.TRANSLATE, GizmoMode.SCALE, GizmoMode.ROTATE];
+    const currentIdx = modes.indexOf(this.gizmoMode);
+    const nextIdx = (currentIdx + 1) % modes.length;
+    this.gizmoMode = modes[nextIdx] ?? GizmoMode.TRANSLATE;
   }
 
   private performSelection(): void {
@@ -676,7 +692,11 @@ export class ModuleEditorSelection extends Module {
     // Calcular desplazamiento a lo largo del eje
     const dragVector = vec3.create();
     vec3.subtract(dragVector, hitPoint, this.dragStartWorldPos);
-    const displacement = vec3.dot(dragVector, axisDir);
+    let displacement = vec3.dot(dragVector, axisDir);
+
+    // --- SNAPPING ---
+    const SNAP_STEP = 0.2;
+    displacement = Math.round(displacement / SNAP_STEP) * SNAP_STEP;
 
     // Aplicar desplazamiento al objeto
     const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;

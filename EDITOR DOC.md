@@ -22,8 +22,6 @@
 ## Principio Arquitectónico
 
 📋 FASE 1: Gizmos y Manipulación (2-3 semanas)
-Interacción con el gizmo - Permitir arrastrar el objeto cuando haces clic en un eje
-Grid y Snapping
 Hover detection funciona con distancia respecto al centro?
 Modos ROTATE y SCALE - Implementar los otros dos gizmos (actualmente hay un TODO)
 Transform update if parent is dirty only better?

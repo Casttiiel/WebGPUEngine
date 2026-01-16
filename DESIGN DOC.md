@@ -36,10 +36,8 @@
    Conserva 80% de velocidad previa
    Tarda 0.25 s
    Regla de recarga:
-   Sin eco:
    1 dash por salto
    Se resetea solo al tocar suelo
-   con eco?
 
 8. Impulse Step
    Una pisada técnica que convierte desaceleración en energía vertical u horizontal.
@@ -47,10 +45,7 @@
    Soltar correr justo antes de aterrizar
    Ventana: 120 ms
    Si haces Impulse Step:
-   Conservas 100% de la velocidad
-   Obtienes:
-   +20% altura de salto o
-   +15% alcance horizontal (según input)
+   Conservas 100% de la velocidad y transformas parte de la energia vertical en horizontal
 
 9. Objetos
    🔵 1. Anclas de Eco
@@ -118,7 +113,9 @@
 
 14. Roll Jump
 
-15. Objetos 2
+15. SHoot
+
+16. Objetos 2
     🟣 3. Anclas Fásicas
     Qué son
     Anclas “avanzadas”
@@ -140,7 +137,7 @@
     Preparar velocidad
     Setups para saltos largos
 
-16. “Fallar un salto” — definición FINAL y clara
+17. “Fallar un salto” — definición FINAL y clara
     Esta es la parte más confusa, así que vamos con una definición binaria (true/false).
     ❌ Fallar un salto NO ES:
     No hacer Impulse Step
