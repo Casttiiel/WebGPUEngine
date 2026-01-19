@@ -3,6 +3,7 @@ export enum PipelineBindGroupLayouts {
   OBJECT_UNIFORMS = 'ObjectUniforms',
   MATERIAL_TEXTURES = 'MaterialTextures',
   SINGLE_TEXTURE = 'SingleTexture',
+  FOG_UNIFORMS = 'FogUniforms',
   CUBEMAP_TEXTURE = 'CubemapTexture',
   AMBIENT_UNIFORMS = 'AmbientUniforms',
   SKYBOX_UNIFORMS = 'SkyboxUniforms',

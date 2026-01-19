@@ -1070,6 +1070,26 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getFogUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('fog_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
   /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
@@ -1132,6 +1152,8 @@ export class BindGroupFactory {
         return this.getSMAABlendParamsLayout();
       case PipelineBindGroupLayouts.VELOCITY_BUFFER_UNIFORMS:
         return this.getVelocityBufferUniformsLayout();
+      case PipelineBindGroupLayouts.FOG_UNIFORMS:
+        return this.getFogUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

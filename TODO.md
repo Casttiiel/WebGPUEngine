@@ -1,16 +1,15 @@
 ### Engine
 
-1. Editor
-2. Screen-Space Light Scattering + depth mask
-3. Exponential Height Fog + Depth Fog
-4. UI
-5. Start Screen
-6. Game Loading Screen
-7. Remove en main.ts el skip first frame?
-8. Quality settings selection
-9. Multiple Light probes has good shadows?
-10. Improve particles
-11. Weird line on corners is irradiance because of normals
+1. Screen-Space Light Scattering + depth mask
+2. Editor
+3. UI
+4. Start Screen
+5. Game Loading Screen
+6. Remove en main.ts el skip first frame?
+7. Quality settings selection
+8. Multiple Light probes has good shadows?
+9. Improve particles
+10. Weird line on corners is irradiance because of normals
 
 ### Improvements
 

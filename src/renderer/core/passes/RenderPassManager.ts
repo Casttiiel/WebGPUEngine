@@ -18,6 +18,7 @@ import {
   BloomFilteringRenderPass,
   MotionBlurRenderPass,
   SpeedLinesVFXRenderPass,
+  HeightFogRenderPass,
 } from './PostProcessingRenderPasses';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderTarget } from '../../resources/RenderTarget';
@@ -150,6 +151,18 @@ export class RenderPassManager {
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
     const pass = new ToneMappingRenderPass(passConfig, mesh, technique, bindGroup);
+    this.executeDynamicPass(pass);
+  }
+
+  public executeHeightFogPass(
+    mesh: Mesh,
+    technique: Technique,
+    bindGroup: GPUBindGroup,
+    gBufferBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const pass = new HeightFogRenderPass(passConfig, mesh, technique, bindGroup, gBufferBindGroup);
     this.executeDynamicPass(pass);
   }
 

@@ -23,6 +23,7 @@ import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
+import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 
 export class ModuleRender extends Module {
@@ -118,6 +119,10 @@ export class ModuleRender extends Module {
       (comp as DepthOfFieldComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('height_fog')?.getList() ?? []) {
+      (comp as HeightFogComponent).resize();
+    }
+
     for (const comp of Engine.getEntities().getObjectManagerByName('motion_blur')?.getList() ??
       []) {
       (comp as MotionBlurComponent).resize();
@@ -175,6 +180,13 @@ export class ModuleRender extends Module {
     // Generar velocity buffer si está activo
     if (velocityMgr.isEnabled()) {
       velocityMgr.generate(camera, this.deferred.getGBufferBindGroup());
+    }
+
+    if (mainCameraEntity.hasComponent('height_fog')) {
+      const heightFog = mainCameraEntity.getComponent('height_fog') as HeightFogComponent;
+      if (heightFog && heightFog.hasLoaded()) {
+        result = heightFog.apply(result, this.deferred.getGBufferBindGroup());
+      }
     }
 
     if (mainCameraEntity.hasComponent('bloom')) {

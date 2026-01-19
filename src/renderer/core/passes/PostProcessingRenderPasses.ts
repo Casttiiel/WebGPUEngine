@@ -313,3 +313,29 @@ export class MotionBlurRenderPass extends PostProcessingRenderPass {
     pass.setBindGroup(2, this.paramsBindGroup);
   }
 }
+
+/**
+ * Height Fog post-processing render pass
+ */
+export class HeightFogRenderPass extends PostProcessingRenderPass {
+  private paramsBindGroup: GPUBindGroup;
+  private gBufferBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    paramsBindGroup: GPUBindGroup,
+    gBufferBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.paramsBindGroup = paramsBindGroup;
+    this.gBufferBindGroup = gBufferBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.gBufferBindGroup);
+    pass.setBindGroup(2, this.paramsBindGroup);
+  }
+}
