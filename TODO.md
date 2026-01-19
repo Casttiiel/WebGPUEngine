@@ -1,19 +1,16 @@
 ### Engine
 
 1. Editor
-2. UI
-3. Start Screen
-4. Game Loading Screen
-5. Remove en main.ts el skip first frame?
-6. Quality settings selection
-7. Multiple Light probes has good shadows?
-8. Froxel Scattering
-   Light injection Directional Light
-   Light Injection Point Light
-   Light Injection Spot Light
-   Scattering propagation (luz rebota entre froxels) Implementar el segundo compute pass que ya tienes preparado Hace que la luz se propague volumétricamente
-9. Improve particles
-10. Weird line on corners is irradiance because of normals
+2. Screen-Space Light Scattering + depth mask
+3. Exponential Height Fog + Depth Fog
+4. UI
+5. Start Screen
+6. Game Loading Screen
+7. Remove en main.ts el skip first frame?
+8. Quality settings selection
+9. Multiple Light probes has good shadows?
+10. Improve particles
+11. Weird line on corners is irradiance because of normals
 
 ### Improvements
 

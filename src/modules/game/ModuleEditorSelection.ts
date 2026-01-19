@@ -802,6 +802,41 @@ export class ModuleEditorSelection extends Module {
   private stopDragging(): void {
     this.isDragging = false;
     this.draggedAxis = GizmoAxis.NONE;
+    // Si se acaba de hacer drag de escala, recrear el collider si existe
+    if (this.gizmoMode === GizmoMode.SCALE && this.selectedEntity) {
+      const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+      const newScale = transformComp?.getTransform().getLocalScale();
+      // Buscar collider
+      const collider =
+        this.selectedEntity.getComponent('box_collider') ||
+        this.selectedEntity.getComponent('sphere_collider') ||
+        this.selectedEntity.getComponent('capsule_collider') ||
+        this.selectedEntity.getComponent('mesh_collider');
+      if (
+        collider &&
+        typeof collider.getRigidBody === 'function' &&
+        typeof collider.getCollider === 'function'
+      ) {
+        const rigidBody = collider.getRigidBody();
+        const oldCollider = collider.getCollider();
+        // Quitar el collider anterior del mundo
+        const world = Engine.getPhysics().getWorld();
+        world.removeCollider(oldCollider, true);
+        // Crear nuevo collider con el tamaño actualizado
+        // Ejemplo para box_collider:
+        if (collider.type === 'box_collider') {
+          // Asume que tienes una función para crear el collider, por ejemplo collider.createCollider()
+          const newCollider = collider.createCollider({
+            halfExtents: [newScale[0] * 0.5, newScale[1] * 0.5, newScale[2] * 0.5],
+            rigidBody,
+          });
+          // Adjuntar al rigidbody
+          rigidBody.addCollider(newCollider);
+          collider.setCollider(newCollider);
+        }
+        // Para otros tipos, deberías adaptar el constructor y los parámetros
+      }
+    }
     // Limpiar escala inicial de drag para futuros drags
     this._dragStartScale = null;
   }
