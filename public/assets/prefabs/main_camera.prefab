@@ -6,7 +6,6 @@
       "smaa": {}, 
       "ambient_occlusion": {},
       "bloom": {},
-      "speed_lines_vfx": {},
-      "height_fog": {}
+      "speed_lines_vfx": {}
     }
   }

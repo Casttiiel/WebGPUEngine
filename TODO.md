@@ -1,23 +1,26 @@
 ### Engine
 
-1. Screen-Space Light Scattering + depth mask
-2. Editor
-3. UI
-4. Start Screen
-5. Game Loading Screen
-6. Remove en main.ts el skip first frame?
-7. Quality settings selection
-8. Multiple Light probes has good shadows?
-9. Improve particles
-10. Weird line on corners is irradiance because of normals
+1. UI
+2. Start Screen
+3. Game Loading Screen
+4. Remove en main.ts el skip first frame?
+5. Editor
+6. Froxel Volumetric Scattering
+7. AO
+8. Quality settings selection
+9. Multiple Light probes has good shadows?
+10. Improve particles
+11. Que pasos tienen/necesitan reproyeccion temporal
+
+12. Weird line on corners is irradiance because of normals
 
 ### Improvements
 
-Snap to ground
-Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
-WallRun after timer can go to wallrun again
-Dash end speed/direction + Conserva 80% de velocidad previa
-Swing Bar needs to be picked with some angle
+1. Snap to ground
+2. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
+3. WallRun after timer can go to wallrun again
+4. Dash end speed/direction + Conserva 80% de velocidad previa
+5. Swing Bar needs to be picked with some angle
 
 ## Gameplay
 
@@ -35,10 +38,3 @@ Swing Bar needs to be picked with some angle
 7. Check neon white for textures
 
 ## Questions
-
-Visuals
-Controls
--Jump too floaty?
--Air control?
-Camera
-Sensacion de velocidad?

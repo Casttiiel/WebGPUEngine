@@ -477,6 +477,16 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getFroxelAmbientLightParametersLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_ambient_light_parameters_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   /**
    * Create bind group layout for froxel textures (compute version)
    */

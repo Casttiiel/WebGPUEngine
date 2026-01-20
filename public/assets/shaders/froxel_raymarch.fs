@@ -10,7 +10,7 @@
 @group(0) @binding(1) var<uniform> froxelParams: FroxelUniforms;
 @group(0) @binding(2) var<uniform> volumetricSettings: VolumetricUniforms;
 @group(0) @binding(3) var froxelDensityTexture: texture_3d<f32>;
-@group(0) @binding(4) var froxelScatteringTexture: texture_3d<f32>;
+@group(0) @binding(4) var froxelLightTexture: texture_3d<f32>;
 @group(0) @binding(5) var linearSampler: sampler;
 
 // G-Buffer depth for proper ray termination
@@ -86,8 +86,8 @@ fn worldSpaceToFroxel(worldPos: vec3<f32>) -> vec3<f32> {
 
 // Sample froxel data with bounds checking
 fn sampleFroxelData(froxelCoord: vec3<f32>) -> vec4<f32> {
-    // Sample scattered light (RGB) using sampling, density using direct load
-    let scatteredLight = textureSampleLevel(froxelScatteringTexture, linearSampler, froxelCoord, 0.0).rgb;
+    // Sample in-scattered light (RGB) using froxelLightTexture, density using direct load
+    let scatteredLight = textureSampleLevel(froxelLightTexture, linearSampler, froxelCoord, 0.0).rgb;
     
     // Convert normalized coordinates to integer texel coordinates for textureLoad
     let texelCoord = vec3<i32>(
@@ -165,7 +165,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         
         // Load density and scattering from froxels
         let density = textureLoad(froxelDensityTexture, texelCoord, 0).r;
-        let scattering = textureSampleLevel(froxelScatteringTexture, linearSampler, froxelCoord, 0.0).rgb;
+        let scattering = textureSampleLevel(froxelLightTexture, linearSampler, froxelCoord, 0.0).rgb;
         
         // Calculate extinction coefficient (density affects how much light is absorbed)
         let extinction = density * volumetricSettings.absorption;

@@ -18,7 +18,7 @@ import { DirectionalLightComponent } from '../../components/render/DirectionalLi
  */
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
-  private isEnabled: boolean = false;
+  private isEnabled: boolean = true;
 
   // Froxel grid dimensions
   private froxelDimensions = {
@@ -39,10 +39,6 @@ export class FroxelVolumetricScattering {
   private directionalLightInjectionShader!: GPUShaderModule; // Directional light injection shader
   private directionalLightInjectionPipeline!: GPUComputePipeline; // Directional light injection pipeline
 
-  // Scattering pass resources
-  private scatteringComputeShader!: GPUShaderModule; // Scattering compute shader
-  private scatteringComputePipeline!: GPUComputePipeline; // Scattering compute pipeline
-
   // Future phase techniques (commented for now):
   // private lightInjectionTechnique!: Technique;       // Inject light into froxels
   private rayMarchTechnique!: Technique; // Final ray marching with alpha blending (does composite automatically)
@@ -50,7 +46,6 @@ export class FroxelVolumetricScattering {
 
   // 3D Textures for froxel data
   private froxelDensityTexture!: GPUTexture; // 3D texture: density per froxel
-  private froxelScatteringTexture!: GPUTexture; // 3D texture: scattered light per froxel
   private froxelLightTexture!: GPUTexture; // 3D texture: injected light per froxel
 
   // Noise texture for density variation
@@ -58,6 +53,9 @@ export class FroxelVolumetricScattering {
 
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
+  // Buffer y bind group para luz ambiente
+  private ambientLightUniformBuffer!: GPUBuffer;
+  private ambientLightBindGroup!: GPUBindGroup;
 
   // Volumetric parameters (increased for visibility)
   private fogDensity: number = 0.5; // Increased from 0.02
@@ -81,6 +79,12 @@ export class FroxelVolumetricScattering {
     this.volumetricUniformData = new Float32Array(16); // 64 bytes aligned
     this.froxelUniformData = new Float32Array(16); // 64 bytes aligned
     this.updateUniforms();
+    // Crear buffer para luz ambiente (vec3 + f32 = 16 bytes)
+    this.ambientLightUniformBuffer = GPUUtils.createBuffer(
+      'froxel_ambient_light_uniforms',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
   }
 
   public async load(): Promise<void> {
@@ -111,14 +115,6 @@ export class FroxelVolumetricScattering {
     this.densityComputeShader = this.device.createShaderModule({
       label: 'Froxel Density Compute Shader',
       code: densityCode,
-    });
-
-    // Load scattering compute shader
-    const scatteringCode = await ResourceManager.loadShader('froxel_scattering.compute.wgsl');
-
-    this.scatteringComputeShader = this.device.createShaderModule({
-      label: 'Froxel Scattering Compute Shader',
-      code: scatteringCode,
     });
 
     // Load ambient light injection compute shader
@@ -167,12 +163,15 @@ export class FroxelVolumetricScattering {
     this.densityComputePipeline = PipelineFactory.createComputePipeline(densityConfig);
 
     // Create ambient light injection pipeline layout
+    // group(0): uniforms (froxelParams, volumetricSettings)
+    // group(1): textures (density, storageTexture)
+    // group(2): ambient light uniform
     const ambientLightPipelineLayout = PipelineFactory.createPipelineLayout(
       'froxel_ambient_light_injection_pipeline_layout',
       [
-        BindGroupFactory.getCameraComputeLayout(),
-        BindGroupFactory.getFroxelParametersLayout(),
-        BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
+        BindGroupFactory.getFroxelParametersLayout(), // group(0): uniforms
+        BindGroupFactory.getAmbientLightInjectionTexturesLayout(), // group(1): textures
+        BindGroupFactory.getFroxelAmbientLightParametersLayout(), // group(2): ambient light uniform
       ],
     );
 
@@ -211,28 +210,6 @@ export class FroxelVolumetricScattering {
 
     this.directionalLightInjectionPipeline =
       PipelineFactory.createComputePipeline(directionalLightConfig);
-
-    // Create scattering pipeline layout - 3 bind groups: camera, parameters, textures
-    const scatteringPipelineLayout = PipelineFactory.createPipelineLayout(
-      'froxel_scattering_pipeline_layout',
-      [
-        BindGroupFactory.getCameraComputeLayout(),
-        BindGroupFactory.getFroxelParametersLayout(),
-        BindGroupFactory.getFroxelScatteringTexturesLayout(),
-      ],
-    );
-
-    // Create scattering compute pipeline
-    const scatteringConfig: ComputePipelineConfig = {
-      label: 'Froxel Scattering Compute Pipeline',
-      layout: scatteringPipelineLayout,
-      compute: {
-        module: this.scatteringComputeShader,
-        entryPoint: 'main',
-      },
-    };
-
-    this.scatteringComputePipeline = PipelineFactory.createComputePipeline(scatteringConfig);
   }
 
   public create(): void {
@@ -258,15 +235,6 @@ export class FroxelVolumetricScattering {
     // Light injection texture (RGBA16F - light contribution per froxel)
     this.froxelLightTexture = this.device.createTexture({
       label: 'froxel_light_3d',
-      size: [x, y, z],
-      dimension: '3d',
-      format: 'rgba16float',
-      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-    });
-
-    // Scattering texture (RGBA16F - final scattered light)
-    this.froxelScatteringTexture = this.device.createTexture({
-      label: 'froxel_scattering_3d',
       size: [x, y, z],
       dimension: '3d',
       format: 'rgba16float',
@@ -308,6 +276,13 @@ export class FroxelVolumetricScattering {
         },
       ],
     );
+
+    // Crear bind group para luz ambiente (group 1, binding 2)
+    this.ambientLightBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_ambient_light_uniforms',
+      BindGroupFactory.getFroxelAmbientLightParametersLayout(),
+      [{ binding: 0, resource: { buffer: this.ambientLightUniformBuffer } }],
+    );
   }
 
   public updateFroxelData(): void {
@@ -326,14 +301,10 @@ export class FroxelVolumetricScattering {
 
     // 3. Directional Light Injection Pass: Inject directional light with shadows
     // Note: This pass reads from froxelLightTexture (ambient) and writes to froxelScatteringTexture (final)
-    this.executeDirectionalLightInjectionPass();
+    //this.executeDirectionalLightInjectionPass();
 
     // 4. Point/Spot Light Injection Pass: Inject dynamic lights (TODO)
     //this.executePointLightInjectionPass();
-
-    // 5. Scattering Pass: DISABLED - directional light already writes to final texture
-    // TODO: Re-enable when implementing proper multi-bounce scattering
-    // this.executeScatteringPass();
   }
 
   private executeDensityPass(): void {
@@ -413,23 +384,6 @@ export class FroxelVolumetricScattering {
     // Set compute pipeline
     computePass.setPipeline(this.ambientLightInjectionPipeline);
 
-    // Create camera bind group
-    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
-    const camera = cameraComponent.getCamera();
-    const cameraBuffer = camera.getUniformBuffer();
-
-    const cameraBindGroup = BindGroupFactory.createBindGroup(
-      'froxel_ambient_light_camera_bind_group',
-      BindGroupFactory.getCameraComputeLayout(),
-      [
-        {
-          binding: 0,
-          resource: { buffer: cameraBuffer },
-        },
-      ],
-    );
-
     // Create parameters bind group
     const parametersBindGroup = BindGroupFactory.createBindGroup(
       'froxel_ambient_light_parameters_bind_group',
@@ -462,10 +416,16 @@ export class FroxelVolumetricScattering {
       ],
     );
 
+    // Actualizar buffer de luz ambiente antes de ejecutar el pass
+    const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
+    // Suponiendo ambientData.color = [r,g,b], ambientData.intensity = float
+    const ambientUniform = new Float32Array([0.7, 0.8, 0.9, ambientData.globalFactor]);
+    this.device.queue.writeBuffer(this.ambientLightUniformBuffer, 0, ambientUniform.buffer);
+
     // Bind all resources
-    computePass.setBindGroup(0, cameraBindGroup);
-    computePass.setBindGroup(1, parametersBindGroup);
-    computePass.setBindGroup(2, texturesBindGroup);
+    computePass.setBindGroup(0, parametersBindGroup);
+    computePass.setBindGroup(1, texturesBindGroup);
+    computePass.setBindGroup(2, this.ambientLightBindGroup);
 
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;
@@ -540,7 +500,7 @@ export class FroxelVolumetricScattering {
     );
 
     // @group(2): Textures bind group (density input, light input, light output)
-    // Note: We read from froxelLightTexture (ambient) and write to froxelScatteringTexture to avoid read/write conflict
+    // Ahora tanto la luz ambiente como la direccional se acumulan en froxelLightTexture
     const texturesBindGroup = BindGroupFactory.createBindGroup(
       'froxel_directional_light_textures_bind_group',
       BindGroupFactory.getDirectionalLightInjectionTexturesLayout(),
@@ -551,11 +511,11 @@ export class FroxelVolumetricScattering {
         },
         {
           binding: 1,
-          resource: this.froxelLightTexture.createView(), // Input: existing ambient light (filterable)
+          resource: this.froxelLightTexture.createView(), // Input/output: luz acumulada
         },
         {
           binding: 2,
-          resource: this.froxelScatteringTexture.createView(), // Output: accumulated light (storage)
+          resource: this.froxelLightTexture.createView(), // Output: luz acumulada
         },
       ],
     );
@@ -622,95 +582,6 @@ export class FroxelVolumetricScattering {
   // }
 
   /**
-   * Phase 3: Propagate scattered light between froxels
-   */
-  private executeScatteringPass(): void {
-    if (!this.scatteringComputePipeline) return;
-
-    const commandEncoder = this.device.createCommandEncoder({
-      label: 'froxel_scattering_pass',
-    });
-
-    const computePass = commandEncoder.beginComputePass({
-      label: 'froxel_scattering_compute',
-    });
-
-    // Set compute pipeline
-    computePass.setPipeline(this.scatteringComputePipeline);
-
-    // Create compute-compatible camera bind group for @group(0)
-    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
-    const camera = cameraComponent.getCamera();
-    const cameraBuffer = camera.getUniformBuffer();
-
-    const cameraBindGroup = BindGroupFactory.createBindGroup(
-      'froxel_scattering_camera_compute_bind_group',
-      BindGroupFactory.getCameraComputeLayout(),
-      [
-        {
-          binding: 0,
-          resource: { buffer: cameraBuffer },
-        },
-      ],
-    );
-    computePass.setBindGroup(0, cameraBindGroup);
-
-    // Create parameters bind group for @group(1) - froxel + volumetric uniforms
-    const parametersBindGroup = BindGroupFactory.createBindGroup(
-      'froxel_scattering_parameters_bind_group',
-      BindGroupFactory.getFroxelParametersLayout(),
-      [
-        {
-          binding: 0,
-          resource: { buffer: this.froxelUniformBuffer },
-        },
-        {
-          binding: 1,
-          resource: { buffer: this.volumetricUniformBuffer },
-        },
-      ],
-    );
-    computePass.setBindGroup(1, parametersBindGroup);
-
-    // Create textures bind group for @group(2)
-    const texturesBindGroup = BindGroupFactory.createBindGroup(
-      'froxel_scattering_textures_bind_group',
-      BindGroupFactory.getFroxelScatteringTexturesLayout(),
-      [
-        {
-          binding: 0,
-          resource: this.froxelLightTexture.createView(), // Input: light injection
-        },
-        {
-          binding: 1,
-          resource: this.froxelDensityTexture.createView(), // Input: density
-        },
-        {
-          binding: 2,
-          resource: this.froxelScatteringTexture.createView(), // Output: scattering
-        },
-        {
-          binding: 3,
-          resource: SamplerLibrary.nonFilteringSampler, // Non-filtering sampler
-        },
-      ],
-    );
-    computePass.setBindGroup(2, texturesBindGroup);
-
-    // Dispatch compute workgroups
-    const { x, y, z } = this.froxelDimensions;
-    const dispatchX = Math.ceil(x / 8); // Workgroup size: 8x8x4
-    const dispatchY = Math.ceil(y / 8);
-    const dispatchZ = Math.ceil(z / 4);
-
-    computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
-    computePass.end();
-
-    this.device.queue.submit([commandEncoder.finish()]);
-  }
-
-  /**
    * Render volumetric effects directly onto the scene target using alpha blending
    * This should be called after deferred rendering is complete
    */
@@ -764,7 +635,7 @@ export class FroxelVolumetricScattering {
         },
         {
           binding: 4,
-          resource: this.froxelScatteringTexture.createView(), // 3D scattering
+          resource: this.froxelLightTexture.createView(), // 3D luz acumulada
         },
         {
           binding: 5,
@@ -833,7 +704,6 @@ export class FroxelVolumetricScattering {
     this.froxelUniformBuffer?.destroy();
     this.froxelDensityTexture?.destroy();
     this.froxelLightTexture?.destroy();
-    this.froxelScatteringTexture?.destroy();
   }
 
   public isVolumetricEnabled(): boolean {
