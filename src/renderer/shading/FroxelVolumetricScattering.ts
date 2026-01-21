@@ -10,6 +10,7 @@ import { Render } from '../core/pipeline/Render';
 import { Engine } from '../../core/engine/Engine';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
+import { PointLightComponent } from '../../components/render/PointLightComponent';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -38,6 +39,10 @@ export class FroxelVolumetricScattering {
   // Directional light injection pass resources
   private directionalLightInjectionShader!: GPUShaderModule; // Directional light injection shader
   private directionalLightInjectionPipeline!: GPUComputePipeline; // Directional light injection pipeline
+
+  // Point light injection pass resources
+  private pointLightInjectionShader!: GPUShaderModule; // Point light injection shader
+  private pointLightInjectionPipeline!: GPUComputePipeline; // Point light injection pipeline
 
   // Future phase techniques (commented for now):
   // private lightInjectionTechnique!: Technique;       // Inject light into froxels
@@ -135,6 +140,15 @@ export class FroxelVolumetricScattering {
       label: 'Froxel Directional Light Injection Compute Shader',
       code: directionalLightCode,
     });
+
+    const pointLightCode = await ResourceManager.loadShader(
+      'froxel_light_injection_point.compute.wgsl',
+    );
+
+    this.pointLightInjectionShader = this.device.createShaderModule({
+      label: 'Froxel Point Light Injection Compute Shader',
+      code: pointLightCode,
+    });
     // Create compute pipelines
     this.createComputePipelines();
   }
@@ -210,6 +224,29 @@ export class FroxelVolumetricScattering {
 
     this.directionalLightInjectionPipeline =
       PipelineFactory.createComputePipeline(directionalLightConfig);
+
+    // Create point light injection pipeline layout
+    const pointLightPipelineLayout = PipelineFactory.createPipelineLayout(
+      'froxel_point_light_injection_pipeline_layout',
+      [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getDirectionalLightInjectionTexturesLayout(),
+        BindGroupFactory.getDirectionalLightDataLayout(),
+      ],
+    );
+
+    // Create point light injection compute pipeline
+    const pointLightConfig: ComputePipelineConfig = {
+      label: 'Froxel Point Light Injection Compute Pipeline',
+      layout: pointLightPipelineLayout,
+      compute: {
+        module: this.pointLightInjectionShader,
+        entryPoint: 'main',
+      },
+    };
+
+    this.pointLightInjectionPipeline = PipelineFactory.createComputePipeline(pointLightConfig);
   }
 
   public create(): void {
@@ -303,8 +340,11 @@ export class FroxelVolumetricScattering {
     // Note: This pass reads from froxelLightTexture (ambient) and writes to froxelScatteringTexture (final)
     //this.executeDirectionalLightInjectionPass();
 
-    // 4. Point/Spot Light Injection Pass: Inject dynamic lights (TODO)
-    //this.executePointLightInjectionPass();
+    // 4. Point Light Injection Pass: Inject dynamic lights
+    this.executePointLightInjectionPass();
+
+    // 5. Spot Light Injection Pass: Inject dynamic lights
+    //this.executeSpotLightInjectionPass();
   }
 
   private executeDensityPass(): void {
@@ -558,28 +598,78 @@ export class FroxelVolumetricScattering {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  /**
-   * Phase 2: Inject light from light sources into affected froxels
-   */
-  // TODO: Implement light injection phase
-  // private executeLightInjectionPass(
-  //   _shadowMapBindGroup: GPUBindGroup,
-  //   _lightBufferBindGroup: GPUBindGroup,
-  // ): void {
-  //   const commandEncoder = this.device.createCommandEncoder({
-  //     label: 'froxel_light_injection_pass',
-  //   });
+  private executePointLightInjectionPass(): void {
+    console.log('🔶 EXECUTING POINT LIGHT INJECTION PASS');
 
-  //   const computePass = commandEncoder.beginComputePass({
-  //     label: 'froxel_light_injection_compute',
-  //   });
+    const pointLightManager = Engine.getEntities().getObjectManagerByName('point_light');
+    if (!pointLightManager) return;
+    const pointLights = pointLightManager.getList() as PointLightComponent[];
 
-  //   // For each light source, determine which froxels are affected
-  //   // and inject light contribution considering shadows
+    // Camera and parameter bind groups (no cambian entre luces)
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+    const camera = cameraComponent.getCamera();
+    const cameraBuffer = camera.getUniformBuffer();
+    const cameraBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_point_light_camera_bind_group',
+      BindGroupFactory.getCameraComputeLayout(),
+      [{ binding: 0, resource: { buffer: cameraBuffer } }],
+    );
+    const parametersBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_point_light_parameters_bind_group',
+      BindGroupFactory.getFroxelParametersLayout(),
+      [
+        { binding: 0, resource: { buffer: this.froxelUniformBuffer } },
+        { binding: 1, resource: { buffer: this.volumetricUniformBuffer } },
+      ],
+    );
+    const texturesBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_point_light_textures_bind_group',
+      BindGroupFactory.getDirectionalLightInjectionTexturesLayout(),
+      [
+        { binding: 0, resource: this.froxelDensityTexture.createView() },
+        { binding: 1, resource: this.froxelLightTexture.createView() },
+        { binding: 2, resource: this.froxelLightTexture.createView() },
+      ],
+    );
 
-  //   computePass.end();
-  //   this.device.queue.submit([commandEncoder.finish()]);
-  // }
+    const { x, y, z } = this.froxelDimensions;
+    const dispatchX = Math.ceil(x / 8);
+    const dispatchY = Math.ceil(y / 8);
+    const dispatchZ = Math.ceil(z / 4);
+
+    for (const pointLightComponent of pointLights) {
+      const commandEncoder = this.device.createCommandEncoder({
+        label: 'froxel_point_light_injection_pass',
+      });
+      const computePass = commandEncoder.beginComputePass({
+        label: 'froxel_point_light_injection_compute',
+      });
+
+      computePass.setPipeline(this.pointLightInjectionPipeline);
+
+      // Bind groups comunes
+      computePass.setBindGroup(0, cameraBindGroup);
+      computePass.setBindGroup(1, parametersBindGroup);
+      computePass.setBindGroup(2, texturesBindGroup);
+
+      // Bind group específico de la luz
+      const pointLightDataBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_point_light_data_bind_group',
+        BindGroupFactory.getDirectionalLightDataLayout(),
+        [
+          { binding: 0, resource: { buffer: pointLightComponent.getUniformBuffer() } },
+          { binding: 1, resource: pointLightComponent.getShadowDepthView() },
+          { binding: 2, resource: pointLightComponent.getShadowSampler() },
+        ],
+      );
+      computePass.setBindGroup(3, pointLightDataBindGroup);
+
+      computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
+      computePass.end();
+      this.device.queue.submit([commandEncoder.finish()]);
+    }
+  }
 
   /**
    * Render volumetric effects directly onto the scene target using alpha blending

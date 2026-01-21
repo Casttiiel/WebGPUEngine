@@ -1,18 +1,21 @@
 ### Engine
 
+1. Froxel Volumetric Scattering (Where to do it?)
+   PointLight Injection (Shader, Is it adding to texture or replacing?)
+   Spot Light Injection
+   Directional Light Injection
 1. UI
-2. Start Screen
-3. Game Loading Screen
-4. Remove en main.ts el skip first frame?
-5. Editor
-6. Froxel Volumetric Scattering
-7. AO
-8. Quality settings selection
-9. Multiple Light probes has good shadows?
-10. Improve particles
-11. Que pasos tienen/necesitan reproyeccion temporal
+1. Start Screen
+1. Game Loading Screen
+1. Remove en main.ts el skip first frame?
+1. Editor
+1. AO
+1. Quality settings selection
+1. Multiple Light probes has good shadows?
+1. Improve particles
+1. Que pasos tienen/necesitan reproyeccion temporal
 
-12. Weird line on corners is irradiance because of normals
+1. Weird line on corners is irradiance because of normals
 
 ### Improvements
 

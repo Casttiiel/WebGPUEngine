@@ -18,6 +18,7 @@ export class PointLightComponent extends Component {
   private uniformBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
 
+  private dummyShadowTexture!: GPUTexture;
   private technique!: Technique;
 
   // ✅ Reusable buffers for GPU writes (zero allocations in update)
@@ -55,7 +56,7 @@ export class PointLightComponent extends Component {
     );
 
     // Create dummy shadow resources for the DIRECTIONAL_LIGHT_UNIFORMS layout
-    const dummyShadowTexture = GPUUtils.createTexture(
+    this.dummyShadowTexture = GPUUtils.createTexture(
       'dummy_shadow_texture_point_light',
       1,
       1,
@@ -74,7 +75,7 @@ export class PointLightComponent extends Component {
         },
         {
           binding: 1,
-          resource: dummyShadowTexture.createView(),
+          resource: this.dummyShadowTexture.createView(),
         },
         {
           binding: 2,
@@ -133,5 +134,17 @@ export class PointLightComponent extends Component {
 
   public renderDebug(): void {
     // Implement debug rendering if needed
+  }
+
+  public getUniformBuffer(): GPUBuffer {
+    return this.uniformBuffer;
+  }
+
+  public getShadowDepthView(): GPUTextureView {
+    return this.dummyShadowTexture.createView(); // Point lights do not have shadow maps in this implementation
+  }
+
+  public getShadowSampler(): GPUSampler {
+    return SamplerLibrary.shadows;
   }
 }
