@@ -1,9 +1,11 @@
 ### Engine
 
 1. Froxel Volumetric Scattering (Where to do it?)
-   PointLight Injection (Shader, Is it adding to texture or replacing?)
+   Froxel Params Struct into file
+   PointLight Injection
    Spot Light Injection
    Directional Light Injection
+   Density
 1. UI
 1. Start Screen
 1. Game Loading Screen
