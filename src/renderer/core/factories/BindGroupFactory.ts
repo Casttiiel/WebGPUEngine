@@ -397,26 +397,13 @@ export class BindGroupFactory {
       {
         binding: 2,
         visibility: GPUShaderStage.FRAGMENT,
-        buffer: { type: 'uniform' }, // Volumetric uniforms
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
         texture: {
           sampleType: 'unfilterable-float',
           viewDimension: '3d',
-        }, // Froxel density texture (3D)
+        },
       },
       {
-        binding: 4,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          sampleType: 'float',
-          viewDimension: '3d',
-        }, // Froxel scattering texture (3D)
-      },
-      {
-        binding: 5,
+        binding: 3,
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'non-filtering' }, // Non-filtering sampler for unfilterable textures
       },
@@ -558,6 +545,62 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getFroxelVolumetricIntegrationLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_volumetric_integration_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+          viewDimension: '3d',
+        },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'non-filtering' },
+      },
+    ]);
+  }
+
+  public static getFroxelAmbientLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_ambient_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+          viewDimension: '3d',
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   /**
    * Create bind group layout for ambient light injection textures
    */
@@ -566,19 +609,17 @@ export class BindGroupFactory {
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
-        texture: {
-          sampleType: 'unfilterable-float', // froxelDensityTexture is r32float (unfilterable)
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float', // froxelScatteringTexture output
           viewDimension: '3d',
-          multisampled: false,
         },
       },
       {
         binding: 1,
         visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float', // froxelScatteringTexture output
-          viewDimension: '3d',
+        buffer: {
+          type: 'uniform',
         },
       },
     ]);
@@ -666,22 +707,9 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: {
           access: 'write-only',
-          format: 'r32float',
+          format: 'rg32float',
           viewDimension: '3d',
         }, // Output density texture
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        texture: {
-          sampleType: 'float',
-          viewDimension: '2d',
-        }, // Noise texture (2D)
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        sampler: { type: 'filtering' }, // Noise sampler
       },
     ]);
   }

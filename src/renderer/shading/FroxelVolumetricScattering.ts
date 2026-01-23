@@ -7,6 +7,7 @@ import { ComputePipelineConfig, PipelineFactory } from '../core/factories/Pipeli
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { Render } from '../core/pipeline/Render';
 import { Texture } from '../resources/Texture';
+import { Engine } from '../../core/engine/Engine';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -29,6 +30,9 @@ export class FroxelVolumetricScattering {
   private volumetricIntegrationComputeShader!: GPUShaderModule;
   private volumetricIntegrationComputePipeline!: GPUComputePipeline;
 
+  private ambientLightInjectionShader!: GPUShaderModule;
+  private ambientLightInjectionPipeline!: GPUComputePipeline;
+
   private rayMarchTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
 
@@ -42,8 +46,8 @@ export class FroxelVolumetricScattering {
   private densityTexturesBindGroup!: GPUBindGroup;
 
   private fogDensity: number = 1.0;
-  private scatteringCoeff: number = 2.0;
-  private absorptionCoeff: number = 3.0;
+  private scatteringCoeff: number = 1.5;
+  private absorptionCoeff: number = 1.12;
   private stepSize: number = 0.1;
   private nearPlane: number = 0.1;
   private farPlane: number = 100.0;
@@ -51,6 +55,7 @@ export class FroxelVolumetricScattering {
   // Uniform buffers
   private volumetricUniformBuffer!: GPUBuffer;
   private froxelUniformBuffer!: GPUBuffer;
+  private ambientUniformBuffer!: GPUBuffer;
   private volumetricUniformData: Float32Array;
   private froxelUniformData: Float32Array;
 
@@ -93,6 +98,15 @@ export class FroxelVolumetricScattering {
       code: volumetricIntegrationCode,
     });
 
+    const ambientLightInjectionCode = await ResourceManager.loadShader(
+      'froxel_light_injection_ambient.compute.wgsl',
+    );
+
+    this.ambientLightInjectionShader = this.device.createShaderModule({
+      label: 'Froxel Ambient Light Injection Compute Shader',
+      code: ambientLightInjectionCode,
+    });
+
     this.createComputePipelines();
   }
 
@@ -120,7 +134,7 @@ export class FroxelVolumetricScattering {
       'froxel_volumetric_integration_pipeline_layout',
       [
         BindGroupFactory.getFroxelParametersLayout(),
-        BindGroupFactory.getFroxelVolumetrictIntegrationLayout(),
+        BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
       ],
     );
 
@@ -136,6 +150,22 @@ export class FroxelVolumetricScattering {
     this.volumetricIntegrationComputePipeline = PipelineFactory.createComputePipeline(
       volumetricIntegrationConfig,
     );
+
+    const ambientLightInjectionPipelineLayout = PipelineFactory.createPipelineLayout(
+      'froxel_ambient_light_injection_pipeline_layout',
+      [BindGroupFactory.getFroxelParametersLayout(), BindGroupFactory.getFroxelAmbientLayout()],
+    );
+
+    const ambientLightConfig: ComputePipelineConfig = {
+      label: 'Froxel Ambient Light Injection Compute Pipeline',
+      layout: ambientLightInjectionPipelineLayout,
+      compute: {
+        module: this.ambientLightInjectionShader,
+        entryPoint: 'main',
+      },
+    };
+
+    this.ambientLightInjectionPipeline = PipelineFactory.createComputePipeline(ambientLightConfig);
   }
 
   public create(): void {
@@ -193,6 +223,12 @@ export class FroxelVolumetricScattering {
       this.froxelUniformData.byteLength,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
+
+    this.ambientUniformBuffer = GPUUtils.createBuffer(
+      'froxel_ambient_light_uniforms',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
   }
 
   private createBindGroups(): void {
@@ -217,7 +253,9 @@ export class FroxelVolumetricScattering {
 
     this.executeDensityPass();
 
-    this.executeVolumetrictIntegrationPass();
+    this.executeAmbientLightInjectionPass();
+
+    this.executeVolumetricIntegrationPass();
   }
 
   private executeDensityPass(): void {
@@ -246,7 +284,7 @@ export class FroxelVolumetricScattering {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  private executeVolumetrictIntegrationPass(): void {
+  private executeVolumetricIntegrationPass(): void {
     const commandEncoder = this.device.createCommandEncoder({
       label: 'froxel_volumetrict_integration_pass',
     });
@@ -256,8 +294,8 @@ export class FroxelVolumetricScattering {
     });
 
     const texturesBindGroup = BindGroupFactory.createBindGroup(
-      'froxel_directional_light_textures_bind_group',
-      BindGroupFactory.getFroxelVolumetrictIntegrationLayout(),
+      'froxel_volumetrict_integration_textures_bind_group',
+      BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
       [
         {
           binding: 0,
@@ -287,6 +325,52 @@ export class FroxelVolumetricScattering {
     const dispatchX = Math.ceil(x / 8); // Workgroup size: 8x8x4
     const dispatchY = Math.ceil(y / 8);
     const dispatchZ = Math.ceil(1);
+
+    computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
+    computePass.end();
+
+    this.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  private executeAmbientLightInjectionPass(): void {
+    const commandEncoder = this.device.createCommandEncoder({
+      label: 'froxel_ambient_light_injection_pass',
+    });
+
+    const computePass = commandEncoder.beginComputePass({
+      label: 'froxel_ambient_light_injection_compute',
+    });
+
+    // Set compute pipeline
+    computePass.setPipeline(this.ambientLightInjectionPipeline);
+
+    // Create textures bind group (@group(1) in shader)
+    const texturesBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_ambient_light_textures_bind_group',
+      BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
+      [
+        {
+          binding: 0,
+          resource: this.froxelLightTexture.createView(),
+        },
+        {
+          binding: 1,
+          resource: {
+            buffer: this.ambientUniformBuffer,
+          },
+        },
+      ],
+    );
+
+    // Bind all resources
+    computePass.setBindGroup(0, this.parametersBindGroup);
+    computePass.setBindGroup(1, texturesBindGroup);
+
+    // Dispatch compute workgroups
+    const { x, y, z } = this.froxelDimensions;
+    const dispatchX = Math.ceil(x / 8);
+    const dispatchY = Math.ceil(y / 8);
+    const dispatchZ = Math.ceil(z / 4);
 
     computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
     computePass.end();
@@ -331,7 +415,7 @@ export class FroxelVolumetricScattering {
         },
         {
           binding: 3,
-          resource: SamplerLibrary.simpleSampler,
+          resource: SamplerLibrary.nonFilteringSampler,
         },
       ],
     );
@@ -370,6 +454,12 @@ export class FroxelVolumetricScattering {
     }
     if (this.froxelUniformBuffer) {
       this.device.queue.writeBuffer(this.froxelUniformBuffer, 0, this.froxelUniformData.buffer);
+    }
+
+    if (this.ambientUniformBuffer) {
+      const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
+      const ambientUniform = new Float32Array([0.7, 0.8, 0.9, ambientData.globalFactor]);
+      this.device.queue.writeBuffer(this.ambientUniformBuffer, 0, ambientUniform.buffer);
     }
 
     if (!this.parametersBindGroup && this.froxelUniformBuffer && this.volumetricUniformBuffer) {
