@@ -15,7 +15,7 @@
 
 
 struct FroxelUniforms {
-  dimensions: vec3<u32>,   // Grid dimensions (160, 90, 64)
+  dimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
   nearPlane: f32,
   farPlane: f32
 }
@@ -37,8 +37,7 @@ fn depth01ToFroxelZ(depth01: f32) -> f32 {
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let depth01 = textureSample(gLinearDepth, samplerGBuffer, uv).x;
 
-  let dimsU = froxelParams.dimensions;
-  let dimsF = vec3<f32>(f32(dimsU.x), f32(dimsU.y), f32(dimsU.z));
+  let dimsF = froxelParams.dimensions;
 
   // XY froxel coord desde pantalla
   let fx = clamp(uv.x * dimsF.x, 0.0, dimsF.x - 1.0);

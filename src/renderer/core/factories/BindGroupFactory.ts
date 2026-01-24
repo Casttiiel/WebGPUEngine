@@ -464,8 +464,8 @@ export class BindGroupFactory {
     ]);
   }
 
-  public static getFroxelAmbientLightParametersLayout(): GPUBindGroupLayout {
-    return this.getLayout('froxel_ambient_light_parameters_layout', [
+  public static getFroxelLightParametersLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_light_parameters_layout', [
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
@@ -620,6 +620,38 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: 'uniform',
+        },
+      },
+    ]);
+  }
+
+  public static getFroxelPointTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_point_textures_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+          viewDimension: '3d',
         },
       },
     ]);

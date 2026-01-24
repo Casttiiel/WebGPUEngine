@@ -1,5 +1,5 @@
 struct FroxelUniforms {
-  dimensions: vec3<u32>,   // Grid dimensions (160, 90, 64)
+  dimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
   nearPlane: f32,
   farPlane: f32
 }
@@ -33,11 +33,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let dims = froxelParams.dimensions;
   
   // 1 hilo por columna (x,y)
-  if (gid.x >= dims.x || gid.y >= dims.y) {
+  if (gid.x >= u32(dims.x) || gid.y >= u32(dims.y)) {
     return;
   }
 
-  let slices = dims.z;
+  let slices = u32(dims.z);
 
   // Integración acumulada por columna
   var T: f32 = 1.0;                 // transmittance acumulada

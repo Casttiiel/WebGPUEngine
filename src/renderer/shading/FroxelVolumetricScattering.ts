@@ -8,6 +8,8 @@ import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { Render } from '../core/pipeline/Render';
 import { Texture } from '../resources/Texture';
 import { Engine } from '../../core/engine/Engine';
+import { PointLightComponent } from '../../components/render/PointLightComponent';
+import { CameraComponent } from '../../components/render/CameraComponent';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -33,6 +35,9 @@ export class FroxelVolumetricScattering {
   private ambientLightInjectionShader!: GPUShaderModule;
   private ambientLightInjectionPipeline!: GPUComputePipeline;
 
+  private pointLightInjectionShader!: GPUShaderModule;
+  private pointLightInjectionPipeline!: GPUComputePipeline;
+
   private rayMarchTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
 
@@ -45,12 +50,12 @@ export class FroxelVolumetricScattering {
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 1.0;
+  private fogDensity: number = 1.1;
   private scatteringCoeff: number = 1.5;
   private absorptionCoeff: number = 1.12;
-  private stepSize: number = 0.1;
+  private stepSize: number = 1.0;
   private nearPlane: number = 0.1;
-  private farPlane: number = 100.0;
+  private farPlane: number = 1000.0;
 
   // Uniform buffers
   private volumetricUniformBuffer!: GPUBuffer;
@@ -105,6 +110,15 @@ export class FroxelVolumetricScattering {
     this.ambientLightInjectionShader = this.device.createShaderModule({
       label: 'Froxel Ambient Light Injection Compute Shader',
       code: ambientLightInjectionCode,
+    });
+
+    const pointLightInjectionCode = await ResourceManager.loadShader(
+      'froxel_light_injection_point.compute.wgsl',
+    );
+
+    this.pointLightInjectionShader = this.device.createShaderModule({
+      label: 'Froxel Point Light Injection Compute Shader',
+      code: pointLightInjectionCode,
     });
 
     this.createComputePipelines();
@@ -166,6 +180,27 @@ export class FroxelVolumetricScattering {
     };
 
     this.ambientLightInjectionPipeline = PipelineFactory.createComputePipeline(ambientLightConfig);
+
+    const pointLightInjectionPipelineLayout = PipelineFactory.createPipelineLayout(
+      'froxel_point_light_injection_pipeline_layout',
+      [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getFroxelPointTexturesLayout(),
+        BindGroupFactory.getFroxelLightParametersLayout(),
+      ],
+    );
+
+    const pointLightConfig: ComputePipelineConfig = {
+      label: 'Froxel Point Light Injection Compute Pipeline',
+      layout: pointLightInjectionPipelineLayout,
+      compute: {
+        module: this.pointLightInjectionShader,
+        entryPoint: 'main',
+      },
+    };
+
+    this.pointLightInjectionPipeline = PipelineFactory.createComputePipeline(pointLightConfig);
   }
 
   public create(): void {
@@ -254,6 +289,8 @@ export class FroxelVolumetricScattering {
     this.executeDensityPass();
 
     this.executeAmbientLightInjectionPass();
+
+    this.executePointLightInjectionPass();
 
     this.executeVolumetricIntegrationPass();
   }
@@ -376,6 +413,84 @@ export class FroxelVolumetricScattering {
     computePass.end();
 
     this.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  private executePointLightInjectionPass(): void {
+    const pointLightManager = Engine.getEntities().getObjectManagerByName('point_light');
+    if (!pointLightManager) return;
+    const pointLights = pointLightManager.getList() as PointLightComponent[];
+
+    // Camera and parameter bind groups (no cambian entre luces)
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+    const camera = cameraComponent.getCamera();
+    const cameraBuffer = camera.getUniformBuffer();
+    const cameraBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_point_light_camera_bind_group',
+      BindGroupFactory.getCameraComputeLayout(),
+      [{ binding: 0, resource: { buffer: cameraBuffer } }],
+    );
+    const parametersBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_point_light_parameters_bind_group',
+      BindGroupFactory.getFroxelParametersLayout(),
+      [
+        { binding: 0, resource: { buffer: this.froxelUniformBuffer } },
+        { binding: 1, resource: { buffer: this.volumetricUniformBuffer } },
+      ],
+    );
+
+    const { x, y, z } = this.froxelDimensions;
+    const dispatchX = Math.ceil(x / 8);
+    const dispatchY = Math.ceil(y / 8);
+    const dispatchZ = Math.ceil(z / 4);
+
+    let lightRead = this.froxelLightTexture;
+    let lightWrite = this.froxelLightTempTexture;
+
+    for (const pointLightComponent of pointLights) {
+      const commandEncoder = this.device.createCommandEncoder({
+        label: 'froxel_point_light_injection_pass',
+      });
+      const computePass = commandEncoder.beginComputePass({
+        label: 'froxel_point_light_injection_compute',
+      });
+
+      computePass.setPipeline(this.pointLightInjectionPipeline);
+
+      // Bind groups comunes
+      computePass.setBindGroup(0, cameraBindGroup);
+      computePass.setBindGroup(1, parametersBindGroup);
+
+      const texturesBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_point_light_textures_bind_group',
+        BindGroupFactory.getFroxelPointTexturesLayout(),
+        [
+          { binding: 0, resource: this.froxelDensityTexture.createView() },
+          { binding: 1, resource: lightRead.createView() },
+          { binding: 2, resource: lightWrite.createView() },
+        ],
+      );
+      computePass.setBindGroup(2, texturesBindGroup);
+
+      // Bind group específico de la luz
+      const pointLightDataBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_point_light_data_bind_group',
+        BindGroupFactory.getFroxelLightParametersLayout(),
+        [{ binding: 0, resource: { buffer: pointLightComponent.getUniformBuffer() } }],
+      );
+      computePass.setBindGroup(3, pointLightDataBindGroup);
+
+      computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
+      computePass.end();
+      this.device.queue.submit([commandEncoder.finish()]);
+
+      const tmp = lightRead;
+      lightRead = lightWrite;
+      lightWrite = tmp;
+    }
+
+    this.froxelLightTexture = lightRead;
+    this.froxelLightTempTexture = lightWrite;
   }
 
   public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {

@@ -1,5 +1,5 @@
 struct FroxelUniforms {
-  froxelDimensions: vec3<u32>,   // Grid dimensions (160, 90, 64)
+  froxelDimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
 }
 
 struct VolumetricUniforms {
@@ -20,9 +20,9 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let froxelCoord = globalId.xyz;
   
   // Bounds check
-  if (froxelCoord.x >= froxelParams.froxelDimensions.x || 
-      froxelCoord.y >= froxelParams.froxelDimensions.y || 
-      froxelCoord.z >= froxelParams.froxelDimensions.z) {
+  if (froxelCoord.x >= u32(froxelParams.froxelDimensions.x) ||
+    froxelCoord.y >= u32(froxelParams.froxelDimensions.y) ||
+    froxelCoord.z >= u32(froxelParams.froxelDimensions.z)) {
     return;
   }
 

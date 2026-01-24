@@ -13,33 +13,17 @@
 @group(3) @binding(0) var<uniform> light: LightUniforms;
 
 struct FroxelUniforms {
-  dimensions: vec3<f32>,
-  padding1: f32,
+  dimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
   nearPlane: f32,
-  farPlane: f32,
-  logDepthScale: f32,
-  logDepthBias: f32,
-};
+  farPlane: f32
+}
 
 struct VolumetricUniforms {
-  density: f32,
-  scattering: f32,
-  absorption: f32,
-  anisotropy: f32,
-
-  fogHeightFalloff: f32,
-  fogDistanceFalloff: f32,
-  noiseScale: f32,
-  noiseStrength: f32,
-
-  windDirection: vec3<f32>,
-  windSpeed: f32,
-
-  time: f32,
-  maxDistance: f32,
-  stepSize: f32,
-  padding3: f32,
-};
+  fogDensity: f32,
+  scatteringCoeff: f32,
+  absorptionCoeff: f32,
+  stepSize: f32
+}
 
 struct LightUniforms {
   color: vec3<f32>,
@@ -56,45 +40,39 @@ struct LightUniforms {
   extraPadding: f32,
 };
 
-fn froxelZToViewDistanceLinear(zSlice: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
+
+fn froxelZToViewZLinear(zSlice: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
     let z01 = (f32(zSlice) + 0.5) / f32(slices);
-    return nearZ + z01 * (farZ - nearZ);
+    return nearZ + z01 * (farZ - nearZ); // distancia positiva
 }
 
+fn computeViewRayFromUV(uv: vec2<f32>) -> vec3<f32> {
+    // ⚠️ aquí NO flip Y (solo si tu engine lo necesita)
+    let ndc = vec4<f32>(uv * 2.0 - 1.0, 1.0, 1.0);
+    let rayH = camera.invProjection * ndc;
+    return normalize(rayH.xyz / max(rayH.w, 1e-6));
+}
+
+// ✅ Froxel coord -> View space position
 fn froxelToViewSpace(froxel: vec3<u32>) -> vec3<f32> {
-    let dims = froxelParams.dimensions; // vec3<f32> (recomendado)
+    let dimsU = vec3<u32>(froxelParams.dimensions);
 
-    // 1) XY -> UV del centro del tile
-    let uv = (vec2<f32>(froxel.xy) + 0.5) / dims.xy;
+    // uv centro del tile
+    var uv = (vec2<f32>(froxel.xy) + vec2<f32>(0.5)) / froxelParams.dimensions.xy;
+    uv.y = 1 - uv.y;
+    // view ray
+    let viewRay = computeViewRayFromUV(uv);
 
-    // 2) UV -> NDC XY
-    var ndcXY = uv * 2.0 - 1.0;
+    // viewZ (distancia positiva)
+    let viewZ = froxelZToViewZLinear(froxel.z, dimsU.z, froxelParams.nearPlane, froxelParams.farPlane);
 
-    // ✅ UV tiene Y hacia abajo, NDC hacia arriba
-    ndcXY.y = -ndcXY.y;
-
-    // 3) NDC -> rayo en view-space
-    // clip.z = 1 y w = 1 solo para generar dirección
-    let clip = vec4<f32>(ndcXY, 1.0, 1.0);
-    let viewH = camera.invProjection * clip;
-    let rayVS = normalize(viewH.xyz / viewH.w);
-
-    // 4) Slice Z -> distancia real positiva
-    let slices = u32(dims.z);
-    let dist = froxelZToViewDistanceLinear(froxel.z, slices, froxelParams.nearPlane, froxelParams.farPlane);
-
-    // 5) Convertimos a Z de view-space (delante = NEGATIVO)
-    let viewZ = -dist;
-
-    // 6) Punto del rayo a ese Z
-    // rayVS.z debería ser NEGATIVO normalmente mirando hacia delante
-    let t = viewZ / min(rayVS.z, -1e-4);
-
-    return rayVS * t;
+    // ✅ tu convención: delante = Z negativo
+    return viewRay * viewZ;
 }
+
 
 fn worldToView(pWS: vec3<f32>) -> vec3<f32> {
-  var v = camera.viewMatrix * vec4<f32>(pWS, 1.0);
+  let v = camera.viewMatrix * vec4<f32>(pWS, 1.0);
   return v.xyz;
 }
 
@@ -103,34 +81,29 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let dimsU = vec3<u32>(froxelParams.dimensions);
 
   if (gid.x >= dimsU.x || gid.y >= dimsU.y || gid.z >= dimsU.z) {
-    //return;
+    return;
   }
 
-  let coordI32 = vec3<i32>(gid);
+  let coord = vec3<i32>(i32(gid.x), i32(gid.y), i32(gid.z));
 
-  // Luz ya acumulada
-  let existing = textureLoad(froxelLightTexture, coordI32, 0).rgb;
+  let existing = textureLoad(froxelLightTexture, coord, 0).rgb;
 
-  // ✅ view-space froxel position (metros reales)
   let froxelVS = froxelToViewSpace(gid);
-
-  // ✅ view-space light position
-  let lightVS = worldToView(light.position);
+  let lightVS  = worldToView(light.position);
 
   let dist = length(lightVS - froxelVS);
 
   // fuera del radio => copiar
-  //if (froxelVS.z < -1.0) {//dist >= light.radius
-    //textureStore(froxelLightOutput, coordI32, vec4<f32>(existing, 1.0));
-    textureStore(froxelLightOutput, coordI32, vec4<f32>(50,0,0, 1.0));
-    //return;
-  //}
+  if (dist >= light.radius) {
+    textureStore(froxelLightOutput, coord, vec4<f32>(existing, 1.0));
+    return;
+  }
 
   let denom = max(light.radius - light.startFalloff, 1e-4);
   let x = max(dist - light.startFalloff, 0.0) / denom;
   let att = clamp(1.0 - x, 0.0, 1.0);
 
-  let contribution = light.color * light.intensity;
+  let contribution = light.color * light.intensity * att;
 
-  textureStore(froxelLightOutput, coordI32, vec4<f32>(existing + contribution, 1.0));
+  textureStore(froxelLightOutput, coord, vec4<f32>(existing + contribution, 1.0));
 }
