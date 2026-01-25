@@ -9,7 +9,7 @@
 
 
 struct FroxelUniforms {
-  dimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
+  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
   nearPlane: f32,
   farPlane: f32
 }

@@ -18,7 +18,7 @@
 @group(3) @binding(2) var shadowSampler: sampler_comparison;
 
 struct FroxelUniforms {
-    dimensions: vec3<f32>,
+    dimensions: vec4<f32>,
     padding1: u32,
     nearPlane: f32,
     farPlane: f32,

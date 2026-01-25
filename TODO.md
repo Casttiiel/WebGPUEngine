@@ -1,11 +1,13 @@
 ### Engine
 
-1. Froxel Volumetric Scattering (Where to do it?)
+1. Froxel Volumetric Scattering
    Froxel Params Struct into file
-   PointLight Injection
-   Directional Light Injection
-   Density
+   Where to do it?
+   Quality
+   Directional Light Injection + Shadows
+   Density by height + Noise
    Spot Light Injection
+
 2. UI
 3. Start Screen
 4. Game Loading Screen
@@ -17,12 +19,12 @@
    Light Probes
 7. AO
 8. Frustum culling of lights
-9. Quality settings selection
-10. Multiple Light probes has good shadows?
-11. Improve particles
-12. Que pasos tienen/necesitan reproyeccion temporal
-
-13. Weird line on corners is irradiance because of normals
+9. Point Light shadows + Revisit light injection for shadows
+10. Quality settings selection
+11. Multiple Light probes has good shadows?
+12. Improve particles
+13. Que pasos tienen/necesitan reproyeccion temporal
+14. Weird line on corners is irradiance because of normals
 
 ### Improvements
 
@@ -32,7 +34,8 @@
 4. WallRun after timer can go to wallrun again
 5. Dash end speed/direction + Conserva 80% de velocidad previa
 6. Dash not working
-7. Swing Bar needs to be picked with some angle
+7. Swing Bar not working
+8. Swing Bar needs to be picked with some angle
 
 ## Gameplay
 

@@ -1,5 +1,5 @@
 struct FroxelUniforms {
-  dimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
+  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
   nearPlane: f32,
   farPlane: f32
 }
@@ -20,10 +20,20 @@ struct VolumetricUniforms {
 @group(1) @binding(1) var froxelLightTexture: texture_3d<f32>;     // RGB = injected light
 @group(1) @binding(2) var froxelIntegratedTexture: texture_storage_3d<rgba16float, write>;
 
-fn getSliceDzLinear(zSlice: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  // dz aproximado constante (lineal)
-  // Si quieres log slicing real, aquí necesitas dist(z+1)-dist(z).
-  return (farZ - nearZ) / f32(slices);
+fn sliceToDepthLinear(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
+  let z01 = (f32(z) + 0.5) / f32(slices);
+  return nearZ + z01 * (farZ - nearZ);
+}
+
+fn sliceToDepthLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
+  let z01 = (f32(z) + 0.5) / f32(slices);
+  return nearZ * pow(farZ / max(nearZ, 1e-6), z01);
+}
+
+fn sliceDzLinear(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
+  let z0 = sliceToDepthLog(z, slices, nearZ, farZ);
+  let z1 = sliceToDepthLog(min(z + 1u, slices - 1u), slices, nearZ, farZ);
+  return max(z1 - z0, 1e-4);
 }
 
 const MAX_SLICES: u32 = 128u;
@@ -43,14 +53,6 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   var T: f32 = 1.0;                 // transmittance acumulada
   var S: vec3<f32> = vec3<f32>(0.0); // scattering acumulado (RGB)
 
-  // dz por slice
-  let dz = select(
-    getSliceDzLinear(0u, slices, froxelParams.nearPlane, froxelParams.farPlane),
-    volumetricSettings.stepSize,
-    volumetricSettings.stepSize > 0.0
-  );
-
-  // Recorremos el volumen desde near -> far
   for (var z: u32 = 0u; z < MAX_SLICES; z = z + 1u) {//slices
     if (z >= slices) { break; }
     let coord = vec3<i32>(i32(gid.x), i32(gid.y), i32(z));
@@ -58,12 +60,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Media coefficients
     // sigmaS: scattering coefficient
     // sigmaT: extinction coefficient = sigmaS + sigmaA
-    let media = textureLoad(froxelMediaTexture, coord, 0);
-    let sigmaS = media.r;
-    let sigmaT = max(media.g, 0.0);
+    let sigma = textureLoad(froxelMediaTexture, coord, 0);
+    let sigmaS = max(sigma.r, 0.0);
+    let sigmaT = max(sigma.g, 0.0);
 
     // Inyected lighting at this froxel
     let L = textureLoad(froxelLightTexture, coord, 0).rgb;
+
+    let dz = sliceDzLinear(z, slices, froxelParams.nearPlane, froxelParams.farPlane);
 
     // 1) In-scattering integration:
     // dS = T * (L * sigmaS) * dz

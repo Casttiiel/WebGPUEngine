@@ -13,7 +13,7 @@
 @group(3) @binding(0) var<uniform> light: LightUniforms;
 
 struct FroxelUniforms {
-  dimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
+  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
   nearPlane: f32,
   farPlane: f32
 }
@@ -46,28 +46,34 @@ fn froxelZToViewZLinear(zSlice: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 
     return nearZ + z01 * (farZ - nearZ); // distancia positiva
 }
 
+fn froxelZToViewZLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
+  let z01 = (f32(z) + 0.5) / f32(slices);
+  return nearZ * pow(farZ / max(nearZ, 1e-6), z01);
+}
+
 fn computeViewRayFromUV(uv: vec2<f32>) -> vec3<f32> {
     // ⚠️ aquí NO flip Y (solo si tu engine lo necesita)
     let ndc = vec4<f32>(uv * 2.0 - 1.0, 1.0, 1.0);
     let rayH = camera.invProjection * ndc;
-    return normalize(rayH.xyz / max(rayH.w, 1e-6));
+    return normalize(rayH.xyz / max(rayH.w, 1e-8));
 }
 
 // ✅ Froxel coord -> View space position
 fn froxelToViewSpace(froxel: vec3<u32>) -> vec3<f32> {
-    let dimsU = vec3<u32>(froxelParams.dimensions);
+    let dimsU = vec3<u32>(froxelParams.dimensions.xyz);
 
     // uv centro del tile
     var uv = (vec2<f32>(froxel.xy) + vec2<f32>(0.5)) / froxelParams.dimensions.xy;
     uv.y = 1 - uv.y;
     // view ray
-    let viewRay = computeViewRayFromUV(uv);
+    let rayVS = computeViewRayFromUV(uv);
 
     // viewZ (distancia positiva)
-    let viewZ = froxelZToViewZLinear(froxel.z, dimsU.z, froxelParams.nearPlane, froxelParams.farPlane);
+    let viewDist = froxelZToViewZLog(froxel.z, dimsU.z, froxelParams.nearPlane, froxelParams.farPlane);
 
-    // ✅ tu convención: delante = Z negativo
-    return viewRay * viewZ;
+    let t = -viewDist / min(rayVS.z, -1e-6);
+
+    return rayVS * t;
 }
 
 
@@ -78,7 +84,7 @@ fn worldToView(pWS: vec3<f32>) -> vec3<f32> {
 
 @compute @workgroup_size(8, 8, 4)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let dimsU = vec3<u32>(froxelParams.dimensions);
+  let dimsU = vec3<u32>(froxelParams.dimensions.xyz);
 
   if (gid.x >= dimsU.x || gid.y >= dimsU.y || gid.z >= dimsU.z) {
     return;

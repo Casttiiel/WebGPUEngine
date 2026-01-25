@@ -50,12 +50,12 @@ export class FroxelVolumetricScattering {
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 1.1;
-  private scatteringCoeff: number = 1.5;
-  private absorptionCoeff: number = 1.12;
+  private fogDensity: number = 0.01;
+  private scatteringCoeff: number = 1.2;
+  private absorptionCoeff: number = 0.02;
   private stepSize: number = 1.0;
   private nearPlane: number = 0.1;
-  private farPlane: number = 1000.0;
+  private farPlane: number = 100.0;
 
   // Uniform buffers
   private volumetricUniformBuffer!: GPUBuffer;
@@ -556,6 +556,7 @@ export class FroxelVolumetricScattering {
     this.froxelUniformData[offset++] = this.froxelDimensions.x;
     this.froxelUniformData[offset++] = this.froxelDimensions.y;
     this.froxelUniformData[offset++] = this.froxelDimensions.z;
+    this.froxelUniformData[offset++] = 0.0; // Padding
     this.froxelUniformData[offset++] = this.nearPlane;
     this.froxelUniformData[offset++] = this.farPlane;
 

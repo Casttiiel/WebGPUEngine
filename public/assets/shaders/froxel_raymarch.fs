@@ -15,7 +15,7 @@
 
 
 struct FroxelUniforms {
-  dimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
+  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
   nearPlane: f32,
   farPlane: f32
 }
@@ -27,17 +27,26 @@ struct VolumetricUniforms {
   stepSize: f32
 }
 
+fn depth01ToViewZ(depth01: f32, nearZ: f32, farZ: f32) -> f32 {
+  // gLinearDepth debe ser lineal 0..1
+  return 0.1 + depth01 * (1000.0 - 0.1);
+}
+
+fn viewZToFroxelZLog(viewZ: f32, nearZ: f32, farZ: f32) -> f32 {
+  let z = clamp(viewZ, nearZ, farZ);
+  return log(z / nearZ) / log(farZ / nearZ);
+}
+
 fn depth01ToFroxelZ(depth01: f32) -> f32 {
-  // ✅ si tu froxel Z es lineal con ndc.z (lo que tú estás usando ahora)
-  // si luego usas log slicing, aquí se cambia
-  return depth01;
+  let viewZ = depth01ToViewZ(depth01, froxelParams.nearPlane, froxelParams.farPlane);
+  return viewZToFroxelZLog(viewZ, froxelParams.nearPlane, froxelParams.farPlane);
 }
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let depth01 = textureSample(gLinearDepth, samplerGBuffer, uv).x;
 
-  let dimsF = froxelParams.dimensions;
+  let dimsF = froxelParams.dimensions.xyz;
 
   // XY froxel coord desde pantalla
   let fx = clamp(uv.x * dimsF.x, 0.0, dimsF.x - 1.0);

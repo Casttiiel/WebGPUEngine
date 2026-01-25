@@ -1,5 +1,5 @@
 struct FroxelUniforms {
-  froxelDimensions: vec3<f32>,   // Grid dimensions (160, 90, 64)
+  froxelDimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
 }
 
 struct VolumetricUniforms {
