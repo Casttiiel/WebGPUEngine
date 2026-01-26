@@ -23,7 +23,7 @@ export class FroxelVolumetricScattering {
   private froxelDimensions = {
     x: 160, // Width slices
     y: 90, // Height slices
-    z: 64, // Depth slices (logarithmic distribution)
+    z: 128, // Depth slices (logarithmic distribution)
   };
 
   private densityComputeShader!: GPUShaderModule;
@@ -530,7 +530,7 @@ export class FroxelVolumetricScattering {
         },
         {
           binding: 3,
-          resource: SamplerLibrary.nonFilteringSampler,
+          resource: SamplerLibrary.simpleSampler,
         },
       ],
     );

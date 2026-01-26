@@ -398,14 +398,14 @@ export class BindGroupFactory {
         binding: 2,
         visibility: GPUShaderStage.FRAGMENT,
         texture: {
-          sampleType: 'unfilterable-float',
+          sampleType: 'float',
           viewDimension: '3d',
         },
       },
       {
         binding: 3,
         visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'non-filtering' }, // Non-filtering sampler for unfilterable textures
+        sampler: { type: 'filtering' },
       },
     ]);
   }

@@ -3,7 +3,6 @@
 1. Froxel Volumetric Scattering
    Froxel Params Struct into file
    Where to do it?
-   Quality
    Directional Light Injection + Shadows
    Density by height + Noise
    Spot Light Injection
