@@ -10,6 +10,7 @@ export class Camera {
   private viewProjection: mat4 = mat4.create();
   private invViewProjection: mat4 = mat4.create();
   private invProjection: mat4 = mat4.create();
+  private invView: mat4 = mat4.create();
 
   private eye: vec3 = vec3.fromValues(0, 0, 0);
   private target: vec3 = vec3.fromValues(0, 0, -1);
@@ -66,7 +67,16 @@ export class Camera {
 
   private updateViewProjection(): void {
     mat4.multiply(this.viewProjection, this.projection, this.view);
+    this.calculateInvViewMatrix();
     this.calculateInvViewProjectionMatrix();
+  }
+
+  private calculateInvViewMatrix(): void {
+    const invView = mat4.create();
+    mat4.invert(invView, this.view);
+
+    // Store the inverse view-projection matrix as invViewProjection
+    this.invView = invView;
   }
 
   private calculateInvViewProjectionMatrix(): void {
@@ -121,7 +131,6 @@ export class Camera {
     const invProjection = mat4.create();
     mat4.invert(invProjection, this.projection);
 
-    // Store the inverse view-projection matrix as invViewProjection
     this.invProjection = invProjection;
   }
 
@@ -262,6 +271,7 @@ export class Camera {
     const projectionMatrix = this.getProjection();
     const invViewProjectionMatrix = this.getInvViewProjectionMatrix();
     const invProjectionMatrix = this.getInvProjectionMatrix();
+    const invViewMatrix = this.invView;
     const cameraPosition = this.getPosition();
     const cameraFront = this.getFront();
 
@@ -289,6 +299,9 @@ export class Camera {
 
     // invProjectionMatrix (offset 60-75)
     uniformData.set(invProjectionMatrix, 60);
+
+    // invViewMatrix (offset 76-91)
+    uniformData.set(invViewMatrix, 76);
 
     // Single GPU write instead of 7 separate writes
     GPUUtils.writeBuffer(this.uniformBuffer, 0, uniformData);

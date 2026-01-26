@@ -7,6 +7,7 @@ struct CameraUniforms {
     cameraFront: vec3<f32>,
     cameraZFar: f32,
     invProjection: mat4x4<f32>,
+    invView: mat4x4<f32>,
 }
 
 struct OldCameraUniforms {

@@ -10,6 +10,7 @@ import { Texture } from '../resources/Texture';
 import { Engine } from '../../core/engine/Engine';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { CameraComponent } from '../../components/render/CameraComponent';
+import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -21,8 +22,8 @@ export class FroxelVolumetricScattering {
 
   // Froxel grid dimensions
   private froxelDimensions = {
-    x: 160, // Width slices
-    y: 90, // Height slices
+    x: 320, // Width slices
+    y: 180, // Height slices
     z: 128, // Depth slices (logarithmic distribution)
   };
 
@@ -49,10 +50,11 @@ export class FroxelVolumetricScattering {
 
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
+  private cameraBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 0.01;
-  private scatteringCoeff: number = 1.2;
-  private absorptionCoeff: number = 0.02;
+  private fogDensity: number = 0.006;
+  private scatteringCoeff: number = 0.9;
+  private absorptionCoeff: number = 1.5;
   private stepSize: number = 1.0;
   private nearPlane: number = 0.1;
   private farPlane: number = 100.0;
@@ -128,6 +130,7 @@ export class FroxelVolumetricScattering {
     const densityPipelineLayout = PipelineFactory.createPipelineLayout(
       'froxel_density_pipeline_layout',
       [
+        BindGroupFactory.getCameraComputeLayout(),
         BindGroupFactory.getFroxelParametersLayout(),
         BindGroupFactory.getFroxelDensityTexturesLayout(),
       ],
@@ -167,7 +170,12 @@ export class FroxelVolumetricScattering {
 
     const ambientLightInjectionPipelineLayout = PipelineFactory.createPipelineLayout(
       'froxel_ambient_light_injection_pipeline_layout',
-      [BindGroupFactory.getFroxelParametersLayout(), BindGroupFactory.getFroxelAmbientLayout()],
+      [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getFroxelAmbientLayout(),
+        BindGroupFactory.getDirectionalLightDataLayout(),
+      ],
     );
 
     const ambientLightConfig: ComputePipelineConfig = {
@@ -304,10 +312,29 @@ export class FroxelVolumetricScattering {
       label: 'froxel_density_compute',
     });
 
+    if (!this.cameraBindGroup || true) {
+      const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+      const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+      const camera = cameraComponent.getCamera();
+      const cameraBuffer = camera.getUniformBuffer();
+
+      this.cameraBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_directional_light_camera_bind_group',
+        BindGroupFactory.getCameraComputeLayout(),
+        [
+          {
+            binding: 0,
+            resource: { buffer: cameraBuffer },
+          },
+        ],
+      );
+    }
+
     // Set compute pipeline
     computePass.setPipeline(this.densityComputePipeline);
-    computePass.setBindGroup(0, this.parametersBindGroup); // Froxel + volumetric uniforms
-    computePass.setBindGroup(1, this.densityTexturesBindGroup); // Textures
+    computePass.setBindGroup(0, this.cameraBindGroup);
+    computePass.setBindGroup(1, this.parametersBindGroup); // Froxel + volumetric uniforms
+    computePass.setBindGroup(2, this.densityTexturesBindGroup); // Textures
 
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;
@@ -370,6 +397,15 @@ export class FroxelVolumetricScattering {
   }
 
   private executeAmbientLightInjectionPass(): void {
+    const directionalLightComponent = Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList()[0] as DirectionalLightComponent;
+
+    if (!directionalLightComponent || !directionalLightComponent.getHasShadows()) {
+      console.log('  ⚠️ No directional light with shadows found, skipping');
+      return; // No directional light or no shadows
+    }
+
     const commandEncoder = this.device.createCommandEncoder({
       label: 'froxel_ambient_light_injection_pass',
     });
@@ -399,9 +435,30 @@ export class FroxelVolumetricScattering {
       ],
     );
 
+    const directionalLightDataBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_directional_light_data_bind_group',
+      BindGroupFactory.getDirectionalLightDataLayout(),
+      [
+        {
+          binding: 0,
+          resource: { buffer: directionalLightComponent.getUniformBuffer() }, // DirectionalLightUniforms
+        },
+        {
+          binding: 1,
+          resource: directionalLightComponent.getShadowDepthView(0), // Shadow map (cascade 0)
+        },
+        {
+          binding: 2,
+          resource: directionalLightComponent.getShadowSampler(), // Comparison sampler
+        },
+      ],
+    );
+
     // Bind all resources
-    computePass.setBindGroup(0, this.parametersBindGroup);
-    computePass.setBindGroup(1, texturesBindGroup);
+    computePass.setBindGroup(0, this.cameraBindGroup);
+    computePass.setBindGroup(1, this.parametersBindGroup);
+    computePass.setBindGroup(2, texturesBindGroup);
+    computePass.setBindGroup(3, directionalLightDataBindGroup);
 
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;
