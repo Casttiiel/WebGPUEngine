@@ -7,6 +7,7 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { PointLightComponentData } from '../../types/PointLightComponentData.type';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Texture } from '../../renderer/resources/Texture';
+import { AABB } from '../../core/math/AABB';
 
 export class PointLightComponent extends Component {
   private color = vec4.create();
@@ -15,6 +16,7 @@ export class PointLightComponent extends Component {
   private radius = 1.0;
   private startFallof = 0.0;
   private isDirty = true;
+  private _isVisible = false;
   private projectorTexture!: Texture;
   private projectorTextureView!: GPUTextureView;
 
@@ -29,6 +31,8 @@ export class PointLightComponent extends Component {
   private positionBuffer = new Float32Array(4);
   private radiusBuffer = new Float32Array(4);
   private falloffBuffer = new Float32Array(4);
+
+  private aabb: AABB = new AABB();
 
   constructor() {
     super();
@@ -97,6 +101,8 @@ export class PointLightComponent extends Component {
         },
       ],
     );
+
+    this.calculateWorldAABB();
   }
 
   public setBindGroup(pass: GPURenderPassEncoder): void {
@@ -138,8 +144,19 @@ export class PointLightComponent extends Component {
       GPUUtils.writeBuffer(this.uniformBuffer, 96, this.radiusBuffer);
       GPUUtils.writeBuffer(this.uniformBuffer, 112, this.falloffBuffer);
 
+      this.calculateWorldAABB();
+
       this.isDirty = false;
     }
+  }
+
+  private calculateWorldAABB(): void {
+    const r = this.radius;
+    const pos = this.position;
+    const min = vec3.fromValues(pos[0] - r, pos[1] - r, pos[2] - r);
+    const max = vec3.fromValues(pos[0] + r, pos[1] + r, pos[2] + r);
+    this.aabb.min = min;
+    this.aabb.max = max;
   }
 
   public debugInMenu(): void {
@@ -160,5 +177,17 @@ export class PointLightComponent extends Component {
 
   public getShadowSampler(): GPUSampler {
     return SamplerLibrary.shadows;
+  }
+
+  public isVisible(): boolean {
+    return this._isVisible;
+  }
+
+  public setIsVisible(visible: boolean): void {
+    this._isVisible = visible;
+  }
+
+  public getAABB(): AABB {
+    return this.aabb;
   }
 }

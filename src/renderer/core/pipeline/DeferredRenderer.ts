@@ -215,7 +215,8 @@ export class DeferredRenderer {
 
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
       const spotLightComponent = comp as SpotLightComponent;
-      if (spotLightComponent.hasShadows()) spotLightComponent.generateShadowMap();
+      if (spotLightComponent.hasShadows() && spotLightComponent.isVisible())
+        spotLightComponent.generateShadowMap();
     }
   }
 

@@ -117,6 +117,10 @@ export class RenderManagerV2 {
     camera.setCulledKeys(culledKeys);
   }
 
+  public performLightCulling(camera: Camera): void {
+    this.cpuCuller!.performLightCulling(camera);
+  }
+
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
     if (!this.camera) return;
 

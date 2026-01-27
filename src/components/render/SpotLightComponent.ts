@@ -10,6 +10,19 @@ import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/R
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Texture } from '../../renderer/resources/Texture';
+import { AABB } from '../../core/math/AABB';
+
+const ndcCorners = [
+  [-1, -1, -1, 1],
+  [1, -1, -1, 1],
+  [-1, 1, -1, 1],
+  [1, 1, -1, 1],
+
+  [-1, -1, 1, 1],
+  [1, -1, 1, 1],
+  [-1, 1, 1, 1],
+  [1, 1, 1, 1],
+];
 
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
@@ -18,6 +31,7 @@ export class SpotLightComponent extends CameraComponent {
   private radius = 1.0;
   private startFallof = 0.0;
   private _hasShadows = false;
+  private _isVisible = false;
   private shadowWidth = 128;
   private shadowHeight = 128;
   private projectorTexture!: Texture;
@@ -43,6 +57,8 @@ export class SpotLightComponent extends CameraComponent {
   private falloffBuffer = new Float32Array(4);
   private paddingBuffer = new Float32Array(3);
   private extraPaddingBuffer = new Float32Array(1);
+
+  private aabb: AABB = new AABB();
 
   constructor() {
     super();
@@ -188,6 +204,7 @@ export class SpotLightComponent extends CameraComponent {
 
     this.camera.updateUniforms();
     this.updateLightUniforms();
+    this.calculateWorldAABB();
   }
 
   public setBindGroup(pass: GPURenderPassEncoder): void {
@@ -270,6 +287,43 @@ export class SpotLightComponent extends CameraComponent {
     pass.end();
   }
 
+  private calculateWorldAABB(): void {
+    const invViewProj = this.camera.getInvViewProjectionMatrix();
+
+    const min = vec3.fromValues(
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+    );
+
+    const max = vec3.fromValues(
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+    );
+
+    for (const c of ndcCorners) {
+      const v = vec4.fromValues(c[0], c[1], c[2], c[3]);
+      vec4.transformMat4(v, v, invViewProj);
+
+      // perspective divide
+      v[0] /= v[3];
+      v[1] /= v[3];
+      v[2] /= v[3];
+
+      min[0] = Math.min(min[0], v[0]);
+      min[1] = Math.min(min[1], v[1]);
+      min[2] = Math.min(min[2], v[2]);
+
+      max[0] = Math.max(max[0], v[0]);
+      max[1] = Math.max(max[1], v[1]);
+      max[2] = Math.max(max[2], v[2]);
+    }
+
+    this.aabb.min = min;
+    this.aabb.max = max;
+  }
+
   public override update(dt: number): void {}
 
   public override renderInMenu(): void {}
@@ -280,5 +334,17 @@ export class SpotLightComponent extends CameraComponent {
 
   public hasShadows(): boolean {
     return this._hasShadows;
+  }
+
+  public isVisible(): boolean {
+    return this._isVisible;
+  }
+
+  public setIsVisible(visible: boolean): void {
+    this._isVisible = visible;
+  }
+
+  public getAABB(): AABB {
+    return this.aabb;
   }
 }

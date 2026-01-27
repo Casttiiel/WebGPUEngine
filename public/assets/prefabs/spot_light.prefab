@@ -16,7 +16,8 @@
         "orthoLeft": 10,
         "orthoWidth": 2,
         "orthoTop": 10,
-        "orthoHeight": 2
+        "orthoHeight": 2,
+        "hasShadows": true
       }
     }
   }

@@ -45,6 +45,9 @@ export class PointLightRenderPass extends BaseRenderPass {
     for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
       []) {
       const pointLightComponent = comp as PointLightComponent;
+      if (!pointLightComponent.isVisible()) {
+        continue;
+      }
       const entity = pointLightComponent.getOwner();
       const transform = entity.getComponent('transform') as TransformComponent;
 
@@ -94,7 +97,7 @@ export class SpotLightRenderPass extends BaseRenderPass {
     // 4. Render all spot lights
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
       const spotLightComponent = comp as SpotLightComponent;
-      if (spotLightComponent.hasShadows()) {
+      if (spotLightComponent.hasShadows() && !spotLightComponent.isVisible()) {
         continue;
       }
       spotLightComponent.setBindGroup(pass);
@@ -139,7 +142,7 @@ export class SpotLightWithShadowsRenderPass extends BaseRenderPass {
     // 4. Render all spot lights
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
       const spotLightComponent = comp as SpotLightComponent;
-      if (!spotLightComponent.hasShadows()) {
+      if (!spotLightComponent.hasShadows() && !spotLightComponent.isVisible()) {
         continue;
       }
       spotLightComponent.setBindGroup(pass);

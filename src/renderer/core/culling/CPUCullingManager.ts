@@ -1,3 +1,7 @@
+import { PointLightComponent } from '../../../components/render/PointLightComponent';
+import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
+import { Engine } from '../../../core/engine/Engine';
+import { AABB } from '../../../core/math/AABB';
 import { Camera } from '../../../core/math/Camera';
 import { RenderKey } from '../managers/RenderKeyManager';
 import { mat4, vec3 } from 'gl-matrix';
@@ -62,6 +66,30 @@ export class CPUCullingManager {
     this.stats.lastCullTime = performance.now() - startTime;
 
     return visibleKeys;
+  }
+
+  public performLightCulling(camera: Camera): void {
+    // Get camera frustum planes (zero-allocation version)
+    this.extractFrustumPlanes(camera);
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
+      const spotLightComponent = comp as SpotLightComponent;
+      const isVisible = this.isLightVisibleInFrustum(
+        spotLightComponent.getAABB(),
+        this.frustumPlanes,
+      );
+      spotLightComponent.setIsVisible(isVisible);
+    }
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
+      []) {
+      const pointLightComponent = comp as PointLightComponent;
+      const isVisible = this.isLightVisibleInFrustum(
+        pointLightComponent.getAABB(),
+        this.frustumPlanes,
+      );
+      pointLightComponent.setIsVisible(isVisible);
+    }
   }
 
   /**
@@ -137,6 +165,46 @@ export class CPUCullingManager {
     // Transform AABB to world space using the object's model matrix
     const modelMatrix = key.transform.getTransform().getWorldMatrix();
     const worldAABB = this.transformAABBToWorldSpace(key.aabb, modelMatrix);
+
+    // Calculate AABB center and half extents (like GPU shader)
+    const aabbCenter = vec3.create();
+    const aabbHalf = vec3.create();
+
+    vec3.add(aabbCenter, worldAABB.min, worldAABB.max);
+    vec3.scale(aabbCenter, aabbCenter, 0.5);
+
+    vec3.subtract(aabbHalf, worldAABB.max, worldAABB.min);
+    vec3.scale(aabbHalf, aabbHalf, 0.5);
+
+    // Test against each frustum plane using GPU shader algorithm
+    for (const plane of frustumPlanes) {
+      const planeNormal = vec3.fromValues(plane[0]!, plane[1]!, plane[2]!);
+      const planeDistance = plane[3]!;
+
+      // GPU shader algorithm:
+      // const float r = dot( abs( plane.xyz ), instance.aabb_half );
+      // const float c = dot( plane.xyz, instance.aabb_center ) + plane.w;
+      // if( c < -r ) return false;
+
+      const absNormal = vec3.fromValues(
+        Math.abs(planeNormal[0]),
+        Math.abs(planeNormal[1]),
+        Math.abs(planeNormal[2]),
+      );
+      const r = vec3.dot(absNormal, aabbHalf);
+      const c = vec3.dot(planeNormal, aabbCenter) + planeDistance;
+
+      if (c < -r) {
+        return false; // AABB is completely outside this plane
+      }
+    }
+
+    // AABB intersects or is inside all planes
+    return true;
+  }
+
+  private isLightVisibleInFrustum(aabb: AABB, frustumPlanes: Float32Array[]): boolean {
+    const worldAABB = aabb;
 
     // Calculate AABB center and half extents (like GPU shader)
     const aabbCenter = vec3.create();

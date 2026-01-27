@@ -4,29 +4,28 @@
 2. Start Screen
 3. Game Loading Screen
 4. Remove en main.ts el skip first frame?
-5. Frustum culling of lights
-6. Menu
-7. Editor
+5. Menu
+6. Editor
    Meshes
    Point Lights
    Spot Lights
    Light Probes
-8. Froxel Volumetric Scattering + Height Fog
+7. Froxel Volumetric Scattering + Height Fog
    .WGSL File
    Density Noise
    Directional Light Injection
    ---PCF
    Fog Color
    Spot Light Injection
-9. Shadows
-10. Point Light shadows + Revisit light injection for shadows
-11. Text Renderer
-12. Quality settings selection
-13. Multiple Light probes has good shadows?
-14. Improve particles
-15. AO Halo
-16. Que pasos tienen/necesitan reproyeccion temporal
-17. Weird line on corners is irradiance because of normals
+8. Shadows
+9. Point Light shadows + Revisit light injection for shadows
+10. Text Renderer
+11. Quality settings selection
+12. Multiple Light probes has good shadows?
+13. Improve particles
+14. AO
+15. Que pasos tienen/necesitan reproyeccion temporal
+16. Weird line on corners is irradiance because of normals
 
 ### Improvements
 

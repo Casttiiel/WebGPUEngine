@@ -505,6 +505,9 @@ export class FroxelVolumetricScattering {
     let lightWrite = this.froxelLightTempTexture;
 
     for (const pointLightComponent of pointLights) {
+      if (!pointLightComponent.isVisible()) {
+        continue;
+      }
       const commandEncoder = this.device.createCommandEncoder({
         label: 'froxel_point_light_injection_pass',
       });
