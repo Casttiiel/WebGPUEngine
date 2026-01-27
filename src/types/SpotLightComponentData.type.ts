@@ -15,4 +15,5 @@ export interface SpotLightComponentData extends CameraComponentDataType {
   hasShadows?: boolean;
   shadowWidth?: number;
   shadowHeight?: number;
+  projector?: string;
 }

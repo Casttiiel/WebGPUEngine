@@ -9,6 +9,7 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { Texture } from '../../renderer/resources/Texture';
 
 export class SpotLightComponent extends CameraComponent {
   private color = vec4.create();
@@ -19,6 +20,8 @@ export class SpotLightComponent extends CameraComponent {
   private _hasShadows = false;
   private shadowWidth = 128;
   private shadowHeight = 128;
+  private projectorTexture!: Texture;
+  private projectorTextureView!: GPUTextureView;
 
   private uniformBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
@@ -102,6 +105,9 @@ export class SpotLightComponent extends CameraComponent {
       );
     }
 
+    this.projectorTexture = await Texture.getAsync(data.projector ? data.projector : 'white.png');
+    this.projectorTextureView = this.projectorTexture.getTextureView()!;
+
     this.camera.lookAt(data.position ?? [0, 0, 0], data.target ?? [0, 0, 1]);
 
     // Crear textura de profundidad para shadow mapping
@@ -143,6 +149,14 @@ export class SpotLightComponent extends CameraComponent {
         {
           binding: 2,
           resource: this.shadowSampler, // Sampler de comparación
+        },
+        {
+          binding: 3,
+          resource: this.projectorTextureView!,
+        },
+        {
+          binding: 4,
+          resource: SamplerLibrary.simpleSampler,
         },
       ],
     );

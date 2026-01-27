@@ -21,6 +21,9 @@
     "prefab": "ground.prefab"
   },
   {
+    "prefab": "spot_light.prefab"
+  },
+  {
     "prefab": "cube_emissive.prefab",
     "components": {
       "transform": {

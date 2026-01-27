@@ -6,6 +6,7 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { PointLightComponentData } from '../../types/PointLightComponentData.type';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { Texture } from '../../renderer/resources/Texture';
 
 export class PointLightComponent extends Component {
   private color = vec4.create();
@@ -14,6 +15,8 @@ export class PointLightComponent extends Component {
   private radius = 1.0;
   private startFallof = 0.0;
   private isDirty = true;
+  private projectorTexture!: Texture;
+  private projectorTextureView!: GPUTextureView;
 
   private uniformBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
@@ -55,6 +58,9 @@ export class PointLightComponent extends Component {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
+    this.projectorTexture = await Texture.getAsync('white.png');
+    this.projectorTextureView = this.projectorTexture.getTextureView()!;
+
     // Create dummy shadow resources for the DIRECTIONAL_LIGHT_UNIFORMS layout
     this.dummyShadowTexture = GPUUtils.createTexture(
       'dummy_shadow_texture_point_light',
@@ -80,6 +86,14 @@ export class PointLightComponent extends Component {
         {
           binding: 2,
           resource: dummyShadowSampler,
+        },
+        {
+          binding: 3,
+          resource: this.projectorTextureView!,
+        },
+        {
+          binding: 4,
+          resource: SamplerLibrary.simpleSampler,
         },
       ],
     );

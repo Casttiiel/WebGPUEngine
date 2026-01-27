@@ -12,6 +12,7 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Component } from '../../core/ecs/Component';
 import { DirectionalLightComponentData } from '../../types/DirectionalLightComponentData.type';
+import { Texture } from '../../renderer/resources/Texture';
 
 interface AABB {
   minX: number;
@@ -35,6 +36,8 @@ export class DirectionalLightComponent extends Component {
   private color!: number[];
   private intensity!: number;
   private lightDirection!: vec3; // Dirección de la luz (normalizada)
+  private projectorTexture!: Texture;
+  private projectorTextureView!: GPUTextureView;
 
   // CSM configuration
   private cascadeCount: number = 1; // Number of cascades (1-3)
@@ -56,6 +59,10 @@ export class DirectionalLightComponent extends Component {
     this.cascadeCount = Math.min(3, Math.max(1, lightData.cascadeCount || 1));
     this.cascadeLambda = lightData.cascadeLambda ?? 0.5; // 0=uniforme, 1=logarítmico
     this.maxShadowDistance = lightData.maxShadowDistance ?? 50.0; // Limitar sombras a 50m por defecto
+    this.projectorTexture = await Texture.getAsync(
+      lightData.projector ? lightData.projector : 'white.png',
+    );
+    this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
     // Cargar técnica apropiada (CSM o single shadow)
     const techniquePath =
@@ -132,6 +139,14 @@ export class DirectionalLightComponent extends Component {
         {
           binding: 2,
           resource: this.shadowSampler,
+        },
+        {
+          binding: 3,
+          resource: this.projectorTextureView!,
+        },
+        {
+          binding: 4,
+          resource: SamplerLibrary.simpleSampler,
         },
       ];
     }

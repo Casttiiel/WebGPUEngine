@@ -41,6 +41,14 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
             shadow_factor = 0.0;
         }
     }
+
+    if(fix_shadows || use_shadows){
+        let almostScreenPos = light.viewProjOffset * worldPos;
+        let screenPos = almostScreenPos.xyz / almostScreenPos.w;
+        let projectorUv = screenPos.xy * 0.5 + 0.5;
+        let projector = textureSampleLevel(projectorTexture, projectorSampler, projectorUv.xy, 0.0).r;
+        shadow_factor *= projector;
+    }
     
     let NdL = saturate(dot(g.normal, light_dir));
     let NdV = saturate(dot(g.normal, g.viewDir));
@@ -81,6 +89,8 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
 @group(3) @binding(0) var<uniform> light: LightUniforms;
 @group(3) @binding(1) var gShadowMap: texture_depth_2d;
 @group(3) @binding(2) var gShadowSampler: sampler_comparison;
+@group(3) @binding(3) var projectorTexture: texture_2d<f32>;
+@group(3) @binding(4) var projectorSampler: sampler;
 
 @fragment
 fn PS_point_lights(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {

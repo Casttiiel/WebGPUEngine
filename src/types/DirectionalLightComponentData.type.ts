@@ -8,6 +8,7 @@ export interface DirectionalLightComponentData {
   intensity?: number;
   position: number[];
   target: number[];
+  projector: string;
   // CSM configuration
   cascadeCount?: number; // 1, 2, or 3 cascades (default: 1)
   cascadeLambda?: number; // 0-1: 0=uniform, 1=logarithmic (default: 0.7)
