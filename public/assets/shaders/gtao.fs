@@ -37,7 +37,7 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     // descartar fondo
     let linearZ = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
     if (linearZ >= 1.0) {
-        discard;
+        return 1.0;
     }
 
     // posición y normal en view-space
@@ -57,7 +57,8 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     let ix = i32(pos.x);
     let iy = i32(pos.y);
     let pattern = (((ix + iy) & 3) << 2) + (ix & 3);
-    let dirAngle = (PI / 16.0) * f32(pattern) + ssaoParams.angleOffset;
+    let noise = textureSampleLevel(noiseTexture, hbaoSampler, uv * ssaoParams.noiseScale, 0.0).x;
+    let dirAngle = (PI / 16.0) * f32(pattern) + ssaoParams.angleOffset + noise * PI * 2.0;
     let aoDir = dirMult * vec2<f32>(sin(dirAngle), cos(dirAngle));
 
     let toDirUnproj = getViewPosition(uv + aoDir);
@@ -151,6 +152,12 @@ fn sliceSample(
     // vector desde el centro hacia el sample (en view space)
     let pVS_unproj = getViewPosition(uv);
     let p = pVS_unproj - rayCenter;
+    let dz = abs(pVS_unproj.z - rayCenter.z);
+
+    // threshold en view-space (ajústalo)
+    if (dz > radius * 1.5) {
+        return closest;
+    }
     let lenp = length(p);
     if (lenp <= 1e-6) { return -1.0; }
 
@@ -176,7 +183,7 @@ fn getCameraVecUnproj(uv: vec2<f32>) -> vec3<f32> {
 }
 
 fn getViewZ(linearDepth: f32) -> f32 {
-    return mix(0.1, 1000.0, linearDepth);
+    return mix(0.1, camera.cameraZFar, linearDepth);
 }
 
 fn computeViewRayFromUV(uv: vec2<f32>) -> vec3<f32> {

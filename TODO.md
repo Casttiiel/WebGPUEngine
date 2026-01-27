@@ -1,29 +1,32 @@
 ### Engine
 
-1. Froxel Volumetric Scattering
-   Froxel Params Struct into file
-   Where to do it?
-   Directional Light Injection + Shadows
-   Density by height + Noise
-   Spot Light Injection
-
+1. Spot Light Projector
 2. UI
 3. Start Screen
 4. Game Loading Screen
 5. Remove en main.ts el skip first frame?
-6. Editor
+6. Frustum culling of lights
+7. Menu
+8. Editor
    Meshes
    Point Lights
    Spot Lights
    Light Probes
-7. AO
-8. Frustum culling of lights
-9. Point Light shadows + Revisit light injection for shadows
-10. Quality settings selection
-11. Multiple Light probes has good shadows?
-12. Improve particles
-13. Que pasos tienen/necesitan reproyeccion temporal
-14. Weird line on corners is irradiance because of normals
+9. Froxel Volumetric Scattering + Height Fog
+   .WGSL File
+   Density Noise
+   Directional Light Injection
+   ---PCF
+   Fog Color
+   Spot Light Injection
+10. Point Light shadows + Revisit light injection for shadows
+11. Shadows
+12. Quality settings selection
+13. Multiple Light probes has good shadows?
+14. Improve particles
+15. AO Halo
+16. Que pasos tienen/necesitan reproyeccion temporal
+17. Weird line on corners is irradiance because of normals
 
 ### Improvements
 
@@ -33,8 +36,9 @@
 4. WallRun after timer can go to wallrun again
 5. Dash end speed/direction + Conserva 80% de velocidad previa
 6. Dash not working
-7. Swing Bar not working
-8. Swing Bar needs to be picked with some angle
+7. Roll not working
+8. Swing Bar not working
+9. Swing Bar needs to be picked with some angle
 
 ## Gameplay
 
