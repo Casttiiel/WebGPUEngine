@@ -15,6 +15,7 @@ import { DebugUIManager } from '../debug/DebugUIManager';
 import { LoadingStatus } from './LoadingStatus';
 import { QualitySettings } from './QualitySettings';
 import { ResourceManager } from './ResourceManager';
+import { ModuleUI } from '../../modules/core/ModuleUI';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -28,6 +29,7 @@ export class Engine {
   private static _sound: ModuleSound;
   private static _input: ModuleInput;
   private static _physics: ModulePhysics;
+  private static _ui: ModuleUI;
   private static _environment_manager: ModuleEnvironmentManager;
   private static _timeScale: number = 1.0;
   private static _debugUI: DebugUIManager = DebugUIManager.getInstance();
@@ -77,6 +79,7 @@ export class Engine {
       this._input = new ModuleInput('input');
       this._entities = new ModuleEntities('entities');
       this._environment_manager = new ModuleEnvironmentManager('environment_manager');
+      this._ui = new ModuleUI('ui');
 
       //UI Module
       //Game controler Module
@@ -87,6 +90,7 @@ export class Engine {
       this._modules.registerSystemModule(this._input);
       this._modules.registerSystemModule(this._sound);
       this._modules.registerSystemModule(this._physics);
+      this._modules.registerSystemModule(this._ui);
 
       this._modules.registerGameModule(this._camera_mixer);
       this._modules.registerGameModule(new ModuleBoot('boot'));
@@ -271,6 +275,10 @@ export class Engine {
 
   public static getEnvironmentManager(): ModuleEnvironmentManager {
     return this._environment_manager;
+  }
+
+  public static getUI(): ModuleUI {
+    return this._ui;
   }
 
   public static getDebugUI(): DebugUIManager {

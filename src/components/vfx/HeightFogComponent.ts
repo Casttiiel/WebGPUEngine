@@ -1,5 +1,5 @@
 import { Component } from '../../core/ecs/Component';
-import { HeightFogComponentData } from '../../../types/HeightFogComponentData.type';
+import { HeightFogComponentData } from '../../types/HeightFogComponentData.type';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';

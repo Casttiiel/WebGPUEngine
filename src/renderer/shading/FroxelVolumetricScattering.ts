@@ -18,7 +18,7 @@ import { DirectionalLightComponent } from '../../components/render/DirectionalLi
  */
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
-  private isEnabled: boolean = true;
+  private isEnabled: boolean = false;
 
   // Froxel grid dimensions
   private froxelDimensions = {
