@@ -2,7 +2,7 @@
     "technique": "stone.tech",
     "textures":{
         "txAlbedo": "wood_0034_color_1k.jpg",
-        "txNormal": "wood_0034_normal_directx_1k.png",
+        "txNormal": "stone_normal.png",
         "txMetallic": "wood_0034_metallic_1k.jpg",
         "txRoughness": "wood_0034_roughness_1k.jpg",
         "txEmissive": "black.png"

@@ -28,9 +28,10 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let light_dir_full = light.position.xyz - g.worldPos;
     let distance_to_light = abs(length(light_dir_full));
     let light_dir = light_dir_full / distance_to_light;
-    if (use_shadows) {
+    if(use_shadows){
         shadow_factor = getShadowFactor(g.worldPos, g.normal, light_dir, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true, 0);
     }
+        
     
     let worldPos = vec4<f32>(g.worldPos, 1.0);
     if (fix_shadows) {
@@ -50,8 +51,11 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
         shadow_factor *= projector;
     }
     
-    let NdL = saturate(dot(g.normal, light_dir));
-    let NdV = saturate(dot(g.normal, g.viewDir));
+    let NdL = max(saturate(dot(g.normal, light_dir)), 0.05);
+    let NdV = max(saturate(dot(g.normal, g.viewDir)), 0.05);
+    if (NdL <= 0.0 || NdV <= 0.0) {
+        return vec4<f32>(0.0);
+    }
     let h = normalize(light_dir + g.viewDir); // half vector
     
     let NdH = saturate(dot(g.normal, h));
@@ -64,11 +68,20 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
     // Attenuation
-    let normalized_distance = max(distance_to_light - light.startFalloff, 0.0) / (light.radius - light.startFalloff);
-    var att = saturate(1.0 - normalized_distance);
+    let d = distance_to_light;
+    let r0 = light.startFalloff; // inicio de caída
+    let r1 = light.radius;       // fin de la luz
+    // 1️⃣ Atenuación física
+    let att_phys = 1.0 / max(d * d, 0.01);
+    // 2️⃣ Falloff artístico suave entre r0 y r1
+    let t = saturate((d - r0) / max(r1 - r0, 0.001));
+    // Smoothstep manual (más barato que smoothstep())
+    let falloff = 1.0 - t * t * (3.0 - 2.0 * t);
+    // 3️⃣ Atenuación final
+    let att = att_phys * falloff;
 
     // Energy conservation: especular ya incluye Fresnel, solo calculamos kD
-    let F = Fresnel_Schlick(VdH, g.specularColor); // Para calcular kD
+    let F = Fresnel_Schlick_Roughness(VdH, g.specularColor, g.roughness);
     let kS = F; // Specular contribution
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic); // Diffuse contribution
     
@@ -76,7 +89,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let diffuse_contrib = kD * cDiff;
     let specular_contrib = cSpec; // cSpec ya incluye Fresnel
     
-    let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * att * light.intensity * shadow_factor;
+    let final_color = light.color.xyz  * light.intensity * shadow_factor * NdL * (diffuse_contrib + specular_contrib);//
     return vec4<f32>(final_color, 1.0);
 }
 

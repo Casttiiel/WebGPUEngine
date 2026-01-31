@@ -375,9 +375,9 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'less',
-          depthBias: 1,
-          depthBiasSlopeScale: 2,
-          depthBiasClamp: 0,
+          depthBias: 2.0,
+          depthBiasSlopeScale: 1.0,
+          depthBiasClamp: 0.0,
         };
       }
       case DepthModes.ALWAYS: {

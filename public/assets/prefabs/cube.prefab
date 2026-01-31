@@ -20,7 +20,7 @@
         ]
       },
       "box_collider": {
-        "bodyType": "dynamic",
+        "bodyType": "static",
         "size": [2, 2, 2],
         "mass": 1,
         "friction": 1.3,

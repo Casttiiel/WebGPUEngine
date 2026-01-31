@@ -32,8 +32,8 @@ export class SpotLightComponent extends CameraComponent {
   private startFallof = 0.0;
   private _hasShadows = false;
   private _isVisible = false;
-  private shadowWidth = 128;
-  private shadowHeight = 128;
+  private shadowWidth = 1024;
+  private shadowHeight = 1024;
   private projectorTexture!: Texture;
   private projectorTextureView!: GPUTextureView;
 
@@ -77,13 +77,8 @@ export class SpotLightComponent extends CameraComponent {
       this.radius = data.radius;
     }
 
-    if (data.near) {
-      this.camera.setNearPlane(data.near);
-    }
-
-    if (data.far) {
-      this.camera.setFarPlane(data.far);
-    }
+    this.camera.setNearPlane(Math.max(0.01, this.radius * 0.005));
+    this.camera.setFarPlane(this.radius * 1.1);
 
     if (data.fov) {
       this.camera.setFov(data.fov);
@@ -226,7 +221,7 @@ export class SpotLightComponent extends CameraComponent {
 
     this.radiusBuffer[0] = this.radius;
 
-    const shadowStep = 2.0;
+    const shadowStep = 1.0;
     this.shadowStepBuffer[0] = shadowStep;
 
     const shadowInverseResolution = 1.0 / this.shadowWidth;

@@ -9,7 +9,7 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     let normalRoughnessData = textureSampleLevel(gNormals, samplerGBuffer, uv, 0.0);
     let encodedNormal = normalRoughnessData.xy;
     g.normal = octahedral01ToNormal(encodedNormal);
-    g.roughness = normalRoughnessData.z;
+    g.roughness = max(normalRoughnessData.z, 0.045);
     
     // Get albedo and metallic
     let albedo = textureSampleLevel(gAlbedo, samplerGBuffer, uv, 0.0);

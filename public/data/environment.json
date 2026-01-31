@@ -1,6 +1,6 @@
 {
   "ambient": {
-    "globalFactor": 8.0,
+    "globalFactor": 0.0,
     "diffuseFactor": 1.0,
     "reflectionFactor": 0.8,
     "irradianceCubemap": "1ReflectionProbe_irradiance_cubemap_T.png"

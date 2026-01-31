@@ -36,10 +36,10 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);    
     
-    let roughness = textureSample(txRoughness, samplerState, input.Uv).g * factors.roughnessFactor;
+    let roughness = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
     let encodedNormal = normalToOctahedral01(N);
 
-    let emissive = textureSample(txEmissive, samplerState, input.Uv).x * factors.emissiveFactor;
+    let emissive = textureSample(txEmissive, samplerState, Uv).x * factors.emissiveFactor;
 
     // Pack octahedral normal + roughness en RGBA8
     output.normal = vec4<f32>(

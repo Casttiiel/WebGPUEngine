@@ -8,8 +8,8 @@
       "point_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
         "intensity": 5,
-        "radius": 5,
-        "startFallof": 3
+        "radius": 8,
+        "startFallof": 5
       }
     }
   }

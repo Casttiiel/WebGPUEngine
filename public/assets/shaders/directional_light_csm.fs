@@ -201,8 +201,11 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     }
     
     // PBR calculations
-    let NdL = saturate(dot(g.normal, light_dir));
-    let NdV = saturate(dot(g.normal, g.viewDir));
+    let NdL = max(saturate(dot(g.normal, light_dir)), 0.05);
+    let NdV = max(saturate(dot(g.normal, g.viewDir)), 0.05);
+    if (NdL <= 0.0 || NdV <= 0.0) {
+        return vec4<f32>(0.0);
+    }
     let h = normalize(light_dir + g.viewDir);
     
     let NdH = saturate(dot(g.normal, h));
@@ -213,7 +216,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let cDiff = Diffuse(g.albedo);
     let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
-    let F = Fresnel_Schlick(VdH, g.specularColor);
+    let F = Fresnel_Schlick_Roughness(VdH, g.specularColor, g.roughness);
     let kS = F;
     let kD = (vec3<f32>(1.0) - kS) * (1.0 - g.metallic);
     

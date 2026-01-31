@@ -60,8 +60,7 @@ fn saturate(x: f32) -> f32 {
 
 // PBR helper functions
 fn NormalDistribution_GGX(NdotH: f32, roughness: f32) -> f32 {
-    let a = roughness * roughness;
-    let a2 = a * a;
+    let a2 = roughness * roughness;
     let NdotH2 = NdotH * NdotH;
     
     let num = a2;
@@ -81,6 +80,13 @@ fn Geometric_Smith_Schlick_GGX(NdotV: f32, NdotL: f32, roughness: f32) -> f32 {
     return ggx1 * ggx2;
 }
 
+fn Geometry_SmithGGX_Correlated(NdV: f32, NdL: f32, roughness: f32) -> f32 {
+    let a = roughness * roughness;
+    let gv = NdL * sqrt(NdV * (NdV - NdV * a) + a);
+    let gl = NdV * sqrt(NdL * (NdL - NdL * a) + a);
+    return 0.5 / max(gv + gl, 0.0001);
+}
+
 fn Fresnel_Schlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
     return F0 + (1.0 - F0) * pow(saturate(1.0 - cosTheta), 5.0);
 }
@@ -97,6 +103,7 @@ fn Specular(specularColor: vec3<f32>, h: vec3<f32>, v: vec3<f32>, l: vec3<f32>, 
     
     let NDF = NormalDistribution_GGX(NdH, roughness);
     let G = Geometric_Smith_Schlick_GGX(NdV, NdL, roughness);
+    //let G = Geometry_SmithGGX_Correlated(NdV, NdL, roughness);
     let F = Fresnel_Schlick(VdH, F0);
     
     let numerator = NDF * G * F;
@@ -160,7 +167,7 @@ fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, normal: vec3<f32>, lightDir: 
     let baseBias = 0.000001;
     let totalBias = baseBias + slopeBias;
     let biased_depth = coord_z - totalBias;
-    return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, biased_depth);
+    return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, baseBias);
 }
 
 fn hash2(p: f32) -> vec2<f32> {
@@ -175,69 +182,28 @@ fn hash3(p: vec3<f32>) -> f32 {
 fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool, cascadeIndex: i32) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
-    if(adaptUVs){
+    if (adaptUVs) {
         lightUVSpacePos.x = lightUVSpacePos.x * 0.5 + 0.5;
         lightUVSpacePos.y = lightUVSpacePos.y * -0.5 + 0.5;
     }
-
-    // Verificar que esté dentro del rango válido de la shadow map
+    // Si está fuera del rango, no hay sombra
     if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0) {
-        return 1.0; // Fuera del rango de profundidad = sin sombra
+        return 1.0;
     }
-
-    if (lightUVSpacePos.x < 0.0 || lightUVSpacePos.x > 1.0 || 
+    if (lightUVSpacePos.x < 0.0 || lightUVSpacePos.x > 1.0 ||
         lightUVSpacePos.y < 0.0 || lightUVSpacePos.y > 1.0) {
-        return 1.0; // Fuera del rango UV = sin sombra
+        return 1.0;
     }
 
-    // CRÍTICO: Filter radius fijo alineado a texeles (no usar wPos-dependent)
-    // lightShadowStepDivResolution = stepSize / resolution (en texel space)
-    let filterRadius = lightShadowStepDivResolution * 1.5;
-    
-    // CRÍTICO: Snapear UV base al centro de texel ANTES del PCF kernel
-    // Esto elimina micro-shifts subpixel cuando la cámara se mueve
-    let texelSize = lightShadowStepDivResolution / 1.5; // Aproximadamente 1/resolution
-    let snappedUV = (floor(lightUVSpacePos.xy / texelSize) + 0.5) * texelSize;
-
-    // PCF adaptativo por cascada para mejor performance
-    // Cascada 0 (cerca): 16 samples - máxima calidad
-    // Cascada 1 (media): 9 samples - calidad media
-    // Cascada 2 (lejos): 1 samples - performance
-    var numSamples = 16;
-    if (cascadeIndex == 1) {
-        numSamples = 9;
-    } else if (cascadeIndex == 2) {
-        return shadowsTap(snappedUV, lightUVSpacePos.z, normal, lightDir, shadowMap, shadowSampler);
-    }
-    
-    // Poisson disk offsets FIJOS para PCF estable (sin rotación aleatoria)
-    // IMPORTANTE: NO rotar per-fragment para evitar temporal noise/shimmering
-    let offsets = array<vec2<f32>, 16>(
-        vec2<f32>(-0.942016, -0.39906),
-        vec2<f32>(-0.094184, -0.92938),
-        vec2<f32>(-0.344959, -0.40023),
-        vec2<f32>(-0.791559, -0.59771),
-        vec2<f32>(-0.310390, 0.90469),
-        vec2<f32>(-0.943749, 0.05449),
-        vec2<f32>(-0.032820, 0.58806),
-        vec2<f32>(-0.611406, 0.17495),
-        vec2<f32>(0.147506, -0.47438),
-        vec2<f32>(0.455077, -0.76838),
-        vec2<f32>(0.542570, -0.17333),
-        vec2<f32>(0.904524, -0.23376),
-        vec2<f32>(0.277191, 0.48309),
-        vec2<f32>(0.674189, 0.41622),
-        vec2<f32>(0.954331, 0.65465),
-        vec2<f32>(0.423446, 0.84157)
-    );
-
+    // PCF 3x3
+    let texelSize = lightShadowStepDivResolution;
     var shadow = 0.0;
-    for (var i = 0; i < numSamples; i++) {
-        // Aplicar kernel desde UV snapeado - no desde lightUVSpacePos directamente
-        let sampleCoord = snappedUV + offsets[i] * filterRadius;
-        shadow += shadowsTap(sampleCoord, lightUVSpacePos.z, normal, lightDir, shadowMap, shadowSampler);
+    for (var dx = -1; dx <= 1; dx = dx + 1) {
+        for (var dy = -1; dy <= 1; dy = dy + 1) {
+            let offset = vec2<f32>(f32(dx), f32(dy)) * texelSize;
+            shadow += textureSampleCompareLevel(shadowMap, shadowSampler, lightUVSpacePos.xy + offset, lightUVSpacePos.z);
+        }
     }
-    
-    let shadowResult = shadow / f32(numSamples);
-    return shadowResult;
+    shadow = shadow / 9.0;
+    return shadow;
 }

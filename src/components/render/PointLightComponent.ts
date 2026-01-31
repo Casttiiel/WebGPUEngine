@@ -115,7 +115,7 @@ export class PointLightComponent extends Component {
       const transform = entity.getComponent('transform') as TransformComponent;
       transform
         .getTransform()
-        .setLocalScale(vec3.fromValues(this.radius + 1.0, this.radius + 1.0, this.radius + 1.0));
+        .setLocalScale(vec3.fromValues(this.radius * 2.0, this.radius * 2.0, this.radius * 2.0));
       vec3.copy(this.position, transform.getTransform().getWorldPosition());
 
       // ✅ Update reusable buffers instead of creating new Float32Arrays
