@@ -4,6 +4,7 @@
 #include "common/octahedral"
 #include "common/gbuffer"
 #include "common/lighting/csm"
+#include "common/lighting/shadows"
 
 // DEBUG: Cambia esto a true para ver colores de cascadas
 const DEBUG_CASCADE_COLORS: bool = false;
@@ -91,9 +92,6 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: v
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
 }
 
-// Use consolidated debug color function
-alias getCascadeDebugColor = getCascadeDebugColorCSM;
-
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let g = decodeGBuffer(uv);
@@ -112,7 +110,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     var cascadeColor = vec3<f32>(1.0);
     // DEBUG: Mostrar colores de cascada si está activado
     if (DEBUG_CASCADE_COLORS) {
-        cascadeColor = getCascadeDebugColor(cascadeIndex);
+        cascadeColor = getCascadeDebugColorCSM(cascadeIndex);
         //return vec4<f32>(cascadeColor * g.albedo * 0.5 + cascadeColor * 0.5, 1.0);
     }
     
@@ -125,8 +123,8 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     }
     
     // PBR calculations
-    let NdL = max(saturate(dot(g.normal, light_dir)), 0.05);
-    let NdV = max(saturate(dot(g.normal, g.viewDir)), 0.05);
+    let NdL = max(dot(g.normal, light_dir), 0.0); // No minimum lighting on back faces
+    let NdV = max(dot(g.normal, g.viewDir), 0.0);
     if (NdL <= 0.0 || NdV <= 0.0) {
         return vec4<f32>(0.0);
     }

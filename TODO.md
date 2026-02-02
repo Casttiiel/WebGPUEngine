@@ -1,29 +1,28 @@
 ### Engine
 
-1. Shadows
-2. AO
+1. AO
 
-3. UI
-4. Start Screen
-5. Game Loading Screen
-6. Remove en main.ts el skip first frame?
-7. Text Renderer
+2. UI
+3. Start Screen
+4. Game Loading Screen
+5. Remove en main.ts el skip first frame?
+6. Text Renderer
 
-8. GBuffer (+ triplanar + etc problem)
-9. Blender
-   Export With PBR Material/ Textures and MiktSpace (Test on Gbuffer)
-   Export With Diferent Size box (how UVs/texture behave) (can control texture size?)
-   Export With Collider
+7. GBuffer (+ triplanar + etc problem)
+8. Blender
+   Export With PBR Material
+   Control if Needs collider
+   Local triplanar mapping
    Export with player spawn?
 
-10. [...........]Environment Menu + Directional Light if any (ImGUI) + MainCamera
-11. Editor Light Probes (Render Debug / Gizmo)
-12. Editor Point Lights (Render Debug / Gizmo / Menu)
-13. Editor Spot Lights (Render Debug / Gizmo / Menu)
-14. Asset Browser + Spawn + Delete
+9. [...........]Environment Menu + Directional Light if any (ImGUI) + MainCamera
+10. Editor Light Probes (Render Debug / Gizmo)
+11. Editor Point Lights (Render Debug / Gizmo / Menu)
+12. Editor Spot Lights (Render Debug / Gizmo / Menu)
+13. Asset Browser + Spawn + Delete
 
-15. Point Light shadows
-16. Froxel Volumetric Scattering + Height Fog
+14. Point Light shadows
+15. Froxel Volumetric Scattering + Height Fog
     .WGSL File
     Density Noise
     Directional Light Injection
@@ -32,11 +31,11 @@
     Fog Color
     Spot Light Injection
 
-17. Quality settings selection
-18. Error en consola de GLTF retrasa en web?
-19. Improve particles
-20. Multiple Light probes has good shadows?
-21. Weird line on corners is irradiance because of normals
+16. Quality settings selection
+17. Error en consola de GLTF retrasa en web?
+18. Improve particles
+19. Multiple Light probes has good shadows?
+20. Weird line on corners is irradiance because of normals
 
 ### Bugs
 

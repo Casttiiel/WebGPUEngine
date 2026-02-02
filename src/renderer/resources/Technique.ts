@@ -375,9 +375,10 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'less',
-          depthBias: 2.0,
-          depthBiasSlopeScale: 1.0,
-          depthBiasClamp: 0.0,
+          // Moderate bias for standard back-face culling
+          depthBias: 2.0, // Constant offset to prevent acne on flat surfaces
+          depthBiasSlopeScale: 2.5, // Increased for steep angles (perpendicular surfaces)
+          depthBiasClamp: 0.008, // Maximum bias limit to prevent peter panning
         };
       }
       case DepthModes.ALWAYS: {

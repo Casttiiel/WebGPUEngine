@@ -1,5 +1,6 @@
 #include "common/uniforms"
 #include "common/structs"
+#include "common/math/matrices"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var txAlbedo: texture_2d<f32>;

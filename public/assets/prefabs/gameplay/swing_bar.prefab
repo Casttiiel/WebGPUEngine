@@ -1,7 +1,7 @@
 {
     "children": [
       {
-        "prefab": "dash_trigger.prefab",
+        "prefab": "gameplay/dash_trigger.prefab",
         "components": {
           "transform": {
             "position": [0, -1, 0]

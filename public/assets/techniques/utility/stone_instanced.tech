@@ -1,6 +1,6 @@
 {
-    "vs": "stone_instanced.vs",
-    "fs": "stone.fs",
+    "vs": "utility/stone_instanced.vs",
+    "fs": "utility/stone.fs",
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",

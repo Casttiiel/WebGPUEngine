@@ -66,7 +66,9 @@ export class DirectionalLightComponent extends Component {
 
     // Cargar técnica apropiada (CSM o single shadow)
     const techniquePath =
-      this.cascadeCount > 1 ? 'directional_light_csm.tech' : 'directional_light.tech';
+      this.cascadeCount > 1
+        ? 'lighting/directional_light_csm.tech'
+        : 'lighting/directional_light.tech';
     this.directionalLightTechnique = await Technique.getAsync(techniquePath);
 
     // Uniform buffer size: base (32 bytes) + 3 cascadas * 64 bytes (mat4x4) + cascadeSplits (16) + shadow params (16)

@@ -18,7 +18,7 @@
     "prefab": "lighting/point_light.prefab"
   },
   {
-    "prefab": "impulse_pad_15.prefab",
+    "prefab": "gameplay/impulse_pad_15.prefab",
     "components": {
       "transform": {
         "position": [8, 0, -9],
@@ -27,7 +27,7 @@
     }
   },
   {
-    "prefab": "impulse_pad_15.prefab",
+    "prefab": "gameplay/impulse_pad_15.prefab",
     "components": {
       "transform": {
         "position": [-33, 7, 19.5],
@@ -36,7 +36,7 @@
     }
   },
   {
-    "prefab": "impulse_pad_10.prefab",
+    "prefab": "gameplay/impulse_pad_10.prefab",
     "components": {
       "transform": {
         "position": [8, 4.5, -2.5],
@@ -45,7 +45,7 @@
     }
   },
   {
-    "prefab": "swing_bar.prefab",
+    "prefab": "gameplay/swing_bar.prefab",
     "components": {
       "transform": {
         "position": [0, 4, 8],
@@ -54,7 +54,7 @@
     }
   },
   {
-    "prefab": "swing_bar.prefab",
+    "prefab": "gameplay/swing_bar.prefab",
     "components": {
       "transform": {
         "position": [15, 9, 8],
@@ -63,7 +63,7 @@
     }
   },
   {
-    "prefab": "swing_bar.prefab",
+    "prefab": "gameplay/swing_bar.prefab",
     "components": {
       "transform": {
         "position": [0, 7, 8],

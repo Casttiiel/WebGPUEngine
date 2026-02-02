@@ -52,8 +52,8 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
         shadow_factor *= projector;
     }
     
-    let NdL = max(saturate(dot(g.normal, light_dir)), 0.05);
-    let NdV = max(saturate(dot(g.normal, g.viewDir)), 0.05);
+    let NdL = max(dot(g.normal, light_dir), 0.0); // No minimum lighting on back faces
+    let NdV = max(dot(g.normal, g.viewDir), 0.0);
     if (NdL <= 0.0 || NdV <= 0.0) {
         return vec4<f32>(0.0);
     }
@@ -68,18 +68,19 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let cDiff = Diffuse(g.albedo);
     let cSpec = Specular(g.specularColor, h, g.viewDir, light_dir, a, NdL, NdV, NdH, VdH, LdV);
     
-    // Attenuation
+    // Attenuation: intensidad máxima hasta startFalloff, luego atenuación suave hasta radius
     let d = distance_to_light;
-    let r0 = light.startFalloff; // inicio de caída
-    let r1 = light.radius;       // fin de la luz
-    // 1️⃣ Atenuación física
-    let att_phys = 1.0 / max(d * d, 0.01);
-    // 2️⃣ Falloff artístico suave entre r0 y r1
-    let t = saturate((d - r0) / max(r1 - r0, 0.001));
-    // Smoothstep manual (más barato que smoothstep())
-    let falloff = 1.0 - t * t * (3.0 - 2.0 * t);
-    // 3️⃣ Atenuación final
-    let att = att_phys * falloff;
+    let r0 = light.startFalloff; // radio interior (intensidad máxima)
+    let r1 = light.radius;       // radio exterior (intensidad 0)
+    
+    // Atenuación con inner/outer radius
+    var att = 1.0;
+    if (d > r0) {
+        // Transición suave de 1.0 a 0.0 entre r0 y r1
+        let t = saturate((d - r0) / max(r1 - r0, 0.001));
+        // Smoothstep inverso: 1.0 → 0.0
+        att = 1.0 - t * t * (3.0 - 2.0 * t);
+    }
 
     // Energy conservation: especular ya incluye Fresnel, solo calculamos kD
     let F = Fresnel_Schlick_Roughness(VdH, g.specularColor, g.roughness);
@@ -90,7 +91,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let diffuse_contrib = kD * cDiff;
     let specular_contrib = cSpec; // cSpec ya incluye Fresnel
     
-    let final_color = light.color.xyz  * light.intensity * shadow_factor * NdL * (diffuse_contrib + specular_contrib);//* att*/
+    let final_color = light.color.xyz  * light.intensity * shadow_factor * NdL * (diffuse_contrib + specular_contrib) * att;//*/
     return vec4<f32>(final_color, 1.0);
 }
 

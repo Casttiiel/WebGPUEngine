@@ -3,24 +3,6 @@
 
 #include "common/core/constants"
 
-// Single shadow map tap with adaptive bias
-fn shadowsTap(homo_coord: vec2<f32>, coord_z: f32, normal: vec3<f32>, lightDir: vec3<f32>, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison) -> f32 {
-    // Quick bounds check
-    if (homo_coord.x < 0.0 || homo_coord.x > 1.0 ||
-        homo_coord.y < 0.0 || homo_coord.y > 1.0) {
-        return 1.0;
-    }
-    
-    // Adaptive bias based on surface angle
-    let cosTheta = clamp(dot(normal, -lightDir), 0.001, 1.0);
-    let tanTheta = sqrt(1.0 - cosTheta * cosTheta) / cosTheta;
-    let slopeBias = clamp(tanTheta * 0.0001, 0.0, 0.001);
-    let baseBias = 0.000001;
-    let totalBias = baseBias + slopeBias;
-    
-    return textureSampleCompareLevel(shadowMap, shadowSampler, homo_coord, baseBias);
-}
-
 // PCF shadow sampling with 3x3 kernel
 fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool, cascadeIndex: i32) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);

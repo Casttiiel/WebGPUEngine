@@ -1,4 +1,5 @@
 {
+    "gltf": "unit_cube.gltf",
     "children": [],
     "components": {
       "name": "Cube",
@@ -25,14 +26,6 @@
         "mass": 1,
         "friction": 1.3,
         "restitution": 0.0
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "cube.obj",
-            "material": "textured.mat"
-          }
-        ]
       }
     }
   }
