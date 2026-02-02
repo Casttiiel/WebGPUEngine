@@ -67,7 +67,7 @@ export class VelocityBufferManager {
     this.device = Render.getInstance().getDevice()!;
 
     // Load velocity technique
-    this.velocityTechnique = await Technique.getAsync('velocity_buffer.tech');
+    this.velocityTechnique = await Technique.getAsync('utility/velocity_buffer.tech');
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     // Create velocity render target (RGBA16Float - usar formato HDR estándar)

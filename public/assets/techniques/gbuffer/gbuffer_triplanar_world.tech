@@ -1,6 +1,6 @@
 {
-    "vs": "gbuffer.vs",
-    "fs": "gbuffer_triplanar_world.fs",
+    "vs": "gbuffer/gbuffer.vs",
+    "fs": "gbuffer/gbuffer_triplanar_world.fs",
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",

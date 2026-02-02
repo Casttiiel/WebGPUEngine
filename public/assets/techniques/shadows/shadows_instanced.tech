@@ -1,6 +1,6 @@
 {
-    "vs": "shadows_instanced.vs",
-    "fs": "shadows.fs",
+    "vs": "shadows/shadows_instanced.vs",
+    "fs": "shadows/shadows.fs",
     "writesOn": "depth_only",
     "uniforms": [
         "CameraUniforms",

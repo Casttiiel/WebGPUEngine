@@ -51,34 +51,46 @@ export class ResourceManager {
 
   // Data loading utilities
   public static async loadPrefab(prefabName: string): Promise<EntityDataType> {
-    const prefab = await ResourceManager.fetch(`assets/prefabs/${prefabName}`).then((res) =>
-      res.json(),
-    );
-    return prefab;
+    const response = await ResourceManager.fetch(`assets/prefabs/${prefabName}`);
+    return await response.json();
   }
 
   public static async loadMeshData(meshPath: string): Promise<string> {
-    return await ResourceManager.fetch(`assets/meshes/${meshPath}`).then((res) => res.text());
+    const response = await ResourceManager.fetch(`assets/meshes/${meshPath}`);
+    return await response.text();
   }
 
   public static async loadMaterialData(materialPath: string): Promise<MaterialDataType> {
-    return await ResourceManager.fetch(`assets/materials/${materialPath}`).then((res) =>
-      res.json(),
-    );
+    const response = await ResourceManager.fetch(`assets/materials/${materialPath}`);
+    return await response.json();
   }
 
   public static async loadTechniqueData(techniquePath: string): Promise<TechniqueDataType> {
-    return await ResourceManager.fetch(`assets/techniques/${techniquePath}`).then((res) =>
-      res.json(),
-    );
+    const response = await ResourceManager.fetch(`assets/techniques/${techniquePath}`);
+    return await response.json();
   }
 
   public static async fetch(input: string, init?: RequestInit): Promise<Response> {
+    const fullPath = `${import.meta.env.BASE_URL}${input}`;
     try {
-      return await fetch(`${import.meta.env.BASE_URL}${input}`, init);
+      const response = await fetch(fullPath, init);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to load resource: ${input}\n` +
+            `Full path: ${fullPath}\n` +
+            `Status: ${response.status} ${response.statusText}\n` +
+            `This usually means the file doesn't exist or the path is incorrect.`,
+        );
+      }
+
+      return response;
     } catch (err) {
-      console.error('ResourceManager.fetch error:', input, err);
-      throw err;
+      if (err instanceof Error && err.message.includes('Failed to load resource')) {
+        throw err; // Re-throw our custom error
+      }
+      console.error(`ResourceManager.fetch error loading: ${input}`, err);
+      throw new Error(`Network error loading: ${input} - ${err}`);
     }
   }
 

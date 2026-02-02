@@ -24,7 +24,7 @@ export class AmbientLight {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.ambientDiffuseTechnique = await Technique.getAsync('ambient.tech');
+    this.ambientDiffuseTechnique = await Technique.getAsync('lighting/ambient.tech');
 
     this.ambientDiffuseUniformBuffer = GPUUtils.createBuffer(
       'ambient diffuse uniform buffer',
@@ -32,7 +32,7 @@ export class AmbientLight {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
-    this.ambientSpecularTechnique = await Technique.getAsync('ambient_specular.tech');
+    this.ambientSpecularTechnique = await Technique.getAsync('lighting/ambient_specular.tech');
 
     this.brdfLUT = await Texture.getAsync('brdfLUT.png');
 

@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "smaa_neighborhood_blending.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/smaa_neighborhood_blending.fs",
     "writesOn": "texture",
     "z": "disable_all",
     "uniforms":["CameraUniforms","SingleTexture", "SingleTexture"]

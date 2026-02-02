@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "distorsion_combine.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/distorsion_combine.fs",
     "writesOn": "texture",
     "z": "disable_all",
     "blend": "combinative",

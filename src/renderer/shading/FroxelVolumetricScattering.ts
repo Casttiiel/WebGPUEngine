@@ -78,7 +78,7 @@ export class FroxelVolumetricScattering {
     await Texture.getAsync('noiseRGB.jpg'); //TODO REMOVE
     await this.initializeComputeShaders();
 
-    this.rayMarchTechnique = await Technique.getAsync('froxel_raymarch.tech');
+    this.rayMarchTechnique = await Technique.getAsync('volumetric/froxel_raymarch.tech');
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     this.createUniformBuffers();
@@ -89,7 +89,7 @@ export class FroxelVolumetricScattering {
   }
 
   private async initializeComputeShaders(): Promise<void> {
-    const densityCode = await ResourceManager.loadShader('froxel_density.compute.wgsl');
+    const densityCode = await ResourceManager.loadShader('volumetric/froxel_density.compute.wgsl');
 
     this.densityComputeShader = this.device.createShaderModule({
       label: 'Froxel Density Compute Shader',
@@ -97,7 +97,7 @@ export class FroxelVolumetricScattering {
     });
 
     const volumetricIntegrationCode = await ResourceManager.loadShader(
-      'froxel_volumetric_integration.compute.wgsl',
+      'volumetric/froxel_volumetric_integration.compute.wgsl',
     );
 
     this.volumetricIntegrationComputeShader = this.device.createShaderModule({
@@ -106,7 +106,7 @@ export class FroxelVolumetricScattering {
     });
 
     const ambientLightInjectionCode = await ResourceManager.loadShader(
-      'froxel_light_injection_ambient.compute.wgsl',
+      'volumetric/froxel_light_injection_ambient.compute.wgsl',
     );
 
     this.ambientLightInjectionShader = this.device.createShaderModule({
@@ -115,7 +115,7 @@ export class FroxelVolumetricScattering {
     });
 
     const pointLightInjectionCode = await ResourceManager.loadShader(
-      'froxel_light_injection_point.compute.wgsl',
+      'volumetric/froxel_light_injection_point.compute.wgsl',
     );
 
     this.pointLightInjectionShader = this.device.createShaderModule({

@@ -1,6 +1,6 @@
 {
-  "vs": "gbuffer_instanced.vs",
-  "fs": "pbr.fs",
+  "vs": "gbuffer/gbuffer_instanced.vs",
+  "fs": "lighting/pbr.fs",
   "blend": "OPAQUE",
   "z": "LESS_EQUAL",
   "rs": "FILL",

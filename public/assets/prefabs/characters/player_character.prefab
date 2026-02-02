@@ -86,7 +86,7 @@
   },
   "children": [
     {
-      "prefab": "player_camera.prefab"
+      "prefab": "cameras/player_camera.prefab"
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "vs": "presentation.vs",
+  "vs": "utility/presentation.vs",
   "fs": "dof_near_blur.fs",
   "uniforms": ["CameraUniforms", "GBufferUniforms", "DOFBlurTextures"],
   "writesOn": "texture",

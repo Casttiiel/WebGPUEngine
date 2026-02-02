@@ -1,5 +1,5 @@
 {    
-    "vs": "presentation.vs",
+    "vs": "utility/presentation.vs",
     "fs": "directional_light.fs",
     "writesOn": "texture",
     "z": "disable_all",

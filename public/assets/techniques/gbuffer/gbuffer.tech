@@ -1,6 +1,6 @@
 {
-    "vs": "gbuffer.vs",
-    "fs": "gbuffer.fs",
+    "vs": "gbuffer/gbuffer.vs",
+    "fs": "gbuffer/gbuffer.fs",
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",

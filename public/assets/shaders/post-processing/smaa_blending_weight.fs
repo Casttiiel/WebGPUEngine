@@ -41,7 +41,7 @@ const SMAA_SEARCHTEX_SIZE: vec2<f32> = vec2(64.0, 16.0);        // Must match ac
 const SMAA_SEARCHTEX_PACKED_SIZE: vec2<f32> = vec2(64.0, 16.0); // Same as SIZE for this texture
 
 // Include all SMAA helper functions
-#include "smaa_diagonal_helpers"
+#include "post-processing/smaa_diagonal_helpers"
 
 @fragment
 fn fs(@builtin(position) position: vec4<f32>,

@@ -14,7 +14,7 @@ export class Skybox {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.skyboxTechnique = await Technique.getAsync('skybox.tech');
+    this.skyboxTechnique = await Technique.getAsync('lighting/skybox.tech');
 
     this.skyboxBindGroup = BindGroupFactory.createBindGroup(
       `skybox_bindgroup`,

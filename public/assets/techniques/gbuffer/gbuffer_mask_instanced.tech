@@ -1,6 +1,6 @@
 {
-    "vs": "gbuffer_instanced.vs",
-    "fs": "gbuffer_mask.fs",
+    "vs": "gbuffer/gbuffer_instanced.vs",
+    "fs": "gbuffer/gbuffer_mask.fs",
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",

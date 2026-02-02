@@ -36,7 +36,9 @@ export class IrradianceGenerator {
     });
 
     // Cargar compute shader usando ShaderPreprocessor para procesar includes
-    const shaderCode = await ShaderPreprocessor.preprocessShader('irradiance_convolution.wgsl');
+    const shaderCode = await ShaderPreprocessor.preprocessShader(
+      'utility/irradiance_convolution.wgsl',
+    );
 
     this.computeShader = this.device.createShaderModule({
       label: 'irradiance_convolution_shader',

@@ -1,6 +1,6 @@
 {
-  "vs": "presentation.vs",
-  "fs": "froxel_raymarch.fs",
+  "vs": "utility/presentation.vs",
+  "fs": "volumetric/froxel_raymarch.fs",
   "blend": "additive_by_src_alpha",
   "z": "disable_all",
   "writesOn": "texture",

@@ -194,9 +194,11 @@ export class DeferredRenderer {
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();
 
-    this.pointLightTechnique = await Technique.getAsync('point_light.tech');
-    this.spotLightTechnique = await Technique.getAsync('spot_light.tech');
-    this.spotLightWithShadowsTechnique = await Technique.getAsync('spot_light_shadows.tech');
+    this.pointLightTechnique = await Technique.getAsync('lighting/point_light.tech');
+    this.spotLightTechnique = await Technique.getAsync('lighting/spot_light.tech');
+    this.spotLightWithShadowsTechnique = await Technique.getAsync(
+      'lighting/spot_light_shadows.tech',
+    );
     this.unitSphere = await Mesh.getAsync('unit_sphere.obj');
     this.unitFrustum = await Mesh.getAsync('unit_frustum.obj');
 

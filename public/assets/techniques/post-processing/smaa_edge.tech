@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "smaa_edge_detection.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/smaa_edge_detection.fs",
     "writesOn": "texture",
     "z": "disable_all",
     "uniforms":["CameraUniforms","SMAAParams"]

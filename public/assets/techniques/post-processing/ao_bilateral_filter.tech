@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "ao_bilateral_filter.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/ao_bilateral_filter.fs",
     "writesOn": "single_channel",
     "z": "disable_all",
     "uniforms":["CameraUniforms", "GBufferUniforms", "SingleTexture"]

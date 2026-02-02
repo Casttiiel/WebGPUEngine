@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "gtao.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/gtao.fs",
     "writesOn": "single_channel",
     "z": "disable_all",
     "uniforms":["CameraUniforms", "GBufferUniforms", "AmbientOcclusionUniforms"]

@@ -1,5 +1,5 @@
 {
-    "technique": "stone.tech",
+    "technique": "utility/stone.tech",
     "textures":{
         "txAlbedo": "stone_albedo.png",
         "txNormal": "stone_normal.png",

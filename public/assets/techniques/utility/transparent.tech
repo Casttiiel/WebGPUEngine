@@ -1,5 +1,5 @@
 {
-    "vs": "gbuffer.vs",
+    "vs": "gbuffer/gbuffer.vs",
     "fs": "transparent.fs",
     "writesOn": "texture",
     "z": "test_but_no_write",

@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "smaa_blending_weight.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/smaa_blending_weight.fs",
     "writesOn": "texture",
     "z": "disable_all",
     "uniforms":["CameraUniforms","SMAABlendTextures","SMAABlendParams"]

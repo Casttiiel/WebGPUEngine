@@ -9,13 +9,13 @@
     "gltf": "Untitled.gltf"
   },
   {
-    "prefab": "main_camera.prefab"
+    "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "player_character.prefab"
+    "prefab": "characters/player_character.prefab"
   },
   {
-    "prefab": "debug_camera.prefab"
+    "prefab": "cameras/debug_camera.prefab"
   },
   {
     "prefab": "point_light.prefab"

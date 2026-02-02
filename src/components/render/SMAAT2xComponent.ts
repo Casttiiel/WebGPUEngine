@@ -96,12 +96,14 @@ export class SMAAT2xComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     // Load SMAA 1x techniques
-    this.edgeTechnique = await Technique.getAsync('smaa_edge.tech');
-    this.blendTechnique = await Technique.getAsync('smaa_blend.tech');
-    this.neighborhoodTechnique = await Technique.getAsync('smaa_neighborhood.tech');
+    this.edgeTechnique = await Technique.getAsync('post-processing/smaa_edge.tech');
+    this.blendTechnique = await Technique.getAsync('post-processing/smaa_blend.tech');
+    this.neighborhoodTechnique = await Technique.getAsync('post-processing/smaa_neighborhood.tech');
 
     // Load temporal resolve technique
-    this.temporalResolveTechnique = await Technique.getAsync('smaa_temporal_resolve.tech');
+    this.temporalResolveTechnique = await Technique.getAsync(
+      'post-processing/smaa_temporal_resolve.tech',
+    );
 
     // Load SMAA lookup textures
     this.areaTex = await Texture.get('AreaTex.png');

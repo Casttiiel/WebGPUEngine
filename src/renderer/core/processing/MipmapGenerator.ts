@@ -35,7 +35,7 @@ export class MipmapGenerator {
     this.device = GPUUtils.getDevice();
 
     // Load the base shader template using ShaderPreprocessor cache
-    this.baseShaderCode = await ShaderPreprocessor.preprocessShader('generate_mipmap.wgsl');
+    this.baseShaderCode = await ShaderPreprocessor.preprocessShader('utility/generate_mipmap.wgsl');
 
     this.isInitialized = true;
   }

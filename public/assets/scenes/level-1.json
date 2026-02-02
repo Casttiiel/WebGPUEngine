@@ -1,18 +1,18 @@
 [
   {
-    "prefab": "main_camera.prefab"
+    "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "player_character.prefab"
+    "prefab": "characters/player_character.prefab"
   },
   {
-    "prefab": "debug_camera.prefab"
+    "prefab": "cameras/debug_camera.prefab"
   },
   {
     "prefab": "directional_light.prefab"
   },
   {
-    "prefab": "ground.prefab"
+    "prefab": "primitives/ground.prefab"
   },
   {
     "prefab": "point_light.prefab"

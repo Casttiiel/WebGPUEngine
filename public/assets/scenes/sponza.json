@@ -9,22 +9,22 @@
     "gltf": "sponza.gltf"
   },
   {
-    "prefab": "main_camera.prefab"
+    "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "player_character.prefab"
+    "prefab": "characters/player_character.prefab"
   },
   {
-    "prefab": "debug_camera.prefab"
+    "prefab": "cameras/debug_camera.prefab"
   },
   {
-    "prefab": "ground.prefab"
+    "prefab": "primitives/ground.prefab"
   },
   {
-    "prefab": "spot_light.prefab"
+    "prefab": "lighting/spot_light.prefab"
   },
   {
-    "prefab": "cube_emissive.prefab",
+    "prefab": "effects/cube_emissive.prefab",
     "components": {
       "transform": {
         "position": [-1.0, 4, 5],
@@ -33,7 +33,7 @@
     }
   },
   {
-    "prefab": "cube.prefab",
+    "prefab": "primitives/cube.prefab",
     "components": {
       "transform": {
         "position": [-1, 0.9, 8],
@@ -42,7 +42,7 @@
     }
   },
   {
-    "prefab": "cube.prefab",
+    "prefab": "primitives/cube.prefab",
     "components": {
       "transform": {
         "position": [0, 2, 8],

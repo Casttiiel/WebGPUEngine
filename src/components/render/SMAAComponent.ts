@@ -70,9 +70,9 @@ export class SMAAComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     // Load the 3 techniques
-    this.edgeTechnique = await Technique.getAsync('smaa_edge.tech');
-    this.blendTechnique = await Technique.getAsync('smaa_blend.tech');
-    this.neighborhoodTechnique = await Technique.getAsync('smaa_neighborhood.tech');
+    this.edgeTechnique = await Technique.getAsync('post-processing/smaa_edge.tech');
+    this.blendTechnique = await Technique.getAsync('post-processing/smaa_blend.tech');
+    this.neighborhoodTechnique = await Technique.getAsync('post-processing/smaa_neighborhood.tech');
 
     // Load SMAA lookup textures
     this.areaTex = await Texture.get('AreaTex.png');

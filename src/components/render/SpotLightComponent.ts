@@ -138,7 +138,7 @@ export class SpotLightComponent extends CameraComponent {
     this.shadowSampler = SamplerLibrary.shadows;
 
     this.technique = await Technique.getAsync(
-      this._hasShadows ? 'spot_light_shadows.tech' : 'spot_light.tech',
+      this._hasShadows ? 'lighting/spot_light_shadows.tech' : 'lighting/spot_light.tech',
     );
     this.uniformBuffer = GPUUtils.createBuffer(
       'spot light uniform buffer',

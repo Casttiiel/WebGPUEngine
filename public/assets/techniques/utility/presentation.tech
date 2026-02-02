@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "presentation.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "utility/presentation.fs",
     "writesOn": "screen",
     "z": "disable_all",
     "uniforms": ["SingleTexture"]

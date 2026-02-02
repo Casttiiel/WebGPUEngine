@@ -1,6 +1,6 @@
 {
-    "vs": "presentation.vs",
-    "fs": "bloom_combine.fs",
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/bloom_combine.fs",
     "fsEntryPoint": "fs",
     "writesOn": "texture",
     "z": "disable_all",

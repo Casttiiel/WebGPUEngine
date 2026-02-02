@@ -1,5 +1,5 @@
 {
-    "technique": "gbuffer.tech",
+    "technique": "gbuffer/gbuffer.tech",
     "textures":{
         "txAlbedo": "white.png",
         "txNormal": "no-normal.jpg",

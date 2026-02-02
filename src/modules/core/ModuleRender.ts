@@ -64,7 +64,7 @@ export class ModuleRender extends Module {
 
     LoadingStatus.updateStatus('Loading presentation resources...', 55);
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.presentationTechnique = await Technique.getAsync('presentation.tech');
+    this.presentationTechnique = await Technique.getAsync('utility/presentation.tech');
 
     LoadingStatus.updateStatus('Initializing render manager...', 60);
     // Initialize GPU Frustum Culling

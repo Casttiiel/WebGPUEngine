@@ -145,7 +145,7 @@ export class Material extends GPUResource {
         if (isInstancedTechnique) {
           // Crear material de sombras con técnica instanciada
           const shadowsMaterialData = {
-            technique: 'shadows_instanced.tech',
+            technique: 'shadows/shadows_instanced.tech',
             textures: {},
             category: 'shadows' as any,
             casts_shadows: false,

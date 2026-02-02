@@ -1,6 +1,6 @@
 {
-    "vs": "pbr.vs",
-    "fs": "pbr.fs",
+    "vs": "lighting/pbr.vs",
+    "fs": "lighting/pbr.fs",
     "fsEntryPoint": "PS_dir_lights_no_shadow",
     "uniforms": [
         "CameraUniforms",

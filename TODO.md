@@ -1,30 +1,29 @@
 ### Engine
 
-1. Multiple Light probes has good shadows?
+1. Shadows
 2. AO
-3. [...........]Environment Menu + Directional Light if any (ImGUI) + MainCamera
-4. Point Light shadows
-5. Shadows
 
-6. UI
-7. Start Screen
-8. Game Loading Screen
-9. Remove en main.ts el skip first frame?
-10. Text Renderer
+3. UI
+4. Start Screen
+5. Game Loading Screen
+6. Remove en main.ts el skip first frame?
+7. Text Renderer
 
-11. GBuffer (+ triplanar + etc problem)
-12. Blender
-    Export With PBR Material/ Textures and MiktSpace (Test on Gbuffer)
-    Export With Diferent Size box (how UVs/texture behave) (can control texture size?)
-    Export With Collider
-    Export with player spawn?
+8. GBuffer (+ triplanar + etc problem)
+9. Blender
+   Export With PBR Material/ Textures and MiktSpace (Test on Gbuffer)
+   Export With Diferent Size box (how UVs/texture behave) (can control texture size?)
+   Export With Collider
+   Export with player spawn?
 
-13. Editor Light Probes (Render Debug / Gizmo)
-14. Editor Point Lights (Render Debug / Gizmo / Menu)
-15. Editor Spot Lights (Render Debug / Gizmo / Menu)
-16. Asset Browser + Spawn + Delete
+10. [...........]Environment Menu + Directional Light if any (ImGUI) + MainCamera
+11. Editor Light Probes (Render Debug / Gizmo)
+12. Editor Point Lights (Render Debug / Gizmo / Menu)
+13. Editor Spot Lights (Render Debug / Gizmo / Menu)
+14. Asset Browser + Spawn + Delete
 
-17. Froxel Volumetric Scattering + Height Fog
+15. Point Light shadows
+16. Froxel Volumetric Scattering + Height Fog
     .WGSL File
     Density Noise
     Directional Light Injection
@@ -33,10 +32,10 @@
     Fog Color
     Spot Light Injection
 
-18. Quality settings selection
-19. Improve particles
+17. Quality settings selection
+18. Improve particles
+19. Multiple Light probes has good shadows?
 20. Weird line on corners is irradiance because of normals
-21. Lens distorsion + chromatic aberration RE4
 
 ### Bugs
 

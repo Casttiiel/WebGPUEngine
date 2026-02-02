@@ -182,22 +182,22 @@ export class GLTFLoader {
     materialData: Material,
     material: MaterialDataType,
   ): MaterialDataType {
-    let technique = 'gbuffer.tech';
+    let technique = 'gbuffer/gbuffer.tech';
     if (materialData.getAlphaMode() === 'MASK') {
-      technique = 'gbuffer_mask.tech';
+      technique = 'gbuffer/gbuffer_mask.tech';
     } else if (materialData.getAlphaMode() === 'BLEND') {
-      technique = 'transparent.tech';
+      technique = 'utility/transparent.tech';
     }
-    let fs = 'gbuffer.fs';
+    let fs = 'gbuffer/gbuffer.fs';
     if (materialData.getAlphaMode() === 'MASK') {
-      fs = 'gbuffer_mask.fs';
+      fs = 'gbuffer/gbuffer_mask.fs';
     } else if (materialData.getAlphaMode() === 'BLEND') {
-      fs = 'transparent.fs';
+      fs = 'utility/transparent.fs';
     }
 
     if (materialData.getDoubleSided()) {
       material.techniqueData = {
-        vs: 'gbuffer.vs',
+        vs: 'gbuffer/gbuffer.vs',
         fs,
         uniforms: [
           PipelineBindGroupLayouts.CAMERA_UNIFORMS,

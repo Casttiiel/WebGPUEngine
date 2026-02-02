@@ -1,5 +1,5 @@
 {
-    "technique": "shadows.tech",
+    "technique": "shadows/shadows.tech",
     "textures":{},
     "casts_shadows": false,
     "category": "shadows"

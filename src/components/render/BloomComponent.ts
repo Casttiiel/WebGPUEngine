@@ -50,8 +50,8 @@ export class BloomComponent extends BlurComponent {
 
     this.whiteTexture = await Texture.getAsync('white.png');
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.technique = await Technique.getAsync('bloom_filter.tech');
-    this.combineTechnique = await Technique.getAsync('bloom_combine.tech');
+    this.technique = await Technique.getAsync('post-processing/bloom_filter.tech');
+    this.combineTechnique = await Technique.getAsync('post-processing/bloom_combine.tech');
 
     // ✅ Create cached sampler once
     this.cachedLinearSampler = GPUUtils.createSampler({

@@ -1,6 +1,6 @@
 {
-    "vs": "stone.vs",
-    "fs": "stone.fs",
+    "vs": "utility/stone.vs",
+    "fs": "utility/stone.fs",
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",

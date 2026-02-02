@@ -5,6 +5,7 @@
 3. Progressive texture streaming o mip streaming
 4. Mesh Collider
 5. DOF adaptative
+6. Lens distorsion + chromatic aberration RE4
    Animations
    Clouds
    Pre-multiplied Alpha Solids (Cristal)

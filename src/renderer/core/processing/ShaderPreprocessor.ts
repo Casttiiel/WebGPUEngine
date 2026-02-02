@@ -12,9 +12,9 @@ export class ShaderPreprocessor {
     }
 
     // Fetch and cache the raw include file
-    const content = await ResourceManager.fetch(`assets/shaders/${path}`).then((res) => res.text());
+    const response = await ResourceManager.fetch(`assets/shaders/${path}`);
+    const content = await response.text();
     this.includeFileCache.set(path, content);
-
     return content;
   }
 

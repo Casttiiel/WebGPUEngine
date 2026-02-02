@@ -31,7 +31,7 @@ export class SpeedLinesVFXComponent extends Component {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.technique = await Technique.getAsync('speed_lines.tech');
+    this.technique = await Technique.getAsync('post-processing/speed_lines.tech');
     this.noiseTexture = await Texture.getAsync('noiseRGB.jpg');
 
     this.uniformBuffer = Render.getInstance()
