@@ -111,6 +111,7 @@ export class Loader {
         ...json.components,
         ...prefabJson.components,
       };
+      json.gltf = prefabJson.gltf;
 
       json.components = mergedComponents;
     }

@@ -60,8 +60,8 @@ export class ModuleEditorSelection extends Module {
     const device = GPUUtils.getDevice();
 
     // Cargar shaders wireframe
-    const vsCode = await ResourceManager.loadShader('wireframe.vs');
-    const fsCode = await ResourceManager.loadShader('wireframe.fs');
+    const vsCode = await ResourceManager.loadShader('utility/wireframe.vs');
+    const fsCode = await ResourceManager.loadShader('utility/wireframe.fs');
 
     const vsModule = device.createShaderModule({ label: 'wireframe_vs', code: vsCode });
     const fsModule = device.createShaderModule({ label: 'wireframe_fs', code: fsCode });

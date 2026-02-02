@@ -33,9 +33,10 @@
     Spot Light Injection
 
 17. Quality settings selection
-18. Improve particles
-19. Multiple Light probes has good shadows?
-20. Weird line on corners is irradiance because of normals
+18. Error en consola de GLTF retrasa en web?
+19. Improve particles
+20. Multiple Light probes has good shadows?
+21. Weird line on corners is irradiance because of normals
 
 ### Bugs
 

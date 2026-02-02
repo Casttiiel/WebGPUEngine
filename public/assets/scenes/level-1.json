@@ -9,13 +9,13 @@
     "prefab": "cameras/debug_camera.prefab"
   },
   {
-    "prefab": "directional_light.prefab"
+    "prefab": "lighting/directional_light.prefab"
   },
   {
     "prefab": "primitives/ground.prefab"
   },
   {
-    "prefab": "point_light.prefab"
+    "prefab": "lighting/point_light.prefab"
   },
   {
     "prefab": "impulse_pad_15.prefab",

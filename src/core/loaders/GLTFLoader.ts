@@ -13,11 +13,8 @@ import { BlendModes } from '../../types/BlendModes.enum';
 import { DepthModes } from '../../types/DepthModes.enum';
 
 export class GLTFLoader {
-  private static gltfBaseName: string = '';
-
   public static async loadGLTF(path: string): Promise<Array<EntityDataType>> {
     const folderName = path.split('.')[0];
-    this.gltfBaseName = folderName;
 
     // 1. Crear IO para navegador con soporte para todas las extensiones
     const io = new WebIO().registerExtensions(ALL_EXTENSIONS);
@@ -58,18 +55,18 @@ export class GLTFLoader {
       },
     };
 
-    const childs = this.processNodeList(scene.listChildren());
+    const childs = this.processNodeList(scene.listChildren(), folderName);
     res.children = childs;
     return res;
   }
 
-  private static processNodeList(nodeList: Node[]): Array<EntityDataType> {
+  private static processNodeList(nodeList: Node[], folderName: string): Array<EntityDataType> {
     const res = [];
     for (const node of nodeList) {
       const mesh = node.getMesh();
       let nodeEntity = null;
       if (mesh) {
-        nodeEntity = this.processMeshNode(node);
+        nodeEntity = this.processMeshNode(node, folderName);
       } else {
         nodeEntity = {
           children: [],
@@ -80,7 +77,7 @@ export class GLTFLoader {
       }
 
       if (node.listChildren().length > 0) {
-        nodeEntity.children = this.processNodeList(node.listChildren());
+        nodeEntity.children = this.processNodeList(node.listChildren(), folderName);
       }
       res.push(nodeEntity);
     }
@@ -88,9 +85,9 @@ export class GLTFLoader {
     return res;
   }
 
-  private static processMeshNode(node: Node): EntityDataType {
+  private static processMeshNode(node: Node, folderName: string): EntityDataType {
     const transform = this.getNodeTransform(node);
-    const render = this.getNodeRender(node);
+    const render = this.getNodeRender(node, folderName);
     const collider = this.getNodeCollider(render);
     const res: EntityDataType = {
       children: [],
@@ -104,7 +101,7 @@ export class GLTFLoader {
     return res;
   }
 
-  private static getNodeRender(node: Node): RenderComponentDataType {
+  private static getNodeRender(node: Node, folderName: string): RenderComponentDataType {
     const mesh = node.getMesh();
     if (!mesh) {
       throw new Error('Node has no mesh');
@@ -130,7 +127,7 @@ export class GLTFLoader {
           },
           indices: prim.getIndices()?.getArray(),
         },
-        materialData: this.getPrimitiveMaterial(prim),
+        materialData: this.getPrimitiveMaterial(prim, folderName),
       };
       res.meshes.push(primitiveInfo);
     }
@@ -138,7 +135,7 @@ export class GLTFLoader {
     return res;
   }
 
-  private static getPrimitiveMaterial(primitive: Primitive): MaterialDataType {
+  private static getPrimitiveMaterial(primitive: Primitive, folderName: string): MaterialDataType {
     const materialData = primitive.getMaterial();
     if (!materialData) {
       throw new Error('Primitive has no material');
@@ -151,19 +148,19 @@ export class GLTFLoader {
       category: this.getCategory(materialData),
       textures: {
         txAlbedo: materialData.getBaseColorTexture()
-          ? this.getTextureName(materialData.getBaseColorTexture()!, this.gltfBaseName)
+          ? this.getTextureName(materialData.getBaseColorTexture()!, folderName)
           : 'white.png',
         txNormal: materialData.getNormalTexture()
-          ? this.getTextureName(materialData.getNormalTexture()!, this.gltfBaseName)
+          ? this.getTextureName(materialData.getNormalTexture()!, folderName)
           : 'no-normal.jpg',
         txMetallic: materialData.getMetallicRoughnessTexture()
-          ? this.getTextureName(materialData.getMetallicRoughnessTexture()!, this.gltfBaseName)
+          ? this.getTextureName(materialData.getMetallicRoughnessTexture()!, folderName)
           : 'black.png',
         txRoughness: materialData.getMetallicRoughnessTexture()
-          ? this.getTextureName(materialData.getMetallicRoughnessTexture()!, this.gltfBaseName)
+          ? this.getTextureName(materialData.getMetallicRoughnessTexture()!, folderName)
           : 'white.png',
         txEmissive: materialData.getEmissiveTexture()
-          ? this.getTextureName(materialData.getEmissiveTexture()!, this.gltfBaseName)
+          ? this.getTextureName(materialData.getEmissiveTexture()!, folderName)
           : hasEmissive
             ? 'white.png'
             : 'black.png',

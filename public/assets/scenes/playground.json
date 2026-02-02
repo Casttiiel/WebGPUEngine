@@ -18,6 +18,6 @@
     "prefab": "cameras/debug_camera.prefab"
   },
   {
-    "prefab": "point_light.prefab"
+    "prefab": "lighting/point_light.prefab"
   }
 ]
