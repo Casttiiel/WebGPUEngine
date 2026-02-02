@@ -5,6 +5,7 @@ import { MeshData } from '../../types/MeshData.type';
 import { Engine } from '../../core/engine/Engine';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { AABB } from '../../types/AABB';
+import { generateTangents } from 'mikktspace';
 
 export interface MeshOptions extends IGPUResourceOptions {
   meshData?: MeshData;
@@ -150,7 +151,16 @@ export class Mesh extends GPUResource {
     } else {
       this.indices = meshData.indices as Uint16Array;
     }
-    this.tangents = this.computeMeshTangents();
+
+    if (Array.isArray(meshData.attributes.TANGENT)) {
+      this.tangents = new Float32Array(meshData.attributes.TANGENT);
+    } else {
+      this.tangents = meshData.attributes.TANGENT;
+      if (!this.tangents) {
+        this.tangents = this.computeMeshTangents();
+      }
+    }
+
     this.indexCount = meshData.indices.length;
     this.aabb = this.calculateAABB();
 
@@ -285,60 +295,112 @@ export class Mesh extends GPUResource {
     this.setHasData();
   }
 
-  private computeTangent(
-    p0: number[],
-    p1: number[],
-    p2: number[],
-    uv0: number[],
-    uv1: number[],
-    uv2: number[],
-  ): { tangent: number[]; w: number } {
-    // Verificar que todos los arrays tengan las dimensiones correctas
-    if (
-      p0.length < 3 ||
-      p1.length < 3 ||
-      p2.length < 3 ||
-      uv0.length < 2 ||
-      uv1.length < 2 ||
-      uv2.length < 2
-    ) {
-      return { tangent: [1, 0, 0], w: 1 }; // Valor por defecto
+  /**
+   * Generates tangents using MikkTSpace algorithm
+   * MikkTSpace ensures consistent tangent space generation across different tools/engines
+   *
+   * IMPORTANT: MikkTSpace requires UNINDEXED geometry (duplicated vertices per triangle)
+   * This method temporarily converts indexed geometry to unindexed for tangent generation
+   */
+  private computeMeshTangents(): Float32Array {
+    const numVertices = this.vertices.length / 3;
+
+    try {
+      // MikkTSpace requires unindexed geometry - expand indexed data
+      const numTriangles = this.indices.length / 3;
+      const unindexedPositions = new Float32Array(numTriangles * 9); // 3 verts * 3 components
+      const unindexedNormals = new Float32Array(numTriangles * 9);
+      const unindexedUVs = new Float32Array(numTriangles * 6); // 3 verts * 2 components
+
+      // Expand indexed geometry to unindexed for MikkTSpace
+      for (let i = 0; i < this.indices.length; i++) {
+        const idx = this.indices[i];
+        if (idx === undefined) continue;
+
+        const vertIdx = Math.floor(i / 3) * 9 + (i % 3) * 3;
+        const uvIdx = Math.floor(i / 3) * 6 + (i % 3) * 2;
+
+        // Copy position
+        unindexedPositions[vertIdx] = this.vertices[idx * 3] ?? 0;
+        unindexedPositions[vertIdx + 1] = this.vertices[idx * 3 + 1] ?? 0;
+        unindexedPositions[vertIdx + 2] = this.vertices[idx * 3 + 2] ?? 0;
+
+        // Copy normal
+        unindexedNormals[vertIdx] = this.normals[idx * 3] ?? 0;
+        unindexedNormals[vertIdx + 1] = this.normals[idx * 3 + 1] ?? 0;
+        unindexedNormals[vertIdx + 2] = this.normals[idx * 3 + 2] ?? 0;
+
+        // Copy UV
+        unindexedUVs[uvIdx] = this.uvs[idx * 2] ?? 0;
+        unindexedUVs[uvIdx + 1] = this.uvs[idx * 2 + 1] ?? 0;
+      }
+
+      // Generate tangents using MikkTSpace algorithm
+      const unindexedTangents = generateTangents(
+        unindexedPositions,
+        unindexedNormals,
+        unindexedUVs,
+      );
+
+      if (!unindexedTangents || unindexedTangents.length !== numTriangles * 12) {
+        console.warn(`MikkTSpace generation failed, falling back to simple tangent generation`);
+        return this.computeSimpleTangents();
+      }
+
+      // Convert back to indexed format by averaging tangents for shared vertices
+      const tangents = new Float32Array(numVertices * 4);
+      const tangentCounts = new Int32Array(numVertices);
+
+      for (let i = 0; i < this.indices.length; i++) {
+        const idx = this.indices[i];
+        if (idx === undefined) continue;
+
+        const unindexedIdx = i * 4;
+        const tangentIdx = idx * 4;
+
+        // Accumulate tangents for this vertex
+        tangents[tangentIdx] = (tangents[tangentIdx] ?? 0) + (unindexedTangents[unindexedIdx] ?? 0);
+        tangents[tangentIdx + 1] =
+          (tangents[tangentIdx + 1] ?? 0) + (unindexedTangents[unindexedIdx + 1] ?? 0);
+        tangents[tangentIdx + 2] =
+          (tangents[tangentIdx + 2] ?? 0) + (unindexedTangents[unindexedIdx + 2] ?? 0);
+        tangents[tangentIdx + 3] = unindexedTangents[unindexedIdx + 3] ?? 1; // w component (handedness)
+        tangentCounts[idx] = (tangentCounts[idx] ?? 0) + 1;
+      }
+
+      // Average accumulated tangents and normalize
+      for (let i = 0; i < numVertices; i++) {
+        const count = tangentCounts[i] ?? 0;
+        if (count > 0) {
+          const idx = i * 4;
+          const tx = (tangents[idx] ?? 0) / count;
+          const ty = (tangents[idx + 1] ?? 0) / count;
+          const tz = (tangents[idx + 2] ?? 0) / count;
+
+          // Normalize XYZ components
+          const len = Math.sqrt(tx * tx + ty * ty + tz * tz);
+
+          if (len > 0) {
+            tangents[idx] = tx / len;
+            tangents[idx + 1] = ty / len;
+            tangents[idx + 2] = tz / len;
+          }
+        }
+      }
+
+      return tangents;
+    } catch (error) {
+      console.error('Error generating MikkTSpace tangents:', error);
+      return this.computeSimpleTangents();
     }
-
-    const edge1 = [
-      (p1[0] ?? 0) - (p0[0] ?? 0),
-      (p1[1] ?? 0) - (p0[1] ?? 0),
-      (p1[2] ?? 0) - (p0[2] ?? 0),
-    ];
-    const edge2 = [
-      (p2[0] ?? 0) - (p0[0] ?? 0),
-      (p2[1] ?? 0) - (p0[1] ?? 0),
-      (p2[2] ?? 0) - (p0[2] ?? 0),
-    ];
-
-    const deltaUV1 = [(uv1[0] ?? 0) - (uv0[0] ?? 0), (uv1[1] ?? 0) - (uv0[1] ?? 0)];
-    const deltaUV2 = [(uv2[0] ?? 0) - (uv0[0] ?? 0), (uv2[1] ?? 0) - (uv0[1] ?? 0)];
-
-    const denominator =
-      (deltaUV1[0] ?? 0) * (deltaUV2[1] ?? 0) - (deltaUV2[0] ?? 0) * (deltaUV1[1] ?? 0);
-    const f = denominator !== 0 ? 1.0 / denominator : 1.0;
-
-    const tangent = [
-      f * ((deltaUV2[1] ?? 0) * (edge1[0] ?? 0) - (deltaUV1[1] ?? 0) * (edge2[0] ?? 0)),
-      f * ((deltaUV2[1] ?? 0) * (edge1[1] ?? 0) - (deltaUV1[1] ?? 0) * (edge2[1] ?? 0)),
-      f * ((deltaUV2[1] ?? 0) * (edge1[2] ?? 0) - (deltaUV1[1] ?? 0) * (edge2[2] ?? 0)),
-    ];
-
-    const uDirection =
-      (deltaUV1[0] ?? 0) * (deltaUV2[1] ?? 0) - (deltaUV2[0] ?? 0) * (deltaUV1[1] ?? 0);
-    const w = uDirection >= 0 ? 1 : -1; // 1 o -1 dependiendo de la dirección
-
-    return { tangent, w };
   }
 
-  private computeMeshTangents(): Float32Array {
-    // Create tangent array initialized to zero
-    const tangents = new Float32Array((this.vertices.length * 4) / 3); // 4 components (xyz + w) per vertex
+  /**
+   * Fallback simple tangent generation (not MikkTSpace)
+   * Used only if MikkTSpace generation fails
+   */
+  private computeSimpleTangents(): Float32Array {
+    const tangents = new Float32Array((this.vertices.length * 4) / 3);
 
     // Process each triangle
     for (let i = 0; i < this.indices.length - 2; i += 3) {
@@ -348,46 +410,64 @@ export class Mesh extends GPUResource {
 
       if (i0 === undefined || i1 === undefined || i2 === undefined) continue;
 
-      // Get vertices of the triangle
-      const p0 = [
-        this.vertices[i0 * 3] ?? 0,
-        this.vertices[i0 * 3 + 1] ?? 0,
-        this.vertices[i0 * 3 + 2] ?? 0,
-      ];
-      const p1 = [
-        this.vertices[i1 * 3] ?? 0,
-        this.vertices[i1 * 3 + 1] ?? 0,
-        this.vertices[i1 * 3 + 2] ?? 0,
-      ];
-      const p2 = [
-        this.vertices[i2 * 3] ?? 0,
-        this.vertices[i2 * 3 + 1] ?? 0,
-        this.vertices[i2 * 3 + 2] ?? 0,
-      ];
+      // Get vertices
+      const p0x = this.vertices[i0 * 3] ?? 0;
+      const p0y = this.vertices[i0 * 3 + 1] ?? 0;
+      const p0z = this.vertices[i0 * 3 + 2] ?? 0;
 
-      // Get UVs of the triangle
-      const uv0 = [this.uvs[i0 * 2] ?? 0, this.uvs[i0 * 2 + 1] ?? 0];
-      const uv1 = [this.uvs[i1 * 2] ?? 0, this.uvs[i1 * 2 + 1] ?? 0];
-      const uv2 = [this.uvs[i2 * 2] ?? 0, this.uvs[i2 * 2 + 1] ?? 0];
+      const p1x = this.vertices[i1 * 3] ?? 0;
+      const p1y = this.vertices[i1 * 3 + 1] ?? 0;
+      const p1z = this.vertices[i1 * 3 + 2] ?? 0;
 
-      // Compute tangent for this triangle
-      const tangentData = this.computeTangent(p0, p1, p2, uv0, uv1, uv2);
+      const p2x = this.vertices[i2 * 3] ?? 0;
+      const p2y = this.vertices[i2 * 3 + 1] ?? 0;
+      const p2z = this.vertices[i2 * 3 + 2] ?? 0;
 
-      // Add computed tangent to each vertex of the triangle
+      // Get UVs
+      const uv0x = this.uvs[i0 * 2] ?? 0;
+      const uv0y = this.uvs[i0 * 2 + 1] ?? 0;
+
+      const uv1x = this.uvs[i1 * 2] ?? 0;
+      const uv1y = this.uvs[i1 * 2 + 1] ?? 0;
+
+      const uv2x = this.uvs[i2 * 2] ?? 0;
+      const uv2y = this.uvs[i2 * 2 + 1] ?? 0;
+
+      // Calculate edges
+      const edge1x = p1x - p0x;
+      const edge1y = p1y - p0y;
+      const edge1z = p1z - p0z;
+
+      const edge2x = p2x - p0x;
+      const edge2y = p2y - p0y;
+      const edge2z = p2z - p0z;
+
+      const deltaUV1x = uv1x - uv0x;
+      const deltaUV1y = uv1y - uv0y;
+
+      const deltaUV2x = uv2x - uv0x;
+      const deltaUV2y = uv2y - uv0y;
+
+      const denominator = deltaUV1x * deltaUV2y - deltaUV2x * deltaUV1y;
+      const f = denominator !== 0 ? 1.0 / denominator : 1.0;
+
+      const tangentX = f * (deltaUV2y * edge1x - deltaUV1y * edge2x);
+      const tangentY = f * (deltaUV2y * edge1y - deltaUV1y * edge2y);
+      const tangentZ = f * (deltaUV2y * edge1z - deltaUV1y * edge2z);
+
+      const w = denominator >= 0 ? 1 : -1;
+
+      // Accumulate tangents for each vertex of triangle
       for (const idx of [i0, i1, i2]) {
         const baseIdx = idx * 4;
-        const currentTangentX = tangents[baseIdx] ?? 0;
-        const currentTangentY = tangents[baseIdx + 1] ?? 0;
-        const currentTangentZ = tangents[baseIdx + 2] ?? 0;
-
-        tangents[baseIdx] = currentTangentX + (tangentData.tangent[0] ?? 0);
-        tangents[baseIdx + 1] = currentTangentY + (tangentData.tangent[1] ?? 0);
-        tangents[baseIdx + 2] = currentTangentZ + (tangentData.tangent[2] ?? 0);
-        tangents[baseIdx + 3] = tangentData.w; // w component (handedness)
+        tangents[baseIdx] = (tangents[baseIdx] ?? 0) + tangentX;
+        tangents[baseIdx + 1] = (tangents[baseIdx + 1] ?? 0) + tangentY;
+        tangents[baseIdx + 2] = (tangents[baseIdx + 2] ?? 0) + tangentZ;
+        tangents[baseIdx + 3] = w;
       }
     }
 
-    // Normalize the tangents
+    // Normalize
     for (let i = 0; i < tangents.length - 3; i += 4) {
       const x = tangents[i] ?? 0;
       const y = tangents[i + 1] ?? 0;

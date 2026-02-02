@@ -1,0 +1,360 @@
+[
+  {
+    "prefab": "main_camera.prefab"
+  },
+  {
+    "prefab": "player_character.prefab"
+  },
+  {
+    "prefab": "debug_camera.prefab"
+  },
+  {
+    "prefab": "directional_light.prefab"
+  },
+  {
+    "prefab": "ground.prefab"
+  },
+  {
+    "prefab": "point_light.prefab"
+  },
+  {
+    "prefab": "impulse_pad_15.prefab",
+    "components": {
+      "transform": {
+        "position": [8, 0, -9],
+        "rotation": [0, 0, 0]
+      }
+    }
+  },
+  {
+    "prefab": "impulse_pad_15.prefab",
+    "components": {
+      "transform": {
+        "position": [-33, 7, 19.5],
+        "rotation": [-90, 0, 0]
+      }
+    }
+  },
+  {
+    "prefab": "impulse_pad_10.prefab",
+    "components": {
+      "transform": {
+        "position": [8, 4.5, -2.5],
+        "rotation": [0, 0, 15]
+      }
+    }
+  },
+  {
+    "prefab": "swing_bar.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 4, 8],
+        "rotation": [0, 90, 0]
+      }
+    }
+  },
+  {
+    "prefab": "swing_bar.prefab",
+    "components": {
+      "transform": {
+        "position": [15, 9, 8],
+        "rotation": [0, 90, 0]
+      }
+    }
+  },
+  {
+    "prefab": "swing_bar.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 7, 8],
+        "rotation": [0, 90, 0]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [0, 2, 16],
+        "rotation": [0, 0, 0],
+        "scale": [20, 4, 5]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Slope",
+      "transform": {
+        "position": [-7.5, 0.98, 9.39],
+        "rotation": [155, 0, 0],
+        "scale": [5, 2, 10]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [0, 8, -5.0],
+        "rotation": [0, 0, 0],
+        "scale": [8, 1, 8]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [8, 2, 9],
+        "rotation": [0, 0, 0],
+        "scale": [4, 4, 9]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [-7, 7, 24],
+        "rotation": [0, 135, 0],
+        "scale": [6, 6, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [8, 7, 24],
+        "rotation": [0, 45, 0],
+        "scale": [6, 6, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [15, 7, 15],
+        "rotation": [0, 45, 0],
+        "scale": [6, 6, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [15, 10, -2],
+        "rotation": [0, 135, 0],
+        "scale": [6, 6, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [-15, 7, 20],
+        "rotation": [0, 0, 0],
+        "scale": [6, 6, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [-24, 7, 12],
+        "rotation": [0, 0, 0],
+        "scale": [6, 6, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall",
+      "transform": {
+        "position": [-33, 7, 20],
+        "rotation": [0, 0, 0],
+        "scale": [6, 6, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  }
+]
