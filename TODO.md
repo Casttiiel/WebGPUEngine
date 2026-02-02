@@ -1,6 +1,6 @@
 ### Engine
 
-1. Organize/Cleanup Includes + Textures + Prefabs/Folders + Techniques/Folders + Shaders/Folders
+1. Organize/Cleanup Prefabs/Folders + Techniques/Folders + Shaders/Folders
 2. Shadows
 3. Multiple Light probes has good shadows?
 4. AO

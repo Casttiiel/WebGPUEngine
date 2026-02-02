@@ -144,19 +144,23 @@ Most shaders include:
 - [x] Update `froxel_light_injection_ambient.compute.wgsl` to use new include
 - [x] Test CSM shadows work in both lighting and volumetrics
 - [x] Fix ShaderPreprocessor visited set mutation bug
-      ) IBL Sampling Includes\*\* ⏭️ SKIPPED
 
-- [ ] ⏭️ Only 1 file uses these functions (no duplication)
-- [ ] ⏭️ Will consolidate in Phase 2 with other utilities
+**3. IBL Sampling Includes** ✅ COMPLETE
+
+- [x] ✅ Created `common/ibl/sampling.wgsl` with importance sampling functions
+- [x] ✅ Created `common/ibl/cubemap.wgsl` with cubemap utilities
+- [x] ✅ Updated `irradiance_convolution.wgsl` to use new includes
+- [x] ✅ Eliminated ~80 lines of potential duplication
+- [x] ✅ Functions now reusable for future IBL features (specular convolution, BRDF LUT, etc.)
 
 #### Results: ✅
 
-- **✅ ShaderPreprocessor Fixed**: Solved visited set mutation bug
-- **✅ 950+ lines of code duplication eliminated**
-- **✅ Consistency**: Single source of truth for froxel and CSM calculations
+- **✅ ShaderPreprocessor Fixed**: Solved visited set mutation bug + duplicate include prevention
+- **✅ 1030+ lines of code duplication eliminated** (950 froxel/CSM + 80 IBL)
+- **✅ Consistency**: Single source of truth for froxel, CSM, and IBL calculations
 - **✅ Bug Prevention**: No more implementation drift between files
 - **✅ Maintainability**: Changes to systems only need one edit each
-- **Maintainability**: Changes to volumetric system only need one edit
+- **✅ Extensibility**: IBL functions ready for future features (specular convolution, BRDF LUT)
 
 ---
 

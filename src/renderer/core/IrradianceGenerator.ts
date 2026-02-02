@@ -2,6 +2,7 @@ import { GPUUtils } from './utils/GPUUtils';
 import { Cubemap } from '../resources/Cubemap';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
+import { ShaderPreprocessor } from './processing/ShaderPreprocessor';
 
 /**
  * IrradianceGenerator
@@ -34,10 +35,8 @@ export class IrradianceGenerator {
       addressModeW: 'clamp-to-edge',
     });
 
-    // Cargar compute shader
-    const shaderCode = await ResourceManager.fetch(
-      `assets/shaders/irradiance_convolution.wgsl`,
-    ).then((r) => r.text());
+    // Cargar compute shader usando ShaderPreprocessor para procesar includes
+    const shaderCode = await ShaderPreprocessor.preprocessShader('irradiance_convolution.wgsl');
 
     this.computeShader = this.device.createShaderModule({
       label: 'irradiance_convolution_shader',
