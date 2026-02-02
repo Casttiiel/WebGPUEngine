@@ -1,5 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
+#include "common/volumetric/structs"
+#include "common/volumetric/froxel"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
@@ -11,19 +13,6 @@
 @group(2) @binding(2) var froxelLightOutput: texture_storage_3d<rgba16float, write>; // write
 
 @group(3) @binding(0) var<uniform> light: LightUniforms;
-
-struct FroxelUniforms {
-  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
-  nearPlane: f32,
-  farPlane: f32
-}
-
-struct VolumetricUniforms {
-  fogDensity: f32,
-  scatteringCoeff: f32,
-  absorptionCoeff: f32,
-  stepSize: f32
-}
 
 struct LightUniforms {
   color: vec3<f32>,
@@ -39,43 +28,6 @@ struct LightUniforms {
   padding: vec3<f32>,
   extraPadding: f32,
 };
-
-
-fn froxelZToViewZLinear(zSlice: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-    let z01 = (f32(zSlice) + 0.5) / f32(slices);
-    return nearZ + z01 * (farZ - nearZ); // distancia positiva
-}
-
-fn froxelZToViewZLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z01 = (f32(z) + 0.5) / f32(slices);
-  return nearZ * pow(farZ / max(nearZ, 1e-6), z01);
-}
-
-fn computeViewRayFromUV(uv: vec2<f32>) -> vec3<f32> {
-    // ⚠️ aquí NO flip Y (solo si tu engine lo necesita)
-    let ndc = vec4<f32>(uv * 2.0 - 1.0, 1.0, 1.0);
-    let rayH = camera.invProjection * ndc;
-    return normalize(rayH.xyz / max(rayH.w, 1e-8));
-}
-
-// ✅ Froxel coord -> View space position
-fn froxelToViewSpace(froxel: vec3<u32>) -> vec3<f32> {
-    let dimsU = vec3<u32>(froxelParams.dimensions.xyz);
-
-    // uv centro del tile
-    var uv = (vec2<f32>(froxel.xy) + vec2<f32>(0.5)) / froxelParams.dimensions.xy;
-    uv.y = 1 - uv.y;
-    // view ray
-    let rayVS = computeViewRayFromUV(uv);
-
-    // viewZ (distancia positiva)
-    let viewDist = froxelZToViewZLog(froxel.z, dimsU.z, froxelParams.nearPlane, froxelParams.farPlane);
-
-    let t = -viewDist / min(rayVS.z, -1e-6);
-
-    return rayVS * t;
-}
-
 
 fn worldToView(pWS: vec3<f32>) -> vec3<f32> {
   let v = camera.viewMatrix * vec4<f32>(pWS, 1.0);
@@ -94,7 +46,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
   let existing = textureLoad(froxelLightTexture, coord, 0).rgb;
 
-  let froxelVS = froxelToViewSpace(gid);
+  let froxelVS = froxelToViewSpace(
+    gid,
+    froxelParams.dimensions.xyz,
+    froxelParams.nearPlane,
+    froxelParams.farPlane,
+    camera.invProjection
+  );
   let lightVS  = worldToView(light.position);
 
   let dist = length(lightVS - froxelVS);

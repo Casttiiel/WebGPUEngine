@@ -2,6 +2,7 @@ import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { ComputePipelineConfig, PipelineFactory } from '../factories/PipelineFactory';
 import { GPUUtils } from '../utils/GPUUtils';
+import { ShaderPreprocessor } from './ShaderPreprocessor';
 
 export class MipmapGenerator {
   private static instance: MipmapGenerator | null = null;
@@ -33,9 +34,8 @@ export class MipmapGenerator {
   async initialize(): Promise<void> {
     this.device = GPUUtils.getDevice();
 
-    // Load the base shader template
-    const shaderResponse = await ResourceManager.fetch(`assets/shaders/generate_mipmap.wgsl`);
-    this.baseShaderCode = await shaderResponse.text();
+    // Load the base shader template using ShaderPreprocessor cache
+    this.baseShaderCode = await ShaderPreprocessor.preprocessShader('generate_mipmap.wgsl');
 
     this.isInitialized = true;
   }

@@ -1,0 +1,66 @@
+// Coordinate transformation utilities
+// Level 1: Depends on core/constants, core/uniforms
+
+#include "common/core/constants"
+#include "common/math/utils"
+
+// Reconstruct world position from UV, depth, and camera
+fn getWorldCoords(uv: vec2<f32>, zlinear: f32, camera: CameraUniforms) -> vec3<f32> {
+    // Convert UV coordinates (0-1) to NDC coordinates (-1 to 1)
+    let coords = vec2<f32>(uv.x, 1.0 - uv.y);
+    let ndc_coords = (coords * 2.0) - 1.0;
+    
+    // Get the ray direction by transforming NDC coordinates
+    let near_ndc = vec4<f32>(ndc_coords.x, ndc_coords.y, 1.0, 1.0);
+    let near_world_homogeneous = camera.invViewProjection * near_ndc;
+    let near_world = near_world_homogeneous.xyz / near_world_homogeneous.w;
+
+    // Calculate the ray direction from camera to the point (in WORLD coordinates)
+    let ray_direction = normalize(near_world - camera.cameraPosition);
+    
+    // zlinear was calculated as: dot(worldPos - cameraPos, cameraFront) / zFar
+    // So: distance_along_front = zlinear * zFar
+    // But we need distance_along_ray = distance_along_front / dot(ray_direction, cameraFront)
+    let distance_along_front = zlinear * camera.cameraZFar;
+    let distance_along_ray = distance_along_front / dot(ray_direction, camera.cameraFront);
+    
+    // Calculate final world position
+    return camera.cameraPosition + ray_direction * distance_along_ray;
+}
+
+// Get view space direction from clip space position
+fn get_view_dir(clip_pos: vec3<f32>, camera: CameraUniforms) -> vec3<f32> {
+    // Extract FOV and aspect ratio from projection matrix
+    let fov = atan(1.0 / camera.projectionMatrix[1][1]);
+    let aspect = camera.projectionMatrix[1][1] / camera.projectionMatrix[0][0];
+    
+    // Reconstruct view space direction
+    var view_dir = vec3<f32>(
+        clip_pos.x * tan(fov) * aspect,
+        clip_pos.y * tan(fov),
+        -1.0
+    );
+    
+    return normalize(view_dir);
+}
+
+// Transform view space direction to world space
+fn get_world_dir(view_dir: vec3<f32>, camera: CameraUniforms) -> vec3<f32> {
+    // Inverse rotation = transpose of upper 3x3 view matrix
+    let rotation = transpose(mat3x3<f32>(
+        camera.viewMatrix[0].xyz,
+        camera.viewMatrix[1].xyz,
+        camera.viewMatrix[2].xyz
+    ));
+    
+    return rotation * view_dir;
+}
+
+// Convert 3D direction to equirectangular UV coordinates
+fn direction_to_equirect_uv(dir: vec3<f32>) -> vec2<f32> {
+    let theta = atan2(dir.x, dir.z); // [-PI, PI]
+    let phi = acos(clamp(dir.y, -1.0, 1.0)); // [0, PI]
+    let u = (theta + PI) / TWO_PI; // [0, 1]
+    let v = phi / PI; // [0, 1]
+    return vec2<f32>(u, v);
+}

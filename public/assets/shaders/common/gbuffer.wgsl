@@ -1,3 +1,6 @@
+#include "common/math/coordinates"
+#include "common/encoding/normal"
+
 fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     var g: GBuffer;
     

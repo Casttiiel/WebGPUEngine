@@ -1,6 +1,6 @@
 #include "common/uniforms"
 #include "common/structs"
-#include "common/utils"
+#include "common/math/matrices"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(2) @binding(0) var<storage, read> instanceMatrices: array<mat4x4<f32>>;

@@ -1,15 +1,5 @@
-struct FroxelUniforms {
-  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
-  nearPlane: f32,
-  farPlane: f32
-}
-
-struct VolumetricUniforms {
-  fogDensity: f32,
-  scatteringCoeff: f32,
-  absorptionCoeff: f32,
-  stepSize: f32
-}
+#include "common/volumetric/structs"
+#include "common/volumetric/froxel"
 
 @group(0) @binding(0) var<uniform> froxelParams: FroxelUniforms;
 @group(0) @binding(1) var<uniform> volumetricSettings: VolumetricUniforms;
@@ -19,22 +9,6 @@ struct VolumetricUniforms {
 @group(1) @binding(0) var froxelMediaTexture: texture_3d<f32>;     // R=sigmaS, G=sigmaT
 @group(1) @binding(1) var froxelLightTexture: texture_3d<f32>;     // RGB = injected light
 @group(1) @binding(2) var froxelIntegratedTexture: texture_storage_3d<rgba16float, write>;
-
-fn sliceToDepthLinear(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z01 = (f32(z) + 0.5) / f32(slices);
-  return nearZ + z01 * (farZ - nearZ);
-}
-
-fn sliceToDepthLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z01 = (f32(z) + 0.5) / f32(slices);
-  return nearZ * pow(farZ / max(nearZ, 1e-6), z01);
-}
-
-fn sliceDzLinear(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z0 = sliceToDepthLog(z, slices, nearZ, farZ);
-  let z1 = sliceToDepthLog(min(z + 1u, slices - 1u), slices, nearZ, farZ);
-  return max(z1 - z0, 1e-4);
-}
 
 const MAX_SLICES: u32 = 128u;
 

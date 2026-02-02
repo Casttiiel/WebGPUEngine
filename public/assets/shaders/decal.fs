@@ -1,6 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
-#include "common/utils"
+#include "common/math/matrices"
+#include "common/math/coordinates"
 #include "common/octahedral"
 
 struct DecalFragmentOutput {

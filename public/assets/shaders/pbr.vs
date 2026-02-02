@@ -1,5 +1,4 @@
 #include "common/uniforms"
-#include "common/utils"
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(2) @binding(0) var<uniform> object: ObjectUniforms;

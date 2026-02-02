@@ -1,6 +1,6 @@
 #include "common/uniforms"
 #include "common/structs"
-#include "common/utils"
+#include "common/core/constants"
 #include "common/octahedral"
 #include "common/gbuffer"
 
