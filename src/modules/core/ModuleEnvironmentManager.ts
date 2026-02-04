@@ -198,7 +198,7 @@ export class ModuleEnvironmentManager extends Module {
     mainLight.setIntensity(lightIntensity);
 
     // FASE 4.1 — Ambient ligado al cielo
-    this.ambientLightData.globalFactor = lerp(0.05, 0.4, sunAbove);
+    this.ambientLightData.globalFactor = lerp(0.08, 1.2, sunAbove);
   }
 
   /**
@@ -590,45 +590,47 @@ export class ModuleEnvironmentManager extends Module {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
-    if (this.beginGUIWindow('Environment')) {
-      // Add sliders for the three factors
-      this.addGUISlider(
-        'Global Factor',
-        this.ambientLightData.globalFactor,
-        0.0,
-        5.0,
-        (value: number) => {
-          this.ambientLightData.globalFactor = value;
-        },
-      );
+    // Use beginWindow to create/get the folder
+    if (!gui.beginWindow('Environment', true)) return;
 
-      this.addGUISlider(
-        'Diffuse Factor',
-        this.ambientLightData.diffuseFactor,
-        0.0,
-        5.0,
-        (value: number) => {
-          this.ambientLightData.diffuseFactor = value;
-        },
-      );
+    // Get the folder from GUIManager's internal map
+    const guiManager = gui as any;
+    const folder = guiManager.folders?.get('Environment');
 
-      this.addGUISlider(
-        'Reflection Factor',
-        this.ambientLightData.reflectionFactor,
-        0.0,
-        5.0,
-        (value: number) => {
-          this.ambientLightData.reflectionFactor = value;
-        },
-      );
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
 
-      // Time of Day slider: 0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk
-      this.addGUISlider('Time of Day', this.timeOfDay, 0.0, 1.0, (value: number) => {
-        this.setTimeOfDay(value);
+    // Use raw lil-gui API with .listen() for automatic UI updates
+    folder
+      .add(this.ambientLightData, 'globalFactor', 0.0, 5.0)
+      .name('Global Factor')
+      .listen()
+      .onChange(() => {
+        Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
       });
 
-      this.endGUIWindow();
-    }
+    folder
+      .add(this.ambientLightData, 'diffuseFactor', 0.0, 5.0)
+      .name('Diffuse Factor')
+      .listen()
+      .onChange(() => {
+        Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
+      });
+
+    folder
+      .add(this.ambientLightData, 'reflectionFactor', 0.0, 5.0)
+      .name('Reflection Factor')
+      .listen()
+      .onChange(() => {
+        Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
+      });
+
+    // Time of Day slider with .listen() for automatic updates
+    folder.add(this, 'timeOfDay', 0.0, 1.0).name('Time of Day').listen();
+
+    gui.endWindow();
   }
 
   public renderDebug(): void {}
