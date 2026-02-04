@@ -594,6 +594,9 @@ export class DirectionalLightComponent extends Component {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
+    // Use raw lil-gui API for proper value tracking with .listen()
+    const folder = (gui as any).folders?.get('Directional Light') || gui;
+
     // Color picker
     gui.addColorPicker('Color', this.color, (color: number[]) => {
       this.color[0] = color[0];
@@ -601,47 +604,48 @@ export class DirectionalLightComponent extends Component {
       this.color[2] = color[2];
     });
 
-    // Intensity slider
-    gui.addSlider('Intensity', this.intensity, 0.0, 5.0, (value: number) => {
-      this.intensity = value;
-    });
+    // Intensity slider with .listen() for automatic updates
+    folder.add(this, 'intensity', 0.0, 30.0).name('Intensity').listen();
 
     gui.addSeparator();
 
-    // Light Direction (editable)
-    gui.addSlider('Dir X', this.lightDirection[0], -1.0, 1.0, (value: number) => {
-      this.lightDirection[0] = value;
-      vec3.normalize(this.lightDirection, this.lightDirection); // Normalize after change
-    });
+    // Light Direction with .listen() for automatic updates when atmospheric system changes it
+    folder
+      .add(this.lightDirection, '0', -1.0, 1.0)
+      .name('Dir X')
+      .onChange(() => {
+        vec3.normalize(this.lightDirection, this.lightDirection);
+      })
+      .listen();
 
-    gui.addSlider('Dir Y', this.lightDirection[1], -1.0, 1.0, (value: number) => {
-      this.lightDirection[1] = value;
-      vec3.normalize(this.lightDirection, this.lightDirection); // Normalize after change
-    });
+    folder
+      .add(this.lightDirection, '1', -1.0, 1.0)
+      .name('Dir Y')
+      .onChange(() => {
+        vec3.normalize(this.lightDirection, this.lightDirection);
+      })
+      .listen();
 
-    gui.addSlider('Dir Z', this.lightDirection[2], -1.0, 1.0, (value: number) => {
-      this.lightDirection[2] = value;
-      vec3.normalize(this.lightDirection, this.lightDirection); // Normalize after change
-    });
+    folder
+      .add(this.lightDirection, '2', -1.0, 1.0)
+      .name('Dir Z')
+      .onChange(() => {
+        vec3.normalize(this.lightDirection, this.lightDirection);
+      })
+      .listen();
 
     gui.addSeparator();
 
     // Shadows toggle
-    gui.addCheckbox('Enable Shadows', this.hasShadows, (value: boolean) => {
-      this.hasShadows = value;
-    });
+    folder.add(this, 'hasShadows').name('Enable Shadows').listen();
 
     // Shadow parameters (only shown if shadows enabled)
     if (this.hasShadows) {
-      gui.addSlider('Max Shadow Distance', this.maxShadowDistance, 10.0, 200.0, (value: number) => {
-        this.maxShadowDistance = value;
-      });
+      folder.add(this, 'maxShadowDistance', 10.0, 200.0).name('Max Shadow Distance').listen();
 
       // Cascade lambda (only if using multiple cascades)
       if (this.cascadeCount > 1) {
-        gui.addSlider('Cascade Lambda', this.cascadeLambda, 0.0, 1.0, (value: number) => {
-          this.cascadeLambda = value;
-        });
+        folder.add(this, 'cascadeLambda', 0.0, 1.0).name('Cascade Lambda').listen();
       }
     }
 
@@ -672,5 +676,18 @@ export class DirectionalLightComponent extends Component {
 
   public getHasShadows(): boolean {
     return this.hasShadows;
+  }
+
+  // Setters for atmospheric lighting system
+  public setColor(color: number[]): void {
+    this.color = color;
+  }
+
+  public setIntensity(intensity: number): void {
+    this.intensity = intensity;
+  }
+
+  public setLightDirection(direction: vec3): void {
+    vec3.normalize(this.lightDirection, direction);
   }
 }

@@ -16,6 +16,14 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { IrradianceGenerator } from '../../renderer/core/IrradianceGenerator';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
+
+// Math utilities for atmospheric lighting
+const lerp = (a: number, b: number, alpha: number): number => a + alpha * (b - a);
+const smoothstep = (edge0: number, edge1: number, x: number): number => {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+};
 
 interface EnvironmentBlendState {
   startData: AmbientEnvironmentData;
@@ -29,6 +37,9 @@ export class ModuleEnvironmentManager extends Module {
   private ssrEnvironmentTexture!: Cubemap;
   private skyboxTexture!: HDRTexture;
   private ambientLightData!: AmbientEnvironmentData;
+  private skyboxType: string = 'cubemap';
+  private timeOfDay: number = 0.5; // 0.0 = midnight, 0.5 = noon, 1.0 = midnight (normalized)
+  private sunDir: vec3 = vec3.fromValues(0, 1, 0); // ALWAYS the real sun direction (for sky scattering)
 
   private blendState: EnvironmentBlendState | null = null;
 
@@ -50,6 +61,8 @@ export class ModuleEnvironmentManager extends Module {
       irradianceCubemap: await Cubemap.getAsync(jsonData.ambient.irradianceCubemap),
     };
 
+    this.skyboxType = jsonData.skyboxType || 'cubemap';
+    this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
     this.skyboxTexture = await HDRTexture.getAsync(jsonData.skybox);
     this.ssrEnvironmentTexture = await Cubemap.getAsync(jsonData.ssrEnvironment);
 
@@ -61,6 +74,11 @@ export class ModuleEnvironmentManager extends Module {
   }
 
   public async update(dt: number): Promise<void> {
+    // Update atmospheric lighting if using procedural skybox
+    if (this.skyboxType === 'procedural') {
+      this.updateAtmosphericLighting();
+    }
+
     if (this.blendState) {
       this.blendState.blendedWeight = Math.min(
         this.blendState.blendedWeight + dt / this.blendState.blendTime,
@@ -90,7 +108,7 @@ export class ModuleEnvironmentManager extends Module {
     if (Engine.getInput().isKeyJustPressed(KeyCode.F8)) {
       // ⏸️ Pausar el render loop principal para facilitar debugging
       const moduleRender = Engine.getRender();
-      (moduleRender as any).pauseRendering = true;
+      moduleRender.pauseRendering = true;
 
       for (const comp of Engine.getEntities()
         .getObjectManagerByName('reflection_probe')
@@ -100,8 +118,87 @@ export class ModuleEnvironmentManager extends Module {
       }
 
       // ▶️ Reanudar el render loop principal
-      (moduleRender as any).pauseRendering = false;
+      moduleRender.pauseRendering = false;
     }
+  }
+
+  /**
+   * Updates atmospheric lighting parameters based on time of day
+   * Only called when skyboxType is 'procedural'
+   *
+   * FASE 2 — Una sola luz con rol sol/luna correcto
+   */
+  private updateAtmosphericLighting(): void {
+    // Get directional light component (assumes there's at least one)
+    const directionalLights = Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList();
+
+    if (!directionalLights || directionalLights.length === 0) {
+      return;
+    }
+
+    // Get first directional light (main light with sun/moon role)
+    const mainLight = directionalLights[0] as DirectionalLightComponent;
+
+    // FASE 1.1 — Dirección del sol (SIEMPRE calculada, para el sky)
+    // Ángulo solar con offset para mapeo astronómico correcto:
+    // -π/2  = medianoche (debajo)
+    //  0    = amanecer (horizonte este)
+    // +π/2  = mediodía (cenit)
+    //  π    = atardecer (horizonte oeste)
+    // 3π/2  = medianoche (debajo)
+    const sunAngle = this.timeOfDay * 2.0 * Math.PI - Math.PI * 0.5;
+    this.sunDir = vec3.fromValues(Math.cos(sunAngle), Math.sin(sunAngle), 0.0);
+    vec3.normalize(this.sunDir, this.sunDir);
+
+    // FASE 1.2 — Dirección de la luna (opuesta al sol)
+    const moonDir = vec3.create();
+    vec3.scale(moonDir, this.sunDir, -1.0);
+
+    // FASE 1.3 — Factores día/noche
+    const sunHeight = this.sunDir[1]!; // Now correctly: positive = above, negative = below
+    const sunAbove = Math.max(0.0, sunHeight);
+
+    // FASE 2.1 — Valores del sol (día)
+    const sunMaxIntensity = 10.0; // Intensidad HDR
+    const t = Math.pow(sunAbove, 0.5); // Factor de altura suavizado
+    const sunColor: vec3 = vec3.fromValues(
+      lerp(1.0, 1.0, t), // R: siempre 1.0
+      lerp(0.5, 1.0, t), // G: 0.5 (naranja) → 1.0 (blanco)
+      lerp(0.3, 0.98, t), // B: 0.3 (naranja) → 0.98 (blanco-azul)
+    );
+    const sunIntensity = sunAbove * sunMaxIntensity;
+
+    // FASE 2.2 — Valores de la luna (noche)
+    const moonMaxIntensity = 0.2; // Mucho más débil
+    const moonColor: vec3 = vec3.fromValues(0.6, 0.7, 1.0); // Azul frío lunar
+
+    // FASE 2.6 — Crossfade suave en el horizonte (sin hard switch)
+    const k = smoothstep(-0.05, 0.05, sunHeight);
+
+    // Interpolar dirección, color e intensidad
+    const celestialDir = vec3.create();
+    vec3.lerp(celestialDir, moonDir, this.sunDir, k);
+    vec3.normalize(celestialDir, celestialDir);
+
+    // CRITICAL: Negar la dirección para que apunte HACIA las superficies (no hacia el cielo)
+    // celestialDir apunta HACIA el sol/luna, lightDir debe apuntar DESDE el sol/luna HACIA el suelo
+    const lightDir = vec3.create();
+    vec3.negate(lightDir, celestialDir);
+
+    const lightColor = vec3.create();
+    vec3.lerp(lightColor, moonColor, sunColor, k);
+
+    const lightIntensity = lerp(moonMaxIntensity, sunIntensity, k);
+
+    // Aplicar a la luz principal
+    mainLight.setLightDirection(lightDir);
+    mainLight.setColor([lightColor[0], lightColor[1], lightColor[2]]);
+    mainLight.setIntensity(lightIntensity);
+
+    // FASE 4.1 — Ambient ligado al cielo
+    this.ambientLightData.globalFactor = lerp(0.05, 0.4, sunAbove);
   }
 
   /**
@@ -176,7 +273,7 @@ export class ModuleEnvironmentManager extends Module {
       // ✅ CRÍTICO: Configurar la cámara del probe como cámara principal temporal
       // Esto hace que AmbientLight, DirectionalLight y otras luces usen esta cámara
       // en lugar de la cámara principal de la escena
-      const moduleRender = Engine.getRender() as any;
+      const moduleRender = Engine.getRender();
       moduleRender.setTemporaryMainCamera(camera);
 
       // ✅ Configurar RenderManager con la cámara del probe DESPUÉS de beginFrame
@@ -218,7 +315,7 @@ export class ModuleEnvironmentManager extends Module {
     }
 
     // ✅ IMPORTANTE: Restaurar la cámara principal original
-    const moduleRender = Engine.getRender() as any;
+    const moduleRender = Engine.getRender();
     moduleRender.restoreMainCamera();
 
     // Limpiar renderer temporal
@@ -525,6 +622,11 @@ export class ModuleEnvironmentManager extends Module {
         },
       );
 
+      // Time of Day slider: 0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk
+      this.addGUISlider('Time of Day', this.timeOfDay, 0.0, 1.0, (value: number) => {
+        this.setTimeOfDay(value);
+      });
+
       this.endGUIWindow();
     }
   }
@@ -543,5 +645,31 @@ export class ModuleEnvironmentManager extends Module {
 
   public getSSREnvironmentTexture(): Cubemap {
     return this.ssrEnvironmentTexture;
+  }
+
+  public getSkyboxType(): string {
+    return this.skyboxType;
+  }
+
+  public setSkyboxType(type: string): void {
+    this.skyboxType = type;
+  }
+
+  public getTimeOfDay(): number {
+    return this.timeOfDay;
+  }
+
+  public setTimeOfDay(time: number): void {
+    // Clamp between 0 and 1 (inclusive)
+    // Note: 0 and 1 represent the same time (midnight), but we allow both for slider convenience
+    this.timeOfDay = Math.max(0.0, Math.min(1.0, time));
+  }
+
+  /**
+   * Get the real sun direction (ALWAYS for sky scattering)
+   * Even at night, the sky needs the real sun position for correct twilight/scattering
+   */
+  public getSunDirection(): vec3 {
+    return this.sunDir;
   }
 }
