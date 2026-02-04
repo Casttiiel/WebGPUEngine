@@ -259,7 +259,7 @@ export class ModuleManager {
   }
 
   public renderInMenu(): void {
-    // Renderizar todos los módulos activos
+    // Renderizar todos los módulos activos (Tweakpane + ImGui)
     for (const module of this.allModules) {
       if (!module.isActive()) continue;
       module.renderInMenu();

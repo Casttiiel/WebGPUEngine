@@ -249,29 +249,7 @@ export class ModuleInput extends Module {
     // No visual debug needed
   }
 
-  public override renderInMenu(): void {
-    // Llamado cada frame para mantener los valores actualizados
-
-    const self = this;
-
-    // Pointer Lock control
-    const pointerLockWrapper = {
-      get enabled() {
-        return self.pointerLockEnabled;
-      },
-      set enabled(value: boolean) {
-        self.pointerLockEnabled = value;
-        if (!value && self.pointerLockActive) {
-          document.exitPointerLock();
-        }
-      },
-    };
-    this.addDebugControl(
-      pointerLockWrapper,
-      'enabled',
-      'Pointer Lock Enabled (click canvas to activate)',
-    );
-  }
+  public override renderInMenu(): void {}
 
   // Utility methods for other modules
   public isMouseButtonPressed(button: MouseButton): boolean {

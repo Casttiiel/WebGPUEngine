@@ -84,7 +84,7 @@ export class ModulePhysics extends Module {
   }
 
   public override renderInMenu(): void {
-    // TODO: Agregar controles de debug UI (gravity, timestep, etc.)
+    // No GUI implementation for this module
   }
 
   /**

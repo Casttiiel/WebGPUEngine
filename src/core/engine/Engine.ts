@@ -11,15 +11,14 @@ import { ModulePhysics } from '../../modules/core/ModulePhysics';
 import { ModuleRender } from '../../modules/core/ModuleRender';
 import { ModuleSound } from '../../modules/core/ModuleSound';
 import { Render } from '../../renderer/core/pipeline/Render';
-import { DebugUIManager } from '../debug/DebugUIManager';
 import { LoadingStatus } from './LoadingStatus';
 import { QualitySettings } from './QualitySettings';
 import { ResourceManager } from './ResourceManager';
 import { ModuleUI } from '../../modules/core/ModuleUI';
+import { GUIManager } from '../debug/GUIManager';
 
 export class Engine {
   private static initialized: boolean = false;
-  private static debugControlsInitialized: boolean = false;
   private static isRestarting: boolean = false;
 
   private static _modules: ModuleManager;
@@ -32,7 +31,7 @@ export class Engine {
   private static _ui: ModuleUI;
   private static _environment_manager: ModuleEnvironmentManager;
   private static _timeScale: number = 1.0;
-  private static _debugUI: DebugUIManager = DebugUIManager.getInstance();
+  private static _guiManager: GUIManager = GUIManager.getInstance();
 
   private static idCounter = 0;
   private static nextId() {
@@ -48,7 +47,6 @@ export class Engine {
       console.warn('Engine is already started.');
       return;
     }
-    this.debugControlsInitialized = false;
     console.warn('Engine started.');
 
     try {
@@ -63,8 +61,8 @@ export class Engine {
 
       LoadingStatus.updateStatus('WebGPU initialized', 25);
 
-      // Initialize debug UI
-      //this._debugUI.initialize();
+      // Initialize GUI for editor UI
+      await this._guiManager.initialize();
 
       // Module Creation: 25% -> 30%
       LoadingStatus.updateStatus('Creating module manager...', 30);
@@ -102,6 +100,9 @@ export class Engine {
       LoadingStatus.updateStatus('Starting modules...', 40);
       await this._modules.start();
 
+      // Initialize debug UI controls once (Tweakpane + Lil-GUI)
+      this.renderInMenu();
+
       LoadingStatus.updateStatus('Engine ready!', 100);
       this.initialized = true;
     } catch (error) {
@@ -117,7 +118,13 @@ export class Engine {
     }
     this._modules.update(dt * this._timeScale);
 
-    //Engine.renderInMenu();
+    // Update GUI (no-op for lil-gui, kept for compatibility)
+    this._guiManager.update(dt * this._timeScale);
+  }
+
+  public static renderInMenu(): void {
+    // Delegate to modules to render their debug UI (Tweakpane + ImGui)
+    this._modules.renderInMenu();
   }
 
   public static render(): void {
@@ -126,50 +133,9 @@ export class Engine {
     }
     this._render.generateFrame();
     this._modules.renderDebug();
-  }
 
-  public static renderInMenu(): void {
-    // Solo inicializamos los controles una vez para evitar duplicados
-    if (!this.debugControlsInitialized) {
-      // Control global de timeScale
-      // Need to create a wrapper object since Tweakpane can't directly modify static properties
-      const timeScaleWrapper = {
-        get timeScale() {
-          return Engine._timeScale;
-        },
-        set timeScale(value) {
-          Engine._timeScale = value;
-        },
-      };
-
-      this._debugUI.addInteractiveControl('Engine', timeScaleWrapper, 'timeScale', 'Time Scale', {
-        min: 0.1,
-        max: 10.0,
-        step: 0.1,
-      });
-
-      // Quality Settings Buttons
-
-      this._debugUI.addButton('Engine', 'Low Quality', async () => {
-        await this.applyQualityPresetAndRestart('LOW');
-      });
-
-      this._debugUI.addButton('Engine', 'Medium Quality', async () => {
-        await this.applyQualityPresetAndRestart('MEDIUM');
-      });
-
-      this._debugUI.addButton('Engine', 'High Quality', async () => {
-        await this.applyQualityPresetAndRestart('HIGH');
-      });
-
-      this._debugUI.addButton('Engine', 'Ultra Quality', async () => {
-        await this.applyQualityPresetAndRestart('ULTRA');
-      });
-
-      this.debugControlsInitialized = true;
-    }
-
-    this._modules.renderInMenu();
+    // End GUI frame and render UI
+    this._guiManager.endFrame();
   }
 
   public static stop(): void {
@@ -179,12 +145,11 @@ export class Engine {
 
     // Clean up modules
     this._modules.stop();
-    this._debugUI.dispose();
+    this._guiManager.dispose();
     Render.getInstance().destroy();
     ResourceManager.stop();
 
     this.initialized = false;
-    this.debugControlsInitialized = false;
 
     console.warn('Engine stopped.');
   }
@@ -281,8 +246,8 @@ export class Engine {
     return this._ui;
   }
 
-  public static getDebugUI(): DebugUIManager {
-    return this._debugUI;
+  public static getGUI(): GUIManager {
+    return this._guiManager;
   }
 
   public static isEngineRestarting(): boolean {

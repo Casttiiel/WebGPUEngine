@@ -1,28 +1,26 @@
 ### Engine
 
-1. AO
-
+1. [...........]Environment Menu + Directional Light if any (ImGUI) + MainCamera
 2. UI
 3. Start Screen
 4. Game Loading Screen
 5. Remove en main.ts el skip first frame?
 6. Text Renderer
 
-7. GBuffer (+ triplanar + etc problem)
-8. Blender
+7. Blender
    Export With PBR Material
    Control if Needs collider
    Local triplanar mapping
    Export with player spawn?
 
-9. [...........]Environment Menu + Directional Light if any (ImGUI) + MainCamera
-10. Editor Light Probes (Render Debug / Gizmo)
-11. Editor Point Lights (Render Debug / Gizmo / Menu)
-12. Editor Spot Lights (Render Debug / Gizmo / Menu)
-13. Asset Browser + Spawn + Delete
+8. Editor Light Probes (Render Debug / Gizmo)
+9. Editor Point Lights (Render Debug / Gizmo / Menu)
+10. Editor Spot Lights (Render Debug / Gizmo / Menu)
+11. Asset Browser + Spawn + Delete
 
-14. Point Light shadows
-15. Froxel Volumetric Scattering + Height Fog
+12. AO
+13. Point Light shadows
+14. Froxel Volumetric Scattering + Height Fog
     .WGSL File
     Density Noise
     Directional Light Injection
@@ -31,11 +29,11 @@
     Fog Color
     Spot Light Injection
 
-16. Quality settings selection
-17. Error en consola de GLTF retrasa en web?
-18. Improve particles
-19. Multiple Light probes has good shadows?
-20. Weird line on corners is irradiance because of normals
+15. Quality settings selection
+16. Error en consola de GLTF retrasa en web?
+17. Improve particles
+18. Multiple Light probes has good shadows?
+19. Weird line on corners is irradiance because of normals
 
 ### Bugs
 

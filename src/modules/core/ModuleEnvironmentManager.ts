@@ -489,6 +489,46 @@ export class ModuleEnvironmentManager extends Module {
     });
   }
 
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (this.beginGUIWindow('Environment')) {
+      // Add sliders for the three factors
+      this.addGUISlider(
+        'Global Factor',
+        this.ambientLightData.globalFactor,
+        0.0,
+        5.0,
+        (value: number) => {
+          this.ambientLightData.globalFactor = value;
+        },
+      );
+
+      this.addGUISlider(
+        'Diffuse Factor',
+        this.ambientLightData.diffuseFactor,
+        0.0,
+        5.0,
+        (value: number) => {
+          this.ambientLightData.diffuseFactor = value;
+        },
+      );
+
+      this.addGUISlider(
+        'Reflection Factor',
+        this.ambientLightData.reflectionFactor,
+        0.0,
+        5.0,
+        (value: number) => {
+          this.ambientLightData.reflectionFactor = value;
+        },
+      );
+
+      this.endGUIWindow();
+    }
+  }
+
   public renderDebug(): void {}
 
   public stop(): void {}

@@ -351,85 +351,47 @@ export class ModuleRender extends Module {
   }
 
   public override renderInMenu(): void {
-    // Render Stats - llamados en cada frame para mantener los valores actualizados
-    this.addDebugControl(
-      this.debugValues.drawCallsSolids,
-      'value',
-      this.debugValues.drawCallsSolids.name,
-    );
-    this.addDebugControl(
-      this.debugValues.drawCallsTransparent,
-      'value',
-      this.debugValues.drawCallsTransparent.name,
-    );
-    this.addDebugControl(
-      this.debugValues.drawCallsDistorsions,
-      'value',
-      this.debugValues.drawCallsDistorsions.name,
-    );
-    this.addDebugControl(
-      this.debugValues.drawCallsDecals,
-      'value',
-      this.debugValues.drawCallsDecals.name,
-    );
-    this.addDebugControl(
-      this.debugValues.totalDrawCalls,
-      'value',
-      this.debugValues.totalDrawCalls.name,
-    );
-    this.addDebugControl(this.debugValues.resolution, 'value', this.debugValues.resolution.name);
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
 
-    // Get main camera same way as in generateFrame()
+    // Create main window for render stats
+    if (this.beginGUIWindow('Render Statistics')) {
+      this.addGUIText(`Draw Calls (Solids): ${this.debugValues.drawCallsSolids.value}`);
+      this.addGUIText(`Draw Calls (Transparent): ${this.debugValues.drawCallsTransparent.value}`);
+      this.addGUIText(`Draw Calls (Distortions): ${this.debugValues.drawCallsDistorsions.value}`);
+      this.addGUIText(`Draw Calls (Decals): ${this.debugValues.drawCallsDecals.value}`);
+      this.addGUISeparator();
+      this.addGUIText(`Total Draw Calls: ${this.debugValues.totalDrawCalls.value}`);
+      this.addGUIText(`Resolution: ${this.debugValues.resolution.value}`);
+      this.endGUIWindow();
+    }
+
+    // Get main camera for post-processing components
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    if (mainCamera) {
-      this.renderCameraComponentsInMenu(mainCamera);
-    }
-  }
-
-  private renderCameraComponentsInMenu(mainCamera: Entity): void {
-    const debugUI = Engine.getDebugUI();
-
-    // Create a subfolder for camera components within the Render module
-    const renderFolderName = this.getName(); // "render"
-    const cameraSubfolderName = 'Camera Components';
-
-    debugUI.addSubFolder(renderFolderName, cameraSubfolderName, 'Camera Components', true);
-
-    // Render each component in its own subfolder
-
-    if (mainCamera.hasComponent('smaa')) {
-      const aoComponent = mainCamera.getComponent('smaa') as SMAAComponent;
-      if (aoComponent && typeof aoComponent.renderInMenu === 'function') {
-        aoComponent.renderInMenu();
+    if (mainCamera && this.beginGUIWindow('Post-Processing')) {
+      // Render post-processing component controls
+      if (mainCamera.hasComponent('ambient_occlusion')) {
+        if (this.beginGUIFolder('Ambient Occlusion')) {
+          // AO component would implement its own GUI controls here
+          this.endGUIFolder();
+        }
       }
-    }
 
-    if (mainCamera.hasComponent('ambient_occlusion')) {
-      const aoComponent = mainCamera.getComponent('ambient_occlusion') as AmbientOcclusionComponent;
-      if (aoComponent && typeof aoComponent.renderInMenu === 'function') {
-        aoComponent.renderInMenu();
+      if (mainCamera.hasComponent('bloom')) {
+        if (this.beginGUIFolder('Bloom')) {
+          // Bloom component would implement its own GUI controls here
+          this.endGUIFolder();
+        }
       }
-    }
 
-    if (mainCamera.hasComponent('fxaa')) {
-      const fxaaComponent = mainCamera.getComponent('fxaa') as FXAAComponent;
-      if (fxaaComponent && typeof fxaaComponent.renderInMenu === 'function') {
-        fxaaComponent.renderInMenu();
+      if (mainCamera.hasComponent('tone_mapping')) {
+        if (this.beginGUIFolder('Tone Mapping')) {
+          // Tone mapping component would implement its own GUI controls here
+          this.endGUIFolder();
+        }
       }
-    }
 
-    if (mainCamera.hasComponent('tone_mapping')) {
-      const toneMappingComponent = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
-      if (toneMappingComponent && typeof toneMappingComponent.renderInMenu === 'function') {
-        toneMappingComponent.renderInMenu();
-      }
-    }
-
-    if (mainCamera.hasComponent('bloom')) {
-      const bloomComponent = mainCamera.getComponent('bloom') as BloomComponent;
-      if (bloomComponent && typeof bloomComponent.renderInMenu === 'function') {
-        bloomComponent.renderInMenu();
-      }
+      this.endGUIWindow();
     }
   }
 

@@ -9,6 +9,7 @@ import { FPSCameraControllerComponent } from '../../components/game/FPSCameraCon
 import { CharacterControllerComponent } from '../../components/game/CharacterControllerComponent';
 import { LinearInterpolator } from '../../core/math/Interpolators';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
+import { GUIManager } from '../../core/debug/GUIManager';
 
 export class ModuleBoot extends Module {
   private playerCameraControllerComponent!: FPSCameraControllerComponent;
@@ -123,7 +124,7 @@ export class ModuleBoot extends Module {
       this.lastGamestate = currentGamestate;
 
       if (currentGamestate === 'gs_editor') {
-        // Modo editor: activar DebugCamera, desactivar PlayerController
+        // Modo editor: activar DebugCamera, desactivar PlayerController, mostrar ImGui
         this.debugCameraComponent.setActive(true);
         this.playerCameraControllerComponent.setActive(false);
         this.playerCharacterControllerComponent.setActive(false);
@@ -132,9 +133,16 @@ export class ModuleBoot extends Module {
           1.0,
           new LinearInterpolator(),
         );
+
+        // Mostrar GUI UI
+        GUIManager.getInstance().show();
+
+        // Re-render menu to populate GUI controls
+        Engine.renderInMenu();
+
         console.log('📷 DebugCamera activated (editor mode)');
       } else if (currentGamestate === 'gs_gameplay') {
-        // Modo gameplay: activar PlayerCamera, activar PlayerController
+        // Modo gameplay: activar PlayerCamera, activar PlayerController, ocultar ImGui
         this.debugCameraComponent.setActive(false);
         this.playerCameraControllerComponent.setActive(true);
         this.playerCharacterControllerComponent.setActive(true);
@@ -143,6 +151,10 @@ export class ModuleBoot extends Module {
           1.0,
           new LinearInterpolator(),
         );
+
+        // Ocultar GUI UI
+        GUIManager.getInstance().hide();
+
         console.log('📷 PlayerCamera activated (gameplay mode)');
       }
     }

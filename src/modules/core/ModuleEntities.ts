@@ -87,19 +87,7 @@ export class ModuleEntities extends Module {
   }
 
   public override renderInMenu(): void {
-    /*if (this.debugControlsAdded) return;
-
-    this.addDebugControl(
-      this.debugValues.numberEntities,
-      'value',
-      this.debugValues.numberEntities.name,
-    );
-    for (const entity of this.omEntities) {
-      if (entity.getParent() !== null) continue; // Skip children entities
-      entity.renderInMenu();
-    }
-
-    this.debugControlsAdded = true;*/
+    // No GUI implementation for this module
   }
 
   public renderDebug(): void {
