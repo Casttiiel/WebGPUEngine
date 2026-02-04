@@ -1,28 +1,7 @@
-FASE 3 — Sky scattering shader
-
-🎯 Objetivo: Que el cielo sea físico y dinámico.
-
-3.1 Sky dome / full screen pass
-
-Renderizar sky procedural
-
-Pasar u_SunDir
-
-Implementar scattering base
-
-3.2 Sun disk
-
-Añadir disco solar procedural
-
-Bloom/halo (si hay postprocess)
-
-3.3 Noche básica
-
-Oscurecer cielo con sunHeight
-
-No cielo negro puro
-
-✅ CHECK: Cielo azul, atardecer naranja, noche oscura.
+Sun halo shold be less intense
+Moon is not full filled
+Stars not visible
+Moon needs small halo?
 
 FASE 4 — Conectar cielo con iluminación
 

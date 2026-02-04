@@ -597,12 +597,9 @@ export class DirectionalLightComponent extends Component {
     // Use raw lil-gui API for proper value tracking with .listen()
     const folder = (gui as any).folders?.get('Directional Light') || gui;
 
-    // Color picker
-    gui.addColorPicker('Color', this.color, (color: number[]) => {
-      this.color[0] = color[0];
-      this.color[1] = color[1];
-      this.color[2] = color[2];
-    });
+    // Color picker with .listen() for automatic updates (works like intensity)
+    // The setter/getter automatically sync with this.color
+    folder.addColor(this, 'guiColorHex').name('Color').listen();
 
     // Intensity slider with .listen() for automatic updates
     folder.add(this, 'intensity', 0.0, 30.0).name('Intensity').listen();
@@ -689,5 +686,28 @@ export class DirectionalLightComponent extends Component {
 
   public setLightDirection(direction: vec3): void {
     vec3.normalize(this.lightDirection, direction);
+  }
+
+  // GUI color hex string with getter/setter (for .listen() to work like intensity)
+  public get guiColorHex(): string {
+    const r = Math.round(this.color[0] * 255)
+      .toString(16)
+      .padStart(2, '0');
+    const g = Math.round(this.color[1] * 255)
+      .toString(16)
+      .padStart(2, '0');
+    const b = Math.round(this.color[2] * 255)
+      .toString(16)
+      .padStart(2, '0');
+    return `#${r}${g}${b}`;
+  }
+
+  public set guiColorHex(hex: string) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (result) {
+      this.color[0] = parseInt(result[1], 16) / 255;
+      this.color[1] = parseInt(result[2], 16) / 255;
+      this.color[2] = parseInt(result[3], 16) / 255;
+    }
   }
 }
