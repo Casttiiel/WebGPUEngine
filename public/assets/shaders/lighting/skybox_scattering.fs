@@ -20,7 +20,7 @@ const NIGHT_HORIZON: vec3<f32> = vec3<f32>(0.02, 0.03, 0.06);         // Lighter
 const SUN_COLOR: vec3<f32> = vec3<f32>(1.5, 1.4, 1.2);                // Warm sun (HDR)
 const SUN_INTENSITY: f32 = 50.0;                                       // Brighter sun
 const MOON_COLOR: vec3<f32> = vec3<f32>(0.8, 0.85, 0.9);              // Cool moon color
-const MOON_INTENSITY: f32 = 3.3;                                       // Subtle moon
+const MOON_INTENSITY: f32 = 10.0;                                       // Subtle moon
 
 // Hash function for procedural noise
 fn hash13(p3: vec3<f32>) -> f32 {
@@ -42,7 +42,7 @@ fn generate_stars(dir: vec3<f32>, night_factor: f32) -> vec3<f32> {
     }
     
     // Multiple layers of stars with different densities
-    let star_density = 512.0;
+    let star_density = 400.0;
     let star_pos = dir * star_density;
     
     // Cell-based stars
@@ -60,14 +60,14 @@ fn generate_stars(dir: vec3<f32>, night_factor: f32) -> vec3<f32> {
                 let random = hash13(neighbor_cell);
                 
                 // Star probability (not every cell has a star)
-                if (random > 0.97) {
+                if (random > 0.95) {
                     // Star position within cell
                     let star_center = hash33(neighbor_cell);
                     let to_star = frac_pos - star_center - vec3<f32>(f32(i), f32(j), f32(k));
                     let dist = length(to_star);
                     
                     // Star brightness (varies per star)
-                    let star_size = 0.001 + random * 0.002;
+                    let star_size = 0.002 + random * 0.003;
                     let brightness = smoothstep(star_size * 2.0, star_size * 0.5, dist);
                     
                     if (brightness > star_brightness) {
@@ -84,7 +84,7 @@ fn generate_stars(dir: vec3<f32>, night_factor: f32) -> vec3<f32> {
     }
     
     // Stars visible only at night, fade in/out
-    let star_intensity = star_brightness * night_factor * 20.0;
+    let star_intensity = star_brightness * night_factor * 35.0;
     return star_color * star_intensity;
 }
 
@@ -97,8 +97,8 @@ fn render_moon(view_dir: vec3<f32>, moon_dir: vec3<f32>, night_factor: f32) -> v
     let cos_moon = dot(view_dir, moon_dir);
     
     // Moon disk (larger than sun)
-    let moon_size = 0.9993; // Slightly larger than sun
-    let moon_disk = smoothstep(moon_size, 0.9998, cos_moon);
+    let moon_size = 0.9990; // Slightly larger than sun
+    let moon_disk = smoothstep(moon_size, 0.9999, cos_moon);
     
     if (moon_disk < 0.001) {
         return vec3<f32>(0.0);
@@ -112,32 +112,8 @@ fn render_moon(view_dir: vec3<f32>, moon_dir: vec3<f32>, night_factor: f32) -> v
     let v = dot(local_dir, up) * 500.0;
     let moon_uv = vec2<f32>(u, v);
     
-    // Base moon surface
-    var moon_surface = 1.0;
-    
-    // Craters (multiple scales)
-    let crater_pos1 = moon_uv * 3.0;
-    let crater_noise1 = hash13(vec3<f32>(floor(crater_pos1), 0.0));
-    if (crater_noise1 > 0.7) {
-        let crater_fract = fract(crater_pos1);
-        let crater_dist = length(crater_fract - 0.5);
-        moon_surface *= smoothstep(0.3, 0.5, crater_dist);
-    }
-    
-    let crater_pos2 = moon_uv * 8.0;
-    let crater_noise2 = hash13(vec3<f32>(floor(crater_pos2), 1.0));
-    if (crater_noise2 > 0.8) {
-        let crater_fract = fract(crater_pos2);
-        let crater_dist = length(crater_fract - 0.5);
-        moon_surface *= smoothstep(0.2, 0.4, crater_dist);
-    }
-    
-    // Subtle surface noise
-    let surface_noise = hash13(vec3<f32>(moon_uv * 20.0, 2.0));
-    moon_surface *= 0.85 + surface_noise * 0.15;
-    
-    // Moon color with surface detail
-    let moon_color = MOON_COLOR * moon_surface;
+    // Moon color (smooth, no surface detail)
+    let moon_color = MOON_COLOR;
     
     // Moon glow (subtle)
     let moon_glow = pow(max(0.0, cos_moon), 256.0) * smoothstep(0.997, 0.999, cos_moon);
@@ -203,9 +179,10 @@ fn atmosphere_scattering(view_dir: vec3<f32>, sun_dir: vec3<f32>) -> vec3<f32> {
     let sun_disk = smoothstep(0.9996, 0.9999, cos_theta);
     let sun_contribution = SUN_COLOR * sun_disk * SUN_INTENSITY * max(0.0, sun_height);
     
-    // Sun halo (glow around sun) - tighter and more concentrated
-    let sun_halo = pow(max(0.0, cos_theta), 128.0) * smoothstep(0.995, 0.998, cos_theta);
-    let halo_contribution = SUN_COLOR * sun_halo * 5.0 * max(0.0, sun_height);
+    // Sun halo with smooth progressive falloff (tighter)
+    let sun_halo_inner = pow(max(0.0, cos_theta), 32.0);  // Concentrated near sun
+    let sun_halo_outer = pow(max(0.0, cos_theta), 32.0);   // Smooth transition
+    let halo_contribution = SUN_COLOR * (sun_halo_inner * 0.4 + sun_halo_outer * 0.2) * max(0.0, sun_height);
     
     sky_color += sun_contribution + halo_contribution;
     

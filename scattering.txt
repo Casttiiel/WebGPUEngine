@@ -1,7 +1,5 @@
-Sun halo shold be less intense
-Moon is not full filled
 Stars not visible
-Moon needs small halo?
+
 
 FASE 4 — Conectar cielo con iluminación
 
@@ -22,65 +20,3 @@ Quitar slider plano
 Que el cielo mande
 
 ✅ CHECK: Materiales cambian con el cielo.
-
-FASE 5 — Noche real (estrellas + luna)
-
-🎯 Objetivo: Que la noche no sea fake.
-
-5.1 Estrellas
-
-Procedural o cubemap
-
-Control por nightFactor
-
-5.2 Luna visual
-
-Moon quad/mesh
-
-Alineado con moonDir
-
-Fases (opcional)
-
-5.3 Sky nocturno
-
-Airglow sutil
-
-Light pollution (opcional)
-
-✅ CHECK: Noche creíble.
-
-FASE 6 — Exposure y HDR
-
-🎯 Objetivo: Que no todo se queme.
-
-6.1 Auto exposure simple
-
-Exposure por sunAbove
-
-Día menos exposición
-
-Noche más exposición
-
-6.2 Tonemapping
-
-ACES / Reinhard
-
-Validar highlights del sol
-
-✅ CHECK: Cielo HDR usable.
-
-FASE 7 — Calidad pro (opcional)
-
-🎯 Objetivo: Subir a nivel AAA.
-
-Sky Light cubemap
-
-Irradiance map
-
-Prefiltered env map
-
-Multiple scattering LUTs
-
-Ozone layer
-
-Volumetric fog
