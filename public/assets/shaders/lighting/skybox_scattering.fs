@@ -42,7 +42,7 @@ fn generate_stars(dir: vec3<f32>, night_factor: f32) -> vec3<f32> {
     }
     
     // Multiple layers of stars with different densities
-    let star_density = 400.0;
+    let star_density = 75.0;  // Lower density = bigger stars
     let star_pos = dir * star_density;
     
     // Cell-based stars
@@ -51,6 +51,7 @@ fn generate_stars(dir: vec3<f32>, night_factor: f32) -> vec3<f32> {
     
     var star_brightness = 0.0;
     var star_color = vec3<f32>(1.0);
+    var star_variation = 1.0;  // Store brightness variation per star
     
     // Check 3x3x3 neighborhood for stars
     for (var i = -1; i <= 1; i++) {
@@ -60,18 +61,19 @@ fn generate_stars(dir: vec3<f32>, night_factor: f32) -> vec3<f32> {
                 let random = hash13(neighbor_cell);
                 
                 // Star probability (not every cell has a star)
-                if (random > 0.95) {
+                if (random > 0.94) {
                     // Star position within cell
                     let star_center = hash33(neighbor_cell);
                     let to_star = frac_pos - star_center - vec3<f32>(f32(i), f32(j), f32(k));
                     let dist = length(to_star);
                     
-                    // Star brightness (varies per star)
-                    let star_size = 0.002 + random * 0.003;
-                    let brightness = smoothstep(star_size * 2.0, star_size * 0.5, dist);
+                    // Star brightness (varies per star) - MULTIPLE PIXELS PER STAR
+                    let star_size = 0.01 + random * 0.03;  // Much larger
+                    let brightness = smoothstep(star_size * 2.0, 0.0, dist);
                     
                     if (brightness > star_brightness) {
                         star_brightness = brightness;
+                        star_variation = mix(0.4, 1.0, random);  // Min 40%, Max 100%
                         // Subtle color variation
                         let color_hash = hash33(neighbor_cell * 2.0);
                         star_color = mix(vec3<f32>(1.0), 
@@ -83,8 +85,8 @@ fn generate_stars(dir: vec3<f32>, night_factor: f32) -> vec3<f32> {
         }
     }
     
-    // Stars visible only at night, fade in/out
-    let star_intensity = star_brightness * night_factor * 35.0;
+    // Stars visible only at night, with individual brightness variation
+    let star_intensity = star_brightness * night_factor * 15.0 * star_variation;
     return star_color * star_intensity;
 }
 
