@@ -25,6 +25,7 @@ import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBuff
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
+import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -354,15 +355,41 @@ export class ModuleRender extends Module {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
+    // Directional Lights section - each light gets its own window
+    const directionalLights = Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList();
+
+    if (directionalLights && directionalLights.length > 0) {
+      for (const light of directionalLights) {
+        const dirLight = light as DirectionalLightComponent;
+        const lightName = dirLight.getOwner().getName();
+
+        if (this.beginGUIWindow(lightName)) {
+          dirLight.renderInMenu();
+          this.endGUIWindow();
+        }
+      }
+    }
+
     // Create main window for render stats
     if (this.beginGUIWindow('Render Statistics')) {
-      this.addGUIText(`Draw Calls (Solids): ${this.debugValues.drawCallsSolids.value}`);
-      this.addGUIText(`Draw Calls (Transparent): ${this.debugValues.drawCallsTransparent.value}`);
-      this.addGUIText(`Draw Calls (Distortions): ${this.debugValues.drawCallsDistorsions.value}`);
-      this.addGUIText(`Draw Calls (Decals): ${this.debugValues.drawCallsDecals.value}`);
+      // Add dynamic text displays that auto-update
+      gui.addDynamicText(this.debugValues.drawCallsSolids, 'value', 'Draw Calls (Solids)');
+      gui.addDynamicText(
+        this.debugValues.drawCallsTransparent,
+        'value',
+        'Draw Calls (Transparent)',
+      );
+      gui.addDynamicText(
+        this.debugValues.drawCallsDistorsions,
+        'value',
+        'Draw Calls (Distortions)',
+      );
+      gui.addDynamicText(this.debugValues.drawCallsDecals, 'value', 'Draw Calls (Decals)');
       this.addGUISeparator();
-      this.addGUIText(`Total Draw Calls: ${this.debugValues.totalDrawCalls.value}`);
-      this.addGUIText(`Resolution: ${this.debugValues.resolution.value}`);
+      gui.addDynamicText(this.debugValues.totalDrawCalls, 'value', 'Total Draw Calls');
+      gui.addDynamicText(this.debugValues.resolution, 'value', 'Resolution');
       this.endGUIWindow();
     }
 
@@ -370,27 +397,6 @@ export class ModuleRender extends Module {
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
     if (mainCamera && this.beginGUIWindow('Post-Processing')) {
       // Render post-processing component controls
-      if (mainCamera.hasComponent('ambient_occlusion')) {
-        if (this.beginGUIFolder('Ambient Occlusion')) {
-          // AO component would implement its own GUI controls here
-          this.endGUIFolder();
-        }
-      }
-
-      if (mainCamera.hasComponent('bloom')) {
-        if (this.beginGUIFolder('Bloom')) {
-          // Bloom component would implement its own GUI controls here
-          this.endGUIFolder();
-        }
-      }
-
-      if (mainCamera.hasComponent('tone_mapping')) {
-        if (this.beginGUIFolder('Tone Mapping')) {
-          // Tone mapping component would implement its own GUI controls here
-          this.endGUIFolder();
-        }
-      }
-
       this.endGUIWindow();
     }
   }

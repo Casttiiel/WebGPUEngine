@@ -100,6 +100,7 @@ export class GUIManager {
     let folder = this.folders.get(name);
     if (!folder) {
       folder = this.gui.addFolder(name);
+      folder.close(); // Start collapsed by default
       this.folders.set(name, folder);
     }
 
@@ -125,6 +126,7 @@ export class GUIManager {
 
     // Create subfolder
     const folder = parent.addFolder(label);
+    folder.close(); // Start collapsed by default
     this.folders.set(label, folder);
 
     return true;
@@ -149,6 +151,27 @@ export class GUIManager {
     // Create a read-only display object
     const obj = { value: text };
     parent.add(obj, 'value').name('').disable();
+  }
+
+  /**
+   * Add dynamic text that updates automatically
+   * @param object - Object containing the property to monitor
+   * @param property - Property name to display
+   * @param label - Label for the control
+   */
+  public addDynamicText<T extends object>(object: T, property: keyof T, label: string): void {
+    if (!this.initialized || !this.isVisible) return;
+
+    const parent = this.getCurrentContext();
+    if (!parent) return;
+
+    // Add controller with reference to object property
+    // Lil-GUI will automatically read the property value each frame
+    parent
+      .add(object, property as string)
+      .name(label)
+      .disable()
+      .listen();
   }
 
   /**

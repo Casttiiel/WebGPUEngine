@@ -590,6 +590,68 @@ export class DirectionalLightComponent extends Component {
 
   public override renderDebug(): void {}
 
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    // Color picker
+    gui.addColorPicker('Color', this.color, (color: number[]) => {
+      this.color[0] = color[0];
+      this.color[1] = color[1];
+      this.color[2] = color[2];
+    });
+
+    // Intensity slider
+    gui.addSlider('Intensity', this.intensity, 0.0, 5.0, (value: number) => {
+      this.intensity = value;
+    });
+
+    gui.addSeparator();
+
+    // Light Direction (editable)
+    gui.addSlider('Dir X', this.lightDirection[0], -1.0, 1.0, (value: number) => {
+      this.lightDirection[0] = value;
+      vec3.normalize(this.lightDirection, this.lightDirection); // Normalize after change
+    });
+
+    gui.addSlider('Dir Y', this.lightDirection[1], -1.0, 1.0, (value: number) => {
+      this.lightDirection[1] = value;
+      vec3.normalize(this.lightDirection, this.lightDirection); // Normalize after change
+    });
+
+    gui.addSlider('Dir Z', this.lightDirection[2], -1.0, 1.0, (value: number) => {
+      this.lightDirection[2] = value;
+      vec3.normalize(this.lightDirection, this.lightDirection); // Normalize after change
+    });
+
+    gui.addSeparator();
+
+    // Shadows toggle
+    gui.addCheckbox('Enable Shadows', this.hasShadows, (value: boolean) => {
+      this.hasShadows = value;
+    });
+
+    // Shadow parameters (only shown if shadows enabled)
+    if (this.hasShadows) {
+      gui.addSlider('Max Shadow Distance', this.maxShadowDistance, 10.0, 200.0, (value: number) => {
+        this.maxShadowDistance = value;
+      });
+
+      // Cascade lambda (only if using multiple cascades)
+      if (this.cascadeCount > 1) {
+        gui.addSlider('Cascade Lambda', this.cascadeLambda, 0.0, 1.0, (value: number) => {
+          this.cascadeLambda = value;
+        });
+      }
+    }
+
+    gui.addSeparator();
+
+    // Read-only information
+    const cascadeInfo = { value: this.cascadeCount };
+    gui.addDynamicText(cascadeInfo, 'value', 'Cascade Count');
+  }
+
   // Getters for volumetric lighting integration
   public getUniformBuffer(): GPUBuffer {
     return this.uniformBuffer;

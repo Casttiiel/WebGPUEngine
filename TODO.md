@@ -1,6 +1,6 @@
 ### Engine
 
-1. [...........]Environment Menu + Directional Light if any (ImGUI) + MainCamera
+1. Atmospheric scattering
 2. UI
 3. Start Screen
 4. Game Loading Screen
@@ -13,14 +13,9 @@
    Local triplanar mapping
    Export with player spawn?
 
-8. Editor Light Probes (Render Debug / Gizmo)
-9. Editor Point Lights (Render Debug / Gizmo / Menu)
-10. Editor Spot Lights (Render Debug / Gizmo / Menu)
-11. Asset Browser + Spawn + Delete
-
-12. AO
-13. Point Light shadows
-14. Froxel Volumetric Scattering + Height Fog
+8. AO
+9. Point Light shadows
+10. Froxel Volumetric Scattering + Height Fog
     .WGSL File
     Density Noise
     Directional Light Injection
@@ -28,6 +23,11 @@
     PCF
     Fog Color
     Spot Light Injection
+
+11. Editor Light Probes (Render Debug / Gizmo)
+12. Editor Point Lights (Render Debug / Gizmo / Menu)
+13. Editor Spot Lights (Render Debug / Gizmo / Menu)
+14. Asset Browser + Spawn + Delete
 
 15. Quality settings selection
 16. Error en consola de GLTF retrasa en web?

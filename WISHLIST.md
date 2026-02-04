@@ -17,7 +17,6 @@
    Atmospheric shadowing
    Area Light (LTC (Linearly Transformed Cosines) for shadows)
    Subsurface Scattering (SSS) (If we need to extend the gbuffer, work on decals normals)
-   Atmospheric scattering (Simular skybox y cielo) / Fix Skybox
    Weighted terrain
    Grass
    Physics Grass
