@@ -22,7 +22,7 @@ export class TextWidget extends Widget {
     }
   }
 
-  protected render(): void {
+  protected override render(): void {
     // Text rendering will be handled by UIRenderUtils in FASE 7
     // Bitmap font layout: 8x8 grid (ASCII standard)
     // Each character: uvX = (charCode % 16) / 16, uvY = (charCode / 16) / 16

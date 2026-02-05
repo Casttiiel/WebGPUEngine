@@ -32,7 +32,7 @@ export class FXFade extends WidgetEffect {
     this.interpolator = InterpolatorFactory.get(interpolatorType);
   }
 
-  public start(): void {
+  public override start(): void {
     if (!this.owner) return;
 
     // Store initial alpha from image color
@@ -42,7 +42,7 @@ export class FXFade extends WidgetEffect {
     }
   }
 
-  public stop(): void {
+  public override stop(): void {
     if (!this.owner || !(this.owner instanceof ImageWidget)) return;
 
     // Restore initial alpha
@@ -98,11 +98,11 @@ export class FXFade extends WidgetEffect {
     this.targetAlpha = Math.max(0, Math.min(1, alpha));
   }
 
-  public changeDuration(duration: number): void {
+  public override changeDuration(duration: number): void {
     this.duration = duration;
   }
 
-  public setTime(time: number): void {
+  public override setTime(time: number): void {
     this.time = time;
   }
 

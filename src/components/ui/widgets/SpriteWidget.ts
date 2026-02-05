@@ -41,7 +41,7 @@ export class SpriteWidget extends ImageWidget {
     super(name, alias, params, imageParams);
   }
 
-  public update(dt: number): void {
+  public override update(dt: number): void {
     super.update(dt);
 
     if (!this.isPlaying || this.spriteConfigs.length === 0) return;
@@ -116,7 +116,7 @@ export class SpriteWidget extends ImageWidget {
     this.isPlaying = false;
   }
 
-  public stop(): void {
+  public override stop(): void {
     this.isPlaying = false;
     this.initializeSprite();
   }

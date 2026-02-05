@@ -79,49 +79,49 @@ export abstract class WidgetEffect {
   /**
    * Change UV animation speed (for FXAnimateUV).
    */
-  public changeSpeedUV(x: number, y: number): void {
+  public changeSpeedUV(_x: number, _y: number): void {
     // Override in FXAnimateUV
   }
 
   /**
    * Change effect duration (for time-based effects).
    */
-  public changeDuration(duration: number): void {
+  public changeDuration(_duration: number): void {
     // Override in subclasses if needed
   }
 
   /**
    * Set target scale (for FXScale).
    */
-  public setScale(x: number, y: number): void {
+  public setScale(_x: number, _y: number): void {
     // Override in FXScale
   }
 
   /**
    * Set initial scale (for FXScale).
    */
-  public setInitialScale(x: number, y: number): void {
+  public setInitialScale(_x: number, _y: number): void {
     // Override in FXScale
   }
 
   /**
    * Set effect time (for seeking).
    */
-  public setTime(time: number): void {
+  public setTime(_time: number): void {
     // Override in subclasses if needed
   }
 
   /**
    * Set min UV (for FXAnimateUV).
    */
-  public setMinUV(u: number, v: number): void {
+  public setMinUV(_u: number, _v: number): void {
     // Override in FXAnimateUV
   }
 
   /**
    * Set max UV (for FXAnimateUV).
    */
-  public setMaxUV(u: number, v: number): void {
+  public setMaxUV(_u: number, _v: number): void {
     // Override in FXAnimateUV
   }
 }

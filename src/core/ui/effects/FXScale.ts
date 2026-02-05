@@ -34,7 +34,7 @@ export class FXScale extends WidgetEffect {
     this.interpolator = InterpolatorFactory.get(interpolatorType);
   }
 
-  public start(): void {
+  public override start(): void {
     if (!this.owner) return;
 
     // Store initial scale from owner
@@ -42,7 +42,7 @@ export class FXScale extends WidgetEffect {
     vec2.set(this.initialScale, ownerScale[0], ownerScale[1]);
   }
 
-  public stop(): void {
+  public override stop(): void {
     if (!this.owner) return;
 
     // Restore initial scale
@@ -112,28 +112,28 @@ export class FXScale extends WidgetEffect {
   /**
    * Change target scale.
    */
-  public setScale(x: number, y: number): void {
+  public override setScale(x: number, y: number): void {
     vec2.set(this.scale, x, y);
   }
 
   /**
    * Set initial scale.
    */
-  public setInitialScale(x: number, y: number): void {
+  public override setInitialScale(x: number, y: number): void {
     vec2.set(this.initialScale, x, y);
   }
 
   /**
    * Change duration.
    */
-  public changeDuration(duration: number): void {
+  public override changeDuration(duration: number): void {
     this.duration = duration;
   }
 
   /**
    * Set current time (for seeking).
    */
-  public setTime(time: number): void {
+  public override setTime(time: number): void {
     this.time = time;
   }
 

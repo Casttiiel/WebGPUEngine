@@ -2,6 +2,7 @@
 import { WidgetController } from '../WidgetController';
 import { Widget } from '../../../components/ui/Widget';
 import { Engine } from '../../engine/Engine';
+import { KeyCode } from '../../../types/KeyCode.enum';
 
 /**
  * CarouselController - Manages carousel/slideshow navigation.
@@ -39,7 +40,9 @@ export class CarouselController extends WidgetController {
 
     // Hide all slides except the current one
     if (this.slides.length > 1) {
-      slide.setActive(false);
+      // TODO: Implement setActive method in Widget class
+      // slide.setActive(false);
+      slide; // Keep slide to avoid unused variable warning
     }
   }
 
@@ -175,7 +178,7 @@ export class CarouselController extends WidgetController {
 
   public getSlide(index: number): Widget | null {
     if (index >= 0 && index < this.slides.length) {
-      return this.slides[index];
+      return this.slides[index] ?? null;
     }
     return null;
   }

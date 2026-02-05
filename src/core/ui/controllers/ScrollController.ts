@@ -1,5 +1,4 @@
 // src/core/ui/controllers/ScrollController.ts
-import { vec2 } from 'gl-matrix';
 import { WidgetController } from '../WidgetController';
 import { Widget } from '../../../components/ui/Widget';
 import { Engine } from '../../engine/Engine';

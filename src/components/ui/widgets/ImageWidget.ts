@@ -32,7 +32,7 @@ export class ImageWidget extends Widget {
     }
   }
 
-  protected render(): void {
+  protected override render(): void {
     // Rendering will be handled by UIRenderUtils in FASE 7
     // For now, this is a placeholder
     // UIRenderUtils.renderImage(this.getAbsolute(), this.imageParams);

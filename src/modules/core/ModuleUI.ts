@@ -11,9 +11,10 @@ export class ModuleUI extends Module {
   private activeWidgets: Widget[] = [];
   private activeControllers: WidgetController[] = [];
   private widgetsToLerp: WidgetToLerp[] = [];
-  private sizeUI = 0;
-  private botonPulsadoGameOver = 0;
-  private botonPulsadoPause = 0;
+  // Legacy variables kept for future implementation
+  // private sizeUI = 0;
+  // private botonPulsadoGameOver = 0;
+  // private botonPulsadoPause = 0;
 
   constructor(name: string) {
     super(name);

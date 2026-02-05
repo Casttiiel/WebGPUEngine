@@ -3,6 +3,8 @@ import { vec2 } from 'gl-matrix';
 import { WidgetController } from '../WidgetController';
 import { ButtonWidget } from '../../../components/ui/widgets/ButtonWidget';
 import { Engine } from '../../engine/Engine';
+import { KeyCode } from '../../../types/KeyCode.enum';
+// import { MouseButton } from '../../../types/MouseButton.enum';
 
 /**
  * MenuOption - Represents a menu button with its callback.
@@ -54,7 +56,7 @@ export class MenuController extends WidgetController {
   /**
    * Register option by button name (searches in ModuleUI).
    */
-  public registerOptionByName(buttonName: string, callback: () => void): void {
+  public registerOptionByName(buttonName: string, _callback: () => void): void {
     // This will be implemented once ModuleUI exists
     console.warn(
       `MenuController.registerOptionByName: ModuleUI not yet implemented for "${buttonName}"`,
@@ -75,7 +77,10 @@ export class MenuController extends WidgetController {
 
     // Set current button to selected state
     if (this.currentOption >= 0 && this.currentOption < this.options.length) {
-      this.options[this.currentOption].button.setCurrentState('HOVER');
+      const option = this.options[this.currentOption];
+      if (option) {
+        option.button.setCurrentState('HOVER');
+      }
     }
   }
 
@@ -83,7 +88,7 @@ export class MenuController extends WidgetController {
   // UPDATE
   // ============================================================================
 
-  public update(dt: number): void {
+  public override update(_dt: number): void {
     if (this.options.length === 0) return;
 
     // Get input module
@@ -113,12 +118,12 @@ export class MenuController extends WidgetController {
     // KEYBOARD NAVIGATION
     // ============================================================================
 
-    // Check for navigation keys (using standard key codes)
-    if (input.isKeyPressed('ArrowDown') || input.isKeyPressed('KeyS')) {
+    // Check for navigation keys (using KeyCode enum)
+    if (input.isKeyPressed(KeyCode.ARROW_DOWN) || input.isKeyPressed(KeyCode.S)) {
       this.setCurrentOption(this.currentOption + 1);
     }
 
-    if (input.isKeyPressed('ArrowUp') || input.isKeyPressed('KeyW')) {
+    if (input.isKeyPressed(KeyCode.ARROW_UP) || input.isKeyPressed(KeyCode.W)) {
       this.setCurrentOption(this.currentOption - 1);
     }
 
@@ -126,12 +131,15 @@ export class MenuController extends WidgetController {
     // CONFIRMATION (Keyboard or Mouse)
     // ============================================================================
 
-    const confirmPressed = input.isKeyPressed('Enter') || input.isKeyPressed('Space');
+    const confirmPressed = input.isKeyPressed(KeyCode.ENTER) || input.isKeyPressed(KeyCode.SPACE);
 
     if (confirmPressed) {
       if (this.currentOption >= 0 && this.currentOption < this.options.length) {
         // Trigger callback
-        this.options[this.currentOption].callback();
+        const option = this.options[this.currentOption];
+        if (option) {
+          option.callback();
+        }
       }
     }
 
@@ -155,7 +163,10 @@ export class MenuController extends WidgetController {
    */
   private getButtonAtPosition(mousePos: vec2): number {
     for (let i = 0; i < this.options.length; i++) {
-      const button = this.options[i].button;
+      const option = this.options[i];
+      if (!option) continue;
+      
+      const button = option.button;
 
       // Get button bounds from absolute transform
       if (this.isPointInButton(mousePos, button)) {
@@ -206,7 +217,7 @@ export class MenuController extends WidgetController {
 
   public getOption(index: number): MenuOption | null {
     if (index >= 0 && index < this.options.length) {
-      return this.options[index];
+      return this.options[index] ?? null;
     }
     return null;
   }

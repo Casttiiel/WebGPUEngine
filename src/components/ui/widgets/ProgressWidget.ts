@@ -32,7 +32,7 @@ export class ProgressWidget extends ImageWidget {
     }
   }
 
-  protected render(): void {
+  protected override render(): void {
     // Rendering will be handled by UIRenderUtils in FASE 7
     // Render background if exists
     if (this.backgroundImage) {

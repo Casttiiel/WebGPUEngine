@@ -221,7 +221,7 @@ export class Widget {
     this.computeLocal();
 
     if (this.parent) {
-      mat4.multiply(this.absolute, this.local, this.parent.getAbsolute());
+      mat4.multiply(this.absolute, this.local, this.parent.absolute);
     } else {
       mat4.copy(this.absolute, this.local);
     }

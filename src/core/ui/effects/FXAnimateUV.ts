@@ -48,14 +48,14 @@ export class FXAnimateUV extends WidgetEffect {
   /**
    * Stop UV animation immediately.
    */
-  public stopUiFx(): void {
+  public override stopUiFx(): void {
     vec2.set(this.speed, 0, 0);
   }
 
   /**
    * Change UV scroll speed.
    */
-  public changeSpeedUV(x: number, y: number): void {
+  public override changeSpeedUV(x: number, y: number): void {
     vec2.set(this.speed, x, y);
   }
 
@@ -76,7 +76,7 @@ export class FXAnimateUV extends WidgetEffect {
   /**
    * Set min UV directly on owner.
    */
-  public setMinUV(u: number, v: number): void {
+  public override setMinUV(u: number, v: number): void {
     if (this.owner && this.owner instanceof ImageWidget) {
       (this.owner as ImageWidget).setMinUV(u, v);
     }
@@ -85,7 +85,7 @@ export class FXAnimateUV extends WidgetEffect {
   /**
    * Set max UV directly on owner.
    */
-  public setMaxUV(u: number, v: number): void {
+  public override setMaxUV(u: number, v: number): void {
     if (this.owner && this.owner instanceof ImageWidget) {
       (this.owner as ImageWidget).setMaxUV(u, v);
     }

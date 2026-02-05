@@ -3,8 +3,6 @@ import { Widget } from '../Widget';
 import type {
   WidgetParams,
   ButtonStateConfig,
-  ImageParams,
-  TextParams,
 } from '../../../types/WidgetTypes';
 import { ButtonState } from '../../../types/WidgetTypes';
 
@@ -26,7 +24,7 @@ export class ButtonWidget extends Widget {
     super(name, alias, params);
   }
 
-  protected render(): void {
+  protected override render(): void {
     // Rendering will be handled by UIRenderUtils in FASE 7
     // Renders current state's image and text
     if (this.currentState) {

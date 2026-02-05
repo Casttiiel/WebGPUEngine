@@ -31,12 +31,12 @@ export class FXRotate extends WidgetEffect {
     this.interpolator = InterpolatorFactory.get(interpolatorType);
   }
 
-  public start(): void {
+  public override start(): void {
     if (!this.owner) return;
     this.initialRotation = this.owner.getRotation();
   }
 
-  public stop(): void {
+  public override stop(): void {
     if (!this.owner) return;
     this.owner.setRotation(this.initialRotation);
     this.owner.updateTransform();
@@ -86,11 +86,11 @@ export class FXRotate extends WidgetEffect {
     this.targetRotation = rotation;
   }
 
-  public changeDuration(duration: number): void {
+  public override changeDuration(duration: number): void {
     this.duration = duration;
   }
 
-  public setTime(time: number): void {
+  public override setTime(time: number): void {
     this.time = time;
   }
 
