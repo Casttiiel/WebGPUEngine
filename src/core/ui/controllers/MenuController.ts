@@ -165,7 +165,7 @@ export class MenuController extends WidgetController {
     for (let i = 0; i < this.options.length; i++) {
       const option = this.options[i];
       if (!option) continue;
-      
+
       const button = option.button;
 
       // Get button bounds from absolute transform

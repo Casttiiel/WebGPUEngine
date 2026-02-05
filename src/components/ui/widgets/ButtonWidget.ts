@@ -1,9 +1,6 @@
 // src/components/ui/widgets/ButtonWidget.ts
 import { Widget } from '../Widget';
-import type {
-  WidgetParams,
-  ButtonStateConfig,
-} from '../../../types/WidgetTypes';
+import type { WidgetParams, ButtonStateConfig } from '../../../types/WidgetTypes';
 import { ButtonState } from '../../../types/WidgetTypes';
 
 /**
