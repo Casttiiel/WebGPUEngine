@@ -88,11 +88,20 @@ export class ModuleRender extends Module {
     const renderWidth = Render.width;
     const renderHeight = Render.height;
     const dpr = window.devicePixelRatio || 1;
-    
-    console.log('[ModuleRender] Canvas:', physicalWidth, 'x', physicalHeight, 
-                '| Render target:', renderWidth, 'x', renderHeight, 
-                '| DPR:', dpr);
-    
+
+    console.log(
+      '[ModuleRender] Canvas:',
+      physicalWidth,
+      'x',
+      physicalHeight,
+      '| Render target:',
+      renderWidth,
+      'x',
+      renderHeight,
+      '| DPR:',
+      dpr,
+    );
+
     UIRenderUtils.updateScreenSize(physicalWidth, physicalHeight, dpr);
 
     // Inicializar VelocityBufferManager
@@ -367,11 +376,19 @@ export class ModuleRender extends Module {
     }
 
     const render = Render.getInstance();
-    
+
     // Get texture info
-    console.log('[Render] UI rendering on texture - Render target:', Render.width, 'x', Render.height, 
-                '| Canvas:', render.getCanvas().width, 'x', render.getCanvas().height);
-    
+    console.log(
+      '[Render] UI rendering on texture - Render target:',
+      Render.width,
+      'x',
+      Render.height,
+      '| Canvas:',
+      render.getCanvas().width,
+      'x',
+      render.getCanvas().height,
+    );
+
     const encoder = render.getDevice().createCommandEncoder({
       label: 'ui_overlay_encoder',
     });
@@ -402,12 +419,18 @@ export class ModuleRender extends Module {
       'x',
       canvas.clientHeight,
     );
-    
+
     // Configure viewport and scissor for UI rendering
     renderPass.setViewport(0, 0, physicalWidth, physicalHeight, 0.0, 1.0);
     // Temporarily disable scissor test to see if it's causing clipping
     // renderPass.setScissorRect(0, 0, physicalWidth, physicalHeight);
-    console.log('[Render] UI Viewport set to:', physicalWidth, 'x', physicalHeight, '| Scissor: DISABLED for testing');
+    console.log(
+      '[Render] UI Viewport set to:',
+      physicalWidth,
+      'x',
+      physicalHeight,
+      '| Scissor: DISABLED for testing',
+    );
 
     // Render all active UI widgets
     moduleUI.render(renderPass);
@@ -454,10 +477,18 @@ export class ModuleRender extends Module {
     // Configure viewport and scissor for presentation (use full canvas size)
     const canvasSize = Render.canvasSize;
     const actualCanvas = render.getCanvas();
-    
-    console.log('[Render] PRESENTATION - CanvasSize:', canvasSize.width, 'x', canvasSize.height, 
-                '| Actual Canvas:', actualCanvas.width, 'x', actualCanvas.height);
-    
+
+    console.log(
+      '[Render] PRESENTATION - CanvasSize:',
+      canvasSize.width,
+      'x',
+      canvasSize.height,
+      '| Actual Canvas:',
+      actualCanvas.width,
+      'x',
+      actualCanvas.height,
+    );
+
     GPUUtils.configureViewportAndScissor(pass, canvasSize.width, canvasSize.height);
 
     // Render result to screen

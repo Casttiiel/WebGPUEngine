@@ -231,10 +231,16 @@ export class Widget {
       this.pivot,
       vec3.fromValues(-this.pivotPoint[0], -this.pivotPoint[1], 0),
     );
-    
+
     // Log pivot for debugging
     if (this.anchorType !== undefined) {
-      console.log('[Widget]', this.name, '- Pivot:', this.pivotPoint[0].toFixed(1), this.pivotPoint[1].toFixed(1));
+      console.log(
+        '[Widget]',
+        this.name,
+        '- Pivot:',
+        this.pivotPoint[0].toFixed(1),
+        this.pivotPoint[1].toFixed(1),
+      );
     }
   }
 
@@ -310,21 +316,42 @@ export class Widget {
     if (this.sizeMode === 'relative') {
       // Scale each axis independently (allows deformation)
       const [scaleX, scaleY] = UIRenderUtils.getUIScaleFactors();
-      
+
       // baseScale is in CSS pixels, need to convert to physical first
       const dpr = window.devicePixelRatio || 1;
       finalScale[0] = this.baseScale[0] * dpr * scaleX;
       finalScale[1] = this.baseScale[1] * dpr * scaleY;
       finalScale[2] = this.baseScale[2]; // Z unchanged
-      
-      console.log('[Widget]', this.name, '- BaseScale:', this.baseScale[0], 'x', this.baseScale[1], 
-                  '| DPR:', dpr.toFixed(2), '| ScaleFactors:', scaleX.toFixed(3), scaleY.toFixed(3),
-                  '| FinalScale:', finalScale[0].toFixed(1), 'x', finalScale[1].toFixed(1));
-      
+
+      console.log(
+        '[Widget]',
+        this.name,
+        '- BaseScale:',
+        this.baseScale[0],
+        'x',
+        this.baseScale[1],
+        '| DPR:',
+        dpr.toFixed(2),
+        '| ScaleFactors:',
+        scaleX.toFixed(3),
+        scaleY.toFixed(3),
+        '| FinalScale:',
+        finalScale[0].toFixed(1),
+        'x',
+        finalScale[1].toFixed(1),
+      );
+
       // Calculate actual screen coverage
       const screenHeight = UIRenderUtils.getScreenHeight();
-      const coverage = (finalScale[1] / screenHeight * 100).toFixed(1);
-      console.log('[Widget]', this.name, '- Screen height:', screenHeight, '| Coverage:', coverage + '%');
+      const coverage = ((finalScale[1] / screenHeight) * 100).toFixed(1);
+      console.log(
+        '[Widget]',
+        this.name,
+        '- Screen height:',
+        screenHeight,
+        '| Coverage:',
+        coverage + '%',
+      );
     }
 
     // Scale in X,Y with Z=1 (no Z scaling)
@@ -338,12 +365,19 @@ export class Widget {
     mat4.multiply(this.local, tr, rot); // local = tr * rot
     mat4.multiply(this.local, this.local, sc); // local = (tr * rot) * sc
     mat4.multiply(this.local, this.local, this.pivot); // local = (tr * rot * sc) * pivot
-    
+
     // Log final matrix translation and scale for debugging
     if (this.anchorType !== undefined && this.name === 'background') {
-      console.log('[Widget]', this.name, '- Final matrix - Translation:', 
-                  this.local[12].toFixed(1), this.local[13].toFixed(1), 
-                  '| Scale:', this.local[0].toFixed(1), this.local[5].toFixed(1));
+      console.log(
+        '[Widget]',
+        this.name,
+        '- Final matrix - Translation:',
+        this.local[12].toFixed(1),
+        this.local[13].toFixed(1),
+        '| Scale:',
+        this.local[0].toFixed(1),
+        this.local[5].toFixed(1),
+      );
     }
   }
 

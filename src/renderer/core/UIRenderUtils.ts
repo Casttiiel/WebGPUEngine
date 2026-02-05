@@ -70,7 +70,7 @@ export class UIRenderUtils {
 
     const scaleX = this.screenWidth / referencePhysicalWidth;
     const scaleY = this.screenHeight / referencePhysicalHeight;
-    
+
     return [scaleX, scaleY];
   }
 
@@ -218,19 +218,45 @@ export class UIRenderUtils {
     mat4.multiply(finalTransform, this.orthoProjection, transform);
 
     // Log matrices for debugging
-    if (additive === false) { // Only log for standard rendering to avoid spam
+    if (additive === false) {
+      // Only log for standard rendering to avoid spam
       console.log('[UIRenderUtils] Matrices:');
-      console.log('  - OrthoProjection[0,5,10,15]:', this.orthoProjection[0].toFixed(4), this.orthoProjection[5].toFixed(4), this.orthoProjection[10].toFixed(4), this.orthoProjection[15].toFixed(4));
-      console.log('  - Transform[12,13]:', transform[12].toFixed(1), transform[13].toFixed(1), '| Scale[0,5]:', transform[0].toFixed(1), transform[5].toFixed(1));
-      console.log('  - FinalTransform[12,13]:', finalTransform[12].toFixed(4), finalTransform[13].toFixed(4));
+      console.log(
+        '  - OrthoProjection[0,5,10,15]:',
+        this.orthoProjection[0].toFixed(4),
+        this.orthoProjection[5].toFixed(4),
+        this.orthoProjection[10].toFixed(4),
+        this.orthoProjection[15].toFixed(4),
+      );
+      console.log(
+        '  - Transform[12,13]:',
+        transform[12].toFixed(1),
+        transform[13].toFixed(1),
+        '| Scale[0,5]:',
+        transform[0].toFixed(1),
+        transform[5].toFixed(1),
+      );
+      console.log(
+        '  - FinalTransform[12,13]:',
+        finalTransform[12].toFixed(4),
+        finalTransform[13].toFixed(4),
+      );
     }
 
     // Update uniform buffer with current parameters
     this.updateUniforms({ transform: finalTransform, tint, minUV, maxUV });
 
     // Log UV mapping for debugging
-    if (additive === false) { // Only log for standard rendering to avoid spam
-      console.log('[UIRenderUtils] UV mapping - minUV:', minUV, '| maxUV:', maxUV, '| Texture:', texture.getName());
+    if (additive === false) {
+      // Only log for standard rendering to avoid spam
+      console.log(
+        '[UIRenderUtils] UV mapping - minUV:',
+        minUV,
+        '| maxUV:',
+        maxUV,
+        '| Texture:',
+        texture.getName(),
+      );
     }
 
     // Select technique based on blend mode
