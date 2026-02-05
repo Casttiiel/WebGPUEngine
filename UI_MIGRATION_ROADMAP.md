@@ -381,35 +381,6 @@ export class UIInputManager {
 
 ---
 
-### **FASE 9: Mesh y Recursos para UI** 📦 [1-2 días]
-
-#### 9.1 Mesh Unit Plane para UI
-
-**Objetivo**: Mesh básico para renderizar quads de UI.
-
-**Archivos a crear**:
-
-- `public/assets/meshes/ui/unit_plane_xy_ui.obj` - Quad unitario en XY
-
-**Características**:
-
-- Vértices: `[(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)]`
-- UVs: `[(0,1), (1,1), (1,0), (0,0)]` (invertir Y si es necesario para WebGPU)
-- Índices: `[0,1,2, 0,2,3]`
-
-#### 9.2 Texturas de UI
-
-**Objetivo**: Cargar y gestionar texturas para widgets.
-
-**Tareas**:
-
-- [ ] Crear directorio `public/assets/textures/ui/`
-- [ ] Texturas de ejemplo: botones, fondos, iconos
-- [ ] Bitmap fonts para texto
-- [ ] Integración con sistema de recursos (Texture.get())
-
----
-
 ### **FASE 10: Testing y Ejemplos** 🧪 [2-3 días]
 
 #### 10.1 Escena de Test de UI
