@@ -296,6 +296,11 @@ export class UIParser {
       params.offset = { x: jData.offset[0], y: jData.offset[1] };
     }
 
+    // Parse size mode (default: relative)
+    if (jData.sizeMode && (jData.sizeMode === 'fixed' || jData.sizeMode === 'relative')) {
+      params.sizeMode = jData.sizeMode;
+    }
+
     // Parse size - support both array [1920, 1080] and string "1920 1080" (C++ format)
     if (jData.size) {
       if (Array.isArray(jData.size)) {

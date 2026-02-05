@@ -41,6 +41,9 @@ export interface WidgetParams {
   anchor?: string; // Anchor type: "center", "top-left", "bottom-right", etc.
   offset?: { x: number; y: number }; // Offset from anchor position
 
+  // Size mode: "fixed" = absolute pixels, "relative" = scaled from 1920x1080 reference
+  sizeMode?: 'fixed' | 'relative'; // Default: 'relative'
+
   [key: string]: any; // Allow additional properties
 }
 

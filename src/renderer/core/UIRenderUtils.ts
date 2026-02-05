@@ -23,6 +23,7 @@ export class UIRenderUtils {
   private static additiveTechnique: Technique | null = null;
   private static initialized = false;
   private static orthoProjection: mat4 = mat4.create(); // Orthographic projection matrix
+  private static devicePixelRatio: number = 1; // Track DPR for scale calculations
   private static screenWidth: number = 1920;
   private static screenHeight: number = 1080;
   private static screenSizeChanged: boolean = false; // Flag to track screen resize
@@ -45,11 +46,32 @@ export class UIRenderUtils {
   /**
    * Get UI scale factor based on current screen vs reference resolution.
    * Uses minimum scale to maintain aspect ratio.
+   * Compares physical pixels to reference (1920x1080 CSS) * DPR.
    */
   public static getUIScaleFactor(): number {
-    const scaleX = this.screenWidth / this.REFERENCE_WIDTH;
-    const scaleY = this.screenHeight / this.REFERENCE_HEIGHT;
+    // Calculate scale comparing physical pixels to reference * DPR
+    const referencePhysicalWidth = this.REFERENCE_WIDTH;
+    const referencePhysicalHeight = this.REFERENCE_HEIGHT;
+
+    const scaleX = this.screenWidth / referencePhysicalWidth;
+    const scaleY = this.screenHeight / referencePhysicalHeight;
     return Math.min(scaleX, scaleY);
+  }
+
+  /**
+   * Get separate X and Y scale factors for non-uniform scaling.
+   * Allows images to deform to match screen aspect ratio.
+   * Returns [scaleX, scaleY]
+   */
+  public static getUIScaleFactors(): [number, number] {
+    // Compare physical screen pixels to physical reference (1920x1080 * DPR)
+    const referencePhysicalWidth = this.REFERENCE_WIDTH * this.devicePixelRatio;
+    const referencePhysicalHeight = this.REFERENCE_HEIGHT * this.devicePixelRatio;
+
+    const scaleX = this.screenWidth / referencePhysicalWidth;
+    const scaleY = this.screenHeight / referencePhysicalHeight;
+    
+    return [scaleX, scaleY];
   }
 
   /**
@@ -77,6 +99,10 @@ export class UIRenderUtils {
     }
 
     this.device = GPUUtils.getDevice();
+
+    // Initialize DPR immediately
+    this.devicePixelRatio = window.devicePixelRatio || 1;
+    console.log('[UIRenderUtils] Initialized with DPR:', this.devicePixelRatio);
 
     // Create uniform buffer for UIUniforms
     // mat4 (64 bytes) + vec4 (16 bytes) + vec2 (8 bytes) + vec2 (8 bytes) = 96 bytes
@@ -110,26 +136,29 @@ export class UIRenderUtils {
     this.updateScreenSize(1920, 1080);
   }
 
+  private static devicePixelRatio: number = 1;
+
   /**
    * Update screen dimensions and recalculate orthographic projection
-   * Direct mapping - no scaling or offset
+   * Uses physical pixel dimensions (canvas.width/height with DPR)
    */
-  public static updateScreenSize(width: number, height: number): void {
+  public static updateScreenSize(physicalWidth: number, physicalHeight: number, dpr: number): void {
     // Detect if screen size actually changed
-    if (this.screenWidth !== width || this.screenHeight !== height) {
+    if (this.screenWidth !== physicalWidth || this.screenHeight !== physicalHeight) {
       this.screenSizeChanged = true;
     }
 
-    this.screenWidth = width;
-    this.screenHeight = height;
+    this.screenWidth = physicalWidth;
+    this.screenHeight = physicalHeight;
+    this.devicePixelRatio = dpr;
 
-    // Create orthographic projection for UI (2D)
-    // Maps screen coordinates directly to clip space
+    // Create orthographic projection for UI (2D) in physical pixel space
+    // Maps physical dimensions to clip space
     mat4.ortho(
       this.orthoProjection,
       0, // left
-      width, // right
-      height, // bottom (flipped for UI)
+      physicalWidth, // right
+      physicalHeight, // bottom (flipped for UI)
       0, // top (flipped for UI)
       -1, // near
       1, // far
@@ -188,8 +217,21 @@ export class UIRenderUtils {
     const finalTransform = mat4.create();
     mat4.multiply(finalTransform, this.orthoProjection, transform);
 
+    // Log matrices for debugging
+    if (additive === false) { // Only log for standard rendering to avoid spam
+      console.log('[UIRenderUtils] Matrices:');
+      console.log('  - OrthoProjection[0,5,10,15]:', this.orthoProjection[0].toFixed(4), this.orthoProjection[5].toFixed(4), this.orthoProjection[10].toFixed(4), this.orthoProjection[15].toFixed(4));
+      console.log('  - Transform[12,13]:', transform[12].toFixed(1), transform[13].toFixed(1), '| Scale[0,5]:', transform[0].toFixed(1), transform[5].toFixed(1));
+      console.log('  - FinalTransform[12,13]:', finalTransform[12].toFixed(4), finalTransform[13].toFixed(4));
+    }
+
     // Update uniform buffer with current parameters
     this.updateUniforms({ transform: finalTransform, tint, minUV, maxUV });
+
+    // Log UV mapping for debugging
+    if (additive === false) { // Only log for standard rendering to avoid spam
+      console.log('[UIRenderUtils] UV mapping - minUV:', minUV, '| maxUV:', maxUV, '| Texture:', texture.getName());
+    }
 
     // Select technique based on blend mode
     const technique = additive ? this.additiveTechnique : this.standardTechnique;

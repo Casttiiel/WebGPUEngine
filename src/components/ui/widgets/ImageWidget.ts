@@ -73,7 +73,7 @@ export class ImageWidget extends Widget {
     UIRenderUtils.renderBitmap(
       renderPass,
       this.cachedTexture,
-      this.getAbsolute(), // Transform matrix
+      this.getLocal(), // Use local transform only (no parent hierarchy)
       tint,
       minUV,
       maxUV,

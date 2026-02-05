@@ -5,6 +5,7 @@ import { Engine } from '../../core/engine/Engine';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { UIParser } from '../../core/ui/UIParser';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
+import { Render } from '../../renderer/core/pipeline/Render';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
 export class ModuleUI extends Module {
@@ -93,6 +94,13 @@ export class ModuleUI extends Module {
   }
 
   public update(dt: number): void {
+    // Update screen dimensions FIRST (before widgets check for size changes)
+    const canvas = Render.getInstance().getCanvas();
+    const physicalWidth = canvas.width;
+    const physicalHeight = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    UIRenderUtils.updateScreenSize(physicalWidth, physicalHeight, dpr);
+
     // Update input system (must be done before controllers/widgets)
     this.updateInput();
 
@@ -101,13 +109,10 @@ export class ModuleUI extends Module {
       controller.update(dt);
     }
 
-    // Update widgets
+    // Update widgets (they can now detect screen size changes)
     for (const widget of this.activeWidgets) {
       widget.update(dt);
     }
-
-    // Reset screen size change flag after all widgets updated
-    UIRenderUtils.resetScreenSizeChanged();
 
     // Update lerp animations
     this.updateLerps(dt);
@@ -168,20 +173,34 @@ export class ModuleUI extends Module {
   }
 
   public render(renderPass: GPURenderPassEncoder): void {
-    // Get actual canvas dimensions
-    const canvas = document.querySelector('canvas');
-    if (!canvas) return;
+    // Get current dimensions for logging
+    const canvas = Render.getInstance().getCanvas();
+    const physicalWidth = canvas.width;
+    const physicalHeight = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
 
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    console.log(
+      '[UI] Physical:',
+      physicalWidth,
+      'x',
+      physicalHeight,
+      '| DPR:',
+      dpr.toFixed(2),
+      '| CSS:',
+      canvas.clientWidth,
+      'x',
+      canvas.clientHeight,
+    );
 
-    // Update UI rendering system with actual screen size (no scaling)
-    UIRenderUtils.updateScreenSize(width, height);
+    console.log('[UI] Rendering', this.activeWidgets.length, 'active widgets');
 
     // Render all active widgets
     for (const widget of this.activeWidgets) {
       widget.doRender(renderPass);
     }
+
+    // Reset screen size change flag after rendering
+    UIRenderUtils.resetScreenSizeChanged();
   }
 
   public override renderInMenu(): void {

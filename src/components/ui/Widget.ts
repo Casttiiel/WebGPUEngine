@@ -32,6 +32,10 @@ export class Widget {
   private anchorType?: AnchorType; // Optional anchor point (e.g., "top-left")
   private anchorOffset: vec2 = vec2.create(); // Offset from anchor position
 
+  // Size mode: 'fixed' (absolute pixels) or 'relative' (scaled from 1920x1080)
+  private sizeMode: 'fixed' | 'relative' = 'relative'; // Default: relative
+  private baseScale: vec3 = vec3.fromValues(1, 1, 1); // Original scale before UI scaling
+
   // Input event callbacks (optional)
   public onMouseEnter?: () => void;
   public onMouseLeave?: () => void;
@@ -51,9 +55,15 @@ export class Widget {
     }
     if (params.scale) {
       this.scale = vec3.fromValues(params.scale.x, params.scale.y, 1);
+      this.baseScale = vec3.clone(this.scale); // Store original scale
     }
     if (params.rotation !== undefined) {
       this.rotation = params.rotation;
+    }
+
+    // Initialize size mode (default: relative)
+    if (params.sizeMode) {
+      this.sizeMode = params.sizeMode;
     }
 
     // Initialize anchor system (Phase 2)
@@ -70,6 +80,21 @@ export class Widget {
   // ============================================================================
 
   public start(): void {
+    // Force initial transform calculation for anchored widgets
+    if (this.anchorType !== undefined) {
+      console.log(
+        '[Widget] Starting anchored widget:',
+        this.name,
+        '- anchorType:',
+        this.anchorType,
+        '- offset:',
+        this.anchorOffset,
+      );
+      this.updateTransform();
+    } else {
+      console.log('[Widget] Starting widget:', this.name, '- position:', this.position);
+    }
+
     for (const fx of this.effects) fx.start();
     for (const child of this.children) child.start();
   }
@@ -206,6 +231,11 @@ export class Widget {
       this.pivot,
       vec3.fromValues(-this.pivotPoint[0], -this.pivotPoint[1], 0),
     );
+    
+    // Log pivot for debugging
+    if (this.anchorType !== undefined) {
+      console.log('[Widget]', this.name, '- Pivot:', this.pivotPoint[0].toFixed(1), this.pivotPoint[1].toFixed(1));
+    }
   }
 
   /**
@@ -237,11 +267,34 @@ export class Widget {
       // This ensures offsets scale proportionally with screen size
       const scaleFactor = UIRenderUtils.getUIScaleFactor();
 
+      console.log(
+        '[Widget]',
+        this.name,
+        '- Screen:',
+        screenWidth,
+        'x',
+        screenHeight,
+        '- Anchor:',
+        this.anchorType,
+        '- AnchorPos:',
+        anchorPos,
+        '- Scale:',
+        scaleFactor.toFixed(3),
+      );
+
       // Apply anchor position + scaled offset
       finalPosition = vec3.fromValues(
         anchorPos[0] + this.anchorOffset[0] * scaleFactor,
         anchorPos[1] + this.anchorOffset[1] * scaleFactor,
         0,
+      );
+
+      console.log(
+        '[Widget]',
+        this.name,
+        '- FinalPos:',
+        finalPosition[0].toFixed(1),
+        finalPosition[1].toFixed(1),
       );
     }
 
@@ -252,8 +305,30 @@ export class Widget {
     // Translation in X,Y with Z=0 (using calculated finalPosition)
     mat4.fromTranslation(tr, finalPosition);
 
+    // Apply UI scale factor to size if mode is 'relative'
+    let finalScale = vec3.clone(this.baseScale);
+    if (this.sizeMode === 'relative') {
+      // Scale each axis independently (allows deformation)
+      const [scaleX, scaleY] = UIRenderUtils.getUIScaleFactors();
+      
+      // baseScale is in CSS pixels, need to convert to physical first
+      const dpr = window.devicePixelRatio || 1;
+      finalScale[0] = this.baseScale[0] * dpr * scaleX;
+      finalScale[1] = this.baseScale[1] * dpr * scaleY;
+      finalScale[2] = this.baseScale[2]; // Z unchanged
+      
+      console.log('[Widget]', this.name, '- BaseScale:', this.baseScale[0], 'x', this.baseScale[1], 
+                  '| DPR:', dpr.toFixed(2), '| ScaleFactors:', scaleX.toFixed(3), scaleY.toFixed(3),
+                  '| FinalScale:', finalScale[0].toFixed(1), 'x', finalScale[1].toFixed(1));
+      
+      // Calculate actual screen coverage
+      const screenHeight = UIRenderUtils.getScreenHeight();
+      const coverage = (finalScale[1] / screenHeight * 100).toFixed(1);
+      console.log('[Widget]', this.name, '- Screen height:', screenHeight, '| Coverage:', coverage + '%');
+    }
+
     // Scale in X,Y with Z=1 (no Z scaling)
-    mat4.fromScaling(sc, this.scale);
+    mat4.fromScaling(sc, finalScale);
 
     // Rotation only on Z axis
     mat4.fromZRotation(rot, this.rotation);
@@ -263,6 +338,13 @@ export class Widget {
     mat4.multiply(this.local, tr, rot); // local = tr * rot
     mat4.multiply(this.local, this.local, sc); // local = (tr * rot) * sc
     mat4.multiply(this.local, this.local, this.pivot); // local = (tr * rot * sc) * pivot
+    
+    // Log final matrix translation and scale for debugging
+    if (this.anchorType !== undefined && this.name === 'background') {
+      console.log('[Widget]', this.name, '- Final matrix - Translation:', 
+                  this.local[12].toFixed(1), this.local[13].toFixed(1), 
+                  '| Scale:', this.local[0].toFixed(1), this.local[5].toFixed(1));
+    }
   }
 
   /**
@@ -292,6 +374,7 @@ export class Widget {
   }
 
   public setScale(x: number, y: number): void {
+    vec3.set(this.baseScale, x, y, 1);
     vec3.set(this.scale, x, y, 1);
   }
 
