@@ -11,6 +11,7 @@ interface ResourceEntry {
 
 export class ResourceManager {
   private static resources: Map<string, ResourceEntry> = new Map();
+  private static prefabCache: Map<string, EntityDataType> = new Map();
 
   constructor() {
     throw new Error('Cannot create instances of this class');
@@ -51,8 +52,16 @@ export class ResourceManager {
 
   // Data loading utilities
   public static async loadPrefab(prefabName: string): Promise<EntityDataType> {
+    // Check cache first
+    if (this.prefabCache.has(prefabName)) {
+      return this.prefabCache.get(prefabName)!;
+    }
+
+    // Load and cache
     const response = await ResourceManager.fetch(`assets/prefabs/${prefabName}`);
-    return await response.json();
+    const prefabData = await response.json();
+    this.prefabCache.set(prefabName, prefabData);
+    return prefabData;
   }
 
   public static async loadMeshData(meshPath: string): Promise<string> {
