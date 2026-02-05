@@ -1,6 +1,13 @@
 // src/components/ui/Widget.ts
+import { mat4, vec3 } from 'gl-matrix';
 import type { WidgetEffect, WidgetParams } from '../../types/WidgetTypes';
 
+/**
+ * Widget base class with integrated 4x4 matrix transformations.
+ * Replicates C++/DirectX11 UI system architecture.
+ *
+ * ⚠️ Uses mat4 (4x4) with Z=0 for 2D transformations (NOT 2D matrices).
+ */
 export class Widget {
   private name: string;
   private alias: string;
@@ -8,14 +15,36 @@ export class Widget {
   private parent: Widget | null = null;
   private children: Widget[] = [];
   private effects: WidgetEffect[] = [];
-  private local: any = null; // Placeholder for transform matrix
-  private pivot: any = null;
-  private absolute: any = null;
+
+  // ⚠️ Transformation matrices (4x4) - integrated in Widget like C++ original
+  private pivot: mat4 = mat4.create();
+  private local: mat4 = mat4.create();
+  private absolute: mat4 = mat4.create();
+
+  // Transformation parameters (2D with Z=0)
+  private position: vec3 = vec3.fromValues(0, 0, 0);
+  private pivotPoint: vec3 = vec3.fromValues(0, 0, 0);
+  private scale: vec3 = vec3.fromValues(1, 1, 1);
+  private rotation: number = 0;
 
   constructor(name: string, alias: string, params: WidgetParams) {
     this.name = name;
     this.alias = alias;
     this.params = params;
+
+    // Initialize transformation parameters from params
+    if (params.position) {
+      this.position = vec3.fromValues(params.position.x, params.position.y, 0);
+    }
+    if (params.pivot) {
+      this.pivotPoint = vec3.fromValues(params.pivot.x, params.pivot.y, 0);
+    }
+    if (params.scale) {
+      this.scale = vec3.fromValues(params.scale.x, params.scale.y, 1);
+    }
+    if (params.rotation !== undefined) {
+      this.rotation = params.rotation;
+    }
   }
 
   private start(): void {
@@ -71,7 +100,7 @@ export class Widget {
     this.parent = null;
   }
 
-  private getAbsolute(): any {
+  public getAbsolute(): mat4 {
     return this.absolute;
   }
 
@@ -93,8 +122,108 @@ export class Widget {
     // Integration with ModuleUI.lerp() would be needed.
   }
 
-  // --- Matrix methods are placeholders ---
-  protected computePivot(): void {}
-  protected computeLocal(): void {}
-  protected computeAbsolute(): void {}
+  // ============================================================================
+  // TRANSFORMATION SYSTEM (replicates C++/DirectX11 original)
+  // ============================================================================
+
+  /**
+   * Compute pivot matrix: Identity * Translation(-pivot.x, -pivot.y, 0)
+   * Identical to C++ implementation.
+   */
+  protected computePivot(): void {
+    mat4.identity(this.pivot);
+    mat4.translate(
+      this.pivot,
+      this.pivot,
+      vec3.fromValues(-this.pivotPoint[0], -this.pivotPoint[1], 0),
+    );
+  }
+
+  /**
+   * Compute local matrix: translation * scale * rotation * pivot
+   * Identical to C++: local = rot * sc * tr
+   * Order: pivot → translation → scale → rotation
+   */
+  protected computeLocal(): void {
+    this.computePivot();
+
+    const tr = mat4.create();
+    const sc = mat4.create();
+    const rot = mat4.create();
+
+    // Translation in X,Y with Z=0
+    mat4.fromTranslation(tr, this.position);
+
+    // Scale in X,Y with Z=1 (no Z scaling)
+    mat4.fromScaling(sc, this.scale);
+
+    // Rotation only on Z axis
+    mat4.fromZRotation(rot, this.rotation);
+
+    // Correct order: local = pivot * translation * scale * rotation
+    mat4.multiply(this.local, tr, this.pivot);
+    mat4.multiply(this.local, sc, this.local);
+    mat4.multiply(this.local, rot, this.local);
+  }
+
+  /**
+   * Compute absolute (world) matrix with parent hierarchy.
+   * Identical to C++: absolute = parent ? local * parent.absolute : local
+   */
+  protected computeAbsolute(): void {
+    this.computeLocal();
+
+    if (this.parent) {
+      mat4.multiply(this.absolute, this.local, this.parent.getAbsolute());
+    } else {
+      mat4.copy(this.absolute, this.local);
+    }
+  }
+
+  // ============================================================================
+  // PUBLIC SETTERS FOR TRANSFORMATIONS
+  // ============================================================================
+
+  public setPosition(x: number, y: number): void {
+    vec3.set(this.position, x, y, 0);
+  }
+
+  public setPivot(x: number, y: number): void {
+    vec3.set(this.pivotPoint, x, y, 0);
+  }
+
+  public setScale(x: number, y: number): void {
+    vec3.set(this.scale, x, y, 1);
+  }
+
+  public setRotation(radians: number): void {
+    this.rotation = radians;
+  }
+
+  public setParentWidget(parent: Widget | null): void {
+    this.parent = parent;
+  }
+
+  // Getters for transformation parameters
+  public getPosition(): vec3 {
+    return this.position;
+  }
+  public getPivot(): vec3 {
+    return this.pivotPoint;
+  }
+  public getScale(): vec3 {
+    return this.scale;
+  }
+  public getRotation(): number {
+    return this.rotation;
+  }
+  public getName(): string {
+    return this.name;
+  }
+  public getAlias(): string {
+    return this.alias;
+  }
+  public getParams(): WidgetParams {
+    return this.params;
+  }
 }
