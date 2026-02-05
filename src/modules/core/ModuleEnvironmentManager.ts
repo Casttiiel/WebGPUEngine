@@ -198,7 +198,7 @@ export class ModuleEnvironmentManager extends Module {
     mainLight.setIntensity(lightIntensity);
 
     // FASE 4.1 — Ambient ligado al cielo
-    this.ambientLightData.globalFactor = lerp(0.08, 1.2, sunAbove);
+    this.ambientLightData.globalFactor = lerp(0.08, 5.0, sunAbove);
   }
 
   /**

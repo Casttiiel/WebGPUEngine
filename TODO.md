@@ -30,9 +30,10 @@
 
 15. Quality settings selection
 16. Error en consola de GLTF retrasa en web?
-17. Improve particles
-18. Multiple Light probes has good shadows?
-19. Weird line on corners is irradiance because of normals
+17. Remove As Any
+18. Improve particles
+19. Multiple Light probes has good shadows?
+20. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
