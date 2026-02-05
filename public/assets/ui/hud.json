@@ -1,0 +1,129 @@
+{
+  "name": "game_hud",
+  "alias": "hud",
+  "type": "image",
+  "visible": true,
+  "position": [0, 0],
+  "scale": [1, 1],
+  "imageParams": {
+    "texture": "ui/transparent.png",
+    "size": [1920, 1080],
+    "color": [1, 1, 1, 0]
+  },
+  "children": [
+    {
+      "name": "health_bar_container",
+      "type": "image",
+      "position": [100, 50],
+      "imageParams": {
+        "texture": "ui/hud/bar_frame.png",
+        "size": [256, 32],
+        "color": [1, 1, 1, 1]
+      },
+      "children": [
+        {
+          "name": "health_bar",
+          "alias": "health_bar",
+          "type": "progress",
+          "position": [4, 4],
+          "progressParams": {
+            "ratio": 1.0,
+            "direction": "horizontal",
+            "foregroundImage": "ui/hud/bar_health.png",
+            "backgroundImage": "ui/hud/bar_background.png"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mana_bar_container",
+      "type": "image",
+      "position": [100, 90],
+      "imageParams": {
+        "texture": "ui/hud/bar_frame.png",
+        "size": [256, 32],
+        "color": [1, 1, 1, 1]
+      },
+      "children": [
+        {
+          "name": "mana_bar",
+          "alias": "mana_bar",
+          "type": "progress",
+          "position": [4, 4],
+          "progressParams": {
+            "ratio": 1.0,
+            "direction": "horizontal",
+            "foregroundImage": "ui/hud/bar_mana.png",
+            "backgroundImage": "ui/hud/bar_background.png"
+          }
+        }
+      ]
+    },
+    {
+      "name": "score_text",
+      "alias": "score",
+      "type": "text",
+      "position": [960, 50],
+      "textParams": {
+        "text": "SCORE: 0",
+        "texture": "fonts/arcade_bitmap.png",
+        "size": [16, 16],
+        "color": [1, 1, 0, 1]
+      }
+    },
+    {
+      "name": "ability_icon_1",
+      "type": "image",
+      "position": [100, 950],
+      "imageParams": {
+        "texture": "ui/hud/ability_1.png",
+        "size": [64, 64],
+        "color": [1, 1, 1, 1]
+      },
+      "children": [
+        {
+          "name": "ability_cooldown_1",
+          "alias": "cd_1",
+          "type": "sprite",
+          "position": [0, 0],
+          "imageParams": {
+            "texture": "ui/hud/cooldown_overlay.png",
+            "size": [64, 64],
+            "color": [0, 0, 0, 0.5]
+          },
+          "sprites": [
+            {
+              "name": "cooldown_anim",
+              "texture": "ui/hud/cooldown_frames.png",
+              "frameCount": 30,
+              "framesPerRow": 6,
+              "fps": 30
+            }
+          ],
+          "initialSprite": "cooldown_anim"
+        }
+      ]
+    },
+    {
+      "name": "crosshair",
+      "alias": "crosshair",
+      "type": "image",
+      "position": [960, 540],
+      "imageParams": {
+        "texture": "ui/hud/crosshair.png",
+        "size": [32, 32],
+        "color": [1, 0, 0, 0.8]
+      },
+      "effects": [
+        {
+          "name": "fx_pulse",
+          "type": "scale",
+          "scale": [1.2, 1.2],
+          "duration": 0.5,
+          "mode": "PingPong",
+          "interpolator": "quadInOut"
+        }
+      ]
+    }
+  ]
+}

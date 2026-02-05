@@ -1,0 +1,163 @@
+{
+  "name": "pause_menu",
+  "alias": "pause",
+  "type": "image",
+  "visible": true,
+  "position": [960, 540],
+  "scale": [1, 1],
+  "imageParams": {
+    "texture": "ui/backgrounds/pause_overlay.png",
+    "size": [1920, 1080],
+    "color": [0, 0, 0, 0.7]
+  },
+  "effects": [
+    {
+      "name": "fx_fade_in",
+      "type": "fade",
+      "alpha": 1.0,
+      "duration": 0.3,
+      "mode": "Single",
+      "interpolator": "linear"
+    }
+  ],
+  "children": [
+    {
+      "name": "pause_panel",
+      "type": "image",
+      "position": [0, 0],
+      "imageParams": {
+        "texture": "ui/panels/panel_dark.png",
+        "size": [512, 384],
+        "color": [1, 1, 1, 1]
+      },
+      "effects": [
+        {
+          "name": "fx_scale_in",
+          "type": "scale",
+          "scale": [1, 1],
+          "duration": 0.3,
+          "mode": "Single",
+          "interpolator": "backOut"
+        }
+      ],
+      "children": [
+        {
+          "name": "pause_title",
+          "type": "text",
+          "position": [0, -120],
+          "textParams": {
+            "text": "PAUSED",
+            "texture": "fonts/arial_bitmap.png",
+            "size": [24, 24],
+            "color": [1, 1, 1, 1]
+          }
+        },
+        {
+          "name": "btn_resume",
+          "alias": "btn_resume",
+          "type": "button",
+          "position": [0, -30],
+          "states": {
+            "NORMAL": {
+              "imageParams": {
+                "texture": "ui/buttons/button_normal.png",
+                "size": [200, 50],
+                "color": [1, 1, 1, 1]
+              }
+            },
+            "HOVER": {
+              "imageParams": {
+                "texture": "ui/buttons/button_hover.png",
+                "size": [200, 50],
+                "color": [1.2, 1.2, 1.2, 1]
+              }
+            }
+          },
+          "children": [
+            {
+              "name": "btn_resume_text",
+              "type": "text",
+              "position": [0, 0],
+              "textParams": {
+                "text": "RESUME",
+                "texture": "fonts/arial_bitmap.png",
+                "size": [14, 14],
+                "color": [1, 1, 1, 1]
+              }
+            }
+          ]
+        },
+        {
+          "name": "btn_restart",
+          "alias": "btn_restart",
+          "type": "button",
+          "position": [0, 40],
+          "states": {
+            "NORMAL": {
+              "imageParams": {
+                "texture": "ui/buttons/button_normal.png",
+                "size": [200, 50],
+                "color": [1, 1, 1, 1]
+              }
+            },
+            "HOVER": {
+              "imageParams": {
+                "texture": "ui/buttons/button_hover.png",
+                "size": [200, 50],
+                "color": [1.2, 1.2, 1.2, 1]
+              }
+            }
+          },
+          "children": [
+            {
+              "name": "btn_restart_text",
+              "type": "text",
+              "position": [0, 0],
+              "textParams": {
+                "text": "RESTART",
+                "texture": "fonts/arial_bitmap.png",
+                "size": [14, 14],
+                "color": [1, 1, 1, 1]
+              }
+            }
+          ]
+        },
+        {
+          "name": "btn_main_menu",
+          "alias": "btn_main_menu",
+          "type": "button",
+          "position": [0, 110],
+          "states": {
+            "NORMAL": {
+              "imageParams": {
+                "texture": "ui/buttons/button_normal.png",
+                "size": [200, 50],
+                "color": [1, 1, 1, 1]
+              }
+            },
+            "HOVER": {
+              "imageParams": {
+                "texture": "ui/buttons/button_hover.png",
+                "size": [200, 50],
+                "color": [1.2, 1.2, 1.2, 1]
+              }
+            }
+          },
+          "children": [
+            {
+              "name": "btn_main_menu_text",
+              "type": "text",
+              "position": [0, 0],
+              "textParams": {
+                "text": "MAIN MENU",
+                "texture": "fonts/arial_bitmap.png",
+                "size": [14, 14],
+                "color": [1, 1, 1, 1]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
