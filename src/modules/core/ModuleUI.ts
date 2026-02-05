@@ -173,27 +173,6 @@ export class ModuleUI extends Module {
   }
 
   public render(renderPass: GPURenderPassEncoder): void {
-    // Get current dimensions for logging
-    const canvas = Render.getInstance().getCanvas();
-    const physicalWidth = canvas.width;
-    const physicalHeight = canvas.height;
-    const dpr = window.devicePixelRatio || 1;
-
-    console.log(
-      '[UI] Physical:',
-      physicalWidth,
-      'x',
-      physicalHeight,
-      '| DPR:',
-      dpr.toFixed(2),
-      '| CSS:',
-      canvas.clientWidth,
-      'x',
-      canvas.clientHeight,
-    );
-
-    console.log('[UI] Rendering', this.activeWidgets.length, 'active widgets');
-
     // Render all active widgets
     for (const widget of this.activeWidgets) {
       widget.doRender(renderPass);
