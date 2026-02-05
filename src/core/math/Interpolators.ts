@@ -59,14 +59,14 @@ export class QuadInOutInterpolator implements Interpolator {
   blend(start: number, end: number, ratio: number): number {
     let t = ratio * 2;
     let t2: number;
-    
+
     if (t < 1) {
       t2 = 0.5 * t * t; // Ease in (first half)
     } else {
       t -= 1;
       t2 = -0.5 * (t * (t - 2) - 1); // Ease out (second half)
     }
-    
+
     return start + (end - start) * t2;
   }
 }
@@ -77,7 +77,7 @@ export class QuadInOutInterpolator implements Interpolator {
  */
 export class BackOutInterpolator implements Interpolator {
   private readonly s = 1.70158; // Overshoot amount
-  
+
   blend(start: number, end: number, ratio: number): number {
     const t = ratio - 1;
     const t2 = t * t * ((this.s + 1) * t + this.s) + 1;
@@ -92,7 +92,7 @@ export class BackOutInterpolator implements Interpolator {
 export class BounceOutInterpolator implements Interpolator {
   blend(start: number, end: number, ratio: number): number {
     let t2: number;
-    
+
     if (ratio < 1 / 2.75) {
       t2 = 7.5625 * ratio * ratio;
     } else if (ratio < 2 / 2.75) {
@@ -105,7 +105,7 @@ export class BounceOutInterpolator implements Interpolator {
       const t = ratio - 2.625 / 2.75;
       t2 = 7.5625 * t * t + 0.984375;
     }
-    
+
     return start + (end - start) * t2;
   }
 }
@@ -117,11 +117,11 @@ export class BounceOutInterpolator implements Interpolator {
 export class ElasticOutInterpolator implements Interpolator {
   blend(start: number, end: number, ratio: number): number {
     if (ratio === 0 || ratio === 1) return start + (end - start) * ratio;
-    
+
     const p = 0.3;
     const s = p / 4;
-    const t2 = Math.pow(2, -10 * ratio) * Math.sin((ratio - s) * (2 * Math.PI) / p) + 1;
-    
+    const t2 = Math.pow(2, -10 * ratio) * Math.sin(((ratio - s) * (2 * Math.PI)) / p) + 1;
+
     return start + (end - start) * t2;
   }
 }
@@ -132,7 +132,7 @@ export class ElasticOutInterpolator implements Interpolator {
 
 /**
  * InterpolatorFactory - Provides static singleton instances of interpolators.
- * 
+ *
  * ⚠️ IMPORTANT: Interpolators are SINGLETONS, not dynamically created.
  * This matches the C++/DirectX11 original architecture where interpolators
  * are referenced, not instantiated per effect.
@@ -145,7 +145,7 @@ export class InterpolatorFactory {
   private static readonly easeOut = new EaseOutInterpolator();
   private static readonly sine = new SineInterpolator();
   private static readonly exponential = new ExponentialInterpolator();
-  
+
   // UI-specific interpolators
   private static readonly quadInOut = new QuadInOutInterpolator();
   private static readonly backOut = new BackOutInterpolator();
@@ -198,14 +198,34 @@ export class InterpolatorFactory {
   }
 
   // Direct getters for type-safe access
-  public static getLinear(): Interpolator { return this.linear; }
-  public static getSmoothStep(): Interpolator { return this.smoothStep; }
-  public static getEaseIn(): Interpolator { return this.easeIn; }
-  public static getEaseOut(): Interpolator { return this.easeOut; }
-  public static getSine(): Interpolator { return this.sine; }
-  public static getExponential(): Interpolator { return this.exponential; }
-  public static getQuadInOut(): Interpolator { return this.quadInOut; }
-  public static getBackOut(): Interpolator { return this.backOut; }
-  public static getBounceOut(): Interpolator { return this.bounceOut; }
-  public static getElasticOut(): Interpolator { return this.elasticOut; }
+  public static getLinear(): Interpolator {
+    return this.linear;
+  }
+  public static getSmoothStep(): Interpolator {
+    return this.smoothStep;
+  }
+  public static getEaseIn(): Interpolator {
+    return this.easeIn;
+  }
+  public static getEaseOut(): Interpolator {
+    return this.easeOut;
+  }
+  public static getSine(): Interpolator {
+    return this.sine;
+  }
+  public static getExponential(): Interpolator {
+    return this.exponential;
+  }
+  public static getQuadInOut(): Interpolator {
+    return this.quadInOut;
+  }
+  public static getBackOut(): Interpolator {
+    return this.backOut;
+  }
+  public static getBounceOut(): Interpolator {
+    return this.bounceOut;
+  }
+  public static getElasticOut(): Interpolator {
+    return this.elasticOut;
+  }
 }

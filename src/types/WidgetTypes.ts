@@ -264,4 +264,3 @@ export function createDefaultProgressParams(): ProgressParams {
     ratio: 1.0,
   };
 }
-
