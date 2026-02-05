@@ -4,7 +4,7 @@ import type { WidgetEffect, WidgetParams } from '../../types/WidgetTypes';
 
 /**
  * Widget base class with integrated 4x4 matrix transformations.
- * 
+ *
  * ⚠️ Uses mat4 (4x4) with Z=0 for 2D transformations (NOT 2D matrices).
  */
 export class Widget {

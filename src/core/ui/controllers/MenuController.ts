@@ -16,7 +16,7 @@ interface MenuOption {
 
 /**
  * MenuController - Manages menu navigation and selection.
- * 
+ *
  * Features:
  * - Keyboard navigation (up/down/confirm)
  * - Mouse hover detection
