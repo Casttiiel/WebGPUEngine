@@ -10,6 +10,9 @@ import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../
 export class ModuleUI extends Module {
   private static instance: ModuleUI | null = null;
 
+  // Canvas dimensions will match screen size directly
+  // No reference canvas or scaling
+
   private widgetStructureMap: Map<string, WidgetClass> = new Map();
   private registeredWidgets: Map<string, Widget> = new Map();
   private registeredAlias: Map<string, Widget> = new Map();
@@ -103,6 +106,9 @@ export class ModuleUI extends Module {
       widget.update(dt);
     }
 
+    // Reset screen size change flag after all widgets updated
+    UIRenderUtils.resetScreenSizeChanged();
+
     // Update lerp animations
     this.updateLerps(dt);
   }
@@ -162,10 +168,17 @@ export class ModuleUI extends Module {
   }
 
   public render(renderPass: GPURenderPassEncoder): void {
-    // UI always uses 1920x1080 design space, regardless of actual canvas size
-    // This ensures widgets designed for 1920x1080 work at any resolution
-    UIRenderUtils.updateScreenSize(1920, 1080);
+    // Get actual canvas dimensions
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
 
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    // Update UI rendering system with actual screen size (no scaling)
+    UIRenderUtils.updateScreenSize(width, height);
+
+    // Render all active widgets
     for (const widget of this.activeWidgets) {
       widget.doRender(renderPass);
     }

@@ -36,6 +36,11 @@ export interface WidgetParams {
   scale: { x: number; y: number };
   rotation: number;
   visible: boolean;
+
+  // Phase 2: Anchor system (optional)
+  anchor?: string; // Anchor type: "center", "top-left", "bottom-right", etc.
+  offset?: { x: number; y: number }; // Offset from anchor position
+
   [key: string]: any; // Allow additional properties
 }
 

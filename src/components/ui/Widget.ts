@@ -1,6 +1,8 @@
 // src/components/ui/Widget.ts
 import { mat4, vec2, vec3 } from 'gl-matrix';
 import type { WidgetEffect, WidgetParams } from '../../types/WidgetTypes';
+import { AnchorType, UIAnchorSystem } from '../../core/ui/UIAnchorSystem.js';
+import { UIRenderUtils } from '../../renderer/core/UIRenderUtils.js';
 
 /**
  * Widget base class with integrated 4x4 matrix transformations.
@@ -26,6 +28,10 @@ export class Widget {
   private scale: vec3 = vec3.fromValues(1, 1, 1);
   private rotation: number = 0;
 
+  // Anchor system (Phase 2)
+  private anchorType?: AnchorType; // Optional anchor point (e.g., "top-left")
+  private anchorOffset: vec2 = vec2.create(); // Offset from anchor position
+
   // Input event callbacks (optional)
   public onMouseEnter?: () => void;
   public onMouseLeave?: () => void;
@@ -49,6 +55,14 @@ export class Widget {
     if (params.rotation !== undefined) {
       this.rotation = params.rotation;
     }
+
+    // Initialize anchor system (Phase 2)
+    if (params.anchor) {
+      this.anchorType = UIAnchorSystem.parseAnchorType(params.anchor);
+    }
+    if (params.offset) {
+      vec2.set(this.anchorOffset, params.offset.x, params.offset.y);
+    }
   }
 
   // ============================================================================
@@ -66,6 +80,11 @@ export class Widget {
   }
 
   public update(dt: number): void {
+    // If using anchor system, only recalculate transform when screen size changes
+    if (this.anchorType !== undefined && UIRenderUtils.hasScreenSizeChanged()) {
+      this.updateTransform();
+    }
+
     for (const fx of this.effects) fx.update(dt);
     for (const child of this.children) child.update(dt);
   }
@@ -192,16 +211,46 @@ export class Widget {
   /**
    * Compute local matrix: translation * rotation * scale * pivot
    * Order ensures position is in pixels, not affected by scale
+   *
+   * If anchor is defined, calculates position from anchor point:
+   *   finalPosition = anchorPosition + anchorOffset (scaled)
    */
   protected computeLocal(): void {
     this.computePivot();
+
+    // Calculate final position based on anchor (if set) or direct position
+    let finalPosition = vec3.clone(this.position);
+
+    if (this.anchorType !== undefined) {
+      // Get current screen dimensions
+      const screenWidth = UIRenderUtils.getScreenWidth();
+      const screenHeight = UIRenderUtils.getScreenHeight();
+
+      // Calculate anchor position in screen space
+      const anchorPos = UIAnchorSystem.getAnchorPosition(
+        this.anchorType,
+        screenWidth,
+        screenHeight,
+      );
+
+      // Get UI scale factor (based on 1920x1080 reference)
+      // This ensures offsets scale proportionally with screen size
+      const scaleFactor = UIRenderUtils.getUIScaleFactor();
+
+      // Apply anchor position + scaled offset
+      finalPosition = vec3.fromValues(
+        anchorPos[0] + this.anchorOffset[0] * scaleFactor,
+        anchorPos[1] + this.anchorOffset[1] * scaleFactor,
+        0,
+      );
+    }
 
     const tr = mat4.create();
     const sc = mat4.create();
     const rot = mat4.create();
 
-    // Translation in X,Y with Z=0
-    mat4.fromTranslation(tr, this.position);
+    // Translation in X,Y with Z=0 (using calculated finalPosition)
+    mat4.fromTranslation(tr, finalPosition);
 
     // Scale in X,Y with Z=1 (no Z scaling)
     mat4.fromScaling(sc, this.scale);
@@ -254,6 +303,17 @@ export class Widget {
     this.parent = parent;
   }
 
+  // Anchor system setters (Phase 2)
+  public setAnchor(anchor: AnchorType, offsetX: number = 0, offsetY: number = 0): void {
+    this.anchorType = anchor;
+    vec2.set(this.anchorOffset, offsetX, offsetY);
+  }
+
+  public clearAnchor(): void {
+    this.anchorType = undefined;
+    vec2.set(this.anchorOffset, 0, 0);
+  }
+
   // Getters for transformation parameters
   public getPosition(): vec3 {
     return this.position;
@@ -275,6 +335,14 @@ export class Widget {
   }
   public getParams(): WidgetParams {
     return this.params;
+  }
+
+  // Anchor system getters (Phase 2)
+  public getAnchor(): AnchorType | undefined {
+    return this.anchorType;
+  }
+  public getAnchorOffset(): vec2 {
+    return this.anchorOffset;
   }
 
   // Getters for transformation matrices

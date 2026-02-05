@@ -25,6 +25,46 @@ export class UIRenderUtils {
   private static orthoProjection: mat4 = mat4.create(); // Orthographic projection matrix
   private static screenWidth: number = 1920;
   private static screenHeight: number = 1080;
+  private static screenSizeChanged: boolean = false; // Flag to track screen resize
+
+  // Reference resolution for UI design (offsets, sizes defined in this space)
+  private static readonly REFERENCE_WIDTH = 1920;
+  private static readonly REFERENCE_HEIGHT = 1080;
+
+  /**
+   * Get current screen dimensions
+   */
+  public static getScreenWidth(): number {
+    return this.screenWidth;
+  }
+
+  public static getScreenHeight(): number {
+    return this.screenHeight;
+  }
+
+  /**
+   * Get UI scale factor based on current screen vs reference resolution.
+   * Uses minimum scale to maintain aspect ratio.
+   */
+  public static getUIScaleFactor(): number {
+    const scaleX = this.screenWidth / this.REFERENCE_WIDTH;
+    const scaleY = this.screenHeight / this.REFERENCE_HEIGHT;
+    return Math.min(scaleX, scaleY);
+  }
+
+  /**
+   * Check if screen size changed this frame
+   */
+  public static hasScreenSizeChanged(): boolean {
+    return this.screenSizeChanged;
+  }
+
+  /**
+   * Reset screen size change flag (called after widgets update)
+   */
+  public static resetScreenSizeChanged(): void {
+    this.screenSizeChanged = false;
+  }
 
   /**
    * Initialize the UI rendering system
@@ -72,14 +112,19 @@ export class UIRenderUtils {
 
   /**
    * Update screen dimensions and recalculate orthographic projection
-   * Call this when the window resizes
+   * Direct mapping - no scaling or offset
    */
   public static updateScreenSize(width: number, height: number): void {
+    // Detect if screen size actually changed
+    if (this.screenWidth !== width || this.screenHeight !== height) {
+      this.screenSizeChanged = true;
+    }
+
     this.screenWidth = width;
     this.screenHeight = height;
 
-    // Create orthographic projection: pixels [0, width] x [0, height] -> clip space [-1, 1] x [-1, 1]
-    // Note: Y axis is flipped (0 at top, height at bottom) to match UI convention
+    // Create orthographic projection for UI (2D)
+    // Maps screen coordinates directly to clip space
     mat4.ortho(
       this.orthoProjection,
       0, // left
@@ -138,7 +183,8 @@ export class UIRenderUtils {
       return;
     }
 
-    // Apply orthographic projection to transform
+    // Apply orthographic projection directly to widget transform
+    // Widget is in reference space, ortho converts to clip space with built-in scaling
     const finalTransform = mat4.create();
     mat4.multiply(finalTransform, this.orthoProjection, transform);
 

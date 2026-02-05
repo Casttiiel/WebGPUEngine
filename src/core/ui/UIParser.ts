@@ -286,6 +286,16 @@ export class UIParser {
       params.scale = { x: jData.scale[0], y: jData.scale[1] };
     }
 
+    // Phase 2: Parse anchor system (optional)
+    if (jData.anchor && typeof jData.anchor === 'string') {
+      params.anchor = jData.anchor;
+      hasExplicitPosition = true; // Anchor counts as explicit position
+    }
+
+    if (jData.offset && Array.isArray(jData.offset)) {
+      params.offset = { x: jData.offset[0], y: jData.offset[1] };
+    }
+
     // Parse size - support both array [1920, 1080] and string "1920 1080" (C++ format)
     if (jData.size) {
       if (Array.isArray(jData.size)) {
@@ -302,7 +312,7 @@ export class UIParser {
         params.scale = { x: params.size.x, y: params.size.y };
       }
 
-      // If no explicit position was provided, center the widget based on size
+      // If no explicit position was provided AND no anchor, center the widget based on size
       // This ensures that a widget with size "1920 1080" is centered at (960, 540)
       if (!hasExplicitPosition && params.size) {
         params.position = { x: params.size.x / 2, y: params.size.y / 2 };

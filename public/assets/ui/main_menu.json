@@ -6,7 +6,9 @@
       "name": "background",
       "type": "image",
       "texture": "ui/backgrounds/menu_principal.jpg",
-      "size": "1920 1080"
+      "size": "757 1080",
+      "anchor": "center",
+      "offset": [0, 0]
     }
   ]
 }
