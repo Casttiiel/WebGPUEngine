@@ -1,7 +1,6 @@
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { Engine } from '../../core/engine/Engine';
-import { Entity } from '../../core/ecs/Entity';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
@@ -26,11 +25,16 @@ import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXCompon
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
+import { RenderTarget } from '../../renderer/resources/RenderTarget';
+import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private distorsions!: Distorsions;
   public pauseRendering: boolean = false; // Flag para pausar rendering durante probe capture
+
+  // UI Rendering
+  private rtUIOutput: RenderTarget;
 
   //Presentation data
   private presentationTechnique!: Technique;
@@ -52,6 +56,7 @@ export class ModuleRender extends Module {
     super(name);
     this.deferred = new DeferredRenderer();
     this.distorsions = new Distorsions();
+    this.rtUIOutput = new RenderTarget();
   }
 
   public async start(): Promise<boolean> {
@@ -71,6 +76,10 @@ export class ModuleRender extends Module {
     // Initialize GPU Frustum Culling
     await RenderManager.getInstance().initialize();
 
+    // Initialize UI rendering system
+    LoadingStatus.updateStatus('Initializing UI renderer...', 65);
+    await UIRenderUtils.initialize();
+
     // Inicializar VelocityBufferManager
     await VelocityBufferManager.getInstance().initialize(Render.width, Render.height);
 
@@ -81,6 +90,10 @@ export class ModuleRender extends Module {
     this.deferred.create(Render.width, Render.height);
     this.distorsions.resize();
     this.presentationBindGroup = null;
+
+    // Create UI render target with LDR format (UI is rendered after tone mapping)
+    // UI doesn't need HDR - it's standard 0-1 color range with alpha for blending
+    this.rtUIOutput.createRT('ui_output', Render.width, Render.height, 'rgba8unorm');
 
     // Redimensionar VelocityBufferManager
     VelocityBufferManager.getInstance().resize(Render.width, Render.height);
@@ -317,6 +330,9 @@ export class ModuleRender extends Module {
       }
 
       this.presentationBindGroup = null;
+
+      // Clean up UI rendering resources
+      UIRenderUtils.destroy();
 
       RenderManager.getInstance().destroy();
 

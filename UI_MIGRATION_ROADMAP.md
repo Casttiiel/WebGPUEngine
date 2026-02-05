@@ -69,48 +69,6 @@ UI System (C++/DirectX11)
 
 ### **FASE 7: Renderizado WebGPU para UI** 🎨 [4-5 días]
 
-#### 7.3 UIRenderUtils
-
-**Objetivo**: Utilidades de renderizado de bajo nivel para UI.
-
-**Archivos a crear**:
-
-- `src/renderer/core/UIRenderUtils.ts`
-
-**Tareas**:
-
-- [ ] Clase/funciones estáticas para renderizado
-- [ ] `renderBitmap(transform, texture, minUV, maxUV, color, additive)`
-- [ ] `renderText(transform, texture, text, size)`
-- [ ] Gestión de uniform buffers para UI
-- [ ] Activación de técnicas y texturas
-- [ ] Uso de mesh `unit_plane_xy` para quads
-- [ ] Conversión de coordenadas screen → NDC
-
-**Detalles técnicos**:
-
-```typescript
-// Ajuste de coordenadas para WebGPU
-const adjustMatrix = mat4.create();
-mat4.scale(adjustMatrix, adjustMatrix, [2.0 / width, 2.0 / height, 1.0]);
-const finalTransform = mat4.multiply(mat4.create(), worldMatrix, adjustMatrix);
-```
-
-#### 7.4 RenderTarget para UI
-
-**Objetivo**: Render target separado para UI overlay.
-
-**Archivos a modificar**:
-
-- `src/renderer/core/DeferredRenderer.ts` (o donde corresponda)
-
-**Tareas**:
-
-- [ ] Crear `rtUIOutput: RenderTarget` (formato RGBA16Float o RGBA8Unorm)
-- [ ] Renderizar UI en pase separado después de post-processing
-- [ ] Composición final: scene + UI con alpha blending
-- [ ] Soporte para MSAA si está habilitado
-
 #### 7.5 Integración con ModuleRender
 
 **Objetivo**: Integrar renderizado de UI en el flujo de ModuleRender.

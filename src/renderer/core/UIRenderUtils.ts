@@ -46,7 +46,7 @@ export class UIRenderUtils {
 
     // Load UI quad mesh
     try {
-      this.quadMesh = await Mesh.get('assets/meshes/ui/unit_plane_xy_ui.obj');
+      this.quadMesh = await Mesh.get('ui/unit_plane_xy_ui.obj');
     } catch (error) {
       console.error('UIRenderUtils: Failed to load UI quad mesh', error);
       throw error;
@@ -54,8 +54,8 @@ export class UIRenderUtils {
 
     // Load techniques
     try {
-      this.standardTechnique = await Technique.getAsync('assets/techniques/ui/ui.tech');
-      this.additiveTechnique = await Technique.getAsync('assets/techniques/ui/ui_additive.tech');
+      this.standardTechnique = await Technique.getAsync('ui/ui.tech');
+      this.additiveTechnique = await Technique.getAsync('ui/ui_additive.tech');
     } catch (error) {
       console.error('UIRenderUtils: Failed to load UI techniques', error);
       throw error;
