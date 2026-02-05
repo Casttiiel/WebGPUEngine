@@ -10,14 +10,7 @@
 
 @fragment
 fn fs(input: UIVertexOutput) -> @location(0) vec4<f32> {
-    // Sample texture at interpolated UV coordinates
-    var textureColor = textureSample(uiTexture, uiSampler, input.uv);
-    
-    // Apply tint color (multiplicative)
-    // This allows color modulation and alpha control
-    var finalColor = textureColor * input.color;
-    
-    // Return final color with alpha
-    // Alpha blending will be handled by the pipeline state
-    return finalColor;
+    // Sample texture and apply tint color
+    let texColor = textureSample(uiTexture, uiSampler, input.uv);
+    return texColor * input.color;
 }

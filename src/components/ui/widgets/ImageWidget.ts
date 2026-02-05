@@ -52,12 +52,14 @@ export class ImageWidget extends Widget {
           this.cachedTexture = texture;
         })
         .catch((error) => {
-          console.error(`Failed to load texture: ${this.imageParams.texture}`, error);
+          console.error(`❌ Failed to load texture: ${this.imageParams.texture}`, error);
         });
     }
 
     // Only render if texture is loaded
-    if (!this.cachedTexture) return;
+    if (!this.cachedTexture) {
+      return;
+    }
 
     // Convert color to tint vec4
     const color = this.imageParams.color;

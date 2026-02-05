@@ -176,7 +176,13 @@ export class UIParser {
     const name = jData['name'] || 'unnamed_image';
     const alias = jData['alias'] || '';
     const params = this.parseWidgetParams(jData);
-    const imageParams = this.parseImageParams(jData.imageParams || {});
+
+    // Support both nested imageParams and flat structure (C++ compatibility)
+    // Flat: { texture: "...", size: "..." }
+    // Nested: { imageParams: { texture: "...", size: "..." } }
+    const imageParamsSource = jData.imageParams || jData;
+    const imageParams = this.parseImageParams(imageParamsSource);
+
     return new ImageWidget(name, alias, params, imageParams);
   }
 
@@ -268,16 +274,39 @@ export class UIParser {
     if (jData.alias) params.alias = jData.alias;
     if (jData.visible !== undefined) params.visible = jData.visible;
 
+    // Parse position - explicit position parameter
+    let hasExplicitPosition = false;
     if (jData.position && Array.isArray(jData.position)) {
       params.position = { x: jData.position[0], y: jData.position[1] };
+      hasExplicitPosition = true;
     }
 
+    // Parse scale - explicit scale parameter
     if (jData.scale && Array.isArray(jData.scale)) {
       params.scale = { x: jData.scale[0], y: jData.scale[1] };
     }
 
-    if (jData.size && Array.isArray(jData.size)) {
-      params.size = { x: jData.size[0], y: jData.size[1] };
+    // Parse size - support both array [1920, 1080] and string "1920 1080" (C++ format)
+    if (jData.size) {
+      if (Array.isArray(jData.size)) {
+        params.size = { x: jData.size[0], y: jData.size[1] };
+      } else if (typeof jData.size === 'string') {
+        const parts = jData.size.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          params.size = { x: parseFloat(parts[0]), y: parseFloat(parts[1]) };
+        }
+      }
+
+      // If no explicit scale was provided, use size as scale
+      if (!jData.scale && params.size) {
+        params.scale = { x: params.size.x, y: params.size.y };
+      }
+
+      // If no explicit position was provided, center the widget based on size
+      // This ensures that a widget with size "1920 1080" is centered at (960, 540)
+      if (!hasExplicitPosition && params.size) {
+        params.position = { x: params.size.x / 2, y: params.size.y / 2 };
+      }
     }
 
     if (jData.pivot && Array.isArray(jData.pivot)) {
@@ -299,8 +328,16 @@ export class UIParser {
 
     if (jData.texture) params.texture = jData.texture;
 
-    if (jData.size && Array.isArray(jData.size)) {
-      params.size = { x: jData.size[0], y: jData.size[1] };
+    // Parse size - support both array [1920, 1080] and string "1920 1080" (C++ format)
+    if (jData.size) {
+      if (Array.isArray(jData.size)) {
+        params.size = { x: jData.size[0], y: jData.size[1] };
+      } else if (typeof jData.size === 'string') {
+        const parts = jData.size.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          params.size = { x: parseFloat(parts[0]), y: parseFloat(parts[1]) };
+        }
+      }
     }
 
     if (jData.color && Array.isArray(jData.color)) {

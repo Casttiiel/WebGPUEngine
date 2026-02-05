@@ -3,6 +3,8 @@ import { Module } from './Module';
 import { UIInputManager } from '../../core/ui/UIInputManager';
 import { Engine } from '../../core/engine/Engine';
 import { MouseButton } from '../../types/MouseButton.enum';
+import { UIParser } from '../../core/ui/UIParser';
+import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
 export class ModuleUI extends Module {
@@ -34,8 +36,57 @@ export class ModuleUI extends Module {
   }
 
   public async start(): Promise<boolean> {
-    // TODO: Load UI config, call initWidgetClass()
+    // Initialize all widget classes (like C++ initWidgetClass())
+    await this.initWidgetClass();
+
     return true;
+  }
+
+  /**
+   * Initialize widget classes - loads JSON files and registers them with type names.
+   * This matches the C++ CModuleUI::initWidgetClass() pattern.
+   */
+  private async initWidgetClass(): Promise<void> {
+    const parser = new UIParser();
+
+    // Main Menu widgets
+    await this.registerWidgetClass('MAIN_MENU_BACKGROUND', 'main_menu.json', parser);
+
+    // TODO: Create MenuController for main menu buttons
+    // const menuController = new MenuController();
+    // await this.registerWidgetClass('MAIN_MENU_BUTTONS', 'assets/ui/main_menu_buttons.json', parser, menuController);
+    // menuController.registerOption(...);
+    // menuController.setCurrentOption(0);
+  }
+
+  /**
+   * Register a widget class by loading its JSON file and associating it with a type name.
+   */
+  private async registerWidgetClass(
+    type: string,
+    widgetPath: string,
+    parser: UIParser,
+    controller?: WidgetController,
+  ): Promise<void> {
+    // Load widget from JSON file
+    const widgetName = await parser.loadFileByName(widgetPath);
+    const widget = this.getWidgetByName(widgetName);
+
+    if (!widget) {
+      console.warn(`Failed to load widget from: ${widgetPath}`);
+      return;
+    }
+
+    // Create widget class structure
+    const widgetClass: WidgetClass = {
+      name: widgetName,
+      type: type,
+      widget: widget,
+      enabled: false,
+      controller: controller,
+    };
+
+    this.widgetStructureMap.set(type, widgetClass);
   }
 
   public update(dt: number): void {
@@ -111,6 +162,10 @@ export class ModuleUI extends Module {
   }
 
   public render(renderPass: GPURenderPassEncoder): void {
+    // UI always uses 1920x1080 design space, regardless of actual canvas size
+    // This ensures widgets designed for 1920x1080 work at any resolution
+    UIRenderUtils.updateScreenSize(1920, 1080);
+
     for (const widget of this.activeWidgets) {
       widget.doRender(renderPass);
     }
@@ -194,19 +249,24 @@ export class ModuleUI extends Module {
   }
 
   // --- WidgetClass logic ---
-  public registerWidgetClass(type: string, path: string, controller?: WidgetController) {
-    // TODO: Load widget from path, assign controller, etc.
-    const widgetClass: WidgetClass = {
-      name: path, // Placeholder: should resolve name from path
-      type,
-      widget: this.getWidgetByName(path),
-      enabled: false,
-    };
+  /**
+   * Register a widget class manually (public API).
+   * For initial setup, use the private async version called from initWidgetClass().
+   */
+  public registerWidgetClassManually(
+    type: string,
+    widgetName: string,
+    controller?: WidgetController,
+  ): void {
+    const widget = this.getWidgetByName(widgetName);
 
-    // Only add controller if provided
-    if (controller) {
-      widgetClass.controller = controller;
-    }
+    const widgetClass: WidgetClass = {
+      name: widgetName,
+      type: type,
+      widget: widget,
+      enabled: false,
+      controller: controller,
+    };
 
     this.widgetStructureMap.set(type, widgetClass);
   }

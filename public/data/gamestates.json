@@ -1,7 +1,7 @@
 {
-  "start": "gs_gameplay",
+  "start": "gs_main_menu",
   "gamestates": {
-    "gs_main_menu": [],
+    "gs_main_menu": ["main_menu"],
     "gs_loading": [],
     "gs_gameplay": ["boot", "camera_mixer", "game_controller"],
     "gs_editor": ["boot", "camera_mixer", "editor_selection"],

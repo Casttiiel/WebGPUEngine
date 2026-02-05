@@ -4,6 +4,7 @@ import { ModuleCameraMixer } from '../../modules/game/ModuleCameraMixer';
 import { ModuleGamePaused } from '../../modules/game/ModuleGamePaused';
 import { ModuleGameController } from '../../modules/game/ModuleGameController';
 import { ModuleEditorSelection } from '../../modules/game/ModuleEditorSelection';
+import { ModuleMainMenu } from '../../modules/game/ModuleMainMenu';
 import { ModuleEntities } from '../../modules/core/ModuleEntities';
 import { ModuleEnvironmentManager } from '../../modules/core/ModuleEnvironmentManager';
 import { ModuleInput } from '../../modules/core/ModuleInput';
@@ -95,6 +96,7 @@ export class Engine {
       this._modules.registerGameModule(new ModuleGameController('game_controller'));
       this._modules.registerGameModule(new ModuleGamePaused('game_paused'));
       this._modules.registerGameModule(new ModuleEditorSelection('editor_selection'));
+      this._modules.registerGameModule(new ModuleMainMenu('main_menu'));
 
       // Module Initialization: 40% -> 100% (dinámico según módulos)
       LoadingStatus.updateStatus('Starting modules...', 40);

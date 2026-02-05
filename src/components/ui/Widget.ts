@@ -190,8 +190,8 @@ export class Widget {
   }
 
   /**
-   * Compute local matrix: translation * scale * rotation * pivot
-   * Order: pivot → translation → scale → rotation
+   * Compute local matrix: translation * rotation * scale * pivot
+   * Order ensures position is in pixels, not affected by scale
    */
   protected computeLocal(): void {
     this.computePivot();
@@ -209,10 +209,11 @@ export class Widget {
     // Rotation only on Z axis
     mat4.fromZRotation(rot, this.rotation);
 
-    // Correct order: local = pivot * translation * scale * rotation
-    mat4.multiply(this.local, tr, this.pivot);
-    mat4.multiply(this.local, sc, this.local);
-    mat4.multiply(this.local, rot, this.local);
+    // Correct order for 2D UI: local = translation * rotation * scale * pivot
+    // This ensures position is in pixels, unaffected by scale
+    mat4.multiply(this.local, tr, rot); // local = tr * rot
+    mat4.multiply(this.local, this.local, sc); // local = (tr * rot) * sc
+    mat4.multiply(this.local, this.local, this.pivot); // local = (tr * rot * sc) * pivot
   }
 
   /**

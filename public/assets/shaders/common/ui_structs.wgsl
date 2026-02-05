@@ -3,11 +3,11 @@
 
 /**
  * Vertex input for UI quads.
- * Simple 2D position + UV coordinates.
+ * Uses vec3 position to match standard mesh format (Z is ignored).
  */
 struct UIVertexInput {
-    @location(0) position: vec2<f32>,  // 2D position in UI space
-    @location(1) uv: vec2<f32>,        // Texture coordinates
+    @location(0) position: vec3<f32>,  // 3D position (Z ignored for UI)
+    @location(2) uv: vec2<f32>,        // Texture coordinates (location 2 = UV buffer)
 }
 
 /**

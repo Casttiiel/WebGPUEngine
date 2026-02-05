@@ -12,13 +12,15 @@ fn vs(input: UIVertexInput) -> UIVertexOutput {
     var output: UIVertexOutput;
     
     // Transform vertex position using UI world matrix
-    // Input position is in local space (-0.5 to 0.5 for unit quad)
+    // Input position is vec3 but we only use XY (Z is ignored for UI)
     // Output position is in clip space (-1 to 1)
-    output.position = ui.transform * vec4<f32>(input.position, 0.0, 1.0);
+    output.position = ui.transform * vec4<f32>(input.position.xy, 0.0, 1.0);
     
     // Remap UVs based on minUV and maxUV (for texture atlasing and animation)
     // mix() does: minUV + input.uv * (maxUV - minUV)
-    output.uv = mix(ui.minUV, ui.maxUV, input.uv);
+    // Flip V coordinate (Y) to match WebGPU texture convention
+    let flippedUV = vec2<f32>(input.uv.x, 1.0 - input.uv.y);
+    output.uv = mix(ui.minUV, ui.maxUV, flippedUV);
     
     // Pass tint color to fragment shader
     output.color = ui.tint;

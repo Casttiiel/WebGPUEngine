@@ -38,6 +38,11 @@ export class ModuleRender extends Module {
   private fullscreenQuadMesh!: Mesh;
   private presentationBindGroup!: GPUBindGroup | null;
   private mainCamera!: Camera;
+  private defaultCamera!: Camera; // Cámara por defecto cuando no hay MainCamera
+
+  // Black texture for UI-only rendering (when no 3D camera exists)
+  private blackTexture!: GPUTexture;
+  private blackTextureView!: GPUTextureView;
 
   // Debug values para Tweakpane
   private debugValues = {
@@ -79,13 +84,69 @@ export class ModuleRender extends Module {
     // Inicializar VelocityBufferManager
     await VelocityBufferManager.getInstance().initialize(Render.width, Render.height);
 
+    // Create default camera for UI-only rendering (when no 3D scene camera exists)
+    this.defaultCamera = new Camera();
+    this.defaultCamera.setViewport(Render.width, Render.height);
+    this.mainCamera = this.defaultCamera;
+
+    // Create black texture for UI-only rendering mode
+    this.createBlackTextureResource();
+
     return true;
+  }
+
+  /**
+   * Create a black texture for UI-only rendering (when no 3D camera)
+   */
+  private createBlackTextureResource(): void {
+    const device = GPUUtils.getDevice();
+    const format = QualitySettings.getInstance().getSettings().hdrTexture;
+
+    this.blackTexture = device.createTexture({
+      label: 'black_texture_ui_only',
+      size: [Render.width, Render.height, 1],
+      format: format,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    this.blackTextureView = this.blackTexture.createView({
+      label: 'black_texture_view',
+    });
+
+    // Clear texture to black once
+    const encoder = device.createCommandEncoder({ label: 'clear_black_texture' });
+    const pass = encoder.beginRenderPass({
+      label: 'clear_black_pass',
+      colorAttachments: [
+        {
+          view: this.blackTextureView,
+          loadOp: 'clear',
+          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+          storeOp: 'store',
+        },
+      ],
+    });
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  }
+
+  /**
+   * Get black texture view for UI-only rendering
+   */
+  private createBlackTexture(): GPUTextureView {
+    return this.blackTextureView;
   }
 
   public onResolutionUpdated(): void {
     this.deferred.create(Render.width, Render.height);
     this.distorsions.resize();
     this.presentationBindGroup = null;
+
+    // Recreate black texture with new resolution
+    if (this.blackTexture) {
+      this.blackTexture.destroy();
+    }
+    this.createBlackTextureResource();
 
     // Redimensionar VelocityBufferManager
     VelocityBufferManager.getInstance().resize(Render.width, Render.height);
@@ -148,105 +209,128 @@ export class ModuleRender extends Module {
     }
 
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
-    if (!mainCameraEntity) {
-      return;
-    }
-    const cameraComponent = mainCameraEntity.getComponent('camera') as CameraComponent;
-    const camera = cameraComponent.getCamera();
-
-    // Enable camera jittering if temporal AA components are present
-    const needsJitter = mainCameraEntity.hasComponent('smaa_t2x');
-
-    if (needsJitter && !camera.isJitterEnabled()) {
-      camera.enableJitter();
-    } else if (!needsJitter && camera.isJitterEnabled()) {
-      camera.disableJitter();
-    }
-
-    // Advance to next jitter offset if jittering is active
-    if (needsJitter) {
-      camera.nextJitter();
-    }
 
     Render.getInstance().beginFrame();
-    RenderManager.getInstance().performCulling(camera);
-    RenderManager.getInstance().performLightCulling(camera);
-    this.deferred.generateShadowMaps();
 
-    RenderManager.getInstance().setCamera(camera);
+    let result: GPUTextureView;
 
-    this.mainCamera = camera;
+    // Si no hay MainCamera, usar textura negra en vez de intentar render 3D
+    if (!mainCameraEntity) {
+      result = this.createBlackTexture();
+    } else {
+      // Render 3D normal con cámara
+      const cameraComponent = mainCameraEntity.getComponent('camera') as CameraComponent;
+      const camera = cameraComponent.getCamera();
+      camera.setViewport(Render.width, Render.height);
+      this.mainCamera = camera;
 
-    let result = this.deferred.render(mainCameraEntity);
+      // Enable camera jittering if temporal AA components are present
+      const needsJitter = mainCameraEntity?.hasComponent('smaa_t2x');
 
-    // Enable velocity buffer if any component needs it
-    const velocityMgr = VelocityBufferManager.getInstance();
-    const needsVelocity = mainCameraEntity.hasComponent('smaa_t2x');
-    velocityMgr.setEnabled(needsVelocity);
-    // Generar velocity buffer si está activo
-    if (velocityMgr.isEnabled()) {
-      velocityMgr.generate(camera, this.deferred.getGBufferBindGroup());
-    }
-
-    if (mainCameraEntity.hasComponent('height_fog')) {
-      const heightFog = mainCameraEntity.getComponent('height_fog') as HeightFogComponent;
-      if (heightFog && heightFog.hasLoaded()) {
-        result = heightFog.apply(result, this.deferred.getGBufferBindGroup());
+      if (needsJitter && !camera.isJitterEnabled()) {
+        camera.enableJitter();
+      } else if (!needsJitter && camera.isJitterEnabled()) {
+        camera.disableJitter();
       }
-    }
 
-    if (mainCameraEntity.hasComponent('bloom')) {
-      const bloom = mainCameraEntity.getComponent('bloom') as BloomComponent;
-      const enableBloom = QualitySettings.getInstance().getSettings().enableBloom;
-
-      if (enableBloom && bloom.hasLoaded()) {
-        result = bloom.apply(result, this.deferred.getGBufferBindGroup());
+      // Advance to next jitter offset if jittering is active
+      if (needsJitter) {
+        camera.nextJitter();
       }
+
+      RenderManager.getInstance().performCulling(camera);
+      RenderManager.getInstance().performLightCulling(camera);
+      this.deferred.generateShadowMaps();
+
+      RenderManager.getInstance().setCamera(camera);
+
+      result = this.deferred.render(mainCameraEntity);
     }
 
-    if (mainCameraEntity.hasComponent('motion_blur')) {
-      const motionBlur = mainCameraEntity.getComponent('motion_blur') as MotionBlurComponent;
-      const enableMotionBlur = QualitySettings.getInstance().getSettings().enableMotionBlur;
+    // Post-processing solo si hay MainCamera
+    if (mainCameraEntity) {
+      // Enable velocity buffer if any component needs it
+      const velocityMgr = VelocityBufferManager.getInstance();
+      const needsVelocity = mainCameraEntity?.hasComponent('smaa_t2x');
+      velocityMgr.setEnabled(needsVelocity);
+      result = this.deferred.render(mainCameraEntity);
+    }
 
-      if (enableMotionBlur && motionBlur.hasLoaded()) {
-        result = motionBlur.apply(result, this.deferred.getGBufferBindGroup());
+    // Post-processing solo si hay MainCamera
+    if (mainCameraEntity) {
+      // Enable velocity buffer if any component needs it
+      const velocityMgr = VelocityBufferManager.getInstance();
+      const needsVelocity = mainCameraEntity?.hasComponent('smaa_t2x');
+      velocityMgr.setEnabled(needsVelocity);
+      // Generar velocity buffer si está activo
+      if (velocityMgr.isEnabled()) {
+        velocityMgr.generate(this.mainCamera, this.deferred.getGBufferBindGroup());
       }
-    }
 
-    this.distorsions.render(result, this.deferred.getDepthStencilView()!);
-
-    if (mainCameraEntity.hasComponent('depth_of_field')) {
-      const depthOfField = mainCameraEntity.getComponent('depth_of_field') as DepthOfFieldComponent;
-      if (depthOfField.hasLoaded()) {
-        result = depthOfField.apply(result, this.deferred.getGBufferBindGroup());
+      if (mainCameraEntity?.hasComponent('height_fog')) {
+        const heightFog = mainCameraEntity.getComponent('height_fog') as HeightFogComponent;
+        if (heightFog && heightFog.hasLoaded()) {
+          result = heightFog.apply(result, this.deferred.getGBufferBindGroup());
+        }
       }
-    }
 
-    if (mainCameraEntity.hasComponent('tone_mapping')) {
-      const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
-      if (toneMapping.hasLoaded()) {
-        result = toneMapping.apply(result);
+      if (mainCameraEntity?.hasComponent('bloom')) {
+        const bloom = mainCameraEntity.getComponent('bloom') as BloomComponent;
+        const enableBloom = QualitySettings.getInstance().getSettings().enableBloom;
+
+        if (enableBloom && bloom.hasLoaded()) {
+          result = bloom.apply(result, this.deferred.getGBufferBindGroup());
+        }
       }
-    }
 
-    if (mainCameraEntity.hasComponent('fxaa')) {
-      const antialiasing = mainCameraEntity.getComponent('fxaa') as FXAAComponent;
-      if (antialiasing.hasLoaded()) {
-        result = antialiasing.apply(result);
+      if (mainCameraEntity?.hasComponent('motion_blur')) {
+        const motionBlur = mainCameraEntity.getComponent('motion_blur') as MotionBlurComponent;
+        const enableMotionBlur = QualitySettings.getInstance().getSettings().enableMotionBlur;
+
+        if (enableMotionBlur && motionBlur.hasLoaded()) {
+          result = motionBlur.apply(result, this.deferred.getGBufferBindGroup());
+        }
       }
-    }
 
-    if (mainCameraEntity.hasComponent('smaa')) {
-      const antialiasing = mainCameraEntity.getComponent('smaa') as SMAAComponent;
-      if (antialiasing.hasLoaded()) {
-        result = antialiasing.apply(result);
+      this.distorsions.render(result, this.deferred.getDepthStencilView()!);
+
+      if (mainCameraEntity?.hasComponent('depth_of_field')) {
+        const depthOfField = mainCameraEntity.getComponent(
+          'depth_of_field',
+        ) as DepthOfFieldComponent;
+        if (depthOfField.hasLoaded()) {
+          result = depthOfField.apply(result, this.deferred.getGBufferBindGroup());
+        }
       }
-    }
 
-    if (mainCameraEntity.hasComponent('speed_lines_vfx')) {
-      const speedLines = mainCameraEntity.getComponent('speed_lines_vfx') as SpeedLinesVFXComponent;
-      if (speedLines.hasLoaded()) {
-        speedLines.apply(result);
+      if (mainCameraEntity?.hasComponent('tone_mapping')) {
+        const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
+        if (toneMapping.hasLoaded()) {
+          result = toneMapping.apply(result);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('fxaa')) {
+        const antialiasing = mainCameraEntity.getComponent('fxaa') as FXAAComponent;
+        if (antialiasing.hasLoaded()) {
+          result = antialiasing.apply(result);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('smaa')) {
+        const antialiasing = mainCameraEntity.getComponent('smaa') as SMAAComponent;
+        if (antialiasing.hasLoaded()) {
+          result = antialiasing.apply(result);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('speed_lines_vfx')) {
+        const speedLines = mainCameraEntity.getComponent(
+          'speed_lines_vfx',
+        ) as SpeedLinesVFXComponent;
+        if (speedLines.hasLoaded()) {
+          speedLines.apply(result);
+        }
       }
     }
 
@@ -345,8 +429,6 @@ export class ModuleRender extends Module {
   }
 
   public stop(): void {
-    console.log('Stopping ModuleRender...');
-
     try {
       // Clean up deferred renderer first
       if (this.deferred) {
@@ -361,12 +443,17 @@ export class ModuleRender extends Module {
 
       this.presentationBindGroup = null;
 
+      // Clean up black texture for UI-only rendering
+      if (this.blackTexture) {
+        this.blackTexture.destroy();
+        this.blackTexture = null as any;
+        this.blackTextureView = null as any;
+      }
+
       // Clean up UI rendering resources
       UIRenderUtils.destroy();
 
       RenderManager.getInstance().destroy();
-
-      console.log('ModuleRender stopped and resources cleaned up.');
     } catch (error) {
       console.error('Error stopping ModuleRender:', error);
     }

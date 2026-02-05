@@ -22,6 +22,9 @@ export class UIRenderUtils {
   private static standardTechnique: Technique | null = null;
   private static additiveTechnique: Technique | null = null;
   private static initialized = false;
+  private static orthoProjection: mat4 = mat4.create(); // Orthographic projection matrix
+  private static screenWidth: number = 1920;
+  private static screenHeight: number = 1080;
 
   /**
    * Initialize the UI rendering system
@@ -62,7 +65,30 @@ export class UIRenderUtils {
     }
 
     this.initialized = true;
-    console.log('UIRenderUtils: Initialized successfully');
+
+    // Initialize default screen size (will be updated by ModuleUI)
+    this.updateScreenSize(1920, 1080);
+  }
+
+  /**
+   * Update screen dimensions and recalculate orthographic projection
+   * Call this when the window resizes
+   */
+  public static updateScreenSize(width: number, height: number): void {
+    this.screenWidth = width;
+    this.screenHeight = height;
+
+    // Create orthographic projection: pixels [0, width] x [0, height] -> clip space [-1, 1] x [-1, 1]
+    // Note: Y axis is flipped (0 at top, height at bottom) to match UI convention
+    mat4.ortho(
+      this.orthoProjection,
+      0, // left
+      width, // right
+      height, // bottom (flipped for UI)
+      0, // top (flipped for UI)
+      -1, // near
+      1, // far
+    );
   }
 
   /**
@@ -112,8 +138,12 @@ export class UIRenderUtils {
       return;
     }
 
+    // Apply orthographic projection to transform
+    const finalTransform = mat4.create();
+    mat4.multiply(finalTransform, this.orthoProjection, transform);
+
     // Update uniform buffer with current parameters
-    this.updateUniforms({ transform, tint, minUV, maxUV });
+    this.updateUniforms({ transform: finalTransform, tint, minUV, maxUV });
 
     // Select technique based on blend mode
     const technique = additive ? this.additiveTechnique : this.standardTechnique;

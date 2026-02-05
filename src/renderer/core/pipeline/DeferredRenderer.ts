@@ -302,7 +302,7 @@ export class DeferredRenderer {
   }
 
   private renderAO(camera: Entity): GPUTextureView {
-    const ambientOcclusionComponent = camera.getComponent(
+    const ambientOcclusionComponent = camera?.getComponent(
       'ambient_occlusion',
     ) as AmbientOcclusionComponent;
     if (!ambientOcclusionComponent || !ambientOcclusionComponent.hasLoaded()) {
