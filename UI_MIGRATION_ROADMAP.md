@@ -69,29 +69,6 @@ UI System (C++/DirectX11)
 
 ### **FASE 7: Renderizado WebGPU para UI** 🎨 [4-5 días]
 
-#### 7.2 Técnicas para UI
-
-**Objetivo**: Crear técnicas (pipelines) para renderizado de UI.
-
-**Archivos a crear**:
-
-- `public/assets/techniques/ui.tech` - Técnica combinativa
-- `public/assets/techniques/ui_additive.tech` - Técnica aditiva
-
-**Configuración de técnicas**:
-
-```json
-{
-  "vs": "ui/ui.vs.wgsl",
-  "fs": "ui/ui.fs.wgsl",
-  "blend": "ALPHA",
-  "z": "ALWAYS",
-  "rs": "FILL",
-  "writesOn": "SCREEN",
-  "uniforms": ["UI_UNIFORMS", "UI_TEXTURE"]
-}
-```
-
 #### 7.3 UIRenderUtils
 
 **Objetivo**: Utilidades de renderizado de bajo nivel para UI.
