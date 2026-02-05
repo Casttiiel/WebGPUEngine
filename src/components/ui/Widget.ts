@@ -47,79 +47,126 @@ export class Widget {
     }
   }
 
-  private start(): void {
+  // ============================================================================
+  // LIFECYCLE METHODS
+  // ============================================================================
+
+  public start(): void {
     for (const fx of this.effects) fx.start();
     for (const child of this.children) child.start();
   }
 
-  private stop(): void {
+  public stop(): void {
     for (const fx of this.effects) fx.stop();
     for (const child of this.children) child.stop();
   }
 
-  private update(dt: number): void {
+  public update(dt: number): void {
     for (const fx of this.effects) fx.update(dt);
     for (const child of this.children) child.update(dt);
   }
 
-  private render(): void {
-    // To be implemented by subclasses or UI system
+  protected render(): void {
+    // To be implemented by subclasses
   }
 
-  private doRender(): void {
+  public doRender(): void {
     if (!this.params.visible) return;
     this.render();
     for (const child of this.children) child.doRender();
   }
 
-  private onActivate(): void {
+  public onActivate(): void {
     for (const child of this.children) child.onActivate();
   }
 
-  private onDeactivate(): void {
+  public onDeactivate(): void {
     for (const fx of this.effects) fx.onDeactivate?.();
     for (const child of this.children) child.onDeactivate();
   }
 
-  private updateTransform(): void {
+  public updateTransform(): void {
     this.computeAbsolute();
     for (const child of this.children) child.updateTransform();
   }
 
-  private setParent(parent: Widget | null): void {
+  // ============================================================================
+  // HIERARCHY MANAGEMENT
+  // ============================================================================
+
+  public setParent(parent: Widget | null): void {
     this.removeFromParent();
     if (!parent) return;
     this.parent = parent;
     parent.children.push(this);
   }
 
-  private removeFromParent(): void {
+  public removeFromParent(): void {
     if (!this.parent) return;
     const idx = this.parent.children.indexOf(this);
     if (idx >= 0) this.parent.children.splice(idx, 1);
     this.parent = null;
   }
 
-  public getAbsolute(): mat4 {
-    return this.absolute;
+  public addChild(child: Widget): void {
+    child.setParent(this);
   }
 
-  private getChildren(pos: number): Widget | undefined {
+  public getChildAt(pos: number): Widget | undefined {
     return this.children[pos];
   }
 
-  private getEffect(name: string): WidgetEffect | undefined {
+  public getAllChildren(): Widget[] {
+    return this.children;
+  }
+
+  // ============================================================================
+  // EFFECT MANAGEMENT
+  // ============================================================================
+
+  public addEffect(effect: WidgetEffect): void {
+    this.effects.push(effect);
+  }
+
+  public removeEffect(effect: WidgetEffect): void {
+    const idx = this.effects.indexOf(effect);
+    if (idx >= 0) this.effects.splice(idx, 1);
+  }
+
+  public getEffect(name: string): WidgetEffect | undefined {
     return this.effects.find((e) => e.getName() === name);
   }
 
-  private childAppears(
+  public getAllEffects(): WidgetEffect[] {
+    return this.effects;
+  }
+
+  // ============================================================================
+  // VISIBILITY AND ACTIVATION
+  // ============================================================================
+
+  public setVisible(visible: boolean): void {
+    this.params.visible = visible;
+  }
+
+  public isVisible(): boolean {
+    return this.params.visible;
+  }
+
+  public childAppears(
     getFromChildren: boolean,
     darkAlpha: boolean,
     initialTime: number,
     lerpTime: number,
   ): void {
-    // This is a stub. Real implementation would animate alpha, etc.
-    // Integration with ModuleUI.lerp() would be needed.
+    // Fade-in animation for widgets
+    // This would integrate with ModuleUI.lerp() system
+    // For now, it's a placeholder for future implementation
+    if (getFromChildren) {
+      for (const child of this.children) {
+        child.childAppears(true, darkAlpha, initialTime, lerpTime);
+      }
+    }
   }
 
   // ============================================================================
