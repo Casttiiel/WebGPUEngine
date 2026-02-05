@@ -146,6 +146,7 @@ export interface WidgetClass {
   type: string; // Widget type identifier
   widget?: Widget;
   controller?: WidgetController;
+  enabled: boolean; // Whether this widget class is currently active
 }
 
 /**

@@ -1,5 +1,8 @@
 // src/modules/core/ModuleUI.ts
 import { Module } from './Module';
+import { UIInputManager } from '../../core/ui/UIInputManager';
+import { Engine } from '../../core/engine/Engine';
+import { MouseButton } from '../../types/MouseButton.enum';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
 export class ModuleUI extends Module {
@@ -11,6 +14,11 @@ export class ModuleUI extends Module {
   private activeWidgets: Widget[] = [];
   private activeControllers: WidgetController[] = [];
   private widgetsToLerp: WidgetToLerp[] = [];
+
+  // Input system
+  private inputManager: UIInputManager = new UIInputManager();
+  private lastMouseClicked: boolean = false;
+
   // Legacy variables kept for future implementation
   // private sizeUI = 0;
   // private botonPulsadoGameOver = 0;
@@ -31,6 +39,9 @@ export class ModuleUI extends Module {
   }
 
   public update(dt: number): void {
+    // Update input system (must be done before controllers/widgets)
+    this.updateInput();
+
     // Update controllers
     for (const controller of this.activeControllers) {
       controller.update(dt);
@@ -45,10 +56,37 @@ export class ModuleUI extends Module {
     this.updateLerps(dt);
   }
 
+  private updateInput(): void {
+    const input = Engine.getInput();
+    if (!input) return;
+
+    // Get canvas dimensions
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
+
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    // Get mouse position from ModuleInput
+    const mousePos = input.getMousePosition();
+
+    // Convert window coordinates to UI space
+    const mouseUIPos = this.inputManager.windowToUISpace(mousePos.x, mousePos.y, width, height);
+
+    // Detect click (transition from not pressed to pressed)
+    const isMousePressed = input.isMouseButtonPressed(MouseButton.LEFT);
+    const isMouseClicked = isMousePressed && !this.lastMouseClicked;
+    this.lastMouseClicked = isMousePressed;
+
+    // Process input for all active widgets
+    this.inputManager.processInput(this.activeWidgets, mouseUIPos, isMouseClicked);
+  }
+
   private updateLerps(dt: number): void {
     // Process all active lerps
     for (let i = this.widgetsToLerp.length - 1; i >= 0; i--) {
       const lerp = this.widgetsToLerp[i];
+      if (!lerp) continue;
 
       // Store max element value on first frame
       if (lerp.isFirstFrame) {
@@ -91,6 +129,10 @@ export class ModuleUI extends Module {
     this.activeWidgets = [];
     this.activeControllers = [];
     this.widgetsToLerp = [];
+
+    // Reset input manager
+    this.inputManager.reset();
+    this.lastMouseClicked = false;
   }
 
   public override renderDebug(): void {
@@ -202,6 +244,22 @@ export class ModuleUI extends Module {
   public getWidgetController(type: string): WidgetController | undefined {
     return this.widgetStructureMap.get(type)?.controller;
   }
+
+  // ============================================================================
+  // INPUT SYSTEM ACCESS
+  // ============================================================================
+
+  /**
+   * Get the UIInputManager instance for advanced input handling.
+   * Controllers can use this for custom input detection.
+   */
+  public getInputManager(): UIInputManager {
+    return this.inputManager;
+  }
+
+  // ============================================================================
+  // LERP/TWEEN ANIMATION SYSTEM
+  // ============================================================================
 
   // Lerp/Tween animation system
   public lerp(

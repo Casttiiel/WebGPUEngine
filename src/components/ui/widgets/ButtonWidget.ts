@@ -19,6 +19,11 @@ export class ButtonWidget extends Widget {
 
   constructor(name: string, alias: string, params: WidgetParams) {
     super(name, alias, params);
+
+    // Set up input callbacks to trigger button state changes
+    this.onMouseEnter = () => this.triggerHover();
+    this.onMouseLeave = () => this.triggerUnhover();
+    this.onClick = () => this.triggerClick();
   }
 
   protected override render(): void {
@@ -75,7 +80,7 @@ export class ButtonWidget extends Widget {
   // INTERACTION CALLBACKS
   // ============================================================================
 
-  public setOnClick(callback: () => void): void {
+  public override setOnClick(callback: () => void): void {
     this.onClickCallback = callback;
   }
 

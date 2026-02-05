@@ -1,5 +1,6 @@
 // src/components/ui/widgets/ImageWidget.ts
 import { Widget } from '../Widget';
+import { vec2 } from 'gl-matrix';
 import type { WidgetParams, ImageParams } from '../../../types/WidgetTypes';
 import { createDefaultImageParams } from '../../../types/WidgetTypes';
 
@@ -58,8 +59,8 @@ export class ImageWidget extends Widget {
     this.imageParams.size = { x, y };
   }
 
-  public getSize(): { x: number; y: number } {
-    return this.imageParams.size;
+  public override getSize(): vec2 {
+    return vec2.fromValues(this.imageParams.size.x, this.imageParams.size.y);
   }
 
   public setColor(r: number, g: number, b: number, a: number): void {

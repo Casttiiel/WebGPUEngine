@@ -1,5 +1,5 @@
 // src/components/ui/Widget.ts
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, vec2, vec3 } from 'gl-matrix';
 import type { WidgetEffect, WidgetParams } from '../../types/WidgetTypes';
 
 /**
@@ -26,6 +26,11 @@ export class Widget {
   private pivotPoint: vec3 = vec3.fromValues(0, 0, 0);
   private scale: vec3 = vec3.fromValues(1, 1, 1);
   private rotation: number = 0;
+
+  // Input event callbacks (optional)
+  public onMouseEnter?: () => void;
+  public onMouseLeave?: () => void;
+  public onClick?: () => void;
 
   constructor(name: string, alias: string, params: WidgetParams) {
     this.name = name;
@@ -272,5 +277,50 @@ export class Widget {
   }
   public getParams(): WidgetParams {
     return this.params;
+  }
+
+  // Getters for transformation matrices
+  public getLocal(): mat4 {
+    return this.local;
+  }
+
+  public getAbsolute(): mat4 {
+    return this.absolute;
+  }
+
+  public getPivotMatrix(): mat4 {
+    return this.pivot;
+  }
+
+  // ============================================================================
+  // INPUT DETECTION SUPPORT
+  // ============================================================================
+
+  /**
+   * Get widget size for AABB collision detection.
+   * Returns size from params, scaled by current scale transform.
+   * Subclasses can override for dynamic sizes.
+   *
+   * @returns vec2 with width and height in UI space
+   */
+  public getSize(): vec2 {
+    const baseSize = this.params.size || { x: 1.0, y: 1.0 };
+    // Apply scale transform to base size
+    return vec2.fromValues(baseSize.x * this.scale[0], baseSize.y * this.scale[1]);
+  }
+
+  /**
+   * Set input event callbacks.
+   */
+  public setOnMouseEnter(callback: () => void): void {
+    this.onMouseEnter = callback;
+  }
+
+  public setOnMouseLeave(callback: () => void): void {
+    this.onMouseLeave = callback;
+  }
+
+  public setOnClick(callback: () => void): void {
+    this.onClick = callback;
   }
 }
