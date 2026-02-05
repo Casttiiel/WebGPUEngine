@@ -34,10 +34,8 @@
 18. Improve particles
 19. Multiple Light probes has good shadows?
 20. Weird line on corners is irradiance because of normals
-21. FXRotate - Rotación animada
-22. FXFade - Fade in/out de alpha
-23. FXPosition - Animación de posición (tweening)
-24. FXPulse - Efecto de pulsación/respiración
+21. FXPosition - Animación de posición (tweening)
+22. FXPulse - Efecto de pulsación/respiración
 
 ### Bugs
 
