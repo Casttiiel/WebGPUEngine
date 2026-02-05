@@ -2,9 +2,9 @@
 
 1. UI
 2. Start Screen
-3. Game Loading Screen
-4. Remove en main.ts el skip first frame?
-5. Text Renderer
+3. Text Renderer
+4. Game Loading Screen
+5. Remove en main.ts el skip first frame?
 
 6. Blender
    Export With PBR Material

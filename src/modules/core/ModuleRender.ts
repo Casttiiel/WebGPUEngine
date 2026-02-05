@@ -25,16 +25,13 @@ import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXCompon
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
-import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
+import { ModuleUI } from './ModuleUI';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private distorsions!: Distorsions;
   public pauseRendering: boolean = false; // Flag para pausar rendering durante probe capture
-
-  // UI Rendering
-  private rtUIOutput: RenderTarget;
 
   //Presentation data
   private presentationTechnique!: Technique;
@@ -56,7 +53,6 @@ export class ModuleRender extends Module {
     super(name);
     this.deferred = new DeferredRenderer();
     this.distorsions = new Distorsions();
-    this.rtUIOutput = new RenderTarget();
   }
 
   public async start(): Promise<boolean> {
@@ -90,10 +86,6 @@ export class ModuleRender extends Module {
     this.deferred.create(Render.width, Render.height);
     this.distorsions.resize();
     this.presentationBindGroup = null;
-
-    // Create UI render target with LDR format (UI is rendered after tone mapping)
-    // UI doesn't need HDR - it's standard 0-1 color range with alpha for blending
-    this.rtUIOutput.createRT('ui_output', Render.width, Render.height, 'rgba8unorm');
 
     // Redimensionar VelocityBufferManager
     VelocityBufferManager.getInstance().resize(Render.width, Render.height);
@@ -258,13 +250,56 @@ export class ModuleRender extends Module {
       }
     }
 
+    // Render UI overlay on top of result texture
+    this.renderUIOnTexture(result);
+
+    // Present final result to screen
     this.presentResult(result);
 
     Render.getInstance().endFrame();
   }
 
-  private presentResult(result: GPUTextureView): void {
+  /**
+   * Render UI overlay directly on top of result texture
+   */
+  private renderUIOnTexture(resultView: GPUTextureView): void {
+    const moduleUI = ModuleUI.getInstance();
+    if (!moduleUI) {
+      return; // No UI module
+    }
+
     const render = Render.getInstance();
+    const encoder = render.getDevice().createCommandEncoder({
+      label: 'ui_overlay_encoder',
+    });
+
+    // Render UI directly on result texture with load operation
+    const renderPass = encoder.beginRenderPass({
+      label: 'ui_overlay_pass',
+      colorAttachments: [
+        {
+          view: resultView,
+          loadOp: 'load', // Load existing scene content
+          storeOp: 'store',
+        },
+      ],
+    });
+
+    // Set viewport to full canvas size
+    const canvasSize = Render.canvasSize;
+    GPUUtils.configureViewportAndScissor(renderPass, canvasSize.width, canvasSize.height);
+
+    // Render all active UI widgets
+    moduleUI.render(renderPass);
+
+    renderPass.end();
+    render.getDevice().queue.submit([encoder.finish()]);
+  }
+
+  private presentResult(sceneResult: GPUTextureView): void {
+    const render = Render.getInstance();
+
+    // Create bind group for scene presentation
     if (!this.presentationBindGroup) {
       const sampler = SamplerLibrary.simpleSampler;
 
@@ -274,7 +309,7 @@ export class ModuleRender extends Module {
         [
           {
             binding: 0,
-            resource: result,
+            resource: sceneResult,
           },
           {
             binding: 1,
@@ -283,6 +318,7 @@ export class ModuleRender extends Module {
         ],
       );
     }
+
     const colorAttachment = GPUUtils.createColorAttachment(
       render.getContext().getCurrentTexture().createView(),
       'clear',
@@ -299,16 +335,10 @@ export class ModuleRender extends Module {
     const canvasSize = Render.canvasSize;
     GPUUtils.configureViewportAndScissor(pass, canvasSize.width, canvasSize.height);
 
-    // 1. Activate pipeline
+    // Render result to screen
     this.presentationTechnique.activatePipeline(pass);
-
-    // 2. Activate mesh data
     this.fullscreenQuadMesh.activate(pass);
-
-    // 3. Set bind groups
     pass.setBindGroup(0, this.presentationBindGroup);
-
-    // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
 
     pass.end();

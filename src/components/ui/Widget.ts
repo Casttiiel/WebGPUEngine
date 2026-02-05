@@ -70,14 +70,14 @@ export class Widget {
     for (const child of this.children) child.update(dt);
   }
 
-  protected render(): void {
+  protected render(_renderPass: GPURenderPassEncoder): void {
     // To be implemented by subclasses
   }
 
-  public doRender(): void {
+  public doRender(renderPass: GPURenderPassEncoder): void {
     if (!this.params.visible) return;
-    this.render();
-    for (const child of this.children) child.doRender();
+    this.render(renderPass);
+    for (const child of this.children) child.doRender(renderPass);
   }
 
   public onActivate(): void {

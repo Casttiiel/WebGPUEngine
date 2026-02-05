@@ -26,12 +26,13 @@ export class ButtonWidget extends Widget {
     this.onClick = () => this.triggerClick();
   }
 
-  protected override render(): void {
-    // Rendering will be handled by UIRenderUtils in FASE 7
+  protected override render(_renderPass: GPURenderPassEncoder): void {
     // Renders current state's image and text
     if (this.currentState) {
-      // UIRenderUtils.renderImage(this.getAbsolute(), this.currentState.imageParams);
-      // UIRenderUtils.renderText(this.getAbsolute(), this.currentState.textParams);
+      // Render state texture if available
+      // UIRenderUtils.renderBitmap(renderPass, texture, ...);
+      // Render state text if available
+      // UIRenderUtils.renderText(renderPass, ...);
     }
   }
 

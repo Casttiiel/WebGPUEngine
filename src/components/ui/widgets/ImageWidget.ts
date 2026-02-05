@@ -1,8 +1,10 @@
 // src/components/ui/widgets/ImageWidget.ts
 import { Widget } from '../Widget';
-import { vec2 } from 'gl-matrix';
+import { vec2, vec4 } from 'gl-matrix';
 import type { WidgetParams, ImageParams } from '../../../types/WidgetTypes';
 import { createDefaultImageParams } from '../../../types/WidgetTypes';
+import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
+import { Texture } from '../../../renderer/resources/Texture';
 
 /**
  * ImageWidget - Renders textures/sprites with full control over UV, color, and blending.
@@ -10,6 +12,8 @@ import { createDefaultImageParams } from '../../../types/WidgetTypes';
  */
 export class ImageWidget extends Widget {
   protected imageParams: ImageParams;
+  private cachedTexture: Texture | null = null;
+  private cachedTexturePath: string | null = null;
 
   constructor(
     name: string,
@@ -33,10 +37,46 @@ export class ImageWidget extends Widget {
     }
   }
 
-  protected override render(): void {
-    // Rendering will be handled by UIRenderUtils in FASE 7
-    // For now, this is a placeholder
-    // UIRenderUtils.renderImage(this.getAbsolute(), this.imageParams);
+  protected override render(renderPass: GPURenderPassEncoder): void {
+    // Skip if no texture is set
+    if (!this.imageParams.texture) return;
+
+    // Check if texture needs to be loaded/reloaded
+    if (this.cachedTexturePath !== this.imageParams.texture) {
+      this.cachedTexturePath = this.imageParams.texture;
+      this.cachedTexture = null;
+
+      // Load texture asynchronously only when texture path changes
+      Texture.getAsync(this.imageParams.texture)
+        .then((texture) => {
+          this.cachedTexture = texture;
+        })
+        .catch((error) => {
+          console.error(`Failed to load texture: ${this.imageParams.texture}`, error);
+        });
+    }
+
+    // Only render if texture is loaded
+    if (!this.cachedTexture) return;
+
+    // Convert color to tint vec4
+    const color = this.imageParams.color;
+    const tint = vec4.fromValues(color.r, color.g, color.b, color.a);
+
+    // Convert UV to vec2
+    const minUV = vec2.fromValues(this.imageParams.minUV.x, this.imageParams.minUV.y);
+    const maxUV = vec2.fromValues(this.imageParams.maxUV.x, this.imageParams.maxUV.y);
+
+    // Render using UIRenderUtils
+    UIRenderUtils.renderBitmap(
+      renderPass,
+      this.cachedTexture,
+      this.getAbsolute(), // Transform matrix
+      tint,
+      minUV,
+      maxUV,
+      this.imageParams.additive, // Additive blending mode
+    );
   }
 
   // ============================================================================

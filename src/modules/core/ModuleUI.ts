@@ -110,9 +110,9 @@ export class ModuleUI extends Module {
     }
   }
 
-  public render(): void {
+  public render(renderPass: GPURenderPassEncoder): void {
     for (const widget of this.activeWidgets) {
-      widget.doRender();
+      widget.doRender(renderPass);
     }
   }
 
@@ -200,9 +200,14 @@ export class ModuleUI extends Module {
       name: path, // Placeholder: should resolve name from path
       type,
       widget: this.getWidgetByName(path),
-      controller,
       enabled: false,
     };
+
+    // Only add controller if provided
+    if (controller) {
+      widgetClass.controller = controller;
+    }
+
     this.widgetStructureMap.set(type, widgetClass);
   }
 

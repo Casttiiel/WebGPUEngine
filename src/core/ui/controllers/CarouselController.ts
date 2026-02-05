@@ -40,9 +40,7 @@ export class CarouselController extends WidgetController {
 
     // Hide all slides except the current one
     if (this.slides.length > 1) {
-      // TODO: Implement setActive method in Widget class
-      // slide.setActive(false);
-      slide; // Keep slide to avoid unused variable warning
+      slide.setActive(false);
     }
   }
 
