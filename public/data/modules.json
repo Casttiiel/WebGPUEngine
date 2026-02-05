@@ -9,6 +9,7 @@
     "game_controller",
     "game_paused",
     "input",
+    "ui",
     "render",
     "sound"
   ],

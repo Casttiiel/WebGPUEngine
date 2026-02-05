@@ -1,8 +1,10 @@
-// src/modules/ui/ModuleUI.ts
+// src/modules/core/ModuleUI.ts
 import { Module } from './Module';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
 export class ModuleUI extends Module {
+  private static instance: ModuleUI | null = null;
+
   private widgetStructureMap: Map<string, WidgetClass> = new Map();
   private registeredWidgets: Map<string, Widget> = new Map();
   private registeredAlias: Map<string, Widget> = new Map();
@@ -15,6 +17,11 @@ export class ModuleUI extends Module {
 
   constructor(name: string) {
     super(name);
+    ModuleUI.instance = this;
+  }
+
+  public static getInstance(): ModuleUI | null {
+    return ModuleUI.instance;
   }
 
   public async start(): Promise<boolean> {
@@ -23,41 +30,96 @@ export class ModuleUI extends Module {
   }
 
   public update(dt: number): void {
-    for (const controller of this.activeControllers) controller.update(dt);
-    for (const widget of this.activeWidgets) widget.update(dt);
-    // Lerp logic (stub, see C++ for full logic)
+    // Update controllers
+    for (const controller of this.activeControllers) {
+      controller.update(dt);
+    }
+
+    // Update widgets
+    for (const widget of this.activeWidgets) {
+      widget.update(dt);
+    }
+
+    // Update lerp animations
+    this.updateLerps(dt);
   }
 
-  private render(): void {
-    for (const widget of this.activeWidgets) widget.doRender();
+  private updateLerps(dt: number): void {
+    // Process all active lerps
+    for (let i = this.widgetsToLerp.length - 1; i >= 0; i--) {
+      const lerp = this.widgetsToLerp[i];
+
+      // Store max element value on first frame
+      if (lerp.isFirstFrame) {
+        lerp.maxElement = lerp.element.value;
+        lerp.isFirstFrame = false;
+      }
+
+      // Update time
+      lerp.currentTime += dt;
+
+      // Calculate lerp ratio
+      const ratio = Math.min(lerp.currentTime / lerp.lerpTime, 1.0);
+
+      // Interpolate value
+      lerp.element.value = lerp.maxElement + (lerp.value - lerp.maxElement) * ratio;
+
+      // Remove completed lerps
+      if (ratio >= 1.0) {
+        this.widgetsToLerp.splice(i, 1);
+      }
+    }
   }
 
-  public override renderInMenu(): void {}
+  public render(): void {
+    for (const widget of this.activeWidgets) {
+      widget.doRender();
+    }
+  }
+
+  public override renderInMenu(): void {
+    // Debug UI rendering for ModuleUI
+    // TODO: Add debug controls if needed
+  }
 
   public override stop(): void {
-    throw new Error('Method not implemented.');
-  }
-  public override renderDebug(): void {
-    throw new Error('Method not implemented.');
+    // Deactivate all widgets
+    for (const widget of this.activeWidgets) {
+      widget.stop();
+    }
+    this.activeWidgets = [];
+    this.activeControllers = [];
+    this.widgetsToLerp = [];
   }
 
-  private registerWidget(widget: Widget): void {
+  public override renderDebug(): void {
+    // Debug rendering for widgets
+    for (const widget of this.activeWidgets) {
+      widget.renderDebug();
+    }
+  }
+
+  public registerWidget(widget: Widget): void {
     this.registeredWidgets.set(widget.name, widget);
   }
 
-  private registerAlias(widget: Widget): void {
-    this.registeredAlias.set(widget.alias, widget);
+  public registerAlias(widget: Widget): void {
+    if (widget.alias) {
+      this.registeredAlias.set(widget.alias, widget);
+    }
   }
 
-  private activateWidget(name: string): void {
+  public activateWidget(name: string): void {
     const widget = this.getWidgetByName(name);
     if (widget) {
-      this.activeWidgets.push(widget);
+      if (!this.activeWidgets.includes(widget)) {
+        this.activeWidgets.push(widget);
+      }
       widget.start();
     }
   }
 
-  private deactivateWidget(name: string): void {
+  public deactivateWidget(name: string): void {
     const idx = this.activeWidgets.findIndex((w) => w.name === name);
     if (idx >= 0) {
       this.activeWidgets[idx].stop();
@@ -65,11 +127,13 @@ export class ModuleUI extends Module {
     }
   }
 
-  private registerController(controller: WidgetController): void {
-    this.activeControllers.push(controller);
+  public registerController(controller: WidgetController): void {
+    if (!this.activeControllers.includes(controller)) {
+      this.activeControllers.push(controller);
+    }
   }
 
-  private unregisterController(controller?: WidgetController): void {
+  public unregisterController(controller?: WidgetController): void {
     if (!controller) {
       this.activeControllers = [];
       return;
@@ -78,27 +142,28 @@ export class ModuleUI extends Module {
     if (idx >= 0) this.activeControllers.splice(idx, 1);
   }
 
-  private getWidgetByName(name: string): Widget | undefined {
+  public getWidgetByName(name: string): Widget | undefined {
     return this.registeredWidgets.get(name);
   }
 
-  private getWidgetByAlias(alias: string): Widget | undefined {
+  public getWidgetByAlias(alias: string): Widget | undefined {
     return this.registeredAlias.get(alias);
   }
 
   // --- WidgetClass logic ---
-  private registerWidgetClass(type: string, path: string, controller?: WidgetController) {
+  public registerWidgetClass(type: string, path: string, controller?: WidgetController) {
     // TODO: Load widget from path, assign controller, etc.
     const widgetClass: WidgetClass = {
       name: path, // Placeholder: should resolve name from path
       type,
       widget: this.getWidgetByName(path),
       controller,
+      enabled: false,
     };
     this.widgetStructureMap.set(type, widgetClass);
   }
 
-  private activateWidgetClass(name: string): Widget | undefined {
+  public activateWidgetClass(name: string): Widget | undefined {
     const widgetClass = this.widgetStructureMap.get(name);
     if (!widgetClass || widgetClass.enabled) return undefined;
     const widget = this.getWidgetByName(widgetClass.name);
@@ -106,14 +171,16 @@ export class ModuleUI extends Module {
       widget.onActivate();
       widgetClass.enabled = true;
       this.widgetStructureMap.set(name, widgetClass);
-      this.activeWidgets.push(widget);
+      if (!this.activeWidgets.includes(widget)) {
+        this.activeWidgets.push(widget);
+      }
       if (widgetClass.controller) this.registerController(widgetClass.controller);
       return widget;
     }
     return undefined;
   }
 
-  private deactivateWidgetClass(name: string): void {
+  public deactivateWidgetClass(name: string): void {
     const widgetClass = this.widgetStructureMap.get(name);
     if (!widgetClass) return;
     const widget = this.getWidgetByName(widgetClass.name);
@@ -127,16 +194,16 @@ export class ModuleUI extends Module {
     if (widgetClass.controller) this.unregisterController(widgetClass.controller);
   }
 
-  private getWidget(name: string): Widget | undefined {
+  public getWidget(name: string): Widget | undefined {
     return this.widgetStructureMap.get(name)?.widget;
   }
 
-  private getWidgetController(type: string): WidgetController | undefined {
+  public getWidgetController(type: string): WidgetController | undefined {
     return this.widgetStructureMap.get(type)?.controller;
   }
 
-  // Lerp logic stub
-  private lerp(
+  // Lerp/Tween animation system
+  public lerp(
     element: { value: number },
     valueToLerp: number,
     initialTime: number,

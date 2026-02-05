@@ -8,8 +8,8 @@
 
 6. Blender
    Export With PBR Material
-   Control if Needs collider
    Local triplanar mapping
+   Control if Needs collider
    Export with player spawn?
 7. Light/Shadow bug on level-1?
 8. AO
