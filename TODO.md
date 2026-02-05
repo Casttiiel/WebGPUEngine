@@ -1,40 +1,39 @@
 ### Engine
 
-1. UI
-2. Start Screen
-3. Text Renderer
-4. Game Loading Screen
-5. Remove en main.ts el skip first frame?
+1. Start Screen
+2. Game Loading Screen
+3. Remove en main.ts el skip first frame?
+4. Text Renderer
 
-6. Blender
+5. Blender
    Export With PBR Material
    Local triplanar mapping
    Control if Needs collider
    Export with player spawn?
-7. Light/Shadow bug on level-1?
-8. AO
-9. Point Light shadows
-10. Froxel Volumetric Scattering + Height Fog
-    Density Noise
-    Directional Light Injection
-    Point Light Injection Shadows
-    PCF
-    Fog Color
-    Spot Light Injection
+6. Light/Shadow bug on level-1?
+7. AO
+8. Point Light shadows
+9. Froxel Volumetric Scattering + Height Fog
+   Density Noise
+   Directional Light Injection
+   Point Light Injection Shadows
+   PCF
+   Fog Color
+   Spot Light Injection
 
-11. Editor Light Probes (Render Debug / Gizmo)
-12. Editor Point Lights (Render Debug / Gizmo / Menu)
-13. Editor Spot Lights (Render Debug / Gizmo / Menu)
-14. Asset Browser + Spawn + Delete
+10. Editor Light Probes (Render Debug / Gizmo)
+11. Editor Point Lights (Render Debug / Gizmo / Menu)
+12. Editor Spot Lights (Render Debug / Gizmo / Menu)
+13. Asset Browser + Spawn + Delete
 
-15. Quality settings selection
-16. Error en consola de GLTF retrasa en web?
-17. Remove As Any
-18. Improve particles
-19. Multiple Light probes has good shadows?
-20. Weird line on corners is irradiance because of normals
-21. FXPosition - Animación de posición (tweening)
-22. FXPulse - Efecto de pulsación/respiración
+14. Quality settings selection
+15. Error en consola de GLTF retrasa en web?
+16. Remove As Any
+17. Improve particles
+18. Multiple Light probes has good shadows?
+19. Weird line on corners is irradiance because of normals
+20. FXPosition - Animación de posición (tweening)
+21. FXPulse - Efecto de pulsación/respiración
 
 ### Bugs
 
