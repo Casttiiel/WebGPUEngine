@@ -7,8 +7,6 @@ import { EffectMode } from '../../../types/WidgetTypes';
 
 /**
  * FXScale - Animates widget scale over time with interpolation.
- * Replicates C++ CFXScale.
- *
  * Supports three modes: Single, Loop, PingPong.
  */
 export class FXScale extends WidgetEffect {

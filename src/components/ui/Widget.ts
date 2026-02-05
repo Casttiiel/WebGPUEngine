@@ -4,8 +4,7 @@ import type { WidgetEffect, WidgetParams } from '../../types/WidgetTypes';
 
 /**
  * Widget base class with integrated 4x4 matrix transformations.
- * Replicates C++/DirectX11 UI system architecture.
- *
+ * 
  * ⚠️ Uses mat4 (4x4) with Z=0 for 2D transformations (NOT 2D matrices).
  */
 export class Widget {
@@ -16,7 +15,7 @@ export class Widget {
   private children: Widget[] = [];
   private effects: WidgetEffect[] = [];
 
-  // ⚠️ Transformation matrices (4x4) - integrated in Widget like C++ original
+  // ⚠️ Transformation matrices (4x4)
   private pivot: mat4 = mat4.create();
   private local: mat4 = mat4.create();
   private absolute: mat4 = mat4.create();
@@ -175,12 +174,11 @@ export class Widget {
   }
 
   // ============================================================================
-  // TRANSFORMATION SYSTEM (replicates C++/DirectX11 original)
+  // TRANSFORMATION SYSTEM
   // ============================================================================
 
   /**
    * Compute pivot matrix: Identity * Translation(-pivot.x, -pivot.y, 0)
-   * Identical to C++ implementation.
    */
   protected computePivot(): void {
     mat4.identity(this.pivot);
@@ -193,7 +191,6 @@ export class Widget {
 
   /**
    * Compute local matrix: translation * scale * rotation * pivot
-   * Identical to C++: local = rot * sc * tr
    * Order: pivot → translation → scale → rotation
    */
   protected computeLocal(): void {
@@ -220,7 +217,7 @@ export class Widget {
 
   /**
    * Compute absolute (world) matrix with parent hierarchy.
-   * Identical to C++: absolute = parent ? local * parent.absolute : local
+   * Formula: absolute = parent ? local * parent.absolute : local
    */
   protected computeAbsolute(): void {
     this.computeLocal();

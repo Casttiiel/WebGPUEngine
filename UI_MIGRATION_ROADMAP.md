@@ -69,56 +69,6 @@ UI System (C++/DirectX11)
 
 ### **FASE 7: Renderizado WebGPU para UI** 🎨 [4-5 días]
 
-#### 7.1 Shaders para UI
-
-**Objetivo**: Crear shaders específicos para renderizado de UI.
-
-**Archivos a crear**:
-
-- `public/assets/shaders/ui/ui.vs.wgsl` - Vertex shader UI
-- `public/assets/shaders/ui/ui.fs.wgsl` - Fragment shader UI
-- `public/assets/shaders/ui/ui_additive.fs.wgsl` - Fragment shader aditivo
-- `public/assets/shaders/ui/ui_text.fs.wgsl` - Fragment shader para texto
-
-**Características de shaders**:
-
-- [ ] Input: posición 2D, UVs
-- [ ] Uniforms: matriz de transformación, color tint, minUV, maxUV
-- [ ] Output: color RGBA con blending alpha
-- [ ] Soporte para modo aditivo (brillos, efectos)
-- [ ] Sampling de texturas con UV remapping
-
-**Ejemplo de vertex shader UI**:
-
-```wgsl
-struct VertexInput {
-    @location(0) position: vec2<f32>,
-    @location(1) uv: vec2<f32>,
-}
-
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-}
-
-struct UIUniforms {
-    transform: mat4x4<f32>,
-    tint: vec4<f32>,
-    minUV: vec2<f32>,
-    maxUV: vec2<f32>,
-}
-
-@group(0) @binding(0) var<uniform> ui: UIUniforms;
-
-@vertex
-fn vs_main(input: VertexInput) -> VertexOutput {
-    var output: VertexOutput;
-    output.position = ui.transform * vec4<f32>(input.position, 0.0, 1.0);
-    output.uv = mix(ui.minUV, ui.maxUV, input.uv);
-    return output;
-}
-```
-
 #### 7.2 Técnicas para UI
 
 **Objetivo**: Crear técnicas (pipelines) para renderizado de UI.

@@ -16,7 +16,7 @@ export interface SpriteConfig {
 
 /**
  * SpriteWidget - Frame-by-frame animation with multi-sprite support.
- * Replicates C++ CSprite widget with full animation system.
+ * Full animation system with configurable FPS and looping modes.
  *
  * ⚠️ Supports MULTIPLE sprite sheets per widget (playingSprite index).
  */

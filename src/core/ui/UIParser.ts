@@ -29,7 +29,7 @@ import { vec2 } from 'gl-matrix';
 
 /**
  * UIParser - Loads and parses UI widgets from JSON files.
- * Replicates C++ UI parser functionality.
+ * Integrated with ResourceManager for asset loading.
  */
 export class UIParser {
   // ============================================================================

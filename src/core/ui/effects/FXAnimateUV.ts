@@ -5,8 +5,6 @@ import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
 
 /**
  * FXAnimateUV - Animates UV coordinates over time.
- * Replicates C++ CFXAnimateUV.
- *
  * Used for scrolling textures, water effects, fire, etc.
  */
 export class FXAnimateUV extends WidgetEffect {

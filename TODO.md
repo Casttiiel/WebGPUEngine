@@ -15,7 +15,6 @@
 8. AO
 9. Point Light shadows
 10. Froxel Volumetric Scattering + Height Fog
-    .WGSL File
     Density Noise
     Directional Light Injection
     Point Light Injection Shadows

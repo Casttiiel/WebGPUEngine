@@ -2,8 +2,6 @@
 
 /**
  * WidgetController - Base class for UI controllers.
- * Replicates C++ CController architecture.
- *
  * Controllers manage widget behavior and user interaction logic.
  */
 export abstract class WidgetController {

@@ -5,7 +5,7 @@ import { ButtonState } from '../../../types/WidgetTypes';
 
 /**
  * ButtonWidget - Interactive widget with multiple visual states.
- * Replicates C++ CButton widget with state system.
+ * Supports multiple states (normal, hover, pressed, disabled) with smooth transitions.
  */
 export class ButtonWidget extends Widget {
   private states: Map<string, ButtonStateConfig> = new Map();

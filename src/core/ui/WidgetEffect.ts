@@ -3,8 +3,6 @@ import type { Widget } from '../../components/ui/Widget';
 
 /**
  * WidgetEffect - Base class for UI visual effects.
- * Replicates C++ CEffect architecture.
- *
  * Effects modify widget properties over time (scale, UV, rotation, etc.).
  */
 export abstract class WidgetEffect {
