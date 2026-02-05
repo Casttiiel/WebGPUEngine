@@ -1,0 +1,262 @@
+import { mat4, vec2, vec4 } from 'gl-matrix';
+import { Mesh } from '../resources/Mesh';
+import { Texture } from '../resources/Texture';
+import { Technique } from '../resources/Technique';
+import { GPUUtils } from './utils/GPUUtils';
+
+interface UIUniformsData {
+  transform: mat4;
+  tint: vec4;
+  minUV: vec2;
+  maxUV: vec2;
+}
+
+/**
+ * Static utility class for UI rendering operations
+ * Manages uniform buffers, bind groups, and draw calls for UI widgets
+ */
+export class UIRenderUtils {
+  private static device: GPUDevice;
+  private static uniformBuffer: GPUBuffer;
+  private static quadMesh: Mesh | null = null;
+  private static standardTechnique: Technique | null = null;
+  private static additiveTechnique: Technique | null = null;
+  private static initialized = false;
+
+  /**
+   * Initialize the UI rendering system
+   * Must be called once before any rendering
+   */
+  public static async initialize(): Promise<void> {
+    if (this.initialized) {
+      console.warn('UIRenderUtils: Already initialized');
+      return;
+    }
+
+    this.device = GPUUtils.getDevice();
+
+    // Create uniform buffer for UIUniforms
+    // mat4 (64 bytes) + vec4 (16 bytes) + vec2 (8 bytes) + vec2 (8 bytes) = 96 bytes
+    // Align to 256 bytes for uniform buffer constraints
+    this.uniformBuffer = GPUUtils.createBuffer(
+      'ui_uniforms',
+      256,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    // Load UI quad mesh
+    try {
+      this.quadMesh = await Mesh.get('assets/meshes/ui/unit_plane_xy_ui.obj');
+    } catch (error) {
+      console.error('UIRenderUtils: Failed to load UI quad mesh', error);
+      throw error;
+    }
+
+    // Load techniques
+    try {
+      this.standardTechnique = await Technique.getAsync('assets/techniques/ui/ui.tech');
+      this.additiveTechnique = await Technique.getAsync('assets/techniques/ui/ui_additive.tech');
+    } catch (error) {
+      console.error('UIRenderUtils: Failed to load UI techniques', error);
+      throw error;
+    }
+
+    this.initialized = true;
+    console.log('UIRenderUtils: Initialized successfully');
+  }
+
+  /**
+   * Clean up GPU resources
+   */
+  public static destroy(): void {
+    if (!this.initialized) return;
+
+    this.uniformBuffer?.destroy();
+    this.quadMesh?.release();
+    this.standardTechnique?.release();
+    this.additiveTechnique?.release();
+
+    this.uniformBuffer = null!;
+    this.quadMesh = null;
+    this.standardTechnique = null;
+    this.additiveTechnique = null;
+    this.initialized = false;
+  }
+
+  /**
+   * Render a bitmap (texture) with the given transform and parameters
+   * @param pass - The render pass encoder
+   * @param texture - The texture to render
+   * @param transform - World transform matrix (position, rotation, scale)
+   * @param tint - Color tint (RGBA, default white)
+   * @param minUV - Minimum UV coordinates (default [0, 0])
+   * @param maxUV - Maximum UV coordinates (default [1, 1])
+   * @param additive - Use additive blending instead of alpha blending
+   */
+  public static renderBitmap(
+    pass: GPURenderPassEncoder,
+    texture: Texture,
+    transform: mat4,
+    tint: vec4 = vec4.fromValues(1, 1, 1, 1),
+    minUV: vec2 = vec2.fromValues(0, 0),
+    maxUV: vec2 = vec2.fromValues(1, 1),
+    additive: boolean = false,
+  ): void {
+    if (!this.initialized) {
+      console.error('UIRenderUtils: Not initialized, call initialize() first');
+      return;
+    }
+
+    if (!this.quadMesh || !this.standardTechnique || !this.additiveTechnique) {
+      console.error('UIRenderUtils: Required resources not loaded');
+      return;
+    }
+
+    // Update uniform buffer with current parameters
+    this.updateUniforms({ transform, tint, minUV, maxUV });
+
+    // Select technique based on blend mode
+    const technique = additive ? this.additiveTechnique : this.standardTechnique;
+
+    // Activate technique (sets pipeline)
+    technique.activatePipeline(pass);
+
+    // Bind group 0: UIUniforms (BufferUniform)
+    const uniformBindGroup = this.createUniformBindGroup(technique);
+    pass.setBindGroup(0, uniformBindGroup);
+
+    // Bind group 1: Texture + Sampler (SingleTexture)
+    const textureBindGroup = this.createTextureBindGroup(technique, texture);
+    pass.setBindGroup(1, textureBindGroup);
+
+    // Activate mesh (set vertex/index buffers)
+    this.quadMesh.activate(pass);
+
+    // Draw call
+    this.quadMesh.renderGroup(pass);
+  }
+
+  /**
+   * Update uniform buffer with current UIUniforms data
+   */
+  private static updateUniforms(data: UIUniformsData): void {
+    const uniformData = new Float32Array(96 / 4); // 96 bytes = 24 floats
+
+    // mat4 transform (64 bytes = 16 floats)
+    uniformData.set(data.transform as Float32Array, 0);
+
+    // vec4 tint (16 bytes = 4 floats)
+    uniformData.set(data.tint as Float32Array, 16);
+
+    // vec2 minUV (8 bytes = 2 floats)
+    uniformData.set(data.minUV as Float32Array, 20);
+
+    // vec2 maxUV (8 bytes = 2 floats)
+    uniformData.set(data.maxUV as Float32Array, 22);
+
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
+  }
+
+  /**
+   * Create bind group for UIUniforms (group 0)
+   */
+  private static createUniformBindGroup(technique: Technique): GPUBindGroup {
+    const layout = technique.getBindGroupLayout(0); // BufferUniform layout
+
+    if (!layout) {
+      throw new Error('UIRenderUtils: Failed to get bind group layout 0');
+    }
+
+    return this.device.createBindGroup({
+      label: 'ui_uniform_bind_group',
+      layout: layout,
+      entries: [
+        {
+          binding: 0,
+          resource: {
+            buffer: this.uniformBuffer,
+          },
+        },
+      ],
+    });
+  }
+
+  /**
+   * Create bind group for texture + sampler (group 1)
+   */
+  private static createTextureBindGroup(technique: Technique, texture: Texture): GPUBindGroup {
+    const layout = technique.getBindGroupLayout(1); // SingleTexture layout
+
+    if (!layout) {
+      throw new Error('UIRenderUtils: Failed to get bind group layout 1');
+    }
+
+    const textureView = texture.getTextureView();
+    const sampler = texture.getSampler();
+
+    if (!textureView || !sampler) {
+      throw new Error('UIRenderUtils: Texture or sampler not available');
+    }
+
+    return this.device.createBindGroup({
+      label: 'ui_texture_bind_group',
+      layout: layout,
+      entries: [
+        {
+          binding: 0,
+          resource: textureView,
+        },
+        {
+          binding: 1,
+          resource: sampler,
+        },
+      ],
+    });
+  }
+
+  /**
+   * Render text using a font texture atlas
+   * @param pass - The render pass encoder
+   * @param text - The text string to render
+   * @param fontTexture - The font atlas texture
+   * @param position - Position in UI space
+   * @param scale - Text scale factor
+   * @param tint - Text color
+   */
+  public static renderText(
+    _pass: GPURenderPassEncoder,
+    _text: string,
+    _fontTexture: Texture,
+    _position: vec2,
+    _scale: number = 1.0,
+    _tint: vec4 = vec4.fromValues(1, 1, 1, 1),
+  ): void {
+    if (!this.initialized) {
+      console.error('UIRenderUtils: Not initialized, call initialize() first');
+      return;
+    }
+
+    // Basic text rendering implementation
+    // For each character:
+    // 1. Calculate UV coords in font atlas
+    // 2. Calculate transform (position + offset + scale)
+    // 3. Call renderBitmap with character UVs
+
+    // This is a simplified placeholder implementation
+    // Full implementation would require font metrics and atlas mapping
+    console.warn('UIRenderUtils: renderText is not fully implemented yet');
+
+    // Example for single character rendering:
+    // const charWidth = 0.1 * scale;
+    // const charHeight = 0.1 * scale;
+    // for (let i = 0; i < text.length; i++) {
+    //   const char = text[i];
+    //   const uvMin = calculateCharUV(char); // Implement based on font atlas
+    //   const uvMax = vec2.add(vec2.create(), uvMin, vec2.fromValues(1/16, 1/16));
+    //   const transform = mat4.create();
+    //   mat4.translate(transform, transform, [position[0] + i * charWidth, position[1], 0]);
+    //   mat4.scale(transform, transform, [charWidth, charHeight, 1]);
+    //   this.renderBitmap(pass, fontTexture, transform, tint, uvMin, uvMax);
+    // }
+  }
+}
