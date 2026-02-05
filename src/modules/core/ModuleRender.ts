@@ -86,7 +86,7 @@ export class ModuleRender extends Module {
     const physicalWidth = canvas.width;
     const physicalHeight = canvas.height;
     const dpr = window.devicePixelRatio || 1;
-    
+
     UIRenderUtils.updateScreenSize(physicalWidth, physicalHeight, dpr);
 
     // Inicializar VelocityBufferManager
@@ -427,7 +427,6 @@ export class ModuleRender extends Module {
 
     // Configure viewport and scissor for presentation (use full canvas size)
     const canvasSize = Render.canvasSize;
-
 
     // Render result to screen
     this.presentationTechnique.activatePipeline(pass);
