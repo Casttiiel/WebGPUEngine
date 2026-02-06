@@ -1,15 +1,14 @@
 ### Engine
 
-1. Blender
-   Local triplanar mapping + scale
-2. Froxel Volumetric Scattering + Height Fog
+1. Froxel Volumetric Scattering + Height Fog
    How Everything is combined
    Fog Color
    Spot Light Injection
    Density Noise
-3. AO
-4. Point Light shadows
+2. AO
+3. Point Light shadows
 
+4. Fix Player movement
 5. Blender Export with player spawn
 6. Light/Shadow bug on level-1?
 
