@@ -343,7 +343,7 @@ export class ModuleRender extends Module {
     }
 
     // Render UI overlay on top of result texture
-    this.renderUIOnTexture(result);
+    //this.renderUIOnTexture(result);
 
     // Present final result to screen
     this.presentResult(result);

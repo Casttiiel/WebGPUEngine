@@ -36,14 +36,6 @@ export class ButtonWidget extends Widget {
   }
 
   protected override render(renderPass: GPURenderPassEncoder): void {
-    console.log(`[ButtonWidget] Rendering: ${this.name}`);
-    const absTransform = this.getAbsolute();
-    const pos = [absTransform[12], absTransform[13]];
-    const scaleX = Math.sqrt(absTransform[0] * absTransform[0] + absTransform[1] * absTransform[1]);
-    const scaleY = Math.sqrt(absTransform[4] * absTransform[4] + absTransform[5] * absTransform[5]);
-    console.log(
-      `  Position: [${pos[0].toFixed(0)}, ${pos[1].toFixed(0)}], Scale: [${scaleX.toFixed(0)}, ${scaleY.toFixed(0)}]`,
-    );
     if (!this.currentState) return;
 
     // Render the button's background image
