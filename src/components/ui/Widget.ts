@@ -387,6 +387,10 @@ export class Widget {
     return this.absolute;
   }
 
+  public hasAnchor(): boolean {
+    return this.anchorType !== undefined;
+  }
+
   public getPivotMatrix(): mat4 {
     return this.pivot;
   }

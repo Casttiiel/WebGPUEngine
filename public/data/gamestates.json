@@ -1,5 +1,5 @@
 {
-  "start": "gs_main_menu",
+  "start": "gs_gameplay",
   "gamestates": {
     "gs_main_menu": ["main_menu"],
     "gs_loading": [],

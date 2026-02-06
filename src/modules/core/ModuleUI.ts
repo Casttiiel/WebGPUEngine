@@ -174,8 +174,15 @@ export class ModuleUI extends Module {
   }
 
   public render(renderPass: GPURenderPassEncoder): void {
+    console.log(
+      `[ModuleUI] Rendering ${this.activeWidgets.length} widgets:`,
+      this.activeWidgets.map((w) => w.name),
+    );
+    console.log('[ModuleUI] Render order (background should be FIRST):');
     // Render all active widgets
-    for (const widget of this.activeWidgets) {
+    for (let i = 0; i < this.activeWidgets.length; i++) {
+      const widget = this.activeWidgets[i];
+      console.log(`  ${i + 1}. ${widget.name}`);
       widget.doRender(renderPass);
     }
 

@@ -38,6 +38,7 @@ export class ImageWidget extends Widget {
   }
 
   protected override render(renderPass: GPURenderPassEncoder): void {
+    console.log(`[ImageWidget] Rendering: ${this.name}`);
     // Skip if no texture is set
     if (!this.imageParams.texture) return;
 
@@ -58,8 +59,20 @@ export class ImageWidget extends Widget {
 
     // Only render if texture is loaded
     if (!this.cachedTexture) {
+      console.log(
+        `[ImageWidget] ${this.name}: Texture not loaded yet (${this.imageParams.texture})`,
+      );
       return;
     }
+
+    console.log(`[ImageWidget] ${this.name}: Rendering texture ${this.imageParams.texture}`);
+    const absTransform = this.getAbsolute();
+    const pos = [absTransform[12], absTransform[13]];
+    const scaleX = Math.sqrt(absTransform[0] * absTransform[0] + absTransform[1] * absTransform[1]);
+    const scaleY = Math.sqrt(absTransform[4] * absTransform[4] + absTransform[5] * absTransform[5]);
+    console.log(
+      `  Position: [${pos[0].toFixed(0)}, ${pos[1].toFixed(0)}], Scale: [${scaleX.toFixed(0)}, ${scaleY.toFixed(0)}]`,
+    );
 
     // Convert color to tint vec4
     const color = this.imageParams.color;
@@ -70,10 +83,13 @@ export class ImageWidget extends Widget {
     const maxUV = vec2.fromValues(this.imageParams.maxUV.x, this.imageParams.maxUV.y);
 
     // Render using UIRenderUtils
+    // If widget has anchor, use local transform (absolute positioning)
+    // Otherwise use absolute transform (relative to parent hierarchy)
+    const transform = this.hasAnchor() ? this.getLocal() : this.getAbsolute();
     UIRenderUtils.renderBitmap(
       renderPass,
       this.cachedTexture,
-      this.getLocal(), // Use local transform only (no parent hierarchy)
+      transform,
       tint,
       minUV,
       maxUV,

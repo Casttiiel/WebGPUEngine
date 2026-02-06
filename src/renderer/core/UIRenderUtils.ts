@@ -17,7 +17,6 @@ interface UIUniformsData {
  */
 export class UIRenderUtils {
   private static device: GPUDevice;
-  private static uniformBuffer: GPUBuffer;
   private static quadMesh: Mesh | null = null;
   private static standardTechnique: Technique | null = null;
   private static additiveTechnique: Technique | null = null;
@@ -103,15 +102,6 @@ export class UIRenderUtils {
     // Initialize DPR immediately
     this.devicePixelRatio = window.devicePixelRatio || 1;
 
-    // Create uniform buffer for UIUniforms
-    // mat4 (64 bytes) + vec4 (16 bytes) + vec2 (8 bytes) + vec2 (8 bytes) = 96 bytes
-    // Align to 256 bytes for uniform buffer constraints
-    this.uniformBuffer = GPUUtils.createBuffer(
-      'ui_uniforms',
-      256,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
-
     // Load UI quad mesh
     try {
       this.quadMesh = await Mesh.get('ui/unit_plane_xy_ui.obj');
@@ -170,12 +160,10 @@ export class UIRenderUtils {
   public static destroy(): void {
     if (!this.initialized) return;
 
-    this.uniformBuffer?.destroy();
     this.quadMesh?.release();
     this.standardTechnique?.release();
     this.additiveTechnique?.release();
 
-    this.uniformBuffer = null!;
     this.quadMesh = null;
     this.standardTechnique = null;
     this.additiveTechnique = null;
@@ -216,8 +204,18 @@ export class UIRenderUtils {
     const finalTransform = mat4.create();
     mat4.multiply(finalTransform, this.orthoProjection, transform);
 
-    // Update uniform buffer with current parameters
-    this.updateUniforms({ transform: finalTransform, tint, minUV, maxUV });
+    console.log(`[UIRenderUtils] renderBitmap:`, {
+      textureName: texture.name,
+      transformPos: [transform[12].toFixed(1), transform[13].toFixed(1)],
+      transformScale: [
+        Math.sqrt(transform[0] * transform[0] + transform[1] * transform[1]).toFixed(1),
+        Math.sqrt(transform[4] * transform[4] + transform[5] * transform[5]).toFixed(1),
+      ],
+      tint: { r: tint[0], g: tint[1], b: tint[2], a: tint[3] },
+      minUV: [minUV[0], minUV[1]],
+      maxUV: [maxUV[0], maxUV[1]],
+      additive,
+    });
 
     // Select technique based on blend mode
     const technique = additive ? this.additiveTechnique : this.standardTechnique;
@@ -225,8 +223,16 @@ export class UIRenderUtils {
     // Activate technique (sets pipeline)
     technique.activatePipeline(pass);
 
+    // Create unique uniform buffer for this draw call (fixes buffer sharing bug)
+    const uniformBuffer = this.createUniformBufferForDraw({
+      transform: finalTransform,
+      tint,
+      minUV,
+      maxUV,
+    });
+
     // Bind group 0: UIUniforms (BufferUniform)
-    const uniformBindGroup = this.createUniformBindGroup(technique);
+    const uniformBindGroup = this.createUniformBindGroup(technique, uniformBuffer);
     pass.setBindGroup(0, uniformBindGroup);
 
     // Bind group 1: Texture + Sampler (SingleTexture)
@@ -241,9 +247,10 @@ export class UIRenderUtils {
   }
 
   /**
-   * Update uniform buffer with current UIUniforms data
+   * Create a unique uniform buffer for a single draw call
+   * This prevents buffer sharing bugs where all draw calls use the last written data
    */
-  private static updateUniforms(data: UIUniformsData): void {
+  private static createUniformBufferForDraw(data: UIUniformsData): GPUBuffer {
     const uniformData = new Float32Array(96 / 4); // 96 bytes = 24 floats
 
     // mat4 transform (64 bytes = 16 floats)
@@ -258,13 +265,27 @@ export class UIRenderUtils {
     // vec2 maxUV (8 bytes = 2 floats)
     uniformData.set(data.maxUV as Float32Array, 22);
 
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
+    // Create buffer with data
+    const buffer = this.device.createBuffer({
+      label: 'ui_uniform_buffer_per_draw',
+      size: 96,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+
+    new Float32Array(buffer.getMappedRange()).set(uniformData);
+    buffer.unmap();
+
+    return buffer;
   }
 
   /**
    * Create bind group for UIUniforms (group 0)
    */
-  private static createUniformBindGroup(technique: Technique): GPUBindGroup {
+  private static createUniformBindGroup(
+    technique: Technique,
+    uniformBuffer: GPUBuffer,
+  ): GPUBindGroup {
     const layout = technique.getBindGroupLayout(0); // BufferUniform layout
 
     if (!layout) {
@@ -278,7 +299,7 @@ export class UIRenderUtils {
         {
           binding: 0,
           resource: {
-            buffer: this.uniformBuffer,
+            buffer: uniformBuffer, // Use provided buffer
           },
         },
       ],
