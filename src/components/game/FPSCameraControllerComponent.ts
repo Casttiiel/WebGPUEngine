@@ -252,4 +252,8 @@ export class FPSCameraControllerComponent extends Component {
   public setActive(active: boolean): void {
     this.isActive = active;
   }
+
+  public getEyeOffset(): vec3 {
+    return this.eyeOffset;
+  }
 }

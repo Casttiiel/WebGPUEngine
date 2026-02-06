@@ -206,17 +206,27 @@ export class UIParser {
     const params = this.parseWidgetParams(jData);
     const button = new ButtonWidget(name, alias, params);
 
-    // Parse button states
-    if (jData.states && typeof jData.states === 'object') {
-      for (const [stateName, stateData] of Object.entries(jData.states)) {
-        const stateConfig = this.parseButtonState(stateData as any);
-        button.addState(stateName as ButtonState, stateConfig);
+    // Parse button states - support both formats:
+    // 1. New format: { states: { "normal": { imageParams: {...}, textParams: {...} } } }
+    // 2. Legacy format: { states: [{ name: "enabled", texture: "..." }], texture: "...", size: "..." }
+
+    if (jData.states) {
+      if (Array.isArray(jData.states)) {
+        // Legacy format: states array with flat structure
+        this.parseButtonStatesLegacy(jData, button);
+      } else if (typeof jData.states === 'object') {
+        // New format: states object with nested structure
+        this.parseButtonStatesNested(jData, button);
       }
     }
 
     // Set initial state
     if (jData.initialState) {
       button.setCurrentState(jData.initialState);
+    } else if (button.hasState('normal')) {
+      button.setCurrentState('normal');
+    } else if (button.hasState('enabled')) {
+      button.setCurrentState('enabled');
     }
 
     return button;
@@ -274,11 +284,19 @@ export class UIParser {
     if (jData.alias) params.alias = jData.alias;
     if (jData.visible !== undefined) params.visible = jData.visible;
 
-    // Parse position - explicit position parameter
+    // Parse position - support both array [900, 800] and string "900 800" (C++ format)
     let hasExplicitPosition = false;
-    if (jData.position && Array.isArray(jData.position)) {
-      params.position = { x: jData.position[0], y: jData.position[1] };
-      hasExplicitPosition = true;
+    if (jData.position) {
+      if (Array.isArray(jData.position)) {
+        params.position = { x: jData.position[0], y: jData.position[1] };
+        hasExplicitPosition = true;
+      } else if (typeof jData.position === 'string') {
+        const parts = jData.position.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          params.position = { x: parseFloat(parts[0]), y: parseFloat(parts[1]) };
+          hasExplicitPosition = true;
+        }
+      }
     }
 
     // Parse scale - explicit scale parameter
@@ -405,6 +423,64 @@ export class UIParser {
     };
 
     return stateConfig;
+  }
+
+  /**
+   * Parse button states in new nested format.
+   * Example: { states: { "normal": { imageParams: {...}, textParams: {...} } } }
+   */
+  private parseButtonStatesNested(jData: any, button: ButtonWidget): void {
+    for (const [stateName, stateData] of Object.entries(jData.states)) {
+      const stateConfig = this.parseButtonState(stateData as any);
+      button.addState(stateName as ButtonState, stateConfig);
+    }
+  }
+
+  /**
+   * Parse button states in legacy flat format.
+   * Example: { states: [{ name: "enabled", texture: "..." }], texture: "...", size: "..." }
+   */
+  private parseButtonStatesLegacy(jData: any, button: ButtonWidget): void {
+    // Extract base button properties for all states
+    const baseTexture = jData.texture || '';
+    const baseSize = jData.size || '100 100';
+    const fontTexture = jData.font_texture || 'ui/fonts/font.png';
+    const fontSize = jData.font_size || '16 16';
+    const buttonText = jData.text || jData.name?.toUpperCase() || 'BUTTON';
+
+    for (const stateData of jData.states) {
+      const stateName = stateData.name || 'normal';
+      const stateTexture = stateData.texture || baseTexture;
+
+      // Create imageParams from flat structure
+      const imageParams = this.parseImageParams({
+        texture: stateTexture,
+        size: baseSize,
+        color: stateData.color || [1, 1, 1, 1],
+        additive: stateData.additive || false,
+        minUV: stateData.minUV || [0, 0],
+        maxUV: stateData.maxUV || [1, 1],
+      });
+
+      // Create textParams for button text
+      const textParams = this.parseTextParams({
+        text: stateData.text || buttonText,
+        texture: stateData.font_texture || fontTexture,
+        size: stateData.font_size || fontSize,
+      });
+
+      const stateConfig: ButtonStateConfig = {
+        imageParams,
+        textParams,
+      };
+
+      // Map legacy state names to standard names
+      let standardStateName = stateName;
+      if (stateName === 'enabled') standardStateName = 'normal';
+      if (stateName === 'selected') standardStateName = 'hover';
+
+      button.addState(standardStateName as ButtonState, stateConfig);
+    }
   }
 
   /**

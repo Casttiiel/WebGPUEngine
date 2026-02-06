@@ -68,7 +68,10 @@ export class Widget {
 
     // Initialize anchor system (Phase 2)
     if (params.anchor) {
-      this.anchorType = UIAnchorSystem.parseAnchorType(params.anchor);
+      const parsedAnchor = UIAnchorSystem.parseAnchorType(params.anchor);
+      if (parsedAnchor !== null) {
+        this.anchorType = parsedAnchor;
+      }
     }
     if (params.offset) {
       vec2.set(this.anchorOffset, params.offset.x, params.offset.y);
@@ -224,8 +227,7 @@ export class Widget {
   }
 
   /**
-   * Compute local matrix: translation * rotation * scale * pivot
-   * Order ensures position is in pixels, not affected by scale
+   * Compute local transformation matrix: local = translation * rotation * scale * pivot.
    *
    * If anchor is defined, calculates position from anchor point:
    *   finalPosition = anchorPosition + anchorOffset (scaled)
@@ -295,13 +297,15 @@ export class Widget {
 
   /**
    * Compute absolute (world) matrix with parent hierarchy.
-   * Formula: absolute = parent ? local * parent.absolute : local
+   * Formula: absolute = parent.absolute * local (parent first!)
    */
   protected computeAbsolute(): void {
     this.computeLocal();
 
     if (this.parent) {
-      mat4.multiply(this.absolute, this.local, this.parent.absolute);
+      // CRITICAL: parent first, then local
+      // This prevents child's scale from affecting parent's position
+      mat4.multiply(this.absolute, this.parent.absolute, this.local);
     } else {
       mat4.copy(this.absolute, this.local);
     }
@@ -339,7 +343,7 @@ export class Widget {
   }
 
   public clearAnchor(): void {
-    this.anchorType = undefined;
+    delete this.anchorType;
     vec2.set(this.anchorOffset, 0, 0);
   }
 

@@ -65,7 +65,7 @@ export class CameraCrouchComponent extends Component {
       }
 
       // Capturar altura base del FPSCamera
-      const eyeOffset = (this.fpsCamera as any).eyeOffset;
+      const eyeOffset = this.fpsCamera.getEyeOffset();
       if (eyeOffset) {
         this.baseEyeHeight = eyeOffset[1];
         this.currentEyeHeight = this.baseEyeHeight;
@@ -108,88 +108,13 @@ export class CameraCrouchComponent extends Component {
     }
 
     // Actualizar eyeOffset Y del FPSCamera
-    const eyeOffset = (this.fpsCamera as any).eyeOffset;
+    const eyeOffset = this.fpsCamera.getEyeOffset();
     if (eyeOffset) {
       eyeOffset[1] = this.currentEyeHeight;
     }
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'game';
-    const subfolderKey = 'Camera Crouch';
-
-    const self = this;
-
-    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
-      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
-        ...(options || {}),
-        readonly: false,
-      });
-    };
-
-    // Enabled
-    const enabledWrapper = {
-      get enabled() {
-        return self.enabled;
-      },
-      set enabled(value) {
-        self.enabled = value;
-      },
-    };
-
-    addControl(enabledWrapper, 'enabled', 'Enabled');
-
-    // Slide crouch height
-    const slideCrouchHeightWrapper = {
-      get slideCrouchHeight() {
-        return self.slideCrouchHeight;
-      },
-      set slideCrouchHeight(value) {
-        self.slideCrouchHeight = value;
-      },
-    };
-
-    addControl(slideCrouchHeightWrapper, 'slideCrouchHeight', 'Slide Height (m)', {
-      min: 0.1,
-      max: 1.5,
-      step: 0.05,
-    });
-
-    // Crouch speed
-    const crouchSpeedWrapper = {
-      get crouchSpeed() {
-        return self.crouchSpeed;
-      },
-      set crouchSpeed(value) {
-        self.crouchSpeed = value;
-      },
-    };
-
-    addControl(crouchSpeedWrapper, 'crouchSpeed', 'Crouch Speed', {
-      min: 1.0,
-      max: 20.0,
-      step: 0.5,
-    });
-
-    // Current height (read-only)
-    const currentHeightWrapper = {
-      get currentHeight() {
-        return self.currentEyeHeight.toFixed(2);
-      },
-    };
-
-    addControl(currentHeightWrapper, 'currentHeight', 'Current Height (m)', { readonly: true });
-
-    // Base height (read-only)
-    const baseHeightWrapper = {
-      get baseHeight() {
-        return self.baseEyeHeight.toFixed(2);
-      },
-    };
-
-    addControl(baseHeightWrapper, 'baseHeight', 'Base Height (m)', { readonly: true });
-  }
+  public override renderInMenu(): void {}
 
   public renderDebug(): void {
     // TODO: Visualización debug
@@ -198,7 +123,7 @@ export class CameraCrouchComponent extends Component {
   public dispose(): void {
     // Restaurar altura original si es necesario
     if (this.fpsCamera) {
-      const eyeOffset = (this.fpsCamera as any).eyeOffset;
+      const eyeOffset = this.fpsCamera.getEyeOffset();
       if (eyeOffset) {
         eyeOffset[1] = this.baseEyeHeight;
       }

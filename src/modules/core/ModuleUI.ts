@@ -55,6 +55,7 @@ export class ModuleUI extends Module {
 
     // Main Menu widgets
     await this.registerWidgetClass('MAIN_MENU_BACKGROUND', 'main_menu.json', parser);
+    await this.registerWidgetClass('MAIN_MENU_BUTTONS', 'main_menu_buttons.json', parser);
 
     // TODO: Create MenuController for main menu buttons
     // const menuController = new MenuController();

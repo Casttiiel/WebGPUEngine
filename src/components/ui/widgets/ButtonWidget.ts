@@ -1,7 +1,10 @@
 // src/components/ui/widgets/ButtonWidget.ts
 import { Widget } from '../Widget';
+import { vec2, vec4 } from 'gl-matrix';
 import type { WidgetParams, ButtonStateConfig } from '../../../types/WidgetTypes';
 import { ButtonState } from '../../../types/WidgetTypes';
+import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
+import { Texture } from '../../../renderer/resources/Texture';
 
 /**
  * ButtonWidget - Interactive widget with multiple visual states.
@@ -11,6 +14,12 @@ export class ButtonWidget extends Widget {
   private states: Map<string, ButtonStateConfig> = new Map();
   private currentStateName: string = ButtonState.NORMAL;
   private currentState: ButtonStateConfig | null = null;
+
+  // Texture caching for current state
+  private cachedImageTexture: Texture | null = null;
+  private cachedImageTexturePath: string | null = null;
+  private cachedFontTexture: Texture | null = null;
+  private cachedFontTexturePath: string | null = null;
 
   // Callbacks for user interaction
   private onClickCallback?: () => void;
@@ -26,14 +35,102 @@ export class ButtonWidget extends Widget {
     this.onClick = () => this.triggerClick();
   }
 
-  protected override render(_renderPass: GPURenderPassEncoder): void {
-    // Renders current state's image and text
-    if (this.currentState) {
-      // Render state texture if available
-      // UIRenderUtils.renderBitmap(renderPass, texture, ...);
-      // Render state text if available
-      // UIRenderUtils.renderText(renderPass, ...);
+  protected override render(renderPass: GPURenderPassEncoder): void {
+    if (!this.currentState) return;
+
+    // Render the button's background image
+    this.renderButtonImage(renderPass);
+
+    // Render the button's text (if font texture is available)
+    this.renderButtonText(renderPass);
+  }
+
+  /**
+   * Render the button's background image for the current state.
+   */
+  private renderButtonImage(renderPass: GPURenderPassEncoder): void {
+    if (!this.currentState?.imageParams?.texture) {
+      console.warn(`⚠️ Button "${this.getName()}" has no texture in current state`);
+      return;
     }
+
+    const imageParams = this.currentState.imageParams;
+
+    // Check if image texture needs to be loaded/reloaded
+    if (this.cachedImageTexturePath !== imageParams.texture) {
+      this.cachedImageTexturePath = imageParams.texture;
+      this.cachedImageTexture = null;
+
+      // Load texture asynchronously only when texture path changes
+      Texture.getAsync(imageParams.texture!)
+        .then((texture) => {
+          this.cachedImageTexture = texture;
+        })
+        .catch((error) => {
+          console.error(`❌ Failed to load button image texture: ${imageParams.texture}`, error);
+        });
+    }
+
+    // Only render if texture is loaded
+    if (!this.cachedImageTexture) {
+      return;
+    }
+
+    // Convert color to tint vec4
+    const color = imageParams.color;
+    const tint = vec4.fromValues(color.r, color.g, color.b, color.a);
+
+    // Convert UV to vec2
+    const minUV = vec2.fromValues(imageParams.minUV.x, imageParams.minUV.y);
+    const maxUV = vec2.fromValues(imageParams.maxUV.x, imageParams.maxUV.y);
+
+    // Render using UIRenderUtils
+    UIRenderUtils.renderBitmap(
+      renderPass,
+      this.cachedImageTexture,
+      this.getAbsolute(), // Use absolute transform to respect parent hierarchy
+      tint,
+      minUV,
+      maxUV,
+      imageParams.additive, // Additive blending mode
+    );
+  }
+
+  /**
+   * Render the button's text for the current state.
+   * Note: Text rendering is not fully implemented in UIRenderUtils yet.
+   */
+  private renderButtonText(_renderPass: GPURenderPassEncoder): void {
+    if (!this.currentState?.textParams?.texture || !this.currentState?.textParams?.text) return;
+
+    const textParams = this.currentState.textParams;
+
+    // Check if font texture needs to be loaded/reloaded
+    if (this.cachedFontTexturePath !== textParams.texture) {
+      this.cachedFontTexturePath = textParams.texture;
+      this.cachedFontTexture = null;
+
+      // Load font texture asynchronously
+      Texture.getAsync(textParams.texture!)
+        .then((texture) => {
+          this.cachedFontTexture = texture;
+        })
+        .catch((error) => {
+          console.error(`❌ Failed to load button font texture: ${textParams.texture}`, error);
+        });
+    }
+
+    // Only proceed if font texture is loaded
+    if (!this.cachedFontTexture) return;
+
+    // TODO: Implement proper text rendering once UIRenderUtils.renderText is complete
+    // For now, this is a placeholder that loads the font texture but doesn't render text
+    //
+    // When UIRenderUtils.renderText is implemented, use:
+    // const position = vec2.fromValues(0, 0); // Center text on button
+    // const scale = Math.min(textParams.size.x, textParams.size.y) / 32; // Scale based on text size
+    // const tint = vec4.fromValues(textParams.color.r, textParams.color.g, textParams.color.b, textParams.color.a);
+    // UIRenderUtils.renderText(renderPass, textParams.text, this.cachedFontTexture, position, scale, tint);
   }
 
   // ============================================================================
@@ -60,6 +157,9 @@ export class ButtonWidget extends Widget {
     if (state) {
       this.currentStateName = stateName;
       this.currentState = state;
+
+      // Clear cached textures when state changes to force reload if needed
+      this.invalidateTextureCache();
     } else {
       console.warn(`Button state "${stateName}" not found on widget "${this.getName()}"`);
     }
@@ -153,5 +253,33 @@ export class ButtonWidget extends Widget {
         this.setCurrentState(ButtonState.DISABLED);
       }
     }
+  }
+
+  // ============================================================================
+  // TEXTURE CACHE MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Clear cached textures to force reload.
+   * Called when state changes or widget is disposed.
+   */
+  private invalidateTextureCache(): void {
+    // Don't destroy textures as they may be shared - just clear references
+    this.cachedImageTexture = null;
+    this.cachedImageTexturePath = null;
+    this.cachedFontTexture = null;
+    this.cachedFontTexturePath = null;
+  }
+
+  /**
+   * Clean up resources when widget is destroyed.
+   */
+  public dispose(): void {
+    this.invalidateTextureCache();
+    this.states.clear();
+    this.currentState = null;
+    this.onClickCallback = undefined as any;
+    this.onHoverCallback = undefined as any;
+    this.onPressCallback = undefined as any;
   }
 }

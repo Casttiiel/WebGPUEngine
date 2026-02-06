@@ -13,6 +13,7 @@ import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Component } from '../../core/ecs/Component';
 import { DirectionalLightComponentData } from '../../types/DirectionalLightComponentData.type';
 import { Texture } from '../../renderer/resources/Texture';
+import { CameraComponent } from './CameraComponent';
 
 interface AABB {
   minX: number;
@@ -575,7 +576,7 @@ export class DirectionalLightComponent extends Component {
       const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
       if (mainCameraEntity && mainCameraEntity.hasComponent('camera')) {
         const cameraComponent = mainCameraEntity.getComponent('camera');
-        const mainCamera = (cameraComponent as any).getCamera(); // CameraComponent tiene getCamera()
+        const mainCamera = (cameraComponent as CameraComponent).getCamera(); // CameraComponent tiene getCamera()
 
         if (mainCamera) {
           // Actualizar shadow cameras basadas en el frustum de la cámara principal
