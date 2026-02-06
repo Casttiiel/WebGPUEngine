@@ -2,7 +2,7 @@
 
 1. Blender
    Export With PBR Material
-   Local triplanar mapping
+   Local triplanar mapping + scale
    Control if Needs collider
    Export with player spawn?
 2. Light/Shadow bug on level-1?
@@ -22,10 +22,9 @@
 9. Asset Browser + Spawn + Delete
 
 10. Quality settings selection
-11. Error en consola de GLTF retrasa en web?
-12. Improve particles
-13. Multiple Light probes has good shadows?
-14. Weird line on corners is irradiance because of normals
+11. Improve particles
+12. Multiple Light probes has good shadows?
+13. Weird line on corners is irradiance because of normals
 
 ### Bugs
 

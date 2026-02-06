@@ -1,6 +1,6 @@
 {
     "vs": "utility/presentation.vs",
-    "fs": "motion_blur.fs",
+    "fs": "post-processing/motion_blur.fs",
     "writesOn": "texture",
     "z": "disable_all",
     "uniforms": ["CameraUniforms", "GBufferUniforms", "MotionBlurParams"]
