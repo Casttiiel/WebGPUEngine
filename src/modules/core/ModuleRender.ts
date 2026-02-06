@@ -261,7 +261,6 @@ export class ModuleRender extends Module {
       const velocityMgr = VelocityBufferManager.getInstance();
       const needsVelocity = mainCameraEntity?.hasComponent('smaa_t2x');
       velocityMgr.setEnabled(needsVelocity);
-      result = this.deferred.render(mainCameraEntity);
     }
 
     // Post-processing solo si hay MainCamera
@@ -343,7 +342,7 @@ export class ModuleRender extends Module {
     }
 
     // Render UI overlay on top of result texture
-    //this.renderUIOnTexture(result);
+    this.renderUIOnTexture(result);
 
     // Present final result to screen
     this.presentResult(result);
