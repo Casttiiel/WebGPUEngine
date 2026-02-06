@@ -117,7 +117,9 @@ export class GLTFLoader {
     }
 
     for (const prim of primitives) {
-      const primitiveInfo = {
+      const materialResult = this.getPrimitiveMaterial(prim, folderName);
+
+      const primitiveInfo: any = {
         meshData: {
           attributes: {
             POSITION: prim.getAttribute('POSITION')?.getArray(),
@@ -127,18 +129,37 @@ export class GLTFLoader {
           },
           indices: prim.getIndices()?.getArray(),
         },
-        materialData: this.getPrimitiveMaterial(prim, folderName),
       };
+
+      // If materialResult is a string, use 'material', otherwise use 'materialData'
+      if (typeof materialResult === 'string') {
+        primitiveInfo.material = materialResult;
+      } else {
+        primitiveInfo.materialData = materialResult;
+      }
+
       res.meshes.push(primitiveInfo);
     }
 
     return res;
   }
 
-  private static getPrimitiveMaterial(primitive: Primitive, folderName: string): MaterialDataType {
+  private static getPrimitiveMaterial(
+    primitive: Primitive,
+    folderName: string,
+  ): MaterialDataType | string {
     const materialData = primitive.getMaterial();
     if (!materialData) {
       throw new Error('Primitive has no material');
+    }
+
+    // Check if material has extras with materialToUse
+    const extras = materialData.getExtras();
+    if (extras && typeof extras === 'object' && 'materialToUse' in extras) {
+      const materialToUse = (extras as any).materialToUse;
+      if (typeof materialToUse === 'string') {
+        return materialToUse; // Return material name directly
+      }
     }
 
     const emissiveFactor = materialData.getEmissiveFactor();

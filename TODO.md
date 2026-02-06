@@ -1,30 +1,30 @@
 ### Engine
 
 1. Blender
-   Export With PBR Material
-   Local triplanar mapping + scale
    Control if Needs collider
-   Export with player spawn?
+   Local triplanar mapping + scale
 2. Light/Shadow bug on level-1?
 3. AO
-4. Point Light shadows
-5. Froxel Volumetric Scattering + Height Fog
-   Density Noise
-   Directional Light Injection
-   Point Light Injection Shadows
-   PCF
+4. Froxel Volumetric Scattering + Height Fog
+   How Everything is combine
+   PCF?
    Fog Color
    Spot Light Injection
+   Density Noise
+5. Point Light shadows
+6. Froxel Point Light injection shadows
 
-6. Editor Light Probes (Render Debug / Gizmo)
-7. Editor Point Lights (Render Debug / Gizmo / Menu)
-8. Editor Spot Lights (Render Debug / Gizmo / Menu)
-9. Asset Browser + Spawn + Delete
+7. Blender Export with player spawn
 
-10. Quality settings selection
-11. Improve particles
-12. Multiple Light probes has good shadows?
-13. Weird line on corners is irradiance because of normals
+8. Editor Light Probes (Render Debug / Gizmo)
+9. Editor Point Lights (Render Debug / Gizmo / Menu)
+10. Editor Spot Lights (Render Debug / Gizmo / Menu)
+11. Asset Browser + Spawn + Delete
+
+12. Quality settings selection
+13. Improve particles
+14. Multiple Light probes has good shadows?
+15. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
