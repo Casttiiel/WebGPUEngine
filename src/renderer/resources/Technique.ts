@@ -328,6 +328,8 @@ export class Technique extends GPUResource {
         return PipelineFactory.getAlphaBlending();
       case BlendModes.COMBINATIVE:
         return PipelineFactory.getAlphaBlending();
+      case BlendModes.VOLUMETRIC:
+        return PipelineFactory.getVolumetricBlending();
       default:
         return PipelineFactory.getOpaqueBlending();
     }

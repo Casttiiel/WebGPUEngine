@@ -18,7 +18,7 @@ import { DirectionalLightComponent } from '../../components/render/DirectionalLi
  */
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
-  private isEnabled: boolean = false;
+  private isEnabled: boolean = true;
 
   // Froxel grid dimensions
   private froxelDimensions = {
@@ -52,10 +52,15 @@ export class FroxelVolumetricScattering {
   private densityTexturesBindGroup!: GPUBindGroup;
   private cameraBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 0.006;
-  private scatteringCoeff: number = 0.9;
-  private absorptionCoeff: number = 1.5;
-  private stepSize: number = 1.0;
+  private fogDensity: number = 0.02;
+  private scatteringCoeff: number = 1.0;
+  private absorptionCoeff: number = 0.2; // Aumentado para god rays más definidos (antes 1.5)
+  private multipleScatteringBoost: number = 1.3; // Energy compensation for multiple scattering (1.1-1.6)
+  private anisotropy: number = 0.9; // Phase function g parameter (0.75-0.9 for god rays)
+  private fogBaseHeight: number = 0.0; // Height fog base (world Y)
+  private fogLayerHeight: number = 30.0; // Uniform fog layer thickness
+  private fogFalloff: number = 0.08; // Exponential falloff above layer
+  private ambientVolumetricIntensity: number = 0.0; // Ambient contribution to volumetric (keep low, 0.0-0.1)
   private nearPlane: number = 0.1;
   private farPlane: number = 100.0;
 
@@ -609,7 +614,12 @@ export class FroxelVolumetricScattering {
     this.volumetricUniformData[offset++] = this.fogDensity;
     this.volumetricUniformData[offset++] = this.scatteringCoeff;
     this.volumetricUniformData[offset++] = this.absorptionCoeff;
-    this.volumetricUniformData[offset++] = this.stepSize;
+    this.volumetricUniformData[offset++] = this.multipleScatteringBoost;
+    this.volumetricUniformData[offset++] = this.anisotropy;
+    this.volumetricUniformData[offset++] = this.fogBaseHeight;
+    this.volumetricUniformData[offset++] = this.fogLayerHeight;
+    this.volumetricUniformData[offset++] = this.fogFalloff;
+    this.volumetricUniformData[offset++] = this.ambientVolumetricIntensity;
 
     // Froxel grid parameters
     offset = 0;
@@ -657,7 +667,110 @@ export class FroxelVolumetricScattering {
     }
   }
 
-  public renderInMenu(): void {}
+  public renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    // Create/get the Volumetrics folder
+    if (!gui.beginWindow('Volumetrics', true)) return;
+
+    // Access the folder from GUIManager's internal map
+    const guiManager = gui as any;
+    const folder = guiManager.folders?.get('Volumetrics');
+
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    // Volumetric parameters with automatic UI updates
+    folder.add(this, 'fogDensity', 0.001, 0.02).name('Fog Density').listen();
+
+    folder.add(this, 'scatteringCoeff', 0.0, 2.0).name('Scattering Coeff').listen();
+
+    folder.add(this, 'absorptionCoeff', 0.0, 5.0).name('Absorption Coeff').listen();
+
+    folder.add(this, 'multipleScatteringBoost', 1.0, 2.0).name('MS Boost').listen();
+
+    folder.add(this, 'anisotropy', 0.0, 0.99).name('Anisotropy (g)').listen();
+
+    folder.add(this, 'fogBaseHeight', -10.0, 10.0).name('Fog Base Height').listen();
+
+    folder.add(this, 'fogLayerHeight', 1.0, 50.0).name('Fog Layer Height').listen();
+
+    folder.add(this, 'fogFalloff', 0.0, 1.0).name('Fog Falloff').listen();
+
+    folder.add(this, 'ambientVolumetricIntensity', 0.0, 0.2).name('Ambient Volumetric').listen();
+
+    folder.add(this, 'nearPlane', 0.01, 1.0).name('Near Plane').listen();
+
+    folder.add(this, 'farPlane', 10.0, 200.0).name('Far Plane').listen();
+
+    gui.endWindow();
+  }
+
+  public getFogDensity(): number {
+    return this.fogDensity;
+  }
+  public setFogDensity(value: number): void {
+    this.fogDensity = value;
+  }
+
+  public getScatteringCoeff(): number {
+    return this.scatteringCoeff;
+  }
+  public setScatteringCoeff(value: number): void {
+    this.scatteringCoeff = value;
+  }
+
+  public getAbsorptionCoeff(): number {
+    return this.absorptionCoeff;
+  }
+  public setAbsorptionCoeff(value: number): void {
+    this.absorptionCoeff = value;
+  }
+
+  public getMultipleScatteringBoost(): number {
+    return this.multipleScatteringBoost;
+  }
+  public setMultipleScatteringBoost(value: number): void {
+    this.multipleScatteringBoost = value;
+  }
+
+  public getAnisotropy(): number {
+    return this.anisotropy;
+  }
+  public setAnisotropy(value: number): void {
+    this.anisotropy = value;
+  }
+
+  public getFogBaseHeight(): number {
+    return this.fogBaseHeight;
+  }
+  public setFogBaseHeight(value: number): void {
+    this.fogBaseHeight = value;
+  }
+
+  public getFogLayerHeight(): number {
+    return this.fogLayerHeight;
+  }
+  public setFogLayerHeight(value: number): void {
+    this.fogLayerHeight = value;
+  }
+
+  public getFogFalloff(): number {
+    return this.fogFalloff;
+  }
+  public setFogFalloff(value: number): void {
+    this.fogFalloff = value;
+  }
+
+  public getAmbientVolumetricIntensity(): number {
+    return this.ambientVolumetricIntensity;
+  }
+  public setAmbientVolumetricIntensity(value: number): void {
+    this.ambientVolumetricIntensity = value;
+  }
 
   public dispose(): void {
     this.volumetricUniformBuffer?.destroy();

@@ -349,6 +349,10 @@ export class DeferredRenderer {
     this.ssr.update(_dt);
   }
 
+  public renderInMenu(): void {
+    this.froxelVolumetrics.renderInMenu();
+  }
+
   public resetSSRResources(): void {
     this.ssr.dispose();
     this.ssr = new ScreenSpaceReflections();

@@ -1,3 +1,4 @@
+#include "common/core/constants"
 #include "common/uniforms"
 #include "common/structs"
 #include "common/volumetric/structs"
@@ -68,7 +69,8 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
 fn phaseHG(cosTheta: f32, g: f32) -> f32 {
     let gg = g * g;
     let denom = pow(1.0 + gg - 2.0 * g * cosTheta, 1.5);
-    return (1.0 - gg) / max(denom, 1e-4);
+    // Normalización correcta con 4π
+    return (1.0 - gg) / (12.566370614 * max(denom, 1e-4)); // 4π ≈ 12.566370614
 }
 
 @compute @workgroup_size(8, 8, 4)
@@ -85,7 +87,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     // Ambient light color e intensidad desde uniform
     let ambientColor = ambientLight.color;
     let ambientIntensity = ambientLight.intensity;
-    let ambientScattering = ambientColor * ambientIntensity * 0.05;
+    let ambientScattering = ambientColor * ambientIntensity * volumetricSettings.ambientVolumetricIntensity;
 
     let directionalScattering = directionalLight.color * directionalLight.intensity;
 
@@ -105,11 +107,18 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
 
     let cosTheta = clamp(dot(V, Ldir), -1.0, 1.0);
 
-    let g = 0.7; // prueba 0.7..0.85
-    let ph = phaseHG(cosTheta, g);
-    let isotropic = 1.0;
-    let phase = mix(isotropic, ph, 0.4) * 0.3;
+    // Forward scattering para god rays marcados
+    // g = 0.7-0.8: god rays visibles
+    // g = 0.85-0.9: god rays muy marcados (puede ser excesivo)
+    let g = volumetricSettings.anisotropy;
+    let phaseRayleigh = 1.0 / (4.0 * PI);   // isotrópico real
+    let phaseMie = phaseHG(cosTheta, g);
 
+    // Peso típico: casi todo Mie para shafts
+    let phase = mix(phaseRayleigh, phaseMie, 0.9);
+
+    // Aplicar phase function directamente (sin mezclar con isotropic)
+    // Esto da god rays claros cuando miras hacia la luz directional
     let scattering = ambientScattering + (directionalScattering * visibility * phase);
     
     textureStore(froxelLightTexture, froxelCoord, vec4<f32>(scattering, 0.0));

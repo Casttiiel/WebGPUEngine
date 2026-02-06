@@ -1,26 +1,25 @@
 ### Engine
 
 1. Froxel Volumetric Scattering + Height Fog
-   How Everything is combined
-   Fog Color
+   3D noise low frequency
    Spot Light Injection
-   Density Noise
 2. AO
 3. Point Light shadows
 
 4. Fix Player movement
 5. Blender Export with player spawn
 6. Light/Shadow bug on level-1?
+7. Motion blur weird error
 
-7. Editor Light Probes (Render Debug / Gizmo)
-8. Editor Point Lights (Render Debug / Gizmo / Menu)
-9. Editor Spot Lights (Render Debug / Gizmo / Menu)
-10. Asset Browser + Spawn + Delete
+8. Editor Light Probes (Render Debug / Gizmo)
+9. Editor Point Lights (Render Debug / Gizmo / Menu)
+10. Editor Spot Lights (Render Debug / Gizmo / Menu)
+11. Asset Browser + Spawn + Delete
 
-11. Quality settings selection
-12. Improve particles
-13. Multiple Light probes has good shadows?
-14. Weird line on corners is irradiance because of normals
+12. Quality settings selection
+13. Improve particles
+14. Multiple Light probes has good shadows?
+15. Weird line on corners is irradiance because of normals
 
 ### Bugs
 

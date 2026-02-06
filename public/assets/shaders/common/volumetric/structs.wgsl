@@ -11,5 +11,10 @@ struct VolumetricUniforms {
   fogDensity: f32,
   scatteringCoeff: f32,
   absorptionCoeff: f32,
-  stepSize: f32  // Optional parameter for integration
+  multipleScatteringBoost: f32,
+  anisotropy: f32,
+  fogBaseHeight: f32,
+  fogLayerHeight: f32,
+  fogFalloff: f32,
+  ambientVolumetricIntensity: f32,
 }

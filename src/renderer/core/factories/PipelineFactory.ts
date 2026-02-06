@@ -122,7 +122,26 @@ export class PipelineFactory {
       },
     };
   }
-
+  /**
+   * Volumetric blending for physically correct fog integration
+   * Formula: FinalColor = SceneColor * T + S
+   * Where src.rgb = S (in-scattering), src.a = T (transmittance)
+   * Result: dst.rgb = src.rgb + dst.rgb * src.a = S + SceneColor * T
+   */
+  public static getVolumetricBlending(): GPUBlendState {
+    return {
+      color: {
+        srcFactor: 'one',
+        dstFactor: 'src-alpha',
+        operation: 'add',
+      },
+      alpha: {
+        srcFactor: 'zero',
+        dstFactor: 'one',
+        operation: 'add',
+      },
+    };
+  }
   /**
    * Gets pure additive blending state (one + one)
    */

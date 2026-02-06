@@ -24,7 +24,6 @@ struct VolumetricUniforms {
   fogDensity: f32,
   scatteringCoeff: f32,
   absorptionCoeff: f32,
-  stepSize: f32
 }
 
 fn depth01ToViewZ(depth01: f32, nearZ: f32, farZ: f32) -> f32 {
@@ -61,10 +60,9 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
   // sample integrated volume
   let integrated = textureSampleLevel(froxelIntegratedTexture, linearSampler, uvw, 0.0);
-  let S = integrated.rgb;
-  let T = integrated.a;
+  let S = integrated.rgb;  // In-scattering
+  let T = integrated.a;    // Transmittance
 
-  let alpha = clamp(1.0 - T, 0.0, 1.0);
-
-  return vec4<f32>(S, alpha);
+  // Return S as RGB and T as alpha for composite: FinalColor = SceneColor * T + S
+  return vec4<f32>(S, T);
 }

@@ -513,6 +513,8 @@ export class ModuleRender extends Module {
       }
     }
 
+    this.deferred.renderInMenu();
+
     // Create main window for render stats
     if (this.beginGUIWindow('Render Statistics')) {
       // Add dynamic text displays that auto-update

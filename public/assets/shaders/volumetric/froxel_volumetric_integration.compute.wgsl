@@ -43,10 +43,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let dz = sliceDzLinear(z, slices, froxelParams.nearPlane, froxelParams.farPlane);
 
-    // 1) In-scattering integration:
-    // dS = T * (L * sigmaS) * dz
-    // (esto es una versión simple, funciona muy bien en práctica)
-    S += T * (L * sigmaS) * dz;
+    // 1) In-scattering integration with multiple scattering boost:
+    // dS = T * (L * sigmaS) * dz * boost
+    // Multiple scattering approximation (energy compensation)
+    let msBoost = volumetricSettings.multipleScatteringBoost;
+    S += T * (L * sigmaS * msBoost) * dz;
 
     // 2) Transmittance update:
     // T *= exp(-sigmaT * dz)

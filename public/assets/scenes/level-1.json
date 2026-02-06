@@ -15,9 +15,6 @@
     "prefab": "primitives/ground.prefab"
   },
   {
-    "prefab": "lighting/point_light.prefab"
-  },
-  {
     "prefab": "gameplay/impulse_pad_15.prefab",
     "components": {
       "transform": {

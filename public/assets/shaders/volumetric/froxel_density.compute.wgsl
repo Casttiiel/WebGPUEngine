@@ -32,10 +32,10 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
   let froxelWS = tempFroxelWS.xyz / tempFroxelWS.w;
 
-  // 2) Height fog
-  let fogBaseHeight: f32 = 0.0;     // y=0 suelo
-  let fogLayerHeight: f32 = 10.0;   // 30m uniformes
-  let fogFalloff: f32 = 0.3;       // decaimiento arriba
+  // 2) Height fog (parameters from uniform)
+  let fogBaseHeight = volumetricParams.fogBaseHeight;
+  let fogLayerHeight = volumetricParams.fogLayerHeight;
+  let fogFalloff = volumetricParams.fogFalloff;
 
   let h = froxelWS.y - fogBaseHeight;
 
