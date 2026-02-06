@@ -39,7 +39,7 @@ export class MotionBlurComponent extends Component {
   // Motion blur parameters (uniform buffer: 144 bytes)
   // mat4x4 (64 bytes) + mat4x4 (64 bytes) + 4 floats (16 bytes) = 144 bytes
   private paramsBuffer!: GPUBuffer;
-  private _blurStrength: number = 0.2; // Blur intensity (user-set)
+  private _blurStrength: number = 0.4; // Blur intensity (user-set)
   private _numSamples: number = 4; // Sample count
   private translationDampening: number = 0.1; // Reduce blur on camera translation (0 = disable blur, 1 = no dampening)
 

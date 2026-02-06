@@ -1,30 +1,27 @@
 ### Engine
 
 1. Blender
-   Control if Needs collider
    Local triplanar mapping + scale
-2. Light/Shadow bug on level-1?
-3. AO
-4. Froxel Volumetric Scattering + Height Fog
-   How Everything is combine
-   PCF?
+2. Froxel Volumetric Scattering + Height Fog
+   How Everything is combined
    Fog Color
    Spot Light Injection
    Density Noise
-5. Point Light shadows
-6. Froxel Point Light injection shadows
+3. AO
+4. Point Light shadows
 
-7. Blender Export with player spawn
+5. Blender Export with player spawn
+6. Light/Shadow bug on level-1?
 
-8. Editor Light Probes (Render Debug / Gizmo)
-9. Editor Point Lights (Render Debug / Gizmo / Menu)
-10. Editor Spot Lights (Render Debug / Gizmo / Menu)
-11. Asset Browser + Spawn + Delete
+7. Editor Light Probes (Render Debug / Gizmo)
+8. Editor Point Lights (Render Debug / Gizmo / Menu)
+9. Editor Spot Lights (Render Debug / Gizmo / Menu)
+10. Asset Browser + Spawn + Delete
 
-12. Quality settings selection
-13. Improve particles
-14. Multiple Light probes has good shadows?
-15. Weird line on corners is irradiance because of normals
+11. Quality settings selection
+12. Improve particles
+13. Multiple Light probes has good shadows?
+14. Weird line on corners is irradiance because of normals
 
 ### Bugs
 

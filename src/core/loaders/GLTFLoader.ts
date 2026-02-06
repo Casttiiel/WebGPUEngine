@@ -88,15 +88,24 @@ export class GLTFLoader {
   private static processMeshNode(node: Node, folderName: string): EntityDataType {
     const transform = this.getNodeTransform(node);
     const render = this.getNodeRender(node, folderName);
-    const collider = this.getNodeCollider(render);
+    
+    // Check if node has extras with collider field
+    const extras = node.getExtras();
+    const shouldCreateCollider = !(extras && typeof extras === 'object' && 'collider' in extras && (extras as any).collider === 'none');
+    
     const res: EntityDataType = {
       children: [],
       components: {
         transform,
         render,
-        mesh_collider: collider,
       },
     };
+
+    // Only add mesh_collider if not explicitly disabled
+    if (shouldCreateCollider) {
+      const collider = this.getNodeCollider(render);
+      res.components.mesh_collider = collider;
+    }
 
     return res;
   }

@@ -1,5 +1,5 @@
 {
-  "gltf": "unit_cube.gltf",
+  "gltf": "player.gltf",
   "components": {
     "name": "Player",
     "transform": {
