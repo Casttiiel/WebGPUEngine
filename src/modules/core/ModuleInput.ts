@@ -183,11 +183,14 @@ export class ModuleInput extends Module {
     const currentGamestate = Engine.getModules().getCurrentGamestate();
     if (currentGamestate !== this.lastGamestate) {
       this.lastGamestate = currentGamestate;
-
       // Si cambiamos a modo editor, liberar pointer lock
       if (currentGamestate === 'gs_editor' && this.pointerLockActive) {
         document.exitPointerLock();
         console.log('🔓 Pointer lock released (entering editor mode)');
+      } else if (currentGamestate === 'gs_gameplay' && !this.pointerLockActive) {
+        const canvas = Render.getInstance().getCanvas();
+        canvas.requestPointerLock();
+        console.log('🔓 Pointer lock locked (entering gameplay mode)');
       }
     }
 

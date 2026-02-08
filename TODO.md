@@ -3,23 +3,24 @@
 1. Froxel Volumetric Scattering + Height Fog
    Spot Light Injection
 2. Camera UpdateUniforms occurs always
-3. AO
-4. Point Light shadows
+3. Camera Uniforms missleading names
+4. AO
+5. Point Light shadows
 
-5. Fix Player movement
-6. Blender Export with player spawn
-7. Light/Shadow bug on level-1?
-8. Motion blur weird error
+6. Fix Player movement
+7. Blender Export with player spawn
+8. Light/Shadow bug on level-1?
+9. Motion blur weird error
 
-9. Editor Light Probes (Render Debug / Gizmo)
-10. Editor Point Lights (Render Debug / Gizmo / Menu)
-11. Editor Spot Lights (Render Debug / Gizmo / Menu)
-12. Asset Browser + Spawn + Delete
+10. Editor Light Probes (Render Debug / Gizmo)
+11. Editor Point Lights (Render Debug / Gizmo / Menu)
+12. Editor Spot Lights (Render Debug / Gizmo / Menu)
+13. Asset Browser + Spawn + Delete
 
-13. Quality settings selection
-14. Improve particles
-15. Multiple Light probes has good shadows?
-16. Weird line on corners is irradiance because of normals
+14. Quality settings selection
+15. Improve particles
+16. Multiple Light probes has good shadows?
+17. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
