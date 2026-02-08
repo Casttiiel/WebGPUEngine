@@ -79,6 +79,9 @@ export class FroxelVolumetricScattering {
     this.device = GPUUtils.getDevice();
     this.volumetricUniformData = new Float32Array(16);
     this.froxelUniformData = new Float32Array(16);
+    if (this.fogDensity <= 0.0) {
+      this.isEnabled = false;
+    }
   }
 
   public async load(): Promise<void> {

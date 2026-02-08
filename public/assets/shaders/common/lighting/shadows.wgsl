@@ -20,15 +20,15 @@ fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, ligh
         return 1.0;
     }
 
-    // PCF 3x3 filtering
+    // PCF 5x5 filtering
     let texelSize = lightShadowStepDivResolution;
     var shadow = 0.0;
-    for (var dx = -1; dx <= 1; dx = dx + 1) {
-        for (var dy = -1; dy <= 1; dy = dy + 1) {
+    for (var dx = -2; dx <= 2; dx = dx + 1) {
+        for (var dy = -2; dy <= 2; dy = dy + 1) {
             let offset = vec2<f32>(f32(dx), f32(dy)) * texelSize;
             shadow += textureSampleCompareLevel(shadowMap, shadowSampler, lightUVSpacePos.xy + offset, lightUVSpacePos.z);
         }
     }
-    shadow = shadow / 9.0;
+    shadow = shadow / 25.0;
     return shadow;
 }

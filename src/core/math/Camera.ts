@@ -275,10 +275,6 @@ export class Camera {
       this.time = 0;
     }
 
-    // Always update time and deltaTime (offset 92-93 = 368 bytes)
-    //const timeData = new Float32Array([this.time, this.deltaTime]);
-    //GPUUtils.writeBuffer(this.uniformBuffer, 368, timeData);
-
     if (!this.isDirty) return;
 
     // Create a single buffer with all data to minimize GPU writes

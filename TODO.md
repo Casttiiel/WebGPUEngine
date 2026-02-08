@@ -1,34 +1,30 @@
 ### Engine
 
-1. Froxel Volumetric Scattering
-   Spot Light Injection
-2. Camera UpdateUniforms occurs always
+1. AO Params
+2. Froxel Volumetric Scattering: Spot Light Injection
 3. Camera Uniforms missleading names
-4. AO
+4. Froxel Volumetric Scattering Fix Banding (Blur result)
 5. Bloom Shape
-6. Lightmaps / Baked GI
-7. Reflection Probes con blending
-8. Contact Shadows
-9. Shadow filtering mejor: PCF 5x5 adaptativo/PCSS
-10. Light cookies
-11. Froxel Volumetric Scattering Fix Banding (Blur result)
+6. Contact Shadows
+7. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+8. Reflection Probes con blending
 
-12. Fix Player movement
-13. Blender Export with player spawn
-14. Light/Shadow bug on level-1?
+9. Fix Player movement
+10. Blender Export with player spawn
+11. Light/Shadow bug on level-1?
 
-15. Editor Light Probes (Render Debug / Gizmo)
-16. Editor Point Lights (Render Debug / Gizmo / Menu)
-17. Editor Spot Lights (Render Debug / Gizmo / Menu)
-18. Asset Browser + Spawn + Delete
+12. Editor Light Probes (Render Debug / Gizmo)
+13. Editor Point Lights (Render Debug / Gizmo / Menu)
+14. Editor Spot Lights (Render Debug / Gizmo / Menu)
+15. Asset Browser + Spawn + Delete
 
-19. Froxel Volumetric/Height Fog based on quality
-20. Motion blur weird error
-21. Point Light shadows
-22. Quality settings selection
-23. Improve particles
-24. Multiple Light probes has good shadows?
-25. Weird line on corners is irradiance because of normals
+16. Froxel Volumetric/Height Fog based on quality
+17. Motion blur weird error
+18. Point Light shadows
+19. Quality settings selection
+20. Improve particles
+21. Multiple Light probes has good shadows?
+22. Weird line on corners is irradiance because of normals
 
 ### Bugs
 

@@ -12,7 +12,7 @@ struct SSAOParams {
     noiseScale: f32,
     angleOffset: f32,
     spacialOffset: f32,
-    padding1: f32,
+    sliceCount: f32,
     padding2: f32
 }
 
@@ -29,22 +29,21 @@ struct SSAOParams {
 
 const PI_HALF: f32 = 1.5707963267948966192313216916398;
 const SSAO_FALLOFF      : f32 = 2.5;     // caída lineal de influencia
-const SSAO_THICKNESSMIX : f32 = 0.05;     // mezcla para objetos finos
+const SSAO_THICKNESSMIX : f32 = 0.02;     // mezcla para objetos finos
 const SSAO_LIMIT        : f32 = 100.0;
-const SSAO_MAX_STRIDE   : f32 = 32.0;
+const SSAO_MAX_STRIDE   : f32 = 24.0;
 
 @fragment
 fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) f32 {
-    // descartar fondo
     let linearZ = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
     if (linearZ >= 1.0) {
         return 1.0;
     }
 
-    // posición y normal en view-space
-    let ray        = getViewPosition(uv);
-    let nData    = textureSampleLevel(gNormals, hbaoSampler, uv, 0.0);
-    let nWorld   = octahedral01ToNormal(nData.xy);
+    let ray = getViewPosition(uv);
+
+    let nData = textureSampleLevel(gNormals, hbaoSampler, uv, 0.0);
+    let nWorld = octahedral01ToNormal(nData.xy);
     var normal = normalize((camera.viewMatrix * vec4<f32>(nWorld, 0.0)).xyz);
     normal *= vec3<f32>(-1.0, 1.0, -1.0);
 
@@ -55,73 +54,36 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     let texel = 1.0 / camera.screenSize;
     let dirMult = texel * stride;
 
-    let ix = i32(pos.x);
-    let iy = i32(pos.y);
-    let pattern = (((ix + iy) & 3) << 2) + (ix & 3);
-    let noise = textureSampleLevel(noiseTexture, hbaoSampler, uv * ssaoParams.noiseScale, 0.0).x;
-    let dirAngle = (PI / 16.0) * f32(pattern) + ssaoParams.angleOffset + noise * PI * 2.0;
-    let aoDir = dirMult * vec2<f32>(sin(dirAngle), cos(dirAngle));
+    let sliceCount = i32(12);
+    var visibilityAccum : f32 = 0.0;
 
-    let toDirUnproj = getViewPosition(uv + aoDir);
-    let toDir = normalize(toDirUnproj); // dirección hacia sample
+    for (var s: i32 = 0; s < sliceCount; s = s + 1) {
 
-    let planeNormal = normalize(cross(v, -toDir));
-    let projNormal = normalize(normal - planeNormal * dot(normal, planeNormal));
-    let projLen = max(length(projNormal), 1e-6);
+        // Stratified angular sampling (GTAO real)
+        let baseAngle =
+            (2.0 * PI) * (f32(s) + 0.5) / f32(sliceCount);
 
-    let projectedDir = normalize(toDir + v);
-    let cosVal = clamp(dot(-projectedDir, projNormal / projLen), -1.0, 1.0);
-    let n = GTAOFastAcos(cosVal) - PI_HALF;
+        let goldenAngle = 2.39996323;
+        let sliceAngle = f32(s) * goldenAngle + ssaoParams.angleOffset;
 
-    let phase = ((iy - ix) & 3);
-    let tc_base = uv + aoDir * (0.25 * f32(phase) - 0.375 + ssaoParams.spacialOffset);
+        let aoDir = dirMult * vec2<f32>(
+            sin(sliceAngle),
+            cos(sliceAngle)
+        );
 
+        let sliceVis = computeSliceVisibility(
+            aoDir,
+            uv,
+            ray,
+            normal,
+            v
+        );
 
-    var c1: f32 = -1.0;
-    var c2: f32 = -1.0;
-
-
-    // lado “atrás”
-    for (var i: i32 = -1; i >= -i32(ssaoParams.sampleCount); i = i - 1) {
-        let uv    = tc_base + aoDir * f32(i);
-        if (any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0))) {
-            break;
-        }
-        let depth = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
-        if (depth >= 1.0) {
-            break;
-        }
-        let val = sliceSample(uv, ray, v, ssaoParams.radius, c1);
-        c1 = val;
-    }
-    // lado “delante”
-    for (var i: i32 =  1; i <=  i32(ssaoParams.sampleCount); i = i + 1) {
-        let uv    = tc_base + aoDir * f32(i);
-        if (any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0))) {
-            break;
-        }
-        let depth = textureSampleLevel(gLinearDepth, hbaoSampler, uv, 0.0).x;
-        if (depth >= 1.0) {
-            break;
-        }
-        let val = sliceSample(uv, ray, v, ssaoParams.radius, c2);
-        c2 = val;
+        visibilityAccum += sliceVis;
     }
 
-    let c1c = clamp(c1, -1.0, 1.0);
-    let c2c = clamp(c2, -1.0, 1.0);
+    let visibility = visibilityAccum / f32(sliceCount);
 
-    let h1a = -GTAOFastAcos(c1c);
-    let h2a =  GTAOFastAcos(c2c);
-
-    // Clamp al hemisferio de la normal proyectada
-    let h1 = n + max(h1a - n, -PI_HALF);
-    let h2 = n + min(h2a - n,  PI_HALF);
-
-    let sliceVis = IntegrateArc(h1, h2, n);
-    let visibility = mix(1.0, sliceVis, clamp(projLen, 0.0, 1.0));
-
-    // fuerza final y clamp
     return clamp(pow(visibility, ssaoParams.aoStrength), 0.0, 1.0);
 }
 
@@ -139,6 +101,68 @@ fn IntegrateArc(h1: f32, h2: f32, n: f32) -> f32 {
     let sinN = sin(n);
     return 0.25 * (-cos(2.0 * h1 - n) + cosN + 2.0 * h1 * sinN
                  - cos(2.0 * h2 - n) + cosN + 2.0 * h2 * sinN);
+}
+
+fn computeSliceVisibility(
+    aoDir : vec2<f32>,
+    uv : vec2<f32>,
+    ray : vec3<f32>,
+    normal : vec3<f32>,
+    v : vec3<f32>
+) -> f32 {
+
+    let toDirUnproj = getViewPosition(uv + aoDir);
+    let toDir = normalize(toDirUnproj);
+
+    let planeNormal = normalize(cross(v, -toDir));
+    let projNormal = normalize(normal - planeNormal * dot(normal, planeNormal));
+    let projLen = clamp(length(projNormal), 0.2, 1.0);
+
+    let projectedDir = normalize(toDir + v);
+    let cosVal = clamp(dot(-projectedDir, projNormal / projLen), -1.0, 1.0);
+    let n = GTAOFastAcos(cosVal) - PI_HALF;
+
+    let tc_base = uv + aoDir * ssaoParams.spacialOffset;
+
+    var c1: f32 = -1.0;
+    var c2: f32 = -1.0;
+
+    // atrás
+    for (var i: i32 = -1; i >= -i32(ssaoParams.sampleCount); i = i - 1) {
+        let uvS = tc_base + aoDir * f32(i);
+        if (any(uvS < vec2<f32>(0.0)) || any(uvS > vec2<f32>(1.0))) { break; }
+        let depth = textureSampleLevel(gLinearDepth, hbaoSampler, uvS, 0.0).x;
+        if (depth >= 1.0) { break; }
+
+        let val = sliceSample(uvS, ray, v, ssaoParams.radius, c1);
+        c1 = val;
+        if (abs(c1) > 0.99) { break; }
+    }
+
+    // delante
+    for (var i: i32 = 1; i <= i32(ssaoParams.sampleCount); i = i + 1) {
+        let uvS = tc_base + aoDir * f32(i);
+        if (any(uvS < vec2<f32>(0.0)) || any(uvS > vec2<f32>(1.0))) { break; }
+        let depth = textureSampleLevel(gLinearDepth, hbaoSampler, uvS, 0.0).x;
+        if (depth >= 1.0) { break; }
+
+        let val = sliceSample(uvS, ray, v, ssaoParams.radius, c2);
+        c2 = val;
+        if (abs(c2) > 0.99) { break; }
+    }
+
+    let c1c = clamp(c1, -1.0, 1.0);
+    let c2c = clamp(c2, -1.0, 1.0);
+
+    let h1a = -GTAOFastAcos(c1c);
+    let h2a =  GTAOFastAcos(c2c);
+
+    let h1 = n + max(h1a - n, -PI_HALF);
+    let h2 = n + min(h2a - n,  PI_HALF);
+
+    let sliceVis = IntegrateArc(h1, h2, n);
+
+    return mix(1.0, sliceVis, clamp(projLen, 0.0, 1.0));
 }
 
 // Devuelve el “cosine of horizon angle” acumulando el máximo a lo largo de la slice.
