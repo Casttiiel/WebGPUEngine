@@ -197,7 +197,7 @@ export class SpotLightComponent extends CameraComponent {
       ],
     );
 
-    this.camera.updateUniforms();
+    this.camera.updateUniforms(0);
     this.updateLightUniforms();
     this.calculateWorldAABB();
   }

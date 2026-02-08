@@ -34,7 +34,7 @@ fn reconstructWorldPosition(uv: vec2<f32>, linearDepth: f32) -> vec3<f32> {
     // Convert linear depth (0 to far) to NDC depth (0 to 1)
     // Linear depth is stored as distance from camera in world units
     // We need to convert it back to clip space depth
-    let ndcDepth = (linearDepth - 0.1) / (camera.cameraZFar - 0.1);
+    let ndcDepth = (linearDepth - 0.1) / (camera.cameraFront.w - 0.1);
     
     // NDC coordinates
     let ndc = vec3<f32>(
@@ -77,7 +77,7 @@ fn fs(input: FragmentInput) -> @location(0) vec4<f32> {
     let originalColor = textureSample(inputTexture, inputSampler, uv).rgb;
     
     // Check if skybox (linear depth near camera.far)
-    let isSkybox = linearDepth >= (camera.cameraZFar - 0.01);
+    let isSkybox = linearDepth >= (camera.cameraFront.w - 0.01);
     
     // Reconstruct world position from linear depth
     let worldPos = reconstructWorldPosition(uv, linearDepth);

@@ -16,16 +16,16 @@ fn getWorldCoords(uv: vec2<f32>, zlinear: f32, camera: CameraUniforms) -> vec3<f
     let near_world = near_world_homogeneous.xyz / near_world_homogeneous.w;
 
     // Calculate the ray direction from camera to the point (in WORLD coordinates)
-    let ray_direction = normalize(near_world - camera.cameraPosition);
+    let ray_direction = normalize(near_world - camera.cameraPosition.xyz);
     
     // zlinear was calculated as: dot(worldPos - cameraPos, cameraFront) / zFar
     // So: distance_along_front = zlinear * zFar
     // But we need distance_along_ray = distance_along_front / dot(ray_direction, cameraFront)
-    let distance_along_front = zlinear * camera.cameraZFar;
-    let distance_along_ray = distance_along_front / dot(ray_direction, camera.cameraFront);
+    let distance_along_front = zlinear * camera.cameraFront.w;
+    let distance_along_ray = distance_along_front / dot(ray_direction, camera.cameraFront.xyz);
     
     // Calculate final world position
-    return camera.cameraPosition + ray_direction * distance_along_ray;
+    return camera.cameraPosition.xyz + ray_direction * distance_along_ray;
 }
 
 // Get view space direction from clip space position

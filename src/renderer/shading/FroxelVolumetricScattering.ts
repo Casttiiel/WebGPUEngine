@@ -22,9 +22,9 @@ export class FroxelVolumetricScattering {
 
   // Froxel grid dimensions
   private froxelDimensions = {
-    x: 320, // Width slices
-    y: 180, // Height slices
-    z: 128, // Depth slices (logarithmic distribution)
+    x: 360, // Width slices
+    y: 240, // Height slices
+    z: 256, // Depth slices (logarithmic distribution)
   };
 
   private densityComputeShader!: GPUShaderModule;
@@ -47,6 +47,7 @@ export class FroxelVolumetricScattering {
   private froxelIntegratedTexture!: GPUTexture;
   private froxelLightTexture!: GPUTexture;
   private froxelLightTempTexture!: GPUTexture;
+  private noiseTexture!: Texture;
 
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
@@ -72,6 +73,7 @@ export class FroxelVolumetricScattering {
   private froxelUniformData: Float32Array;
 
   private parametersBindGroup!: GPUBindGroup;
+  private noiseTextureBindGroup!: GPUBindGroup;
 
   constructor() {
     this.device = GPUUtils.getDevice();
@@ -80,7 +82,7 @@ export class FroxelVolumetricScattering {
   }
 
   public async load(): Promise<void> {
-    await Texture.getAsync('noiseRGB.jpg'); //TODO REMOVE
+    this.noiseTexture = await Texture.getAsync('noiseRGBTileable.jpg');
     await this.initializeComputeShaders();
 
     this.rayMarchTechnique = await Technique.getAsync('volumetric/froxel_raymarch.tech');
@@ -138,6 +140,7 @@ export class FroxelVolumetricScattering {
         BindGroupFactory.getCameraComputeLayout(),
         BindGroupFactory.getFroxelParametersLayout(),
         BindGroupFactory.getFroxelDensityTexturesLayout(),
+        BindGroupFactory.getSingleTextureComputeLayout(),
       ],
     );
 
@@ -334,12 +337,29 @@ export class FroxelVolumetricScattering {
         ],
       );
     }
+    if (!this.noiseTextureBindGroup) {
+      this.noiseTextureBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_directional_light_noise_texture_bind_group',
+        BindGroupFactory.getSingleTextureComputeLayout(),
+        [
+          {
+            binding: 0,
+            resource: this.noiseTexture.getTextureView()!,
+          },
+          {
+            binding: 1,
+            resource: SamplerLibrary.simpleSampler,
+          },
+        ],
+      );
+    }
 
     // Set compute pipeline
     computePass.setPipeline(this.densityComputePipeline);
     computePass.setBindGroup(0, this.cameraBindGroup);
     computePass.setBindGroup(1, this.parametersBindGroup); // Froxel + volumetric uniforms
     computePass.setBindGroup(2, this.densityTexturesBindGroup); // Textures
+    computePass.setBindGroup(3, this.noiseTextureBindGroup); // Textures
 
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;

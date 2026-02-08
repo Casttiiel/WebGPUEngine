@@ -11,6 +11,46 @@
 // Output 3D texture (R32F - single channel density)
 @group(2) @binding(0) var froxelDensityTexture: texture_storage_3d<rg32float, write>;
 
+@group(3) @binding(0) var noiseTex: texture_2d<f32>;
+@group(3) @binding(1) var noiseSampler: sampler;
+
+// Función para samplear noise 3D desde textura 2D RGB tileable
+fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
+    let scale = 0.02;
+    let wind = vec3<f32>(1.0, 0.0, 0.7);
+
+    // Separar el scale del noise del movimiento temporal para control independiente
+    let p = (worldPos + wind * camera.timeDelta.x) * scale;
+
+    let dims = vec2<f32>(textureDimensions(noiseTex));
+
+    // Proyecciones 2D para simular 3D
+    let uv1 = fract(p.xy);
+    let uv2 = fract(p.yz);
+    let uv3 = fract(p.zx);
+
+    let c1 = textureLoad(
+        noiseTex,
+        vec2<i32>(uv1 * dims),
+        0
+    ).r;
+
+    let c2 = textureLoad(
+        noiseTex,
+        vec2<i32>(uv2 * dims),
+        0
+    ).r;
+
+    let c3 = textureLoad(
+        noiseTex,
+        vec2<i32>(uv3 * dims),
+        0
+    ).r;
+
+    // Promedio para volumen suave
+    return (c1 + c2 + c3) * (1.0 / 3.0);
+}
+
 @compute @workgroup_size(8, 8, 4)
 fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let froxelCoord = globalId.xyz;
@@ -39,17 +79,33 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
 
   let h = froxelWS.y - fogBaseHeight;
 
-  // Dentro de la capa: uniforme
-  // Por arriba: exp decay
+  // Altura normalizada dentro de la capa
+  let layerT = saturate(h / fogLayerHeight);
+
+  // Capa más densa abajo
+  let layerShape = smoothstep(0.0, 1.0, 1.0 - layerT);
+
+  // Decay arriba
   let above = max(h - fogLayerHeight, 0.0);
-  let heightFactor = exp(-above * fogFalloff);
+  let expFalloff = exp(-above * fogFalloff);
 
-  // opcional clamp
-  let hf = clamp(heightFactor, 0.0, 1.0);
+  let heightFog = layerShape * expFalloff;
 
+  // Base density
+  var densityFinal = volumetricParams.fogDensity * heightFog;
 
-  // 3) Densidad final del medio
-  let densityFinal = volumetricParams.fogDensity * hf;
+  // 3D Noise
+  let noise = sampleNoise3D(froxelWS);
+
+  // Más noise abajo
+  let heightMask = saturate(1.0 - layerT);
+  let layeredNoise = mix(1.0, noise, heightMask);
+
+  // Mucho más contraste para shafts
+  let shapedNoise = smoothstep(0.3, 0.6, layeredNoise);
+  let noiseFactor = mix(0.2, 2.5, shapedNoise);
+
+  densityFinal *= noiseFactor;
 
   // parámetros globales físicos
   let sigmaS = densityFinal * volumetricParams.scatteringCoeff;

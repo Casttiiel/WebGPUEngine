@@ -106,9 +106,12 @@ export class ModuleCameraMixer extends Module {
     const newZNear = camera1.getNear() * (1.0 - ratio) + camera2.getNear() * ratio;
     const newZFar = camera1.getFar() * (1.0 - ratio) + camera2.getFar() * ratio;
 
+    const newTime = camera1.getTime() * (1.0 - ratio) + camera2.getTime() * ratio;
+
     output.setProjectionParams(newFov, newZNear, newZFar);
     output.setViewport(Render.width, Render.height);
     output.lookAt(newPosition, vec3.add(vec3.create(), newPosition, newFront), newUp);
+    output.setTime(newTime);
 
     return output;
   }

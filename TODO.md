@@ -1,25 +1,25 @@
 ### Engine
 
 1. Froxel Volumetric Scattering + Height Fog
-   3D noise low frequency
    Spot Light Injection
-2. AO
-3. Point Light shadows
+2. Camera UpdateUniforms occurs always
+3. AO
+4. Point Light shadows
 
-4. Fix Player movement
-5. Blender Export with player spawn
-6. Light/Shadow bug on level-1?
-7. Motion blur weird error
+5. Fix Player movement
+6. Blender Export with player spawn
+7. Light/Shadow bug on level-1?
+8. Motion blur weird error
 
-8. Editor Light Probes (Render Debug / Gizmo)
-9. Editor Point Lights (Render Debug / Gizmo / Menu)
-10. Editor Spot Lights (Render Debug / Gizmo / Menu)
-11. Asset Browser + Spawn + Delete
+9. Editor Light Probes (Render Debug / Gizmo)
+10. Editor Point Lights (Render Debug / Gizmo / Menu)
+11. Editor Spot Lights (Render Debug / Gizmo / Menu)
+12. Asset Browser + Spawn + Delete
 
-12. Quality settings selection
-13. Improve particles
-14. Multiple Light probes has good shadows?
-15. Weird line on corners is irradiance because of normals
+13. Quality settings selection
+14. Improve particles
+15. Multiple Light probes has good shadows?
+16. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
@@ -45,3 +45,29 @@
 3. Remove en main.ts el skip first frame?
 
 ## Questions
+
+PROBLEMA:
+
+Muchos engines renderizan volumetric en un buffer separado y luego componen.
+
+Si estás haciendo blending directo:
+
+⚠️ OJO: el alpha channel no siempre se usa como esperas en WebGPU
+
+Además, NO estás atenuando correctamente la escena si:
+
+Hay múltiples passes
+
+HDR resolve
+
+Tonemap después
+
+PRO RECOMENDADO (más robusto):
+
+Hazlo en un composite shader explícito:
+
+sceneColor.rgb = sceneColor.rgb \* T + S;
+
+Y no dependas del fixed function blending para esto.
+
+👉 Esto solo ya puede duplicar visibilidad de shafts.

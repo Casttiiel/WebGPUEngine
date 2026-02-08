@@ -172,6 +172,21 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getSingleTextureComputeLayout(): GPUBindGroupLayout {
+    return this.getLayout('single_texture_compute', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
   public static getSSRUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('ssr_uniforms', [
       {

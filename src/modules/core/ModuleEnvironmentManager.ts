@@ -263,7 +263,7 @@ export class ModuleEnvironmentManager extends Module {
 
       // Configurar cámara para esta cara
       camera.lookAt(position, target, up);
-      camera.updateUniforms();
+      camera.updateUniforms(0);
 
       // ✅ Actualizar viewport de la cámara a la resolución del probe
       camera.setViewport(resolution, resolution);

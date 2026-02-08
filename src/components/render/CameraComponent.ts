@@ -62,7 +62,7 @@ export class CameraComponent extends Component {
     const target = data.target || [0, 0, 1];
     const up = data.up || [0, 1, 0];
     this.camera.lookAt(position, target, up);
-    this.camera.updateUniforms();
+    this.camera.updateUniforms(0);
   }
 
   public update(dt: number): void {
@@ -116,7 +116,7 @@ export class CameraComponent extends Component {
       }
     }
 
-    this.camera.updateUniforms();
+    this.camera.updateUniforms(dt);
   }
 
   public override renderInMenu(): void {

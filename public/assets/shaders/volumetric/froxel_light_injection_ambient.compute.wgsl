@@ -102,7 +102,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     let froxelWorldPos = tempFroxelWS.xyz / tempFroxelWS.w;
     let visibility = getShadowFactorCSMBlended(froxelWorldPos.xyz, froxelVS.z);
 
-    let V = normalize(camera.cameraPosition - froxelWorldPos);
+    let V = normalize(camera.cameraPosition.xyz - froxelWorldPos);
     let Ldir = normalize(-directionalLight.position);
 
     let cosTheta = clamp(dot(V, Ldir), -1.0, 1.0);

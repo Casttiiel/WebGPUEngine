@@ -41,6 +41,11 @@ export class Camera {
   private jitterOffsetX: number = 0;
   private jitterOffsetY: number = 0;
 
+  // Time tracking for shader animations
+  private time: number = 0;
+  private deltaTime: number = 0;
+  private readonly TIME_RESET_INTERVAL = 3600.0; // Reset every hour to avoid float precision loss
+
   // Jitter patterns
   private static readonly JITTER_2X2: [number, number][] = [
     [0.25, 0.25],
@@ -260,7 +265,20 @@ export class Camera {
     );
   }
 
-  public updateUniforms(): void {
+  public updateUniforms(deltaTime: number): void {
+    // Update time tracking
+    this.deltaTime = deltaTime;
+    this.time += this.deltaTime;
+
+    // Reset time every hour to prevent float precision loss
+    if (this.time >= this.TIME_RESET_INTERVAL) {
+      this.time = 0;
+    }
+
+    // Always update time and deltaTime (offset 92-93 = 368 bytes)
+    //const timeData = new Float32Array([this.time, this.deltaTime]);
+    //GPUUtils.writeBuffer(this.uniformBuffer, 368, timeData);
+
     if (!this.isDirty) return;
 
     // Create a single buffer with all data to minimize GPU writes
@@ -275,33 +293,34 @@ export class Camera {
     const cameraPosition = this.getPosition();
     const cameraFront = this.getFront();
 
-    // viewMatrix (offset 0-15)
+    // === ALL MATRICES FIRST (320 bytes total) ===
+    // viewMatrix (offset 0-15 = 0-63 bytes)
     uniformData.set(viewMatrix, 0);
 
-    // projectionMatrix (offset 16-31)
+    // projectionMatrix (offset 16-31 = 64-127 bytes)
     uniformData.set(projectionMatrix, 16);
 
-    // invViewProjectionMatrix (offset 32-47)
+    // invViewProjectionMatrix (offset 32-47 = 128-191 bytes)
     uniformData.set(invViewProjectionMatrix, 32);
 
-    // cameraPosition (offset 48-50)
-    uniformData.set(cameraPosition, 48);
+    // invProjectionMatrix (offset 48-63 = 192-255 bytes)
+    uniformData.set(invProjectionMatrix, 48);
 
-    // screenSize (offset 52-53)
-    uniformData[52] = Render.width;
-    uniformData[53] = Render.height;
+    // invViewMatrix (offset 64-79 = 256-319 bytes)
+    uniformData.set(invViewMatrix, 64);
 
-    // cameraFront + cameraZFar (offset 56-59)
-    uniformData[56] = cameraFront[0];
-    uniformData[57] = cameraFront[1];
-    uniformData[58] = cameraFront[2];
-    uniformData[59] = this.getFar();
+    // === SCALAR DATA AFTER MATRICES ===
+    // cameraPosition (offset 80-83 = 320-335 bytes) vec4
+    uniformData.set([cameraPosition[0], cameraPosition[1], cameraPosition[2], 0], 80);
 
-    // invProjectionMatrix (offset 60-75)
-    uniformData.set(invProjectionMatrix, 60);
+    // screenSize (offset 84-85 = 336-343 bytes) vec2 + padding
+    uniformData[84] = Render.width;
+    uniformData[85] = Render.height;
+    uniformData[86] = this.time;
+    uniformData[87] = this.deltaTime;
 
-    // invViewMatrix (offset 76-91)
-    uniformData.set(invViewMatrix, 76);
+    // cameraFront + cameraZFar (offset 88-91 = 352-367 bytes) vec4
+    uniformData.set([cameraFront[0], cameraFront[1], cameraFront[2], this.getFar()], 88);
 
     // Single GPU write instead of 7 separate writes
     GPUUtils.writeBuffer(this.uniformBuffer, 0, uniformData);
@@ -348,6 +367,18 @@ export class Camera {
 
   public getFar(): number {
     return this.zFar;
+  }
+
+  public getTime(): number {
+    return this.time;
+  }
+
+  public getDeltaTime(): number {
+    return this.deltaTime;
+  }
+
+  public resetTime(): void {
+    this.time = 0;
   }
 
   public setFov(fov: number): void {
@@ -444,6 +475,11 @@ export class Camera {
 
   public setIsDirty(dirty: boolean): void {
     this.isDirty = dirty;
+  }
+
+  public setTime(time: number): void {
+    this.time = time;
+    this.isDirty = true;
   }
 
   // Jittering methods for temporal anti-aliasing

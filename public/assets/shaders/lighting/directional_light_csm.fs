@@ -101,7 +101,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     }
 
     // Calcular distancia en view space para selección de cascada
-    let camToFragment = g.worldPos - camera.cameraPosition;
+    let camToFragment = g.worldPos - camera.cameraPosition.xyz;
     let viewSpaceDepth = length(camToFragment);
     
     // Determinar cascada usando función consolidada

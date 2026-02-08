@@ -44,8 +44,8 @@ fn fs(input: VertexOutput) -> FragmentOutput {
         emissive
     );
 
-    let camb2obj = input.WorldPos - camera.cameraPosition;
-    let linear_depth = dot(camb2obj, camera.cameraFront) / camera.cameraZFar;
+    let camb2obj = input.WorldPos - camera.cameraPosition.xyz;
+    let linear_depth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFront.w;
     output.depth = linear_depth;
 
     return output;

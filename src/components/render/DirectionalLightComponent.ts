@@ -169,7 +169,7 @@ export class DirectionalLightComponent extends Component {
       // Se configurará dinámicamente en updateShadowCameras()
       // basado en el frustum de la cámara principal
       camera.lookAt(lightData.position, lightData.target, [0, 0, 1]);
-      camera.updateUniforms();
+      camera.updateUniforms(0);
 
       this.shadowCameras.push(camera);
     }
@@ -411,6 +411,7 @@ export class DirectionalLightComponent extends Component {
       // Dimensiones del AABB estabilizado
       const orthoWidth = aabb.maxX - aabb.minX;
       const orthoHeight = aabb.maxY - aabb.minY;
+      if (!shadowCamera) continue;
 
       // Near/Far: usar el rango del AABB en light space
       // Como la cámara está a 100m de distancia, aabb.minZ será el near y aabb.maxZ el far
@@ -422,7 +423,7 @@ export class DirectionalLightComponent extends Component {
 
       // Actualizar shadow camera con la MISMA posición usada para calcular el AABB
       shadowCamera.lookAt(lightPos, worldCenter, lightUp);
-      shadowCamera.updateUniforms();
+      shadowCamera.updateUniforms(0);
 
       prevSplit = currentSplit;
     }

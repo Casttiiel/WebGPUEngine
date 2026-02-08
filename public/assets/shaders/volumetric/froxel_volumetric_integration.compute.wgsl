@@ -10,7 +10,7 @@
 @group(1) @binding(1) var froxelLightTexture: texture_3d<f32>;     // RGB = injected light
 @group(1) @binding(2) var froxelIntegratedTexture: texture_storage_3d<rgba16float, write>;
 
-const MAX_SLICES: u32 = 128u;
+const MAX_SLICES: u32 = 1024u;
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {

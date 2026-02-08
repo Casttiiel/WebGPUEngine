@@ -29,7 +29,7 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     g.specularColor = mix(vec3<f32>(0.04), g.albedo, g.metallic);
     
     // View and reflection directions
-    let incident_dir = normalize(g.worldPos - camera.cameraPosition);
+    let incident_dir = normalize(g.worldPos - camera.cameraPosition.xyz);
     g.reflectedDir = normalize(reflect(incident_dir, g.normal));
     g.viewDir = -incident_dir;
     
