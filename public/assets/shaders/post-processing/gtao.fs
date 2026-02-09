@@ -6,14 +6,18 @@
 #include "common/gbuffer"
 
 struct SSAOParams {
-    sampleCount: u32,
+    sampleCount: f32,
+    sliceCount: f32,
     radius: f32,
     aoStrength: f32,
-    noiseScale: f32,
     angleOffset: f32,
     spacialOffset: f32,
-    sliceCount: f32,
-    padding2: f32
+    falloff: f32,
+    thicknessMix: f32,
+    maxStride: f32,
+    limit: f32,
+    padding: f32,
+    padding2: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -28,10 +32,6 @@ struct SSAOParams {
 @group(2) @binding(2) var noiseTexture: texture_2d<f32>;
 
 const PI_HALF: f32 = 1.5707963267948966192313216916398;
-const SSAO_FALLOFF      : f32 = 2.5;     // caída lineal de influencia
-const SSAO_THICKNESSMIX : f32 = 0.02;     // mezcla para objetos finos
-const SSAO_LIMIT        : f32 = 100.0;
-const SSAO_MAX_STRIDE   : f32 = 24.0;
 
 @fragment
 fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) f32 {
@@ -50,11 +50,11 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     let v = normalize(-ray);
 
     let distCenter = max(length(ray), 1e-4);
-    let stride = min((1.0 / distCenter) * SSAO_LIMIT, SSAO_MAX_STRIDE);
+    let stride = min((1.0 / distCenter) * ssaoParams.limit, ssaoParams.maxStride);
     let texel = 1.0 / camera.screenSize;
     let dirMult = texel * stride;
 
-    let sliceCount = i32(12);
+    let sliceCount = i32(ssaoParams.sliceCount);
     var visibilityAccum : f32 = 0.0;
 
     for (var s: i32 = 0; s < sliceCount; s = s + 1) {
@@ -187,12 +187,12 @@ fn sliceSample(
     if (lenp <= 1e-6) { return -1.0; }
 
     let current = dot(vView, p / lenp);       // cos(horizonAngle)
-    let falloff = clamp((radius - lenp) / SSAO_FALLOFF, 0.0, 1.0);
+    let falloff = clamp((radius - lenp) / ssaoParams.falloff, 0.0, 1.0);
     var res = closest;
     if(current > closest){
         res = mix(closest, current, falloff);
     }
-    return mix(res, current, SSAO_THICKNESSMIX * falloff);
+    return mix(res, current, ssaoParams.thicknessMix * falloff);
 }
 
 fn getCameraVec(uv: vec2<f32>) -> vec3<f32> {

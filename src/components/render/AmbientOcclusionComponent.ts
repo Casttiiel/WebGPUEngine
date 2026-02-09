@@ -9,8 +9,10 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { Render } from '../../renderer/core/pipeline/Render';
 import { Texture } from '../../renderer/resources/Texture';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { Engine } from '../../core/engine/Engine';
 
 export class AmbientOcclusionComponent extends Component {
+  private device: GPUDevice;
   private loaded = false;
   private aoTechnique!: Technique;
   private bilateralFilterTechnique!: Technique;
@@ -27,12 +29,24 @@ export class AmbientOcclusionComponent extends Component {
   private bilateralFilterBindGroup!: GPUBindGroup | null;
   private isEnabled = true;
   private noiseTexture!: Texture;
+  private ssaoUniformData: Float32Array;
+  private sampleCount: number = QualitySettings.getInstance().getSettings().aoSampleCount;
+  private sliceCount: number = QualitySettings.getInstance().getSettings().aoSliceCount;
+  private radius: number = QualitySettings.getInstance().getSettings().aoRadius;
+  private strength: number = QualitySettings.getInstance().getSettings().aoStrength;
+  private angleOffset: number = 0.1;
+  private spacialOffset: number = 0.66;
+  private falloff: number = 1.0;
+  private thicknessMix: number = 0.001;
+  private maxStride: number = 5.0;
+  private limit: number = 20.0;
 
   constructor() {
     super();
     this.renderPassManager = new RenderPassManager();
-
+    this.device = GPUUtils.getDevice();
     this.isEnabled = QualitySettings.getInstance().getSettings().enableAO;
+    this.ssaoUniformData = new Float32Array(12);
   }
 
   public async load(): Promise<void> {
@@ -86,26 +100,11 @@ export class AmbientOcclusionComponent extends Component {
 
   private createSSAOParamsBuffer(): void {
     // Create buffer with enough space for SSAO parameters only
-    // 4 floats = 16
     this.ssaoParamsBuffer = GPUUtils.createBuffer(
       'SSAO Parameters Buffer',
-      32,
+      48,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-
-    // Creamos un ArrayBuffer para almacenar tanto u32 como f32
-    const arrayBuffer = new ArrayBuffer(16); // 8 * 4 bytes (1 u32 + 5 f32 + 2 padding)
-    const u32View = new Uint32Array(arrayBuffer, 0, 1);
-    const f32View = new Float32Array(arrayBuffer, 4); // Comienza después del u32
-
-    const qualitySettings = QualitySettings.getInstance().getSettings();
-    u32View[0] = qualitySettings.aoSampleCount;
-    f32View[0] = qualitySettings.aoRadius;
-    f32View[1] = qualitySettings.aoStrength;
-    f32View[2] = qualitySettings.aoNoiseScale;
-
-    const paramsData = new Uint8Array(arrayBuffer);
-    GPUUtils.writeBuffer(this.ssaoParamsBuffer, 0, paramsData);
   }
 
   private createSSAOParamsBindGroup(): void {
@@ -160,6 +159,8 @@ export class AmbientOcclusionComponent extends Component {
       return this.renderDisabledAO();
     }
 
+    this.updateUniforms();
+
     // Pass 1: Generate raw AO using SSAO with parameters
     this.renderPassManager.executeAmbientOcclusionPass(
       this.fullscreenQuadMesh,
@@ -208,9 +209,67 @@ export class AmbientOcclusionComponent extends Component {
     );
   }
 
-  public update(_dt: number): void {}
+  private updateUniforms(): void {
+    let offset = 0;
+    this.ssaoUniformData[offset++] = this.sampleCount;
+    this.ssaoUniformData[offset++] = this.sliceCount;
+    this.ssaoUniformData[offset++] = this.radius;
+    this.ssaoUniformData[offset++] = this.strength;
+    this.ssaoUniformData[offset++] = this.angleOffset;
+    this.ssaoUniformData[offset++] = this.spacialOffset;
+    this.ssaoUniformData[offset++] = this.falloff;
+    this.ssaoUniformData[offset++] = this.thicknessMix;
+    this.ssaoUniformData[offset++] = this.maxStride;
+    this.ssaoUniformData[offset++] = this.limit;
 
-  public override renderInMenu(): void {}
+    // Upload to GPU
+    if (this.ssaoParamsBuffer) {
+      this.device.queue.writeBuffer(this.ssaoParamsBuffer, 0, this.ssaoUniformData.buffer);
+    }
+  }
+
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    // Create/get the Volumetric Scattering folder
+    if (!gui.beginWindow('Ambient Occlusion', true)) return;
+
+    // Access the folder from GUIManager's internal map
+    const guiManager = gui as any;
+    const folder = guiManager.folders?.get('Ambient Occlusion');
+
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    folder.add(this, 'isEnabled').name('Enable AO').listen();
+
+    folder.add(this, 'sampleCount', 1.0, 16.0).name('Sample Count').listen();
+
+    folder.add(this, 'sliceCount', 1.0, 8.0).name('Slice Count').listen();
+
+    folder.add(this, 'radius', 0.0, 5.0).name('Radius').listen();
+
+    folder.add(this, 'strength', 0.0, 2.0).name('Strength').listen();
+
+    folder.add(this, 'angleOffset', 0.0, 3.0).name('Angle Offset').listen();
+
+    folder.add(this, 'spacialOffset', 0.0, 3.0).name('Spacial Offset').listen();
+
+    folder.add(this, 'falloff', 0.0, 15.0).name('Falloff').listen();
+
+    folder.add(this, 'thicknessMix', 0.001, 0.01).name('Thickness Mix').listen();
+
+    folder.add(this, 'maxStride', 1.0, 32.0).name('Max Stride').listen();
+
+    folder.add(this, 'limit', 0.0, 100.0).name('Limit').listen();
+
+    gui.endWindow();
+  }
+
+  public update(_dt: number): void {}
 
   public renderDebug(): void {
     // Implement debug rendering if needed

@@ -430,7 +430,6 @@ export class FroxelVolumetricScattering {
       ?.getList()[0] as DirectionalLightComponent;
 
     if (!directionalLightComponent || !directionalLightComponent.getHasShadows()) {
-      console.log('  ⚠️ No directional light with shadows found, skipping');
       return; // No directional light or no shadows
     }
 
@@ -694,12 +693,12 @@ export class FroxelVolumetricScattering {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
-    // Create/get the Volumetrics folder
-    if (!gui.beginWindow('Volumetrics', true)) return;
+    // Create/get the Volumetric Scattering folder
+    if (!gui.beginWindow('Volumetric Scattering', true)) return;
 
     // Access the folder from GUIManager's internal map
     const guiManager = gui as any;
-    const folder = guiManager.folders?.get('Volumetrics');
+    const folder = guiManager.folders?.get('Volumetric Scattering');
 
     if (!folder) {
       gui.endWindow();

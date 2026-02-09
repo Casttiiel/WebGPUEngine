@@ -424,9 +424,6 @@ export class ModuleRender extends Module {
         GPUUtils.createRenderPassDescriptor('main presentation render pass', [colorAttachment]),
       );
 
-    // Configure viewport and scissor for presentation (use full canvas size)
-    const canvasSize = Render.canvasSize;
-
     // Render result to screen
     this.presentationTechnique.activatePipeline(pass);
     this.fullscreenQuadMesh.activate(pass);

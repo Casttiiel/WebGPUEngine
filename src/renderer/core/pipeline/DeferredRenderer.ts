@@ -351,6 +351,14 @@ export class DeferredRenderer {
 
   public renderInMenu(): void {
     this.froxelVolumetrics.renderInMenu();
+
+    const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
+    const ambientOcclusionComponent = mainCameraEntity?.getComponent(
+      'ambient_occlusion',
+    ) as AmbientOcclusionComponent;
+    if (ambientOcclusionComponent) {
+      ambientOcclusionComponent.renderInMenu();
+    }
   }
 
   public resetSSRResources(): void {
