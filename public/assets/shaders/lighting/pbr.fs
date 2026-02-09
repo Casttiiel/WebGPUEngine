@@ -30,9 +30,8 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let distance_to_light = abs(length(light_dir_full));
     let light_dir = light_dir_full / distance_to_light;
     if(use_shadows){
-        shadow_factor = getShadowFactor(g.worldPos, g.normal, light_dir, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true, 0);
+        shadow_factor = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true);
     }
-        
     
     let worldPos = vec4<f32>(g.worldPos, 1.0);
     if (fix_shadows) {
@@ -91,7 +90,7 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let diffuse_contrib = kD * cDiff;
     let specular_contrib = cSpec; // cSpec ya incluye Fresnel
     
-    let final_color = light.color.xyz  * light.intensity * shadow_factor * NdL * (diffuse_contrib + specular_contrib) * att;//*/
+    let final_color = light.color.xyz  * light.intensity * shadow_factor * NdL * (diffuse_contrib + specular_contrib) * att;
     return vec4<f32>(final_color, 1.0);
 }
 

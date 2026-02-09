@@ -16,6 +16,8 @@
 @group(3) @binding(0) var<uniform> directionalLight: DirectionalLightCSMUniforms;
 @group(3) @binding(1) var shadowMap: texture_depth_2d;
 @group(3) @binding(2) var shadowSampler: sampler_comparison;
+@group(3) @binding(3) var projectorTexture: texture_2d<f32>;
+@group(3) @binding(4) var projectorSampler: sampler;
 
 struct AmbientLightUniforms {
     color: vec3<f32>,
@@ -64,13 +66,6 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let shadowFactor2 = getShadowFactorCSM(worldPos, nextCascadeDepth);
     
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
-}
-
-fn phaseHG(cosTheta: f32, g: f32) -> f32 {
-    let gg = g * g;
-    let denom = pow(1.0 + gg - 2.0 * g * cosTheta, 1.5);
-    // Normalización correcta con 4π
-    return (1.0 - gg) / (12.566370614 * max(denom, 1e-4)); // 4π ≈ 12.566370614
 }
 
 @compute @workgroup_size(8, 8, 4)

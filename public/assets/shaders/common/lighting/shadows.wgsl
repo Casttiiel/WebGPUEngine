@@ -4,7 +4,7 @@
 #include "common/core/constants"
 
 // PCF shadow sampling with 3x3 kernel
-fn getShadowFactor(wPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool, cascadeIndex: i32) -> f32 {
+fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
     

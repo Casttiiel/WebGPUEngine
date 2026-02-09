@@ -11,6 +11,7 @@ import { Engine } from '../../core/engine/Engine';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
+import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -38,6 +39,9 @@ export class FroxelVolumetricScattering {
 
   private pointLightInjectionShader!: GPUShaderModule;
   private pointLightInjectionPipeline!: GPUComputePipeline;
+
+  private spotLightInjectionShader!: GPUShaderModule;
+  private spotLightInjectionPipeline!: GPUComputePipeline;
 
   private rayMarchTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
@@ -133,6 +137,15 @@ export class FroxelVolumetricScattering {
       code: pointLightInjectionCode,
     });
 
+    const spotLightInjectionCode = await ResourceManager.loadShader(
+      'volumetric/froxel_light_injection_spot.compute.wgsl',
+    );
+
+    this.spotLightInjectionShader = this.device.createShaderModule({
+      label: 'Froxel Spot Light Injection Compute Shader',
+      code: spotLightInjectionCode,
+    });
+
     this.createComputePipelines();
   }
 
@@ -220,6 +233,27 @@ export class FroxelVolumetricScattering {
     };
 
     this.pointLightInjectionPipeline = PipelineFactory.createComputePipeline(pointLightConfig);
+
+    const spotLightInjectionPipelineLayout = PipelineFactory.createPipelineLayout(
+      'froxel_spot_light_injection_pipeline_layout',
+      [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getFroxelPointTexturesLayout(),
+        BindGroupFactory.getFroxelSpotLightDataLayout(),
+      ],
+    );
+
+    const spotLightConfig: ComputePipelineConfig = {
+      label: 'Froxel Spot Light Injection Compute Pipeline',
+      layout: spotLightInjectionPipelineLayout,
+      compute: {
+        module: this.spotLightInjectionShader,
+        entryPoint: 'main',
+      },
+    };
+
+    this.spotLightInjectionPipeline = PipelineFactory.createComputePipeline(spotLightConfig);
   }
 
   public create(): void {
@@ -310,6 +344,8 @@ export class FroxelVolumetricScattering {
     this.executeAmbientLightInjectionPass();
 
     this.executePointLightInjectionPass();
+
+    this.executeSpotLightInjectionPass();
 
     this.executeVolumetricIntegrationPass();
   }
@@ -580,6 +616,108 @@ export class FroxelVolumetricScattering {
     this.froxelLightTempTexture = lightWrite;
   }
 
+  private executeSpotLightInjectionPass(): void {
+    const spotLightManager = Engine.getEntities().getObjectManagerByName('spot_light');
+    if (!spotLightManager) return;
+    const spotLights = spotLightManager.getList() as SpotLightComponent[];
+
+    // Camera and parameter bind groups (no cambian entre luces)
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+    const camera = cameraComponent.getCamera();
+    const cameraBuffer = camera.getUniformBuffer();
+    const cameraBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_spot_light_camera_bind_group',
+      BindGroupFactory.getCameraComputeLayout(),
+      [{ binding: 0, resource: { buffer: cameraBuffer } }],
+    );
+    const parametersBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_spot_light_parameters_bind_group',
+      BindGroupFactory.getFroxelParametersLayout(),
+      [
+        { binding: 0, resource: { buffer: this.froxelUniformBuffer } },
+        { binding: 1, resource: { buffer: this.volumetricUniformBuffer } },
+      ],
+    );
+
+    const { x, y, z } = this.froxelDimensions;
+    const dispatchX = Math.ceil(x / 8);
+    const dispatchY = Math.ceil(y / 8);
+    const dispatchZ = Math.ceil(z / 4);
+
+    let lightRead = this.froxelLightTexture;
+    let lightWrite = this.froxelLightTempTexture;
+
+    for (const spotLightComponent of spotLights) {
+      if (!spotLightComponent.isVisible()) {
+        continue;
+      }
+      const commandEncoder = this.device.createCommandEncoder({
+        label: 'froxel_spot_light_injection_pass',
+      });
+      const computePass = commandEncoder.beginComputePass({
+        label: 'froxel_spot_light_injection_compute',
+      });
+
+      computePass.setPipeline(this.spotLightInjectionPipeline);
+
+      // Bind groups comunes
+      computePass.setBindGroup(0, cameraBindGroup);
+      computePass.setBindGroup(1, parametersBindGroup);
+
+      const texturesBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_spot_light_textures_bind_group',
+        BindGroupFactory.getFroxelPointTexturesLayout(),
+        [
+          { binding: 0, resource: this.froxelDensityTexture.createView() },
+          { binding: 1, resource: lightRead.createView() },
+          { binding: 2, resource: lightWrite.createView() },
+        ],
+      );
+      computePass.setBindGroup(2, texturesBindGroup);
+
+      // Bind group específico de la luz
+      const spotLightDataBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_spot_light_data_bind_group',
+        BindGroupFactory.getFroxelSpotLightDataLayout(),
+        [
+          {
+            binding: 0,
+            resource: { buffer: spotLightComponent.getUniformBuffer() },
+          },
+          {
+            binding: 1,
+            resource: spotLightComponent.getShadowDepthView(),
+          },
+          {
+            binding: 2,
+            resource: spotLightComponent.getShadowSampler(),
+          },
+          {
+            binding: 3,
+            resource: spotLightComponent.getProjectorTextureView(),
+          },
+          {
+            binding: 4,
+            resource: SamplerLibrary.simpleSampler,
+          },
+        ],
+      );
+      computePass.setBindGroup(3, spotLightDataBindGroup);
+
+      computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
+      computePass.end();
+      this.device.queue.submit([commandEncoder.finish()]);
+
+      const tmp = lightRead;
+      lightRead = lightWrite;
+      lightWrite = tmp;
+    }
+
+    this.froxelLightTexture = lightRead;
+    this.froxelLightTempTexture = lightWrite;
+  }
+
   public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
     const render = Render.getInstance();
     const commandEncoder = render.getCommandEncoder();
@@ -729,69 +867,6 @@ export class FroxelVolumetricScattering {
     folder.add(this, 'farPlane', 10.0, 200.0).name('Far Plane').listen();
 
     gui.endWindow();
-  }
-
-  public getFogDensity(): number {
-    return this.fogDensity;
-  }
-  public setFogDensity(value: number): void {
-    this.fogDensity = value;
-  }
-
-  public getScatteringCoeff(): number {
-    return this.scatteringCoeff;
-  }
-  public setScatteringCoeff(value: number): void {
-    this.scatteringCoeff = value;
-  }
-
-  public getAbsorptionCoeff(): number {
-    return this.absorptionCoeff;
-  }
-  public setAbsorptionCoeff(value: number): void {
-    this.absorptionCoeff = value;
-  }
-
-  public getMultipleScatteringBoost(): number {
-    return this.multipleScatteringBoost;
-  }
-  public setMultipleScatteringBoost(value: number): void {
-    this.multipleScatteringBoost = value;
-  }
-
-  public getAnisotropy(): number {
-    return this.anisotropy;
-  }
-  public setAnisotropy(value: number): void {
-    this.anisotropy = value;
-  }
-
-  public getFogBaseHeight(): number {
-    return this.fogBaseHeight;
-  }
-  public setFogBaseHeight(value: number): void {
-    this.fogBaseHeight = value;
-  }
-
-  public getFogLayerHeight(): number {
-    return this.fogLayerHeight;
-  }
-  public setFogLayerHeight(value: number): void {
-    this.fogLayerHeight = value;
-  }
-
-  public getFogFalloff(): number {
-    return this.fogFalloff;
-  }
-  public setFogFalloff(value: number): void {
-    this.fogFalloff = value;
-  }
-
-  public getAmbientVolumetricIntensity(): number {
-    return this.ambientVolumetricIntensity;
-  }
-  public setAmbientVolumetricIntensity(value: number): void {
-    this.ambientVolumetricIntensity = value;
   }
 
   public dispose(): void {

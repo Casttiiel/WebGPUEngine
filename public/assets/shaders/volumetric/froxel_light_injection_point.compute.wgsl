@@ -55,17 +55,25 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   );
   let lightVS  = worldToView(light.position);
 
-  let dist = length(lightVS - froxelVS);
+  let d = length(lightVS - froxelVS);
 
   // fuera del radio => copiar
-  if (dist >= light.radius) {
+  if (d >= light.radius) {
     textureStore(froxelLightOutput, coord, vec4<f32>(existing, 1.0));
     return;
   }
 
-  let denom = max(light.radius - light.startFalloff, 1e-4);
-  let x = max(dist - light.startFalloff, 0.0) / denom;
-  let att = clamp(1.0 - x, 0.0, 1.0);
+  let r0 = light.startFalloff; // radio interior (intensidad máxima)
+  let r1 = light.radius;       // radio exterior (intensidad 0)
+    
+  // Atenuación con inner/outer radius
+  var att = 1.0;
+  if (d > r0) {
+      // Transición suave de 1.0 a 0.0 entre r0 y r1
+      let t = saturate((d - r0) / max(r1 - r0, 0.001));
+      // Smoothstep inverso: 1.0 → 0.0
+      att = 1.0 - t * t * (3.0 - 2.0 * t);
+  }
 
   let contribution = light.color * light.intensity * att;
 

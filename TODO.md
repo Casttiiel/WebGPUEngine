@@ -1,23 +1,24 @@
 ### Engine
 
-1. Froxel Volumetric Scattering: Spot Light Injection
-2. Froxel Volumetric quality
-3. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-4. Fix Player movement
+1. Froxel Volumetric Scattering: Spot Light Injection angle
+2. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+3. Fix Player movement
+
+4. Gameplay
 
 5. Camera Uniforms missleading names
 6. Open Editor multiple times, creates data multiple times
 7. Bloom Shape
-8. Contact Shadows
-9. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-10. Reflection Probes con blending
 
-11. Blender Export with player spawn
-12. Editor Light Probes (Render Debug / Gizmo)
-13. Editor Point Lights (Render Debug / Gizmo / Menu)
-14. Editor Spot Lights (Render Debug / Gizmo / Menu)
-15. Asset Browser + Spawn + Delete
+8. Blender Export with player spawn
+9. Editor Light Probes (Render Debug / Gizmo)
+10. Editor Point Lights (Render Debug / Gizmo / Menu)
+11. Editor Spot Lights (Render Debug / Gizmo / Menu)
+12. Asset Browser + Spawn + Delete
 
+13. Reflection Probes con blending
+14. Contact Shadows
+15. CSM: Logarithmic depth o reversed-Z or less max shadow distance
 16. Motion blur weird error
 17. Point Light shadows
 18. Quality settings selection

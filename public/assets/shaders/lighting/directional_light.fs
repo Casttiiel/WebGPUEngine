@@ -43,7 +43,7 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     var shadow_factor = 1.0;
     let light_dir = normalize(light.position); // this will be used as a directional light
     if (light.hasShadows > 0.5) {
-        shadow_factor = getShadowFactor(g.worldPos, g.normal, light_dir, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, false, 0);
+        shadow_factor = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, false);
     }
 
     

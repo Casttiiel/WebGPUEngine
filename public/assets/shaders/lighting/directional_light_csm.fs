@@ -28,27 +28,27 @@ alias LightUniformsCSM = DirectionalLightCSMUniforms;
  * Shader-specific implementation using consolidated CSM functions.
  * Selects appropriate shadow map based on cascade index.
  */
-fn getShadowFactorCSM(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, viewSpaceDepth: f32) -> f32 {
+fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
     
     // Call getShadowFactor with appropriate cascade shadow map
     if (cascadeIndex == 0) {
         return getShadowFactor(
-            worldPos, normal, lightDir,
+            worldPos,
             light.viewProjOffset0, light.shadowParams.z,
-            gShadowMap0, gShadowSampler, false, 0
+            gShadowMap0, gShadowSampler, false
         );
     } else if (cascadeIndex == 1) {
         return getShadowFactor(
-            worldPos, normal, lightDir,
+            worldPos,
             light.viewProjOffset1, light.shadowParams.z,
-            gShadowMap1, gShadowSampler, false, 1
+            gShadowMap1, gShadowSampler, false
         );
     } else {
         return getShadowFactor(
-            worldPos, normal, lightDir,
+            worldPos,
             light.viewProjOffset2, light.shadowParams.z,
-            gShadowMap2, gShadowSampler, false, 2
+            gShadowMap2, gShadowSampler, false
         );
     }
 }
@@ -56,14 +56,14 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32
 /**
  * Shader-specific blended CSM using consolidated functions.
  */
-fn getShadowFactorCSMBlended(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: vec3<f32>, viewSpaceDepth: f32) -> f32 {
+fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeCount = i32(light.cascadeSplits.w);
     
     if (cascadeCount == 1) {
         return getShadowFactor(
-            worldPos, normal, lightDir,
+            worldPos,
             light.viewProjOffset0, light.shadowParams.z,
-            gShadowMap0, gShadowSampler, false, 0
+            gShadowMap0, gShadowSampler, false
         );
     }
     
@@ -82,12 +82,12 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, normal: vec3<f32>, lightDir: v
     }
     
     if (blendFactor < 0.01) {
-        return getShadowFactorCSM(worldPos, normal, lightDir, viewSpaceDepth);
+        return getShadowFactorCSM(worldPos, viewSpaceDepth);
     }
     
-    let shadowFactor1 = getShadowFactorCSM(worldPos, normal, lightDir, viewSpaceDepth);
+    let shadowFactor1 = getShadowFactorCSM(worldPos, viewSpaceDepth);
     let nextCascadeDepth = viewSpaceDepth + 0.1;
-    let shadowFactor2 = getShadowFactorCSM(worldPos, normal, lightDir, nextCascadeDepth);
+    let shadowFactor2 = getShadowFactorCSM(worldPos, nextCascadeDepth);
     
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
 }
@@ -119,7 +119,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let light_dir = normalize(light.position);
     
     if (light.hasShadows > 0.5) {
-        shadow_factor = getShadowFactorCSMBlended(g.worldPos, g.normal, light_dir, viewSpaceDepth);
+        shadow_factor = getShadowFactorCSMBlended(g.worldPos, viewSpaceDepth);
     }
     
     // PBR calculations

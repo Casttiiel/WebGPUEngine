@@ -81,3 +81,10 @@ fn froxelToViewSpace(
 
     return rayVS * t;
 }
+
+fn phaseHG(cosTheta: f32, g: f32) -> f32 {
+    let gg = g * g;
+    let denom = pow(1.0 + gg - 2.0 * g * cosTheta, 1.5);
+    // Normalización correcta con 4π
+    return (1.0 - gg) / (12.566370614 * max(denom, 1e-4)); // 4π ≈ 12.566370614
+}

@@ -744,6 +744,44 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getFroxelSpotLightDataLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_spot_light_data_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'uniform',
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: {
+          type: 'comparison',
+        },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
   /**
    * Create bind group layout for froxel density textures (group 1)
    */

@@ -327,6 +327,22 @@ export class SpotLightComponent extends CameraComponent {
     // Implement debug rendering if needed
   }
 
+  public getUniformBuffer(): GPUBuffer {
+    return this.uniformBuffer;
+  }
+
+  public getShadowDepthView(): GPUTextureView {
+    return this.shadowDepthView;
+  }
+
+  public getProjectorTextureView(): GPUTextureView {
+    return this.projectorTextureView;
+  }
+
+  public getShadowSampler(): GPUSampler {
+    return this.shadowSampler;
+  }
+
   public hasShadows(): boolean {
     return this._hasShadows;
   }
