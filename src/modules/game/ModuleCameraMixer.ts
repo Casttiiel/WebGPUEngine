@@ -12,12 +12,14 @@ export class ModuleCameraMixer extends Module {
   private mixedCameras: MixedCamera[] = [];
   private defaultCamera!: Entity;
   private outputCamera!: Entity;
+  private camera!: Camera;
 
   constructor(name: string) {
     super(name);
   }
 
   public async start(): Promise<boolean> {
+    this.camera = new Camera();
     this.setDefaultCamera(Engine.getEntities().getEntityByName('PlayerCamera')!);
     this.setOutputCamera(Engine.getEntities().getEntityByName('MainCamera')!);
 
@@ -89,7 +91,7 @@ export class ModuleCameraMixer extends Module {
   private blendCameras(camera1: Camera, camera2: Camera, ratio: number): Camera {
     if (!camera1 || !camera2 || ratio <= 0.0) throw new Error('Invalid cameras or ratio');
 
-    const output = new Camera();
+    const output = this.camera;
 
     const newPosition = vec3.lerp(
       vec3.create(),

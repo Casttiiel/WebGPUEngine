@@ -29,6 +29,26 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
             shadow += textureSampleCompareLevel(shadowMap, shadowSampler, lightUVSpacePos.xy + offset, lightUVSpacePos.z);
         }
     }
-    shadow = shadow / 25.0;
+    shadow = shadow / 9.0;
     return shadow;
+}
+
+
+fn getShadowFactorSimple(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
+    let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
+    var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
+    
+    if (adaptUVs) {
+        lightUVSpacePos.x = lightUVSpacePos.x * 0.5 + 0.5;
+        lightUVSpacePos.y = lightUVSpacePos.y * -0.5 + 0.5;
+    }
+    
+    // Out of bounds check
+    if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0 ||
+        lightUVSpacePos.x < 0.0 || lightUVSpacePos.x > 1.0 ||
+        lightUVSpacePos.y < 0.0 || lightUVSpacePos.y > 1.0) {
+        return 1.0;
+    }
+
+    return textureSampleCompareLevel(shadowMap, shadowSampler, lightUVSpacePos.xy, lightUVSpacePos.z);
 }

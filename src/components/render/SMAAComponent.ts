@@ -29,6 +29,8 @@ export class SMAAComponent extends Component {
   private fullscreenQuadMesh!: Mesh;
   private renderPassManager!: RenderPassManager;
 
+  private blendParamsBindGroup!: GPUBindGroup;
+
   // Render targets for intermediate results
   private edgesRT!: RenderTarget; // Edges texture (R=horizontal, G=vertical)
   private blendRT!: RenderTarget; // Blending weights texture
@@ -388,18 +390,22 @@ export class SMAAComponent extends Component {
    * Get bind group for blending parameters (group 2)
    */
   private getBlendParamsBindGroup(): GPUBindGroup {
-    return BindGroupFactory.createBindGroup(
-      `smaa_blend_params_bindgroup`,
-      this.blendTechnique.getPipeline().getBindGroupLayout(2),
-      [
-        {
-          binding: 0,
-          resource: {
-            buffer: this.blendUniformBuffer,
+    if (!this.blendParamsBindGroup) {
+      this.blendParamsBindGroup = BindGroupFactory.createBindGroup(
+        `smaa_blend_params_bindgroup`,
+        this.blendTechnique.getPipeline().getBindGroupLayout(2),
+        [
+          {
+            binding: 0,
+            resource: {
+              buffer: this.blendUniformBuffer,
+            },
           },
-        },
-      ],
-    );
+        ],
+      );
+    }
+
+    return this.blendParamsBindGroup;
   }
 
   public override renderInMenu(): void {

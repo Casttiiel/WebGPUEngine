@@ -1,30 +1,36 @@
 ### Engine
 
-1. Froxel Volumetric Scattering: Spot Light Injection angle
-2. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-3. Fix Player movement
+1. Gameplay
 
-4. Gameplay
+2. Optimize with compute shaders
 
-5. Camera Uniforms missleading names
-6. Open Editor multiple times, creates data multiple times
-7. Bloom Shape
+3. Optimize Texture View Creation for Froxel Volumetric
+4. Optimize Bind group creation for Froxel Volumetric
+5. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+6. Froxel Volumetric Light Shafts parpadean
+7. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+8. Froxel Volumetric Scattering: Spot Light Injection angle
 
-8. Blender Export with player spawn
-9. Editor Light Probes (Render Debug / Gizmo)
-10. Editor Point Lights (Render Debug / Gizmo / Menu)
-11. Editor Spot Lights (Render Debug / Gizmo / Menu)
-12. Asset Browser + Spawn + Delete
+9. Camera Uniforms missleading names
+10. Open Editor multiple times, creates data multiple times
+11. Bloom Shape
 
-13. Reflection Probes con blending
-14. Contact Shadows
-15. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-16. Motion blur weird error
-17. Point Light shadows
-18. Quality settings selection
-19. Improve particles
-20. Multiple Light probes has good shadows?
-21. Weird line on corners is irradiance because of normals
+12. Motion blur weird error
+13. Point Light shadows
+14. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+15. Contact Shadows
+16. Reflection Probes con blending
+
+17. Blender Export with player spawn
+18. Editor Light Probes (Render Debug / Gizmo)
+19. Editor Point Lights (Render Debug / Gizmo / Menu)
+20. Editor Spot Lights (Render Debug / Gizmo / Menu)
+21. Asset Browser + Spawn + Delete
+
+22. Quality settings selection
+23. Improve particles
+24. Multiple Light probes has good shadows?
+25. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
@@ -50,29 +56,3 @@
 3. Remove en main.ts el skip first frame?
 
 ## Questions
-
-PROBLEMA:
-
-Muchos engines renderizan volumetric en un buffer separado y luego componen.
-
-Si estás haciendo blending directo:
-
-⚠️ OJO: el alpha channel no siempre se usa como esperas en WebGPU
-
-Además, NO estás atenuando correctamente la escena si:
-
-Hay múltiples passes
-
-HDR resolve
-
-Tonemap después
-
-PRO RECOMENDADO (más robusto):
-
-Hazlo en un composite shader explícito:
-
-sceneColor.rgb = sceneColor.rgb \* T + S;
-
-Y no dependas del fixed function blending para esto.
-
-👉 Esto solo ya puede duplicar visibilidad de shafts.

@@ -193,20 +193,22 @@ export class AmbientOcclusionComponent extends Component {
     const sampler = SamplerLibrary.simpleSampler;
 
     // Create bind group for AO texture (group 2 in the shader) using SingleTexture layout
-    this.bilateralFilterBindGroup = BindGroupFactory.createBindGroup(
-      `ao_bilateral_filter_bindgroup`,
-      BindGroupFactory.getSingleTextureLayout(),
-      [
-        {
-          binding: 0,
-          resource: this.rawAOTarget.getView(),
-        },
-        {
-          binding: 1,
-          resource: sampler,
-        },
-      ],
-    );
+    if (!this.bilateralFilterBindGroup) {
+      this.bilateralFilterBindGroup = BindGroupFactory.createBindGroup(
+        `ao_bilateral_filter_bindgroup`,
+        BindGroupFactory.getSingleTextureLayout(),
+        [
+          {
+            binding: 0,
+            resource: this.rawAOTarget.getView(),
+          },
+          {
+            binding: 1,
+            resource: sampler,
+          },
+        ],
+      );
+    }
   }
 
   private updateUniforms(): void {

@@ -62,7 +62,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     );
     let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
     let froxelWorldPos = tempFroxelWS.xyz / tempFroxelWS.w;
-    var visibility = getShadowFactor(froxelWorldPos.xyz, light.viewProjOffset, light.shadowStepDivResolution, shadowMap, shadowSampler, true);
+    var visibility = getShadowFactorSimple(froxelWorldPos.xyz, light.viewProjOffset, light.shadowStepDivResolution, shadowMap, shadowSampler, true);
 
     let almostScreenPos = light.viewProjOffset * vec4<f32>(froxelWorldPos, 1.0);
     let screenPos = almostScreenPos.xyz / almostScreenPos.w;
