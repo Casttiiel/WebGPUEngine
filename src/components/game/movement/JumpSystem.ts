@@ -62,6 +62,11 @@ export class JumpSystem {
 
   private manageJump(deltaTime: number): void {
     const input = Engine.getInput();
+    /*console.log(
+      this.controller.getIsJumping(),
+      this.controller.getIsGrounded(),
+      this.timeSinceGrounded,
+    );*/
     const canGroundJump =
       !this.controller.getIsJumping() &&
       (this.timeSinceGrounded <= this.coyoteTime || this.controller.getIsGrounded());

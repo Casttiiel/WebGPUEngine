@@ -103,8 +103,6 @@ export class DashSystem {
     vec3.copy(this.dashTargetPos, targetPoint);
 
     this.controller.setVerticalVelocity(0.0);
-    this.controller.setIsJumping(false);
-    this.controller.setIsWallRunning(false);
   }
 
   private endDash(): void {

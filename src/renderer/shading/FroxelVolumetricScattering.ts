@@ -48,9 +48,13 @@ export class FroxelVolumetricScattering {
 
   // 3D Textures for froxel data
   private froxelDensityTexture!: GPUTexture;
+  private froxelDensityTextureView!: GPUTextureView;
   private froxelIntegratedTexture!: GPUTexture;
+  private froxelIntegratedTextureView!: GPUTextureView;
   private froxelLightTexture!: GPUTexture;
+  private froxelLightTextureView!: GPUTextureView;
   private froxelLightTempTexture!: GPUTexture;
+  private froxelLightTempTextureView!: GPUTextureView;
   private noiseTexture!: Texture;
 
   // Static bind groups (textures only - uniforms are created dynamically)
@@ -273,6 +277,8 @@ export class FroxelVolumetricScattering {
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
 
+    this.froxelDensityTextureView = this.froxelDensityTexture.createView();
+
     // Light injection texture (RGBA16F - light contribution per froxel)
     this.froxelLightTexture = this.device.createTexture({
       label: 'froxel_light_3d',
@@ -282,6 +288,8 @@ export class FroxelVolumetricScattering {
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
 
+    this.froxelLightTextureView = this.froxelLightTexture.createView();
+
     this.froxelLightTempTexture = this.device.createTexture({
       label: 'froxel_light_3d_temp',
       size: [x, y, z],
@@ -290,6 +298,8 @@ export class FroxelVolumetricScattering {
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
 
+    this.froxelLightTempTextureView = this.froxelLightTempTexture.createView();
+
     this.froxelIntegratedTexture = this.device.createTexture({
       label: 'froxel_integrated_3d',
       size: [x, y, z],
@@ -297,6 +307,8 @@ export class FroxelVolumetricScattering {
       format: 'rgba16float',
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
+
+    this.froxelIntegratedTextureView = this.froxelIntegratedTexture.createView();
   }
 
   private createUniformBuffers(): void {
@@ -326,7 +338,7 @@ export class FroxelVolumetricScattering {
       [
         {
           binding: 0,
-          resource: this.froxelDensityTexture.createView(),
+          resource: this.froxelDensityTextureView,
         },
       ],
     );
@@ -427,15 +439,15 @@ export class FroxelVolumetricScattering {
       [
         {
           binding: 0,
-          resource: this.froxelDensityTexture.createView(), // Input: density (unfilterable)
+          resource: this.froxelDensityTextureView, // Input: density (unfilterable)
         },
         {
           binding: 1,
-          resource: this.froxelLightTexture.createView(), // Input/output: luz acumulada
+          resource: this.froxelLightTextureView, // Input/output: luz acumulada
         },
         {
           binding: 2,
-          resource: this.froxelIntegratedTexture.createView(), // Output:integrated
+          resource: this.froxelIntegratedTextureView, // Output:integrated
         },
         {
           binding: 3,
@@ -487,7 +499,7 @@ export class FroxelVolumetricScattering {
       [
         {
           binding: 0,
-          resource: this.froxelLightTexture.createView(),
+          resource: this.froxelLightTextureView,
         },
         {
           binding: 1,
@@ -564,8 +576,8 @@ export class FroxelVolumetricScattering {
     const dispatchY = Math.ceil(y / 8);
     const dispatchZ = Math.ceil(z / 4);
 
-    let lightRead = this.froxelLightTexture;
-    let lightWrite = this.froxelLightTempTexture;
+    let lightReadView = this.froxelLightTextureView;
+    let lightWriteView = this.froxelLightTempTextureView;
 
     for (const pointLightComponent of pointLights) {
       if (!pointLightComponent.isVisible()) {
@@ -588,9 +600,9 @@ export class FroxelVolumetricScattering {
         'froxel_point_light_textures_bind_group',
         BindGroupFactory.getFroxelPointTexturesLayout(),
         [
-          { binding: 0, resource: this.froxelDensityTexture.createView() },
-          { binding: 1, resource: lightRead.createView() },
-          { binding: 2, resource: lightWrite.createView() },
+          { binding: 0, resource: this.froxelDensityTextureView },
+          { binding: 1, resource: lightReadView },
+          { binding: 2, resource: lightWriteView },
         ],
       );
       computePass.setBindGroup(2, texturesBindGroup);
@@ -607,13 +619,13 @@ export class FroxelVolumetricScattering {
       computePass.end();
       this.device.queue.submit([commandEncoder.finish()]);
 
-      const tmp = lightRead;
-      lightRead = lightWrite;
-      lightWrite = tmp;
+      const tmp = lightReadView;
+      lightReadView = lightWriteView;
+      lightWriteView = tmp;
     }
 
-    this.froxelLightTexture = lightRead;
-    this.froxelLightTempTexture = lightWrite;
+    this.froxelLightTextureView = lightReadView;
+    this.froxelLightTempTextureView = lightWriteView;
   }
 
   private executeSpotLightInjectionPass(): void {
@@ -645,8 +657,8 @@ export class FroxelVolumetricScattering {
     const dispatchY = Math.ceil(y / 8);
     const dispatchZ = Math.ceil(z / 4);
 
-    let lightRead = this.froxelLightTexture;
-    let lightWrite = this.froxelLightTempTexture;
+    let lightReadView = this.froxelLightTextureView;
+    let lightWriteView = this.froxelLightTempTextureView;
 
     for (const spotLightComponent of spotLights) {
       if (!spotLightComponent.isVisible()) {
@@ -669,9 +681,9 @@ export class FroxelVolumetricScattering {
         'froxel_spot_light_textures_bind_group',
         BindGroupFactory.getFroxelPointTexturesLayout(),
         [
-          { binding: 0, resource: this.froxelDensityTexture.createView() },
-          { binding: 1, resource: lightRead.createView() },
-          { binding: 2, resource: lightWrite.createView() },
+          { binding: 0, resource: this.froxelDensityTextureView },
+          { binding: 1, resource: lightReadView },
+          { binding: 2, resource: lightWriteView },
         ],
       );
       computePass.setBindGroup(2, texturesBindGroup);
@@ -709,13 +721,13 @@ export class FroxelVolumetricScattering {
       computePass.end();
       this.device.queue.submit([commandEncoder.finish()]);
 
-      const tmp = lightRead;
-      lightRead = lightWrite;
-      lightWrite = tmp;
+      const tmp = lightReadView;
+      lightReadView = lightWriteView;
+      lightWriteView = tmp;
     }
 
-    this.froxelLightTexture = lightRead;
-    this.froxelLightTempTexture = lightWrite;
+    this.froxelLightTextureView = lightReadView;
+    this.froxelLightTempTextureView = lightWriteView;
   }
 
   public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
@@ -751,7 +763,7 @@ export class FroxelVolumetricScattering {
         },
         {
           binding: 2,
-          resource: this.froxelIntegratedTexture.createView(),
+          resource: this.froxelIntegratedTextureView,
         },
         {
           binding: 3,

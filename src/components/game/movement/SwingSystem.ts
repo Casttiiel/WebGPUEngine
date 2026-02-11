@@ -36,7 +36,6 @@ export class SwingSystem {
     }
 
     this.controller.setIsSwinging(true);
-    this.controller.setIsDashing(false);
 
     this.swingAngle = data.startAngle;
     this.swingEndAngle = data.endAngle;
@@ -59,7 +58,6 @@ export class SwingSystem {
     }
 
     this.controller.setVerticalVelocity(0);
-    this.controller.setIsJumping(false);
   }
 
   public updateSwingMovement(deltaTime: number): void {
@@ -95,11 +93,9 @@ export class SwingSystem {
   }
 
   private endSwing(): void {
-    this.controller.setIsSwinging(false);
-
     const verticalVel = Math.max(this.controller.getVerticalVelocity(), 1.5);
     this.controller.setVerticalVelocity(verticalVel);
-    this.controller.setIsJumping(true);
+    this.controller.setIsSwinging(false);
   }
 
   private projectOnPlane(v: vec3, normal: vec3): vec3 {

@@ -107,9 +107,9 @@ export class CharacterControllerComponent extends Component {
     this.wallRunSystem.detectWall();
 
     // Actualizar sistemas de manejo (no ejecutan movimiento, solo detectan)
-    this.dashSystem.update();
-    this.mantleSystem.update();
-    this.rollSystem.update(deltaTime);
+    //this.dashSystem.update();
+    //this.mantleSystem.update();
+    //this.rollSystem.update(deltaTime);
 
     // Ejecutar sistema de movimiento activo según el estado
     switch (this.movementState) {

@@ -183,7 +183,6 @@ export class MantleSystem {
 
     this.mantleStoredVelocity = Math.max(this.controller.getCurrentSpeed(), this.minMantleVelocity);
     this.controller.setVerticalVelocity(0.0);
-    this.controller.setIsJumping(false);
   }
 
   private endMantle(): void {

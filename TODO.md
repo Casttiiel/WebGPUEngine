@@ -2,35 +2,32 @@
 
 1. Gameplay
 
-2. Optimize with compute shaders
+2. Optimize Bind group creation for Froxel Volumetric
+3. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+4. Froxel Volumetric Light Shafts parpadean
+5. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+6. Froxel Volumetric Scattering: Spot Light Injection angle
 
-3. Optimize Texture View Creation for Froxel Volumetric
-4. Optimize Bind group creation for Froxel Volumetric
-5. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-6. Froxel Volumetric Light Shafts parpadean
-7. Froxel Volumetric Scattering Fix Light fuge (more res less far)
-8. Froxel Volumetric Scattering: Spot Light Injection angle
+7. Camera Uniforms missleading names
+8. Open Editor multiple times, creates data multiple times
+9. Bloom Shape
+10. Optimize with compute shaders
 
-9. Camera Uniforms missleading names
-10. Open Editor multiple times, creates data multiple times
-11. Bloom Shape
+11. Point Light shadows
+12. CSM: Logarithmic depth o reversed-Z or less max shadow distance
 
-12. Motion blur weird error
-13. Point Light shadows
-14. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-15. Contact Shadows
-16. Reflection Probes con blending
+13. Blender Export with player spawn
+14. Editor Light Probes (Render Debug / Gizmo)
+15. Editor Point Lights (Render Debug / Gizmo / Menu)
+16. Editor Spot Lights (Render Debug / Gizmo / Menu)
+17. Asset Browser + Spawn + Delete
 
-17. Blender Export with player spawn
-18. Editor Light Probes (Render Debug / Gizmo)
-19. Editor Point Lights (Render Debug / Gizmo / Menu)
-20. Editor Spot Lights (Render Debug / Gizmo / Menu)
-21. Asset Browser + Spawn + Delete
-
-22. Quality settings selection
-23. Improve particles
-24. Multiple Light probes has good shadows?
-25. Weird line on corners is irradiance because of normals
+18. Reflection Probes con blending
+19. Contact Shadows
+20. Quality settings selection
+21. Improve particles
+22. Multiple Light probes has good shadows?
+23. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
