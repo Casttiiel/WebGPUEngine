@@ -18,6 +18,9 @@ export class AmbientLight {
   private ambientSpecularBindGroup!: GPUBindGroup;
   private ambientSpecularUniformBuffer!: GPUBuffer;
 
+  private ambientDiffuseUniformArray = new Float32Array(4);
+  private ambientSpecularUniformArray = new Float32Array(8);
+
   private brdfLUT!: Texture;
 
   constructor() {}
@@ -196,31 +199,22 @@ export class AmbientLight {
   }
 
   public update(_dt: number): void {
-    GPUUtils.writeBuffer(
-      this.ambientDiffuseUniformBuffer,
-      0,
-      new Float32Array([
-        Engine.getEnvironmentManager().getAmbientLightData().globalFactor,
-        Engine.getEnvironmentManager().getAmbientLightData().diffuseFactor,
-        0.0,
-        0.0,
-      ]),
-    );
+    const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
+    this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
+    this.ambientDiffuseUniformArray[1] = ambientData.diffuseFactor;
+    this.ambientDiffuseUniformArray[2] = 0.0;
+    this.ambientDiffuseUniformArray[3] = 0.0;
+    GPUUtils.writeBuffer(this.ambientDiffuseUniformBuffer, 0, this.ambientDiffuseUniformArray);
 
-    GPUUtils.writeBuffer(
-      this.ambientSpecularUniformBuffer,
-      0,
-      new Float32Array([
-        Engine.getEnvironmentManager().getAmbientLightData().globalFactor,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        Engine.getEnvironmentManager().getAmbientLightData().reflectionFactor,
-        Engine.getEnvironmentManager().getAmbientLightData().diffuseFactor,
-      ]),
-    );
+    this.ambientSpecularUniformArray[0] = ambientData.globalFactor;
+    this.ambientSpecularUniformArray[1] = 0.0;
+    this.ambientSpecularUniformArray[2] = 0.0;
+    this.ambientSpecularUniformArray[3] = 0.0;
+    this.ambientSpecularUniformArray[4] = 0.0;
+    this.ambientSpecularUniformArray[5] = 0.0;
+    this.ambientSpecularUniformArray[6] = ambientData.reflectionFactor;
+    this.ambientSpecularUniformArray[7] = ambientData.diffuseFactor;
+    GPUUtils.writeBuffer(this.ambientSpecularUniformBuffer, 0, this.ambientSpecularUniformArray);
   }
 
   public destroy(): void {
