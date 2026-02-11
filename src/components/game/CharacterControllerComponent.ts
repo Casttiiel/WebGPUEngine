@@ -544,6 +544,9 @@ export class CharacterControllerComponent extends Component {
     // 2. Buscar componente de modifiers (opcional)
     this.modifiers = this.getOwner().getComponent('player_modifiers') as PlayerModifiersComponent;
 
+    this.impulsePadInputDisableTime =
+      data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
+
     // 3. Crear sub-sistemas pasándoles referencia al controller
     this.movementSystem = new MovementSystem(this, this.modifiers, data);
     this.jumpSystem = new JumpSystem(this, this.modifiers, data);
