@@ -71,6 +71,7 @@ export class ModuleCameraMixer extends Module {
 
     const outputCamera = this.getCameraComponentFromEntity(this.outputCamera);
     if (outputCamera) {
+      result.updateUniforms(dt);
       outputCamera.setCamera(result);
     }
   }
