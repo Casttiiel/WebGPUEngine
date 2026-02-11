@@ -2,32 +2,33 @@
 
 1. Gameplay
 
-2. Optimize Bind group creation for Froxel Volumetric
-3. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-4. Froxel Volumetric Light Shafts parpadean
-5. Froxel Volumetric Scattering Fix Light fuge (more res less far)
-6. Froxel Volumetric Scattering: Spot Light Injection angle
+2. Optimize Bind group creation for Froxel Volumetric (Spot/Point lights)
+3. FPS inestable on Full screen
+4. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+5. Froxel Volumetric Light Shafts parpadean
+6. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+7. Froxel Volumetric Scattering: Spot Light Injection angle
 
-7. Camera Uniforms missleading names
-8. Open Editor multiple times, creates data multiple times
-9. Bloom Shape
-10. Optimize with compute shaders
+8. Camera Uniforms missleading names
+9. Open Editor multiple times, creates data multiple times
+10. Bloom Shape
+11. Optimize with compute shaders
 
-11. Point Light shadows
-12. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+12. Point Light shadows
+13. CSM: Logarithmic depth o reversed-Z or less max shadow distance
 
-13. Blender Export with player spawn
-14. Editor Light Probes (Render Debug / Gizmo)
-15. Editor Point Lights (Render Debug / Gizmo / Menu)
-16. Editor Spot Lights (Render Debug / Gizmo / Menu)
-17. Asset Browser + Spawn + Delete
+14. Blender Export with player spawn
+15. Editor Light Probes (Render Debug / Gizmo)
+16. Editor Point Lights (Render Debug / Gizmo / Menu)
+17. Editor Spot Lights (Render Debug / Gizmo / Menu)
+18. Asset Browser + Spawn + Delete
 
-18. Reflection Probes con blending
-19. Contact Shadows
-20. Quality settings selection
-21. Improve particles
-22. Multiple Light probes has good shadows?
-23. Weird line on corners is irradiance because of normals
+19. Reflection Probes con blending
+20. Contact Shadows
+21. Quality settings selection
+22. Improve particles
+23. Multiple Light probes has good shadows?
+24. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
