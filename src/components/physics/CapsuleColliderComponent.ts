@@ -163,22 +163,7 @@ export class CapsuleColliderComponent extends ColliderComponent {
     return this.capsuleRadius;
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'physics';
-
-    const self = this;
-
-    // Velocity (read-only)
-    const velWrapper = {
-      get velocity() {
-        if (!self.rigidBody) return '(0.00, 0.00, 0.00)';
-        const vel = self.rigidBody.linvel();
-        return `(${vel.x.toFixed(2)}, ${vel.y.toFixed(2)}, ${vel.z.toFixed(2)})`;
-      },
-    };
-    debugUI.addDebugControl(parentFolder, velWrapper, 'velocity', 'Velocity');
-  }
+  public override renderInMenu(): void {}
 
   public override renderDebug(): void {
     // TODO: Wireframe capsule, raycast visualization

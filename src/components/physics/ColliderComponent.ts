@@ -346,11 +346,6 @@ export class ColliderComponent extends Component {
     } else if (this.bodyType === RigidBodyType.KINEMATIC) {
       // Si es cinemático, actualizar física desde transform
       // (para mover plataformas desde código)
-      /*const pos = transformComponent.getTransform().getWorldPosition();
-      const rot = transformComponent.getTransform().getWorldRotation();
-
-      this.rigidBody.setNextKinematicTranslation({ x: pos[0], y: pos[1], z: pos[2] });
-      this.rigidBody.setNextKinematicRotation({ x: rot[0], y: rot[1], z: rot[2], w: rot[3] });*/
       const translation = this.rigidBody.translation();
       const rotation = this.rigidBody.rotation();
 

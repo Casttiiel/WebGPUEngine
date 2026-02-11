@@ -1,9 +1,9 @@
 {
   "update": [
-    "camera_mixer",
     "environment_manager",
     "physics",
     "entities",
+    "camera_mixer",
     "boot",
     "editor_selection",
     "game_controller",
