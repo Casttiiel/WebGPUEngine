@@ -4,6 +4,7 @@ import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
 
 /**
  * MantleSystem - Gestiona el trepar (mantling)
@@ -24,10 +25,17 @@ export class MantleSystem {
   constructor(
     private controller: CharacterControllerComponent,
     private _modifiers: PlayerModifiersComponent | null,
+    data: CharacterControllerComponentDataType,
   ) {
     const collider = this.controller.getCollider();
     this.originalHeight = collider.getCapsuleHeight();
     this.originalRadius = collider.getCapsuleRadius();
+
+    this.mantleDetectionDistance = data.mantleDetectionDistance ?? this.mantleDetectionDistance;
+    this.mantleMaxHeight = data.mantleMaxHeight ?? this.mantleMaxHeight;
+    this.minMantleVelocity = data.minMantleVelocity ?? this.minMantleVelocity;
+    this.mantlingMinVerticalVelocity =
+      data.mantlingMinVerticalVelocity ?? this.mantlingMinVerticalVelocity;
   }
 
   public update(): void {

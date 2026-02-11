@@ -35,16 +35,15 @@
 
 ## Gameplay
 
-1. WallRun
-2. Swing Bar + needs to be picked with some angle
+1. Swing Bar + needs to be picked with some angle
+2. WallRun
 3. Head Bob
 4. Landing camera animation
 5. WallJump
-6. Mantle
-7. Snap to ground
-8. Roll
-9. Dash
-10. Momentum
+6. Snap to ground
+7. Roll
+8. Dash
+9. Momentum
 
 ---
 

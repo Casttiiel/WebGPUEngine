@@ -104,11 +104,11 @@ export class CharacterControllerComponent extends Component {
     this.updateGroundedState();
 
     // Detectar paredes para wallrun
-    this.wallRunSystem.detectWall();
+    //this.wallRunSystem.detectWall();
 
     // Actualizar sistemas de manejo (no ejecutan movimiento, solo detectan)
     //this.dashSystem.update();
-    //this.mantleSystem.update();
+    this.mantleSystem.update();
     //this.rollSystem.update(deltaTime);
 
     // Ejecutar sistema de movimiento activo según el estado
@@ -550,7 +550,7 @@ export class CharacterControllerComponent extends Component {
     this.rollSystem = new RollSystem(this, this.modifiers);
     this.wallRunSystem = new WallRunSystem(this, this.modifiers);
     this.dashSystem = new DashSystem(this, this.modifiers);
-    this.mantleSystem = new MantleSystem(this, this.modifiers);
+    this.mantleSystem = new MantleSystem(this, this.modifiers, data);
     this.swingSystem = new SwingSystem(this, this.modifiers);
 
     // 4. Crear character controller de Rapier
