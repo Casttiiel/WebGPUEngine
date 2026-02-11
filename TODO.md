@@ -3,12 +3,12 @@
 1. Gameplay
 
 2. Camera Uniforms missleading names
-3. Open Editor multiple times, creates data multiple times
-4. Optimize Bind group creation for Froxel Volumetric (Spot/Point lights)
-5. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
+3. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights)
+4. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
+5. Open Editor multiple times, creates data multiple times
 6. FPS inestable on Full screen
-7. Optimize with compute shaders
-8. Bloom Shape
+7. Bloom Shape
+8. Optimize with compute shaders
 
 9. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
 10. Froxel Volumetric Light Shafts parpadean
@@ -35,16 +35,16 @@
 
 ## Gameplay
 
-1. Acceleration/Brake
-2. Jump
-3. Landing camera animation
-4. WallRun
+1. WallRun
+2. Swing Bar + needs to be picked with some angle
+3. Head Bob
+4. Landing camera animation
 5. WallJump
-6. Swing Bar + needs to be picked with some angle
+6. Mantle
 7. Snap to ground
-8. Mantle
-9. Roll
-10. Dash
+8. Roll
+9. Dash
+10. Momentum
 
 ---
 

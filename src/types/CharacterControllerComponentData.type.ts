@@ -1,11 +1,14 @@
 export type CharacterControllerComponentDataType = {
   moveSpeed?: number; // Movement speed in units per second (default: 5.0)
-  airAcceleration?: number; // Air control strength (0.0 = no control, 1.0 = full control, default: 0.3)
+  maxSpeed?: number; // Maximum horizontal speed in units per second (default: 10.0)
+  airControl?: number; // Air control strength (0.0 = no control, 1.0 = full control, default: 0.3)
   groundAcceleration: number; // Time to reach max speed on ground in seconds (default: 0.1)
   groundDeceleration: number; // Time to stop completely on ground in seconds (default: 0.1)
   airDrag: number; // Air drag factor (0.0 = no drag, 1.0 = full stop, default: 0.1)
 
-  jumpForce?: number; // Jump initial velocity (default: 8.0)
+  jumpHeight?: number; // Jump height in units (default: 2.0)
+  jumpTimeToPeak?: number; // Time to reach jump apex in seconds (default: 0.5)
+  jumpTimeToDescent?: number; // Time to fall from apex to ground in seconds (default: 0.5)
   jumpCutFactor?: number; // Factor to reduce jump height when cutting jump (0.0 = no cut, 1.0 = full cut, default: 0.5)
   jumpCutVerticalVelocityLimit?: number; // Max vertical velocity to allow jump cut (default: 1.0)
   coyoteTime?: number; // Grace period to jump after leaving ground in seconds (default: 0.15)

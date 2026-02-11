@@ -1,6 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import type { CharacterControllerComponent } from '../CharacterControllerComponent';
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
+import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
 
 /**
  * MovementSystem - Gestiona movimiento horizontal en suelo y aire
@@ -18,7 +19,15 @@ export class MovementSystem {
   constructor(
     private controller: CharacterControllerComponent,
     private _modifiers: PlayerModifiersComponent | null,
-  ) {}
+    data: CharacterControllerComponentDataType,
+  ) {
+    this.runSpeed = data.moveSpeed ?? this.runSpeed;
+    this.maxSpeed = data.maxSpeed ?? this.maxSpeed;
+    this.groundAcceleration = data.groundAcceleration ?? this.groundAcceleration;
+    this.groundDeceleration = data.groundDeceleration ?? this.groundDeceleration;
+    this.airDrag = data.airDrag ?? this.airDrag;
+    this.airControl = data.airControl ?? this.airControl;
+  }
 
   public update(deltaTime: number, targetMovement: vec3): void {
     const hasInput = vec3.length(targetMovement) > 0.01;
@@ -54,6 +63,7 @@ export class MovementSystem {
     const baseTargetSpeed = hasInput ? Math.max(this.runSpeed, boostedSpeed) : 0.0;
     const targetSpeed = hasInput ? baseTargetSpeed : 0.0;
     const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
+
     const newSpeed = this.approach(currentSpeed, targetSpeed, accel * deltaTime);
 
     const newVelocity = vec3.scale(vec3.create(), targetMovement, newSpeed);
@@ -66,14 +76,12 @@ export class MovementSystem {
       const baseTargetSpeed = Math.max(this.runSpeed, boostedSpeed);
       vec3.scale(targetMovement, targetMovement, baseTargetSpeed);
 
-      const disabler = this.controller.isInputDisabled() ? 0.25 : 1.0;
+      const disabler = this.controller.isInputDisabled() ? 0.0 : 1.0;
       const airAcceleration = this.groundAcceleration * this.airControl * disabler;
 
       const currentVel = this.controller.getHorizontalVelocity();
-      const newVel = vec3.create();
-      newVel[0] = this.approach(currentVel[0], targetMovement[0], airAcceleration * deltaTime);
+      const newVel = this.approachVec3(currentVel, targetMovement, airAcceleration * deltaTime);
       newVel[1] = currentVel[1];
-      newVel[2] = this.approach(currentVel[2], targetMovement[2], airAcceleration * deltaTime);
 
       this.controller.setHorizontalVelocity(newVel);
     } else {
@@ -93,6 +101,21 @@ export class MovementSystem {
       return Math.max(current - delta, target);
     }
     return target;
+  }
+
+  private approachVec3(current: vec3, target: vec3, maxDelta: number): vec3 {
+    const delta = vec3.create();
+    vec3.subtract(delta, target, current);
+
+    const dist = vec3.length(delta);
+
+    if (dist <= maxDelta || dist === 0) {
+      return vec3.clone(target);
+    }
+
+    const result = vec3.create();
+    vec3.scaleAndAdd(result, current, delta, maxDelta / dist);
+    return result;
   }
 
   // Getters públicos

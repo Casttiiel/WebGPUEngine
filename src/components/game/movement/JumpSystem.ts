@@ -2,6 +2,7 @@ import type { CharacterControllerComponent } from '../CharacterControllerCompone
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
+import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
 
 /**
  * JumpSystem - Gestiona saltos y gravedad
@@ -11,18 +12,28 @@ export class JumpSystem {
   private jumpHeight: number = 2.2;
   private jumpTimeToPeak: number = 0.5;
   private jumpTimeToDescent: number = 0.4;
+  private jumpCutFactor: number = 0.7;
+  private coyoteTime: number = 0.12;
+  private jumpCutVerticalVelocityLimit: number = 0.25;
+
   private jumpVelocity: number = 0.0;
   private jumpGravity: number = 0.0;
   private fallGravity: number = 0.0;
-  private jumpCutFactor: number = 0.7;
-  private coyoteTime: number = 0.12;
   private timeSinceGrounded: number = 0.0;
-  private jumpCutVerticalVelocityLimit: number = 0.25;
 
   constructor(
     private controller: CharacterControllerComponent,
     private _modifiers: PlayerModifiersComponent | null,
+    data: CharacterControllerComponentDataType,
   ) {
+    this.jumpHeight = data.jumpHeight ?? this.jumpHeight;
+    this.jumpTimeToPeak = data.jumpTimeToPeak ?? this.jumpTimeToPeak;
+    this.jumpTimeToDescent = data.jumpTimeToDescent ?? this.jumpTimeToDescent;
+    this.jumpCutFactor = data.jumpCutFactor ?? this.jumpCutFactor;
+    this.coyoteTime = data.coyoteTime ?? this.coyoteTime;
+    this.jumpCutVerticalVelocityLimit =
+      data.jumpCutVerticalVelocityLimit ?? this.jumpCutVerticalVelocityLimit;
+
     this.calculatePhysicsConstants();
   }
 
@@ -62,11 +73,6 @@ export class JumpSystem {
 
   private manageJump(deltaTime: number): void {
     const input = Engine.getInput();
-    /*console.log(
-      this.controller.getIsJumping(),
-      this.controller.getIsGrounded(),
-      this.timeSinceGrounded,
-    );*/
     const canGroundJump =
       !this.controller.getIsJumping() &&
       (this.timeSinceGrounded <= this.coyoteTime || this.controller.getIsGrounded());

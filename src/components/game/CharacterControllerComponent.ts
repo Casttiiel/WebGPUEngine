@@ -528,7 +528,7 @@ export class CharacterControllerComponent extends Component {
   // INICIALIZACIÓN (LOAD)
   // ============================================
 
-  public async load(_data: CharacterControllerComponentDataType): Promise<void> {
+  public async load(data: CharacterControllerComponentDataType): Promise<void> {
     // 1. Inicializar física y referencias básicas
     this.capsuleCollider = this.getOwner().getComponent(
       'capsule_collider',
@@ -545,8 +545,8 @@ export class CharacterControllerComponent extends Component {
     this.modifiers = this.getOwner().getComponent('player_modifiers') as PlayerModifiersComponent;
 
     // 3. Crear sub-sistemas pasándoles referencia al controller
-    this.movementSystem = new MovementSystem(this, this.modifiers);
-    this.jumpSystem = new JumpSystem(this, this.modifiers);
+    this.movementSystem = new MovementSystem(this, this.modifiers, data);
+    this.jumpSystem = new JumpSystem(this, this.modifiers, data);
     this.rollSystem = new RollSystem(this, this.modifiers);
     this.wallRunSystem = new WallRunSystem(this, this.modifiers);
     this.dashSystem = new DashSystem(this, this.modifiers);
