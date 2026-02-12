@@ -45,6 +45,7 @@ export class WallRunSystem {
   }
 
   public detectWall(): void {
+    const input = Engine.getInput();
     console.log(this.isNearWall);
     this.isNearWall = false;
 
@@ -78,7 +79,8 @@ export class WallRunSystem {
       this.isNearWall &&
       !this.controller.getIsGrounded() &&
       !this.controller.getIsMantling() &&
-      !this.controller.getIsWallRunning()
+      !this.controller.getIsWallRunning() &&
+      input.isActionPressed(GameAction.MOVE_FORWARD)
     ) {
       this.startWallRun();
     } else if (this.controller.getIsGrounded()) {
@@ -130,7 +132,11 @@ export class WallRunSystem {
     //this.currentWallRunTime += deltaTime;
 
     // Salir si nos alejamos de la pared
-    if (!this.isNearWall || this.currentWallRunTime >= this.maxWallRunDuration) {
+    if (
+      !this.isNearWall ||
+      this.currentWallRunTime >= this.maxWallRunDuration ||
+      !input.isActionPressed(GameAction.MOVE_FORWARD)
+    ) {
       this.controller.setIsWallRunning(false);
       return;
     }

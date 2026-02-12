@@ -35,7 +35,6 @@
 ## Gameplay
 
 1. WallRun
-   Start Conditions
    Speed/Change behavior
    Gravity
    End Conditions
