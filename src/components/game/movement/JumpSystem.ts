@@ -54,7 +54,7 @@ export class JumpSystem {
       const gravity = verticalVel > 0 ? this.jumpGravity : this.fallGravity;
 
       // Gravedad especial durante wallrun
-      const finalGravity = this.controller.getIsWallRunning() && verticalVel < 0.0 ? -4.0 : gravity;
+      const finalGravity = this.controller.getIsWallRunning() && verticalVel < 0.0 ? -0.0 : gravity;
 
       const jumpCutFactor =
         this.controller.getIsJumping() &&

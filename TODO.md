@@ -34,11 +34,15 @@
 
 ## Gameplay
 
-1. Landing camera animation
-2. WallRun
+1. WallRun
+   Start Conditions
+   Speed/Change behavior
+   Gravity
+   End Conditions
+2. Snap to ground
 3. WallJump
-4. Snap to ground
-5. Roll
+4. Roll
+5. Landing camera animation
 6. Momentum
 7. Dash
 
@@ -47,7 +51,6 @@
 8. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
 9. Dash end speed/direction + Conserva 80% de velocidad previa
 10. Door
-11. Enemy
 
 ## Visuals and Sound
 

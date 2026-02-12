@@ -104,7 +104,7 @@ export class CharacterControllerComponent extends Component {
     this.updateGroundedState();
 
     // Detectar paredes para wallrun
-    //this.wallRunSystem.detectWall();
+    this.wallRunSystem.detectWall();
 
     // Actualizar sistemas de manejo (no ejecutan movimiento, solo detectan)
     //this.dashSystem.update();
@@ -551,7 +551,7 @@ export class CharacterControllerComponent extends Component {
     this.movementSystem = new MovementSystem(this, this.modifiers, data);
     this.jumpSystem = new JumpSystem(this, this.modifiers, data);
     this.rollSystem = new RollSystem(this, this.modifiers);
-    this.wallRunSystem = new WallRunSystem(this, this.modifiers);
+    this.wallRunSystem = new WallRunSystem(this, this.modifiers, data);
     this.dashSystem = new DashSystem(this, this.modifiers);
     this.mantleSystem = new MantleSystem(this, this.modifiers, data);
     this.swingSystem = new SwingSystem(this, this.modifiers, data);

@@ -4,6 +4,7 @@ import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
 
 /**
  * WallRunSystem - Gestiona wall running y wall jumps
@@ -13,10 +14,10 @@ export class WallRunSystem {
   private minWallRunSpeed: number = 7.0;
   private initialDragFactorDuringWallRun: number = 0.85;
   private _wallRunGravity: number = -4.0;
-  private detectWallDistance: number = 0.7;
+  private detectWallDistance: number = 0.6;
   private wallRunMaxEntryAngle: number = 0.9;
   private wallDrag: number = 0.05;
-  private maxWallRunDuration: number = 2.5;
+  private maxWallRunDuration: number = 20.5;
 
   // Wall jump
   private disableInputAfterWallJumpTime: number = 0.3;
@@ -29,9 +30,22 @@ export class WallRunSystem {
   constructor(
     private controller: CharacterControllerComponent,
     private _modifiers: PlayerModifiersComponent | null,
-  ) {}
+    data: CharacterControllerComponentDataType,
+  ) {
+    this.detectWallDistance = data.detectWallDistance ?? this.detectWallDistance;
+    /* "wallRunGravity": -4.0,
+      "wallRunAcceleration": 3.0,
+      "wallRunBrake": 3.0,
+      "detectWallDistance": 0.6,
+      "wallRunMaxEntryAngle": 0.9,
+      "wallDrag": 0.3,
+      "wallJumpForce": 7.0,
+      "disableInputAfterWallJumpTime": 0.3,
+      "disableMantleAfterWallJumpTime": 0.3,*/
+  }
 
   public detectWall(): void {
+    console.log(this.isNearWall);
     this.isNearWall = false;
 
     const camera = this.controller.getCamera();
@@ -40,98 +54,24 @@ export class WallRunSystem {
     const facingVector = camera.getCamera().getFront();
     facingVector[1] = 0;
     vec3.normalize(facingVector, facingVector);
+    const backVector = vec3.negate(vec3.create(), facingVector);
 
     const left = camera.getCamera().getLeft();
     left[1] = 0;
     vec3.normalize(left, left);
 
     const right = vec3.scale(vec3.create(), left, -1);
-    const origin = this.controller.getCollider().getRigidBody().translation();
-    const physics = Engine.getPhysics();
 
-    // Raycast izquierda
-    const leftRay = new RAPIER.Ray(
-      { x: origin.x, y: origin.y, z: origin.z },
-      { x: left[0], y: left[1], z: left[2] },
-    );
-    const leftHit = physics
-      .getWorld()
-      .castRayAndGetNormal(
-        leftRay,
-        this.detectWallDistance,
-        true,
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined,
-        this.controller.getCollider().getCollider(),
-      );
+    const diagonalLeft = vec3.add(vec3.create(), backVector, left);
+    vec3.normalize(diagonalLeft, diagonalLeft);
+    const diagonalRight = vec3.add(vec3.create(), backVector, right);
+    vec3.normalize(diagonalRight, diagonalRight);
 
-    if (
-      leftHit &&
-      leftHit.collider &&
-      leftHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
-    ) {
-      const n = vec3.fromValues(leftHit.normal.x, leftHit.normal.y, leftHit.normal.z);
-      const facing = vec3.dot(facingVector, n);
-      if (facing >= -this.wallRunMaxEntryAngle) {
-        this.isNearWall = true;
-        vec3.copy(this.wallNormal, n);
-      }
-    }
-
-    // Raycast derecha
-    const rightRay = new RAPIER.Ray(
-      { x: origin.x, y: origin.y, z: origin.z },
-      { x: right[0], y: right[1], z: right[2] },
-    );
-    const rightHit = physics
-      .getWorld()
-      .castRayAndGetNormal(
-        rightRay,
-        this.detectWallDistance,
-        true,
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined,
-        this.controller.getCollider().getCollider(),
-      );
-
-    if (
-      rightHit &&
-      rightHit.collider &&
-      rightHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
-    ) {
-      const n = vec3.fromValues(rightHit.normal.x, rightHit.normal.y, rightHit.normal.z);
-      const facing = vec3.dot(facingVector, n);
-      if (facing >= -this.wallRunMaxEntryAngle) {
-        this.isNearWall = true;
-        vec3.copy(this.wallNormal, n);
-      }
-    }
-
-    // Raycast atrás
-    const backRay = new RAPIER.Ray(
-      { x: origin.x, y: origin.y, z: origin.z },
-      { x: -facingVector[0], y: -facingVector[1], z: -facingVector[2] },
-    );
-    const backHit = physics
-      .getWorld()
-      .castRayAndGetNormal(
-        backRay,
-        this.detectWallDistance,
-        true,
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined,
-        this.controller.getCollider().getCollider(),
-      );
-
-    if (
-      backHit &&
-      backHit.collider &&
-      backHit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed
-    ) {
-      const n = vec3.fromValues(backHit.normal.x, backHit.normal.y, backHit.normal.z);
-      this.isNearWall = true;
-      vec3.copy(this.wallNormal, n);
-    }
+    this.wallRaycast(left);
+    this.wallRaycast(right);
+    this.wallRaycast(backVector);
+    this.wallRaycast(diagonalLeft);
+    this.wallRaycast(diagonalRight);
 
     // Iniciar o terminar wallrun
     if (
@@ -143,6 +83,31 @@ export class WallRunSystem {
       this.startWallRun();
     } else if (this.controller.getIsGrounded()) {
       this.controller.setIsWallRunning(false);
+    }
+  }
+
+  public wallRaycast(dir: vec3): void {
+    const origin = this.controller.getCollider().getRigidBody().translation();
+    const physics = Engine.getPhysics();
+    const ray = new RAPIER.Ray(
+      { x: origin.x, y: origin.y, z: origin.z },
+      { x: dir[0], y: dir[1], z: dir[2] },
+    );
+    const hit = physics
+      .getWorld()
+      .castRayAndGetNormal(
+        ray,
+        this.detectWallDistance,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        this.controller.getCollider().getCollider(),
+      );
+
+    if (hit && hit.collider && hit.collider.parent()!.bodyType() === RAPIER.RigidBodyType.Fixed) {
+      const n = vec3.fromValues(hit.normal.x, hit.normal.y, hit.normal.z);
+      this.isNearWall = true;
+      vec3.copy(this.wallNormal, n);
     }
   }
 
@@ -162,7 +127,7 @@ export class WallRunSystem {
 
   public update(deltaTime: number, targetMovement: vec3): void {
     const input = Engine.getInput();
-    this.currentWallRunTime += deltaTime;
+    //this.currentWallRunTime += deltaTime;
 
     // Salir si nos alejamos de la pared
     if (!this.isNearWall || this.currentWallRunTime >= this.maxWallRunDuration) {
@@ -171,14 +136,14 @@ export class WallRunSystem {
     }
 
     // Wall jump
-    if (input.isActionBuffered(GameAction.JUMP)) {
+    /*if (input.isActionBuffered(GameAction.JUMP)) {
       input.consumeBufferedAction(GameAction.JUMP);
       this.applyWallJump();
       return;
     }
 
     // Movimiento horizontal durante wallrun
-    this.updateHorizontalMovement(deltaTime, targetMovement);
+    this.updateHorizontalMovement(deltaTime, targetMovement);*/
   }
 
   private updateHorizontalMovement(deltaTime: number, targetMovement: vec3): void {

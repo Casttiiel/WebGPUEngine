@@ -333,9 +333,9 @@
     "components": {
       "name": "Wall",
       "transform": {
-        "position": [-33, 7, 20],
+        "position": [-33, 3, 20],
         "rotation": [0, 0, 0],
-        "scale": [6, 6, 1]
+        "scale": [60, 6, 1]
       },
       "box_collider": {
         "bodyType": "static",
