@@ -34,14 +34,13 @@
 
 ## Gameplay
 
-1. WallRun
-2. Head Bob
-3. Landing camera animation
-4. WallJump
-5. Snap to ground
-6. Roll
-7. Momentum
-8. Dash
+1. Landing camera animation
+2. WallRun
+3. WallJump
+4. Snap to ground
+5. Roll
+6. Momentum
+7. Dash
 
 ---
 
