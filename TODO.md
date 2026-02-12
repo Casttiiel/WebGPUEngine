@@ -15,35 +15,33 @@
 11. Froxel Volumetric Scattering Fix Light fuge (more res less far)
 12. Froxel Volumetric Scattering: Spot Light Injection angle
 
-13. Point Light shadows
-14. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+13. Blender Export with player spawn
+14. Editor Light Probes (Render Debug / Gizmo)
+15. Editor Point Lights (Render Debug / Gizmo / Menu)
+16. Editor Spot Lights (Render Debug / Gizmo / Menu)
+17. Asset Browser + Spawn + Delete
 
-15. Blender Export with player spawn
-16. Editor Light Probes (Render Debug / Gizmo)
-17. Editor Point Lights (Render Debug / Gizmo / Menu)
-18. Editor Spot Lights (Render Debug / Gizmo / Menu)
-19. Asset Browser + Spawn + Delete
-
+18. Point Light shadows
+19. CSM: Logarithmic depth o reversed-Z or less max shadow distance
 20. Reflection Probes con blending
-21. Contact Shadows
-22. Quality settings selection
-23. Improve particles
-24. Multiple Light probes has good shadows?
+21. Multiple Light probes has good shadows?
+22. Contact Shadows
+23. Quality settings selection
+24. Improve particles
 25. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
 ## Gameplay
 
-1. Swing Bar + needs to be picked with some angle
-2. WallRun
-3. Head Bob
-4. Landing camera animation
-5. WallJump
-6. Snap to ground
-7. Roll
+1. WallRun
+2. Head Bob
+3. Landing camera animation
+4. WallJump
+5. Snap to ground
+6. Roll
+7. Momentum
 8. Dash
-9. Momentum
 
 ---
 

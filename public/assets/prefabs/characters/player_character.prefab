@@ -21,7 +21,7 @@
       "collisionMask": "PLAYER_INTERACTIONS"
     },
     "character_controller": {
-      "moveSpeed": 13.0,
+      "moveSpeed": 11.0,
       "maxSpeed": 18.0,
       "airControl": 0.7,
       "groundAcceleration": 65.0,
@@ -50,7 +50,7 @@
       "disableMantleAfterWallJumpTime": 0.3,
       "mantleDetectionDistance": 1.5,
       "mantleMaxHeight": -0.025,
-      "mantlingMinVerticalVelocity": -5.0,
+      "mantlingMinVerticalVelocity": -9.0,
       "minMantleVelocity": 8.0,
       "divingGravityMultiplier": 4.0,
       "minSwingSpeed": 8.5,

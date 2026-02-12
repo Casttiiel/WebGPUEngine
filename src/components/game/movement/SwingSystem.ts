@@ -2,6 +2,7 @@ import { vec3 } from 'gl-matrix';
 import type { CharacterControllerComponent } from '../CharacterControllerComponent';
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { SwingEntryData } from '../../../types/SwingEntryData.type';
+import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
 
 /**
  * SwingSystem - Gestiona el columpiarse en barras
@@ -24,7 +25,10 @@ export class SwingSystem {
   constructor(
     private controller: CharacterControllerComponent,
     private _modifiers: PlayerModifiersComponent | null,
-  ) {}
+    data: CharacterControllerComponentDataType,
+  ) {
+    this.minSwingSpeed = data.minSwingSpeed ?? this.minSwingSpeed;
+  }
 
   public startSwing(data: SwingEntryData): void {
     if (

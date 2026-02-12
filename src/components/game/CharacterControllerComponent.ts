@@ -554,7 +554,7 @@ export class CharacterControllerComponent extends Component {
     this.wallRunSystem = new WallRunSystem(this, this.modifiers);
     this.dashSystem = new DashSystem(this, this.modifiers);
     this.mantleSystem = new MantleSystem(this, this.modifiers, data);
-    this.swingSystem = new SwingSystem(this, this.modifiers);
+    this.swingSystem = new SwingSystem(this, this.modifiers, data);
 
     // 4. Crear character controller de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
