@@ -19,12 +19,13 @@ export class WallRunSystem {
   private wallAcceleration: number = 3.0;
 
   // Wall jump
-  private disableInputAfterWallJumpTime: number = 0.3;
+  private disableInputAfterWallJumpTime: number = 2.9;
 
   // Estado interno
   private wallNormal: vec3 = vec3.create();
   private isNearWall: boolean = false;
-  private currentWallRunTime: number = 0.0;
+  private wallRunCooldown: number = 0.0;
+  private wallRunCooldownTimer: number = 0.0;
 
   constructor(
     private controller: CharacterControllerComponent,
@@ -35,12 +36,16 @@ export class WallRunSystem {
     this.startWallRunGravity = data.startWallRunGravity ?? this.startWallRunGravity;
     this.runSpeed = data.moveSpeed ?? this.runSpeed;
     this.wallAcceleration = data.wallRunAcceleration ?? this.wallAcceleration;
+    this.wallRunCooldown = 0.1;
   }
 
-  public detectWall(): void {
+  public detectWall(deltaTime: number): void {
     const input = Engine.getInput();
-    console.log(this.isNearWall);
     this.isNearWall = false;
+
+    // Actualizar cooldown de wallrun
+    this.wallRunCooldownTimer -= deltaTime;
+    if (this.wallRunCooldownTimer > 0) return;
 
     const camera = this.controller.getCamera();
     if (!camera) return;
@@ -108,7 +113,6 @@ export class WallRunSystem {
 
   private startWallRun(): void {
     this.controller.setIsWallRunning(true);
-    this.currentWallRunTime = 0.0;
     this.controller.setVerticalVelocity(this.startWallRunGravity);
 
     this.removeVelocityIntoWall(this.wallNormal);
@@ -116,24 +120,19 @@ export class WallRunSystem {
 
   public update(deltaTime: number, targetMovement: vec3): void {
     const input = Engine.getInput();
-    //this.currentWallRunTime += deltaTime;
 
     // Salir si nos alejamos de la pared
-    if (
-      !this.isNearWall ||
-      this.currentWallRunTime >= this.maxWallRunDuration ||
-      !input.isActionPressed(GameAction.MOVE_FORWARD)
-    ) {
+    if (!this.isNearWall || !input.isActionPressed(GameAction.MOVE_FORWARD)) {
       this.controller.setIsWallRunning(false);
       return;
     }
 
     // Wall jump
-    /*if (input.isActionBuffered(GameAction.JUMP)) {
+    if (input.isActionBuffered(GameAction.JUMP)) {
       input.consumeBufferedAction(GameAction.JUMP);
       this.applyWallJump();
       return;
-    }*/
+    }
 
     // Movimiento horizontal durante wallrun
     this.updateHorizontalMovement(deltaTime, targetMovement);
@@ -160,6 +159,7 @@ export class WallRunSystem {
     this.isNearWall = false;
     this.controller.setIsWallRunning(false);
     this.controller.setInputDisableTimer(this.disableInputAfterWallJumpTime);
+    this.wallRunCooldownTimer = this.wallRunCooldown;
 
     const camera = this.controller.getCamera();
     if (!camera) return;
@@ -175,7 +175,7 @@ export class WallRunSystem {
     }
 
     const speed = this.controller.getCurrentSpeed();
-    const newVel = vec3.scale(vec3.create(), jumpDir, speed * 0.85);
+    const newVel = vec3.scale(vec3.create(), jumpDir, speed);
     this.controller.setHorizontalVelocity(newVel);
 
     // Aplicar salto (necesitamos acceso al JumpSystem)

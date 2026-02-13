@@ -104,7 +104,7 @@ export class CharacterControllerComponent extends Component {
     this.updateGroundedState();
 
     // Detectar paredes para wallrun
-    this.wallRunSystem.detectWall();
+    this.wallRunSystem.detectWall(deltaTime);
 
     // Actualizar sistemas de manejo (no ejecutan movimiento, solo detectan)
     //this.dashSystem.update();

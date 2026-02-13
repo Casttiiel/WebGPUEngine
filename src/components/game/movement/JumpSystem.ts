@@ -61,7 +61,7 @@ export class JumpSystem {
       const jumpCutFactor =
         this.controller.getIsJumping() &&
         !this.controller.getIsWallRunning() &&
-        Math.abs(verticalVel) > 0 &&
+        verticalVel > 0 &&
         Math.abs(verticalVel) < this.jumpCutVerticalVelocityLimit
           ? this.jumpCutFactor
           : 1.0;
