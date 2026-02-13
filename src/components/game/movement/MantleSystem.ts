@@ -187,6 +187,7 @@ export class MantleSystem {
 
   private startMantle(targetPosition: vec3): void {
     this.controller.setIsMantling(true);
+    this.controller.setIsJumping(false);
     vec3.copy(this.mantleTargetPos, targetPosition);
 
     this.mantleStoredVelocity = Math.max(this.controller.getCurrentSpeed(), this.minMantleVelocity);

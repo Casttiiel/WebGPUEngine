@@ -43,7 +43,6 @@
 
 ---
 
-9. Bug Is Jumping while on ground
 10. WallRun Entry dir
 11. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime/No need to jump for mantling?
 12. WallRun ZigZag makes you higher
