@@ -35,7 +35,6 @@
 ## Gameplay
 
 1. WallJump
-   Direction
    Disabling
 2. Snap to ground
 3. Landing camera animation

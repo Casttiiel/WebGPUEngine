@@ -170,6 +170,7 @@ export class WallRunSystem {
 
     const d = vec3.dot(jumpDir, this.wallNormal);
     if (d < 0.2) {
+      vec3.scale(this.wallNormal, this.wallNormal, 0.5);
       vec3.add(jumpDir, jumpDir, this.wallNormal);
       vec3.normalize(jumpDir, jumpDir);
     }
