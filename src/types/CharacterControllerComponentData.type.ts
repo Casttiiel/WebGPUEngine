@@ -23,10 +23,7 @@ export type CharacterControllerComponentDataType = {
   wallRunGravity?: number; // Gravity multiplier when wall running (default: 0.5)
   startWallRunGravity?: number; // Initial vertical velocity when starting a wall run (default: 2.5)
   wallRunAcceleration?: number; // Time to reach max speed while wall running in seconds (default: 0.2)
-  wallRunBrake?: number; // Time to stop completely from wall run in seconds (default: 0.2)
   detectWallDistance?: number; // Distance to detect walls for wall running (default: 1.0)
-  wallRunMaxEntryAngle?: number; // Maximum angle (in degrees) to enter wall run (default: 45)
-  wallDrag?: number; // Drag applied while wall running (default: 0.2)
 
   wallJumpForce?: number; // Wall jump vertical force (default: 8.0)
   disableInputAfterWallJumpTime?: number; // Time to disable input after wall jump in seconds (default: 0.2)

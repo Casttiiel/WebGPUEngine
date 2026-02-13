@@ -11,12 +11,12 @@ import { CharacterControllerComponentDataType } from '../../../types/CharacterCo
  */
 export class WallRunSystem {
   // Parámetros de wallrun
-  private minWallRunSpeed: number = 7.0;
   private initialDragFactorDuringWallRun: number = 1.0;
   private startWallRunGravity: number = 2.5;
   private detectWallDistance: number = 0.6;
-  private wallDrag: number = 0.05;
   private maxWallRunDuration: number = 10.0;
+  private runSpeed = 9.0;
+  private wallAcceleration: number = 3.0;
 
   // Wall jump
   private disableInputAfterWallJumpTime: number = 0.3;
@@ -33,16 +33,8 @@ export class WallRunSystem {
   ) {
     this.detectWallDistance = data.detectWallDistance ?? this.detectWallDistance;
     this.startWallRunGravity = data.startWallRunGravity ?? this.startWallRunGravity;
-
-    /* "wallRunGravity": -4.0,
-      "wallRunAcceleration": 3.0,
-      "wallRunBrake": 3.0,
-      "detectWallDistance": 0.6,
-      "wallRunMaxEntryAngle": 0.9,
-      "wallDrag": 0.3,
-      "wallJumpForce": 7.0,
-      "disableInputAfterWallJumpTime": 0.3,
-      "disableMantleAfterWallJumpTime": 0.3,*/
+    this.runSpeed = data.moveSpeed ?? this.runSpeed;
+    this.wallAcceleration = data.wallRunAcceleration ?? this.wallAcceleration;
   }
 
   public detectWall(): void {
@@ -141,34 +133,27 @@ export class WallRunSystem {
       input.consumeBufferedAction(GameAction.JUMP);
       this.applyWallJump();
       return;
-    }
+    }*/
 
     // Movimiento horizontal durante wallrun
-    this.updateHorizontalMovement(deltaTime, targetMovement);*/
+    this.updateHorizontalMovement(deltaTime, targetMovement);
   }
 
   private updateHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
-    const hasInput = vec3.length(targetMovement) > 0.01;
-
     // Solo puedes ir hacia adelante o atrás de la pared
     let wallTangent = this.projectOntoWallTangent(targetMovement, this.wallNormal);
     vec3.normalize(wallTangent, wallTangent);
     vec3.copy(targetMovement, wallTangent);
 
+    const boostedSpeed = this.controller.getBoostedSpeed();
+    const baseTargetSpeed = Math.max(this.runSpeed, boostedSpeed);
+    vec3.scale(targetMovement, targetMovement, baseTargetSpeed);
+
     const currentVel = this.controller.getHorizontalVelocity();
-    const horizontalDirection = vec3.normalize(vec3.create(), currentVel);
-    const alignment = vec3.dot(targetMovement, horizontalDirection);
+    const newVel = this.approachVec3(currentVel, targetMovement, this.wallAcceleration * deltaTime);
+    newVel[1] = currentVel[1];
 
-    let keysFactor = 1.0;
-    if (hasInput && alignment > 0.0) {
-      keysFactor = 0.5;
-    } else if (hasInput && alignment <= 0.0) {
-      keysFactor = 2.0;
-    }
-
-    const dragFactor = Math.pow(1.0 - this.wallDrag * keysFactor, deltaTime);
-    vec3.scale(currentVel, currentVel, dragFactor);
-    this.controller.setHorizontalVelocity(currentVel);
+    this.controller.setHorizontalVelocity(newVel);
   }
 
   private applyWallJump(): void {
@@ -221,6 +206,21 @@ export class WallRunSystem {
     const dot = vec3.dot(v, wallNormal);
     const projected = vec3.scale(vec3.create(), wallNormal, dot);
     return vec3.subtract(vec3.create(), v, projected);
+  }
+
+  private approachVec3(current: vec3, target: vec3, maxDelta: number): vec3 {
+    const delta = vec3.create();
+    vec3.subtract(delta, target, current);
+
+    const dist = vec3.length(delta);
+
+    if (dist <= maxDelta || dist === 0) {
+      return vec3.clone(target);
+    }
+
+    const result = vec3.create();
+    vec3.scaleAndAdd(result, current, delta, maxDelta / dist);
+    return result;
   }
 
   // Getters públicos

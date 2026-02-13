@@ -26,8 +26,8 @@ export interface HeadBobComponentData {
 export class HeadBobComponent extends Component {
   // Configuración
   private frequency: number = 1.0; // Frecuencia en Hz (2.0 = 2 ciclos por segundo)
-  private verticalAmplitude: number = 0.03; // Movimiento vertical (5cm)
-  private horizontalAmplitude: number = 0.03; // Movimiento horizontal (3cm)
+  private verticalAmplitude: number = 0.02; // Movimiento vertical (5cm)
+  private horizontalAmplitude: number = 0.02; // Movimiento horizontal (3cm)
   private speedThreshold: number = 0.5; // Velocidad mínima para activar (m/s)
   private enabled: boolean = true; // Activar head bob
 

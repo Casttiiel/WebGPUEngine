@@ -35,21 +35,23 @@
 ## Gameplay
 
 1. WallRun
-   Speed/Change behavior
    End Conditions
 2. Snap to ground
 3. WallJump
-4. Roll
-5. Landing camera animation
+4. Landing camera animation
+5. Roll
 6. Momentum
 7. Dash
 
 ---
 
+8. Swing Bar exit momentum
 9. WallRun Into Wall
-10. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
-11. Dash end speed/direction + Conserva 80% de velocidad previa
-12. Door
+10. WallRun ZigZag makes you higher
+11. Bug Is Jumping while on ground
+12. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
+13. Dash end speed/direction + Conserva 80% de velocidad previa
+14. Door
 
 ## Visuals and Sound
 
