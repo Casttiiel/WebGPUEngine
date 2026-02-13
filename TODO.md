@@ -36,7 +36,6 @@
 
 1. WallRun
    Speed/Change behavior
-   Gravity
    End Conditions
 2. Snap to ground
 3. WallJump
@@ -47,9 +46,10 @@
 
 ---
 
-8. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
-9. Dash end speed/direction + Conserva 80% de velocidad previa
-10. Door
+9. WallRun Into Wall
+10. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
+11. Dash end speed/direction + Conserva 80% de velocidad previa
+12. Door
 
 ## Visuals and Sound
 

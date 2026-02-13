@@ -21,6 +21,7 @@ export type CharacterControllerComponentDataType = {
   slideMinDuration?: number; // Minimum slide duration before it can be cancelled in seconds (default: 0.5)
 
   wallRunGravity?: number; // Gravity multiplier when wall running (default: 0.5)
+  startWallRunGravity?: number; // Initial vertical velocity when starting a wall run (default: 2.5)
   wallRunAcceleration?: number; // Time to reach max speed while wall running in seconds (default: 0.2)
   wallRunBrake?: number; // Time to stop completely from wall run in seconds (default: 0.2)
   detectWallDistance?: number; // Distance to detect walls for wall running (default: 1.0)

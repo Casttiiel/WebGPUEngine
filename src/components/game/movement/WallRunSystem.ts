@@ -12,12 +12,11 @@ import { CharacterControllerComponentDataType } from '../../../types/CharacterCo
 export class WallRunSystem {
   // Parámetros de wallrun
   private minWallRunSpeed: number = 7.0;
-  private initialDragFactorDuringWallRun: number = 0.85;
-  private _wallRunGravity: number = -4.0;
+  private initialDragFactorDuringWallRun: number = 1.0;
+  private startWallRunGravity: number = 2.5;
   private detectWallDistance: number = 0.6;
-  private wallRunMaxEntryAngle: number = 0.9;
   private wallDrag: number = 0.05;
-  private maxWallRunDuration: number = 20.5;
+  private maxWallRunDuration: number = 10.0;
 
   // Wall jump
   private disableInputAfterWallJumpTime: number = 0.3;
@@ -33,6 +32,8 @@ export class WallRunSystem {
     data: CharacterControllerComponentDataType,
   ) {
     this.detectWallDistance = data.detectWallDistance ?? this.detectWallDistance;
+    this.startWallRunGravity = data.startWallRunGravity ?? this.startWallRunGravity;
+
     /* "wallRunGravity": -4.0,
       "wallRunAcceleration": 3.0,
       "wallRunBrake": 3.0,
@@ -114,15 +115,9 @@ export class WallRunSystem {
   }
 
   private startWallRun(): void {
-    const speed = this.controller.getCurrentSpeed();
-    if (speed < this.minWallRunSpeed) return;
-
     this.controller.setIsWallRunning(true);
     this.currentWallRunTime = 0.0;
-
-    if (this.controller.getVerticalVelocity() < 0.0) {
-      this.controller.setVerticalVelocity(0.0);
-    }
+    this.controller.setVerticalVelocity(this.startWallRunGravity);
 
     this.removeVelocityIntoWall(this.wallNormal);
   }

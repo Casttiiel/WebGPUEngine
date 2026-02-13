@@ -20,6 +20,7 @@ export class JumpSystem {
   private jumpGravity: number = 0.0;
   private fallGravity: number = 0.0;
   private timeSinceGrounded: number = 0.0;
+  private wallRunGravity: number = -2.0;
 
   constructor(
     private controller: CharacterControllerComponent,
@@ -33,6 +34,7 @@ export class JumpSystem {
     this.coyoteTime = data.coyoteTime ?? this.coyoteTime;
     this.jumpCutVerticalVelocityLimit =
       data.jumpCutVerticalVelocityLimit ?? this.jumpCutVerticalVelocityLimit;
+    this.wallRunGravity = data.wallRunGravity ?? this.wallRunGravity;
 
     this.calculatePhysicsConstants();
   }
@@ -54,7 +56,7 @@ export class JumpSystem {
       const gravity = verticalVel > 0 ? this.jumpGravity : this.fallGravity;
 
       // Gravedad especial durante wallrun
-      const finalGravity = this.controller.getIsWallRunning() && verticalVel < 0.0 ? -0.0 : gravity;
+      const finalGravity = this.controller.getIsWallRunning() ? this.wallRunGravity : gravity;
 
       const jumpCutFactor =
         this.controller.getIsJumping() &&
