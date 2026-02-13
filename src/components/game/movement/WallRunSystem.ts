@@ -14,12 +14,11 @@ export class WallRunSystem {
   private initialDragFactorDuringWallRun: number = 1.0;
   private startWallRunGravity: number = 2.5;
   private detectWallDistance: number = 0.6;
-  private maxWallRunDuration: number = 10.0;
   private runSpeed = 9.0;
   private wallAcceleration: number = 3.0;
 
   // Wall jump
-  private disableInputAfterWallJumpTime: number = 2.9;
+  private disableInputAfterWallJumpTime: number = 0.4;
 
   // Estado interno
   private wallNormal: vec3 = vec3.create();

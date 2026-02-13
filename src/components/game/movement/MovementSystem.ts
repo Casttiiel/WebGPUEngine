@@ -82,7 +82,6 @@ export class MovementSystem {
       const currentVel = this.controller.getHorizontalVelocity();
       const newVel = this.approachVec3(currentVel, targetMovement, airAcceleration * deltaTime);
       newVel[1] = currentVel[1];
-
       this.controller.setHorizontalVelocity(newVel);
     } else {
       // Sin input: aplicar resistencia del aire

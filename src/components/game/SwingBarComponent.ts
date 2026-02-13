@@ -15,7 +15,7 @@ export class SwingBarComponent extends Component {
   private barEnd: vec3 = vec3.create();
   private barAxis: vec3 = vec3.create();
   private maxStartSwingAngle = 3.1; // 90°
-  private maxSwingAngle = 2.1; // 90°
+  private maxSwingAngle = 1.5; // 90°
   private maxGrabHeight = 0.65; // demasiado arriba
   private maxProgressAllowed = 0.5; // pasada la mitad no engancha
 

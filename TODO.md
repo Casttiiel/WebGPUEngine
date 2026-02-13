@@ -21,37 +21,36 @@
 16. Editor Spot Lights (Render Debug / Gizmo / Menu)
 17. Asset Browser + Spawn + Delete
 
-18. Point Light shadows
-19. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-20. Reflection Probes con blending
-21. Multiple Light probes has good shadows?
-22. Contact Shadows
-23. Quality settings selection
-24. Improve particles
-25. Weird line on corners is irradiance because of normals
+18. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+19. Reflection Probes con blending
+20. Multiple Light probes has good shadows?
+21. Contact Shadows
+22. Reflective Shadow Maps
+23. Point Light shadows
+24. Quality settings selection
+25. Improve particles
+26. Weird line on corners is irradiance because of normals
 
 ### Bugs
 
 ## Gameplay
 
-1. WallJump
-   Disabling
-2. Snap to ground
-3. Landing camera animation
-4. Dash
-5. Roll
-6. Momentum
+1. Snap to ground
+2. Landing camera animation
+3. Dash
+4. Roll
+5. Momentum
 
 ---
 
-8. Swing Bar exit momentum
-9. WallJump Coyote time
-10. WallRun Into Wall
-11. WallRun ZigZag makes you higher
-12. Bug Is Jumping while on ground
-13. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime?
-14. Dash end speed/direction + Conserva 80% de velocidad previa
-15. Door
+9. Bug Is Jumping while on ground
+10. WallRun Entry dir
+11. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime/No need to jump for mantling?
+12. WallRun ZigZag makes you higher
+13. WallRun Into Wall
+14. WallJump Coyote time
+15. Dash end speed/direction + Conserva 80% de velocidad previa
+16. Door
 
 ## Visuals and Sound
 

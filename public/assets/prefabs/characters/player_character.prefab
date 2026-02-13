@@ -51,7 +51,7 @@
       "mantlingMinVerticalVelocity": -9.0,
       "minMantleVelocity": 8.0,
       "divingGravityMultiplier": 4.0,
-      "minSwingSpeed": 8.5,
+      "minSwingSpeed": 11.0,
       "impulsePadInputDisableTime": 0.3
     },
     "fps_camera_controller": {

@@ -90,14 +90,14 @@ export class SwingSystem {
     const newVel = vec3.scale(vec3.create(), velocityDir, this.swingSpeed);
     this.controller.setHorizontalVelocity(newVel);
 
-    const horizontalVel = this.controller.getHorizontalVelocity();
+    const horizontalVel = newVel;
     this.controller.setVerticalVelocity(horizontalVel[1]);
     horizontalVel[1] = 0;
     this.controller.setHorizontalVelocity(horizontalVel);
   }
 
   private endSwing(): void {
-    const verticalVel = Math.max(this.controller.getVerticalVelocity(), 1.5);
+    const verticalVel = Math.max(this.controller.getVerticalVelocity(), 10.0);
     this.controller.setVerticalVelocity(verticalVel);
     this.controller.setIsSwinging(false);
   }
