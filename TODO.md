@@ -40,16 +40,15 @@
 3. Dash
 4. Roll
 5. Momentum
+6. Blur on borders
+7. Vignetting
 
 ---
 
-10. WallRun Entry dir
-11. Jump to ledge of same wall i am wallruning -> disableMantleAfterWallJumpTime/No need to jump for mantling?
-12. WallRun ZigZag makes you higher
-13. WallRun Into Wall
-14. WallJump Coyote time
-15. Dash end speed/direction + Conserva 80% de velocidad previa
-16. Door
+8. WallRun ZigZag makes you higher
+9. WallJump Coyote time
+10. Dash end speed/direction + Conserva 80% de velocidad previa
+11. Door
 
 ## Visuals and Sound
 

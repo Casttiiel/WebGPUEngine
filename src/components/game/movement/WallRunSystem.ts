@@ -18,7 +18,7 @@ export class WallRunSystem {
   private wallAcceleration: number = 3.0;
 
   // Wall jump
-  private disableInputAfterWallJumpTime: number = 0.4;
+  private disableInputAfterWallJumpTime: number = 0.3;
 
   // Estado interno
   private wallNormal: vec3 = vec3.create();
@@ -40,6 +40,7 @@ export class WallRunSystem {
 
   public detectWall(deltaTime: number): void {
     const input = Engine.getInput();
+    const physics = Engine.getPhysics();
     this.isNearWall = false;
 
     // Actualizar cooldown de wallrun
@@ -67,9 +68,29 @@ export class WallRunSystem {
 
     this.wallRaycast(left);
     this.wallRaycast(right);
-    this.wallRaycast(backVector);
-    this.wallRaycast(diagonalLeft);
-    this.wallRaycast(diagonalRight);
+    if (this.controller.getIsWallRunning()) {
+      this.wallRaycast(backVector);
+      this.wallRaycast(diagonalLeft);
+      this.wallRaycast(diagonalRight);
+    }
+
+    const origin = this.controller.getCollider().getRigidBody().translation();
+    let wallTangent = this.projectOntoWallTangent(facingVector, this.wallNormal);
+    vec3.normalize(wallTangent, wallTangent);
+    const ray = new RAPIER.Ray(
+      { x: origin.x, y: origin.y, z: origin.z },
+      { x: wallTangent[0], y: wallTangent[1], z: wallTangent[2] },
+    );
+    const wallInFront = physics
+      .getWorld()
+      .castRayAndGetNormal(
+        ray,
+        this.detectWallDistance,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        this.controller.getCollider().getCollider(),
+      );
 
     // Iniciar o terminar wallrun
     if (
@@ -77,10 +98,11 @@ export class WallRunSystem {
       !this.controller.getIsGrounded() &&
       !this.controller.getIsMantling() &&
       !this.controller.getIsWallRunning() &&
-      input.isActionPressed(GameAction.MOVE_FORWARD)
+      input.isActionPressed(GameAction.MOVE_FORWARD) &&
+      !wallInFront
     ) {
       this.startWallRun();
-    } else if (this.controller.getIsGrounded()) {
+    } else if (this.controller.getIsGrounded() || wallInFront) {
       this.controller.setIsWallRunning(false);
     }
   }
