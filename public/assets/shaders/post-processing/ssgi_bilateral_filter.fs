@@ -27,6 +27,11 @@ fn bilateralFilter(centerUV: vec2<f32>) -> vec4<f32> {
     
     // Obtener datos del pixel central
     let centerDepth = textureSample(gLinearDepth, samplerGBuffer, centerUV).x;
+
+    if(centerDepth > 0.99) {
+        return 1.0; // Early exit for sky
+    }
+
     let normalRoughnessData = textureSample(gNormals, samplerGBuffer, centerUV);
     let centerNormal = octahedral01ToNormal(normalRoughnessData.xy);
     let centerSSGI = textureSample(ssgiTexture, samplerSSGI, centerUV);

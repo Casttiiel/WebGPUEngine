@@ -261,14 +261,6 @@ export class ModuleRender extends Module {
       const velocityMgr = VelocityBufferManager.getInstance();
       const needsVelocity = mainCameraEntity?.hasComponent('smaa_t2x');
       velocityMgr.setEnabled(needsVelocity);
-    }
-
-    // Post-processing solo si hay MainCamera
-    if (mainCameraEntity) {
-      // Enable velocity buffer if any component needs it
-      const velocityMgr = VelocityBufferManager.getInstance();
-      const needsVelocity = mainCameraEntity?.hasComponent('smaa_t2x');
-      velocityMgr.setEnabled(needsVelocity);
       // Generar velocity buffer si está activo
       if (velocityMgr.isEnabled()) {
         velocityMgr.generate(this.mainCamera, this.deferred.getGBufferBindGroup());

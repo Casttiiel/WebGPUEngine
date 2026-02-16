@@ -23,8 +23,8 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
     // PCF 5x5 filtering
     let texelSize = lightShadowStepDivResolution;
     var shadow = 0.0;
-    for (var dx = -2; dx <= 2; dx = dx + 1) {
-        for (var dy = -2; dy <= 2; dy = dy + 1) {
+    for (var dx = -1; dx <= 1; dx = dx + 1) {
+        for (var dy = -1; dy <= 1; dy = dy + 1) {
             let offset = vec2<f32>(f32(dx), f32(dy)) * texelSize;
             shadow += textureSampleCompareLevel(shadowMap, shadowSampler, lightUVSpacePos.xy + offset, lightUVSpacePos.z);
         }

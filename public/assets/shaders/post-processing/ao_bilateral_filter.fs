@@ -26,9 +26,14 @@ fn bilateralFilter(centerUV: vec2<f32>) -> f32 {
     let texelSize = 1.0 / camera.screenSize;
       // Obtener datos del pixel central
     let centerDepth = textureSample(gLinearDepth, samplerGBuffer, centerUV).x;
-    let normalRoughnessData = textureSample(gNormals, samplerGBuffer, centerUV);
+    
+    if(centerDepth > 0.99) {
+        return 1.0; // Early exit for sky
+    }
+
+    let normalRoughnessData = textureSampleLevel(gNormals, samplerGBuffer, centerUV, 0.0);
     let centerNormal = octahedral01ToNormal(normalRoughnessData.xy);
-    let centerAO = textureSample(aoTexture, samplerAO, centerUV).r;
+    let centerAO = textureSampleLevel(aoTexture, samplerAO, centerUV, 0.0).r;
     
     // Muestrear en un patrón 5x5 alrededor del pixel central
     for (var x = -i32(BILATERAL_RADIUS); x <= i32(BILATERAL_RADIUS); x++) {
@@ -37,10 +42,10 @@ fn bilateralFilter(centerUV: vec2<f32>) -> f32 {
             let sampleUV = clamp(centerUV + offset, vec2<f32>(0.0), vec2<f32>(1.0));
             
             // Obtener datos de la muestra
-            let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUV).x;
-            let normalRoughnessData2 = textureSample(gNormals, samplerGBuffer, sampleUV);
+            let sampleDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, sampleUV, 0.0).x;
+            let normalRoughnessData2 = textureSampleLevel(gNormals, samplerGBuffer, sampleUV, 0.0);
             let sampleNormal = octahedral01ToNormal(normalRoughnessData2.xy);
-            let sampleAO = textureSample(aoTexture, samplerAO, sampleUV).r;
+            let sampleAO = textureSampleLevel(aoTexture, samplerAO, sampleUV, 0.0).r;
             
             // Calcular pesos basados en similitud de profundidad y normal
             let depthDiff = abs(centerDepth - sampleDepth);

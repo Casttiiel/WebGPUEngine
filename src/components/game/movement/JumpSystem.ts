@@ -74,7 +74,7 @@ export class JumpSystem {
       !this.controller.getIsJumping() &&
       vec3.length(this.controller.getHorizontalVelocity()) > 0.01
     ) {
-      this.controller.setVerticalVelocity(-0.01);
+      this.controller.setVerticalVelocity(-0.1);
     } else if (
       this.controller.getIsGrounded() &&
       !this.controller.getIsJumping() &&
