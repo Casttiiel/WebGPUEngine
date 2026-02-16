@@ -3,6 +3,7 @@ import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
 import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
+import { vec3 } from 'gl-matrix';
 
 /**
  * JumpSystem - Gestiona saltos y gravedad
@@ -68,7 +69,17 @@ export class JumpSystem {
 
       const newVerticalVel = verticalVel + finalGravity * jumpCutFactor * deltaTime;
       this.controller.setVerticalVelocity(newVerticalVel);
-    } else if (this.controller.getIsGrounded() && !this.controller.getIsJumping()) {
+    } else if (
+      this.controller.getIsGrounded() &&
+      !this.controller.getIsJumping() &&
+      vec3.length(this.controller.getHorizontalVelocity()) > 0.01
+    ) {
+      this.controller.setVerticalVelocity(-0.01);
+    } else if (
+      this.controller.getIsGrounded() &&
+      !this.controller.getIsJumping() &&
+      vec3.length(this.controller.getHorizontalVelocity()) <= 0.01
+    ) {
       this.controller.setVerticalVelocity(0.0);
     }
   }

@@ -2,53 +2,40 @@
 
 1. Gameplay
 
-2. Camera Uniforms missleading names
-3. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights)
-4. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
-5. Open Editor multiple times, creates data multiple times
-6. FPS inestable on Full screen
-7. Bloom Shape
-8. Optimize with compute shaders
+2. FPS inestable on Full screen (sponza)
+3. Camera Uniforms missleading names
+4. Open Editor multiple times, creates data multiple times
+5. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+6. Bloom Shape
+7. Optimize with compute shaders
+8. Contact Shadows
 
-9. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-10. Froxel Volumetric Light Shafts parpadean
-11. Froxel Volumetric Scattering Fix Light fuge (more res less far)
-12. Froxel Volumetric Scattering: Spot Light Injection angle
+9. Froxel Volumetric Light Shafts parpadean
+10. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
+11. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
+12. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+13. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+14. Froxel Volumetric Scattering: Spot Light Injection angle
 
-13. Blender Export with player spawn
-14. Editor Light Probes (Render Debug / Gizmo)
-15. Editor Point Lights (Render Debug / Gizmo / Menu)
-16. Editor Spot Lights (Render Debug / Gizmo / Menu)
-17. Asset Browser + Spawn + Delete
-
-18. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-19. Reflection Probes con blending
-20. Multiple Light probes has good shadows?
-21. Contact Shadows
-22. Reflective Shadow Maps
-23. Point Light shadows
-24. Quality settings selection
-25. Improve particles
-26. Weird line on corners is irradiance because of normals
-
-### Bugs
+15. SS Global Illumination + Froxel
+16. Reflection Probes con blending
+17. Multiple Light probes has good shadows?
+18. Point Light shadows
+19. Quality settings selection
+20. Improve particles
+21. Weird line on corners is irradiance because of normals
 
 ## Gameplay
 
-1. Snap to ground
-2. Landing camera animation
-3. Dash
-4. Roll
-5. Momentum
-6. Blur on borders
-7. Vignetting
-
----
-
-8. WallRun ZigZag makes you higher
-9. WallJump Coyote time
-10. Dash end speed/direction + Conserva 80% de velocidad previa
-11. Door
+1. WallRun ZigZag makes you higher
+2. WallJump Coyote time
+3. Landing camera animation
+4. Dash
+5. Roll
+6. Momentum
+7. Blur on borders
+8. Vignetting
+9. Door
 
 ## Visuals and Sound
 
@@ -56,4 +43,12 @@
 2. Game Loading Screen
 3. Remove en main.ts el skip first frame?
 
-## Questions
+##
+
+### Editor
+
+15. Blender Export with player spawn
+16. Editor Light Probes (Render Debug / Gizmo)
+17. Editor Point Lights (Render Debug / Gizmo / Menu)
+18. Editor Spot Lights (Render Debug / Gizmo / Menu)
+19. Asset Browser + Spawn + Delete
