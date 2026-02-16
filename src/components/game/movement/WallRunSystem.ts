@@ -70,6 +70,7 @@ export class WallRunSystem {
     this.wallRaycast(right);
     if (this.controller.getIsWallRunning()) {
       this.wallRaycast(backVector);
+      this.wallRaycast(facingVector);
       this.wallRaycast(diagonalLeft);
       this.wallRaycast(diagonalRight);
     }
@@ -134,6 +135,7 @@ export class WallRunSystem {
 
   private startWallRun(): void {
     this.controller.setIsWallRunning(true);
+    this.controller.setIsJumping(false);
     this.controller.setVerticalVelocity(this.startWallRunGravity);
 
     this.removeVelocityIntoWall(this.wallNormal);

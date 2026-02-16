@@ -27,8 +27,8 @@
 
 ## Gameplay
 
-1. WallRun ZigZag makes you higher
-2. WallJump Coyote time
+1. WallJump Coyote time
+2. Jump right on change inclination and then wallrun
 3. Landing camera animation
 4. Dash
 5. Roll
