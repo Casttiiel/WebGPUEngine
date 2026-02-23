@@ -5,7 +5,6 @@
       "tone_mapping": {},
       "smaa": {}, 
       "ambient_occlusion": {},
-      "bloom": {},
-      "speed_lines_vfx": {}
+      "bloom": {}
     }
   }

@@ -114,9 +114,9 @@ export class BloomComponent extends BlurComponent {
     // Update bloom combine parameters buffer
     const paramsData = new Float32Array([
       1.0,
-      this.maxBlurSteps > 1 ? 0.8 : 0.0,
-      this.maxBlurSteps > 2 ? 0.64 : 0.0,
-      this.maxBlurSteps > 3 ? 0.512 : 0.0,
+      this.maxBlurSteps > 1 ? 0.6 : 0.0,
+      this.maxBlurSteps > 2 ? 0.4 : 0.0,
+      this.maxBlurSteps > 3 ? 0.25 : 0.0,
     ]);
 
     GPUUtils.writeBuffer(this.bloomCombineParamsBuffer, 0, paramsData);

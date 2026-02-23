@@ -33,14 +33,14 @@ fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
 
     // Then discard if there is no edge:
     if (dot(edges, vec2<f32>(1.0)) == 0.0) {
-        discard;
+        return vec2<f32>(0.0);
     }
 
-    let cR = textureSample(colorTex, colorSampler, offset[1].xy).rgb;
+    let cR = textureSampleLevel(colorTex, colorSampler, offset[1].xy, 0.0).rgb;
     t = abs(c - cR);
     var deltaZ = max(max(t.r, t.g), t.b);
 
-    let cB = textureSample(colorTex, colorSampler, offset[1].zw).rgb;
+    let cB = textureSampleLevel(colorTex, colorSampler, offset[1].zw, 0.0).rgb;
     t = abs(c - cB);
     var deltaW = max(max(t.r, t.g), t.b);
 
@@ -48,11 +48,11 @@ fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
     var maxDelta = max(vec2<f32>(deltaX, deltaY), vec2<f32>(deltaZ, deltaW));
 
     // Calculate left-left and top-top deltas:
-    let cLL = textureSample(colorTex, colorSampler, offset[2].xy).rgb;
+    let cLL = textureSampleLevel(colorTex, colorSampler, offset[2].xy, 0.0).rgb;
     t = abs(c - cLL);
     deltaZ = max(max(t.r, t.g), t.b);
 
-    let cTT = textureSample(colorTex, colorSampler, offset[2].zw).rgb;
+    let cTT = textureSampleLevel(colorTex, colorSampler, offset[2].zw, 0.0).rgb;
     t = abs(c - cTT);
     deltaW = max(max(t.r, t.g), t.b);
 

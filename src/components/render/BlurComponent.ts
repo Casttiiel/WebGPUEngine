@@ -70,7 +70,7 @@ export class BlurComponent extends Component {
   private gaussianBlurTechnique!: Technique;
   private gaussianBlurUniformBuffer!: GPUBuffer;
   protected fullscreenQuadMesh!: Mesh;
-  private globalDistance: number = 2.0;
+  private globalDistance: number = 1.0;
 
   // Default weights from blur.fx - well balanced for most situations
   private normalizationFactor = 70 + 2 * 56 + 2 * 28 + 2 * 8;
