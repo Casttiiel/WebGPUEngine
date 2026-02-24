@@ -10,14 +10,6 @@
       "box_collider": {
         "bodyType": "static",
         "size": [1, 1, 1]
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "unit_cube.obj",
-            "material": "stone.mat"
-          }
-        ]
       }
     }
 }

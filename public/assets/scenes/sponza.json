@@ -36,11 +36,10 @@
     }
   },
   {
-    "prefab": "primitives/cube.prefab",
+    "prefab": "primitives/sphere_metal.prefab",
     "components": {
       "transform": {
-        "position": [-1, 0.9, 8],
-        "scale": [0.6, 1.8, 0.6]
+        "position": [-1, 0.9, 8]
       }
     }
   },

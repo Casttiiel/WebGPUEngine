@@ -35,11 +35,11 @@ export class AmbientOcclusionComponent extends Component {
   private radius: number = QualitySettings.getInstance().getSettings().aoRadius;
   private strength: number = QualitySettings.getInstance().getSettings().aoStrength;
   private angleOffset: number = 0.1;
-  private spacialOffset: number = 0.66;
+  private spacialOffset: number = 1.0;
   private falloff: number = 1.0;
-  private thicknessMix: number = 0.001;
-  private maxStride: number = 5.0;
-  private limit: number = 20.0;
+  private thicknessMix: number = 0.2;
+  private maxStride: number = 8.0;
+  private limit: number = 100.0;
 
   constructor() {
     super();
@@ -127,6 +127,10 @@ export class AmbientOcclusionComponent extends Component {
         {
           binding: 2,
           resource: this.noiseTexture.getTextureView()!,
+        },
+        {
+          binding: 3,
+          resource: SamplerLibrary.anisotropic16x,
         },
       ],
     );
@@ -248,11 +252,11 @@ export class AmbientOcclusionComponent extends Component {
 
     folder.add(this, 'isEnabled').name('Enable AO').listen();
 
-    folder.add(this, 'sampleCount', 1.0, 16.0).name('Sample Count').listen();
+    folder.add(this, 'sampleCount', 4.0, 8.0).name('Sample Count').listen();
 
-    folder.add(this, 'sliceCount', 1.0, 8.0).name('Slice Count').listen();
+    folder.add(this, 'sliceCount', 3.0, 6.0).name('Slice Count').listen();
 
-    folder.add(this, 'radius', 0.0, 5.0).name('Radius').listen();
+    folder.add(this, 'radius', 0.1, 2.0).name('Radius').listen();
 
     folder.add(this, 'strength', 0.0, 2.0).name('Strength').listen();
 
@@ -262,7 +266,7 @@ export class AmbientOcclusionComponent extends Component {
 
     folder.add(this, 'falloff', 0.0, 15.0).name('Falloff').listen();
 
-    folder.add(this, 'thicknessMix', 0.001, 0.01).name('Thickness Mix').listen();
+    folder.add(this, 'thicknessMix', 0.001, 1.0).name('Thickness Mix').listen();
 
     folder.add(this, 'maxStride', 1.0, 32.0).name('Max Stride').listen();
 

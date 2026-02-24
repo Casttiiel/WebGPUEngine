@@ -18,6 +18,7 @@ import { DirectionalLightComponent } from '../../../components/render/Directiona
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
+import { SamplerLibrary } from '../utils/SamplerLibrary';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -120,7 +121,7 @@ export class DeferredRenderer {
         },
         {
           binding: 3,
-          resource: this.whiteTexture.getSampler()!,
+          resource: SamplerLibrary.nonFilteringSampler!,
         },
       ],
     );
@@ -154,7 +155,7 @@ export class DeferredRenderer {
         },
         {
           binding: 3,
-          resource: this.whiteTexture.getSampler()!,
+          resource: SamplerLibrary.nonFilteringSampler!,
         },
       ],
     );
