@@ -12,7 +12,6 @@ import { TransformComponentDataType } from '../../types/TransformComponentData.t
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
-import { BloomComponent } from '../../components/render/BloomComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { NameComponent } from '../../components/core/NameComponent';
 import { TransformComponent } from '../../components/core/TransformComponent';
@@ -42,6 +41,7 @@ import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { SphereColliderComponent } from '../../components/physics/SphereColliderComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
+import { BloomComponent } from '../../components/render/BloomComponent';
 
 type Operation = 'add' | 'multiply';
 

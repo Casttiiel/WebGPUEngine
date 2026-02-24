@@ -31,8 +31,6 @@ export class BlurStep {
       this.inputWidth,
       Math.max(1, Math.floor(this.inputHeight * downscaleFactor)),
       format,
-      false,
-      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     );
 
     // Final output target (scaled width and height)
@@ -42,8 +40,6 @@ export class BlurStep {
       Math.max(1, Math.floor(this.inputWidth * downscaleFactor)),
       Math.max(1, Math.floor(this.inputHeight * downscaleFactor)),
       format,
-      false,
-      GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     );
   }
 
@@ -60,7 +56,7 @@ export class BlurStep {
   }
 }
 
-export class BlurComponent extends Component {
+export class BlurGaussianComponent extends Component {
   protected steps: BlurStep[] = [];
   protected sampler!: GPUSampler;
   protected maxBlurSteps: number = 3;

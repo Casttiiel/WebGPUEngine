@@ -23,9 +23,9 @@ export class FroxelVolumetricScattering {
 
   // Froxel grid dimensions
   private froxelDimensions = {
-    x: 360, // Width slices
-    y: 240, // Height slices
-    z: 256, // Depth slices (logarithmic distribution)
+    x: 160, // Width slices
+    y: 90, // Height slices
+    z: 64, // Depth slices (logarithmic distribution)
   };
 
   private densityComputeShader!: GPUShaderModule;

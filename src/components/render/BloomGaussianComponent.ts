@@ -1,3 +1,4 @@
+import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { BloomCombineRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
@@ -9,10 +10,10 @@ import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Texture } from '../../renderer/resources/Texture';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
+import { BlurGaussianComponent } from './BlurGaussianComponent';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
-import { BlurKawaseComponent } from './BlurKawaseComponent';
 
-export class BloomComponent extends BlurKawaseComponent {
+export class BloomGaussianComponent extends BlurGaussianComponent {
   private whiteTexture!: Texture;
   private technique!: Technique;
   private combineTechnique!: Technique;
@@ -34,6 +35,8 @@ export class BloomComponent extends BlurKawaseComponent {
 
   private bloomTexturesBindGroup!: GPUBindGroup | null;
 
+  // ✅ Cached samplers to avoid recreation every frame
+  private cachedLinearSampler!: GPUSampler;
   private inputTextureCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
   constructor() {
@@ -48,7 +51,13 @@ export class BloomComponent extends BlurKawaseComponent {
     this.whiteTexture = await Texture.getAsync('white.png');
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.getAsync('post-processing/bloom_filter.tech');
-    this.combineTechnique = await Technique.getAsync('post-processing/bloom_combine_simple.tech');
+    this.combineTechnique = await Technique.getAsync('post-processing/bloom_combine.tech');
+
+    // ✅ Create cached sampler once
+    this.cachedLinearSampler = GPUUtils.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
 
     const qualitySettings = QualitySettings.getInstance();
     const bloomFormat = qualitySettings.getSettings().bloomTexture;
@@ -103,7 +112,12 @@ export class BloomComponent extends BlurKawaseComponent {
 
   private updateBloomCombineParams(): void {
     // Update bloom combine parameters buffer
-    const paramsData = new Float32Array([1.0]);
+    const paramsData = new Float32Array([
+      1.0,
+      this.maxBlurSteps > 1 ? 0.6 : 0.0,
+      this.maxBlurSteps > 2 ? 0.4 : 0.0,
+      this.maxBlurSteps > 3 ? 0.25 : 0.0,
+    ]);
 
     GPUUtils.writeBuffer(this.bloomCombineParamsBuffer, 0, paramsData);
   }
@@ -126,15 +140,17 @@ export class BloomComponent extends BlurKawaseComponent {
     );
 
     const highlightsResult = this.result.getView();
-    return this.applyBlur(highlightsResult);
+    this.applyBlur(highlightsResult);
+
+    return this.result.getView();
   }
 
   public apply(inputTexture: GPUTextureView, gBufferBindGroup: GPUBindGroup): GPUTextureView {
     // Generate bloom highlights from input texture using G-Buffer data
-    const bloomTexture = this.generateHighlights(gBufferBindGroup, inputTexture);
+    this.generateHighlights(gBufferBindGroup, inputTexture);
 
     // Add bloom to original texture
-    this.addBloom(inputTexture, bloomTexture);
+    this.addBloom(inputTexture);
 
     // Return the original texture (bloom is applied directly to it)
     return inputTexture;
@@ -150,9 +166,9 @@ export class BloomComponent extends BlurKawaseComponent {
     );
   }
 
-  public addBloom(originalTexture: GPUTextureView, bloomTexture: GPUTextureView): void {
+  public addBloom(originalTexture: GPUTextureView): void {
     // Create bind groups for the combine operation
-    this.setupCombineBindGroups(bloomTexture);
+    this.setupCombineBindGroups();
 
     // Use the RenderPassFactory to create a post-process pass config
     const passConfig = RenderPassFactory.createBloomCombinePassConfig(originalTexture);
@@ -187,7 +203,7 @@ export class BloomComponent extends BlurKawaseComponent {
     );
   }
 
-  private setupCombineBindGroups(bloomTexture: GPUTextureView): void {
+  private setupCombineBindGroups(): void {
     // ✅ Skip if already created
     if (this.bloomCombineParamsBindGroup && this.bloomTexturesBindGroup) return;
 
@@ -205,11 +221,31 @@ export class BloomComponent extends BlurKawaseComponent {
     );
 
     const bindGroupData = [
+      { binding: 0, resource: SamplerLibrary.simpleSampler },
       {
-        binding: 0,
-        resource: bloomTexture,
+        binding: 1,
+        resource: this.steps[0]
+          ? this.steps[0].getOutputView()
+          : this.whiteTexture.getTextureView()!,
       },
-      { binding: 1, resource: SamplerLibrary.bloom },
+      {
+        binding: 2,
+        resource: this.steps[1]
+          ? this.steps[1].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 3,
+        resource: this.steps[2]
+          ? this.steps[2].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
+      {
+        binding: 4,
+        resource: this.steps[3]
+          ? this.steps[3].getOutputView()
+          : this.whiteTexture.getTextureView()!,
+      },
     ];
 
     this.bloomTexturesBindGroup = BindGroupFactory.createBindGroup(
@@ -236,13 +272,23 @@ export class BloomComponent extends BlurKawaseComponent {
           },
           {
             binding: 1,
-            resource: SamplerLibrary.simpleSampler,
+            resource: this.cachedLinearSampler, // ✅ Use cached sampler
           },
         ],
       );
       this.inputTextureCache.set(texture, cached);
     }
     this.inputTextureBindGroup = cached;
+  }
+
+  // Inherit blur parameter controls from parent
+  public override setMaxBlurSteps(steps: number): void {
+    super.setMaxBlurSteps(steps);
+    this.updateBloomCombineParams();
+  }
+
+  public override setBlurStrength(strength: number): void {
+    super.setBlurStrength(strength);
   }
 
   public override update(_dt: number): void {
@@ -254,7 +300,116 @@ export class BloomComponent extends BlurKawaseComponent {
   }
 
   public override renderInMenu(): void {
-    // Implement render menu for bloom parameters
+    const debugUI = Engine.getDebugUI();
+    const parentFolder = 'render';
+    const subfolderKey = 'Camera Components';
+    const componentName = 'Bloom';
+
+    // Declare self at the beginning to avoid reference errors
+    const self = this;
+
+    // Add controls to the Camera Components subfolder
+    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
+      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
+        ...(options || {}),
+        readonly: false,
+      });
+    };
+
+    // Add controls for bloom filter parameters
+    const thresholdMinWrapper = {
+      get thresholdMin() {
+        return self.thresholdMin;
+      },
+      set thresholdMin(value) {
+        self.thresholdMin = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    const thresholdMaxWrapper = {
+      get thresholdMax() {
+        return self.thresholdMax;
+      },
+      set thresholdMax(value) {
+        self.thresholdMax = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    const emissiveFactorWrapper = {
+      get emissiveFactor() {
+        return self.emissiveFactor;
+      },
+      set emissiveFactor(value) {
+        self.emissiveFactor = value;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null; // Force recreation
+      },
+    };
+
+    addControl(thresholdMinWrapper, 'thresholdMin', `${componentName} Filter Threshold Min`, {
+      min: 0.0,
+      max: 50.0,
+      step: 0.1,
+    });
+    addControl(thresholdMaxWrapper, 'thresholdMax', `${componentName} Filter Threshold Max`, {
+      min: 0.5,
+      max: 100.0,
+      step: 0.1,
+    });
+    addControl(emissiveFactorWrapper, 'emissiveFactor', `${componentName} Emissive Factor`, {
+      min: 0.1,
+      max: 10.0,
+      step: 0.1,
+    });
+
+    const blurStrengthWrapper = {
+      get blurStrength() {
+        return self.getBlurStrength();
+      },
+      set blurStrength(value) {
+        self.setBlurStrength(value);
+      },
+    };
+
+    const maxBlurStepsWrapper = {
+      get maxBlurSteps() {
+        return self.getMaxBlurSteps();
+      },
+      set maxBlurSteps(value) {
+        self.setMaxBlurSteps(value);
+      },
+    };
+
+    addControl(blurStrengthWrapper, 'blurStrength', `${componentName} Blur Strength`, {
+      min: 0.0,
+      max: 10.0,
+      step: 0.1,
+    });
+    addControl(maxBlurStepsWrapper, 'maxBlurSteps', `${componentName} Max Blur Steps`, {
+      min: 1,
+      max: 20,
+      step: 1,
+    });
+
+    // ✅ Add bloom size control
+    const bloomSizeWrapper = {
+      get bloomSize() {
+        return self.getBloomSize();
+      },
+      set bloomSize(value) {
+        self.setBloomSize(value);
+      },
+    };
+
+    addControl(bloomSizeWrapper, 'bloomSize', `${componentName} Size`, {
+      min: 0.25,
+      max: 4.0,
+      step: 0.05,
+    });
   }
 
   public override renderDebug(): void {

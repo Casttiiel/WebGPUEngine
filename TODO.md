@@ -1,24 +1,24 @@
 ### Engine
 
 1. Camera Uniforms missleading names
-2. Open Editor multiple times, creates data multiple times
-3. Optimize SMAA
-4. Bloom Shape
-5. Transform matrix multiplication frequency
-6. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-7. Froxel Volumetric Light Shafts parpadean
-8. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
-9. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
-10. Froxel Volumetric Scattering Fix Light fuge (more res less far)
-11. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-12. Froxel Volumetric Scattering: Spot Light Injection angle
-13. SS Global Illumination + Froxel
-14. Reflection Probes con blending
-15. Multiple Light probes has good shadows?
-16. Contact Shadows
-17. Point Light shadows
-18. Optimize with compute shaders
-19. Mesh one single buffer
+2. Optimize gtao.fs
+3. Open Editor multiple times, creates data multiple times
+4. Transform matrix multiplication frequency
+5. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
+6. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
+7. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+8. SS Global Illumination + Froxel
+9. Froxel Volumetric Light Shafts parpadean
+10. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+11. Froxel Volumetric Scattering: Spot Light Injection angle
+12. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+13. Reflection Probes con blending
+14. Multiple Light probes has good shadows?
+15. Contact Shadows
+16. Point Light shadows
+17. Optimize with compute shaders
+18. Mesh one single buffer
+19. Clouds
 20. Improve particles
 21. UI
 22. TAA (Test with high_sponza)

@@ -44,6 +44,11 @@ fn fs(@builtin(position) position: vec4<f32>,
     var a: vec4<f32>;
     a.x = textureSampleLevel(blendTex, blendSampler, offset.xy, 0.0).a; // Right
     a.y = textureSampleLevel(blendTex, blendSampler, offset.zw, 0.0).g; // Top
+
+    if (dot(a, vec4<f32>(1.0)) <= 1e-5) {
+        return textureSampleLevel(colorTex, colorSampler, uv, 0.0);
+    }
+
     let temp = textureSampleLevel(blendTex, blendSampler, uv, 0.0);
     a.w = temp.x; // Bottom (using .x which is left weight - confusing naming in original)
     a.z = temp.z; // Left (using .z which is top weight - confusing naming in original)

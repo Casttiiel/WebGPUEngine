@@ -50,7 +50,15 @@ fn fs(@builtin(position) position: vec4<f32>,
     // Calculate texel size and pixel coordinates
     let texelSize = 1.0 / camera.screenSize;
     let pixCoord = uv * camera.screenSize;
-    
+
+    let subsampleIndices = vec4<f32>(0.0); // Just pass zero for SMAA 1x
+    var weights = vec4<f32>(0.0);
+    var e = textureSampleLevel(edgesTex, edgesSampler, uv, 0.0).rg;
+
+    if (dot(e, vec2<f32>(1.0)) == 0.0) {
+        return vec4<f32>(0.0);
+    }
+
     // Calculate offsets (CROSSING_OFFSET = -0.25 * texelSize)
     // vOffset[0] = mad(vec4(-0.25, -0.125, 1.25, -0.125), texelSize.xyxy, uv.xyxy)
     // vOffset[1] = mad(vec4(-0.125, -0.25, -0.125, 1.25), texelSize.xyxy, uv.xyxy)
@@ -64,10 +72,6 @@ fn fs(@builtin(position) position: vec4<f32>,
         vec4<f32>(texelSize.x, texelSize.x, texelSize.y, texelSize.y),
         vec4<f32>(vOffset[0].x, vOffset[0].z, vOffset[1].y, vOffset[1].w)
     );
-    
-    let subsampleIndices = vec4<f32>(0.0); // Just pass zero for SMAA 1x
-    var weights = vec4<f32>(0.0);
-    var e = textureSampleLevel(edgesTex, edgesSampler, uv, 0.0).rg;
     
     if (e.g > 0.0) { // Edge at north
         

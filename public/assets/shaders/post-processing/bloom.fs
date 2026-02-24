@@ -30,7 +30,7 @@ fn PS_filter(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Luminancia perceptual
     let luminance = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
     let emissive_contribution = g.emissive / bloomParams.emissive_factor;
-    let total_brightness = luminance + emissive_contribution;
+    let total_brightness = luminance;// + emissive_contribution;
 
     // Unity-style bloom filter
     let threshold = bloomParams.threshold;

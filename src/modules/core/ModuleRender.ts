@@ -9,7 +9,6 @@ import { Module } from '../core/Module';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
-import { BloomComponent } from '../../components/render/BloomComponent';
 import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { Camera } from '../../core/math/Camera';
@@ -27,6 +26,7 @@ import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 import { ModuleUI } from './ModuleUI';
+import { BloomComponent } from '../../components/render/BloomComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;

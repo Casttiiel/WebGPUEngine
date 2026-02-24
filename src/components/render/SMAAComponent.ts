@@ -55,8 +55,8 @@ export class SMAAComponent extends Component {
     edgeThreshold: 0.05, // Lower = more edges detected (was 0.1, reference uses 0.1, but we want stronger effect)
     predicationStrength: 2.0,
     // Pass 2 (Blending Weights) parameters
-    maxSearchSteps: 64, // Higher = longer edge patterns detected (was 32)
-    maxSearchStepsDiag: 20, // Higher = better diagonal detection (was 16)
+    maxSearchSteps: 16, // Higher = longer edge patterns detected (was 32)
+    maxSearchStepsDiag: 4, // Higher = better diagonal detection (was 16)
     cornerRounding: 25.0,
     disableDiagDetection: false,
     useDirectWeights: false,
