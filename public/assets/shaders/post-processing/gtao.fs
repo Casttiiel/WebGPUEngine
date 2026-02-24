@@ -208,7 +208,7 @@ fn getCameraVecUnproj(uv: vec2<f32>) -> vec3<f32> {
 }
 
 fn getViewZ(linearDepth: f32) -> f32 {
-    return mix(0.1, camera.cameraFront.w, linearDepth);
+    return mix(0.1, camera.cameraFar, linearDepth);
 }
 
 fn computeViewRayFromUV(uv: vec2<f32>) -> vec3<f32> {

@@ -21,7 +21,7 @@ fn getWorldCoords(uv: vec2<f32>, zlinear: f32, camera: CameraUniforms) -> vec3<f
     // zlinear was calculated as: dot(worldPos - cameraPos, cameraFront) / zFar
     // So: distance_along_front = zlinear * zFar
     // But we need distance_along_ray = distance_along_front / dot(ray_direction, cameraFront)
-    let distance_along_front = zlinear * camera.cameraFront.w;
+    let distance_along_front = zlinear * camera.cameraFar;
     let distance_along_ray = distance_along_front / dot(ray_direction, camera.cameraFront.xyz);
     
     // Calculate final world position

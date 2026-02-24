@@ -8,8 +8,10 @@ struct CameraUniforms {
     // Scalar data after matrices
     cameraPosition: vec4<f32>,
     screenSize: vec2<f32>,
-    timeDelta: vec2<f32>,// time, deltaTime
-    cameraFront: vec4<f32>,      // xyz + far
+    time: f32,
+    timeDelta: f32,
+    cameraFront: vec3<f32>,
+    cameraFar: f32,
 }
 
 struct OldCameraUniforms {

@@ -53,7 +53,7 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
   let worldPos = g.worldPos;
 
   // Distancia (viewZ lineal)
-  let distGeom = g.zlinear * camera.cameraFront.w;
+  let distGeom = g.zlinear * camera.cameraFar;
 
   let skyDist = select(fog.end * 2.0, skyDistance, skyDistance > 0.0);
   let dist = mix(distGeom, skyDist, skyMask);

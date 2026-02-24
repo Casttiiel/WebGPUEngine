@@ -20,7 +20,7 @@ fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
     let wind = vec3<f32>(1.0, 0.0, 0.7);
 
     // Separar el scale del noise del movimiento temporal para control independiente
-    let p = (worldPos + wind * camera.timeDelta.x) * scale;
+    let p = (worldPos + wind * camera.time) * scale;
 
     let dims = vec2<f32>(textureDimensions(noiseTex));
 

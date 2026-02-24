@@ -41,6 +41,8 @@ export class Camera {
   private jitterOffsetX: number = 0;
   private jitterOffsetY: number = 0;
 
+  private uniformData = new Float32Array(128); // 512 bytes / 4 = 128 floats
+
   // Time tracking for shader animations
   private time: number = 0;
   private deltaTime: number = 0;
@@ -277,9 +279,6 @@ export class Camera {
 
     if (!this.isDirty) return;
 
-    // Create a single buffer with all data to minimize GPU writes
-    const uniformData = new Float32Array(128); // 512 bytes / 4 = 128 floats
-
     // Copy matrices and data into single buffer
     const viewMatrix = this.getView();
     const projectionMatrix = this.getProjection();
@@ -291,35 +290,35 @@ export class Camera {
 
     // === ALL MATRICES FIRST (320 bytes total) ===
     // viewMatrix (offset 0-15 = 0-63 bytes)
-    uniformData.set(viewMatrix, 0);
+    this.uniformData.set(viewMatrix, 0);
 
     // projectionMatrix (offset 16-31 = 64-127 bytes)
-    uniformData.set(projectionMatrix, 16);
+    this.uniformData.set(projectionMatrix, 16);
 
     // invViewProjectionMatrix (offset 32-47 = 128-191 bytes)
-    uniformData.set(invViewProjectionMatrix, 32);
+    this.uniformData.set(invViewProjectionMatrix, 32);
 
     // invProjectionMatrix (offset 48-63 = 192-255 bytes)
-    uniformData.set(invProjectionMatrix, 48);
+    this.uniformData.set(invProjectionMatrix, 48);
 
     // invViewMatrix (offset 64-79 = 256-319 bytes)
-    uniformData.set(invViewMatrix, 64);
+    this.uniformData.set(invViewMatrix, 64);
 
     // === SCALAR DATA AFTER MATRICES ===
     // cameraPosition (offset 80-83 = 320-335 bytes) vec4
-    uniformData.set([cameraPosition[0], cameraPosition[1], cameraPosition[2], 0], 80);
+    this.uniformData.set([cameraPosition[0], cameraPosition[1], cameraPosition[2], 0], 80);
 
     // screenSize (offset 84-85 = 336-343 bytes) vec2 + padding
-    uniformData[84] = Render.width;
-    uniformData[85] = Render.height;
-    uniformData[86] = this.time;
-    uniformData[87] = this.deltaTime;
+    this.uniformData[84] = Render.width;
+    this.uniformData[85] = Render.height;
+    this.uniformData[86] = this.time;
+    this.uniformData[87] = this.deltaTime;
 
     // cameraFront + cameraZFar (offset 88-91 = 352-367 bytes) vec4
-    uniformData.set([cameraFront[0], cameraFront[1], cameraFront[2], this.getFar()], 88);
+    this.uniformData.set([cameraFront[0], cameraFront[1], cameraFront[2], this.getFar()], 88);
 
     // Single GPU write instead of 7 separate writes
-    GPUUtils.writeBuffer(this.uniformBuffer, 0, uniformData);
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, this.uniformData);
 
     this.isDirty = false;
   }

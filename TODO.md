@@ -1,29 +1,28 @@
 ### Engine
 
-1. Camera Uniforms missleading names
-2. Optimize gtao.fs
-3. Open Editor multiple times, creates data multiple times
-4. Transform matrix multiplication frequency
-5. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
-6. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
-7. Froxel Volumetric Scattering Fix Light fuge (more res less far)
-8. SS Global Illumination + Froxel
-9. Froxel Volumetric Light Shafts parpadean
-10. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-11. Froxel Volumetric Scattering: Spot Light Injection angle
-12. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-13. Reflection Probes con blending
-14. Multiple Light probes has good shadows?
-15. Contact Shadows
-16. Point Light shadows
-17. Optimize with compute shaders
-18. Mesh one single buffer
-19. Clouds
-20. Improve particles
-21. UI
-22. TAA (Test with high_sponza)
-23. Quality settings selection
-24. Weird line on corners is irradiance because of normals
+1. Optimize gtao.fs
+2. Open Editor multiple times, creates data multiple times
+3. Transform matrix multiplication frequency
+4. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
+5. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
+6. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+7. SS Global Illumination + Froxel
+8. Froxel Volumetric Light Shafts parpadean
+9. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+10. Froxel Volumetric Scattering: Spot Light Injection angle
+11. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+12. Reflection Probes con blending
+13. Multiple Light probes has good shadows?
+14. Contact Shadows
+15. Point Light shadows
+16. Optimize with compute shaders
+17. Mesh one single buffer
+18. Clouds
+19. Improve particles
+20. UI
+21. TAA (Test with high_sponza)
+22. Quality settings selection
+23. Weird line on corners is irradiance because of normals
 
 ## Gameplay
 

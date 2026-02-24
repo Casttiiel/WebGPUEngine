@@ -176,7 +176,7 @@ fn performScreenSpaceRayMarching(
         // Sample depth at current screen position
         let sampledDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, screenUV, 0.0).r;
         let camb2obj = currentPos - camera.cameraPosition.xyz;
-        let currentDepth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFront.w;
+        let currentDepth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
         
         // Check for intersection
         if ((currentDepth > sampledDepth && (currentDepth - sampledDepth) < thickness) || sampledDepth == 1.0) {

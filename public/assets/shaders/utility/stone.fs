@@ -156,7 +156,7 @@ fn fs(input: StoneVertexOutput) -> FragmentOutput {
     );
 
     let camb2obj = input.WorldPos - camera.cameraPosition.xyz;
-    let linear_depth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFront.w;
+    let linear_depth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
     output.depth = linear_depth;
 
     return output;
