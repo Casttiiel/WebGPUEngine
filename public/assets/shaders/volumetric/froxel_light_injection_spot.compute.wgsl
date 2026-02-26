@@ -62,14 +62,14 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     );
     let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
     let froxelWorldPos = tempFroxelWS.xyz / tempFroxelWS.w;
-    var visibility = getShadowFactorSimple(froxelWorldPos.xyz, light.viewProjOffset, light.shadowStepDivResolution, shadowMap, shadowSampler, true);
-
     let almostScreenPos = light.viewProjOffset * vec4<f32>(froxelWorldPos, 1.0);
     let screenPos = almostScreenPos.xyz / almostScreenPos.w;
     // if out of range, shadow_factor = 0
     if (screenPos.x < -1.0 || screenPos.x > 1.0 || screenPos.y < -1.0 || screenPos.y > 1.0 || screenPos.z < 0.0 || screenPos.z > 1.0) {
-        visibility = 0.0;
+        textureStore(froxelLightOutput, coord, vec4<f32>(existing, 1.0));
+        return;
     }
+    var visibility = getShadowFactorSimple(froxelWorldPos.xyz, light.viewProjOffset, light.shadowStepDivResolution, shadowMap, shadowSampler, true);    
     
     let projectorUv = screenPos.xy * 0.5 + 0.5;
     let projector = textureSampleLevel(projectorTexture, projectorSampler, projectorUv.xy, 0.0).r;

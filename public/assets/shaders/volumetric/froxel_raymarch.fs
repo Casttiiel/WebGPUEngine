@@ -15,7 +15,7 @@
 
 
 struct FroxelUniforms {
-  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
+  dimensions: vec4<f32>,
   nearPlane: f32,
   farPlane: f32
 }
@@ -26,8 +26,8 @@ struct VolumetricUniforms {
   absorptionCoeff: f32,
 }
 
-fn depth01ToViewZ(depth01: f32, nearZ: f32, farZ: f32) -> f32 {
-  // gLinearDepth debe ser lineal 0..1
+fn depth01ToViewZ(depth01: f32) -> f32 {
+  // gLinearDepth debe ser lineal 0..1, hardcoded near/far as we don't receive camera data
   return 0.1 + depth01 * (1000.0 - 0.1);
 }
 
@@ -37,7 +37,7 @@ fn viewZToFroxelZLog(viewZ: f32, nearZ: f32, farZ: f32) -> f32 {
 }
 
 fn depth01ToFroxelZ(depth01: f32) -> f32 {
-  let viewZ = depth01ToViewZ(depth01, froxelParams.nearPlane, froxelParams.farPlane);
+  let viewZ = depth01ToViewZ(depth01);
   return viewZToFroxelZLog(viewZ, froxelParams.nearPlane, froxelParams.farPlane);
 }
 

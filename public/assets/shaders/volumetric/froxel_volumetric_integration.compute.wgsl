@@ -29,6 +29,14 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
   for (var z: u32 = 0u; z < MAX_SLICES; z = z + 1u) {//slices
     if (z >= slices) { break; }
+    if (T < 0.001) {
+        // Rellenar slices restantes con el valor actual
+        for (var zz = z; zz < slices; zz++) {
+            let c = vec3<i32>(i32(gid.x), i32(gid.y), i32(zz));
+            textureStore(froxelIntegratedTexture, c, vec4<f32>(S, 0.0));
+        }
+        break;
+    }
     let coord = vec3<i32>(i32(gid.x), i32(gid.y), i32(z));
 
     // Media coefficients
@@ -41,7 +49,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Inyected lighting at this froxel
     let L = textureLoad(froxelLightTexture, coord, 0).rgb;
 
-    let dz = sliceDzLinear(z, slices, froxelParams.nearPlane, froxelParams.farPlane);
+    let dz = sliceDzLog(z, slices, froxelParams.nearPlane, froxelParams.farPlane);
 
     // 1) In-scattering integration with multiple scattering boost:
     // dS = T * (L * sigmaS) * dz * boost

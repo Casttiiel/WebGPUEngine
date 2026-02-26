@@ -21,6 +21,9 @@
     "prefab": "primitives/ground.prefab"
   },
   {
+    "prefab": "lighting/point_light.prefab"
+  },
+  {
     "prefab": "lighting/spot_light.prefab"
   },
   {

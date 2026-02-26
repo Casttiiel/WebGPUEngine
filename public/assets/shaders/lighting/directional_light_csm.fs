@@ -53,6 +53,29 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     }
 }
 
+fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {    
+    // Call getShadowFactor with appropriate cascade shadow map
+    if (idx == 0) {
+        return getShadowFactor(
+            worldPos,
+            light.viewProjOffset0, light.shadowParams.z,
+            gShadowMap0, gShadowSampler, false
+        );
+    } else if (idx == 1) {
+        return getShadowFactor(
+            worldPos,
+            light.viewProjOffset1, light.shadowParams.z,
+            gShadowMap1, gShadowSampler, false
+        );
+    } else {
+        return getShadowFactor(
+            worldPos,
+            light.viewProjOffset2, light.shadowParams.z,
+            gShadowMap2, gShadowSampler, false
+        );
+    }
+}
+
 /**
  * Shader-specific blended CSM using consolidated functions.
  */
@@ -85,9 +108,8 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
         return getShadowFactorCSM(worldPos, viewSpaceDepth);
     }
     
-    let shadowFactor1 = getShadowFactorCSM(worldPos, viewSpaceDepth);
-    let nextCascadeDepth = viewSpaceDepth + 0.1;
-    let shadowFactor2 = getShadowFactorCSM(worldPos, nextCascadeDepth);
+    let shadowFactor1 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex);
+    let shadowFactor2 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex + 1);
     
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
 }

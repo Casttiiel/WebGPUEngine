@@ -1,5 +1,6 @@
 #include "common/uniforms"
 #include "common/structs"
+#include "common/core/constants"
 #include "common/volumetric/structs"
 #include "common/volumetric/froxel"
 
@@ -63,6 +64,20 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
+  let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
+  let froxelWorldPos = tempFroxelWS.xyz / tempFroxelWS.w;
+  let V = normalize(camera.cameraPosition.xyz - froxelWorldPos);
+  let Ldir = normalize(froxelWorldPos - light.position);
+
+  let cosTheta = clamp(dot(V, Ldir), -1.0, 1.0);
+
+  let g = clamp(volumetricSettings.anisotropy, -0.95, 0.95);
+  let phaseRayleigh = 1.0 / (4.0 * PI);   // isotrópico real
+  let phaseMie = phaseHG(cosTheta, g);
+
+  // Peso típico: casi todo Mie para shafts
+  let phase = mix(phaseRayleigh, phaseMie, 0.9);
+
   let r0 = light.startFalloff; // radio interior (intensidad máxima)
   let r1 = light.radius;       // radio exterior (intensidad 0)
     
@@ -75,7 +90,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
       att = 1.0 - t * t * (3.0 - 2.0 * t);
   }
 
-  let contribution = light.color * light.intensity * att;
+  let contribution = light.color * light.intensity * att * phase;
 
   textureStore(froxelLightOutput, coord, vec4<f32>(existing + contribution, 1.0));
 }
