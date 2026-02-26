@@ -6,6 +6,8 @@
 @group(0) @binding(1) var<uniform> volumetricSettings: VolumetricUniforms;
 @group(0) @binding(2) var froxelIntegratedTexture: texture_3d<f32>;
 @group(0) @binding(3) var linearSampler: sampler;
+@group(0) @binding(4) var blueNoiseTex: texture_2d<f32>;
+@group(0) @binding(5) var nearestSampler: sampler;
 
 // G-Buffer depth for proper ray termination
 @group(1) @binding(0) var gAlbedo: texture_2d<f32>;
@@ -51,13 +53,18 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let fx = clamp(uv.x * dimsF.x, 0.0, dimsF.x - 1.0);
   let fy = clamp(uv.y * dimsF.y, 0.0, dimsF.y - 1.0);
 
+  // Blue noise: tilea cada 64 pixels, centrado en 0
+  let noiseUV = uv * vec2<f32>(2689, 1973) / 64.0;
+  let dither = textureSample(blueNoiseTex, nearestSampler, noiseUV).r - 0.5;
+
   // Z froxel coord desde depth
-  let z01 = depth01ToFroxelZ(depth01);
+  let viewZ = depth01ToViewZ(depth01);
+  let ditherViewZ = viewZ * (1.0 + dither * 0.02); // ±1% en view space
+  let z01 = viewZToFroxelZLog(ditherViewZ, froxelParams.nearPlane, froxelParams.farPlane);
   let fz = clamp(z01 * dimsF.z, 0.0, dimsF.z - 1.0);
 
   // UVW normalizado para trilinear sample
-  let uvw = (vec3<f32>(fx, fy, fz) + vec3<f32>(0.5)) / dimsF;
-
+  let uvw = (vec3<f32>(fx + dither, fy + dither, fz) + vec3<f32>(0.5)) / dimsF;
   // sample integrated volume
   let integrated = textureSampleLevel(froxelIntegratedTexture, linearSampler, uvw, 0.0);
   let S = integrated.rgb;  // In-scattering

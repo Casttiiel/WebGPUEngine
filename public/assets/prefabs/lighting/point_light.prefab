@@ -3,7 +3,7 @@
     "components": {
       "name": "Point Light",
       "transform": {
-        "position": [5, 1, 0]
+        "position": [0, 1, -5]
       },
       "point_light": {
         "color": [1.0, 1.0, 1.0, 1.0],

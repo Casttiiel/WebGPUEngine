@@ -25,7 +25,7 @@ export class FroxelVolumetricScattering {
   private froxelDimensions = {
     x: 160, // Width slices
     y: 90, // Height slices
-    z: 64, // Depth slices (logarithmic distribution)
+    z: 128, // Depth slices (logarithmic distribution)
   };
 
   private densityComputeShader!: GPUShaderModule;
@@ -56,6 +56,7 @@ export class FroxelVolumetricScattering {
   private froxelLightTempTexture!: GPUTexture;
   private froxelLightTempTextureView!: GPUTextureView;
   private noiseTexture!: Texture;
+  private blueNoiseTexture!: Texture;
 
   private froxelLightTextureViewA!: GPUTextureView; // Siempre apunta a froxel_light_3d
   private froxelLightTempTextureViewB!: GPUTextureView; // Siempre apunta a froxel_light_3d_temp
@@ -106,6 +107,7 @@ export class FroxelVolumetricScattering {
 
   public async load(): Promise<void> {
     this.noiseTexture = await Texture.getAsync('white.png'); //noiseRGBTileable.jpg
+    this.blueNoiseTexture = await Texture.getAsync('bluenoise64.png');
     await this.initializeComputeShaders();
 
     this.rayMarchTechnique = await Technique.getAsync('volumetric/froxel_raymarch.tech');
@@ -413,7 +415,7 @@ export class FroxelVolumetricScattering {
       label: 'froxel_density_compute',
     });
 
-    if (!this.cameraBindGroup) {
+    if (!this.cameraBindGroup || true) {
       const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
       const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
       const camera = cameraComponent.getCamera();
@@ -766,6 +768,14 @@ export class FroxelVolumetricScattering {
           {
             binding: 3,
             resource: SamplerLibrary.simpleSampler,
+          },
+          {
+            binding: 4,
+            resource: this.blueNoiseTexture.getTextureView()!,
+          },
+          {
+            binding: 5,
+            resource: SamplerLibrary.froxelRaymarchSampler,
           },
         ],
       );

@@ -102,8 +102,8 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let layeredNoise = mix(1.0, noise, heightMask);
 
   // Mucho más contraste para shafts
-  let shapedNoise = smoothstep(0.3, 0.6, layeredNoise);
-  let noiseFactor = mix(0.2, 2.5, shapedNoise);
+  let shapedNoise = smoothstep(0.2, 0.8, layeredNoise);
+  let noiseFactor = mix(0.5, 1.8, shapedNoise);
 
   densityFinal *= noiseFactor;
 

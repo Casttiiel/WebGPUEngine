@@ -53,8 +53,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // 1) In-scattering integration with multiple scattering boost:
     // dS = T * (L * sigmaS) * dz * boost
-    // Multiple scattering approximation (energy compensation)
-    let msBoost = volumetricSettings.multipleScatteringBoost;
+
+    // Cuando T es alto (zona poco densa): msBoost completo
+    // Cuando T es bajo (zona muy densa): msBoost se acerca a 1.0 (sin boost)
+    let msBoost = mix(volumetricSettings.multipleScatteringBoost, 1.0, 1.0 - T);
     S += T * (L * sigmaS * msBoost) * dz;
 
     // 2) Transmittance update:
