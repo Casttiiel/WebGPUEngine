@@ -56,7 +56,9 @@ export class FroxelVolumetricScattering {
   private froxelLightTempTexture!: GPUTexture;
   private froxelLightTempTextureView!: GPUTextureView;
   private noiseTexture!: Texture;
-  private lastDirectionalLightView!: GPUTextureView;
+
+  private froxelLightTextureViewA!: GPUTextureView; // Siempre apunta a froxel_light_3d
+  private froxelLightTempTextureViewB!: GPUTextureView; // Siempre apunta a froxel_light_3d_temp
 
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
@@ -84,9 +86,14 @@ export class FroxelVolumetricScattering {
   private parametersBindGroup!: GPUBindGroup;
   private noiseTextureBindGroup!: GPUBindGroup;
   private rayMarchBindGroup!: GPUBindGroup;
-  private integrationBindGroup!: GPUBindGroup;
   private ambientBindGroup!: GPUBindGroup;
   private directionalLightDataBindGroup!: GPUBindGroup;
+
+  private pointLightTexturesBindGroups: Map<PointLightComponent, GPUBindGroup[]> = new Map();
+  private pointLightDataBindGroups: Map<PointLightComponent, GPUBindGroup> = new Map();
+  private spotLightTexturesBindGroups: Map<SpotLightComponent, GPUBindGroup[]> = new Map();
+  private spotLightDataBindGroups: Map<SpotLightComponent, GPUBindGroup> = new Map();
+  private integrationBindGroups: GPUBindGroup[] = [];
 
   constructor() {
     this.device = GPUUtils.getDevice();
@@ -292,8 +299,6 @@ export class FroxelVolumetricScattering {
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
 
-    this.froxelLightTextureView = this.froxelLightTexture.createView();
-
     this.froxelLightTempTexture = this.device.createTexture({
       label: 'froxel_light_3d_temp',
       size: [x, y, z],
@@ -301,8 +306,6 @@ export class FroxelVolumetricScattering {
       format: 'rgba16float',
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
-
-    this.froxelLightTempTextureView = this.froxelLightTempTexture.createView();
 
     this.froxelIntegratedTexture = this.device.createTexture({
       label: 'froxel_integrated_3d',
@@ -313,6 +316,12 @@ export class FroxelVolumetricScattering {
     });
 
     this.froxelIntegratedTextureView = this.froxelIntegratedTexture.createView();
+
+    this.froxelLightTextureView = this.froxelLightTexture.createView();
+    this.froxelLightTextureViewA = this.froxelLightTextureView;
+
+    this.froxelLightTempTextureView = this.froxelLightTempTexture.createView();
+    this.froxelLightTempTextureViewB = this.froxelLightTempTextureView;
   }
 
   private createUniformBuffers(): void {
@@ -346,12 +355,39 @@ export class FroxelVolumetricScattering {
         },
       ],
     );
+
+    this.integrationBindGroups = [
+      BindGroupFactory.createBindGroup(
+        'froxel_integration_bind_group_0',
+        BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
+        [
+          { binding: 0, resource: this.froxelDensityTextureView },
+          { binding: 1, resource: this.froxelLightTextureViewA }, // lee de A
+          { binding: 2, resource: this.froxelIntegratedTextureView },
+          { binding: 3, resource: SamplerLibrary.nonFilteringSampler },
+        ],
+      ),
+      BindGroupFactory.createBindGroup(
+        'froxel_integration_bind_group_1',
+        BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
+        [
+          { binding: 0, resource: this.froxelDensityTextureView },
+          { binding: 1, resource: this.froxelLightTempTextureViewB }, // lee de B
+          { binding: 2, resource: this.froxelIntegratedTextureView },
+          { binding: 3, resource: SamplerLibrary.nonFilteringSampler },
+        ],
+      ),
+    ];
   }
 
   public updateFroxelData(): void {
     if (!this.isEnabled) {
       return;
     }
+
+    // Resetear ping-pong al inicio de cada frame para estado consistente
+    this.froxelLightTextureView = this.froxelLightTextureViewA;
+    this.froxelLightTempTextureView = this.froxelLightTempTextureViewB;
 
     this.updateUniforms();
 
@@ -433,34 +469,11 @@ export class FroxelVolumetricScattering {
       label: 'froxel_volumetrict_integration_compute',
     });
 
-    if (!this.integrationBindGroup) {
-      this.integrationBindGroup = BindGroupFactory.createBindGroup(
-        'froxel_volumetrict_integration_textures_bind_group',
-        BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
-        [
-          {
-            binding: 0,
-            resource: this.froxelDensityTextureView, // Input: density (unfilterable)
-          },
-          {
-            binding: 1,
-            resource: this.froxelLightTextureView, // Input/output: luz acumulada
-          },
-          {
-            binding: 2,
-            resource: this.froxelIntegratedTextureView, // Output:integrated
-          },
-          {
-            binding: 3,
-            resource: SamplerLibrary.nonFilteringSampler, // Non-filtering sampler for unfilterable textures
-          },
-        ],
-      );
-    }
+    const pingPongIdx = this.froxelLightTextureView === this.froxelLightTextureViewA ? 0 : 1;
 
     computePass.setPipeline(this.volumetricIntegrationComputePipeline);
     computePass.setBindGroup(0, this.parametersBindGroup); // Froxel + volumetric uniforms
-    computePass.setBindGroup(1, this.integrationBindGroup); // Textures
+    computePass.setBindGroup(1, this.integrationBindGroups[pingPongIdx]);
 
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;
@@ -489,18 +502,14 @@ export class FroxelVolumetricScattering {
     computePass.setPipeline(this.directionalLightInjectionPipeline);
 
     // Create textures bind group (@group(1) in shader)
-    if (this.ambientBindGroup && this.froxelLightTextureView !== this.lastDirectionalLightView) {
-      this.ambientBindGroup = null!;
-    }
     if (!this.ambientBindGroup) {
-      this.lastDirectionalLightView = this.froxelLightTextureView;
       this.ambientBindGroup = BindGroupFactory.createBindGroup(
         'froxel_ambient_light_textures_bind_group',
         BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
         [
           {
             binding: 0,
-            resource: this.froxelLightTextureView,
+            resource: this.froxelLightTextureViewA,
           },
           {
             binding: 1,
@@ -576,23 +585,49 @@ export class FroxelVolumetricScattering {
       computePass.setBindGroup(0, this.cameraBindGroup);
       computePass.setBindGroup(1, this.parametersBindGroup);
 
-      const texturesBindGroup = BindGroupFactory.createBindGroup(
-        'froxel_point_light_textures_bind_group',
-        BindGroupFactory.getFroxelPointTexturesLayout(),
-        [
-          { binding: 0, resource: this.froxelDensityTextureView },
-          { binding: 1, resource: lightReadView },
-          { binding: 2, resource: lightWriteView },
-        ],
-      );
-      computePass.setBindGroup(2, texturesBindGroup);
+      // Cachear textures bind group por combinación [readView, writeView]
+      // Como las views cambian con el swap, siempre hay exactamente 2 combinaciones posibles
+      if (!this.pointLightTexturesBindGroups.has(pointLightComponent)) {
+        this.pointLightTexturesBindGroups.set(pointLightComponent, [
+          BindGroupFactory.createBindGroup(
+            'froxel_point_light_textures_bind_group_0',
+            BindGroupFactory.getFroxelPointTexturesLayout(),
+            [
+              { binding: 0, resource: this.froxelDensityTextureView },
+              { binding: 1, resource: this.froxelLightTextureViewA },
+              { binding: 2, resource: this.froxelLightTempTextureViewB },
+            ],
+          ),
+          BindGroupFactory.createBindGroup(
+            'froxel_point_light_textures_bind_group_1',
+            BindGroupFactory.getFroxelPointTexturesLayout(),
+            [
+              { binding: 0, resource: this.froxelDensityTextureView },
+              { binding: 1, resource: this.froxelLightTempTextureViewB },
+              { binding: 2, resource: this.froxelLightTextureViewA },
+            ],
+          ),
+        ]);
+      }
+      if (!this.pointLightDataBindGroups.has(pointLightComponent)) {
+        this.pointLightDataBindGroups.set(
+          pointLightComponent,
+          BindGroupFactory.createBindGroup(
+            'froxel_point_light_data_bind_group',
+            BindGroupFactory.getFroxelLightParametersLayout(),
+            [{ binding: 0, resource: { buffer: pointLightComponent.getUniformBuffer() } }],
+          ),
+        );
+      }
 
-      // Bind group específico de la luz
-      const pointLightDataBindGroup = BindGroupFactory.createBindGroup(
-        'froxel_point_light_data_bind_group',
-        BindGroupFactory.getFroxelLightParametersLayout(),
-        [{ binding: 0, resource: { buffer: pointLightComponent.getUniformBuffer() } }],
-      );
+      // Usar índice ping-pong para saber qué combinación usar
+      const pingPongIdx = lightReadView === this.froxelLightTextureViewA ? 0 : 1;
+
+      const texturesBindGroup =
+        this.pointLightTexturesBindGroups.get(pointLightComponent)![pingPongIdx];
+      const pointLightDataBindGroup = this.pointLightDataBindGroups.get(pointLightComponent)!;
+
+      computePass.setBindGroup(2, texturesBindGroup);
       computePass.setBindGroup(3, pointLightDataBindGroup);
 
       computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
@@ -605,8 +640,6 @@ export class FroxelVolumetricScattering {
 
     this.froxelLightTextureView = lightReadView;
     this.froxelLightTempTextureView = lightWriteView;
-    // Invalidar para que se recree con la view correcta
-    this.integrationBindGroup = null!;
   }
 
   private executeSpotLightInjectionPass(commandEncoder: GPUCommandEncoder): void {
@@ -636,46 +669,52 @@ export class FroxelVolumetricScattering {
       computePass.setBindGroup(0, this.cameraBindGroup);
       computePass.setBindGroup(1, this.parametersBindGroup);
 
-      const texturesBindGroup = BindGroupFactory.createBindGroup(
-        'froxel_spot_light_textures_bind_group',
-        BindGroupFactory.getFroxelPointTexturesLayout(),
-        [
-          { binding: 0, resource: this.froxelDensityTextureView },
-          { binding: 1, resource: lightReadView },
-          { binding: 2, resource: lightWriteView },
-        ],
-      );
+      if (!this.spotLightTexturesBindGroups.has(spotLightComponent)) {
+        this.spotLightTexturesBindGroups.set(spotLightComponent, [
+          BindGroupFactory.createBindGroup(
+            'froxel_spot_light_textures_bind_group_0',
+            BindGroupFactory.getFroxelPointTexturesLayout(),
+            [
+              { binding: 0, resource: this.froxelDensityTextureView },
+              { binding: 1, resource: this.froxelLightTextureViewA },
+              { binding: 2, resource: this.froxelLightTempTextureViewB },
+            ],
+          ),
+          BindGroupFactory.createBindGroup(
+            'froxel_spot_light_textures_bind_group_1',
+            BindGroupFactory.getFroxelPointTexturesLayout(),
+            [
+              { binding: 0, resource: this.froxelDensityTextureView },
+              { binding: 1, resource: this.froxelLightTempTextureViewB },
+              { binding: 2, resource: this.froxelLightTextureViewA },
+            ],
+          ),
+        ]);
+      }
+      if (!this.spotLightDataBindGroups.has(spotLightComponent)) {
+        this.spotLightDataBindGroups.set(
+          spotLightComponent,
+          BindGroupFactory.createBindGroup(
+            'froxel_spot_light_data_bind_group',
+            BindGroupFactory.getFroxelSpotLightDataLayout(),
+            [
+              { binding: 0, resource: { buffer: spotLightComponent.getUniformBuffer() } },
+              { binding: 1, resource: spotLightComponent.getShadowDepthView() },
+              { binding: 2, resource: spotLightComponent.getShadowSampler() },
+              { binding: 3, resource: spotLightComponent.getProjectorTextureView() },
+              { binding: 4, resource: SamplerLibrary.simpleSampler },
+            ],
+          ),
+        );
+      }
+
+      const pingPongIdx = lightReadView === this.froxelLightTextureViewA ? 0 : 1;
+
+      const texturesBindGroup =
+        this.spotLightTexturesBindGroups.get(spotLightComponent)![pingPongIdx];
+      const spotLightDataBindGroup = this.spotLightDataBindGroups.get(spotLightComponent)!;
       computePass.setBindGroup(2, texturesBindGroup);
-
-      // Bind group específico de la luz
-      const spotLightDataBindGroup = BindGroupFactory.createBindGroup(
-        'froxel_spot_light_data_bind_group',
-        BindGroupFactory.getFroxelSpotLightDataLayout(),
-        [
-          {
-            binding: 0,
-            resource: { buffer: spotLightComponent.getUniformBuffer() },
-          },
-          {
-            binding: 1,
-            resource: spotLightComponent.getShadowDepthView(),
-          },
-          {
-            binding: 2,
-            resource: spotLightComponent.getShadowSampler(),
-          },
-          {
-            binding: 3,
-            resource: spotLightComponent.getProjectorTextureView(),
-          },
-          {
-            binding: 4,
-            resource: SamplerLibrary.simpleSampler,
-          },
-        ],
-      );
       computePass.setBindGroup(3, spotLightDataBindGroup);
-
       computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
       computePass.end();
 
@@ -686,7 +725,6 @@ export class FroxelVolumetricScattering {
 
     this.froxelLightTextureView = lightReadView;
     this.froxelLightTempTextureView = lightWriteView;
-    this.integrationBindGroup = null!;
   }
 
   public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
@@ -849,6 +887,11 @@ export class FroxelVolumetricScattering {
     this.froxelIntegratedTexture?.destroy();
     this.froxelLightTexture?.destroy();
     this.froxelLightTempTexture?.destroy();
+
+    this.pointLightTexturesBindGroups.clear();
+    this.pointLightDataBindGroups.clear();
+    this.spotLightTexturesBindGroups.clear();
+    this.spotLightDataBindGroups.clear();
   }
 
   public isVolumetricEnabled(): boolean {

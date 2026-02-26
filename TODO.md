@@ -1,26 +1,25 @@
 ### Engine
 
-1. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
-2. Froxel Volumetric Scattering: Spot Light Injection angle
-3. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-4. Froxel Volumetric Light Shafts parpadean
-5. Froxel Volumetric Scattering Fix Light fuge (more res less far)
-6. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
-7. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-8. Open Editor multiple times, creates data multiple times
-9. Transform matrix multiplication frequency
-10. Mesh one single buffer
-11. SS Global Illumination + Froxel
-12. Reflection Probes con blending
-13. Multiple Light probes has good shadows?
-14. Contact Shadows
-15. Point Light shadows
-16. Optimize with compute shaders
-17. Clouds
-18. Improve particles
-19. UI
-20. Quality settings selection
-21. Weird line on corners is irradiance because of normals
+1. Froxel Volumetric Scattering: Spot Light Injection angle
+2. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+3. Froxel Volumetric Light Shafts parpadean
+4. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+5. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
+6. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+7. Open Editor multiple times, creates data multiple times
+8. Transform matrix multiplication frequency
+9. Mesh one single buffer
+10. SS Global Illumination + Froxel
+11. Reflection Probes con blending
+12. Multiple Light probes has good shadows?
+13. Contact Shadows
+14. Point Light shadows
+15. Optimize with compute shaders
+16. Clouds
+17. Improve particles
+18. UI
+19. Quality settings selection
+20. Weird line on corners is irradiance because of normals
 
 ## Gameplay
 
