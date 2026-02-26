@@ -34,8 +34,8 @@ export class FroxelVolumetricScattering {
   private volumetricIntegrationComputeShader!: GPUShaderModule;
   private volumetricIntegrationComputePipeline!: GPUComputePipeline;
 
-  private ambientLightInjectionShader!: GPUShaderModule;
-  private ambientLightInjectionPipeline!: GPUComputePipeline;
+  private directionalLightInjectionShader!: GPUShaderModule;
+  private directionalLightInjectionPipeline!: GPUComputePipeline;
 
   private pointLightInjectionShader!: GPUShaderModule;
   private pointLightInjectionPipeline!: GPUComputePipeline;
@@ -56,12 +56,13 @@ export class FroxelVolumetricScattering {
   private froxelLightTempTexture!: GPUTexture;
   private froxelLightTempTextureView!: GPUTextureView;
   private noiseTexture!: Texture;
+  private lastDirectionalLightView!: GPUTextureView;
 
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
   private cameraBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 0.0;
+  private fogDensity: number = 0.01;
   private scatteringCoeff: number = 1.0;
   private absorptionCoeff: number = 0.2; // Aumentado para god rays más definidos (antes 1.5)
   private multipleScatteringBoost: number = 1.3; // Energy compensation for multiple scattering (1.1-1.6)
@@ -97,7 +98,7 @@ export class FroxelVolumetricScattering {
   }
 
   public async load(): Promise<void> {
-    this.noiseTexture = await Texture.getAsync('noiseRGBTileable.jpg');
+    this.noiseTexture = await Texture.getAsync('white.png'); //noiseRGBTileable.jpg
     await this.initializeComputeShaders();
 
     this.rayMarchTechnique = await Technique.getAsync('volumetric/froxel_raymarch.tech');
@@ -125,13 +126,13 @@ export class FroxelVolumetricScattering {
       code: volumetricIntegrationCode,
     });
 
-    const ambientLightInjectionCode = await ResourceManager.loadShader(
-      'volumetric/froxel_light_injection_ambient.compute.wgsl',
+    const directionalLightInjectionCode = await ResourceManager.loadShader(
+      'volumetric/froxel_light_injection_directional.compute.wgsl',
     );
 
-    this.ambientLightInjectionShader = this.device.createShaderModule({
-      label: 'Froxel Ambient Light Injection Compute Shader',
-      code: ambientLightInjectionCode,
+    this.directionalLightInjectionShader = this.device.createShaderModule({
+      label: 'Froxel Directional Light Injection Compute Shader',
+      code: directionalLightInjectionCode,
     });
 
     const pointLightInjectionCode = await ResourceManager.loadShader(
@@ -203,21 +204,22 @@ export class FroxelVolumetricScattering {
       [
         BindGroupFactory.getCameraComputeLayout(),
         BindGroupFactory.getFroxelParametersLayout(),
-        BindGroupFactory.getFroxelAmbientLayout(),
+        BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
         BindGroupFactory.getDirectionalLightDataLayout(),
       ],
     );
 
-    const ambientLightConfig: ComputePipelineConfig = {
-      label: 'Froxel Ambient Light Injection Compute Pipeline',
+    const directionalLightConfig: ComputePipelineConfig = {
+      label: 'Froxel Directional Light Injection Compute Pipeline',
       layout: ambientLightInjectionPipelineLayout,
       compute: {
-        module: this.ambientLightInjectionShader,
+        module: this.directionalLightInjectionShader,
         entryPoint: 'main',
       },
     };
 
-    this.ambientLightInjectionPipeline = PipelineFactory.createComputePipeline(ambientLightConfig);
+    this.directionalLightInjectionPipeline =
+      PipelineFactory.createComputePipeline(directionalLightConfig);
 
     const pointLightInjectionPipelineLayout = PipelineFactory.createPipelineLayout(
       'froxel_point_light_injection_pipeline_layout',
@@ -353,22 +355,24 @@ export class FroxelVolumetricScattering {
 
     this.updateUniforms();
 
-    this.executeDensityPass();
-
-    this.executeAmbientLightInjectionPass();
-
-    this.executePointLightInjectionPass();
-
-    this.executeSpotLightInjectionPass();
-
-    this.executeVolumetricIntegrationPass();
-  }
-
-  private executeDensityPass(): void {
     const commandEncoder = this.device.createCommandEncoder({
-      label: 'froxel_density_pass',
+      label: 'volumetrict_scattering_compute_pass',
     });
 
+    this.executeDensityPass(commandEncoder);
+
+    this.executeDirectionalLightInjectionPass(commandEncoder);
+
+    this.executePointLightInjectionPass(commandEncoder);
+
+    this.executeSpotLightInjectionPass(commandEncoder);
+
+    this.executeVolumetricIntegrationPass(commandEncoder);
+
+    this.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  private executeDensityPass(commandEncoder: GPUCommandEncoder): void {
     const computePass = commandEncoder.beginComputePass({
       label: 'froxel_density_compute',
     });
@@ -422,15 +426,9 @@ export class FroxelVolumetricScattering {
 
     computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
     computePass.end();
-
-    this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  private executeVolumetricIntegrationPass(): void {
-    const commandEncoder = this.device.createCommandEncoder({
-      label: 'froxel_volumetrict_integration_pass',
-    });
-
+  private executeVolumetricIntegrationPass(commandEncoder: GPUCommandEncoder): void {
     const computePass = commandEncoder.beginComputePass({
       label: 'froxel_volumetrict_integration_compute',
     });
@@ -472,11 +470,9 @@ export class FroxelVolumetricScattering {
 
     computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
     computePass.end();
-
-    this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  private executeAmbientLightInjectionPass(): void {
+  private executeDirectionalLightInjectionPass(commandEncoder: GPUCommandEncoder): void {
     const directionalLightComponent = Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList()[0] as DirectionalLightComponent;
@@ -485,19 +481,19 @@ export class FroxelVolumetricScattering {
       return; // No directional light or no shadows
     }
 
-    const commandEncoder = this.device.createCommandEncoder({
-      label: 'froxel_ambient_light_injection_pass',
-    });
-
     const computePass = commandEncoder.beginComputePass({
-      label: 'froxel_ambient_light_injection_compute',
+      label: 'froxel_directional_light_injection_compute',
     });
 
     // Set compute pipeline
-    computePass.setPipeline(this.ambientLightInjectionPipeline);
+    computePass.setPipeline(this.directionalLightInjectionPipeline);
 
     // Create textures bind group (@group(1) in shader)
+    if (this.ambientBindGroup && this.froxelLightTextureView !== this.lastDirectionalLightView) {
+      this.ambientBindGroup = null!;
+    }
     if (!this.ambientBindGroup) {
+      this.lastDirectionalLightView = this.froxelLightTextureView;
       this.ambientBindGroup = BindGroupFactory.createBindGroup(
         'froxel_ambient_light_textures_bind_group',
         BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
@@ -551,11 +547,9 @@ export class FroxelVolumetricScattering {
 
     computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
     computePass.end();
-
-    this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  private executePointLightInjectionPass(): void {
+  private executePointLightInjectionPass(commandEncoder: GPUCommandEncoder): void {
     const pointLightManager = Engine.getEntities().getObjectManagerByName('point_light');
     if (!pointLightManager) return;
     const pointLights = pointLightManager.getList() as PointLightComponent[];
@@ -572,9 +566,6 @@ export class FroxelVolumetricScattering {
       if (!pointLightComponent.isVisible()) {
         continue;
       }
-      const commandEncoder = this.device.createCommandEncoder({
-        label: 'froxel_point_light_injection_pass',
-      });
       const computePass = commandEncoder.beginComputePass({
         label: 'froxel_point_light_injection_compute',
       });
@@ -606,7 +597,6 @@ export class FroxelVolumetricScattering {
 
       computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
       computePass.end();
-      this.device.queue.submit([commandEncoder.finish()]);
 
       const tmp = lightReadView;
       lightReadView = lightWriteView;
@@ -615,9 +605,11 @@ export class FroxelVolumetricScattering {
 
     this.froxelLightTextureView = lightReadView;
     this.froxelLightTempTextureView = lightWriteView;
+    // Invalidar para que se recree con la view correcta
+    this.integrationBindGroup = null!;
   }
 
-  private executeSpotLightInjectionPass(): void {
+  private executeSpotLightInjectionPass(commandEncoder: GPUCommandEncoder): void {
     const spotLightManager = Engine.getEntities().getObjectManagerByName('spot_light');
     if (!spotLightManager) return;
     const spotLights = spotLightManager.getList() as SpotLightComponent[];
@@ -634,9 +626,6 @@ export class FroxelVolumetricScattering {
       if (!spotLightComponent.isVisible()) {
         continue;
       }
-      const commandEncoder = this.device.createCommandEncoder({
-        label: 'froxel_spot_light_injection_pass',
-      });
       const computePass = commandEncoder.beginComputePass({
         label: 'froxel_spot_light_injection_compute',
       });
@@ -689,7 +678,6 @@ export class FroxelVolumetricScattering {
 
       computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
       computePass.end();
-      this.device.queue.submit([commandEncoder.finish()]);
 
       const tmp = lightReadView;
       lightReadView = lightWriteView;
@@ -698,6 +686,7 @@ export class FroxelVolumetricScattering {
 
     this.froxelLightTextureView = lightReadView;
     this.froxelLightTempTextureView = lightWriteView;
+    this.integrationBindGroup = null!;
   }
 
   public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {

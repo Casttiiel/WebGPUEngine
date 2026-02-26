@@ -597,25 +597,6 @@ export class BindGroupFactory {
     ]);
   }
 
-  public static getFroxelAmbientLayout(): GPUBindGroupLayout {
-    return this.getLayout('froxel_ambient_layout', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-          viewDimension: '3d',
-        },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' },
-      },
-    ]);
-  }
-
   /**
    * Create bind group layout for ambient light injection textures
    */

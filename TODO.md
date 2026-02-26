@@ -1,28 +1,26 @@
 ### Engine
 
-1. Optimize gtao.fs
-2. Open Editor multiple times, creates data multiple times
-3. Transform matrix multiplication frequency
-4. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
-5. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
-6. Froxel Volumetric Scattering Fix Light fuge (more res less far)
-7. Mesh one single buffer
-8. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-9. SS Global Illumination + Froxel
-10. Froxel Volumetric Light Shafts parpadean
-11. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-12. Froxel Volumetric Scattering: Spot Light Injection angle
-13. Reflection Probes con blending
-14. Multiple Light probes has good shadows?
-15. Contact Shadows
-16. Point Light shadows
-17. Optimize with compute shaders
-18. Clouds
-19. Improve particles
-20. UI
-21. TAA (Test with high_sponza)
-22. Quality settings selection
-23. Weird line on corners is irradiance because of normals
+1. Froxel Volumetric Scattering: Optimize Bind group creation (Spot/Point lights) (Bug with bindgroup texture light swap?)
+2. Froxel Volumetric Scattering: Spot Light Injection angle
+3. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+4. Froxel Volumetric Light Shafts parpadean
+5. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+6. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
+7. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+8. Open Editor multiple times, creates data multiple times
+9. Transform matrix multiplication frequency
+10. Mesh one single buffer
+11. SS Global Illumination + Froxel
+12. Reflection Probes con blending
+13. Multiple Light probes has good shadows?
+14. Contact Shadows
+15. Point Light shadows
+16. Optimize with compute shaders
+17. Clouds
+18. Improve particles
+19. UI
+20. Quality settings selection
+21. Weird line on corners is irradiance because of normals
 
 ## Gameplay
 
