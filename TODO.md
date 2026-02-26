@@ -1,25 +1,23 @@
 ### Engine
 
-1. Froxel Volumetric Scattering: Spot Light Injection angle
-2. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
-3. Froxel Volumetric Light Shafts parpadean
-4. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+1. Froxel Volumetric Scattering Fix Banding (Bilateral filtering result)
+2. Froxel Volumetric Light Shafts parpadean
+3. Froxel Volumetric Scattering Fix Light fuge (more res less far)
+4. Froxel Volumetric Scattering: Spot Light Injection angle
 5. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
-6. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-7. Open Editor multiple times, creates data multiple times
-8. Transform matrix multiplication frequency
-9. Mesh one single buffer
+6. Open Editor multiple times, creates data multiple times
+7. Transform matrix multiplication frequency
+8. Mesh one single buffer
+9. CSM: Logarithmic depth o reversed-Z or less max shadow distance
 10. SS Global Illumination + Froxel
-11. Reflection Probes con blending
-12. Multiple Light probes has good shadows?
-13. Contact Shadows
-14. Point Light shadows
-15. Optimize with compute shaders
-16. Clouds
-17. Improve particles
-18. UI
-19. Quality settings selection
-20. Weird line on corners is irradiance because of normals
+11. Contact Shadows
+12. Optimize with compute shaders
+13. Improve particles
+14. UI
+15. Reflection Probes con blending
+16. Multiple Light probes has good shadows?
+17. Point Light shadows
+18. Clouds
 
 ## Gameplay
 
@@ -38,6 +36,7 @@ Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast 
 1. Start Screen
 2. Game Loading Screen
 3. Remove en main.ts el skip first frame?
+4. Quality settings selection
 
 ### Editor
 

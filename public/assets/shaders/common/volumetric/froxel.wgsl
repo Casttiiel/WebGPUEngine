@@ -11,35 +11,18 @@ fn froxelZToViewZLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
   return nearZ * pow(farZ / max(nearZ, 1e-6), z01);
 }
 
-// Convert froxel Z coordinate to view space depth using linear distribution
-fn froxelZToViewZLinear(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z01 = (f32(z) + 0.5) / f32(slices);
-  return nearZ + z01 * (farZ - nearZ);
-}
-
-// Convert slice index to depth value (linear distribution)
-fn sliceToDepthLinear(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z01 = (f32(z) + 0.5) / f32(slices);
-  return nearZ + z01 * (farZ - nearZ);
-}
-
-// Convert slice index to depth value (logarithmic distribution)
-fn sliceToDepthLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z01 = (f32(z) + 0.5) / f32(slices);
-  return nearZ * pow(farZ / max(nearZ, 1e-6), z01);
-}
-
 // Calculate slice depth delta for linear distribution
 fn sliceDzLinear(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z0 = sliceToDepthLog(z, slices, nearZ, farZ);
-  let z1 = sliceToDepthLog(min(z + 1u, slices - 1u), slices, nearZ, farZ);
+  let z0 = froxelZToViewZLog(z, slices, nearZ, farZ);
+  let z1 = froxelZToViewZLog(min(z + 1u, slices - 1u), slices, nearZ, farZ);
   return max(z1 - z0, 1e-4);
 }
 
 // Calculate slice depth delta for logarithmic distribution
 fn sliceDzLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z0 = sliceToDepthLog(z, slices, nearZ, farZ);
-  let z1 = sliceToDepthLog(min(z + 1u, slices - 1u), slices, nearZ, farZ);
+  let z0 = froxelZToViewZLog(z, slices, nearZ, farZ);
+  // Extrapolar más allá del último slice en vez de clampear
+  let z1 = froxelZToViewZLog(z + 1u, slices, nearZ, farZ);
   return max(z1 - z0, 1e-4);
 }
 

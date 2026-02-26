@@ -7,7 +7,6 @@
 5. DOF adaptative
 6. Lens distorsion + chromatic aberration RE4
    Animations
-   Clouds
    Pre-multiplied Alpha Solids (Cristal)
    Auto exposure
    GPUDrivenRendering with indirect draw calls and frustum culling on GPU
@@ -23,7 +22,5 @@
    Mesh LOD
    Light Clustered culling + instancing
    Occlusion culling
-   Voxel Global Illumination
-   Contact Shadows
    TrimSheets
    CRT Shader

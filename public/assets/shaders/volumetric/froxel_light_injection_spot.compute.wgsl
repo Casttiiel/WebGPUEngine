@@ -87,7 +87,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     // Forward scattering para god rays marcados
     // g = 0.7-0.8: god rays visibles
     // g = 0.85-0.9: god rays muy marcados (puede ser excesivo)
-    let g = volumetricSettings.anisotropy / 3.0;
+    let g = clamp(volumetricSettings.anisotropy, -0.95, 0.95);
     let phaseRayleigh = 1.0 / (4.0 * PI);   // isotrópico real
     let phaseMie = phaseHG(cosTheta, g);
 
