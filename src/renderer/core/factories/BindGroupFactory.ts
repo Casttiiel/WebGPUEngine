@@ -728,6 +728,24 @@ export class BindGroupFactory {
       {
         binding: 2,
         visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: '2d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
         sampler: {
           type: 'comparison',
         },

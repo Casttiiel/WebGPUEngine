@@ -14,10 +14,10 @@
 @group(2) @binding(1) var<uniform> ambientLight: AmbientLightUniforms;
 
 @group(3) @binding(0) var<uniform> directionalLight: DirectionalLightCSMUniforms;
-@group(3) @binding(1) var shadowMap: texture_depth_2d;
-@group(3) @binding(2) var shadowSampler: sampler_comparison;
-@group(3) @binding(3) var projectorTexture: texture_2d<f32>;
-@group(3) @binding(4) var projectorSampler: sampler;
+@group(3) @binding(1) var shadowMap0: texture_depth_2d;
+@group(3) @binding(2) var shadowMap1: texture_depth_2d;
+@group(3) @binding(3) var shadowMap2: texture_depth_2d;
+@group(3) @binding(4) var shadowSampler: sampler_comparison;
 
 struct AmbientLightUniforms {
     color: vec3<f32>,
@@ -30,13 +30,13 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     
     if (cascadeIndex == 0) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
-                directionalLight.shadowParams.z, shadowMap, shadowSampler);
+                directionalLight.shadowParams.z, shadowMap0, shadowSampler);
     } else if (cascadeIndex == 1) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset1,
-                directionalLight.shadowParams.z, shadowMap, shadowSampler);
+                directionalLight.shadowParams.z, shadowMap1, shadowSampler);
     } else {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset2,
-                directionalLight.shadowParams.z, shadowMap, shadowSampler);
+                directionalLight.shadowParams.z, shadowMap2, shadowSampler);
     }
 }
 
@@ -44,13 +44,13 @@ fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {
     // Call getShadowFactor with appropriate cascade shadow map
     if (idx == 0) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
-                directionalLight.shadowParams.z, shadowMap, shadowSampler);
+                directionalLight.shadowParams.z, shadowMap0, shadowSampler);
     } else if (idx == 1) {
-        return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
-                directionalLight.shadowParams.z, shadowMap, shadowSampler);
+        return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset1,
+                directionalLight.shadowParams.z, shadowMap1, shadowSampler);
     } else {
-        return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
-                directionalLight.shadowParams.z, shadowMap, shadowSampler);
+        return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset2,
+                directionalLight.shadowParams.z, shadowMap2, shadowSampler);
     }
 }
 
