@@ -17,4 +17,7 @@ struct VolumetricUniforms {
   fogLayerHeight: f32,
   fogFalloff: f32,
   ambientVolumetricIntensity: f32,
+  gLightFactor: f32,
+  renderWidth: f32,
+  renderHeight: f32,
 }

@@ -87,7 +87,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     // Forward scattering para god rays marcados
     // g = 0.7-0.8: god rays visibles
     // g = 0.85-0.9: god rays muy marcados (puede ser excesivo)
-    let g = clamp(volumetricSettings.anisotropy, -0.95, 0.95) / 3.0;
+    let g = clamp(volumetricSettings.anisotropy, -0.95, 0.95) * volumetricSettings.gLightFactor;
     let phaseRayleigh = 1.0 / (4.0 * PI);   // isotrópico real
     let phaseMie = phaseHG(cosTheta, g);
 
@@ -105,9 +105,14 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
         att = 1.0 - t * t * (3.0 - 2.0 * t);
     }
 
+    let distFromCenter = length(screenPos.xy);
+    // Zona inner: 0.0 a 0.7 → intensidad máxima
+    // Zona outer: 0.7 a 1.0 → fade a 0
+    let spotAttenuation = smoothstep(1.0, 0.5, distFromCenter);
+
     // Aplicar phase function directamente (sin mezclar con isotropic)
     // Esto da god rays claros cuando miras hacia la luz directional
-    let contribution = light.color * light.intensity * visibility * phase * att;
+    let contribution = light.color * light.intensity * visibility * phase * att * spotAttenuation;
     
     textureStore(froxelLightOutput, coord, vec4<f32>(existing + contribution, 1.0));
 }

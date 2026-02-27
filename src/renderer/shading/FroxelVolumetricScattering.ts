@@ -76,6 +76,7 @@ export class FroxelVolumetricScattering {
   private ambientVolumetricIntensity: number = 0.0; // Ambient contribution to volumetric (keep low, 0.0-0.1)
   private nearPlane: number = 0.1;
   private farPlane: number = 100.0;
+  private gLightFactor: number = 0.33;
 
   // Uniform buffers
   private volumetricUniformBuffer!: GPUBuffer;
@@ -801,6 +802,9 @@ export class FroxelVolumetricScattering {
     this.volumetricUniformData[offset++] = this.fogLayerHeight;
     this.volumetricUniformData[offset++] = this.fogFalloff;
     this.volumetricUniformData[offset++] = this.ambientVolumetricIntensity;
+    this.volumetricUniformData[offset++] = this.gLightFactor;
+    this.volumetricUniformData[offset++] = Render.width;
+    this.volumetricUniformData[offset++] = Render.height;
 
     // Froxel grid parameters
     offset = 0;
@@ -882,6 +886,8 @@ export class FroxelVolumetricScattering {
     folder.add(this, 'fogFalloff', 0.0, 1.0).name('Fog Falloff').listen();
 
     folder.add(this, 'ambientVolumetricIntensity', 0.0, 0.2).name('Ambient Volumetric').listen();
+
+    folder.add(this, 'gLightFactor', 0.0, 1.0).name('G Light Factor').listen();
 
     folder.add(this, 'nearPlane', 0.01, 1.0).name('Near Plane').listen();
 

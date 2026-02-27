@@ -71,7 +71,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
   let cosTheta = clamp(dot(V, Ldir), -1.0, 1.0);
 
-  let g = clamp(volumetricSettings.anisotropy, -0.95, 0.95) / 3.0;
+  let g = clamp(volumetricSettings.anisotropy, -0.95, 0.95) * volumetricSettings.gLightFactor;
   let phaseRayleigh = 1.0 / (4.0 * PI);   // isotrópico real
   let phaseMie = phaseHG(cosTheta, g);
 

@@ -1,26 +1,24 @@
 ### Engine
 
-1. Froxel Volumetric Scattering: Uniform for Reduced G for light injection
-2. Froxel Volumetric Scattering: Raymarch blue noise param for camera size
-3. Froxel Volumetric Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
-4. Froxel Volumetric Scattering: on change camera, we need to destroy camerabindgroup
-5. Froxel Volumetric Scattering: Density leaking (Depth-aware density pass)
-6. Froxel Volumetric Light Directional not using correctly cascades
-7. Froxel Volumetric Scattering: Spot Light Injection angle
-8. Froxel Volumetric Scattering Fix Banding
-9. Open Editor multiple times, creates data multiple times
-10. Transform matrix multiplication frequency
-11. Mesh one single buffer
-12. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-13. SS Global Illumination + Froxel
-14. Contact Shadows
-15. Optimize with compute shaders
-16. Improve particles
-17. UI
-18. Reflection Probes con blending
-19. Multiple Light probes has good shadows?
-20. Point Light shadows
-21. Clouds
+1. Froxel: Density leaking (Depth-aware density pass)
+2. Froxel: Light Directional not using correctly cascades
+3. Froxel: Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
+4. Froxel: Banding
+5. Froxel: Self occlusion
+6. Froxel: on change camera, we need to destroy camerabindgroup
+7. Open Editor multiple times, creates data multiple times
+8. Transform matrix multiplication frequency
+9. Mesh one single buffer
+10. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+11. SS Global Illumination + Froxel
+12. Contact Shadows
+13. Optimize with compute shaders
+14. Improve particles
+15. UI
+16. Reflection Probes con blending
+17. Multiple Light probes has good shadows?
+18. Point Light shadows
+19. Clouds
 
 ## Gameplay
 
