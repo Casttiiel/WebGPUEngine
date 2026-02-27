@@ -264,7 +264,8 @@ export class DeferredRenderer {
     );
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
-      this.froxelVolumetrics.updateFroxelData();
+      const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
+      this.froxelVolumetrics.updateFroxelData(gBufferRenderTargets.linearDepth);
       this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
     }
 

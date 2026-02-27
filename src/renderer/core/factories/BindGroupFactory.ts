@@ -187,6 +187,26 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getDensityInputTextureLayout(): GPUBindGroupLayout {
+    return this.getLayout('density_input_texture_compute', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' },
+      },
+    ]);
+  }
+
   public static getSSRUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('ssr_uniforms', [
       {

@@ -1,24 +1,22 @@
 ### Engine
 
-1. Froxel: Light Directional not using correctly cascades
-2. Froxel: Density leaking (Depth-aware density pass)
-3. Froxel: Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
-4. Froxel: Banding
+1. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+2. Froxel: Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
+3. Froxel: on change screen size error
+4. Froxel: on change camera, we need to destroy camerabindgroup
 5. Froxel: Self occlusion
-6. Froxel: on change camera, we need to destroy camerabindgroup
-7. Open Editor multiple times, creates data multiple times
-8. Mesh one single buffer
-9. Transform matrix multiplication frequency
-10. SS Global Illumination + Froxel
-11. CSM: Logarithmic depth o reversed-Z or less max shadow distance
-12. Contact Shadows
-13. Optimize with compute shaders
-14. Improve particles
-15. UI
-16. Reflection Probes con blending
-17. Multiple Light probes has good shadows?
-18. Point Light shadows
-19. Clouds
+6. Open Editor multiple times, creates data multiple times
+7. Mesh one single buffer
+8. Transform matrix multiplication frequency
+9. SS Global Illumination + Froxel
+10. Contact Shadows
+11. Optimize with compute shaders
+12. Improve particles
+13. UI
+14. Reflection Probes con blending
+15. Multiple Light probes has good shadows?
+16. Point Light shadows
+17. Clouds
 
 ## Gameplay
 

@@ -40,7 +40,7 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     }
 }
 
-fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {    
+fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {
     // Call getShadowFactor with appropriate cascade shadow map
     if (idx == 0) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
@@ -70,14 +70,14 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
         let blendStart = splitDist * (1.0 - blendRegion);
         blendFactor = (viewSpaceDepth - blendStart) / (splitDist - blendStart);
     }
-    
+
     if (blendFactor < 0.01) {
         return getShadowFactorCSM(worldPos, viewSpaceDepth);
     }
     
     let shadowFactor1 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex);
     let shadowFactor2 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex + 1);
-    
+
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
 }
 
@@ -108,7 +108,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     );
     let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
     let froxelWorldPos = tempFroxelWS.xyz / tempFroxelWS.w;
-    let visibility = getShadowFactorCSMBlended(froxelWorldPos.xyz, froxelVS.z);
+    let visibility = getShadowFactorCSMBlended(froxelWorldPos.xyz, abs(froxelVS.z));
 
     let V = normalize(camera.cameraPosition.xyz - froxelWorldPos);
     let Ldir = normalize(-directionalLight.position);

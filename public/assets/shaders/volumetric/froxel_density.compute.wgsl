@@ -13,6 +13,7 @@
 
 @group(3) @binding(0) var noiseTex: texture_2d<f32>;
 @group(3) @binding(1) var noiseSampler: sampler;
+@group(3) @binding(2) var linearDepth: texture_2d<f32>;
 
 // Función para samplear noise 3D desde textura 2D RGB tileable
 fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
@@ -71,6 +72,24 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   );
   let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
   let froxelWS = tempFroxelWS.xyz / tempFroxelWS.w;
+
+  // Proyectar el froxel a UV de pantalla
+  let froxelClip = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(froxelWS, 1.0);
+  let froxelNDC = froxelClip.xyz / froxelClip.w;
+  let screenUV = vec2<f32>(
+    froxelNDC.x * 0.5 + 0.5,
+    1.0 - (froxelNDC.y * 0.5 + 0.5)
+  );
+
+  let sceneDepth01 = textureSampleLevel(linearDepth, noiseSampler, screenUV, 0.0).r;
+  let sceneViewZ = sceneDepth01 * camera.cameraFar;
+
+  let froxelViewZ = -froxelVS.z; // positivo
+
+  if (froxelViewZ > sceneViewZ) {
+      textureStore(froxelDensityTexture, froxelCoord, vec4<f32>(0.0, 0.0, 0.0, 0.0));
+      return;
+  }
 
   // 2) Height fog (parameters from uniform)
   let fogBaseHeight = volumetricParams.fogBaseHeight;

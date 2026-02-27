@@ -12,6 +12,7 @@ import { PointLightComponent } from '../../components/render/PointLightComponent
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
+import { RenderTarget } from '../resources/RenderTarget';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -23,9 +24,9 @@ export class FroxelVolumetricScattering {
 
   // Froxel grid dimensions
   private froxelDimensions = {
-    x: 160, // Width slices
-    y: 90, // Height slices
-    z: 64, // Depth slices (logarithmic distribution)
+    x: 160, // Width slices 256
+    y: 90, // Height slices 144
+    z: 128, // Depth slices (logarithmic distribution)
   };
 
   private densityComputeShader!: GPUShaderModule;
@@ -173,7 +174,7 @@ export class FroxelVolumetricScattering {
         BindGroupFactory.getCameraComputeLayout(),
         BindGroupFactory.getFroxelParametersLayout(),
         BindGroupFactory.getFroxelDensityTexturesLayout(),
-        BindGroupFactory.getSingleTextureComputeLayout(),
+        BindGroupFactory.getDensityInputTextureLayout(),
       ],
     );
 
@@ -383,7 +384,7 @@ export class FroxelVolumetricScattering {
     ];
   }
 
-  public updateFroxelData(): void {
+  public updateFroxelData(linearDepth: RenderTarget): void {
     if (!this.isEnabled) {
       return;
     }
@@ -398,7 +399,7 @@ export class FroxelVolumetricScattering {
       label: 'volumetrict_scattering_compute_pass',
     });
 
-    this.executeDensityPass(commandEncoder);
+    this.executeDensityPass(commandEncoder, linearDepth);
 
     this.executeDirectionalLightInjectionPass(commandEncoder);
 
@@ -411,7 +412,7 @@ export class FroxelVolumetricScattering {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  private executeDensityPass(commandEncoder: GPUCommandEncoder): void {
+  private executeDensityPass(commandEncoder: GPUCommandEncoder, linearDepth: RenderTarget): void {
     const computePass = commandEncoder.beginComputePass({
       label: 'froxel_density_compute',
     });
@@ -436,7 +437,7 @@ export class FroxelVolumetricScattering {
     if (!this.noiseTextureBindGroup) {
       this.noiseTextureBindGroup = BindGroupFactory.createBindGroup(
         'froxel_directional_light_noise_texture_bind_group',
-        BindGroupFactory.getSingleTextureComputeLayout(),
+        BindGroupFactory.getDensityInputTextureLayout(),
         [
           {
             binding: 0,
@@ -445,6 +446,10 @@ export class FroxelVolumetricScattering {
           {
             binding: 1,
             resource: SamplerLibrary.simpleSampler,
+          },
+          {
+            binding: 2,
+            resource: linearDepth.getRenderView(),
           },
         ],
       );
