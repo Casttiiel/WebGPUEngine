@@ -46,6 +46,10 @@ export class DirectionalLightComponent extends Component {
   private cascadeLambda: number = 0.5; // 0=uniform, 1=logarithmic
   private maxShadowDistance: number = 50.0; // Distancia máxima de sombras (no usar full frustum)
 
+  private shadowFov: number = 0;
+  private shadowAspect: number = 0;
+  private splitsInitialized: boolean = false;
+
   // Shadow camera configuration
   private static readonly LIGHT_DISTANCE = 100.0; // Distancia fija CONSTANTE de la shadow camera
 
@@ -265,119 +269,49 @@ export class DirectionalLightComponent extends Component {
     return corners;
   }
 
-  /**
-   * Calcula el AABB en light space de un conjunto de corners.
-   * IMPORTANTE: Estabiliza el AABB redondeándolo a múltiplos de texel size.
-   */
-  private calculateAABBInLightSpace(corners: vec3[], lightView: mat4): AABB {
-    const aabb: AABB = {
-      minX: Infinity,
-      maxX: -Infinity,
-      minY: Infinity,
-      maxY: -Infinity,
-      minZ: Infinity,
-      maxZ: -Infinity,
-    };
-
-    // Transformar cada corner a light space y expandir AABB
-    for (const corner of corners) {
-      const lightSpaceCorner = vec3.create();
-      vec3.transformMat4(lightSpaceCorner, corner, lightView);
-
-      aabb.minX = Math.min(aabb.minX, lightSpaceCorner[0]);
-      aabb.maxX = Math.max(aabb.maxX, lightSpaceCorner[0]);
-      aabb.minY = Math.min(aabb.minY, lightSpaceCorner[1]);
-      aabb.maxY = Math.max(aabb.maxY, lightSpaceCorner[1]);
-      aabb.minZ = Math.min(aabb.minZ, lightSpaceCorner[2]);
-      aabb.maxZ = Math.max(aabb.maxZ, lightSpaceCorner[2]);
+  private updateShadowCameras(mainCamera: Camera): void {
+    if (!this.splitsInitialized) {
+      const near = mainCamera.getNear();
+      const far = Math.min(this.maxShadowDistance, mainCamera.getFar());
+      this.cascadeSplits = this.calculateCascadeSplits(near, far);
+      this.shadowFov = mainCamera.getFov();
+      this.shadowAspect = mainCamera.getAspectRatio();
+      this.splitsInitialized = true;
     }
 
-    return aabb;
-  }
-
-  /**
-   * Estabiliza el AABB snapeándolo a la grilla de texeles en light space.
-   * CRÍTICO: Snapear min/max del AABB, NO el centro - esto es clave para estabilidad.
-   * El tamaño NO debe cambiar, solo la posición debe moverse en incrementos discretos.
-   */
-  private stabilizeAABB(aabb: AABB): AABB {
-    const shadowMapResolution =
+    const shadowResolution =
       QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
-    const width = aabb.maxX - aabb.minX;
-    const height = aabb.maxY - aabb.minY;
-
-    // CRÍTICO: El tamaño debe ser CONSTANTE — tomar el máximo histórico o
-    // usar el lado más largo para hacer el AABB cuadrado.
-    // Un AABB cuadrado garantiza que el texelSize no cambia al rotar la cámara.
-    const size = Math.max(width, height);
-
-    const texelSize = size / shadowMapResolution;
-
-    // Snapear el centro (no el min) — más estable para AABB cuadrado
-    const centerX = (aabb.minX + aabb.maxX) * 0.5;
-    const centerY = (aabb.minY + aabb.maxY) * 0.5;
-
-    const snappedCenterX = Math.floor(centerX / texelSize) * texelSize;
-    const snappedCenterY = Math.floor(centerY / texelSize) * texelSize;
-
-    return {
-      minX: snappedCenterX - size * 0.5,
-      maxX: snappedCenterX + size * 0.5,
-      minY: snappedCenterY - size * 0.5,
-      maxY: snappedCenterY + size * 0.5,
-      minZ: aabb.minZ,
-      maxZ: aabb.maxZ,
-    };
-  }
-
-  /**
-   * Actualiza las shadow cameras basándose en el frustum de la cámara principal.
-   * Calcula los splits, extrae los corners, y configura cada cascade con tight-fitting AABB.
-   */
-  private updateShadowCameras(mainCamera: Camera): void {
-    // 1. Calcular split distances basados en maxShadowDistance
-    const near = mainCamera.getNear();
-    const far = Math.min(this.maxShadowDistance, mainCamera.getFar());
-    this.cascadeSplits = this.calculateCascadeSplits(near, far);
-
-    // CRÍTICO: lightUp debe cambiar cuando la luz está casi vertical para evitar flips
-    // Si lightDirection está casi paralelo a Z, usar Y como up vector
     const lightUp =
       Math.abs(this.lightDirection[2]) > 0.9 ? vec3.fromValues(0, 1, 0) : vec3.fromValues(0, 0, 1);
 
-    // 2. Configurar cada cascada CON lightView centrado por slice
-    let prevSplit = near;
+    let prevSplit = mainCamera.getNear();
 
     for (let i = 0; i < this.cascadeCount; i++) {
       const currentSplit = this.cascadeSplits[i];
 
-      // 2.1. Extraer los 8 corners del sub-frustum en world space
+      // 1. Radio fijo geométrico — NO depende de world space, es constante entre frames
+      const radius_raw = this.calculateCascadeRadius(
+        this.shadowFov,
+        this.shadowAspect,
+        prevSplit,
+        currentSplit,
+      );
+
+      // Redondear radio al texel más cercano para tamaño exactamente constante
+      const texelSize_provisional = (radius_raw * 2.0) / shadowResolution;
+      const radius = Math.ceil(radius_raw / texelSize_provisional) * texelSize_provisional;
+      const texelSize = (radius * 2.0) / shadowResolution;
+
+      // 2. Calcular worldCenter del frustum slice (solo para orientar la cámara)
       const frustumCorners = this.extractFrustumCorners(mainCamera, prevSplit, currentSplit);
-
-      // 2.1b. Extender frustum corners en world space hacia atrás (dirección -lightDir)
-      // Esto garantiza que capturamos shadow casters detrás del frustum
-      // Extensión fija: captura shadow casters hasta N unidades detrás del frustum
-      // No depende del tamaño del slice, es constante entre frames
-      const extensionDistance = this.maxShadowDistance * 0.5;
-      const extendedCorners = frustumCorners.map((corner) => {
-        const extended = vec3.create();
-        vec3.scaleAndAdd(extended, corner, this.lightDirection, -extensionDistance);
-        return extended;
-      });
-      // Combinar corners originales + extendidos = 16 corners totales
-      const allCorners = [...frustumCorners, ...extendedCorners];
-
-      // 2.2. Calcular el centro del frustum slice en world space
       const worldCenter = vec3.create();
       for (const corner of frustumCorners) {
         vec3.add(worldCenter, worldCenter, corner);
       }
       vec3.scale(worldCenter, worldCenter, 1.0 / frustumCorners.length);
 
-      // 2.3. Construir lightView con posición FINAL desde el principio
-      // CRÍTICO: Usar distancia CONSTANTE GLOBAL - NO depende del slice ni del AABB
-      // Esto garantiza estabilidad temporal completa
+      // 3. Construir lightView desde worldCenter
       const lightPos = vec3.create();
       vec3.scaleAndAdd(
         lightPos,
@@ -388,48 +322,83 @@ export class DirectionalLightComponent extends Component {
       const lightView = mat4.create();
       mat4.lookAt(lightView, lightPos, worldCenter, lightUp);
 
-      // 2.4. Calcular AABB en light space usando TODOS los corners (originales + extendidos)
-      // Este es el ÚNICO cálculo de AABB - no se recalcula después
-      let aabb = this.calculateAABBInLightSpace(allCorners, lightView);
+      // 4. SNAP: modificar directamente los elementos de traslación de lightView
+      // lightView[12] y [13] ya están en light space — no hay que transformar nada
+      // Esto evita el ciclo invert→transformar→lookAt que destruye el snap
+      lightView[12] = Math.floor(lightView[12] / texelSize) * texelSize;
+      lightView[13] = Math.floor(lightView[13] / texelSize) * texelSize;
+      // lightView[14] no se snapea — es profundidad Z
 
-      // 2.6. ESTABILIZAR el AABB (snap a texel grid)
-      aabb = this.stabilizeAABB(aabb);
+      // 5. Calcular near/far Z desde los corners + extensión para shadow casters
+      const Z_EXTENSION = this.maxShadowDistance * 0.5;
+      const allCorners = [
+        ...frustumCorners,
+        ...frustumCorners.map((c) => {
+          const ext = vec3.create();
+          vec3.scaleAndAdd(ext, c, this.lightDirection, -Z_EXTENSION);
+          return ext;
+        }),
+      ];
 
-      // 3. Margin fijo en texels (no porcentaje dinámico)
-      const MARGIN_TEXELS = 4; // constante, nunca varía
-      const shadowResolution =
-        QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-      const texelSizeX = (aabb.maxX - aabb.minX) / shadowResolution;
-      const texelSizeY = (aabb.maxY - aabb.minY) / shadowResolution;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (const corner of allCorners) {
+        const lsc = vec3.create();
+        vec3.transformMat4(lsc, corner, lightView);
+        minZ = Math.min(minZ, lsc[2]);
+        maxZ = Math.max(maxZ, lsc[2]);
+      }
 
-      // Margin en múltiplos EXACTOS de texelSize para no romper el snap
-      aabb.minX -= MARGIN_TEXELS * texelSizeX;
-      aabb.maxX += MARGIN_TEXELS * texelSizeX;
-      aabb.minY -= MARGIN_TEXELS * texelSizeY;
-      aabb.maxY += MARGIN_TEXELS * texelSizeY;
-
-      // 2.7. Configurar la shadow camera con el MISMO lightView usado para el AABB
+      // 6. Configurar shadow camera
       const shadowCamera = this.shadowCameras[i];
-
-      // Dimensiones del AABB estabilizado
-      const orthoWidth = aabb.maxX - aabb.minX;
-      const orthoHeight = aabb.maxY - aabb.minY;
       if (!shadowCamera) continue;
 
-      // Near/Far: usar el rango del AABB en light space
-      // Como la cámara está a 100m de distancia, aabb.minZ será el near y aabb.maxZ el far
-      shadowCamera.setNearPlane(-aabb.maxZ);
-      shadowCamera.setFarPlane(-aabb.minZ);
+      shadowCamera.setNearPlane(-maxZ);
+      shadowCamera.setFarPlane(-minZ);
+      shadowCamera.setOrthoParams(true, 0, radius * 2.0, 0, radius * 2.0);
 
-      // Ortho bounds: usar las dimensiones del AABB
-      shadowCamera.setOrthoParams(true, 0, orthoWidth, 0, orthoHeight);
-
-      // Actualizar shadow camera con la MISMA posición usada para calcular el AABB
-      shadowCamera.lookAt(lightPos, worldCenter, lightUp);
+      // Usar setViewMatrix — NO lookAt, para preservar el snap
+      shadowCamera.setViewMatrix(lightView);
       shadowCamera.updateUniforms(0);
 
       prevSplit = currentSplit;
     }
+  }
+
+  private calculateCascadeRadius(
+    fovRadians: number,
+    aspect: number,
+    nearSplit: number,
+    farSplit: number,
+  ): number {
+    // Radio del círculo circunscrito al frustum slice
+    // Calculado geométricamente, no desde corners en world space
+    const tanHalfFov = Math.tan(fovRadians / 2.0);
+
+    // Center del slice en view space (punto medio entre near y far)
+    const sliceCenter = (nearSplit + farSplit) / 2.0;
+
+    // Corner más lejano del far plane
+    const farHeight = tanHalfFov * farSplit;
+    const farWidth = farHeight * aspect;
+
+    // Distancia desde el centro del slice al corner más lejano
+    const cornerDist = Math.sqrt(
+      farWidth * farWidth +
+        farHeight * farHeight +
+        (farSplit - sliceCenter) * (farSplit - sliceCenter),
+    );
+
+    // Comparar con distancia al near corner también
+    const nearHeight = tanHalfFov * nearSplit;
+    const nearWidth = nearHeight * aspect;
+    const nearCornerDist = Math.sqrt(
+      nearWidth * nearWidth +
+        nearHeight * nearHeight +
+        (nearSplit - sliceCenter) * (nearSplit - sliceCenter),
+    );
+
+    return Math.max(cornerDist, nearCornerDist);
   }
 
   private updateLightUniforms(): void {

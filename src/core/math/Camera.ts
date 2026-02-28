@@ -267,6 +267,22 @@ export class Camera {
     );
   }
 
+  public setViewMatrix(viewMatrix: mat4): void {
+    mat4.copy(this.view, viewMatrix);
+
+    // Recalcular eye position desde la view matrix inversa
+    // eye = -R^T * t
+    const tx = viewMatrix[12];
+    const ty = viewMatrix[13];
+    const tz = viewMatrix[14];
+    this.eye[0] = -(viewMatrix[0] * tx + viewMatrix[1] * ty + viewMatrix[2] * tz);
+    this.eye[1] = -(viewMatrix[4] * tx + viewMatrix[5] * ty + viewMatrix[6] * tz);
+    this.eye[2] = -(viewMatrix[8] * tx + viewMatrix[9] * ty + viewMatrix[10] * tz);
+
+    this.updateViewProjection();
+    this.isDirty = true;
+  }
+
   public updateUniforms(deltaTime: number): void {
     // Update time tracking
     this.deltaTime = deltaTime;

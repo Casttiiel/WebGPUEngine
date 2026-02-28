@@ -1,24 +1,23 @@
 ### Engine
 
-1. CSM: Logarithmic depth o reversed-Z (Bias changes?)
-2. Froxel: Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
-3. Froxel: Self occlusion
+1. Froxel: Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
+2. Froxel: Self occlusion
 
+3. Open Editor multiple times, creates data multiple times
 4. Froxel: on change screen size error
 5. Froxel: on change camera, we need to destroy camerabindgroup
-6. Open Editor multiple times, creates data multiple times
-7. Mesh one single buffer
-8. Transform matrix multiplication frequency
+6. Mesh one single buffer
+7. Transform matrix multiplication frequency
 
-9. SS Global Illumination + Froxel
-10. Contact Shadows
-11. Optimize with compute shaders
-12. Improve particles
-13. UI
-14. Reflection Probes con blending
-15. Multiple Light probes has good shadows?
-16. Point Light shadows
-17. Clouds
+8. SS Global Illumination + Froxel
+9. Contact Shadows
+10. Optimize with compute shaders
+11. Improve particles
+12. UI
+13. Reflection Probes con blending
+14. Multiple Light probes has good shadows?
+15. Point Light shadows
+16. Clouds
 
 ## Gameplay
 

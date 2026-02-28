@@ -35,24 +35,14 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
     let texelSize = lightShadowStepDivResolution;
     let kernelRadius = texelSize * 1.5;
 
-    // Rotar el kernel basado en la posición del TEXEL en el shadow map, no en world pos
-    // Esto hace que la rotación sea ESTABLE — no cambia cuando se mueve la cámara,
-    // solo cambia si el objeto se mueve en el shadow map
-    let shadowTexelPos = floor(lightUVSpacePos.xy / texelSize);
-    let angle = fract(sin(dot(shadowTexelPos, vec2<f32>(127.1, 311.7))) * 43758.5453) * 6.2832;
-    let cosA = cos(angle);
-    let sinA = sin(angle);
-
+    // Sin snap — Poisson distribuye los taps de forma que el noise
+    // es isotrópico y no produce banding estructural
     var shadow = 0.0;
     for (var i = 0; i < 8; i++) {
-        // Rotar el tap Poisson por el ángulo estable
-        let rotated = vec2<f32>(
-            poissonDisk[i].x * cosA - poissonDisk[i].y * sinA,
-            poissonDisk[i].x * sinA + poissonDisk[i].y * cosA
-        );
+        let offset = poissonDisk[i] * kernelRadius;
         shadow += textureSampleCompareLevel(
             shadowMap, shadowSampler,
-            lightUVSpacePos.xy + rotated * kernelRadius,
+            lightUVSpacePos.xy + offset,
             lightUVSpacePos.z
         );
     }
