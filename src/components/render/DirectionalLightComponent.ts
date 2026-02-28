@@ -304,30 +304,31 @@ export class DirectionalLightComponent extends Component {
     const shadowMapResolution =
       QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
-    // Calcular el tamaño actual del AABB (MANTENER CONSTANTE)
     const width = aabb.maxX - aabb.minX;
     const height = aabb.maxY - aabb.minY;
 
-    // Calcular world units per texel (texel size en light space)
-    const texelSizeX = width / shadowMapResolution;
-    const texelSizeY = height / shadowMapResolution;
+    // CRÍTICO: El tamaño debe ser CONSTANTE — tomar el máximo histórico o
+    // usar el lado más largo para hacer el AABB cuadrado.
+    // Un AABB cuadrado garantiza que el texelSize no cambia al rotar la cámara.
+    const size = Math.max(width, height);
 
-    // CRÍTICO: Snapear minX/minY a la grilla de texeles
-    // Esto es lo que hacen los motores reales - no snapear el centro
-    const snappedMinX = Math.floor(aabb.minX / texelSizeX) * texelSizeX;
-    const snappedMinY = Math.floor(aabb.minY / texelSizeY) * texelSizeY;
+    const texelSize = size / shadowMapResolution;
 
-    // Reconstruir AABB manteniendo el tamaño EXACTAMENTE igual
-    const stabilized: AABB = {
-      minX: snappedMinX,
-      maxX: snappedMinX + width,
-      minY: snappedMinY,
-      maxY: snappedMinY + height,
-      minZ: aabb.minZ, // Z no necesita snapping (es profundidad)
+    // Snapear el centro (no el min) — más estable para AABB cuadrado
+    const centerX = (aabb.minX + aabb.maxX) * 0.5;
+    const centerY = (aabb.minY + aabb.maxY) * 0.5;
+
+    const snappedCenterX = Math.floor(centerX / texelSize) * texelSize;
+    const snappedCenterY = Math.floor(centerY / texelSize) * texelSize;
+
+    return {
+      minX: snappedCenterX - size * 0.5,
+      maxX: snappedCenterX + size * 0.5,
+      minY: snappedCenterY - size * 0.5,
+      maxY: snappedCenterY + size * 0.5,
+      minZ: aabb.minZ,
       maxZ: aabb.maxZ,
     };
-
-    return stabilized;
   }
 
   /**
@@ -356,9 +357,9 @@ export class DirectionalLightComponent extends Component {
 
       // 2.1b. Extender frustum corners en world space hacia atrás (dirección -lightDir)
       // Esto garantiza que capturamos shadow casters detrás del frustum
-      // CRÍTICO: La extensión debe escalar con el tamaño del cascade
-      const sliceDepth = currentSplit - prevSplit;
-      const extensionDistance = sliceDepth * 1.5; // 150% de la profundidad del slice
+      // Extensión fija: captura shadow casters hasta N unidades detrás del frustum
+      // No depende del tamaño del slice, es constante entre frames
+      const extensionDistance = this.maxShadowDistance * 0.5;
       const extendedCorners = frustumCorners.map((corner) => {
         const extended = vec3.create();
         vec3.scaleAndAdd(extended, corner, this.lightDirection, -extensionDistance);
@@ -389,21 +390,23 @@ export class DirectionalLightComponent extends Component {
 
       // 2.4. Calcular AABB en light space usando TODOS los corners (originales + extendidos)
       // Este es el ÚNICO cálculo de AABB - no se recalcula después
-      let aabb = this.calculateAABBInLightSpace(allCorners, lightView, i);
-
-      // 2.5. Extensión lateral adicional (la extensión en Z ya está hecha en world space)
-      const cascadeSize = Math.sqrt(
-        Math.pow(aabb.maxX - aabb.minX, 2) + Math.pow(aabb.maxY - aabb.minY, 2),
-      );
-
-      const lateralMargin = cascadeSize * (0.1 + i * 0.05);
-      aabb.minX -= lateralMargin;
-      aabb.maxX += lateralMargin;
-      aabb.minY -= lateralMargin;
-      aabb.maxY += lateralMargin;
+      let aabb = this.calculateAABBInLightSpace(allCorners, lightView);
 
       // 2.6. ESTABILIZAR el AABB (snap a texel grid)
       aabb = this.stabilizeAABB(aabb);
+
+      // 3. Margin fijo en texels (no porcentaje dinámico)
+      const MARGIN_TEXELS = 4; // constante, nunca varía
+      const shadowResolution =
+        QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
+      const texelSizeX = (aabb.maxX - aabb.minX) / shadowResolution;
+      const texelSizeY = (aabb.maxY - aabb.minY) / shadowResolution;
+
+      // Margin en múltiplos EXACTOS de texelSize para no romper el snap
+      aabb.minX -= MARGIN_TEXELS * texelSizeX;
+      aabb.maxX += MARGIN_TEXELS * texelSizeX;
+      aabb.minY -= MARGIN_TEXELS * texelSizeY;
+      aabb.maxY += MARGIN_TEXELS * texelSizeY;
 
       // 2.7. Configurar la shadow camera con el MISMO lightView usado para el AABB
       const shadowCamera = this.shadowCameras[i];
@@ -491,7 +494,7 @@ export class DirectionalLightComponent extends Component {
     );
 
     // Shadow parameters - bytes 240-255
-    const shadowStep = 2.0;
+    const shadowStep = 1.0;
     const shadowInverseResolution =
       1.0 / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
     const shadowStepDivResolution =

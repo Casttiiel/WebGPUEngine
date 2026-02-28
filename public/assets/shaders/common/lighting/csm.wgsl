@@ -105,13 +105,10 @@ fn getShadowFactorForCascade(
         lightUVSpacePos.y < 0.0 || lightUVSpacePos.y > 1.0) {
         return 1.0; // Out of UV range = no shadow
     }
-    
-    // CRITICAL: Snap UV to texel center BEFORE PCF kernel
-    // This eliminates sub-pixel micro-shifts when camera moves
-    let texelSize = shadowStepDivResolution / 1.5; // Approximately 1/resolution
-    let snappedUV = (floor(lightUVSpacePos.xy / texelSize) + 0.5) * texelSize;
 
-    return shadowsTapCSM(snappedUV, lightUVSpacePos.z, shadowMap, shadowSampler);
+    let uv = lightUVSpacePos.xy;
+
+    return shadowsTapCSM(uv, lightUVSpacePos.z, shadowMap, shadowSampler);
 }
 
 // ===========================

@@ -1,13 +1,15 @@
 ### Engine
 
-1. CSM: Logarithmic depth o reversed-Z or less max shadow distance
+1. CSM: Logarithmic depth o reversed-Z (Bias changes?)
 2. Froxel: Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
-3. Froxel: on change screen size error
-4. Froxel: on change camera, we need to destroy camerabindgroup
-5. Froxel: Self occlusion
+3. Froxel: Self occlusion
+
+4. Froxel: on change screen size error
+5. Froxel: on change camera, we need to destroy camerabindgroup
 6. Open Editor multiple times, creates data multiple times
 7. Mesh one single buffer
 8. Transform matrix multiplication frequency
+
 9. SS Global Illumination + Froxel
 10. Contact Shadows
 11. Optimize with compute shaders

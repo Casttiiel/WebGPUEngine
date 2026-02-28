@@ -56,28 +56,29 @@ fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {
 
 fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeCount = i32(directionalLight.cascadeSplits.w);
-    let blendRegion = 0.1;
     
-    var cascadeIndex = selectCascadeCSM(viewSpaceDepth, directionalLight.cascadeSplits);
-    var blendFactor = 0.0;
-    
-    if (cascadeIndex == 0 && viewSpaceDepth > directionalLight.cascadeSplits.x * (1.0 - blendRegion)) {
-        let splitDist = directionalLight.cascadeSplits.x;
-        let blendStart = splitDist * (1.0 - blendRegion);
-        blendFactor = (viewSpaceDepth - blendStart) / (splitDist - blendStart);
-    } else if (cascadeIndex == 1 && cascadeCount > 2 && viewSpaceDepth > directionalLight.cascadeSplits.y * (1.0 - blendRegion)) {
-        let splitDist = directionalLight.cascadeSplits.y;
-        let blendStart = splitDist * (1.0 - blendRegion);
-        blendFactor = (viewSpaceDepth - blendStart) / (splitDist - blendStart);
+    if (cascadeCount == 1) {
+        return getShadowFactorForCascadeIndex(worldPos,0);
     }
-
+    
+    let blendZone = 2.0; // 2 metros fijos, igual para todas las cascadas
+    var cascadeIndex = selectCascadeCSM(viewSpaceDepth, directionalLight.cascadeSplits);
+    
+    // Calcular split distance de la cascada actual
+    var splitDist = directionalLight.cascadeSplits.x;
+    if (cascadeIndex == 1) { splitDist = directionalLight.cascadeSplits.y; }
+    else if (cascadeIndex == 2) { splitDist = directionalLight.cascadeSplits.z; }
+    
+    let blendStart = splitDist - blendZone;
+    let blendFactor = saturate((viewSpaceDepth - blendStart) / blendZone);
+    
     if (blendFactor < 0.01) {
         return getShadowFactorCSM(worldPos, viewSpaceDepth);
     }
     
+    // Solo hacer doble lookup en la zona de blend real (2m)
     let shadowFactor1 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex);
     let shadowFactor2 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex + 1);
-
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
 }
 

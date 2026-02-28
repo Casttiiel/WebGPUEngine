@@ -83,34 +83,28 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeCount = i32(light.cascadeSplits.w);
     
     if (cascadeCount == 1) {
-        return getShadowFactor(
-            worldPos,
-            light.viewProjOffset0, light.shadowParams.z,
-            gShadowMap0, gShadowSampler, false
-        );
+        return getShadowFactor(worldPos, light.viewProjOffset0, 
+                               light.shadowParams.z, gShadowMap0, gShadowSampler, false);
     }
     
-    let blendRegion = 0.1;
+    let blendZone = 2.0; // 2 metros fijos, igual para todas las cascadas
     var cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
-    var blendFactor = 0.0;
     
-    if (cascadeIndex == 0 && viewSpaceDepth > light.cascadeSplits.x * (1.0 - blendRegion)) {
-        let splitDist = light.cascadeSplits.x;
-        let blendStart = splitDist * (1.0 - blendRegion);
-        blendFactor = (viewSpaceDepth - blendStart) / (splitDist - blendStart);
-    } else if (cascadeIndex == 1 && cascadeCount > 2 && viewSpaceDepth > light.cascadeSplits.y * (1.0 - blendRegion)) {
-        let splitDist = light.cascadeSplits.y;
-        let blendStart = splitDist * (1.0 - blendRegion);
-        blendFactor = (viewSpaceDepth - blendStart) / (splitDist - blendStart);
-    }
+    // Calcular split distance de la cascada actual
+    var splitDist = light.cascadeSplits.x;
+    if (cascadeIndex == 1) { splitDist = light.cascadeSplits.y; }
+    else if (cascadeIndex == 2) { splitDist = light.cascadeSplits.z; }
+    
+    let blendStart = splitDist - blendZone;
+    let blendFactor = saturate((viewSpaceDepth - blendStart) / blendZone);
     
     if (blendFactor < 0.01) {
         return getShadowFactorCSM(worldPos, viewSpaceDepth);
     }
     
+    // Solo hacer doble lookup en la zona de blend real (2m)
     let shadowFactor1 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex);
     let shadowFactor2 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex + 1);
-    
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
 }
 
@@ -123,7 +117,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     }
 
     // Calcular distancia en view space para selección de cascada
-    let viewSpaceDepth = abs((camera.viewMatrix * vec4(g.worldPos,1)).z);
+    let viewSpaceDepth = g.zlinear * camera.cameraFar;
     
     // Determinar cascada usando función consolidada
     let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
