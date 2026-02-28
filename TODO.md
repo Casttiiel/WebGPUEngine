@@ -1,16 +1,15 @@
 ### Engine
 
-1. Froxel: Light Shafts parpadean (Dither en raymarch en todos los ejes o blur 3d)
-2. Froxel: Self occlusion
+1. Froxel: Light Shafts parpadean (blur 3d)
+2. Open Editor multiple times, creates data multiple times
+3. Froxel: on change screen size error
+4. Froxel: on change camera, we need to destroy camerabindgroup
+5. Mesh one single buffer
+6. Transform matrix multiplication frequency
 
-3. Open Editor multiple times, creates data multiple times
-4. Froxel: on change screen size error
-5. Froxel: on change camera, we need to destroy camerabindgroup
-6. Mesh one single buffer
-7. Transform matrix multiplication frequency
-
-8. SS Global Illumination + Froxel
-9. Contact Shadows
+7. SS Global Illumination + Froxel
+8. Contact Shadows
+9. Froxel: Self occlusion
 10. Optimize with compute shaders
 11. Improve particles
 12. UI
