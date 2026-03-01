@@ -42,6 +42,7 @@ import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { SphereColliderComponent } from '../../components/physics/SphereColliderComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
+import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -265,6 +266,8 @@ export class Loader {
         return new SwingBarComponent();
       case 'height_fog':
         return new HeightFogComponent();
+      case 'contact_shadows':
+        return new ContactShadowsComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

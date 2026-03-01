@@ -649,6 +649,17 @@ export class DirectionalLightComponent extends Component {
     return this.hasShadows;
   }
 
+  /**
+   * Returns the world-space direction FROM any surface TOWARD this light source.
+   * This is the negation of the internal lightDirection (which points FROM source TO target).
+   * Use this for contact shadows or other effects that need the "toward light" direction.
+   */
+  public getLightDirectionToSource(): vec3 {
+    const result = vec3.create();
+    vec3.negate(result, this.lightDirection);
+    return result;
+  }
+
   // Setters for atmospheric lighting system
   public setColor(color: number[]): void {
     this.color = color;

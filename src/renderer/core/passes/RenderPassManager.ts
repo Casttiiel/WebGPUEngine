@@ -20,6 +20,7 @@ import {
   MotionBlurRenderPass,
   SpeedLinesVFXRenderPass,
   HeightFogRenderPass,
+  ContactShadowsRenderPass,
 } from './PostProcessingRenderPasses';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderTarget } from '../../resources/RenderTarget';
@@ -328,6 +329,27 @@ export class RenderPassManager {
       technique,
       paramsBindGroup,
       texturesBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Create and execute a contact shadows pass dynamically
+   */
+  public executeContactShadowsPass(
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const pass = new ContactShadowsRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      gBufferBindGroup,
+      paramsBindGroup,
     );
     this.executeDynamicPass(pass);
   }

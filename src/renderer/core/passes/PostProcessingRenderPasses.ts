@@ -315,6 +315,33 @@ export class MotionBlurRenderPass extends PostProcessingRenderPass {
 }
 
 /**
+ * Contact shadows post-processing render pass.
+ * group 0 = camera, group 1 = GBuffer, group 2 = params (accLight tex + sampler + uniform)
+ */
+export class ContactShadowsRenderPass extends PostProcessingRenderPass {
+  private gBufferBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.gBufferBindGroup = gBufferBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.gBufferBindGroup);
+    pass.setBindGroup(2, this.paramsBindGroup);
+  }
+}
+
+/**
  * Height Fog post-processing render pass
  */
 export class HeightFogRenderPass extends PostProcessingRenderPass {

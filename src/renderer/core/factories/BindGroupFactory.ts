@@ -1275,6 +1275,30 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * Contact shadows bind group layout (group 2)
+   * binding 0: accLight texture, binding 1: sampler, binding 2: params uniform
+   */
+  public static getContactShadowsUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('contact_shadows_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   public static getFogUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('fog_uniforms', [
       {
@@ -1361,6 +1385,8 @@ export class BindGroupFactory {
         return this.getVelocityBufferUniformsLayout();
       case PipelineBindGroupLayouts.FOG_UNIFORMS:
         return this.getFogUniformsLayout();
+      case PipelineBindGroupLayouts.CONTACT_SHADOWS_UNIFORMS:
+        return this.getContactShadowsUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

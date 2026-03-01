@@ -1,18 +1,19 @@
 ### Engine
 
-1. Point Light shadows
-2. Multiple Light probes has good shadows?
-3. Reflection Probes con blending
-4. Clouds
-5. Contact Shadows
-6. High Sponza low frame rate on near doors
+1. Contact Shadows
+2. High Sponza low frame rate on near doors
+3. Multiple Light probes has good shadows?
+4. Reflection Probes con blending
 
-7. Better loading speed
-8. FSR 1.0
-9. TAA
-10. Optimize with compute shaders
-11. Froxel: Self occlusion
-12. SS Global Illumination
+5. Point light shadows banding
+6. Optimize with compute shaders
+7. SS Global Illumination
+
+8. Better loading speed
+9. FSR 1.0
+10. TAA
+11. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
+12. Froxel: Self occlusion
 13. Froxel Global Illumination
 14. UI
 15. Improve particles
@@ -22,12 +23,11 @@
 Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast Fall, Slide, Dash
 
 1. Landing camera animation
-2. Momentum
-3. Blur on borders
-4. Vignetting
-5. WallJump Coyote time
-6. Jump right on change inclination and then wallrun
-7. Door
+2. Jump right on change inclination and then wallrun
+3. WallJump Coyote time
+4. Momentum
+5. Blur on borders
+6. Door
 
 ## Visuals and Sound
 

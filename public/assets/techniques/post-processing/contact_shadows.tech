@@ -1,0 +1,11 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/contact_shadows.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferUniforms",
+        "ContactShadowsUniforms"
+    ]
+}

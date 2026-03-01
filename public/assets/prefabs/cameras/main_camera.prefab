@@ -5,6 +5,7 @@
       "tone_mapping": {},
       "smaa": {}, 
       "ambient_occlusion": {},
+      "contact_shadows": {},
       "bloom": {}
     }
   }
