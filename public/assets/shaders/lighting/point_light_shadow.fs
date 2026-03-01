@@ -42,21 +42,31 @@ fn PS_point_lights_shadow(@builtin(position) position: vec4<f32>) -> @location(0
     let pos = position.xy / camera.screenSize;
     let g = decodeGBuffer(pos);
 
+    let light_dir_full = light.position.xyz - g.worldPos;
+    let distance_to_light = length(light_dir_full);
+    let light_dir = light_dir_full / distance_to_light;
+
+    // Normal bias: shift the shadow query point along the surface normal,
+    // scaled by the angle of incidence — maximum at grazing angles where
+    // depth-only bias is insufficient to prevent acne on flat surfaces.
+    let NdL_raw = dot(g.normal, light_dir);
+    let normalBiasScale = clamp(1.0 - NdL_raw, 0.0, 1.0);
+    let biasedWorldPos = g.worldPos + g.normal * 0.05 * normalBiasScale;
+
+    // Shadow sample MUST happen before any non-uniform early return.
     let shadow_factor = getShadowFactorCube(
-        g.worldPos,
+        biasedWorldPos,
         light.position.xyz,
         light.shadowNear,
         light.shadowFar,
+        light.shadowStepDivResolution,
         gPointShadowCube,
         gShadowSampler,
     );
 
-    let light_dir_full = light.position.xyz - g.worldPos;
-    let distance_to_light = abs(length(light_dir_full));
-    let light_dir = light_dir_full / distance_to_light;
-
-    let NdL = max(dot(g.normal, light_dir), 0.0);
+    let NdL = max(NdL_raw, 0.0);
     let NdV = max(dot(g.normal, g.viewDir), 0.0);
+    // Safe to early-return here — shadow sample already done.
     if (NdL <= 0.0 || NdV <= 0.0) {
         return vec4<f32>(0.0);
     }

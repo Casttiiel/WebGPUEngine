@@ -61,41 +61,61 @@ fn getShadowFactorCube(
     lightPos: vec3<f32>,
     shadowNear: f32,
     shadowFar: f32,
+    invResolution: f32,   // 1.0 / shadowResolution — for texel-accurate bias
     shadowCube: texture_depth_cube,
     shadowSampler: sampler_comparison,
 ) -> f32 {
     let dir  = wPos - lightPos;
     let dist = length(dir);
 
-    // The face camera stores depth using its view-space Z = the dominant axis component.
-    let absDir = abs(dir);
-    let faceZ  = max(absDir.x, max(absDir.y, absDir.z));
-
-    // gl-matrix lookAt builds a right-vector that is the mirror of what WebGPU/Vulkan
-    // cubemap sampling expects. The mismatch is in the sc (horizontal UV) component,
-    // which differs per major axis:
-    //   ±X faces: sc_vulkan = -dir.z, sc_rendered = +dir.z  → negate dir.z to fix
-    //   ±Y faces: sc_vulkan = +dir.x, sc_rendered = -dir.x  → negate dir.x to fix
-    //   ±Z faces: sc_vulkan = +dir.x, sc_rendered = -dir.x  → negate dir.x to fix
-    // Both branches converge before textureSampleCompare so uniform control flow is preserved.
-    let xDominant = absDir.x >= absDir.y && absDir.x >= absDir.z;
-    let sampleDir = select(
-        vec3<f32>(-dir.x, dir.y,  dir.z),   // ±Y / ±Z dominant: negate X
-        vec3<f32>( dir.x, dir.y, -dir.z),   // ±X dominant:      negate Z
-        xDominant
-    );
-
-    // ZO perspective depth formula matching perspectiveZO projection
+    // Perspective depth constants (ZO — zero-to-one, matching perspectiveZO)
     let A = shadowFar / (shadowFar - shadowNear);
-    let B = -(shadowFar * shadowNear) / (shadowFar - shadowNear);
-    let ref_depth = clamp(A + B / max(faceZ, 0.0001), 0.0, 1.0) - 0.002;
+    let B = -(shadowFar * shadowNear) / (shadowFar - shadowNear); // B < 0
 
-    // Use select (not early return) to keep uniform control flow for textureSampleCompare.
-    // compare:'less' → returns 1.0 (lit) when ref < stored. 0.0 is always < stored → lit.
-    let in_range = dist >= shadowNear && dist <= shadowFar;
-    let cmp_depth = select(0.0, ref_depth, in_range);
+    // Problem 1 fix — texel-accurate bias.
+    // 1 texel in world space at a face = 2*faceZ / shadowResolution (FOV 90°).
+    // Converting to NDC: dDepth/dfaceZ = |B|/faceZ², so
+    //   texelBias = (2*faceZ/res) * |B|/faceZ² = 2*|B| / (res*faceZ)
+    // We apply it per-tap below where each tap has its own faceZ.
 
-    return textureSampleCompare(shadowCube, shadowSampler, sampleDir, cmp_depth);
+    // Problem 3 fix — smooth kernel with a guaranteed minimum so it never
+    // collapses near the light or explodes far away.
+    let kernelRadius = 0.02 * dist + 0.001;
+
+    // Tangent frame built on the ORIGINAL dir (Problem 2 fix — see tap loop).
+    let dirN    = normalize(dir);
+    let worldUp = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), abs(dirN.y) < 0.99);
+    let right   = normalize(cross(dirN, worldUp));
+    let up      = normalize(cross(right, dirN));
+
+    var shadow = 0.0;
+    for (var i = 0; i < 8; i++) {
+        // Offset applied in original (uncorrected) direction space.
+        let tapDir = dir + right * poissonDisk[i].x * kernelRadius
+                        + up    * poissonDisk[i].y * kernelRadius;
+
+        // Problem 2 fix — apply the gl-matrix/WebGPU cubemap correction per tap.
+        // Every tap may land on a different face, so each needs its own correction:
+        //   ±X dominant: negate Z   |   ±Y / ±Z dominant: negate X
+        let tapAbs  = abs(tapDir);
+        let tapXDom = tapAbs.x >= tapAbs.y && tapAbs.x >= tapAbs.z;
+        let tapSampleDir = select(
+            vec3<f32>(-tapDir.x,  tapDir.y,  tapDir.z),
+            vec3<f32>( tapDir.x,  tapDir.y, -tapDir.z),
+            tapXDom
+        );
+
+        // Depth and bias computed for this tap's face.
+        let tapFaceZ    = max(max(tapAbs.x, tapAbs.y), tapAbs.z);
+        let tapFaceZs   = max(tapFaceZ, 0.0001);
+        let texelBias   = 2.0 * abs(B) * invResolution / tapFaceZs; // ~1.5 texels
+        let tap_depth   = clamp(A + B / tapFaceZs - texelBias * 1.5, 0.0, 1.0);
+        let tap_in_range = tapFaceZ >= shadowNear && tapFaceZ <= shadowFar;
+        let tap_cmp     = select(0.0, tap_depth, tap_in_range);
+
+        shadow += textureSampleCompare(shadowCube, shadowSampler, tapSampleDir, tap_cmp);
+    }
+    return shadow / 8.0;
 }
 
 fn getShadowFactorSimple(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {

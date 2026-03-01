@@ -5,11 +5,11 @@
 3. Reflection Probes con blending
 4. Clouds
 5. Contact Shadows
+6. High Sponza low frame rate on near doors
 
-6. Better loading speed
-7. FSR 1.0
-8. TAA
-9. High Sponza low frame rate on near doors
+7. Better loading speed
+8. FSR 1.0
+9. TAA
 10. Optimize with compute shaders
 11. Froxel: Self occlusion
 12. SS Global Illumination
