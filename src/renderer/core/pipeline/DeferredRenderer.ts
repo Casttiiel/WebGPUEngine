@@ -204,7 +204,9 @@ export class DeferredRenderer {
     this.gBufferPass.load();
 
     this.pointLightTechnique = await Technique.getAsync('lighting/point_light.tech');
-    this.pointLightWithShadowsTechnique = await Technique.getAsync('lighting/point_light_shadows.tech');
+    this.pointLightWithShadowsTechnique = await Technique.getAsync(
+      'lighting/point_light_shadows.tech',
+    );
     this.spotLightTechnique = await Technique.getAsync('lighting/spot_light.tech');
     this.spotLightWithShadowsTechnique = await Technique.getAsync(
       'lighting/spot_light_shadows.tech',
@@ -231,7 +233,8 @@ export class DeferredRenderer {
         spotLightComponent.generateShadowMap();
     }
 
-    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ?? []) {
+    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
+      []) {
       const pointLightComponent = comp as PointLightComponent;
       if (pointLightComponent.hasShadows() && pointLightComponent.isVisible())
         pointLightComponent.generateShadowMap();

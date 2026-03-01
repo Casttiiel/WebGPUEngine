@@ -1,9 +1,9 @@
 ### Engine
 
-1. Multiple Light probes has good shadows?
-2. Reflection Probes con blending
-3. Clouds
-4. Point Light shadows
+1. Point Light shadows
+2. Multiple Light probes has good shadows?
+3. Reflection Probes con blending
+4. Clouds
 
 5. TAA
 6. Froxel: Self occlusion

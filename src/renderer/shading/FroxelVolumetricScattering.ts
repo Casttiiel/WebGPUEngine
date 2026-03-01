@@ -395,7 +395,7 @@ export class FroxelVolumetricScattering {
   }
 
   public updateFroxelData(linearDepth: RenderTarget): void {
-    if (!this.isEnabled) {
+    if (!this.isEnabled || this.fogDensity === 0.0) {
       return;
     }
 
@@ -892,7 +892,7 @@ export class FroxelVolumetricScattering {
     }
 
     // Volumetric parameters with automatic UI updates
-    folder.add(this, 'fogDensity', 0.001, 0.02).name('Fog Density').listen();
+    folder.add(this, 'fogDensity', 0.0, 0.03).name('Fog Density').listen();
 
     folder.add(this, 'scatteringCoeff', 0.0, 2.0).name('Scattering Coeff').listen();
 

@@ -118,25 +118,14 @@ export class ModuleEditorSelection extends Module {
         module: vsModule,
         entryPoint: 'main',
         buffers: [
-          // Buffer 0: Position
+          // Buffer 0: Position (from interleaved mesh buffer, stride 48 bytes)
           {
-            arrayStride: 3 * 4, // vec3<f32>
+            arrayStride: 48, // Mesh.VERTEX_STRIDE_BYTES — interleaved buffer
             attributes: [
               {
                 shaderLocation: 0,
                 offset: 0,
-                format: 'float32x3',
-              },
-            ],
-          },
-          // Buffer 1: Barycentric
-          {
-            arrayStride: 3 * 4, // vec3<f32>
-            attributes: [
-              {
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x3',
+                format: 'float32x3', // position at byte offset 0
               },
             ],
           },
