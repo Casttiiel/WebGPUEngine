@@ -97,6 +97,8 @@ export class TransformComponent extends Component {
     for (const child of children) {
       const transformComponent = child.getComponent('transform') as TransformComponent;
       if (transformComponent) {
+        // Mark the child dirty so its updateWorldTransform knows parent world changed
+        transformComponent.getTransform().markDirty();
         transformComponent.updateWorldTransform();
         transformComponent.updateModelMatrix();
         transformComponent.updateChildrenTransforms();
@@ -105,6 +107,9 @@ export class TransformComponent extends Component {
   }
 
   public update(): void {
+    // Only do work when something actually changed
+    if (!this.transform.getIsDirty()) return;
+
     this.updateWorldTransform();
     this.updateModelMatrix();
     this.updateChildrenTransforms();

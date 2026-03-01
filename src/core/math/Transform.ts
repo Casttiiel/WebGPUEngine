@@ -16,6 +16,15 @@ export class Transform {
 
   constructor() {}
 
+  public getIsDirty(): boolean {
+    return this.isDirty;
+  }
+
+  /** Called by parent TransformComponent to propagate world-space changes down the hierarchy */
+  public markDirty(): void {
+    this.isDirty = true;
+  }
+
   // Position methods
   public getLocalPosition(): vec3 {
     return this.localPosition;
@@ -94,7 +103,8 @@ export class Transform {
   }
 
   public updateWorldTransform(parentWorldTransform?: Transform): void {
-    if (!this.isDirty && !parentWorldTransform) return;
+    // Skip entirely if nothing changed — parent must mark us dirty before calling this
+    if (!this.isDirty) return;
 
     if (parentWorldTransform) {
       // Update world position

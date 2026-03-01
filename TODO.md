@@ -4,18 +4,17 @@
 2. Reflection Probes con blending
 3. Clouds
 4. Point Light shadows
-5. Transform matrix multiplication frequency
 
-6. TAA
-7. Froxel: Self occlusion
-8. Froxel: on change screen size error
-9. Froxel: on change camera, we need to destroy camerabindgroup
-10. Optimize with compute shaders
-11. Contact Shadows
-12. SS Global Illumination
-13. Froxel Global Illumination
-14. UI
-15. Improve particles
+5. TAA
+6. Froxel: Self occlusion
+7. Froxel: on change screen size error
+8. Froxel: on change camera, we need to destroy camerabindgroup
+9. Optimize with compute shaders
+10. Contact Shadows
+11. SS Global Illumination
+12. Froxel Global Illumination
+13. UI
+14. Improve particles
 
 ## Gameplay
 
