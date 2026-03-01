@@ -91,18 +91,21 @@ export class GUIManager {
   }
 
   /**
-   * Begin a window/folder for organizing controls
+   * Begin a window/folder for organizing controls.
+   * Returns true only when newly created so controls are added exactly once.
    */
   public beginWindow(name: string, _defaultOpen: boolean = true): boolean {
     if (!this.initialized || !this.isVisible || !this.gui) return false;
 
-    // Create or get folder
-    let folder = this.folders.get(name);
-    if (!folder) {
-      folder = this.gui.addFolder(name);
-      folder.close(); // Start collapsed by default
-      this.folders.set(name, folder);
+    // Create or get folder — only populate content on first creation
+    const existing = this.folders.get(name);
+    if (existing) {
+      return false; // Already populated, skip re-adding controls
     }
+
+    const folder = this.gui.addFolder(name);
+    folder.close(); // Start collapsed by default
+    this.folders.set(name, folder);
 
     return true;
   }
@@ -115,7 +118,8 @@ export class GUIManager {
   }
 
   /**
-   * Begin a collapsible folder
+   * Begin a collapsible folder.
+   * Returns true only when newly created so controls are added exactly once.
    */
   public beginFolder(label: string): boolean {
     if (!this.initialized || !this.isVisible || !this.gui) return false;
@@ -124,7 +128,12 @@ export class GUIManager {
     const parent = this.getCurrentContext();
     if (!parent) return false;
 
-    // Create subfolder
+    // Create or get existing subfolder — only populate content on first creation
+    const existing = this.folders.get(label);
+    if (existing) {
+      return false; // Already populated, skip re-adding controls
+    }
+
     const folder = parent.addFolder(label);
     folder.close(); // Start collapsed by default
     this.folders.set(label, folder);

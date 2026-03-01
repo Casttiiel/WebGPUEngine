@@ -1,22 +1,22 @@
 ### Engine
 
-1. Froxel: Light Shafts parpadean (blur 3d)
-2. Open Editor multiple times, creates data multiple times
-3. Froxel: on change screen size error
-4. Froxel: on change camera, we need to destroy camerabindgroup
-5. Mesh one single buffer
+1. Mesh one single buffer
+2. Multiple Light probes has good shadows?
+3. Reflection Probes con blending
+4. Clouds
+5. Point Light shadows
 6. Transform matrix multiplication frequency
 
-7. SS Global Illumination + Froxel
-8. Contact Shadows
-9. Froxel: Self occlusion
-10. Optimize with compute shaders
-11. Improve particles
-12. UI
-13. Reflection Probes con blending
-14. Multiple Light probes has good shadows?
-15. Point Light shadows
-16. Clouds
+7. TAA
+8. Froxel: Self occlusion
+9. Froxel: on change screen size error
+10. Froxel: on change camera, we need to destroy camerabindgroup
+11. Optimize with compute shaders
+12. Contact Shadows
+13. SS Global Illumination
+14. Froxel Global Illumination
+15. UI
+16. Improve particles
 
 ## Gameplay
 
