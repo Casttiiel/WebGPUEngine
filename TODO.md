@@ -7,14 +7,13 @@
 
 5. TAA
 6. Froxel: Self occlusion
-7. Froxel: on change screen size error
-8. Froxel: on change camera, we need to destroy camerabindgroup
-9. Optimize with compute shaders
-10. Contact Shadows
-11. SS Global Illumination
-12. Froxel Global Illumination
-13. UI
-14. Improve particles
+7. Froxel: on change camera, we need to destroy camerabindgroup
+8. Optimize with compute shaders
+9. Contact Shadows
+10. SS Global Illumination
+11. Froxel Global Illumination
+12. UI
+13. Improve particles
 
 ## Gameplay
 

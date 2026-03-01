@@ -50,6 +50,40 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
 }
 
 
+// PCF cube shadow for omnidirectional (point) lights
+// Computes the expected NDC depth analytically from distance using the light's near/far planes,
+// then samples the cube with 4 axis-aligned jitter taps for soft shadows.
+fn getShadowFactorCube(
+    wPos: vec3<f32>,
+    lightPos: vec3<f32>,
+    shadowNear: f32,
+    shadowFar: f32,
+    shadowCube: texture_depth_cube,
+    shadowSampler: sampler_comparison,
+) -> f32 {
+    let dir  = wPos - lightPos;
+    let dist = max(length(dir), 0.0001); // avoid div-by-zero
+
+    // Perspective NDC depth matching each cube face projection:
+    // depth = A + B/z,  A = far/(far-near),  B = -(far*near)/(far-near)
+    let A = shadowFar / (shadowFar - shadowNear);
+    let B = -(shadowFar * shadowNear) / (shadowFar - shadowNear);
+    let computed_depth = clamp(A + B / dist, 0.0, 1.0);
+
+    // When dist is out of range, use depth_ref = 0.0 so the comparison always
+    // returns 1.0 (fully lit) — avoids a non-uniform early return.
+    let in_range = (dist >= shadowNear) && (dist <= shadowFar);
+    let depth_ref = select(0.0, computed_depth, in_range);
+
+    let eps = 0.01 * dist / shadowFar;
+    var shadow = 0.0;
+    shadow += textureSampleCompare(shadowCube, shadowSampler, dir + vec3<f32>( eps, 0.0, 0.0), depth_ref);
+    shadow += textureSampleCompare(shadowCube, shadowSampler, dir + vec3<f32>(-eps, 0.0, 0.0), depth_ref);
+    shadow += textureSampleCompare(shadowCube, shadowSampler, dir + vec3<f32>(0.0,  eps, 0.0), depth_ref);
+    shadow += textureSampleCompare(shadowCube, shadowSampler, dir + vec3<f32>(0.0, -eps, 0.0), depth_ref);
+    return shadow * 0.25;
+}
+
 fn getShadowFactorSimple(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;

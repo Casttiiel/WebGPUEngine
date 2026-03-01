@@ -8,6 +8,20 @@ import { PointLightComponentData } from '../../types/PointLightComponentData.typ
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Texture } from '../../renderer/resources/Texture';
 import { AABB } from '../../core/math/AABB';
+import { Camera } from '../../core/math/Camera';
+import { Render } from '../../renderer/core/pipeline/Render';
+import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
+import { RenderCategory } from '../../types/RenderCategory.enum';
+
+// WebGPU cube face order: +X, -X, +Y, -Y, +Z, -Z
+const CUBE_FACE_SETUPS = [
+  { target: vec3.fromValues( 1,  0,  0), up: vec3.fromValues(0, -1,  0) }, // +X
+  { target: vec3.fromValues(-1,  0,  0), up: vec3.fromValues(0, -1,  0) }, // -X
+  { target: vec3.fromValues( 0,  1,  0), up: vec3.fromValues(0,  0,  1) }, // +Y
+  { target: vec3.fromValues( 0, -1,  0), up: vec3.fromValues(0,  0, -1) }, // -Y
+  { target: vec3.fromValues( 0,  0,  1), up: vec3.fromValues(0, -1,  0) }, // +Z
+  { target: vec3.fromValues( 0,  0, -1), up: vec3.fromValues(0, -1,  0) }, // -Z
+] as const;
 
 export class PointLightComponent extends Component {
   private color = vec4.create();
@@ -17,6 +31,7 @@ export class PointLightComponent extends Component {
   private startFallof = 0.0;
   private isDirty = true;
   private _isVisible = false;
+  private _hasShadows = false;
   private projectorTexture!: Texture;
   private projectorTextureView!: GPUTextureView;
 
@@ -24,6 +39,15 @@ export class PointLightComponent extends Component {
   private uniformBuffer!: GPUBuffer;
 
   private dummyShadowTexture!: GPUTexture;
+
+  // Shadow resources (only created when hasShadows = true)
+  private shadowResolution = 512;
+  private shadowNear = 0.05;
+  private shadowCubeTexture!: GPUTexture;
+  private shadowCubeFaceViews: GPUTextureView[] = []; // 6 face views for rendering
+  private shadowCubeView!: GPUTextureView;             // cube view for sampling
+  private shadowCameras: Camera[] = [];               // 6 per-face cameras
+
   private technique!: Technique;
 
   // ✅ Reusable buffers for GPU writes (zero allocations in update)
@@ -42,20 +66,24 @@ export class PointLightComponent extends Component {
     if (data.color) {
       vec4.copy(this.color, data.color);
     }
-
     if (data.intensity) {
       this.intensity = data.intensity;
     }
-
     if (data.radius) {
       this.radius = data.radius;
     }
-
     if (data.startFallof) {
       this.startFallof = data.startFallof;
     }
+    if (data.hasShadows) {
+      this._hasShadows = data.hasShadows;
+    }
+    if (data.shadowResolution) {
+      this.shadowResolution = data.shadowResolution;
+    }
 
-    this.technique = await Technique.getAsync('lighting/point_light.tech');
+    this.shadowNear = Math.max(0.01, this.radius * 0.005);
+
     this.uniformBuffer = GPUUtils.createBuffer(
       'point light uniform buffer',
       36 * 4,
@@ -65,48 +93,133 @@ export class PointLightComponent extends Component {
     this.projectorTexture = await Texture.getAsync('white.png');
     this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
-    // Create dummy shadow resources for the DIRECTIONAL_LIGHT_UNIFORMS layout
-    this.dummyShadowTexture = GPUUtils.createTexture(
-      'dummy_shadow_texture_point_light',
-      1,
-      1,
-      'depth32float',
-      GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
-    );
-    const dummyShadowSampler = SamplerLibrary.shadows;
+    if (this._hasShadows) {
+      this.technique = await Technique.getAsync('lighting/point_light_shadows.tech');
+      this.initShadowResources();
+    } else {
+      this.technique = await Technique.getAsync('lighting/point_light.tech');
+      // Dummy 2D shadow texture to satisfy the non-shadow bind group layout
+      this.dummyShadowTexture = GPUUtils.createTexture(
+        'dummy_shadow_texture_point_light',
+        1,
+        1,
+        'depth32float',
+        GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      );
+    }
 
-    this.uniformBindGroup = BindGroupFactory.createBindGroup(
-      `point light uniform bind group`,
-      this.technique.getPipeline().getBindGroupLayout(3)!,
-      [
-        {
-          binding: 0,
-          resource: { buffer: this.uniformBuffer },
-        },
-        {
-          binding: 1,
-          resource: this.dummyShadowTexture.createView(),
-        },
-        {
-          binding: 2,
-          resource: dummyShadowSampler,
-        },
-        {
-          binding: 3,
-          resource: this.projectorTextureView!,
-        },
-        {
-          binding: 4,
-          resource: SamplerLibrary.simpleSampler,
-        },
-      ],
-    );
-
+    this.buildBindGroup();
     this.calculateWorldAABB();
   }
 
+  // ─── Shadow helpers ───────────────────────────────────────────────────────
+
+  private initShadowResources(): void {
+    const res = this.shadowResolution;
+
+    // 6-layer 2D texture treated as a cubemap
+    this.shadowCubeTexture = GPUUtils.getDevice().createTexture({
+      label: 'point_light_shadow_cube',
+      size: [res, res, 6],
+      dimension: '2d',
+      format: 'depth32float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    // One face view per layer for rendering
+    this.shadowCubeFaceViews = [];
+    for (let face = 0; face < 6; face++) {
+      this.shadowCubeFaceViews.push(
+        this.shadowCubeTexture.createView({
+          label: `point_shadow_face_${face}`,
+          dimension: '2d',
+          aspect: 'depth-only',
+          baseArrayLayer: face,
+          arrayLayerCount: 1,
+        }),
+      );
+    }
+
+    // Cube view for shader sampling
+    this.shadowCubeView = this.shadowCubeTexture.createView({
+      label: 'point_shadow_cube_view',
+      dimension: 'cube',
+      aspect: 'depth-only',
+    });
+
+    // 6 cameras — one per cube face
+    this.shadowCameras = [];
+    for (let face = 0; face < 6; face++) {
+      const cam = new Camera();
+      cam.setViewport(this.shadowResolution, this.shadowResolution);
+      cam.setFov(90);
+      cam.setNearPlane(this.shadowNear);
+      cam.setFarPlane(this.radius);
+      this.shadowCameras.push(cam);
+    }
+  }
+
+  private buildBindGroup(): void {
+    const layout = this.technique.getPipeline().getBindGroupLayout(3)!;
+    const shadowResource = this._hasShadows
+      ? this.shadowCubeView
+      : this.dummyShadowTexture.createView();
+
+    this.uniformBindGroup = BindGroupFactory.createBindGroup(
+      'point light uniform bind group',
+      layout,
+      [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: shadowResource },
+        { binding: 2, resource: SamplerLibrary.shadows },
+        { binding: 3, resource: this.projectorTextureView },
+        { binding: 4, resource: SamplerLibrary.simpleSampler },
+      ],
+    );
+  }
+
+  // ─── Shadow generation ────────────────────────────────────────────────────
+
+  public generateShadowMap(): void {
+    if (!this._hasShadows) return;
+
+    const render = Render.getInstance();
+    const res  = this.shadowResolution;
+
+    // Update camera positions to current light world position before rendering
+    for (let face = 0; face < 6; face++) {
+      const setup = CUBE_FACE_SETUPS[face];
+      const target = vec3.add(vec3.create(), this.position, setup.target);
+      this.shadowCameras[face].lookAt(this.position, target, setup.up);
+      this.shadowCameras[face].updateUniforms(0);
+    }
+
+    // One render pass per face
+    for (let face = 0; face < 6; face++) {
+      const cam = this.shadowCameras[face];
+      RenderManager.getInstance().performCulling(cam, RenderCategory.SHADOWS);
+
+      const depthAttachment = GPUUtils.createDepthStencilAttachment(this.shadowCubeFaceViews[face]);
+      const pass = render.getCommandEncoder().beginRenderPass(
+        GPUUtils.createRenderPassDescriptor(
+          `point_light_shadow_face_${face}`,
+          [],
+          depthAttachment,
+        ),
+      );
+      GPUUtils.configureViewportAndScissor(pass, res, res);
+
+      RenderManager.getInstance().setCamera(cam);
+      RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
+
+      pass.end();
+    }
+  }
+
+  // ─── Per-frame update ─────────────────────────────────────────────────────
+
   public setBindGroup(pass: GPURenderPassEncoder): void {
-    pass.setBindGroup(3, this.uniformBindGroup); // point light parameters
+    pass.setBindGroup(3, this.uniformBindGroup);
   }
 
   public update(_dt: number): void {
@@ -118,7 +231,6 @@ export class PointLightComponent extends Component {
         .setLocalScale(vec3.fromValues(this.radius * 2.0, this.radius * 2.0, this.radius * 2.0));
       vec3.copy(this.position, transform.getTransform().getWorldPosition());
 
-      // ✅ Update reusable buffers instead of creating new Float32Arrays
       this.colorBuffer[0] = this.color[0];
       this.colorBuffer[1] = this.color[1];
       this.colorBuffer[2] = this.color[2];
@@ -144,8 +256,13 @@ export class PointLightComponent extends Component {
       GPUUtils.writeBuffer(this.uniformBuffer, 96, this.radiusBuffer);
       GPUUtils.writeBuffer(this.uniformBuffer, 112, this.falloffBuffer);
 
-      this.calculateWorldAABB();
+      if (this._hasShadows) {
+        // Write nearPlane and farPlane into the repurposed shadow param slots
+        GPUUtils.writeBuffer(this.uniformBuffer, 100, new Float32Array([this.shadowNear]));
+        GPUUtils.writeBuffer(this.uniformBuffer, 104, new Float32Array([this.radius]));
+      }
 
+      this.calculateWorldAABB();
       this.isDirty = false;
     }
   }
@@ -153,41 +270,28 @@ export class PointLightComponent extends Component {
   private calculateWorldAABB(): void {
     const r = this.radius;
     const pos = this.position;
-    const min = vec3.fromValues(pos[0] - r, pos[1] - r, pos[2] - r);
-    const max = vec3.fromValues(pos[0] + r, pos[1] + r, pos[2] + r);
-    this.aabb.min = min;
-    this.aabb.max = max;
+    this.aabb.min = vec3.fromValues(pos[0] - r, pos[1] - r, pos[2] - r);
+    this.aabb.max = vec3.fromValues(pos[0] + r, pos[1] + r, pos[2] + r);
   }
 
-  public debugInMenu(): void {
-    // Implement debug menu if needed
-  }
+  // ─── Accessors ────────────────────────────────────────────────────────────
 
-  public renderDebug(): void {
-    // Implement debug rendering if needed
-  }
-
-  public getUniformBuffer(): GPUBuffer {
-    return this.uniformBuffer;
-  }
+  public hasShadows(): boolean { return this._hasShadows; }
+  public isVisible(): boolean  { return this._isVisible;  }
+  public setIsVisible(visible: boolean): void { this._isVisible = visible; }
+  public getAABB(): AABB { return this.aabb; }
+  public getUniformBuffer(): GPUBuffer { return this.uniformBuffer; }
 
   public getShadowDepthView(): GPUTextureView {
-    return this.dummyShadowTexture.createView(); // Point lights do not have shadow maps in this implementation
+    return this._hasShadows
+      ? this.shadowCubeView
+      : this.dummyShadowTexture.createView();
   }
 
   public getShadowSampler(): GPUSampler {
     return SamplerLibrary.shadows;
   }
 
-  public isVisible(): boolean {
-    return this._isVisible;
-  }
-
-  public setIsVisible(visible: boolean): void {
-    this._isVisible = visible;
-  }
-
-  public getAABB(): AABB {
-    return this.aabb;
-  }
+  public debugInMenu(): void {}
+  public renderDebug(): void {}
 }

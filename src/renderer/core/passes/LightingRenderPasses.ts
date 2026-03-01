@@ -41,11 +41,11 @@ export class PointLightRenderPass extends BaseRenderPass {
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
     pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
 
-    // 4. Render all point lights
+    // 4. Render all point lights WITHOUT shadows
     for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
       []) {
       const pointLightComponent = comp as PointLightComponent;
-      if (!pointLightComponent.isVisible()) {
+      if (pointLightComponent.hasShadows() || !pointLightComponent.isVisible()) {
         continue;
       }
       const entity = pointLightComponent.getOwner();
@@ -148,6 +148,50 @@ export class SpotLightWithShadowsRenderPass extends BaseRenderPass {
       spotLightComponent.setBindGroup(pass);
 
       // Draw the mesh
+      this.mesh.renderGroup(pass);
+    }
+  }
+}
+
+/**
+ * Render pass for point lights WITH cubemap shadow support
+ */
+export class PointLightWithShadowsRenderPass extends BaseRenderPass {
+  private technique!: Technique;
+  private mesh!: Mesh;
+  private gBufferBindGroup!: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    technique: Technique,
+    mesh: Mesh,
+    gBufferBindGroup: GPUBindGroup,
+  ) {
+    super(config);
+    this.technique = technique;
+    this.mesh = mesh;
+    this.gBufferBindGroup = gBufferBindGroup;
+  }
+
+  protected render(pass: GPURenderPassEncoder): void {
+    GPUUtils.configureViewportAndScissor(pass);
+    this.technique.activatePipeline(pass);
+    this.mesh.activate(pass);
+
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.gBufferBindGroup);
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
+      []) {
+      const pointLightComponent = comp as PointLightComponent;
+      if (!pointLightComponent.hasShadows() || !pointLightComponent.isVisible()) {
+        continue;
+      }
+      const entity = pointLightComponent.getOwner();
+      const transform = entity.getComponent('transform') as TransformComponent;
+
+      pass.setBindGroup(2, transform.getModelBindGroup());
+      pointLightComponent.setBindGroup(pass);
       this.mesh.renderGroup(pass);
     }
   }

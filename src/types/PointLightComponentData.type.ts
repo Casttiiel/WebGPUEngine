@@ -5,4 +5,6 @@ export interface PointLightComponentData {
   intensity?: number;
   radius?: number;
   startFallof?: number;
+  hasShadows?: boolean;
+  shadowResolution?: number; // Face resolution in pixels (default 512)
 }

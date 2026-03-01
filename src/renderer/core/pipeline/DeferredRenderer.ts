@@ -15,6 +15,7 @@ import { DepthPrepass } from '../passes/DepthPrepass';
 import { RenderPassManager } from '../passes/RenderPassManager';
 import { Render } from './Render';
 import { DirectionalLightComponent } from '../../../components/render/DirectionalLightComponent';
+import { PointLightComponent } from '../../../components/render/PointLightComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
@@ -40,6 +41,7 @@ export class DeferredRenderer {
   private whiteTexture!: Texture;
 
   private pointLightTechnique!: Technique;
+  private pointLightWithShadowsTechnique!: Technique;
   private spotLightTechnique!: Technique;
   private spotLightWithShadowsTechnique!: Technique;
   private unitSphere!: Mesh;
@@ -57,6 +59,11 @@ export class DeferredRenderer {
 
     // Create G-Buffer pass with specified dimensions by resizing
     this.gBufferPass.resize();
+
+    // Invalidate any volumetric bind groups that reference the old GBuffer textures
+    if (this.froxelVolumetrics) {
+      this.froxelVolumetrics.resize();
+    }
 
     // Initialize render pass manager
     if (!this.renderPassManager) {
@@ -166,6 +173,7 @@ export class DeferredRenderer {
       this.rtAccLight,
       prepassDepthView,
       this.pointLightTechnique,
+      this.pointLightWithShadowsTechnique,
       this.spotLightTechnique,
       this.spotLightWithShadowsTechnique,
       this.unitSphere,
@@ -196,6 +204,7 @@ export class DeferredRenderer {
     this.gBufferPass.load();
 
     this.pointLightTechnique = await Technique.getAsync('lighting/point_light.tech');
+    this.pointLightWithShadowsTechnique = await Technique.getAsync('lighting/point_light_shadows.tech');
     this.spotLightTechnique = await Technique.getAsync('lighting/spot_light.tech');
     this.spotLightWithShadowsTechnique = await Technique.getAsync(
       'lighting/spot_light_shadows.tech',
@@ -220,6 +229,12 @@ export class DeferredRenderer {
       const spotLightComponent = comp as SpotLightComponent;
       if (spotLightComponent.hasShadows() && spotLightComponent.isVisible())
         spotLightComponent.generateShadowMap();
+    }
+
+    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ?? []) {
+      const pointLightComponent = comp as PointLightComponent;
+      if (pointLightComponent.hasShadows() && pointLightComponent.isVisible())
+        pointLightComponent.generateShadowMap();
     }
   }
 
@@ -328,6 +343,7 @@ export class DeferredRenderer {
       directionalLightComponent.render(this.rtAccLight.getView(), this.gBufferBindGroup);
     }
     this.renderPassManager.executePass('pointLights');
+    this.renderPassManager.executePass('pointLightsWithShadows');
     this.renderPassManager.executePass('spotLights');
     this.renderPassManager.executePass('spotLightsWithShadows');
 

@@ -29,4 +29,5 @@ export enum PipelineBindGroupLayouts {
   SMAA_BLEND_TEXTURES = 'SMAABlendTextures',
   SMAA_BLEND_PARAMS = 'SMAABlendParams',
   VELOCITY_BUFFER_UNIFORMS = 'VelocityBufferUniforms',
+  POINT_LIGHT_SHADOW_UNIFORMS = 'PointLightShadowUniforms',
 }

@@ -384,6 +384,16 @@ export class FroxelVolumetricScattering {
     ];
   }
 
+  /**
+   * Call when the screen is resized so stale screen-size-dependent bind groups are rebuilt.
+   */
+  public resize(): void {
+    // noiseTextureBindGroup holds a reference to the linearDepth RenderTarget view.
+    // After a resize GBufferPass destroys that texture, so we must drop the bind group
+    // so it gets recreated with the new view on the next updateFroxelData call.
+    this.noiseTextureBindGroup = null as any;
+  }
+
   public updateFroxelData(linearDepth: RenderTarget): void {
     if (!this.isEnabled) {
       return;

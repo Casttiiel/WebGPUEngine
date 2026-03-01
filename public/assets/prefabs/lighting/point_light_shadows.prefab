@@ -1,7 +1,7 @@
 {
     "children": [],
     "components": {
-      "name": "Point Light",
+      "name": "Point Light Shadows",
       "transform": {
         "position": [0, 1, -5]
       },

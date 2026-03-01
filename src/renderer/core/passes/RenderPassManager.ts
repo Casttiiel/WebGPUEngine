@@ -7,6 +7,7 @@ import {
 } from './DeferredRenderPasses';
 import {
   PointLightRenderPass,
+  PointLightWithShadowsRenderPass,
   SpotLightRenderPass,
   SpotLightWithShadowsRenderPass,
 } from './LightingRenderPasses';
@@ -89,6 +90,7 @@ export class RenderPassManager {
     accLight: RenderTarget,
     singleDepthView: GPUTextureView,
     pointLightTechnique: Technique,
+    pointLightWithShadowsTechnique: Technique,
     spotLightTechnique: Technique,
     spotLightWithShadowsTechnique: Technique,
     unitSphere: Mesh,
@@ -107,6 +109,19 @@ export class RenderPassManager {
       gBufferBindGroup,
     );
     this.renderPasses.set('pointLights', pointLightPass);
+
+    // Create Point Light with shadows pass
+    const pointLightWithShadowsConfig = RenderPassFactory.createPointLightPassConfig(
+      accLight,
+      singleDepthView,
+    );
+    const pointLightWithShadowsPass = new PointLightWithShadowsRenderPass(
+      pointLightWithShadowsConfig,
+      pointLightWithShadowsTechnique,
+      unitSphere,
+      gBufferBindGroup,
+    );
+    this.renderPasses.set('pointLightsWithShadows', pointLightWithShadowsPass);
 
     // Create Spot Light pass
     const spotLightConfig = RenderPassFactory.createSpotLightPassConfig(accLight, singleDepthView);

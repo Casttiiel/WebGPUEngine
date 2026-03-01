@@ -940,6 +940,44 @@ export class BindGroupFactory {
   }
 
   /**
+   * Creates a bind group layout for point lights with cubemap shadow support.
+   * Binding 1 is texture_depth_cube instead of texture_depth_2d.
+   */
+  public static getPointLightShadowUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('point_light_shadow_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'depth',
+          viewDimension: 'cube',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'comparison' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
+  /**
    * Creates a directional light uniforms bind group layout
    * Includes uniform buffer, depth texture and comparison sampler for shadows
    */
@@ -1317,6 +1355,8 @@ export class BindGroupFactory {
         return this.getSMAABlendTexturesLayout();
       case PipelineBindGroupLayouts.SMAA_BLEND_PARAMS:
         return this.getSMAABlendParamsLayout();
+      case PipelineBindGroupLayouts.POINT_LIGHT_SHADOW_UNIFORMS:
+        return this.getPointLightShadowUniformsLayout();
       case PipelineBindGroupLayouts.VELOCITY_BUFFER_UNIFORMS:
         return this.getVelocityBufferUniformsLayout();
       case PipelineBindGroupLayouts.FOG_UNIFORMS:
