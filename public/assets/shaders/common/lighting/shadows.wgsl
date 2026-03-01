@@ -50,9 +50,12 @@ fn getShadowFactor(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShado
 }
 
 
-// PCF cube shadow for omnidirectional (point) lights
-// Computes the expected NDC depth analytically from distance using the light's near/far planes,
-// then samples the cube with 4 axis-aligned jitter taps for soft shadows.
+// PCF cube shadow for omnidirectional (point) lights.
+//
+// KEY: the depth stored in each cubemap face was written by a perspective camera
+// whose view-space Z equals the *dominant axis component* of dir, not length(dir).
+// Using length(dir) for the reference is wrong and causes everything to appear in shadow,
+// especially on the faces pointing up/down where horizontal spread makes dist >> faceZ.
 fn getShadowFactorCube(
     wPos: vec3<f32>,
     lightPos: vec3<f32>,
@@ -62,31 +65,27 @@ fn getShadowFactorCube(
     shadowSampler: sampler_comparison,
 ) -> f32 {
     let dir  = wPos - lightPos;
-  let dist = max(length(dir), 0.0001);
+    let dist = length(dir);
 
-  let A = shadowFar / (shadowFar - shadowNear);
-  let B = -(shadowFar * shadowNear) / (shadowFar - shadowNear);
-  let computed_depth = clamp(A + B / dist, 0.0, 1.0);
+    // The face camera that stores the depth uses its view-space Z, which for a
+    // cubemap is the absolute value of the dominant component (the selected face axis).
+    let absDir = abs(dir);
+    let faceZ  = max(absDir.x, max(absDir.y, absDir.z));
 
-  let in_range = (dist >= shadowNear) && (dist <= shadowFar);
-  let depth_ref = select(0.0, computed_depth, in_range);
+    // ZO (zero-to-one) perspective depth formula matching perspectiveZO projection
+    let A = shadowFar / (shadowFar - shadowNear);
+    let B = -(shadowFar * shadowNear) / (shadowFar - shadowNear);
+    let ref_depth = clamp(A + B / max(faceZ, 0.0001), 0.0, 1.0) - 0.002; // small bias to avoid acne
 
-  // ✅ Ejes perpendiculares al vector de lookup
-  let dirN  = dir / dist;
-  let world_up = select(vec3<f32>(0.0, 1.0, 0.0),
-                        vec3<f32>(1.0, 0.0, 0.0),
-                        abs(dirN.y) > 0.99);
-  let right = normalize(cross(dirN, world_up));
-  let up    = normalize(cross(right, dirN));
+    // Outside light range → fully lit (1.0 means no shadow).
+    // Use select instead of early return to preserve uniform control flow
+    // (textureSampleCompare requires uniform control flow in WebGPU).
+    // With compare:'less', the call returns 1.0 when ref < stored_depth.
+    // Passing 0.0 guarantees (0.0 < stored) which is always true → lit.
+    let in_range = dist >= shadowNear && dist <= shadowFar;
+    let cmp_depth = select(0.0, ref_depth, in_range);
 
-  let eps = 0.02 * dist; // escala con la distancia, no inversamente
-
-  var shadow = 0.0;
-  shadow += textureSampleCompare(shadowCube, shadowSampler, dir + right *  eps, depth_ref);
-  shadow += textureSampleCompare(shadowCube, shadowSampler, dir - right *  eps, depth_ref);
-  shadow += textureSampleCompare(shadowCube, shadowSampler, dir + up    *  eps, depth_ref);
-  shadow += textureSampleCompare(shadowCube, shadowSampler, dir - up    *  eps, depth_ref);
-  return shadow * 0.25;
+    return textureSampleCompare(shadowCube, shadowSampler, dir, cmp_depth);
 }
 
 fn getShadowFactorSimple(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {

@@ -14,13 +14,15 @@ import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/R
 import { RenderCategory } from '../../types/RenderCategory.enum';
 
 // WebGPU cube face order: +X, -X, +Y, -Y, +Z, -Z
+// Up vectors match the WebGPU/Vulkan cubemap sampling convention (v=0 at top).
+// In WebGPU, NDC y=1 maps to texture v=0 (top), so no Y-flip is needed.
 const CUBE_FACE_SETUPS = [
-  { target: vec3.fromValues(1, 0, 0), up: vec3.fromValues(0, -1, 0) }, // +X
-  { target: vec3.fromValues(-1, 0, 0), up: vec3.fromValues(0, -1, 0) }, // -X
-  { target: vec3.fromValues(0, 1, 0), up: vec3.fromValues(0, 0, 1) }, // +Y
-  { target: vec3.fromValues(0, -1, 0), up: vec3.fromValues(0, 0, -1) }, // -Y
-  { target: vec3.fromValues(0, 0, 1), up: vec3.fromValues(0, -1, 0) }, // +Z
-  { target: vec3.fromValues(0, 0, -1), up: vec3.fromValues(0, -1, 0) }, // -Z
+  { target: vec3.fromValues(1, 0, 0), up: vec3.fromValues(0, 1, 0) }, // +X
+  { target: vec3.fromValues(-1, 0, 0), up: vec3.fromValues(0, 1, 0) }, // -X
+  { target: vec3.fromValues(0, 1, 0), up: vec3.fromValues(0, 0, -1) }, // +Y
+  { target: vec3.fromValues(0, -1, 0), up: vec3.fromValues(0, 0, 1) }, // -Y
+  { target: vec3.fromValues(0, 0, 1), up: vec3.fromValues(0, 1, 0) }, // +Z
+  { target: vec3.fromValues(0, 0, -1), up: vec3.fromValues(0, 1, 0) }, // -Z
 ] as const;
 
 export class PointLightComponent extends Component {
