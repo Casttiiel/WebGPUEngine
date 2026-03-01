@@ -27,7 +27,7 @@ export class Mesh extends GPUResource {
   //   offset 24 : uv        (float32x2,  8 bytes)
   //   offset 32 : tangent   (float32x4, 16 bytes)
   private interleavedBuffer!: GPUBuffer; // Buffer entrelazado único
-  private indexBuffer!: GPUBuffer;       // Buffer de índices
+  private indexBuffer!: GPUBuffer; // Buffer de índices
 
   private static readonly VERTEX_STRIDE = 12; // floats por vértice
   private static readonly VERTEX_STRIDE_BYTES = 12 * 4; // 48 bytes
@@ -499,19 +499,19 @@ export class Mesh extends GPUResource {
     for (let i = 0; i < vertexCount; i++) {
       const base = i * stride;
       // position (3 floats, offset 0)
-      interleaved[base]     = this.vertices[i * 3]     ?? 0;
+      interleaved[base] = this.vertices[i * 3] ?? 0;
       interleaved[base + 1] = this.vertices[i * 3 + 1] ?? 0;
       interleaved[base + 2] = this.vertices[i * 3 + 2] ?? 0;
       // normal (3 floats, offset 3)
-      interleaved[base + 3] = this.normals[i * 3]     ?? 0;
+      interleaved[base + 3] = this.normals[i * 3] ?? 0;
       interleaved[base + 4] = this.normals[i * 3 + 1] ?? 0;
       interleaved[base + 5] = this.normals[i * 3 + 2] ?? 0;
       // uv (2 floats, offset 6)
-      interleaved[base + 6] = this.uvs[i * 2]     ?? 0;
+      interleaved[base + 6] = this.uvs[i * 2] ?? 0;
       interleaved[base + 7] = this.uvs[i * 2 + 1] ?? 0;
       // tangent (4 floats, offset 8)
-      interleaved[base + 8]  = this.tangents[i * 4]     ?? 0;
-      interleaved[base + 9]  = this.tangents[i * 4 + 1] ?? 0;
+      interleaved[base + 8] = this.tangents[i * 4] ?? 0;
+      interleaved[base + 9] = this.tangents[i * 4 + 1] ?? 0;
       interleaved[base + 10] = this.tangents[i * 4 + 2] ?? 0;
       interleaved[base + 11] = this.tangents[i * 4 + 3] ?? 1;
     }
@@ -575,11 +575,7 @@ export class Mesh extends GPUResource {
   }
 
   public isGPUReady(): boolean {
-    return (
-      this.hasData &&
-      this.interleavedBuffer !== undefined &&
-      this.indexBuffer !== undefined
-    );
+    return this.hasData && this.interleavedBuffer !== undefined && this.indexBuffer !== undefined;
   }
 
   public static getVertexBufferLayout(): GPUVertexBufferLayout[] {
@@ -593,7 +589,7 @@ export class Mesh extends GPUResource {
         arrayStride: Mesh.VERTEX_STRIDE_BYTES, // 48 bytes
         stepMode: 'vertex',
         attributes: [
-          { shaderLocation: 0, offset:  0, format: 'float32x3' }, // position
+          { shaderLocation: 0, offset: 0, format: 'float32x3' }, // position
           { shaderLocation: 1, offset: 12, format: 'float32x3' }, // normal
           { shaderLocation: 2, offset: 24, format: 'float32x2' }, // uv
           { shaderLocation: 3, offset: 32, format: 'float32x4' }, // tangent
