@@ -4,14 +4,14 @@
 2. Multiple Light probes has good shadows?
 3. Reflection Probes con blending
 4. Clouds
-5. Better loading speed
-6. FSR 1.0
+5. Contact Shadows
 
-7. TAA
-8. High Sponza low frame rate on near doors
-9. Froxel: Self occlusion
+6. Better loading speed
+7. FSR 1.0
+8. TAA
+9. High Sponza low frame rate on near doors
 10. Optimize with compute shaders
-11. Contact Shadows
+11. Froxel: Self occlusion
 12. SS Global Illumination
 13. Froxel Global Illumination
 14. UI

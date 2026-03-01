@@ -67,25 +67,35 @@ fn getShadowFactorCube(
     let dir  = wPos - lightPos;
     let dist = length(dir);
 
-    // The face camera that stores the depth uses its view-space Z, which for a
-    // cubemap is the absolute value of the dominant component (the selected face axis).
+    // The face camera stores depth using its view-space Z = the dominant axis component.
     let absDir = abs(dir);
     let faceZ  = max(absDir.x, max(absDir.y, absDir.z));
 
-    // ZO (zero-to-one) perspective depth formula matching perspectiveZO projection
+    // gl-matrix lookAt builds a right-vector that is the mirror of what WebGPU/Vulkan
+    // cubemap sampling expects. The mismatch is in the sc (horizontal UV) component,
+    // which differs per major axis:
+    //   ±X faces: sc_vulkan = -dir.z, sc_rendered = +dir.z  → negate dir.z to fix
+    //   ±Y faces: sc_vulkan = +dir.x, sc_rendered = -dir.x  → negate dir.x to fix
+    //   ±Z faces: sc_vulkan = +dir.x, sc_rendered = -dir.x  → negate dir.x to fix
+    // Both branches converge before textureSampleCompare so uniform control flow is preserved.
+    let xDominant = absDir.x >= absDir.y && absDir.x >= absDir.z;
+    let sampleDir = select(
+        vec3<f32>(-dir.x, dir.y,  dir.z),   // ±Y / ±Z dominant: negate X
+        vec3<f32>( dir.x, dir.y, -dir.z),   // ±X dominant:      negate Z
+        xDominant
+    );
+
+    // ZO perspective depth formula matching perspectiveZO projection
     let A = shadowFar / (shadowFar - shadowNear);
     let B = -(shadowFar * shadowNear) / (shadowFar - shadowNear);
-    let ref_depth = clamp(A + B / max(faceZ, 0.0001), 0.0, 1.0) - 0.002; // small bias to avoid acne
+    let ref_depth = clamp(A + B / max(faceZ, 0.0001), 0.0, 1.0) - 0.002;
 
-    // Outside light range → fully lit (1.0 means no shadow).
-    // Use select instead of early return to preserve uniform control flow
-    // (textureSampleCompare requires uniform control flow in WebGPU).
-    // With compare:'less', the call returns 1.0 when ref < stored_depth.
-    // Passing 0.0 guarantees (0.0 < stored) which is always true → lit.
+    // Use select (not early return) to keep uniform control flow for textureSampleCompare.
+    // compare:'less' → returns 1.0 (lit) when ref < stored. 0.0 is always < stored → lit.
     let in_range = dist >= shadowNear && dist <= shadowFar;
     let cmp_depth = select(0.0, ref_depth, in_range);
 
-    return textureSampleCompare(shadowCube, shadowSampler, dir, cmp_depth);
+    return textureSampleCompare(shadowCube, shadowSampler, sampleDir, cmp_depth);
 }
 
 fn getShadowFactorSimple(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {

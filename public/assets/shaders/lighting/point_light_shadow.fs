@@ -42,13 +42,8 @@ fn PS_point_lights_shadow(@builtin(position) position: vec4<f32>) -> @location(0
     let pos = position.xy / camera.screenSize;
     let g = decodeGBuffer(pos);
 
-    // gl-matrix lookAt mirrors the horizontal axis of each cubemap face relative
-    // to WebGPU's cubemap sampling convention. Reflecting worldPos.x around the
-    // light corrects the direction vector (negates dir.x) without touching the
-    // general shadow shaders used by other light types.
-    let worldPosForShadow = vec3<f32>(2.0 * light.position.x - g.worldPos.x, g.worldPos.y, g.worldPos.z);
     let shadow_factor = getShadowFactorCube(
-        worldPosForShadow,
+        g.worldPos,
         light.position.xyz,
         light.shadowNear,
         light.shadowFar,
