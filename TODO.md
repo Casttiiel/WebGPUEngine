@@ -1,22 +1,21 @@
 ### Engine
 
-1. Mesh one single buffer
-2. Multiple Light probes has good shadows?
-3. Reflection Probes con blending
-4. Clouds
-5. Point Light shadows
-6. Transform matrix multiplication frequency
+1. Multiple Light probes has good shadows?
+2. Reflection Probes con blending
+3. Clouds
+4. Point Light shadows
+5. Transform matrix multiplication frequency
 
-7. TAA
-8. Froxel: Self occlusion
-9. Froxel: on change screen size error
-10. Froxel: on change camera, we need to destroy camerabindgroup
-11. Optimize with compute shaders
-12. Contact Shadows
-13. SS Global Illumination
-14. Froxel Global Illumination
-15. UI
-16. Improve particles
+6. TAA
+7. Froxel: Self occlusion
+8. Froxel: on change screen size error
+9. Froxel: on change camera, we need to destroy camerabindgroup
+10. Optimize with compute shaders
+11. Contact Shadows
+12. SS Global Illumination
+13. Froxel Global Illumination
+14. UI
+15. Improve particles
 
 ## Gameplay
 

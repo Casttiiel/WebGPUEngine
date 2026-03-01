@@ -21,11 +21,16 @@ export class Mesh extends GPUResource {
   private aabb!: AABB; // Axis-Aligned Bounding Box for culling
 
   // Buffers en GPU
-  private vertexBuffer!: GPUBuffer; // Buffer de vértices
-  private normalBuffer!: GPUBuffer; // Buffer de normales
-  private uvBuffer!: GPUBuffer; // Buffer de UVs
-  private tangentBuffer!: GPUBuffer; // Buffer de tangentes
-  private indexBuffer!: GPUBuffer; // Buffer de índices
+  // Layout por vértice (interleaved, 48 bytes = 12 floats):
+  //   offset  0 : position  (float32x3, 12 bytes)
+  //   offset 12 : normal    (float32x3, 12 bytes)
+  //   offset 24 : uv        (float32x2,  8 bytes)
+  //   offset 32 : tangent   (float32x4, 16 bytes)
+  private interleavedBuffer!: GPUBuffer; // Buffer entrelazado único
+  private indexBuffer!: GPUBuffer;       // Buffer de índices
+
+  private static readonly VERTEX_STRIDE = 12; // floats por vértice
+  private static readonly VERTEX_STRIDE_BYTES = 12 * 4; // 48 bytes
 
   constructor(options: MeshOptions) {
     super({
@@ -484,36 +489,38 @@ export class Mesh extends GPUResource {
     return tangents;
   }
   private initBuffers(): void {
-    // Crear buffer de vértices en GPU
-    this.vertexBuffer = GPUUtils.createBuffer(
-      `${this.label}_vertexBuffer`,
-      this.vertices.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.vertices,
-    );
+    const vertexCount = this.vertices.length / 3;
+    const stride = Mesh.VERTEX_STRIDE; // 12 floats per vertex
 
-    // Crear buffer de normales en GPU
-    this.normalBuffer = GPUUtils.createBuffer(
-      `${this.label}_normalBuffer`,
-      this.normals.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.normals,
-    );
+    // Pack all attributes into a single interleaved Float32Array
+    // Layout per vertex: [px py pz | nx ny nz | u v | tx ty tz tw]
+    const interleaved = new Float32Array(vertexCount * stride);
 
-    // Crear buffer de UVs en GPU
-    this.uvBuffer = GPUUtils.createBuffer(
-      `${this.label}_uvBuffer`,
-      this.uvs.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.uvs,
-    );
+    for (let i = 0; i < vertexCount; i++) {
+      const base = i * stride;
+      // position (3 floats, offset 0)
+      interleaved[base]     = this.vertices[i * 3]     ?? 0;
+      interleaved[base + 1] = this.vertices[i * 3 + 1] ?? 0;
+      interleaved[base + 2] = this.vertices[i * 3 + 2] ?? 0;
+      // normal (3 floats, offset 3)
+      interleaved[base + 3] = this.normals[i * 3]     ?? 0;
+      interleaved[base + 4] = this.normals[i * 3 + 1] ?? 0;
+      interleaved[base + 5] = this.normals[i * 3 + 2] ?? 0;
+      // uv (2 floats, offset 6)
+      interleaved[base + 6] = this.uvs[i * 2]     ?? 0;
+      interleaved[base + 7] = this.uvs[i * 2 + 1] ?? 0;
+      // tangent (4 floats, offset 8)
+      interleaved[base + 8]  = this.tangents[i * 4]     ?? 0;
+      interleaved[base + 9]  = this.tangents[i * 4 + 1] ?? 0;
+      interleaved[base + 10] = this.tangents[i * 4 + 2] ?? 0;
+      interleaved[base + 11] = this.tangents[i * 4 + 3] ?? 1;
+    }
 
-    // Crear buffer de tangentes en GPU
-    this.tangentBuffer = GPUUtils.createBuffer(
-      `${this.label}_tangentBuffer`,
-      this.tangents.byteLength,
+    this.interleavedBuffer = GPUUtils.createBuffer(
+      `${this.label}_interleavedBuffer`,
+      interleaved.byteLength,
       GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      this.tangents,
+      interleaved,
     );
 
     // Crear buffer de índices en GPU
@@ -570,67 +577,29 @@ export class Mesh extends GPUResource {
   public isGPUReady(): boolean {
     return (
       this.hasData &&
-      this.vertexBuffer !== undefined &&
-      this.normalBuffer !== undefined &&
-      this.uvBuffer !== undefined &&
-      this.tangentBuffer !== undefined &&
+      this.interleavedBuffer !== undefined &&
       this.indexBuffer !== undefined
     );
   }
 
   public static getVertexBufferLayout(): GPUVertexBufferLayout[] {
-    const layouts: GPUVertexBufferLayout[] = [
+    // Single interleaved buffer, stride = 48 bytes (12 floats)
+    // offset  0 : position  (float32x3, 12 bytes)
+    // offset 12 : normal    (float32x3, 12 bytes)
+    // offset 24 : uv        (float32x2,  8 bytes)
+    // offset 32 : tangent   (float32x4, 16 bytes)
+    return [
       {
-        // Position attribute
-        arrayStride: 3 * 4, // 3 floats * 4 bytes
-        attributes: [
-          {
-            shaderLocation: 0,
-            offset: 0,
-            format: 'float32x3',
-          },
-        ],
+        arrayStride: Mesh.VERTEX_STRIDE_BYTES, // 48 bytes
         stepMode: 'vertex',
-      },
-      {
-        // Normal attribute
-        arrayStride: 3 * 4,
         attributes: [
-          {
-            shaderLocation: 1,
-            offset: 0,
-            format: 'float32x3',
-          },
+          { shaderLocation: 0, offset:  0, format: 'float32x3' }, // position
+          { shaderLocation: 1, offset: 12, format: 'float32x3' }, // normal
+          { shaderLocation: 2, offset: 24, format: 'float32x2' }, // uv
+          { shaderLocation: 3, offset: 32, format: 'float32x4' }, // tangent
         ],
-        stepMode: 'vertex',
-      },
-      {
-        // UV attribute
-        arrayStride: 2 * 4,
-        attributes: [
-          {
-            shaderLocation: 2,
-            offset: 0,
-            format: 'float32x2',
-          },
-        ],
-        stepMode: 'vertex',
-      },
-      {
-        // Tangent attribute
-        arrayStride: 4 * 4,
-        attributes: [
-          {
-            shaderLocation: 3,
-            offset: 0,
-            format: 'float32x4',
-          },
-        ],
-        stepMode: 'vertex',
       },
     ];
-
-    return layouts;
   }
 
   public activate(pass: GPURenderPassEncoder): void {
@@ -639,10 +608,7 @@ export class Mesh extends GPUResource {
       return;
     }
 
-    pass.setVertexBuffer(0, this.vertexBuffer);
-    pass.setVertexBuffer(1, this.normalBuffer);
-    pass.setVertexBuffer(2, this.uvBuffer);
-    pass.setVertexBuffer(3, this.tangentBuffer);
+    pass.setVertexBuffer(0, this.interleavedBuffer);
     pass.setIndexBuffer(this.indexBuffer, 'uint16');
   }
 
