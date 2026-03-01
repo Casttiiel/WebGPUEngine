@@ -91,6 +91,7 @@ export class FroxelVolumetricScattering {
   private rayMarchBindGroup!: GPUBindGroup;
   private ambientBindGroup!: GPUBindGroup;
   private directionalLightDataBindGroup!: GPUBindGroup;
+  private lastCameraBuffer: GPUBuffer | null = null;
 
   private pointLightTexturesBindGroups: Map<PointLightComponent, GPUBindGroup[]> = new Map();
   private pointLightDataBindGroups: Map<PointLightComponent, GPUBindGroup> = new Map();
@@ -427,11 +428,12 @@ export class FroxelVolumetricScattering {
       label: 'froxel_density_compute',
     });
 
-    if (!this.cameraBindGroup || true) {
-      const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-      const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
-      const camera = cameraComponent.getCamera();
-      const cameraBuffer = camera.getUniformBuffer();
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
+    const cameraBuffer = cameraComponent.getCamera().getUniformBuffer();
+
+    if (!this.cameraBindGroup || cameraBuffer !== this.lastCameraBuffer) {
+      this.lastCameraBuffer = cameraBuffer;
 
       this.cameraBindGroup = BindGroupFactory.createBindGroup(
         'froxel_directional_light_camera_bind_group',

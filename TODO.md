@@ -7,13 +7,12 @@
 
 5. TAA
 6. Froxel: Self occlusion
-7. Froxel: on change camera, we need to destroy camerabindgroup
-8. Optimize with compute shaders
-9. Contact Shadows
-10. SS Global Illumination
-11. Froxel Global Illumination
-12. UI
-13. Improve particles
+7. Optimize with compute shaders
+8. Contact Shadows
+9. SS Global Illumination
+10. Froxel Global Illumination
+11. UI
+12. Improve particles
 
 ## Gameplay
 
