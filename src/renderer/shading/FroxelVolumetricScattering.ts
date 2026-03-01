@@ -66,7 +66,7 @@ export class FroxelVolumetricScattering {
   private densityTexturesBindGroup!: GPUBindGroup;
   private cameraBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 0.01;
+  private fogDensity: number = 0.0;
   private scatteringCoeff: number = 1.0;
   private absorptionCoeff: number = 0.2; // Aumentado para god rays más definidos (antes 1.5)
   private multipleScatteringBoost: number = 1.3; // Energy compensation for multiple scattering (1.1-1.6)

@@ -15,12 +15,12 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 
 // WebGPU cube face order: +X, -X, +Y, -Y, +Z, -Z
 const CUBE_FACE_SETUPS = [
-  { target: vec3.fromValues( 1,  0,  0), up: vec3.fromValues(0, -1,  0) }, // +X
-  { target: vec3.fromValues(-1,  0,  0), up: vec3.fromValues(0, -1,  0) }, // -X
-  { target: vec3.fromValues( 0,  1,  0), up: vec3.fromValues(0,  0,  1) }, // +Y
-  { target: vec3.fromValues( 0, -1,  0), up: vec3.fromValues(0,  0, -1) }, // -Y
-  { target: vec3.fromValues( 0,  0,  1), up: vec3.fromValues(0, -1,  0) }, // +Z
-  { target: vec3.fromValues( 0,  0, -1), up: vec3.fromValues(0, -1,  0) }, // -Z
+  { target: vec3.fromValues(1, 0, 0), up: vec3.fromValues(0, -1, 0) }, // +X
+  { target: vec3.fromValues(-1, 0, 0), up: vec3.fromValues(0, -1, 0) }, // -X
+  { target: vec3.fromValues(0, 1, 0), up: vec3.fromValues(0, 0, 1) }, // +Y
+  { target: vec3.fromValues(0, -1, 0), up: vec3.fromValues(0, 0, -1) }, // -Y
+  { target: vec3.fromValues(0, 0, 1), up: vec3.fromValues(0, -1, 0) }, // +Z
+  { target: vec3.fromValues(0, 0, -1), up: vec3.fromValues(0, -1, 0) }, // -Z
 ] as const;
 
 export class PointLightComponent extends Component {
@@ -39,14 +39,17 @@ export class PointLightComponent extends Component {
   private uniformBuffer!: GPUBuffer;
 
   private dummyShadowTexture!: GPUTexture;
+  private dummyShadowTextureView!: GPUTextureView;
+
+  private _shadowTarget = vec3.create();
 
   // Shadow resources (only created when hasShadows = true)
   private shadowResolution = 512;
   private shadowNear = 0.05;
   private shadowCubeTexture!: GPUTexture;
   private shadowCubeFaceViews: GPUTextureView[] = []; // 6 face views for rendering
-  private shadowCubeView!: GPUTextureView;             // cube view for sampling
-  private shadowCameras: Camera[] = [];               // 6 per-face cameras
+  private shadowCubeView!: GPUTextureView; // cube view for sampling
+  private shadowCameras: Camera[] = []; // 6 per-face cameras
 
   private technique!: Technique;
 
@@ -106,6 +109,7 @@ export class PointLightComponent extends Component {
         'depth32float',
         GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
       );
+      this.dummyShadowTextureView = this.dummyShadowTexture.createView();
     }
 
     this.buildBindGroup();
@@ -151,10 +155,10 @@ export class PointLightComponent extends Component {
     this.shadowCameras = [];
     for (let face = 0; face < 6; face++) {
       const cam = new Camera();
-      cam.setViewport(this.shadowResolution, this.shadowResolution);
       cam.setFov(90);
       cam.setNearPlane(this.shadowNear);
       cam.setFarPlane(this.radius);
+      cam.setViewport(this.shadowResolution, this.shadowResolution);
       this.shadowCameras.push(cam);
     }
   }
@@ -184,13 +188,14 @@ export class PointLightComponent extends Component {
     if (!this._hasShadows) return;
 
     const render = Render.getInstance();
-    const res  = this.shadowResolution;
+    const res = this.shadowResolution;
 
     // Update camera positions to current light world position before rendering
     for (let face = 0; face < 6; face++) {
       const setup = CUBE_FACE_SETUPS[face];
-      const target = vec3.add(vec3.create(), this.position, setup.target);
-      this.shadowCameras[face].lookAt(this.position, target, setup.up);
+      vec3.add(this._shadowTarget, this.position, setup.target);
+      this.shadowCameras[face].lookAt(this.position, this._shadowTarget, setup.up);
+      this.shadowCameras[face].setIsDirty(true); // ← garantizar escritura al buffer
       this.shadowCameras[face].updateUniforms(0);
     }
 
@@ -200,13 +205,15 @@ export class PointLightComponent extends Component {
       RenderManager.getInstance().performCulling(cam, RenderCategory.SHADOWS);
 
       const depthAttachment = GPUUtils.createDepthStencilAttachment(this.shadowCubeFaceViews[face]);
-      const pass = render.getCommandEncoder().beginRenderPass(
-        GPUUtils.createRenderPassDescriptor(
-          `point_light_shadow_face_${face}`,
-          [],
-          depthAttachment,
-        ),
-      );
+      const pass = render
+        .getCommandEncoder()
+        .beginRenderPass(
+          GPUUtils.createRenderPassDescriptor(
+            `point_light_shadow_face_${face}`,
+            [],
+            depthAttachment,
+          ),
+        );
       GPUUtils.configureViewportAndScissor(pass, res, res);
 
       RenderManager.getInstance().setCamera(cam);
@@ -234,7 +241,7 @@ export class PointLightComponent extends Component {
       this.colorBuffer[0] = this.color[0];
       this.colorBuffer[1] = this.color[1];
       this.colorBuffer[2] = this.color[2];
-      this.colorBuffer[3] = this.color[3];
+      this.colorBuffer[3] = this._hasShadows ? 1.0 : 0.0;
 
       this.positionBuffer[0] = this.position[0];
       this.positionBuffer[1] = this.position[1];
@@ -253,14 +260,13 @@ export class PointLightComponent extends Component {
 
       GPUUtils.writeBuffer(this.uniformBuffer, 0, this.colorBuffer);
       GPUUtils.writeBuffer(this.uniformBuffer, 16, this.positionBuffer);
-      GPUUtils.writeBuffer(this.uniformBuffer, 96, this.radiusBuffer);
-      GPUUtils.writeBuffer(this.uniformBuffer, 112, this.falloffBuffer);
+      this.radiusBuffer[0] = this.radius;
+      this.radiusBuffer[1] = this._hasShadows ? this.shadowNear : 0.0; // shadowNear en [1]
+      this.radiusBuffer[2] = this._hasShadows ? this.radius : 0.0; // shadowFar  en [2]
+      this.radiusBuffer[3] = 0.0;
 
-      if (this._hasShadows) {
-        // Write nearPlane and farPlane into the repurposed shadow param slots
-        GPUUtils.writeBuffer(this.uniformBuffer, 100, new Float32Array([this.shadowNear]));
-        GPUUtils.writeBuffer(this.uniformBuffer, 104, new Float32Array([this.radius]));
-      }
+      GPUUtils.writeBuffer(this.uniformBuffer, 96, this.radiusBuffer); // un solo write limpio
+      GPUUtils.writeBuffer(this.uniformBuffer, 112, this.falloffBuffer);
 
       this.calculateWorldAABB();
       this.isDirty = false;
@@ -276,16 +282,24 @@ export class PointLightComponent extends Component {
 
   // ─── Accessors ────────────────────────────────────────────────────────────
 
-  public hasShadows(): boolean { return this._hasShadows; }
-  public isVisible(): boolean  { return this._isVisible;  }
-  public setIsVisible(visible: boolean): void { this._isVisible = visible; }
-  public getAABB(): AABB { return this.aabb; }
-  public getUniformBuffer(): GPUBuffer { return this.uniformBuffer; }
+  public hasShadows(): boolean {
+    return this._hasShadows;
+  }
+  public isVisible(): boolean {
+    return this._isVisible;
+  }
+  public setIsVisible(visible: boolean): void {
+    this._isVisible = visible;
+  }
+  public getAABB(): AABB {
+    return this.aabb;
+  }
+  public getUniformBuffer(): GPUBuffer {
+    return this.uniformBuffer;
+  }
 
   public getShadowDepthView(): GPUTextureView {
-    return this._hasShadows
-      ? this.shadowCubeView
-      : this.dummyShadowTexture.createView();
+    return this._hasShadows ? this.shadowCubeView : this.dummyShadowTextureView;
   }
 
   public getShadowSampler(): GPUSampler {

@@ -35,8 +35,9 @@ Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast 
 
 ### Editor
 
-15. Blender Export with player spawn
 16. Editor Light Probes (Render Debug / Gizmo)
 17. Editor Point Lights (Render Debug / Gizmo / Menu)
 18. Editor Spot Lights (Render Debug / Gizmo / Menu)
-19. Asset Browser + Spawn + Delete
+19. Editor Camera (Render Debug / Gizmo / Menu)
+20. Blender Export with player spawn
+21. Asset Browser + Spawn + Delete
