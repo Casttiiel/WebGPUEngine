@@ -277,12 +277,17 @@ export class ColliderComponent extends Component {
           return;
         }
 
+        // Use WORLD scale so parent entity scale (e.g. sponza 0.01) is included.
+        const trimeshScale = data.ignoreTransformScale
+          ? [1, 1, 1]
+          : transformComponent.getTransform().getWorldScale();
+
         // Aplicar la escala del transform a los vértices del trimesh
         const scaledVertices = new Float32Array(data.vertices.length);
         for (let i = 0; i < data.vertices.length; i += 3) {
-          scaledVertices[i] = data.vertices[i]! * scale[0]; // X
-          scaledVertices[i + 1] = data.vertices[i + 1]! * scale[1]; // Y
-          scaledVertices[i + 2] = data.vertices[i + 2]! * scale[2]; // Z
+          scaledVertices[i] = data.vertices[i]! * trimeshScale[0]; // X
+          scaledVertices[i + 1] = data.vertices[i + 1]! * trimeshScale[1]; // Y
+          scaledVertices[i + 2] = data.vertices[i + 2]! * trimeshScale[2]; // Z
         }
 
         const indices = new Uint32Array(data.indices);

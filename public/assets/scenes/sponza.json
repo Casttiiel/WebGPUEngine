@@ -3,10 +3,11 @@
     "components": {
       "name": "Sponza",
       "transform": {
-        "rotation": [0, 90, 0]
+        "rotation": [0, 90, 0],
+        "scale": [0.01, 0.01, 0.01]
       }
     },
-    "gltf": "sponza.gltf"
+    "gltf": "high_sponza.gltf"
   },
   {
     "prefab": "cameras/main_camera.prefab"

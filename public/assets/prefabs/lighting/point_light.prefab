@@ -3,7 +3,7 @@
     "components": {
       "name": "Point Light",
       "transform": {
-        "position": [0, 1, -5]
+        "position": [0, 3, -5]
       },
       "point_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
@@ -11,7 +11,7 @@
         "radius": 5,
         "startFallof": 2,
         "hasShadows": true,
-        "shadowResolution": 4096
+        "shadowResolution": 512
       }
     }
   }

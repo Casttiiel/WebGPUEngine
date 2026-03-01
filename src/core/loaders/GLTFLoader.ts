@@ -103,7 +103,7 @@ export class GLTFLoader {
 
     // Only add mesh_collider if not explicitly disabled
     if (shouldCreateCollider) {
-      const collider = this.getNodeCollider(render);
+      const collider = this.getNodeCollider(render, node);
       res.components.mesh_collider = collider;
     }
 
@@ -252,7 +252,7 @@ export class GLTFLoader {
     return material;
   }
 
-  private static getNodeCollider(render: RenderComponentDataType): any {
+  private static getNodeCollider(render: RenderComponentDataType, _node: Node): any {
     const meshData = render.meshes[0]?.meshData;
 
     if (!meshData) {
@@ -262,11 +262,10 @@ export class GLTFLoader {
       };
     }
 
-    // Los datos ya vienen como TypedArrays directamente desde getArray()
-    const positionArray = meshData.attributes.POSITION as any;
+    // Vertices are in local mesh space; ColliderComponent applies world scale at load time.
+    const positionArray = meshData.attributes.POSITION as Float32Array | null;
     const indexArray = meshData.indices as any;
 
-    // Convertir TypedArrays a arrays normales para Rapier
     const vertices = positionArray ? Array.from(positionArray) : [];
     const indices = indexArray ? Array.from(indexArray) : [];
 
