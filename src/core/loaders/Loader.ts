@@ -73,10 +73,8 @@ export class Loader {
       this.totalEntitiesToLoad += this.countEntities(e);
     }
 
-    // Cargar entidades con progreso
-    for (const e of json) {
-      await this.loadEntityFromJSON(e);
-    }
+    // Cargar entidades raíz en paralelo
+    await Promise.all(json.map((e) => this.loadEntityFromJSON(e)));
   }
 
   public static async parseSceneJSON(json: SceneDataType): Promise<SceneDataType> {

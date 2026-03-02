@@ -2,11 +2,11 @@
 
 1. Better loading speed (7,48segs)
    Root entities en paralelo Baja 🟠 Medio
-   Buffers GLTF en paralelo Muy baja 🟠 Medio
-   WebIO singleton Muy baja 🟡 Pequeño
    readMesh en paralelo Muy baja 🟠 Medio
    Escenas en paralelo Baja 🟡 Pequeño
    Deduplicación fetches en vuelo Media 🟡 Preventivo
+   Buffers GLTF en paralelo Muy baja 🟠 Medio
+   WebIO singleton Muy baja 🟡 Pequeño
 
 2. Contact Shadows
 3. High Sponza low frame rate on near doors
