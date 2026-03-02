@@ -15,11 +15,7 @@ export class ModuleManager {
   private isTransitioning: boolean = false; // Flag para indicar transición en progreso
 
   public async start(): Promise<void> {
-    this.loadConfig();
-    this.loadGamestates();
-
-    // Esperar a que se carguen las configuraciones
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await Promise.all([this.loadConfig(), this.loadGamestates()]);
 
     // Contar módulos del gamestate inicial
     const initialGamestate = this.getGamestate(this.startGamestate);
@@ -81,16 +77,26 @@ export class ModuleManager {
   }
 
   public async startModules(modules: Module[], reportProgress: boolean = false): Promise<void> {
+    const t0 = performance.now();
     for (const module of modules) {
       if (module.isActive()) continue;
+      const tModule = performance.now();
       await module.start();
       module.setActive(true);
+      console.log(
+        `%c[ModuleManager] ${module.getName()}: +${(performance.now() - tModule).toFixed(0)}ms  (elapsed: +${(performance.now() - t0).toFixed(0)}ms)`,
+        'color:#a5d6a7',
+      );
 
       // Reportar progreso si está habilitado
       if (reportProgress) {
         LoadingStatus.moduleLoaded(module.getName());
       }
     }
+    console.log(
+      `%c[ModuleManager] startModules(${modules.map((m) => m.getName()).join(', ')}) TOTAL: +${(performance.now() - t0).toFixed(0)}ms`,
+      'color:#a5d6a7;font-weight:bold',
+    );
   }
 
   public stopModules(modules: Module[]): void {
@@ -200,62 +206,57 @@ export class ModuleManager {
     this.isTransitioning = false;
   }
 
-  public loadConfig(): void {
+  public async loadConfig(): Promise<void> {
     const url = `data/modules.json`;
 
-    const responsePromise = ResourceManager.fetch(url);
+    try {
+      const response = await ResourceManager.fetch(url);
+      const jsonData = await response.json();
 
-    responsePromise
-      .then(async (response) => {
-        const jsonData = await response.json();
+      this.updateModules = [];
+      this.renderDebugModules = [];
 
-        this.updateModules = [];
-        this.renderDebugModules = [];
-
-        for (const moduleName of jsonData['update']) {
-          const module = this.getModule(moduleName);
-          if (module) {
-            this.updateModules.push(module);
-          }
+      for (const moduleName of jsonData['update']) {
+        const module = this.getModule(moduleName);
+        if (module) {
+          this.updateModules.push(module);
         }
+      }
 
-        for (const moduleName of jsonData['render_debug']) {
-          const module = this.getModule(moduleName);
-          if (module) {
-            this.renderDebugModules.push(module);
-          }
+      for (const moduleName of jsonData['render_debug']) {
+        const module = this.getModule(moduleName);
+        if (module) {
+          this.renderDebugModules.push(module);
         }
-      })
-      .catch((error) => {
-        console.error('Error loading modules config:', error);
-      });
+      }
+    } catch (error) {
+      console.error('Error loading modules config:', error);
+    }
   }
 
-  public loadGamestates(): void {
+  public async loadGamestates(): Promise<void> {
     const url = `data/gamestates.json`;
-    const responsePromise = ResourceManager.fetch(url);
 
-    responsePromise
-      .then(async (response) => {
-        const jsonData = await response.json();
-        const jsonGamestates = jsonData['gamestates'];
+    try {
+      const response = await ResourceManager.fetch(url);
+      const jsonData = await response.json();
+      const jsonGamestates = jsonData['gamestates'];
 
-        for (const gamestateName of Object.keys(jsonGamestates)) {
-          const gamestate = new Gamestate(gamestateName);
-          for (const jsonModule of jsonGamestates[gamestateName]) {
-            const moduleName = typeof jsonModule === 'string' ? jsonModule : jsonModule['name'];
-            const module = this.getModule(moduleName);
-            if (module) {
-              gamestate.push(module);
-            }
+      for (const gamestateName of Object.keys(jsonGamestates)) {
+        const gamestate = new Gamestate(gamestateName);
+        for (const jsonModule of jsonGamestates[gamestateName]) {
+          const moduleName = typeof jsonModule === 'string' ? jsonModule : jsonModule['name'];
+          const module = this.getModule(moduleName);
+          if (module) {
+            gamestate.push(module);
           }
-          this.gamestates.push(gamestate);
         }
-        this.startGamestate = jsonData['start'];
-      })
-      .catch((error) => {
-        console.error('Error loading gamestates:', error);
-      });
+        this.gamestates.push(gamestate);
+      }
+      this.startGamestate = jsonData['start'];
+    } catch (error) {
+      console.error('Error loading gamestates:', error);
+    }
   }
 
   public renderInMenu(): void {

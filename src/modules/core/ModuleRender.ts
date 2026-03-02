@@ -61,25 +61,27 @@ export class ModuleRender extends Module {
   }
 
   public async start(): Promise<boolean> {
+    // 1. Deferred renderer first — sets up GBuffer that everything else depends on
     LoadingStatus.updateStatus('Initializing deferred renderer...', 45);
     await this.deferred.load();
 
-    LoadingStatus.updateStatus('Loading distortion system...', 50);
-    await this.distorsions.load();
-
     this.onResolutionUpdated();
 
-    LoadingStatus.updateStatus('Loading presentation resources...', 55);
-    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.presentationTechnique = await Technique.getAsync('utility/presentation.tech');
+    // 2. Everything independent of each other → parallel
+    LoadingStatus.updateStatus('Loading render resources...', 50);
+    [this.fullscreenQuadMesh, this.presentationTechnique] = (await Promise.all([
+      Mesh.getAsync('fullscreenquad.obj'),
+      Technique.getAsync('utility/presentation.tech'),
+      this.distorsions.load(),
+      RenderManager.getInstance().initialize(),
+    ])) as [Mesh, Technique, void, void];
 
-    LoadingStatus.updateStatus('Initializing render manager...', 60);
-    // Initialize GPU Frustum Culling
-    await RenderManager.getInstance().initialize();
-
-    // Initialize UI rendering system
-    LoadingStatus.updateStatus('Initializing UI renderer...', 65);
-    await UIRenderUtils.initialize();
+    // 3. UI + velocity buffer are independent of each other → parallel
+    LoadingStatus.updateStatus('Initializing UI renderer...', 60);
+    await Promise.all([
+      UIRenderUtils.initialize(),
+      VelocityBufferManager.getInstance().initialize(Render.width, Render.height),
+    ]);
 
     // Initialize UI screen dimensions immediately after UIRenderUtils
     const canvas = Render.getInstance().getCanvas();
@@ -88,9 +90,6 @@ export class ModuleRender extends Module {
     const dpr = window.devicePixelRatio || 1;
 
     UIRenderUtils.updateScreenSize(physicalWidth, physicalHeight, dpr);
-
-    // Inicializar VelocityBufferManager
-    await VelocityBufferManager.getInstance().initialize(Render.width, Render.height);
 
     // Create default camera for UI-only rendering (when no 3D scene camera exists)
     this.defaultCamera = new Camera();

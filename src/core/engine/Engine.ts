@@ -48,22 +48,33 @@ export class Engine {
       console.warn('Engine is already started.');
       return;
     }
+
+    const t0 = performance.now();
+    const ts = (label: string, from: number = t0) =>
+      console.log(
+        `%c[Engine] ${label}: +${(performance.now() - from).toFixed(0)}ms  (total: +${(performance.now() - t0).toFixed(0)}ms)`,
+        'color:#4fc3f7',
+      );
+
     console.warn('Engine started.');
 
     try {
       // WebGPU Initialization: 0% -> 25%
       LoadingStatus.updateStatus('Initializing WebGPU...', 0);
       const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
+      let tStep = performance.now();
       const initialized = await Render.getInstance().initialize(canvas);
 
       if (!initialized) {
         throw new Error('Failed to initialize WebGPU. Your browser may not support WebGPU.');
       }
-
+      ts('WebGPU initialized', tStep);
       LoadingStatus.updateStatus('WebGPU initialized', 25);
 
       // Initialize GUI for editor UI
+      tStep = performance.now();
       await this._guiManager.initialize();
+      ts('GUIManager initialized', tStep);
 
       // Module Creation: 25% -> 30%
       LoadingStatus.updateStatus('Creating module manager...', 30);
@@ -100,13 +111,17 @@ export class Engine {
 
       // Module Initialization: 40% -> 100% (dinámico según módulos)
       LoadingStatus.updateStatus('Starting modules...', 40);
+      tStep = performance.now();
       await this._modules.start();
+      ts('All modules started', tStep);
 
       // Initialize debug UI controls once (Tweakpane + Lil-GUI)
       this.renderInMenu();
 
       LoadingStatus.updateStatus('Engine ready!', 100);
       this.initialized = true;
+
+      ts('✅ Engine.start() TOTAL');
     } catch (error) {
       console.error('Error during engine initialization:', error);
       LoadingStatus.showError(error as Error);

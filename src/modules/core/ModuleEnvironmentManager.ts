@@ -54,21 +54,25 @@ export class ModuleEnvironmentManager extends Module {
     const response = await ResourceManager.fetch(`/data/environment.json`);
     const jsonData = await response.json();
 
+    this.skyboxType = jsonData.skyboxType || 'cubemap';
+    this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
+    this.irradianceGenerator = new IrradianceGenerator();
+
+    const [irradianceCubemap, skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
+      Cubemap.getAsync(jsonData.ambient.irradianceCubemap),
+      HDRTexture.getAsync(jsonData.skybox),
+      Cubemap.getAsync(jsonData.ssrEnvironment),
+      this.irradianceGenerator.initialize(),
+    ]);
+
     this.ambientLightData = {
       globalFactor: jsonData.ambient.globalFactor,
       diffuseFactor: jsonData.ambient.diffuseFactor,
       reflectionFactor: jsonData.ambient.reflectionFactor,
-      irradianceCubemap: await Cubemap.getAsync(jsonData.ambient.irradianceCubemap),
+      irradianceCubemap,
     };
-
-    this.skyboxType = jsonData.skyboxType || 'cubemap';
-    this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
-    this.skyboxTexture = await HDRTexture.getAsync(jsonData.skybox);
-    this.ssrEnvironmentTexture = await Cubemap.getAsync(jsonData.ssrEnvironment);
-
-    // Inicializar generador de irradiance
-    this.irradianceGenerator = new IrradianceGenerator();
-    await this.irradianceGenerator.initialize();
+    this.skyboxTexture = skyboxTexture;
+    this.ssrEnvironmentTexture = ssrEnvironmentTexture;
 
     return true;
   }
