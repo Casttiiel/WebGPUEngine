@@ -38,6 +38,9 @@ export type MaterialOptions = Required<Pick<MaterialBaseOptions, 'textures' | 't
   IGPUResourceOptions;
 
 export class Material extends GPUResource {
+  // Prevents duplicate registration for string-path materials under parallel load.
+  private static readonly inflight = new Map<string, Promise<Material>>();
+
   private technique?: Technique;
   private textures: Map<string, Texture> = new Map();
   private baseColorFactor!: number[];
@@ -75,16 +78,36 @@ export class Material extends GPUResource {
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
     let materialData = null;
     if (typeof pathOrData === 'string') {
+      // 1. Already registered.
       try {
         return ResourceManager.getResource<Material>(pathOrData);
       } catch {
-        // Load material data from file if needed
-        materialData = await ResourceManager.loadMaterialData(pathOrData);
+        // not registered yet
       }
+
+      // 2. Another concurrent call is already loading this path.
+      const existing = this.inflight.get(pathOrData);
+      if (existing) return existing;
+
+      // 3. First caller: wrap the work in a stored promise before any await.
+      const path = pathOrData;
+      const promise = (async () => {
+        const data = await ResourceManager.loadMaterialData(path);
+        const mat = await this.buildMaterial(path, data);
+        this.inflight.delete(path);
+        return mat;
+      })();
+      this.inflight.set(path, promise);
+      return promise;
     } else {
       materialData = pathOrData;
     }
 
+    // Inline MaterialDataType — always a unique dynamic material, no dedup needed.
+    return this.buildMaterial(`dynamic_material_${Engine.generateDynamicId()}`, materialData!);
+  }
+
+  private static async buildMaterial(path: string, materialData: MaterialDataType): Promise<Material> {
     const techniqueSource =
       materialData.technique !== undefined
         ? materialData.technique
@@ -93,12 +116,12 @@ export class Material extends GPUResource {
           : undefined;
 
     if (techniqueSource === undefined) {
-      throw new Error(`Missing technique for material: ${pathOrData}`);
+      throw new Error(`Missing technique for material: ${path}`);
     }
 
     const techniqueToUse = await Technique.getAsync(techniqueSource);
     if (!techniqueToUse) {
-      throw new Error(`Missing technique for material: ${pathOrData}`);
+      throw new Error(`Missing technique for material: ${path}`);
     }
 
     const textures: MaterialTexturesOptions = {
@@ -110,10 +133,7 @@ export class Material extends GPUResource {
     };
 
     const material = new Material({
-      path:
-        typeof pathOrData === 'string'
-          ? pathOrData
-          : `dynamic_material_${Engine.generateDynamicId()}`,
+      path,
       type: ResourceType.MATERIAL,
       technique: techniqueToUse,
       textures,

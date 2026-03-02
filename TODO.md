@@ -1,6 +1,14 @@
 ### Engine
 
-1. Better loading speed
+1. Better loading speed (8segs -> )
+   Entidades hija en paralelo Baja 🔴 Alto
+   Root entities en paralelo Baja 🟠 Medio
+   Buffers GLTF en paralelo Muy baja 🟠 Medio
+   WebIO singleton Muy baja 🟡 Pequeño
+   readMesh en paralelo Muy baja 🟠 Medio
+   Escenas en paralelo Baja 🟡 Pequeño
+   Deduplicación fetches en vuelo Media 🟡 Preventivo
+
 2. Contact Shadows
 3. High Sponza low frame rate on near doors
 4. Multiple Light probes has good shadows?

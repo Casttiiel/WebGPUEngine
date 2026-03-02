@@ -21,6 +21,9 @@ export class Texture extends GPUResource {
   private usage: GPUTextureUsageFlags;
   private static mipmapGenerator: MipmapGenerator | null = null;
 
+  // Prevents returning a registered-but-not-yet-loaded texture to concurrent callers.
+  private static readonly inflight = new Map<string, Promise<Texture>>();
+
   constructor(options: TextureOptions) {
     super({
       ...options,
@@ -61,20 +64,30 @@ export class Texture extends GPUResource {
   }
 
   public static async getAsync(path: string): Promise<Texture> {
-    // Check if texture is already registered
+    // 1. Fully loaded and registered — return immediately.
     try {
-      return ResourceManager.getResource<Texture>(path);
+      const t = ResourceManager.getResource<Texture>(path);
+      // Only return if the texture view is actually ready (fully loaded).
+      if (t.getTextureView()) return t;
     } catch {
-      // Create new texture and register it before loading
-      const texture = new Texture({ path, type: ResourceType.TEXTURE });
-
-      // Register first to prevent race conditions
-      ResourceManager.registerResource(texture);
-
-      // Then load the texture
-      await texture.loadAsync();
-      return texture;
+      // not registered yet
     }
+
+    // 2. Another concurrent call is already loading this texture — share its promise.
+    const existing = this.inflight.get(path);
+    if (existing) return existing;
+
+    // 3. First caller: create, register, and store the in-flight promise before any await.
+    const texture = new Texture({ path, type: ResourceType.TEXTURE });
+    ResourceManager.registerResource(texture);
+
+    const promise = texture.loadAsync().then(() => {
+      this.inflight.delete(path);
+      return texture;
+    });
+
+    this.inflight.set(path, promise);
+    return promise;
   }
 
   public async loadAsync(): Promise<void> {

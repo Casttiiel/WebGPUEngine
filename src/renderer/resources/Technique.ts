@@ -28,6 +28,10 @@ export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'
 export type TechniqueOptions = TechniqueCreateOptions & IGPUResourceOptions;
 
 export class Technique extends GPUResource {
+  // Prevents duplicate registration when multiple parallel loaders request the
+  // same technique before any of them has finished registering it.
+  private static readonly inflight = new Map<string, Promise<Technique>>();
+
   // Pipeline resources
   private pipeline?: GPURenderPipeline;
   private pipelineLayouts?: GPUBindGroupLayout[];
@@ -72,19 +76,29 @@ export class Technique extends GPUResource {
   ): Promise<Technique> {
     const path = this.generatePath(pathOrData);
 
-    // Try to get existing resource
+    // 1. Already registered — return immediately.
     try {
       return ResourceManager.getResource<Technique>(path);
     } catch {
-      // Resource doesn't exist, create new one
+      // not registered yet
     }
 
-    const techniqueData = await this.loadTechniqueData(pathOrData);
-    const technique = this.createTechnique(path, techniqueData);
+    // 2. Another concurrent call is already loading this path — share its promise.
+    const existing = this.inflight.get(path);
+    if (existing) return existing;
 
-    await technique.loadAsync();
-    ResourceManager.registerResource(technique);
-    return technique;
+    // 3. First caller: create the in-flight promise and store it before any await.
+    const promise = (async () => {
+      const techniqueData = await this.loadTechniqueData(pathOrData);
+      const technique = this.createTechnique(path, techniqueData);
+      await technique.loadAsync();
+      ResourceManager.registerResource(technique);
+      this.inflight.delete(path);
+      return technique;
+    })();
+
+    this.inflight.set(path, promise);
+    return promise;
   }
 
   private static generatePath(pathOrData: string | Partial<TechniqueCreateOptions>): string {
