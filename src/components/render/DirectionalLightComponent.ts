@@ -58,23 +58,25 @@ export class DirectionalLightComponent extends Component {
   }
 
   public async load(lightData: DirectionalLightComponentData): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-
     // Configurar CSM
     this.cascadeCount = Math.min(3, Math.max(1, lightData.cascadeCount || 1));
     this.cascadeLambda = lightData.cascadeLambda ?? 0.5; // 0=uniforme, 1=logarítmico
     this.maxShadowDistance = lightData.maxShadowDistance ?? 50.0; // Limitar sombras a 50m por defecto
-    this.projectorTexture = await Texture.getAsync(
-      lightData.projector ? lightData.projector : 'white.png',
-    );
-    this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
     // Cargar técnica apropiada (CSM o single shadow)
     const techniquePath =
       this.cascadeCount > 1
         ? 'lighting/directional_light_csm.tech'
         : 'lighting/directional_light.tech';
-    this.directionalLightTechnique = await Technique.getAsync(techniquePath);
+
+    // Load mesh, texture, and technique in parallel — none depend on each other
+    [this.fullscreenQuadMesh, this.projectorTexture, this.directionalLightTechnique] =
+      await Promise.all([
+        Mesh.getAsync('fullscreenquad.obj'),
+        Texture.getAsync(lightData.projector ? lightData.projector : 'white.png'),
+        Technique.getAsync(techniquePath),
+      ]);
+    this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
     // Uniform buffer size: base (32 bytes) + 3 cascadas * 64 bytes (mat4x4) + cascadeSplits (16) + shadow params (16)
     const uniformBufferSize = 32 + 3 * 64 + 16 + 16;

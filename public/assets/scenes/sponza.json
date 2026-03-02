@@ -4,17 +4,7 @@
       "name": "Sponza",
       "transform": {
         "rotation": [0, 90, 0],
-        "scale": [0.01, 0.01, 0.01]
-      }
-    },
-    "gltf": "high_sponza.gltf"
-  },
-  {
-    "components": {
-      "name": "Sponza",
-      "transform": {
-        "rotation": [0, 90, 0],
-        "position": [0, 0, 50]
+        "position": [0, 0, 0]
       }
     },
     "gltf": "sponza.gltf"

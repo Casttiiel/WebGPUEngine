@@ -95,14 +95,19 @@ export class PointLightComponent extends Component {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
-    this.projectorTexture = await Texture.getAsync('white.png');
+    // Load texture and technique in parallel — they don't depend on each other
+    const techPath = this._hasShadows
+      ? 'lighting/point_light_shadows.tech'
+      : 'lighting/point_light.tech';
+    [this.projectorTexture, this.technique] = await Promise.all([
+      Texture.getAsync('white.png'),
+      Technique.getAsync(techPath),
+    ]);
     this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
     if (this._hasShadows) {
-      this.technique = await Technique.getAsync('lighting/point_light_shadows.tech');
       this.initShadowResources();
     } else {
-      this.technique = await Technique.getAsync('lighting/point_light.tech');
       // Dummy 2D shadow texture to satisfy the non-shadow bind group layout
       this.dummyShadowTexture = GPUUtils.createTexture(
         'dummy_shadow_texture_point_light',

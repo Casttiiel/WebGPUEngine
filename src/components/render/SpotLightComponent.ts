@@ -116,9 +116,6 @@ export class SpotLightComponent extends CameraComponent {
       );
     }
 
-    this.projectorTexture = await Texture.getAsync(data.projector ? data.projector : 'white.png');
-    this.projectorTextureView = this.projectorTexture.getTextureView()!;
-
     this.camera.lookAt(data.position ?? [0, 0, 0], data.target ?? [0, 0, 1]);
 
     // Crear textura de profundidad para shadow mapping
@@ -137,9 +134,14 @@ export class SpotLightComponent extends CameraComponent {
     // Crear sampler de comparación para shadow mapping
     this.shadowSampler = SamplerLibrary.shadows;
 
-    this.technique = await Technique.getAsync(
-      this._hasShadows ? 'lighting/spot_light_shadows.tech' : 'lighting/spot_light.tech',
-    );
+    // Load texture and technique in parallel — they don't depend on each other
+    [this.projectorTexture, this.technique] = await Promise.all([
+      Texture.getAsync(data.projector ? data.projector : 'white.png'),
+      Technique.getAsync(
+        this._hasShadows ? 'lighting/spot_light_shadows.tech' : 'lighting/spot_light.tech',
+      ),
+    ]);
+    this.projectorTextureView = this.projectorTexture.getTextureView()!;
     this.uniformBuffer = GPUUtils.createBuffer(
       'spot light uniform buffer',
       36 * 4,
