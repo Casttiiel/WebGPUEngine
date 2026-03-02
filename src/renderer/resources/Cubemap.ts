@@ -96,11 +96,20 @@ export class Cubemap extends GPUResource {
           const faceCanvas = new OffscreenCanvas(faceSize, faceSize);
           const ctx = faceCanvas.getContext('2d');
           if (!ctx) throw new Error('Could not get 2D context from OffscreenCanvas');
-          ctx.drawImage(image, col * faceSize, row * faceSize, faceSize, faceSize, 0, 0, faceSize, faceSize);
+          ctx.drawImage(
+            image,
+            col * faceSize,
+            row * faceSize,
+            faceSize,
+            faceSize,
+            0,
+            0,
+            faceSize,
+            faceSize,
+          );
           return createImageBitmap(faceCanvas);
         }),
       );
-
 
       // Calcular niveles de mipmap
       const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1; // Crear la textura en GPU

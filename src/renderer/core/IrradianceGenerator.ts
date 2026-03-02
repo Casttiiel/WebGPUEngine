@@ -54,14 +54,20 @@ export class IrradianceGenerator {
     const shaderCode = await ShaderPreprocessor.preprocessShader(
       'utility/irradiance_convolution.wgsl',
     );
-    console.log(`%c[IrradianceGenerator] preprocessShader: +${(performance.now() - tStep).toFixed(0)}ms`, 'color:#ffcc80');
+    console.log(
+      `%c[IrradianceGenerator] preprocessShader: +${(performance.now() - tStep).toFixed(0)}ms`,
+      'color:#ffcc80',
+    );
 
     tStep = performance.now();
     this.computeShader = this.device.createShaderModule({
       label: 'irradiance_convolution_shader',
       code: shaderCode,
     });
-    console.log(`%c[IrradianceGenerator] createShaderModule: +${(performance.now() - tStep).toFixed(0)}ms`, 'color:#ffcc80');
+    console.log(
+      `%c[IrradianceGenerator] createShaderModule: +${(performance.now() - tStep).toFixed(0)}ms`,
+      'color:#ffcc80',
+    );
 
     // Crear bind group layout
     this.bindGroupLayout = this.device.createBindGroupLayout({
@@ -112,9 +118,15 @@ export class IrradianceGenerator {
         entryPoint: 'main',
       },
     });
-    console.log(`%c[IrradianceGenerator] createComputePipelineAsync: +${(performance.now() - tStep).toFixed(0)}ms`, 'color:#ffcc80');
+    console.log(
+      `%c[IrradianceGenerator] createComputePipelineAsync: +${(performance.now() - tStep).toFixed(0)}ms`,
+      'color:#ffcc80',
+    );
 
-    console.log(`%c[IrradianceGenerator] initialize() TOTAL: +${(performance.now() - t0).toFixed(0)}ms`, 'color:#ffcc80;font-weight:bold');
+    console.log(
+      `%c[IrradianceGenerator] initialize() TOTAL: +${(performance.now() - t0).toFixed(0)}ms`,
+      'color:#ffcc80;font-weight:bold',
+    );
     console.log('✅ IrradianceGenerator initialized');
   }
 

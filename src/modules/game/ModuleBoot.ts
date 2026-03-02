@@ -45,7 +45,10 @@ export class ModuleBoot extends Module {
     for (const jsonSceneData of sceneArrays) {
       finalScene.push(...jsonSceneData);
     }
-    ts(`Scene files fetched (${jsonData.scenes_to_load.length} files, ${finalScene.length} root entities)`, tStep);
+    ts(
+      `Scene files fetched (${jsonData.scenes_to_load.length} files, ${finalScene.length} root entities)`,
+      tStep,
+    );
 
     LoadingStatus.updateStatus('Parsing scene data...');
     tStep = performance.now();

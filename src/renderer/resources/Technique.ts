@@ -149,7 +149,7 @@ export class Technique extends GPUResource {
   public async loadAsync(): Promise<void> {
     await this.createShaderModules();
     this.createPipelineLayout();
-    this.createPipeline();
+    await this.createPipelineAsync();
   }
 
   private async createShaderModules(): Promise<void> {
@@ -196,7 +196,7 @@ export class Technique extends GPUResource {
     return BindGroupFactory.getLayoutFromEnum(layout);
   }
 
-  private createPipeline(): void {
+  private async createPipelineAsync(): Promise<void> {
     if (!this.vsModule || !this.fsModule) {
       throw new Error(
         `Cannot create pipeline for technique ${this.path}: Shader modules not loaded`,
@@ -238,7 +238,7 @@ export class Technique extends GPUResource {
       pipelineConfig.depthStencil = this.getDepthConfig();
     }
 
-    this.pipeline = PipelineFactory.createPipeline(pipelineConfig);
+    this.pipeline = await PipelineFactory.createPipelineAsync(pipelineConfig);
   }
 
   // ============================================================================

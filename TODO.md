@@ -1,27 +1,21 @@
 ### Engine
 
 1.  Better loading speed (6600ms)
-    🟡 Complejidad media — Cambios controlados 3. Paralelizar environment_manager + render en el arranque → −400~500ms estimado
-    Son independientes entre sí — render no usa datos del environment manager. Bastaría con Promise.all([startModule(env), startModule(render)]) en vez de ejecutarlos en serie. El resto sí depende del render (entities, physics, etc.) y quedan en serie. Ganancia neta: casi los 507ms del env_manager quedan solapados.
+2.  Contact Shadows
+3.  High Sponza low frame rate on near doors
+4.  Multiple Light probes has good shadows?
+5.  Reflection Probes con blending
 
-🔴 Mayor complejidad — Alto impacto 5. Pipeline parse+load por entidad en ModuleBoot → −400ms estimado
-(El que se discutió en la sesión anterior — cada entidad raíz hace parse→flag→load de forma independiente sin esperar al GLTF más pesado)
+6.  Point light shadows banding
+7.  SS Global Illumination
+8.  Optimize with compute shaders
 
-7. Contact Shadows
-8. High Sponza low frame rate on near doors
-9. Multiple Light probes has good shadows?
-10. Reflection Probes con blending
-
-11. Point light shadows banding
-12. SS Global Illumination
-13. Optimize with compute shaders
-
-14. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
-15. Froxel Density Volumes
-16. Froxel: Self occlusion
-17. Froxel Global Illumination
-18. UI
-19. Improve particles
+9.  Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
+10. Froxel Density Volumes
+11. Froxel: Self occlusion
+12. Froxel Global Illumination
+13. UI
+14. Improve particles
 
 ## Gameplay
 

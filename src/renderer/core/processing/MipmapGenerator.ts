@@ -38,7 +38,9 @@ export class MipmapGenerator {
     if (this.initPromise) return this.initPromise;
     this.initPromise = (async () => {
       this.device = GPUUtils.getDevice();
-      this.baseShaderCode = await ShaderPreprocessor.preprocessShader('utility/generate_mipmap.wgsl');
+      this.baseShaderCode = await ShaderPreprocessor.preprocessShader(
+        'utility/generate_mipmap.wgsl',
+      );
       this.isInitialized = true;
     })();
     return this.initPromise;
@@ -95,12 +97,10 @@ export class MipmapGenerator {
         };
 
         // Async compile — does not block the main thread
-        const promise = this.device
-          .createComputePipelineAsync(computeConfig)
-          .then((pipeline) => {
-            this.pipelines.set(format, pipeline);
-            return pipeline;
-          });
+        const promise = this.device.createComputePipelineAsync(computeConfig).then((pipeline) => {
+          this.pipelines.set(format, pipeline);
+          return pipeline;
+        });
         this.pipelinePromises.set(format, promise);
       }
       await this.pipelinePromises.get(format)!;

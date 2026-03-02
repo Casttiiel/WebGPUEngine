@@ -43,7 +43,8 @@ function wgslIncludePlugin(): Plugin {
         if (!/\.(wgsl|fs|vs)$/.test(url)) return next();
 
         let relative = url;
-        if (relative.startsWith('/WebGPUEngine/')) relative = relative.slice('/WebGPUEngine/'.length);
+        if (relative.startsWith('/WebGPUEngine/'))
+          relative = relative.slice('/WebGPUEngine/'.length);
         if (relative.startsWith('/')) relative = relative.slice(1);
 
         const absPath = path.join(server.config.root, 'public', relative);
@@ -69,7 +70,10 @@ function wgslIncludePlugin(): Plugin {
       const processDir = (dir: string) => {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
           const full = path.join(dir, entry.name);
-          if (entry.isDirectory()) { processDir(full); continue; }
+          if (entry.isDirectory()) {
+            processDir(full);
+            continue;
+          }
           if (!/\.(wgsl|fs|vs)$/.test(entry.name)) continue;
           const processed = readAndInline(full);
           fs.writeFileSync(full, processed, 'utf-8');

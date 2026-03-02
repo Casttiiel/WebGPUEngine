@@ -55,14 +55,17 @@ export class ModuleEnvironmentManager extends Module {
   public async start(): Promise<boolean> {
     const t0 = performance.now();
     const ts = (label: string, from: number) =>
-      console.log(`%c[EnvManager] ${label}: +${(performance.now() - from).toFixed(0)}ms  (total: +${(performance.now() - t0).toFixed(0)}ms)`, 'color:#ce93d8');
+      console.log(
+        `%c[EnvManager] ${label}: +${(performance.now() - from).toFixed(0)}ms  (total: +${(performance.now() - t0).toFixed(0)}ms)`,
+        'color:#ce93d8',
+      );
 
     // Kick off mipmap pipeline compilation immediately — runs in background while
     // we fetch JSON and download textures so GPU work overlaps with I/O.
     const qualitySettings = QualitySettings.getInstance().getSettings();
     void MipmapGenerator.getInstance().preWarm([
       qualitySettings.generalTexture, // cubemap format
-      'rgba16float',                   // HDR texture format
+      'rgba16float', // HDR texture format
     ]);
 
     const response = await ResourceManager.fetch(`/data/environment.json`);
@@ -74,9 +77,18 @@ export class ModuleEnvironmentManager extends Module {
 
     let tStep = performance.now();
     const [irradianceCubemap, skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
-      Cubemap.getAsync(jsonData.ambient.irradianceCubemap).then((r) => { ts('irradianceCubemap', tStep); return r; }),
-      HDRTexture.getAsync(jsonData.skybox).then((r) => { ts('skyboxTexture (HDR)', tStep); return r; }),
-      Cubemap.getAsync(jsonData.ssrEnvironment).then((r) => { ts('ssrEnvironmentTexture', tStep); return r; }),
+      Cubemap.getAsync(jsonData.ambient.irradianceCubemap).then((r) => {
+        ts('irradianceCubemap', tStep);
+        return r;
+      }),
+      HDRTexture.getAsync(jsonData.skybox).then((r) => {
+        ts('skyboxTexture (HDR)', tStep);
+        return r;
+      }),
+      Cubemap.getAsync(jsonData.ssrEnvironment).then((r) => {
+        ts('ssrEnvironmentTexture', tStep);
+        return r;
+      }),
     ]);
 
     this.ambientLightData = {

@@ -32,7 +32,7 @@ export interface PipelineConfig {
  */
 export class PipelineFactory {
   /**
-   * Creates a new render pipeline
+   * Creates a new render pipeline (synchronous — prefer createPipelineAsync during load)
    */
   public static createPipeline(config: PipelineConfig): GPURenderPipeline {
     const device = GPUUtils.getDevice();
@@ -56,6 +56,34 @@ export class PipelineFactory {
     }
 
     return device.createRenderPipeline(descriptor);
+  }
+
+  /**
+   * Creates a new render pipeline asynchronously.
+   * Allows the browser to compile multiple pipelines in parallel without blocking the main thread.
+   */
+  public static async createPipelineAsync(config: PipelineConfig): Promise<GPURenderPipeline> {
+    const device = GPUUtils.getDevice();
+
+    const descriptor: GPURenderPipelineDescriptor = {
+      label: config.label,
+      layout: config.layout || 'auto',
+      vertex: config.vertex,
+      fragment: config.fragment,
+    };
+
+    if (config.primitive) {
+      descriptor.primitive = config.primitive;
+    }
+    if (config.depthStencil) {
+      descriptor.depthStencil = config.depthStencil;
+    }
+
+    if (config.multisample) {
+      descriptor.multisample = config.multisample;
+    }
+
+    return device.createRenderPipelineAsync(descriptor);
   }
 
   /**
