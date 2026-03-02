@@ -14,6 +14,8 @@ import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer'
 import { Entity } from '../../core/ecs/Entity';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { IrradianceGenerator } from '../../renderer/core/IrradianceGenerator';
+import { MipmapGenerator } from '../../renderer/core/processing/MipmapGenerator';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
@@ -51,6 +53,18 @@ export class ModuleEnvironmentManager extends Module {
   }
 
   public async start(): Promise<boolean> {
+    const t0 = performance.now();
+    const ts = (label: string, from: number) =>
+      console.log(`%c[EnvManager] ${label}: +${(performance.now() - from).toFixed(0)}ms  (total: +${(performance.now() - t0).toFixed(0)}ms)`, 'color:#ce93d8');
+
+    // Kick off mipmap pipeline compilation immediately — runs in background while
+    // we fetch JSON and download textures so GPU work overlaps with I/O.
+    const qualitySettings = QualitySettings.getInstance().getSettings();
+    void MipmapGenerator.getInstance().preWarm([
+      qualitySettings.generalTexture, // cubemap format
+      'rgba16float',                   // HDR texture format
+    ]);
+
     const response = await ResourceManager.fetch(`/data/environment.json`);
     const jsonData = await response.json();
 
@@ -58,11 +72,11 @@ export class ModuleEnvironmentManager extends Module {
     this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
     this.irradianceGenerator = new IrradianceGenerator();
 
+    let tStep = performance.now();
     const [irradianceCubemap, skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
-      Cubemap.getAsync(jsonData.ambient.irradianceCubemap),
-      HDRTexture.getAsync(jsonData.skybox),
-      Cubemap.getAsync(jsonData.ssrEnvironment),
-      this.irradianceGenerator.initialize(),
+      Cubemap.getAsync(jsonData.ambient.irradianceCubemap).then((r) => { ts('irradianceCubemap', tStep); return r; }),
+      HDRTexture.getAsync(jsonData.skybox).then((r) => { ts('skyboxTexture (HDR)', tStep); return r; }),
+      Cubemap.getAsync(jsonData.ssrEnvironment).then((r) => { ts('ssrEnvironmentTexture', tStep); return r; }),
     ]);
 
     this.ambientLightData = {

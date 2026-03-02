@@ -1,17 +1,11 @@
 ### Engine
 
-1.  Better loading speed (5400ms)
+1.  Better loading speed (6600ms)
     🟡 Complejidad media — Cambios controlados 3. Paralelizar environment_manager + render en el arranque → −400~500ms estimado
     Son independientes entre sí — render no usa datos del environment manager. Bastaría con Promise.all([startModule(env), startModule(render)]) en vez de ejecutarlos en serie. El resto sí depende del render (entities, physics, etc.) y quedan en serie. Ganancia neta: casi los 507ms del env_manager quedan solapados.
 
-2.  Paralelizar las cargas dentro de ModuleRender.start() → −50~80ms estimado
-    deferred.load(), distortions.load(), fullscreenquad.obj y presentation.tech son secuenciales. Los tres últimos son independientes entre sí.
-
 🔴 Mayor complejidad — Alto impacto 5. Pipeline parse+load por entidad en ModuleBoot → −400ms estimado
 (El que se discutió en la sesión anterior — cada entidad raíz hace parse→flag→load de forma independiente sin esperar al GLTF más pesado)
-
-6. Investigar qué hace environment_manager durante esos ~507ms totales
-   Las 3 texturas en paralelo (#2) probablemente dejen ~100ms de irradianceGenerator.initialize(). Si ese initialize está compilando shaders podría combinarse con la compilación del deferred renderer.
 
 7. Contact Shadows
 8. High Sponza low frame rate on near doors

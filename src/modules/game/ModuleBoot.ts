@@ -22,10 +22,15 @@ export class ModuleBoot extends Module {
   }
 
   public async start(): Promise<boolean> {
-    // El progreso del módulo Boot se gestiona dentro de su propio rango
-    // No usamos porcentajes absolutos porque el sistema es dinámico
+    const t0 = performance.now();
+    const ts = (label: string, from: number = t0) =>
+      console.log(
+        `%c[Boot] ${label}: +${(performance.now() - from).toFixed(0)}ms  (total: +${(performance.now() - t0).toFixed(0)}ms)`,
+        'color:#80cbc4',
+      );
 
     LoadingStatus.updateStatus('Loading scene files...');
+    let tStep = performance.now();
     const response = await ResourceManager.fetch(`data/boot.json`);
     const jsonData = await response.json();
     const finalScene = [];
@@ -40,25 +45,30 @@ export class ModuleBoot extends Module {
     for (const jsonSceneData of sceneArrays) {
       finalScene.push(...jsonSceneData);
     }
+    ts(`Scene files fetched (${jsonData.scenes_to_load.length} files, ${finalScene.length} root entities)`, tStep);
 
     LoadingStatus.updateStatus('Parsing scene data...');
-    // 1. Parsear el JSON (expandir prefabs, GLTF, etc.)
+    tStep = performance.now();
     const parsedJson = await Loader.parseSceneJSON(finalScene);
+    ts('parseSceneJSON', tStep);
 
     LoadingStatus.updateStatus('Processing instances...');
-    // 2. Flagear entidades que pueden ser instanciadas
+    tStep = performance.now();
     const flaggedJson = InstanceManager.flagInstanceableEntities(parsedJson);
+    ts('flagInstanceableEntities', tStep);
 
-    // 3. Cargar la escena con las entidades flaggeadas
-    // El Loader usa updateRangeProgress internamente para mostrar progreso por entidad
     LoadingStatus.updateStatus('Loading entities...');
+    tStep = performance.now();
     await Loader.loadSceneFromJSON(flaggedJson);
+    ts('loadSceneFromJSON', tStep);
 
     LoadingStatus.updateStatus('Creating instance groups...');
-    // 4. Crear grupos de instancias (después de que todas las entities estén cargadas)
+    tStep = performance.now();
     const allEntities = Engine.getEntities().getAllEntities();
     await InstanceManager.createInstanceGroups(allEntities);
+    ts('createInstanceGroups', tStep);
 
+    ts('\u2705 ModuleBoot.start() TOTAL');
     return true;
   }
 

@@ -103,14 +103,14 @@ export class CharacterControllerComponent extends Component {
     // Actualizar estado del suelo
     this.updateGroundedState();
 
-    console.log(
+    /*console.log(
       'grounded',
       this.isGrounded,
       'state',
       this.movementState,
       'jumping',
       this.isJumping,
-    );
+    );*/
 
     // Detectar paredes para wallrun
     this.wallRunSystem.detectWall(deltaTime);

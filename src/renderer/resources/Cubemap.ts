@@ -85,36 +85,22 @@ export class Cubemap extends GPUResource {
         5: [3, 1], // -Z
       };
 
-      const canvas = new OffscreenCanvas(faceSize, faceSize);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('Could not get 2D context from canvas');
-      }
+      // Extract all 6 faces in parallel — each gets its own OffscreenCanvas so
+      // drawImage + createImageBitmap run concurrently without shared state.
+      const faces = await Promise.all(
+        Array.from({ length: 6 }, (_, i) => {
+          const coords = faceCoords[i];
+          if (!coords) throw new Error(`Invalid face index: ${i}`);
+          const [col, row] = coords;
 
-      const faces: ImageBitmap[] = [];
+          const faceCanvas = new OffscreenCanvas(faceSize, faceSize);
+          const ctx = faceCanvas.getContext('2d');
+          if (!ctx) throw new Error('Could not get 2D context from OffscreenCanvas');
+          ctx.drawImage(image, col * faceSize, row * faceSize, faceSize, faceSize, 0, 0, faceSize, faceSize);
+          return createImageBitmap(faceCanvas);
+        }),
+      );
 
-      for (let i = 0; i < 6; i++) {
-        const coords = faceCoords[i];
-        if (!coords) {
-          throw new Error(`Invalid face index: ${i}`);
-        }
-        const [col, row] = coords;
-
-        ctx.clearRect(0, 0, faceSize, faceSize);
-        ctx.drawImage(
-          image,
-          col * faceSize,
-          row * faceSize,
-          faceSize,
-          faceSize,
-          0,
-          0,
-          faceSize,
-          faceSize,
-        );
-        const face = await createImageBitmap(canvas);
-        faces.push(face);
-      }
 
       // Calcular niveles de mipmap
       const mipLevelCount = Math.floor(Math.log2(Math.max(faceSize, faceSize))) + 1; // Crear la textura en GPU

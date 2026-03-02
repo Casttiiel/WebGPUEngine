@@ -10,8 +10,10 @@ export class MipmapGenerator {
   private device!: GPUDevice;
   private baseShaderCode!: string;
   private pipelines: Map<GPUTextureFormat, GPUComputePipeline> = new Map();
+  private pipelinePromises: Map<GPUTextureFormat, Promise<GPUComputePipeline>> = new Map();
   private bindGroupLayouts: Map<GPUTextureFormat, GPUBindGroupLayout> = new Map();
   private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
   private constructor() {
     // Private constructor for singleton pattern
@@ -32,12 +34,14 @@ export class MipmapGenerator {
   }
 
   async initialize(): Promise<void> {
-    this.device = GPUUtils.getDevice();
-
-    // Load the base shader template using ShaderPreprocessor cache
-    this.baseShaderCode = await ShaderPreprocessor.preprocessShader('utility/generate_mipmap.wgsl');
-
-    this.isInitialized = true;
+    if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = (async () => {
+      this.device = GPUUtils.getDevice();
+      this.baseShaderCode = await ShaderPreprocessor.preprocessShader('utility/generate_mipmap.wgsl');
+      this.isInitialized = true;
+    })();
+    return this.initPromise;
   }
 
   private createShaderForFormat(format: GPUTextureFormat): string {
@@ -45,56 +49,61 @@ export class MipmapGenerator {
     return this.baseShaderCode.replace('rgba16float', format);
   }
 
-  private getOrCreatePipeline(format: GPUTextureFormat): {
+  /**
+   * Pre-warms pipelines for known texture formats.
+   * Call this as early as possible so GPU compilation overlaps with I/O work.
+   */
+  public async preWarm(formats: GPUTextureFormat[]): Promise<void> {
+    await this.initialize();
+    await Promise.all(formats.map((f) => this.getOrCreatePipeline(f)));
+  }
+
+  private async getOrCreatePipeline(format: GPUTextureFormat): Promise<{
     pipeline: GPUComputePipeline;
     bindGroupLayout: GPUBindGroupLayout;
-  } {
+  }> {
     if (!this.pipelines.has(format)) {
-      // Create shader module for this specific format
-      const shaderCode = this.createShaderForFormat(format);
-      const shaderModule = this.device.createShaderModule({
-        label: `Mipmap Generation Compute Shader ${format}`,
-        code: shaderCode,
-      });
+      // Deduplicate concurrent compile requests for the same format
+      if (!this.pipelinePromises.has(format)) {
+        const shaderCode = this.createShaderForFormat(format);
+        const shaderModule = this.device.createShaderModule({
+          label: `Mipmap Generation Compute Shader ${format}`,
+          code: shaderCode,
+        });
 
-      // Create bind group layout for this format
-      const bindGroupLayout = BindGroupFactory.getLayout(`mipmap_generation_${format}`, [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: {
-            viewDimension: '2d',
-            sampleType: 'float',
+        const bindGroupLayout = BindGroupFactory.getLayout(`mipmap_generation_${format}`, [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            texture: { viewDimension: '2d', sampleType: 'float' },
           },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: format, // Use the actual texture format
-            viewDimension: '2d',
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: { access: 'write-only', format, viewDimension: '2d' },
           },
-        },
-      ]);
+        ]);
+        this.bindGroupLayouts.set(format, bindGroupLayout);
 
-      // Create compute pipeline for this format
-      const computeConfig: ComputePipelineConfig = {
-        label: `Mipmap Generation Pipeline ${format}`,
-        layout: PipelineFactory.createPipelineLayout(
-          `mipmap_generation_pipeline_layout_${format}`,
-          [bindGroupLayout],
-        ),
-        compute: {
-          module: shaderModule,
-          entryPoint: 'main',
-        },
-      };
+        const computeConfig: ComputePipelineConfig = {
+          label: `Mipmap Generation Pipeline ${format}`,
+          layout: PipelineFactory.createPipelineLayout(
+            `mipmap_generation_pipeline_layout_${format}`,
+            [bindGroupLayout],
+          ),
+          compute: { module: shaderModule, entryPoint: 'main' },
+        };
 
-      const pipeline = PipelineFactory.createComputePipeline(computeConfig);
-
-      this.pipelines.set(format, pipeline);
-      this.bindGroupLayouts.set(format, bindGroupLayout);
+        // Async compile — does not block the main thread
+        const promise = this.device
+          .createComputePipelineAsync(computeConfig)
+          .then((pipeline) => {
+            this.pipelines.set(format, pipeline);
+            return pipeline;
+          });
+        this.pipelinePromises.set(format, promise);
+      }
+      await this.pipelinePromises.get(format)!;
     }
 
     return {
@@ -115,7 +124,7 @@ export class MipmapGenerator {
     }
 
     // Get pipeline and bind group layout for this texture format
-    const { pipeline, bindGroupLayout } = this.getOrCreatePipeline(texture.format);
+    const { pipeline, bindGroupLayout } = await this.getOrCreatePipeline(texture.format);
 
     const commandEncoder = this.device.createCommandEncoder({
       label: 'Cubemap Mipmap Generation Command Encoder',
@@ -190,7 +199,7 @@ export class MipmapGenerator {
     }
 
     // Get pipeline and bind group layout for this texture format
-    const { pipeline, bindGroupLayout } = this.getOrCreatePipeline(texture.format);
+    const { pipeline, bindGroupLayout } = await this.getOrCreatePipeline(texture.format);
 
     const commandEncoder = this.device.createCommandEncoder({
       label: '2D Texture Mipmap Generation Command Encoder',
@@ -260,11 +269,13 @@ export class MipmapGenerator {
 
     // Clear all cached pipelines and bind group layouts
     this.pipelines.clear();
+    this.pipelinePromises.clear();
     this.bindGroupLayouts.clear();
 
     // Clear device reference
     this.device = null!;
     this.baseShaderCode = null!;
+    this.initPromise = null;
 
     // Mark as not initialized to force re-initialization
     this.isInitialized = false;
@@ -277,10 +288,9 @@ export class MipmapGenerator {
    */
   private async ensureValidDevice(): Promise<void> {
     const currentDevice = GPUUtils.getDevice();
-
-    // If device has changed or we're not initialized, re-initialize
     if (!this.isInitialized || this.device !== currentDevice) {
       console.log('MipmapGenerator device invalid, re-initializing...');
+      this.initPromise = null; // force fresh init
       await this.initialize();
     }
   }

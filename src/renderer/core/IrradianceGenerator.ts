@@ -15,6 +15,7 @@ export class IrradianceGenerator {
   private computeShader: GPUShaderModule | null = null;
   private bindGroupLayout: GPUBindGroupLayout | null = null;
   private sampler: GPUSampler | null = null;
+  private initPromise: Promise<void> | null = null;
 
   // Tamaño del irradiance cubemap (típicamente 32x32 o 64x64)
   private readonly IRRADIANCE_SIZE = 128;
@@ -23,7 +24,20 @@ export class IrradianceGenerator {
     this.device = GPUUtils.getDevice();
   }
 
+  /**
+   * Lazily initializes the compute pipeline — only compiles GPU shaders when
+   * generateIrradiance() is first called, not at engine boot.
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.computePipeline) return;
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this.initialize();
+    return this.initPromise;
+  }
+
   public async initialize(): Promise<void> {
+    const t0 = performance.now();
+
     // Crear sampler para el cubemap de entrada
     this.sampler = this.device.createSampler({
       label: 'irradiance_input_sampler',
@@ -36,14 +50,18 @@ export class IrradianceGenerator {
     });
 
     // Cargar compute shader usando ShaderPreprocessor para procesar includes
+    let tStep = performance.now();
     const shaderCode = await ShaderPreprocessor.preprocessShader(
       'utility/irradiance_convolution.wgsl',
     );
+    console.log(`%c[IrradianceGenerator] preprocessShader: +${(performance.now() - tStep).toFixed(0)}ms`, 'color:#ffcc80');
 
+    tStep = performance.now();
     this.computeShader = this.device.createShaderModule({
       label: 'irradiance_convolution_shader',
       code: shaderCode,
     });
+    console.log(`%c[IrradianceGenerator] createShaderModule: +${(performance.now() - tStep).toFixed(0)}ms`, 'color:#ffcc80');
 
     // Crear bind group layout
     this.bindGroupLayout = this.device.createBindGroupLayout({
@@ -79,13 +97,14 @@ export class IrradianceGenerator {
       ],
     });
 
-    // Crear compute pipeline
+    // Crear compute pipeline — async para no bloquear el hilo principal
     const pipelineLayout = this.device.createPipelineLayout({
       label: 'irradiance_pipeline_layout',
       bindGroupLayouts: [this.bindGroupLayout],
     });
 
-    this.computePipeline = this.device.createComputePipeline({
+    tStep = performance.now();
+    this.computePipeline = await this.device.createComputePipelineAsync({
       label: 'irradiance_compute_pipeline',
       layout: pipelineLayout,
       compute: {
@@ -93,7 +112,9 @@ export class IrradianceGenerator {
         entryPoint: 'main',
       },
     });
+    console.log(`%c[IrradianceGenerator] createComputePipelineAsync: +${(performance.now() - tStep).toFixed(0)}ms`, 'color:#ffcc80');
 
+    console.log(`%c[IrradianceGenerator] initialize() TOTAL: +${(performance.now() - t0).toFixed(0)}ms`, 'color:#ffcc80;font-weight:bold');
     console.log('✅ IrradianceGenerator initialized');
   }
 
@@ -103,6 +124,8 @@ export class IrradianceGenerator {
    * @returns Promise<Cubemap> Irradiance cubemap generado
    */
   public async generateIrradiance(inputCubemap: Cubemap): Promise<Cubemap> {
+    await this.ensureInitialized();
+
     if (!this.computePipeline || !this.bindGroupLayout || !this.sampler) {
       throw new Error('IrradianceGenerator not initialized');
     }

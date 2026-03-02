@@ -83,6 +83,30 @@ export class ShaderPreprocessor {
     return processedContent;
   }
 
+  /**
+   * Recursively pre-fetches all transitive #include files into the cache in parallel.
+   * After this completes, every readShaderFile() call in processIncludes() is a cache hit.
+   */
+  private static async prefetchIncludes(path: string, visited: Set<string>): Promise<void> {
+    if (visited.has(path)) return;
+    visited.add(path);
+
+    const content = await this.readShaderFile(path); // populates includeFileCache
+
+    const includeRegex = /#include\s*["']([^"']+)["']/g;
+    const childPaths: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = includeRegex.exec(content)) !== null) {
+      const includePath = match[1];
+      if (!includePath) continue;
+      const fullPath = includePath.endsWith('.wgsl') ? includePath : `${includePath}.wgsl`;
+      childPaths.push(fullPath);
+    }
+
+    // Fetch all children in parallel, and recurse into each in parallel
+    await Promise.all(childPaths.map((p) => this.prefetchIncludes(p, visited)));
+  }
+
   public static async preprocessShader(shaderPath: string): Promise<string> {
     // Check cache first for the full processed shader
     const cached = this.processedShaderCache.get(shaderPath);
@@ -90,7 +114,11 @@ export class ShaderPreprocessor {
       return cached;
     }
 
-    // Load and process shader
+    // Pre-fetch all transitive #include files in parallel into the cache.
+    // After this, every readShaderFile() call inside processIncludes() is a cache hit → instant.
+    await this.prefetchIncludes(shaderPath, new Set());
+
+    // Load and process shader (all reads are now cache hits)
     const content = await this.readShaderFile(shaderPath);
     const processedContent = await this.processIncludes(content, new Set(), new Set(), shaderPath);
 

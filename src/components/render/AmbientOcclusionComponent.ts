@@ -109,7 +109,7 @@ export class AmbientOcclusionComponent extends Component {
 
   private createSSAOParamsBindGroup(): void {
     const sampler = SamplerLibrary.ambientOcclusionSampler;
-    console.log(this.ssaoParamsBuffer, sampler, this.noiseTexture.getTextureView());
+    //console.log(this.ssaoParamsBuffer, sampler, this.noiseTexture.getTextureView());
     this.ssaoParamsBindGroup = BindGroupFactory.createBindGroup(
       'ssao_params_bindgroup',
       this.aoTechnique.getBindGroupLayout(2)!,
