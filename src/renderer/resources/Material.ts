@@ -107,7 +107,10 @@ export class Material extends GPUResource {
     return this.buildMaterial(`dynamic_material_${Engine.generateDynamicId()}`, materialData!);
   }
 
-  private static async buildMaterial(path: string, materialData: MaterialDataType): Promise<Material> {
+  private static async buildMaterial(
+    path: string,
+    materialData: MaterialDataType,
+  ): Promise<Material> {
     const techniqueSource =
       materialData.technique !== undefined
         ? materialData.technique
