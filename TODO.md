@@ -1,9 +1,7 @@
 ### Engine
 
 1. Better loading speed (7,48segs)
-   Root entities en paralelo Baja 🟠 Medio
    readMesh en paralelo Muy baja 🟠 Medio
-   Escenas en paralelo Baja 🟡 Pequeño
    Deduplicación fetches en vuelo Media 🟡 Preventivo
    Buffers GLTF en paralelo Muy baja 🟠 Medio
    WebIO singleton Muy baja 🟡 Pequeño

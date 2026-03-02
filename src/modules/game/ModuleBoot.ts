@@ -30,12 +30,14 @@ export class ModuleBoot extends Module {
     const jsonData = await response.json();
     const finalScene = [];
 
-    // Mergear todas las escenas en finalScene
-    for (let sceneName of jsonData.scenes_to_load) {
-      const sceneResponse = await ResourceManager.fetch(`assets/scenes/${sceneName}`);
-      const jsonSceneData = await sceneResponse.json();
-
-      // Mergear el array de la escena actual con finalScene
+    // Fetch all scene files in parallel, then merge in original order
+    const sceneArrays = await Promise.all(
+      jsonData.scenes_to_load.map(async (sceneName: string) => {
+        const sceneResponse = await ResourceManager.fetch(`assets/scenes/${sceneName}`);
+        return sceneResponse.json();
+      }),
+    );
+    for (const jsonSceneData of sceneArrays) {
       finalScene.push(...jsonSceneData);
     }
 
