@@ -1,7 +1,6 @@
 ### Engine
 
-1. Better loading speed (8segs -> )
-   Entidades hija en paralelo Baja 🔴 Alto
+1. Better loading speed (7,48segs)
    Root entities en paralelo Baja 🟠 Medio
    Buffers GLTF en paralelo Muy baja 🟠 Medio
    WebIO singleton Muy baja 🟡 Pequeño

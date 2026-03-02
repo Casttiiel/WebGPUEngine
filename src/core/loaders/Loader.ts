@@ -155,10 +155,9 @@ export class Loader {
       `Loading entities... (${this.entitiesLoaded}/${this.totalEntitiesToLoad})`,
     );
 
-    // Load children after parent is fully setup
-    for (const children_json of entityChildrens) {
-      await this.loadEntityFromJSON(children_json, entity);
-    }
+    // Load children in parallel — safe because Technique/Material/Texture all have
+    // inflight dedup maps that prevent duplicate registration under concurrent load.
+    await Promise.all(entityChildrens.map((children_json) => this.loadEntityFromJSON(children_json, entity)));
 
     return entity;
   }
