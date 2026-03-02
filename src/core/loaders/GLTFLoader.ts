@@ -13,6 +13,9 @@ import { BlendModes } from '../../types/BlendModes.enum';
 import { DepthModes } from '../../types/DepthModes.enum';
 
 export class GLTFLoader {
+  // Singleton para no re-registrar ~40 extensiones en cada carga
+  private static io = new WebIO().registerExtensions(ALL_EXTENSIONS);
+
   public static async loadGLTF(path: string): Promise<Array<EntityDataType>> {
     const folderName = path.split('.')[0];
     const gltfUrl = `assets/meshes/${folderName}/${path}`;
@@ -37,16 +40,19 @@ export class GLTFLoader {
       }
     }
 
-    for (const buffer of (json.buffers ?? []) as { uri?: string }[]) {
-      if (buffer.uri && !buffer.uri.startsWith('data:')) {
+    // Fetch all geometry buffers in parallel
+    const buffers = ((json.buffers ?? []) as { uri?: string }[]).filter(
+      (b) => b.uri && !b.uri.startsWith('data:'),
+    );
+    await Promise.all(
+      buffers.map(async (buffer) => {
         const bufResponse = await fetch(`assets/meshes/${folderName}/${buffer.uri}`);
-        resources[buffer.uri] = new Uint8Array(await bufResponse.arrayBuffer());
-      }
-    }
+        resources[buffer.uri!] = new Uint8Array(await bufResponse.arrayBuffer());
+      }),
+    );
 
     // ── Parse with gltf-transform (no extra fetches) ─────────────────────
-    const io = new WebIO().registerExtensions(ALL_EXTENSIONS);
-    const doc = await io.readJSON({ json, resources });
+    const doc = await GLTFLoader.io.readJSON({ json, resources });
 
     // ── Get default scene ────────────────────────────────────────────────
     const scene = doc.getRoot().getDefaultScene();

@@ -31,9 +31,7 @@ export class RenderComponent extends Component {
     }
 
     if (data.meshes) {
-      for (const meshData of data.meshes) {
-        await this.readMesh(meshData);
-      }
+      await Promise.all(data.meshes.map((meshData) => this.readMesh(meshData)));
     }
 
     // Solo actualizar RenderManager si NO es instanciada
