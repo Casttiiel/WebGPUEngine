@@ -161,26 +161,30 @@ export class Material extends GPUResource {
 
   public override async load(): Promise<void> {
     try {
-      if (this.castsShadows) {
-        // Si este material usa una técnica instanciada, el shadowsMaterial también debe usarla
-        const isInstancedTechnique = this.technique?.path.includes('_instanced.tech');
+      // Build the shadow material promise (if needed) and the 5 texture promises,
+      // then await all of them in parallel — shadow fetch no longer blocks textures.
+      const shadowPromise = this.castsShadows
+        ? (() => {
+            const isInstancedTechnique = this.technique?.path.includes('_instanced.tech');
+            if (isInstancedTechnique) {
+              return Material.get({
+                technique: 'shadows/shadows_instanced.tech',
+                textures: {},
+                category: 'shadows' as any,
+                casts_shadows: false,
+              }).then((m) => {
+                this.shadowsMaterial = m;
+              });
+            } else {
+              return Material.get('shadows.mat').then((m) => {
+                this.shadowsMaterial = m;
+              });
+            }
+          })()
+        : Promise.resolve();
 
-        if (isInstancedTechnique) {
-          // Crear material de sombras con técnica instanciada
-          const shadowsMaterialData = {
-            technique: 'shadows/shadows_instanced.tech',
-            textures: {},
-            category: 'shadows' as any,
-            casts_shadows: false,
-          };
-          this.shadowsMaterial = await Material.get(shadowsMaterialData);
-        } else {
-          this.shadowsMaterial = await Material.get('shadows.mat');
-        }
-      }
-
-      // Cargar todas las texturas en paralelo usando Promise.all
       await Promise.all([
+        shadowPromise,
         this.loadTexture('albedo', this.textureFiles.albedo),
         this.loadTexture('normal', this.textureFiles.normal),
         this.loadTexture('metallic', this.textureFiles.metallic),
