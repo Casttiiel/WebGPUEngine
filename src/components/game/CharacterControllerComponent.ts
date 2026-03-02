@@ -159,6 +159,10 @@ export class CharacterControllerComponent extends Component {
         const targetMovement = this.getTargetMovement(inputDir);
         this.movementSystem.update(deltaTime, targetMovement);
         this.jumpSystem.update(deltaTime);
+        // Coyote time de wall jump: permite saltar brevemente después de dejar la pared
+        if (!this.isGrounded) {
+          this.wallRunSystem.checkCoyoteWallJump(deltaTime);
+        }
         const finalVelocity = this.mergeMovements();
         this.applyMovement(finalVelocity, deltaTime);
         break;

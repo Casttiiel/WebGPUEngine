@@ -20,6 +20,11 @@ export class WallRunSystem {
   // Wall jump
   private disableInputAfterWallJumpTime: number = 0.3;
 
+  // Coyote time para wall jump
+  private wallJumpCoyoteTime: number = 0.15;
+  private wallJumpCoyoteTimer: number = 0.0;
+  private lastWallNormal: vec3 = vec3.create();
+
   // Estado interno
   private wallNormal: vec3 = vec3.create();
   private isNearWall: boolean = false;
@@ -36,6 +41,7 @@ export class WallRunSystem {
     this.runSpeed = data.moveSpeed ?? this.runSpeed;
     this.wallAcceleration = data.wallRunAcceleration ?? this.wallAcceleration;
     this.wallRunCooldown = 0.1;
+    this.wallJumpCoyoteTime = data.wallJumpCoyoteTime ?? this.wallJumpCoyoteTime;
   }
 
   public detectWall(deltaTime: number): void {
@@ -104,6 +110,16 @@ export class WallRunSystem {
     ) {
       this.startWallRun();
     } else if (this.controller.getIsGrounded() || wallInFront) {
+      if (this.controller.getIsWallRunning()) {
+        // El wallrun termina — arrancar el timer de coyote
+        vec3.copy(this.lastWallNormal, this.wallNormal);
+        this.wallJumpCoyoteTimer = this.wallJumpCoyoteTime;
+      }
+      this.controller.setIsWallRunning(false);
+    } else if (this.controller.getIsWallRunning() && !this.isNearWall) {
+      // Se alejó de la pared durante wallrun — arrancar coyote
+      vec3.copy(this.lastWallNormal, this.wallNormal);
+      this.wallJumpCoyoteTimer = this.wallJumpCoyoteTime;
       this.controller.setIsWallRunning(false);
     }
   }
@@ -146,11 +162,14 @@ export class WallRunSystem {
 
     // Salir si nos alejamos de la pared
     if (!this.isNearWall || !input.isActionPressed(GameAction.MOVE_FORWARD)) {
+      // Guardar la normal antes de abandonar el wallrun para coyote time
+      vec3.copy(this.lastWallNormal, this.wallNormal);
+      this.wallJumpCoyoteTimer = this.wallJumpCoyoteTime;
       this.controller.setIsWallRunning(false);
       return;
     }
 
-    // Wall jump
+    // Wall jump (ventana normal, dentro del wallrun)
     if (input.isActionBuffered(GameAction.JUMP)) {
       input.consumeBufferedAction(GameAction.JUMP);
       this.applyWallJump();
@@ -159,6 +178,33 @@ export class WallRunSystem {
 
     // Movimiento horizontal durante wallrun
     this.updateHorizontalMovement(deltaTime, targetMovement);
+  }
+
+  /**
+   * Comprueba si el jugador puede hacer un wall jump usando coyote time.
+   * Debe llamarse desde el IDLE/falling path del controller.
+   * @returns true si se aplicó un wall jump
+   */
+  public checkCoyoteWallJump(deltaTime: number): boolean {
+    if (this.wallJumpCoyoteTimer <= 0.0) return false;
+
+    // El coyote timer solo aplica mientras el jugador está en el aire
+    if (this.controller.getIsGrounded()) {
+      this.wallJumpCoyoteTimer = 0.0;
+      return false;
+    }
+
+    this.wallJumpCoyoteTimer -= deltaTime;
+
+    const input = Engine.getInput();
+    if (input.isActionBuffered(GameAction.JUMP)) {
+      input.consumeBufferedAction(GameAction.JUMP);
+      this.wallJumpCoyoteTimer = 0.0;
+      this.applyWallJumpWithNormal(this.lastWallNormal);
+      return true;
+    }
+
+    return false;
   }
 
   private updateHorizontalMovement(deltaTime: number, targetMovement: vec3): void {
@@ -179,10 +225,15 @@ export class WallRunSystem {
   }
 
   private applyWallJump(): void {
+    this.applyWallJumpWithNormal(this.wallNormal);
+  }
+
+  private applyWallJumpWithNormal(normal: vec3): void {
     this.isNearWall = false;
     this.controller.setIsWallRunning(false);
     this.controller.setInputDisableTimer(this.disableInputAfterWallJumpTime);
     this.wallRunCooldownTimer = this.wallRunCooldown;
+    this.wallJumpCoyoteTimer = 0.0;
 
     const camera = this.controller.getCamera();
     if (!camera) return;
@@ -191,10 +242,11 @@ export class WallRunSystem {
     jumpDir[1] = 0.0;
     vec3.normalize(jumpDir, jumpDir);
 
-    const d = vec3.dot(jumpDir, this.wallNormal);
+    const wallNormalCopy = vec3.clone(normal);
+    const d = vec3.dot(jumpDir, wallNormalCopy);
     if (d < 0.2) {
-      vec3.scale(this.wallNormal, this.wallNormal, 0.5);
-      vec3.add(jumpDir, jumpDir, this.wallNormal);
+      vec3.scale(wallNormalCopy, wallNormalCopy, 0.5);
+      vec3.add(jumpDir, jumpDir, wallNormalCopy);
       vec3.normalize(jumpDir, jumpDir);
     }
 

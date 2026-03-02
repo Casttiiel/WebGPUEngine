@@ -74,6 +74,17 @@
     "head_bob": {
 
     },
+    "landing_camera": {
+      "maxDipAmplitude": 0.20,
+      "maxImpactSpeed": 12.0,
+      "minImpactSpeed": 2.0,
+      "dipStiffness": 200,
+      "dipDamping": 18,
+      "maxPitchPunch": 3.0,
+      "pitchStiffness": 120,
+      "pitchDamping": 18,
+      "enabled": true
+    },
     "camera_fov_modifier": {
       "maxFOVIncrease": 6.0,
       "speedThreshold": 3.0,

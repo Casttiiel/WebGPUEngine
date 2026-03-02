@@ -25,6 +25,7 @@ import { CharacterControllerComponent } from '../../components/game/CharacterCon
 import { CameraArmComponent } from '../../components/game/CameraArmComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { HeadBobComponent } from '../../components/game/HeadBobComponent';
+import { LandingCameraComponent } from '../../components/game/LandingCameraComponent';
 import { CameraCrouchComponent } from '../../components/game/CameraCrouchComponent';
 import { CameraFOVModifierComponent } from '../../components/game/CameraFOVModifierComponent';
 import { InfinitePlaneColliderComponent } from '../../components/physics/InfinitePlaneColliderComponent';
@@ -244,6 +245,8 @@ export class Loader {
         return new HeadBobComponent();
       case 'head_tilt':
         return new HeadTiltComponent();
+      case 'landing_camera':
+        return new LandingCameraComponent();
       case 'camera_crouch':
         return new CameraCrouchComponent();
       case 'camera_fov_modifier':

@@ -6,6 +6,7 @@ import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
 import { HeadBobComponent } from './HeadBobComponent';
 import { HeadTiltComponent } from './HeadTiltComponent';
+import { LandingCameraComponent } from './LandingCameraComponent';
 
 export interface FPSCameraComponentData {
   eyeOffset?: number[]; // [x, y, z] - Offset de los ojos relativo al owner (ej: [0, 1.6, 0])
@@ -88,9 +89,16 @@ export class FPSCameraControllerComponent extends Component {
     // Limitar pitch (evitar gimbal lock)
     this.pitch = Math.max(-89, Math.min(89, this.pitch));
 
+    // Landing camera pitch offset (procedural, no persiste en this.pitch)
+    let landingPitchDeg = 0;
+    const landingCameraComponent = this.getOwner().getComponent('landing_camera');
+    if (landingCameraComponent) {
+      landingPitchDeg = (landingCameraComponent as LandingCameraComponent).getLandingPitchOffset();
+    }
+
     // Calcular dirección de mirada desde pitch/yaw
     const yawRadians = (this.yaw * Math.PI) / 180;
-    const pitchRadians = (this.pitch * Math.PI) / 180;
+    const pitchRadians = ((this.pitch + landingPitchDeg) * Math.PI) / 180;
 
     // Dirección forward usando coordenadas esféricas
     const forward = vec3.fromValues(
@@ -109,6 +117,11 @@ export class FPSCameraControllerComponent extends Component {
     // Calcular posición de la cámara (ojos del personaje)
     const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
     const eyePos = vec3.add(vec3.create(), ownerWorldPos, this.eyeOffset);
+
+    // Aplicar landing camera Y offset si el componente está presente
+    if (landingCameraComponent) {
+      eyePos[1] += (landingCameraComponent as LandingCameraComponent).getLandingYOffset();
+    }
 
     // Aplicar head bob si el componente está presente
     const headBobComponent = this.getOwner().getComponent('head_bob');

@@ -26,6 +26,7 @@ export type CharacterControllerComponentDataType = {
   detectWallDistance?: number; // Distance to detect walls for wall running (default: 1.0)
 
   wallJumpForce?: number; // Wall jump vertical force (default: 8.0)
+  wallJumpCoyoteTime?: number; // Grace period to wall jump after leaving a wall in seconds (default: 0.15)
   disableInputAfterWallJumpTime?: number; // Time to disable input after wall jump in seconds (default: 0.2)
   disableMantleAfterWallJumpTime?: number; // Time to disable mantling after wall jump in seconds (default: 0.3)
 

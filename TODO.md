@@ -6,28 +6,25 @@
 4. Reflection Probes con blending
 
 5. Point light shadows banding
-6. Optimize with compute shaders
-7. SS Global Illumination
+6. SS Global Illumination
+7. Optimize with compute shaders
 
 8. Better loading speed
-9. FSR 1.0
-10. TAA
-11. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
-12. Froxel: Self occlusion
-13. Froxel Global Illumination
-14. UI
-15. Improve particles
+9. TAA
+10. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
+11. Froxel: Self occlusion
+12. Froxel Global Illumination
+13. UI
+14. Improve particles
+15. FSR 1.0
 
 ## Gameplay
 
 Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast Fall, Slide, Dash
 
-1. Landing camera animation
-2. Jump right on change inclination and then wallrun
-3. WallJump Coyote time
-4. Momentum
-5. Blur on borders
-6. Door
+1. Jump right on change inclination and then wallrun
+2. Momentum
+3. Blur on borders
 
 ## Visuals and Sound
 
