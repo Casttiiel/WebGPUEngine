@@ -15,14 +15,40 @@ import { DepthModes } from '../../types/DepthModes.enum';
 export class GLTFLoader {
   public static async loadGLTF(path: string): Promise<Array<EntityDataType>> {
     const folderName = path.split('.')[0];
+    const gltfUrl = `assets/meshes/${folderName}/${path}`;
 
-    // 1. Crear IO para navegador con soporte para todas las extensiones
+    // ── Fetch only the .gltf JSON file ──────────────────────────────────
+    // We avoid using io.read() because it fetches ALL external resources,
+    // including textures that may not exist — producing 404 console errors.
+    // Instead we manually provide resources to readJSON() so gltf-transform
+    // never makes any additional HTTP requests.
+    const jsonResponse = await fetch(gltfUrl);
+    const json = await jsonResponse.json();
+
+    // ── Build resources map ──────────────────────────────────────────────
+    // - Geometry buffers (.bin): actually fetched (mesh data is required).
+    // - Images (textures):       empty Uint8Array — only the URI strings are
+    //                            needed by this loader (via texture.getURI()).
+    const resources: Record<string, Uint8Array> = {};
+
+    for (const image of (json.images ?? []) as { uri?: string }[]) {
+      if (image.uri && !image.uri.startsWith('data:')) {
+        resources[image.uri] = new Uint8Array(0);
+      }
+    }
+
+    for (const buffer of (json.buffers ?? []) as { uri?: string }[]) {
+      if (buffer.uri && !buffer.uri.startsWith('data:')) {
+        const bufResponse = await fetch(`assets/meshes/${folderName}/${buffer.uri}`);
+        resources[buffer.uri] = new Uint8Array(await bufResponse.arrayBuffer());
+      }
+    }
+
+    // ── Parse with gltf-transform (no extra fetches) ─────────────────────
     const io = new WebIO().registerExtensions(ALL_EXTENSIONS);
+    const doc = await io.readJSON({ json, resources });
 
-    // 2. Leer desde URL remota o local (assets/)
-    const doc = await io.read(`assets/meshes/${folderName}/${path}`);
-
-    // 3. Obtener la escena por defecto
+    // ── Get default scene ────────────────────────────────────────────────
     const scene = doc.getRoot().getDefaultScene();
 
     if (!scene) {
@@ -88,11 +114,16 @@ export class GLTFLoader {
   private static processMeshNode(node: Node, folderName: string): EntityDataType {
     const transform = this.getNodeTransform(node);
     const render = this.getNodeRender(node, folderName);
-    
+
     // Check if node has extras with collider field
     const extras = node.getExtras();
-    const shouldCreateCollider = !(extras && typeof extras === 'object' && 'collider' in extras && (extras as any).collider === 'none');
-    
+    const shouldCreateCollider = !(
+      extras &&
+      typeof extras === 'object' &&
+      'collider' in extras &&
+      (extras as any).collider === 'none'
+    );
+
     const res: EntityDataType = {
       children: [],
       components: {
