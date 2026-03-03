@@ -1,21 +1,18 @@
 ### Engine
 
-1.  Better loading speed (6600ms)
-2.  Contact Shadows
-3.  High Sponza low frame rate on near doors
-4.  Multiple Light probes has good shadows?
-5.  Reflection Probes con blending
+1.  Multiple Light probes has good shadows?
+2.  Reflection Probes con blending
+3.  Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
 
-6.  Point light shadows banding
+4.  UI
+5.  Improve particles
+6.  Optimize with compute shaders and more
+
 7.  SS Global Illumination
-8.  Optimize with compute shaders
-
-9.  Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
+8.  Froxel Global Illumination
+9.  Froxel: Self occlusion
 10. Froxel Density Volumes
-11. Froxel: Self occlusion
-12. Froxel Global Illumination
-13. UI
-14. Improve particles
+11. KTX2
 
 ## Gameplay
 

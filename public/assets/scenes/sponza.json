@@ -3,8 +3,7 @@
     "components": {
       "name": "Sponza",
       "transform": {
-        "rotation": [0, 90, 0],
-        "position": [0, 0, 0]
+        "rotation": [0, 90, 0]
       }
     },
     "gltf": "sponza.gltf"

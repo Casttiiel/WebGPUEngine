@@ -1058,6 +1058,17 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'comparison' },
       },
+      // Contact shadow factor map: [0,1] scalar produced by ContactShadowsComponent
+      {
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
     ]);
   }
 
@@ -1276,23 +1287,14 @@ export class BindGroupFactory {
   }
 
   /**
-   * Contact shadows bind group layout (group 2)
-   * binding 0: accLight texture, binding 1: sampler, binding 2: params uniform
+   * Contact shadows bind group layout (group 2).
+   * Now outputs a shadow-factor map — only needs the params uniform buffer.
+   * binding 0: ContactShadowParams uniform
    */
   public static getContactShadowsUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('contact_shadows_uniforms', [
       {
         binding: 0,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: 'float' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
-      },
-      {
-        binding: 2,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },

@@ -7,7 +7,6 @@ import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager'
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { Render } from '../../renderer/core/pipeline/Render';
-import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Engine } from '../../core/engine/Engine';
 
@@ -38,9 +37,7 @@ export class ContactShadowsComponent extends Component {
   private paramsBuffer!: GPUBuffer;
 
   // ─── Bind group cache ────────────────────────────────────────────────────
-  /** Invalidated whenever the accLight view changes (i.e. after a resize). */
   private paramsBindGroup: GPUBindGroup | null = null;
-  private lastAccLightView: GPUTextureView | null = null;
 
   // ─── Tuneable parameters (exposed for debug UI) ──────────────────────────
   public isEnabled: boolean = true;
@@ -64,9 +61,16 @@ export class ContactShadowsComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.getAsync('post-processing/contact_shadows.tech');
 
-    const format = QualitySettings.getInstance().getSettings().hdrTexture;
+    // Shadow factor RT uses the same single-channel format as AO (r16float) so
+    // the pipeline format matches the render target format.
+    const shadowFactorFormat = QualitySettings.getInstance().getSettings().aoTexture;
     this.result = new RenderTarget();
-    this.result.createRT('contact_shadows_result.dds', Render.width, Render.height, format);
+    this.result.createRT(
+      'contact_shadows_result.dds',
+      Render.width,
+      Render.height,
+      shadowFactorFormat,
+    );
 
     // 8 floats × 4 bytes = 32 bytes, matching ContactShadowParams in WGSL
     this.paramsBuffer = GPUUtils.createBuffer(
@@ -75,54 +79,53 @@ export class ContactShadowsComponent extends Component {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
+    // Bind group only contains the params uniform — created once, valid for the lifetime of the component
+    this.paramsBindGroup = BindGroupFactory.createBindGroup(
+      'contact_shadows_params_bindgroup',
+      this.technique.getPipeline().getBindGroupLayout(2),
+      [{ binding: 0, resource: { buffer: this.paramsBuffer } }],
+    );
+
     this.renderPassManager = new RenderPassManager();
     this.loaded = true;
   }
 
   public resize(): void {
     if (!this.loaded) return;
-    const format = QualitySettings.getInstance().getSettings().hdrTexture;
+    const shadowFactorFormat = QualitySettings.getInstance().getSettings().aoTexture;
     this.result.destroy();
     this.result = new RenderTarget();
-    this.result.createRT('contact_shadows_result.dds', Render.width, Render.height, format);
-    // Invalidate bind group — it holds a reference to the old accLight view
-    this.paramsBindGroup = null;
-    this.lastAccLightView = null;
+    this.result.createRT(
+      'contact_shadows_result.dds',
+      Render.width,
+      Render.height,
+      shadowFactorFormat,
+    );
+    // paramsBindGroup only contains the uniform buffer — no resize invalidation needed
   }
 
   // ─── Per-frame apply ─────────────────────────────────────────────────────
 
   /**
-   * Apply contact shadows to the accumulated-light buffer.
+   * Compute a per-pixel shadow factor [0, 1] via screen-space ray marching.
+   * 1.0 = fully lit, 0.0 = fully occluded.
    *
-   * @param accLightView   GPUTextureView of the accumulated light render target.
+   * The result is meant to be passed to DirectionalLightComponent.render() so
+   * contact shadows are applied only to that light's contribution.
+   *
    * @param gBufferBindGroup  Standard GBuffer bind group (group 1).
-   * @returns              GPUTextureView of the result (accLight × shadow factor).
+   * @returns GPUTextureView of the shadow-factor render target (r8unorm).
    */
-  public apply(accLightView: GPUTextureView, gBufferBindGroup: GPUBindGroup): GPUTextureView {
-    if (!this.loaded) return accLightView;
+  public computeShadowFactor(gBufferBindGroup: GPUBindGroup): GPUTextureView {
+    if (!this.loaded) return this.result.getView();
 
     this.updateParamsBuffer();
-
-    // Recreate bind group whenever the input view changes (e.g. after resize)
-    if (!this.paramsBindGroup || this.lastAccLightView !== accLightView) {
-      this.paramsBindGroup = BindGroupFactory.createBindGroup(
-        'contact_shadows_params_bindgroup',
-        this.technique.getPipeline().getBindGroupLayout(2),
-        [
-          { binding: 0, resource: accLightView },
-          { binding: 1, resource: SamplerLibrary.simpleSampler },
-          { binding: 2, resource: { buffer: this.paramsBuffer } },
-        ],
-      );
-      this.lastAccLightView = accLightView;
-    }
 
     this.renderPassManager.executeContactShadowsPass(
       this.fullscreenQuadMesh,
       this.technique,
       gBufferBindGroup,
-      this.paramsBindGroup,
+      this.paramsBindGroup!,
       this.result,
     );
 

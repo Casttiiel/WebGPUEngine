@@ -256,29 +256,35 @@ export class DeferredRenderer {
 
     // 3. Render ambient occlusion and lighting
     this.aoResult = this.renderAO(camera);
-    this.renderAccLight();
-
-    // 4. Contact shadows — darkens accLight before SSR reads it
-    const accLightView = this.renderContactShadows(camera);
+    this.renderAccLight(camera);
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     // Si es para reflection probes, devolver aquí (sin SSR ni volumetrics)
     if (skipPostProcessing) {
-      return accLightView;
+      return this.rtAccLight.getView();
     }
 
     // Post-procesado (solo para renderizado normal)
-    const ssr = this.ssr.generateSSR(accLightView, this.aoResult, this.gBufferBindGroup);
-    this.ambientLight.renderSpecular(accLightView, ssr, this.aoResult, this.gBufferBindGroup);
+    const ssr = this.ssr.generateSSR(
+      this.rtAccLight.getView(),
+      this.aoResult,
+      this.gBufferBindGroup,
+    );
+    this.ambientLight.renderSpecular(
+      this.rtAccLight.getView(),
+      ssr,
+      this.aoResult,
+      this.gBufferBindGroup,
+    );
 
     if (this.froxelVolumetrics.isVolumetricEnabled()) {
       const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
       this.froxelVolumetrics.updateFroxelData(gBufferRenderTargets.linearDepth);
-      this.froxelVolumetrics.renderVolumetrics(accLightView, this.gBufferBindGroup);
+      this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
     }
 
-    return accLightView;
+    return this.rtAccLight.getView();
   }
 
   private copyGBufferTexturesToBindGroup(): void {
@@ -318,19 +324,29 @@ export class DeferredRenderer {
     return ambientOcclusionComponent.compute(this.gBufferBindGroup);
   }
 
-  private renderAccLight(): void {
+  private renderAccLight(camera: Entity): void {
     this.ambientLight.renderDiffuse(
       this.rtAccLight.getView(),
       this.gBufferBindGroup,
       this.aoResult,
     );
 
-    // Use new render pass system for lights
+    // Compute contact shadow factor BEFORE directional light so it can be applied internally
+    const contactShadowsComp = camera?.getComponent('contact_shadows') as ContactShadowsComponent;
+    const contactShadowView = contactShadowsComp?.hasLoaded()
+      ? contactShadowsComp.computeShadowFactor(this.gBufferBindGroup)
+      : undefined;
+
+    // Directional lights receive the shadow factor and apply it to their own contribution only
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
       const directionalLightComponent = comp as DirectionalLightComponent;
-      directionalLightComponent.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+      directionalLightComponent.render(
+        this.rtAccLight.getView(),
+        this.gBufferBindGroup,
+        contactShadowView,
+      );
     }
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('pointLightsWithShadows');
@@ -339,19 +355,6 @@ export class DeferredRenderer {
 
     const prepassDepthView = this.depthPrepass.getDepthTextureView();
     this.skybox.render(this.rtAccLight.getView(), prepassDepthView);
-  }
-
-  /**
-   * Applies contact shadows if the camera entity has a ContactShadowsComponent.
-   * Returns the contact-shadow-attenuated view (a new RT), or the original
-   * rtAccLight view when the component is absent / not yet loaded.
-   */
-  private renderContactShadows(camera: Entity): GPUTextureView {
-    const contactShadowsComp = camera?.getComponent('contact_shadows') as ContactShadowsComponent;
-    if (!contactShadowsComp || !contactShadowsComp.hasLoaded()) {
-      return this.rtAccLight.getView();
-    }
-    return contactShadowsComp.apply(this.rtAccLight.getView(), this.gBufferBindGroup);
   }
 
   public update(_dt: number): void {

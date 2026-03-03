@@ -23,6 +23,9 @@ alias LightUniformsCSM = DirectionalLightCSMUniforms;
 @group(2) @binding(2) var gShadowMap1: texture_depth_2d; // Cascade 1 (mid)
 @group(2) @binding(3) var gShadowMap2: texture_depth_2d; // Cascade 2 (far)
 @group(2) @binding(4) var gShadowSampler: sampler_comparison;
+// Contact shadow factor [0,1]: 1.0 = lit, 0.0 = occluded
+@group(2) @binding(5) var contactShadowMap:     texture_2d<f32>;
+@group(2) @binding(6) var contactShadowSampler: sampler;
 
 /**
  * Shader-specific implementation using consolidated CSM functions.
@@ -161,6 +164,8 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let specular_contrib = cSpec;
 
     let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * light.intensity * shadow_factor;
-    
-    return vec4<f32>(final_color * cascadeColor, 1.0);
+
+    // Apply contact shadow factor (1.0 = lit, 0.0 = occluded)
+    let contactFactor = textureSampleLevel(contactShadowMap, contactShadowSampler, uv, 0.0).r;
+    return vec4<f32>(final_color * cascadeColor * contactFactor, 1.0);
 }

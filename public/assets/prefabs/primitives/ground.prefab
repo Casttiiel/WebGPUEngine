@@ -16,7 +16,7 @@
           {
             "mesh": "unit_cube.obj",
             "material": "stone.mat",
-            "visible": false
+            "visible": true
           }
         ]
     }

@@ -343,7 +343,10 @@ export class RenderPassManager {
     paramsBindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
+      width: result.getWidth(),
+      height: result.getHeight(),
+    });
     const pass = new ContactShadowsRenderPass(
       passConfig,
       mesh,

@@ -1,7 +1,7 @@
 {
     "vs": "utility/presentation.vs",
     "fs": "post-processing/contact_shadows.fs",
-    "writesOn": "texture",
+    "writesOn": "single_channel",
     "z": "disable_all",
     "uniforms": [
         "CameraUniforms",

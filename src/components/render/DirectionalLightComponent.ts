@@ -40,6 +40,12 @@ export class DirectionalLightComponent extends Component {
   private projectorTexture!: Texture;
   private projectorTextureView!: GPUTextureView;
 
+  // Contact shadows integration
+  /** 1×1 white texture used as fallback when no ContactShadowsComponent is present. */
+  private contactShadowFallbackView!: GPUTextureView;
+  /** Tracks the last contact shadow view bound, to detect when a rebuild is needed. */
+  private lastContactShadowView!: GPUTextureView;
+
   // CSM configuration
   private cascadeCount: number = 1; // Number of cascades (1-3)
   private cascadeSplits: number[] = []; // Split distances (calculadas dinámicamente)
@@ -78,6 +84,10 @@ export class DirectionalLightComponent extends Component {
       ]);
     this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
+    // White 1×1 texture used as the contact shadow fallback (factor = 1.0 everywhere = no shadow)
+    const contactShadowFallbackTexture = await Texture.getAsync('white.png');
+    this.contactShadowFallbackView = contactShadowFallbackTexture.getTextureView()!;
+
     // Uniform buffer size: base (32 bytes) + 3 cascadas * 64 bytes (mat4x4) + cascadeSplits (16) + shadow params (16)
     const uniformBufferSize = 32 + 3 * 64 + 16 + 16;
     this.uniformBuffer = GPUUtils.createBuffer(
@@ -111,7 +121,7 @@ export class DirectionalLightComponent extends Component {
     let bindGroupEntries: GPUBindGroupEntry[];
 
     if (this.cascadeCount > 1) {
-      // CSM: 3 shadow maps + sampler
+      // CSM: 3 shadow maps + sampler + contact shadow factor
       bindGroupEntries = [
         {
           binding: 0,
@@ -133,9 +143,17 @@ export class DirectionalLightComponent extends Component {
           binding: 4,
           resource: this.shadowSampler,
         },
+        {
+          binding: 5,
+          resource: this.contactShadowFallbackView,
+        },
+        {
+          binding: 6,
+          resource: SamplerLibrary.simpleSampler,
+        },
       ];
     } else {
-      // Single shadow map: 1 shadow map + sampler
+      // Single shadow map: 1 shadow map + sampler + contact shadow factor
       bindGroupEntries = [
         {
           binding: 0,
@@ -151,7 +169,7 @@ export class DirectionalLightComponent extends Component {
         },
         {
           binding: 3,
-          resource: this.projectorTextureView!,
+          resource: this.contactShadowFallbackView,
         },
         {
           binding: 4,
@@ -165,6 +183,9 @@ export class DirectionalLightComponent extends Component {
       this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!,
       bindGroupEntries,
     );
+
+    // Track the initial contact shadow view so the first real view triggers a rebuild
+    this.lastContactShadowView = this.contactShadowFallbackView;
 
     // Crear shadow cameras (una por cascada)
     this.shadowCameras = [];
@@ -513,7 +534,52 @@ export class DirectionalLightComponent extends Component {
     }
   }
 
-  public render(rtAccLight: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+  /**
+   * Rebuilds the directional light bind group with a new contact shadow view.
+   * Called automatically by render() whenever the view reference changes.
+   */
+  private rebuildLightBindGroup(contactShadowView: GPUTextureView): void {
+    let bindGroupEntries: GPUBindGroupEntry[];
+
+    if (this.cascadeCount > 1) {
+      bindGroupEntries = [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: this.shadowDepthViews[0] },
+        { binding: 2, resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)] },
+        { binding: 3, resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)] },
+        { binding: 4, resource: this.shadowSampler },
+        { binding: 5, resource: contactShadowView },
+        { binding: 6, resource: SamplerLibrary.simpleSampler },
+      ];
+    } else {
+      bindGroupEntries = [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: this.shadowDepthViews[0] },
+        { binding: 2, resource: this.shadowSampler },
+        { binding: 3, resource: contactShadowView },
+        { binding: 4, resource: SamplerLibrary.simpleSampler },
+      ];
+    }
+
+    this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
+      'directional_light_bindgroup',
+      this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!,
+      bindGroupEntries,
+    );
+  }
+
+  public render(
+    rtAccLight: GPUTextureView,
+    gBufferBindGroup: GPUBindGroup,
+    contactShadowView?: GPUTextureView,
+  ): void {
+    // Rebuild bind group if the contact shadow view changed (e.g. first frame or after resize)
+    const csView = contactShadowView ?? this.contactShadowFallbackView;
+    if (csView !== this.lastContactShadowView) {
+      this.rebuildLightBindGroup(csView);
+      this.lastContactShadowView = csView;
+    }
+
     const render = Render.getInstance();
 
     // Use GPUUtils for consistent render pass descriptor creation

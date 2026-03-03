@@ -29,6 +29,9 @@ struct LightUniforms {
 @group(2) @binding(0) var<uniform> light: LightUniforms;
 @group(2) @binding(1) var gShadowMap: texture_depth_2d;
 @group(2) @binding(2) var gShadowSampler: sampler_comparison;
+// Contact shadow factor [0,1]: 1.0 = lit, 0.0 = occluded
+@group(2) @binding(3) var contactShadowMap:     texture_2d<f32>;
+@group(2) @binding(4) var contactShadowSampler: sampler;
 
 
 @fragment
@@ -73,5 +76,8 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     let specular_contrib = cSpec; // cSpec ya incluye Fresnel
 
     let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * light.intensity * shadow_factor;
-    return vec4<f32>(final_color, 1.0);
+
+    // Apply contact shadow factor (1.0 = lit, 0.0 = occluded)
+    let contactFactor = textureSampleLevel(contactShadowMap, contactShadowSampler, uv, 0.0).r;
+    return vec4<f32>(final_color * contactFactor, 1.0);
 }

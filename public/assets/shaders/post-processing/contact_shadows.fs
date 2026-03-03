@@ -25,10 +25,8 @@ struct ContactShadowParams {
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
 @group(1) @binding(3) var samplerGBuffer: sampler;
 
-// Contact shadow inputs (group 2)
-@group(2) @binding(0) var accLight:    texture_2d<f32>;
-@group(2) @binding(1) var accSampler:  sampler;
-@group(2) @binding(2) var<uniform> params: ContactShadowParams;
+// Contact shadow params (group 2) — outputs shadow factor [0,1], not accLight
+@group(2) @binding(0) var<uniform> params: ContactShadowParams;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,26 +48,25 @@ fn worldToLinearDepth(pos: vec3<f32>) -> f32 {
 // ─── Fragment Entry ───────────────────────────────────────────────────────────
 @fragment
 fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
-    let uv         = fragCoord.xy / camera.screenSize;
-    let inputColor = textureSampleLevel(accLight, accSampler, uv, 0.0);
+    let uv = fragCoord.xy / camera.screenSize;
 
-    // Early-out: disabled
+    // Early-out: disabled — factor 1.0 means no attenuation
     if (params.enabled < 0.5) {
-        return inputColor;
+        return vec4<f32>(1.0);
     }
 
     // Decode GBuffer — gives worldPos, normal, zlinear, etc.
     let g = decodeGBuffer(uv);
 
-    // Early-out: sky / far plane (zlinear → 1 at the far clipping plane)
+    // Early-out: sky / far plane
     if (g.zlinear >= 0.9999) {
-        return inputColor;
+        return vec4<f32>(1.0);
     }
 
     // Early-out: surface facing away from the light (backlit surfaces don't cast contact shadows)
     let NdL = saturate(dot(g.normal, params.lightDir));
     if (NdL <= 0.0) {
-        return inputColor;
+        return vec4<f32>(1.0);
     }
 
     // ── Screen-space ray march toward light ──────────────────────────────────
@@ -102,5 +99,7 @@ fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
         }
     }
 
-    return inputColor * (1.0 - shadow);
+    // Output shadow factor: 1.0 = fully lit, 0.0 = fully in shadow
+    let shadowFactor = 1.0 - shadow;
+    return vec4<f32>(shadowFactor, shadowFactor, shadowFactor, 1.0);
 }
