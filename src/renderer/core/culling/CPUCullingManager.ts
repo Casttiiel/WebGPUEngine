@@ -68,6 +68,22 @@ export class CPUCullingManager {
     return visibleKeys;
   }
 
+  /**
+   * Count-only version of performCulling — no array allocation.
+   * Used to show an estimated visible object count in the debug UI
+   * when the GPU culling path is active (no readback available).
+   */
+  public countVisible(keys: RenderKey[], camera: Camera): number {
+    this.extractFrustumPlanes(camera);
+    let count = 0;
+    for (const key of keys) {
+      if (key.isInstanced || this.isVisibleInFrustum(key, this.frustumPlanes)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   public performLightCulling(camera: Camera): void {
     // Get camera frustum planes (zero-allocation version)
     this.extractFrustumPlanes(camera);

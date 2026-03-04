@@ -6,8 +6,10 @@ import { Material } from '../../resources/Material';
 import { Mesh } from '../../resources/Mesh';
 import { Technique } from '../../resources/Technique';
 import { CPUCullingManager } from '../culling/CPUCullingManager';
+import { GPUCullingManager } from '../culling/GPUCullingManager';
 import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
+import { Render } from '../pipeline/Render';
 
 export class RenderManagerV2 {
   private static instance: RenderManagerV2 | null = null;
@@ -16,12 +18,14 @@ export class RenderManagerV2 {
   private keyManager: RenderKeyManager;
   private stateManager: RenderStateManager;
   private cpuCuller: CPUCullingManager | null = null;
+  private gpuCuller: GPUCullingManager | null = null;
 
   // State
   private camera: Camera | null = null;
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private techniqueOverride: Technique | null = null;
   private techniqueOverrideInstanced: Technique | null = null;
+  private gpuCullingEstimatedVisible: number = 0;
 
   private constructor() {
     this.keyManager = new RenderKeyManager();
@@ -36,12 +40,16 @@ export class RenderManagerV2 {
   }
 
   public async initialize(): Promise<void> {
-    console.log('RenderManagerV2: Initializing with CPU culling...');
+    console.log('RenderManagerV2: Initializing culling systems...');
 
-    // Initialize CPU culling system
+    // CPU culling — used for shadow cameras and as fallback
     this.cpuCuller = new CPUCullingManager();
 
-    console.log('RenderManagerV2: CPU culling system initialized');
+    // GPU culling — used for the main camera (no readback, zero CPU overhead)
+    this.gpuCuller = new GPUCullingManager();
+    await this.gpuCuller.initialize();
+
+    console.log('RenderManagerV2: CPU + GPU culling systems initialized');
   }
 
   public setCamera(camera: Camera): void {
@@ -93,27 +101,57 @@ export class RenderManagerV2 {
         indirectDrawBuffer,
       );
     }
+
+    // Mark GPU culler dirty so it rebuilds on next performCulling()
+    this.gpuCuller?.markDirty();
   }
 
   public delKeys(owner: RenderComponent): void {
     this.keyManager.removeKeys(owner);
+    this.gpuCuller?.markDirty();
   }
 
   public performCulling(camera: Camera, category?: RenderCategory): void {
-    let keysToCull = this.keyManager.getAllKeys();
+    const allKeys = this.keyManager.getAllKeys();
 
-    // ✅ Manual loop instead of filter() to avoid array allocation
     if (category !== undefined) {
+      // Shadow / light camera path — CPU culling on a specific category
       const filteredKeys: RenderKey[] = [];
-      for (let i = 0; i < keysToCull.length; i++) {
-        if (keysToCull[i]!.material.getCategory() === category) {
-          filteredKeys.push(keysToCull[i]!);
+      for (let i = 0; i < allKeys.length; i++) {
+        if (allKeys[i]!.material.getCategory() === category) {
+          filteredKeys.push(allKeys[i]!);
         }
       }
-      keysToCull = filteredKeys;
+      const culledKeys = this.cpuCuller!.performCulling(filteredKeys, camera);
+      camera.setCulledKeys(culledKeys);
+      return;
     }
 
-    const culledKeys = this.cpuCuller!.performCulling(keysToCull, camera);
+    // Main camera path — GPU culling
+    if (this.gpuCuller?.isInitialized()) {
+      // Rebuild GPU buffers if keys changed since last rebuild
+      if (this.gpuCuller.isDirty()) {
+        this.gpuCuller.rebuild(allKeys);
+      }
+
+      // Dispatch the compute shader on the current frame encoder (no readback)
+      const encoder = Render.getInstance().getCommandEncoder();
+      this.gpuCuller.dispatch(encoder, camera);
+
+      // CPU-side estimate for the debug UI (pure AABB math, no array alloc)
+      this.gpuCullingEstimatedVisible = this.cpuCuller!.countVisible(
+        this.gpuCuller.getManagedKeys(),
+        camera,
+      );
+
+      // Pass ALL keys to the camera — GPU handles visibility via instanceCount=0.
+      // Shadow keys are excluded in rebuild() so they retain their CPU-only path.
+      camera.setCulledKeys(allKeys);
+      return;
+    }
+
+    // Fallback: CPU culling (GPU culler not yet initialized)
+    const culledKeys = this.cpuCuller!.performCulling(allKeys, camera);
     camera.setCulledKeys(culledKeys);
   }
 
@@ -150,6 +188,26 @@ export class RenderManagerV2 {
 
   public getAllKeys(): RenderKey[] {
     return this.keyManager.getAllKeys();
+  }
+
+  /**
+   * Returns GPU culling statistics for the debug UI.
+   * managed — keys dispatched via indirect draw (GPU culls them)
+   * total   — all registered keys including shadows / particles
+   * active  — whether the GPU path is initialized and in use
+   */
+  public getGPUCullerStats(): {
+    managed: number;
+    total: number;
+    active: boolean;
+    estimatedVisible: number;
+  } {
+    return {
+      managed: this.gpuCuller?.getManagedCount() ?? 0,
+      total: this.keyManager.getAllKeys().length,
+      active: this.gpuCuller?.isInitialized() ?? false,
+      estimatedVisible: this.gpuCullingEstimatedVisible,
+    };
   }
 
   private renderKeys(keys: RenderKey[], pass: GPURenderPassEncoder): number {
@@ -200,8 +258,12 @@ export class RenderManagerV2 {
       }
 
       if (key.indirectDrawBuffer) {
-        this.stateManager.setBindGroup(pass, 3, key.renderBindGroup!);
-        pass.drawIndexedIndirect(key.indirectDrawBuffer, 0);
+        // Only set @group(3) when the key actually has a custom render bind group
+        // (particles). GPU-culled mesh keys have no renderBindGroup.
+        if (key.renderBindGroup) {
+          this.stateManager.setBindGroup(pass, 3, key.renderBindGroup);
+        }
+        pass.drawIndexedIndirect(key.indirectDrawBuffer, key.indirectDrawOffset);
       } else if (key.isInstanced) {
         key.mesh.renderInstance(pass, key.instanceCount);
       } else {
@@ -244,6 +306,11 @@ export class RenderManagerV2 {
     if (this.cpuCuller) {
       this.cpuCuller.dispose();
       this.cpuCuller = null;
+    }
+
+    if (this.gpuCuller) {
+      this.gpuCuller.dispose();
+      this.gpuCuller = null;
     }
 
     this.keyManager.clear();

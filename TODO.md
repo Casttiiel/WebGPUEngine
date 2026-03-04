@@ -1,7 +1,11 @@
 ### Engine
 
 1. GPU Driven Rendering + Indirect Draw Calls
-2. Improve particles
+2. Optimize with compute shaders and more
+3. Improve particles
+4. Gameplay
+5. UI
+6. TAA
 
 ## Gameplay
 
@@ -30,5 +34,3 @@ Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast 
 8. Froxel: Self occlusion
 9. Froxel Density Volumes
 10. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
-11. UI
-12. Optimize with compute shaders and more

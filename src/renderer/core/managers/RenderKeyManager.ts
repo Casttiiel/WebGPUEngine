@@ -18,6 +18,7 @@ export interface RenderKey {
   instanceBindGroup?: GPUBindGroup | undefined; // Bind group with storage buffer for instanced rendering (@group(2))
   renderBindGroup?: GPUBindGroup | undefined; // Optional bind group for custom rendering (e.g. particles)
   indirectDrawBuffer?: GPUBuffer | undefined; // Optional indirect draw buffer for GPU-driven rendering
+  indirectDrawOffset: number; // Byte offset into indirectDrawBuffer (0 for dedicated per-key buffers)
   id: number;
 }
 
@@ -53,6 +54,7 @@ export class RenderKeyManager {
       instanceBindGroup,
       renderBindGroup,
       indirectDrawBuffer,
+      indirectDrawOffset: 0,
       id: this.nextObjectId++,
     };
 

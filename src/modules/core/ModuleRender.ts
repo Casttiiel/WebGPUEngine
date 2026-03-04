@@ -29,6 +29,8 @@ import { ModuleUI } from './ModuleUI';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { AutoExposureComponent } from '../../components/render/AutoExposureComponent';
 import { FSRComponent } from '../../components/render/FSRComponent';
+import { PointLightComponent } from '../../components/render/PointLightComponent';
+import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -49,11 +51,15 @@ export class ModuleRender extends Module {
 
   // Debug values para Tweakpane
   private debugValues = {
-    drawCallsSolids: { name: 'Draw Calls (Solids)', value: 0 },
-    drawCallsTransparent: { name: 'Draw Calls (Transparent)', value: 0 },
-    drawCallsDistorsions: { name: 'Draw Calls (Distorsions)', value: 0 },
-    drawCallsDecals: { name: 'Draw Calls (Decals)', value: 0 },
-    totalDrawCalls: { name: 'Total Draw Calls', value: 0 },
+    drawCallsSolids: { name: 'Draw Cmds (Solids)', value: 0 },
+    drawCallsTransparent: { name: 'Draw Cmds (Transparent)', value: 0 },
+    drawCallsDistorsions: { name: 'Draw Cmds (Distorsions)', value: 0 },
+    drawCallsDecals: { name: 'Draw Cmds (Decals)', value: 0 },
+    totalDrawCalls: { name: 'Total Draw Cmds', value: 0 },
+    gpuCullingKeys: { name: 'GPU Managed Keys', value: '0 / 0' },
+    gpuEstimatedVisible: { name: 'Est. Visible (CPU)', value: '0 / 0' },
+    visiblePointLights: { name: 'Point Lights (visible)', value: 0 },
+    visibleSpotLights: { name: 'Spot Lights (visible)', value: 0 },
     resolution: { name: 'Resolution', value: '0x0' },
     canvasResolution: { name: 'Canvas Resolution', value: '0x0' },
   };
@@ -508,6 +514,26 @@ export class ModuleRender extends Module {
       this.debugValues.drawCallsTransparent.value +
       this.debugValues.drawCallsDistorsions.value +
       this.debugValues.drawCallsDecals.value;
+    // GPU culling stats
+    const gpuStats = renderManager.getGPUCullerStats();
+    this.debugValues.gpuCullingKeys.value = gpuStats.active
+      ? `${gpuStats.managed} / ${gpuStats.total}`
+      : 'CPU fallback';
+    this.debugValues.gpuEstimatedVisible.value = gpuStats.active
+      ? `${gpuStats.estimatedVisible} / ${gpuStats.managed}`
+      : '-';
+
+    // Visible light counts (after CPU light culling)
+    const pointLights = Engine.getEntities().getObjectManagerByName('point_light')?.getList() ?? [];
+    this.debugValues.visiblePointLights.value = pointLights.filter((c) =>
+      (c as PointLightComponent).isVisible(),
+    ).length;
+
+    const spotLights = Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? [];
+    this.debugValues.visibleSpotLights.value = spotLights.filter((c) =>
+      (c as SpotLightComponent).isVisible(),
+    ).length;
+
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
     const cs = Render.canvasSize;
     this.debugValues.canvasResolution.value = `${cs.width}x${cs.height}`;
@@ -566,7 +592,13 @@ export class ModuleRender extends Module {
       );
       gui.addDynamicText(this.debugValues.drawCallsDecals, 'value', 'Draw Calls (Decals)');
       this.addGUISeparator();
-      gui.addDynamicText(this.debugValues.totalDrawCalls, 'value', 'Total Draw Calls');
+      gui.addDynamicText(this.debugValues.totalDrawCalls, 'value', 'Total Draw Cmds');
+      this.addGUISeparator();
+      gui.addDynamicText(this.debugValues.gpuCullingKeys, 'value', 'GPU Managed Keys');
+      gui.addDynamicText(this.debugValues.gpuEstimatedVisible, 'value', 'Est. Visible (CPU)');
+      gui.addDynamicText(this.debugValues.visiblePointLights, 'value', 'Point Lights (visible)');
+      gui.addDynamicText(this.debugValues.visibleSpotLights, 'value', 'Spot Lights (visible)');
+      this.addGUISeparator();
       gui.addDynamicText(this.debugValues.resolution, 'value', 'Render Resolution');
       gui.addDynamicText(this.debugValues.canvasResolution, 'value', 'Canvas Resolution');
       this.endGUIWindow();
