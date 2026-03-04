@@ -19,6 +19,7 @@ export interface RenderKey {
   renderBindGroup?: GPUBindGroup | undefined; // Optional bind group for custom rendering (e.g. particles)
   indirectDrawBuffer?: GPUBuffer | undefined; // Optional indirect draw buffer for GPU-driven rendering
   indirectDrawOffset: number; // Byte offset into indirectDrawBuffer (0 for dedicated per-key buffers)
+  shadowIndirectOffset: number; // Byte offset into the per-dispatch shadow indirect buffer (-1 = not GPU shadow culled)
   id: number;
 }
 
@@ -55,6 +56,7 @@ export class RenderKeyManager {
       renderBindGroup,
       indirectDrawBuffer,
       indirectDrawOffset: 0,
+      shadowIndirectOffset: -1,
       id: this.nextObjectId++,
     };
 

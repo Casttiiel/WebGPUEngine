@@ -30,7 +30,7 @@ export class AutoExposureComponent extends Component {
   public adaptSpeedDown = 1.0; // Speed adapting toward dark    (iris opening — slow)
   public keyValue = 0.18; // 18 % grey target
   public minExposure = 0.1;
-  public maxExposure = 5.0;
+  public maxExposure = 4.0;
   public compensation = 0.0; // EV stops added on top
   public lowPercentile = 0.2; // Discard this fraction of darkest pixels
   public highPercentile = 0.9; // Discard pixels above this brightness fraction

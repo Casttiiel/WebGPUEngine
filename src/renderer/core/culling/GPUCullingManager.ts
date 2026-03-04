@@ -23,6 +23,12 @@ const INDIRECT_STRIDE = 20;
 /** Size of the FrustumPlanes uniform (6 planes × vec4<f32> = 96 bytes). */
 const FRUSTUM_SIZE = 96;
 
+/**
+ * Maximum concurrent shadow dispatches per frame
+ * (e.g. 3 cascades + 6×point-face + 2 spotlights = 11; 20 gives comfortable headroom).
+ */
+const SHADOW_POOL = 20;
+
 // ObjectData memory map (byte offsets):
 //   [  0.. 31]  AABB  (min.xyz + pad + max.xyz + pad)
 //   [ 32.. 95]  modelMatrix (mat4x4<f32>, 16 floats)
@@ -70,6 +76,26 @@ export class GPUCullingManager {
 
   private built = false;
   private initialized = false;
+
+  // ---- Shadow culling pool ----
+  // One shared objectDataBuffer for shadow-cast keys (AABB + draw args, static).
+  // A pool of SHADOW_POOL indirect + frustum buffers so each per-light dispatch
+  // writes to its own slot — all submitted into the same GPUCommandEncoder.
+  private shadowKeys: RenderKey[] = [];
+  private shadowCapacity = 0;
+  private shadowObjectDataBuffer!: GPUBuffer;
+  private shadowIndirectPool: GPUBuffer[] = [];
+  private shadowFrustumPool: GPUBuffer[] = [];
+  private shadowBindGroupPool: GPUBindGroup[] = [];
+  private shadowSlotIndex = 0;
+  private shadowBuilt = false;
+  private shadowMatricesDirty = true;
+
+  // CPU staging for shadow object data (separate from main to avoid aliasing)
+  private cpuShadowObjectData = new ArrayBuffer(0);
+  private cpuShadowF32 = new Float32Array(0);
+  private cpuShadowU32 = new Uint32Array(0);
+  private cpuShadowFrustum = new Float32Array(24);
 
   // ---- stats / logging ----
   private frameCount = 0;
@@ -214,8 +240,15 @@ export class GPUCullingManager {
     this.writeStaticObjectData(n);
 
     this.built = true;
+
+    // Also rebuild the shadow culling pool from the SHADOWS-category keys
+    const shadowKeys = allKeys.filter(
+      (key) => key.material.getCategory() === RenderCategory.SHADOWS && !key.isInstanced,
+    );
+    this.rebuildShadow(shadowKeys);
+
     console.log(
-      `[GPUCullingManager] Rebuilt — ${n} GPU-managed keys (${allKeys.length - n} shadows/instanced/particles kept on CPU)`,
+      `[GPUCullingManager] Rebuilt — ${n} GPU-managed keys, ${shadowKeys.length} shadow keys (${allKeys.length - n - shadowKeys.length} instanced/particles)`,
     );
   }
 
@@ -225,6 +258,168 @@ export class GPUCullingManager {
 
   public markDirty(): void {
     this.built = false;
+    this.shadowBuilt = false;
+  }
+
+  // ------------------------------------------------------------------
+  // Shadow culling pool
+  // ------------------------------------------------------------------
+
+  /**
+   * Rebuilds the shadow object-data buffer and the per-dispatch indirect pool.
+   * Called automatically from rebuild() whenever the full key list changes.
+   */
+  private rebuildShadow(newShadowKeys: RenderKey[]): void {
+    // Clear previous assignments
+    for (const key of this.shadowKeys) {
+      key.shadowIndirectOffset = -1;
+    }
+
+    this.shadowKeys = newShadowKeys;
+    const n = this.shadowKeys.length;
+
+    if (n === 0) {
+      this.shadowBuilt = true;
+      return;
+    }
+
+    // Grow shared shadow object-data buffer if needed
+    if (n > this.shadowCapacity) {
+      this.shadowObjectDataBuffer?.destroy();
+      this.shadowObjectDataBuffer = this.device.createBuffer({
+        label: 'gpu_culling_shadow_object_data',
+        size: n * OBJECT_STRIDE,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      this.shadowCapacity = n;
+
+      this.cpuShadowObjectData = new ArrayBuffer(n * OBJECT_STRIDE);
+      this.cpuShadowF32 = new Float32Array(this.cpuShadowObjectData);
+      this.cpuShadowU32 = new Uint32Array(this.cpuShadowObjectData);
+    }
+
+    // Grow pool if needed (SHADOW_POOL slots, each has its own indirect + frustum + bind group)
+    if (this.shadowIndirectPool.length < SHADOW_POOL) {
+      // Destroy any existing pool buffers
+      for (const buf of this.shadowIndirectPool) buf.destroy();
+      for (const buf of this.shadowFrustumPool) buf.destroy();
+      this.shadowIndirectPool = [];
+      this.shadowFrustumPool = [];
+      this.shadowBindGroupPool = [];
+
+      for (let s = 0; s < SHADOW_POOL; s++) {
+        const indirect = this.device.createBuffer({
+          label: `gpu_culling_shadow_indirect_slot${s}`,
+          size: n * INDIRECT_STRIDE,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+        });
+        const frustum = this.device.createBuffer({
+          label: `gpu_culling_shadow_frustum_slot${s}`,
+          size: FRUSTUM_SIZE,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        const bg = this.device.createBindGroup({
+          label: `gpu_culling_shadow_bind_group_slot${s}`,
+          layout: this.bindGroupLayout,
+          entries: [
+            { binding: 0, resource: { buffer: frustum } },
+            {
+              binding: 1,
+              resource: { buffer: this.shadowObjectDataBuffer, size: n * OBJECT_STRIDE },
+            },
+            { binding: 2, resource: { buffer: indirect, size: n * INDIRECT_STRIDE } },
+          ],
+        });
+        this.shadowIndirectPool.push(indirect);
+        this.shadowFrustumPool.push(frustum);
+        this.shadowBindGroupPool.push(bg);
+      }
+    } else if (n * INDIRECT_STRIDE > this.shadowIndirectPool[0]!.size) {
+      // More shadow keys than before — grow all pool indirect buffers
+      for (let s = 0; s < SHADOW_POOL; s++) {
+        this.shadowIndirectPool[s]!.destroy();
+        this.shadowIndirectPool[s] = this.device.createBuffer({
+          label: `gpu_culling_shadow_indirect_slot${s}`,
+          size: n * INDIRECT_STRIDE,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+        });
+        // Rebuild bind group to reference new indirect buffer
+        this.shadowBindGroupPool[s] = this.device.createBindGroup({
+          label: `gpu_culling_shadow_bind_group_slot${s}`,
+          layout: this.bindGroupLayout,
+          entries: [
+            { binding: 0, resource: { buffer: this.shadowFrustumPool[s]! } },
+            {
+              binding: 1,
+              resource: { buffer: this.shadowObjectDataBuffer, size: n * OBJECT_STRIDE },
+            },
+            {
+              binding: 2,
+              resource: { buffer: this.shadowIndirectPool[s]!, size: n * INDIRECT_STRIDE },
+            },
+          ],
+        });
+      }
+    }
+
+    // Assign shadowIndirectOffset on each key (same offset regardless of slot —
+    // all slots have the same layout, only the frustum differs)
+    for (let i = 0; i < n; i++) {
+      this.shadowKeys[i]!.shadowIndirectOffset = i * INDIRECT_STRIDE;
+    }
+
+    // Write static fields (AABB + draw args)
+    this.writeShadowStaticData(n);
+
+    this.shadowBuilt = true;
+    this.shadowMatricesDirty = true;
+  }
+
+  /** Returns true when the shadow pool is ready for dispatchShadow() calls. */
+  public isShadowReady(): boolean {
+    return this.shadowBuilt && this.shadowKeys.length > 0;
+  }
+
+  /**
+   * Dispatches the frustum culling compute shader for one shadow camera.
+   * Uses a rotating slot from the pool so concurrent calls within the same
+   * command encoder each write to their own indirect buffer.
+   *
+   * @returns The indirect buffer for this slot — pass it to renderKeys via
+   *          RenderManagerV2.currentShadowIndirectBuffer.
+   */
+  public dispatchShadow(commandEncoder: GPUCommandEncoder, camera: Camera): GPUBuffer {
+    const n = this.shadowKeys.length;
+    const slot = this.shadowSlotIndex % SHADOW_POOL;
+    this.shadowSlotIndex++;
+
+    // Write shadow model matrices once per frame (same world matrices for all cameras)
+    if (this.shadowMatricesDirty) {
+      this.writeShadowModelMatrices(n);
+      this.device.queue.writeBuffer(
+        this.shadowObjectDataBuffer,
+        0,
+        this.cpuShadowObjectData,
+        0,
+        n * OBJECT_STRIDE,
+      );
+      this.shadowMatricesDirty = false;
+    }
+
+    // Update frustum uniform for this camera into the slot's frustum buffer
+    this.extractFrustumPlanesTo(camera, this.cpuShadowFrustum);
+    this.device.queue.writeBuffer(this.shadowFrustumPool[slot]!, 0, this.cpuShadowFrustum);
+
+    // Dispatch
+    const computePass = commandEncoder.beginComputePass({
+      label: `gpu_shadow_culling_slot${slot}`,
+    });
+    computePass.setPipeline(this.pipeline);
+    computePass.setBindGroup(0, this.shadowBindGroupPool[slot]!);
+    computePass.dispatchWorkgroups(Math.ceil(n / 64));
+    computePass.end();
+
+    return this.shadowIndirectPool[slot]!;
   }
 
   // ------------------------------------------------------------------
@@ -240,8 +435,12 @@ export class GPUCullingManager {
 
     const n = this.managedKeys.length;
 
+    // Reset shadow slot index and mark shadow matrices dirty each new frame
+    this.shadowSlotIndex = 0;
+    this.shadowMatricesDirty = true;
+
     // 1. Update frustum uniform (96 bytes, cheap)
-    this.extractFrustumPlanes(camera);
+    this.extractFrustumPlanesTo(camera, this.cpuFrustum);
     this.device.queue.writeBuffer(this.frustumBuffer, 0, this.cpuFrustum);
 
     // 2. Update model matrices in the ObjectData staging buffer.
@@ -319,21 +518,54 @@ export class GPUCullingManager {
     for (let i = 0; i < n; i++) {
       const key = this.managedKeys[i]!;
       const b = (i * OBJECT_STRIDE) / 4;
-      // modelMatrix starts at byte 32 = float32 index b+8, size 64 bytes / 16 floats
       const mat = key.transform.getTransform().getWorldMatrix() as Float32Array;
       f32.set(mat, b + 8);
     }
   }
 
+  private writeShadowModelMatrices(n: number): void {
+    const f32 = this.cpuShadowF32;
+    for (let i = 0; i < n; i++) {
+      const key = this.shadowKeys[i]!;
+      const b = (i * OBJECT_STRIDE) / 4;
+      const mat = key.transform.getTransform().getWorldMatrix() as Float32Array;
+      f32.set(mat, b + 8);
+    }
+  }
+
+  private writeShadowStaticData(n: number): void {
+    const f32 = this.cpuShadowF32;
+    const u32 = this.cpuShadowU32;
+    for (let i = 0; i < n; i++) {
+      const key = this.shadowKeys[i]!;
+      const b = (i * OBJECT_STRIDE) / 4;
+      const aabb = key.aabb;
+      if (aabb) {
+        f32[b + 0] = aabb.min[0] ?? 0;
+        f32[b + 1] = aabb.min[1] ?? 0;
+        f32[b + 2] = aabb.min[2] ?? 0;
+        f32[b + 3] = 0;
+        f32[b + 4] = aabb.max[0] ?? 0;
+        f32[b + 5] = aabb.max[1] ?? 0;
+        f32[b + 6] = aabb.max[2] ?? 0;
+        f32[b + 7] = 0;
+      }
+      u32[b + 24] = key.mesh.getIndexCount();
+      u32[b + 25] = 1; // instanceCount (shadow keys are never instanced)
+      u32[b + 26] = 0;
+      u32[b + 27] = 0;
+      u32[b + 28] = 0;
+    }
+  }
+
   /**
-   * Extracts 6 frustum planes from the camera's viewProjection matrix.
-   * Order matches FrustumPlanes struct: left, right, top, bottom, near, far.
-   * Uses the Gribb-Hartmann method on a column-major gl-matrix mat4.
+   * Extracts 6 frustum planes from the camera's viewProjection matrix into `out`.
+   * Order: left, right, top, bottom, near, far (Gribb-Hartmann, column-major gl-matrix).
    */
-  private extractFrustumPlanes(camera: Camera): void {
+  private extractFrustumPlanesTo(camera: Camera, out: Float32Array): void {
     mat4.multiply(this.viewProj, camera.getProjection(), camera.getView());
     const m = this.viewProj;
-    const p = this.cpuFrustum;
+    const p = out;
 
     // gl-matrix column-major storage:
     //  col0: m[0],m[1],m[2],m[3]   col1: m[4],m[5],m[6],m[7]
@@ -391,19 +623,33 @@ export class GPUCullingManager {
   // ------------------------------------------------------------------
 
   public dispose(): void {
-    // Release GPU buffer assignments from keys
+    // Release main culling buffer assignments
     for (const key of this.managedKeys) {
       key.indirectDrawBuffer = undefined;
       key.indirectDrawOffset = 0;
+    }
+    // Release shadow culling buffer assignments
+    for (const key of this.shadowKeys) {
+      key.shadowIndirectOffset = -1;
     }
 
     this.objectDataBuffer?.destroy();
     this.frustumBuffer?.destroy();
     this.indirectArgsBuffer?.destroy();
 
+    this.shadowObjectDataBuffer?.destroy();
+    for (const buf of this.shadowIndirectPool) buf.destroy();
+    for (const buf of this.shadowFrustumPool) buf.destroy();
+    this.shadowIndirectPool = [];
+    this.shadowFrustumPool = [];
+    this.shadowBindGroupPool = [];
+
     this.managedKeys = [];
+    this.shadowKeys = [];
     this.capacity = 0;
+    this.shadowCapacity = 0;
     this.built = false;
+    this.shadowBuilt = false;
     this.initialized = false;
     this.frameCount = 0;
     this.firstDispatch = true;

@@ -1,11 +1,10 @@
 ### Engine
 
-1. GPU Driven Rendering + Indirect Draw Calls
-2. Optimize with compute shaders and more
-3. Improve particles
-4. Gameplay
-5. UI
-6. TAA
+1. Optimize with compute shaders and more
+2. Improve particles
+3. Gameplay
+4. UI
+5. TAA
 
 ## Gameplay
 

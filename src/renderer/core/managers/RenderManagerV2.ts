@@ -27,6 +27,11 @@ export class RenderManagerV2 {
   private techniqueOverrideInstanced: Technique | null = null;
   private gpuCullingEstimatedVisible: number = 0;
 
+  // Cached shadow keys — rebuilt only when markDirty() fires (addKey/delKeys)
+  private cachedShadowKeys: RenderKey[] | null = null;
+  // Indirect buffer written by the last dispatchShadow() call; consumed by renderKeys()
+  private currentShadowIndirectBuffer: GPUBuffer | null = null;
+
   private constructor() {
     this.keyManager = new RenderKeyManager();
     this.stateManager = new RenderStateManager();
@@ -104,26 +109,43 @@ export class RenderManagerV2 {
 
     // Mark GPU culler dirty so it rebuilds on next performCulling()
     this.gpuCuller?.markDirty();
+    this.cachedShadowKeys = null; // Invalidate shadow key cache
   }
 
   public delKeys(owner: RenderComponent): void {
     this.keyManager.removeKeys(owner);
     this.gpuCuller?.markDirty();
+    this.cachedShadowKeys = null; // Invalidate shadow key cache
   }
 
   public performCulling(camera: Camera, category?: RenderCategory): void {
     const allKeys = this.keyManager.getAllKeys();
 
     if (category !== undefined) {
-      // Shadow / light camera path — CPU culling on a specific category
-      const filteredKeys: RenderKey[] = [];
-      for (let i = 0; i < allKeys.length; i++) {
-        if (allKeys[i]!.material.getCategory() === category) {
-          filteredKeys.push(allKeys[i]!);
+      // Shadow / light camera path.
+      // The shadow key list is cached and rebuilt only when keys are added/removed.
+      if (this.cachedShadowKeys === null) {
+        this.cachedShadowKeys = [];
+        for (let i = 0; i < allKeys.length; i++) {
+          if (allKeys[i]!.material.getCategory() === category) {
+            this.cachedShadowKeys.push(allKeys[i]!);
+          }
         }
       }
-      const culledKeys = this.cpuCuller!.performCulling(filteredKeys, camera);
-      camera.setCulledKeys(culledKeys);
+
+      if (this.gpuCuller?.isShadowReady()) {
+        // GPU path: one compute dispatch per shadow camera, no CPU array alloc.
+        // The returned buffer holds DrawIndexedIndirectParameters written by the shader.
+        const encoder = Render.getInstance().getCommandEncoder();
+        this.currentShadowIndirectBuffer = this.gpuCuller.dispatchShadow(encoder, camera);
+        // Hand all shadow keys to the camera — GPU will zero instanceCount for culled ones.
+        camera.setCulledKeys(this.cachedShadowKeys);
+      } else {
+        // CPU fallback (GPU culler not yet ready)
+        this.currentShadowIndirectBuffer = null;
+        const culledKeys = this.cpuCuller!.performCulling(this.cachedShadowKeys, camera);
+        camera.setCulledKeys(culledKeys);
+      }
       return;
     }
 
@@ -145,7 +167,7 @@ export class RenderManagerV2 {
       );
 
       // Pass ALL keys to the camera — GPU handles visibility via instanceCount=0.
-      // Shadow keys are excluded in rebuild() so they retain their CPU-only path.
+      // Shadow keys have their own pool rebuilt in GPUCullingManager.rebuildShadow().
       camera.setCulledKeys(allKeys);
       return;
     }
@@ -258,12 +280,14 @@ export class RenderManagerV2 {
       }
 
       if (key.indirectDrawBuffer) {
-        // Only set @group(3) when the key actually has a custom render bind group
-        // (particles). GPU-culled mesh keys have no renderBindGroup.
+        // Particles or main-camera GPU-culled keys
         if (key.renderBindGroup) {
           this.stateManager.setBindGroup(pass, 3, key.renderBindGroup);
         }
         pass.drawIndexedIndirect(key.indirectDrawBuffer, key.indirectDrawOffset);
+      } else if (key.shadowIndirectOffset >= 0 && this.currentShadowIndirectBuffer) {
+        // Shadow key — GPU-culled via per-dispatch indirect buffer
+        pass.drawIndexedIndirect(this.currentShadowIndirectBuffer, key.shadowIndirectOffset);
       } else if (key.isInstanced) {
         key.mesh.renderInstance(pass, key.instanceCount);
       } else {
