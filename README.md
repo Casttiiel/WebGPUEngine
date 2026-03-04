@@ -4,6 +4,8 @@ A modern 3D rendering engine built on **WebGPU** technology, implementing physic
 
 ## 🚀 Features
 
+npm run compress-textures
+
 ### Core Rendering
 
 - **Deferred Rendering Pipeline** - G-Buffer based approach for efficient multi-light scenarios

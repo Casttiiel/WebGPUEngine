@@ -25,6 +25,7 @@
     "@webgpu/types": "^0.1.60",
     "eslint": "^9.28.0",
     "prettier": "^3.5.3",
+    "sharp": "^0.34.5",
     "tsx": "^4.21.0",
     "typescript": "~5.7.2",
     "vite": "^6.2.0",

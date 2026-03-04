@@ -1,6 +1,4 @@
 export interface GraphicsQualitySettings {
-  renderWidth: number;
-  renderHeight: number;
   renderResolution: number;
   aliasingTexture: GPUTextureFormat;
   toneMappingTexture: GPUTextureFormat;

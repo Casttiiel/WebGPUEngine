@@ -1,11 +1,13 @@
 /**
  * Texture compression pipeline — converts PNG/JPG/WebP → KTX2 (Basis Universal / UASTC)
  *
- * Prerequisites:
- *   1. Download the basisu binary for your platform from:
- *      https://github.com/BinomialLLC/basis_universal/releases
- *   2. Place basisu.exe (Windows) or basisu (Linux/Mac) in scripts/bin/
- *      OR add it to your system PATH.
+ * Requires toktx from KTX-Software (already installed at scripts/bin/ktx/bin/toktx.exe).
+ * Download manually if needed: https://github.com/KhronosGroup/KTX-Software/releases
+ * and place toktx.exe in scripts/bin/ or scripts/bin/ktx/bin/.
+ *
+ * WebP textures are first converted to a temporary PNG via sharp (no extra install
+ * needed — it uses prebuilt binaries) and then fed to toktx, which only accepts PNG/JPG.
+ * The temporary PNG is deleted immediately after toktx finishes.
  *
  * Usage:
  *   npm run compress-textures
@@ -13,10 +15,11 @@
  *   npm run compress-textures -- --dir sponza  (only process a subdirectory)
  */
 
-import { existsSync, readdirSync, statSync, mkdirSync } from 'fs';
+import { existsSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join, extname, relative, basename, dirname } from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import sharp from 'sharp';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..');
@@ -24,11 +27,15 @@ const TEXTURES_DIR = join(REPO_ROOT, 'public', 'assets', 'textures');
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const BASISU_BINARY = existsSync(join(__dirname, 'bin', 'basisu.exe'))
-  ? join(__dirname, 'bin', 'basisu.exe')
-  : existsSync(join(__dirname, 'bin', 'basisu'))
-    ? join(__dirname, 'bin', 'basisu')
-    : 'basisu'; // fallback: assume it's in PATH
+// toktx ships with KTX-Software. We search for it in several locations:
+const TOKTX_BINARY =
+  existsSync(join(__dirname, 'bin', 'ktx', 'bin', 'toktx.exe'))
+    ? join(__dirname, 'bin', 'ktx', 'bin', 'toktx.exe')
+    : existsSync(join(__dirname, 'bin', 'toktx.exe'))
+      ? join(__dirname, 'bin', 'toktx.exe')
+      : existsSync(join(__dirname, 'bin', 'toktx'))
+        ? join(__dirname, 'bin', 'toktx')
+        : 'toktx'; // fallback: assume it's in PATH
 
 const SUPPORTED_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
@@ -77,7 +84,7 @@ interface CompressResult {
   failed: number;
 }
 
-function compress(texturePath: string, force: boolean): 'skip' | 'ok' | 'fail' {
+async function compress(texturePath: string, force: boolean): Promise<'skip' | 'ok' | 'fail'> {
   const ktx2Path = texturePath.replace(/\.(png|jpg|jpeg|webp)$/i, '.ktx2');
   const rel = relative(TEXTURES_DIR, texturePath);
 
@@ -86,31 +93,39 @@ function compress(texturePath: string, force: boolean): 'skip' | 'ok' | 'fail' {
   }
 
   const linear = isLinear(texturePath);
+  const ext = extname(texturePath).toLowerCase();
 
-  const args: string[] = [
-    texturePath,
-    '-output_file',
-    ktx2Path,
-    '-ktx2',
-    '-uastc', // UASTC encoding (higher quality than ETC1S, transcodes to BC7/ASTC)
-    '-uastc_level',
-    '2', // 0=fastest, 4=best; 2 is a good balance
-    '-mipmap', // embed all mip levels (skip generateMipmaps at runtime)
-  ];
+  // toktx only accepts PNG/JPG. For WebP we convert to a temp PNG via sharp first.
+  let toktxInput = texturePath;
+  let tempPng: string | null = null;
 
-  if (linear) {
-    args.push('-linear');
+  if (ext === '.webp') {
+    tempPng = texturePath.replace(/\.webp$/i, '.__tmp__.png');
+    await sharp(texturePath).png({ compressionLevel: 0 }).toFile(tempPng);
+    toktxInput = tempPng;
   }
 
-  const result = spawnSync(BASISU_BINARY, args, { encoding: 'utf8' });
+  // toktx argument order: [options]  <output.ktx2>  <input.png>
+  const args: string[] = [
+    '--encode',    'uastc',   // UASTC encoding (high quality, transcodes to BC7/ASTC)
+    '--uastc_quality', '2',  // 0=fastest, 4=best; 2 is a good balance
+    '--genmipmap',           // generate and embed all mip levels
+    '--assign_oetf', linear ? 'linear' : 'srgb',
+    ktx2Path,                // output (before input!)
+    toktxInput,              // input (temp PNG for WebP, original for PNG/JPG)
+  ];
+
+  const result = spawnSync(TOKTX_BINARY, args, { encoding: 'utf8' });
+
+  // Always clean up the temporary PNG regardless of toktx outcome
+  if (tempPng && existsSync(tempPng)) unlinkSync(tempPng);
 
   if (result.error) {
-    // Binary not found
-    console.error(`\n[ERROR] Could not run basisu: ${result.error.message}`);
+    console.error(`\n[ERROR] Could not run toktx: ${result.error.message}`);
     console.error(
-      '  → Download basisu from https://github.com/BinomialLLC/basis_universal/releases',
+      '  → Download KTX-Software from https://github.com/KhronosGroup/KTX-Software/releases',
     );
-    console.error('    and place it in scripts/bin/ or add to PATH.\n');
+    console.error('    and place toktx.exe in scripts/bin/ or scripts/bin/ktx/bin/.\n');
     process.exit(1);
   }
 
@@ -154,7 +169,7 @@ console.log(`   [S] = sRGB   (base color, albedo)\n`);
 const result: CompressResult = { skipped: 0, ok: 0, failed: 0 };
 
 for (const tex of textures) {
-  const outcome = compress(tex, force);
+  const outcome = await compress(tex, force);
   result[outcome === 'skip' ? 'skipped' : outcome === 'ok' ? 'ok' : 'failed']++;
 }
 

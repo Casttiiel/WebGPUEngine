@@ -5,6 +5,7 @@ import { QualitySettings } from '../../core/engine/QualitySettings';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { MipmapGenerator } from '../core/processing/MipmapGenerator';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
+import { KTX2Loader, KTX2TextureData } from './KTX2Loader';
 
 export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
@@ -104,6 +105,29 @@ export class Texture extends GPUResource {
   private async createTexture(): Promise<void> {
     const _t0 = performance.now();
 
+    // ── Try KTX2 compressed format first ─────────────────────────────────────
+    // ktx2PathFor() swaps the extension, e.g. "diffuse.png" / "diffuse.webp" → "diffuse.ktx2".
+    // ResourceManager.fetch throws on 404, so we catch silently and fall through
+    // to the PNG/WebP path when the .ktx2 file does not exist yet.
+    const ktx2Path = KTX2Loader.ktx2PathFor(this.path);
+    try {
+      const resp = await ResourceManager.fetch(`assets/textures/${ktx2Path}`);
+      const buffer = await resp.arrayBuffer();
+      const ktx2 = await KTX2Loader.decode(buffer);
+      this.uploadKTX2(ktx2);
+      const ms = (performance.now() - _t0).toFixed(0);
+      if (+ms > 30) console.log(`%c[Texture/KTX2] ${ktx2Path}  total=${ms}ms`, 'color:#4caf50');
+      return;
+    } catch (e) {
+      // .ktx2 not present or transcode error — fall through to PNG / WebP.
+      // Log only once per path to avoid console spam on legitimate 404s.
+      if (e instanceof Error && !e.message.includes('404') && !(e as Error & { logged?: boolean }).logged) {
+        (e as Error & { logged?: boolean }).logged = true;
+        console.warn(`[Texture/KTX2] fallback for ${this.path}:`, e.message);
+      }
+    }
+
+    // ── PNG / WebP fallback ───────────────────────────────────────────────────
     const response = await ResourceManager.fetch(`assets/textures/${this.path}`);
     const blob = await response.blob();
     const _tDecode = performance.now();
@@ -160,6 +184,65 @@ export class Texture extends GPUResource {
     this.sampler = SamplerLibrary.anisotropic16x;
 
     // Mark as loaded when createTexture completes
+    this.setHasData();
+  }
+
+  /**
+   * Upload pre-transcoded KTX2 mip levels directly to the GPU.
+   *
+   * Block-compressed formats (BC7) do NOT support RENDER_ATTACHMENT or
+   * STORAGE_BINDING, so the usage flags are narrowed automatically when the
+   * data is compressed.  The caller therefore never needs to know whether it
+   * received a compressed or uncompressed decode result.
+   */
+  private uploadKTX2(ktx2: KTX2TextureData): void {
+    const { mipLevels, format, isCompressed, blockByteSize, blockDim } = ktx2;
+    const { width, height } = mipLevels[0]!;
+    const mipLevelCount = mipLevels.length;
+
+    // BC7 and other block-compressed formats cannot have RENDER_ATTACHMENT
+    // or STORAGE_BINDING — restrict to TEXTURE_BINDING | COPY_DST.
+    const safeUsage = isCompressed
+      ? GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+      : this.usage;
+
+    this.texture = GPUUtils.createTextureWithMipmaps(
+      `${this.label}_texture`,
+      width,
+      height,
+      format,
+      safeUsage,
+      mipLevelCount,
+    );
+
+    for (let level = 0; level < mipLevels.length; level++) {
+      const mip = mipLevels[level]!;
+      const blocksX = Math.ceil(mip.width / blockDim);
+      const blocksY = Math.ceil(mip.height / blockDim);
+      const bytesPerRow = blocksX * blockByteSize;
+
+      // For block-compressed formats the copy extent width/height must be
+      // multiples of the block dimension.  Mip levels smaller than blockDim
+      // (e.g. 2×2 or 1×1 with BC7 blockDim=4) must be padded up to blockDim,
+      // while the transcoder already produced exactly blocksX*blocksY blocks.
+      const copyWidth  = isCompressed ? blocksX * blockDim : mip.width;
+      const copyHeight = isCompressed ? blocksY * blockDim : mip.height;
+
+      this.device.queue.writeTexture(
+        { texture: this.texture, mipLevel: level },
+        mip.data,
+        { bytesPerRow, rowsPerImage: blocksY },
+        { width: copyWidth, height: copyHeight },
+      );
+    }
+
+    this.textureView = this.texture.createView({
+      label: `${this.label}_textureView`,
+      baseMipLevel: 0,
+      mipLevelCount,
+    });
+
+    this.sampler = SamplerLibrary.anisotropic16x;
     this.setHasData();
   }
 

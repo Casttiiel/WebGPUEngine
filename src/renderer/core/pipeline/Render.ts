@@ -149,20 +149,6 @@ export class Render {
     Render.renderHeight = Math.max(1, Math.floor(scaledHeight * renderRes));
   }
 
-  /**
-   * Re-derive render width/height from the current QualitySettings.renderResolution
-   * and notify all modules (resize all render targets, pipelines, etc.).
-   * Call this after QualitySettings.setRenderResolution().
-   */
-  public static applyRenderResolution(): void {
-    Render.updateRenderDimensions();
-    Render.getInstance()
-      .device.queue.onSubmittedWorkDone()
-      .then(() => {
-        Engine.getRender().onResolutionUpdated();
-      });
-  }
-
   // Ajustar el tamaño del buffer de render
   public async resizeBackBuffer(newWidth: number, newHeight: number): Promise<boolean> {
     if (Render.canvasWidth === newWidth && Render.canvasHeight === newHeight) {

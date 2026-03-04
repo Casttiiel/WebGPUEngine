@@ -5,12 +5,10 @@
 3. Progressive texture streaming o mip streaming
 4. DOF adaptative
 5. Lens distorsion + chromatic aberration RE4
-6. FSR 1.0
-7. TAA
-8. SS Global Illumination
+6. TAA
+7. SS Global Illumination
    Animations
    Pre-multiplied Alpha Solids (Cristal)
-   Auto exposure
    GPUDrivenRendering with indirect draw calls and frustum culling on GPU
    Area Light (LTC (Linearly Transformed Cosines) for shadows)
    Light Clustered culling + instancing

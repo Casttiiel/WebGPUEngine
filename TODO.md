@@ -1,6 +1,9 @@
 ### Engine
 
-1. KTX2 / Basis Universal Texture Compression
+1. KTX2 / Basis Universal Texture Compression Texture Memory: 1,070,257,361 Bytes a Texture Memory: 552,401,019 Bytes
+2. Web Workers
+3. GPU Driven Rendering + Indirect Draw Calls
+4. Improve particles
 
 ## Gameplay
 
@@ -25,11 +28,9 @@ Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast 
 4. Editor Camera (Render Debug / Gizmo / Menu)
 5. Blender Export with player spawn
 6. Asset Browser + Spawn + Delete
-7. KTX2
-8. Froxel Global Illumination
-9. Froxel: Self occlusion
-10. Froxel Density Volumes
-11. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
-12. UI
-13. Improve particles
-14. Optimize with compute shaders and more
+7. Froxel Global Illumination
+8. Froxel: Self occlusion
+9. Froxel Density Volumes
+10. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
+11. UI
+12. Optimize with compute shaders and more
