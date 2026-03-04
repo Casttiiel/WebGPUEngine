@@ -526,9 +526,7 @@ export class ModuleRender extends Module {
 
     const mainCameraForMenu = Engine.getEntities().getEntityByName('MainCamera');
     if (mainCameraForMenu?.hasComponent('auto_exposure')) {
-      const autoExposure = mainCameraForMenu.getComponent(
-        'auto_exposure',
-      ) as AutoExposureComponent;
+      const autoExposure = mainCameraForMenu.getComponent('auto_exposure') as AutoExposureComponent;
       if (autoExposure.hasLoaded()) autoExposure.renderInMenu();
     }
 
