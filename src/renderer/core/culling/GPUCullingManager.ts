@@ -97,10 +97,6 @@ export class GPUCullingManager {
   private cpuShadowU32 = new Uint32Array(0);
   private cpuShadowFrustum = new Float32Array(24);
 
-  // ---- stats / logging ----
-  private frameCount = 0;
-  private firstDispatch = true;
-
   // ------------------------------------------------------------------
   // Initialization
   // ------------------------------------------------------------------
@@ -152,7 +148,6 @@ export class GPUCullingManager {
     });
 
     this.initialized = true;
-    console.log('[GPUCullingManager] Initialized');
   }
 
   public isInitialized(): boolean {
@@ -246,10 +241,6 @@ export class GPUCullingManager {
       (key) => key.material.getCategory() === RenderCategory.SHADOWS && !key.isInstanced,
     );
     this.rebuildShadow(shadowKeys);
-
-    console.log(
-      `[GPUCullingManager] Rebuilt — ${n} GPU-managed keys, ${shadowKeys.length} shadow keys (${allKeys.length - n - shadowKeys.length} instanced/particles)`,
-    );
   }
 
   public isDirty(): boolean {
@@ -460,16 +451,6 @@ export class GPUCullingManager {
     computePass.setBindGroup(0, this.bindGroup);
     computePass.dispatchWorkgroups(Math.ceil(n / 64));
     computePass.end();
-
-    // Log first dispatch and then every 300 frames (~5 s at 60 fps)
-    if (this.firstDispatch || this.frameCount % 300 === 0) {
-      console.log(
-        `%c[GPUCuller] dispatch frame=${this.frameCount} managed=${n} workgroups=${Math.ceil(n / 64)}`,
-        'color:#4fc3f7',
-      );
-      this.firstDispatch = false;
-    }
-    this.frameCount++;
   }
 
   // ------------------------------------------------------------------
@@ -651,7 +632,5 @@ export class GPUCullingManager {
     this.built = false;
     this.shadowBuilt = false;
     this.initialized = false;
-    this.frameCount = 0;
-    this.firstDispatch = true;
   }
 }

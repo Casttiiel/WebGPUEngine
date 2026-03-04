@@ -137,16 +137,7 @@ export class Texture extends GPUResource {
     // ── PNG / WebP fallback ───────────────────────────────────────────────────
     const response = await ResourceManager.fetch(`assets/textures/${this.path}`);
     const blob = await response.blob();
-    const _tDecode = performance.now();
     const imageBitmap = await createImageBitmap(blob);
-    const _decodeMs = performance.now() - _tDecode;
-    const _totalMs = performance.now() - _t0;
-    if (_totalMs > 30) {
-      console.log(
-        `%c[Texture] ${this.path}  decode=${_decodeMs.toFixed(0)}ms  total=${_totalMs.toFixed(0)}ms`,
-        'color:#ff9800',
-      );
-    }
     const mipLevelCount = this.genMipmaps
       ? Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1
       : 1;

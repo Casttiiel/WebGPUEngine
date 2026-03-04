@@ -78,13 +78,7 @@ export class Loader {
     // Cargar entidades raíz en paralelo, con log por entidad
     await Promise.all(
       json.map(async (e) => {
-        const tEntity = performance.now();
-        const name = (e.components?.name as string) ?? e.prefab ?? '(unnamed)';
         await this.loadEntityFromJSON(e);
-        console.log(
-          `%c[Loader] load "${name}": +${(performance.now() - tEntity).toFixed(0)}ms`,
-          'color:#a5d6a7',
-        );
       }),
     );
   }
@@ -92,13 +86,7 @@ export class Loader {
   public static async parseSceneJSON(json: SceneDataType): Promise<SceneDataType> {
     // Procesar todas las entidades en paralelo para acelerar el parsing
     const parsePromises = json.map(async (entityJson) => {
-      const tEntity = performance.now();
-      const name = (entityJson.components?.name as string) ?? entityJson.prefab ?? '(unnamed)';
       const result = await this.parseEntityFromJSON(entityJson);
-      console.log(
-        `%c[Loader] parse "${name}": +${(performance.now() - tEntity).toFixed(0)}ms`,
-        'color:#fff176',
-      );
       return result;
     });
     const parsedEntities = await Promise.all(parsePromises);

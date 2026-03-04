@@ -77,26 +77,16 @@ export class ModuleManager {
   }
 
   public async startModules(modules: Module[], reportProgress: boolean = false): Promise<void> {
-    const t0 = performance.now();
     for (const module of modules) {
       if (module.isActive()) continue;
-      const tModule = performance.now();
       await module.start();
       module.setActive(true);
-      console.log(
-        `%c[ModuleManager] ${module.getName()}: +${(performance.now() - tModule).toFixed(0)}ms  (elapsed: +${(performance.now() - t0).toFixed(0)}ms)`,
-        'color:#a5d6a7',
-      );
 
       // Reportar progreso si está habilitado
       if (reportProgress) {
         LoadingStatus.moduleLoaded(module.getName());
       }
     }
-    console.log(
-      `%c[ModuleManager] startModules(${modules.map((m) => m.getName()).join(', ')}) TOTAL: +${(performance.now() - t0).toFixed(0)}ms`,
-      'color:#a5d6a7;font-weight:bold',
-    );
   }
 
   public stopModules(modules: Module[]): void {

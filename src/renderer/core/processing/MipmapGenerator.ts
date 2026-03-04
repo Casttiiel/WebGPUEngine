@@ -67,10 +67,6 @@ export class MipmapGenerator {
     if (!this.pipelines.has(format)) {
       // Deduplicate concurrent compile requests for the same format
       if (!this.pipelinePromises.has(format)) {
-        console.log(
-          `%c[MipmapGen] First createComputePipelineAsync for format: ${format}`,
-          'color:#e91e63',
-        );
         const shaderCode = this.createShaderForFormat(format);
         const shaderModule = this.device.createShaderModule({
           label: `Mipmap Generation Compute Shader ${format}`,
@@ -101,24 +97,13 @@ export class MipmapGenerator {
         };
 
         // Async compile — does not block the main thread
-        const _tPipeline = performance.now();
         const promise = this.device.createComputePipelineAsync(computeConfig).then((pipeline) => {
           this.pipelines.set(format, pipeline);
-          console.log(
-            `%c[MipmapGen] createComputePipelineAsync(${format}) resolved: +${(performance.now() - _tPipeline).toFixed(0)}ms`,
-            'color:#e91e63',
-          );
           return pipeline;
         });
         this.pipelinePromises.set(format, promise);
       }
-      const _tWait = performance.now();
       await this.pipelinePromises.get(format)!;
-      if (performance.now() - _tWait > 5)
-        console.log(
-          `%c[MipmapGen] waited for pipeline(${format}): +${(performance.now() - _tWait).toFixed(0)}ms`,
-          'color:#e91e63',
-        );
     }
 
     return {
