@@ -630,6 +630,17 @@ export class DirectionalLightComponent extends Component {
     this.updateLightUniforms();
   }
 
+  /**
+   * Forces shadow camera update for an explicit camera (used by reflection probe capture).
+   * Bypasses the EntityManager lookup so probe face cameras are used instead of MainCamera.
+   */
+  public updateShadowsForCamera(camera: Camera): void {
+    if (!this.hasShadows) return;
+    this.splitsInitialized = false; // Force recalculation for this camera's frustum
+    this.updateShadowCameras(camera);
+    this.updateLightUniforms();
+  }
+
   public override renderDebug(): void {}
 
   public override renderInMenu(): void {

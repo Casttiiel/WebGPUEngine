@@ -312,9 +312,17 @@ export class ModuleEnvironmentManager extends Module {
       RenderManager.getInstance().setCamera(camera);
       RenderManager.getInstance().performCulling(camera);
 
-      // ⚠️ DESACTIVADO: generateShadowMaps() sobrescribe el culling de la probe camera
-      // Las reflection probes no necesitan shadows detallados
-      // tempRenderer.generateShadowMaps();
+      // Regenerar shadow maps ajustados al frustum de esta cara del probe
+      for (const comp of Engine.getEntities()
+        .getObjectManagerByName('directional_light')
+        ?.getList() ?? []) {
+        (comp as DirectionalLightComponent).updateShadowsForCamera(camera);
+      }
+      tempRenderer.generateShadowMaps();
+
+      // Restaurar culling de geometría principal tras la generación de shadow maps
+      RenderManager.getInstance().setCamera(camera);
+      RenderManager.getInstance().performCulling(camera);
 
       // 🔧 CRITICAL FIX: Llamar update() antes de render() para escribir uniforms
       // Sin esto, el ambient uniform buffer queda vacío/corrupto

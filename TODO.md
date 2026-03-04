@@ -1,10 +1,9 @@
 ### Engine
 
-1.  Multiple Light probes has good shadows?
-2.  Reflection Probes con blending
-3.  Improve particles
+1.  Reflection Probes con blending
+2.  Improve particles
+3.  UI
 4.  Optimize with compute shaders and more
-5.  UI
 
 ## Gameplay
 
