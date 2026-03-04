@@ -4,7 +4,7 @@
       "name": "ReflectionProbe",
       "transform": {},
       "reflection_probe": {
-        "resolution": 256
+        "resolution": 512
       },
       "box_collider": {
         "isSensor": true,

@@ -64,7 +64,13 @@ export class Cubemap extends GPUResource {
       // Register first to prevent race conditions
       ResourceManager.registerResource(cubemap);
 
-      await cubemap.loadAsync();
+      try {
+        await cubemap.loadAsync();
+      } catch (e) {
+        // Unregister so future calls can retry cleanly instead of returning a broken cubemap
+        ResourceManager.unregisterResource(path);
+        throw e;
+      }
       return cubemap;
     }
   }

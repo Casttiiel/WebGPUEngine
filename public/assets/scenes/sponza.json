@@ -21,6 +21,14 @@
     "prefab": "primitives/ground.prefab"
   },
   {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 2, 0]
+      }
+    }
+  },
+  {
     "prefab": "lighting/point_light.prefab"
   },
   {

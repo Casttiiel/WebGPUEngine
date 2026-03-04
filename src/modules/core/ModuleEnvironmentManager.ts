@@ -603,17 +603,25 @@ export class ModuleEnvironmentManager extends Module {
   }
 
   public changeIrradianceTexture(newTexture: string): void {
-    Cubemap.getAsync(newTexture).then((cubemap) => {
-      this.ambientLightData.irradianceCubemap = cubemap;
-      Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
-    });
+    Cubemap.getAsync(newTexture)
+      .then((cubemap) => {
+        this.ambientLightData.irradianceCubemap = cubemap;
+        Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
+      })
+      .catch(() => {
+        // Texture not found (not yet baked) — keep current irradiance cubemap
+      });
   }
 
   public changeSSREnvironmentTexture(newTexture: string): void {
-    Cubemap.getAsync(newTexture).then((cubemap) => {
-      this.ssrEnvironmentTexture = cubemap;
-      Engine.getRender().getDeferredRenderer().resetSSRResources();
-    });
+    Cubemap.getAsync(newTexture)
+      .then((cubemap) => {
+        this.ssrEnvironmentTexture = cubemap;
+        Engine.getRender().getDeferredRenderer().resetSSRResources();
+      })
+      .catch(() => {
+        // Texture not found (not yet baked) — keep current SSR environment texture
+      });
   }
 
   public override renderInMenu(): void {
