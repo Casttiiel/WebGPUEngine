@@ -1,16 +1,13 @@
 ### Engine
 
-1. Optimize with compute shaders and more
-2. Improve particles
-3. Gameplay
-4. UI
-5. TAA
+1. Improve particles
+2. Gameplay
+3. UI
 
 ## Gameplay
 
-Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast Fall, Slide, Dash
-
 1. Jump right on change inclination and then wallrun
+   Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast Fall, Slide, Dash
 2. Blur on borders
 3. Momentum
 
@@ -29,7 +26,8 @@ Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast 
 4. Editor Camera (Render Debug / Gizmo / Menu)
 5. Blender Export with player spawn
 6. Asset Browser + Spawn + Delete
-7. Froxel Global Illumination
-8. Froxel: Self occlusion
-9. Froxel Density Volumes
+7. TAA
+8. Froxel Density Volumes
+9. Froxel: Self occlusion
 10. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
+11. Froxel Global Illumination

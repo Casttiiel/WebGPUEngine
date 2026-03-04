@@ -157,6 +157,16 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Same structure as getGBufferLayout() but with COMPUTE visibility — for AO/SSGI compute passes. */
+  public static getGBufferComputeLayout(): GPUBindGroupLayout {
+    return this.getLayout('gbuffer_compute', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+    ]);
+  }
+
   public static getSingleTextureLayout(): GPUBindGroupLayout {
     return this.getLayout('single_texture', [
       {

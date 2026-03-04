@@ -1,0 +1,60 @@
+[
+  {
+    "components": {
+      "name": "Sponza",
+      "transform": {
+        "rotation": [0, 90, 0],
+        "scale": [0.01, 0.01, 0.01]
+      }
+    },
+    "gltf": "high_sponza.gltf"
+  },
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "characters/player_character.prefab"
+  },
+  {
+    "prefab": "cameras/debug_camera.prefab"
+  },
+  {
+    "prefab": "primitives/ground.prefab"
+  },
+  {
+    "prefab": "lighting/point_light.prefab"
+  },
+  {
+    "prefab": "lighting/spot_light.prefab"
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "prefab": "effects/cube_emissive.prefab",
+    "components": {
+      "transform": {
+        "position": [-1.0, 4, 5],
+        "scale": [0.3, 0.3, 0.3]
+      }
+    }
+  },
+  {
+    "prefab": "primitives/sphere_metal.prefab",
+    "components": {
+      "transform": {
+        "position": [-1, 0.9, 8]
+      }
+    }
+  },
+  {
+    "prefab": "primitives/cube.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 2, 8],
+        "rotation": [35, 15, 45],
+        "scale": [0.7, 0.7, 0.7]
+      }
+    }
+  }
+]

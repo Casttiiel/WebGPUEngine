@@ -40,6 +40,7 @@ export class DeferredRenderer {
   private rtCopyNormals!: RenderTarget;
 
   private gBufferBindGroup!: GPUBindGroup;
+  private gBufferComputeBindGroup!: GPUBindGroup; // COMPUTE-visibility version for AO/SSGI compute passes
   private gBufferLayout!: GPUBindGroupLayout;
   private whiteTexture!: Texture;
 
@@ -167,6 +168,18 @@ export class DeferredRenderer {
           binding: 3,
           resource: SamplerLibrary.nonFilteringSampler!,
         },
+      ],
+    );
+
+    // Compute-visibility G-Buffer bind group — same textures, COMPUTE visibility for AO/SSGI dispatches.
+    this.gBufferComputeBindGroup = BindGroupFactory.createBindGroup(
+      `gbuffer_compute_bindgroup`,
+      BindGroupFactory.getGBufferComputeLayout(),
+      [
+        { binding: 0, resource: gBufferRenderTargets.albedos.getView()! },
+        { binding: 1, resource: gBufferRenderTargets.normals.getView()! },
+        { binding: 2, resource: gBufferRenderTargets.linearDepth.getView()! },
+        { binding: 3, resource: SamplerLibrary.nonFilteringSampler! },
       ],
     );
 
@@ -327,7 +340,7 @@ export class DeferredRenderer {
     if (!ambientOcclusionComponent || !ambientOcclusionComponent.hasLoaded()) {
       return this.whiteTexture.getTextureView()!;
     }
-    return ambientOcclusionComponent.compute(this.gBufferBindGroup);
+    return ambientOcclusionComponent.compute(this.gBufferComputeBindGroup);
   }
 
   private renderAccLight(camera: Entity): void {
