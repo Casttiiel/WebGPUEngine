@@ -224,6 +224,19 @@ export class QualitySettings {
     this.onSettingsChanged();
   }
 
+  /**
+   * Override only the render resolution scale (0.1 – 1.0) without changing
+   * any other quality settings.  Callers must follow with
+   * Render.applyRenderResolution() to propagate the change to GPU resources.
+   */
+  public setRenderResolution(value: number): void {
+    const clamped = Math.min(1.0, Math.max(0.1, value));
+    if (this.settings) {
+      this.settings.renderResolution = clamped;
+    }
+    this.currentPreset = 'CUSTOM' as any;
+  }
+
   private onSettingsChanged(): void {
     // Emit event or trigger updates in renderer
     console.log('Graphics settings changed:', this.settings);

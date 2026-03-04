@@ -1,0 +1,416 @@
+import { ResourceManager } from '../../core/engine/ResourceManager';
+import { Component } from '../../core/ecs/Component';
+import { Render } from '../../renderer/core/pipeline/Render';
+import { RenderTarget } from '../../renderer/resources/RenderTarget';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import {
+  PipelineFactory,
+  ComputePipelineConfig,
+} from '../../renderer/core/factories/PipelineFactory';
+import { QualitySettings } from '../../core/engine/QualitySettings';
+import { Engine } from '../../core/engine/Engine';
+
+/**
+ * FSR 1.0 — FidelityFX Super Resolution
+ *
+ * Upscales the internal render resolution (Render.width × Render.height) to the
+ * physical canvas resolution (Render.canvasSize) in two compute passes:
+ *
+ *   EASU  — Edge-Adaptive Spatial Upsampling using a 12-tap Catmull-Rom bicubic
+ *            reconstruction with anti-ringing clamping.
+ *   RCAS  — Robust Contrast-Adaptive Sharpening applied at canvas resolution.
+ *
+ * Pipeline order: … → tone_mapping → FSR (this) → fxaa → smaa → …
+ *
+ * The component is a no-op when renderResolution = 1.0 AND enableRCAS = false.
+ * When renderResolution < 1.0 EASU always runs; RCAS is optional.
+ */
+export class FSRComponent extends Component {
+  private device!: GPUDevice;
+  private isLoaded = false;
+
+  // ── Public settings (exposed in debug UI) ─────────────────────────────────
+  public enabled = true;
+  /** Run RCAS sharpening pass after EASU.  Can be disabled to save GPU time. */
+  public enableRCAS = true;
+  /**
+   * RCAS sharpness:  0 = maximum sharpening,  2 = very gentle.
+   * Internally mapped to exp2(-sharpness) for the GPU uniform.
+   */
+  public rcasSharpness = 0.2;
+
+  // ── Compute shaders ────────────────────────────────────────────────────────
+  private easuShader!: GPUShaderModule;
+  private rcasShader!: GPUShaderModule;
+
+  // ── Compute pipelines ──────────────────────────────────────────────────────
+  private easuPipeline!: GPUComputePipeline;
+  private rcasPipeline!: GPUComputePipeline;
+
+  // ── Shared bind group layouts (3 groups, same slots in both shaders) ───────
+  /** Group 0: input texture_2d */
+  private inputTexLayout!: GPUBindGroupLayout;
+  /** Group 1: output texture_storage_2d (write-only, rgba16float) */
+  private storageTexLayout!: GPUBindGroupLayout;
+  /** Group 2: params uniform buffer */
+  private paramsLayout!: GPUBindGroupLayout;
+
+  // ── Render targets at CANVAS resolution ───────────────────────────────────
+  private easuResult!: RenderTarget; // EASU writes here
+  private rcasResult!: RenderTarget; // RCAS writes here (final output)
+
+  // ── Params GPU buffers ─────────────────────────────────────────────────────
+  /** [inputW, inputH, outputW, outputH] — updated every apply() call */
+  private easuParamsBuffer!: GPUBuffer;
+  /** [sharpness, 0, 0, 0] — updated whenever rcasSharpness changes */
+  private rcasParamsBuffer!: GPUBuffer;
+
+  // ── Fixed bind groups (rebuilt on resize) ─────────────────────────────────
+  private easuOutputBindGroup!: GPUBindGroup;
+  private rcasOutputBindGroup!: GPUBindGroup;
+  /** Points at easuResult for RCAS input — also rebuilt on resize */
+  private rcasInputBindGroup!: GPUBindGroup;
+
+  // ── Fixed params bind groups (created once after load) ────────────────────
+  private easuParamsBindGroup!: GPUBindGroup;
+  private rcasParamsBindGroup!: GPUBindGroup;
+
+  // ── Per-frame EASU input bind group cache ─────────────────────────────────
+  // The input view from the previous pass can change, so we cache lazily.
+  private easuInputCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+
+  // ── Component lifecycle ────────────────────────────────────────────────────
+
+  public async load(): Promise<void> {
+    this.device = Render.getInstance().getDevice();
+
+    await this.loadShaders();
+    this.createLayouts();
+    this.createParamsBuffers();
+    this.createPipelines();
+    this.createParamsBindGroups();
+    this.createRenderTargets();
+    this.createResizableBindGroups();
+
+    this.isLoaded = true;
+  }
+
+  // ── Public API ─────────────────────────────────────────────────────────────
+
+  /**
+   * Run EASU (and optionally RCAS) upscaling.
+   * @param inputView  The LDR (post tone-mapping) texture view at render resolution.
+   * @returns          Final upscaled texture view at canvas resolution.
+   */
+  public apply(inputView: GPUTextureView): GPUTextureView {
+    if (!this.isLoaded || !this.enabled) return inputView;
+
+    const canvas = Render.canvasSize;
+
+    // Update EASU params: render res → canvas res
+    this.device.queue.writeBuffer(
+      this.easuParamsBuffer,
+      0,
+      new Float32Array([Render.width, Render.height, canvas.width, canvas.height]),
+    );
+
+    // Update RCAS params
+    this.device.queue.writeBuffer(
+      this.rcasParamsBuffer,
+      0,
+      new Float32Array([this.rcasSharpness, 0, 0, 0]),
+    );
+
+    // Lazily create / look up EASU input bind group for this view
+    let easuInputBG = this.easuInputCache.get(inputView);
+    if (!easuInputBG) {
+      easuInputBG = BindGroupFactory.createBindGroup(
+        `fsr_easu_input_${this.easuInputCache.size}`,
+        this.inputTexLayout,
+        [{ binding: 0, resource: inputView }],
+      );
+      this.easuInputCache.set(inputView, easuInputBG);
+    }
+
+    const dispatchX = Math.ceil(canvas.width / 8);
+    const dispatchY = Math.ceil(canvas.height / 8);
+
+    // ── Single encoder: EASU then RCAS (WebGPU guarantees storage write barrier
+    //    between compute passes within the same command buffer) ────────────────
+    const encoder = this.device.createCommandEncoder({ label: 'FSR Encoder' });
+
+    // EASU pass
+    const easuPass = encoder.beginComputePass({ label: 'FSR EASU' });
+    easuPass.setPipeline(this.easuPipeline);
+    easuPass.setBindGroup(0, easuInputBG);
+    easuPass.setBindGroup(1, this.easuOutputBindGroup);
+    easuPass.setBindGroup(2, this.easuParamsBindGroup);
+    easuPass.dispatchWorkgroups(dispatchX, dispatchY, 1);
+    easuPass.end();
+
+    if (this.enableRCAS) {
+      // RCAS pass
+      const rcasPass = encoder.beginComputePass({ label: 'FSR RCAS' });
+      rcasPass.setPipeline(this.rcasPipeline);
+      rcasPass.setBindGroup(0, this.rcasInputBindGroup);
+      rcasPass.setBindGroup(1, this.rcasOutputBindGroup);
+      rcasPass.setBindGroup(2, this.rcasParamsBindGroup);
+      rcasPass.dispatchWorkgroups(dispatchX, dispatchY, 1);
+      rcasPass.end();
+    }
+
+    this.device.queue.submit([encoder.finish()]);
+
+    return this.enableRCAS ? this.rcasResult.getView() : this.easuResult.getView();
+  }
+
+  /** Recreate render targets when the canvas / render resolution changes. */
+  public resize(): void {
+    if (!this.isLoaded) return;
+
+    this.easuInputCache.clear();
+
+    this.createRenderTargets();
+    this.createResizableBindGroups();
+  }
+
+  public hasLoaded(): boolean {
+    return this.isLoaded;
+  }
+
+  // ── Private helpers ────────────────────────────────────────────────────────
+
+  private async loadShaders(): Promise<void> {
+    const [easuRes, rcasRes] = await Promise.all([
+      ResourceManager.fetch('assets/shaders/post-processing/fsr_easu.compute.wgsl'),
+      ResourceManager.fetch('assets/shaders/post-processing/fsr_rcas.compute.wgsl'),
+    ]);
+
+    this.easuShader = this.device.createShaderModule({
+      label: 'FSR EASU Compute Shader',
+      code: await easuRes.text(),
+    });
+
+    this.rcasShader = this.device.createShaderModule({
+      label: 'FSR RCAS Compute Shader',
+      code: await rcasRes.text(),
+    });
+  }
+
+  private createLayouts(): void {
+    // Group 0 — input texture (same layout for both EASU and RCAS)
+    this.inputTexLayout = BindGroupFactory.getLayout('fsr_input_tex', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' },
+      },
+    ]);
+
+    // Group 1 — storage output texture (write-only rgba16float)
+    this.storageTexLayout = BindGroupFactory.getLayout('fsr_storage_tex', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'rgba16float',
+        },
+      },
+    ]);
+
+    // Group 2 — params uniform buffer
+    this.paramsLayout = BindGroupFactory.getLayout('fsr_params', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
+  private createParamsBuffers(): void {
+    // EASU params: [inputW, inputH, outputW, outputH] — 16 bytes
+    this.easuParamsBuffer = GPUUtils.createBuffer(
+      'fsr_easu_params',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    // RCAS params: [sharpness, _pad, _pad, _pad] — 16 bytes
+    this.rcasParamsBuffer = GPUUtils.createBuffer(
+      'fsr_rcas_params',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+
+    // Write sensible defaults
+    const canvas = Render.canvasSize;
+    this.device.queue.writeBuffer(
+      this.easuParamsBuffer,
+      0,
+      new Float32Array([Render.width, Render.height, canvas.width, canvas.height]),
+    );
+    this.device.queue.writeBuffer(
+      this.rcasParamsBuffer,
+      0,
+      new Float32Array([this.rcasSharpness, 0, 0, 0]),
+    );
+  }
+
+  private createPipelines(): void {
+    const sharedLayouts = [this.inputTexLayout, this.storageTexLayout, this.paramsLayout];
+
+    const easuConfig: ComputePipelineConfig = {
+      label: 'FSR EASU Compute Pipeline',
+      layout: PipelineFactory.createPipelineLayout('fsr_easu_pipeline_layout', sharedLayouts),
+      compute: {
+        module: this.easuShader,
+        entryPoint: 'cs_easu',
+      },
+    };
+    this.easuPipeline = PipelineFactory.createComputePipeline(easuConfig);
+
+    const rcasConfig: ComputePipelineConfig = {
+      label: 'FSR RCAS Compute Pipeline',
+      layout: PipelineFactory.createPipelineLayout('fsr_rcas_pipeline_layout', sharedLayouts),
+      compute: {
+        module: this.rcasShader,
+        entryPoint: 'cs_rcas',
+      },
+    };
+    this.rcasPipeline = PipelineFactory.createComputePipeline(rcasConfig);
+  }
+
+  private createParamsBindGroups(): void {
+    this.easuParamsBindGroup = BindGroupFactory.createBindGroup(
+      'fsr_easu_params_bg',
+      this.paramsLayout,
+      [{ binding: 0, resource: { buffer: this.easuParamsBuffer } }],
+    );
+
+    this.rcasParamsBindGroup = BindGroupFactory.createBindGroup(
+      'fsr_rcas_params_bg',
+      this.paramsLayout,
+      [{ binding: 0, resource: { buffer: this.rcasParamsBuffer } }],
+    );
+  }
+
+  private createRenderTargets(): void {
+    const canvas = Render.canvasSize;
+    const format = QualitySettings.getInstance().getSettings().aliasingTexture;
+
+    this.easuResult = new RenderTarget();
+    this.easuResult.createRT(
+      'fsr_easu_result',
+      canvas.width,
+      canvas.height,
+      format,
+      GPUTextureUsage.STORAGE_BINDING,
+    );
+
+    this.rcasResult = new RenderTarget();
+    this.rcasResult.createRT(
+      'fsr_rcas_result',
+      canvas.width,
+      canvas.height,
+      format,
+      GPUTextureUsage.STORAGE_BINDING,
+    );
+  }
+
+  /**
+   * Build the bind groups that reference render target views.
+   * Must be called after createRenderTargets() — and again after every resize.
+   */
+  private createResizableBindGroups(): void {
+    // EASU writes to easuResult
+    this.easuOutputBindGroup = BindGroupFactory.createBindGroup(
+      'fsr_easu_output_bg',
+      this.storageTexLayout,
+      [{ binding: 0, resource: this.easuResult.getStorageView() }],
+    );
+
+    // RCAS reads from easuResult
+    this.rcasInputBindGroup = BindGroupFactory.createBindGroup(
+      'fsr_rcas_input_bg',
+      this.inputTexLayout,
+      [{ binding: 0, resource: this.easuResult.getView() }],
+    );
+
+    // RCAS writes to rcasResult
+    this.rcasOutputBindGroup = BindGroupFactory.createBindGroup(
+      'fsr_rcas_output_bg',
+      this.storageTexLayout,
+      [{ binding: 0, resource: this.rcasResult.getStorageView() }],
+    );
+  }
+
+  // ── Debug UI ───────────────────────────────────────────────────────────────
+
+  // Live read-only stats shown in the GUI
+  private debugStats = {
+    input: '?x?',
+    output: '?x?',
+    scale: '?x',
+  };
+
+  // Proxy so lil-gui can read/write renderResolution through QualitySettings
+  private readonly renderResProxy = {
+    get resolution() {
+      return QualitySettings.getInstance().getSettings().renderResolution;
+    },
+    set resolution(v: number) {
+      QualitySettings.getInstance().setRenderResolution(v);
+      Render.applyRenderResolution();
+    },
+  };
+
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (!gui.beginWindow('FSR 1.0', true)) return;
+
+    const folder = (gui as any).folders?.get('FSR 1.0');
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    // Update live stats every frame
+    const canvas = Render.canvasSize;
+    this.debugStats.input = `${Render.width} × ${Render.height}`;
+    this.debugStats.output = `${canvas.width} × ${canvas.height}`;
+    const scaleX = canvas.width / Math.max(Render.width, 1);
+    const scaleY = canvas.height / Math.max(Render.height, 1);
+    this.debugStats.scale = `${scaleX.toFixed(2)}x (${scaleY.toFixed(2)}x)`;
+
+    folder.add(this.debugStats, 'input').name('Input  (render res)').listen().disable();
+    folder.add(this.debugStats, 'output').name('Output (canvas res)').listen().disable();
+    folder.add(this.debugStats, 'scale').name('Upscale factor').listen().disable();
+
+    folder.add(this, 'enabled').name('Enable FSR').listen();
+    folder.add(this, 'enableRCAS').name('Enable RCAS Sharpening').listen();
+    folder.add(this, 'rcasSharpness', 0.0, 2.0, 0.05).name('RCAS Sharpness').listen();
+    folder
+      .add(this.renderResProxy, 'resolution', 0.25, 1.0, 0.05)
+      .name('Render Resolution')
+      .listen();
+
+    gui.endWindow();
+  }
+
+  public debugInMenu(): void {}
+  public renderDebug(): void {}
+  public update(_dt: number): void {}
+
+  // ── Cleanup ────────────────────────────────────────────────────────────────
+
+  public dispose(): void {
+    this.easuParamsBuffer?.destroy();
+    this.rcasParamsBuffer?.destroy();
+    this.easuInputCache.clear();
+  }
+}

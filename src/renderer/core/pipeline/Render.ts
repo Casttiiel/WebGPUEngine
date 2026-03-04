@@ -112,6 +112,20 @@ export class Render {
     }
   }
 
+  /**
+   * Re-derive render width/height from the current QualitySettings.renderResolution
+   * and notify all modules (resize all render targets, pipelines, etc.).
+   * Call this after QualitySettings.setRenderResolution().
+   */
+  public static applyRenderResolution(): void {
+    Render.updateRenderDimensions();
+    Render.getInstance()
+      .device.queue.onSubmittedWorkDone()
+      .then(() => {
+        Engine.getRender().onResolutionUpdated();
+      });
+  }
+
   // Update render dimensions based on quality settings
   private static updateRenderDimensions(): void {
     const renderRes = QualitySettings.getInstance().getSettings().renderResolution;
@@ -133,6 +147,20 @@ export class Render {
     // Apply quality render resolution scaling
     Render.renderWidth = Math.max(1, Math.floor(scaledWidth * renderRes));
     Render.renderHeight = Math.max(1, Math.floor(scaledHeight * renderRes));
+  }
+
+  /**
+   * Re-derive render width/height from the current QualitySettings.renderResolution
+   * and notify all modules (resize all render targets, pipelines, etc.).
+   * Call this after QualitySettings.setRenderResolution().
+   */
+  public static applyRenderResolution(): void {
+    Render.updateRenderDimensions();
+    Render.getInstance()
+      .device.queue.onSubmittedWorkDone()
+      .then(() => {
+        Engine.getRender().onResolutionUpdated();
+      });
   }
 
   // Ajustar el tamaño del buffer de render

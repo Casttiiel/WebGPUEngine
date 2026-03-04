@@ -28,6 +28,7 @@ import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 import { ModuleUI } from './ModuleUI';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { AutoExposureComponent } from '../../components/render/AutoExposureComponent';
+import { FSRComponent } from '../../components/render/FSRComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -54,6 +55,7 @@ export class ModuleRender extends Module {
     drawCallsDecals: { name: 'Draw Calls (Decals)', value: 0 },
     totalDrawCalls: { name: 'Total Draw Calls', value: 0 },
     resolution: { name: 'Resolution', value: '0x0' },
+    canvasResolution: { name: 'Canvas Resolution', value: '0x0' },
   };
 
   constructor(name: string) {
@@ -204,6 +206,10 @@ export class ModuleRender extends Module {
       (comp as MotionBlurComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('fsr')?.getList() ?? []) {
+      (comp as FSRComponent).resize();
+    }
+
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -325,6 +331,13 @@ export class ModuleRender extends Module {
             }
           }
           result = toneMapping.apply(result);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('fsr')) {
+        const fsr = mainCameraEntity.getComponent('fsr') as FSRComponent;
+        if (fsr.hasLoaded() && fsr.enabled) {
+          result = fsr.apply(result);
         }
       }
 
@@ -496,6 +509,8 @@ export class ModuleRender extends Module {
       this.debugValues.drawCallsDistorsions.value +
       this.debugValues.drawCallsDecals.value;
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
+    const cs = Render.canvasSize;
+    this.debugValues.canvasResolution.value = `${cs.width}x${cs.height}`;
 
     this.deferred.update(dt);
     this.lastDt = dt;
@@ -530,6 +545,11 @@ export class ModuleRender extends Module {
       if (autoExposure.hasLoaded()) autoExposure.renderInMenu();
     }
 
+    if (mainCameraForMenu?.hasComponent('fsr')) {
+      const fsr = mainCameraForMenu.getComponent('fsr') as FSRComponent;
+      if (fsr.hasLoaded()) fsr.renderInMenu();
+    }
+
     // Create main window for render stats
     if (this.beginGUIWindow('Render Statistics')) {
       // Add dynamic text displays that auto-update
@@ -547,7 +567,8 @@ export class ModuleRender extends Module {
       gui.addDynamicText(this.debugValues.drawCallsDecals, 'value', 'Draw Calls (Decals)');
       this.addGUISeparator();
       gui.addDynamicText(this.debugValues.totalDrawCalls, 'value', 'Total Draw Calls');
-      gui.addDynamicText(this.debugValues.resolution, 'value', 'Resolution');
+      gui.addDynamicText(this.debugValues.resolution, 'value', 'Render Resolution');
+      gui.addDynamicText(this.debugValues.canvasResolution, 'value', 'Canvas Resolution');
       this.endGUIWindow();
     }
 

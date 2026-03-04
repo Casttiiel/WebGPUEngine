@@ -1,7 +1,6 @@
 ### Engine
 
-1. FSR 1.0
-2. KTX2 / Basis Universal Texture Compression
+1. KTX2 / Basis Universal Texture Compression
 
 ## Gameplay
 
