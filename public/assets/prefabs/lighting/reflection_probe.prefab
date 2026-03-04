@@ -9,7 +9,7 @@
       "box_collider": {
         "isSensor": true,
         "bodyType": "static",
-        "size": [2, 2, 2]
+        "size": [3, 3, 3]
       },
       "render": {
         "meshes": [

@@ -6,6 +6,7 @@ import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { Texture } from '../resources/Texture';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
@@ -21,7 +22,12 @@ export class AmbientLight {
   private ambientDiffuseUniformArray = new Float32Array(4);
   private ambientSpecularUniformArray = new Float32Array(8);
 
+  /** Cached views for bind-group invalidation on resize or SSGI toggle. */
+  private lastAoView: GPUTextureView | null = null;
+  private lastSsgiView: GPUTextureView | null = null;
+
   private brdfLUT!: Texture;
+  private whiteTexture!: Texture;
 
   constructor() {}
 
@@ -38,6 +44,7 @@ export class AmbientLight {
     this.ambientSpecularTechnique = await Technique.getAsync('lighting/ambient_specular.tech');
 
     this.brdfLUT = await Texture.getAsync('brdfLUT.png');
+    this.whiteTexture = await Texture.getAsync('white.png');
 
     this.ambientSpecularUniformBuffer = GPUUtils.createBuffer(
       'ambient specular uniform buffer',
@@ -50,9 +57,18 @@ export class AmbientLight {
     rtAccLight: GPUTextureView,
     gBufferBindGroup: GPUBindGroup,
     aoResult: GPUTextureView,
+    ssgiView?: GPUTextureView,
   ): void {
-    if (!this.ambientDiffuseBindGroup) {
-      this.createAmbientDiffuseBindGroup(aoResult);
+    // Rebuild bind group when AO or SSGI view references change (e.g. after resize or toggle)
+    const effectiveSsgiView = ssgiView ?? this.whiteTexture.getTextureView()!; // null SSGI → white texture as neutral dummy
+    if (
+      !this.ambientDiffuseBindGroup ||
+      this.lastAoView !== aoResult ||
+      this.lastSsgiView !== effectiveSsgiView
+    ) {
+      this.createAmbientDiffuseBindGroup(aoResult, effectiveSsgiView);
+      this.lastAoView = aoResult;
+      this.lastSsgiView = effectiveSsgiView;
     }
     const render = Render.getInstance();
 
@@ -124,7 +140,7 @@ export class AmbientLight {
     pass.end();
   }
 
-  private createAmbientDiffuseBindGroup(aoResult: GPUTextureView): void {
+  private createAmbientDiffuseBindGroup(aoResult: GPUTextureView, ssgiView: GPUTextureView): void {
     this.ambientDiffuseBindGroup = BindGroupFactory.createBindGroup(
       'ambient_bindgroup',
       this.ambientDiffuseTechnique.getPipeline().getBindGroupLayout(2),
@@ -152,6 +168,10 @@ export class AmbientLight {
           resource: Engine.getEnvironmentManager()
             .getAmbientLightData()
             .irradianceCubemap.getSampler()!,
+        },
+        {
+          binding: 5,
+          resource: ssgiView,
         },
       ],
     );
@@ -202,8 +222,10 @@ export class AmbientLight {
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
     this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
     this.ambientDiffuseUniformArray[1] = ambientData.diffuseFactor;
-    this.ambientDiffuseUniformArray[2] = 0.0;
-    this.ambientDiffuseUniformArray[3] = 0.0;
+    // [2] ssgiEnabled — read from QualitySettings each frame so runtime toggles take effect
+    const ssgiEnabled = QualitySettings.getInstance().getSettings().enableSSGI;
+    this.ambientDiffuseUniformArray[2] = ssgiEnabled ? 1.0 : 0.0;
+    this.ambientDiffuseUniformArray[3] = 1.0; // ssgiIntensity (constant; expose via settings later)
     GPUUtils.writeBuffer(this.ambientDiffuseUniformBuffer, 0, this.ambientDiffuseUniformArray);
 
     this.ambientSpecularUniformArray[0] = ambientData.globalFactor;
@@ -220,5 +242,7 @@ export class AmbientLight {
   public destroy(): void {
     this.ambientDiffuseBindGroup = null!;
     this.ambientSpecularBindGroup = null!;
+    this.lastAoView = null;
+    this.lastSsgiView = null;
   }
 }

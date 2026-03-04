@@ -354,6 +354,12 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'filtering' },
       },
+      // SSGI indirect diffuse contribution
+      {
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
     ]);
   }
 

@@ -8,6 +8,7 @@
 6. Lens distorsion + chromatic aberration RE4
 7. FSR 1.0
 8. TAA
+9. SS Global Illumination
    Animations
    Pre-multiplied Alpha Solids (Cristal)
    Auto exposure

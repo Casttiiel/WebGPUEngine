@@ -26,15 +26,15 @@ fn bilateralFilter(centerUV: vec2<f32>) -> vec4<f32> {
     let texelSize = 1.0 / camera.screenSize;
     
     // Obtener datos del pixel central
-    let centerDepth = textureSample(gLinearDepth, samplerGBuffer, centerUV).x;
+    let centerDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, centerUV, 0.0).x;
 
     if(centerDepth > 0.99) {
-        return 1.0; // Early exit for sky
+        return vec4<f32>(0.0); // Early exit for sky — no SSGI on skybox
     }
 
-    let normalRoughnessData = textureSample(gNormals, samplerGBuffer, centerUV);
+    let normalRoughnessData = textureSampleLevel(gNormals, samplerGBuffer, centerUV, 0.0);
     let centerNormal = octahedral01ToNormal(normalRoughnessData.xy);
-    let centerSSGI = textureSample(ssgiTexture, samplerSSGI, centerUV);
+    let centerSSGI = textureSampleLevel(ssgiTexture, samplerSSGI, centerUV, 0.0);
     
     // Muestrear en un patrón 5x5 alrededor del pixel central
     for (var x = -i32(BILATERAL_RADIUS); x <= i32(BILATERAL_RADIUS); x++) {
@@ -43,10 +43,10 @@ fn bilateralFilter(centerUV: vec2<f32>) -> vec4<f32> {
             let sampleUV = clamp(centerUV + offset, vec2<f32>(0.0), vec2<f32>(1.0));
             
             // Obtener datos de la muestra
-            let sampleDepth = textureSample(gLinearDepth, samplerGBuffer, sampleUV).x;
-            let normalRoughnessData2 = textureSample(gNormals, samplerGBuffer, sampleUV);
+            let sampleDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, sampleUV, 0.0).x;
+            let normalRoughnessData2 = textureSampleLevel(gNormals, samplerGBuffer, sampleUV, 0.0);
             let sampleNormal = octahedral01ToNormal(normalRoughnessData2.xy);
-            let sampleSSGI = textureSample(ssgiTexture, samplerSSGI, sampleUV);
+            let sampleSSGI = textureSampleLevel(ssgiTexture, samplerSSGI, sampleUV, 0.0);
             
             // Calcular pesos basados en similitud de profundidad y normal
             let depthDiff = abs(centerDepth - sampleDepth);

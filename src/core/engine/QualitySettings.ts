@@ -26,6 +26,7 @@ export interface GraphicsQualitySettings {
   ssrMaxSteps: number;
   directionalShadowMapResolution: number;
   ssgiScale: number;
+  enableSSGI: boolean;
 }
 
 export class QualitySettings {
@@ -60,6 +61,7 @@ export class QualitySettings {
       ssrMaxSteps: 160.0,
       directionalShadowMapResolution: 256,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: false,
     } as GraphicsQualitySettings,
 
@@ -88,6 +90,7 @@ export class QualitySettings {
       ssrMaxSteps: 320.0,
       directionalShadowMapResolution: 512,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: true,
     } as GraphicsQualitySettings,
 
@@ -116,6 +119,7 @@ export class QualitySettings {
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 1024,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: true,
     } as GraphicsQualitySettings,
 
@@ -144,6 +148,7 @@ export class QualitySettings {
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 4096,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: true,
     } as GraphicsQualitySettings,
   };
@@ -187,6 +192,7 @@ export class QualitySettings {
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
       enableMotionBlur: true,
+      enableSSGI: false,
     };
     return { ...defaults, ...this.settings };
   }

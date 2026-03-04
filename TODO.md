@@ -8,11 +8,10 @@
 5.  Improve particles
 6.  Optimize with compute shaders and more
 
-7.  SS Global Illumination
-8.  Froxel Global Illumination
-9.  Froxel: Self occlusion
-10. Froxel Density Volumes
-11. KTX2
+7.  Froxel Global Illumination
+8.  Froxel: Self occlusion
+9.  Froxel Density Volumes
+10. KTX2
 
 ## Gameplay
 

@@ -17,6 +17,7 @@ export class ScreenSpaceGlobalIllumination {
   private ssgiResult!: RenderTarget;
   private finalSSGIResult!: RenderTarget;
   private bilateralFilterBindGroup!: GPUBindGroup | null;
+  private bilateralBindGroupDirty: boolean = true;
   private renderPassManager!: RenderPassManager;
 
   constructor() {
@@ -25,13 +26,16 @@ export class ScreenSpaceGlobalIllumination {
 
   public async load(): Promise<void> {
     try {
-      this.isInitialized = true;
       this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-      this.ssgiTechnique = await Technique.getAsync('ssgi.tech');
-      this.bilateralFilterTechnique = await Technique.getAsync('ssgi_bilateral_filter.tech');
+      this.ssgiTechnique = await Technique.getAsync('post-processing/ssgi.tech');
+      this.bilateralFilterTechnique = await Technique.getAsync(
+        'post-processing/ssgi_bilateral_filter.tech',
+      );
 
       this.createRenderTarget();
 
+      // Mark initialized only after all resources are ready
+      this.isInitialized = true;
       console.log('SSGI loaded successfully');
     } catch (error) {
       console.warn('Failed to load SSGI, disabling feature:', error);
@@ -59,11 +63,14 @@ export class ScreenSpaceGlobalIllumination {
       Render.height * QualitySettings.getInstance().getSettings().ssgiScale,
       QualitySettings.getInstance().getSettings().hdrTexture,
     );
+
+    // The bilateral bind group references ssgiResult — mark dirty after (re)create
+    this.bilateralBindGroupDirty = true;
   }
 
-  public render(gBufferBindGroup: GPUBindGroup): GPUTextureView {
-    if (!this.isInitialized) {
-      return;
+  public render(gBufferBindGroup: GPUBindGroup): GPUTextureView | undefined {
+    if (!this.isInitialized || !this.ssgiResult || !this.finalSSGIResult) {
+      return undefined;
     }
 
     this.executeSSRPass(gBufferBindGroup);
@@ -73,7 +80,7 @@ export class ScreenSpaceGlobalIllumination {
   }
 
   public executeSSRPass(gBufferBindGroup: GPUBindGroup): void {
-    if (!this.isInitialized) return;
+    if (!this.isInitialized || !this.ssgiResult) return;
     const render = Render.getInstance();
 
     const colorAttachment = GPUUtils.createColorAttachment(
@@ -116,7 +123,11 @@ export class ScreenSpaceGlobalIllumination {
   }
 
   private applyBilateralFilter(gBufferBindGroup: GPUBindGroup): GPUTextureView {
-    this.setupBilateralFilterBindGroup();
+    // Only rebuild if ssgiResult changed (after load or resize)
+    if (this.bilateralBindGroupDirty) {
+      this.setupBilateralFilterBindGroup();
+      this.bilateralBindGroupDirty = false;
+    }
 
     // Use RenderPassManager to execute bilateral filter pass with both bind groups
     this.renderPassManager.executeSSGIBilateralFilterPass(
@@ -150,9 +161,18 @@ export class ScreenSpaceGlobalIllumination {
     );
   }
 
-  public dispose(): void {
-    this.ssgiResult = null as any;
-    this.bilateralFilterBindGroup = null;
+  public resize(): void {
+    if (!this.isInitialized) return;
     this.createRenderTarget();
+  }
+
+  public dispose(): void {
+    this.isInitialized = false;
+    this.ssgiResult?.destroy();
+    this.finalSSGIResult?.destroy();
+    this.ssgiResult = null as any;
+    this.finalSSGIResult = null as any;
+    this.bilateralFilterBindGroup = null;
+    this.bilateralBindGroupDirty = true;
   }
 }

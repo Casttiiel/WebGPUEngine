@@ -16,72 +16,46 @@
 
 // SSGI Constants
 const NUM_SSGI_SAMPLES: u32 = 16u;
+const MAX_RAY_STEPS:    i32 = 32;
 
-// Uses Fibonacci spiral distribution for better coverage
-fn getHemisphereSample(index: u32) -> vec3<f32> {
-    let i = f32(index);
-    let n = f32(NUM_SSGI_SAMPLES);
-    
-    // Uniform hemisphere distribution by area
-    // Option 1: Guaranteed 2PI coverage (uniform distribution)
-    let theta = (2.0 * PI * i) / n; // Evenly distributed around 2PI
-    let cosTheta = 1.0 - (i / n); // Cosine of polar angle (1 to 0)
-    let sinTheta = sqrt(1.0 - cosTheta * cosTheta); // Sine of polar angle
-    
-    // Option 2: Fibonacci (better distribution but less predictable coverage)
-    // let goldenAngle = 2.39996323;
-    // let theta = goldenAngle * i;
-    
-    // Convert to cartesian coordinates (Y up hemisphere)
-    let x = cos(theta) * sinTheta;
-    let z = sin(theta) * sinTheta;
-    let y = cosTheta; // y component (height in hemisphere)
-    
-    return normalize(vec3<f32>(x, y, z));
+// ─── Interleaved Gradient Noise (Jimenez, 2014) ──────────────────────────────
+// Temporally varied with camera.time so each rendered frame gets a different
+// noise pattern, enabling temporal accumulation / denoising.
+fn IGN(pixelCoord: vec2<f32>, sampleIndex: u32) -> f32 {
+    // Ruido estático — mismo patrón cada frame, el bilateral lo suaviza
+    let p = pixelCoord + f32(sampleIndex) * vec2<f32>(1.6180339887, 2.6180339887);
+    return fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))));
 }
 
-// Generate hemisphere direction based on surface normal
-fn generateHemisphereDirection(normal: vec3<f32>, index: u32, seed: f32) -> vec3<f32> {
-    // Get base hemisphere sample (Y up, local space)
-    let localSample = getHemisphereSample(index);
-    
-    // Transform directly to world space using surface normal as up vector
-    let worldDir = transformToNormalSpace(localSample, normal);
-    
-    // Add small random rotation to break patterns (but keep in hemisphere)
-    let noise = fract(seed + f32(index) * 0.618);
-    let rotationAngle = noise * 0.2; // Small rotation (about 11 degrees max)
-    
-    // Create rotation around the normal
-    let rotAxis = normalize(cross(normal, worldDir));
-    if (length(rotAxis) < 0.001) {
-        // If cross product is too small, use the direction as-is
-        return worldDir;
-    }
-    
-    // Apply small rotation to add variation
-    let cosAngle = cos(rotationAngle);
-    let sinAngle = sin(rotationAngle);
-    let rotatedDir = worldDir * cosAngle + cross(rotAxis, worldDir) * sinAngle;
-    
-    return normalize(rotatedDir);
+// ─── Cosine-weighted hemisphere sampling ─────────────────────────────────────
+// PDF = cos(theta)/PI  →  the cosine term in the rendering equation cancels,
+// so the estimator simplifies to a plain average of hit radiances.
+fn cosineSampleHemisphere(u1: f32, u2: f32) -> vec3<f32> {
+    let r     = sqrt(u1);
+    let theta = 2.0 * PI * u2;
+    let x     = r * cos(theta);
+    let z     = r * sin(theta);
+    // y = cos(polar angle), already carries the cosine IS weight in the PDF
+    return vec3<f32>(x, sqrt(max(0.0, 1.0 - u1)), z);
 }
 
 // Transform vector from local hemisphere space (Y up) to world space using normal
 fn transformToNormalSpace(localDir: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
-    // Create orthonormal basis with normal as Z (up)
     var tangent = vec3<f32>(1.0, 0.0, 0.0);
     if (abs(normal.x) > 0.9) {
         tangent = vec3<f32>(0.0, 1.0, 0.0);
     }
-    
     let bitangent = normalize(cross(normal, tangent));
     tangent = normalize(cross(bitangent, normal));
-    
-    // Transform from local space (Y up) to world space (normal up)
-    // localDir.y becomes the component along normal
-    // localDir.x and localDir.z become tangent plane components
     return localDir.x * tangent + localDir.z * bitangent + localDir.y * normal;
+}
+
+// ─── Screen-edge fade ─────────────────────────────────────────────────────────
+fn computeScreenEdgeFade(uv: vec2<f32>) -> f32 {
+    let fadeWidth = 0.1;
+    let fx = min(uv.x, 1.0 - uv.x) / fadeWidth;
+    let fy = min(uv.y, 1.0 - uv.y) / fadeWidth;
+    return saturate(min(fx, fy));
 }
 
 @fragment
@@ -94,35 +68,36 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0);
     }
 
-    var accumColor = vec3<f32>(0.0);
+    var accumColor  = vec3<f32>(0.0);
     var validSamples = 0u;
     
-    // Generate seed for this pixel
-    let seed = dot(uv, vec2<f32>(12.9898, 78.233)) * 43758.5453;
+    // Pixel coordinates for IGN (avoids scaling issues)
+    let pixelCoord = uv * camera.screenSize;
     
-    // Perform multiple ray marching passes for SSGI
     for (var sampleIndex = 0u; sampleIndex < NUM_SSGI_SAMPLES; sampleIndex++) {
-        let hemisphereDir = generateHemisphereDirection(g.normal, sampleIndex, seed);
-        
-        // Calculate cosine weight for Lambert's law (more contribution from rays aligned with normal)
-        let cosWeight = max(dot(g.normal, hemisphereDir), 0.0);
+        // Two independent random numbers per sample via IGN
+        let u1 = IGN(pixelCoord, sampleIndex * 2u);
+        let u2 = IGN(pixelCoord, sampleIndex * 2u + 1u);
+
+        // Cosine-weighted direction in world space
+        let localDir      = cosineSampleHemisphere(u1, u2);
+        let hemisphereDir = transformToNormalSpace(localDir, g.normal);
         
         let sampleResult = performScreenSpaceRayMarching(
             g.worldPos,
             hemisphereDir,
             uv,
-            g.zlinear,
-            g
+            g.zlinear
         );
         
         if (sampleResult.a > 0.0) {
-            // Apply cosine weighting for physically correct diffuse distribution
-            accumColor += sampleResult.rgb * cosWeight;
+            // No cosine factor: with cosine-weighted sampling the estimator
+            // simplifies to a plain average (cos/PDF = 1).
+            accumColor += sampleResult.rgb * sampleResult.a;
             validSamples++;
         }
     }
     
-    // Average the results
     if (validSamples > 0u) {
         accumColor /= f32(validSamples);
     }
@@ -131,62 +106,55 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 }
 
 fn performScreenSpaceRayMarching(
-    startPos: vec3<f32>,
-    rayDir: vec3<f32>,
-    startUV: vec2<f32>,
-    startDepth: f32,
-    g: GBuffer
+    startPos:  vec3<f32>,
+    rayDir:    vec3<f32>,
+    startUV:   vec2<f32>,
+    startDepth: f32
 ) -> vec4<f32> {
     
-    let stepSize = 0.05;
-    let maxSteps = i32(640.0);
     let maxDistance = 50.0;
-    let thickness = 0.03;
-    
+
     var currentPos = startPos;
+    var stepSize   = 0.08;   // initial world-space step
     
-    // Ray marching loop
-    for (var i = 0; i < maxSteps; i++) {
+    // Exponential ray march: 32 steps cover the same range as ~300 fixed steps
+    // while front-loading precision where it matters most (close contacts).
+    for (var i = 0; i < MAX_RAY_STEPS; i++) {
         
-        // Advance ray
         currentPos += rayDir * stepSize;
+        stepSize   *= 1.25;   // geometric growth
 
         let currentDistance = length(currentPos - startPos);
-        if (currentDistance > maxDistance) {
-            break; // Early exit - save GPU cycles
-        }
+        if (currentDistance > maxDistance) { break; }
 
         let viewPos = camera.viewMatrix * vec4<f32>(currentPos, 1.0);
-        
-        if (viewPos.z > 0.0) {
-            break;
-        }
+        if (viewPos.z > 0.0) { break; }   // ray behind camera
         
         // Project to screen space
-        let clipPos = camera.projectionMatrix * viewPos;
-        let ndc = clipPos.xyz / clipPos.w;        
+        let clipPos  = camera.projectionMatrix * viewPos;
+        let ndc      = clipPos.xyz / clipPos.w;        
         var screenUV = ndc.xy * 0.5 + 0.5;
-        screenUV.y = 1.0 - screenUV.y;
+        screenUV.y   = 1.0 - screenUV.y;
 
-        // Check if ray is outside screen
-        if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) {
-            break;
-        }
+        if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) { break; }
         
-        // Sample depth at current screen position
         let sampledDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, screenUV, 0.0).r;
-        let camb2obj = currentPos - camera.cameraPosition.xyz;
+        let camb2obj     = currentPos - camera.cameraPosition.xyz;
         let currentDepth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
         
-        // Check for intersection
-        if ((currentDepth > sampledDepth && (currentDepth - sampledDepth) < thickness) || sampledDepth == 1.0) {
-            // Hit! Sample color at this position
-            let tempG = decodeGBuffer(screenUV);
-            let hitColor = tempG.albedo;
-            return vec4<f32>(hitColor.rgb, 1.0);
+        // Adaptive thickness: looser at distance to avoid missing hits with large steps
+        let adaptiveThickness = 0.02 + currentDistance * 0.01;
+        
+        if (currentDepth > sampledDepth && (currentDepth - sampledDepth) < adaptiveThickness) {
+            // Direct albedo sample — cheaper than full decodeGBuffer on every hit
+            let hitColor = textureSampleLevel(gAlbedo, samplerGBuffer, screenUV, 0.0).rgb;
+
+            // Fade by screen edge and distance
+            let screenFade = computeScreenEdgeFade(screenUV);
+            let distFade   = 1.0 - saturate(currentDistance / maxDistance);
+            return vec4<f32>(hitColor, screenFade * distFade);
         }
     }
     
-    // No hit found
     return vec4<f32>(0.0);
 }

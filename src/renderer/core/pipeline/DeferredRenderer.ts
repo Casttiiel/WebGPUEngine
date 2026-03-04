@@ -20,6 +20,7 @@ import { PointLightComponent } from '../../../components/render/PointLightCompon
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
+import { ScreenSpaceGlobalIllumination } from '../../shading/ScreenSpaceGlobalIllumination';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
 
 export class DeferredRenderer {
@@ -28,6 +29,7 @@ export class DeferredRenderer {
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
   private froxelVolumetrics!: FroxelVolumetricScattering;
+  private ssgi!: ScreenSpaceGlobalIllumination;
   private depthPrepass!: DepthPrepass;
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
@@ -183,6 +185,7 @@ export class DeferredRenderer {
     );
 
     this.ssr.dispose();
+    this.ssgi?.resize();
   }
 
   public async load(): Promise<void> {
@@ -194,6 +197,9 @@ export class DeferredRenderer {
 
     this.ssr = new ScreenSpaceReflections();
     await this.ssr.load();
+
+    this.ssgi = new ScreenSpaceGlobalIllumination();
+    await this.ssgi.load();
 
     this.froxelVolumetrics = new FroxelVolumetricScattering();
     await this.froxelVolumetrics.load();
@@ -325,10 +331,18 @@ export class DeferredRenderer {
   }
 
   private renderAccLight(camera: Entity): void {
+    // Compute SSGI before ambient diffuse — provides indirect bounce lighting
+    let ssgiView: GPUTextureView | undefined;
+    if (QualitySettings.getInstance().getSettings().enableSSGI) {
+      const result = this.ssgi.render(this.gBufferBindGroup);
+      if (result) ssgiView = result;
+    }
+
     this.ambientLight.renderDiffuse(
       this.rtAccLight.getView(),
       this.gBufferBindGroup,
       this.aoResult,
+      ssgiView,
     );
 
     // Compute contact shadow factor BEFORE directional light so it can be applied internally
@@ -420,6 +434,7 @@ export class DeferredRenderer {
       this.renderPassManager.clear();
     }
 
+    this.ssgi?.dispose();
     this.gBufferBindGroup = null as any;
     this.gBufferLayout = null as any;
     this.aoResult = null as any;

@@ -1,6 +1,6 @@
 {
     "vs": "utility/presentation.vs",
-    "fs": "ssgi.fs",
+    "fs": "post-processing/ssgi.fs",
     "writesOn": "texture",
     "z": "disable_all",
     "uniforms": [

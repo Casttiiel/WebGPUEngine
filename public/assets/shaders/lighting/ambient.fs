@@ -6,9 +6,9 @@
 
 struct AmbientUniforms {
     globalAmbientBoost: f32,
-    diffuseBoost: f32,
-    padding: f32,
-    padding2: f32,
+    diffuseBoost:       f32,
+    ssgiEnabled:        f32,  // 1.0 = SSGI active, 0.0 = disabled
+    ssgiIntensity:      f32,  // multiplier for SSGI contribution
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -18,11 +18,12 @@ struct AmbientUniforms {
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
 @group(1) @binding(3) var samplerGBuffer: sampler;
 
-@group(2) @binding(0) var gAO: texture_2d<f32>;
-@group(2) @binding(1) var samplerEnv: sampler;
+@group(2) @binding(0) var gAO:        texture_2d<f32>;
+@group(2) @binding(1) var samplerEnv:  sampler;
 @group(2) @binding(2) var<uniform> ambient: AmbientUniforms;
-@group(2) @binding(3) var irradianceMap: texture_cube<f32>;
+@group(2) @binding(3) var irradianceMap:     texture_cube<f32>;
 @group(2) @binding(4) var samplerIrradiance: sampler;
+@group(2) @binding(5) var gSSGI:       texture_2d<f32>;  // indirect diffuse from SSGI
 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
@@ -38,15 +39,22 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {   
-    // Decode GBuffer data
-    let g = decodeGBuffer(uv);
-    
-    // Get ambient occlusion
+    let g  = decodeGBuffer(uv);
     let ao = textureSample(gAO, samplerEnv, uv).r;
 
-    // Calculate image based lighting
     let ibl = calculateIBL(g, ao);
 
-    let final_color = vec4<f32>(ibl + g.selfIllum, 1.0);
-    return final_color;
+    var ssgiContrib = vec3<f32>(0.0);
+    if (ambient.ssgiEnabled > 0.5) {
+        let ssgiRaw  = textureSample(gSSGI, samplerGBuffer, uv).rgb;
+        let aoForSSGI = mix(1.0, ao, 0.5);  // AO suavizado, evita double-occlusion
+        ssgiContrib  = ssgiRaw 
+                     * g.albedo.rgb          // modular por albedo del receptor
+                     * aoForSSGI
+                     * ambient.ssgiIntensity
+                     * ambient.diffuseBoost
+                     * ambient.globalAmbientBoost;
+    }
+
+    return vec4<f32>(ibl + ssgiContrib + g.selfIllum, 1.0);
 }
