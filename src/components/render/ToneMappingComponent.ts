@@ -7,6 +7,7 @@ import { Technique } from '../../renderer/resources/Technique';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 
 export class ToneMappingComponent extends Component {
   private isLoaded = false;
@@ -17,6 +18,10 @@ export class ToneMappingComponent extends Component {
 
   // ✅ Cache bind groups per texture to avoid recreation every frame
   private bindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+  /** Fallback 1.0 exposure buffer — always set so group 1 is never missing. */
+  private defaultExposureBuffer!: GPUBuffer;
+  private exposureBindGroup!: GPUBindGroup;
+  private trackedExposureBuffer: GPUBuffer | null = null;
 
   constructor() {
     super();
@@ -32,6 +37,22 @@ export class ToneMappingComponent extends Component {
     this.result = new RenderTarget();
     this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, toneMappingFormat);
 
+    // ✅ Create a fallback exposure buffer (1.0 = no adaptation) so group 1 is
+    //    always bound even when AutoExposureComponent is absent.
+    this.defaultExposureBuffer = GPUUtils.createBuffer(
+      'tonemapping_default_exposure_buffer',
+      4,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    );
+    Render.getInstance()
+      .getDevice()
+      .queue.writeBuffer(this.defaultExposureBuffer, 0, new Float32Array([1.0]));
+    this.exposureBindGroup = BindGroupFactory.createBindGroup(
+      'tonemapping_default_exposure_bindgroup',
+      this.technique.getPipeline().getBindGroupLayout(1),
+      [{ binding: 0, resource: { buffer: this.defaultExposureBuffer } }],
+    );
+
     this.isLoaded = true;
   }
 
@@ -41,6 +62,22 @@ export class ToneMappingComponent extends Component {
     this.result.createRT('tone_mapping_result.dds', Render.width, Render.height, toneMappingFormat);
     // ✅ Clear cache on resize (textures recreated)
     this.bindGroupCache.clear();
+    // Note: exposureBindGroup is not texture-dependent, no need to clear it
+  }
+
+  /**
+   * Provide the GPU buffer written by AutoExposureComponent so tone mapping
+   * reads the current adapted exposure value.
+   * Call once after AutoExposureComponent is loaded; the bind group is cached.
+   */
+  public setExposureBuffer(exposureBuffer: GPUBuffer): void {
+    if (exposureBuffer === this.trackedExposureBuffer) return; // No change
+    this.trackedExposureBuffer = exposureBuffer;
+    this.exposureBindGroup = BindGroupFactory.createBindGroup(
+      'tonemapping_exposure_bindgroup',
+      this.technique.getPipeline().getBindGroupLayout(1),
+      [{ binding: 0, resource: { buffer: exposureBuffer } }],
+    );
   }
 
   public apply(texture: GPUTextureView): GPUTextureView {
@@ -52,6 +89,7 @@ export class ToneMappingComponent extends Component {
       this.technique,
       bindGroup,
       this.result,
+      this.exposureBindGroup,
     );
 
     return this.result.getView();

@@ -6,6 +6,7 @@
       "smaa": {}, 
       "ambient_occlusion": {},
       "contact_shadows": {},
-      "bloom": {}
+      "bloom": {},
+      "auto_exposure": {}
     }
   }

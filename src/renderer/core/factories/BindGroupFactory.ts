@@ -1328,6 +1328,20 @@ export class BindGroupFactory {
   }
 
   /**
+   * Auto Exposure read layout (group 1) used by tone_mapping.fs.
+   * binding 0: storage buffer (read-only) — contains current adapted exposure f32
+   */
+  public static getAutoExposureReadLayout(): GPUBindGroupLayout {
+    return this.getLayout('auto_exposure_read', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'read-only-storage' },
+      },
+    ]);
+  }
+
+  /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
     switch (layout) {
@@ -1395,6 +1409,8 @@ export class BindGroupFactory {
         return this.getFogUniformsLayout();
       case PipelineBindGroupLayouts.CONTACT_SHADOWS_UNIFORMS:
         return this.getContactShadowsUniformsLayout();
+      case PipelineBindGroupLayouts.AUTO_EXPOSURE_READ:
+        return this.getAutoExposureReadLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

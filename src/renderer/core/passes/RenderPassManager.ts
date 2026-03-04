@@ -164,9 +164,16 @@ export class RenderPassManager {
     technique: Technique,
     bindGroup: GPUBindGroup,
     result: RenderTarget,
+    exposureBindGroup?: GPUBindGroup,
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
-    const pass = new ToneMappingRenderPass(passConfig, mesh, technique, bindGroup);
+    const pass = new ToneMappingRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      bindGroup,
+      exposureBindGroup,
+    );
     this.executeDynamicPass(pass);
   }
 

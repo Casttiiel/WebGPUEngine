@@ -13,6 +13,7 @@ import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclus
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { AutoExposureComponent } from '../../components/render/AutoExposureComponent';
 import { NameComponent } from '../../components/core/NameComponent';
 import { TransformComponent } from '../../components/core/TransformComponent';
 import { FXAAComponent } from '../../components/render/FXAAComponent';
@@ -229,6 +230,8 @@ export class Loader {
         return new CameraComponent();
       case 'tone_mapping':
         return new ToneMappingComponent();
+      case 'auto_exposure':
+        return new AutoExposureComponent();
       case 'fxaa':
         return new FXAAComponent();
       case 'smaa':

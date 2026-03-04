@@ -27,11 +27,13 @@ import { DirectionalLightComponent } from '../../components/render/DirectionalLi
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 import { ModuleUI } from './ModuleUI';
 import { BloomComponent } from '../../components/render/BloomComponent';
+import { AutoExposureComponent } from '../../components/render/AutoExposureComponent';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
   private distorsions!: Distorsions;
   public pauseRendering: boolean = false; // Flag para pausar rendering durante probe capture
+  private lastDt: number = 1 / 60; // Cached delta time from update(), used in generateFrame()
 
   //Presentation data
   private presentationTechnique!: Technique;
@@ -301,9 +303,27 @@ export class ModuleRender extends Module {
         }
       }
 
+      if (mainCameraEntity?.hasComponent('auto_exposure')) {
+        const autoExposure = mainCameraEntity.getComponent(
+          'auto_exposure',
+        ) as AutoExposureComponent;
+        if (autoExposure.hasLoaded() && autoExposure.enabled) {
+          autoExposure.apply(result, this.lastDt);
+        }
+      }
+
       if (mainCameraEntity?.hasComponent('tone_mapping')) {
         const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
         if (toneMapping.hasLoaded()) {
+          // Wire auto-exposure buffer into tone mapping on first frame (and whenever it changes)
+          if (mainCameraEntity.hasComponent('auto_exposure')) {
+            const autoExposure = mainCameraEntity.getComponent(
+              'auto_exposure',
+            ) as AutoExposureComponent;
+            if (autoExposure.hasLoaded()) {
+              toneMapping.setExposureBuffer(autoExposure.getExposureBuffer());
+            }
+          }
           result = toneMapping.apply(result);
         }
       }
@@ -478,6 +498,7 @@ export class ModuleRender extends Module {
     this.debugValues.resolution.value = `${Render.width}x${Render.height}`;
 
     this.deferred.update(dt);
+    this.lastDt = dt;
   }
 
   public override renderInMenu(): void {

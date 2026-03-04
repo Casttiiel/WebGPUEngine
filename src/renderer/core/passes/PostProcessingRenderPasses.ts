@@ -41,14 +41,25 @@ export abstract class PostProcessingRenderPass extends BaseRenderPass {
  */
 export class ToneMappingRenderPass extends PostProcessingRenderPass {
   private bindGroup: GPUBindGroup;
+  private exposureBindGroup: GPUBindGroup | null = null;
 
-  constructor(config: RenderPassConfig, mesh: Mesh, technique: Technique, bindGroup: GPUBindGroup) {
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    bindGroup: GPUBindGroup,
+    exposureBindGroup?: GPUBindGroup,
+  ) {
     super(config, mesh, technique);
     this.bindGroup = bindGroup;
+    this.exposureBindGroup = exposureBindGroup ?? null;
   }
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
     pass.setBindGroup(0, this.bindGroup);
+    if (this.exposureBindGroup) {
+      pass.setBindGroup(1, this.exposureBindGroup);
+    }
   }
 
   /**

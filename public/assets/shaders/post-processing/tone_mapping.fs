@@ -1,6 +1,9 @@
 @group(0) @binding(0) var gAlbedo: texture_2d<f32>;
 @group(0) @binding(1) var gAlbedoSampler: sampler;
 
+// Auto Exposure — written by AutoExposureComponent compute pass each frame
+@group(1) @binding(0) var<storage, read> exposureData: array<f32>;
+
 fn tonemapACES(color: vec3<f32>) -> vec3<f32> {
     // ACES approximation by Krzysztof Narkowicz
     let a = 2.51;
@@ -14,7 +17,7 @@ fn tonemapACES(color: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
-    let adaptedExposure = 1.0; // TODO DEBERIA SER UNA UNIFORM
+    let adaptedExposure = exposureData[0];
     var hdrColor = textureSample(gAlbedo, gAlbedoSampler, uv).rgb;
     hdrColor *= adaptedExposure;
 

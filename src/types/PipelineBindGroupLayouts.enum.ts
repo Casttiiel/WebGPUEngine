@@ -31,4 +31,5 @@ export enum PipelineBindGroupLayouts {
   VELOCITY_BUFFER_UNIFORMS = 'VelocityBufferUniforms',
   POINT_LIGHT_SHADOW_UNIFORMS = 'PointLightShadowUniforms',
   CONTACT_SHADOWS_UNIFORMS = 'ContactShadowsUniforms',
+  AUTO_EXPOSURE_READ = 'AutoExposureRead',
 }

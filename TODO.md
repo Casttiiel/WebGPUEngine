@@ -1,9 +1,8 @@
 ### Engine
 
-1.  Reflection Probes con blending
-2.  Improve particles
-3.  UI
-4.  Optimize with compute shaders and more
+1. Auto Exposure / Eye Adaptation
+2. FSR 1.0
+3. KTX2 / Basis Universal Texture Compression
 
 ## Gameplay
 
@@ -33,3 +32,6 @@ Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast 
 9. Froxel: Self occlusion
 10. Froxel Density Volumes
 11. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
+12. UI
+13. Improve particles
+14. Optimize with compute shaders and more

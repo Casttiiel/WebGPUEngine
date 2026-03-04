@@ -3,5 +3,5 @@
     "fs": "post-processing/tone_mapping.fs",
     "writesOn": "texture",
     "z": "disable_all",
-    "uniforms":["SingleTexture"]
+    "uniforms":["SingleTexture", "AutoExposureRead"]
 }
