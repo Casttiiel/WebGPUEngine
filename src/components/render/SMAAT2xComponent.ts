@@ -106,9 +106,9 @@ export class SMAAT2xComponent extends Component {
     );
 
     // Load SMAA lookup textures
-    this.areaTex = await Texture.get('AreaTex.png');
-    this.searchTex = await Texture.get('SearchTex.png');
-    this.whiteTexture = await Texture.get('white.png');
+    this.areaTex = await Texture.getAsync('AreaTex.png');
+    this.searchTex = await Texture.getAsync('SearchTex.png');
+    this.whiteTexture = await Texture.getAsync('white.png');
 
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 

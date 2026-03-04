@@ -77,8 +77,8 @@ export class SMAAComponent extends Component {
     this.neighborhoodTechnique = await Technique.getAsync('post-processing/smaa_neighborhood.tech');
 
     // Load SMAA lookup textures
-    this.areaTex = await Texture.get('AreaTex.png');
-    this.searchTex = await Texture.get('SearchTex.png');
+    this.areaTex = await Texture.getAsync('AreaTex.png');
+    this.searchTex = await Texture.getAsync('SearchTex.png');
 
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 

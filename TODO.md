@@ -2,16 +2,9 @@
 
 1.  Multiple Light probes has good shadows?
 2.  Reflection Probes con blending
-3.  Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
-
-4.  UI
-5.  Improve particles
-6.  Optimize with compute shaders and more
-
-7.  Froxel Global Illumination
-8.  Froxel: Self occlusion
-9.  Froxel Density Volumes
-10. KTX2
+3.  Improve particles
+4.  Optimize with compute shaders and more
+5.  UI
 
 ## Gameplay
 
@@ -30,9 +23,14 @@ Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast 
 
 ### Editor
 
-16. Editor Light Probes (Render Debug / Gizmo)
-17. Editor Point Lights (Render Debug / Gizmo / Menu)
-18. Editor Spot Lights (Render Debug / Gizmo / Menu)
-19. Editor Camera (Render Debug / Gizmo / Menu)
-20. Blender Export with player spawn
-21. Asset Browser + Spawn + Delete
+1. Editor Point Lights (Render Debug / Gizmo / Menu)
+2. Editor Spot Lights (Render Debug / Gizmo / Menu)
+3. Editor Light Probes (Render Debug / Gizmo)
+4. Editor Camera (Render Debug / Gizmo / Menu)
+5. Blender Export with player spawn
+6. Asset Browser + Spawn + Delete
+7. KTX2
+8. Froxel Global Illumination
+9. Froxel: Self occlusion
+10. Froxel Density Volumes
+11. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
