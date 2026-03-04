@@ -1,43 +1,73 @@
-// Auto Exposure - Adaptation Pass
-// Reads the accumulated log-luminance sum from the previous compute pass,
-// derives target exposure, and smoothly adapts the current exposure value
-// using exponential smoothing (eye-adaptation simulation).
+// Auto Exposure - Histogram Adaptation Pass
+// Reads the 256-bin luminance histogram written by the luminance pass,
+// trims the darkest and brightest percentiles (artist-controlled),
+// derives average log-luminance from the remaining range, and writes
+// a temporally smoothed exposure multiplier to exposureBuffer[0].
+// Also resets the histogram bins for the next frame.
 
 struct AdaptParams {
   dt:             f32,  // Delta time (seconds)
-  adaptSpeedUp:   f32,  // Speed adapting TO bright  (iris closing — fast)
-  adaptSpeedDown: f32,  // Speed adapting TO dark    (iris opening — slow)
+  adaptSpeedUp:   f32,  // Speed adapting toward bright (iris closing — fast)
+  adaptSpeedDown: f32,  // Speed adapting toward dark   (iris opening — slow)
   keyValue:       f32,  // Target mid-tone (0.18 = 18% grey)
   minExposure:    f32,  // Minimum exposure multiplier
   maxExposure:    f32,  // Maximum exposure multiplier
-  compensation:   f32,  // EV compensation in stops (additive)
-  _pad:           f32,
+  compensation:   f32,  // EV compensation in stops
+  lowPercentile:  f32,  // Fraction of darkest pixels to discard  (e.g. 0.2)
+  highPercentile: f32,  // Fraction of brightest pixels to keep   (e.g. 0.9)
+  _pad1:          f32,
+  _pad2:          f32,
+  _pad3:          f32,
 }
 
-// accumulator[0] = sum of log-luminances scaled by 1000 (atomic i32, written by luminance pass)
-@group(0) @binding(0) var<storage, read_write> accumulator: array<atomic<i32>>;
+// histogram[i] = pixel count for log-lum bin i  (written by luminance pass)
+@group(0) @binding(0) var<storage, read_write> histogram: array<atomic<i32>>;
 
-// exposureBuffer[0] = current adapted exposure (f32, read by tone_mapping shader)
+// exposureBuffer[0] = current adapted exposure (read by tone_mapping shader)
 @group(1) @binding(0) var<storage, read_write> exposureBuffer: array<f32>;
 
 @group(2) @binding(0) var<uniform> params: AdaptParams;
 
-const SCALE:         f32 = 1000.0;
-const TOTAL_SAMPLES: f32 = 16384.0; // 256 workgroups × 64 threads
+const TOTAL_SAMPLES: f32 = 16384.0; // 16×16 dispatch × 8×8 workgroup
+const MIN_LOG_LUM:   f32 = -10.0;
+const MAX_LOG_LUM:   f32 =  4.0;
 
 @compute @workgroup_size(1, 1, 1)
 fn cs_adapt() {
-  // --- Read accumulated log-luminance and reset for next frame ---
-  let scaledSum = atomicLoad(&accumulator[0]);
-  atomicStore(&accumulator[0], 0i);
+  let totalPixels = i32(TOTAL_SAMPLES);
+  let lowCut  = i32(f32(totalPixels) * params.lowPercentile);
+  let highCut = i32(f32(totalPixels) * params.highPercentile);
 
-  // --- Compute average log luminance across all samples ---
-  let avgLogLum = f32(scaledSum) / (SCALE * TOTAL_SAMPLES);
+  var count        = 0i;
+  var logSum       = 0.0;
+  var validSamples = 0i;
 
-  // Convert log-luminance back to linear, then apply EV compensation
-  let avgLum = exp(avgLogLum) * exp2(params.compensation);
+  // Walk all 256 bins, accumulate log-lum for the [lowCut, highCut) range,
+  // and reset each bin for the next frame in the same pass.
+  for (var i = 0u; i < 256u; i++) {
+    let binCount = atomicLoad(&histogram[i]);
+    atomicStore(&histogram[i], 0i); // reset for next frame
 
-  // --- Target exposure: key / avgLum  (18% grey mapping) ---
+    // Reconstruct the log-lum at the centre of this bin
+    let t      = (f32(i) + 0.5) / 256.0;
+    let logLum = mix(MIN_LOG_LUM, MAX_LOG_LUM, t);
+
+    // Iterate over every pixel in this bin and decide if it falls in range.
+    // Total iterations across all bins == TOTAL_SAMPLES (≤ 16 384) — fast.
+    for (var j = 0i; j < binCount; j++) {
+      count++;
+      if (count > lowCut && count <= highCut) {
+        logSum += logLum;
+        validSamples++;
+      }
+    }
+  }
+
+  // Average log-lum of the trimmed range → linear lum → apply EV compensation
+  let avgLogLum = logSum / max(f32(validSamples), 1.0);
+  let avgLum    = exp(avgLogLum) * exp2(params.compensation);
+
+  // --- Target exposure ---
   let targetExposure = clamp(
     params.keyValue / max(avgLum, 0.0001),
     params.minExposure,
@@ -46,8 +76,7 @@ fn cs_adapt() {
 
   // --- Temporal eye-adaptation (exponential smoothing) ---
   let prevExposure = exposureBuffer[0];
-  // Adapt faster toward bright (iris closing), slower toward dark (iris opening)
-  let adaptSpeed = select(params.adaptSpeedDown, params.adaptSpeedUp, targetExposure > prevExposure);
-  let t = 1.0 - exp(-params.dt * adaptSpeed);
-  exposureBuffer[0] = mix(prevExposure, targetExposure, t);
+  let adaptSpeed   = select(params.adaptSpeedDown, params.adaptSpeedUp, targetExposure > prevExposure);
+  let blend        = 1.0 - exp(-params.dt * adaptSpeed);
+  exposureBuffer[0] = mix(prevExposure, targetExposure, blend);
 }

@@ -1,8 +1,7 @@
 ### Engine
 
-1. Auto Exposure / Eye Adaptation
-2. FSR 1.0
-3. KTX2 / Basis Universal Texture Compression
+1. FSR 1.0
+2. KTX2 / Basis Universal Texture Compression
 
 ## Gameplay
 

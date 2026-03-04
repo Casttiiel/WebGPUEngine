@@ -524,6 +524,14 @@ export class ModuleRender extends Module {
 
     this.deferred.renderInMenu();
 
+    const mainCameraForMenu = Engine.getEntities().getEntityByName('MainCamera');
+    if (mainCameraForMenu?.hasComponent('auto_exposure')) {
+      const autoExposure = mainCameraForMenu.getComponent(
+        'auto_exposure',
+      ) as AutoExposureComponent;
+      if (autoExposure.hasLoaded()) autoExposure.renderInMenu();
+    }
+
     // Create main window for render stats
     if (this.beginGUIWindow('Render Statistics')) {
       // Add dynamic text displays that auto-update

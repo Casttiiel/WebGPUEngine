@@ -8,12 +8,14 @@ import {
   ComputePipelineConfig,
 } from '../../renderer/core/factories/PipelineFactory';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { Engine } from '../../core/engine/Engine';
 
 // ── Params layout (must match AdaptParams struct in adapt shader) ─────────────
 // [0] dt, [1] adaptSpeedUp, [2] adaptSpeedDown, [3] keyValue,
-// [4] minExposure, [5] maxExposure, [6] compensation, [7] _pad
-const PARAMS_FLOATS = 8;
-const PARAMS_BYTE_SIZE = PARAMS_FLOATS * 4; // 32 bytes
+// [4] minExposure, [5] maxExposure, [6] compensation, [7] lowPercentile,
+// [8] highPercentile, [9-11] _pad
+const PARAMS_FLOATS = 12;
+const PARAMS_BYTE_SIZE = PARAMS_FLOATS * 4; // 48 bytes
 
 // Luminance pass dispatches 16×16 workgroups of 8×8 threads → 16 384 samples
 const LUMINANCE_DISPATCH_X = 16;
@@ -24,12 +26,14 @@ export class AutoExposureComponent extends Component {
   private isLoaded = false;
 
   // User-tunable settings (exposed to editor / debug UI)
-  public adaptSpeedUp = 1.5; // Speed adapting toward bright  (iris closing — fast)
-  public adaptSpeedDown = 1.1; // Speed adapting toward dark    (iris opening — slow)
+  public adaptSpeedUp = 1.0; // Speed adapting toward bright  (iris closing — fast)
+  public adaptSpeedDown = 1.0; // Speed adapting toward dark    (iris opening — slow)
   public keyValue = 0.18; // 18 % grey target
   public minExposure = 0.1;
-  public maxExposure = 10.0;
+  public maxExposure = 5.0;
   public compensation = 0.0; // EV stops added on top
+  public lowPercentile = 0.2; // Discard this fraction of darkest pixels
+  public highPercentile = 0.9; // Discard pixels above this brightness fraction
   public enabled = true;
 
   // ── Compute pipelines ──────────────────────────────────────────────────────
@@ -45,8 +49,8 @@ export class AutoExposureComponent extends Component {
   private adaptParamsLayout!: GPUBindGroupLayout; // group 2 of adapt
 
   // ── GPU Buffers ────────────────────────────────────────────────────────────
-  /** Atomic i32 accumulator — reset and re-filled every frame. */
-  private accumulatorBuffer!: GPUBuffer;
+  /** 256-bin i32 histogram — filled by luminance pass, reset by adapt pass. */
+  private histogramBuffer!: GPUBuffer;
   /** f32 adapted exposure — read by ToneMappingComponent via a bind group. */
   private exposureBuffer!: GPUBuffer;
   /** Uniform params (dt, speeds, key, limits…). */
@@ -54,7 +58,7 @@ export class AutoExposureComponent extends Component {
   private paramsData!: Float32Array;
 
   // ── Bind groups (fixed — buffers don't change) ────────────────────────────
-  private accumulatorBindGroup!: GPUBindGroup; // luminance group 1 / adapt group 0
+  private histogramBindGroup!: GPUBindGroup; // luminance group 1 / adapt group 0
   private exposureWriteBindGroup!: GPUBindGroup;
   private adaptParamsBindGroup!: GPUBindGroup;
 
@@ -136,8 +140,8 @@ export class AutoExposureComponent extends Component {
       },
     ]);
 
-    // Shared — atomic i32 storage buffer (luminance group 1 / adapt group 0)
-    this.accumulatorLayout = BindGroupFactory.getLayout('ae_accumulator', [
+    // Shared — histogram: 256 atomic i32 bins (luminance group 1 / adapt group 0)
+    this.accumulatorLayout = BindGroupFactory.getLayout('ae_histogram', [
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
@@ -165,14 +169,13 @@ export class AutoExposureComponent extends Component {
   }
 
   private createBuffers(): void {
-    // accumulator: 4 bytes, cleared to 0 at startup (adapt shader resets it per-frame)
-    this.accumulatorBuffer = GPUUtils.createBuffer(
-      'ae_accumulator_buffer',
-      4,
+    // histogram: 256 bins × 4 bytes, zeroed at startup (adapt shader resets per-frame)
+    this.histogramBuffer = GPUUtils.createBuffer(
+      'ae_histogram_buffer',
+      256 * 4,
       GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     );
-    // Initialize to zero
-    this.device.queue.writeBuffer(this.accumulatorBuffer, 0, new Int32Array([0]));
+    this.device.queue.writeBuffer(this.histogramBuffer, 0, new Int32Array(256));
 
     // exposure: 4 bytes, initialised to 1.0 so the first frame is unaffected
     this.exposureBuffer = GPUUtils.createBuffer(
@@ -225,10 +228,10 @@ export class AutoExposureComponent extends Component {
   }
 
   private createFixedBindGroups(): void {
-    this.accumulatorBindGroup = BindGroupFactory.createBindGroup(
-      'ae_accumulator_bindgroup',
+    this.histogramBindGroup = BindGroupFactory.createBindGroup(
+      'ae_histogram_bindgroup',
       this.accumulatorLayout,
-      [{ binding: 0, resource: { buffer: this.accumulatorBuffer } }],
+      [{ binding: 0, resource: { buffer: this.histogramBuffer } }],
     );
 
     this.exposureWriteBindGroup = BindGroupFactory.createBindGroup(
@@ -252,7 +255,9 @@ export class AutoExposureComponent extends Component {
     this.paramsData[4] = this.minExposure;
     this.paramsData[5] = this.maxExposure;
     this.paramsData[6] = this.compensation;
-    this.paramsData[7] = 0.0; // padding
+    this.paramsData[7] = this.lowPercentile;
+    this.paramsData[8] = this.highPercentile;
+    // [9-11] padding
   }
 
   private updateParamsBuffer(dt: number): void {
@@ -287,14 +292,14 @@ export class AutoExposureComponent extends Component {
     const lum = encoder.beginComputePass({ label: 'AE Luminance' });
     lum.setPipeline(this.luminancePipeline);
     lum.setBindGroup(0, this.getLuminanceSrcBindGroup(hdrTexture));
-    lum.setBindGroup(1, this.accumulatorBindGroup);
+    lum.setBindGroup(1, this.histogramBindGroup);
     lum.dispatchWorkgroups(LUMINANCE_DISPATCH_X, LUMINANCE_DISPATCH_Y, 1);
     lum.end();
 
     // Pass 2 — read + reset accumulator, write adapted exposure to exposureBuffer
     const adapt = encoder.beginComputePass({ label: 'AE Adapt' });
     adapt.setPipeline(this.adaptPipeline);
-    adapt.setBindGroup(0, this.accumulatorBindGroup);
+    adapt.setBindGroup(0, this.histogramBindGroup);
     adapt.setBindGroup(1, this.exposureWriteBindGroup);
     adapt.setBindGroup(2, this.adaptParamsBindGroup);
     adapt.dispatchWorkgroups(1, 1, 1);
@@ -307,7 +312,32 @@ export class AutoExposureComponent extends Component {
 
   public update(_dt: number): void {}
 
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    // beginWindow returns true only on first call — controls are added once,
+    // .listen() keeps them reactive every frame.
+    if (!gui.beginWindow('Auto Exposure', true)) return;
+
+    const folder = (gui as any).folders?.get('Auto Exposure');
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    folder.add(this, 'enabled').name('Enable').listen();
+    folder.add(this, 'keyValue', 0.01, 1.0, 0.01).name('Key Value').listen();
+    folder.add(this, 'adaptSpeedUp', 0.0, 5.0, 0.05).name('Adapt Speed Up').listen();
+    folder.add(this, 'adaptSpeedDown', 0.0, 5.0, 0.05).name('Adapt Speed Down').listen();
+    folder.add(this, 'minExposure', 0.01, 5.0, 0.01).name('Min Exposure').listen();
+    folder.add(this, 'maxExposure', 1.0, 20.0, 0.1).name('Max Exposure').listen();
+    folder.add(this, 'compensation', -4.0, 4.0, 0.1).name('EV Compensation').listen();
+    folder.add(this, 'lowPercentile', 0.0, 0.5, 0.01).name('Low Percentile').listen();
+    folder.add(this, 'highPercentile', 0.5, 1.0, 0.01).name('High Percentile').listen();
+
+    gui.endWindow();
+  }
 
   public debugInMenu(): void {}
 
@@ -316,7 +346,7 @@ export class AutoExposureComponent extends Component {
   // ── Cleanup ────────────────────────────────────────────────────────────────
 
   public dispose(): void {
-    this.accumulatorBuffer?.destroy();
+    this.histogramBuffer?.destroy();
     this.exposureBuffer?.destroy();
     this.paramsBuffer?.destroy();
     this.luminanceSrcBindGroupCache.clear();
