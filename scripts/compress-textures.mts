@@ -28,14 +28,13 @@ const TEXTURES_DIR = join(REPO_ROOT, 'public', 'assets', 'textures');
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 // toktx ships with KTX-Software. We search for it in several locations:
-const TOKTX_BINARY =
-  existsSync(join(__dirname, 'bin', 'ktx', 'bin', 'toktx.exe'))
-    ? join(__dirname, 'bin', 'ktx', 'bin', 'toktx.exe')
-    : existsSync(join(__dirname, 'bin', 'toktx.exe'))
-      ? join(__dirname, 'bin', 'toktx.exe')
-      : existsSync(join(__dirname, 'bin', 'toktx'))
-        ? join(__dirname, 'bin', 'toktx')
-        : 'toktx'; // fallback: assume it's in PATH
+const TOKTX_BINARY = existsSync(join(__dirname, 'bin', 'ktx', 'bin', 'toktx.exe'))
+  ? join(__dirname, 'bin', 'ktx', 'bin', 'toktx.exe')
+  : existsSync(join(__dirname, 'bin', 'toktx.exe'))
+    ? join(__dirname, 'bin', 'toktx.exe')
+    : existsSync(join(__dirname, 'bin', 'toktx'))
+      ? join(__dirname, 'bin', 'toktx')
+      : 'toktx'; // fallback: assume it's in PATH
 
 const SUPPORTED_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
@@ -107,12 +106,15 @@ async function compress(texturePath: string, force: boolean): Promise<'skip' | '
 
   // toktx argument order: [options]  <output.ktx2>  <input.png>
   const args: string[] = [
-    '--encode',    'uastc',   // UASTC encoding (high quality, transcodes to BC7/ASTC)
-    '--uastc_quality', '2',  // 0=fastest, 4=best; 2 is a good balance
-    '--genmipmap',           // generate and embed all mip levels
-    '--assign_oetf', linear ? 'linear' : 'srgb',
-    ktx2Path,                // output (before input!)
-    toktxInput,              // input (temp PNG for WebP, original for PNG/JPG)
+    '--encode',
+    'uastc', // UASTC encoding (high quality, transcodes to BC7/ASTC)
+    '--uastc_quality',
+    '2', // 0=fastest, 4=best; 2 is a good balance
+    '--genmipmap', // generate and embed all mip levels
+    '--assign_oetf',
+    linear ? 'linear' : 'srgb',
+    ktx2Path, // output (before input!)
+    toktxInput, // input (temp PNG for WebP, original for PNG/JPG)
   ];
 
   const result = spawnSync(TOKTX_BINARY, args, { encoding: 'utf8' });

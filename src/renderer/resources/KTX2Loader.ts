@@ -45,19 +45,45 @@ export interface KTX2TextureData {
 
 // ─── Internal worker message types ────────────────────────────────────────────
 
-interface WorkerInitMsg     { type: 'init';      wasmBinary: ArrayBuffer; }
-interface WorkerTranscodeMsg { type: 'transcode'; id: number; buffer: ArrayBuffer; hasBc: boolean; hasAstc: boolean; }
+interface WorkerInitMsg {
+  type: 'init';
+  wasmBinary: ArrayBuffer;
+}
+interface WorkerTranscodeMsg {
+  type: 'transcode';
+  id: number;
+  buffer: ArrayBuffer;
+  hasBc: boolean;
+  hasAstc: boolean;
+}
 
-interface WorkerReadyMsg    { type: 'ready'; }
-interface WorkerResultMsg   { type: 'result'; id: number; mipLevels: KTX2MipLevel[]; format: GPUTextureFormat; isCompressed: boolean; blockByteSize: number; blockDim: number; }
-interface WorkerErrorMsg    { type: 'error';  id: number; message: string; }
-interface WorkerInitErrMsg  { type: 'init_error'; message: string; }
+interface WorkerReadyMsg {
+  type: 'ready';
+}
+interface WorkerResultMsg {
+  type: 'result';
+  id: number;
+  mipLevels: KTX2MipLevel[];
+  format: GPUTextureFormat;
+  isCompressed: boolean;
+  blockByteSize: number;
+  blockDim: number;
+}
+interface WorkerErrorMsg {
+  type: 'error';
+  id: number;
+  message: string;
+}
+interface WorkerInitErrMsg {
+  type: 'init_error';
+  message: string;
+}
 
 type WorkerOutMsg = WorkerReadyMsg | WorkerResultMsg | WorkerErrorMsg | WorkerInitErrMsg;
 
 type PendingJob = {
   resolve: (data: KTX2TextureData) => void;
-  reject:  (err: Error) => void;
+  reject: (err: Error) => void;
 };
 
 // ─── KTX2Loader ──────────────────────────────────────────────────────────────
@@ -66,12 +92,12 @@ export class KTX2Loader {
   /** Number of parallel transcoding workers. 2 halves load time, 4 quarters it. */
   private static readonly NUM_WORKERS = 2;
 
-  private static hasBCSupport:   boolean | null = null;
+  private static hasBCSupport: boolean | null = null;
   private static hasASTCSupport: boolean | null = null;
 
-  private static workers:       Worker[]              = [];
-  private static pendingJobs  = new Map<number, PendingJob>();
-  private static nextJobId    = 0;
+  private static workers: Worker[] = [];
+  private static pendingJobs = new Map<number, PendingJob>();
+  private static nextJobId = 0;
   private static nextWorkerIdx = 0;
   private static initPromise: Promise<void> | null = null;
 
@@ -98,10 +124,10 @@ export class KTX2Loader {
       KTX2Loader.nextWorkerIdx++;
 
       const msg: WorkerTranscodeMsg = {
-        type:   'transcode',
+        type: 'transcode',
         id,
         buffer,
-        hasBc:   KTX2Loader.checkBCSupport(),
+        hasBc: KTX2Loader.checkBCSupport(),
         hasAstc: KTX2Loader.checkASTCSupport(),
       };
       worker.postMessage(msg, [buffer]); // zero-copy transfer
@@ -115,7 +141,9 @@ export class KTX2Loader {
     try {
       KTX2Loader.hasBCSupport =
         GPUUtils.getDevice()?.features.has('texture-compression-bc') ?? false;
-    } catch { KTX2Loader.hasBCSupport = false; }
+    } catch {
+      KTX2Loader.hasBCSupport = false;
+    }
     return KTX2Loader.hasBCSupport;
   }
 
@@ -124,7 +152,9 @@ export class KTX2Loader {
     try {
       KTX2Loader.hasASTCSupport =
         GPUUtils.getDevice()?.features.has('texture-compression-astc') ?? false;
-    } catch { KTX2Loader.hasASTCSupport = false; }
+    } catch {
+      KTX2Loader.hasASTCSupport = false;
+    }
     return KTX2Loader.hasASTCSupport;
   }
 
@@ -132,7 +162,10 @@ export class KTX2Loader {
 
   private static async ensureWorkers(): Promise<void> {
     if (KTX2Loader.workers.length === KTX2Loader.NUM_WORKERS) return;
-    if (KTX2Loader.initPromise) { await KTX2Loader.initPromise; return; }
+    if (KTX2Loader.initPromise) {
+      await KTX2Loader.initPromise;
+      return;
+    }
 
     KTX2Loader.initPromise = (async () => {
       const t0 = performance.now();
@@ -147,13 +180,12 @@ export class KTX2Loader {
           '[KTX2Loader] Failed to fetch basis_transcoder.{js,wasm} from public/basis/.',
         );
       }
-      const [jsSource, wasmBinary] = await Promise.all([
-        jsResp.text(),
-        wasmResp.arrayBuffer(),
-      ]);
+      const [jsSource, wasmBinary] = await Promise.all([jsResp.text(), wasmResp.arrayBuffer()]);
 
       // Single Blob URL shared by all workers (revoked once workers are alive).
-      const blob    = new Blob([KTX2Loader.buildWorkerSource(jsSource)], { type: 'application/javascript' });
+      const blob = new Blob([KTX2Loader.buildWorkerSource(jsSource)], {
+        type: 'application/javascript',
+      });
       const blobUrl = URL.createObjectURL(blob);
 
       const readyPromises: Promise<void>[] = [];
@@ -169,11 +201,11 @@ export class KTX2Loader {
             if (!job) return;
             KTX2Loader.pendingJobs.delete(msg.id);
             job.resolve({
-              mipLevels:    msg.mipLevels,
-              format:       msg.format,
+              mipLevels: msg.mipLevels,
+              format: msg.format,
               isCompressed: msg.isCompressed,
               blockByteSize: msg.blockByteSize,
-              blockDim:     msg.blockDim,
+              blockDim: msg.blockDim,
             });
           } else if (msg.type === 'error') {
             const job = KTX2Loader.pendingJobs.get(msg.id);
@@ -184,18 +216,20 @@ export class KTX2Loader {
         };
 
         // Temporary listener — waits for WASM ready signal from this worker.
-        readyPromises.push(new Promise<void>((resolve, reject) => {
-          const onInit = (e: MessageEvent<WorkerOutMsg>) => {
-            if (e.data.type === 'ready') {
-              worker.removeEventListener('message', onInit as EventListener);
-              resolve();
-            } else if (e.data.type === 'init_error') {
-              worker.removeEventListener('message', onInit as EventListener);
-              reject(new Error((e.data as WorkerInitErrMsg).message));
-            }
-          };
-          worker.addEventListener('message', onInit as EventListener);
-        }));
+        readyPromises.push(
+          new Promise<void>((resolve, reject) => {
+            const onInit = (e: MessageEvent<WorkerOutMsg>) => {
+              if (e.data.type === 'ready') {
+                worker.removeEventListener('message', onInit as EventListener);
+                resolve();
+              } else if (e.data.type === 'init_error') {
+                worker.removeEventListener('message', onInit as EventListener);
+                reject(new Error((e.data as WorkerInitErrMsg).message));
+              }
+            };
+            worker.addEventListener('message', onInit as EventListener);
+          }),
+        );
 
         // Each worker needs its own copy of the WASM binary (ArrayBuffer can't be shared).
         const wasmCopy = wasmBinary.slice(0);
@@ -208,7 +242,7 @@ export class KTX2Loader {
 
       console.log(
         `[KTX2Loader] ${KTX2Loader.NUM_WORKERS} workers ready` +
-        `  (init: ${(performance.now() - t0).toFixed(0)}ms)`,
+          `  (init: ${(performance.now() - t0).toFixed(0)}ms)`,
       );
     })();
 

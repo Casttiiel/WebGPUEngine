@@ -121,7 +121,11 @@ export class Texture extends GPUResource {
     } catch (e) {
       // .ktx2 not present or transcode error — fall through to PNG / WebP.
       // Log only once per path to avoid console spam on legitimate 404s.
-      if (e instanceof Error && !e.message.includes('404') && !(e as Error & { logged?: boolean }).logged) {
+      if (
+        e instanceof Error &&
+        !e.message.includes('404') &&
+        !(e as Error & { logged?: boolean }).logged
+      ) {
         (e as Error & { logged?: boolean }).logged = true;
         console.warn(`[Texture/KTX2] fallback for ${this.path}:`, e.message);
       }
@@ -225,7 +229,7 @@ export class Texture extends GPUResource {
       // multiples of the block dimension.  Mip levels smaller than blockDim
       // (e.g. 2×2 or 1×1 with BC7 blockDim=4) must be padded up to blockDim,
       // while the transcoder already produced exactly blocksX*blocksY blocks.
-      const copyWidth  = isCompressed ? blocksX * blockDim : mip.width;
+      const copyWidth = isCompressed ? blocksX * blockDim : mip.width;
       const copyHeight = isCompressed ? blocksY * blockDim : mip.height;
 
       this.device.queue.writeTexture(
