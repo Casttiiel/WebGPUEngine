@@ -1,9 +1,7 @@
 ### Engine
 
-1. KTX2 / Basis Universal Texture Compression Texture Memory: 1,070,257,361 Bytes a Texture Memory: 552,401,019 Bytes
-2. Web Workers
-3. GPU Driven Rendering + Indirect Draw Calls
-4. Improve particles
+1. GPU Driven Rendering + Indirect Draw Calls
+2. Improve particles
 
 ## Gameplay
 

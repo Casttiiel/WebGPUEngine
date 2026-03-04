@@ -25,6 +25,7 @@ export interface GraphicsQualitySettings {
   directionalShadowMapResolution: number;
   ssgiScale: number;
   enableSSGI: boolean;
+  useKTX2: boolean;
 }
 
 export class QualitySettings {
@@ -61,6 +62,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableSSGI: false,
       enableMotionBlur: false,
+      useKTX2: false,
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -90,6 +92,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableSSGI: false,
       enableMotionBlur: true,
+      useKTX2: false,
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -119,6 +122,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableSSGI: false,
       enableMotionBlur: true,
+      useKTX2: false,
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -148,6 +152,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableSSGI: false,
       enableMotionBlur: true,
+      useKTX2: false,
     } as GraphicsQualitySettings,
   };
 
@@ -191,6 +196,7 @@ export class QualitySettings {
       directionalShadowMapResolution: 2048,
       enableMotionBlur: true,
       enableSSGI: false,
+      useKTX2: false,
     };
     return { ...defaults, ...this.settings };
   }

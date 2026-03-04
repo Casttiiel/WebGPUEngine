@@ -109,25 +109,28 @@ export class Texture extends GPUResource {
     // ktx2PathFor() swaps the extension, e.g. "diffuse.png" / "diffuse.webp" → "diffuse.ktx2".
     // ResourceManager.fetch throws on 404, so we catch silently and fall through
     // to the PNG/WebP path when the .ktx2 file does not exist yet.
-    const ktx2Path = KTX2Loader.ktx2PathFor(this.path);
-    try {
-      const resp = await ResourceManager.fetch(`assets/textures/${ktx2Path}`);
-      const buffer = await resp.arrayBuffer();
-      const ktx2 = await KTX2Loader.decode(buffer);
-      this.uploadKTX2(ktx2);
-      const ms = (performance.now() - _t0).toFixed(0);
-      if (+ms > 30) console.log(`%c[Texture/KTX2] ${ktx2Path}  total=${ms}ms`, 'color:#4caf50');
-      return;
-    } catch (e) {
-      // .ktx2 not present or transcode error — fall through to PNG / WebP.
-      // Log only once per path to avoid console spam on legitimate 404s.
-      if (
-        e instanceof Error &&
-        !e.message.includes('404') &&
-        !(e as Error & { logged?: boolean }).logged
-      ) {
-        (e as Error & { logged?: boolean }).logged = true;
-        console.warn(`[Texture/KTX2] fallback for ${this.path}:`, e.message);
+    const useKTX2 = QualitySettings.getInstance().getSettings().useKTX2;
+    if (useKTX2) {
+      const ktx2Path = KTX2Loader.ktx2PathFor(this.path);
+      try {
+        const resp = await ResourceManager.fetch(`assets/textures/${ktx2Path}`);
+        const buffer = await resp.arrayBuffer();
+        const ktx2 = await KTX2Loader.decode(buffer);
+        this.uploadKTX2(ktx2);
+        const ms = (performance.now() - _t0).toFixed(0);
+        if (+ms > 30) console.log(`%c[Texture/KTX2] ${ktx2Path}  total=${ms}ms`, 'color:#4caf50');
+        return;
+      } catch (e) {
+        // .ktx2 not present or transcode error — fall through to PNG / WebP.
+        // Log only once per path to avoid console spam on legitimate 404s.
+        if (
+          e instanceof Error &&
+          !e.message.includes('404') &&
+          !(e as Error & { logged?: boolean }).logged
+        ) {
+          (e as Error & { logged?: boolean }).logged = true;
+          console.warn(`[Texture/KTX2] fallback for ${this.path}:`, e.message);
+        }
       }
     }
 
