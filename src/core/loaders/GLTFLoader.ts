@@ -290,7 +290,7 @@ export class GLTFLoader {
             PipelineBindGroupLayouts.CAMERA_UNIFORMS,
             PipelineBindGroupLayouts.MATERIAL_TEXTURES,
             PipelineBindGroupLayouts.OBJECT_UNIFORMS,
-            PipelineBindGroupLayouts.CUBEMAP_TEXTURE,
+            PipelineBindGroupLayouts.OIT_GLASS_ENV,
           ] as const)
         : ([
             PipelineBindGroupLayouts.CAMERA_UNIFORMS,

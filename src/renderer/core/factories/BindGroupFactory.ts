@@ -355,6 +355,37 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * OIT glass env bind group layout — extends cubemap with a 2D BRDF split-sum LUT.
+   * group(3) in oit_gather.fs:
+   *   binding 0 — prefiltered env cubemap
+   *   binding 1 — env sampler
+   *   binding 2 — BRDF LUT (split-sum, U=NdotV V=roughness)
+   */
+  public static getOITGlassEnvLayout(): GPUBindGroupLayout {
+    return this.getLayout('oit_glass_env', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          viewDimension: 'cube',
+          sampleType: 'float',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+    ]);
+  }
+
   public static getAmbientUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('ambient uniforms layout', [
       {
@@ -1425,6 +1456,8 @@ export class BindGroupFactory {
         return this.getSkyboxUniformsLayout();
       case PipelineBindGroupLayouts.CUBEMAP_TEXTURE:
         return this.getCubemapTextureLayout();
+      case PipelineBindGroupLayouts.OIT_GLASS_ENV:
+        return this.getOITGlassEnvLayout();
       case PipelineBindGroupLayouts.AMBIENT_UNIFORMS:
         return this.getAmbientUniformsLayout();
       case PipelineBindGroupLayouts.GBUFFER_UNIFORMS:

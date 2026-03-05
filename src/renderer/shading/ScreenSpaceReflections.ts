@@ -182,6 +182,10 @@ export class ScreenSpaceReflections {
     if (!this.isInitialized) return;
   }
 
+  public getBRDFLUT(): Texture {
+    return this.brdfLUT;
+  }
+
   private createSSRBindGroup(accLights: GPUTextureView, ao: GPUTextureView) {
     this.ssrBindGroup = BindGroupFactory.createBindGroup('ssr_bindgroup', this.ssrParamsLayout!, [
       {

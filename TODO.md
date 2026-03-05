@@ -1,6 +1,7 @@
 ### Engine
 
-1. Gameplay
+1. Decal
+2. Gameplay
 
 ## Gameplay
 

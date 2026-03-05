@@ -190,7 +190,7 @@ export class QualitySettings {
       generalTexture: 'rgba8unorm',
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
-      ssrScale: 0.5,
+      ssrScale: 0.75,
       ssrStepSize: 0.05,
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,

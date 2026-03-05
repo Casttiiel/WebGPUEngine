@@ -475,14 +475,14 @@ export class DeferredRenderer {
   private ensureOITGlassEnvBindGroup(): void {
     const envTex = Engine.getEnvironmentManager().getSSREnvironmentTexture();
     if (!envTex) return;
-    // Rebuild once per scene load or when the env texture is replaced.
-    // GPUBindGroup creation is fast; we guard with a simple null-check and
-    // rely on environment change events to null-out the cached group.
+    const brdfLUT = this.ssr.getBRDFLUT();
+    if (!brdfLUT) return;
     if (!this.oitGlassEnvBindGroup) {
-      const layout = BindGroupFactory.getLayoutFromEnum(PipelineBindGroupLayouts.CUBEMAP_TEXTURE);
+      const layout = BindGroupFactory.getOITGlassEnvLayout();
       this.oitGlassEnvBindGroup = BindGroupFactory.createBindGroup('oit_glass_env_bg', layout, [
         { binding: 0, resource: envTex.getTextureView()! },
         { binding: 1, resource: envTex.getSampler()! },
+        { binding: 2, resource: brdfLUT.getTextureView()! },
       ]);
       this.renderPassManager.setOITGatherEnvBindGroup(this.oitGlassEnvBindGroup);
     }
