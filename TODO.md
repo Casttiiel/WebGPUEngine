@@ -5,7 +5,7 @@
 
 ## Gameplay
 
-1. Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast Fall, Slide
+1. Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Fast Fall, Slide, Vertical Wall Jump
 2. Blur on borders
 3. Momentum
 4. Jump right on change inclination and then wallrun
