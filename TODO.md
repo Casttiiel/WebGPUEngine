@@ -1,9 +1,8 @@
 ### Engine
 
-1. GLTF Glass
-2. SSR (One direction good, others bad)
-3. Gameplay
-4. Decals error on some places
+1. SSR (One direction good, others bad)
+2. Gameplay
+3. Decals error on some places
 
 ## Gameplay
 
@@ -18,14 +17,6 @@
 2. Game Loading Screen
 3. Remove en main.ts el skip first frame?
 4. Quality settings selection
-
-## Rendering
-
-1. **Weighted Blended OIT** para `RenderCategory.GLASS` (cristales, agua, vidrios)
-   - Dos render targets: `accumulation` (RGBA16F) + `revealage` (R8)
-   - Compose pass sobre la escena opaca tras el forward pass
-   - Sin sorting CPU, sin artifacts de orden de renderizado
-   - `RenderCategory.TRANSPARENT` mantiene blend aditivo actual (partículas, VFX)
 
 ### Editor
 

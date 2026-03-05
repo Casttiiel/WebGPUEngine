@@ -241,9 +241,17 @@ export class GLTFLoader {
 
     // Glass (KHR_materials_transmission): el baseColorFactor RGB viene en [0,0,0] porque
     // es un modelo de transmisión física — no sirve para rasterización simple.
-    // Sustituir por tinte neutro conservando el alpha original.
+    // Sustituir por tinte neutro; el alpha real es (1 - transmissionFactor) —
+    // baseColorFactor[3] suele ser 1.0 para estos materiales (opaco por defecto en GLTF).
     if (this.isGlass(materialData)) {
-      const alpha = materialData.getBaseColorFactor()[3];
+      const transmission = materialData.getExtension<Transmission>('KHR_materials_transmission');
+      // getTransmissionFactor() defaults to 0.0 in gltf-transform when not set in the GLTF.
+      // A material that passed isGlass() but has factor=0 is glass with unset factor — treat as
+      // fully transmissive (factor=1). Using || 1.0 covers both null/undefined and 0.
+      const transmissionFactor = transmission?.getTransmissionFactor() || 1.0;
+      // transmissionFactor=1 → fully transparent (alpha=0.05 min so it isn't invisible)
+      // transmissionFactor=0.5 → semi-transparent glass (alpha=0.5)
+      const alpha = Math.max(0.08, 1.0 - transmissionFactor);
       material = { ...material, baseColorFactor: [0.85, 0.95, 1.0, alpha] };
     }
 
