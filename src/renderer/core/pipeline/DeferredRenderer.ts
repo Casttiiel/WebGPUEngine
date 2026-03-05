@@ -313,8 +313,6 @@ export class DeferredRenderer {
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
-    // Weighted Blended OIT — gather glass geometry then compose over accLight
-    // Lazily create (or rebuild) the env bind group so glass gets IBL reflections.
     this.ensureOITGlassEnvBindGroup();
     this.renderPassManager.executePass('oit_gather', RenderCategory.GLASS);
     this.renderPassManager.executeOITComposePass(
@@ -330,10 +328,11 @@ export class DeferredRenderer {
     }
 
     // Post-procesado (solo para renderizado normal)
+    // Use gBufferComputeBindGroup — SSR now runs as a compute pass and requires COMPUTE visibility
     const ssr = this.ssr.generateSSR(
       this.rtAccLight.getView(),
       this.aoResult,
-      this.gBufferBindGroup,
+      this.gBufferComputeBindGroup,
     );
     this.ambientLight.renderSpecular(
       this.rtAccLight.getView(),

@@ -1,6 +1,6 @@
 {
-    "vs": "decal.vs",
-    "fs": "decal.fs",
+    "vs": "gbuffer/decal.vs",
+    "fs": "gbuffer/decal.fs",
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",

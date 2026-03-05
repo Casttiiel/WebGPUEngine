@@ -1,20 +1,32 @@
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
+import { ResourceManager } from '../../core/engine/ResourceManager';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { PipelineFactory, ComputePipelineConfig } from '../core/factories/PipelineFactory';
 import { Render } from '../core/pipeline/Render';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
-import { Mesh } from '../resources/Mesh';
 import { RenderTarget } from '../resources/RenderTarget';
-import { Technique } from '../resources/Technique';
 import { Texture } from '../resources/Texture';
 
 export class ScreenSpaceReflections {
   private isInitialized: boolean = false;
-  private fullscreenQuadMesh!: Mesh;
-  private ssrTechnique!: Technique;
+
+  // Compute resources
+  private ssrComputePipeline: GPUComputePipeline | null = null;
+  private ssrParamsLayout: GPUBindGroupLayout | null = null;
+  private ssrOutputLayout: GPUBindGroupLayout | null = null;
+
+  // Render targets
   private ssrResult!: RenderTarget;
-  private ssrBindGroup!: GPUBindGroup;
+
+  // Bind groups
+  private ssrBindGroup: GPUBindGroup | null = null;
+  private ssrOutputBindGroup: GPUBindGroup | null = null;
+  private cameraComputeBindGroup: GPUBindGroup | null = null;
+  private lastCameraBuffer: GPUBuffer | null = null;
+
+  // Buffers / textures
   private ssrUniformBuffer!: GPUBuffer;
   private brdfLUT!: Texture;
 
@@ -23,8 +35,6 @@ export class ScreenSpaceReflections {
   public async load(): Promise<void> {
     try {
       this.isInitialized = true;
-      this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-      this.ssrTechnique = await Technique.getAsync('post-processing/ssr.tech');
       this.brdfLUT = await Texture.getAsync('brdfLUT.png');
 
       this.createRenderTarget();
@@ -35,7 +45,9 @@ export class ScreenSpaceReflections {
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
 
-      console.log('SSR loaded successfully');
+      await this.createComputePipeline();
+
+      console.log('SSR loaded successfully (compute)');
     } catch (error) {
       console.warn('Failed to load SSR, disabling feature:', error);
       this.isInitialized = false;
@@ -51,7 +63,40 @@ export class ScreenSpaceReflections {
       Render.width * QualitySettings.getInstance().getSettings().ssrScale,
       Render.height * QualitySettings.getInstance().getSettings().ssrScale,
       QualitySettings.getInstance().getSettings().hdrTexture,
+      // STORAGE_BINDING required so the compute shader can write directly
+      GPUTextureUsage.STORAGE_BINDING,
     );
+    // Invalidate output bind group — it references the old texture view
+    this.ssrOutputBindGroup = null;
+  }
+
+  // ─── Compute pipeline setup ────────────────────────────────────────────────
+
+  private async createComputePipeline(): Promise<void> {
+    const device = GPUUtils.getDevice();
+
+    // Layouts
+    const cameraLayout = BindGroupFactory.getCameraComputeLayout();
+    const gbufferLayout = BindGroupFactory.getGBufferComputeLayout();
+    this.ssrParamsLayout = BindGroupFactory.getSSRUniformsComputeLayout();
+    this.ssrOutputLayout = BindGroupFactory.getSSROutputLayout();
+
+    // Shader
+    const shaderCode = await ResourceManager.loadShader('post-processing/ssr.cs');
+    const shaderModule = device.createShaderModule({ label: 'ssr_cs', code: shaderCode });
+
+    const config: ComputePipelineConfig = {
+      label: 'SSR Compute Pipeline',
+      layout: PipelineFactory.createPipelineLayout('ssr_compute_pipeline_layout', [
+        cameraLayout,
+        gbufferLayout,
+        this.ssrParamsLayout,
+        this.ssrOutputLayout,
+      ]),
+      compute: { module: shaderModule, entryPoint: 'cs' },
+    };
+
+    this.ssrComputePipeline = PipelineFactory.createComputePipeline(config);
   }
 
   private renderDisabledSSR(): GPUTextureView {
@@ -92,46 +137,44 @@ export class ScreenSpaceReflections {
   }
 
   public executeSSRPass(gBufferBindGroup: GPUBindGroup): void {
-    if (!this.isInitialized) return;
-    const render = Render.getInstance();
+    if (!this.isInitialized || !this.ssrComputePipeline) return;
 
-    const colorAttachment = GPUUtils.createColorAttachment(
-      this.ssrResult.getView(),
-      'clear',
-      'store',
-      {
-        r: 0,
-        g: 0,
-        b: 0,
-        a: 1,
-      },
-    );
+    const qs = QualitySettings.getInstance().getSettings();
+    const ssrW = Math.floor(Render.width * qs.ssrScale);
+    const ssrH = Math.floor(Render.height * qs.ssrScale);
 
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(GPUUtils.createRenderPassDescriptor('ssr render pass', [colorAttachment]));
+    // ── Camera compute bind group (lazily created / refreshed) ───────────────
+    const cameraBuffer = Engine.getRender().getMainCamera().getUniformBuffer();
+    if (!cameraBuffer) return;
+    if (!this.cameraComputeBindGroup || cameraBuffer !== this.lastCameraBuffer) {
+      this.lastCameraBuffer = cameraBuffer;
+      this.cameraComputeBindGroup = BindGroupFactory.createBindGroup(
+        'ssr_camera_compute_bindgroup',
+        BindGroupFactory.getCameraComputeLayout(),
+        [{ binding: 0, resource: { buffer: cameraBuffer } }],
+      );
+    }
 
-    // Configure viewport and scissor using GPUUtils
-    GPUUtils.configureViewportAndScissor(
-      pass,
-      Render.width * QualitySettings.getInstance().getSettings().ssrScale,
-      Render.height * QualitySettings.getInstance().getSettings().ssrScale,
-    );
+    // ── Output bind group (lazily created / invalidated on resize) ────────────
+    if (!this.ssrOutputBindGroup) {
+      this.ssrOutputBindGroup = BindGroupFactory.createBindGroup(
+        'ssr_output_bindgroup',
+        this.ssrOutputLayout!,
+        [{ binding: 0, resource: this.ssrResult.getStorageView() }],
+      );
+    }
 
-    // 1. Activate pipeline
-    this.ssrTechnique.activatePipeline(pass);
+    // ── Dispatch ──────────────────────────────────────────────────────────────
+    const encoder = Render.getInstance().getCommandEncoder();
+    const pass = encoder.beginComputePass({ label: 'SSR Compute' });
 
-    // 2. Activate mesh data
-    this.fullscreenQuadMesh.activate(pass);
-
-    // 3. Set bind groups
-    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setPipeline(this.ssrComputePipeline);
+    pass.setBindGroup(0, this.cameraComputeBindGroup);
     pass.setBindGroup(1, gBufferBindGroup);
-    pass.setBindGroup(2, this.ssrBindGroup);
+    pass.setBindGroup(2, this.ssrBindGroup!);
+    pass.setBindGroup(3, this.ssrOutputBindGroup);
 
-    // 4. Draw the mesh
-    this.fullscreenQuadMesh.renderGroup(pass);
-
+    pass.dispatchWorkgroups(Math.ceil(ssrW / 8), Math.ceil(ssrH / 8), 1);
     pass.end();
   }
 
@@ -140,32 +183,28 @@ export class ScreenSpaceReflections {
   }
 
   private createSSRBindGroup(accLights: GPUTextureView, ao: GPUTextureView) {
-    this.ssrBindGroup = BindGroupFactory.createBindGroup(
-      'ssr_bindgroup',
-      this.ssrTechnique.getPipeline().getBindGroupLayout(2),
-      [
-        {
-          binding: 0,
-          resource: accLights,
-        },
-        {
-          binding: 1,
-          resource: ao,
-        },
-        {
-          binding: 2,
-          resource: this.brdfLUT.getTextureView()!,
-        },
-        {
-          binding: 3,
-          resource: SamplerLibrary.simpleSampler!,
-        },
-        {
-          binding: 4,
-          resource: { buffer: this.ssrUniformBuffer },
-        },
-      ],
-    );
+    this.ssrBindGroup = BindGroupFactory.createBindGroup('ssr_bindgroup', this.ssrParamsLayout!, [
+      {
+        binding: 0,
+        resource: accLights,
+      },
+      {
+        binding: 1,
+        resource: ao,
+      },
+      {
+        binding: 2,
+        resource: this.brdfLUT.getTextureView()!,
+      },
+      {
+        binding: 3,
+        resource: SamplerLibrary.simpleSampler!,
+      },
+      {
+        binding: 4,
+        resource: { buffer: this.ssrUniformBuffer },
+      },
+    ]);
   }
 
   public update(dt: number): void {
@@ -188,7 +227,10 @@ export class ScreenSpaceReflections {
   }
 
   public dispose(): void {
-    this.ssrBindGroup = null as any;
+    this.ssrBindGroup = null;
+    this.ssrOutputBindGroup = null;
+    this.cameraComputeBindGroup = null;
+    this.lastCameraBuffer = null;
     this.ssrResult = null as any;
     this.createRenderTarget();
   }

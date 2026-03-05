@@ -1,8 +1,9 @@
 ### Engine
 
 1. GLTF Glass
-2. HIGH Sponza Performance
-3. Gameplay
+2. SSR (One direction good, others bad)
+3. Decals error on some places
+4. Gameplay
 
 ## Gameplay
 

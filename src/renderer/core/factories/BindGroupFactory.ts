@@ -247,6 +247,28 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Same as getSSRUniformsLayout() but with COMPUTE visibility — used by ssr.cs. */
+  public static getSSRUniformsComputeLayout(): GPUBindGroupLayout {
+    return this.getLayout('ssr_uniforms_compute', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+    ]);
+  }
+
+  /** Write-only rgba16float storage texture output for the SSR compute pass (group 3). */
+  public static getSSROutputLayout(): GPUBindGroupLayout {
+    return this.getLayout('ssr_output_storage', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '2d' },
+      },
+    ]);
+  }
+
   public static getSSRComposeUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('ssr_compose_uniforms', [
       {
