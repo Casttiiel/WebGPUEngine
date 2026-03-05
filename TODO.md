@@ -1,8 +1,6 @@
 ### Engine
 
-1. SSR (One direction good, others bad)
-2. Gameplay
-3. Decals error on some places
+1. Gameplay
 
 ## Gameplay
 

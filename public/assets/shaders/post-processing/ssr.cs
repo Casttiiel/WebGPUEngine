@@ -1,15 +1,6 @@
-// Screen-Space Reflections — compute shader
-// Replaces the fullscreen-quad + fragment-shader approach (ssr.fs) with a direct
-// compute dispatch, eliminating quad rasterization overhead.
-//
-// Optimizations:
-//   • Screen-space DDA march — endpoints projected once, zero matrix muls per step.
-//   • Back-face cull — rays pointing away from camera skipped before march.
-//   • Screen-edge cull — negligible delta UV means no visible hit possible.
-//   • Cheap depth early exit — sky/background skipped before decoding GBuffer.
-//   • Aggressive surface cull — metallic, roughness, specularWeight thresholds.
-//   • Adaptive binary refinement — 8 steps for sharp, 4 for rough surfaces.
-//   • Mip-level accLight sampling — cheaper fetch + correct soft look.
+﻿// Screen-Space Reflections — compute shader
+// Ray marching logic ported from the original ssr.fs (world-space per-step march).
+// Compute wrapper keeps the STORAGE_BINDING output and eliminates fullscreen quad overhead.
 //
 // Bind-group layout:
 //   group(0)  Camera uniforms       (CameraUniforms UBO)
@@ -51,31 +42,6 @@ fn SSR_Fresnel_Schlick_Roughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -
 @group(3) @binding(0) var outputSSR: texture_storage_2d<rgba16float, write>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Projects a world-space position to screen UV only (no depth).
-/// Used once per ray to compute the screen-space end point.
-fn projectWorldToUV(worldPos: vec3<f32>) -> vec2<f32> {
-    let viewPos = camera.viewMatrix * vec4<f32>(worldPos, 1.0);
-    let clipPos = camera.projectionMatrix * viewPos;
-    let ndc     = clipPos.xy / clipPos.w;
-    var uv      = ndc * 0.5 + 0.5;
-    uv.y        = 1.0 - uv.y;
-    return uv;
-}
-
-/// Camera-front linear depth of a world position: dot(P-camPos, camFront) / camFar
-fn worldToLinearDepth(worldPos: vec3<f32>) -> f32 {
-    return dot(worldPos - camera.cameraPosition.xyz, camera.cameraFront.xyz) / camera.cameraFar;
-}
-
-fn calcEdgeFade(uv: vec2<f32>) -> f32 {
-    let fw = 0.1;
-    let fx = min(uv.x / fw, (1.0 - uv.x) / fw);
-    let fy = min(uv.y / fw, (1.0 - uv.y) / fw);
-    return clamp(min(fx, fy), 0.0, 1.0);
-}
 
 fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     let N     = normalize(g.normal);
@@ -91,94 +57,58 @@ fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
     return color * (F * brdf.x + brdf.y);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Screen-space DDA ray march + adaptive binary refinement
-// ─────────────────────────────────────────────────────────────────────────────
-fn marchScreenSpace(
-    startWorldPos: vec3<f32>,
-    rayDir:        vec3<f32>,
-    startDepth:    f32,
-    startUV:       vec2<f32>,
-    roughness:     f32,
+fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
+    let fadeWidth = 0.1;
+    let fadeX = min(uv.x / fadeWidth, (1.0 - uv.x) / fadeWidth);
+    let fadeY = min(uv.y / fadeWidth, (1.0 - uv.y) / fadeWidth);
+    return min(fadeX, fadeY);
+}
+
+fn performScreenSpaceRayMarching(
+    startPos:   vec3<f32>,
+    rayDir:     vec3<f32>,
+    startUV:    vec2<f32>,
+    startDepth: f32,
 ) -> vec4<f32> {
-    let maxDistance = ssrParams.maxDistance;
+    let stepSize    = ssrParams.stepSize;
     let maxSteps    = i32(ssrParams.maxSteps);
+    let maxDistance = ssrParams.maxDistance;
 
-    // ── Back-face cull ────────────────────────────────────────────────────────
-    // Ray pointing away from the camera (view-Z >= 0) can never produce a hit.
-    let rayViewZ = (camera.viewMatrix * vec4<f32>(rayDir, 0.0)).z;
-    if (rayViewZ >= 0.0) { return vec4<f32>(0.0); }
+    var currentPos = startPos;
 
-    // Project start and end of the ray into screen UV (two matrix muls, done once)
-    let endWorldPos = startWorldPos + rayDir * maxDistance;
-    let endUV       = projectWorldToUV(endWorldPos);
-    let endRayDepth = worldToLinearDepth(endWorldPos);
+    for (var i = 0; i < maxSteps; i++) {
 
-    let deltaUV    = endUV - startUV;
-    let deltaDepth = endRayDepth - startDepth;
+        currentPos += rayDir * stepSize;
 
-    // ── Screen-edge cull ──────────────────────────────────────────────────────
-    // Skip rays that cover less than 1 texel — nothing useful to find.
-    let dims2f      = vec2<f32>(textureDimensions(outputSSR));
-    let deltaPixels = abs(deltaUV) * dims2f;
-    if (max(deltaPixels.x, deltaPixels.y) < 1.0) { return vec4<f32>(0.0); }
+        let currentDistance = length(currentPos - startPos);
+        if (currentDistance > maxDistance) { break; }
 
-    let invSteps = 1.0 / f32(maxSteps);
+        let viewPos = camera.viewMatrix * vec4<f32>(currentPos, 1.0);
+        if (viewPos.z > 0.0) { break; }
 
-    // Mip level for accLight — rougher surfaces sample a blurrier mip (max 4)
-    let hitMip = roughness * 4.0;
+        // Project to screen space
+        let clipPos  = camera.projectionMatrix * viewPos;
+        let ndc      = clipPos.xyz / clipPos.w;
+        var screenUV = ndc.xy * 0.5 + 0.5;
+        screenUV.y   = 1.0 - screenUV.y;
 
-    var prevUV    = startUV;
-    var prevDepth = startDepth;
+        if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) { break; }
 
-    for (var i = 1; i <= maxSteps; i++) {
-        let t        = f32(i) * invSteps;
-        let curUV    = startUV + deltaUV * t;
-        let curDepth = startDepth + deltaDepth * t;
+        let sampledDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, screenUV, 0.0).r;
+        let camb2obj     = currentPos - camera.cameraPosition.xyz;
+        let currentDepth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
 
-        // Off-screen exit
-        if (any(curUV < vec2<f32>(0.0)) || any(curUV > vec2<f32>(1.0))) { break; }
-
-        let sampledDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, curUV, 0.0).r;
-
-        if (curDepth > sampledDepth
-            && (curDepth - sampledDepth) < ssrParams.thickness
+        if (currentDepth > sampledDepth
+            && (currentDepth - sampledDepth) < ssrParams.thickness
             && sampledDepth > startDepth)
         {
-            // ── Adaptive binary refinement ────────────────────────────────────
-            // Sharp surfaces (roughness < 0.35) get 8 bisection steps.
-            // Rougher surfaces only need 4 — result is blurred anyway.
-            let refineSteps = select(4u, 8u, roughness < 0.35);
-
-            var lo     = prevUV;
-            var loD    = prevDepth;
-            var hi     = curUV;
-            var hiD    = curDepth;
-            var bestUV = curUV;
-
-            for (var r = 0u; r < refineSteps; r++) {
-                let midUV      = (lo + hi) * 0.5;
-                let midD       = (loD + hiD) * 0.5;
-                let midSampled = textureSampleLevel(gLinearDepth, samplerGBuffer, midUV, 0.0).r;
-                if (midD > midSampled) {
-                    hi     = midUV;
-                    hiD    = midD;
-                    bestUV = midUV;
-                } else {
-                    lo  = midUV;
-                    loD = midD;
-                }
-            }
-
-            let hitColor = textureSampleLevel(accLight, texSampler, bestUV, hitMip);
-            let distFade = 1.0 - t;
-            let edgeFade = calcEdgeFade(bestUV);
-            let fade     = clamp(distFade * edgeFade, 0.0, 1.0);
-            return vec4<f32>(hitColor.rgb, fade);
+            let hitColor  = textureSampleLevel(accLight, texSampler, screenUV, 0.0);
+            let distFade  = 1.0 - (currentDistance / maxDistance);
+            let edgeFade  = calculateEdgeFade(screenUV);
+            let stepFade  = 1.0 - (f32(i) / f32(maxSteps));
+            let finalFade = clamp(distFade * edgeFade * stepFade, 0.0, 1.0);
+            return vec4<f32>(hitColor.rgb, finalFade);
         }
-
-        prevUV    = curUV;
-        prevDepth = curDepth;
     }
 
     return vec4<f32>(0.0);
@@ -195,7 +125,7 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let uv = (vec2<f32>(coords) + 0.5) / vec2<f32>(dims);
 
-    // Cheap sky / disabled early exit — sample depth before decoding the full GBuffer
+    // Cheap sky / disabled early exit
     let rawDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).r;
     if (ssrParams.enabled < 0.5 || rawDepth >= 0.9999) {
         textureStore(outputSSR, coords, vec4<f32>(0.0));
@@ -204,19 +134,12 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let g = decodeGBuffer(uv);
 
-    // Non-reflective surface early exit — three layered checks, cheapest first:
-    //   1. metallic < 0.2 → mostly diffuse, F0 ≈ 0.04, reflections invisible
-    //   2. roughness > 0.7 → surface too rough, result would be fully blurred
-    //   3. combined specular weight — catches mid-range cases where both metallic
-    //      and roughness together make the contribution imperceptible
-    let baseReflectance = mix(0.04, 1.0, g.metallic);
-    let specularWeight  = baseReflectance * (1.0 - g.roughness * g.roughness);
-    if (g.metallic < 0.2 || g.roughness > 0.7 || specularWeight < 0.08) {
+    if (g.metallic < 0.1 || g.roughness > 0.9) {
         textureStore(outputSSR, coords, vec4<f32>(0.0));
         return;
     }
 
-    let result       = marchScreenSpace(g.worldPos, g.reflectedDir, g.zlinear, uv, g.roughness);
+    let result       = performScreenSpaceRayMarching(g.worldPos, g.reflectedDir, uv, g.zlinear);
     let contribution = applyFresnelBRDF(result.rgb, g);
     textureStore(outputSSR, coords, vec4<f32>(contribution, result.a));
 }
