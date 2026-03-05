@@ -1,7 +1,10 @@
 ### Engine
 
-1. Gameplay
-2. UI
+1. Occlusion Culling
+2. Gameplay
+3. UI
+4. Enemy AI (Pathfinding, Behavior Trees)
+5. Animations
 
 ## Gameplay
 
