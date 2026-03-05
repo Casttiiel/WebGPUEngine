@@ -22,15 +22,23 @@ struct IndirectDrawArgs {
 };
 
 struct SpawnParams {
-    spawnCount: u32,        // Cuántas partículas spawnear este frame
-    randomSeed: f32,        // Seed para generación de números aleatorios
-    worldSpace: u32,        // 0 = local space, 1 = world space
-    padding1: f32,
-    emitterWorldPos: vec3<f32>,  // Posición mundial del emisor (cuando worldSpace = 1)
-    padding2: f32,
-    emitterWorldScale: vec3<f32>, // Escala mundial del emisor (cuando worldSpace = 1)
-    padding3: f32,
-    spawnRadius: f32,       // Radio de spawn de las partículas
+    spawnCount: u32,              // offset  0: Cuántas partículas spawnear este frame
+    randomSeed: f32,              // offset  4: Seed para generación de números aleatorios
+    worldSpace: u32,              // offset  8: 0 = local space, 1 = world space
+    padding1: f32,                // offset 12
+    emitterWorldPos: vec3<f32>,   // offset 16: Posición mundial del emisor
+    padding2: f32,                // offset 28
+    emitterWorldScale: vec3<f32>, // offset 32: Escala mundial del emisor
+    padding3: f32,                // offset 44
+    spawnExtents: vec3<f32>,      // offset 48: Half-extents del box de spawn [x,y,z] (align 16 ✓)
+    velocitySpread: f32,          // offset 60: Dispersión aleatoria de la velocidad respecto a baseVelocity (0-1)
+    baseVelocity: vec3<f32>,      // offset 64: Velocidad base [x,y,z] (auto-aligned to 16 ✓)
+    particleLife: f32,            // offset 76: Vida base de la partícula en segundos
+    particleLifeVarMin: f32,      // offset 80: Varianza mínima de vida
+    particleLifeVarMax: f32,      // offset 84: Varianza máxima de vida
+    padding4: f32,                // offset 88
+    padding5: f32,                // offset 92
+    // total: 96 bytes
 };
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
@@ -90,7 +98,10 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let freeListIndex = atomicSub(&freeListCount, 1u);
     
     // Validar que había slots disponibles
-    if (freeListIndex == 0u || freeListIndex > 1024u) {
+    // freeListIndex == 0 significa underflow (ya estaba en 0 antes del decremento)
+    // freeListIndex > arrayLength(&freeList) no es posible en condiciones normales, pero defiende contra race conditions
+    let maxFreeSlots = arrayLength(&freeList);
+    if (freeListIndex == 0u || freeListIndex > maxFreeSlots) {
         // No hay slots libres, restaurar contador
         atomicAdd(&freeListCount, 1u);
         return;
@@ -117,10 +128,21 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Generar números aleatorios basados en el thread y seed
     let seedBase = u32(spawnParams.randomSeed * 1000.0) + threadIndex;
     
-    let randomX = (randomFloat(seedBase) - 0.5) * 2.0 * spawnParams.spawnRadius;
-    let randomZ = (randomFloat(seedBase + 1000u) - 0.5) * 2.0 * spawnParams.spawnRadius;
-    let randomY = randomFloat(seedBase + 2000u) * spawnParams.spawnRadius;
-    let randomLifetime = 3.0 + randomFloat(seedBase + 3000u) * 2.0; // 3-5 segundos
+    // Posición de spawn: offset aleatorio dentro del box (half-extents por eje)
+    let randomX = (randomFloat(seedBase)          - 0.5) * 2.0 * spawnParams.spawnExtents.x;
+    let randomZ = (randomFloat(seedBase + 1000u)  - 0.5) * 2.0 * spawnParams.spawnExtents.z;
+    let randomY = (randomFloat(seedBase + 2000u)  - 0.5) * 2.0 * spawnParams.spawnExtents.y;
+
+    // Vida de la partícula: particleLife base + random en [varMin, varMax]
+    let lifeRandom = randomFloat(seedBase + 3000u); // [0, 1]
+    let lifeVariance = spawnParams.particleLifeVarMin + lifeRandom * (spawnParams.particleLifeVarMax - spawnParams.particleLifeVarMin);
+    let randomLifetime = max(0.1, spawnParams.particleLife + lifeVariance);
+
+    // Velocidad: baseVelocity + perturbación aleatoria escalada por randomness
+    let randVX = (randomFloat(seedBase + 4000u) - 0.5) * 2.0 * spawnParams.velocitySpread;
+    let randVY = (randomFloat(seedBase + 5000u) - 0.5) * 2.0 * spawnParams.velocitySpread;
+    let randVZ = (randomFloat(seedBase + 6000u) - 0.5) * 2.0 * spawnParams.velocitySpread;
+    let velocity = spawnParams.baseVelocity + vec3<f32>(randVX, randVY, randVZ);
     
     // Calcular posición de spawn (local o world space)
     var spawnPosition: vec3<f32>;
@@ -135,7 +157,7 @@ fn spawn(@builtin(global_invocation_id) global_id: vec3<u32>) {
     
     // Spawn partícula directamente en el índice obtenido de free list
     particles[particleIndex].position = spawnPosition;
-    particles[particleIndex].velocity = vec3<f32>(0.0, -2.0, 0.0);
+    particles[particleIndex].velocity = velocity;
     particles[particleIndex].lifetime = randomLifetime;
     particles[particleIndex].age = 0.0;
     particles[particleIndex].alive = 1u;

@@ -14,7 +14,10 @@ import { ParticleSystemComponentData } from '../../types/ParticleSystemComponent
  * for efficient rendering of dynamic particle counts
  */
 export class ParticleSystemComponent extends Component {
-  private static readonly MAX_PARTICLES = 1024; // Aumentado para spawn system
+  // ── Capacidad (leída del prefab) ──────────────────────────────────────────────
+  private maxParticles: number = 1024;
+
+  // ── GPU resources ──────────────────────────────────────────────────────────────
   private quadMesh!: Mesh;
   private particleMaterial!: Material;
   private transform!: TransformComponent;
@@ -34,31 +37,39 @@ export class ParticleSystemComponent extends Component {
   private spawnParamsBuffer!: GPUBuffer;
   private spawnCounterBuffer!: GPUBuffer;
 
+  // Render params uniform buffer (startSize, endSize, startColor, endColor → VS)
+  private particleRenderParamsBuffer!: GPUBuffer;
+
   // OPTIMIZACIÓN: Dead Particle Free List
-  // En lugar de scan linear O(n) para encontrar slots muertos,
-  // mantenemos una stack de índices disponibles para O(1) lookups.
-  private freeListBuffer!: GPUBuffer; // Array de índices libres (u32 x 1024)
-  private freeListCountBuffer!: GPUBuffer; // Contador atómico de slots libres
+  private freeListBuffer!: GPUBuffer;
+  private freeListCountBuffer!: GPUBuffer;
 
-  // Spawn timing
+  // ── Spawn timing ───────────────────────────────────────────────────────────────
   private spawnTimer: number = 0;
-  private spawnInterval: number = 0.5; // Spawn cada 0.5 segundos
-  private particlesPerSpawn: number = 20; // 5 partículas por spawn
+  private spawnInterval: number = 0.05; // Spawn 20 veces/segundo
+  private particlesPerSpawn: number = 5;
 
-  // World space mode - determina qué técnica usar (particle.tech vs particle_worldspace.tech)
-  private worldSpace: boolean = false; // Si true, las partículas se emiten en world space
-  private spawnRadius: number = 2.0; // Radio de spawn de las partículas
+  // ── Parámetros de partícula (leídos del prefab) ────────────────────────────────
+  private worldSpace: boolean = false;
+  private spawnExtents: number[] = [2, 2, 2];
+  private startSize: number = 0.1;
+  private endSize: number = 0.1;
+  private startColor: number[] = [1, 1, 1, 1];
+  private endColor: number[] = [1, 1, 1, 1];
+  private baseVelocity: number[] = [0, 1, 0];
+  private gravity: number[] = [0, -9.81, 0];
+  private particleLife: number = 3.0;
+  private particleLifeVarMin: number = 0.0;
+  private particleLifeVarMax: number = 0.0;
+  private velocitySpread: number = 0.5;
 
-  // OPTIMIZACIÓN: Reuse buffers CPU para evitar allocations
-  private simParamsArray = new Float32Array(8); // Reutilizable
-  private spawnParamsArray = new ArrayBuffer(64); // Alineado a 16 bytes: u32 + f32 + u32 + f32 + vec3 + f32 + vec3 + f32 + f32 + padding = 64 bytes
+  // ── Reuse buffers CPU para evitar allocations ────────────────────────────────
+  private simParamsArray = new Float32Array(8); // 32 bytes: deltaTime + padding*3 + gravity(vec3) + padding
+  private spawnParamsArray = new ArrayBuffer(96); // 96 bytes: ver SpawnParams en shader
   private spawnParamsFloat32View!: Float32Array;
   private spawnParamsUint32View!: Uint32Array;
-  private counterDataArray = new Uint32Array(1); // Reutilizable para atomic counter
-
-  // Cache de valores previos para conditional writes
-  private lastSpawnInterval: number = 0;
-  private lastParticlesPerSpawn: number = 0;
+  private counterDataArray = new Uint32Array(1);
+  private particleRenderParamsArray = new Float32Array(12); // 48 bytes: startSize,endSize,pad,pad + startColor + endColor
 
   constructor() {
     super();
@@ -67,18 +78,84 @@ export class ParticleSystemComponent extends Component {
     this.spawnParamsUint32View = new Uint32Array(this.spawnParamsArray);
   }
 
+  /** Escribe los parámetros de renderizado (tamaño/color) al buffer GPU */
+  private writeRenderParamsBuffer(device: GPUDevice): void {
+    const a = this.particleRenderParamsArray;
+    a[0] = this.startSize;
+    a[1] = this.endSize;
+    a[2] = 0; // padding
+    a[3] = 0; // padding
+    a[4] = this.startColor[0];
+    a[5] = this.startColor[1];
+    a[6] = this.startColor[2];
+    a[7] = this.startColor[3];
+    a[8] = this.endColor[0];
+    a[9] = this.endColor[1];
+    a[10] = this.endColor[2];
+    a[11] = this.endColor[3];
+    device.queue.writeBuffer(this.particleRenderParamsBuffer, 0, a);
+  }
+
+  /** Escribe la gravedad (y el padding) al buffer de simulación */
+  private writeGravityToSimBuffer(device: GPUDevice): void {
+    // gravity va en offset 16 → indices 4,5,6 del Float32Array de 8 floats
+    this.simParamsArray[4] = this.gravity[0];
+    this.simParamsArray[5] = this.gravity[1];
+    this.simParamsArray[6] = this.gravity[2];
+    this.simParamsArray[7] = 0;
+    // Escribir los 8 floats completos (32 bytes)
+    device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray);
+  }
+
   public override async load(_data: unknown): Promise<void> {
     try {
       // Leer configuración
       const data = _data as ParticleSystemComponentData;
       this.worldSpace = data?.worldSpace ?? false;
-      this.spawnRadius = data?.spawnRadius ?? 2.0;
+      const rawRadius = data?.spawnRadius;
+      if (Array.isArray(rawRadius)) {
+        this.spawnExtents = rawRadius;
+      } else if (typeof rawRadius === 'number') {
+        this.spawnExtents = [rawRadius, rawRadius, rawRadius];
+      } else {
+        this.spawnExtents = [2, 2, 2];
+      }
+      this.maxParticles = data?.maxParticles ?? 1024;
+
+      // emissionRate → spawnInterval + particlesPerSpawn
+      // Si emissionRate <= 20: 1 partícula cada (1/emissionRate) segundos
+      // Si emissionRate >  20: múltiples partículas cada 0.05s (20 ticks/s)
+      const emissionRate = data?.emissionRate ?? 100;
+      const MAX_TICK_RATE = 20; // ticks/segundo máximo
+      if (emissionRate <= MAX_TICK_RATE) {
+        this.spawnInterval = 1 / emissionRate;
+        this.particlesPerSpawn = 1;
+      } else {
+        this.spawnInterval = 1 / MAX_TICK_RATE; // 0.05s
+        this.particlesPerSpawn = Math.round(emissionRate / MAX_TICK_RATE);
+      }
+
+      // Parámetros visuales
+      this.startSize = data?.startSize ?? 0.1;
+      this.endSize = data?.endSize ?? 0.1;
+      this.startColor = data?.startColor ?? [1, 1, 1, 1];
+      this.endColor = data?.endColor ?? [1, 1, 1, 1];
+
+      // Parámetros de movimiento
+      this.baseVelocity = data?.baseVelocity ?? [0, 1, 0];
+      this.gravity = data?.gravity ?? [0, -9.81, 0];
+      this.velocitySpread = data?.velocitySpread ?? 0.5;
+
+      // Vida de partícula
+      this.particleLife = data?.particleLife ?? 3.0;
+      this.particleLifeVarMin = data?.particleLifeVarianceMin ?? 0.0;
+      this.particleLifeVarMax = data?.particleLifeVarianceMax ?? 0.0;
 
       // 1. Cargar mesh y material con la técnica apropiada según worldSpace
-      this.quadMesh = await Mesh.get('quad.obj');
-
-      // Seleccionar material basado en el modo world space
-      const materialPath = this.worldSpace ? 'particle_worldspace.mat' : 'particle.mat';
+      const meshPath = data?.mesh ?? 'quad.obj';
+      const materialPath =
+        data?.material ?? (this.worldSpace ? 'particle_worldspace.mat' : 'particle.mat');
+      this.quadMesh = await Mesh.get(meshPath);
       this.particleMaterial = await Material.get(materialPath);
 
       const device = GPUUtils.getDevice();
@@ -89,14 +166,11 @@ export class ParticleSystemComponent extends Component {
       // Estructura: position(vec3 + padding) + velocity(vec3) + lifetime(f32) + age(f32) + active(u32) + padding(u32 x2)
       // Total: 48 bytes por partícula
       const PARTICLE_SIZE_FLOATS = 12; // 48 bytes / 4 bytes por float
-      const particleData = new Float32Array(
-        ParticleSystemComponent.MAX_PARTICLES * PARTICLE_SIZE_FLOATS,
-      );
+      const particleData = new Float32Array(this.maxParticles * PARTICLE_SIZE_FLOATS);
 
       // Inicializar TODAS las partículas como muertas (alive = 0)
-      // El sistema de spawn las irá activando automáticamente
       const uint32View = new Uint32Array(particleData.buffer);
-      for (let i = 0; i < ParticleSystemComponent.MAX_PARTICLES; i++) {
+      for (let i = 0; i < this.maxParticles; i++) {
         const offset = i * PARTICLE_SIZE_FLOATS;
         // position, velocity, lifetime, age = 0 por defecto (Float32Array inicia en 0)
 
@@ -113,12 +187,10 @@ export class ParticleSystemComponent extends Component {
       device.queue.writeBuffer(this.particleBuffer, 0, particleData);
 
       // 3. Crear buffer indirecto (indexCount, instanceCount, firstIndex, baseVertex, firstInstance)
-      // OPTIMIZACIÓN: instanceCount ahora es FIJO = MAX_PARTICLES
-      // El vertex shader skip partículas muertas (alive == 0) generando triángulos degenerados.
-      // Esto elimina la necesidad de compactar el array cada frame (ganancia: 10-50%).
+      // instanceCount es FIJO = maxParticles; el VS descarta partículas muertas.
       const indirectArgs = new Uint32Array([
         6, // indexCount (quad)
-        ParticleSystemComponent.MAX_PARTICLES, // instanceCount FIJO - skip dead en VS
+        this.maxParticles, // instanceCount FIJO - skip dead en VS
         0, // firstIndex
         0, // baseVertex
         0, // firstInstance
@@ -130,25 +202,21 @@ export class ParticleSystemComponent extends Component {
       });
       device.queue.writeBuffer(this.indirectDrawBuffer, 0, indirectArgs);
 
-      // 4. OPTIMIZACIÓN: Crear Dead Particle Free List
-      // Free list es un stack de índices de partículas muertas.
-      // Permite O(1) spawn lookups en vez de O(n) scan linear.
-      // Inicialmente todas las partículas están muertas, así que la free list
-      // contiene todos los índices [0, 1, 2, ..., 1023].
-      const freeListData = new Uint32Array(ParticleSystemComponent.MAX_PARTICLES);
-      for (let i = 0; i < ParticleSystemComponent.MAX_PARTICLES; i++) {
+      // 4. Dead Particle Free List: inicialmente todos los índices están libres
+      const freeListData = new Uint32Array(this.maxParticles);
+      for (let i = 0; i < this.maxParticles; i++) {
         freeListData[i] = i; // Índice de la partícula
       }
 
       this.freeListBuffer = device.createBuffer({
         label: 'particle_free_list',
-        size: freeListData.byteLength, // 1024 × 4 bytes = 4096 bytes
+        size: freeListData.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       device.queue.writeBuffer(this.freeListBuffer, 0, freeListData);
 
-      // Contador de slots libres (inicialmente = MAX_PARTICLES)
-      const freeListCount = new Uint32Array([ParticleSystemComponent.MAX_PARTICLES]);
+      // Contador de slots libres (inicialmente = maxParticles)
+      const freeListCount = new Uint32Array([this.maxParticles]);
       this.freeListCountBuffer = device.createBuffer({
         label: 'particle_free_list_count',
         size: 4, // 1 × u32 = 4 bytes
@@ -156,7 +224,16 @@ export class ParticleSystemComponent extends Component {
       });
       device.queue.writeBuffer(this.freeListCountBuffer, 0, freeListCount);
 
-      // 5. Crear bind group para el storage buffer (group 3, binding 0)
+      // 5. Crear ParticleRenderParams buffer (48 bytes: startSize, endSize, pad, pad, startColor, endColor)
+      this.particleRenderParamsBuffer = device.createBuffer({
+        label: 'particle_render_params_buffer',
+        size: 48,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+
+      // 6. Crear bind group para el storage buffer (group 3)
+      //    binding 0: particle storage array (read by VS)
+      //    binding 1: ParticleRenderParams uniform (read by VS)
       const renderBindGroupLayout = device.createBindGroupLayout({
         entries: [
           {
@@ -164,23 +241,32 @@ export class ParticleSystemComponent extends Component {
             visibility: GPUShaderStage.VERTEX,
             buffer: { type: 'read-only-storage' },
           },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.VERTEX,
+            buffer: { type: 'uniform' },
+          },
         ],
       });
 
       this.renderBindGroup = device.createBindGroup({
         layout: renderBindGroupLayout,
         entries: [
-          {
-            binding: 0,
-            resource: { buffer: this.particleBuffer },
-          },
+          { binding: 0, resource: { buffer: this.particleBuffer } },
+          { binding: 1, resource: { buffer: this.particleRenderParamsBuffer } },
         ],
       });
 
-      // 5. Crear compute shader pipeline y recursos
+      // Escribir render params iniciales (particleRenderParamsBuffer ya existe)
+      this.writeRenderParamsBuffer(device);
+
+      // 7. Crear compute shader pipeline y recursos
       await this.createComputePipeline();
 
-      // 6. Registrar la key instanciada en el RenderManagerV2
+      // Escribir gravedad inicial al buffer de simulación (creado en createComputePipeline)
+      this.writeGravityToSimBuffer(device);
+
+      // 8. Registrar la key instanciada en el RenderManagerV2
       this.renderComponent = new RenderComponent();
       this.renderComponent.setOwner(this.getOwner());
       RenderManagerV2.getInstance().addKey(
@@ -188,8 +274,8 @@ export class ParticleSystemComponent extends Component {
         this.quadMesh,
         this.particleMaterial,
         this.transform,
-        true, // ✅ Skip CPU frustum culling (particles are dynamic, indirect draw handles visibility)
-        ParticleSystemComponent.MAX_PARTICLES,
+        true, // Skip CPU frustum culling
+        this.maxParticles,
         undefined, // instanceBindGroup no se usa
         this.renderBindGroup, // renderBindGroup para @group(2) del sistema de partículas
         this.indirectDrawBuffer,
@@ -211,7 +297,7 @@ export class ParticleSystemComponent extends Component {
 
     this.spawnParamsBuffer = device.createBuffer({
       label: 'spawn_params_buffer',
-      size: 64, // Alineado a 16 bytes según WebGPU uniform buffer requirements
+      size: 96, // SpawnParams struct: ver comentario de layout en particle_spawn_compact.cs
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -266,8 +352,10 @@ export class ParticleSystemComponent extends Component {
     });
 
     // 4. Cargar shaders
-    const updateShaderCode = await ResourceManager.loadShader('particle_update.cs');
-    const spawnCompactShaderCode = await ResourceManager.loadShader('particle_spawn_compact.cs');
+    const updateShaderCode = await ResourceManager.loadShader('particles/particle_update.cs');
+    const spawnCompactShaderCode = await ResourceManager.loadShader(
+      'particles/particle_spawn_compact.cs',
+    );
 
     const updateShader = device.createShaderModule({
       label: 'particle_update_cs',
@@ -371,10 +459,8 @@ export class ParticleSystemComponent extends Component {
     // 1. Actualizar timer de spawn
     this.spawnTimer += deltaTime;
 
-    // 2. OPTIMIZACIÓN: Reutilizar buffer y solo escribir deltaTime (4 bytes)
-    // En lugar de crear Float32Array nuevo cada frame
+    // 2. Actualizar deltaTime en el buffer de simulación (gravity se escribe una sola vez en load)
     this.simParamsArray[0] = deltaTime;
-    // Solo escribimos el primer float (4 bytes) en lugar de todo el buffer (32 bytes)
     device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray, 0, 1);
 
     // Verificar si es momento de spawn
@@ -383,38 +469,37 @@ export class ParticleSystemComponent extends Component {
     if (shouldSpawn) {
       this.spawnTimer = 0;
 
-      // OPTIMIZACIÓN: Reutilizar buffer en lugar de crear nuevo cada spawn
-      // Detectar cambios en spawn params desde debug UI
-      const paramsChanged =
-        this.lastSpawnInterval !== this.spawnInterval ||
-        this.lastParticlesPerSpawn !== this.particlesPerSpawn;
+      // Preparar parámetros de spawn según SpawnParams en particle_spawn_compact.cs (80 bytes)
+      this.spawnParamsUint32View[0] = this.particlesPerSpawn; // [0]  spawnCount
+      this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // [1]  randomSeed
+      this.spawnParamsUint32View[2] = this.worldSpace ? 1 : 0; // [2]  worldSpace
+      this.spawnParamsFloat32View[3] = 0; // [3]  padding1
 
-      if (paramsChanged) {
-        this.lastSpawnInterval = this.spawnInterval;
-        this.lastParticlesPerSpawn = this.particlesPerSpawn;
-      }
-
-      // Preparar parámetros de spawn - struct tiene:
-      // u32 spawnCount, f32 randomSeed, u32 worldSpace, f32 padding1, vec3 emitterWorldPos, f32 padding2, vec3 emitterWorldScale, f32 padding3
-      this.spawnParamsUint32View[0] = this.particlesPerSpawn; // spawnCount (u32)
-      this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // randomSeed (f32)
-      this.spawnParamsUint32View[2] = this.worldSpace ? 1 : 0; // worldSpace (u32)
-      this.spawnParamsFloat32View[3] = 0; // padding1
-
-      // Emitter world position (vec3)
       const worldPos = this.transform.getTransform().getWorldPosition();
-      this.spawnParamsFloat32View[4] = worldPos[0]; // emitterWorldPos.x
-      this.spawnParamsFloat32View[5] = worldPos[1]; // emitterWorldPos.y
-      this.spawnParamsFloat32View[6] = worldPos[2]; // emitterWorldPos.z
-      this.spawnParamsFloat32View[7] = 0; // padding2
+      this.spawnParamsFloat32View[4] = worldPos[0]; // [4]  emitterWorldPos.x
+      this.spawnParamsFloat32View[5] = worldPos[1]; // [5]  emitterWorldPos.y
+      this.spawnParamsFloat32View[6] = worldPos[2]; // [6]  emitterWorldPos.z
+      this.spawnParamsFloat32View[7] = 0; // [7]  padding2
 
-      // Emitter world scale (vec3)
       const worldScale = this.transform.getTransform().getWorldScale();
-      this.spawnParamsFloat32View[8] = worldScale[0]; // emitterWorldScale.x
-      this.spawnParamsFloat32View[9] = worldScale[1]; // emitterWorldScale.y
-      this.spawnParamsFloat32View[10] = worldScale[2]; // emitterWorldScale.z
-      this.spawnParamsFloat32View[11] = 0; // padding3
-      this.spawnParamsFloat32View[12] = this.spawnRadius; // spawnRadius
+      this.spawnParamsFloat32View[8] = worldScale[0]; // [8]  emitterWorldScale.x
+      this.spawnParamsFloat32View[9] = worldScale[1]; // [9]  emitterWorldScale.y
+      this.spawnParamsFloat32View[10] = worldScale[2]; // [10] emitterWorldScale.z
+      this.spawnParamsFloat32View[11] = 0; // [11] padding3
+
+      // spawnExtents (vec3) at offset 48 → float index 12,13,14 (16-byte aligned)
+      this.spawnParamsFloat32View[12] = this.spawnExtents[0]; // [12] spawnExtents.x
+      this.spawnParamsFloat32View[13] = this.spawnExtents[1]; // [13] spawnExtents.y
+      this.spawnParamsFloat32View[14] = this.spawnExtents[2]; // [14] spawnExtents.z
+      this.spawnParamsFloat32View[15] = this.velocitySpread; // [15] velocitySpread (offset 60)
+
+      // baseVelocity (vec3) at offset 64 → float index 16,17,18 (auto-aligned to 16 ✓)
+      this.spawnParamsFloat32View[16] = this.baseVelocity[0]; // [16] baseVelocity.x
+      this.spawnParamsFloat32View[17] = this.baseVelocity[1]; // [17] baseVelocity.y
+      this.spawnParamsFloat32View[18] = this.baseVelocity[2]; // [18] baseVelocity.z
+      this.spawnParamsFloat32View[19] = this.particleLife; // [19] particleLife (offset 76)
+      this.spawnParamsFloat32View[20] = this.particleLifeVarMin; // [20] particleLifeVarMin (offset 80)
+      this.spawnParamsFloat32View[21] = this.particleLifeVarMax; // [21] particleLifeVarMax (offset 84)
 
       device.queue.writeBuffer(this.spawnParamsBuffer, 0, this.spawnParamsArray);
 
@@ -423,6 +508,9 @@ export class ParticleSystemComponent extends Component {
       // AHORA: reutilizar counterDataArray → 0 allocations
       this.counterDataArray[0] = this.particlesPerSpawn;
       device.queue.writeBuffer(this.spawnCounterBuffer, 0, this.counterDataArray);
+
+      // Actualizar render params si cambiaron (p.ej. debug UI)
+      this.writeRenderParamsBuffer(device);
     }
 
     // OPTIMIZACIÓN CRÍTICA: Batch Command Submissions + Eliminar Compaction
@@ -446,7 +534,7 @@ export class ParticleSystemComponent extends Component {
     const updatePass = encoder.beginComputePass({ label: 'Update Pass' });
     updatePass.setPipeline(this.updatePipeline);
     updatePass.setBindGroup(0, this.updateBindGroup);
-    const updateWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
+    const updateWorkgroups = Math.ceil(this.maxParticles / 64);
     updatePass.dispatchWorkgroups(updateWorkgroups);
     updatePass.end();
 
@@ -455,7 +543,7 @@ export class ParticleSystemComponent extends Component {
       const spawnPass = encoder.beginComputePass({ label: 'Spawn Pass' });
       spawnPass.setPipeline(this.spawnPipeline);
       spawnPass.setBindGroup(0, this.spawnCompactBindGroup);
-      const spawnWorkgroups = Math.ceil(ParticleSystemComponent.MAX_PARTICLES / 64);
+      const spawnWorkgroups = Math.ceil(this.maxParticles / 64);
       spawnPass.dispatchWorkgroups(spawnWorkgroups);
       spawnPass.end();
     }
@@ -472,12 +560,6 @@ export class ParticleSystemComponent extends Component {
     const folderName = `Particle System (${this.getOwner().getName()})`;
 
     // Spawn controls
-    debugUI.addInteractiveControl(folderName, this, 'spawnRadius', 'Spawn Radius', {
-      min: 0.1,
-      max: 10.0,
-      step: 0.1,
-    });
-
     debugUI.addInteractiveControl(folderName, this, 'spawnInterval', 'Spawn Interval (s)', {
       min: 0.1,
       max: 5.0,
@@ -491,7 +573,7 @@ export class ParticleSystemComponent extends Component {
     });
 
     // Info (read-only)
-    const stats = { maxParticles: ParticleSystemComponent.MAX_PARTICLES };
+    const stats = { maxParticles: this.maxParticles };
     debugUI.addDebugControl(folderName, stats, 'maxParticles', 'Max Particles');
   }
 
@@ -508,5 +590,6 @@ export class ParticleSystemComponent extends Component {
     this.spawnCounterBuffer?.destroy();
     this.freeListBuffer?.destroy();
     this.freeListCountBuffer?.destroy();
+    this.particleRenderParamsBuffer?.destroy();
   }
 }

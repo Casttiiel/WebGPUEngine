@@ -21,14 +21,13 @@ struct IndirectDrawArgs {
 
 // Parámetros de simulación (32 bytes total)
 struct SimulationParams {
-    deltaTime: f32,
-    padding1: f32,
-    padding2: f32,
-    padding3: f32,
-    padding4: f32,
-    padding5: f32,
-    padding6: f32,
-    padding7: f32,
+    deltaTime: f32,    // offset  0
+    padding1: f32,     // offset  4
+    padding2: f32,     // offset  8
+    padding3: f32,     // offset 12
+    gravity: vec3<f32>, // offset 16 (aceleración acumulada en velocidad por frame)
+    padding4: f32,     // offset 28
+    // total: 32 bytes
 };
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
@@ -55,6 +54,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         // Incrementar edad
         particle.age += simParams.deltaTime;
         
+        // Acumular gravedad en velocidad: v += g * dt
+        particle.velocity += simParams.gravity * simParams.deltaTime;
+
         // Actualizar posición basándose en velocidad y deltaTime
         particle.position += particle.velocity * simParams.deltaTime;
         

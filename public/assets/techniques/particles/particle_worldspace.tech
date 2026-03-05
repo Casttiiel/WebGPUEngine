@@ -1,6 +1,6 @@
 {
-    "vs": "particle_worldspace.vs",
-    "fs": "particle.fs",
+    "vs": "particles/particle_worldspace.vs",
+    "fs": "particles/particle.fs",
     "writesOn": "texture",
     "z": "test_but_no_write",
     "blend": "additive_by_src_alpha",

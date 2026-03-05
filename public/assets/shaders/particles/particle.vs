@@ -12,9 +12,21 @@ struct Particle {
     padding3: u32,    // Alineamiento (total: 48 bytes)
 };
 
+// Parámetros de renderizado compartidos entre VS y FS
+struct ParticleRenderParams {
+    startSize:  f32,           // offset  0
+    endSize:    f32,           // offset  4
+    padding1:   f32,           // offset  8
+    padding2:   f32,           // offset 12
+    startColor: vec4<f32>,     // offset 16
+    endColor:   vec4<f32>,     // offset 32
+    // total: 48 bytes
+};
+
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(2) @binding(0) var<uniform> object: ObjectUniforms;
 @group(3) @binding(0) var<storage, read> particles: array<Particle>;
+@group(3) @binding(1) var<uniform>  renderParams: ParticleRenderParams;
 
 // Vertex attributes del quad mesh
 struct VertexInput {
@@ -28,6 +40,7 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
+    @location(1) particleColor: vec4<f32>, // Color interpolado (startColor → endColor)
 };
 
 @vertex
@@ -35,35 +48,41 @@ fn vs(input: VertexInput) -> VertexOutput {
     // Obtener la partícula actual usando el instance index
     let particle = particles[input.instanceIndex];
 
-    // OPTIMIZACIÓN CRÍTICA: Skip dead particles
-    // En lugar de compactar el array cada frame (50-500μs overhead),
-    // simplemente generamos un triángulo degenerado que el GPU descarta.
-    // Early return es ~1-2 ciclos GPU, vs 240μs de parallel compaction.
-    // Ganancia: 10-50% performance improvement eliminando compute pass completo.
+    // OPTIMIZACIÓN CRÍTICA: Skip dead particles generando triángulo degenerado
     if (particle.alive == 0u) {
         var output: VertexOutput;
         output.position = vec4<f32>(0.0, 0.0, 0.0, 0.0); // Degenerate triangle (w=0)
         output.uv = vec2<f32>(0.0, 0.0);
+        output.particleColor = vec4<f32>(0.0);
         return output;
     }
 
+    // t: fracción de vida [0 = recién nacida, 1 = a punto de morir]
+    let t = clamp(particle.age / max(particle.lifetime, 0.0001), 0.0, 1.0);
+
+    // Tamaño interpolado
+    let size = mix(renderParams.startSize, renderParams.endSize, t);
+
+    // Color interpolado
+    let color = mix(renderParams.startColor, renderParams.endColor, t);
+
     // Billboarding: extraer vectores right y up de las matrices de cámara
-    // Usamos la matriz de vista para obtener los vectores de cámara
     let cameraRight = normalize(vec3<f32>(camera.viewMatrix[0].x, camera.viewMatrix[1].x, camera.viewMatrix[2].x));
-    let cameraUp = normalize(vec3<f32>(camera.viewMatrix[0].y, camera.viewMatrix[1].y, camera.viewMatrix[2].y));
+    let cameraUp    = normalize(vec3<f32>(camera.viewMatrix[0].y, camera.viewMatrix[1].y, camera.viewMatrix[2].y));
 
-    // Calcular offset del vértice del quad en espacio mundo usando billboarding
-    let quadOffset = (cameraRight * input.position.x + cameraUp * input.position.y);
+    // Calcular offset del vértice del quad con el tamaño interpolado
+    let quadOffset = (cameraRight * input.position.x + cameraUp * input.position.y) * size;
 
-    // Posición final en mundo: posición de la partícula + offset del quad
-    let worldPos = object.modelMatrix * vec4<f32>(quadOffset, 1.0);
-
-    // Transformar a espacio clip usando las matrices de cámara
-    let clipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(worldPos.xyz + particle.position, 1.0);
+    // LOCAL SPACE MODE: La partícula está en espacio local del emisor
+    // Aplicamos modelMatrix al conjunto (offset + posición de la partícula)
+    let localPos = quadOffset + particle.position;
+    let worldPos = object.modelMatrix * vec4<f32>(localPos, 1.0);
+    let clipPos  = camera.projectionMatrix * camera.viewMatrix * worldPos;
 
     var output: VertexOutput;
-    output.position = clipPos;
-    output.uv = input.uv;
+    output.position      = clipPos;
+    output.uv            = input.uv;
+    output.particleColor = color;
     
     return output;
 }

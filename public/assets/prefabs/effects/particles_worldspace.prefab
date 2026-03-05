@@ -3,10 +3,23 @@
         "name": "Particles (World Space)",
         "transform": {
             "position": [0, 5, 0],
-            "scale": [0.1, 0.1, 0.1]
+            "scale": [1, 1, 1]
         },
         "particle_system": {
-            "worldSpace": true
+            "worldSpace": true,
+            "maxParticles": 1000,
+            "emissionRate": 200,
+            "particleLife": 2.0,
+            "particleLifeVarianceMin": -0.5,
+            "particleLifeVarianceMax": 0.5,
+            "spawnRadius": [1.0, 1.0, 1.0],
+            "startColor": [1.0, 0.5, 0.0, 1.0],
+            "endColor": [1.0, 0.0, 0.0, 0.0],
+            "startSize": 0.05,
+            "endSize": 0.2,
+            "baseVelocity": [0, 2, 0],
+            "velocitySpread": 0.5,
+            "gravity": [0, -9.81, 0]
         }
     }
 }

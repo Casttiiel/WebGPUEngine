@@ -12,9 +12,22 @@ struct Particle {
     padding3: u32,    // Alineamiento (total: 48 bytes)
 };
 
+// Parámetros de renderizado compartidos entre VS y FS
+// (startSize, endSize, startColor, endColor − vienen del componente CPU)
+struct ParticleRenderParams {
+    startSize:  f32,           // offset  0
+    endSize:    f32,           // offset  4
+    padding1:   f32,           // offset  8
+    padding2:   f32,           // offset 12
+    startColor: vec4<f32>,     // offset 16
+    endColor:   vec4<f32>,     // offset 32
+    // total: 48 bytes
+};
+
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(2) @binding(0) var<uniform> object: ObjectUniforms;
 @group(3) @binding(0) var<storage, read> particles: array<Particle>;
+@group(3) @binding(1) var<uniform>  renderParams: ParticleRenderParams;
 
 // Vertex attributes del quad mesh
 struct VertexInput {
@@ -28,6 +41,7 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
+    @location(1) particleColor: vec4<f32>, // Color interpolado (startColor → endColor)
 };
 
 @vertex
@@ -35,42 +49,40 @@ fn vs(input: VertexInput) -> VertexOutput {
     // Obtener la partícula actual usando el instance index
     let particle = particles[input.instanceIndex];
 
-    // OPTIMIZACIÓN CRÍTICA: Skip dead particles
-    // En lugar de compactar el array cada frame (50-500μs overhead),
-    // simplemente generamos un triángulo degenerado que el GPU descarta.
-    // Early return es ~1-2 ciclos GPU, vs 240μs de parallel compaction.
-    // Ganancia: 10-50% performance improvement eliminando compute pass completo.
+    // OPTIMIZACIÓN CRÍTICA: Skip dead particles generando triángulo degenerado
     if (particle.alive == 0u) {
         var output: VertexOutput;
         output.position = vec4<f32>(0.0, 0.0, 0.0, 0.0); // Degenerate triangle (w=0)
         output.uv = vec2<f32>(0.0, 0.0);
+        output.particleColor = vec4<f32>(0.0);
         return output;
     }
 
+    // t: fracción de vida [0 = recién nacida, 1 = a punto de morir]
+    let t = clamp(particle.age / max(particle.lifetime, 0.0001), 0.0, 1.0);
+
+    // Tamaño interpolado
+    let size = mix(renderParams.startSize, renderParams.endSize, t);
+
+    // Color interpolado
+    let color = mix(renderParams.startColor, renderParams.endColor, t);
+
     // Billboarding: extraer vectores right y up de las matrices de cámara
-    // Usamos la matriz de vista para obtener los vectores de cámara
     let cameraRight = normalize(vec3<f32>(camera.viewMatrix[0].x, camera.viewMatrix[1].x, camera.viewMatrix[2].x));
-    let cameraUp = normalize(vec3<f32>(camera.viewMatrix[0].y, camera.viewMatrix[1].y, camera.viewMatrix[2].y));
+    let cameraUp    = normalize(vec3<f32>(camera.viewMatrix[0].y, camera.viewMatrix[1].y, camera.viewMatrix[2].y));
 
-    // Extraer escala del objeto desde la modelMatrix
-    let scaleX = length(vec3<f32>(object.modelMatrix[0].x, object.modelMatrix[0].y, object.modelMatrix[0].z));
-    let scaleY = length(vec3<f32>(object.modelMatrix[1].x, object.modelMatrix[1].y, object.modelMatrix[1].z));
-    let objectScale = vec2<f32>(scaleX, scaleY);
-
-    // Calcular offset del vértice del quad en espacio mundo usando billboarding
-    // Aplicar la escala del objeto al tamaño del quad
-    let quadOffset = (cameraRight * input.position.x * objectScale.x + cameraUp * input.position.y * objectScale.y);
+    // Calcular offset del vértice del quad en espacio mundo usando billboarding + tamaño
+    let quadOffset = (cameraRight * input.position.x + cameraUp * input.position.y) * size;
 
     // WORLD SPACE MODE: Las partículas ya están en coordenadas mundiales
-    // No aplicamos modelMatrix, solo sumamos el offset del quad (ya escalado)
     let worldPos = particle.position + quadOffset;
 
-    // Transformar a espacio clip usando las matrices de cámara
     let clipPos = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(worldPos, 1.0);
 
     var output: VertexOutput;
-    output.position = clipPos;
-    output.uv = input.uv;
+    output.position    = clipPos;
+    output.uv          = input.uv;
+    output.particleColor = color;
     
     return output;
 }

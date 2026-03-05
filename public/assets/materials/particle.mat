@@ -1,5 +1,5 @@
 {
-    "technique": "particle.tech",
+    "technique": "particles/particle.tech",
     "textures":{
         "txAlbedo": "white.png"
     },

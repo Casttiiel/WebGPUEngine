@@ -3,24 +3,23 @@
     "components": {
         "transform": {
             "position": [0, 0, 0],
-            "scale": [0.1,0.1,0.1]
+            "scale": [1, 1, 1]
         },
         "particle_system": {
-            "particles": {
-                "maxParticles": 100000,
-                "emissionRate": 1000,
-                "particleLife": 2.0,
-                "spawnRadius": 1.0,
-                "startColor": [1.0, 0.5, 0.0, 1.0],
-                "endColor": [1.0, 0.0, 0.0, 0.0],
-                "startSize": 0.1,
-                "endSize": 0.05,
-                "baseVelocity": [0, 2, 0],
-                "randomness": 0.5,
-                "gravity": [0, -9.81, 0],
-                "material": "transparent.mat",
-                "mesh": "fullscreenquad.obj"
-            }
+            "worldSpace": false,
+            "maxParticles": 1000,
+            "emissionRate": 10,
+            "spawnRadius": [1.0, 1.0, 1.0],
+            "velocitySpread": 0.5,
+            "baseVelocity": [0, 0, 0],
+            "gravity": [0, 0.0, 0],
+            "startSize": 0.05,
+            "endSize": 0.15,
+            "particleLife": 0.0,
+            "particleLifeVarianceMin": 0.5,
+            "particleLifeVarianceMax": 1.5,
+            "startColor": [1.0, 0.5, 0.0, 0.1],
+            "endColor": [1.0, 0.0, 0.0, 0.1]
         }
     }
 }

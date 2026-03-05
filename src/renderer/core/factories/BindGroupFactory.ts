@@ -1118,6 +1118,12 @@ export class BindGroupFactory {
           hasDynamicOffset: false,
         },
       },
+      {
+        // ParticleRenderParams: startSize, endSize, startColor, endColor
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'uniform' },
+      },
     ]);
   }
 
