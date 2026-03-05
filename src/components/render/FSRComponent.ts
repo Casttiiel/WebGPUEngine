@@ -10,6 +10,7 @@ import {
 } from '../../renderer/core/factories/PipelineFactory';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Engine } from '../../core/engine/Engine';
+import { FSRComponentData } from '../../types/FSRComponentData.type';
 
 /**
  * FSR 1.0 — FidelityFX Super Resolution
@@ -82,7 +83,24 @@ export class FSRComponent extends Component {
 
   // ── Component lifecycle ────────────────────────────────────────────────────
 
-  public async load(): Promise<void> {
+  /**
+   * Called by the ECS loader with the JSON component data.
+   * Applies renderScale to QualitySettings (and immediately triggers a
+   * Render.applyRenderResolution() so the G-Buffer is recreated at the
+   * correct size), then initialises all GPU resources.
+   */
+  public async load(data: FSRComponentData = {}): Promise<void> {
+    // ── Apply JSON settings before creating GPU resources ──────────────────
+    if (data.enabled !== undefined) this.enabled = data.enabled;
+    if (data.enableRCAS !== undefined) this.enableRCAS = data.enableRCAS;
+    if (data.rcasSharpness !== undefined) this.rcasSharpness = data.rcasSharpness;
+
+    if (data.renderScale !== undefined) {
+      const scale = Math.max(0.25, Math.min(1.0, data.renderScale));
+      QualitySettings.getInstance().setRenderResolution(scale);
+      Render.applyRenderResolution();
+    }
+
     this.device = Render.getInstance().getDevice();
 
     await this.loadShaders();

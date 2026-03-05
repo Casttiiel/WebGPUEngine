@@ -6,6 +6,9 @@
       "smaa": {}, 
       "ambient_occlusion": {},
       "bloom": {},
-      "auto_exposure": {}
+      "auto_exposure": {},
+      "fsr":{
+        "renderScale": 0.77
+      }
     }
   }

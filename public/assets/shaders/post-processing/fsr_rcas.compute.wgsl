@@ -6,8 +6,8 @@
 //   1. 5-tap cross neighbourhood (N, S, W, E, centre).
 //   2. Compute neighbourhood luma range.
 //   3. Derive a negative "neighbour weight" that is:
-//      - proportional to the requested sharpness (exp2(-sharpness))
-//      - adaptively reduced in low-contrast regions (avoids noise amplification)
+//      - capped by min(lumaRange, sharpAmt) so flat/noisy regions get LESS sharpening
+//      - normalised by lumaMax*4 (AMD reference) so bright edges are preserved
 //      - never below -0.25 (prevents over-sharpening / ringing)
 //   4. Blend: result = (centre + neighbours * negW) / (1 + 4*negW)
 //   5. Clamp per-channel to neighbourhood min/max.
@@ -40,7 +40,7 @@ fn cs_rcas(@builtin(global_invocation_id) gid: vec3<u32>) {
   // ── Load 5-tap cross ──────────────────────────────────────────────────────
   let n  = textureLoad(inputTex, clamp(coord + vec2<i32>( 0, -1), vec2<i32>(0), maxC), 0).rgb;
   let s  = textureLoad(inputTex, clamp(coord + vec2<i32>( 0,  1), vec2<i32>(0), maxC), 0).rgb;
-  let ww = textureLoad(inputTex, clamp(coord + vec2<i32>(-1,  0), vec2<i32>(0), maxC), 0).rgb;
+  let we = textureLoad(inputTex, clamp(coord + vec2<i32>(-1,  0), vec2<i32>(0), maxC), 0).rgb;
   let e  = textureLoad(inputTex, clamp(coord + vec2<i32>( 1,  0), vec2<i32>(0), maxC), 0).rgb;
   let mc = textureLoad(inputTex, coord, 0).rgb;
 
@@ -48,26 +48,33 @@ fn cs_rcas(@builtin(global_invocation_id) gid: vec3<u32>) {
   let lumaM   = luma(mc);
   let lumaN   = luma(n);
   let lumaS   = luma(s);
-  let lumaW   = luma(ww);
+  let lumaW   = luma(we);
   let lumaE   = luma(e);
 
-  let lumaMin = min(lumaM, min(min(lumaN, lumaS), min(lumaW, lumaE)));
-  let lumaMax = max(lumaM, max(max(lumaN, lumaS), max(lumaW, lumaE)));
+  let lumaMin   = min(lumaM, min(min(lumaN, lumaS), min(lumaW, lumaE)));
+  let lumaMax   = max(lumaM, max(max(lumaN, lumaS), max(lumaW, lumaE)));
   let lumaRange = lumaMax - lumaMin;
 
-  // ── Adaptive negative neighbour weight ────────────────────────────────────
-  // sharpAmt: full desired sharpening factor, in [0, 1] for sharpness ∈ [0, ∞)
-  let sharpAmt = exp2(-params.sharpness); // sharpness=0 → 1.0,  sharpness=2 → 0.25
-  // Divide by (4 * lumaRange) so the filter becomes neutral in flat regions.
-  // Clamp to [-0.25, 0] so we never invert the kernel.
-  let negW = max(-0.25, min(0.0, -sharpAmt / max(4.0 * lumaRange, 0.0001)));
+  // ── Adaptive negative neighbour weight (AMD reference formulation) ─────────
+  // sharpAmt: desired sharpening amplitude, in (0, 1].  sharpness=0 → 1.0 (max).
+  let sharpAmt = exp2(-params.sharpness);
+  //
+  // Key insight: cap the numerator with min(lumaRange, sharpAmt).
+  //   • In HIGH contrast regions (real edges): lumaRange is large → cap is sharpAmt
+  //     → full sharpening applied where it's most visible.
+  //   • In LOW contrast / flat regions: lumaRange is small → cap reduces negW
+  //     → noise is NOT amplified.
+  // Normalise by lumaMax*4 (not lumaRange*4): this makes bright edges preserve
+  // their weight independent of how dark their neighbours are.
+  let rcasInput = min(lumaRange, sharpAmt);
+  let negW      = max(-0.25, -(rcasInput / max(lumaMax * 4.0, 0.0001)));
 
   // ── Sharpening blend ──────────────────────────────────────────────────────
-  let result = (mc + (n + s + ww + e) * negW) / (1.0 + 4.0 * negW);
+  let result = (mc + (n + s + we + e) * negW) / (1.0 + 4.0 * negW);
 
   // ── Per-channel neighbourhood clamp to prevent ringing ────────────────────
-  let cMin = min(mc, min(min(n, s), min(ww, e)));
-  let cMax = max(mc, max(max(n, s), max(ww, e)));
+  let cMin = min(mc, min(min(n, s), min(we, e)));
+  let cMax = max(mc, max(max(n, s), max(we, e)));
 
   textureStore(outputTex, coord, vec4<f32>(clamp(result, cMin, cMax), 1.0));
 }

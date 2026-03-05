@@ -2,8 +2,8 @@
 
 1. GLTF Glass
 2. SSR (One direction good, others bad)
-3. Decals error on some places
-4. Gameplay
+3. Gameplay
+4. Decals error on some places
 
 ## Gameplay
 
