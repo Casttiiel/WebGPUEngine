@@ -18,7 +18,7 @@
     "prefab": "cameras/debug_camera.prefab"
   },
   {
-    "prefab": "effects/particles.prefab"
+    "prefab": "effects/particles_worldspace.prefab"
   },
   {
     "prefab": "primitives/ground.prefab"

@@ -1,8 +1,7 @@
 ### Engine
 
-1. Improve particles
-2. Gameplay
-3. UI
+1. Gameplay
+2. UI
 
 ## Gameplay
 
