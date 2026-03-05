@@ -205,4 +205,23 @@ export class PipelineFactory {
       },
     };
   }
+
+  /**
+   * Premultiplied alpha blending: ONE + ONE_MINUS_SRC_ALPHA
+   * Used for OIT compose: composites premultiplied glass over opaque accLight.
+   */
+  public static getPremultipliedBlending(): GPUBlendState {
+    return {
+      color: {
+        srcFactor: 'one',
+        dstFactor: 'one-minus-src-alpha',
+        operation: 'add',
+      },
+      alpha: {
+        srcFactor: 'one',
+        dstFactor: 'one-minus-src-alpha',
+        operation: 'add',
+      },
+    };
+  }
 }

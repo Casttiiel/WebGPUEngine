@@ -4,6 +4,7 @@ import {
   DecalRenderPass,
   TransparentRenderPass,
   DepthPrepassRenderPass,
+  GlassOITGatherRenderPass,
 } from './DeferredRenderPasses';
 import {
   PointLightRenderPass,
@@ -22,6 +23,7 @@ import {
   HeightFogRenderPass,
   ContactShadowsRenderPass,
 } from './PostProcessingRenderPasses';
+import { FullScreenPass } from './BaseRenderPass';
 import { RenderPassFactory } from './RenderPassFactory';
 import { RenderTarget } from '../../resources/RenderTarget';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
@@ -81,6 +83,44 @@ export class RenderPassManager {
 
     const encoder = Render.getInstance().getCommandEncoder();
     pass.execute(encoder, category, renderKeys);
+  }
+
+  /**
+   * Registers the OIT gather pass using pre-created accumulation and revealage render targets.
+   * Must be called after initializeDeferredPasses and before render().
+   */
+  public initializeOITPasses(
+    accumulation: RenderTarget,
+    revealage: RenderTarget,
+    depthView: GPUTextureView,
+  ): void {
+    const config = RenderPassFactory.createOITGatherPassConfig(accumulation, revealage, depthView);
+    const pass = new GlassOITGatherRenderPass(config);
+    this.renderPasses.set('oit_gather', pass);
+  }
+
+  /**
+   * Sets the environment cubemap bind group on the OIT gather pass (group 3).
+   * Should be called once after initializeOITPasses and whenever the env texture changes.
+   */
+  public setOITGatherEnvBindGroup(bindGroup: GPUBindGroup): void {
+    const pass = this.renderPasses.get('oit_gather') as GlassOITGatherRenderPass | undefined;
+    pass?.setEnvBindGroup(bindGroup);
+  }
+
+  /**
+   * Creates and executes the OIT compose pass dynamically each frame.
+   * Blends the resolved accumulation/revealage into accLight using premultiplied alpha.
+   */
+  public executeOITComposePass(
+    mesh: Mesh,
+    technique: Technique,
+    bindGroup: GPUBindGroup,
+    accLight: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createOITComposePassConfig(accLight);
+    const pass = new FullScreenPass(passConfig, mesh, technique, bindGroup);
+    this.executeDynamicPass(pass);
   }
 
   public clear(): void {

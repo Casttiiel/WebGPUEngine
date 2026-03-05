@@ -116,3 +116,40 @@ export class TransparentRenderPass extends BaseRenderPass {
     RenderManager.getInstance().render(RenderCategory.TRANSPARENT, pass);
   }
 }
+
+/**
+ * Weighted Blended OIT gather pass — renders RenderCategory.GLASS into
+ * two render targets: accumulation (RGBA16F) and revealage (RGBA8Unorm).
+ * Depth is read-only (test but no write) so the prepass depth is preserved.
+ * Group 3 is set to the prefiltered environment cubemap for IBL reflections.
+ */
+export class GlassOITGatherRenderPass extends BaseRenderPass {
+  private envBindGroup: GPUBindGroup | null = null;
+
+  constructor(config: RenderPassConfig) {
+    super(config);
+  }
+
+  public setEnvBindGroup(bindGroup: GPUBindGroup): void {
+    this.envBindGroup = bindGroup;
+  }
+
+  protected render(
+    pass: GPURenderPassEncoder,
+    _category?: RenderCategory,
+    _renderKeys?: RenderKey[],
+  ): void {
+    const viewport = this.config.viewport;
+    if (viewport) {
+      GPUUtils.configureViewportAndScissor(pass, viewport.width, viewport.height);
+    } else {
+      GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
+    }
+
+    if (this.envBindGroup) {
+      pass.setBindGroup(3, this.envBindGroup);
+    }
+
+    RenderManager.getInstance().render(RenderCategory.GLASS, pass);
+  }
+}

@@ -260,4 +260,62 @@ export class RenderPassFactory {
       },
     };
   }
+
+  /**
+   * Creates configuration for the Weighted Blended OIT gather pass.
+   * Renders glass into two dual render targets:
+   *   [0] accumulation (RGBA16F) — cleared to (0,0,0,0), additive blend
+   *   [1] revealage    (RGBA8Unorm) — cleared to (1,0,0,1), product of (1 - alpha_i)
+   * Depth is read-only: test geometry visibility but never write (prepass depth is preserved).
+   */
+  public static createOITGatherPassConfig(
+    accumulation: RenderTarget,
+    revealage: RenderTarget,
+    depthView: GPUTextureView,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    return {
+      label: 'OIT Gather Pass',
+      colorAttachments: [
+        {
+          view: accumulation.getRenderView()!,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+        {
+          view: revealage.getRenderView()!,
+          clearValue: { r: 1, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: depthView,
+        depthReadOnly: true,
+      },
+      viewport,
+    };
+  }
+
+  /**
+   * Creates configuration for the OIT compose pass.
+   * Blends the resolved OIT result over the existing accLight buffer using premultiplied alpha.
+   */
+  public static createOITComposePassConfig(
+    accLight: RenderTarget,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    return {
+      label: 'OIT Compose Pass',
+      colorAttachments: [
+        {
+          view: accLight.getRenderView()!,
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+      viewport,
+    };
+  }
 }

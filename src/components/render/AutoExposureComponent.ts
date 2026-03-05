@@ -26,8 +26,8 @@ export class AutoExposureComponent extends Component {
   private isLoaded = false;
 
   // User-tunable settings (exposed to editor / debug UI)
-  public adaptSpeedUp = 1.0; // Speed adapting toward bright  (iris closing — fast)
-  public adaptSpeedDown = 1.0; // Speed adapting toward dark    (iris opening — slow)
+  public adaptSpeedUp = 0.5; // Speed adapting toward bright  (iris closing — fast)
+  public adaptSpeedDown = 0.5; // Speed adapting toward dark    (iris opening — slow)
   public keyValue = 0.18; // 18 % grey target
   public minExposure = 0.1;
   public maxExposure = 4.0;

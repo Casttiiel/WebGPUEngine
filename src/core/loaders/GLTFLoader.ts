@@ -7,6 +7,7 @@ import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { FragmentShaderTargets } from '../../types/FragmentShaderTargets.enum';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { Node, WebIO, Material, Primitive, Texture } from '@gltf-transform/core';
+import { Transmission } from '@gltf-transform/extensions';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { mat4 } from 'gl-matrix';
 import { BlendModes } from '../../types/BlendModes.enum';
@@ -238,6 +239,14 @@ export class GLTFLoader {
       emissiveFactor: hasEmissive ? 5 : 0,
     };
 
+    // Glass (KHR_materials_transmission): el baseColorFactor RGB viene en [0,0,0] porque
+    // es un modelo de transmisión física — no sirve para rasterización simple.
+    // Sustituir por tinte neutro conservando el alpha original.
+    if (this.isGlass(materialData)) {
+      const alpha = materialData.getBaseColorFactor()[3];
+      material = { ...material, baseColorFactor: [0.85, 0.95, 1.0, alpha] };
+    }
+
     material = this.addTechniqueData(materialData, material);
     return material;
   }
@@ -247,40 +256,52 @@ export class GLTFLoader {
     material: MaterialDataType,
   ): MaterialDataType {
     let technique = 'gbuffer/gbuffer.tech';
+
     if (materialData.getAlphaMode() === 'MASK') {
       technique = 'gbuffer/gbuffer_mask.tech';
+    } else if (this.isGlass(materialData)) {
+      technique = 'utility/oit_gather.tech';
     } else if (materialData.getAlphaMode() === 'BLEND') {
       technique = 'utility/transparent.tech';
     }
     let fs = 'gbuffer/gbuffer.fs';
     if (materialData.getAlphaMode() === 'MASK') {
       fs = 'gbuffer/gbuffer_mask.fs';
+    } else if (this.isGlass(materialData)) {
+      fs = 'utility/oit_gather.fs';
     } else if (materialData.getAlphaMode() === 'BLEND') {
       fs = 'utility/transparent.fs';
     }
 
+    const isGlass = this.isGlass(materialData);
+    const isBlend = materialData.getAlphaMode() === 'BLEND';
+
     if (materialData.getDoubleSided()) {
+      const uniforms = isGlass
+        ? ([
+            PipelineBindGroupLayouts.CAMERA_UNIFORMS,
+            PipelineBindGroupLayouts.MATERIAL_TEXTURES,
+            PipelineBindGroupLayouts.OBJECT_UNIFORMS,
+            PipelineBindGroupLayouts.CUBEMAP_TEXTURE,
+          ] as const)
+        : ([
+            PipelineBindGroupLayouts.CAMERA_UNIFORMS,
+            PipelineBindGroupLayouts.MATERIAL_TEXTURES,
+            PipelineBindGroupLayouts.OBJECT_UNIFORMS,
+          ] as const);
+
       material.techniqueData = {
         vs: 'gbuffer/gbuffer.vs',
         fs,
-        uniforms: [
-          PipelineBindGroupLayouts.CAMERA_UNIFORMS,
-          PipelineBindGroupLayouts.MATERIAL_TEXTURES,
-          PipelineBindGroupLayouts.OBJECT_UNIFORMS,
-        ] as const,
-        writesOn:
-          materialData.getAlphaMode() === 'BLEND'
+        uniforms,
+        writesOn: isGlass
+          ? FragmentShaderTargets.OIT_GATHER
+          : isBlend
             ? FragmentShaderTargets.TEXTURE
             : FragmentShaderTargets.GBUFFER,
         rs: RasterizationMode.DOUBLE_SIDED,
-        z:
-          materialData.getAlphaMode() === 'BLEND'
-            ? DepthModes.TEST_BUT_NO_WRITE
-            : DepthModes.DEFAULT,
-        blend:
-          materialData.getAlphaMode() === 'BLEND'
-            ? BlendModes.ADDITIVE_BY_SRC_ALPHA
-            : BlendModes.DEFAULT,
+        z: isGlass || isBlend ? DepthModes.TEST_BUT_NO_WRITE : DepthModes.DEFAULT,
+        blend: isBlend ? BlendModes.ADDITIVE_BY_SRC_ALPHA : BlendModes.DEFAULT,
       };
     } else {
       material.technique = technique;
@@ -312,7 +333,14 @@ export class GLTFLoader {
     };
   }
 
+  private static isGlass(material: Material): boolean {
+    return material.getExtension<Transmission>('KHR_materials_transmission') !== null;
+  }
+
   private static getCategory(material: Material): RenderCategory {
+    if (this.isGlass(material)) {
+      return RenderCategory.GLASS;
+    }
     if (material.getAlphaMode() === 'BLEND') {
       return RenderCategory.TRANSPARENT;
     }

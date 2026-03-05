@@ -4,5 +4,6 @@ export enum BlendModes {
   COMBINATIVE_GBUFFER = 'combinative_gbuffer',
   COMBINATIVE = 'combinative',
   VOLUMETRIC = 'volumetric',
+  PREMULTIPLIED = 'premultiplied',
   DEFAULT = 'default',
 }

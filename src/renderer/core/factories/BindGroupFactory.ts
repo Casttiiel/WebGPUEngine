@@ -1358,6 +1358,32 @@ export class BindGroupFactory {
   }
 
   /**
+   * OIT compose bind group layout (group 0).
+   * binding 0: accumulation texture (RGBA16F)
+   * binding 1: revealage texture (RGBA8)
+   * binding 2: sampler
+   */
+  public static getOITComposeTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('oit_compose_textures', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
+  /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
     switch (layout) {
@@ -1427,6 +1453,8 @@ export class BindGroupFactory {
         return this.getContactShadowsUniformsLayout();
       case PipelineBindGroupLayouts.AUTO_EXPOSURE_READ:
         return this.getAutoExposureReadLayout();
+      case PipelineBindGroupLayouts.OIT_COMPOSE_TEXTURES:
+        return this.getOITComposeTexturesLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

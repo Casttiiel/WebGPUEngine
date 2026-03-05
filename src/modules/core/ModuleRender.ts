@@ -53,6 +53,7 @@ export class ModuleRender extends Module {
   private debugValues = {
     drawCallsSolids: { name: 'Draw Cmds (Solids)', value: 0 },
     drawCallsTransparent: { name: 'Draw Cmds (Transparent)', value: 0 },
+    drawCallsGlass: { name: 'Draw Cmds (Glass)', value: 0 },
     drawCallsDistorsions: { name: 'Draw Cmds (Distorsions)', value: 0 },
     drawCallsDecals: { name: 'Draw Cmds (Decals)', value: 0 },
     totalDrawCalls: { name: 'Total Draw Cmds', value: 0 },
@@ -503,6 +504,9 @@ export class ModuleRender extends Module {
     this.debugValues.drawCallsTransparent.value = renderManager.getDrawCallsForCategory(
       RenderCategory.TRANSPARENT,
     );
+    this.debugValues.drawCallsGlass.value = renderManager.getDrawCallsForCategory(
+      RenderCategory.GLASS,
+    );
     this.debugValues.drawCallsDistorsions.value = renderManager.getDrawCallsForCategory(
       RenderCategory.DISTORSIONS,
     );
@@ -512,6 +516,7 @@ export class ModuleRender extends Module {
     this.debugValues.totalDrawCalls.value =
       this.debugValues.drawCallsSolids.value +
       this.debugValues.drawCallsTransparent.value +
+      this.debugValues.drawCallsGlass.value +
       this.debugValues.drawCallsDistorsions.value +
       this.debugValues.drawCallsDecals.value;
     // GPU culling stats
@@ -585,6 +590,7 @@ export class ModuleRender extends Module {
         'value',
         'Draw Calls (Transparent)',
       );
+      gui.addDynamicText(this.debugValues.drawCallsGlass, 'value', 'Draw Calls (Glass)');
       gui.addDynamicText(
         this.debugValues.drawCallsDistorsions,
         'value',

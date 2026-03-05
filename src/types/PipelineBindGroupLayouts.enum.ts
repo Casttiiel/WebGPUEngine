@@ -32,4 +32,5 @@ export enum PipelineBindGroupLayouts {
   POINT_LIGHT_SHADOW_UNIFORMS = 'PointLightShadowUniforms',
   CONTACT_SHADOWS_UNIFORMS = 'ContactShadowsUniforms',
   AUTO_EXPOSURE_READ = 'AutoExposureRead',
+  OIT_COMPOSE_TEXTURES = 'OITComposeTextures',
 }

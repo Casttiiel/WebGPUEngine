@@ -1,14 +1,15 @@
 ### Engine
 
-1. Gameplay
-2. UI
+1. GLTF Glass
+2. HIGH Sponza Performance
+3. Gameplay
 
 ## Gameplay
 
-1. Jump right on change inclination and then wallrun
-   Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast Fall, Slide, Dash
+1. Actions: Jump, Wall Run, Horizontal Wall Jump, Mantle, Vertical Wall Jump, Fast Fall, Slide
 2. Blur on borders
 3. Momentum
+4. Jump right on change inclination and then wallrun
 
 ## Visuals and Sound
 
@@ -16,6 +17,14 @@
 2. Game Loading Screen
 3. Remove en main.ts el skip first frame?
 4. Quality settings selection
+
+## Rendering
+
+1. **Weighted Blended OIT** para `RenderCategory.GLASS` (cristales, agua, vidrios)
+   - Dos render targets: `accumulation` (RGBA16F) + `revealage` (R8)
+   - Compose pass sobre la escena opaca tras el forward pass
+   - Sin sorting CPU, sin artifacts de orden de renderizado
+   - `RenderCategory.TRANSPARENT` mantiene blend aditivo actual (partículas, VFX)
 
 ### Editor
 
@@ -25,8 +34,3 @@
 4. Editor Camera (Render Debug / Gizmo / Menu)
 5. Blender Export with player spawn
 6. Asset Browser + Spawn + Delete
-7. TAA
-8. Froxel Density Volumes
-9. Froxel: Self occlusion
-10. Clouds: Raymarching con Noise 3D (Horizon Zero Dawn / The Witcher 3)
-11. Froxel Global Illumination

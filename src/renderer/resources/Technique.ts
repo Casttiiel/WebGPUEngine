@@ -283,6 +283,8 @@ export class Technique extends GPUResource {
         return this.createScreenTarget();
       case FragmentShaderTargets.DEPTH_ONLY:
         return []; // No color targets, only depth output
+      case FragmentShaderTargets.OIT_GATHER:
+        return this.createOITGatherTargets();
       default:
         throw new Error(`${this.label}: Unknown Fragment Shader Target`);
     }
@@ -319,6 +321,31 @@ export class Technique extends GPUResource {
     return [{ format: QualitySettings.getInstance().getSettings().aoTexture }];
   }
 
+  /**
+   * Dual-target for Weighted Blended OIT gather pass.
+   *   [0] accumulation (rgba16float) — additive blend: ONE + ONE
+   *   [1] revealage    (rgba8unorm)  — multiplicative: ZERO + ONE_MINUS_SRC_ALPHA
+   *       fragment writes alpha to .a; blend gives product(1 - alpha_i) starting from clearValue=1
+   */
+  private createOITGatherTargets(): GPUColorTargetState[] {
+    return [
+      {
+        format: 'rgba16float',
+        blend: {
+          color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+          alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+        },
+      },
+      {
+        format: 'rgba8unorm',
+        blend: {
+          color: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+          alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        },
+      },
+    ];
+  }
+
   private createScreenTarget(): GPUColorTargetState[] {
     return [
       {
@@ -344,6 +371,8 @@ export class Technique extends GPUResource {
         return PipelineFactory.getAlphaBlending();
       case BlendModes.VOLUMETRIC:
         return PipelineFactory.getVolumetricBlending();
+      case BlendModes.PREMULTIPLIED:
+        return PipelineFactory.getPremultipliedBlending();
       default:
         return PipelineFactory.getOpaqueBlending();
     }

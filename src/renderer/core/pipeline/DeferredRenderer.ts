@@ -22,6 +22,7 @@ import { SpotLightComponent } from '../../../components/render/SpotLightComponen
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
 import { ScreenSpaceGlobalIllumination } from '../../shading/ScreenSpaceGlobalIllumination';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
+import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -34,6 +35,12 @@ export class DeferredRenderer {
   private gBufferPass!: GBufferPass;
   private renderPassManager!: RenderPassManager;
   private rtAccLight!: RenderTarget;
+  private rtOITAccumulation!: RenderTarget;
+  private rtOITRevealage!: RenderTarget;
+  private oitComposeTechnique!: Technique;
+  private oitComposeMesh!: Mesh;
+  private oitComposeBindGroup!: GPUBindGroup;
+  private oitGlassEnvBindGroup: GPUBindGroup | null = null;
   private aoResult!: GPUTextureView;
 
   private rtCopyAlbedos!: RenderTarget;
@@ -85,6 +92,12 @@ export class DeferredRenderer {
       QualitySettings.getInstance().getSettings().hdrTexture,
       GPUTextureUsage.COPY_SRC,
     );
+
+    // Create OIT render targets
+    if (!this.rtOITAccumulation) this.rtOITAccumulation = new RenderTarget();
+    this.rtOITAccumulation.createRT('oit_accumulation', width, height, 'rgba16float');
+    if (!this.rtOITRevealage) this.rtOITRevealage = new RenderTarget();
+    this.rtOITRevealage.createRT('oit_revealage', width, height, 'rgba8unorm');
 
     if (!this.rtCopyAlbedos) {
       this.rtCopyAlbedos = new RenderTarget();
@@ -147,6 +160,13 @@ export class DeferredRenderer {
       copyPartialGBufferBindGroup,
     );
 
+    // Initialize OIT passes (gather into accum+revealage, depth read-only from prepass)
+    this.renderPassManager.initializeOITPasses(
+      this.rtOITAccumulation,
+      this.rtOITRevealage,
+      prepassDepthView,
+    );
+
     // Create bind group with G-Buffer targets and linear depth from G-Buffer
     this.gBufferBindGroup = BindGroupFactory.createBindGroup(
       `gbuffer_bindgroup`,
@@ -199,6 +219,16 @@ export class DeferredRenderer {
 
     this.ssr.dispose();
     this.ssgi?.resize();
+
+    // Create OIT compose bind group (accumulation + revealage → resolve over accLight)
+    const oitLayout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.OIT_COMPOSE_TEXTURES,
+    );
+    this.oitComposeBindGroup = BindGroupFactory.createBindGroup('oit_compose_bg', oitLayout, [
+      { binding: 0, resource: this.rtOITAccumulation.getView() },
+      { binding: 1, resource: this.rtOITRevealage.getView() },
+      { binding: 2, resource: SamplerLibrary.simpleSampler! },
+    ]);
   }
 
   public async load(): Promise<void> {
@@ -233,6 +263,10 @@ export class DeferredRenderer {
     );
     this.unitSphere = await Mesh.getAsync('unit_sphere.obj');
     this.unitFrustum = await Mesh.getAsync('unit_frustum.obj');
+
+    // OIT compose resources
+    this.oitComposeTechnique = await Technique.getAsync('utility/oit_compose.tech');
+    this.oitComposeMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     this.whiteTexture = await Texture.getAsync('white.png');
 
@@ -278,6 +312,17 @@ export class DeferredRenderer {
     this.renderAccLight(camera);
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
+
+    // Weighted Blended OIT — gather glass geometry then compose over accLight
+    // Lazily create (or rebuild) the env bind group so glass gets IBL reflections.
+    this.ensureOITGlassEnvBindGroup();
+    this.renderPassManager.executePass('oit_gather', RenderCategory.GLASS);
+    this.renderPassManager.executeOITComposePass(
+      this.oitComposeMesh,
+      this.oitComposeTechnique,
+      this.oitComposeBindGroup,
+      this.rtAccLight,
+    );
 
     // Si es para reflection probes, devolver aquí (sin SSR ni volumetrics)
     if (skipPostProcessing) {
@@ -424,6 +469,26 @@ export class DeferredRenderer {
     this.ambientLight.load();
   }
 
+  /**
+   * Creates or rebuilds the OIT glass env bind group from the current environment cubemap.
+   * Caches the result — only rebuilds if the cubemap texture view changed.
+   */
+  private ensureOITGlassEnvBindGroup(): void {
+    const envTex = Engine.getEnvironmentManager().getSSREnvironmentTexture();
+    if (!envTex) return;
+    // Rebuild once per scene load or when the env texture is replaced.
+    // GPUBindGroup creation is fast; we guard with a simple null-check and
+    // rely on environment change events to null-out the cached group.
+    if (!this.oitGlassEnvBindGroup) {
+      const layout = BindGroupFactory.getLayoutFromEnum(PipelineBindGroupLayouts.CUBEMAP_TEXTURE);
+      this.oitGlassEnvBindGroup = BindGroupFactory.createBindGroup('oit_glass_env_bg', layout, [
+        { binding: 0, resource: envTex.getTextureView()! },
+        { binding: 1, resource: envTex.getSampler()! },
+      ]);
+      this.renderPassManager.setOITGatherEnvBindGroup(this.oitGlassEnvBindGroup);
+    }
+  }
+
   private dispose(): void {
     if (this.gBufferPass) {
       this.gBufferPass.dispose();
@@ -431,6 +496,13 @@ export class DeferredRenderer {
     if (this.rtAccLight) {
       this.rtAccLight.destroy();
     }
+    if (this.rtOITAccumulation) {
+      this.rtOITAccumulation.destroy();
+    }
+    if (this.rtOITRevealage) {
+      this.rtOITRevealage.destroy();
+    }
+    this.oitGlassEnvBindGroup = null;
 
     if (this.ambientLight) {
       this.ambientLight.destroy();
