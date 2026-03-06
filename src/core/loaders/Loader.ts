@@ -47,6 +47,7 @@ import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
+import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -282,6 +283,8 @@ export class Loader {
         return new SwingBarComponent();
       case 'enemy_controller':
         return new EnemyControllerComponent();
+      case 'perception':
+        return new PerceptionComponent();
       case 'height_fog':
         return new HeightFogComponent();
       case 'contact_shadows':

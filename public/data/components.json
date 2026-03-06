@@ -5,6 +5,7 @@
     "particle_system",
     "character_controller",
     "enemy_controller",
+    "perception",
     "flow",
     "swing_bar",
     "depth_of_field",

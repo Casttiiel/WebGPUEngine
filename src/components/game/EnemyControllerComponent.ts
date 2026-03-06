@@ -90,6 +90,7 @@ export class EnemyControllerComponent extends Component {
     // Seed the blackboard with self-reference and initial values
     this.bb.set<EnemyControllerComponent>('self', this);
     this.bb.set<vec3>('position', vec3.create());
+    this.bb.set<vec3>('facing', vec3.fromValues(0, 0, 1));
     this.bb.set<boolean>('isGrounded', false);
     this.bb.set<boolean>('canSeePlayer', false);
     this.bb.set<vec3>('playerPosition', vec3.create());
@@ -155,6 +156,12 @@ export class EnemyControllerComponent extends Component {
     const yaw = Math.atan2(dx, dz);
     const transform = this.getOwner().getComponent('transform') as TransformComponent;
     if (transform) transform.getTransform().setAngles(yaw, 0, 0);
+
+    // Keep 'facing' in sync so PerceptionComponent can use it for FOV cone checks
+    const len = Math.sqrt(dx * dx + dz * dz);
+    const facing = this.bb.get<vec3>('facing') ?? vec3.create();
+    vec3.set(facing, dx / len, 0, dz / len);
+    this.bb.set('facing', facing);
   }
 
   public getMoveSpeed(): number {
