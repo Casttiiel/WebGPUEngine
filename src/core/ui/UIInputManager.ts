@@ -59,35 +59,28 @@ export class UIInputManager {
   }
 
   /**
-   * Extract world position from widget's absolute transformation matrix.
-   * The absolute matrix contains the final world position after hierarchy transforms.
-   *
-   * @param widget Widget to extract position from
-   * @returns vec2 with world position (X, Y from matrix translation)
+   * Return widget's AABB centre in physical pixels.
+   * Uses originX/Y (top-left) + half-size — NOT the matrix translation,
+   * which points to the pivot, not the centre.
    */
   public getWidgetWorldPosition(widget: Widget): vec2 {
-    const absolute = widget.getAbsolute();
-    // Extract translation from mat4: elements [12] and [13] are X and Y translation
-    return vec2.fromValues(absolute[12], absolute[13]);
+    const [ox, oy] = widget.getOrigin();
+    const size = widget.getSize();
+    return vec2.fromValues(ox + size[0] * 0.5, oy + size[1] * 0.5);
   }
 
   /**
    * Check if mouse is hovering over a widget.
-   * Combines world position, size, and AABB detection.
+   * All coordinates are in physical pixels.
    *
    * @param widget Widget to test
-   * @param mouseUIPos Mouse position in UI space
+   * @param mousePhysPos Mouse position in physical pixels
    * @returns true if mouse is over widget
    */
-  public checkHover(widget: Widget, mouseUIPos: vec2): boolean {
-    // Get widget's world position from its absolute transform
-    const worldPos = this.getWidgetWorldPosition(widget);
-
-    // Get widget size
+  public checkHover(widget: Widget, mousePhysPos: vec2): boolean {
+    const centre = this.getWidgetWorldPosition(widget);
     const size = widget.getSize();
-
-    // AABB collision test
-    return this.pointInRectangle(mouseUIPos, worldPos, size);
+    return this.pointInRectangle(mousePhysPos, centre, vec2.fromValues(size[0], size[1]));
   }
 
   /**

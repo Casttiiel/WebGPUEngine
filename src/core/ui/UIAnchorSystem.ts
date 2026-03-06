@@ -1,8 +1,8 @@
-import { vec2 } from 'gl-matrix';
+﻿import { UIRenderUtils } from '../../renderer/core/UIRenderUtils.js';
 
 /**
- * Anchor types for positioning UI widgets
- * Defines 9 standard anchor points on the screen
+ * Anchor types â€” define which screen edge/corner a root widget is relative to.
+ * Children widgets do NOT use anchors; they are always relative to their parent's top-left.
  */
 export enum AnchorType {
   CENTER = 'center',
@@ -17,82 +17,57 @@ export enum AnchorType {
 }
 
 /**
- * Static utility class for calculating anchor positions
- * Used by widgets to position themselves relative to screen edges/corners
+ * UIAnchorSystem â€” maps anchor types to a physical-pixel base coordinate.
+ *
+ * Widget.computeAbsolute() calls getAnchorBasePhysical() to obtain the
+ * starting point from which (x * gs, y * gs) is added.
+ *
+ * Examples (1920Ã—1080 screen, gs=1):
+ *   bottom-left  + x=40,  y=-80  â†’ origin at (40, 1000)     â€” 40px from left, 80px from bottom
+ *   top-right    + x=-200, y=20  â†’ origin at (1720, 20)     â€” 200px from right, 20px from top
+ *   center       + x=-405, y=-540 â†’ origin at (555, 0)      â€” centred 811px-wide element
  */
 export class UIAnchorSystem {
   /**
-   * Get the position of an anchor point in reference canvas space
-   * @param anchor - The anchor type (center, top-left, etc.)
-   * @param refWidth - Reference canvas width (e.g., 1920)
-   * @param refHeight - Reference canvas height (e.g., 1080)
-   * @returns Position [x, y] in reference canvas coordinates
+   * Returns the physical-pixel base point for a given anchor.
+   * The widget's (x * gs, y * gs) offset is added on top of this base.
    */
-  public static getAnchorPosition(anchor: AnchorType, refWidth: number, refHeight: number): vec2 {
-    const pos = vec2.create();
+  public static getAnchorBasePhysical(anchor: AnchorType): [number, number] {
+    const W = UIRenderUtils.getScreenWidth();
+    const H = UIRenderUtils.getScreenHeight();
 
     switch (anchor) {
+      case AnchorType.TOP_LEFT:     return [0,     0    ];
+      case AnchorType.TOP_CENTER:   return [W / 2, 0    ];
+      case AnchorType.TOP_RIGHT:    return [W,     0    ];
+      case AnchorType.BOTTOM_LEFT:  return [0,     H    ];
+      case AnchorType.BOTTOM_CENTER:return [W / 2, H    ];
+      case AnchorType.BOTTOM_RIGHT: return [W,     H    ];
+      case AnchorType.LEFT_CENTER:  return [0,     H / 2];
+      case AnchorType.RIGHT_CENTER: return [W,     H / 2];
       case AnchorType.CENTER:
-        return vec2.fromValues(refWidth / 2, refHeight / 2);
-
-      case AnchorType.TOP_LEFT:
-        return vec2.fromValues(0, 0);
-
-      case AnchorType.TOP_CENTER:
-        return vec2.fromValues(refWidth / 2, 0);
-
-      case AnchorType.TOP_RIGHT:
-        return vec2.fromValues(refWidth, 0);
-
-      case AnchorType.BOTTOM_LEFT:
-        return vec2.fromValues(0, refHeight);
-
-      case AnchorType.BOTTOM_CENTER:
-        return vec2.fromValues(refWidth / 2, refHeight);
-
-      case AnchorType.BOTTOM_RIGHT:
-        return vec2.fromValues(refWidth, refHeight);
-
-      case AnchorType.LEFT_CENTER:
-        return vec2.fromValues(0, refHeight / 2);
-
-      case AnchorType.RIGHT_CENTER:
-        return vec2.fromValues(refWidth, refHeight / 2);
-
-      default:
-        console.warn(`UIAnchorSystem: Unknown anchor type ${anchor}, defaulting to center`);
-        return vec2.fromValues(refWidth / 2, refHeight / 2);
+      default:                      return [W / 2, H / 2];
     }
   }
 
   /**
-   * Parse anchor type from string
-   * @param anchorStr - Anchor string from JSON (e.g., "top-left", "center")
-   * @returns AnchorType enum value or null if invalid
+   * Parse anchor string from JSON.
+   * Returns null if the string is not a recognised anchor type.
    */
   public static parseAnchorType(anchorStr: string): AnchorType | null {
-    const normalized = anchorStr.toLowerCase().trim();
-
-    switch (normalized) {
-      case 'center':
-        return AnchorType.CENTER;
-      case 'top-left':
-        return AnchorType.TOP_LEFT;
-      case 'top-center':
-        return AnchorType.TOP_CENTER;
-      case 'top-right':
-        return AnchorType.TOP_RIGHT;
-      case 'bottom-left':
-        return AnchorType.BOTTOM_LEFT;
-      case 'bottom-center':
-        return AnchorType.BOTTOM_CENTER;
-      case 'bottom-right':
-        return AnchorType.BOTTOM_RIGHT;
-      case 'left-center':
-        return AnchorType.LEFT_CENTER;
-      case 'right-center':
-        return AnchorType.RIGHT_CENTER;
+    const s = anchorStr.toLowerCase().trim();
+    switch (s) {
+      case 'center':        return AnchorType.CENTER;
+      case 'top-left':      return AnchorType.TOP_LEFT;
+      case 'top-center':    return AnchorType.TOP_CENTER;
+      case 'top-right':     return AnchorType.TOP_RIGHT;
+      case 'bottom-left':   return AnchorType.BOTTOM_LEFT;
+      case 'bottom-center': return AnchorType.BOTTOM_CENTER;
+      case 'bottom-right':  return AnchorType.BOTTOM_RIGHT;
+      case 'left-center':   return AnchorType.LEFT_CENTER;
+      case 'right-center':  return AnchorType.RIGHT_CENTER;
       default:
+        console.warn(`UIAnchorSystem: unknown anchor "${anchorStr}"`);
         return null;
     }
   }

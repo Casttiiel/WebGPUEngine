@@ -1,4 +1,5 @@
 // src/modules/core/ModuleUI.ts
+import { vec2 } from 'gl-matrix';
 import { Module } from './Module';
 import { UIInputManager } from '../../core/ui/UIInputManager';
 import { Engine } from '../../core/engine/Engine';
@@ -88,7 +89,7 @@ export class ModuleUI extends Module {
       type: type,
       widget: widget,
       enabled: false,
-      controller: controller,
+      ...(controller !== undefined && { controller }),
     };
 
     this.widgetStructureMap.set(type, widgetClass);
@@ -123,26 +124,21 @@ export class ModuleUI extends Module {
     const input = Engine.getInput();
     if (!input) return;
 
-    // Get canvas dimensions
     const canvas = document.querySelector('canvas');
     if (!canvas) return;
 
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-
-    // Get mouse position from ModuleInput
+    // Get mouse position from ModuleInput (CSS pixels → physical pixels)
     const mousePos = input.getMousePosition();
-
-    // Convert window coordinates to UI space
-    const mouseUIPos = this.inputManager.windowToUISpace(mousePos.x, mousePos.y, width, height);
+    const dpr = window.devicePixelRatio || 1;
+    const mousePhysPos = vec2.fromValues(mousePos.x * dpr, mousePos.y * dpr);
 
     // Detect click (transition from not pressed to pressed)
     const isMousePressed = input.isMouseButtonPressed(MouseButton.LEFT);
     const isMouseClicked = isMousePressed && !this.lastMouseClicked;
     this.lastMouseClicked = isMousePressed;
 
-    // Process input for all active widgets
-    this.inputManager.processInput(this.activeWidgets, mouseUIPos, isMouseClicked);
+    // Process input for all active widgets (physical-px coordinates)
+    this.inputManager.processInput(this.activeWidgets, mousePhysPos, isMouseClicked);
   }
 
   private updateLerps(dt: number): void {
@@ -278,7 +274,7 @@ export class ModuleUI extends Module {
       type: type,
       widget: widget,
       enabled: false,
-      controller: controller,
+      ...(controller !== undefined && { controller }),
     };
 
     this.widgetStructureMap.set(type, widgetClass);

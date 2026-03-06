@@ -1,6 +1,9 @@
 ### Engine
 
-1. Enemy AI
+1. UI
+2. Froxels
+3. Gameplay
+4. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo
@@ -10,9 +13,6 @@
    Fase 3 — Polish
    └── AnimationStateMachine driven by BT state
    (idle → patrol → chase → attack)
-
-2. UI
-3. Gameplay
 
 ## Gameplay
 

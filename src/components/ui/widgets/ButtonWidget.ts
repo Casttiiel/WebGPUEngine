@@ -84,18 +84,14 @@ export class ButtonWidget extends Widget {
     const minUV = vec2.fromValues(imageParams.minUV.x, imageParams.minUV.y);
     const maxUV = vec2.fromValues(imageParams.maxUV.x, imageParams.maxUV.y);
 
-    // Render using UIRenderUtils
-    // If widget has anchor, use local transform (absolute positioning)
-    // Otherwise use absolute transform (relative to parent hierarchy)
-    const transform = this.hasAnchor() ? this.getLocal() : this.getAbsolute();
     UIRenderUtils.renderBitmap(
       renderPass,
       this.cachedImageTexture,
-      transform,
+      this.getAbsolute(),
       tint,
       minUV,
       maxUV,
-      imageParams.additive, // Additive blending mode
+      imageParams.additive,
     );
   }
 

@@ -52,12 +52,12 @@ export class CarouselController extends WidgetController {
 
     // Deactivate current slide
     if (this.currentSlide >= 0 && this.currentSlide < this.slides.length) {
-      this.slides[this.currentSlide].setActive(false);
+      this.slides[this.currentSlide]?.setActive(false);
     }
 
     // Activate new slide
     this.currentSlide = index;
-    this.slides[this.currentSlide].setActive(true);
+    this.slides[this.currentSlide]?.setActive(true);
 
     // Reset auto-advance timer
     this.timeSinceLastAdvance = 0;
@@ -140,11 +140,11 @@ export class CarouselController extends WidgetController {
     // KEYBOARD NAVIGATION
     // ============================================================================
 
-    if (input.isKeyPressed('ArrowRight') || input.isKeyPressed('KeyD')) {
+    if (input.isKeyPressed(KeyCode.ARROW_RIGHT) || input.isKeyPressed(KeyCode.D)) {
       this.nextSlide();
     }
 
-    if (input.isKeyPressed('ArrowLeft') || input.isKeyPressed('KeyA')) {
+    if (input.isKeyPressed(KeyCode.ARROW_LEFT) || input.isKeyPressed(KeyCode.A)) {
       this.previousSlide();
     }
 

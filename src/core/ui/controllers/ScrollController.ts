@@ -2,6 +2,7 @@
 import { WidgetController } from '../WidgetController';
 import { Widget } from '../../../components/ui/Widget';
 import { Engine } from '../../engine/Engine';
+import { KeyCode } from '../../../types/KeyCode.enum';
 
 /**
  * ScrollController - Manages scrollable content areas.
@@ -131,7 +132,7 @@ export class ScrollController extends WidgetController {
 
     // Update content position based on scroll offset
     const currentPos = this.content.getPosition();
-    this.content.setPosition(currentPos[0], -this.scrollOffset);
+    this.content.setPosition(currentPos.x, -this.scrollOffset);
     this.content.updateTransform();
   }
 
@@ -160,19 +161,19 @@ export class ScrollController extends WidgetController {
     // KEYBOARD SCROLLING
     // ============================================================================
 
-    if (input.isKeyDown('ArrowDown') || input.isKeyDown('KeyS')) {
+    if (input.isKeyPressed(KeyCode.ARROW_DOWN) || input.isKeyPressed(KeyCode.S)) {
       this.scroll(this.scrollSpeed * dt);
     }
 
-    if (input.isKeyDown('ArrowUp') || input.isKeyDown('KeyW')) {
+    if (input.isKeyPressed(KeyCode.ARROW_UP) || input.isKeyPressed(KeyCode.W)) {
       this.scroll(-this.scrollSpeed * dt);
     }
 
-    if (input.isKeyPressed('Home')) {
+    if (input.isKeyJustPressed(KeyCode.HOME)) {
       this.scrollToTop();
     }
 
-    if (input.isKeyPressed('End')) {
+    if (input.isKeyJustPressed(KeyCode.END)) {
       this.scrollToBottom();
     }
 

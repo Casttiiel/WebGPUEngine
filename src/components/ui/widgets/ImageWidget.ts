@@ -69,18 +69,14 @@ export class ImageWidget extends Widget {
     const minUV = vec2.fromValues(this.imageParams.minUV.x, this.imageParams.minUV.y);
     const maxUV = vec2.fromValues(this.imageParams.maxUV.x, this.imageParams.maxUV.y);
 
-    // Render using UIRenderUtils
-    // If widget has anchor, use local transform (absolute positioning)
-    // Otherwise use absolute transform (relative to parent hierarchy)
-    const transform = this.hasAnchor() ? this.getLocal() : this.getAbsolute();
     UIRenderUtils.renderBitmap(
       renderPass,
       this.cachedTexture,
-      transform,
+      this.getAbsolute(),
       tint,
       minUV,
       maxUV,
-      this.imageParams.additive, // Additive blending mode
+      this.imageParams.additive,
     );
   }
 
@@ -100,12 +96,9 @@ export class ImageWidget extends Widget {
     return this.imageParams.texture;
   }
 
-  public setSize(x: number, y: number): void {
+  public override setSize(x: number, y: number): void {
+    super.setSize(x, y);
     this.imageParams.size = { x, y };
-  }
-
-  public override getSize(): vec2 {
-    return vec2.fromValues(this.imageParams.size.x, this.imageParams.size.y);
   }
 
   public setColor(r: number, g: number, b: number, a: number): void {

@@ -1,42 +1,57 @@
-// src/components/ui/Widget.ts
-import { mat4, vec2, vec3 } from 'gl-matrix';
+﻿// src/components/ui/Widget.ts
+import { mat4, vec2 } from 'gl-matrix';
 import type { WidgetEffect, WidgetParams } from '../../types/WidgetTypes';
 import { AnchorType, UIAnchorSystem } from '../../core/ui/UIAnchorSystem.js';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils.js';
 
 /**
- * Widget base class with integrated 4x4 matrix transformations.
+ * Widget base class â€” reference-space (1920Ã—1080) coordinate system.
  *
- * ⚠️ Uses mat4 (4x4) with Z=0 for 2D transformations (NOT 2D matrices).
+ * Key rules:
+ *  - `x, y` is the TOP-LEFT corner of the element in the 1920Ã—1080 design canvas.
+ *  - `width, height` is the element size in the same reference space.
+ *  - `pivotX/Y` (0â€“1) only affects the centre of rotation/scale, NOT position.
+ *  - Children's x,y is an offset from the parent's top-left corner.
+ *  - Anchor is only meaningful on root widgets (no parent).
+ *  - The render matrix (`absolute`) is in physical pixels, ready for the ortho projection.
+ *
+ * Transform formula:
+ *   gs       = globalScale  (or DPR if scaleWithScreen:false)
+ *   originX  = anchorBase + x * gs   (root)  |  parent.originX + x * gs  (child)
+ *   pivX     = originX + pivotX * width * gs
+ *   absolute = T(pivX,pivY) * R(rotation) * T((0.5âˆ’pivX)*w*gs, (0.5âˆ’pivY)*h*gs) * S(w*gs, h*gs)
  */
 export class Widget {
-  private name: string;
-  private alias: string;
-  private params: WidgetParams;
+  protected name: string;
+  protected alias: string;
+  protected params: WidgetParams;
   private parent: Widget | null = null;
   private children: Widget[] = [];
   private effects: WidgetEffect[] = [];
 
-  // ⚠️ Transformation matrices (4x4)
-  private pivot: mat4 = mat4.create();
-  private local: mat4 = mat4.create();
-  private absolute: mat4 = mat4.create();
+  // â”€â”€ Reference-space parameters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  protected x: number;
+  protected y: number;
+  protected width: number;
+  protected height: number;
+  protected pivotX: number;
+  protected pivotY: number;
+  protected rotation: number;
+  protected scaleWithScreen: boolean;
+  protected anchorType: AnchorType | undefined = undefined;
 
-  // Transformation parameters (2D with Z=0)
-  private position: vec3 = vec3.fromValues(0, 0, 0);
-  private pivotPoint: vec3 = vec3.fromValues(0, 0, 0);
-  private scale: vec3 = vec3.fromValues(1, 1, 1);
-  private rotation: number = 0;
+  // ── Effect scale (used by FXScale / FXFade effects) ─────────────────────────
+  private effectScaleX: number = 1;
+  private effectScaleY: number = 1;
 
-  // Anchor system (Phase 2)
-  private anchorType?: AnchorType; // Optional anchor point (e.g., "top-left")
-  private anchorOffset: vec2 = vec2.create(); // Offset from anchor position
+  // â”€â”€ Physical-pixel computed values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  /** Top-left corner in physical pixels (updated by computeAbsolute). */
+  public originX: number = 0;
+  public originY: number = 0;
+  /** Render matrix in physical pixels â€” fed to the ortho projection in UIRenderUtils. */
+  protected absolute: mat4 = mat4.create();
 
-  // Size mode: 'fixed' (absolute pixels) or 'relative' (scaled from 1920x1080)
-  private sizeMode: 'fixed' | 'relative' = 'relative'; // Default: relative
-  private baseScale: vec3 = vec3.fromValues(1, 1, 1); // Original scale before UI scaling
-
-  // Input event callbacks (optional)
+  // â”€â”€ Input callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   public onMouseEnter?: () => void;
   public onMouseLeave?: () => void;
   public onClick?: () => void;
@@ -46,48 +61,27 @@ export class Widget {
     this.alias = alias;
     this.params = params;
 
-    // Initialize transformation parameters from params
-    if (params.position) {
-      this.position = vec3.fromValues(params.position.x, params.position.y, 0);
-    }
-    if (params.pivot) {
-      this.pivotPoint = vec3.fromValues(params.pivot.x, params.pivot.y, 0);
-    }
-    if (params.scale) {
-      this.scale = vec3.fromValues(params.scale.x, params.scale.y, 1);
-      this.baseScale = vec3.clone(this.scale); // Store original scale
-    }
-    if (params.rotation !== undefined) {
-      this.rotation = params.rotation;
-    }
+    this.x = params.x ?? 0;
+    this.y = params.y ?? 0;
+    this.width = params.width ?? 100;
+    this.height = params.height ?? 100;
+    this.pivotX = params.pivotX ?? 0;
+    this.pivotY = params.pivotY ?? 0;
+    this.rotation = params.rotation ?? 0;
+    this.scaleWithScreen = params.scaleWithScreen ?? true;
 
-    // Initialize size mode (default: relative)
-    if (params.sizeMode) {
-      this.sizeMode = params.sizeMode;
-    }
-
-    // Initialize anchor system (Phase 2)
     if (params.anchor) {
-      const parsedAnchor = UIAnchorSystem.parseAnchorType(params.anchor);
-      if (parsedAnchor !== null) {
-        this.anchorType = parsedAnchor;
-      }
-    }
-    if (params.offset) {
-      vec2.set(this.anchorOffset, params.offset.x, params.offset.y);
+      const parsed = UIAnchorSystem.parseAnchorType(params.anchor);
+      if (parsed !== null) this.anchorType = parsed;
     }
   }
 
   // ============================================================================
-  // LIFECYCLE METHODS
+  // LIFECYCLE
   // ============================================================================
 
   public start(): void {
-    // Force initial transform calculation for anchored widgets
-    if (this.anchorType !== undefined) {
-      this.updateTransform();
-    }
-
+    this.updateTransform();
     for (const fx of this.effects) fx.start();
     for (const child of this.children) child.start();
   }
@@ -98,17 +92,16 @@ export class Widget {
   }
 
   public update(dt: number): void {
-    // If using anchor system, only recalculate transform when screen size changes
-    if (this.anchorType !== undefined && UIRenderUtils.hasScreenSizeChanged()) {
+    // Recompute on resize (flag set by UIRenderUtils.updateScreenSize)
+    if (UIRenderUtils.hasScreenSizeChanged()) {
       this.updateTransform();
     }
-
     for (const fx of this.effects) fx.update(dt);
     for (const child of this.children) child.update(dt);
   }
 
   protected render(_renderPass: GPURenderPassEncoder): void {
-    // To be implemented by subclasses
+    // Override in subclasses
   }
 
   public doRender(renderPass: GPURenderPassEncoder): void {
@@ -116,6 +109,8 @@ export class Widget {
     this.render(renderPass);
     for (const child of this.children) child.doRender(renderPass);
   }
+
+  public renderDebug(): void {}
 
   public onActivate(): void {
     for (const child of this.children) child.onActivate();
@@ -126,13 +121,75 @@ export class Widget {
     for (const child of this.children) child.onDeactivate();
   }
 
+  // ============================================================================
+  // TRANSFORM
+  // ============================================================================
+
+  /**
+   * Recompute the absolute render matrix for this widget and all its children.
+   * Call after any position/size/anchor change, or when screen size changes.
+   */
   public updateTransform(): void {
     this.computeAbsolute();
     for (const child of this.children) child.updateTransform();
   }
 
+  /**
+   * Compute `originX/Y` (physical-px top-left) and `absolute` render matrix.
+   *
+   * No rotation, pivotX=0 example:
+   *   originX  = canvasOffX + x * gs
+   *   centre   = (originX + w*gs/2, originY + h*gs/2)
+   *   absolute = T(centre) * S(w*gs, h*gs)
+   *
+   * With pivot=(0.5, 0.5) and rotation r:
+   *   pivX = originX + 0.5*w*gs  (centre)
+   *   absolute = T(pivX,pivY) * R(r) * T(0,0) * S(w*gs,h*gs)
+   */
+  protected computeAbsolute(): void {
+    const gs = this.scaleWithScreen
+      ? UIRenderUtils.getGlobalScale()
+      : (window.devicePixelRatio || 1);
+
+    const physW = this.width * gs;
+    const physH = this.height * gs;
+
+    // â”€â”€ Compute top-left origin in physical pixels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if (this.parent === null) {
+      if (this.anchorType !== undefined) {
+        const [bx, by] = UIAnchorSystem.getAnchorBasePhysical(this.anchorType);
+        this.originX = bx + this.x * gs;
+        this.originY = by + this.y * gs;
+      } else {
+        const [ox, oy] = UIRenderUtils.getCanvasOffset();
+        this.originX = ox + this.x * gs;
+        this.originY = oy + this.y * gs;
+      }
+    } else {
+      // Child: offset from parent's top-left
+      this.originX = this.parent.originX + this.x * gs;
+      this.originY = this.parent.originY + this.y * gs;
+    }
+
+    // â”€â”€ Build render matrix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Pivot point in physical px
+    const pivX = this.originX + this.pivotX * physW;
+    const pivY = this.originY + this.pivotY * physH;
+    // Offset from pivot to quad centre (mesh is [-0.5..0.5] centred)
+    const offX = (0.5 - this.pivotX) * physW;
+    const offY = (0.5 - this.pivotY) * physH;
+
+    mat4.identity(this.absolute);
+    mat4.translate(this.absolute, this.absolute, [pivX, pivY, 0]);
+    if (this.rotation !== 0) {
+      mat4.rotateZ(this.absolute, this.absolute, this.rotation);
+    }
+    mat4.translate(this.absolute, this.absolute, [offX, offY, 0]);
+    mat4.scale(this.absolute, this.absolute, [physW * this.effectScaleX, physH * this.effectScaleY, 1]);
+  }
+
   // ============================================================================
-  // HIERARCHY MANAGEMENT
+  // HIERARCHY
   // ============================================================================
 
   public setParent(parent: Widget | null): void {
@@ -162,7 +219,7 @@ export class Widget {
   }
 
   // ============================================================================
-  // EFFECT MANAGEMENT
+  // EFFECTS
   // ============================================================================
 
   public addEffect(effect: WidgetEffect): void {
@@ -183,7 +240,7 @@ export class Widget {
   }
 
   // ============================================================================
-  // VISIBILITY AND ACTIVATION
+  // VISIBILITY / ACTIVATION
   // ============================================================================
 
   public setVisible(visible: boolean): void {
@@ -194,236 +251,126 @@ export class Widget {
     return this.params.visible;
   }
 
-  public childAppears(
-    getFromChildren: boolean,
-    darkAlpha: boolean,
-    initialTime: number,
-    lerpTime: number,
-  ): void {
-    // Fade-in animation for widgets
-    // This would integrate with ModuleUI.lerp() system
-    // For now, it's a placeholder for future implementation
-    if (getFromChildren) {
-      for (const child of this.children) {
-        child.childAppears(true, darkAlpha, initialTime, lerpTime);
-      }
-    }
+  /** Alias of setVisible â€” used by CarouselController and similar. */
+  public setActive(active: boolean): void {
+    this.setVisible(active);
   }
 
   // ============================================================================
-  // TRANSFORMATION SYSTEM
-  // ============================================================================
-
-  /**
-   * Compute pivot matrix: Identity * Translation(-pivot.x, -pivot.y, 0)
-   */
-  protected computePivot(): void {
-    mat4.identity(this.pivot);
-    mat4.translate(
-      this.pivot,
-      this.pivot,
-      vec3.fromValues(-this.pivotPoint[0], -this.pivotPoint[1], 0),
-    );
-  }
-
-  /**
-   * Compute local transformation matrix: local = translation * rotation * scale * pivot.
-   *
-   * If anchor is defined, calculates position from anchor point:
-   *   finalPosition = anchorPosition + anchorOffset (scaled)
-   */
-  protected computeLocal(): void {
-    this.computePivot();
-
-    // Calculate final position based on anchor (if set) or direct position
-    let finalPosition = vec3.clone(this.position);
-
-    if (this.anchorType !== undefined) {
-      // Get current screen dimensions
-      const screenWidth = UIRenderUtils.getScreenWidth();
-      const screenHeight = UIRenderUtils.getScreenHeight();
-
-      // Calculate anchor position in screen space
-      const anchorPos = UIAnchorSystem.getAnchorPosition(
-        this.anchorType,
-        screenWidth,
-        screenHeight,
-      );
-
-      // Get UI scale factor (based on 1920x1080 reference)
-      // This ensures offsets scale proportionally with screen size
-      const scaleFactor = UIRenderUtils.getUIScaleFactor();
-
-      // Apply anchor position + scaled offset
-      finalPosition = vec3.fromValues(
-        anchorPos[0] + this.anchorOffset[0] * scaleFactor,
-        anchorPos[1] + this.anchorOffset[1] * scaleFactor,
-        0,
-      );
-    }
-
-    const tr = mat4.create();
-    const sc = mat4.create();
-    const rot = mat4.create();
-
-    // Translation in X,Y with Z=0 (using calculated finalPosition)
-    mat4.fromTranslation(tr, finalPosition);
-
-    // Apply UI scale factor to size if mode is 'relative'
-    let finalScale = vec3.clone(this.baseScale);
-    if (this.sizeMode === 'relative') {
-      // Scale each axis independently (allows deformation)
-      const [scaleX, scaleY] = UIRenderUtils.getUIScaleFactors();
-
-      // baseScale is in CSS pixels, need to convert to physical first
-      const dpr = window.devicePixelRatio || 1;
-      finalScale[0] = this.baseScale[0] * dpr * scaleX;
-      finalScale[1] = this.baseScale[1] * dpr * scaleY;
-      finalScale[2] = this.baseScale[2]; // Z unchanged
-    }
-
-    // Scale in X,Y with Z=1 (no Z scaling)
-    mat4.fromScaling(sc, finalScale);
-
-    // Rotation only on Z axis
-    mat4.fromZRotation(rot, this.rotation);
-
-    // Correct order for 2D UI: local = translation * rotation * scale * pivot
-    // This ensures position is in pixels, unaffected by scale
-    mat4.multiply(this.local, tr, rot); // local = tr * rot
-    mat4.multiply(this.local, this.local, sc); // local = (tr * rot) * sc
-    mat4.multiply(this.local, this.local, this.pivot); // local = (tr * rot * sc) * pivot
-  }
-
-  /**
-   * Compute absolute (world) matrix with parent hierarchy.
-   * Formula: absolute = parent.absolute * local (parent first!)
-   */
-  protected computeAbsolute(): void {
-    this.computeLocal();
-
-    if (this.parent) {
-      // CRITICAL: parent first, then local
-      // This prevents child's scale from affecting parent's position
-      mat4.multiply(this.absolute, this.parent.absolute, this.local);
-    } else {
-      mat4.copy(this.absolute, this.local);
-    }
-  }
-
-  // ============================================================================
-  // PUBLIC SETTERS FOR TRANSFORMATIONS
+  // SETTERS  (all call updateTransform so the matrix stays current)
   // ============================================================================
 
   public setPosition(x: number, y: number): void {
-    vec3.set(this.position, x, y, 0);
+    this.x = x;
+    this.y = y;
+    this.updateTransform();
   }
 
-  public setPivot(x: number, y: number): void {
-    vec3.set(this.pivotPoint, x, y, 0);
+  /** Return the current visual effect scale (used by FXScale). */
+  public getScale(): [number, number] {
+    return [this.effectScaleX, this.effectScaleY];
   }
 
+  /** Set visual effect scale without affecting layout/hit-detection size. */
   public setScale(x: number, y: number): void {
-    vec3.set(this.baseScale, x, y, 1);
-    vec3.set(this.scale, x, y, 1);
+    this.effectScaleX = x;
+    this.effectScaleY = y;
+  }
+
+  public setSize(w: number, h: number): void {
+    this.width = w;
+    this.height = h;
+    this.updateTransform();
   }
 
   public setRotation(radians: number): void {
     this.rotation = radians;
+    this.updateTransform();
   }
 
+  public setPivot(px: number, py: number): void {
+    this.pivotX = px;
+    this.pivotY = py;
+    this.updateTransform();
+  }
+
+  public setAnchor(anchor: AnchorType, offsetX: number = 0, offsetY: number = 0): void {
+    this.anchorType = anchor;
+    this.x = offsetX;
+    this.y = offsetY;
+    this.updateTransform();
+  }
+
+  public clearAnchor(): void {
+    this.anchorType = undefined;
+    this.updateTransform();
+  }
+
+  /** Low-level parent assignment (no addChild bookkeeping). */
   public setParentWidget(parent: Widget | null): void {
     this.parent = parent;
   }
 
-  // Anchor system setters (Phase 2)
-  public setAnchor(anchor: AnchorType, offsetX: number = 0, offsetY: number = 0): void {
-    this.anchorType = anchor;
-    vec2.set(this.anchorOffset, offsetX, offsetY);
-  }
-
-  public clearAnchor(): void {
-    delete this.anchorType;
-    vec2.set(this.anchorOffset, 0, 0);
-  }
-
-  // Getters for transformation parameters
-  public getPosition(): vec3 {
-    return this.position;
-  }
-  public getPivot(): vec3 {
-    return this.pivotPoint;
-  }
-  public getScale(): vec3 {
-    return this.scale;
-  }
-  public getRotation(): number {
-    return this.rotation;
-  }
-  public getName(): string {
-    return this.name;
-  }
-  public getAlias(): string {
-    return this.alias;
-  }
-  public getParams(): WidgetParams {
-    return this.params;
-  }
-
-  // Anchor system getters (Phase 2)
-  public getAnchor(): AnchorType | undefined {
-    return this.anchorType;
-  }
-  public getAnchorOffset(): vec2 {
-    return this.anchorOffset;
-  }
-
-  // Getters for transformation matrices
-  public getLocal(): mat4 {
-    return this.local;
-  }
-
-  public getAbsolute(): mat4 {
-    return this.absolute;
-  }
-
-  public hasAnchor(): boolean {
-    return this.anchorType !== undefined;
-  }
-
-  public getPivotMatrix(): mat4 {
-    return this.pivot;
-  }
-
   // ============================================================================
-  // INPUT DETECTION SUPPORT
+  // GETTERS
   // ============================================================================
+
+  public getName(): string { return this.name; }
+  public getAlias(): string { return this.alias; }
+  public getParams(): WidgetParams { return this.params; }
+
+  public getX(): number { return this.x; }
+  public getY(): number { return this.y; }
+  public getWidth(): number { return this.width; }
+  public getHeight(): number { return this.height; }
+  public getRotation(): number { return this.rotation; }
+  public getAnchor(): AnchorType | undefined { return this.anchorType; }
+  public hasAnchor(): boolean { return this.anchorType !== undefined; }
+
+  /** Absolute render matrix in physical pixels. Always use this for rendering. */
+  public getAbsolute(): mat4 { return this.absolute; }
+  /** Backwards-compat alias. */
+  public getAbsoluteTransform(): mat4 { return this.absolute; }
+
+  /** Top-left corner in physical pixels (for hit detection). */
+  public getOrigin(): [number, number] { return [this.originX, this.originY]; }
 
   /**
-   * Get widget size for AABB collision detection.
-   * Returns size from params, scaled by current scale transform.
-   * Subclasses can override for dynamic sizes.
-   *
-   * @returns vec2 with width and height in UI space
+   * Size in physical pixels â€” used for AABB hit detection.
+   * Subclasses can override if they manage their own size logic.
    */
   public getSize(): vec2 {
-    const baseSize = this.params.size || { x: 1.0, y: 1.0 };
-    // Apply scale transform to base size
-    return vec2.fromValues(baseSize.x * this.scale[0], baseSize.y * this.scale[1]);
+    const gs = this.scaleWithScreen
+      ? UIRenderUtils.getGlobalScale()
+      : (window.devicePixelRatio || 1);
+    return vec2.fromValues(this.width * gs, this.height * gs);
   }
+
+  // â”€â”€ Input callback setters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  public setOnMouseEnter(callback: () => void): void { this.onMouseEnter = callback; }
+  public setOnMouseLeave(callback: () => void): void { this.onMouseLeave = callback; }
+  public setOnClick(callback: () => void): void { this.onClick = callback; }
+
+  // â”€â”€ Legacy compat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  /** @deprecated Use getX() / getY(). */
+  public getPosition(): { x: number; y: number } { return { x: this.x, y: this.y }; }
 
   /**
-   * Set input event callbacks.
+   * childAppears â€” legacy fade-in stub.
+   * @deprecated Use FXFade effect instead.
    */
-  public setOnMouseEnter(callback: () => void): void {
-    this.onMouseEnter = callback;
-  }
-
-  public setOnMouseLeave(callback: () => void): void {
-    this.onMouseLeave = callback;
-  }
-
-  public setOnClick(callback: () => void): void {
-    this.onClick = callback;
+  public childAppears(
+    getFromChildren: boolean,
+    _darkAlpha: boolean,
+    _initialTime: number,
+    _lerpTime: number,
+  ): void {
+    if (getFromChildren) {
+      for (const child of this.children) {
+        child.childAppears(true, _darkAlpha, _initialTime, _lerpTime);
+      }
+    }
   }
 }

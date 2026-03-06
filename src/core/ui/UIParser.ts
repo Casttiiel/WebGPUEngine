@@ -284,73 +284,79 @@ export class UIParser {
     if (jData.alias) params.alias = jData.alias;
     if (jData.visible !== undefined) params.visible = jData.visible;
 
-    // Parse position - support both array [900, 800] and string "900 800" (C++ format)
-    let hasExplicitPosition = false;
-    if (jData.position) {
-      if (Array.isArray(jData.position)) {
-        params.position = { x: jData.position[0], y: jData.position[1] };
-        hasExplicitPosition = true;
-      } else if (typeof jData.position === 'string') {
-        const parts = jData.position.trim().split(/\s+/);
-        if (parts.length >= 2) {
-          params.position = { x: parseFloat(parts[0]), y: parseFloat(parts[1]) };
-          hasExplicitPosition = true;
-        }
-      }
-    }
-
-    // Parse scale - explicit scale parameter
-    if (jData.scale && Array.isArray(jData.scale)) {
-      params.scale = { x: jData.scale[0], y: jData.scale[1] };
-    }
-
-    // Phase 2: Parse anchor system (optional)
+    // ── Anchor ────────────────────────────────────────────────────────────
     if (jData.anchor && typeof jData.anchor === 'string') {
       params.anchor = jData.anchor;
-      hasExplicitPosition = true; // Anchor counts as explicit position
     }
 
-    if (jData.offset && Array.isArray(jData.offset)) {
-      params.offset = { x: jData.offset[0], y: jData.offset[1] };
-    }
+    // ── Position: new (x/y) or legacy (position array/string / offset) ────
+    // New format: explicit x/y
+    if (jData.x !== undefined) params.x = jData.x;
+    if (jData.y !== undefined) params.y = jData.y;
 
-    // Parse size mode (default: relative)
-    if (jData.sizeMode && (jData.sizeMode === 'fixed' || jData.sizeMode === 'relative')) {
-      params.sizeMode = jData.sizeMode;
-    }
-
-    // Parse size - support both array [1920, 1080] and string "1920 1080" (C++ format)
-    if (jData.size) {
-      if (Array.isArray(jData.size)) {
-        params.size = { x: jData.size[0], y: jData.size[1] };
-      } else if (typeof jData.size === 'string') {
-        const parts = jData.size.trim().split(/\s+/);
-        if (parts.length >= 2) {
-          params.size = { x: parseFloat(parts[0]), y: parseFloat(parts[1]) };
-        }
-      }
-
-      // If no explicit scale was provided, use size as scale
-      if (!jData.scale && params.size) {
-        params.scale = { x: params.size.x, y: params.size.y };
-      }
-
-      // If no explicit position was provided AND no anchor, center the widget based on size
-      // This ensures that a widget with size "1920 1080" is centered at (960, 540)
-      if (!hasExplicitPosition && params.size) {
-        params.position = { x: params.size.x / 2, y: params.size.y / 2 };
+    // Legacy: position: [x, y] or "x y"
+    if (jData.position !== undefined && jData.x === undefined) {
+      const p = this.parseVec2(jData.position);
+      if (p) {
+        params.x = p[0];
+        params.y = p[1];
       }
     }
 
-    if (jData.pivot && Array.isArray(jData.pivot)) {
-      params.pivot = { x: jData.pivot[0], y: jData.pivot[1] };
+    // Legacy: offset: [x, y] overrides x/y when anchor is set (old anchor+offset pattern)
+    if (jData.offset !== undefined && jData.x === undefined && jData.y === undefined) {
+      const o = Array.isArray(jData.offset) ? jData.offset : null;
+      if (o) {
+        params.x = o[0] ?? 0;
+        params.y = o[1] ?? 0;
+      }
     }
 
-    if (jData.rotation !== undefined) {
-      params.rotation = jData.rotation;
+    // ── Size: new (width/height) or legacy (size array/string) ───────────
+    if (jData.width !== undefined) params.width = jData.width;
+    if (jData.height !== undefined) params.height = jData.height;
+
+    // Legacy: size: [w, h] or "w h"
+    if (jData.size !== undefined && jData.width === undefined) {
+      const s = this.parseVec2(jData.size);
+      if (s) {
+        params.width = s[0];
+        params.height = s[1];
+      }
     }
+
+    // ── Pivot ─────────────────────────────────────────────────────────────
+    // New format: pivotX/pivotY (0–1 fractions)
+    if (jData.pivotX !== undefined) params.pivotX = jData.pivotX;
+    if (jData.pivotY !== undefined) params.pivotY = jData.pivotY;
+
+    // Legacy: pivot: [x, y] (old fractional pivot or pixel-based ignored)
+    if (jData.pivot && Array.isArray(jData.pivot) && jData.pivotX === undefined) {
+      params.pivotX = jData.pivot[0] ?? 0;
+      params.pivotY = jData.pivot[1] ?? 0;
+    }
+
+    // ── Other ─────────────────────────────────────────────────────────────
+    if (jData.rotation !== undefined) params.rotation = jData.rotation;
+    if (jData.scaleWithScreen !== undefined) params.scaleWithScreen = jData.scaleWithScreen;
 
     return params;
+  }
+
+  /** Parse a vec2 from [x, y] array or "x y" string. Returns null on failure. */
+  private parseVec2(value: any): [number, number] | null {
+    if (Array.isArray(value) && value.length >= 2) {
+      const a = value[0] as string | number;
+      const b = value[1] as string | number;
+      return [parseFloat(String(a)), parseFloat(String(b))];
+    }
+    if (typeof value === 'string') {
+      const parts = value.trim().split(/\s+/);
+      const p0 = parts[0] ?? '';
+      const p1 = parts[1] ?? '';
+      if (p0 && p1) return [parseFloat(p0), parseFloat(p1)];
+    }
+    return null;
   }
 
   /**

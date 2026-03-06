@@ -1,5 +1,4 @@
 // types/ui/WidgetTypes.ts
-import { vec2, vec4 } from 'gl-matrix';
 
 // ============================================================================
 // FORWARD DECLARATIONS
@@ -27,24 +26,30 @@ export type Widget = any;
 // ============================================================================
 
 /**
- * Base widget transformation parameters.
- * Replicates C++ TParams structure.
+ * Base widget parameters — reference-space (1920×1080) coordinates.
+ *
+ * - `x, y`          — top-left corner of the element in the 1920×1080 reference canvas.
+ *                    With `anchor`, this is the offset from that screen edge.
+ * - `width, height` — element size in the reference canvas.
+ * - `pivotX/Y`      — 0–1 fraction, only affects rotation/scale centre, NOT position.
+ * - `anchor`        — only on root widgets; ties the element to a screen edge.
+ * - `scaleWithScreen` — if false, the element keeps a fixed physical-pixel size (icon use-case).
  */
 export interface WidgetParams {
-  pivot: { x: number; y: number };
-  position: { x: number; y: number };
-  scale: { x: number; y: number };
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pivotX: number;
+  pivotY: number;
   rotation: number;
+  scaleWithScreen: boolean;
+  anchor?: string;
   visible: boolean;
-
-  // Phase 2: Anchor system (optional)
-  anchor?: string; // Anchor type: "center", "top-left", "bottom-right", etc.
-  offset?: { x: number; y: number }; // Offset from anchor position
-
-  // Size mode: "fixed" = absolute pixels, "relative" = scaled from 1920x1080 reference
-  sizeMode?: 'fixed' | 'relative'; // Default: 'relative'
-
-  [key: string]: any; // Allow additional properties
+  // widget name / alias
+  name?: string;
+  alias?: string;
+  [key: string]: any;
 }
 
 /**
@@ -232,10 +237,14 @@ export interface FXRotateParams {
  */
 export function createDefaultWidgetParams(): WidgetParams {
   return {
-    pivot: { x: 0, y: 0 },
-    position: { x: 0, y: 0 },
-    scale: { x: 1, y: 1 },
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+    pivotX: 0,
+    pivotY: 0,
     rotation: 0,
+    scaleWithScreen: true,
     visible: true,
   };
 }

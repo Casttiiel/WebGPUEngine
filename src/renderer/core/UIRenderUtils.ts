@@ -12,8 +12,13 @@ interface UIUniformsData {
 }
 
 /**
- * Static utility class for UI rendering operations
- * Manages uniform buffers, bind groups, and draw calls for UI widgets
+ * Static utility class for UI rendering operations.
+ *
+ * Coordinate system:
+ *  - All widget positions / sizes are defined in a 1920×1080 reference space.
+ *  - At runtime a single `globalScale = min(physW/1920, physH/1080)` is applied.
+ *  - A letterbox offset centres the scaled canvas on screen.
+ *  - The orthographic projection maps physical pixels to WebGPU clip space.
  */
 export class UIRenderUtils {
   private static device: GPUDevice;
@@ -21,19 +26,18 @@ export class UIRenderUtils {
   private static standardTechnique: Technique | null = null;
   private static additiveTechnique: Technique | null = null;
   private static initialized = false;
-  private static orthoProjection: mat4 = mat4.create(); // Orthographic projection matrix
-  private static devicePixelRatio: number = 1; // Track DPR for scale calculations
+  private static orthoProjection: mat4 = mat4.create();
+  private static devicePixelRatio: number = 1;
   private static screenWidth: number = 1920;
   private static screenHeight: number = 1080;
-  private static screenSizeChanged: boolean = false; // Flag to track screen resize
+  private static screenSizeChanged: boolean = false;
 
-  // Reference resolution for UI design (offsets, sizes defined in this space)
-  private static readonly REFERENCE_WIDTH = 1920;
-  private static readonly REFERENCE_HEIGHT = 1080;
+  // Reference resolution — all JSON coords are in this space
+  public static readonly REFERENCE_WIDTH = 1920;
+  public static readonly REFERENCE_HEIGHT = 1080;
 
-  /**
-   * Get current screen dimensions
-   */
+  // ── Screen size accessors ────────────────────────────────────────────────
+
   public static getScreenWidth(): number {
     return this.screenWidth;
   }
@@ -42,47 +46,36 @@ export class UIRenderUtils {
     return this.screenHeight;
   }
 
-  /**
-   * Get UI scale factor based on current screen vs reference resolution.
-   * Uses minimum scale to maintain aspect ratio.
-   * Compares physical pixels to reference (1920x1080 CSS) * DPR.
-   */
-  public static getUIScaleFactor(): number {
-    // Calculate scale comparing physical pixels to reference * DPR
-    const referencePhysicalWidth = this.REFERENCE_WIDTH;
-    const referencePhysicalHeight = this.REFERENCE_HEIGHT;
+  public static getDevicePixelRatio(): number {
+    return this.devicePixelRatio;
+  }
 
-    const scaleX = this.screenWidth / referencePhysicalWidth;
-    const scaleY = this.screenHeight / referencePhysicalHeight;
+  /**
+   * Single uniform scale factor: min(physW/1920, physH/1080).
+   * Guarantees aspect-ratio preservation — no deformation.
+   */
+  public static getGlobalScale(): number {
+    const scaleX = this.screenWidth / this.REFERENCE_WIDTH;
+    const scaleY = this.screenHeight / this.REFERENCE_HEIGHT;
     return Math.min(scaleX, scaleY);
   }
 
   /**
-   * Get separate X and Y scale factors for non-uniform scaling.
-   * Allows images to deform to match screen aspect ratio.
-   * Returns [scaleX, scaleY]
+   * Letterbox offsets (physical px) that centre the 1920×1080 canvas on screen.
+   * canvasOffsetX = (physW − 1920 * gs) / 2
+   * canvasOffsetY = (physH − 1080 * gs) / 2
    */
-  public static getUIScaleFactors(): [number, number] {
-    // Compare physical screen pixels to physical reference (1920x1080 * DPR)
-    const referencePhysicalWidth = this.REFERENCE_WIDTH * this.devicePixelRatio;
-    const referencePhysicalHeight = this.REFERENCE_HEIGHT * this.devicePixelRatio;
-
-    const scaleX = this.screenWidth / referencePhysicalWidth;
-    const scaleY = this.screenHeight / referencePhysicalHeight;
-
-    return [scaleX, scaleY];
+  public static getCanvasOffset(): [number, number] {
+    const gs = this.getGlobalScale();
+    const ox = (this.screenWidth - this.REFERENCE_WIDTH * gs) / 2;
+    const oy = (this.screenHeight - this.REFERENCE_HEIGHT * gs) / 2;
+    return [ox, oy];
   }
 
-  /**
-   * Check if screen size changed this frame
-   */
   public static hasScreenSizeChanged(): boolean {
     return this.screenSizeChanged;
   }
 
-  /**
-   * Reset screen size change flag (called after widgets update)
-   */
   public static resetScreenSizeChanged(): void {
     this.screenSizeChanged = false;
   }
@@ -122,17 +115,20 @@ export class UIRenderUtils {
     this.initialized = true;
 
     // Initialize default screen size (will be updated by ModuleUI)
-    this.updateScreenSize(1920, 1080);
+    this.updateScreenSize(1920, 1080, 1);
   }
 
-  private static devicePixelRatio: number = 1;
-
   /**
-   * Update screen dimensions and recalculate orthographic projection
-   * Uses physical pixel dimensions (canvas.width/height with DPR)
+   * Update screen dimensions and recalculate orthographic projection.
+   * @param physicalWidth  canvas.width  (physical pixels, DPR already baked in)
+   * @param physicalHeight canvas.height
+   * @param dpr            window.devicePixelRatio (needed for scaleWithScreen:false elements)
    */
-  public static updateScreenSize(physicalWidth: number, physicalHeight: number, dpr: number): void {
-    // Detect if screen size actually changed
+  public static updateScreenSize(
+    physicalWidth: number,
+    physicalHeight: number,
+    dpr: number = window.devicePixelRatio || 1,
+  ): void {
     if (this.screenWidth !== physicalWidth || this.screenHeight !== physicalHeight) {
       this.screenSizeChanged = true;
     }
@@ -199,23 +195,9 @@ export class UIRenderUtils {
       return;
     }
 
-    // Apply orthographic projection directly to widget transform
-    // Widget is in reference space, ortho converts to clip space with built-in scaling
+    // Project widget transform (physical px) into clip space
     const finalTransform = mat4.create();
     mat4.multiply(finalTransform, this.orthoProjection, transform);
-
-    console.log(`[UIRenderUtils] renderBitmap:`, {
-      textureName: texture.name,
-      transformPos: [transform[12].toFixed(1), transform[13].toFixed(1)],
-      transformScale: [
-        Math.sqrt(transform[0] * transform[0] + transform[1] * transform[1]).toFixed(1),
-        Math.sqrt(transform[4] * transform[4] + transform[5] * transform[5]).toFixed(1),
-      ],
-      tint: { r: tint[0], g: tint[1], b: tint[2], a: tint[3] },
-      minUV: [minUV[0], minUV[1]],
-      maxUV: [maxUV[0], maxUV[1]],
-      additive,
-    });
 
     // Select technique based on blend mode
     const technique = additive ? this.additiveTechnique : this.standardTechnique;

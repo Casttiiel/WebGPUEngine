@@ -4,7 +4,7 @@ import { WidgetController } from '../WidgetController';
 import { ButtonWidget } from '../../../components/ui/widgets/ButtonWidget';
 import { Engine } from '../../engine/Engine';
 import { KeyCode } from '../../../types/KeyCode.enum';
-// import { MouseButton } from '../../../types/MouseButton.enum';
+import { MouseButton } from '../../../types/MouseButton.enum';
 
 /**
  * MenuOption - Represents a menu button with its callback.
@@ -143,11 +143,11 @@ export class MenuController extends WidgetController {
     }
 
     // Handle mouse click separately with justPressed check
-    if (input.isMouseButtonPressed('LEFT')) {
+    if (input.isMouseButtonJustPressed(MouseButton.LEFT)) {
       const clickedButton = this.getButtonAtPosition(mouseVec);
       if (clickedButton !== -1) {
         this.setCurrentOption(clickedButton);
-        this.options[clickedButton].callback();
+        this.options[clickedButton]?.callback();
       }
     }
   }

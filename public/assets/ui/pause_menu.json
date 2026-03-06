@@ -3,8 +3,10 @@
   "alias": "pause",
   "type": "image",
   "visible": true,
-  "position": [960, 540],
-  "scale": [1, 1],
+  "x": 0,
+  "y": 0,
+  "width": 1920,
+  "height": 1080,
   "imageParams": {
     "texture": "ui/backgrounds/pause_overlay.png",
     "size": [1920, 1080],
@@ -24,7 +26,10 @@
     {
       "name": "pause_panel",
       "type": "image",
-      "position": [0, 0],
+      "x": 704,
+      "y": 348,
+      "width": 512,
+      "height": 384,
       "imageParams": {
         "texture": "ui/panels/panel_dark.png",
         "size": [512, 384],
@@ -44,7 +49,10 @@
         {
           "name": "pause_title",
           "type": "text",
-          "position": [0, -120],
+          "x": 156,
+          "y": 72,
+          "width": 200,
+          "height": 40,
           "textParams": {
             "text": "PAUSED",
             "texture": "fonts/arial_bitmap.png",
@@ -56,7 +64,10 @@
           "name": "btn_resume",
           "alias": "btn_resume",
           "type": "button",
-          "position": [0, -30],
+          "x": 156,
+          "y": 162,
+          "width": 200,
+          "height": 50,
           "states": {
             "NORMAL": {
               "imageParams": {
@@ -77,7 +88,8 @@
             {
               "name": "btn_resume_text",
               "type": "text",
-              "position": [0, 0],
+              "x": 0,
+              "y": 0,
               "textParams": {
                 "text": "RESUME",
                 "texture": "fonts/arial_bitmap.png",
@@ -91,7 +103,10 @@
           "name": "btn_restart",
           "alias": "btn_restart",
           "type": "button",
-          "position": [0, 40],
+          "x": 156,
+          "y": 232,
+          "width": 200,
+          "height": 50,
           "states": {
             "NORMAL": {
               "imageParams": {
@@ -112,7 +127,8 @@
             {
               "name": "btn_restart_text",
               "type": "text",
-              "position": [0, 0],
+              "x": 0,
+              "y": 0,
               "textParams": {
                 "text": "RESTART",
                 "texture": "fonts/arial_bitmap.png",
@@ -126,7 +142,10 @@
           "name": "btn_main_menu",
           "alias": "btn_main_menu",
           "type": "button",
-          "position": [0, 110],
+          "x": 156,
+          "y": 302,
+          "width": 200,
+          "height": 50,
           "states": {
             "NORMAL": {
               "imageParams": {
@@ -147,7 +166,8 @@
             {
               "name": "btn_main_menu_text",
               "type": "text",
-              "position": [0, 0],
+              "x": 0,
+              "y": 0,
               "textParams": {
                 "text": "MAIN MENU",
                 "texture": "fonts/arial_bitmap.png",

@@ -3,8 +3,10 @@
   "alias": "hud",
   "type": "image",
   "visible": true,
-  "position": [0, 0],
-  "scale": [1, 1],
+  "x": 0,
+  "y": 0,
+  "width": 1920,
+  "height": 1080,
   "imageParams": {
     "texture": "ui/transparent.png",
     "size": [1920, 1080],

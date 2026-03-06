@@ -49,4 +49,8 @@ export enum KeyCode {
   ARROW_DOWN = 'arrowdown',
   ARROW_LEFT = 'arrowleft',
   ARROW_RIGHT = 'arrowright',
+
+  // Navigation keys
+  HOME = 'home',
+  END = 'end',
 }
