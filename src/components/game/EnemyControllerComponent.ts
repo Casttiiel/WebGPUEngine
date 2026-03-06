@@ -90,7 +90,7 @@ export class EnemyControllerComponent extends Component {
     // Seed the blackboard with self-reference and initial values
     this.bb.set<EnemyControllerComponent>('self', this);
     this.bb.set<vec3>('position', vec3.create());
-    this.bb.set<vec3>('facing', vec3.fromValues(0, 0, 1));
+    this.bb.set<vec3>('facing', vec3.fromValues(0, 0, 1)); // overwritten in onAttach
     this.bb.set<boolean>('isGrounded', false);
     this.bb.set<boolean>('canSeePlayer', false);
     this.bb.set<vec3>('playerPosition', vec3.create());
@@ -99,16 +99,28 @@ export class EnemyControllerComponent extends Component {
     this.tree = new BehaviorTree(this.buildTree(), this.bb);
   }
 
+  /**
+   * Called after ALL components on the entity are loaded.
+   * At this point TransformComponent already has the rotation from the prefab.
+   */
+  public override async onAttach(): Promise<void> {
+    this.syncFacingFromTransform();
+  }
+
   // ─── Main update ───────────────────────────────────────────────────────────
 
   public update(deltaTime: number): void {
     if (!this.capsuleCollider || !this.characterController) return;
 
-    // 1. Sync world position into blackboard
+    // 1. Sync world position + facing into blackboard
     const pos = this.capsuleCollider.getRigidBody().translation();
     const bbPos = this.bb.get<vec3>('position') ?? vec3.create();
     vec3.set(bbPos, pos.x, pos.y, pos.z);
     this.bb.set('position', bbPos);
+
+    // Sync facing from the rigid body quaternion every tick so it is always
+    // accurate even if faceToward() hasn't been called yet (e.g. first frame).
+    this.syncFacingFromRigidBody();
 
     // 2. Ground detection
     this.updateGroundedState();
@@ -161,6 +173,44 @@ export class EnemyControllerComponent extends Component {
     const len = Math.sqrt(dx * dx + dz * dz);
     const facing = this.bb.get<vec3>('facing') ?? vec3.create();
     vec3.set(facing, dx / len, 0, dz / len);
+    this.bb.set('facing', facing);
+  }
+
+  // ─── Facing helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Reads yaw from the TransformComponent (set by the prefab rotation)
+   * and writes the corresponding forward XZ vector into `bb['facing']`.
+   * Call once in onAttach() so the initial prefab rotation is respected.
+   */
+  private syncFacingFromTransform(): void {
+    const transform = this.getOwner().getComponent('transform') as TransformComponent;
+    if (!transform) return;
+    const { yaw } = transform.getTransform().getAngles();
+    const facing = this.bb.get<vec3>('facing') ?? vec3.create();
+    vec3.set(facing, Math.sin(yaw), 0, Math.cos(yaw));
+    this.bb.set('facing', facing);
+  }
+
+  /**
+   * Derives the facing XZ vector from the KCC rigid body's quaternion.
+   * Called every tick so `facing` stays accurate without relying solely on
+   * explicit faceToward() calls.
+   */
+  private syncFacingFromRigidBody(): void {
+    const q = this.capsuleCollider.getRigidBody().rotation();
+    // Rotate the local forward vector (0,0,1) by the quaternion.
+    // forward.x = 2*(qx*qz + qw*qy), forward.z = 1 - 2*(qx²+qy²)
+    const wy = q.w * q.y;
+    const xx = q.x * q.x,
+      yy = q.y * q.y;
+    const xz = q.x * q.z;
+    const fx = 2 * (xz + wy);
+    const fz = 1 - 2 * (xx + yy);
+    const len = Math.sqrt(fx * fx + fz * fz);
+    if (len < 0.0001) return;
+    const facing = this.bb.get<vec3>('facing') ?? vec3.create();
+    vec3.set(facing, fx / len, 0, fz / len);
     this.bb.set('facing', facing);
   }
 

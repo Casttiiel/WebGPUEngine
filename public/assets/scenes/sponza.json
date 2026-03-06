@@ -31,5 +31,12 @@
   },
   {
     "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "prefab": "characters/enemy_basic.prefab",
+    "components": {
+      "name": "Enemy_03",
+      "transform": { "position": [0, 0, 8] }
+    }
   }
 ]

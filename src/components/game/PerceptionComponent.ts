@@ -1,5 +1,5 @@
 import { vec3 } from 'gl-matrix';
-import RAPIER from '@dimforge/rapier3d';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
@@ -25,8 +25,12 @@ import { PerceptionComponentDataType } from '../../types/PerceptionComponentData
  *  2. Sight    — three-stage:
  *       a. Distance gate  (dist < sightRadius)
  *       b. FOV cone gate  (angle to player < fovDegrees / 2)
- *       c. LOS raycast    (Rapier castRay excluding own collider;
- *                          first hit must be the player entity)
+ *       c. LOS raycast    (Rapier castRay excluding BOTH own and player colliders;
+ *                          clear LOS = ray reaches player with no hit in between)
+ *
+ * NOTE — eyeHeightOffset is relative to the rigid body center (capsule midpoint),
+ * NOT the ground. For a 1.8m capsule (center at ~0.9m from ground), an offset of
+ * 0.7 places the eye at ~1.6m from ground — a natural eye level.
  *
  * Checks are throttled to `checkInterval` seconds (default 0.1 = 10 Hz).
  *
@@ -50,7 +54,8 @@ export class PerceptionComponent extends Component {
   private sightRadius: number = 20;
   private hearRadius: number = 8;
   private fovCosHalf: number = Math.cos((120 / 2) * (Math.PI / 180)); // pre-computed
-  private eyeHeightOffset: number = 1.6;
+  // Offset from rigid body CENTER (capsule midpoint). 0.7 ≈ eye level for a 1.8m capsule.
+  private eyeHeightOffset: number = 0.7;
   private checkInterval: number = 0.1;
   private playerComponentKey: string = 'character_controller';
 
@@ -152,9 +157,11 @@ export class PerceptionComponent extends Component {
   }
 
   /**
-   * Casts a ray from `origin` in `direction` up to `maxDist`.
-   * Excludes the enemy's own collider.
-   * Returns true if the first hit belongs to the player entity.
+   * Casts a ray from enemy eye to player eye.
+   * Excludes BOTH the enemy's own collider AND the player's collider.
+   * Strategy: if nothing is hit → path is clear → can see.
+   *           if something IS hit → a wall/object blocks the LOS.
+   * This avoids entity-ID lookups and is robust against sensors / triggers.
    */
   private castLOS(origin: vec3, direction: vec3, maxDist: number): boolean {
     const world = Engine.getPhysics().getWorld();
@@ -164,21 +171,22 @@ export class PerceptionComponent extends Component {
       { x: direction[0], y: direction[1], z: direction[2] },
     );
 
-    // Exclude own collider so the ray doesn't immediately self-intersect
+    // Rapier only lets us exclude ONE collider natively.
+    // We exclude the enemy's own collider and use a predicate to skip the player.
+    const playerCollider = this.playerCollider!.getCollider();
     const hit = world.castRay(
       ray,
       maxDist,
       true, // solid
-      undefined, // QueryFilterFlags — default (hits everything except sensors off)
-      undefined, // interactionGroups — no group filter needed
-      this.ownCollider.getCollider(),
+      QueryFilterFlags.EXCLUDE_SENSORS, // ignore trigger volumes
+      undefined, // no interaction group filter
+      this.ownCollider.getCollider(), // exclude own capsule
+      undefined, // no rigid body exclusion
+      (collider) => collider.handle !== playerCollider.handle, // skip player collider
     );
 
-    if (!hit) return false;
-
-    // Check that the first obstacle is the player (not a wall between us)
-    const hitEntityId = Engine.getPhysics().getEntityIdFromCollider(hit.collider.handle);
-    return hitEntityId === this.playerEntity!.id;
+    // No hit → nothing blocked the path → player is visible
+    return hit === null;
   }
 
   // ─── Utilities ─────────────────────────────────────────────────────────────

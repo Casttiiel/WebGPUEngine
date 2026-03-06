@@ -1,0 +1,42 @@
+{
+  "components": {
+    "name": "Enemy",
+    "transform": {
+      "position": [0, 0.9, 0],
+      "rotation": [0, 180, 0],
+      "scale": [0.6, 1.8, 0.6]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0.0,
+      "mass": 70.0,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "emissive.mat"
+        }
+      ]
+    },
+    "enemy_controller": {
+      "moveSpeed": 3.5,
+      "gravity": 9,
+      "acceleration": 8
+    },
+    "perception": {
+      "sightRadius": 20,
+      "hearRadius": 8,
+      "fovDegrees": 120,
+      "eyeHeightOffset": 1.6,
+      "checkInterval": 0.1
+    }
+  }
+}
