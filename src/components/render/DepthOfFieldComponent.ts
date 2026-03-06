@@ -1,6 +1,7 @@
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Engine } from '../../core/engine/Engine';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
+import { PipelineFactory } from '../../renderer/core/factories/PipelineFactory';
 import { DOFRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
 import { RenderPassFactory } from '../../renderer/core/passes/RenderPassFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
@@ -9,8 +10,13 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
+import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Component } from '../../core/ecs/Component';
+import { Entity } from '../../core/ecs/Entity';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
+import { CameraComponent } from './CameraComponent';
+import { TransformComponent } from '../core/TransformComponent';
+import { vec3 } from 'gl-matrix';
 
 /**
  * Near-Far Depth of Field Component
@@ -57,6 +63,45 @@ export class DepthOfFieldComponent extends Component {
   private farBlurBindGroup!: GPUBindGroup | null;
   private compositeBindGroup!: GPUBindGroup | null;
 
+  // ---- Adaptive auto-focus -----------------------------------------------
+
+  /**
+   * 'none'          — manual (user sets focusDistance)
+   * 'screen-center' — GPU reads center pixel depth → smooth lerp
+   * 'target'        — follows an Entity's world distance from camera → smooth lerp
+   */
+  public autoFocusMode: 'none' | 'screen-center' | 'target' = 'screen-center';
+
+  /** Entity to follow when autoFocusMode === 'target'. */
+  public focusTarget: Entity | null = null;
+
+  /** Exponential lerp speed (units/s). Higher = reaches target faster. */
+  public focusSpeed: number = 3.0;
+
+  /** Target depth (metres) the lerp is heading toward. */
+  private _targetFocusDepth: number = 10.0;
+
+  // GPU pipeline for sampling the center pixel (screen-center mode).
+  private autoFocusPipeline: GPUComputePipeline | null = null;
+  private autoFocusLayout: GPUBindGroupLayout | null = null;
+  private autoFocusBindGroup: GPUBindGroup | null = null;
+
+  /** 1-float STORAGE | COPY_SRC written by the compute shader. */
+  private depthResultBuffer: GPUBuffer | null = null;
+  /** 1-float MAP_READ  | COPY_DST staging buffer for async readback. */
+  private depthStagingBuffer: GPUBuffer | null = null;
+
+  /**
+   * 3-state readback machine (same pattern as HZBCullingPass counter):
+   *  IDLE → record copy (afCopyScheduled=T)
+   *  COPY_SCHEDULED → next dispatch start: call mapAsync (afMapPending=T)
+   *  MAP_PENDING → promise resolves: afStagingMapped=T
+   *  STAGED → next dispatch start: read + unmap → IDLE
+   */
+  private afCopyScheduled = false;
+  private afMapPending = false;
+  private afStagingMapped = false;
+
   constructor() {
     super();
     this.renderPassManager = new RenderPassManager();
@@ -64,10 +109,10 @@ export class DepthOfFieldComponent extends Component {
 
   public async load(): Promise<void> {
     // Load all 4 techniques
-    this.cocTechnique = await Technique.getAsync('dof_coc.tech');
-    this.nearBlurTechnique = await Technique.getAsync('dof_near_blur.tech');
-    this.farBlurTechnique = await Technique.getAsync('dof_far_blur.tech');
-    this.compositeTechnique = await Technique.getAsync('dof.tech');
+    this.cocTechnique = await Technique.getAsync('post-processing/dof_coc.tech');
+    this.nearBlurTechnique = await Technique.getAsync('post-processing/dof_near_blur.tech');
+    this.farBlurTechnique = await Technique.getAsync('post-processing/dof_far_blur.tech');
+    this.compositeTechnique = await Technique.getAsync('post-processing/dof.tech');
 
     // Load fullscreen quad mesh
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
@@ -104,6 +149,72 @@ export class DepthOfFieldComponent extends Component {
 
     // Initialize parameters
     this.updateDOFParams();
+
+    // Initialize auto-focus GPU pipeline (screen-center mode).
+    await this.initializeAutoFocus();
+  }
+
+  /**
+   * Loads the auto-focus compute shader and creates its pipeline + buffers.
+   * Safe to call even if the shader is unavailable — auto-focus simply stays
+   * disabled (autoFocusPipeline will be null).
+   */
+  private async initializeAutoFocus(): Promise<void> {
+    const device = GPUUtils.getDevice();
+    let shaderCode: string;
+    try {
+      shaderCode = await ResourceManager.loadShader('utility/auto_focus_sample.cs');
+    } catch {
+      console.warn(
+        'DepthOfFieldComponent: auto_focus_sample.cs not found — screen-center auto-focus disabled.',
+      );
+      return;
+    }
+
+    // Bind group layout:
+    //   binding 0 — texture_2d<f32>  (gLinearDepth, unfilterable-float for textureLoad)
+    //   binding 1 — storage-rw f32   (result depth)
+    this.autoFocusLayout = BindGroupFactory.getLayout('af_sample_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'unfilterable-float', viewDimension: '2d' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'storage' },
+      },
+    ]);
+
+    const module = device.createShaderModule({
+      label: 'auto_focus_sample_shader',
+      code: shaderCode,
+    });
+
+    const pipelineLayout = PipelineFactory.createPipelineLayout('af_sample_pipeline_layout', [
+      this.autoFocusLayout,
+    ]);
+
+    this.autoFocusPipeline = PipelineFactory.createComputePipeline({
+      label: 'auto_focus_sample_pipeline',
+      layout: pipelineLayout,
+      compute: { module, entryPoint: 'main' },
+    });
+
+    // 1-float result buffer (shader writes here).
+    this.depthResultBuffer = device.createBuffer({
+      label: 'af_depth_result',
+      size: 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+
+    // Staging buffer for async CPU readback.
+    this.depthStagingBuffer = device.createBuffer({
+      label: 'af_depth_staging',
+      size: 4,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
   }
 
   public resize(): void {
@@ -127,6 +238,7 @@ export class DepthOfFieldComponent extends Component {
     this.nearBlurBindGroup = null;
     this.farBlurBindGroup = null;
     this.compositeBindGroup = null;
+    this.autoFocusBindGroup = null; // linear-depth view changed
   }
 
   /**
@@ -144,12 +256,52 @@ export class DepthOfFieldComponent extends Component {
   }
 
   /**
-   * Apply 4-pass Near-Far DOF pipeline
-   * @param inputTexture - Original HDR scene texture
-   * @param gBufferBindGroup - G-Buffer bind group (albedo, normals, depth)
+   * Apply 4-pass Near-Far DOF pipeline.
+   *
+   * @param inputTexture       Original HDR scene texture
+   * @param gBufferBindGroup   G-Buffer bind group (albedo, normals, linearDepth)
+   * @param linearDepthView    Raw G-Buffer linearDepth texture view — required for
+   *                           screen-center auto-focus; ignored in other modes.
    * @returns Final DOF composite texture
    */
-  public apply(inputTexture: GPUTextureView, gBufferBindGroup: GPUBindGroup): GPUTextureView {
+  public apply(
+    inputTexture: GPUTextureView,
+    gBufferBindGroup: GPUBindGroup,
+    linearDepthView?: GPUTextureView,
+  ): GPUTextureView {
+    // ---- Auto-focus readback state machine (must run before any encoder work) ----
+    if (this.autoFocusMode === 'screen-center' && this.autoFocusPipeline) {
+      // Phase COPY_SCHEDULED → MAP_PENDING
+      if (this.afCopyScheduled && !this.afMapPending && !this.afStagingMapped) {
+        this.afCopyScheduled = false;
+        this.afMapPending = true;
+        this.depthStagingBuffer!.mapAsync(GPUMapMode.READ)
+          .then(() => {
+            this.afMapPending = false;
+            this.afStagingMapped = true;
+          })
+          .catch(() => {
+            this.afMapPending = false; // device lost / buffer destroyed — reset to IDLE
+          });
+      }
+
+      // Phase STAGED → IDLE: read the value and convert to metres
+      if (this.afStagingMapped) {
+        const raw = new Float32Array(this.depthStagingBuffer!.getMappedRange())[0]!;
+        this.depthStagingBuffer!.unmap();
+        this.afStagingMapped = false;
+
+        // raw is linear depth [0, 1].  Skip sky (≥0.9999) and clip near (≤0.001).
+        if (raw > 0.001 && raw < 0.9999) {
+          try {
+            const cam = (this.getOwner().getComponent('camera') as CameraComponent).getCamera();
+            this._targetFocusDepth = raw * cam.getFar();
+          } catch {
+            /* owner not yet set — ignore */
+          }
+        }
+      }
+    }
     // Pass 1: Calculate Circle of Confusion
     this.renderCoCPass(gBufferBindGroup);
 
@@ -161,6 +313,41 @@ export class DepthOfFieldComponent extends Component {
 
     // Pass 4: Composite all layers
     this.renderCompositePass(inputTexture, gBufferBindGroup);
+
+    // ---- Screen-center auto-focus: dispatch sample compute + schedule readback ----
+    if (
+      this.autoFocusMode === 'screen-center' &&
+      this.autoFocusPipeline &&
+      this.autoFocusLayout &&
+      linearDepthView &&
+      !this.afCopyScheduled &&
+      !this.afMapPending &&
+      !this.afStagingMapped
+    ) {
+      // (Re-)create bind group lazily — invalidated by resize() via invalidateBindGroups()
+      if (!this.autoFocusBindGroup) {
+        this.autoFocusBindGroup = BindGroupFactory.createBindGroup(
+          'af_sample_bind_group',
+          this.autoFocusLayout,
+          [
+            { binding: 0, resource: linearDepthView },
+            { binding: 1, resource: { buffer: this.depthResultBuffer! } },
+          ],
+        );
+      }
+
+      const encoder = Render.getInstance().getCommandEncoder();
+      const pass = encoder.beginComputePass({ label: 'auto_focus_sample' });
+      pass.setPipeline(this.autoFocusPipeline);
+      pass.setBindGroup(0, this.autoFocusBindGroup);
+      pass.dispatchWorkgroups(1, 1, 1);
+      pass.end();
+
+      // Schedule readback — mapAsync is called NEXT frame to avoid
+      // "used in submit while pending map" (same technique as HZBCullingPass).
+      encoder.copyBufferToBuffer(this.depthResultBuffer!, 0, this.depthStagingBuffer!, 0, 4);
+      this.afCopyScheduled = true;
+    }
 
     return this.finalResult.getRenderView()!;
   }
@@ -389,6 +576,7 @@ export class DepthOfFieldComponent extends Component {
     this.nearBlurBindGroup = null;
     this.farBlurBindGroup = null;
     this.compositeBindGroup = null;
+    this.autoFocusBindGroup = null; // will be rebuilt with updated views
   }
 
   public hasLoaded(): boolean {
@@ -405,54 +593,57 @@ export class DepthOfFieldComponent extends Component {
     );
   }
 
-  public update(_dt: number): void {
-    // Update DOF parameters if needed (e.g., auto-focus)
+  public update(dt: number): void {
+    if (this.autoFocusMode === 'none') return;
+
+    // In 'target' mode, compute world-space distance from camera to entity directly.
+    if (this.autoFocusMode === 'target' && this.focusTarget) {
+      try {
+        const cam = (this.getOwner().getComponent('camera') as CameraComponent).getCamera();
+        const cameraPos = cam.getPosition();
+        const transform = this.focusTarget.getComponent('transform') as TransformComponent | null;
+        if (transform) {
+          const targetPos = transform.getTransform().getWorldPosition();
+          this._targetFocusDepth = Math.max(0.1, vec3.distance(cameraPos, targetPos));
+        }
+      } catch {
+        /* owner not ready */
+      }
+    }
+
+    // Exponential lerp: feels organic and is frame-rate independent.
+    //   alpha = 1 − e^(−speed × dt)  →  at speed=3, reaches 95% in ~1 s.
+    const alpha = 1.0 - Math.exp(-this.focusSpeed * dt);
+    const newFocus = this._focusDistance + (this._targetFocusDepth - this._focusDistance) * alpha;
+
+    if (Math.abs(newFocus - this._focusDistance) > 0.0001) {
+      this._focusDistance = Math.max(0.1, newFocus);
+      this.updateDOFParams();
+    }
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const folderName = 'Depth of Field';
-
-    // Add interactive controls for physical lens parameters
-    debugUI.addInteractiveControl(folderName, this, 'focusDistance', 'Focus Distance (m)', {
-      min: 0.1,
-      max: 100.0,
-      step: 0.1,
-    });
-
-    debugUI.addInteractiveControl(folderName, this, 'aperture', 'Aperture (f-number)', {
-      min: 1.0,
-      max: 22.0,
-      step: 0.1,
-    });
-
-    debugUI.addInteractiveControl(folderName, this, 'focalLength', 'Focal Length (m)', {
-      min: 0.01,
-      max: 0.2,
-      step: 0.001,
-    });
-
-    debugUI.addInteractiveControl(folderName, this, 'sensorHeight', 'Sensor Height (m)', {
-      min: 0.001,
-      max: 0.05,
-      step: 0.001,
-    });
-
-    // Add read-only info
-    debugUI.addDebugControl(folderName, this, 'focusDistance', 'Current Focus Distance');
-    debugUI.addDebugControl(folderName, this, 'aperture', 'Current Aperture');
-  }
+  public override renderInMenu(): void {}
 
   public override renderDebug(): void {
     // Implement debug visualization if needed
   }
 
   public dispose(): void {
-    // Clean up GPU resources
+    // Clean up DoF render targets
     if (this.cocBuffer) this.cocBuffer.destroy();
     if (this.nearBlurBuffer) this.nearBlurBuffer.destroy();
     if (this.farBlurBuffer) this.farBlurBuffer.destroy();
     if (this.finalResult) this.finalResult.destroy();
     if (this.dofParamsBuffer) this.dofParamsBuffer.destroy();
+
+    // Clean up auto-focus GPU resources
+    this.depthResultBuffer?.destroy();
+    this.depthStagingBuffer?.destroy();
+    this.depthResultBuffer = null;
+    this.depthStagingBuffer = null;
+    // Reset readback state so nothing tries to unmap a destroyed buffer.
+    this.afCopyScheduled = false;
+    this.afMapPending = false;
+    this.afStagingMapped = false;
   }
 }

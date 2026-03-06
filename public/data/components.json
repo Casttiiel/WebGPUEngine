@@ -6,6 +6,7 @@
     "character_controller",
     "flow",
     "swing_bar",
+    "depth_of_field",
     "camera_arm",
     "head_bob",
     "head_tilt",

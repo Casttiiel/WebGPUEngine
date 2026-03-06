@@ -556,6 +556,11 @@ export class DeferredRenderer {
     return this.hzbBuilder;
   }
 
+  /** Returns the G-Buffer linear depth texture view (R = linear depth [0,1]). */
+  public getLinearDepthView(): GPUTextureView {
+    return this.gBufferPass.getRenderTargets().linearDepth.getView()!;
+  }
+
   public getGBufferBindGroup(): GPUBindGroup {
     return this.gBufferBindGroup;
   }

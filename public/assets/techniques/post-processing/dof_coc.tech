@@ -1,6 +1,6 @@
 {
   "vs": "utility/presentation.vs",
-  "fs": "dof_coc.fs",
+  "fs": "post-processing/dof_coc.fs",
   "uniforms": ["CameraUniforms", "GBufferUniforms", "DOFParams"],
   "writesOn": "texture",
   "z": "disable_all"

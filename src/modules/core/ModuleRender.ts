@@ -319,7 +319,11 @@ export class ModuleRender extends Module {
           'depth_of_field',
         ) as DepthOfFieldComponent;
         if (depthOfField.hasLoaded()) {
-          result = depthOfField.apply(result, this.deferred.getGBufferBindGroup());
+          result = depthOfField.apply(
+            result,
+            this.deferred.getGBufferBindGroup(),
+            this.deferred.getLinearDepthView(),
+          );
         }
       }
 
