@@ -3,7 +3,7 @@ import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { BulletPoolComponent } from './BulletPoolComponent';
-import { FPSCameraControllerComponent } from './FPSCameraControllerComponent';
+import { CameraComponent } from '../render/CameraComponent';
 
 export type WeaponComponentData = {
   /** Shots per second. Default 8. */
@@ -22,7 +22,7 @@ export class WeaponComponent extends Component {
   private timeSinceLastShot: number = 0;
 
   // Resolved lazily on first shoot() call so load order doesn't matter
-  private fpsController: FPSCameraControllerComponent | null = null;
+  private cameraComponent: CameraComponent | null = null;
   private pool: BulletPoolComponent | null = null;
 
   public load(data: WeaponComponentData): void {
@@ -49,14 +49,13 @@ export class WeaponComponent extends Component {
   }
 
   private shoot(): void {
-    // Lazy-resolve FPS controller (stays on same entity as WeaponComponent)
-    if (!this.fpsController) {
-      this.fpsController = this.getOwner().getComponent(
-        'fps_camera_controller',
-      ) as FPSCameraControllerComponent | null;
+    // Lazy-resolve: find the camera child entity (has the actual rendered view direction)
+    if (!this.cameraComponent) {
+      const cameraEntity = this.getOwner().getChildren().find(c => c.hasComponent('camera'));
+      this.cameraComponent = (cameraEntity?.getComponent('camera') as CameraComponent) ?? null;
 
-      if (!this.fpsController) {
-        console.warn('WeaponComponent: fps_camera_controller not found on owner entity');
+      if (!this.cameraComponent) {
+        console.warn('WeaponComponent: no camera child entity found on owner');
         return;
       }
     }
@@ -72,14 +71,16 @@ export class WeaponComponent extends Component {
       }
     }
 
-    const dir = this.fpsController.getLookDirection();
-    const eyePos = this.fpsController.getEyeWorldPosition();
+    // Use the camera's ground-truth position and direction (same values used by the renderer)
+    const cam = this.cameraComponent.getCamera();
+    const eyePos = cam.getPosition();
+    const dir = cam.getFront();
 
-    // Offset muzzle 0.5m forward so the bullet starts in front of the camera
+    // Offset muzzle forward so the bullet starts in front of the camera
     const muzzle = vec3.scaleAndAdd(vec3.create(), eyePos, dir, 0.5);
 
     const bullet = this.pool.acquire();
-    if (!bullet) return; // pool exhausted — increase pool size if this happens often
+    if (!bullet) return;
 
     bullet.fire(muzzle, dir, this.pool.release.bind(this.pool));
   }

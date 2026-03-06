@@ -1,5 +1,5 @@
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
-import { vec3 } from 'gl-matrix';
+import { vec3, quat } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { TransformComponent } from '../core/TransformComponent';
@@ -41,6 +41,12 @@ export class ProjectileComponent extends Component {
     transform.markDirty();
 
     vec3.normalize(this.direction, direction);
+
+    // Rotate bullet mesh to face direction of travel (+Z local → direction world)
+    const q = quat.create();
+    quat.rotationTo(q, vec3.fromValues(0, 0, 1), this.direction);
+    transform.setLocalRotation(q);
+
     vec3.copy(this.prevPosition, origin);
     this.traveledDistance = 0;
     this.releaseCallback = onRelease;
