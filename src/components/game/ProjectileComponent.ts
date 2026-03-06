@@ -37,7 +37,7 @@ export class ProjectileComponent extends Component {
     const transform = (
       this.getOwner().getComponent('transform') as TransformComponent
     ).getTransform();
-    transform.setWorldPosition(origin);
+    transform.setLocalPosition(origin);
     transform.markDirty();
 
     vec3.normalize(this.direction, direction);
@@ -82,7 +82,7 @@ export class ProjectileComponent extends Component {
     const transform = (
       this.getOwner().getComponent('transform') as TransformComponent
     ).getTransform();
-    transform.setWorldPosition(newPos);
+    transform.setLocalPosition(newPos);
     transform.markDirty();
 
     vec3.copy(this.prevPosition, newPos);

@@ -90,7 +90,7 @@ export class BulletPoolComponent extends Component {
     const transform = (
       projectile.getOwner().getComponent('transform') as TransformComponent
     ).getTransform();
-    transform.setWorldPosition(PARK_POSITION);
+    transform.setLocalPosition(PARK_POSITION);
     transform.markDirty();
   }
 
