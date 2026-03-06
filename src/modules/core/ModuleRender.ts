@@ -392,8 +392,13 @@ export class ModuleRender extends Module {
     Render.getInstance().endFrame();
   }
 
+  private _uiDbgFrames = 0;
+
   /**
-   * Render UI overlay directly on top of result texture
+   * Render UI overlay directly on top of result texture.
+   * Uses the MAIN command encoder so that the UI pass is recorded after all
+   * post-processing (FXAA/FSR/etc.) and submitted together as a single batch.
+   * This prevents the UI from being overwritten by a later main-encoder submission.
    */
   private renderUIOnTexture(resultView: GPUTextureView): void {
     const moduleUI = ModuleUI.getInstance();
@@ -402,8 +407,8 @@ export class ModuleRender extends Module {
     }
 
     const render = Render.getInstance();
-    const device = render.getDevice();
-    const encoder = device.createCommandEncoder({ label: 'ui_overlay_encoder' });
+    // Use the MAIN encoder — not a separate one — so execution order is guaranteed.
+    const encoder = render.getCommandEncoder();
     const renderPass = encoder.beginRenderPass({
       label: 'ui_overlay_pass',
       colorAttachments: [
@@ -425,10 +430,17 @@ export class ModuleRender extends Module {
     renderPass.setScissorRect(0, 0, physicalWidth, physicalHeight);
 
     // Render all active UI widgets
+    if (this._uiDbgFrames < 5) {
+      const activeCount = (moduleUI as any).activeWidgets?.length ?? '?';
+      console.log(
+        `[UI] renderUIOnTexture — activeWidgets: ${activeCount}, RT size: ${physicalWidth}x${physicalHeight}`,
+      );
+      this._uiDbgFrames++;
+    }
     moduleUI.render(renderPass);
 
     renderPass.end();
-    render.getDevice().queue.submit([encoder.finish()]);
+    // DO NOT submit here — endFrame() submits the main encoder.
   }
 
   private presentResult(sceneResult: GPUTextureView): void {
