@@ -23,6 +23,7 @@ import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
 import { ScreenSpaceGlobalIllumination } from '../../shading/ScreenSpaceGlobalIllumination';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
+import { HZBBuilder } from '../culling/HZBBuilder';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -33,6 +34,7 @@ export class DeferredRenderer {
   private ssgi!: ScreenSpaceGlobalIllumination;
   private depthPrepass!: DepthPrepass;
   private gBufferPass!: GBufferPass;
+  private hzbBuilder!: HZBBuilder;
   private renderPassManager!: RenderPassManager;
   private rtAccLight!: RenderTarget;
   private rtOITAccumulation!: RenderTarget;
@@ -67,6 +69,12 @@ export class DeferredRenderer {
 
     // Create depth prepass first (generates depth + linear depth)
     this.depthPrepass.resize();
+
+    // Rebuild the HZB pyramid for the new depth texture (if already initialized).
+    // Must come after depthPrepass.resize() so the depth texture is the new one.
+    if (this.hzbBuilder?.isInitialized()) {
+      this.hzbBuilder.createResources(this.depthPrepass.getDepthTexture());
+    }
 
     // Create G-Buffer pass with specified dimensions by resizing
     this.gBufferPass.resize();
@@ -253,6 +261,10 @@ export class DeferredRenderer {
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();
 
+    // HZB Builder — async pipeline setup, resources created on first create()
+    this.hzbBuilder = new HZBBuilder();
+    await this.hzbBuilder.initialize();
+
     this.pointLightTechnique = await Technique.getAsync('lighting/point_light.tech');
     this.pointLightWithShadowsTechnique = await Technique.getAsync(
       'lighting/point_light_shadows.tech',
@@ -304,6 +316,14 @@ export class DeferredRenderer {
   public render(camera: Entity, skipPostProcessing: boolean = false): GPUTextureView {
     // 1. G-Buffer pass - uses depth from prepass
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
+
+    // 2. Build the HZB pyramid from this frame's depth buffer.
+    //    The pyramid will be consumed NEXT frame by HZBCullingPass (after frustum culling)
+    //    to perform occlusion culling at zero CPU readback cost.
+    if (this.hzbBuilder?.isInitialized()) {
+      const encoder = Render.getInstance().getCommandEncoder();
+      this.hzbBuilder.build(encoder, this.depthPrepass.getDepthTexture());
+    }
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
@@ -518,6 +538,8 @@ export class DeferredRenderer {
       this.renderPassManager.clear();
     }
 
+    this.hzbBuilder?.dispose();
+
     this.ssgi?.dispose();
     this.gBufferBindGroup = null as any;
     this.gBufferLayout = null as any;
@@ -527,6 +549,11 @@ export class DeferredRenderer {
 
   public getDepthStencilView(): GPUTextureView | null {
     return this.depthPrepass.getDepthTextureView();
+  }
+
+  /** Returns the HZB pyramid builder for registration with RenderManagerV2. */
+  public getHZBBuilder(): HZBBuilder {
+    return this.hzbBuilder;
   }
 
   public getGBufferBindGroup(): GPUBindGroup {

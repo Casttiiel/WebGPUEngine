@@ -1,10 +1,10 @@
 ### Engine
 
-1. Occlusion Culling
-2. Gameplay
-3. UI
-4. Enemy AI (Pathfinding, Behavior Trees)
-5. Animations
+1. HZB Occlusion Culling
+2. DOF Adaptativo
+3. Enemy AI (Pathfinding, Behavior Trees)
+4. UI
+5. Gameplay
 
 ## Gameplay
 

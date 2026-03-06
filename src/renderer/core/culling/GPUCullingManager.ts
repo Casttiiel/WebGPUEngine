@@ -599,6 +599,24 @@ export class GPUCullingManager {
     return this.managedKeys;
   }
 
+  /**
+   * The GPU buffer containing per-object AABB + modelMatrix + draw args.
+   * Exposed so HZBCullingPass can bind it for the occlusion test.
+   * Returns null when the main culling buffer has not been built yet.
+   */
+  public getObjectDataBuffer(): GPUBuffer | null {
+    return this.built && this.managedKeys.length > 0 ? this.objectDataBuffer : null;
+  }
+
+  /**
+   * The GPU buffer of DrawIndexedIndirectParameters written by the frustum pass.
+   * Exposed so HZBCullingPass can read and further zero occluded entries.
+   * Returns null when the main culling buffer has not been built yet.
+   */
+  public getIndirectArgsBuffer(): GPUBuffer | null {
+    return this.built && this.managedKeys.length > 0 ? this.indirectArgsBuffer : null;
+  }
+
   // ------------------------------------------------------------------
   // Cleanup
   // ------------------------------------------------------------------

@@ -59,6 +59,7 @@ export class ModuleRender extends Module {
     totalDrawCalls: { name: 'Total Draw Cmds', value: 0 },
     gpuCullingKeys: { name: 'GPU Managed Keys', value: '0 / 0' },
     gpuEstimatedVisible: { name: 'Est. Visible (CPU)', value: '0 / 0' },
+    hzbCulled: { name: 'HZB Culled', value: '0 objs' },
     visiblePointLights: { name: 'Point Lights (visible)', value: 0 },
     visibleSpotLights: { name: 'Spot Lights (visible)', value: 0 },
     resolution: { name: 'Resolution', value: '0x0' },
@@ -93,6 +94,12 @@ export class ModuleRender extends Module {
       UIRenderUtils.initialize(),
       VelocityBufferManager.getInstance().initialize(Render.width, Render.height),
     ]);
+
+    // Register HZB pyramid builder with the render manager.
+    // Both systems are fully initialized at this point: deferred renderer built
+    // the HZBBuilder pipelines and resources in load()/create(), and
+    // RenderManager initialized HZBCullingPass in initialize().
+    RenderManager.getInstance().setHZBBuilder(this.deferred.getHZBBuilder());
 
     // Initialize UI screen dimensions immediately after UIRenderUtils
     const canvas = Render.getInstance().getCanvas();
@@ -527,6 +534,9 @@ export class ModuleRender extends Module {
     this.debugValues.gpuEstimatedVisible.value = gpuStats.active
       ? `${gpuStats.estimatedVisible} / ${gpuStats.managed}`
       : '-';
+    this.debugValues.hzbCulled.value = gpuStats.active
+      ? `${renderManager.getHZBCulledCount()} objs`
+      : '-';
 
     // Visible light counts (after CPU light culling)
     const pointLights = Engine.getEntities().getObjectManagerByName('point_light')?.getList() ?? [];
@@ -602,6 +612,7 @@ export class ModuleRender extends Module {
       this.addGUISeparator();
       gui.addDynamicText(this.debugValues.gpuCullingKeys, 'value', 'GPU Managed Keys');
       gui.addDynamicText(this.debugValues.gpuEstimatedVisible, 'value', 'Est. Visible (CPU)');
+      gui.addDynamicText(this.debugValues.hzbCulled, 'value', 'HZB Culled');
       gui.addDynamicText(this.debugValues.visiblePointLights, 'value', 'Point Lights (visible)');
       gui.addDynamicText(this.debugValues.visibleSpotLights, 'value', 'Spot Lights (visible)');
       this.addGUISeparator();

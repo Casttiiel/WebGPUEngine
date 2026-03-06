@@ -7,6 +7,8 @@ import { Mesh } from '../../resources/Mesh';
 import { Technique } from '../../resources/Technique';
 import { CPUCullingManager } from '../culling/CPUCullingManager';
 import { GPUCullingManager } from '../culling/GPUCullingManager';
+import { HZBBuilder } from '../culling/HZBBuilder';
+import { HZBCullingPass } from '../culling/HZBCullingPass';
 import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
 import { Render } from '../pipeline/Render';
@@ -19,6 +21,8 @@ export class RenderManagerV2 {
   private stateManager: RenderStateManager;
   private cpuCuller: CPUCullingManager | null = null;
   private gpuCuller: GPUCullingManager | null = null;
+  private hzbCullingPass: HZBCullingPass | null = null;
+  private hzbBuilder: HZBBuilder | null = null;
 
   // State
   private camera: Camera | null = null;
@@ -54,11 +58,23 @@ export class RenderManagerV2 {
     this.gpuCuller = new GPUCullingManager();
     await this.gpuCuller.initialize();
 
-    console.log('RenderManagerV2: CPU + GPU culling systems initialized');
+    // HZB occlusion culling — layered on top of GPU frustum culling
+    this.hzbCullingPass = new HZBCullingPass();
+    await this.hzbCullingPass.initialize();
+
+    console.log('RenderManagerV2: CPU + GPU + HZB culling systems initialized');
   }
 
   public setCamera(camera: Camera): void {
     this.camera = camera;
+  }
+
+  /**
+   * Registers the HZBBuilder built each frame by DeferredRenderer.
+   * The HZB pyramid is used to perform occlusion culling after frustum culling.
+   */
+  public setHZBBuilder(hzbBuilder: HZBBuilder): void {
+    this.hzbBuilder = hzbBuilder;
   }
 
   public setTechniqueOverride(technique: Technique, instancedTechnique?: Technique): void {
@@ -160,6 +176,25 @@ export class RenderManagerV2 {
       const encoder = Render.getInstance().getCommandEncoder();
       this.gpuCuller.dispatch(encoder, camera);
 
+      // HZB occlusion culling — further refines indirect args using the
+      // depth pyramid built from the previous frame.  Runs in the same
+      // encoder immediately after the frustum dispatch so the GPU sees a
+      // single contiguous workload before the GBuffer render pass.
+      if (this.hzbCullingPass && this.hzbBuilder?.isReady()) {
+        const objBuf = this.gpuCuller.getObjectDataBuffer();
+        const indBuf = this.gpuCuller.getIndirectArgsBuffer();
+        if (objBuf && indBuf) {
+          this.hzbCullingPass.dispatch(
+            encoder,
+            camera,
+            objBuf,
+            indBuf,
+            this.gpuCuller.getManagedCount(),
+            this.hzbBuilder,
+          );
+        }
+      }
+
       // CPU-side estimate for the debug UI (pure AABB math, no array alloc)
       this.gpuCullingEstimatedVisible = this.cpuCuller!.countVisible(
         this.gpuCuller.getManagedKeys(),
@@ -230,6 +265,14 @@ export class RenderManagerV2 {
       active: this.gpuCuller?.isInitialized() ?? false,
       estimatedVisible: this.gpuCullingEstimatedVisible,
     };
+  }
+
+  /**
+   * Number of objects culled by the HZB occlusion pass in the most recent
+   * completed frame (1-frame GPU readback lag).
+   */
+  public getHZBCulledCount(): number {
+    return this.hzbCullingPass?.getCulledCount() ?? 0;
   }
 
   private renderKeys(keys: RenderKey[], pass: GPURenderPassEncoder): number {
@@ -336,6 +379,13 @@ export class RenderManagerV2 {
       this.gpuCuller.dispose();
       this.gpuCuller = null;
     }
+
+    if (this.hzbCullingPass) {
+      this.hzbCullingPass.dispose();
+      this.hzbCullingPass = null;
+    }
+
+    this.hzbBuilder = null;
 
     this.keyManager.clear();
     this.stateManager.clear();
