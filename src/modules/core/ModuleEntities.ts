@@ -22,6 +22,7 @@ class ObjectManager {
 
   public updateAll(delta: number): void {
     for (const c of this.list) {
+      if (!c.enabled) continue;
       c.update(delta);
     }
   }
@@ -32,6 +33,10 @@ class ObjectManager {
   }
   public getList(): Component[] {
     return this.list;
+  }
+
+  public removeByOwner(entity: Entity): void {
+    this.list = this.list.filter(c => c.getOwner() !== entity);
   }
 }
 
@@ -139,6 +144,23 @@ export class ModuleEntities extends Module {
 
   public getAllEntities(): Entity[] {
     return this.omEntities;
+  }
+
+  public destroyEntity(entity: Entity): void {
+    for (const child of entity.getChildren()) {
+      this.destroyEntity(child);
+    }
+
+    for (const [, om] of this.omGeneral) om.removeByOwner(entity);
+    for (const [, om] of this.omToUpdate) om.removeByOwner(entity);
+    for (const [, om] of this.omToRenderDebug) om.removeByOwner(entity);
+
+    for (const component of entity.getAllComponents()) {
+      component.dispose();
+    }
+
+    const idx = this.omEntities.indexOf(entity);
+    if (idx !== -1) this.omEntities.splice(idx, 1);
   }
 
   public stop(): void {

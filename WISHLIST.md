@@ -1,11 +1,14 @@
 ---------------------------------------Wishlist Backlog-----------------------------------
 
-1. Spawn/Delete items having in mind Instancing
-2. Parallax Mapping
-3. Progressive texture streaming o mip streaming
-4. Lens distorsion + chromatic aberration RE4
-5. TAA
-6. SS Global Illumination
+1. Parallax Mapping
+2. Progressive texture streaming o mip streaming
+3. Lens distorsion + chromatic aberration RE4
+4. TAA
+5. GLTF clearcoat
+6. GLTF sheen
+7. GLTF anisotropy
+8. GLTF iridescence
+9. SS Global Illumination
    Area Light (LTC (Linearly Transformed Cosines) for shadows)
    Tool for asset creation (Pregenerar AABBs y tangentes)
    Grain

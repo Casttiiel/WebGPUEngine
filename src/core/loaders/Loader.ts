@@ -48,6 +48,8 @@ import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
+import { ProjectileComponent } from '../../components/game/ProjectileComponent';
+import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -285,6 +287,10 @@ export class Loader {
         return new EnemyControllerComponent();
       case 'perception':
         return new PerceptionComponent();
+      case 'projectile':
+        return new ProjectileComponent();
+      case 'bullet_pool':
+        return new BulletPoolComponent();
       case 'height_fog':
         return new HeightFogComponent();
       case 'contact_shadows':

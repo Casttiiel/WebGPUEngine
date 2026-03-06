@@ -1,10 +1,14 @@
 ### Engine
 
-1. Froxel Self Occlusion
-2. Froxel Density Volumes
-3. Froxel Global Illumination
-4. Gameplay
-5. Enemy AI
+1. Bullet Prefab
+2. Weapon Component
+
+3. Trails
+4. Froxel Self Occlusion
+5. Froxel Density Volumes
+6. Voxel Cone Tracing
+7. Gameplay
+8. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo

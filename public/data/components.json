@@ -20,7 +20,9 @@
     "transform",
     "fps_camera_controller",
     "camera",
-    "speed_lines_vfx"
+    "speed_lines_vfx",
+    "projectile",
+    "bullet_pool"
   ],
   "render_debug": []
 }

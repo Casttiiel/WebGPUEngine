@@ -2,6 +2,7 @@ import { Entity } from './Entity';
 
 export abstract class Component {
   private owner!: Entity;
+  public enabled: boolean = true;
 
   constructor() {}
 
@@ -15,6 +16,8 @@ export abstract class Component {
   // Called after the component is attached to an entity and loaded
   // Override this to set up dependencies on other components
   public async onAttach(): Promise<void> {}
+
+  public dispose(): void {}
 
   public setOwner(owner: Entity): void {
     this.owner = owner;
