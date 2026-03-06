@@ -32,7 +32,7 @@ export class BulletPoolComponent extends Component {
 
   public async load(data: BulletPoolComponentData): Promise<void> {
     this.prefabPath = data.prefab;
-    this.poolSize   = data.size ?? 20;
+    this.poolSize = data.size ?? 20;
     await this.prewarm();
   }
 
@@ -40,11 +40,11 @@ export class BulletPoolComponent extends Component {
     // ResourceManager caches the prefab JSON — only one fetch regardless of poolSize
     const template = await ResourceManager.loadPrefab(this.prefabPath);
 
-    await Promise.all(
-      Array.from({ length: this.poolSize }, () => this.spawnDormant(template))
-    );
+    await Promise.all(Array.from({ length: this.poolSize }, () => this.spawnDormant(template)));
 
-    console.log(`[BulletPoolComponent] Pooled ${this.pool.length} bullets from "${this.prefabPath}"`);
+    console.log(
+      `[BulletPoolComponent] Pooled ${this.pool.length} bullets from "${this.prefabPath}"`,
+    );
   }
 
   private async spawnDormant(template: EntityDataType): Promise<void> {
@@ -77,7 +77,7 @@ export class BulletPoolComponent extends Component {
    *   if (bullet) bullet.fire(origin, direction, pool.release.bind(pool));
    */
   public acquire(): ProjectileComponent | null {
-    return this.pool.find(p => !p.enabled) ?? null;
+    return this.pool.find((p) => !p.enabled) ?? null;
   }
 
   /**
@@ -87,14 +87,16 @@ export class BulletPoolComponent extends Component {
   public release(projectile: ProjectileComponent): void {
     projectile.enabled = false;
 
-    const transform = (projectile.getOwner().getComponent('transform') as TransformComponent).getTransform();
+    const transform = (
+      projectile.getOwner().getComponent('transform') as TransformComponent
+    ).getTransform();
     transform.setWorldPosition(PARK_POSITION);
     transform.markDirty();
   }
 
   /** How many bullets are currently in flight. */
   public get activeCount(): number {
-    return this.pool.filter(p => p.enabled).length;
+    return this.pool.filter((p) => p.enabled).length;
   }
 
   /** Total pool capacity. */

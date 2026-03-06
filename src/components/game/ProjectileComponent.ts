@@ -23,10 +23,10 @@ export class ProjectileComponent extends Component {
   private releaseCallback: ((proj: ProjectileComponent) => void) | null = null;
 
   public load(data: ProjectileComponentData): void {
-    this.speed    = data.speed    ?? 80;
+    this.speed = data.speed ?? 80;
     this.maxRange = data.maxRange ?? 200;
-    this.damage   = data.damage   ?? 25;
-    this.gravity  = data.gravity  ?? 0;
+    this.damage = data.damage ?? 25;
+    this.gravity = data.gravity ?? 0;
   }
 
   /**
@@ -34,7 +34,9 @@ export class ProjectileComponent extends Component {
    * Called by BulletPoolComponent.acquire() → WeaponComponent.
    */
   public fire(origin: vec3, direction: vec3, onRelease: (proj: ProjectileComponent) => void): void {
-    const transform = (this.getOwner().getComponent('transform') as TransformComponent).getTransform();
+    const transform = (
+      this.getOwner().getComponent('transform') as TransformComponent
+    ).getTransform();
     transform.setWorldPosition(origin);
     transform.markDirty();
 
@@ -60,19 +62,26 @@ export class ProjectileComponent extends Component {
     const world = Engine.getPhysics().getWorld();
     const ray = new RAPIER.Ray(
       { x: this.prevPosition[0], y: this.prevPosition[1], z: this.prevPosition[2] },
-      { x: this.direction[0],    y: this.direction[1],    z: this.direction[2] },
+      { x: this.direction[0], y: this.direction[1], z: this.direction[2] },
     );
 
     const hit = world.castRay(ray, stepDist, true, QueryFilterFlags.EXCLUDE_SENSORS);
     if (hit) {
-      const hitPoint = vec3.scaleAndAdd(vec3.create(), this.prevPosition, this.direction, hit.timeOfImpact);
+      const hitPoint = vec3.scaleAndAdd(
+        vec3.create(),
+        this.prevPosition,
+        this.direction,
+        hit.timeOfImpact,
+      );
       this.onHit(hitPoint, hit);
       return;
     }
 
     // Advance position
     const newPos = vec3.scaleAndAdd(vec3.create(), this.prevPosition, this.direction, stepDist);
-    const transform = (this.getOwner().getComponent('transform') as TransformComponent).getTransform();
+    const transform = (
+      this.getOwner().getComponent('transform') as TransformComponent
+    ).getTransform();
     transform.setWorldPosition(newPos);
     transform.markDirty();
 

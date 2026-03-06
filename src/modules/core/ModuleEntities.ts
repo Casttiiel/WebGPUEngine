@@ -36,7 +36,7 @@ class ObjectManager {
   }
 
   public removeByOwner(entity: Entity): void {
-    this.list = this.list.filter(c => c.getOwner() !== entity);
+    this.list = this.list.filter((c) => c.getOwner() !== entity);
   }
 }
 
