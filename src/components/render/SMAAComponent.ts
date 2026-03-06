@@ -108,13 +108,13 @@ export class SMAAComponent extends Component {
 
     // Create render targets
     this.edgesRT = new RenderTarget();
-    this.edgesRT.createRT('smaa_edges.dds', Render.width, Render.height, aliasingFormat);
+    this.edgesRT.createRT('smaa_edges.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
 
     this.blendRT = new RenderTarget();
-    this.blendRT.createRT('smaa_blend.dds', Render.width, Render.height, aliasingFormat);
+    this.blendRT.createRT('smaa_blend.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
 
     this.finalRT = new RenderTarget();
-    this.finalRT.createRT('smaa_final.dds', Render.width, Render.height, aliasingFormat);
+    this.finalRT.createRT('smaa_final.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
 
     this.loaded = true;
   }
@@ -122,9 +122,9 @@ export class SMAAComponent extends Component {
   public resize(): void {
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
-    this.edgesRT.createRT('smaa_edges.dds', Render.width, Render.height, aliasingFormat);
-    this.blendRT.createRT('smaa_blend.dds', Render.width, Render.height, aliasingFormat);
-    this.finalRT.createRT('smaa_final.dds', Render.width, Render.height, aliasingFormat);
+    this.edgesRT.createRT('smaa_edges.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.blendRT.createRT('smaa_blend.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.finalRT.createRT('smaa_final.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
 
     // Clear all caches
     this.edgeBindGroupCache.clear();
