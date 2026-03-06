@@ -147,9 +147,7 @@ export class Widget {
    *   absolute = T(pivX,pivY) * R(r) * T(0,0) * S(w*gs,h*gs)
    */
   protected computeAbsolute(): void {
-    const gs = this.scaleWithScreen
-      ? UIRenderUtils.getGlobalScale()
-      : (window.devicePixelRatio || 1);
+    const gs = this.scaleWithScreen ? UIRenderUtils.getGlobalScale() : window.devicePixelRatio || 1;
 
     const physW = this.width * gs;
     const physH = this.height * gs;
@@ -185,7 +183,11 @@ export class Widget {
       mat4.rotateZ(this.absolute, this.absolute, this.rotation);
     }
     mat4.translate(this.absolute, this.absolute, [offX, offY, 0]);
-    mat4.scale(this.absolute, this.absolute, [physW * this.effectScaleX, physH * this.effectScaleY, 1]);
+    mat4.scale(this.absolute, this.absolute, [
+      physW * this.effectScaleX,
+      physH * this.effectScaleY,
+      1,
+    ]);
   }
 
   // ============================================================================
@@ -315,47 +317,79 @@ export class Widget {
   // GETTERS
   // ============================================================================
 
-  public getName(): string { return this.name; }
-  public getAlias(): string { return this.alias; }
-  public getParams(): WidgetParams { return this.params; }
+  public getName(): string {
+    return this.name;
+  }
+  public getAlias(): string {
+    return this.alias;
+  }
+  public getParams(): WidgetParams {
+    return this.params;
+  }
 
-  public getX(): number { return this.x; }
-  public getY(): number { return this.y; }
-  public getWidth(): number { return this.width; }
-  public getHeight(): number { return this.height; }
-  public getRotation(): number { return this.rotation; }
-  public getAnchor(): AnchorType | undefined { return this.anchorType; }
-  public hasAnchor(): boolean { return this.anchorType !== undefined; }
+  public getX(): number {
+    return this.x;
+  }
+  public getY(): number {
+    return this.y;
+  }
+  public getWidth(): number {
+    return this.width;
+  }
+  public getHeight(): number {
+    return this.height;
+  }
+  public getRotation(): number {
+    return this.rotation;
+  }
+  public getAnchor(): AnchorType | undefined {
+    return this.anchorType;
+  }
+  public hasAnchor(): boolean {
+    return this.anchorType !== undefined;
+  }
 
   /** Absolute render matrix in physical pixels. Always use this for rendering. */
-  public getAbsolute(): mat4 { return this.absolute; }
+  public getAbsolute(): mat4 {
+    return this.absolute;
+  }
   /** Backwards-compat alias. */
-  public getAbsoluteTransform(): mat4 { return this.absolute; }
+  public getAbsoluteTransform(): mat4 {
+    return this.absolute;
+  }
 
   /** Top-left corner in physical pixels (for hit detection). */
-  public getOrigin(): [number, number] { return [this.originX, this.originY]; }
+  public getOrigin(): [number, number] {
+    return [this.originX, this.originY];
+  }
 
   /**
    * Size in physical pixels â€” used for AABB hit detection.
    * Subclasses can override if they manage their own size logic.
    */
   public getSize(): vec2 {
-    const gs = this.scaleWithScreen
-      ? UIRenderUtils.getGlobalScale()
-      : (window.devicePixelRatio || 1);
+    const gs = this.scaleWithScreen ? UIRenderUtils.getGlobalScale() : window.devicePixelRatio || 1;
     return vec2.fromValues(this.width * gs, this.height * gs);
   }
 
   // â”€â”€ Input callback setters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  public setOnMouseEnter(callback: () => void): void { this.onMouseEnter = callback; }
-  public setOnMouseLeave(callback: () => void): void { this.onMouseLeave = callback; }
-  public setOnClick(callback: () => void): void { this.onClick = callback; }
+  public setOnMouseEnter(callback: () => void): void {
+    this.onMouseEnter = callback;
+  }
+  public setOnMouseLeave(callback: () => void): void {
+    this.onMouseLeave = callback;
+  }
+  public setOnClick(callback: () => void): void {
+    this.onClick = callback;
+  }
 
   // â”€â”€ Legacy compat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /** @deprecated Use getX() / getY(). */
-  public getPosition(): { x: number; y: number } { return { x: this.x, y: this.y }; }
+  public getPosition(): { x: number; y: number } {
+    return { x: this.x, y: this.y };
+  }
 
   /**
    * childAppears â€” legacy fade-in stub.

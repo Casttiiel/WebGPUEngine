@@ -37,16 +37,25 @@ export class UIAnchorSystem {
     const H = UIRenderUtils.getScreenHeight();
 
     switch (anchor) {
-      case AnchorType.TOP_LEFT:     return [0,     0    ];
-      case AnchorType.TOP_CENTER:   return [W / 2, 0    ];
-      case AnchorType.TOP_RIGHT:    return [W,     0    ];
-      case AnchorType.BOTTOM_LEFT:  return [0,     H    ];
-      case AnchorType.BOTTOM_CENTER:return [W / 2, H    ];
-      case AnchorType.BOTTOM_RIGHT: return [W,     H    ];
-      case AnchorType.LEFT_CENTER:  return [0,     H / 2];
-      case AnchorType.RIGHT_CENTER: return [W,     H / 2];
+      case AnchorType.TOP_LEFT:
+        return [0, 0];
+      case AnchorType.TOP_CENTER:
+        return [W / 2, 0];
+      case AnchorType.TOP_RIGHT:
+        return [W, 0];
+      case AnchorType.BOTTOM_LEFT:
+        return [0, H];
+      case AnchorType.BOTTOM_CENTER:
+        return [W / 2, H];
+      case AnchorType.BOTTOM_RIGHT:
+        return [W, H];
+      case AnchorType.LEFT_CENTER:
+        return [0, H / 2];
+      case AnchorType.RIGHT_CENTER:
+        return [W, H / 2];
       case AnchorType.CENTER:
-      default:                      return [W / 2, H / 2];
+      default:
+        return [W / 2, H / 2];
     }
   }
 
@@ -57,15 +66,24 @@ export class UIAnchorSystem {
   public static parseAnchorType(anchorStr: string): AnchorType | null {
     const s = anchorStr.toLowerCase().trim();
     switch (s) {
-      case 'center':        return AnchorType.CENTER;
-      case 'top-left':      return AnchorType.TOP_LEFT;
-      case 'top-center':    return AnchorType.TOP_CENTER;
-      case 'top-right':     return AnchorType.TOP_RIGHT;
-      case 'bottom-left':   return AnchorType.BOTTOM_LEFT;
-      case 'bottom-center': return AnchorType.BOTTOM_CENTER;
-      case 'bottom-right':  return AnchorType.BOTTOM_RIGHT;
-      case 'left-center':   return AnchorType.LEFT_CENTER;
-      case 'right-center':  return AnchorType.RIGHT_CENTER;
+      case 'center':
+        return AnchorType.CENTER;
+      case 'top-left':
+        return AnchorType.TOP_LEFT;
+      case 'top-center':
+        return AnchorType.TOP_CENTER;
+      case 'top-right':
+        return AnchorType.TOP_RIGHT;
+      case 'bottom-left':
+        return AnchorType.BOTTOM_LEFT;
+      case 'bottom-center':
+        return AnchorType.BOTTOM_CENTER;
+      case 'bottom-right':
+        return AnchorType.BOTTOM_RIGHT;
+      case 'left-center':
+        return AnchorType.LEFT_CENTER;
+      case 'right-center':
+        return AnchorType.RIGHT_CENTER;
       default:
         console.warn(`UIAnchorSystem: unknown anchor "${anchorStr}"`);
         return null;
