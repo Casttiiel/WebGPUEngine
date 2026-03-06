@@ -406,9 +406,12 @@ export class FroxelVolumetricScattering {
 
     this.updateUniforms();
 
-    const commandEncoder = this.device.createCommandEncoder({
-      label: 'volumetrict_scattering_compute_pass',
-    });
+    // Use the MAIN encoder (same one used for shadow maps) so that:
+    // shadow map render passes → froxel compute passes are ordered within
+    // the same command buffer. Previously a separate encoder was submitted
+    // immediately, reading shadow maps that were still pending in the main
+    // encoder (previous frame's shadows) → flicker on camera rotation.
+    const commandEncoder = Render.getInstance().getCommandEncoder();
 
     this.executeDensityPass(commandEncoder, linearDepth);
 
@@ -419,8 +422,7 @@ export class FroxelVolumetricScattering {
     this.executeSpotLightInjectionPass(commandEncoder);
 
     this.executeVolumetricIntegrationPass(commandEncoder);
-
-    this.device.queue.submit([commandEncoder.finish()]);
+    // No submit here — endFrame() submits everything together.
   }
 
   private executeDensityPass(commandEncoder: GPUCommandEncoder, linearDepth: RenderTarget): void {

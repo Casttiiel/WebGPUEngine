@@ -1,9 +1,10 @@
 ### Engine
 
-1. UI
-2. Froxels
-3. Gameplay
-4. Enemy AI
+1. Froxel Self Occlusion
+2. Froxel Density Volumes
+3. Froxel Global Illumination
+4. Gameplay
+5. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo
