@@ -51,7 +51,9 @@ export class WeaponComponent extends Component {
   private shoot(): void {
     // Lazy-resolve: find the camera child entity (has the actual rendered view direction)
     if (!this.cameraComponent) {
-      const cameraEntity = this.getOwner().getChildren().find(c => c.hasComponent('camera'));
+      const cameraEntity = this.getOwner()
+        .getChildren()
+        .find((c) => c.hasComponent('camera'));
       this.cameraComponent = (cameraEntity?.getComponent('camera') as CameraComponent) ?? null;
 
       if (!this.cameraComponent) {
