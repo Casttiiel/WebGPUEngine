@@ -39,7 +39,12 @@ export class FXAAComponent extends Component {
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
     this.result = new RenderTarget();
-    this.result.createRT('fxaa_result.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.result.createRT(
+      'fxaa_result.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
 
     this.loaded = true;
   }
@@ -47,7 +52,12 @@ export class FXAAComponent extends Component {
   public resize(): void {
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
-    this.result.createRT('fxaa_result.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.result.createRT(
+      'fxaa_result.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
     // ✅ Clear cache on resize
     this.bindGroupCache.clear();
   }
