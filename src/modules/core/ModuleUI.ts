@@ -70,6 +70,7 @@ export class ModuleUI extends Module {
 
   /**
    * Register a widget class by loading its JSON file and associating it with a type name.
+   * Supports both single-object JSON and array JSON (multiple root widgets per class).
    */
   private async registerWidgetClass(
     type: string,
@@ -77,20 +78,38 @@ export class ModuleUI extends Module {
     parser: UIParser,
     controller?: WidgetController,
   ): Promise<void> {
-    // Load widget from JSON file
-    const widgetName = await parser.loadFileByName(widgetPath);
-    const widget = this.getWidgetByName(widgetName);
+    const names = await parser.loadFileByName(widgetPath);
 
-    if (!widget) {
+    if (names.length === 0 || names[0] === 'error_widget') {
       console.warn(`Failed to load widget from: ${widgetPath}`);
       return;
     }
 
-    // Create widget class structure
+    if (names.length > 1) {
+      // Multi-root widget class (e.g. hud.json as an array of anchored root widgets)
+      const widgetClass: WidgetClass = {
+        name: names[0]!,
+        names,
+        type,
+        enabled: false,
+        ...(controller !== undefined && { controller }),
+      };
+      this.widgetStructureMap.set(type, widgetClass);
+      return;
+    }
+
+    // Single root widget (original path)
+    const widgetName = names[0]!;
+    const widget = this.getWidgetByName(widgetName);
+    if (!widget) {
+      console.warn(`Failed to find registered widget '${widgetName}' from: ${widgetPath}`);
+      return;
+    }
+
     const widgetClass: WidgetClass = {
       name: widgetName,
-      type: type,
-      widget: widget,
+      type,
+      widget,
       enabled: false,
       ...(controller !== undefined && { controller }),
     };
@@ -286,6 +305,25 @@ export class ModuleUI extends Module {
   public activateWidgetClass(name: string): Widget | undefined {
     const widgetClass = this.widgetStructureMap.get(name);
     if (!widgetClass || widgetClass.enabled) return undefined;
+
+    // Multi-root widget class
+    if (widgetClass.names && widgetClass.names.length > 1) {
+      let firstWidget: Widget | undefined;
+      for (const wname of widgetClass.names) {
+        const w = this.getWidgetByName(wname);
+        if (w) {
+          w.onActivate();
+          if (!this.activeWidgets.includes(w)) this.activeWidgets.push(w);
+          if (!firstWidget) firstWidget = w;
+        }
+      }
+      widgetClass.enabled = true;
+      this.widgetStructureMap.set(name, widgetClass);
+      if (widgetClass.controller) this.registerController(widgetClass.controller);
+      return firstWidget;
+    }
+
+    // Single root widget
     const widget = this.getWidgetByName(widgetClass.name);
     if (widget) {
       widget.onActivate();
@@ -303,6 +341,24 @@ export class ModuleUI extends Module {
   public deactivateWidgetClass(name: string): void {
     const widgetClass = this.widgetStructureMap.get(name);
     if (!widgetClass) return;
+
+    // Multi-root widget class
+    if (widgetClass.names && widgetClass.names.length > 1) {
+      for (const wname of widgetClass.names) {
+        const w = this.getWidgetByName(wname);
+        if (w) {
+          w.onDeactivate();
+          const idx = this.activeWidgets.indexOf(w);
+          if (idx >= 0) this.activeWidgets.splice(idx, 1);
+        }
+      }
+      widgetClass.enabled = false;
+      this.widgetStructureMap.set(name, widgetClass);
+      if (widgetClass.controller) this.unregisterController(widgetClass.controller);
+      return;
+    }
+
+    // Single root widget
     const widget = this.getWidgetByName(widgetClass.name);
     if (widget) {
       widget.onDeactivate();

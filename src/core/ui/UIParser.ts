@@ -67,19 +67,36 @@ export class UIParser {
   }
 
   /**
-   * Load widget from file and return its name.
+   * Load widget(s) from a file and return the root widget name(s).
+   * Supports both single-object JSON (returns one-element array) and
+   * array JSON (returns an array of names — used for multi-anchor HUD files).
    */
-  public async loadFileByName(file: string): Promise<string> {
+  public async loadFileByName(file: string): Promise<string[]> {
     const jData = await this.loadJson(file);
-    const widget = await this.parseWidget(jData, null);
 
+    if (Array.isArray(jData)) {
+      // Multiple independent root widgets in one file
+      const names: string[] = [];
+      for (const itemData of jData) {
+        const widget = await this.parseWidget(itemData, null);
+        if (widget) {
+          widget.updateTransform();
+          ModuleUI.getInstance()?.registerWidget(widget);
+          names.push(itemData['name'] || 'unnamed_widget');
+        }
+      }
+      return names;
+    }
+
+    // Single root widget
+    const widget = await this.parseWidget(jData, null);
     if (widget) {
       widget.updateTransform();
       ModuleUI.getInstance()?.registerWidget(widget);
-      return jData['name'] || 'unnamed_widget';
+      return [jData['name'] || 'unnamed_widget'];
     }
 
-    return 'error_widget';
+    return ['error_widget'];
   }
 
   // ============================================================================

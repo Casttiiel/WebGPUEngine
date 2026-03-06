@@ -155,7 +155,8 @@ export interface SpriteAnimationParams {
  * Widget class registration (for ModuleUI).
  */
 export interface WidgetClass {
-  name: string; // Widget class name (from JSON)
+  name: string; // Primary widget name (first in the array, or the sole widget)
+  names?: string[]; // All widget names when a class maps to multiple root widgets
   type: string; // Widget type identifier
   widget?: Widget;
   controller?: WidgetController;

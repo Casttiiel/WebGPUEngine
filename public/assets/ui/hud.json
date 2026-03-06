@@ -1,89 +1,80 @@
-﻿{
-  "name": "game_hud",
-  "alias": "hud",
-  "type": "image",
-  "visible": true,
-  "x": 0,
-  "y": 0,
-  "width": 1920,
-  "height": 1080,
-  "imageParams": {
-    "texture": "white.png",
-    "size": [1920, 1080],
-    "color": [0, 0, 0, 0]
-  },
-  "children": [
-    {
-      "name": "crosshair",
-      "alias": "crosshair",
-      "type": "image",
-      "x": 944,
-      "y": 524,
-      "width": 32,
-      "height": 32,
-      "imageParams": {
-        "texture": "white.png",
-        "size": [32, 32],
-        "color": [1, 1, 1, 0.8]
-      }
-    },
-    {
-      "name": "health_bar_bg",
-      "type": "image",
-      "x": 40,
-      "y": 990,
-      "width": 256,
-      "height": 20,
-      "imageParams": {
-        "texture": "white.png",
-        "size": [256, 20],
-        "color": [0.2, 0.05, 0.05, 0.7]
-      },
-      "children": [
-        {
-          "name": "health_bar",
-          "alias": "health_bar",
-          "type": "image",
-          "x": 2,
-          "y": 2,
-          "width": 252,
-          "height": 16,
-          "imageParams": {
-            "texture": "white.png",
-            "size": [252, 16],
-            "color": [0.9, 0.15, 0.15, 1]
-          }
-        }
-      ]
-    },
-    {
-      "name": "stamina_bar_bg",
-      "type": "image",
-      "x": 40,
-      "y": 1016,
-      "width": 256,
-      "height": 14,
-      "imageParams": {
-        "texture": "white.png",
-        "size": [256, 14],
-        "color": [0.05, 0.2, 0.05, 0.7]
-      },
-      "children": [
-        {
-          "name": "stamina_bar",
-          "alias": "stamina_bar",
-          "type": "image",
-          "x": 2,
-          "y": 2,
-          "width": 252,
-          "height": 10,
-          "imageParams": {
-            "texture": "white.png",
-            "size": [252, 10],
-            "color": [0.15, 0.9, 0.15, 1]
-          }
-        }
-      ]
+﻿[
+  {
+    "name": "crosshair",
+    "alias": "crosshair",
+    "type": "image",
+    "anchor": "center",
+    "visible": true,
+    "x": -16,
+    "y": -16,
+    "width": 32,
+    "height": 32,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [32, 32],
+      "color": [1, 1, 1, 0.8]
     }
-  ]
-}
+  },
+  {
+    "name": "health_bar_bg",
+    "type": "image",
+    "anchor": "bottom-left",
+    "visible": true,
+    "x": 40,
+    "y": -90,
+    "width": 256,
+    "height": 20,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [256, 20],
+      "color": [0.2, 0.05, 0.05, 0.7]
+    },
+    "children": [
+      {
+        "name": "health_bar",
+        "alias": "health_bar",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 252,
+        "height": 16,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [252, 16],
+          "color": [0.9, 0.15, 0.15, 1]
+        }
+      }
+    ]
+  },
+  {
+    "name": "stamina_bar_bg",
+    "type": "image",
+    "anchor": "bottom-left",
+    "visible": true,
+    "x": 40,
+    "y": -64,
+    "width": 256,
+    "height": 14,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [256, 14],
+      "color": [0.05, 0.2, 0.05, 0.7]
+    },
+    "children": [
+      {
+        "name": "stamina_bar",
+        "alias": "stamina_bar",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 252,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [252, 10],
+          "color": [0.15, 0.9, 0.15, 1]
+        }
+      }
+    ]
+  }
+]
