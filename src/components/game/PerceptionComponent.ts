@@ -47,11 +47,11 @@ import { PerceptionComponentDataType } from '../../types/PerceptionComponentData
  */
 export class PerceptionComponent extends Component {
   // ─── Parameters ────────────────────────────────────────────────────────────
-  private sightRadius: number    = 20;
-  private hearRadius: number     = 8;
-  private fovCosHalf: number     = Math.cos((120 / 2) * (Math.PI / 180)); // pre-computed
+  private sightRadius: number = 20;
+  private hearRadius: number = 8;
+  private fovCosHalf: number = Math.cos((120 / 2) * (Math.PI / 180)); // pre-computed
   private eyeHeightOffset: number = 1.6;
-  private checkInterval: number  = 0.1;
+  private checkInterval: number = 0.1;
   private playerComponentKey: string = 'character_controller';
 
   // ─── Internal ──────────────────────────────────────────────────────────────
@@ -64,10 +64,10 @@ export class PerceptionComponent extends Component {
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   public load(data: PerceptionComponentDataType): void {
-    if (data.sightRadius   !== undefined) this.sightRadius     = data.sightRadius;
-    if (data.hearRadius    !== undefined) this.hearRadius      = data.hearRadius;
+    if (data.sightRadius !== undefined) this.sightRadius = data.sightRadius;
+    if (data.hearRadius !== undefined) this.hearRadius = data.hearRadius;
     if (data.eyeHeightOffset !== undefined) this.eyeHeightOffset = data.eyeHeightOffset;
-    if (data.checkInterval !== undefined) this.checkInterval   = data.checkInterval;
+    if (data.checkInterval !== undefined) this.checkInterval = data.checkInterval;
     if (data.playerComponentKey !== undefined) this.playerComponentKey = data.playerComponentKey;
 
     const fov = data.fovDegrees ?? 120;
@@ -107,11 +107,11 @@ export class PerceptionComponent extends Component {
   // ─── Core logic ────────────────────────────────────────────────────────────
 
   private runChecks(): void {
-    const playerPos   = this.getPlayerEyePos();
-    const ownPos      = this.getOwnEyePos();
+    const playerPos = this.getPlayerEyePos();
+    const ownPos = this.getOwnEyePos();
 
-    const toPlayer    = vec3.subtract(vec3.create(), playerPos, ownPos);
-    const dist        = vec3.length(toPlayer);
+    const toPlayer = vec3.subtract(vec3.create(), playerPos, ownPos);
+    const dist = vec3.length(toPlayer);
 
     // Always write distance
     this.bb.set<number>('distToPlayer', dist);
@@ -160,7 +160,7 @@ export class PerceptionComponent extends Component {
     const world = Engine.getPhysics().getWorld();
 
     const ray = new RAPIER.Ray(
-      { x: origin[0],    y: origin[1],    z: origin[2] },
+      { x: origin[0], y: origin[1], z: origin[2] },
       { x: direction[0], y: direction[1], z: direction[2] },
     );
 
@@ -168,9 +168,9 @@ export class PerceptionComponent extends Component {
     const hit = world.castRay(
       ray,
       maxDist,
-      true,           // solid
-      undefined,      // QueryFilterFlags — default (hits everything except sensors off)
-      undefined,      // interactionGroups — no group filter needed
+      true, // solid
+      undefined, // QueryFilterFlags — default (hits everything except sensors off)
+      undefined, // interactionGroups — no group filter needed
       this.ownCollider.getCollider(),
     );
 
@@ -206,10 +206,12 @@ export class PerceptionComponent extends Component {
     const entities = Engine.getEntities().getAllEntities();
     for (const entity of entities) {
       if (entity.hasComponent(this.playerComponentKey)) {
-        this.playerEntity  = entity;
+        this.playerEntity = entity;
         this.playerCollider = entity.getComponent('capsule_collider') as CapsuleColliderComponent;
         if (!this.playerCollider) {
-          console.warn('PerceptionComponent: player entity found but has no CapsuleColliderComponent.');
+          console.warn(
+            'PerceptionComponent: player entity found but has no CapsuleColliderComponent.',
+          );
         }
         return;
       }
