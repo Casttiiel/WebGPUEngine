@@ -392,8 +392,6 @@ export class ModuleRender extends Module {
     Render.getInstance().endFrame();
   }
 
-  private _uiDbgFrames = 0;
-
   /**
    * Render UI overlay directly on top of result texture.
    * Uses the MAIN command encoder so that the UI pass is recorded after all
@@ -430,13 +428,6 @@ export class ModuleRender extends Module {
     renderPass.setScissorRect(0, 0, physicalWidth, physicalHeight);
 
     // Render all active UI widgets
-    if (this._uiDbgFrames < 5) {
-      const activeCount = (moduleUI as any).activeWidgets?.length ?? '?';
-      console.log(
-        `[UI] renderUIOnTexture — activeWidgets: ${activeCount}, RT size: ${physicalWidth}x${physicalHeight}`,
-      );
-      this._uiDbgFrames++;
-    }
     moduleUI.render(renderPass);
 
     renderPass.end();

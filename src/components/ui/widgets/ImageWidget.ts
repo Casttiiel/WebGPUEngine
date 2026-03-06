@@ -37,7 +37,6 @@ export class ImageWidget extends Widget {
     }
   }
 
-  private _dbgLogged = false;
   protected override render(renderPass: GPURenderPassEncoder): void {
     // Skip if no texture is set
     if (!this.imageParams.texture) return;
@@ -59,8 +58,6 @@ export class ImageWidget extends Widget {
 
     // Only render if texture is loaded
     if (!this.cachedTexture) {
-      if (!this._dbgLogged)
-        console.log(`[UI] "${this.name}" texture not yet loaded: ${this.imageParams.texture}`);
       return;
     }
 
@@ -71,19 +68,6 @@ export class ImageWidget extends Widget {
     // Convert UV to vec2
     const minUV = vec2.fromValues(this.imageParams.minUV.x, this.imageParams.minUV.y);
     const maxUV = vec2.fromValues(this.imageParams.maxUV.x, this.imageParams.maxUV.y);
-
-    if (!this._dbgLogged) {
-      const abs = this.getAbsolute();
-      console.log(
-        `[UI] "${this.name}" → tex:${this.imageParams.texture} color:[${color.r.toFixed(2)},${color.g.toFixed(2)},${color.b.toFixed(2)},${color.a.toFixed(2)}] matrix:[${Array.from(
-          abs as Float32Array,
-        )
-          .slice(0, 4)
-          .map((v: number) => v.toFixed(1))
-          .join(',')}...]`,
-      );
-      this._dbgLogged = true;
-    }
 
     UIRenderUtils.renderBitmap(
       renderPass,
