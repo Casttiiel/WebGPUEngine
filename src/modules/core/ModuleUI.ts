@@ -58,6 +58,9 @@ export class ModuleUI extends Module {
     await this.registerWidgetClass('MAIN_MENU_BACKGROUND', 'main_menu.json', parser);
     await this.registerWidgetClass('MAIN_MENU_BUTTONS', 'main_menu_buttons.json', parser);
 
+    // Gameplay HUD
+    await this.registerWidgetClass('HUD', 'hud.json', parser);
+
     // TODO: Create MenuController for main menu buttons
     // const menuController = new MenuController();
     // await this.registerWidgetClass('MAIN_MENU_BUTTONS', 'assets/ui/main_menu_buttons.json', parser, menuController);

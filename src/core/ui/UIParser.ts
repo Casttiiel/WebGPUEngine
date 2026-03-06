@@ -183,6 +183,15 @@ export class UIParser {
     const imageParamsSource = jData.imageParams || jData;
     const imageParams = this.parseImageParams(imageParamsSource);
 
+    // When no explicit widget size was provided, inherit from imageParams.size.
+    // This keeps hud.json / legacy JSONs working where only imageParams.size is set.
+    const hasExplicitSize =
+      jData.width !== undefined || jData.height !== undefined || jData.size !== undefined;
+    if (!hasExplicitSize && imageParams.size.x > 0 && imageParams.size.y > 0) {
+      params.width = imageParams.size.x;
+      params.height = imageParams.size.y;
+    }
+
     return new ImageWidget(name, alias, params, imageParams);
   }
 
