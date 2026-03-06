@@ -70,14 +70,18 @@ export class EnemyControllerComponent extends Component {
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   public async load(data: EnemyControllerComponentDataType): Promise<void> {
-    this.moveSpeed    = data.moveSpeed    ?? this.moveSpeed;
-    this.gravity      = data.gravity      ?? this.gravity;
+    this.moveSpeed = data.moveSpeed ?? this.moveSpeed;
+    this.gravity = data.gravity ?? this.gravity;
     this.acceleration = data.acceleration ?? this.acceleration;
 
     // Physics
-    this.capsuleCollider = this.getOwner().getComponent('capsule_collider') as CapsuleColliderComponent;
+    this.capsuleCollider = this.getOwner().getComponent(
+      'capsule_collider',
+    ) as CapsuleColliderComponent;
     if (!this.capsuleCollider) {
-      console.error('EnemyControllerComponent: requires CapsuleColliderComponent on the same entity!');
+      console.error(
+        'EnemyControllerComponent: requires CapsuleColliderComponent on the same entity!',
+      );
       return;
     }
 
@@ -139,12 +143,7 @@ export class EnemyControllerComponent extends Component {
    */
   public setDesiredHorizontal(direction: vec3, speed?: number): void {
     const s = speed ?? this.moveSpeed;
-    vec3.set(
-      this.desiredHorizontal,
-      direction[0] * s,
-      0,
-      direction[2] * s,
-    );
+    vec3.set(this.desiredHorizontal, direction[0] * s, 0, direction[2] * s);
   }
 
   /** Immediately face toward `target` (yaw-only rotation via TransformComponent). */
@@ -158,9 +157,15 @@ export class EnemyControllerComponent extends Component {
     if (transform) transform.getTransform().setAngles(yaw, 0, 0);
   }
 
-  public getMoveSpeed(): number { return this.moveSpeed; }
-  public getIsGrounded(): boolean { return this.isGrounded; }
-  public getVerticalVelocity(): number { return this.verticalVelocity; }
+  public getMoveSpeed(): number {
+    return this.moveSpeed;
+  }
+  public getIsGrounded(): boolean {
+    return this.isGrounded;
+  }
+  public getVerticalVelocity(): number {
+    return this.verticalVelocity;
+  }
 
   // ─── Override in subclasses ────────────────────────────────────────────────
 
@@ -178,11 +183,11 @@ export class EnemyControllerComponent extends Component {
       [
         // ── Priority 1: Chase player when visible ──────────────────────────
         new Sequence([
-          new Condition('CanSeePlayer', bb => bb.get<boolean>('canSeePlayer', false)),
-          new Action('ChasePlayer', bb => {
-            const self    = bb.get<EnemyControllerComponent>('self')!;
-            const myPos   = bb.get<vec3>('position')!;
-            const target  = bb.get<vec3>('playerPosition')!;
+          new Condition('CanSeePlayer', (bb) => bb.get<boolean>('canSeePlayer', false)),
+          new Action('ChasePlayer', (bb) => {
+            const self = bb.get<EnemyControllerComponent>('self')!;
+            const myPos = bb.get<vec3>('position')!;
+            const target = bb.get<vec3>('playerPosition')!;
 
             const toTarget = vec3.subtract(vec3.create(), target, myPos);
             toTarget[1] = 0; // ignore Y — horizontal only
@@ -200,7 +205,7 @@ export class EnemyControllerComponent extends Component {
         ]),
 
         // ── Priority 2: Idle ───────────────────────────────────────────────
-        new Action('Idle', _bb => Status.RUNNING),
+        new Action('Idle', (_bb) => Status.RUNNING),
       ],
       { label: 'EnemyRoot', reactive: true },
     );
@@ -228,10 +233,9 @@ export class EnemyControllerComponent extends Component {
 
     const corrected = this.characterController.computedMovement();
 
-    this.capsuleCollider.getRigidBody().setLinvel(
-      { x: corrected.x / dt, y: corrected.y / dt, z: corrected.z / dt },
-      true,
-    );
+    this.capsuleCollider
+      .getRigidBody()
+      .setLinvel({ x: corrected.x / dt, y: corrected.y / dt, z: corrected.z / dt }, true);
 
     // Cancel vertical velocity if hitting ceiling (corrected.y is much less than requested)
     if (vy > 0 && corrected.y < vy * dt * 0.5) {
