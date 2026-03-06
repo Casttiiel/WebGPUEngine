@@ -4,6 +4,7 @@
     "directional_light",
     "particle_system",
     "character_controller",
+    "enemy_controller",
     "flow",
     "swing_bar",
     "depth_of_field",

@@ -46,6 +46,7 @@ import { SphereColliderComponent } from '../../components/physics/SphereCollider
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
+import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -279,6 +280,8 @@ export class Loader {
         return new ImpulsePadComponent();
       case 'swing_bar':
         return new SwingBarComponent();
+      case 'enemy_controller':
+        return new EnemyControllerComponent();
       case 'height_fog':
         return new HeightFogComponent();
       case 'contact_shadows':

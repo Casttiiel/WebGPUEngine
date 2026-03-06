@@ -3,8 +3,8 @@
 1. Enemy AI
    Fase 1 — Algo que ya funciona esta semana
    ├── V Blackboard (Map<string, any>)
-   ├── BehaviorTree framework (Sequence, Selector, Action, Condition)
-   ├── EnemyControllerComponent (kinematic controller + desiredVelocity)
+   ├── V BehaviorTree framework (Sequence, Selector, Action, Condition)
+   ├── V EnemyControllerComponent (kinematic controller + desiredVelocity)
    └── Perception (raycast LOS + radius check)
    → Con esto tienes un enemigo que ve al jugador y se mueve hacia él en línea recta
 
