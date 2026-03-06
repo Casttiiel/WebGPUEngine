@@ -5,7 +5,11 @@ export interface PerceptionComponentDataType {
   hearRadius?: number;
   /** Horizontal field-of-view cone for sight (degrees). Default: 120 */
   fovDegrees?: number;
-  /** Ray origin height above the capsule base (metres). Default: 1.6 */
+  /**
+   * Eye ray origin height relative to the rigid body CENTER (capsule midpoint), in metres.
+   * For a 1.8m capsule (centre ~0.9m from ground), 0.7 places the eye at ~1.6m from ground.
+   * Default: 0.7
+   */
   eyeHeightOffset?: number;
   /**
    * How often perception checks run (seconds). Default: 0.1 (10 Hz).

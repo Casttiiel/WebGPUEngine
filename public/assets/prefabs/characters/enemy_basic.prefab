@@ -35,7 +35,7 @@
       "sightRadius": 20,
       "hearRadius": 8,
       "fovDegrees": 120,
-      "eyeHeightOffset": 1.6,
+      "eyeHeightOffset": 0.7,
       "checkInterval": 0.1
     }
   }
