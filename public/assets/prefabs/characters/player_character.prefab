@@ -90,6 +90,11 @@
       "speedThreshold": 3.0,
       "lerpSpeed": 5.0,
       "enabled": true
+    },
+    "weapon": {
+      "fireRate": 8,
+      "fireMode": "semi",
+      "poolName": "BulletManager"
     }
   },
   "children": [

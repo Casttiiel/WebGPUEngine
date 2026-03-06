@@ -16,6 +16,16 @@
     "prefab": "characters/player_character.prefab"
   },
   {
+    "components": {
+      "name": "BulletManager",
+      "transform": { "position": [0, 0, 0] },
+      "bullet_pool": {
+        "prefab": "gameplay/bullet.prefab",
+        "size": 30
+      }
+    }
+  },
+  {
     "prefab": "cameras/debug_camera.prefab"
   },
   {

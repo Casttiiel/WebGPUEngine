@@ -33,6 +33,10 @@ export class FPSCameraControllerComponent extends Component {
   private pitch: number = 0; // Rotación vertical (arriba/abajo)
   private yaw: number = 0; // Rotación horizontal (izquierda/derecha)
 
+  // Cached look state (updated every frame, read by WeaponComponent)
+  private cachedForward: vec3 = vec3.fromValues(0, 0, 1);
+  private cachedEyePos: vec3 = vec3.create();
+
   // Referencias
   private cameraEntity: Entity | null = null;
   private isActive: boolean = true;
@@ -158,6 +162,10 @@ export class FPSCameraControllerComponent extends Component {
       finalUp = upRot;
     }
 
+    // Cache para WeaponComponent
+    vec3.copy(this.cachedForward, finalForward);
+    vec3.copy(this.cachedEyePos, eyePos);
+
     // Punto de mira (1 metro adelante de la cámara)
     const lookAtTarget = vec3.add(vec3.create(), eyePos, finalForward);
 
@@ -188,5 +196,15 @@ export class FPSCameraControllerComponent extends Component {
 
   public getEyeOffset(): vec3 {
     return this.eyeOffset;
+  }
+
+  /** Normalized camera forward in world space. Updated every frame. */
+  public getLookDirection(): vec3 {
+    return this.cachedForward;
+  }
+
+  /** Eye (camera) world position. Updated every frame. */
+  public getEyeWorldPosition(): vec3 {
+    return this.cachedEyePos;
   }
 }

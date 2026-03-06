@@ -22,7 +22,8 @@
     "camera",
     "speed_lines_vfx",
     "projectile",
-    "bullet_pool"
+    "bullet_pool",
+    "weapon"
   ],
   "render_debug": []
 }

@@ -50,6 +50,7 @@ import { EnemyControllerComponent } from '../../components/game/EnemyControllerC
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
 import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
+import { WeaponComponent } from '../../components/game/WeaponComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -291,6 +292,8 @@ export class Loader {
         return new ProjectileComponent();
       case 'bullet_pool':
         return new BulletPoolComponent();
+      case 'weapon':
+        return new WeaponComponent();
       case 'height_fog':
         return new HeightFogComponent();
       case 'contact_shadows':
