@@ -40,6 +40,7 @@ import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { HeadTiltComponent } from '../../components/game/HeadTiltComponent';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
+import { TrailRendererComponent } from '../../components/vfx/TrailRendererComponent';
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { SphereColliderComponent } from '../../components/physics/SphereColliderComponent';
@@ -274,6 +275,8 @@ export class Loader {
         return new MeshColliderComponent();
       case 'particle_system':
         return new ParticleSystemComponent();
+      case 'trail_renderer':
+        return new TrailRendererComponent();
       case 'depth_of_field':
         return new DepthOfFieldComponent();
       case 'motion_blur':

@@ -3,6 +3,7 @@ import { vec3, quat } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { TransformComponent } from '../core/TransformComponent';
+import { TrailRendererComponent } from '../vfx/TrailRendererComponent';
 
 export type ProjectileComponentData = {
   speed?: number;
@@ -51,6 +52,13 @@ export class ProjectileComponent extends Component {
     this.traveledDistance = 0;
     this.releaseCallback = onRelease;
     this.enabled = true;
+
+    // Reset and activate trail
+    const trail = this.getOwner().getComponent('trail_renderer') as TrailRendererComponent | null;
+    if (trail) {
+      trail.reset();
+      trail.enabled = true;
+    }
   }
 
   public update(dt: number): void {

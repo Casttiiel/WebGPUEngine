@@ -5,6 +5,7 @@ import { Loader } from '../../core/loaders/Loader';
 import { EntityDataType } from '../../types/SceneData.type';
 import { TransformComponent } from '../core/TransformComponent';
 import { ProjectileComponent } from './ProjectileComponent';
+import { TrailRendererComponent } from '../vfx/TrailRendererComponent';
 
 export type BulletPoolComponentData = {
   /** Path to the bullet prefab relative to assets/prefabs/, e.g. "gameplay/bullet.prefab" */
@@ -86,6 +87,15 @@ export class BulletPoolComponent extends Component {
    */
   public release(projectile: ProjectileComponent): void {
     projectile.enabled = false;
+
+    // Clear and hide the trail
+    const trail = projectile
+      .getOwner()
+      .getComponent('trail_renderer') as TrailRendererComponent | null;
+    if (trail) {
+      trail.reset();
+      trail.enabled = false;
+    }
 
     const transform = (
       projectile.getOwner().getComponent('transform') as TransformComponent

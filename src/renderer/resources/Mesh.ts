@@ -637,4 +637,22 @@ export class Mesh extends GPUResource {
   public getIndexCount(): number {
     return this.indexCount;
   }
+
+  /**
+   * Overwrites the interleaved vertex buffer with new CPU-side data.
+   * Caller must ensure data.byteLength <= the allocated buffer size.
+   * Used by TrailRendererComponent to stream world-space ribbon geometry each frame.
+   */
+  public writeVertexData(data: Float32Array): void {
+    if (!this.interleavedBuffer) return;
+    GPUUtils.getDevice().queue.writeBuffer(this.interleavedBuffer, 0, data);
+  }
+
+  /**
+   * Overrides how many indices are submitted with the next drawIndexed call.
+   * Setting 0 effectively skips rendering (no-op draw call).
+   */
+  public setActiveIndexCount(count: number): void {
+    this.indexCount = count;
+  }
 }

@@ -23,7 +23,8 @@
     "speed_lines_vfx",
     "projectile",
     "bullet_pool",
-    "weapon"
+    "weapon",
+    "trail_renderer"
   ],
   "render_debug": []
 }
