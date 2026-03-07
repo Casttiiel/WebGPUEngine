@@ -88,13 +88,12 @@ export class BulletPoolComponent extends Component {
   public release(projectile: ProjectileComponent): void {
     projectile.enabled = false;
 
-    // Clear and hide the trail
+    // Let the trail fade out naturally instead of snapping to invisible
     const trail = projectile
       .getOwner()
       .getComponent('trail_renderer') as TrailRendererComponent | null;
     if (trail) {
-      trail.reset();
-      trail.enabled = false;
+      trail.stopEmitting(); // stops new nodes; existing nodes age out over their lifetime
     }
 
     const transform = (

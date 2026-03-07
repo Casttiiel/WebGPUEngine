@@ -1,6 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { Render } from '../../renderer/core/pipeline/Render';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Material } from '../../renderer/resources/Material';
 import { RenderManagerV2 } from '../../renderer/core/managers/RenderManagerV2';
@@ -60,6 +61,8 @@ export class TrailRendererComponent extends Component {
   private trailMaterial!: Material;
   private renderComp!: RenderComponent;
   private transformComp!: TransformComponent;
+  private indirectBuffer!: GPUBuffer;
+  private dummyBindGroup!: GPUBindGroup;
 
   // CPU geometry scratch buffer (reused every frame, no alloc)
   private vertexCPU!: Float32Array;
@@ -72,6 +75,9 @@ export class TrailRendererComponent extends Component {
   // Position tracking for node distance check
   private readonly lastPos = vec3.create();
   private hasLastPos = false;
+
+  // When false, no new nodes are pushed but existing ones continue to age out
+  private emitting: boolean = true;
 
   // Max render vertices (may exceed maxNodes for spline)
   private maxRenderVerts: number = 0;
@@ -137,6 +143,26 @@ export class TrailRendererComponent extends Component {
     this.trailMaterial = await Material.get(this.materialPath);
     this.transformComp = this.getOwner().getComponent('transform') as TransformComponent;
 
+    // Create a self-managed indirect draw buffer (5 × uint32 = 20 bytes).
+    // Owning this buffer prevents the GPUCullingManager from hijacking the key.
+    const device = Render.getInstance().getDevice();
+    this.indirectBuffer = device.createBuffer({
+      label: 'trail-indirect',
+      size: 20,
+      usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+    });
+    // Start invisible: indexCount = 0
+    device.queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([0, 1, 0, 0, 0]));
+
+    // A non-null renderBindGroup at group 3 excludes this key from GPUCullingManager.
+    // The trail shader doesn't use group 3, so an empty layout is safe.
+    const emptyLayout = device.createBindGroupLayout({ label: 'trail-dummy-bgl', entries: [] });
+    this.dummyBindGroup = device.createBindGroup({
+      label: 'trail-dummy-bg',
+      layout: emptyLayout,
+      entries: [],
+    });
+
     // Register once with the transparent render pipeline
     this.renderComp = new RenderComponent();
     this.renderComp.setOwner(this.getOwner());
@@ -145,30 +171,51 @@ export class TrailRendererComponent extends Component {
       this.trailMesh,
       this.trailMaterial,
       this.transformComp,
+      false, // isInstanced
+      1, // instanceCount
+      undefined, // instanceBindGroup
+      this.dummyBindGroup, // renderBindGroup — non-null escapes GPU culler filter
+      this.indirectBuffer, // indirectDrawBuffer — trail owns and writes this
     );
   }
 
-  /** Clear all trail nodes and hide the ribbon (no-op draw). */
+  /** Clear all trail nodes and hide the ribbon immediately. Restores emitting. */
   public reset(): void {
     this.head = 0;
     this.activeCount = 0;
     this.hasLastPos = false;
-    if (this.trailMesh) this.trailMesh.setActiveIndexCount(0);
+    this.emitting = true;
+    if (this.indirectBuffer) {
+      Render.getInstance()
+        .getDevice()
+        .queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([0, 1, 0, 0, 0]));
+    }
+  }
+
+  /**
+   * Stop recording new nodes. Existing nodes continue to age out and fade
+   * naturally over their lifetime. The component auto-disables itself once
+   * the last node expires.
+   */
+  public stopEmitting(): void {
+    this.emitting = false;
   }
 
   public override update(dt: number): void {
     if (!this.trailMesh) return;
 
-    const ownerPos = this.transformComp.getTransform().getWorldPosition();
+    if (this.emitting) {
+      const ownerPos = this.transformComp.getTransform().getWorldPosition();
 
-    // Record a new control node when the emitter has moved far enough
-    if (!this.hasLastPos) {
-      this.pushNode(ownerPos);
-      vec3.copy(this.lastPos, ownerPos);
-      this.hasLastPos = true;
-    } else if (vec3.distance(ownerPos, this.lastPos) >= this.minNodeDistance) {
-      this.pushNode(ownerPos);
-      vec3.copy(this.lastPos, ownerPos);
+      // Record a new control node when the emitter has moved far enough
+      if (!this.hasLastPos) {
+        this.pushNode(ownerPos);
+        vec3.copy(this.lastPos, ownerPos);
+        this.hasLastPos = true;
+      } else if (vec3.distance(ownerPos, this.lastPos) >= this.minNodeDistance) {
+        this.pushNode(ownerPos);
+        vec3.copy(this.lastPos, ownerPos);
+      }
     }
 
     // Age every active node
@@ -188,7 +235,11 @@ export class TrailRendererComponent extends Component {
     }
 
     if (this.activeCount < 2) {
-      this.trailMesh.setActiveIndexCount(0);
+      Render.getInstance()
+        .getDevice()
+        .queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([0, 1, 0, 0, 0]));
+      // Auto-disable once all nodes have faded out after stopEmitting()
+      if (!this.emitting) this.enabled = false;
       return;
     }
 
@@ -212,7 +263,10 @@ export class TrailRendererComponent extends Component {
     this.buildRibbonGeometry(finalPositions, cameraPos, N);
 
     this.trailMesh.writeVertexData(this.vertexCPU.subarray(0, N * 2 * VERTEX_STRIDE));
-    this.trailMesh.setActiveIndexCount((N - 1) * 6);
+    const activeIndexCount = (N - 1) * 6;
+    Render.getInstance()
+      .getDevice()
+      .queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([activeIndexCount, 1, 0, 0, 0]));
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────
@@ -354,6 +408,7 @@ export class TrailRendererComponent extends Component {
     if (this.renderComp) {
       RenderManagerV2.getInstance().delKeys(this.renderComp);
     }
+    this.indirectBuffer?.destroy();
   }
 
   public renderDebug(): void {}
