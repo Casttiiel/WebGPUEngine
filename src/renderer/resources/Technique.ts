@@ -257,7 +257,7 @@ export class Technique extends GPUResource {
         return 'none';
       }
       case RasterizationMode.SHADOWS: {
-        return 'back';
+        return 'front';
       }
       default: {
         throw new Error(`${this.label}: Unknown Rasterization Mode`);
@@ -420,10 +420,11 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'less',
-          // Moderate bias for standard back-face culling
-          depthBias: 2.0, // Constant offset to prevent acne on flat surfaces
-          depthBiasSlopeScale: 2.5, // Increased for steep angles (perpendicular surfaces)
-          depthBiasClamp: 0.008, // Maximum bias limit to prevent peter panning
+          // Front-face culling renders back faces into the shadow map, eliminating
+          // acne on solid meshes without hardware bias (no peter panning either).
+          depthBias: 0,
+          depthBiasSlopeScale: 0,
+          depthBiasClamp: 0,
         };
       }
       case DepthModes.ALWAYS: {
