@@ -36,7 +36,13 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);    
     
-    let roughness = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
+    let roughness_raw = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
+    let dndx = dpdx(N);
+    let dndy = dpdy(N);
+    let variance      = dot(dndx, dndx) + dot(dndy, dndy);
+    let kernelRough2  = min(2.0 * variance * 0.25, 0.18);
+    let rough2        = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
+    let roughness     = sqrt(rough2);
     let encodedNormal = normalToOctahedral01(N);
 
     let emissive = textureSample(txEmissive, samplerState, Uv).x * factors.emissiveFactor;

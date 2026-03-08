@@ -31,7 +31,25 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);    
     
-    let roughness = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
+    let roughness_raw = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
+
+    // ── Specular Anti-Aliasing (Toksvigs / Kanis 2013) ───────────────────────
+    // High-frequency normal maps introduce specular variance that is not captured
+    // in the stored roughness value.  At distance (lower mips) the averaged normal
+    // appears smoother than the real micro-surface, making specular highlights narrow
+    // and aliased.  We estimate the per-pixel normal variance from screen-space
+    // derivatives and add it to roughness² before writing it to the GBuffer.
+    // This is what Sketchfab, UE5 and Frostbite all do.
+    let dndx = dpdx(N);
+    let dndy = dpdy(N);
+    // variance = sum of squared lengths of the screen-space normal gradient
+    let variance = dot(dndx, dndx) + dot(dndy, dndy);
+    // Bias limits the maximum roughness increase to avoid over-blurring flat surfaces
+    let saaBias       = 0.25;
+    let kernelRough2  = min(2.0 * variance * saaBias, 0.18);
+    let rough2        = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
+    let roughness     = sqrt(rough2);
+    // ─────────────────────────────────────────────────────────────────────────
     let encodedNormal = normalToOctahedral01(N);
 
     let emissive = textureSample(txEmissive, samplerState, Uv).x * factors.emissiveFactor;

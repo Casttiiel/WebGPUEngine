@@ -34,7 +34,7 @@ export class ScreenSpaceReflections {
 
   public async load(): Promise<void> {
     try {
-      this.isInitialized = true;
+      this.isInitialized = false;
       this.brdfLUT = await Texture.getAsync('brdfLUT.png');
 
       this.createRenderTarget();

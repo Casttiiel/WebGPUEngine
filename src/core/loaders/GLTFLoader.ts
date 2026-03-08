@@ -356,7 +356,8 @@ export class GLTFLoader {
   }
 
   private static getTextureName(texture: Texture, gltfBaseName: string): string {
-    const texName = texture.getURI();
+    // Strip leading "./" so URIs like "./textures/foo.png" don't produce double path segments
+    const texName = texture.getURI().replace(/^\.\//, '');
     return `${gltfBaseName}/${texName}`;
   }
 

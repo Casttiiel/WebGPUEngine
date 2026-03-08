@@ -7,7 +7,6 @@
       "ambient_occlusion": {},
       "bloom": {},
       "auto_exposure": {},
-      "depth_of_field":{},
       "fsr":{
         "renderScale": 0.77
       }

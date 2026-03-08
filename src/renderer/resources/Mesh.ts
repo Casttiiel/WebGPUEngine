@@ -15,7 +15,7 @@ export class Mesh extends GPUResource {
   private vertices!: Float32Array; // Posiciones de los vértices
   private normals!: Float32Array; // Normales de los vértices
   private uvs!: Float32Array; // Coordenadas de textura
-  private indices!: Uint16Array; // Índices para formar triángulos
+  private indices!: Uint16Array | Uint32Array; // Índices para formar triángulos
   private tangents!: Float32Array; // Vectores tangentes para normal mapping
   private indexCount!: number; // Número total de índices
   private aabb!: AABB; // Axis-Aligned Bounding Box for culling
@@ -152,7 +152,10 @@ export class Mesh extends GPUResource {
     }
 
     if (Array.isArray(meshData.indices)) {
-      this.indices = new Uint16Array(meshData.indices);
+      // Use Uint32Array for arrays: avoids silent truncation if any index >= 65536
+      this.indices = new Uint32Array(meshData.indices);
+    } else if (meshData.indices instanceof Uint32Array) {
+      this.indices = meshData.indices;
     } else {
       this.indices = meshData.indices as Uint16Array;
     }
@@ -523,18 +526,27 @@ export class Mesh extends GPUResource {
       interleaved,
     );
 
-    // Crear buffer de índices en GPU
-    const paddedIndexCount = Math.ceil((this.indices.length * 2) / 4) * 2;
-    const paddedArray = new Uint16Array(paddedIndexCount);
-    paddedArray.set(this.indices);
-
-    this.indexBuffer = GPUUtils.createBuffer(
-      `${this.label}_indexBuffer`,
-      paddedArray.byteLength,
-      GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    );
-
-    GPUUtils.writeBuffer(this.indexBuffer, 0, paddedArray);
+    // Crear buffer de índices en GPU — preservar el tipo original (uint16 o uint32)
+    if (this.indices instanceof Uint32Array) {
+      // uint32: cada índice ocupa 4 bytes, alineación de 4 bytes garantizada
+      this.indexBuffer = GPUUtils.createBuffer(
+        `${this.label}_indexBuffer`,
+        this.indices.byteLength,
+        GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        this.indices,
+      );
+    } else {
+      // uint16: padear hasta múltiplo de 4 bytes (requisito WebGPU)
+      const paddedIndexCount = Math.ceil((this.indices.length * 2) / 4) * 2;
+      const paddedArray = new Uint16Array(paddedIndexCount);
+      paddedArray.set(this.indices);
+      this.indexBuffer = GPUUtils.createBuffer(
+        `${this.label}_indexBuffer`,
+        paddedArray.byteLength,
+        GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        paddedArray,
+      );
+    }
   }
 
   private calculateAABB(): AABB {
@@ -605,7 +617,10 @@ export class Mesh extends GPUResource {
     }
 
     pass.setVertexBuffer(0, this.interleavedBuffer);
-    pass.setIndexBuffer(this.indexBuffer, 'uint16');
+    pass.setIndexBuffer(
+      this.indexBuffer,
+      this.indices instanceof Uint32Array ? 'uint32' : 'uint16',
+    );
   }
 
   public renderGroup(pass: GPURenderPassEncoder): void {
@@ -630,7 +645,7 @@ export class Mesh extends GPUResource {
     return this.vertices ? this.vertices.length / 3 : 0;
   }
 
-  public getIndices(): Uint16Array {
+  public getIndices(): Uint16Array | Uint32Array {
     return this.indices;
   }
 

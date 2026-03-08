@@ -272,7 +272,9 @@ export class Material extends GPUResource {
   }
 
   private loadTexture(type: string, path: string): Promise<void> {
-    return Texture.getAsync(path).then((texture) => {
+    // Normal maps must use the normalise-after-average mipmap generator to avoid
+    // shimmering at distance caused by box-filtering encoded normal vectors.
+    return Texture.getAsync(path, type === 'normal').then((texture) => {
       this.textures.set(type, texture);
     });
   }

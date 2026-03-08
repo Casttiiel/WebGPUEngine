@@ -34,6 +34,8 @@ build/
 # TypeScript
 *.tsbuildinfo
 high_sponza/
+NewSponza_IvyGrowth_glTF/
+NewSponza_Curtains_glTF/
 
 VISUAL-GUIDE.md
 old/

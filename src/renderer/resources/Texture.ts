@@ -11,6 +11,7 @@ export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
   format?: GPUTextureFormat;
   usage?: GPUTextureUsageFlags;
+  isNormalMap?: boolean;
 }
 
 export class Texture extends GPUResource {
@@ -20,6 +21,7 @@ export class Texture extends GPUResource {
   private genMipmaps: boolean;
   private format: GPUTextureFormat;
   private usage: GPUTextureUsageFlags;
+  private isNormalMap: boolean;
   private static mipmapGenerator: MipmapGenerator | null = null;
 
   // Prevents returning a registered-but-not-yet-loaded texture to concurrent callers.
@@ -31,6 +33,7 @@ export class Texture extends GPUResource {
       type: ResourceType.TEXTURE,
     });
     this.genMipmaps = options.genMipmaps ?? true;
+    this.isNormalMap = options.isNormalMap ?? false;
 
     // Use quality settings for texture format if not explicitly specified
     if (options.format) {
@@ -64,7 +67,7 @@ export class Texture extends GPUResource {
     }
   }
 
-  public static async getAsync(path: string): Promise<Texture> {
+  public static async getAsync(path: string, isNormalMap = false): Promise<Texture> {
     // 1. Fully loaded and registered — return immediately.
     try {
       const t = ResourceManager.getResource<Texture>(path);
@@ -79,7 +82,7 @@ export class Texture extends GPUResource {
     if (existing) return existing;
 
     // 3. First caller: create, register, and store the in-flight promise before any await.
-    const texture = new Texture({ path, type: ResourceType.TEXTURE });
+    const texture = new Texture({ path, type: ResourceType.TEXTURE, isNormalMap });
     ResourceManager.registerResource(texture);
 
     const promise = texture.loadAsync().then(() => {
@@ -269,8 +272,11 @@ export class Texture extends GPUResource {
 
     const mipLevelCount = this.texture.mipLevelCount ?? 1;
 
-    // Use the dynamic MipmapGenerator for 2D textures
-    await Texture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount);
+    if (this.isNormalMap) {
+      await Texture.mipmapGenerator.generateMipmapsFor2DNormal(this.texture, mipLevelCount);
+    } else {
+      await Texture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount);
+    }
   }
 
   private static async initMipmapGenerator() {

@@ -1,10 +1,11 @@
 ### Engine
 
+1. Smooth camera movement
 1. Froxel Self Occlusion
-2. Froxel Density Volumes
-3. Voxel Cone Tracing
-4. Gameplay
-5. Enemy AI
+1. Froxel Density Volumes
+1. Voxel Cone Tracing
+1. Gameplay
+1. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo
