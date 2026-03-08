@@ -281,21 +281,18 @@ export class MipmapGenerator {
           code: shaderCode,
         });
 
-        const bindGroupLayout = BindGroupFactory.getLayout(
-          `normal_mipmap_generation_${format}`,
-          [
-            {
-              binding: 0,
-              visibility: GPUShaderStage.COMPUTE,
-              texture: { viewDimension: '2d', sampleType: 'float' },
-            },
-            {
-              binding: 1,
-              visibility: GPUShaderStage.COMPUTE,
-              storageTexture: { access: 'write-only', format, viewDimension: '2d' },
-            },
-          ],
-        );
+        const bindGroupLayout = BindGroupFactory.getLayout(`normal_mipmap_generation_${format}`, [
+          {
+            binding: 0,
+            visibility: GPUShaderStage.COMPUTE,
+            texture: { viewDimension: '2d', sampleType: 'float' },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.COMPUTE,
+            storageTexture: { access: 'write-only', format, viewDimension: '2d' },
+          },
+        ]);
         this.normalMapBindGroupLayouts.set(format, bindGroupLayout);
 
         const computeConfig: ComputePipelineConfig = {
@@ -307,12 +304,10 @@ export class MipmapGenerator {
           compute: { module: shaderModule, entryPoint: 'main' },
         };
 
-        const promise = this.device
-          .createComputePipelineAsync(computeConfig)
-          .then((pipeline) => {
-            this.normalMapPipelines.set(format, pipeline);
-            return pipeline;
-          });
+        const promise = this.device.createComputePipelineAsync(computeConfig).then((pipeline) => {
+          this.normalMapPipelines.set(format, pipeline);
+          return pipeline;
+        });
         this.normalMapPipelinePromises.set(format, promise);
       }
       await this.normalMapPipelinePromises.get(format)!;
