@@ -24,14 +24,28 @@
 @group(2) @binding(7) var<uniform> ssrParams: SSRUniforms;
 
 fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
-    let N = normalize(g.normal);
-    let V = normalize(g.viewDir);    
+    let N     = normalize(g.normal);
+    let V     = normalize(g.viewDir);    
     let NdotV = max(dot(N, V), 0.0);
-    let F0 = g.specularColor;
-    let F = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
+    let F0    = g.specularColor;
+    let F     = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
     let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NdotV, 0.0, 1.0));
-    let brdf = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
-    return color * (F * brdf.x + brdf.y);
+    let brdf  = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
+
+    // Kulla-Conty multi-scattering energy compensation.
+    // Single-scatter GGX does not integrate to 1 over the hemisphere — the missing
+    // energy grows with roughness and makes rough metals appear too dark.
+    // We add the multi-scatter complement using the average-Fresnel approximation:
+    //   E(NdV)  = brdf.x + brdf.y   (total single-scatter directional albedo)
+    //   E_ms    = 1 - E             (missing energy fraction)
+    //   F_avg   = F0 + (1-F0)/21   (hemisphere-average Fresnel)
+    //   f_ms    = F_avg*E_ms / (1 - F_avg*E_ms)   (Turquin 2019)
+    let E    = brdf.x + brdf.y;
+    let Ems  = 1.0 - E;
+    let Favg = F0 + (1.0 - F0) / 21.0;
+    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+
+    return color * (F * brdf.x + brdf.y + Fms);
 }
 
 fn computeSpecularOcclusion(ao: f32, NoV: f32, roughness: f32) -> f32 {
