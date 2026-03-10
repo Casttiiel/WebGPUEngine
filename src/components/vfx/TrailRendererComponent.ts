@@ -209,7 +209,9 @@ export class TrailRendererComponent extends Component {
 
       // Record a new control node when the emitter has moved far enough
       if (!this.hasLastPos) {
-        this.pushNode(ownerPos);
+        // Record the initial position without pushing a node — the transform may not yet
+        // have its final world matrix on the very first update tick.  The first real node
+        // is pushed only once the entity has actually moved >= minNodeDistance from here.
         vec3.copy(this.lastPos, ownerPos);
         this.hasLastPos = true;
       } else if (vec3.distance(ownerPos, this.lastPos) >= this.minNodeDistance) {
