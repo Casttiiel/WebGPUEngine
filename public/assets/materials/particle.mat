@@ -1,7 +1,7 @@
 {
     "technique": "particles/particle.tech",
     "textures":{
-        "txAlbedo": "white.png"
+        "txAlbedo": "projector.png"
     },
     "casts_shadows": false,
     "category": "transparent",

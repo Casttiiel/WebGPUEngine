@@ -160,15 +160,7 @@ export class Texture extends GPUResource {
 
     // Generate mipmaps if needed
     if (this.genMipmaps) {
-      const _tMip = performance.now();
       await this.generateMipmaps();
-      const _mipMs = performance.now() - _tMip;
-      if (_mipMs > 30) {
-        console.log(
-          `%c[Texture] ${this.path}  generateMipmaps waited=${_mipMs.toFixed(0)}ms`,
-          'color:#ff9800',
-        );
-      }
     }
 
     // Create view and sampler

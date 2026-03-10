@@ -18,8 +18,8 @@
             "particleLife": 0.0,
             "particleLifeVarianceMin": 0.5,
             "particleLifeVarianceMax": 1.5,
-            "startColor": [1.0, 0.5, 0.0, 0.1],
-            "endColor": [1.0, 0.0, 0.0, 0.1]
+            "startColor": [1.0, 0.5, 0.0, 1.0],
+            "endColor": [1.0, 1.0, 1.0, 1.0]
         }
     }
 }

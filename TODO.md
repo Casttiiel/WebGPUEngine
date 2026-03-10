@@ -1,21 +1,23 @@
 ### Engine
 
-1. SSR works on one direction only (add render in menu to test params)
-2. AO Weird + Slow
-3. Antialiasing Better?
-4. HZB Culling regulero
-5. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
-6. DBuffer (Compare my Deferred renderer with UE)
+1. Better console logs
+2. Particles not showing properly texture
+3. SSR works on one direction only (add render in menu to test params)
+4. AO Weird + Slow
+5. Antialiasing Better?
+6. HZB Culling regulero
+7. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
+8. DBuffer (Compare my Deferred renderer with UE)
 
-7. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
-8. Emissive strength > 1.0 correctamente en HDR - Sketchfab usa emissiveFactor real en HDR antes del tonemapper; tú guardas un escalar en el GBuffer que puede saturar
-9. Glass
+9. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+10. Emissive strength > 1.0 correctamente en HDR - Sketchfab usa emissiveFactor real en HDR antes del tonemapper; tú guardas un escalar en el GBuffer que puede saturar
+11. Glass
 
-10. Froxel Self Occlusion
-11. Froxel Density Volumes
-12. Voxel Cone Tracing
-13. Gameplay
-14. Enemy AI
+12. Froxel Self Occlusion
+13. Froxel Density Volumes
+14. Voxel Cone Tracing
+15. Gameplay
+16. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo
