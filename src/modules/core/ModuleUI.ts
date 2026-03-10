@@ -192,6 +192,7 @@ export class ModuleUI extends Module {
   }
 
   public render(renderPass: GPURenderPassEncoder): void {
+    UIRenderUtils.beginFrame();
     // Render all active widgets
     for (let i = 0; i < this.activeWidgets.length; i++) {
       const widget = this.activeWidgets[i];

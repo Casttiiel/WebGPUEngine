@@ -32,6 +32,20 @@ export class UIRenderUtils {
   private static screenHeight: number = 1080;
   private static screenSizeChanged: boolean = false;
 
+  // ── Uniform buffer ring pool ─────────────────────────────────────────────
+  // Pre-allocated buffers + bind groups reused every frame via writeBuffer.
+  // Avoids ~2 allocations per widget per frame (one GPUBuffer + one GPUBindGroup).
+  private static uniformBufferPool: GPUBuffer[] = [];
+  private static uniformBindGroupPool: GPUBindGroup[] = [];
+  private static uniformPoolIndex = 0;
+  private static readonly UNIFORM_POOL_SIZE = 128;
+  private static readonly reusableUniformData = new Float32Array(24); // 96 bytes scratch
+
+  // ── Texture bind group cache ─────────────────────────────────────────────
+  // Keyed per technique to handle the (unlikely) case of layout differences.
+  private static textureBGStandard: Map<Texture, GPUBindGroup> = new Map();
+  private static textureBGAdditive: Map<Texture, GPUBindGroup> = new Map();
+
   // Reference resolution — all JSON coords are in this space
   public static readonly REFERENCE_WIDTH = 1920;
   public static readonly REFERENCE_HEIGHT = 1080;
@@ -113,6 +127,7 @@ export class UIRenderUtils {
     }
 
     this.initialized = true;
+    this.initializeUniformPool();
 
     // Initialize default screen size (will be updated by ModuleUI)
     this.updateScreenSize(1920, 1080, 1);
@@ -150,6 +165,30 @@ export class UIRenderUtils {
     );
   }
 
+  /** Pre-allocate the uniform ring buffer pool once after techniques are loaded. */
+  private static initializeUniformPool(): void {
+    const layout = this.standardTechnique!.getBindGroupLayout(0)!;
+    for (let i = 0; i < this.UNIFORM_POOL_SIZE; i++) {
+      const buffer = this.device.createBuffer({
+        label: `ui_uniform_buffer_${i}`,
+        size: 96,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      const bindGroup = this.device.createBindGroup({
+        label: `ui_uniform_bind_group_${i}`,
+        layout,
+        entries: [{ binding: 0, resource: { buffer } }],
+      });
+      this.uniformBufferPool.push(buffer);
+      this.uniformBindGroupPool.push(bindGroup);
+    }
+  }
+
+  /** Call once per frame before rendering any widgets to reset the ring index. */
+  public static beginFrame(): void {
+    this.uniformPoolIndex = 0;
+  }
+
   /**
    * Clean up GPU resources
    */
@@ -159,6 +198,13 @@ export class UIRenderUtils {
     this.quadMesh?.release();
     this.standardTechnique?.release();
     this.additiveTechnique?.release();
+
+    for (const buf of this.uniformBufferPool) buf.destroy();
+    this.uniformBufferPool = [];
+    this.uniformBindGroupPool = [];
+    this.uniformPoolIndex = 0;
+    this.textureBGStandard.clear();
+    this.textureBGAdditive.clear();
 
     this.quadMesh = null;
     this.standardTechnique = null;
@@ -205,20 +251,33 @@ export class UIRenderUtils {
     // Activate technique (sets pipeline)
     technique.activatePipeline(pass);
 
-    // Create unique uniform buffer for this draw call (fixes buffer sharing bug)
-    const uniformBuffer = this.createUniformBufferForDraw({
-      transform: finalTransform,
-      tint,
-      minUV,
-      maxUV,
-    });
-
-    // Bind group 0: UIUniforms (BufferUniform)
-    const uniformBindGroup = this.createUniformBindGroup(technique, uniformBuffer);
+    // Bind group 0: UIUniforms — use ring-buffer pool (avoids per-frame GPUBuffer allocation)
+    let uniformBuffer: GPUBuffer;
+    let uniformBindGroup: GPUBindGroup;
+    if (this.uniformPoolIndex < this.UNIFORM_POOL_SIZE) {
+      uniformBuffer = this.uniformBufferPool[this.uniformPoolIndex];
+      uniformBindGroup = this.uniformBindGroupPool[this.uniformPoolIndex];
+      this.uniformPoolIndex++;
+      this.writeUniformData(uniformBuffer, finalTransform, tint, minUV, maxUV);
+    } else {
+      // Pool exhausted (>128 UI draws this frame) — fall back to one-shot allocation
+      uniformBuffer = this.createUniformBufferForDraw({
+        transform: finalTransform,
+        tint,
+        minUV,
+        maxUV,
+      });
+      uniformBindGroup = this.createUniformBindGroup(technique, uniformBuffer);
+    }
     pass.setBindGroup(0, uniformBindGroup);
 
-    // Bind group 1: Texture + Sampler (SingleTexture)
-    const textureBindGroup = this.createTextureBindGroup(technique, texture);
+    // Bind group 1: Texture + Sampler — cached per Texture instance (never recreates for the same texture)
+    const textureBGCache = additive ? this.textureBGAdditive : this.textureBGStandard;
+    let textureBindGroup = textureBGCache.get(texture);
+    if (!textureBindGroup) {
+      textureBindGroup = this.createTextureBindGroup(technique, texture);
+      textureBGCache.set(texture, textureBindGroup);
+    }
     pass.setBindGroup(1, textureBindGroup);
 
     // Activate mesh (set vertex/index buffers)
@@ -226,6 +285,22 @@ export class UIRenderUtils {
 
     // Draw call
     this.quadMesh.renderGroup(pass);
+  }
+
+  /** Write uniform data into a persistent pool buffer via queue.writeBuffer. */
+  private static writeUniformData(
+    buffer: GPUBuffer,
+    transform: mat4,
+    tint: vec4,
+    minUV: vec2,
+    maxUV: vec2,
+  ): void {
+    const d = UIRenderUtils.reusableUniformData;
+    d.set(transform as Float32Array, 0); // mat4  → floats 0-15  (64 bytes)
+    d.set(tint as Float32Array, 16); // vec4  → floats 16-19 (16 bytes)
+    d.set(minUV as Float32Array, 20); // vec2  → floats 20-21 (8 bytes)
+    d.set(maxUV as Float32Array, 22); // vec2  → floats 22-23 (8 bytes)
+    GPUUtils.writeBuffer(buffer, 0, d);
   }
 
   /**

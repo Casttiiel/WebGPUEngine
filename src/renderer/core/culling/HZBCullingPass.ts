@@ -67,6 +67,13 @@ export class HZBCullingPass {
   private mapPending = false; // mapAsync in flight
   private stagingMapped = false; // data ready to read via getMappedRange
 
+  // ---- Bind group cache: avoid per-frame recreation ----------------------
+  private cachedBindGroup: GPUBindGroup | null = null;
+  private cachedObjectDataBuffer: GPUBuffer | null = null;
+  private cachedIndirectArgsBuffer: GPUBuffer | null = null;
+  private cachedObjectCount = -1;
+  private cachedHZBView: GPUTextureView | null = null;
+
   private initialized = false;
 
   // --------------------------------------------------------------------------
@@ -222,24 +229,37 @@ export class HZBCullingPass {
 
     this.device.queue.writeBuffer(this.cameraBuffer, 0, this.cpuCamera);
 
-    // ---- Build bind group for this frame -----------------------------------
-    const bindGroup = this.device.createBindGroup({
-      label: 'hzb_culling_bind_group',
-      layout: this.layout,
-      entries: [
-        { binding: 0, resource: { buffer: this.cameraBuffer } },
-        {
-          binding: 1,
-          resource: { buffer: objectDataBuffer, size: objectCount * OBJECT_STRIDE },
-        },
-        {
-          binding: 2,
-          resource: { buffer: indirectArgsBuffer, size: objectCount * INDIRECT_STRIDE },
-        },
-        { binding: 3, resource: hzbView },
-        { binding: 4, resource: { buffer: this.counterBuffer } },
-      ],
-    });
+    // ---- Build bind group (cached — only recreate when inputs change) ------
+    if (
+      this.cachedBindGroup === null ||
+      this.cachedObjectDataBuffer !== objectDataBuffer ||
+      this.cachedIndirectArgsBuffer !== indirectArgsBuffer ||
+      this.cachedObjectCount !== objectCount ||
+      this.cachedHZBView !== hzbView
+    ) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'hzb_culling_bind_group',
+        layout: this.layout,
+        entries: [
+          { binding: 0, resource: { buffer: this.cameraBuffer } },
+          {
+            binding: 1,
+            resource: { buffer: objectDataBuffer, size: objectCount * OBJECT_STRIDE },
+          },
+          {
+            binding: 2,
+            resource: { buffer: indirectArgsBuffer, size: objectCount * INDIRECT_STRIDE },
+          },
+          { binding: 3, resource: hzbView },
+          { binding: 4, resource: { buffer: this.counterBuffer } },
+        ],
+      });
+      this.cachedObjectDataBuffer = objectDataBuffer;
+      this.cachedIndirectArgsBuffer = indirectArgsBuffer;
+      this.cachedObjectCount = objectCount;
+      this.cachedHZBView = hzbView;
+    }
+    const bindGroup = this.cachedBindGroup;
 
     // ---- Dispatch ----------------------------------------------------------
     const workgroups = Math.ceil(objectCount / 64);
@@ -282,6 +302,11 @@ export class HZBCullingPass {
     // The staging buffer must be unmapped before destroy; if mapAsync is still
     // in flight the spec allows destroying — the promise rejection is silenced.
     this.stagingBuffer?.destroy();
+    this.cachedBindGroup = null;
+    this.cachedObjectDataBuffer = null;
+    this.cachedIndirectArgsBuffer = null;
+    this.cachedObjectCount = -1;
+    this.cachedHZBView = null;
     this.initialized = false;
     this.copyScheduled = false;
     this.mapPending = false;
