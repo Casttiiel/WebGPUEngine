@@ -251,16 +251,53 @@ export class BindGroupFactory {
   public static getSSRUniformsComputeLayout(): GPUBindGroupLayout {
     return this.getLayout('ssr_uniforms_compute', [
       { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
     ]);
   }
 
   /** Write-only rgba16float storage texture output for the SSR compute pass (group 3). */
   public static getSSROutputLayout(): GPUBindGroupLayout {
     return this.getLayout('ssr_output_storage', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '2d' },
+      },
+    ]);
+  }
+
+  /**
+   * Group 0 for ssr_blur.cs: raw SSR texture (read) + linear sampler.
+   * group(0) @binding(0) = ssrRaw (texture_2d<f32>)
+   * group(0) @binding(1) = samplerLinear
+   */
+  public static getSSRBlurInputLayout(): GPUBindGroupLayout {
+    return this.getLayout('ssr_blur_input', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+    ]);
+  }
+
+  /**
+   * Group 1 for ssr_blur.cs: GBuffer normals + linear depth for bilateral weights.
+   * group(1) @binding(0) = gNormals      (texture_2d<f32>)
+   * group(1) @binding(1) = gLinearDepth  (texture_2d<f32>)
+   * group(1) @binding(2) = samplerPoint
+   */
+  public static getSSRBlurGBufferLayout(): GPUBindGroupLayout {
+    return this.getLayout('ssr_blur_gbuffer', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+    ]);
+  }
+
+  /**
+   * Group 2 for ssr_blur.cs: blurred SSR storage output.
+   * group(2) @binding(0) = outputBlurred (texture_storage_2d<rgba16float, write>)
+   */
+  public static getSSRBlurOutputLayout(): GPUBindGroupLayout {
+    return this.getLayout('ssr_blur_output', [
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,

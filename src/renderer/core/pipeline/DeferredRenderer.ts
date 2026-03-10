@@ -349,10 +349,13 @@ export class DeferredRenderer {
 
     // Post-procesado (solo para renderizado normal)
     // Use gBufferComputeBindGroup — SSR now runs as a compute pass and requires COMPUTE visibility
+    const gBufferRTs = this.gBufferPass.getRenderTargets();
     const ssr = this.ssr.generateSSR(
       this.rtAccLight.getView(),
       this.aoResult,
       this.gBufferComputeBindGroup,
+      gBufferRTs.normals.getView()!,
+      gBufferRTs.linearDepth.getView()!,
     );
     this.ambientLight.renderSpecular(
       this.rtAccLight.getView(),

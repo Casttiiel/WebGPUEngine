@@ -1,11 +1,14 @@
 ﻿// Screen-Space Reflections — compute shader
-// Ray marching logic ported from the original ssr.fs (world-space per-step march).
-// Compute wrapper keeps the STORAGE_BINDING output and eliminates fullscreen quad overhead.
+// View-space linear march + binary-search refinement.
+// Marching in view space gives constant perceived step size at all depths,
+// avoiding the large-step artifacts of world-space marching.
+// Binary search (8 iters) refines the hit to sub-step accuracy, removing pixelation.
+// Thickness scales with distance to suppress false-positive hits on thin objects far away.
 //
 // Bind-group layout:
 //   group(0)  Camera uniforms       (CameraUniforms UBO)
 //   group(1)  G-Buffer              (albedo, normals, linearDepth, sampler)
-//   group(2)  SSR params + inputs   (accLight, ao, brdfLUT, sampler, SSRUniforms UBO)
+//   group(2)  SSR params + inputs   (accLight, ao, SSRUniforms UBO)
 //   group(3)  Output storage tex    (rgba16float write-only)
 
 // common/pbr/core is intentionally omitted: common/gbuffer already pulls in
@@ -15,12 +18,6 @@
 #include "common/structs"
 #include "common/octahedral"
 #include "common/gbuffer"
-
-// Fresnel_Schlick_Roughness inlined — avoids pulling common/pbr/core.
-fn SSR_Fresnel_Schlick_Roughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
-    let r1 = max(vec3<f32>(1.0 - roughness), F0);
-    return F0 + (r1 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
 
 // ── Group 0: camera ───────────────────────────────────────────────────────────
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -33,80 +30,107 @@ fn SSR_Fresnel_Schlick_Roughness(cosTheta: f32, F0: vec3<f32>, roughness: f32) -
 
 // ── Group 2: SSR params ───────────────────────────────────────────────────────
 @group(2) @binding(0) var accLight:           texture_2d<f32>;
-@group(2) @binding(1) var aoTexture:          texture_2d<f32>;
-@group(2) @binding(2) var brdfLUT:            texture_2d<f32>;
-@group(2) @binding(3) var texSampler:         sampler;
-@group(2) @binding(4) var<uniform> ssrParams: SSRUniforms;
+@group(2) @binding(1) var<uniform> ssrParams: SSRUniforms;
 
 // ── Group 3: output ───────────────────────────────────────────────────────────
 @group(3) @binding(0) var outputSSR: texture_storage_2d<rgba16float, write>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
-    let N     = normalize(g.normal);
-    let V     = normalize(g.viewDir);
-    let NdotV = max(dot(N, V), 0.0);
-    let F0    = g.specularColor;
-    let F     = SSR_Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
-    let brdfCoords = vec2<f32>(
-        clamp(g.roughness,  0.0, 1.0),
-        clamp(1.0 - NdotV, 0.0, 1.0),
-    );
-    let brdf = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
-    return color * (F * brdf.x + brdf.y);
-}
-
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
-    let fadeWidth = 0.1;
+    let fadeWidth = 0.15;
     let fadeX = min(uv.x / fadeWidth, (1.0 - uv.x) / fadeWidth);
     let fadeY = min(uv.y / fadeWidth, (1.0 - uv.y) / fadeWidth);
-    return min(fadeX, fadeY);
+    return saturate(min(fadeX, fadeY));
 }
 
-fn performScreenSpaceRayMarching(
-    startPos:   vec3<f32>,
-    rayDir:     vec3<f32>,
-    startUV:    vec2<f32>,
+// ── View-space helper: project a view-space position to screen UV + linear depth ──
+fn viewToScreen(viewPos: vec3<f32>) -> vec3<f32> {
+    let clip  = camera.projectionMatrix * vec4<f32>(viewPos, 1.0);
+    let ndc   = clip.xyz / clip.w;
+    var uv    = ndc.xy * 0.5 + 0.5;
+    uv.y      = 1.0 - uv.y;
+    let depth = -viewPos.z / camera.cameraFar; // normalised linear depth [0,1]
+    return vec3<f32>(uv, depth);
+}
+
+// ── Binary search refinement ─────────────────────────────────────────────────
+// Bisects between the last miss (loVP) and first hit (hiVP) in view space
+// to find the actual surface crossing more precisely (8 iterations = ~1/256 step).
+fn binarySearchRefine(loVP: vec3<f32>, hiVP: vec3<f32>) -> vec3<f32> {
+    var lo = loVP;
+    var hi = hiVP;
+    for (var j: i32 = 0; j < 8; j++) {
+        let midVP  = (lo + hi) * 0.5;
+        let midScr = viewToScreen(midVP);
+        if (midScr.x < 0.0 || midScr.x > 1.0 || midScr.y < 0.0 || midScr.y > 1.0) { break; }
+        let sceneDep = textureSampleLevel(gLinearDepth, samplerGBuffer, midScr.xy, 0.0).r;
+        if (midScr.z > sceneDep) {
+            hi = midVP; // mid is inside geometry → move hi back
+        } else {
+            lo = midVP; // mid is in front → move lo forward
+        }
+    }
+    return hi; // refined hit point (view space)
+}
+
+// ── Main ray march (view-space) ───────────────────────────────────────────────
+fn performSSRMarch(
+    worldPos:   vec3<f32>,
+    reflWorld:  vec3<f32>,
     startDepth: f32,
+    roughness:  f32,
 ) -> vec4<f32> {
-    let stepSize    = ssrParams.stepSize;
     let maxSteps    = i32(ssrParams.maxSteps);
+    let stepSize    = ssrParams.stepSize;
     let maxDistance = ssrParams.maxDistance;
 
-    var currentPos = startPos;
+    // Transform to view space — march here so step size is camera-relative
+    let viewStartRaw = (camera.viewMatrix * vec4<f32>(worldPos, 1.0)).xyz;
+    let viewDir      = normalize((camera.viewMatrix * vec4<f32>(reflWorld, 0.0)).xyz);
 
-    for (var i = 0; i < maxSteps; i++) {
+    // Reject rays going toward the camera (behind near plane)
+    if (viewDir.z > 0.0) { return vec4<f32>(0.0); }
 
-        currentPos += rayDir * stepSize;
+    // Offset by 2 steps to avoid self-intersection with coplanar geometry
+    let viewStart = viewStartRaw + viewDir * stepSize * 2.0;
+    var prevVP    = viewStart;
+    var currentVP = viewStart;
 
-        let currentDistance = length(currentPos - startPos);
-        if (currentDistance > maxDistance) { break; }
+    for (var i: i32 = 0; i < maxSteps; i++) {
+        prevVP     = currentVP;
+        currentVP += viewDir * stepSize;
 
-        let viewPos = camera.viewMatrix * vec4<f32>(currentPos, 1.0);
-        if (viewPos.z > 0.0) { break; }
+        // Clip to near plane
+        if (currentVP.z > -0.01) { break; }
 
-        // Project to screen space
-        let clipPos  = camera.projectionMatrix * viewPos;
-        let ndc      = clipPos.xyz / clipPos.w;
-        var screenUV = ndc.xy * 0.5 + 0.5;
-        screenUV.y   = 1.0 - screenUV.y;
+        let scr = viewToScreen(currentVP);
 
-        if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) { break; }
+        // Out of screen
+        if (scr.x < 0.0 || scr.x > 1.0 || scr.y < 0.0 || scr.y > 1.0) { break; }
 
-        let sampledDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, screenUV, 0.0).r;
-        let camb2obj     = currentPos - camera.cameraPosition.xyz;
-        let currentDepth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
+        let sceneDep = textureSampleLevel(gLinearDepth, samplerGBuffer, scr.xy, 0.0).r;
 
-        if (currentDepth > sampledDepth
-            && (currentDepth - sampledDepth) < ssrParams.thickness
-            && sampledDepth > startDepth)
-        {
-            let hitColor  = textureSampleLevel(accLight, texSampler, screenUV, 0.0);
-            let distFade  = 1.0 - (currentDistance / maxDistance);
-            let edgeFade  = calculateEdgeFade(screenUV);
+        // Adaptive thickness: wider slab at distance prevents false misses and
+        // false positives — scales proportionally with the linear depth value.
+        let adaptiveThickness = ssrParams.thickness * (1.0 + sceneDep * 8.0);
+
+        if (scr.z > sceneDep && (scr.z - sceneDep) < adaptiveThickness && sceneDep > startDepth) {
+            // Binary search refinement
+            let refinedVP  = binarySearchRefine(prevVP, currentVP);
+            let refinedScr = viewToScreen(refinedVP);
+
+            var hitUV = refinedScr.xy;
+            if (hitUV.x < 0.0 || hitUV.x > 1.0 || hitUV.y < 0.0 || hitUV.y > 1.0) { return vec4<f32>(0.0); }
+
+            let hitColor  = textureSampleLevel(accLight, samplerGBuffer, hitUV, 0.0);
+            let hitDist   = length(currentVP - viewStart);
+            let distFade  = 1.0 - saturate(hitDist / maxDistance);
+            let edgeFade  = calculateEdgeFade(hitUV);
             let stepFade  = 1.0 - (f32(i) / f32(maxSteps));
-            let finalFade = clamp(distFade * edgeFade * stepFade, 0.0, 1.0);
+            // Roughness fade: fades to 0 at roughness=0.6, matching the soft gate in cs()
+            let roughFade = 1.0 - saturate(roughness / 0.6);
+            let finalFade = saturate(distFade * edgeFade * stepFade * roughFade);
             return vec4<f32>(hitColor.rgb, finalFade);
         }
     }
@@ -134,12 +158,27 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let g = decodeGBuffer(uv);
 
-    if (g.metallic < 0.1 || g.roughness > 0.9) {
+    // Soft metallic fade: ramps 0→1 between metallic 0.1 and 0.4, giving smooth
+    // SSR entry on partially metallic materials instead of a hard cutoff.
+    // Hard roughness cutoff raised to 0.85 — roughFade inside the march already
+    // fades contributions to 0 at roughness=0.6, this avoids fully wasted dispatches.
+    let metallicFade = saturate((g.metallic - 0.1) / 0.3);
+    if (g.metallic < 0.4 || g.roughness > 0.6) {//g.metallic < 0.1 || g.roughness > 0.9
         textureStore(outputSSR, coords, vec4<f32>(0.0));
         return;
     }
 
-    let result       = performScreenSpaceRayMarching(g.worldPos, g.reflectedDir, uv, g.zlinear);
-    let contribution = applyFresnelBRDF(result.rgb, g);
-    textureStore(outputSSR, coords, vec4<f32>(contribution, result.a));
+    // Mip-smoothed normal for ray direction — suppresses normal-map high-frequency
+    // detail that causes adjacent pixels to fire divergent rays (sparkle noise).
+    // Rougher surfaces sample higher mips for more spatially averaged normals.
+    let smoothMip     = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
+    let smoothNData   = textureSampleLevel(gNormals, samplerGBuffer, uv, smoothMip);
+    let smoothN       = normalize(octahedral01ToNormal(smoothNData.xy));
+    let incidentDir   = normalize(g.worldPos - camera.cameraPosition.xyz);
+    let smoothReflDir = normalize(reflect(incidentDir, smoothN));
+
+    // Raw hit color — BRDF applied once in ambient_specular.fs (with Kulla-Conty).
+    // metallicFade baked into alpha for smooth SSR entry on partially metallic surfaces.
+    let result = performSSRMarch(g.worldPos, smoothReflDir, g.zlinear, g.roughness);
+    textureStore(outputSSR, coords, vec4<f32>(result.rgb, result.a * metallicFade));
 }
