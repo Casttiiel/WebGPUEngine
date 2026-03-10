@@ -106,8 +106,6 @@ export class Texture extends GPUResource {
   }
 
   private async createTexture(): Promise<void> {
-    const _t0 = performance.now();
-
     // ── Try KTX2 compressed format first ─────────────────────────────────────
     // ktx2PathFor() swaps the extension, e.g. "diffuse.png" / "diffuse.webp" → "diffuse.ktx2".
     // ResourceManager.fetch throws on 404, so we catch silently and fall through
@@ -120,8 +118,6 @@ export class Texture extends GPUResource {
         const buffer = await resp.arrayBuffer();
         const ktx2 = await KTX2Loader.decode(buffer);
         this.uploadKTX2(ktx2);
-        const ms = (performance.now() - _t0).toFixed(0);
-        if (+ms > 30) console.log(`%c[Texture/KTX2] ${ktx2Path}  total=${ms}ms`, 'color:#4caf50');
         return;
       } catch (e) {
         // .ktx2 not present or transcode error — fall through to PNG / WebP.
