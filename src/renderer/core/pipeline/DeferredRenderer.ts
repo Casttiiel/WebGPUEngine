@@ -329,7 +329,7 @@ export class DeferredRenderer {
 
     // 3. Render ambient occlusion and lighting
     this.aoResult = this.renderAO(camera);
-    this.renderAccLight(camera);
+    this.renderAccLight();
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
@@ -407,26 +407,12 @@ export class DeferredRenderer {
     return ambientOcclusionComponent.compute(this.gBufferComputeBindGroup);
   }
 
-  private renderAccLight(camera: Entity): void {
-    // Compute SSGI before ambient diffuse — provides indirect bounce lighting
-    let ssgiView: GPUTextureView | undefined;
-    if (QualitySettings.getInstance().getSettings().enableSSGI) {
-      const result = this.ssgi.render(this.gBufferBindGroup);
-      if (result) ssgiView = result;
-    }
-
+  private renderAccLight(): void {
     this.ambientLight.renderDiffuse(
       this.rtAccLight.getView(),
       this.gBufferBindGroup,
       this.aoResult,
-      ssgiView,
     );
-
-    // Compute contact shadow factor BEFORE directional light so it can be applied internally
-    const contactShadowsComp = camera?.getComponent('contact_shadows') as ContactShadowsComponent;
-    const contactShadowView = contactShadowsComp?.hasLoaded()
-      ? contactShadowsComp.computeShadowFactor(this.gBufferBindGroup)
-      : undefined;
 
     // Directional lights receive the shadow factor and apply it to their own contribution only
     for (const comp of Engine.getEntities()
@@ -436,7 +422,7 @@ export class DeferredRenderer {
       directionalLightComponent.render(
         this.rtAccLight.getView(),
         this.gBufferBindGroup,
-        contactShadowView,
+        this.whiteTexture.getTextureView()!,
       );
     }
     this.renderPassManager.executePass('pointLights');
