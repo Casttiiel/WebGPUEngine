@@ -236,7 +236,7 @@ export class AmbientOcclusionComponent extends Component {
         { binding: 0, resource: { buffer: this.ssaoParamsBuffer } },
         { binding: 1, resource: SamplerLibrary.ambientOcclusionSampler },
         { binding: 2, resource: this.noiseTexture.getTextureView()! },
-        { binding: 3, resource: SamplerLibrary.anisotropic16x },
+        { binding: 3, resource: SamplerLibrary.ambientOcclusionSampler },
       ],
     );
   }

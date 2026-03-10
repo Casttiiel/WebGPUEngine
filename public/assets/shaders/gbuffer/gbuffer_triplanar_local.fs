@@ -137,13 +137,24 @@ fn fs(input: VertexOutput) -> FragmentOutput {
 
     var output: FragmentOutput;
 
-    output.albedo = albedo_color * factors.baseColorFactor;
+    // Linearize sRGB albedo before applying factor (same as gbuffer.fs)
+    let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
+    output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
     output.albedo.a = metallic_value * factors.metallicFactor;
+
+    // Specular Anti-Aliasing (same as gbuffer.fs)
+    let dndx          = dpdx(N);
+    let dndy          = dpdy(N);
+    let variance      = dot(dndx, dndx) + dot(dndy, dndy);
+    let kernelRough2  = min(2.0 * variance * 0.25, 0.18);
+    let roughness_raw = roughness_value * factors.roughnessFactor;
+    let rough2        = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
+    let roughness     = sqrt(rough2);
 
     output.normal = vec4<f32>(
         encodedNormal.x,
         encodedNormal.y,
-        roughness_value * factors.roughnessFactor,
+        roughness,
         emissive_value * factors.emissiveFactor
     );
 

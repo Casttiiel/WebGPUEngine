@@ -18,8 +18,7 @@ fn decodeGBuffer(uv: vec2<f32>) -> GBuffer {
     let albedo = textureSampleLevel(gAlbedo, samplerGBuffer, uv, 0.0);
     g.metallic = albedo.a;
     
-    // Gamma correction for albedo
-    g.albedo = pow(abs(albedo.rgb), vec3<f32>(2.2));
+    g.albedo = albedo.rgb;
     
     // Get self illumination
     g.emissive = normalRoughnessData.a;

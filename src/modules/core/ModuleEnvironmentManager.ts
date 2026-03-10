@@ -18,6 +18,7 @@ import { MipmapGenerator } from '../../renderer/core/processing/MipmapGenerator'
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 
 // Math utilities for atmospheric lighting
@@ -411,15 +412,7 @@ export class ModuleEnvironmentManager extends Module {
     (cubemap as any).gpuTextureView = texture.createView({
       dimension: 'cube',
     });
-    (cubemap as any).gpuSampler = device.createSampler({
-      label: `${name}_sampler`,
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      addressModeW: 'clamp-to-edge',
-    });
+    (cubemap as any).gpuSampler = SamplerLibrary.environmentCubemap;
 
     (cubemap as any)._hasData = true;
 

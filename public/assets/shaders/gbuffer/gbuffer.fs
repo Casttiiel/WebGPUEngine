@@ -21,7 +21,10 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     
     var output: FragmentOutput;
 
-    output.albedo = albedo_color * factors.baseColorFactor;
+    // Linearize sRGB albedo before applying the factor so the factor scales linear energy,
+    // not sRGB-encoded values. Sketchfab / glTF reference: pow(sRGB, 2.2) * linearFactor.
+    let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
+    output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
     output.albedo.a = textureSample(txMetallic, samplerState, Uv).b * factors.metallicFactor;
 
     // Obtener la normal del normal map

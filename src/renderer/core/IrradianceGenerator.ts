@@ -1,4 +1,5 @@
 import { GPUUtils } from './utils/GPUUtils';
+import { SamplerLibrary } from './utils/SamplerLibrary';
 import { Cubemap } from '../resources/Cubemap';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
@@ -14,7 +15,6 @@ export class IrradianceGenerator {
   private computePipeline: GPUComputePipeline | null = null;
   private computeShader: GPUShaderModule | null = null;
   private bindGroupLayout: GPUBindGroupLayout | null = null;
-  private sampler: GPUSampler | null = null;
   private initPromise: Promise<void> | null = null;
 
   // Tamaño del irradiance cubemap (típicamente 32x32 o 64x64)
@@ -37,17 +37,6 @@ export class IrradianceGenerator {
 
   public async initialize(): Promise<void> {
     const t0 = performance.now();
-
-    // Crear sampler para el cubemap de entrada
-    this.sampler = this.device.createSampler({
-      label: 'irradiance_input_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      addressModeW: 'clamp-to-edge',
-    });
 
     // Cargar compute shader usando ShaderPreprocessor para procesar includes
     let tStep = performance.now();
@@ -138,7 +127,7 @@ export class IrradianceGenerator {
   public async generateIrradiance(inputCubemap: Cubemap): Promise<Cubemap> {
     await this.ensureInitialized();
 
-    if (!this.computePipeline || !this.bindGroupLayout || !this.sampler) {
+    if (!this.computePipeline || !this.bindGroupLayout) {
       throw new Error('IrradianceGenerator not initialized');
     }
 
@@ -190,7 +179,7 @@ export class IrradianceGenerator {
           },
           {
             binding: 1,
-            resource: this.sampler,
+            resource: SamplerLibrary.environmentCubemap,
           },
           {
             binding: 2,
@@ -259,15 +248,7 @@ export class IrradianceGenerator {
     (cubemap as any).gpuTextureView = texture.createView({
       dimension: 'cube',
     });
-    (cubemap as any).gpuSampler = this.device.createSampler({
-      label: 'irradiance_sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      mipmapFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      addressModeW: 'clamp-to-edge',
-    });
+    (cubemap as any).gpuSampler = SamplerLibrary.environmentCubemap;
 
     (cubemap as any)._hasData = true;
 
@@ -279,6 +260,5 @@ export class IrradianceGenerator {
     this.computePipeline = null;
     this.computeShader = null;
     this.bindGroupLayout = null;
-    this.sampler = null;
   }
 }

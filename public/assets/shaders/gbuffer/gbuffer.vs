@@ -46,8 +46,6 @@ fn vs(
     output.N = normalize(model3x3 * normal);
     output.T = vec4<f32>(normalize(model3x3 * tangent.xyz), tangent.w);
 
-    let displace_value = textureSampleLevel(txRoughness, samplerState, uv, 0).x;
-
     output.WorldPos = worldPos.xyz;
     output.position = camera.projectionMatrix * camera.viewMatrix * worldPos;
 

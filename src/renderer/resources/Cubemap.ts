@@ -164,7 +164,7 @@ export class Cubemap extends GPUResource {
         mipLevelCount: mipLevelCount,
       });
 
-      this.gpuSampler = SamplerLibrary.bloom;
+      this.gpuSampler = SamplerLibrary.environmentCubemap;
 
       // Mark as loaded when loadAsync completes
       this.setHasData();

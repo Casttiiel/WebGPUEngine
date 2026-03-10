@@ -35,8 +35,6 @@ export class BloomGaussianComponent extends BlurGaussianComponent {
 
   private bloomTexturesBindGroup!: GPUBindGroup | null;
 
-  // ✅ Cached samplers to avoid recreation every frame
-  private cachedLinearSampler!: GPUSampler;
   private inputTextureCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
   constructor() {
@@ -52,12 +50,6 @@ export class BloomGaussianComponent extends BlurGaussianComponent {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.getAsync('post-processing/bloom_filter.tech');
     this.combineTechnique = await Technique.getAsync('post-processing/bloom_combine.tech');
-
-    // ✅ Create cached sampler once
-    this.cachedLinearSampler = GPUUtils.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
 
     const qualitySettings = QualitySettings.getInstance();
     const bloomFormat = qualitySettings.getSettings().bloomTexture;
@@ -272,7 +264,7 @@ export class BloomGaussianComponent extends BlurGaussianComponent {
           },
           {
             binding: 1,
-            resource: this.cachedLinearSampler, // ✅ Use cached sampler
+            resource: SamplerLibrary.bloom,
           },
         ],
       );

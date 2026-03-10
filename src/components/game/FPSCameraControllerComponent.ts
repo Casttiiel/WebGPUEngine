@@ -12,6 +12,7 @@ export interface FPSCameraComponentData {
   eyeOffset?: number[]; // [x, y, z] - Offset de los ojos relativo al owner (ej: [0, 1.6, 0])
   mouseSensitivity?: number; // Sensibilidad del mouse
   invertY?: boolean; // Invertir eje Y (típico en FPS de consola)
+  mouseSmoothingFactor?: number; // Smoothing speed (higher = snappier). 0 = disabled. Default: 20
 }
 
 /**
@@ -28,10 +29,13 @@ export class FPSCameraControllerComponent extends Component {
   private eyeOffset: vec3 = vec3.fromValues(0, 1.6, 0); // Altura de ojos (1.6m = típico humano)
   private mouseSensitivity: number = 0.3; // Sensibilidad más alta para FPS
   private invertY: boolean = false; // Invertir eje Y
+  private mouseSmoothingFactor: number = 20; // Exponential smoothing speed (0 = instant)
 
   // Estado de rotación
-  private pitch: number = 0; // Rotación vertical (arriba/abajo)
-  private yaw: number = 0; // Rotación horizontal (izquierda/derecha)
+  private pitch: number = 0; // Rotación vertical suavizada (arriba/abajo)
+  private yaw: number = 0; // Rotación horizontal suavizada (izquierda/derecha)
+  private targetPitch: number = 0; // Rotación vertical objetivo (raw mouse input)
+  private targetYaw: number = 0; // Rotación horizontal objetivo (raw mouse input)
 
   // Cached look state (updated every frame, read by WeaponComponent)
   private cachedForward: vec3 = vec3.fromValues(0, 0, 1);
@@ -54,6 +58,9 @@ export class FPSCameraControllerComponent extends Component {
     }
     if (data.invertY !== undefined) {
       this.invertY = data.invertY;
+    }
+    if (data.mouseSmoothingFactor !== undefined) {
+      this.mouseSmoothingFactor = data.mouseSmoothingFactor;
     }
   }
 
@@ -86,11 +93,24 @@ export class FPSCameraControllerComponent extends Component {
     const input = Engine.getInput();
     const mouseDelta = input.getMouseDelta();
 
-    // Actualizar rotación (sin smoothing para FPS)
-    this.yaw -= mouseDelta.x * this.mouseSensitivity;
-    this.pitch += mouseDelta.y * this.mouseSensitivity * (this.invertY ? -1 : 1);
+    // Acumular input en los valores objetivo
+    this.targetYaw -= mouseDelta.x * this.mouseSensitivity;
+    this.targetPitch += mouseDelta.y * this.mouseSensitivity * (this.invertY ? -1 : 1);
 
-    // Limitar pitch (evitar gimbal lock)
+    // Limitar pitch objetivo (evitar gimbal lock)
+    this.targetPitch = Math.max(-89, Math.min(89, this.targetPitch));
+
+    // Aplicar suavizado exponencial independiente del framerate
+    if (this.mouseSmoothingFactor > 0) {
+      const t = 1 - Math.exp(-this.mouseSmoothingFactor * dt);
+      this.yaw += (this.targetYaw - this.yaw) * t;
+      this.pitch += (this.targetPitch - this.pitch) * t;
+    } else {
+      this.yaw = this.targetYaw;
+      this.pitch = this.targetPitch;
+    }
+
+    // Limitar pitch suavizado (evitar gimbal lock)
     this.pitch = Math.max(-89, Math.min(89, this.pitch));
 
     // Landing camera pitch offset (procedural, no persiste en this.pitch)

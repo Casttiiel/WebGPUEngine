@@ -11,6 +11,7 @@ export class SamplerLibrary {
   private static _skyboxSampler: GPUSampler;
   private static _nonFilteringSampler: GPUSampler;
   private static _froxelRaymarchSampler: GPUSampler;
+  private static _environmentCubemapSampler: GPUSampler;
 
   /**
    * Initialize all samplers. Must be called after WebGPU device is ready.
@@ -102,6 +103,17 @@ export class SamplerLibrary {
       maxAnisotropy: 1,
     });
 
+    SamplerLibrary._environmentCubemapSampler = GPUUtils.createSampler({
+      label: 'environment_cubemap_sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      addressModeW: 'clamp-to-edge',
+      maxAnisotropy: 1,
+    });
+
     SamplerLibrary.initialized = true;
     // All samplers created successfully
   }
@@ -121,7 +133,10 @@ export class SamplerLibrary {
     SamplerLibrary._ambientOcclusionSampler = null as any;
     SamplerLibrary._shadowsSampler = null as any;
     SamplerLibrary._anisotropic16x = null as any;
+    SamplerLibrary._skyboxSampler = null as any;
+    SamplerLibrary._nonFilteringSampler = null as any;
     SamplerLibrary._froxelRaymarchSampler = null as any;
+    SamplerLibrary._environmentCubemapSampler = null as any;
 
     SamplerLibrary.initialized = false;
   }
@@ -180,5 +195,12 @@ export class SamplerLibrary {
       throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
     }
     return SamplerLibrary._froxelRaymarchSampler;
+  }
+
+  public static get environmentCubemap(): GPUSampler {
+    if (!SamplerLibrary.initialized) {
+      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
+    }
+    return SamplerLibrary._environmentCubemapSampler;
   }
 }

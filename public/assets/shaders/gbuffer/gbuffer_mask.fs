@@ -26,7 +26,8 @@ fn fs(input: VertexOutput) -> FragmentOutput {
 
     var output: FragmentOutput;
 
-    output.albedo = albedo_color * factors.baseColorFactor;
+    let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
+    output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
     output.albedo.a = textureSample(txMetallic, samplerState, Uv).b * factors.metallicFactor;
 
     // Obtener la normal del normal map
