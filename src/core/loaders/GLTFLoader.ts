@@ -263,26 +263,48 @@ export class GLTFLoader {
     materialData: Material,
     material: MaterialDataType,
   ): MaterialDataType {
-    let technique = 'gbuffer/gbuffer.tech';
+    const isGlass = this.isGlass(materialData);
+    const isDecal = this.isDecal(materialData);
+    const isBlend = materialData.getAlphaMode() === 'BLEND';
+    const isMask = materialData.getAlphaMode() === 'MASK';
 
-    if (materialData.getAlphaMode() === 'MASK') {
-      technique = 'gbuffer/gbuffer_mask.tech';
-    } else if (this.isGlass(materialData)) {
-      technique = 'utility/oit_gather.tech';
-    } else if (materialData.getAlphaMode() === 'BLEND') {
-      technique = 'utility/transparent.tech';
-    }
+    // Resolve technique and fragment shader
+    let technique = 'gbuffer/gbuffer.tech';
     let fs = 'gbuffer/gbuffer.fs';
-    if (materialData.getAlphaMode() === 'MASK') {
+    if (isDecal) {
+      technique = 'gbuffer/decal.tech';
+      fs = 'gbuffer/decal.fs';
+    } else if (isMask) {
+      technique = 'gbuffer/gbuffer_mask.tech';
       fs = 'gbuffer/gbuffer_mask.fs';
-    } else if (this.isGlass(materialData)) {
+    } else if (isGlass) {
+      technique = 'utility/oit_gather.tech';
       fs = 'utility/oit_gather.fs';
-    } else if (materialData.getAlphaMode() === 'BLEND') {
+    } else if (isBlend) {
+      technique = 'utility/transparent.tech';
       fs = 'utility/transparent.fs';
     }
 
-    const isGlass = this.isGlass(materialData);
-    const isBlend = materialData.getAlphaMode() === 'BLEND';
+    // Decals always need an inline techniqueData (GBufferUniforms at group 3).
+    // decal_flat uses the mesh's own UV coords and blends by alpha — designed for
+    // artist-placed flat planes (e.g. GLTF dirt decals), not projected cube decals.
+    if (isDecal) {
+      material.techniqueData = {
+        vs: 'gbuffer/gbuffer.vs',
+        fs: 'gbuffer/decal_flat.fs',
+        uniforms: [
+          PipelineBindGroupLayouts.CAMERA_UNIFORMS,
+          PipelineBindGroupLayouts.MATERIAL_TEXTURES,
+          PipelineBindGroupLayouts.OBJECT_UNIFORMS,
+          PipelineBindGroupLayouts.GBUFFER_UNIFORMS,
+        ] as const,
+        writesOn: FragmentShaderTargets.PARTIAL_GBUFFER,
+        rs: RasterizationMode.DOUBLE_SIDED,
+        z: DepthModes.LESS_EQUAL_NO_WRITE,
+        blend: BlendModes.DEFAULT,
+      };
+      return material;
+    }
 
     if (materialData.getDoubleSided()) {
       const uniforms = isGlass
@@ -345,7 +367,20 @@ export class GLTFLoader {
     return material.getExtension<Transmission>('KHR_materials_transmission') !== null;
   }
 
+  /**
+   * A GLTF MASK material with alphaCutoff == 0.0 is semantically a decal:
+   * alphaCutoff=0 means "keep all pixels where alpha > 0", which is not a
+   * hard cutout — the artist is using alpha as a blend weight over the GBuffer.
+   * Real cutout geometry (leaves, fences) always uses alphaCutoff > 0 (e.g. 0.5).
+   */
+  private static isDecal(material: Material): boolean {
+    return material.getAlphaMode() === 'MASK' && material.getAlphaCutoff() === 0.0;
+  }
+
   private static getCategory(material: Material): RenderCategory {
+    if (this.isDecal(material)) {
+      return RenderCategory.DECALS;
+    }
     if (this.isGlass(material)) {
       return RenderCategory.GLASS;
     }

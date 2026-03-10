@@ -307,7 +307,7 @@ export class Material extends GPUResource {
     return this.textureFiles;
   }
 
-  public getName(): string {
+  public override getName(): string {
     return this.path;
   }
 
