@@ -27,88 +27,55 @@ alias LightUniformsCSM = DirectionalLightCSMUniforms;
 @group(2) @binding(5) var contactShadowMap:     texture_2d<f32>;
 @group(2) @binding(6) var contactShadowSampler: sampler;
 
-/**
- * Shader-specific implementation using consolidated CSM functions.
- * Selects appropriate shadow map based on cascade index.
- */
 fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
-    
-    // Call getShadowFactor with appropriate cascade shadow map
-    if (cascadeIndex == 0) {
-        return getShadowFactor(
-            worldPos,
-            light.viewProjOffset0, light.shadowParams.z,
-            gShadowMap0, gShadowSampler, false
-        );
-    } else if (cascadeIndex == 1) {
-        return getShadowFactor(
-            worldPos,
-            light.viewProjOffset1, light.shadowParams.z,
-            gShadowMap1, gShadowSampler, false
-        );
-    } else {
-        return getShadowFactor(
-            worldPos,
-            light.viewProjOffset2, light.shadowParams.z,
-            gShadowMap2, gShadowSampler, false
-        );
-    }
+    if (cascadeIndex == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.z, gShadowMap0, gShadowSampler, false); }
+    if (cascadeIndex == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.z, gShadowMap1, gShadowSampler, false); }
+    return getShadowFactor(worldPos, light.viewProjOffset2, light.shadowParams.z, gShadowMap2, gShadowSampler, false);
 }
 
-fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {    
-    // Call getShadowFactor with appropriate cascade shadow map
-    if (idx == 0) {
-        return getShadowFactor(
-            worldPos,
-            light.viewProjOffset0, light.shadowParams.z,
-            gShadowMap0, gShadowSampler, false
-        );
-    } else if (idx == 1) {
-        return getShadowFactor(
-            worldPos,
-            light.viewProjOffset1, light.shadowParams.z,
-            gShadowMap1, gShadowSampler, false
-        );
-    } else {
-        return getShadowFactor(
-            worldPos,
-            light.viewProjOffset2, light.shadowParams.z,
-            gShadowMap2, gShadowSampler, false
-        );
-    }
+fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {
+    if (idx == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.z, gShadowMap0, gShadowSampler, false); }
+    if (idx == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.z, gShadowMap1, gShadowSampler, false); }
+    return getShadowFactor(worldPos, light.viewProjOffset2, light.shadowParams.z, gShadowMap2, gShadowSampler, false);
 }
 
 /**
- * Shader-specific blended CSM using consolidated functions.
+ * Blended CSM.
+ * Blend zone = 10% of each cascade distance (min 1 m), scales with far cascades.
+ * Last cascade fades to fully lit (1.0) instead of hard-cutting.
  */
 fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeCount = i32(light.cascadeSplits.w);
-    
+
     if (cascadeCount == 1) {
-        return getShadowFactor(worldPos, light.viewProjOffset0, 
-                               light.shadowParams.z, gShadowMap0, gShadowSampler, false);
+        return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.z, gShadowMap0, gShadowSampler, false);
     }
-    
-    let blendZone = 2.0; // 2 metros fijos, igual para todas las cascadas
-    var cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
-    
-    // Calcular split distance de la cascada actual
-    var splitDist = light.cascadeSplits.x;
-    if (cascadeIndex == 1) { splitDist = light.cascadeSplits.y; }
-    else if (cascadeIndex == 2) { splitDist = light.cascadeSplits.z; }
-    
-    let blendStart = splitDist - blendZone;
+
+    let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
+
+    var splitDist: f32;
+    if      (cascadeIndex == 0) { splitDist = light.cascadeSplits.x; }
+    else if (cascadeIndex == 1) { splitDist = light.cascadeSplits.y; }
+    else                        { splitDist = light.cascadeSplits.z; }
+
+    // 10% blend zone, minimum 1 m — scales naturally with each cascade reach
+    let blendZone   = max(splitDist * 0.1, 1.0);
+    let blendStart  = splitDist - blendZone;
     let blendFactor = saturate((viewSpaceDepth - blendStart) / blendZone);
-    
-    if (blendFactor < 0.01) {
-        return getShadowFactorCSM(worldPos, viewSpaceDepth);
+
+    let shadow1 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex);
+    if (blendFactor < 0.01) { return shadow1; }
+
+    // Beyond the last cascade fade to unshadowed (1.0) instead of repeating cascade N
+    var shadow2: f32;
+    if (cascadeIndex >= cascadeCount - 1) {
+        shadow2 = 1.0;
+    } else {
+        shadow2 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex + 1);
     }
-    
-    // Solo hacer doble lookup en la zona de blend real (2m)
-    let shadowFactor1 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex);
-    let shadowFactor2 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex + 1);
-    return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
+
+    return mix(shadow1, shadow2, smoothstep(0.0, 1.0, blendFactor));
 }
 
 @fragment
