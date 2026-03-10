@@ -7,8 +7,8 @@
 struct AmbientUniforms {
     globalAmbientBoost: f32,
     diffuseBoost:       f32,
-    ssgiEnabled:        f32,  // 1.0 = SSGI active, 0.0 = disabled
-    ssgiIntensity:      f32,  // multiplier for SSGI contribution
+    padding:        f32,
+    padding2:      f32, 
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -23,7 +23,6 @@ struct AmbientUniforms {
 @group(2) @binding(2) var<uniform> ambient: AmbientUniforms;
 @group(2) @binding(3) var irradianceMap:     texture_cube<f32>;
 @group(2) @binding(4) var samplerIrradiance: sampler;
-@group(2) @binding(5) var gSSGI:       texture_2d<f32>;  // indirect diffuse from SSGI
 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
@@ -49,17 +48,5 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     let ibl = calculateIBL(g, ao);
 
-    var ssgiContrib = vec3<f32>(0.0);
-    if (ambient.ssgiEnabled > 0.5) {
-        let ssgiRaw  = textureSample(gSSGI, samplerGBuffer, uv).rgb;
-        let aoForSSGI = mix(1.0, ao, 0.5);  // AO suavizado, evita double-occlusion
-        ssgiContrib  = ssgiRaw 
-                     * g.albedo.rgb          // modular por albedo del receptor
-                     * aoForSSGI
-                     * ambient.ssgiIntensity
-                     * ambient.diffuseBoost
-                     * ambient.globalAmbientBoost;
-    }
-
-    return vec4<f32>(ibl + ssgiContrib + g.selfIllum, 1.0);
+    return vec4<f32>(ibl + g.selfIllum, 1.0);
 }
