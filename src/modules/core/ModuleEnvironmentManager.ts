@@ -69,7 +69,6 @@ export class ModuleEnvironmentManager extends Module {
     this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
     this.irradianceGenerator = new IrradianceGenerator();
 
-    let tStep = performance.now();
     const [irradianceCubemap, skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
       Cubemap.getAsync(jsonData.ambient.irradianceCubemap).then((r) => {
         return r;

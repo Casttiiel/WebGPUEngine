@@ -3,21 +3,27 @@
 1. Better console logs
 2. Particles not showing properly texture
 3. SSR works on one direction only (add render in menu to test params)
-4. AO Weird + Slow
-5. Antialiasing Better?
-6. HZB Culling regulero
-7. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
-8. DBuffer (Compare my Deferred renderer with UE)
+4. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
 
-9. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
-10. Emissive strength > 1.0 correctamente en HDR - Sketchfab usa emissiveFactor real en HDR antes del tonemapper; tú guardas un escalar en el GBuffer que puede saturar
-11. Glass
+5. Usar trilinear filtering, configurar para poder tener filtrado nearest-neighbor (sin bilinear/trilinear)
+6. Half Lambert
+7. Paleta de 128 colores
+8. Resolución interna baja con upscale a pantalla completa — típicamente 320×240 o 480×270, luego pixel-perfect upscale
+9. Dithering para transparencias y gradientes — muy barato, muy efectivo
+10. Sombras con dithering pixelado
+11. Light Shafts pixelados
 
-12. Froxel Self Occlusion
-13. Froxel Density Volumes
-14. Voxel Cone Tracing
-15. Gameplay
-16. Enemy AI
+12. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
+13. DBuffer (Compare my Deferred renderer with UE)
+14. HZB Culling regulero
+15. Glass
+16. AO Weird + Slow
+
+17. Froxel Self Occlusion
+18. Froxel Density Volumes
+19. Voxel Cone Tracing
+20. Gameplay
+21. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo
