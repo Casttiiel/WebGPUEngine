@@ -144,11 +144,30 @@
         z-index: 1000;
         display: none; /* Hidden by default, shown in editor mode */
       }
+
+      #profiler-overlay {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        color: #cdd6f4;
+        background-color: rgba(17, 17, 27, 0.88);
+        padding: 10px 14px;
+        border-radius: 6px;
+        border-left: 3px solid #cba6f7;
+        white-space: pre;
+        pointer-events: none;
+        z-index: 1001;
+        display: none; /* Toggle with F3 */
+      }
     </style>
   </head>
 
   <body>
     <div id="fps-display">FPS: 0</div>
+    <div id="profiler-overlay"></div>
     <canvas id="gfx-canvas"></canvas>
     <div id="loader-container">
       <img

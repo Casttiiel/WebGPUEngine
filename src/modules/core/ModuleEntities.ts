@@ -3,6 +3,7 @@ import { Component } from '../../core/ecs/Component';
 import { Entity } from '../../core/ecs/Entity';
 import { ComponentDataType } from '../../types/ComponentData.type';
 import { Module } from '../core/Module';
+import { Profiler } from '../../core/debug/Profiler';
 
 class ObjectManager {
   private list: Component[] = [];
@@ -84,9 +85,11 @@ export class ModuleEntities extends Module {
 
   public update(delta: number): void {
     if (delta <= 0) return;
+    Profiler.getInstance().cpu.begin('Entities');
     for (const [, om] of this.omToUpdate) {
       om.updateAll(delta);
     }
+    Profiler.getInstance().cpu.end();
 
     this.debugValues.numberEntities.value = this.omEntities.length;
   }

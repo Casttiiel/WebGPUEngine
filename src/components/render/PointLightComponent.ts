@@ -12,6 +12,7 @@ import { Camera } from '../../core/math/Camera';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { RenderCategory } from '../../types/RenderCategory.enum';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 // WebGPU cube face order: +X, -X, +Y, -Y, +Z, -Z
 // Up vectors match the WebGPU/Vulkan cubemap sampling convention (v=0 at top).
@@ -212,15 +213,14 @@ export class PointLightComponent extends Component {
       RenderManager.getInstance().performCulling(cam, RenderCategory.SHADOWS);
 
       const depthAttachment = GPUUtils.createDepthStencilAttachment(this.shadowCubeFaceViews[face]);
-      const pass = render
-        .getCommandEncoder()
-        .beginRenderPass(
-          GPUUtils.createRenderPassDescriptor(
-            `point_light_shadow_face_${face}`,
-            [],
-            depthAttachment,
-          ),
-        );
+      const faceDesc = GPUUtils.createRenderPassDescriptor(
+        `point_light_shadow_face_${face}`,
+        [],
+        depthAttachment,
+      );
+      const faceTs = GPUProfiler.getInstance().getTimestampWrites('Point Shadow');
+      if (faceTs) faceDesc.timestampWrites = faceTs;
+      const pass = render.getCommandEncoder().beginRenderPass(faceDesc);
       GPUUtils.configureViewportAndScissor(pass, res, res);
 
       RenderManager.getInstance().setCamera(cam);

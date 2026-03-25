@@ -1,8 +1,8 @@
 ### Engine
 
 1. Profiler
-2. Half Lambert
-3. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+2. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+3. Half Lambert
 4. SSR works on one direction only (add render in menu to test params)
 5. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
 

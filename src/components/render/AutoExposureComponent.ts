@@ -9,6 +9,7 @@ import {
 } from '../../renderer/core/factories/PipelineFactory';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Engine } from '../../core/engine/Engine';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 // ── Params layout (must match AdaptParams struct in adapt shader) ─────────────
 // [0] dt, [1] adaptSpeedUp, [2] adaptSpeedDown, [3] keyValue,
@@ -288,7 +289,11 @@ export class AutoExposureComponent extends Component {
     const encoder = this.device.createCommandEncoder({ label: 'AutoExposure' });
 
     // Pass 1 — sample HDR, accumulate log-luminance into accumulatorBuffer
-    const lum = encoder.beginComputePass({ label: 'AE Luminance' });
+    const lumTs = GPUProfiler.getInstance().getTimestampWrites('AE Luminance');
+    const lum = encoder.beginComputePass({
+      label: 'AE Luminance',
+      ...(lumTs ? { timestampWrites: lumTs } : {}),
+    });
     lum.setPipeline(this.luminancePipeline);
     lum.setBindGroup(0, this.getLuminanceSrcBindGroup(hdrTexture));
     lum.setBindGroup(1, this.histogramBindGroup);
@@ -296,7 +301,11 @@ export class AutoExposureComponent extends Component {
     lum.end();
 
     // Pass 2 — read + reset accumulator, write adapted exposure to exposureBuffer
-    const adapt = encoder.beginComputePass({ label: 'AE Adapt' });
+    const adaptTs = GPUProfiler.getInstance().getTimestampWrites('AE Adapt');
+    const adapt = encoder.beginComputePass({
+      label: 'AE Adapt',
+      ...(adaptTs ? { timestampWrites: adaptTs } : {}),
+    });
     adapt.setPipeline(this.adaptPipeline);
     adapt.setBindGroup(0, this.histogramBindGroup);
     adapt.setBindGroup(1, this.exposureWriteBindGroup);
@@ -344,7 +353,7 @@ export class AutoExposureComponent extends Component {
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
 
-  public dispose(): void {
+  public override dispose(): void {
     this.histogramBuffer?.destroy();
     this.exposureBuffer?.destroy();
     this.paramsBuffer?.destroy();

@@ -13,6 +13,7 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Engine } from '../../core/engine/Engine';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { CameraComponent } from './CameraComponent';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 // ─── Layout constant (must match WGSL SSAOParams struct: 10 × f32 padded to 48 bytes) ──────
 const SSAO_PARAMS_SIZE = 48;
@@ -319,7 +320,11 @@ export class AmbientOcclusionComponent extends Component {
     const wY = Math.ceil(this.aoHeight / 8);
 
     // ── Pass 1: GTAO ─────────────────────────────────────────────────────────
-    const gtaoPass = encoder.beginComputePass({ label: 'GTAO Compute' });
+    const gtaoTs = GPUProfiler.getInstance().getTimestampWrites('GTAO Compute');
+    const gtaoPass = encoder.beginComputePass({
+      label: 'GTAO Compute',
+      ...(gtaoTs ? { timestampWrites: gtaoTs } : {}),
+    });
     gtaoPass.setPipeline(this.gtaoPipeline);
     gtaoPass.setBindGroup(0, cameraBindGroup);
     gtaoPass.setBindGroup(1, gBufferComputeBindGroup);
@@ -329,7 +334,11 @@ export class AmbientOcclusionComponent extends Component {
     gtaoPass.end();
 
     // ── Pass 2: Bilateral filter ──────────────────────────────────────────────
-    const bilateralPass = encoder.beginComputePass({ label: 'AO Bilateral Filter Compute' });
+    const bilateralTs = GPUProfiler.getInstance().getTimestampWrites('AO Bilateral Filter Compute');
+    const bilateralPass = encoder.beginComputePass({
+      label: 'AO Bilateral Filter Compute',
+      ...(bilateralTs ? { timestampWrites: bilateralTs } : {}),
+    });
     bilateralPass.setPipeline(this.bilateralPipeline);
     bilateralPass.setBindGroup(0, cameraBindGroup);
     bilateralPass.setBindGroup(1, gBufferComputeBindGroup);

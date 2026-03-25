@@ -162,6 +162,7 @@ export class RenderPassManager {
       unitSphere,
       gBufferBindGroup,
     );
+    pointLightWithShadowsPass.updateConfig({ label: 'Point Lights with Shadows' });
     this.renderPasses.set('pointLightsWithShadows', pointLightWithShadowsPass);
 
     // Create Spot Light pass
@@ -174,13 +175,13 @@ export class RenderPassManager {
     );
     this.renderPasses.set('spotLights', spotLightPass);
 
-    // Create Spot Light with shadows pass
     const spotLightWithShadowsPass = new SpotLightWithShadowsRenderPass(
       spotLightConfig,
       spotLightWithShadowsTechnique,
       unitFrustum,
       gBufferBindGroup,
     );
+    spotLightWithShadowsPass.updateConfig({ label: 'Spot Lights with Shadows' });
     this.renderPasses.set('spotLightsWithShadows', spotLightWithShadowsPass);
   }
 

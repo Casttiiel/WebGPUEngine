@@ -9,6 +9,7 @@ import { GPUUtils } from '../core/utils/GPUUtils';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { RenderTarget } from '../resources/RenderTarget';
 import { Texture } from '../resources/Texture';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 export class ScreenSpaceReflections {
   private isInitialized: boolean = false;
@@ -232,7 +233,11 @@ export class ScreenSpaceReflections {
     const ssrW = Math.floor(Render.width * qs.ssrScale);
     const ssrH = Math.floor(Render.height * qs.ssrScale);
     const encoder = Render.getInstance().getCommandEncoder();
-    const pass = encoder.beginComputePass({ label: 'SSR Blur' });
+    const ssrBlurTs = GPUProfiler.getInstance().getTimestampWrites('SSR Blur');
+    const pass = encoder.beginComputePass({
+      label: 'SSR Blur',
+      ...(ssrBlurTs ? { timestampWrites: ssrBlurTs } : {}),
+    });
     pass.setPipeline(this.blurPipeline);
     pass.setBindGroup(0, this.blurInputBindGroup);
     pass.setBindGroup(1, this.blurGBufferBindGroup);
@@ -271,7 +276,11 @@ export class ScreenSpaceReflections {
 
     // ── Dispatch ──────────────────────────────────────────────────────────────
     const encoder = Render.getInstance().getCommandEncoder();
-    const pass = encoder.beginComputePass({ label: 'SSR Compute' });
+    const ssrTs = GPUProfiler.getInstance().getTimestampWrites('SSR Compute');
+    const pass = encoder.beginComputePass({
+      label: 'SSR Compute',
+      ...(ssrTs ? { timestampWrites: ssrTs } : {}),
+    });
 
     pass.setPipeline(this.ssrComputePipeline);
     pass.setBindGroup(0, this.cameraComputeBindGroup);

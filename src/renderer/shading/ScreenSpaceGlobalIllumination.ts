@@ -9,6 +9,7 @@ import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { Mesh } from '../resources/Mesh';
 import { RenderTarget } from '../resources/RenderTarget';
 import { Technique } from '../resources/Technique';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 export class ScreenSpaceGlobalIllumination {
   private isInitialized: boolean = false;
@@ -96,9 +97,10 @@ export class ScreenSpaceGlobalIllumination {
       },
     );
 
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(GPUUtils.createRenderPassDescriptor('ssgi render pass', [colorAttachment]));
+    const ssgiDesc = GPUUtils.createRenderPassDescriptor('ssgi render pass', [colorAttachment]);
+    const ssgiTs = GPUProfiler.getInstance().getTimestampWrites('SSGI');
+    if (ssgiTs) ssgiDesc.timestampWrites = ssgiTs;
+    const pass = render.getCommandEncoder().beginRenderPass(ssgiDesc);
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(

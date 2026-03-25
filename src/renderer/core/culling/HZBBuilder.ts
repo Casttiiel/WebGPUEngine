@@ -2,6 +2,7 @@ import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { PipelineFactory } from '../factories/PipelineFactory';
 import { GPUUtils } from '../utils/GPUUtils';
+import { GPUProfiler } from '../../../core/debug/GPUProfiler';
 
 // ---- Constants ---------------------------------------------------------------
 
@@ -304,7 +305,11 @@ export class HZBBuilder {
       const wg = Math.ceil(this.hzbWidth / 8);
       const hg = Math.ceil(this.hzbHeight / 8);
 
-      const pass = encoder.beginComputePass({ label: 'hzb_build_copy' });
+      const hzbCopyTs = GPUProfiler.getInstance().getTimestampWrites('hzb_build_copy');
+      const pass = encoder.beginComputePass({
+        label: 'hzb_build_copy',
+        ...(hzbCopyTs ? { timestampWrites: hzbCopyTs } : {}),
+      });
       pass.setPipeline(this.copyPipeline);
       pass.setBindGroup(0, this.copyBindGroup);
       pass.dispatchWorkgroups(wg, hg, 1);

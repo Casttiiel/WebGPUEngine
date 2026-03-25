@@ -14,6 +14,7 @@ import { Component } from '../../core/ecs/Component';
 import { DirectionalLightComponentData } from '../../types/DirectionalLightComponentData.type';
 import { Texture } from '../../renderer/resources/Texture';
 import { CameraComponent } from './CameraComponent';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 interface AABB {
   minX: number;
@@ -514,13 +515,14 @@ export class DirectionalLightComponent extends Component {
         this.shadowDepthViews[i],
       );
 
-      const pass = render.getCommandEncoder().beginRenderPass(
-        GPUUtils.createRenderPassDescriptor(
-          `directional light shadow map cascade ${i}`,
-          [], // Sin color attachments
-          depthStencilAttachment,
-        ),
+      const shadowDesc = GPUUtils.createRenderPassDescriptor(
+        `directional light shadow map cascade ${i}`,
+        [], // Sin color attachments
+        depthStencilAttachment,
       );
+      const shadowTs = GPUProfiler.getInstance().getTimestampWrites('Directional Shadow');
+      if (shadowTs) shadowDesc.timestampWrites = shadowTs;
+      const pass = render.getCommandEncoder().beginRenderPass(shadowDesc);
 
       GPUUtils.configureViewportAndScissor(pass, shadowResolution, shadowResolution);
 
@@ -585,11 +587,12 @@ export class DirectionalLightComponent extends Component {
     // Use GPUUtils for consistent render pass descriptor creation
     const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
 
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor('directional light render pass', [colorAttachment]),
-      );
+    const dlDesc = GPUUtils.createRenderPassDescriptor('directional light render pass', [
+      colorAttachment,
+    ]);
+    const dlTs = GPUProfiler.getInstance().getTimestampWrites('Directional Light');
+    if (dlTs) dlDesc.timestampWrites = dlTs;
+    const pass = render.getCommandEncoder().beginRenderPass(dlDesc);
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);

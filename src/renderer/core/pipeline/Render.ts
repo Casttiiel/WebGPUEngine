@@ -8,6 +8,7 @@ import { MipmapGenerator } from '../processing/MipmapGenerator';
 import { GPUUtils } from '../utils/GPUUtils';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { Logger } from '../../../core/debug/Logger';
+import { GPUProfiler } from '../../../core/debug/GPUProfiler';
 
 export class Render {
   private static instance: Render;
@@ -72,13 +73,22 @@ export class Render {
 
       LoadingStatus.updateStatus('Creating GPU device...', 10);
       // 2. Crear el dispositivo lógico con las características requeridas
+      const hasTimestamps = this.adapter.features.has('timestamp-query');
+      const requiredFeatures: GPUFeatureName[] = [
+        'texture-compression-bc',
+        'depth32float-stencil8',
+      ];
+      if (hasTimestamps) requiredFeatures.push('timestamp-query');
+
       this.device = await this.adapter.requestDevice({
         label: `${Date.now()}`,
-        requiredFeatures: ['texture-compression-bc', 'depth32float-stencil8'],
+        requiredFeatures,
         requiredLimits: {
           maxStorageBufferBindingSize: 1024 * 1024 * 1024, // 1GB de buffer máximo
         },
       });
+
+      GPUProfiler.getInstance().initialize(this.device, hasTimestamps);
 
       LoadingStatus.updateStatus('Configuring canvas context...', 15);
       // 3. Configurar el contexto del canvas para WebGPU
@@ -183,8 +193,10 @@ export class Render {
   public endFrame(): void {
     if (!this.device) return;
 
+    GPUProfiler.getInstance().resolve(this.currentCommandEncoder);
     const commandBuffer = this.currentCommandEncoder.finish();
     this.device.queue.submit([commandBuffer]);
+    GPUProfiler.getInstance().tick();
   }
 
   private setupResizeObserver(): void {
@@ -295,6 +307,7 @@ export class Render {
       Texture.cleanup();
       SamplerLibrary.destroy();
       GPUUtils.destroy();
+      GPUProfiler.getInstance().dispose();
 
       Render.instance = null as any; // Clear singleton instance
 

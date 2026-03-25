@@ -31,6 +31,8 @@ import { AutoExposureComponent } from '../../components/render/AutoExposureCompo
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
+import { Profiler } from '../../core/debug/Profiler';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -64,6 +66,63 @@ export class ModuleRender extends Module {
     visibleSpotLights: { name: 'Spot Lights (visible)', value: 0 },
     resolution: { name: 'Resolution', value: '0x0' },
     canvasResolution: { name: 'Canvas Resolution', value: '0x0' },
+  };
+
+  // Profiler display values (updated every frame in update())
+  private readonly profilerCPU = {
+    Entities: { value: '0.00 ms' },
+    Shadows: { value: '0.00 ms' },
+    Deferred: { value: '0.00 ms' },
+    'Post-Process': { value: '0.00 ms' },
+  };
+
+  private readonly profilerGPU: Record<string, { value: string }> = {
+    // Shadows
+    'Directional Shadow': { value: '-' },
+    'Point Shadow': { value: '-' },
+    'Spot Shadow': { value: '-' },
+    // Lighting
+    'Directional Light': { value: '-' },
+    'Ambient Diffuse': { value: '-' },
+    'Ambient Specular': { value: '-' },
+    Skybox: { value: '-' },
+    // G-Buffer & Geometry
+    'Depth Prepass': { value: '-' },
+    'G-Buffer Pass': { value: '-' },
+    'Decal Pass': { value: '-' },
+    'Transparent Pass': { value: '-' },
+    'OIT Gather Pass': { value: '-' },
+    'OIT Compose Pass': { value: '-' },
+    // Lights (deferred)
+    'Point Lights Render Pass': { value: '-' },
+    'Point Lights with Shadows': { value: '-' },
+    'Spot Lights Render Pass': { value: '-' },
+    'Spot Lights with Shadows': { value: '-' },
+    // Compute effects
+    'GTAO Compute': { value: '-' },
+    'AO Bilateral Filter Compute': { value: '-' },
+    'SSR Compute': { value: '-' },
+    'SSR Blur': { value: '-' },
+    SSGI: { value: '-' },
+    hzb_build_copy: { value: '-' },
+    // Auto Exposure
+    'AE Luminance': { value: '-' },
+    'AE Adapt': { value: '-' },
+    // Volumetrics
+    froxel_density_compute: { value: '-' },
+    froxel_directional_light_injection_compute: { value: '-' },
+    froxel_point_light_injection_compute: { value: '-' },
+    froxel_spot_light_injection_compute: { value: '-' },
+    froxel_volumetrict_integration_compute: { value: '-' },
+    froxel_volumetrics_render: { value: '-' },
+    // Post Process
+    'Post Process Pass': { value: '-' },
+    'Bloom Combine Pass': { value: '-' },
+    'DOF Pass': { value: '-' },
+  };
+
+  private readonly profilerMeta = {
+    gpuSupported: { value: 'checking…' },
   };
 
   constructor(name: string) {
@@ -268,15 +327,21 @@ export class ModuleRender extends Module {
 
       RenderManager.getInstance().performCulling(camera);
       RenderManager.getInstance().performLightCulling(camera);
+
+      Profiler.getInstance().cpu.begin('Shadows');
       this.deferred.generateShadowMaps();
+      Profiler.getInstance().cpu.end();
 
       RenderManager.getInstance().setCamera(camera);
 
+      Profiler.getInstance().cpu.begin('Deferred');
       result = this.deferred.render(mainCameraEntity);
+      Profiler.getInstance().cpu.end();
     }
 
     // Post-processing solo si hay MainCamera
     if (mainCameraEntity) {
+      Profiler.getInstance().cpu.begin('Post-Process');
       // Enable velocity buffer if any component needs it
       const velocityMgr = VelocityBufferManager.getInstance();
       const needsVelocity = mainCameraEntity?.hasComponent('smaa_t2x');
@@ -380,6 +445,8 @@ export class ModuleRender extends Module {
           speedLines.apply(result);
         }
       }
+
+      Profiler.getInstance().cpu.end(); // Post-Process
     }
 
     // Render UI overlay on top of result texture
@@ -559,6 +626,20 @@ export class ModuleRender extends Module {
     const cs = Render.canvasSize;
     this.debugValues.canvasResolution.value = `${cs.width}x${cs.height}`;
 
+    // Update profiler display values
+    const cpu = Profiler.getInstance().cpu;
+    this.profilerCPU.Entities.value = `${cpu.getMs('Entities').toFixed(2)} ms`;
+    this.profilerCPU.Shadows.value = `${cpu.getMs('Shadows').toFixed(2)} ms`;
+    this.profilerCPU.Deferred.value = `${cpu.getMs('Deferred').toFixed(2)} ms`;
+    this.profilerCPU['Post-Process'].value = `${cpu.getMs('Post-Process').toFixed(2)} ms`;
+
+    const gpu = GPUProfiler.getInstance();
+    this.profilerMeta.gpuSupported.value = gpu.supported ? 'Yes' : 'Not available';
+    for (const name of Object.keys(this.profilerGPU)) {
+      const entry = this.profilerGPU[name];
+      if (entry) entry.value = `${gpu.getMs(name).toFixed(2)} ms`;
+    }
+
     this.deferred.update(dt);
     this.lastDt = dt;
   }
@@ -631,6 +712,21 @@ export class ModuleRender extends Module {
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
     if (mainCamera && this.beginGUIWindow('Post-Processing')) {
       // Render post-processing component controls
+      this.endGUIWindow();
+    }
+
+    // Profiler window
+    if (this.beginGUIWindow('Profiler')) {
+      gui.addDynamicText(this.profilerMeta.gpuSupported, 'value', 'GPU Timestamps');
+      this.addGUISeparator();
+      gui.addDynamicText(this.profilerCPU.Entities, 'value', 'CPU  Entities');
+      gui.addDynamicText(this.profilerCPU.Shadows, 'value', 'CPU  Shadows');
+      gui.addDynamicText(this.profilerCPU.Deferred, 'value', 'CPU  Deferred');
+      gui.addDynamicText(this.profilerCPU['Post-Process'], 'value', 'CPU  Post-Process');
+      this.addGUISeparator();
+      for (const [name, obj] of Object.entries(this.profilerGPU)) {
+        gui.addDynamicText(obj, 'value', `GPU  ${name}`);
+      }
       this.endGUIWindow();
     }
   }

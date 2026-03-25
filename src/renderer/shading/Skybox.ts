@@ -4,6 +4,7 @@ import { Mesh } from '../resources/Mesh';
 import { Technique } from '../resources/Technique';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 export class Skybox {
   private fullscreenQuadMesh!: Mesh;
@@ -126,15 +127,14 @@ export class Skybox {
       'store',
     );
 
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor(
-          'skybox render pass',
-          [colorAttachment],
-          depthAttachment,
-        ),
-      );
+    const skyboxDesc = GPUUtils.createRenderPassDescriptor(
+      'skybox render pass',
+      [colorAttachment],
+      depthAttachment,
+    );
+    const skyboxTs = GPUProfiler.getInstance().getTimestampWrites('Skybox');
+    if (skyboxTs) skyboxDesc.timestampWrites = skyboxTs;
+    const pass = render.getCommandEncoder().beginRenderPass(skyboxDesc);
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);

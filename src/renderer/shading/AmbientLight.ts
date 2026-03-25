@@ -6,6 +6,7 @@ import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { Texture } from '../resources/Texture';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
@@ -63,11 +64,12 @@ export class AmbientLight {
     // Use GPUUtils for consistent render pass descriptor creation
     const colorAttachment = GPUUtils.createColorAttachment(rtAccLight, 'clear', 'store');
 
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor('ambient light render pass', [colorAttachment]),
-      );
+    const ambDiffDesc = GPUUtils.createRenderPassDescriptor('ambient light render pass', [
+      colorAttachment,
+    ]);
+    const ambDiffTs = GPUProfiler.getInstance().getTimestampWrites('Ambient Diffuse');
+    if (ambDiffTs) ambDiffDesc.timestampWrites = ambDiffTs;
+    const pass = render.getCommandEncoder().beginRenderPass(ambDiffDesc);
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass);
@@ -102,11 +104,12 @@ export class AmbientLight {
 
     const colorAttachment = GPUUtils.createColorAttachment(accLights, 'load', 'store');
 
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor('ambient specular render pass', [colorAttachment]),
-      );
+    const ambSpecDesc = GPUUtils.createRenderPassDescriptor('ambient specular render pass', [
+      colorAttachment,
+    ]);
+    const ambSpecTs = GPUProfiler.getInstance().getTimestampWrites('Ambient Specular');
+    if (ambSpecTs) ambSpecDesc.timestampWrites = ambSpecTs;
+    const pass = render.getCommandEncoder().beginRenderPass(ambSpecDesc);
 
     // Configure viewport and scissor using GPUUtils
     GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);

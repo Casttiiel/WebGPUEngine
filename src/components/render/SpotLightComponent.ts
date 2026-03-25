@@ -11,6 +11,7 @@ import { RenderCategory } from '../../types/RenderCategory.enum';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Texture } from '../../renderer/resources/Texture';
 import { AABB } from '../../core/math/AABB';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 const ndcCorners = [
   [-1, -1, -1, 1],
@@ -268,13 +269,14 @@ export class SpotLightComponent extends CameraComponent {
     // Solo renderizar a la textura de profundidad (sin color attachment)
     const depthStencilAttachment = GPUUtils.createDepthStencilAttachment(this.shadowDepthView!);
 
-    const pass = render.getCommandEncoder().beginRenderPass(
-      GPUUtils.createRenderPassDescriptor(
-        'spot light shadow map render pass',
-        [], // Sin color attachments
-        depthStencilAttachment,
-      ),
+    const spotShadowDesc = GPUUtils.createRenderPassDescriptor(
+      'spot light shadow map render pass',
+      [], // Sin color attachments
+      depthStencilAttachment,
     );
+    const spotShadowTs = GPUProfiler.getInstance().getTimestampWrites('Spot Shadow');
+    if (spotShadowTs) spotShadowDesc.timestampWrites = spotShadowTs;
+    const pass = render.getCommandEncoder().beginRenderPass(spotShadowDesc);
     GPUUtils.configureViewportAndScissor(pass, this.shadowWidth, this.shadowHeight);
 
     RenderManager.getInstance().setCamera(this.camera);

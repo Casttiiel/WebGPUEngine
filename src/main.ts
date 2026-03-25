@@ -1,6 +1,8 @@
 import { Engine } from './core/engine/Engine';
 import { Time } from './core/engine/Time';
 import { LoadingStatus } from './core/engine/LoadingStatus';
+import { ProfilerOverlay } from './core/debug/ProfilerOverlay';
+import { Profiler } from './core/debug/Profiler';
 
 // Esperar a que el motor cargue
 try {
@@ -10,6 +12,8 @@ try {
       LoadingStatus.initialize();
 
       await Engine.start();
+
+      ProfilerOverlay.initialize();
 
       let then = 0;
       let isFirstFrame = false;
@@ -40,6 +44,7 @@ try {
           Engine.render();
         }
         Time.updateFPSDisplay(deltaTime);
+        ProfilerOverlay.update(deltaTime, Profiler.getInstance().cpu);
 
         // Ocultar el loader cuando el motor esté completamente listo y no hay recursos cargando
         if (Engine.isReady()) {

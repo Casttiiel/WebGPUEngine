@@ -4,6 +4,7 @@ import { RenderKeyManager, RenderKey } from '../managers/RenderKeyManager';
 import { Engine } from '../../../core/engine/Engine';
 import { Mesh } from '../../resources/Mesh';
 import { Technique } from '../../resources/Technique';
+import { GPUProfiler } from '../../../core/debug/GPUProfiler';
 
 export interface RenderPassConfig {
   label: string;
@@ -36,6 +37,11 @@ export abstract class BaseRenderPass {
 
     if (this.config.depthStencilAttachment) {
       descriptor.depthStencilAttachment = this.config.depthStencilAttachment;
+    }
+
+    const tsWrites = GPUProfiler.getInstance().getTimestampWrites(this.config.label);
+    if (tsWrites) {
+      descriptor.timestampWrites = tsWrites;
     }
 
     const pass = commandEncoder.beginRenderPass(descriptor);

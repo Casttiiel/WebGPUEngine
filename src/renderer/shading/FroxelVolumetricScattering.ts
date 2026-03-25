@@ -13,6 +13,7 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { RenderTarget } from '../resources/RenderTarget';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -426,8 +427,10 @@ export class FroxelVolumetricScattering {
   }
 
   private executeDensityPass(commandEncoder: GPUCommandEncoder, linearDepth: RenderTarget): void {
+    const densityTs = GPUProfiler.getInstance().getTimestampWrites('froxel_density_compute');
     const computePass = commandEncoder.beginComputePass({
       label: 'froxel_density_compute',
+      ...(densityTs ? { timestampWrites: densityTs } : {}),
     });
 
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
@@ -487,8 +490,12 @@ export class FroxelVolumetricScattering {
   }
 
   private executeVolumetricIntegrationPass(commandEncoder: GPUCommandEncoder): void {
+    const integrationTs = GPUProfiler.getInstance().getTimestampWrites(
+      'froxel_volumetrict_integration_compute',
+    );
     const computePass = commandEncoder.beginComputePass({
       label: 'froxel_volumetrict_integration_compute',
+      ...(integrationTs ? { timestampWrites: integrationTs } : {}),
     });
 
     const pingPongIdx = this.froxelLightTextureView === this.froxelLightTextureViewA ? 0 : 1;
@@ -516,8 +523,12 @@ export class FroxelVolumetricScattering {
       return; // No directional light or no shadows
     }
 
+    const dirLightTs = GPUProfiler.getInstance().getTimestampWrites(
+      'froxel_directional_light_injection_compute',
+    );
     const computePass = commandEncoder.beginComputePass({
       label: 'froxel_directional_light_injection_compute',
+      ...(dirLightTs ? { timestampWrites: dirLightTs } : {}),
     });
 
     // Set compute pipeline
@@ -605,8 +616,12 @@ export class FroxelVolumetricScattering {
       if (!pointLightComponent.isVisible()) {
         continue;
       }
+      const pointTs = GPUProfiler.getInstance().getTimestampWrites(
+        'froxel_point_light_injection_compute',
+      );
       const computePass = commandEncoder.beginComputePass({
         label: 'froxel_point_light_injection_compute',
+        ...(pointTs ? { timestampWrites: pointTs } : {}),
       });
 
       computePass.setPipeline(this.pointLightInjectionPipeline);
@@ -689,8 +704,12 @@ export class FroxelVolumetricScattering {
       if (!spotLightComponent.isVisible()) {
         continue;
       }
+      const spotTs = GPUProfiler.getInstance().getTimestampWrites(
+        'froxel_spot_light_injection_compute',
+      );
       const computePass = commandEncoder.beginComputePass({
         label: 'froxel_spot_light_injection_compute',
+        ...(spotTs ? { timestampWrites: spotTs } : {}),
       });
 
       computePass.setPipeline(this.spotLightInjectionPipeline);
@@ -761,8 +780,12 @@ export class FroxelVolumetricScattering {
     const render = Render.getInstance();
     const commandEncoder = render.getCommandEncoder();
 
+    const froxelRenderTs = GPUProfiler.getInstance().getTimestampWrites(
+      'froxel_volumetrics_render',
+    );
     const renderPass = commandEncoder.beginRenderPass({
       label: 'froxel_volumetrics_render',
+      ...(froxelRenderTs ? { timestampWrites: froxelRenderTs } : {}),
       colorAttachments: [
         {
           view: sceneTarget,
