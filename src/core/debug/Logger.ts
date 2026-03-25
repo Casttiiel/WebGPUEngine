@@ -1,13 +1,14 @@
 export type LogTag = 'ENGINE' | 'RENDER' | 'PHYSICS' | 'MODULES' | 'INPUT';
 
-const BASE = 'font-weight:bold;padding:1px 6px;border-radius:3px;font-family:monospace;background:#313244;color:';
+const BASE =
+  'font-weight:bold;padding:1px 6px;border-radius:3px;font-family:monospace;background:#313244;color:';
 
 const STYLES: Record<LogTag, string> = {
-  ENGINE:  BASE + '#cba6f7',
-  RENDER:  BASE + '#89b4fa',
+  ENGINE: BASE + '#cba6f7',
+  RENDER: BASE + '#89b4fa',
   PHYSICS: BASE + '#fab387',
   MODULES: BASE + '#a6e3a1',
-  INPUT:   BASE + '#89dceb',
+  INPUT: BASE + '#89dceb',
 };
 
 export class Logger {

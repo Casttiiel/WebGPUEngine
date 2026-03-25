@@ -1,28 +1,27 @@
 ### Engine
 
-1.
-2. Profiler
-3. Half Lambert
-4. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
-5. SSR works on one direction only (add render in menu to test params)
-6. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
+1. Profiler
+2. Half Lambert
+3. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+4. SSR works on one direction only (add render in menu to test params)
+5. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
 
-7. Paleta de 128 colores
-8. Resolución interna baja con upscale a pantalla completa — típicamente 320×240 o 480×270, luego pixel-perfect upscale
-9. Dithering para transparencias y gradientes — muy barato, muy efectivo
-10. Sombras con dithering pixelado
-11. Light Shafts pixelados
+6. Paleta de 128 colores
+7. Resolución interna baja con upscale a pantalla completa — típicamente 320×240 o 480×270, luego pixel-perfect upscale
+8. Dithering para transparencias y gradientes — muy barato, muy efectivo
+9. Sombras con dithering pixelado
+10. Light Shafts pixelados
 
-12. AO Weird + Slow
-13. Glass
-14. DBuffer (Compare my Deferred renderer with UE)
-15. HZB Culling regulero
+11. AO Weird + Slow
+12. Glass
+13. DBuffer (Compare my Deferred renderer with UE)
+14. HZB Culling regulero
 
-16. Froxel Self Occlusion
-17. Froxel Density Volumes
-18. Voxel Cone Tracing
-19. Gameplay
-20. Enemy AI
+15. Froxel Self Occlusion
+16. Froxel Density Volumes
+17. Voxel Cone Tracing
+18. Gameplay
+19. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo
