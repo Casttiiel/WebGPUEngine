@@ -97,6 +97,7 @@ fn PS_point_lights_shadow(@builtin(position) position: vec4<f32>) -> @location(0
     let diffuse_contrib  = kD * cDiff;
     let specular_contrib = cSpec;
 
-    let final_color = light.color.xyz * light.intensity * shadow_factor * NdL * (diffuse_contrib + specular_contrib) * att;
+    let hl = halfLambert(NdL);
+    let final_color = light.color.xyz * light.intensity * shadow_factor * (diffuse_contrib * hl + specular_contrib * NdL) * att;
     return vec4<f32>(final_color, 1.0);
 }

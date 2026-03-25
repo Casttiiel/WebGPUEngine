@@ -75,7 +75,8 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     let diffuse_contrib = kD * cDiff;
     let specular_contrib = cSpec; // cSpec ya incluye Fresnel
 
-    let final_color = light.color.xyz * NdL * (diffuse_contrib + specular_contrib) * light.intensity * shadow_factor;
+    let hl = halfLambert(NdL);
+    let final_color = light.color.xyz * (diffuse_contrib * hl + specular_contrib * NdL) * light.intensity * shadow_factor;
 
     // Apply contact shadow factor (1.0 = lit, 0.0 = occluded)
     let contactFactor = textureSampleLevel(contactShadowMap, contactShadowSampler, uv, 0.0).r;

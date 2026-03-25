@@ -90,7 +90,8 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     let diffuse_contrib = kD * cDiff;
     let specular_contrib = cSpec; // cSpec ya incluye Fresnel
     
-    let final_color = light.color.xyz  * light.intensity * shadow_factor * NdL * (diffuse_contrib + specular_contrib) * att;
+    let hl = halfLambert(NdL);
+    let final_color = light.color.xyz * light.intensity * shadow_factor * (diffuse_contrib * hl + specular_contrib * NdL) * att;
     return vec4<f32>(final_color, 1.0);
 }
 
