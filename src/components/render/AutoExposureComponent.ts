@@ -26,15 +26,14 @@ export class AutoExposureComponent extends Component {
   private isLoaded = false;
 
   // User-tunable settings (exposed to editor / debug UI)
-  public adaptSpeedUp = 0.5; // Speed adapting toward bright  (iris closing — fast)
-  public adaptSpeedDown = 0.5; // Speed adapting toward dark    (iris opening — slow)
-  public keyValue = 0.18; // 18 % grey target
-  public minExposure = 0.1;
-  public maxExposure = 4.0;
-  public compensation = 0.0; // EV stops added on top
-  public lowPercentile = 0.2; // Discard this fraction of darkest pixels
-  public highPercentile = 0.9; // Discard pixels above this brightness fraction
-  public enabled = true;
+  private adaptSpeedUp = 0.5; // Speed adapting toward bright  (iris closing — τ ≈ 0.4s)
+  private adaptSpeedDown = 0.5; // Speed adapting toward dark    (iris opening — τ ≈ 2.0s)
+  private keyValue = 0.18; // 18 % grey target
+  private minExposure = 0.1;
+  private maxExposure = 3.0;
+  private compensation = 0.0; // EV stops added on top
+  private lowPercentile = 0.1; // Discard this fraction of darkest pixels
+  private highPercentile = 0.9; // Discard pixels above this brightness fraction
 
   // ── Compute pipelines ──────────────────────────────────────────────────────
   private luminanceShader!: GPUShaderModule;
