@@ -15,9 +15,9 @@
 
 12. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
 13. DBuffer (Compare my Deferred renderer with UE)
-14. HZB Culling regulero
-15. Glass
-16. AO Weird + Slow
+14. Glass
+15. AO Weird + Slow
+16. HZB Culling regulero
 
 17. Froxel Self Occlusion
 18. Froxel Density Volumes
