@@ -41,9 +41,6 @@ export class LoadingStatus {
   public static setTotalModules(systemModules: number, gamestateModules: number): void {
     this.totalModulesToLoad = systemModules + gamestateModules;
     this.modulesLoaded = 0;
-    console.log(
-      `Loading ${this.totalModulesToLoad} modules (${systemModules} system + ${gamestateModules} gamestate)`,
-    );
   }
 
   /**

@@ -1,3 +1,4 @@
+import { Logger } from '../../core/debug/Logger';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { ResourceManager } from '../../core/engine/ResourceManager';
@@ -63,7 +64,7 @@ export class ScreenSpaceReflections {
       await this.createComputePipeline();
       await this.createBlurPipeline();
 
-      console.log('SSR loaded successfully (compute + blur)');
+      Logger.info('RENDER', 'SSR ready');
     } catch (error) {
       console.warn('Failed to load SSR, disabling feature:', error);
       this.isInitialized = false;

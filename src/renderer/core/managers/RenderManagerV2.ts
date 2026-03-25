@@ -7,7 +7,7 @@ import { Mesh } from '../../resources/Mesh';
 import { Technique } from '../../resources/Technique';
 import { CPUCullingManager } from '../culling/CPUCullingManager';
 import { GPUCullingManager } from '../culling/GPUCullingManager';
-import { HZBBuilder } from '../culling/HZBBuilder';
+import { Logger } from '../../../core/debug/Logger';
 import { HZBCullingPass } from '../culling/HZBCullingPass';
 import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
@@ -49,8 +49,6 @@ export class RenderManagerV2 {
   }
 
   public async initialize(): Promise<void> {
-    console.log('RenderManagerV2: Initializing culling systems...');
-
     // CPU culling — used for shadow cameras and as fallback
     this.cpuCuller = new CPUCullingManager();
 
@@ -62,7 +60,7 @@ export class RenderManagerV2 {
     this.hzbCullingPass = new HZBCullingPass();
     await this.hzbCullingPass.initialize();
 
-    console.log('RenderManagerV2: CPU + GPU + HZB culling systems initialized');
+    Logger.info('RENDER', 'Culling ready  CPU · GPU · HZB');
   }
 
   public setCamera(camera: Camera): void {

@@ -1,6 +1,6 @@
 ### Engine
 
-1. Better console logs
+1.
 2. Profiler
 3. Half Lambert
 4. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple

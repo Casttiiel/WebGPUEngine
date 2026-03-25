@@ -3,6 +3,7 @@ import { Loader } from '../../core/loaders/Loader';
 import { Module } from '../core/Module';
 import { InstanceManager } from '../../renderer/core/managers/InstanceManager';
 import { Engine } from '../../core/engine/Engine';
+import { Logger } from '../../core/debug/Logger';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
@@ -61,7 +62,7 @@ export class ModuleBoot extends Module {
 
   public stop(): void {
     // ModuleBoot doesn't need cleanup - it's just initialization
-    console.log('ModuleBoot stopped.');
+    Logger.info('ENGINE', 'Stopped');
   }
 
   public update(dt: number): void {
@@ -139,7 +140,7 @@ export class ModuleBoot extends Module {
         // Re-render menu to populate GUI controls
         Engine.renderInMenu();
 
-        console.log('📷 DebugCamera activated (editor mode)');
+        Logger.info('ENGINE', '📷 Debug camera');
       } else if (currentGamestate === 'gs_gameplay') {
         // Modo gameplay: activar PlayerCamera, activar PlayerController, ocultar ImGui
         this.debugCameraComponent.setActive(false);
@@ -154,7 +155,7 @@ export class ModuleBoot extends Module {
         // Ocultar GUI UI
         GUIManager.getInstance().hide();
 
-        console.log('📷 PlayerCamera activated (gameplay mode)');
+        Logger.info('ENGINE', '📷 Player camera');
       }
     }
   }
@@ -170,10 +171,10 @@ export class ModuleBoot extends Module {
     const currentGamestate = Engine.getModules().getCurrentGamestate();
 
     if (currentGamestate === 'gs_gameplay') {
-      console.log('🎨 Switching to EDITOR mode');
+      Logger.info('ENGINE', '🎨 Editor mode');
       Engine.getModules().changeToGamestate('gs_editor');
     } else if (currentGamestate === 'gs_editor') {
-      console.log('🎮 Switching to GAMEPLAY mode');
+      Logger.info('ENGINE', '🎮 Gameplay mode');
       Engine.getModules().changeToGamestate('gs_gameplay');
     }
   }

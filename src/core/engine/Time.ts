@@ -1,4 +1,5 @@
 import { QualitySettings } from './QualitySettings';
+import { Logger } from '../debug/Logger';
 
 export class Time {
   private static lastTimeFPSUpdate: number = 0;
@@ -28,7 +29,6 @@ export class Time {
   public static pause(): void {
     Time.timeScale = 0;
     Time.isPaused = true;
-    console.log('Game paused');
   }
 
   /**
@@ -37,7 +37,6 @@ export class Time {
   public static resume(): void {
     Time.timeScale = 1.0;
     Time.isPaused = false;
-    console.log('Game resumed');
   }
 
   /**
@@ -70,9 +69,7 @@ export class Time {
         fpsDisplay.innerText = `FPS: ${(1 / deltaTime).toFixed(1)} | Quality: ${currentQuality}${pauseIndicator}`;
       }
       if (1 / deltaTime < 40) {
-        console.log(
-          'Low FPS detected! Consider lowering the graphics quality settings for a better experience.',
-        );
+        Logger.warn('ENGINE', 'Low FPS – consider reducing quality');
       }
     }
   }

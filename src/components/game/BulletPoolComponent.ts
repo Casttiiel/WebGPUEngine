@@ -42,10 +42,6 @@ export class BulletPoolComponent extends Component {
     const template = await ResourceManager.loadPrefab(this.prefabPath);
 
     await Promise.all(Array.from({ length: this.poolSize }, () => this.spawnDormant(template)));
-
-    console.log(
-      `[BulletPoolComponent] Pooled ${this.pool.length} bullets from "${this.prefabPath}"`,
-    );
   }
 
   private async spawnDormant(template: EntityDataType): Promise<void> {

@@ -1,4 +1,5 @@
 import { Module } from '../core/Module';
+import { Logger } from '../../core/debug/Logger';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { vec3 } from 'gl-matrix';
 import { Engine } from '../../core/engine/Engine';
@@ -42,7 +43,7 @@ export class ModulePhysics extends Module {
       // Crear cola de eventos para detectar colisiones
       this.eventQueue = new RAPIER.EventQueue(true);
 
-      console.log('Rapier physics initialized successfully');
+      Logger.info('PHYSICS', 'Rapier ready');
       return true;
     } catch (error) {
       console.error('Error initializing Rapier physics:', error);

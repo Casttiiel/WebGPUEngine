@@ -17,6 +17,7 @@ import { QualitySettings } from './QualitySettings';
 import { ResourceManager } from './ResourceManager';
 import { ModuleUI } from '../../modules/core/ModuleUI';
 import { GUIManager } from '../debug/GUIManager';
+import { Logger } from '../debug/Logger';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -45,11 +46,11 @@ export class Engine {
 
   public static async start(): Promise<void> {
     if (this.initialized) {
-      console.warn('Engine is already started.');
+      Logger.warn('ENGINE', 'Already running');
       return;
     }
 
-    console.warn('Engine started.');
+    Logger.info('ENGINE', 'Starting...');
 
     try {
       // WebGPU Initialization: 0% -> 25%
@@ -107,8 +108,9 @@ export class Engine {
 
       LoadingStatus.updateStatus('Engine ready!', 100);
       this.initialized = true;
+      Logger.info('ENGINE', `Ready  ·  ${QualitySettings.getInstance().getCurrentQualityName()}`);
     } catch (error) {
-      console.error('Error during engine initialization:', error);
+      Logger.error('ENGINE', 'Initialization failed', error);
       LoadingStatus.showError(error as Error);
       throw error; // Re-throw para que main.ts lo capture también
     }
@@ -153,11 +155,11 @@ export class Engine {
 
     this.initialized = false;
 
-    console.warn('Engine stopped.');
+    Logger.info('ENGINE', 'Stopped');
   }
 
   public static async restart(): Promise<void> {
-    console.log('Restarting engine...');
+    Logger.info('ENGINE', 'Restarting...');
 
     // Show loader during restart
     this.toggleLoader(true);
@@ -182,7 +184,7 @@ export class Engine {
 
     // Don't hide loader here - main.ts will handle it when isReady() returns true
 
-    console.log('Engine restarted successfully.');
+    Logger.info('ENGINE', 'Restarted');
   }
 
   private static async applyQualityPresetAndRestart(
@@ -190,7 +192,7 @@ export class Engine {
   ): Promise<void> {
     const qualitySettings = QualitySettings.getInstance();
 
-    console.log(`Applying ${presetName} quality preset...`);
+    Logger.info('ENGINE', `Quality preset: ${presetName}`);
     qualitySettings.applyPreset(presetName);
 
     // Restart engine to apply changes

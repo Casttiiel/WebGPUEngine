@@ -2,6 +2,7 @@ import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Gamestate } from '../../core/engine/Gamestate';
 import { Module } from './Module';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
+import { Logger } from '../../core/debug/Logger';
 
 export class ModuleManager {
   private allModules: Module[] = [];
@@ -29,7 +30,7 @@ export class ModuleManager {
 
     // Cargar gamestate inicial de forma síncrona para garantizar carga completa
     if (this.startGamestate.length > 0 && initialGamestate) {
-      console.log(`Loading initial gamestate: ${this.startGamestate}`);
+      Logger.info('MODULES', `Gamestate → ${this.startGamestate}`);
       await this.performGamestateTransition(initialGamestate);
       this.currentGamestate = initialGamestate;
     }
@@ -132,7 +133,7 @@ export class ModuleManager {
     // Ejecutar la transición de forma asíncrona sin bloquear el update
     this.performGamestateTransition(this.requestedGamestate)
       .then(() => {
-        console.log(`Gamestate transition completed: ${this.currentGamestate?.name}`);
+        Logger.info('MODULES', `→ ${this.currentGamestate?.name}`);
       })
       .catch((error) => {
         console.error('Error during gamestate transition:', error);
@@ -162,7 +163,6 @@ export class ModuleManager {
       }
 
       if (modulesToStop.length > 0) {
-        console.log(`Stopping ${modulesToStop.length} modules`);
         this.stopModules(modulesToStop);
       }
     }
@@ -185,7 +185,6 @@ export class ModuleManager {
     }
 
     if (modulesToStart.length > 0) {
-      console.log(`Starting ${modulesToStart.length} modules (async loading...)`);
       await this.startModules(modulesToStart, true); // Reportar progreso durante carga inicial
     }
 

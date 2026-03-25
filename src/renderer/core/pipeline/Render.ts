@@ -7,6 +7,7 @@ import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { MipmapGenerator } from '../processing/MipmapGenerator';
 import { GPUUtils } from '../utils/GPUUtils';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
+import { Logger } from '../../../core/debug/Logger';
 
 export class Render {
   private static instance: Render;
@@ -54,9 +55,7 @@ export class Render {
     Render.canvasHeight = height;
     Render.updateRenderDimensions();
 
-    console.warn(
-      `Canvas initialized: ${width}x${height} (Resolution: ${Render.renderWidth}x${Render.renderHeight})`,
-    );
+    Logger.info('RENDER', `Canvas ${width}\u00d7${height}`);
 
     try {
       LoadingStatus.updateStatus('Requesting GPU adapter...', 5);
@@ -98,12 +97,10 @@ export class Render {
       LoadingStatus.updateStatus('Initializing GPU utilities...', 20);
       // Initialize GPUUtils with the WebGPU device
       GPUUtils.initialize(this.device);
-      console.warn('GPUUtils initialized with WebGPU device');
 
       LoadingStatus.updateStatus('Creating sampler library...', 23);
       // Initialize SamplerLibrary with reusable samplers
       SamplerLibrary.initialize();
-      console.warn('SamplerLibrary initialized with reusable samplers');
 
       return true;
     } catch (error) {

@@ -178,7 +178,6 @@ export class ModuleRender extends Module {
 
     const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
     if (!mainCameraEntity) {
-      console.warn('No main camera found');
       return;
     }
     const cameraComponent = mainCameraEntity.getComponent('camera') as CameraComponent;

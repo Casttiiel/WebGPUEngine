@@ -1,3 +1,4 @@
+import { Logger } from '../../core/debug/Logger';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
@@ -36,7 +37,7 @@ export class ScreenSpaceGlobalIllumination {
 
       // Mark initialized only after all resources are ready
       this.isInitialized = true;
-      console.log('SSGI loaded successfully');
+      Logger.info('RENDER', 'SSGI ready');
     } catch (error) {
       console.warn('Failed to load SSGI, disabling feature:', error);
       this.isInitialized = false;

@@ -20,8 +20,6 @@ export class ModuleGameController extends Module {
 
     const moduleUI = ModuleUI.getInstance();
     if (moduleUI) moduleUI.activateWidgetClass('HUD');
-
-    console.log('GameController started - Game resumed');
     return true;
   }
 

@@ -2,6 +2,7 @@ import { Module } from '../core/Module';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { Logger } from '../../core/debug/Logger';
 import { InputManager } from '../../core/input/InputManager';
 import { GameAction } from '../../types/GameAction.enum';
 import { ControlMappingConfig, InputBinding } from '../../types/ControlMapping.type';
@@ -170,9 +171,7 @@ export class ModuleInput extends Module {
     this.pointerLockActive = document.pointerLockElement === canvas;
 
     if (this.pointerLockActive) {
-      console.log('Pointer Lock ACTIVADO (ESC para salir)');
     } else {
-      console.log('Pointer Lock DESACTIVADO');
       // Reset movement cuando se desactiva
       this.mouseMovement = { x: 0, y: 0 };
     }
@@ -186,11 +185,11 @@ export class ModuleInput extends Module {
       // Si cambiamos a modo editor, liberar pointer lock
       if (currentGamestate === 'gs_editor' && this.pointerLockActive) {
         document.exitPointerLock();
-        console.log('🔓 Pointer lock released (entering editor mode)');
+        Logger.info('INPUT', 'Pointer lock released');
       } else if (currentGamestate === 'gs_gameplay' && !this.pointerLockActive) {
         const canvas = Render.getInstance().getCanvas();
         canvas.requestPointerLock();
-        console.log('🔓 Pointer lock locked (entering gameplay mode)');
+        Logger.info('INPUT', 'Pointer lock acquired');
       }
     }
 

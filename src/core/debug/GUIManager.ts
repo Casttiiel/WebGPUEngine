@@ -38,8 +38,6 @@ export class GUIManager {
       return;
     }
 
-    console.log('GUIManager: Initializing Lil-GUI...');
-
     try {
       // Create main GUI instance
       this.gui = new GUI({
@@ -60,8 +58,6 @@ export class GUIManager {
       this.isVisible = false;
 
       this.initialized = true;
-
-      console.log('GUIManager: Initialized successfully');
     } catch (error) {
       console.error('GUIManager: Failed to initialize', error);
       throw error;
@@ -380,8 +376,6 @@ export class GUIManager {
     if (fpsDisplay) {
       fpsDisplay.style.display = 'none';
     }
-
-    console.log('GUIManager: UI hidden (gameplay mode)');
   }
 
   /**
