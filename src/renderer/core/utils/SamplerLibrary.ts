@@ -12,6 +12,7 @@ export class SamplerLibrary {
   private static _nonFilteringSampler: GPUSampler;
   private static _froxelRaymarchSampler: GPUSampler;
   private static _environmentCubemapSampler: GPUSampler;
+  private static _nearestRepeat: GPUSampler;
 
   /**
    * Initialize all samplers. Must be called after WebGPU device is ready.
@@ -114,6 +115,16 @@ export class SamplerLibrary {
       maxAnisotropy: 1,
     });
 
+    SamplerLibrary._nearestRepeat = GPUUtils.createSampler({
+      label: 'nearest_repeat_sampler',
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      mipmapFilter: 'nearest',
+      addressModeU: 'repeat',
+      addressModeV: 'repeat',
+      maxAnisotropy: 1,
+    });
+
     SamplerLibrary.initialized = true;
     // All samplers created successfully
   }
@@ -137,6 +148,7 @@ export class SamplerLibrary {
     SamplerLibrary._nonFilteringSampler = null as any;
     SamplerLibrary._froxelRaymarchSampler = null as any;
     SamplerLibrary._environmentCubemapSampler = null as any;
+    SamplerLibrary._nearestRepeat = null as any;
 
     SamplerLibrary.initialized = false;
   }
@@ -202,5 +214,12 @@ export class SamplerLibrary {
       throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
     }
     return SamplerLibrary._environmentCubemapSampler;
+  }
+
+  public static get nearestRepeat(): GPUSampler {
+    if (!SamplerLibrary.initialized) {
+      throw new Error('SamplerLibrary not initialized. Call SamplerLibrary.initialize() first.');
+    }
+    return SamplerLibrary._nearestRepeat;
   }
 }

@@ -25,6 +25,7 @@ export interface GraphicsQualitySettings {
   directionalShadowMapResolution: number;
   ssgiScale: number;
   useKTX2: boolean;
+  meshTextureFilter: 'trilinear' | 'nearest';
 }
 
 export class QualitySettings {
@@ -61,6 +62,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableMotionBlur: false,
       useKTX2: false,
+      meshTextureFilter: 'trilinear',
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -90,6 +92,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableMotionBlur: true,
       useKTX2: false,
+      meshTextureFilter: 'trilinear',
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -119,6 +122,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableMotionBlur: true,
       useKTX2: false,
+      meshTextureFilter: 'trilinear',
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -148,6 +152,7 @@ export class QualitySettings {
       ssgiScale: 0.25,
       enableMotionBlur: true,
       useKTX2: false,
+      meshTextureFilter: 'trilinear',
     } as GraphicsQualitySettings,
   };
 
@@ -191,6 +196,7 @@ export class QualitySettings {
       directionalShadowMapResolution: 2048,
       enableMotionBlur: true,
       useKTX2: false,
+      meshTextureFilter: 'trilinear',
     };
     return { ...defaults, ...this.settings };
   }
@@ -233,6 +239,12 @@ export class QualitySettings {
       this.settings.renderResolution = clamped;
     }
     this.currentPreset = 'CUSTOM' as any;
+  }
+
+  public setMeshTextureFilter(value: 'trilinear' | 'nearest'): void {
+    if (this.settings) {
+      this.settings.meshTextureFilter = value;
+    }
   }
 
   private onSettingsChanged(): void {

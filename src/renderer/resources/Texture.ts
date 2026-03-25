@@ -170,7 +170,8 @@ export class Texture extends GPUResource {
       mipLevelCount,
     });
 
-    this.sampler = SamplerLibrary.anisotropic16x;
+    const useNearest = QualitySettings.getInstance().getSettings().meshTextureFilter === 'nearest';
+    this.sampler = useNearest ? SamplerLibrary.nearestRepeat : SamplerLibrary.anisotropic16x;
 
     // Mark as loaded when createTexture completes
     this.setHasData();
@@ -231,7 +232,8 @@ export class Texture extends GPUResource {
       mipLevelCount,
     });
 
-    this.sampler = SamplerLibrary.anisotropic16x;
+    const useNearest = QualitySettings.getInstance().getSettings().meshTextureFilter === 'nearest';
+    this.sampler = useNearest ? SamplerLibrary.nearestRepeat : SamplerLibrary.anisotropic16x;
     this.setHasData();
   }
 

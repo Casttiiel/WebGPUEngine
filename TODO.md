@@ -1,22 +1,22 @@
 ### Engine
 
-1. Better console logs
-2. Particles not showing properly texture
-3. SSR works on one direction only (add render in menu to test params)
-4. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+1. Particles not showing properly texture
+2. Half Lambert
+3. Profiler
+4. Better console logs
+5. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+6. SSR works on one direction only (add render in menu to test params)
+7. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
 
-5. Usar trilinear filtering, configurar para poder tener filtrado nearest-neighbor (sin bilinear/trilinear)
-6. Half Lambert
-7. Paleta de 128 colores
-8. Resolución interna baja con upscale a pantalla completa — típicamente 320×240 o 480×270, luego pixel-perfect upscale
-9. Dithering para transparencias y gradientes — muy barato, muy efectivo
-10. Sombras con dithering pixelado
-11. Light Shafts pixelados
+8. Paleta de 128 colores
+9. Resolución interna baja con upscale a pantalla completa — típicamente 320×240 o 480×270, luego pixel-perfect upscale
+10. Dithering para transparencias y gradientes — muy barato, muy efectivo
+11. Sombras con dithering pixelado
+12. Light Shafts pixelados
 
-12. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
-13. DBuffer (Compare my Deferred renderer with UE)
+13. AO Weird + Slow
 14. Glass
-15. AO Weird + Slow
+15. DBuffer (Compare my Deferred renderer with UE)
 16. HZB Culling regulero
 
 17. Froxel Self Occlusion
