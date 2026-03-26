@@ -2,17 +2,18 @@
 
 1. Normal de suelo con luces raro en spot light
 2. Point light usa normal?
-3. Dithering para transparencias
-4. DBuffer (Compare my Deferred renderer with UE)
-5. SSR works on one direction only
+3. DBuffer (Compare my Deferred renderer with UE)
+4. SSR works on one direction only
+5. Dithering para transparencias
 6. AO Weird + Slow
-7. HZB Culling regulero
+7. Baja resolución — 320×240 con upscaling
+8. HZB Culling regulero
 
-8. Froxel Self Occlusion
-9. Froxel Density Volumes
-10. Light Shafts pixelados
-11. Voxel Cone Tracing
-12. Enemy AI
+9. Froxel Self Occlusion
+10. Froxel Density Volumes
+11. Light Shafts pixelados
+12. Voxel Cone Tracing
+13. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo

@@ -69,10 +69,6 @@ export class ModuleEnvironmentManager extends Module {
     this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
     this.irradianceGenerator = new IrradianceGenerator();
 
-    if (jsonData.meshTextureFilter === 'nearest' || jsonData.meshTextureFilter === 'trilinear') {
-      QualitySettings.getInstance().setMeshTextureFilter(jsonData.meshTextureFilter);
-    }
-
     const [irradianceCubemap, skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
       Cubemap.getAsync(jsonData.ambient.irradianceCubemap).then((r) => {
         return r;
