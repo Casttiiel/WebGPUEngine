@@ -79,14 +79,9 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let maxMipLevel = 7.0;
     let mipLevel = g.roughness * maxMipLevel;
     let fallbackColor = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb * ssrParams.globalAmbientBoost;
-    var fallbackSpecular = applyFresnelBRDF(fallbackColor, g);
-    fallbackSpecular *= so;
-    // SSR: apply the same BRDF as IBL so both sides of the mix have equal energy.
-    // The compute stores raw hit color (no BRDF) so we apply it exactly once here.
-    let ssrSpecular = applyFresnelBRDF(ssrColor.rgb, g) * so;
 
     // Mezcla SSR y fallback según alpha
-    var finalSpecular = mix(fallbackSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost;
+    var finalSpecular = applyFresnelBRDF(mix(fallbackColor, ssrColor.rgb, ssrAlpha), g) * ssrParams.specularBoost * so;
 
     // Composición final: suma a la escena base fuera de este shader.
     // Blend mode = additive_by_src_alpha → dst += finalSpecular * alpha.

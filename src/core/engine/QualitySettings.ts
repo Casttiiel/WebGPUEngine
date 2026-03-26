@@ -157,7 +157,7 @@ export class QualitySettings {
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
-      ditheringMode: 'psx',
+      ditheringMode: 'off',
     } as GraphicsQualitySettings,
   };
 

@@ -38,10 +38,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
-    let fadeWidth = 0.15;
-    let fadeX = min(uv.x / fadeWidth, (1.0 - uv.x) / fadeWidth);
-    let fadeY = min(uv.y / fadeWidth, (1.0 - uv.y) / fadeWidth);
-    return saturate(min(fadeX, fadeY));
+    // 10 % fade bands on all four edges; multiply X×Y for smooth corners.
+    let fade = min(uv, vec2<f32>(1.0) - uv) / 0.1;
+    return saturate(fade.x) * saturate(fade.y);
 }
 
 // ── View-space helper: project a view-space position to screen UV + linear depth ──
@@ -115,7 +114,7 @@ fn performSSRMarch(
         // false positives — scales proportionally with the linear depth value.
         let adaptiveThickness = ssrParams.thickness * (1.0 + sceneDep * 8.0);
 
-        if (scr.z > sceneDep && (scr.z - sceneDep) < adaptiveThickness && sceneDep > startDepth) {
+        if (scr.z > sceneDep && (scr.z - sceneDep) < adaptiveThickness) {
             // Binary search refinement
             let refinedVP  = binarySearchRefine(prevVP, currentVP);
             let refinedScr = viewToScreen(refinedVP);
@@ -125,12 +124,12 @@ fn performSSRMarch(
 
             let hitColor  = textureSampleLevel(accLight, samplerGBuffer, hitUV, 0.0);
             let hitDist   = length(currentVP - viewStart);
-            let distFade  = 1.0 - saturate(hitDist / maxDistance);
-            let edgeFade  = calculateEdgeFade(hitUV);
-            let stepFade  = 1.0 - (f32(i) / f32(maxSteps));
-            // Roughness fade: fades to 0 at roughness=0.6, matching the soft gate in cs()
-            let roughFade = 1.0 - saturate(roughness / 0.6);
-            let finalFade = saturate(distFade * edgeFade * stepFade * roughFade);
+            // Confidence factors — all three gate the alpha that ambient_specular.fs uses
+            // to blend SSR against the IBL cubemap fallback: mix(ibl, ssr, confidence).
+            let distFade  = 1.0 - saturate(hitDist / maxDistance);  // distant hits fade to IBL
+            let edgeFade  = calculateEdgeFade(hitUV);                // screen-border hits fade to IBL
+            let roughFade = 1.0 - smoothstep(0.0, 0.4, roughness);   // rough surfaces fall back to IBL
+            let finalFade = edgeFade * roughFade;//distFade not used
             return vec4<f32>(hitColor.rgb, finalFade);
         }
     }
@@ -160,10 +159,11 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // Soft metallic fade: ramps 0→1 between metallic 0.1 and 0.4, giving smooth
     // SSR entry on partially metallic materials instead of a hard cutoff.
-    // Hard roughness cutoff raised to 0.85 — roughFade inside the march already
-    // fades contributions to 0 at roughness=0.6, this avoids fully wasted dispatches.
+    // Hard roughness cutoff (roughnessMax ≈ 0.85) — roughFade inside the march already
+    // smoothsteps confidence to 0 at roughness=0.4 and ambient_specular.fs blends
+    // the remainder against the IBL cubemap, so fully wasted dispatches are avoided.
     let metallicFade = saturate((g.metallic - 0.1) / 0.3);
-    if (g.metallic < 0.4 || g.roughness > 0.6) {//g.metallic < 0.1 || g.roughness > 0.9
+    if (g.metallic < ssrParams.metallicMin || g.roughness > ssrParams.roughnessMax) {
         textureStore(outputSSR, coords, vec4<f32>(0.0));
         return;
     }

@@ -31,6 +31,9 @@
     "prefab": "effects/particles_worldspace.prefab"
   },
   {
+    "prefab": "effects/water_decal.prefab"
+  },
+  {
     "prefab": "primitives/ground.prefab"
   },
   {

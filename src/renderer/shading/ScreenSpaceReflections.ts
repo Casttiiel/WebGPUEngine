@@ -51,7 +51,7 @@ export class ScreenSpaceReflections {
   private debugParams = {
     stepSize: 0.3,
     maxSteps: 48,
-    maxDistance: 50.0,
+    maxDistance: 300.0,
     thickness: 0.03,
     metallicMin: 0.4,
     roughnessMax: 0.6,
@@ -190,9 +190,9 @@ export class ScreenSpaceReflections {
     }
 
     this.executeSSRPass(gBufferBindGroup);
-    //this.executeBlurPass(gNormalsView, gDepthView);
+    this.executeBlurPass(gNormalsView, gDepthView);
 
-    return this.ssrResult.getView();
+    return this.ssrBlurred.getView();
   }
 
   private executeBlurPass(gNormalsView: GPUTextureView, gDepthView: GPUTextureView): void {
@@ -340,7 +340,7 @@ export class ScreenSpaceReflections {
     gui.addSliderInt('Max Steps', this.debugParams.maxSteps, 8, 128, (v) => {
       this.debugParams.maxSteps = v;
     });
-    gui.addSlider('Max Distance', this.debugParams.maxDistance, 5.0, 200.0, (v) => {
+    gui.addSlider('Max Distance', this.debugParams.maxDistance, 5.0, 300.0, (v) => {
       this.debugParams.maxDistance = v;
     });
     gui.addSlider('Thickness', this.debugParams.thickness, 0.001, 0.2, (v) => {
