@@ -1,6 +1,5 @@
 {
     "vs": "depth_prepass.vs",
-    "fs": "depth_prepass.fs",
     "writesOn": "depth_only",
     "uniforms": ["CameraUniforms", "MaterialTextures", "ObjectUniforms"]
 }

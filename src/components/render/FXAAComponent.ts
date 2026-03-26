@@ -71,6 +71,7 @@ export class FXAAComponent extends Component {
       this.technique,
       bindGroup,
       this.result,
+      'FXAA',
     );
 
     return this.result.getView();

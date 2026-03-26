@@ -16,7 +16,7 @@ export interface PipelineConfig {
     entryPoint: string;
     buffers?: GPUVertexBufferLayout[];
   };
-  fragment: {
+  fragment?: {
     module: GPUShaderModule;
     entryPoint: string;
     targets: GPUColorTargetState[];
@@ -41,7 +41,7 @@ export class PipelineFactory {
       label: config.label,
       layout: config.layout || 'auto',
       vertex: config.vertex,
-      fragment: config.fragment,
+      ...(config.fragment !== undefined && { fragment: config.fragment }),
     };
 
     if (config.primitive) {
@@ -69,7 +69,7 @@ export class PipelineFactory {
       label: config.label,
       layout: config.layout || 'auto',
       vertex: config.vertex,
-      fragment: config.fragment,
+      ...(config.fragment !== undefined && { fragment: config.fragment }),
     };
 
     if (config.primitive) {

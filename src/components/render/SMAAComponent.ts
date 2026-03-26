@@ -9,6 +9,7 @@ import { Texture } from '../../renderer/resources/Texture';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 /**
  * SMAA (Subpixel Morphological Anti-Aliasing) Component
@@ -108,13 +109,28 @@ export class SMAAComponent extends Component {
 
     // Create render targets
     this.edgesRT = new RenderTarget();
-    this.edgesRT.createRT('smaa_edges.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.edgesRT.createRT(
+      'smaa_edges.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
 
     this.blendRT = new RenderTarget();
-    this.blendRT.createRT('smaa_blend.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.blendRT.createRT(
+      'smaa_blend.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
 
     this.finalRT = new RenderTarget();
-    this.finalRT.createRT('smaa_final.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.finalRT.createRT(
+      'smaa_final.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
 
     this.loaded = true;
   }
@@ -122,9 +138,24 @@ export class SMAAComponent extends Component {
   public resize(): void {
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 
-    this.edgesRT.createRT('smaa_edges.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
-    this.blendRT.createRT('smaa_blend.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
-    this.finalRT.createRT('smaa_final.dds', Render.canvasSize.width, Render.canvasSize.height, aliasingFormat);
+    this.edgesRT.createRT(
+      'smaa_edges.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
+    this.blendRT.createRT(
+      'smaa_blend.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
+    this.finalRT.createRT(
+      'smaa_final.dds',
+      Render.canvasSize.width,
+      Render.canvasSize.height,
+      aliasingFormat,
+    );
 
     // Clear all caches
     this.edgeBindGroupCache.clear();
@@ -154,6 +185,7 @@ export class SMAAComponent extends Component {
       this.edgeTechnique,
       edgeBindGroup,
       this.edgesRT,
+      'SMAA Edge Detection',
     );
 
     // Pass 2: Blending Weight Calculation
@@ -184,6 +216,7 @@ export class SMAAComponent extends Component {
 
     const pass = encoder.beginRenderPass({
       label: 'SMAA Blending Weights',
+      timestampWrites: GPUProfiler.getInstance().getTimestampWrites('SMAA Blending Weights'),
       colorAttachments: [
         {
           view: this.blendRT.getView(),
@@ -218,6 +251,7 @@ export class SMAAComponent extends Component {
 
     const pass = encoder.beginRenderPass({
       label: 'SMAA Neighborhood Blending',
+      timestampWrites: GPUProfiler.getInstance().getTimestampWrites('SMAA Neighborhood Blending'),
       colorAttachments: [
         {
           view: this.finalRT.getView(), // Use getView() instead of getRenderView() - no MSAA

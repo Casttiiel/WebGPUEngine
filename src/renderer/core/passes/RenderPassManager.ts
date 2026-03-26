@@ -207,7 +207,11 @@ export class RenderPassManager {
     result: RenderTarget,
     exposureBindGroup?: GPUBindGroup,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      undefined,
+      'Tone Mapping',
+    );
     const pass = new ToneMappingRenderPass(
       passConfig,
       mesh,
@@ -225,7 +229,11 @@ export class RenderPassManager {
     gBufferBindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      undefined,
+      'Height Fog',
+    );
     const pass = new HeightFogRenderPass(passConfig, mesh, technique, bindGroup, gBufferBindGroup);
     this.executeDynamicPass(pass);
   }
@@ -240,7 +248,11 @@ export class RenderPassManager {
     bufferBindGroup: GPUBindGroup,
     result: GPUTextureView,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(result);
+    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
+      result,
+      undefined,
+      'Speed Lines',
+    );
     const pass = new SpeedLinesVFXRenderPass(
       passConfig,
       mesh,
@@ -259,8 +271,9 @@ export class RenderPassManager {
     technique: Technique,
     bindGroup: GPUBindGroup,
     result: RenderTarget,
+    label = 'Antialiasing',
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, undefined, label);
     const pass = new AntialiasingRenderPass(passConfig, mesh, technique, bindGroup);
     this.executeDynamicPass(pass);
   }
@@ -275,8 +288,9 @@ export class RenderPassManager {
     inputTextureBindGroup: GPUBindGroup,
     result: RenderTarget,
     paramsBindGroup?: GPUBindGroup,
+    label = 'Bloom',
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, undefined, label);
     const pass = new BloomFilteringRenderPass(
       passConfig,
       mesh,
@@ -299,10 +313,14 @@ export class RenderPassManager {
     result: RenderTarget,
   ): void {
     const aoScale = QualitySettings.getInstance().getSettings().aoScale;
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
-      width: Render.width * aoScale,
-      height: Render.height * aoScale,
-    });
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      {
+        width: Render.width * aoScale,
+        height: Render.height * aoScale,
+      },
+      'AO Pass',
+    );
     const pass = new AmbientOcclusionRenderPass(
       passConfig,
       mesh,
@@ -324,10 +342,14 @@ export class RenderPassManager {
     result: RenderTarget,
   ): void {
     const aoScale = QualitySettings.getInstance().getSettings().aoScale;
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
-      width: Render.width * aoScale,
-      height: Render.height * aoScale,
-    });
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      {
+        width: Render.width * aoScale,
+        height: Render.height * aoScale,
+      },
+      'AO Bilateral Filter',
+    );
     const pass = new AOBilateralFilterRenderPass(
       passConfig,
       mesh,
@@ -346,10 +368,14 @@ export class RenderPassManager {
     result: RenderTarget,
   ): void {
     const scale = QualitySettings.getInstance().getSettings().ssgiScale;
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
-      width: Render.width * scale,
-      height: Render.height * scale,
-    });
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      {
+        width: Render.width * scale,
+        height: Render.height * scale,
+      },
+      'SSGI Bilateral Filter',
+    );
     const pass = new AOBilateralFilterRenderPass(
       passConfig,
       mesh,
@@ -370,7 +396,11 @@ export class RenderPassManager {
     texturesBindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      undefined,
+      'Motion Blur',
+    );
     const pass = new MotionBlurRenderPass(
       passConfig,
       mesh,
@@ -391,10 +421,14 @@ export class RenderPassManager {
     paramsBindGroup: GPUBindGroup,
     result: RenderTarget,
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, {
-      width: result.getWidth(),
-      height: result.getHeight(),
-    });
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      {
+        width: result.getWidth(),
+        height: result.getHeight(),
+      },
+      'Contact Shadows',
+    );
     const pass = new ContactShadowsRenderPass(
       passConfig,
       mesh,

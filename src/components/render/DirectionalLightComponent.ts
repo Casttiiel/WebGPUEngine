@@ -520,7 +520,7 @@ export class DirectionalLightComponent extends Component {
         [], // Sin color attachments
         depthStencilAttachment,
       );
-      const shadowTs = GPUProfiler.getInstance().getTimestampWrites('Directional Shadow');
+      const shadowTs = GPUProfiler.getInstance().getTimestampWrites(`Directional Shadow ${i}`);
       if (shadowTs) shadowDesc.timestampWrites = shadowTs;
       const pass = render.getCommandEncoder().beginRenderPass(shadowDesc);
 

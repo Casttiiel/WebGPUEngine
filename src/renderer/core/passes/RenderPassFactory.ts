@@ -139,6 +139,7 @@ export class RenderPassFactory {
   public static createPostProcessPassConfig(
     target: RenderTarget,
     viewport?: { width: number; height: number },
+    label = 'Post Process Pass',
   ): RenderPassConfig {
     const colorAttachments: GPURenderPassColorAttachment[] = [
       {
@@ -150,7 +151,7 @@ export class RenderPassFactory {
     ];
 
     return {
-      label: 'Post Process Pass',
+      label,
       colorAttachments,
       viewport,
     };
@@ -159,6 +160,7 @@ export class RenderPassFactory {
   public static createPostProcessPassConfigBlended(
     target: GPUTextureView,
     viewport?: { width: number; height: number },
+    label = 'Post Process Pass',
   ): RenderPassConfig {
     const colorAttachments: GPURenderPassColorAttachment[] = [
       {
@@ -169,7 +171,7 @@ export class RenderPassFactory {
     ];
 
     return {
-      label: 'Post Process Pass',
+      label,
       colorAttachments,
       viewport,
     };

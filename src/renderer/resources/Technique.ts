@@ -14,7 +14,7 @@ import { Render } from '../core/pipeline/Render';
 
 export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'> {
   vs: string;
-  fs: string;
+  fs?: string;
   vsEntryPoint?: string;
   fsEntryPoint?: string;
   blend?: BlendModes;
@@ -48,7 +48,7 @@ export class Technique extends GPUResource {
   private uniformsLayout: ReadonlyArray<PipelineBindGroupLayouts>;
   private isInstanced: boolean;
   private vsFile: string;
-  private fsFile: string;
+  private fsFile?: string;
   private vsEntryPoint: string;
   private fsEntryPoint: string;
 
@@ -67,7 +67,6 @@ export class Technique extends GPUResource {
     this.isInstanced = options.instanced || false;
     this.vsFile = options.vs;
     this.fsFile = options.fs;
-    this.vsEntryPoint = options.vsEntryPoint || 'vs';
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
   }
 
@@ -118,8 +117,8 @@ export class Technique extends GPUResource {
     path: string,
     techniqueData: Partial<TechniqueCreateOptions>,
   ): Technique {
-    if (!techniqueData?.vs || !techniqueData?.fs) {
-      throw new Error(`Missing shader files for technique: ${path}`);
+    if (!techniqueData?.vs) {
+      throw new Error(`Missing vertex shader for technique: ${path}`);
     }
 
     const options: TechniqueOptions = {
@@ -153,28 +152,28 @@ export class Technique extends GPUResource {
   }
 
   private async createShaderModules(): Promise<void> {
-    // Load both shaders in parallel
-    const [vsCode, fsCode] = await Promise.all([
-      ResourceManager.loadShader(this.vsFile),
-      ResourceManager.loadShader(this.fsFile),
-    ]);
-
+    // Load vertex shader; fragment shader is optional (depth-only passes)
+    const vsCode = await ResourceManager.loadShader(this.vsFile);
     if (!vsCode) throw new Error(`Failed to load vertex shader: ${this.vsFile}`);
-    if (!fsCode) throw new Error(`Failed to load fragment shader: ${this.fsFile}`);
 
     this.vsModule = this.device.createShaderModule({
       label: `${this.label}_vs`,
       code: vsCode,
     });
 
-    this.fsModule = this.device.createShaderModule({
-      label: `${this.label}_fs`,
-      code: fsCode,
-    });
+    if (this.fsFile) {
+      const fsCode = await ResourceManager.loadShader(this.fsFile);
+      if (!fsCode) throw new Error(`Failed to load fragment shader: ${this.fsFile}`);
+      this.fsModule = this.device.createShaderModule({
+        label: `${this.label}_fs`,
+        code: fsCode,
+      });
+    }
   }
 
   private createPipelineLayout(): void {
-    if (!this.vsModule || !this.fsModule) {
+    const isDepthOnly = this.writesOn === FragmentShaderTargets.DEPTH_ONLY;
+    if (!this.vsModule || (!isDepthOnly && !this.fsModule)) {
       throw new Error(
         `Cannot create pipeline layout for technique ${this.path}: Shader modules not loaded`,
       );
@@ -197,9 +196,9 @@ export class Technique extends GPUResource {
   }
 
   private async createPipelineAsync(): Promise<void> {
-    if (!this.vsModule || !this.fsModule) {
+    if (!this.vsModule) {
       throw new Error(
-        `Cannot create pipeline for technique ${this.path}: Shader modules not loaded`,
+        `Cannot create pipeline for technique ${this.path}: Vertex shader module not loaded`,
       );
     }
 
@@ -212,21 +211,15 @@ export class Technique extends GPUResource {
       layouts,
     );
 
-    const vsModule = this.vsModule;
-    const fsModule = this.fsModule;
-    if (!vsModule || !fsModule) throw new Error('Shader modules not available');
+    const isDepthOnly = this.writesOn === FragmentShaderTargets.DEPTH_ONLY;
+
     const pipelineConfig: PipelineConfig = {
       label: this.label,
       layout: pipelineLayout,
       vertex: {
-        module: vsModule,
+        module: this.vsModule,
         entryPoint: this.vsEntryPoint,
         buffers: Mesh.getVertexBufferLayout(),
-      },
-      fragment: {
-        module: fsModule,
-        entryPoint: this.fsEntryPoint,
-        targets: this.getFragmentShaderTarget(),
       },
       primitive: {
         topology: 'triangle-list',
@@ -234,6 +227,17 @@ export class Technique extends GPUResource {
         frontFace: 'ccw',
       },
     };
+
+    // Omit fragment stage entirely for depth-only passes (shadow maps, depth prepass).
+    // This eliminates fragment shader invocations and lets the GPU skip rasterization work.
+    if (!isDepthOnly && this.fsModule) {
+      pipelineConfig.fragment = {
+        module: this.fsModule,
+        entryPoint: this.fsEntryPoint,
+        targets: this.getFragmentShaderTarget(),
+      };
+    }
+
     if (this.depthTest && this.depthTest !== DepthModes.DISABLE_ALL) {
       pipelineConfig.depthStencil = this.getDepthConfig();
     }

@@ -71,6 +71,7 @@ export class PaletteQuantizeComponent extends Component {
       this.technique,
       bindGroup,
       this.result,
+      'Palette Quantize',
     );
 
     return this.result.getView();

@@ -1,26 +1,22 @@
 ### Engine
 
 1. Profiler
-2. SSR works on one direction only (add render in menu to test params)
+2. SSR works on one direction only
 3. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
 
-4. Paleta de 128 colores
-5. Resolución interna baja con upscale a pantalla completa — típicamente 320×240 o 480×270, luego pixel-perfect upscale
-6. Dithering para transparencias y gradientes — muy barato, muy efectivo
-7. Sombras con dithering pixelado
-8. Light Shafts pixelados
+4. Dithering para transparencias y gradientes — muy barato, muy efectivo
+5. Sombras con dithering pixelado
 
-9. AO Weird + Slow
-10. Glass
-11. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
-12. DBuffer (Compare my Deferred renderer with UE)
-13. HZB Culling regulero
+6. AO Weird + Slow
+7. DBuffer (Compare my Deferred renderer with UE)
+8. HZB Culling regulero
 
-14. Froxel Self Occlusion
-15. Froxel Density Volumes
-16. Voxel Cone Tracing
-17. Gameplay
-18. Enemy AI
+9. Froxel Self Occlusion
+10. Froxel Density Volumes
+11. Light Shafts pixelados
+12. Voxel Cone Tracing
+13. Gameplay
+14. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo
@@ -55,3 +51,5 @@
 11. Clearcoat - Segunda capa especular encima del PBR base
 12. Sheen - Retroreflexión de telas
 13. Thin-film / Iridescence - Interferencia de películas finas (burbujas, insectos, nácar)
+14. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+15. Staggered cascades

@@ -11,6 +11,7 @@ import {
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Engine } from '../../core/engine/Engine';
 import { FSRComponentData } from '../../types/FSRComponentData.type';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 /**
  * FSR 1.0 — FidelityFX Super Resolution
@@ -125,13 +126,10 @@ export class FSRComponent extends Component {
     if (!this.isLoaded || !this.enabled) return inputView;
 
     const canvas = Render.canvasSize;
+    const isNativeRes = Render.width === canvas.width && Render.height === canvas.height;
 
-    // Update EASU params: render res → canvas res
-    this.device.queue.writeBuffer(
-      this.easuParamsBuffer,
-      0,
-      new Float32Array([Render.width, Render.height, canvas.width, canvas.height]),
-    );
+    // No upscaling needed and no sharpening requested — skip entirely
+    if (isNativeRes && !this.enableRCAS) return inputView;
 
     // Update RCAS params
     this.device.queue.writeBuffer(
@@ -140,7 +138,7 @@ export class FSRComponent extends Component {
       new Float32Array([this.rcasSharpness, 0, 0, 0]),
     );
 
-    // Lazily create / look up EASU input bind group for this view
+    // Lazily create / look up input bind group for this view (shared by EASU & RCAS-only paths)
     let easuInputBG = this.easuInputCache.get(inputView);
     if (!easuInputBG) {
       easuInputBG = BindGroupFactory.createBindGroup(
@@ -158,20 +156,36 @@ export class FSRComponent extends Component {
     //    between compute passes within the same command buffer) ────────────────
     const encoder = this.device.createCommandEncoder({ label: 'FSR Encoder' });
 
-    // EASU pass
-    const easuPass = encoder.beginComputePass({ label: 'FSR EASU' });
-    easuPass.setPipeline(this.easuPipeline);
-    easuPass.setBindGroup(0, easuInputBG);
-    easuPass.setBindGroup(1, this.easuOutputBindGroup);
-    easuPass.setBindGroup(2, this.easuParamsBindGroup);
-    easuPass.dispatchWorkgroups(dispatchX, dispatchY, 1);
-    easuPass.end();
+    if (!isNativeRes) {
+      // EASU pass — only needed when upscaling
+      this.device.queue.writeBuffer(
+        this.easuParamsBuffer,
+        0,
+        new Float32Array([Render.width, Render.height, canvas.width, canvas.height]),
+      );
+      const easuTs = GPUProfiler.getInstance().getTimestampWrites('FSR EASU');
+      const easuPass = encoder.beginComputePass({
+        label: 'FSR EASU',
+        ...(easuTs && { timestampWrites: easuTs }),
+      });
+      easuPass.setPipeline(this.easuPipeline);
+      easuPass.setBindGroup(0, easuInputBG);
+      easuPass.setBindGroup(1, this.easuOutputBindGroup);
+      easuPass.setBindGroup(2, this.easuParamsBindGroup);
+      easuPass.dispatchWorkgroups(dispatchX, dispatchY, 1);
+      easuPass.end();
+    }
 
     if (this.enableRCAS) {
-      // RCAS pass
-      const rcasPass = encoder.beginComputePass({ label: 'FSR RCAS' });
+      // RCAS pass: reads from easuResult after upscaling, or directly from inputView at native res
+      const rcasInputBG = isNativeRes ? easuInputBG : this.rcasInputBindGroup;
+      const rcasTs = GPUProfiler.getInstance().getTimestampWrites('FSR RCAS');
+      const rcasPass = encoder.beginComputePass({
+        label: 'FSR RCAS',
+        ...(rcasTs && { timestampWrites: rcasTs }),
+      });
       rcasPass.setPipeline(this.rcasPipeline);
-      rcasPass.setBindGroup(0, this.rcasInputBindGroup);
+      rcasPass.setBindGroup(0, rcasInputBG);
       rcasPass.setBindGroup(1, this.rcasOutputBindGroup);
       rcasPass.setBindGroup(2, this.rcasParamsBindGroup);
       rcasPass.dispatchWorkgroups(dispatchX, dispatchY, 1);

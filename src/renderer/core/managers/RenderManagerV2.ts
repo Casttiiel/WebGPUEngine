@@ -33,6 +33,8 @@ export class RenderManagerV2 {
 
   // Cached shadow keys — rebuilt only when markDirty() fires (addKey/delKeys)
   private cachedShadowKeys: RenderKey[] | null = null;
+  // Pre-sorted shadow keys — same sort used for every cascade, built once per key-change
+  private sortedShadowKeys: RenderKey[] | null = null;
   // Indirect buffer written by the last dispatchShadow() call; consumed by renderKeys()
   private currentShadowIndirectBuffer: GPUBuffer | null = null;
 
@@ -124,12 +126,14 @@ export class RenderManagerV2 {
     // Mark GPU culler dirty so it rebuilds on next performCulling()
     this.gpuCuller?.markDirty();
     this.cachedShadowKeys = null; // Invalidate shadow key cache
+    this.sortedShadowKeys = null;
   }
 
   public delKeys(owner: RenderComponent): void {
     this.keyManager.removeKeys(owner);
     this.gpuCuller?.markDirty();
     this.cachedShadowKeys = null; // Invalidate shadow key cache
+    this.sortedShadowKeys = null;
   }
 
   public performCulling(camera: Camera, category?: RenderCategory): void {
@@ -152,8 +156,13 @@ export class RenderManagerV2 {
         // The returned buffer holds DrawIndexedIndirectParameters written by the shader.
         const encoder = Render.getInstance().getCommandEncoder();
         this.currentShadowIndirectBuffer = this.gpuCuller.dispatchShadow(encoder, camera);
-        // Hand all shadow keys to the camera — GPU will zero instanceCount for culled ones.
-        camera.setCulledKeys(this.cachedShadowKeys);
+        // Sort shadow keys once per key-change — same order for all cascades
+        if (this.sortedShadowKeys === null) {
+          this.sortedShadowKeys = [...this.cachedShadowKeys!];
+          this.keyManager.sortKeys(this.sortedShadowKeys, RenderCategory.SHADOWS, undefined);
+        }
+        // Hand sorted keys to the camera — GPU zeros instanceCount for culled ones
+        camera.setCulledKeys(this.sortedShadowKeys);
       } else {
         // CPU fallback (GPU culler not yet ready)
         this.currentShadowIndirectBuffer = null;
@@ -219,6 +228,17 @@ export class RenderManagerV2 {
 
     // Reset render state for this pass
     this.stateManager.reset();
+
+    // Fast path for GPU-culled shadow passes: keys are already filtered (shadow-only)
+    // and pre-sorted — skip the O(n) filter loop and O(n log n) sort entirely.
+    if (category === RenderCategory.SHADOWS && this.sortedShadowKeys !== null) {
+      const keys = this.camera.getCulledKeys();
+      if (keys === this.sortedShadowKeys) {
+        const drawCalls = this.renderKeys(keys as RenderKey[], pass);
+        this.drawCallsPerCategory.set(category, drawCalls);
+        return;
+      }
+    }
 
     // ✅ Manual loop instead of filter() to avoid array allocation
     const keys = this.camera.getCulledKeys();

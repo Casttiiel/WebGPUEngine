@@ -148,7 +148,7 @@ export class QualitySettings {
       ssrScale: 0.5,
       ssrStepSize: 0.3,
       ssrMaxSteps: 48.0,
-      directionalShadowMapResolution: 4096,
+      directionalShadowMapResolution: 2048,
       ssgiScale: 0.25,
       enableMotionBlur: true,
       useKTX2: false,

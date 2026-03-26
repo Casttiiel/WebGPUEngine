@@ -5,50 +5,101 @@ const OVERLAY_ID = 'profiler-overlay';
 
 const CPU_SCOPES = ['Entities', 'Shadows', 'Deferred', 'Post-Process'] as const;
 
-const GPU_PASSES = [
-  // ── Shadows ────────────────────────────────────────────
-  'Directional Shadow',
-  'Point Shadow',
-  'Spot Shadow',
-  // ── Lighting ───────────────────────────────────────────
-  'Directional Light',
-  'Ambient Diffuse',
-  'Ambient Specular',
-  'Skybox',
-  // ── G-Buffer & Geometry ────────────────────────────────
-  'Depth Prepass',
-  'G-Buffer Pass',
-  'Decal Pass',
-  'Transparent Pass',
-  'OIT Gather Pass',
-  'OIT Compose Pass',
-  // ── Lights (deferred) ──────────────────────────────────
-  'Point Lights Render Pass',
-  'Point Lights with Shadows',
-  'Spot Lights Render Pass',
-  'Spot Lights with Shadows',
-  // ── Compute effects ────────────────────────────────────
-  'GTAO Compute',
-  'AO Bilateral Filter Compute',
-  'SSR Compute',
-  'SSR Blur',
-  'SSGI',
-  'hzb_build_copy',
-  // ── Auto Exposure ──────────────────────────────────────
-  'AE Luminance',
-  'AE Adapt',
-  // ── Volumetrics ────────────────────────────────────────
-  'froxel_density_compute',
-  'froxel_directional_light_injection_compute',
-  'froxel_point_light_injection_compute',
-  'froxel_spot_light_injection_compute',
-  'froxel_volumetrict_integration_compute',
-  'froxel_volumetrics_render',
-  // ── Post Process ───────────────────────────────────────
-  'Post Process Pass',
-  'Bloom Combine Pass',
-  'DOF Pass',
-] as const;
+// Grouped GPU passes — order matches render pipeline execution order
+const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
+  {
+    label: 'Geometry',
+    color: '#89dceb',
+    passes: ['Depth Prepass', 'G-Buffer Pass', 'Decal Pass'],
+  },
+  {
+    label: 'Shadows',
+    color: '#f38ba8',
+    passes: [
+      'Directional Shadow 0',
+      'Directional Shadow 1',
+      'Directional Shadow 2',
+      'Point Shadow',
+      'Spot Shadow',
+    ],
+  },
+  {
+    label: 'Lighting',
+    color: '#fab387',
+    passes: [
+      'Directional Light',
+      'Point Lights Render Pass',
+      'Point Lights with Shadows',
+      'Spot Lights Render Pass',
+      'Spot Lights with Shadows',
+      'Ambient Diffuse',
+      'Ambient Specular',
+      'Skybox',
+    ],
+  },
+  {
+    label: 'Transparency',
+    color: '#a6e3a1',
+    passes: ['Transparent Pass', 'OIT Gather Pass', 'OIT Compose Pass'],
+  },
+  {
+    label: 'Compute FX',
+    color: '#cba6f7',
+    passes: [
+      'GTAO Compute',
+      'AO Bilateral Filter Compute',
+      'SSR Compute',
+      'SSR Blur',
+      'SSGI',
+      'hzb_build_copy',
+      'AE Luminance',
+      'AE Adapt',
+    ],
+  },
+  {
+    label: 'Volumetrics',
+    color: '#89b4fa',
+    passes: [
+      'froxel_density_compute',
+      'froxel_directional_light_injection_compute',
+      'froxel_point_light_injection_compute',
+      'froxel_spot_light_injection_compute',
+      'froxel_volumetrict_integration_compute',
+      'froxel_volumetrics_render',
+    ],
+  },
+  {
+    label: 'Post-Process',
+    color: '#f9e2af',
+    passes: [
+      'Tone Mapping',
+      'Contact Shadows',
+      'Height Fog',
+      'AO Pass',
+      'AO Bilateral Filter',
+      'SSGI Bilateral Filter',
+      'Bloom',
+      'Bloom Combine Pass',
+      'Motion Blur',
+      'FSR EASU',
+      'FSR RCAS',
+      'FXAA',
+      'SMAA Edge Detection',
+      'SMAA Blending Weights',
+      'SMAA Neighborhood Blending',
+      'SMAA-T2x Edge Detection',
+      'SMAA T2x Blending Weights',
+      'SMAA T2x Neighborhood Blending',
+      'SMAA T2x Temporal Resolve',
+      'Palette Quantize',
+      'Speed Lines',
+      'DOF Pass',
+    ],
+  },
+];
+
+// Flat list for the snapshot loop
+const GPU_PASSES = GPU_GROUPS.flatMap((g) => g.passes) as readonly string[];
 
 /**
  * Lightweight HTML overlay for real-time CPU + GPU profiling data.
@@ -123,27 +174,60 @@ export class ProfilerOverlay {
   }
 
   private static buildHTML(gpuSupported: boolean): string {
-    const frameMs = 1000 / 60; // budget reference (16.67 ms)
+    const frameMs = 1000 / 60; // 16.67 ms budget reference
+    const SEP = `<span style="color:#313244">${'─'.repeat(36)}</span>\n`;
 
-    let html = `<b style="color:#cba6f7">PROFILER</b>  <span style="color:#6c7086;font-size:11px">[F3 to hide]</span>\n`;
-    html += `<span style="color:#6c7086">─────────────────────────────</span>\n`;
+    // ── Totals ────────────────────────────────────────────────────────────────
+    const cpuTotal = CPU_SCOPES.reduce((s, k) => s + (ProfilerOverlay.cpuMs[k] ?? 0), 0);
+    const gpuTotal = GPU_PASSES.reduce((s, k) => s + (ProfilerOverlay.gpuMs[k] ?? 0), 0);
 
-    html += `<span style="color:#89b4fa">CPU</span>\n`;
+    let html = `<b style="color:#cba6f7">PROFILER</b>  <span style="color:#6c7086;font-size:10px">[F3 to hide]</span>\n`;
+    html += SEP;
+
+    // Summary row
+    html += `<b style="color:#89b4fa">CPU</b> ${ProfilerOverlay.bar(cpuTotal, frameMs)} <b>${ProfilerOverlay.fmt(cpuTotal)} ms</b>`;
+    if (gpuSupported) {
+      html += `   <b style="color:#fab387">GPU</b> ${ProfilerOverlay.bar(gpuTotal, frameMs)} <b>${ProfilerOverlay.fmt(gpuTotal)} ms</b>`;
+    }
+    html += '\n' + SEP;
+
+    // ── CPU breakdown ─────────────────────────────────────────────────────────
+    html += `<span style="color:#89b4fa">▸ CPU breakdown</span>\n`;
     for (const s of CPU_SCOPES) {
       const ms = ProfilerOverlay.cpuMs[s] ?? 0;
-      html += ` ${ProfilerOverlay.bar(ms, frameMs)} <b>${s}</b>  ${ProfilerOverlay.fmt(ms)} ms\n`;
+      html += `  ${ProfilerOverlay.bar(ms, frameMs)} <b>${s}</b>  ${ProfilerOverlay.fmt(ms)} ms\n`;
+    }
+    html += SEP;
+
+    // ── GPU breakdown ─────────────────────────────────────────────────────────
+    if (!gpuSupported) {
+      html += `<span style="color:#fab387">▸ GPU</span>  <span style="color:#6c7086">timestamp-query not available</span>\n`;
+      return html;
     }
 
-    html += `<span style="color:#6c7086">─────────────────────────────</span>\n`;
+    for (const group of GPU_GROUPS) {
+      // Only show groups that have at least one active pass
+      const activePasses = group.passes.filter((p) => (ProfilerOverlay.gpuMs[p] ?? 0) > 0);
+      if (activePasses.length === 0) continue;
 
-    if (!gpuSupported) {
-      html += `<span style="color:#fab387">GPU</span>  <span style="color:#6c7086">timestamp-query not available</span>\n`;
-    } else {
-      html += `<span style="color:#fab387">GPU</span>\n`;
-      for (const p of GPU_PASSES) {
+      const groupTotal = activePasses.reduce((s, p) => s + (ProfilerOverlay.gpuMs[p] ?? 0), 0);
+
+      html += `<span style="color:${group.color}">▸ ${group.label}</span>`;
+      html += `  <span style="color:#6c7086">${ProfilerOverlay.fmt(groupTotal)} ms</span>\n`;
+
+      for (const p of activePasses) {
         const ms = ProfilerOverlay.gpuMs[p] ?? 0;
-        if (ms === 0) continue; // hide unused passes
-        html += ` ${ProfilerOverlay.bar(ms, frameMs)} <b>${p}</b>  ${ProfilerOverlay.fmt(ms)} ms\n`;
+        // Short name: strip common verbose suffixes for tighter display
+        const short = p
+          .replace(' Render Pass', '')
+          .replace(' Compute', '')
+          .replace('froxel_', '')
+          .replace('_compute', '')
+          .replace('_injection', ' inj')
+          .replace('_light', ' light')
+          .replace('hzb_build_copy', 'HZB Build')
+          .replace('froxel_volumetrict_integration_compute', 'vol. integration');
+        html += `  ${ProfilerOverlay.bar(ms, frameMs)} <span style="color:#cdd6f4">${short}</span>  ${ProfilerOverlay.fmt(ms)} ms\n`;
       }
     }
 

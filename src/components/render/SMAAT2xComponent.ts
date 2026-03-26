@@ -10,6 +10,7 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
+import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 /**
  * SMAA T2x (Temporal 2x Super-Sampling Anti-Aliasing)
@@ -227,6 +228,7 @@ export class SMAAT2xComponent extends Component {
       this.edgeTechnique,
       edgeBindGroup,
       this.edgesRT,
+      'SMAA-T2x Edge Detection',
     );
 
     // Pass 2: Blending Weight Calculation
@@ -266,6 +268,7 @@ export class SMAAT2xComponent extends Component {
 
     const pass = encoder.beginRenderPass({
       label: 'SMAA T2x Blending Weights',
+      timestampWrites: GPUProfiler.getInstance().getTimestampWrites('SMAA T2x Blending Weights'),
       colorAttachments: [
         {
           view: this.blendRT.getView(),
@@ -296,6 +299,9 @@ export class SMAAT2xComponent extends Component {
 
     const pass = encoder.beginRenderPass({
       label: 'SMAA T2x Neighborhood Blending',
+      timestampWrites: GPUProfiler.getInstance().getTimestampWrites(
+        'SMAA T2x Neighborhood Blending',
+      ),
       colorAttachments: [
         {
           view: this.smaaResultRT.getView(),
@@ -324,6 +330,7 @@ export class SMAAT2xComponent extends Component {
 
     const pass = encoder.beginRenderPass({
       label: 'SMAA T2x Temporal Resolve',
+      timestampWrites: GPUProfiler.getInstance().getTimestampWrites('SMAA T2x Temporal Resolve'),
       colorAttachments: [
         {
           view: this.finalRT.getView(),
