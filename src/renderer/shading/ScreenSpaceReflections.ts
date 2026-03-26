@@ -47,6 +47,17 @@ export class ScreenSpaceReflections {
   private ssrUniformBuffer!: GPUBuffer;
   private brdfLUT!: Texture;
 
+  // ── Debug-tweakable parameters (exposed in renderInMenu) ─────────────────
+  private debugParams = {
+    stepSize: 0.3,
+    maxSteps: 48,
+    maxDistance: 50.0,
+    thickness: 0.03,
+    metallicMin: 0.4,
+    roughnessMax: 0.6,
+    enabled: 1.0,
+  };
+
   constructor() {}
 
   public async load(): Promise<void> {
@@ -56,9 +67,13 @@ export class ScreenSpaceReflections {
 
       this.createRenderTarget();
 
+      const qs2 = QualitySettings.getInstance().getSettings();
+      this.debugParams.stepSize = qs2.ssrStepSize;
+      this.debugParams.maxSteps = qs2.ssrMaxSteps;
+
       this.ssrUniformBuffer = GPUUtils.createBuffer(
         'ssr uniform buffer',
-        32,
+        48,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
 
@@ -175,9 +190,9 @@ export class ScreenSpaceReflections {
     }
 
     this.executeSSRPass(gBufferBindGroup);
-    this.executeBlurPass(gNormalsView, gDepthView);
+    //this.executeBlurPass(gNormalsView, gDepthView);
 
-    return this.ssrBlurred.getView();
+    return this.ssrResult.getView();
   }
 
   private executeBlurPass(gNormalsView: GPUTextureView, gDepthView: GPUTextureView): void {
@@ -313,21 +328,56 @@ export class ScreenSpaceReflections {
     ]);
   }
 
+  public renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (!gui.beginWindow('SSR')) return;
+
+    gui.addSlider('Step Size', this.debugParams.stepSize, 0.01, 2.0, (v) => {
+      this.debugParams.stepSize = v;
+    });
+    gui.addSliderInt('Max Steps', this.debugParams.maxSteps, 8, 128, (v) => {
+      this.debugParams.maxSteps = v;
+    });
+    gui.addSlider('Max Distance', this.debugParams.maxDistance, 5.0, 200.0, (v) => {
+      this.debugParams.maxDistance = v;
+    });
+    gui.addSlider('Thickness', this.debugParams.thickness, 0.001, 0.2, (v) => {
+      this.debugParams.thickness = v;
+    });
+    gui.addSlider('Metallic Min', this.debugParams.metallicMin, 0.0, 1.0, (v) => {
+      this.debugParams.metallicMin = v;
+    });
+    gui.addSlider('Roughness Max', this.debugParams.roughnessMax, 0.0, 1.0, (v) => {
+      this.debugParams.roughnessMax = v;
+    });
+    gui.addCheckbox('Enabled', this.debugParams.enabled > 0.5, (v) => {
+      this.debugParams.enabled = v ? 1.0 : 0.0;
+    });
+
+    gui.endWindow();
+  }
+
   public update(dt: number): void {
-    const qualitySettings = QualitySettings.getInstance().getSettings();
+    const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
 
     GPUUtils.writeBuffer(
       this.ssrUniformBuffer,
       0,
       new Float32Array([
-        Engine.getEnvironmentManager().getAmbientLightData().globalFactor,
-        qualitySettings.ssrStepSize,
-        qualitySettings.ssrMaxSteps,
-        50.0,
-        0.03,
-        1.0,
-        Engine.getEnvironmentManager().getAmbientLightData().reflectionFactor,
-        Engine.getEnvironmentManager().getAmbientLightData().diffuseFactor,
+        ambientData.globalFactor,
+        this.debugParams.stepSize,
+        this.debugParams.maxSteps,
+        this.debugParams.maxDistance,
+        this.debugParams.thickness,
+        this.debugParams.enabled,
+        ambientData.reflectionFactor,
+        ambientData.diffuseFactor,
+        this.debugParams.metallicMin,
+        this.debugParams.roughnessMax,
+        0.0, // _pad0
+        0.0, // _pad1
       ]),
     );
   }

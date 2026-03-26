@@ -65,4 +65,8 @@ struct SSRUniforms {
     enabled: f32,
     specularBoost: f32,
     diffuseBoost: f32,
+    metallicMin: f32,
+    roughnessMax: f32,
+    _pad0: f32,
+    _pad1: f32,
 }

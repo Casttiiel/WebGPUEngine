@@ -20,7 +20,7 @@ export class AmbientLight {
   private ambientSpecularUniformBuffer!: GPUBuffer;
 
   private ambientDiffuseUniformArray = new Float32Array(4);
-  private ambientSpecularUniformArray = new Float32Array(8);
+  private ambientSpecularUniformArray = new Float32Array(12);
 
   /** Cached views for bind-group invalidation on resize or SSGI toggle. */
   private lastAoView: GPUTextureView | null = null;
@@ -45,7 +45,7 @@ export class AmbientLight {
 
     this.ambientSpecularUniformBuffer = GPUUtils.createBuffer(
       'ambient specular uniform buffer',
-      32,
+      48,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
   }
@@ -221,6 +221,11 @@ export class AmbientLight {
     this.ambientSpecularUniformArray[5] = 0.0;
     this.ambientSpecularUniformArray[6] = ambientData.reflectionFactor;
     this.ambientSpecularUniformArray[7] = ambientData.diffuseFactor;
+    // indices 8–11 are metallicMin, roughnessMax, _pad0, _pad1 — unused in this pass, keep as 0
+    this.ambientSpecularUniformArray[8] = 0.0;
+    this.ambientSpecularUniformArray[9] = 0.0;
+    this.ambientSpecularUniformArray[10] = 0.0;
+    this.ambientSpecularUniformArray[11] = 0.0;
     GPUUtils.writeBuffer(this.ambientSpecularUniformBuffer, 0, this.ambientSpecularUniformArray);
   }
 

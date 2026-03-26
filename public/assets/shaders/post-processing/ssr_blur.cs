@@ -85,11 +85,24 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
             let w = spatialW * depthW;
 
             let sample = textureSampleLevel(ssrRaw, samplerLinear, sUV, 0.0);
-            accum  += sample * w;
+            // Pre-multiplied alpha: weight RGB by the sample's own alpha so that
+            // no-hit neighbours (alpha=0, rgb=0) don't bleed into the blurred colour.
+            // If we averaged linearly, a hit pixel surrounded by no-hit pixels would
+            // have its colour dragged toward 0 AND its alpha diluted — both wrong.
+            accum  += vec4<f32>(sample.rgb * sample.a, sample.a) * w;
             totalW += w;
         }
     }
 
-    let result = select(rawCenter, accum / totalW, totalW > 0.0001);
+    var result: vec4<f32>;
+    if (totalW > 0.0001) {
+        let blurredAlpha = accum.a / totalW;
+        // Un-premultiply: recover the blurred colour from the weighted sum.
+        // Guard against division by near-zero when all neighbours have alpha≈0.
+        let blurredRGB = select(vec3<f32>(0.0), accum.rgb / max(accum.a, 0.0001), accum.a > 0.0001);
+        result = vec4<f32>(blurredRGB, blurredAlpha);
+    } else {
+        result = rawCenter;
+    }
     textureStore(outputBlurred, coord, result);
 }
