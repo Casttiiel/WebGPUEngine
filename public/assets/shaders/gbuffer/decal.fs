@@ -56,6 +56,15 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     }
     if (abs(amount_of_y) > 0.5) { discard; }
 
+    // Reject surfaces that are nearly perpendicular to the decal projection axis.
+    // Without this, wall pixels inside the decal volume (e.g. near the floor) get painted
+    // even though the decal should only project onto surfaces facing its Y axis.
+    // Threshold 0.3 (~72°) rejects walls while allowing slightly tilted floors/ramps.
+    let orig_NRoughnessEmissive = textureSample(gBufferNormals, samplerState, screen_pos);
+    let surface_normal = normalize(octahedral01ToNormal(orig_NRoughnessEmissive.xy));
+    let decal_proj_dir = normalize(input.decal_axis_y);
+    if (abs(dot(surface_normal, decal_proj_dir)) < 0.3) { discard; }
+
     // Sample decal texture using projected coordinates
     let decal_uv = vec2<f32>(amount_of_x, amount_of_z);
     let decal_albedo = textureSample(txAlbedo, samplerState, decal_uv);
@@ -80,8 +89,6 @@ fn fs(input: DecalVertexOutput) -> DecalFragmentOutput {
     let orig_albedo = textureSample(gBufferAlbedo, samplerState, screen_pos);
     let out_albedo_rgb = mix(orig_albedo.rgb, decal_albedo.rgb, final_alpha);
     let out_albedo_a = mix(orig_albedo.a, decal_albedo.a, final_alpha); // Mix metallic as well
-
-    let orig_NRoughnessEmissive = textureSample(gBufferNormals, samplerState, screen_pos);
 
     let orig_normal = octahedral01ToNormal(orig_NRoughnessEmissive.xy);
     // Fallback prevents NaN when orig_normal ≈ up (cross product ≈ zero)
