@@ -24,6 +24,7 @@ import { ScreenSpaceGlobalIllumination } from '../../shading/ScreenSpaceGlobalIl
 import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { HZBBuilder } from '../culling/HZBBuilder';
+import { RenderManagerV2 } from '../managers/RenderManagerV2';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -36,6 +37,12 @@ export class DeferredRenderer {
   private gBufferPass!: GBufferPass;
   private hzbBuilder!: HZBBuilder;
   private renderPassManager!: RenderPassManager;
+
+  // Depth prepass techniques (override applied per-frame before GBuffer)
+  private depthPrepassTechnique!: Technique;
+  private depthPrepassInstancedTechnique!: Technique;
+  private depthPrepassMaskTechnique!: Technique;
+  private depthPrepassMaskInstancedTechnique!: Technique;
   private rtAccLight!: RenderTarget;
   private rtOITAccumulation!: RenderTarget;
   private rtOITRevealage!: RenderTarget;
@@ -261,6 +268,16 @@ export class DeferredRenderer {
     this.gBufferPass = new GBufferPass();
     this.gBufferPass.load();
 
+    // Depth prepass techniques (VS-only for opaque, alpha-test FS for masked geometry)
+    this.depthPrepassTechnique = await Technique.getAsync('utility/depth_prepass.tech');
+    this.depthPrepassInstancedTechnique = await Technique.getAsync(
+      'utility/depth_prepass_instanced.tech',
+    );
+    this.depthPrepassMaskTechnique = await Technique.getAsync('utility/depth_prepass_mask.tech');
+    this.depthPrepassMaskInstancedTechnique = await Technique.getAsync(
+      'utility/depth_prepass_mask_instanced.tech',
+    );
+
     // HZB Builder — async pipeline setup, resources created on first create()
     this.hzbBuilder = new HZBBuilder();
     await this.hzbBuilder.initialize();
@@ -314,7 +331,21 @@ export class DeferredRenderer {
    * @returns Vista de textura con el resultado final
    */
   public render(camera: Entity, skipPostProcessing: boolean = false): GPUTextureView {
-    // 1. G-Buffer pass - uses depth from prepass
+    // 0. Depth prepass — fills the shared depth buffer so the GBuffer can use
+    //    hardware early-Z to eliminate overdraw.  Alpha-masked materials use a
+    //    dedicated technique that discards transparent fragments so depth is only
+    //    written for genuinely opaque pixels.
+    const renderManager = RenderManagerV2.getInstance();
+    renderManager.setTechniqueOverride(
+      this.depthPrepassTechnique,
+      this.depthPrepassInstancedTechnique,
+      this.depthPrepassMaskTechnique,
+      this.depthPrepassMaskInstancedTechnique,
+    );
+    this.renderPassManager.executePass('depth_prepass', RenderCategory.SOLIDS);
+    renderManager.clearTechniqueOverride();
+
+    // 1. G-Buffer pass - loads depth from prepass (hardware early-Z active)
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
     // 2. Build the HZB pyramid from this frame's depth buffer.

@@ -1,15 +1,14 @@
 ### Engine
 
-1. Profiler
-2. SSR works on one direction only
-3. Performance (Something else) (Frustum culling on generate shadows?) (Analize buffer/bind group amount)
+1. Performance (Cortinas no se ven por un lado) (Double sided que?) (CSM bigger less res?)
+2. Directional light 1 CSM banding
+3. SSR works on one direction only
+4. AO Weird + Slow
+5. DBuffer (Compare my Deferred renderer with UE)
+6. HZB Culling regulero
 
-4. Dithering para transparencias y gradientes — muy barato, muy efectivo
-5. Sombras con dithering pixelado
-
-6. AO Weird + Slow
-7. DBuffer (Compare my Deferred renderer with UE)
-8. HZB Culling regulero
+7. Dithering para transparencias y gradientes — muy barato, muy efectivo
+8. Sombras con dithering pixelado
 
 9. Froxel Self Occlusion
 10. Froxel Density Volumes

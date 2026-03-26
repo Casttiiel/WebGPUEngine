@@ -1,6 +1,7 @@
 {
   "vs": "gbuffer/gbuffer_instanced.vs",
   "fs": "gbuffer/gbuffer.fs",
+  "z": "less_equal_no_write",
   "writesOn": "gbuffer",
   "uniforms": ["CameraUniforms", "MaterialTextures", "InstanceStorage"]
 }

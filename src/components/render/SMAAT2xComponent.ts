@@ -55,6 +55,13 @@ export class SMAAT2xComponent extends Component {
   private blendUniformBuffer!: GPUBuffer; // SMAA blend params
   private temporalUniformBuffer!: GPUBuffer; // Temporal params (jitter, blend factor)
 
+  // Cached typed arrays — avoid per-frame allocation
+  private readonly edgeParamsData = new Float32Array(4); // [threshold, predication, 0, 0]
+  private readonly blendParamsData = new Float32Array(8); // [maxSteps, maxStepsDiag, corner, disableDiag, useDir, 0, 0, 0]
+  private readonly temporalParamsData = new Float32Array(4); // [jitterX, jitterY, blend, clamp]
+  private edgeParamsDirty = true;
+  private blendParamsDirty = true;
+
   // Bind group caches
   private edgeBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
   private blendBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
@@ -172,37 +179,31 @@ export class SMAAT2xComponent extends Component {
   }
 
   private updateUniformBuffers(): void {
-    // SMAA edge detection params
-    this.device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,
-      new Float32Array([this.smaaParams.edgeThreshold, this.smaaParams.predicationStrength]),
-    );
+    // SMAA edge detection params — only upload when changed
+    if (this.edgeParamsDirty) {
+      this.edgeParamsData[0] = this.smaaParams.edgeThreshold;
+      this.edgeParamsData[1] = this.smaaParams.predicationStrength;
+      this.device.queue.writeBuffer(this.uniformBuffer, 0, this.edgeParamsData);
+      this.edgeParamsDirty = false;
+    }
 
-    // SMAA blend params
-    this.device.queue.writeBuffer(
-      this.blendUniformBuffer,
-      0,
-      new Float32Array([
-        this.smaaParams.maxSearchSteps,
-        this.smaaParams.maxSearchStepsDiag,
-        this.smaaParams.cornerRounding,
-        this.smaaParams.disableDiagDetection ? 1.0 : 0.0,
-        this.smaaParams.useDirectWeights ? 1.0 : 0.0,
-      ]),
-    );
+    // SMAA blend params — only upload when changed
+    if (this.blendParamsDirty) {
+      this.blendParamsData[0] = this.smaaParams.maxSearchSteps;
+      this.blendParamsData[1] = this.smaaParams.maxSearchStepsDiag;
+      this.blendParamsData[2] = this.smaaParams.cornerRounding;
+      this.blendParamsData[3] = this.smaaParams.disableDiagDetection ? 1.0 : 0.0;
+      this.blendParamsData[4] = this.smaaParams.useDirectWeights ? 1.0 : 0.0;
+      this.device.queue.writeBuffer(this.blendUniformBuffer, 0, this.blendParamsData);
+      this.blendParamsDirty = false;
+    }
 
-    // Temporal params
-    this.device.queue.writeBuffer(
-      this.temporalUniformBuffer,
-      0,
-      new Float32Array([
-        this.currentJitter[0] || 0,
-        this.currentJitter[1] || 0,
-        this.temporalParams.blendFactor,
-        this.temporalParams.neighborhoodClampFactor,
-      ]),
-    );
+    // Temporal params — jitter changes every frame, always upload (reuse cached array)
+    this.temporalParamsData[0] = this.currentJitter[0] || 0;
+    this.temporalParamsData[1] = this.currentJitter[1] || 0;
+    this.temporalParamsData[2] = this.temporalParams.blendFactor;
+    this.temporalParamsData[3] = this.temporalParams.neighborhoodClampFactor;
+    this.device.queue.writeBuffer(this.temporalUniformBuffer, 0, this.temporalParamsData);
   }
 
   /**

@@ -25,14 +25,12 @@ struct EASUParams {
 @group(2) @binding(0) var<uniform>   params: EASUParams;
 
 // Catmull-Rom cubic kernel, alpha = -0.5
+// Branchless via select() — avoids warp/wave divergence.
 fn catr(t: f32) -> f32 {
-  let x = abs(t);
-  if (x < 1.0) {
-    return (1.5 * x - 2.5) * x * x + 1.0;
-  } else if (x < 2.0) {
-    return ((-0.5 * x + 2.5) * x - 4.0) * x + 2.0;
-  }
-  return 0.0;
+  let x  = abs(t);
+  let v1 = (1.5 * x - 2.5) * x * x + 1.0;           // x < 1
+  let v2 = ((-0.5 * x + 2.5) * x - 4.0) * x + 2.0;  // 1 ≤ x < 2
+  return select(select(0.0, v2, x < 2.0), v1, x < 1.0);
 }
 
 fn load(p: vec2<i32>, maxC: vec2<i32>) -> vec4<f32> {

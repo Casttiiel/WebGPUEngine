@@ -29,6 +29,8 @@ export class RenderManagerV2 {
   private drawCallsPerCategory: Map<RenderCategory, number> = new Map();
   private techniqueOverride: Technique | null = null;
   private techniqueOverrideInstanced: Technique | null = null;
+  private techniqueOverrideMask: Technique | null = null;
+  private techniqueOverrideMaskInstanced: Technique | null = null;
   private gpuCullingEstimatedVisible: number = 0;
 
   // Cached shadow keys — rebuilt only when markDirty() fires (addKey/delKeys)
@@ -77,14 +79,23 @@ export class RenderManagerV2 {
     this.hzbBuilder = hzbBuilder;
   }
 
-  public setTechniqueOverride(technique: Technique, instancedTechnique?: Technique): void {
+  public setTechniqueOverride(
+    technique: Technique,
+    instancedTechnique?: Technique,
+    maskTechnique?: Technique,
+    maskInstancedTechnique?: Technique,
+  ): void {
     this.techniqueOverride = technique;
     this.techniqueOverrideInstanced = instancedTechnique || null;
+    this.techniqueOverrideMask = maskTechnique || null;
+    this.techniqueOverrideMaskInstanced = maskInstancedTechnique || null;
   }
 
   public clearTechniqueOverride(): void {
     this.techniqueOverride = null;
     this.techniqueOverrideInstanced = null;
+    this.techniqueOverrideMask = null;
+    this.techniqueOverrideMaskInstanced = null;
   }
 
   public addKey(
@@ -306,8 +317,21 @@ export class RenderManagerV2 {
       // Select technique based on override and instancing
       let technique: Technique;
       if (this.techniqueOverride) {
-        // Use override technique for depth prepass, etc.
-        if (key.isInstanced && this.techniqueOverrideInstanced) {
+        // Use override technique for depth prepass, shadows, etc.
+        // Alpha-masked materials use the mask variant (supports alpha-test discard).
+        const origName = key.material.getTechnique()?.getName() ?? '';
+        const isMasked = origName.includes('mask');
+
+        if (isMasked && this.techniqueOverrideMask) {
+          if (key.isInstanced && this.techniqueOverrideMaskInstanced) {
+            technique = this.techniqueOverrideMaskInstanced;
+          } else if (key.isInstanced) {
+            // No instanced mask override — fall back to non-instanced mask
+            technique = this.techniqueOverrideMask;
+          } else {
+            technique = this.techniqueOverrideMask;
+          }
+        } else if (key.isInstanced && this.techniqueOverrideInstanced) {
           technique = this.techniqueOverrideInstanced;
         } else if (key.isInstanced) {
           // No instanced override available, skip this object

@@ -434,7 +434,10 @@ export class ModuleRender extends Module {
       if (mainCameraEntity?.hasComponent('fsr')) {
         const fsr = mainCameraEntity.getComponent('fsr') as FSRComponent;
         if (fsr.hasLoaded() && fsr.enabled) {
-          result = fsr.apply(result);
+          // Pass the main encoder so EASU/RCAS compute passes run in the same
+          // command buffer as tone mapping, eliminating the cross-submission
+          // pipeline barrier that caused ~1ms GPU spikes.
+          result = fsr.apply(result, Render.getInstance().getCommandEncoder());
         }
       }
 

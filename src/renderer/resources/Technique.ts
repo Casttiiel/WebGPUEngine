@@ -228,9 +228,12 @@ export class Technique extends GPUResource {
       },
     };
 
-    // Omit fragment stage entirely for depth-only passes (shadow maps, depth prepass).
-    // This eliminates fragment shader invocations and lets the GPU skip rasterization work.
-    if (!isDepthOnly && this.fsModule) {
+    // Include fragment stage if an FS module was loaded.
+    // For depth-only passes (shadow maps, depth prepass) with NO FS module, skip the
+    // fragment stage entirely — the GPU skips rasterization work.
+    // For depth-only passes WITH an FS (e.g. depth prepass mask), include the FS with
+    // empty targets: [] so alpha-discard works while still writing only depth.
+    if (this.fsModule) {
       pipelineConfig.fragment = {
         module: this.fsModule,
         entryPoint: this.fsEntryPoint,

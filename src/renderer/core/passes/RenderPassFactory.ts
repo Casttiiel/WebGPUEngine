@@ -65,9 +65,8 @@ export class RenderPassFactory {
       colorAttachments,
       depthStencilAttachment: {
         view: prepassDepthView,
-        depthLoadOp: 'clear', // clear
-        depthStoreOp: 'store', // Keep for next passes
-        depthClearValue: 1.0,
+        depthLoadOp: 'load', // reuse depth written by the depth prepass
+        depthStoreOp: 'store',
       },
       viewport,
     };

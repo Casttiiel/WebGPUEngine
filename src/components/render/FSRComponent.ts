@@ -82,6 +82,16 @@ export class FSRComponent extends Component {
   // The input view from the previous pass can change, so we cache lazily.
   private easuInputCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
+  // ── Reusable typed arrays for GPU buffer uploads (avoid per-frame allocation) ──
+  private readonly easuParamsData = new Float32Array(4);
+  private readonly rcasParamsData = new Float32Array(4);
+  private lastRcasSharpness = NaN;
+  private easuParamsDirty = true;
+
+  // ── Cached dispatch sizes (only change on resize) ─────────────────────────
+  private dispatchX = 0;
+  private dispatchY = 0;
+
   // ── Component lifecycle ────────────────────────────────────────────────────
 
   /**
@@ -112,6 +122,10 @@ export class FSRComponent extends Component {
     this.createRenderTargets();
     this.createResizableBindGroups();
 
+    const canvas = Render.canvasSize;
+    this.dispatchX = Math.ceil(canvas.width / 8);
+    this.dispatchY = Math.ceil(canvas.height / 8);
+
     this.isLoaded = true;
   }
 
@@ -119,10 +133,13 @@ export class FSRComponent extends Component {
 
   /**
    * Run EASU (and optionally RCAS) upscaling.
-   * @param inputView  The LDR (post tone-mapping) texture view at render resolution.
-   * @returns          Final upscaled texture view at canvas resolution.
+   * @param inputView       The LDR (post tone-mapping) texture view at render resolution.
+   * @param externalEncoder When provided, compute passes are recorded into this encoder
+   *                        and the caller is responsible for submitting it.  When omitted
+   *                        a private encoder is created and submitted immediately.
+   * @returns               Final upscaled texture view at canvas resolution.
    */
-  public apply(inputView: GPUTextureView): GPUTextureView {
+  public apply(inputView: GPUTextureView, externalEncoder?: GPUCommandEncoder): GPUTextureView {
     if (!this.isLoaded || !this.enabled) return inputView;
 
     const canvas = Render.canvasSize;
@@ -131,12 +148,15 @@ export class FSRComponent extends Component {
     // No upscaling needed and no sharpening requested — skip entirely
     if (isNativeRes && !this.enableRCAS) return inputView;
 
-    // Update RCAS params
-    this.device.queue.writeBuffer(
-      this.rcasParamsBuffer,
-      0,
-      new Float32Array([this.rcasSharpness, 0, 0, 0]),
-    );
+    // Update RCAS params only when sharpness changes (it's a user setting, not per-frame)
+    if (this.rcasSharpness !== this.lastRcasSharpness) {
+      this.rcasParamsData[0] = this.rcasSharpness;
+      this.rcasParamsData[1] = 0;
+      this.rcasParamsData[2] = 0;
+      this.rcasParamsData[3] = 0;
+      this.device.queue.writeBuffer(this.rcasParamsBuffer, 0, this.rcasParamsData);
+      this.lastRcasSharpness = this.rcasSharpness;
+    }
 
     // Lazily create / look up input bind group for this view (shared by EASU & RCAS-only paths)
     let easuInputBG = this.easuInputCache.get(inputView);
@@ -149,20 +169,20 @@ export class FSRComponent extends Component {
       this.easuInputCache.set(inputView, easuInputBG);
     }
 
-    const dispatchX = Math.ceil(canvas.width / 8);
-    const dispatchY = Math.ceil(canvas.height / 8);
-
-    // ── Single encoder: EASU then RCAS (WebGPU guarantees storage write barrier
-    //    between compute passes within the same command buffer) ────────────────
-    const encoder = this.device.createCommandEncoder({ label: 'FSR Encoder' });
+    // Use provided encoder (preferred — avoids a cross-submission pipeline barrier with the
+    // preceding render pass) or fall back to a private one.
+    const encoder = externalEncoder ?? this.device.createCommandEncoder({ label: 'FSR Encoder' });
 
     if (!isNativeRes) {
       // EASU pass — only needed when upscaling
-      this.device.queue.writeBuffer(
-        this.easuParamsBuffer,
-        0,
-        new Float32Array([Render.width, Render.height, canvas.width, canvas.height]),
-      );
+      if (this.easuParamsDirty) {
+        this.easuParamsData[0] = Render.width;
+        this.easuParamsData[1] = Render.height;
+        this.easuParamsData[2] = canvas.width;
+        this.easuParamsData[3] = canvas.height;
+        this.device.queue.writeBuffer(this.easuParamsBuffer, 0, this.easuParamsData);
+        this.easuParamsDirty = false;
+      }
       const easuTs = GPUProfiler.getInstance().getTimestampWrites('FSR EASU');
       const easuPass = encoder.beginComputePass({
         label: 'FSR EASU',
@@ -172,7 +192,7 @@ export class FSRComponent extends Component {
       easuPass.setBindGroup(0, easuInputBG);
       easuPass.setBindGroup(1, this.easuOutputBindGroup);
       easuPass.setBindGroup(2, this.easuParamsBindGroup);
-      easuPass.dispatchWorkgroups(dispatchX, dispatchY, 1);
+      easuPass.dispatchWorkgroups(this.dispatchX, this.dispatchY, 1);
       easuPass.end();
     }
 
@@ -188,11 +208,14 @@ export class FSRComponent extends Component {
       rcasPass.setBindGroup(0, rcasInputBG);
       rcasPass.setBindGroup(1, this.rcasOutputBindGroup);
       rcasPass.setBindGroup(2, this.rcasParamsBindGroup);
-      rcasPass.dispatchWorkgroups(dispatchX, dispatchY, 1);
+      rcasPass.dispatchWorkgroups(this.dispatchX, this.dispatchY, 1);
       rcasPass.end();
     }
 
-    this.device.queue.submit([encoder.finish()]);
+    // Only submit when we own the encoder
+    if (!externalEncoder) {
+      this.device.queue.submit([encoder.finish()]);
+    }
 
     return this.enableRCAS ? this.rcasResult.getView() : this.easuResult.getView();
   }
@@ -202,6 +225,12 @@ export class FSRComponent extends Component {
     if (!this.isLoaded) return;
 
     this.easuInputCache.clear();
+    this.lastRcasSharpness = NaN; // force re-upload after buffer recreation
+    this.easuParamsDirty = true;
+
+    const canvas = Render.canvasSize;
+    this.dispatchX = Math.ceil(canvas.width / 8);
+    this.dispatchY = Math.ceil(canvas.height / 8);
 
     this.createRenderTargets();
     this.createResizableBindGroups();

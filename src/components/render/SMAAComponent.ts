@@ -45,6 +45,12 @@ export class SMAAComponent extends Component {
   private uniformBuffer!: GPUBuffer; // Pass 1 params (edge detection)
   private blendUniformBuffer!: GPUBuffer; // Pass 2 params (blending weights)
 
+  // Cached typed arrays (avoid per-frame allocation)
+  private readonly edgeParamsData = new Float32Array(4); // [threshold, predication, 0, 0]
+  private readonly blendParamsData = new Float32Array(8); // [maxSteps, maxStepsDiag, corner, disableDiag, useDir, 0, 0, 0]
+  private edgeParamsDirty = true;
+  private blendParamsDirty = true;
+
   // Bind group caches
   private edgeBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
   private blendBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
@@ -90,12 +96,9 @@ export class SMAAComponent extends Component {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Initialize with default values
-    this.device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,
-      new Float32Array([this.smaaParams.edgeThreshold, this.smaaParams.predicationStrength]),
-    );
+    // Initialize with default values (dirty flags are true — will upload on first apply())
+    this.edgeParamsDirty = true;
+    this.blendParamsDirty = true;
 
     // Create uniform buffer for Pass 2 (Blending Weights) parameters
     this.blendUniformBuffer = this.device.createBuffer({
@@ -103,9 +106,6 @@ export class SMAAComponent extends Component {
       size: 32, // 5 floats: maxSearchSteps, maxSearchStepsDiag, cornerRounding, disableDiag, useDirectWeights
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-
-    // Initialize blend parameters
-    this.updateBlendParameters();
 
     // Create render targets
     this.edgesRT = new RenderTarget();
@@ -168,12 +168,13 @@ export class SMAAComponent extends Component {
    * Executes the 3-pass algorithm
    */
   public apply(inputTexture: GPUTextureView): GPUTextureView {
-    // Update uniform buffer with current parameters
-    this.device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,
-      new Float32Array([this.smaaParams.edgeThreshold, this.smaaParams.predicationStrength]),
-    );
+    // Upload edge params only when changed
+    if (this.edgeParamsDirty) {
+      this.edgeParamsData[0] = this.smaaParams.edgeThreshold;
+      this.edgeParamsData[1] = this.smaaParams.predicationStrength;
+      this.device.queue.writeBuffer(this.uniformBuffer, 0, this.edgeParamsData);
+      this.edgeParamsDirty = false;
+    }
 
     // Update blending parameters
     this.updateBlendParameters();
@@ -407,17 +408,14 @@ export class SMAAComponent extends Component {
   }
 
   private updateBlendParameters(): void {
-    this.device.queue.writeBuffer(
-      this.blendUniformBuffer,
-      0,
-      new Float32Array([
-        this.smaaParams.maxSearchSteps,
-        this.smaaParams.maxSearchStepsDiag,
-        this.smaaParams.cornerRounding,
-        this.smaaParams.disableDiagDetection ? 1.0 : 0.0,
-        this.smaaParams.useDirectWeights ? 1.0 : 0.0,
-      ]),
-    );
+    if (!this.blendParamsDirty) return;
+    this.blendParamsData[0] = this.smaaParams.maxSearchSteps;
+    this.blendParamsData[1] = this.smaaParams.maxSearchStepsDiag;
+    this.blendParamsData[2] = this.smaaParams.cornerRounding;
+    this.blendParamsData[3] = this.smaaParams.disableDiagDetection ? 1.0 : 0.0;
+    this.blendParamsData[4] = this.smaaParams.useDirectWeights ? 1.0 : 0.0;
+    this.device.queue.writeBuffer(this.blendUniformBuffer, 0, this.blendParamsData);
+    this.blendParamsDirty = false;
   }
 
   /**
