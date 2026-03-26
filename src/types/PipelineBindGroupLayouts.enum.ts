@@ -30,6 +30,7 @@ export enum PipelineBindGroupLayouts {
   SMAA_BLEND_PARAMS = 'SMAABlendParams',
   VELOCITY_BUFFER_UNIFORMS = 'VelocityBufferUniforms',
   POINT_LIGHT_SHADOW_UNIFORMS = 'PointLightShadowUniforms',
+  SPOT_LIGHT_UNIFORMS = 'SpotLightUniforms',
   CONTACT_SHADOWS_UNIFORMS = 'ContactShadowsUniforms',
   AUTO_EXPOSURE_READ = 'AutoExposureRead',
   OIT_COMPOSE_TEXTURES = 'OITComposeTextures',

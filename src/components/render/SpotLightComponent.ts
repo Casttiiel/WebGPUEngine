@@ -1,5 +1,4 @@
 import { vec3, vec4, mat4 } from 'gl-matrix';
-import { Technique } from '../../renderer/resources/Technique';
 import { CameraComponent } from './CameraComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
@@ -45,8 +44,6 @@ export class SpotLightComponent extends CameraComponent {
   private shadowSampler!: GPUSampler;
   private modelUniformBuffer!: GPUBuffer;
   private modelBindGroup!: GPUBindGroup;
-
-  private technique!: Technique;
 
   // ✅ Reusable buffers for GPU writes (zero allocations in updateLightUniforms)
   private colorBuffer = new Float32Array(4);
@@ -135,12 +132,9 @@ export class SpotLightComponent extends CameraComponent {
     // Crear sampler de comparación para shadow mapping
     this.shadowSampler = SamplerLibrary.shadows;
 
-    // Load texture and technique in parallel — they don't depend on each other
-    [this.projectorTexture, this.technique] = await Promise.all([
+    // Load projector texture
+    [this.projectorTexture] = await Promise.all([
       Texture.getAsync(data.projector ? data.projector : 'white.png'),
-      Technique.getAsync(
-        this._hasShadows ? 'lighting/spot_light_shadows.tech' : 'lighting/spot_light.tech',
-      ),
     ]);
     this.projectorTextureView = this.projectorTexture.getTextureView()!;
     this.uniformBuffer = GPUUtils.createBuffer(
@@ -150,7 +144,7 @@ export class SpotLightComponent extends CameraComponent {
     );
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
       `spot light bind group`,
-      this.technique.getPipeline().getBindGroupLayout(3)!,
+      BindGroupFactory.getLayoutFromEnum(PipelineBindGroupLayouts.SPOT_LIGHT_UNIFORMS),
       [
         {
           binding: 0,

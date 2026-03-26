@@ -1078,6 +1078,28 @@ export class BindGroupFactory {
   }
 
   /**
+   * Bind group layout for spot light data (@group(3))
+   * binding 0: uniform buffer (LightUniforms)
+   * binding 1: depth 2D texture (shadow map)
+   * binding 2: comparison sampler
+   * binding 3: 2D float texture (projector)
+   * binding 4: filtering sampler
+   */
+  public static getSpotLightUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('spot_light_uniforms', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'depth', viewDimension: '2d', multisampled: false },
+      },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'comparison' } },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+    ]);
+  }
+
+  /**
    * Creates a directional light uniforms bind group layout
    * Includes uniform buffer, depth texture and comparison sampler for shadows
    */
@@ -1540,6 +1562,10 @@ export class BindGroupFactory {
         return this.getSMAABlendParamsLayout();
       case PipelineBindGroupLayouts.POINT_LIGHT_SHADOW_UNIFORMS:
         return this.getPointLightShadowUniformsLayout();
+      case PipelineBindGroupLayouts.SPOT_LIGHT_UNIFORMS:
+        return this.getSpotLightUniformsLayout();
+      case PipelineBindGroupLayouts.SPOT_LIGHT_UNIFORMS:
+        return this.getSpotLightUniformsLayout();
       case PipelineBindGroupLayouts.VELOCITY_BUFFER_UNIFORMS:
         return this.getVelocityBufferUniformsLayout();
       case PipelineBindGroupLayouts.FOG_UNIFORMS:

@@ -1,7 +1,7 @@
 import { vec3, vec4 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
-import { Technique } from '../../renderer/resources/Technique';
 import { TransformComponent } from '../core/TransformComponent';
+import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { PointLightComponentData } from '../../types/PointLightComponentData.type';
@@ -54,8 +54,6 @@ export class PointLightComponent extends Component {
   private shadowCubeView!: GPUTextureView; // cube view for sampling
   private shadowCameras: Camera[] = []; // 6 per-face cameras
 
-  private technique!: Technique;
-
   // ✅ Reusable buffers for GPU writes (zero allocations in update)
   private colorBuffer = new Float32Array(4);
   private positionBuffer = new Float32Array(4);
@@ -96,14 +94,7 @@ export class PointLightComponent extends Component {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
-    // Load texture and technique in parallel — they don't depend on each other
-    const techPath = this._hasShadows
-      ? 'lighting/point_light_shadows.tech'
-      : 'lighting/point_light.tech';
-    [this.projectorTexture, this.technique] = await Promise.all([
-      Texture.getAsync('white.png'),
-      Technique.getAsync(techPath),
-    ]);
+    this.projectorTexture = await Texture.getAsync('white.png');
     this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
     if (this._hasShadows) {
@@ -172,7 +163,9 @@ export class PointLightComponent extends Component {
   }
 
   private buildBindGroup(): void {
-    const layout = this.technique.getPipeline().getBindGroupLayout(3)!;
+    const layout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.POINT_LIGHT_SHADOW_UNIFORMS,
+    );
     const shadowResource = this._hasShadows
       ? this.shadowCubeView
       : this.dummyShadowTexture.createView();
