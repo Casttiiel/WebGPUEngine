@@ -320,7 +320,7 @@ export class RenderManagerV2 {
         // Use override technique for depth prepass, shadows, etc.
         // Alpha-masked materials use the mask variant (supports alpha-test discard).
         const origName = key.material.getTechnique()?.getName() ?? '';
-        const isMasked = origName.includes('mask');
+        const isMasked = origName.includes('mask') || origName.includes('dither');
 
         if (isMasked && this.techniqueOverrideMask) {
           if (key.isInstanced && this.techniqueOverrideMaskInstanced) {

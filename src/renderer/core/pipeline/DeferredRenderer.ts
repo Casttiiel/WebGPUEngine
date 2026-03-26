@@ -43,6 +43,8 @@ export class DeferredRenderer {
   private depthPrepassInstancedTechnique!: Technique;
   private depthPrepassMaskTechnique!: Technique;
   private depthPrepassMaskInstancedTechnique!: Technique;
+  private depthPrepassDitherTechnique!: Technique;
+  private depthPrepassDitherInstancedTechnique!: Technique;
   private rtAccLight!: RenderTarget;
   private rtOITAccumulation!: RenderTarget;
   private rtOITRevealage!: RenderTarget;
@@ -277,6 +279,12 @@ export class DeferredRenderer {
     this.depthPrepassMaskInstancedTechnique = await Technique.getAsync(
       'utility/depth_prepass_mask_instanced.tech',
     );
+    this.depthPrepassDitherTechnique = await Technique.getAsync(
+      'utility/depth_prepass_dither.tech',
+    );
+    this.depthPrepassDitherInstancedTechnique = await Technique.getAsync(
+      'utility/depth_prepass_dither_instanced.tech',
+    );
 
     // HZB Builder — async pipeline setup, resources created on first create()
     this.hzbBuilder = new HZBBuilder();
@@ -337,11 +345,14 @@ export class DeferredRenderer {
     //    dedicated technique that discards transparent fragments so depth is only
     //    written for genuinely opaque pixels.
     const renderManager = RenderManagerV2.getInstance();
+    const isDithered = QualitySettings.getInstance().getSettings().ditheringMode === 'psx';
     renderManager.setTechniqueOverride(
       this.depthPrepassTechnique,
       this.depthPrepassInstancedTechnique,
-      this.depthPrepassMaskTechnique,
-      this.depthPrepassMaskInstancedTechnique,
+      isDithered ? this.depthPrepassDitherTechnique : this.depthPrepassMaskTechnique,
+      isDithered
+        ? this.depthPrepassDitherInstancedTechnique
+        : this.depthPrepassMaskInstancedTechnique,
     );
     this.renderPassManager.executePass('depth_prepass', RenderCategory.SOLIDS);
     renderManager.clearTechniqueOverride();

@@ -12,6 +12,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { mat4 } from 'gl-matrix';
 import { BlendModes } from '../../types/BlendModes.enum';
 import { DepthModes } from '../../types/DepthModes.enum';
+import { QualitySettings } from '../engine/QualitySettings';
 
 export class GLTFLoader {
   // Singleton para no re-registrar ~40 extensiones en cada carga
@@ -267,6 +268,7 @@ export class GLTFLoader {
     const isDecal = this.isDecal(materialData);
     const isBlend = materialData.getAlphaMode() === 'BLEND';
     const isMask = materialData.getAlphaMode() === 'MASK';
+    const isDither = QualitySettings.getInstance().getSettings().ditheringMode === 'psx';
 
     // Resolve technique and fragment shader
     let technique = 'gbuffer/gbuffer.tech';
@@ -275,8 +277,13 @@ export class GLTFLoader {
       technique = 'gbuffer/decal.tech';
       fs = 'gbuffer/decal.fs';
     } else if (isMask) {
-      technique = 'gbuffer/gbuffer_mask.tech';
-      fs = 'gbuffer/gbuffer_mask.fs';
+      if (isDither) {
+        technique = 'gbuffer/gbuffer_dither.tech';
+        fs = 'gbuffer/gbuffer_dither.fs';
+      } else {
+        technique = 'gbuffer/gbuffer_mask.tech';
+        fs = 'gbuffer/gbuffer_mask.fs';
+      }
     } else if (isGlass) {
       technique = 'utility/oit_gather.tech';
       fs = 'utility/oit_gather.fs';

@@ -3,6 +3,7 @@ export enum BlendModes {
   ADDITIVE = 'additive',
   COMBINATIVE_GBUFFER = 'combinative_gbuffer',
   COMBINATIVE = 'combinative',
+  DITHERED_GBUFFER = 'dithered_gbuffer',
   VOLUMETRIC = 'volumetric',
   PREMULTIPLIED = 'premultiplied',
   DEFAULT = 'default',

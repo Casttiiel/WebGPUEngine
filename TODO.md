@@ -1,10 +1,10 @@
 ### Engine
 
-1. Normal de suelo con luces raro en spot light
-2. Point light usa normal?
-3. Dithering para transparencias
-4. DBuffer (Compare my Deferred renderer with UE)
-5. AO Weird + Slow
+1. Dithering para transparencias
+2. Normal de suelo con luces raro en spot light
+3. Point light usa normal?
+4. AO Weird + Slow
+5. DBuffer (Compare my Deferred renderer with UE)
 6. Baja resolución — 320×240 con upscaling
 7. HZB Culling regulero
 
