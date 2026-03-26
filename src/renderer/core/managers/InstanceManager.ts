@@ -135,6 +135,7 @@ export class InstanceManager {
       'particle_system',
       'bloom',
       'tone_mapping',
+      'palette_quantize',
       'antialiasing',
       'ambient_occlusion',
     ];

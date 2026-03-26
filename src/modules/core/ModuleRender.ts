@@ -29,6 +29,7 @@ import { ModuleUI } from './ModuleUI';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { AutoExposureComponent } from '../../components/render/AutoExposureComponent';
 import { FSRComponent } from '../../components/render/FSRComponent';
+import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { Profiler } from '../../core/debug/Profiler';
@@ -282,6 +283,11 @@ export class ModuleRender extends Module {
       (comp as FSRComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('palette_quantize')?.getList() ??
+      []) {
+      (comp as PaletteQuantizeComponent).resize();
+    }
+
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -413,6 +419,15 @@ export class ModuleRender extends Module {
             }
           }
           result = toneMapping.apply(result);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('palette_quantize')) {
+        const paletteQuantize = mainCameraEntity.getComponent(
+          'palette_quantize',
+        ) as PaletteQuantizeComponent;
+        if (paletteQuantize.hasLoaded()) {
+          result = paletteQuantize.apply(result);
         }
       }
 

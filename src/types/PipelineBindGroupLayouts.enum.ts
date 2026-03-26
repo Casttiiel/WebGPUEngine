@@ -34,4 +34,5 @@ export enum PipelineBindGroupLayouts {
   AUTO_EXPOSURE_READ = 'AutoExposureRead',
   OIT_COMPOSE_TEXTURES = 'OITComposeTextures',
   OIT_GLASS_ENV = 'OITGlassEnv',
+  PALETTE_QUANTIZE = 'PaletteQuantize',
 }

@@ -13,6 +13,7 @@ import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclus
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { AutoExposureComponent } from '../../components/render/AutoExposureComponent';
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { NameComponent } from '../../components/core/NameComponent';
@@ -225,6 +226,8 @@ export class Loader {
         return new CameraComponent();
       case 'tone_mapping':
         return new ToneMappingComponent();
+      case 'palette_quantize':
+        return new PaletteQuantizeComponent();
       case 'auto_exposure':
         return new AutoExposureComponent();
       case 'fsr':

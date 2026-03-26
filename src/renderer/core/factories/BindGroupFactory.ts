@@ -1447,6 +1447,15 @@ export class BindGroupFactory {
    * binding 1: revealage texture (RGBA8)
    * binding 2: sampler
    */
+  /** group(1) for palette_quantize.fs: input texture + sampler + params uniform buffer. */
+  public static getPaletteQuantizeLayout(): GPUBindGroupLayout {
+    return this.getLayout('palette_quantize', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+    ]);
+  }
+
   public static getOITComposeTexturesLayout(): GPUBindGroupLayout {
     return this.getLayout('oit_compose_textures', [
       {
@@ -1541,6 +1550,8 @@ export class BindGroupFactory {
         return this.getAutoExposureReadLayout();
       case PipelineBindGroupLayouts.OIT_COMPOSE_TEXTURES:
         return this.getOITComposeTexturesLayout();
+      case PipelineBindGroupLayouts.PALETTE_QUANTIZE:
+        return this.getPaletteQuantizeLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }
