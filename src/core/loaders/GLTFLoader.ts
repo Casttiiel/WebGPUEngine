@@ -330,7 +330,7 @@ export class GLTFLoader {
             ? FragmentShaderTargets.TEXTURE
             : FragmentShaderTargets.GBUFFER,
         rs: RasterizationMode.DOUBLE_SIDED,
-        z: isGlass || isBlend ? DepthModes.TEST_BUT_NO_WRITE : DepthModes.LESS_EQUAL_NO_WRITE,
+        z: isGlass || isBlend ? DepthModes.TEST_BUT_NO_WRITE : DepthModes.LESS_EQUAL_WRITE,
         blend: isBlend ? BlendModes.ADDITIVE_BY_SRC_ALPHA : BlendModes.DEFAULT,
       };
     } else {

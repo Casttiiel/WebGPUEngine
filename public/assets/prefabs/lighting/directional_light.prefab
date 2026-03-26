@@ -8,7 +8,7 @@
         "hasShadows": true,
         "position": [10, 15, 14],
         "target": [0, 0, 0],
-        "cascadeCount": 1,
+        "cascadeCount": 3,
         "cascadeLambda": 0.6,
         "maxShadowDistance": 100
       }

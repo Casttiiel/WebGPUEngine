@@ -1,21 +1,18 @@
 ### Engine
 
-1. Performance (Cortinas no se ven por un lado) (Double sided que?)
-2. SSR works on one direction only
-3. AO Weird + Slow
-4. DBuffer (Compare my Deferred renderer with UE)
-5. HZB Culling regulero
+1. El loader en pantalla muestra datos mal
+2. Dithering para transparencias y gradientes — muy barato, muy efectivo
+3. Sombras con dithering pixelado
+4. AO Weird + Slow
+5. DBuffer (Compare my Deferred renderer with UE)
+6. SSR works on one direction only
+7. HZB Culling regulero
 
-6. El loader en pantalla muestra datos mal
-7. Dithering para transparencias y gradientes — muy barato, muy efectivo
-8. Sombras con dithering pixelado
-
-9. Froxel Self Occlusion
-10. Froxel Density Volumes
-11. Light Shafts pixelados
-12. Voxel Cone Tracing
-13. Gameplay
-14. Enemy AI
+8. Froxel Self Occlusion
+9. Froxel Density Volumes
+10. Light Shafts pixelados
+11. Voxel Cone Tracing
+12. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo

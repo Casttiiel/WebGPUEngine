@@ -448,6 +448,13 @@ export class Technique extends GPUResource {
           depthCompare: 'less-equal',
         };
       }
+      case DepthModes.LESS_EQUAL_WRITE: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: true,
+          depthCompare: 'less-equal',
+        };
+      }
       case DepthModes.TEST_EQUAL_NO_WRITE: {
         return {
           format: 'depth32float',
