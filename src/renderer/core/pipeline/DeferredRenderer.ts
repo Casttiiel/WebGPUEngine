@@ -283,12 +283,13 @@ export class DeferredRenderer {
     await this.hzbBuilder.initialize();
 
     this.pointLightTechnique = await Technique.getAsync('lighting/point_light.tech');
+    const isPSX = QualitySettings.getInstance().getSettings().ditheringMode === 'psx';
     this.pointLightWithShadowsTechnique = await Technique.getAsync(
-      'lighting/point_light_shadows.tech',
+      isPSX ? 'lighting/point_light_shadows_psx.tech' : 'lighting/point_light_shadows.tech',
     );
     this.spotLightTechnique = await Technique.getAsync('lighting/spot_light.tech');
     this.spotLightWithShadowsTechnique = await Technique.getAsync(
-      'lighting/spot_light_shadows.tech',
+      isPSX ? 'lighting/spot_light_shadows_psx.tech' : 'lighting/spot_light_shadows.tech',
     );
     this.unitSphere = await Mesh.getAsync('unit_sphere.obj');
     this.unitFrustum = await Mesh.getAsync('unit_frustum.obj');

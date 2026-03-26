@@ -1,17 +1,18 @@
 ### Engine
 
-1. Sombras con dithering pixelado
-2. Dithering para transparencias
-3. AO Weird + Slow
+1. Normal de suelo con luces raro en spot light
+2. Point light usa normal?
+3. Dithering para transparencias
 4. DBuffer (Compare my Deferred renderer with UE)
 5. SSR works on one direction only
-6. HZB Culling regulero
+6. AO Weird + Slow
+7. HZB Culling regulero
 
-7. Froxel Self Occlusion
-8. Froxel Density Volumes
-9. Light Shafts pixelados
-10. Voxel Cone Tracing
-11. Enemy AI
+8. Froxel Self Occlusion
+9. Froxel Density Volumes
+10. Light Shafts pixelados
+11. Voxel Cone Tracing
+12. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo

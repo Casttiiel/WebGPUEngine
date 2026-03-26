@@ -45,6 +45,57 @@ fn bayer4(coord: vec2<u32>) -> f32 {
     return b[(coord.x % 4u) + (coord.y % 4u) * 4u] / 16.0;
 }
 
+// Wide-kernel PCF for PSX point-light dithering.
+// Uses 8× normal kernel radius so the shadow boundary gradient covers enough
+// screen pixels for the Bayer stipple pattern to be clearly visible.
+fn getShadowFactorCubePSX(
+    wPos: vec3<f32>,
+    lightPos: vec3<f32>,
+    shadowNear: f32,
+    shadowFar: f32,
+    invResolution: f32,
+    shadowCube: texture_depth_cube,
+    shadowSampler: sampler_comparison,
+) -> f32 {
+    let dir  = wPos - lightPos;
+    let dist = length(dir);
+
+    let A = shadowFar / (shadowFar - shadowNear);
+    let B = -(shadowFar * shadowNear) / (shadowFar - shadowNear);
+
+    // 8× wider kernel than the normal shadow for a visible dithered zone
+    let kernelRadius = (0.02 * dist + 0.001) * 8.0;
+
+    let dirN    = normalize(dir);
+    let worldUp = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), abs(dirN.y) < 0.99);
+    let right   = normalize(cross(dirN, worldUp));
+    let up      = normalize(cross(right, dirN));
+
+    var shadow = 0.0;
+    for (var i = 0; i < 8; i++) {
+        let tapDir = dir + right * poissonDisk[i].x * kernelRadius
+                        + up    * poissonDisk[i].y * kernelRadius;
+
+        let tapAbs  = abs(tapDir);
+        let tapXDom = tapAbs.x >= tapAbs.y && tapAbs.x >= tapAbs.z;
+        let tapSampleDir = select(
+            vec3<f32>(-tapDir.x,  tapDir.y,  tapDir.z),
+            vec3<f32>( tapDir.x,  tapDir.y, -tapDir.z),
+            tapXDom
+        );
+
+        let tapFaceZ  = max(max(tapAbs.x, tapAbs.y), tapAbs.z);
+        let tapFaceZs = max(tapFaceZ, 0.0001);
+        let texelBias = 2.0 * abs(B) * invResolution / tapFaceZs;
+        let tap_depth = clamp(A + B / tapFaceZs - texelBias * 1.5, 0.0, 1.0);
+        let tap_in_range = tapFaceZ >= shadowNear && tapFaceZ <= shadowFar;
+        let tap_cmp = select(0.0, tap_depth, tap_in_range);
+
+        shadow += textureSampleCompare(shadowCube, shadowSampler, tapSampleDir, tap_cmp);
+    }
+    return shadow / 8.0;
+}
+
 @fragment
 fn PS_point_lights_shadow(@builtin(position) fragPos: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = fragPos.xy / camera.screenSize;
@@ -58,15 +109,12 @@ fn PS_point_lights_shadow(@builtin(position) fragPos: vec4<f32>) -> @location(0)
     let normalBiasScale = clamp(1.0 - NdL_raw, 0.0, 1.0);
     let biasedWorldPos = g.worldPos + g.normal * 0.05 * normalBiasScale;
 
-    // Get the smooth cube-shadow factor, then Bayer-threshold it.
-    let pcf = getShadowFactorCube(
-        biasedWorldPos,
-        light.position.xyz,
-        light.shadowNear,
-        light.shadowFar,
+    // Wide-kernel PCF → Bayer threshold
+    let pcf   = getShadowFactorCubePSX(
+        biasedWorldPos, light.position.xyz,
+        light.shadowNear, light.shadowFar,
         light.shadowStepDivResolution,
-        gPointShadowCube,
-        gShadowSampler,
+        gPointShadowCube, gShadowSampler,
     );
     let bayer = bayer4(vec2<u32>(fragPos.xy));
     let shadow_factor = select(0.0, 1.0, pcf > bayer);

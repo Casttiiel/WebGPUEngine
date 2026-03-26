@@ -34,6 +34,37 @@ fn bayer4(coord: vec2<u32>) -> f32 {
     return b[(coord.x % 4u) + (coord.y % 4u) * 4u] / 16.0;
 }
 
+// Wide-kernel PCF for PSX dithering: 8× the normal radius so the gradient zone
+// is wide enough in screen space to show a visible Bayer stipple pattern.
+fn getShadowFactorSpotPSX(
+    wPos: vec3<f32>,
+    lightViewProjOffset: mat4x4<f32>,
+    texelSize: f32,
+    shadowMap: texture_depth_2d,
+    shadowSampler: sampler_comparison,
+) -> f32 {
+    let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
+    var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;
+    lightUVSpacePos.x =  lightUVSpacePos.x * 0.5 + 0.5;
+    lightUVSpacePos.y = -lightUVSpacePos.y * 0.5 + 0.5;
+    if (lightUVSpacePos.z < 0.0 || lightUVSpacePos.z > 1.0 ||
+        lightUVSpacePos.x < 0.0 || lightUVSpacePos.x > 1.0 ||
+        lightUVSpacePos.y < 0.0 || lightUVSpacePos.y > 1.0) {
+        return 1.0;
+    }
+    let kernelRadius = texelSize * 8.0;  // Wider kernel → visible dithered zone
+    var shadow = 0.0;
+    for (var i = 0; i < 8; i++) {
+        let offset = poissonDisk[i] * kernelRadius;
+        shadow += textureSampleCompareLevel(
+            shadowMap, shadowSampler,
+            lightUVSpacePos.xy + offset,
+            lightUVSpacePos.z,
+        );
+    }
+    return shadow / 8.0;
+}
+
 fn shade_psx(iPosition: vec2<f32>, fragPos: vec4<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32> {
     let g = decodeGBuffer(iPosition);
 
@@ -43,8 +74,8 @@ fn shade_psx(iPosition: vec2<f32>, fragPos: vec4<f32>, use_shadows: bool, fix_sh
     let light_dir = light_dir_full / distance_to_light;
 
     if (use_shadows) {
-        let pcf = getShadowFactor(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler, true);
-        // Bayer threshold: convert continuous PCF to stippled binary shadow
+        let pcf = getShadowFactorSpotPSX(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler);
+        // Bayer threshold: convert wide-gradient PCF to stippled binary shadow
         let bayer = bayer4(vec2<u32>(fragPos.xy));
         shadow_factor = select(0.0, 1.0, pcf > bayer);
     }
