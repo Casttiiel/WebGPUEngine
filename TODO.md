@@ -1,18 +1,17 @@
 ### Engine
 
-1. El loader en pantalla muestra datos mal
-2. Dithering para transparencias y gradientes — muy barato, muy efectivo
-3. Sombras con dithering pixelado
-4. AO Weird + Slow
-5. DBuffer (Compare my Deferred renderer with UE)
-6. SSR works on one direction only
-7. HZB Culling regulero
+1. Dithering para transparencias y gradientes — muy barato, muy efectivo
+2. Sombras con dithering pixelado
+3. AO Weird + Slow
+4. DBuffer (Compare my Deferred renderer with UE)
+5. SSR works on one direction only
+6. HZB Culling regulero
 
-8. Froxel Self Occlusion
-9. Froxel Density Volumes
-10. Light Shafts pixelados
-11. Voxel Cone Tracing
-12. Enemy AI
+7. Froxel Self Occlusion
+8. Froxel Density Volumes
+9. Light Shafts pixelados
+10. Voxel Cone Tracing
+11. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo

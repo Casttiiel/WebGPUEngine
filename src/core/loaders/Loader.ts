@@ -61,6 +61,23 @@ export class Loader {
   private static totalEntitiesToLoad: number = 0;
   private static entitiesLoaded: number = 0;
 
+  // Contadores para el parsing (GLTFs)
+  private static totalGltfsToLoad: number = 0;
+  private static gltfsLoaded: number = 0;
+
+  /**
+   * Cuenta recursivamente cuántos nodos tienen gltf en el árbol
+   */
+  private static countGltfs(json: EntityDataType): number {
+    let count = json.gltf ? 1 : 0;
+    if (json.prefab) count++; // prefab puede tener gltf, cuenta conservadoramente
+    const children = json.children ?? [];
+    for (const child of children) {
+      count += this.countGltfs(child);
+    }
+    return count;
+  }
+
   /**
    * Cuenta recursivamente todas las entidades que se van a cargar
    */
@@ -91,6 +108,15 @@ export class Loader {
   }
 
   public static async parseSceneJSON(json: SceneDataType): Promise<SceneDataType> {
+    // Contar GLTFs antes de empezar para mostrar progreso real
+    this.totalGltfsToLoad = 0;
+    this.gltfsLoaded = 0;
+    for (const e of json) {
+      this.totalGltfsToLoad += this.countGltfs(e);
+    }
+
+    LoadingStatus.updateStatus(`Parsing scene data... (0/${this.totalGltfsToLoad} assets)`);
+
     // Procesar todas las entidades en paralelo para acelerar el parsing
     const parsePromises = json.map(async (entityJson) => {
       const result = await this.parseEntityFromJSON(entityJson);
@@ -135,6 +161,10 @@ export class Loader {
     if (json.gltf) {
       const gltfJson = await GLTFLoader.loadGLTF(json.gltf);
       entityChildrens = entityChildrens.concat(gltfJson);
+      this.gltfsLoaded++;
+      LoadingStatus.updateStatus(
+        `Parsing scene data... (${this.gltfsLoaded}/${this.totalGltfsToLoad}) ${json.gltf}`,
+      );
     }
 
     // Load children after parent is fully setup - proceso en paralelo
@@ -147,7 +177,11 @@ export class Loader {
     return json;
   }
 
-  public static async loadEntityFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
+  public static async loadEntityFromJSON(
+    json: EntityDataType,
+    parent?: Entity,
+    trackProgress: boolean = true,
+  ): Promise<Entity> {
     const entity = new Entity();
 
     // Set parent relationship first
@@ -161,18 +195,27 @@ export class Loader {
 
     await this.loadComponentFromJSON(json, entity);
 
-    // Incrementar contador y actualizar progreso
-    this.entitiesLoaded++;
-
-    // Actualizar solo el mensaje, mantener el progreso del módulo Boot
-    LoadingStatus.updateStatus(
-      `Loading entities... (${this.entitiesLoaded}/${this.totalEntitiesToLoad})`,
-    );
+    if (trackProgress) {
+      this.entitiesLoaded++;
+      LoadingStatus.updateStatus(
+        `Loading entities... (${this.entitiesLoaded}/${this.totalEntitiesToLoad})`,
+      );
+      // Yield to the browser's rendering loop every 8 entities so the progress
+      // text is actually visible. Without this, Promise.all drains the entire
+      // microtask queue before the browser can repaint — the counter jumps from
+      // e.g. 39 to 199 in a single frame because all entities complete as one
+      // uninterrupted microtask burst.
+      if (this.entitiesLoaded % 8 === 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    }
 
     // Load children in parallel — safe because Technique/Material/Texture all have
     // inflight dedup maps that prevent duplicate registration under concurrent load.
     await Promise.all(
-      entityChildrens.map((children_json) => this.loadEntityFromJSON(children_json, entity)),
+      entityChildrens.map((children_json) =>
+        this.loadEntityFromJSON(children_json, entity, trackProgress),
+      ),
     );
 
     return entity;

@@ -18,20 +18,23 @@ export class ModuleManager {
   public async start(): Promise<void> {
     await Promise.all([this.loadConfig(), this.loadGamestates()]);
 
-    // Contar módulos del gamestate inicial
     const initialGamestate = this.getGamestate(this.startGamestate);
-    const gamestateModuleCount = initialGamestate ? initialGamestate.modules.length : 0;
 
-    // Configurar tracking dinámico de progreso
-    LoadingStatus.setTotalModules(this.systemModules.length, gamestateModuleCount);
+    // Count only modules that will actually start (not already active)
+    const systemToStart = this.systemModules.filter((m) => !m.isActive());
+    const gamestateToStart = initialGamestate
+      ? [...initialGamestate].filter((m) => !m.isActive() && !systemToStart.includes(m))
+      : [];
+
+    LoadingStatus.setTotalModules(systemToStart.length, gamestateToStart.length);
 
     // Cargar módulos del sistema
     await this.startModules(this.systemModules, true);
 
-    // Cargar gamestate inicial de forma síncrona para garantizar carga completa
+    // Cargar gamestate inicial — reportProgress=true para el boot inicial
     if (this.startGamestate.length > 0 && initialGamestate) {
       Logger.info('MODULES', `Gamestate → ${this.startGamestate}`);
-      await this.performGamestateTransition(initialGamestate);
+      await this.performGamestateTransition(initialGamestate, true);
       this.currentGamestate = initialGamestate;
     }
   }
@@ -144,7 +147,10 @@ export class ModuleManager {
     this.requestedGamestate = null;
   }
 
-  private async performGamestateTransition(newGamestate: Gamestate): Promise<void> {
+  private async performGamestateTransition(
+    newGamestate: Gamestate,
+    reportProgress: boolean = false,
+  ): Promise<void> {
     // PARAR SOLO LOS MÓDULOS QUE NO ESTÁN EN EL NUEVO GAMESTATE
     if (this.currentGamestate) {
       const modulesToStop: Module[] = [];
@@ -185,7 +191,7 @@ export class ModuleManager {
     }
 
     if (modulesToStart.length > 0) {
-      await this.startModules(modulesToStart, true); // Reportar progreso durante carga inicial
+      await this.startModules(modulesToStart, reportProgress);
     }
 
     // Actualizar el gamestate actual

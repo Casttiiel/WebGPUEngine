@@ -53,7 +53,7 @@ export class BulletPoolComponent extends Component {
       data.components.transform.position = [0, -1000, 0];
     }
 
-    const entity = await Loader.loadEntityFromJSON(data);
+    const entity = await Loader.loadEntityFromJSON(data, undefined, false);
     const projectile = entity.getComponent('projectile') as ProjectileComponent | null;
 
     if (!projectile) {
