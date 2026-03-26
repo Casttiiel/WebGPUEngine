@@ -1,7 +1,7 @@
 ### Engine
 
-1. Dithering para transparencias y gradientes — muy barato, muy efectivo
-2. Sombras con dithering pixelado
+1. Sombras con dithering pixelado
+2. Dithering para transparencias
 3. AO Weird + Slow
 4. DBuffer (Compare my Deferred renderer with UE)
 5. SSR works on one direction only

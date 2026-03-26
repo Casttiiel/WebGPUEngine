@@ -12,6 +12,7 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Texture } from '../../renderer/resources/Texture';
 import { AABB } from '../../core/math/AABB';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 const ndcCorners = [
   [-1, -1, -1, 1],
@@ -139,7 +140,11 @@ export class SpotLightComponent extends CameraComponent {
     [this.projectorTexture, this.technique] = await Promise.all([
       Texture.getAsync(data.projector ? data.projector : 'white.png'),
       Technique.getAsync(
-        this._hasShadows ? 'lighting/spot_light_shadows.tech' : 'lighting/spot_light.tech',
+        this._hasShadows
+          ? QualitySettings.getInstance().getSettings().ditheringMode === 'psx'
+            ? 'lighting/spot_light_shadows_psx.tech'
+            : 'lighting/spot_light_shadows.tech'
+          : 'lighting/spot_light.tech',
       ),
     ]);
     this.projectorTextureView = this.projectorTexture.getTextureView()!;

@@ -1,0 +1,12 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "lighting/directional_light_csm_psx.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "blend": "additive",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferUniforms",
+        "DirectionalLightCSMUniforms"
+    ]
+}

@@ -26,6 +26,7 @@ export interface GraphicsQualitySettings {
   ssgiScale: number;
   useKTX2: boolean;
   meshTextureFilter: 'trilinear' | 'nearest';
+  ditheringMode: 'off' | 'psx';
 }
 
 export class QualitySettings {
@@ -63,6 +64,7 @@ export class QualitySettings {
       enableMotionBlur: false,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
+      ditheringMode: 'off',
     } as GraphicsQualitySettings,
 
     MEDIUM: {
@@ -93,6 +95,7 @@ export class QualitySettings {
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
+      ditheringMode: 'off',
     } as GraphicsQualitySettings,
 
     HIGH: {
@@ -123,6 +126,7 @@ export class QualitySettings {
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
+      ditheringMode: 'off',
     } as GraphicsQualitySettings,
 
     ULTRA: {
@@ -153,6 +157,7 @@ export class QualitySettings {
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
+      ditheringMode: 'psx',
     } as GraphicsQualitySettings,
   };
 
@@ -197,6 +202,7 @@ export class QualitySettings {
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
+      ditheringMode: 'off',
     };
     return { ...defaults, ...this.settings };
   }

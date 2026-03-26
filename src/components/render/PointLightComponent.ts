@@ -13,6 +13,7 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { QualitySettings } from '../../core/engine/QualitySettings';
 
 // WebGPU cube face order: +X, -X, +Y, -Y, +Z, -Z
 // Up vectors match the WebGPU/Vulkan cubemap sampling convention (v=0 at top).
@@ -97,8 +98,11 @@ export class PointLightComponent extends Component {
     );
 
     // Load texture and technique in parallel — they don't depend on each other
+    const isPSX = QualitySettings.getInstance().getSettings().ditheringMode === 'psx';
     const techPath = this._hasShadows
-      ? 'lighting/point_light_shadows.tech'
+      ? isPSX
+        ? 'lighting/point_light_shadows_psx.tech'
+        : 'lighting/point_light_shadows.tech'
       : 'lighting/point_light.tech';
     [this.projectorTexture, this.technique] = await Promise.all([
       Texture.getAsync('white.png'),

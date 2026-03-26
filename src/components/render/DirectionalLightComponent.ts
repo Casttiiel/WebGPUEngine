@@ -75,7 +75,10 @@ export class DirectionalLightComponent extends Component {
     // shadowStepDivResolution from inside the second cascade matrix (byte 108),
     // producing garbage kernel radius → banding.  The CSM shader handles
     // cascadeCount=1 correctly via the early-return path in getShadowFactorCSMBlended.
-    const techniquePath = 'lighting/directional_light_csm.tech';
+    const isPSX = QualitySettings.getInstance().getSettings().ditheringMode === 'psx';
+    const techniquePath = isPSX
+      ? 'lighting/directional_light_csm_psx.tech'
+      : 'lighting/directional_light_csm.tech';
 
     // Load mesh, texture, and technique in parallel — none depend on each other
     [this.fullscreenQuadMesh, this.projectorTexture, this.directionalLightTechnique] =
