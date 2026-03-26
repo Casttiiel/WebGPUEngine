@@ -29,14 +29,14 @@ alias LightUniformsCSM = DirectionalLightCSMUniforms;
 
 fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
-    if (cascadeIndex == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.z, gShadowMap0, gShadowSampler, false); }
-    if (cascadeIndex == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.z, gShadowMap1, gShadowSampler, false); }
+    if (cascadeIndex == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.x, gShadowMap0, gShadowSampler, false); }
+    if (cascadeIndex == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.y, gShadowMap1, gShadowSampler, false); }
     return getShadowFactor(worldPos, light.viewProjOffset2, light.shadowParams.z, gShadowMap2, gShadowSampler, false);
 }
 
 fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {
-    if (idx == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.z, gShadowMap0, gShadowSampler, false); }
-    if (idx == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.z, gShadowMap1, gShadowSampler, false); }
+    if (idx == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.x, gShadowMap0, gShadowSampler, false); }
+    if (idx == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.y, gShadowMap1, gShadowSampler, false); }
     return getShadowFactor(worldPos, light.viewProjOffset2, light.shadowParams.z, gShadowMap2, gShadowSampler, false);
 }
 
@@ -49,7 +49,7 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeCount = i32(light.cascadeSplits.w);
 
     if (cascadeCount == 1) {
-        return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.z, gShadowMap0, gShadowSampler, false);
+        return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.x, gShadowMap0, gShadowSampler, false);
     }
 
     let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);

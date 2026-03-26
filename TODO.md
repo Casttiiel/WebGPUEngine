@@ -1,12 +1,12 @@
 ### Engine
 
-1. Performance (Cortinas no se ven por un lado) (Double sided que?) (CSM bigger less res?)
-2. Directional light 1 CSM banding
-3. SSR works on one direction only
-4. AO Weird + Slow
-5. DBuffer (Compare my Deferred renderer with UE)
-6. HZB Culling regulero
+1. Performance (Cortinas no se ven por un lado) (Double sided que?)
+2. SSR works on one direction only
+3. AO Weird + Slow
+4. DBuffer (Compare my Deferred renderer with UE)
+5. HZB Culling regulero
 
+6. El loader en pantalla muestra datos mal
 7. Dithering para transparencias y gradientes — muy barato, muy efectivo
 8. Sombras con dithering pixelado
 

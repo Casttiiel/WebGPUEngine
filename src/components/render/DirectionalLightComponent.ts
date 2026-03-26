@@ -70,11 +70,12 @@ export class DirectionalLightComponent extends Component {
     this.cascadeLambda = lightData.cascadeLambda ?? 0.5; // 0=uniforme, 1=logarítmico
     this.maxShadowDistance = lightData.maxShadowDistance ?? 50.0; // Limitar sombras a 50m por defecto
 
-    // Cargar técnica apropiada (CSM o single shadow)
-    const techniquePath =
-      this.cascadeCount > 1
-        ? 'lighting/directional_light_csm.tech'
-        : 'lighting/directional_light.tech';
+    // Always use the CSM shader regardless of cascade count.
+    // directional_light.fs has a different uniform struct layout that misreads
+    // shadowStepDivResolution from inside the second cascade matrix (byte 108),
+    // producing garbage kernel radius → banding.  The CSM shader handles
+    // cascadeCount=1 correctly via the early-return path in getShadowFactorCSMBlended.
+    const techniquePath = 'lighting/directional_light_csm.tech';
 
     // Load mesh, texture, and technique in parallel — none depend on each other
     [this.fullscreenQuadMesh, this.projectorTexture, this.directionalLightTechnique] =
@@ -100,14 +101,13 @@ export class DirectionalLightComponent extends Component {
     // Crear texturas de profundidad para shadow mapping (una por cascada)
     this.shadowDepthTextures = [];
     this.shadowDepthViews = [];
-    const shadowResolution =
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
     for (let i = 0; i < this.cascadeCount; i++) {
+      const res = this.getCascadeResolution(i);
       const shadowTexture = GPUUtils.createTexture(
         `directional_light_shadow_depth_map_cascade_${i}`,
-        shadowResolution,
-        shadowResolution,
+        res,
+        res,
         'depth32float',
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       );
@@ -118,66 +118,18 @@ export class DirectionalLightComponent extends Component {
     // Crear sampler de comparación para shadow mapping
     this.shadowSampler = SamplerLibrary.shadows;
 
-    // Crear bind group apropiado según el número de cascadas
-    let bindGroupEntries: GPUBindGroupEntry[];
-
-    if (this.cascadeCount > 1) {
-      // CSM: 3 shadow maps + sampler + contact shadow factor
-      bindGroupEntries = [
-        {
-          binding: 0,
-          resource: { buffer: this.uniformBuffer },
-        },
-        {
-          binding: 1,
-          resource: this.shadowDepthViews[0],
-        },
-        {
-          binding: 2,
-          resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)],
-        },
-        {
-          binding: 3,
-          resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)],
-        },
-        {
-          binding: 4,
-          resource: this.shadowSampler,
-        },
-        {
-          binding: 5,
-          resource: this.contactShadowFallbackView,
-        },
-        {
-          binding: 6,
-          resource: SamplerLibrary.simpleSampler,
-        },
-      ];
-    } else {
-      // Single shadow map: 1 shadow map + sampler + contact shadow factor
-      bindGroupEntries = [
-        {
-          binding: 0,
-          resource: { buffer: this.uniformBuffer },
-        },
-        {
-          binding: 1,
-          resource: this.shadowDepthViews[0],
-        },
-        {
-          binding: 2,
-          resource: this.shadowSampler,
-        },
-        {
-          binding: 3,
-          resource: this.contactShadowFallbackView,
-        },
-        {
-          binding: 4,
-          resource: SamplerLibrary.simpleSampler,
-        },
-      ];
-    }
+    // Always use CSM bind group layout — single cascade re-uses view[0] for the
+    // unused cascade slots so every path binds the same 7 entries.
+    const v0 = this.shadowDepthViews[0]!;
+    const bindGroupEntries: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: this.uniformBuffer } },
+      { binding: 1, resource: v0 },
+      { binding: 2, resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)] ?? v0 },
+      { binding: 3, resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)] ?? v0 },
+      { binding: 4, resource: this.shadowSampler },
+      { binding: 5, resource: this.contactShadowFallbackView },
+      { binding: 6, resource: SamplerLibrary.simpleSampler },
+    ];
 
     this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
       `directional_light_bindgroup`,
@@ -215,6 +167,18 @@ export class DirectionalLightComponent extends Component {
     this.intensity = lightData.intensity ?? 1.0;
 
     this.updateLightUniforms();
+  }
+
+  /**
+   * Returns the shadow map resolution for the given cascade index.
+   * Each cascade halves the resolution of the previous one (minimum 256).
+   *   C0 = baseRes  (near — full quality)
+   *   C1 = baseRes / 2
+   *   C2 = baseRes / 4
+   */
+  private getCascadeResolution(cascadeIndex: number): number {
+    const base = QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
+    return Math.max(256, base >> cascadeIndex);
   }
 
   /**
@@ -303,9 +267,6 @@ export class DirectionalLightComponent extends Component {
       this.splitsInitialized = true;
     }
 
-    const shadowResolution =
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-
     const lightUp =
       Math.abs(this.lightDirection[2]) > 0.9 ? vec3.fromValues(0, 1, 0) : vec3.fromValues(0, 0, 1);
 
@@ -313,6 +274,7 @@ export class DirectionalLightComponent extends Component {
 
     for (let i = 0; i < this.cascadeCount; i++) {
       const currentSplit = this.cascadeSplits[i];
+      const shadowResolution = this.getCascadeResolution(i);
 
       // 1. Radio fijo geométrico — NO depende de world space, es constante entre frames
       const radius_raw = this.calculateCascadeRadius(
@@ -487,27 +449,28 @@ export class DirectionalLightComponent extends Component {
     );
 
     // Shadow parameters - bytes 240-255
-    const shadowStep = 1.0;
-    const shadowInverseResolution =
-      1.0 / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-    const shadowStepDivResolution =
-      shadowStep / QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
-
+    // shadowParams: x = stepDivRes cascade0, y = stepDivRes cascade1,
+    //               z = stepDivRes cascade2, w = unused
+    // Each cascade may have a different resolution (C0=R, C1=R/2, C2=R/4),
+    // so the PCF kernel step is scaled accordingly.
     GPUUtils.writeBuffer(
       this.uniformBuffer,
       240,
-      new Float32Array([shadowStep, shadowInverseResolution, shadowStepDivResolution, 0.0]),
+      new Float32Array([
+        1.0 / this.getCascadeResolution(0),
+        1.0 / this.getCascadeResolution(Math.min(1, this.cascadeCount - 1)),
+        1.0 / this.getCascadeResolution(Math.min(2, this.cascadeCount - 1)),
+        0.0,
+      ]),
     );
   }
 
   public generateShadowMap(): void {
     const render = Render.getInstance();
-    const shadowResolution =
-      QualitySettings.getInstance().getSettings().directionalShadowMapResolution;
 
     // Renderizar cada cascada
     for (let i = 0; i < this.cascadeCount; i++) {
-      // Culling para esta cascada
+      const cascadeResolution = this.getCascadeResolution(i);
       RenderManager.getInstance().performCulling(this.shadowCameras[i], RenderCategory.SHADOWS);
 
       // Crear render pass para esta cascada
@@ -524,7 +487,7 @@ export class DirectionalLightComponent extends Component {
       if (shadowTs) shadowDesc.timestampWrites = shadowTs;
       const pass = render.getCommandEncoder().beginRenderPass(shadowDesc);
 
-      GPUUtils.configureViewportAndScissor(pass, shadowResolution, shadowResolution);
+      GPUUtils.configureViewportAndScissor(pass, cascadeResolution, cascadeResolution);
 
       // Usar la cámara de esta cascada
       RenderManager.getInstance().setCamera(this.shadowCameras[i]);
@@ -541,27 +504,17 @@ export class DirectionalLightComponent extends Component {
    * Called automatically by render() whenever the view reference changes.
    */
   private rebuildLightBindGroup(contactShadowView: GPUTextureView): void {
-    let bindGroupEntries: GPUBindGroupEntry[];
-
-    if (this.cascadeCount > 1) {
-      bindGroupEntries = [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.shadowDepthViews[0] },
-        { binding: 2, resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)] },
-        { binding: 3, resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)] },
-        { binding: 4, resource: this.shadowSampler },
-        { binding: 5, resource: contactShadowView },
-        { binding: 6, resource: SamplerLibrary.simpleSampler },
-      ];
-    } else {
-      bindGroupEntries = [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.shadowDepthViews[0] },
-        { binding: 2, resource: this.shadowSampler },
-        { binding: 3, resource: contactShadowView },
-        { binding: 4, resource: SamplerLibrary.simpleSampler },
-      ];
-    }
+    // Always use CSM layout — single cascade reuses view[0] for all 3 slots.
+    const v0 = this.shadowDepthViews[0]!;
+    const bindGroupEntries: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: this.uniformBuffer } },
+      { binding: 1, resource: v0 },
+      { binding: 2, resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)] ?? v0 },
+      { binding: 3, resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)] ?? v0 },
+      { binding: 4, resource: this.shadowSampler },
+      { binding: 5, resource: contactShadowView },
+      { binding: 6, resource: SamplerLibrary.simpleSampler },
+    ];
 
     this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
       'directional_light_bindgroup',

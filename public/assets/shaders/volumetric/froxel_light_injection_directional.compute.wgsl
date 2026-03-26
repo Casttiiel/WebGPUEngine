@@ -30,10 +30,10 @@ fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     
     if (cascadeIndex == 0) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
-                directionalLight.shadowParams.z, shadowMap0, shadowSampler);
+                directionalLight.shadowParams.x, shadowMap0, shadowSampler);
     } else if (cascadeIndex == 1) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset1,
-                directionalLight.shadowParams.z, shadowMap1, shadowSampler);
+                directionalLight.shadowParams.y, shadowMap1, shadowSampler);
     } else {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset2,
                 directionalLight.shadowParams.z, shadowMap2, shadowSampler);
@@ -44,10 +44,10 @@ fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {
     // Call getShadowFactor with appropriate cascade shadow map
     if (idx == 0) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset0,
-                directionalLight.shadowParams.z, shadowMap0, shadowSampler);
+                directionalLight.shadowParams.x, shadowMap0, shadowSampler);
     } else if (idx == 1) {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset1,
-                directionalLight.shadowParams.z, shadowMap1, shadowSampler);
+                directionalLight.shadowParams.y, shadowMap1, shadowSampler);
     } else {
         return getShadowFactorForCascade(worldPos, directionalLight.viewProjOffset2,
                 directionalLight.shadowParams.z, shadowMap2, shadowSampler);

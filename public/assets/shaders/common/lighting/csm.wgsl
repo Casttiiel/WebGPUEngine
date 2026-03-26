@@ -14,7 +14,7 @@ struct DirectionalLightCSMUniforms {
     viewProjOffset1: mat4x4<f32>, // Cascade 1 (mid)
     viewProjOffset2: mat4x4<f32>, // Cascade 2 (far)
     cascadeSplits: vec4<f32>,     // x: split0, y: split1, z: split2, w: cascadeCount
-    shadowParams: vec4<f32>,      // x: shadowStep, y: invResolution, z: stepDivResolution, w: unused
+    shadowParams: vec4<f32>,      // x: stepDivRes cascade0, y: stepDivRes cascade1, z: stepDivRes cascade2, w: unused
 }
 
 // ===========================
