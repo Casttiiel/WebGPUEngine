@@ -1,9 +1,9 @@
 ### Engine
 
 1. Transparency dithered?
-2. DBuffer (Compare my Deferred renderer with UE)
-3. Normal de suelo con luces raro en spot light
-4. Point light usa normal?
+2. (Quitar Decal) Normal de suelo con luces raro en spot light
+3. Point light usa normal?
+4. DBuffer (Compare my Deferred renderer with UE)
 5. HZB Culling regulero
 6. Baja resolución — 320×240 con upscaling
 

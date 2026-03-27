@@ -47,7 +47,8 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
     color: '#cba6f7',
     passes: [
       'GTAO Compute',
-      'AO Bilateral Filter Compute',
+      'AO Bilateral Horizontal',
+      'AO Bilateral Vertical',
       'SSR Compute',
       'SSR Blur',
       'SSGI',
