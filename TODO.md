@@ -1,6 +1,6 @@
 ### Engine
 
-1. Transparency dithered
+1. Dither AO
 2. Baja resolución — 320×240 con upscaling
 
 3. Froxel Self Occlusion

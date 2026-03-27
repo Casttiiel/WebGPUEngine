@@ -24,7 +24,11 @@ fn bayer4(coord: vec2<u32>) -> f32 {
 @fragment
 fn fs(input: VertexOutput) {
     let uv    = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
-    let alpha = textureSample(txAlbedo, samplerState, uv).a;
+    // Combine texture alpha with baseColorFactor.a — must match gbuffer_dither.fs exactly
+    // so that the same pixels are discarded in both passes. If only texture alpha is used here,
+    // holes punched by the GBuffer pass have depth pre-written by the prepass, blocking
+    // the geometry behind the cube from filling those positions.
+    let alpha = textureSample(txAlbedo, samplerState, uv).a * factors.baseColorFactor.a;
     let pixelCoord = vec2<u32>(input.position.xy);
     if (alpha <= bayer4(pixelCoord)) { discard; }
 }

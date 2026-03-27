@@ -15,6 +15,16 @@
     "prefab": "characters/player_character.prefab"
   },
   {
+    "prefab": "effects/cube_dither.prefab",
+    "components": {
+      "name": "Dithered Cube",
+      "transform": {
+        "position": [0, 2, 0],
+        "scale": [1, 1, 1]
+      }
+    }
+  },
+  {
     "components": {
       "name": "BulletManager",
       "transform": { "position": [0, 0, 0] },

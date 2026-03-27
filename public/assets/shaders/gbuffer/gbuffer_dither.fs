@@ -49,10 +49,14 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let albedo_color = textureSample(txAlbedo, samplerState, Uv);
 
     // Dither discard: pixel survives iff alpha > its Bayer threshold.
-    // This distributes transparency across the 4×4 tile in a visually
-    // uniform pattern, avoiding the aliased silhouette of a hard cutoff.
+    // Combine texture alpha with the material baseColorFactor alpha so that
+    // setting baseColorFactor[3] < 1.0 controls the effective transparency.
+    //   baseColorFactor.a = 1.0 → fully opaque
+    //   baseColorFactor.a = 0.5 → ~8/16 pixels discarded → 50% transparent
+    //   baseColorFactor.a = 0.0 → fully invisible
+    let alpha = albedo_color.a * factors.baseColorFactor.a;
     let pixelCoord = vec2<u32>(input.position.xy);
-    if (albedo_color.a <= bayer4(pixelCoord)) {
+    if (alpha <= bayer4(pixelCoord)) {
         discard;
     }
 
