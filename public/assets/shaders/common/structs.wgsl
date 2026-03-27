@@ -49,10 +49,10 @@ struct MaterialFactors {
     roughnessFactor: f32,
     metallicFactor: f32,
     emissiveFactor: f32,
-    padding: f32,
+    appearanceBlend: f32,  // decal: blend weight for albedo+normal (1=full, 0=no change)
     uvXScale: f32,
     uvYScale: f32,
-    padding2: f32,
+    surfaceBlend: f32,     // decal: blend weight for roughness+metallic (1=full, 0=no change)
     padding3: f32
 }
 

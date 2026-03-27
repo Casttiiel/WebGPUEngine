@@ -49,20 +49,23 @@ fn fs(input: VertexOutput) -> DecalFlatOutput {
     let orig_albedo = textureSampleLevel(gBufferAlbedo,  samplerGBuffer, screen_uv, 0.0);
     let orig_normal = textureSampleLevel(gBufferNormals, samplerGBuffer, screen_uv, 0.0);
 
-    // ── Albedo + metallic blend by alpha ─────────────────────────────────────
-    let out_albedo   = mix(orig_albedo.rgb, decal_albedo,   alpha);
-    let out_metallic = mix(orig_albedo.a,   decal_metallic, alpha);
+    // ── Per-channel blend weights from MaterialFactors ───────────────────────
+    // appearanceBlend: controls albedo + normal  (0 = leave unchanged, 1 = full blend)
+    // surfaceBlend:    controls roughness + metallic
+    let app_alpha  = alpha * factors.appearanceBlend;
+    let surf_alpha = alpha * factors.surfaceBlend;
+
+    // ── Albedo + metallic blend ───────────────────────────────────────────────
+    let out_albedo   = mix(orig_albedo.rgb, decal_albedo,   app_alpha);
+    let out_metallic = mix(orig_albedo.a,   decal_metallic, surf_alpha);
 
     // ── Normal blend: apply decal normal map in mesh TBN, blend WS normals ──
-    // Use the mesh's own TBN so the decal normal is oriented correctly even on
-    // non-horizontal surfaces (walls, ceilings, etc.).
     let N         = normalize(input.N);
     let TBN       = computeTBN(N, input.T);
     let decal_n_ts = textureSample(txNormal, samplerState, uv).xyz * 2.0 - 1.0;
     let decal_n_ws = normalize(TBN * decal_n_ts);
     let orig_n_ws  = octahedral01ToNormal(orig_normal.xy);
-    // Blend world-space normals then re-normalise before encoding
-    let blended_n_ws = normalize(mix(orig_n_ws, decal_n_ws, alpha));
+    let blended_n_ws = normalize(mix(orig_n_ws, decal_n_ws, app_alpha));
     let encoded_n    = normalToOctahedral01(blended_n_ws);
 
     // ── Roughness, with Specular Anti-Aliasing applied to the decal normal ───
@@ -71,10 +74,10 @@ fn fs(input: VertexOutput) -> DecalFlatOutput {
     let variance   = dot(dndx, dndx) + dot(dndy, dndy);
     let kernel_r2  = min(2.0 * variance * 0.25, 0.18);
     let decal_rough = sqrt(clamp(decal_rough_raw * decal_rough_raw + kernel_r2, 0.0, 1.0));
-    let out_roughness = mix(orig_normal.z, decal_rough, alpha);
+    let out_roughness = mix(orig_normal.z, decal_rough, surf_alpha);
 
-    // ── Emissive blend ────────────────────────────────────────────────────────
-    let out_emissive = mix(orig_normal.w, decal_emissive, alpha);
+    // ── Emissive blend (follows appearanceBlend) ──────────────────────────────
+    let out_emissive = mix(orig_normal.w, decal_emissive, app_alpha);
 
     var out: DecalFlatOutput;
     out.albedo = vec4<f32>(out_albedo,  out_metallic);

@@ -30,6 +30,10 @@ export interface MaterialBaseOptions {
   emissiveFactor?: number;
   uvXScale?: number;
   uvYScale?: number;
+  /** Decal blend weight for albedo + normal channels. 1 = full blend, 0 = no change. Default 1. */
+  appearanceBlend?: number;
+  /** Decal blend weight for roughness + metallic channels. 1 = full blend, 0 = no change. Default 1. */
+  surfaceBlend?: number;
 }
 
 export type MaterialCreateOptions = MaterialBaseOptions & Omit<IGPUResourceOptions, 'type'>;
@@ -49,6 +53,8 @@ export class Material extends GPUResource {
   private emissiveFactor!: number;
   private uvXScale!: number;
   private uvYScale!: number;
+  private appearanceBlend!: number;
+  private surfaceBlend!: number;
   private category: RenderCategory;
   private castsShadows: boolean;
   private shadows: boolean;
@@ -73,6 +79,8 @@ export class Material extends GPUResource {
     this.emissiveFactor = options.emissiveFactor ?? 1;
     this.uvXScale = options.uvXScale ?? 1;
     this.uvYScale = options.uvYScale ?? 1;
+    this.appearanceBlend = options.appearanceBlend ?? 1;
+    this.surfaceBlend = options.surfaceBlend ?? 1;
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
@@ -150,6 +158,8 @@ export class Material extends GPUResource {
         materialData?.emissiveFactor !== undefined ? materialData.emissiveFactor : 1.0,
       uvXScale: materialData?.uvXScale !== undefined ? materialData.uvXScale : 1.0,
       uvYScale: materialData?.uvYScale !== undefined ? materialData.uvYScale : 1.0,
+      appearanceBlend: materialData?.appearanceBlend !== undefined ? materialData.appearanceBlend : 1.0,
+      surfaceBlend: materialData?.surfaceBlend !== undefined ? materialData.surfaceBlend : 1.0,
       castsShadows: materialData?.casts_shadows !== undefined ? materialData.casts_shadows : true,
       shadows: materialData?.shadows !== undefined ? materialData.shadows : false,
     });
@@ -250,9 +260,9 @@ export class Material extends GPUResource {
     GPUUtils.writeBuffer(
       uniformBuffer,
       16,
-      new Float32Array([this.roughnessFactor, this.metallicFactor, this.emissiveFactor, 0]),
+      new Float32Array([this.roughnessFactor, this.metallicFactor, this.emissiveFactor, this.appearanceBlend]),
     );
-    GPUUtils.writeBuffer(uniformBuffer, 32, new Float32Array([this.uvXScale, this.uvYScale, 0, 0]));
+    GPUUtils.writeBuffer(uniformBuffer, 32, new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, 0]));
 
     entries.push({
       binding: 6,

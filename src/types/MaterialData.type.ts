@@ -10,6 +10,10 @@ export type MaterialDataType = Readonly<{
   emissiveFactor?: number;
   uvXScale?: number;
   uvYScale?: number;
+  /** Decal blend weight for albedo + normal channels. 1 = full blend, 0 = no change. Default 1. */
+  appearanceBlend?: number;
+  /** Decal blend weight for roughness + metallic channels. 1 = full blend, 0 = no change. Default 1. */
+  surfaceBlend?: number;
   textures: MaterialTextureDataType;
   casts_shadows?: boolean;
   category: RenderCategory;
