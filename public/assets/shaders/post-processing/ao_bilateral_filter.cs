@@ -1,30 +1,37 @@
-// Only the two includes actually used by this shader.
-// common/structs is NOT needed in a pure compute shader.
 #include "common/uniforms"
 #include "common/octahedral"
 
 // ---------------------------------------------------------------------------
-// AO Bilateral Filter — compute shader
-// Converts ao_bilateral_filter.fs to @compute, eliminating the fullscreen-quad
-// render pass and using textureSampleLevel (required in compute).
+// AO Bilateral Filter — SEPARABLE compute shader with shared memory tile cache
 //
-// Weights each neighbouring AO sample by depth + normal similarity to preserve
-// geometric edges while smoothing noise.
+// Pass 0 (cs_h): horizontal  — workgroup 16×8,  tile (16+2R)×8  = 22×8  = 176
+// Pass 1 (cs_v): vertical    — workgroup  8×16, tile  8×(16+2R) = 8×22  = 176
 //
-// TODO: shared memory tile caching for the AO texture and G-Buffer to reduce
-// coalesced texture reads from 147/pixel to ~5/pixel.
+// Reducing texture fetches from 147/pixel (2D 7×7) to ~11/pixel by:
+//   1. Separating into two 1D passes (7 samples instead of 49)
+//   2. Amortising texture reads with workgroup-shared tile caching
 // ---------------------------------------------------------------------------
 
-// Filter radius in full-resolution screen pixels
 const BILATERAL_RADIUS: i32 = 3;
-const BILATERAL_SIGMA_DEPTH: f32  = 0.01;
-const BILATERAL_SIGMA_NORMAL: f32 = 0.5;
+const SIGMA_DEPTH:  f32     = 0.02;
+const SIGMA_NORMAL: f32     = 0.3;
+
+// Tile is 176 elements for BOTH passes (symmetric):
+//   Horizontal: TILE_W_H=22  TILE_H_H=8   → 22*8  = 176
+//   Vertical:   TILE_W_V=8   TILE_H_V=22  → 8*22  = 176
+const TILE_ELEM: u32 = 176u;
+const TILE_W_H:  u32 = 22u;  // horizontal stride
+const TILE_W_V:  u32 = 8u;   // vertical stride
+
+var<workgroup> tileAO:    array<f32, TILE_ELEM>;
+var<workgroup> tileDepth: array<f32, TILE_ELEM>;
+var<workgroup> tileNX:    array<f32, TILE_ELEM>;
+var<workgroup> tileNY:    array<f32, TILE_ELEM>;
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
-@group(1) @binding(0) var gAlbedo: texture_2d<f32>;
-@group(1) @binding(1) var gNormals: texture_2d<f32>;
-@group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
+@group(1) @binding(1) var gNormals:       texture_2d<f32>;
+@group(1) @binding(2) var gLinearDepth:   texture_2d<f32>;
 @group(1) @binding(3) var samplerGBuffer: sampler;
 
 @group(2) @binding(0) var aoTexture: texture_2d<f32>;
@@ -32,57 +39,140 @@ const BILATERAL_SIGMA_NORMAL: f32 = 0.5;
 
 @group(3) @binding(0) var outputAO: texture_storage_2d<rgba16float, write>;
 
-@compute @workgroup_size(8, 8, 1)
-fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let dstSize = vec2<i32>(textureDimensions(outputAO));
-    let coords  = vec2<i32>(global_id.xy);
+// ── Horizontal pass — 16×8 workgroup, halo in X ──────────────────────────────
+@compute @workgroup_size(16, 8, 1)
+fn cs_h(
+    @builtin(global_invocation_id) gid: vec3<u32>,
+    @builtin(local_invocation_id)  lid: vec3<u32>,
+    @builtin(workgroup_id)         wid: vec3<u32>,
+) {
+    let dstSize   = vec2<i32>(textureDimensions(outputAO));
+    let texelSize = 1.0 / vec2<f32>(dstSize);
+    let groupBase = vec2<i32>(wid.xy) * vec2<i32>(16, 8);
 
+    // ── Cooperative tile load: 22×8 = 176 elements, halo ±R in X ────────────
+    let localIdx = lid.y * 16u + lid.x; // 128 threads → 2 iterations to cover 176
+    for (var k = localIdx; k < TILE_ELEM; k += 128u) {
+        let tx = i32(k % TILE_W_H);
+        let ty = i32(k / TILE_W_H);
+        let srcCoord = clamp(
+            groupBase + vec2<i32>(tx - BILATERAL_RADIUS, ty),
+            vec2<i32>(0), dstSize - vec2<i32>(1)
+        );
+        let uv = (vec2<f32>(srcCoord) + 0.5) * texelSize;
+        tileAO[k]    = textureSampleLevel(aoTexture,    samplerAO,     uv, 0.0).r;
+        tileDepth[k] = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).x;
+        let nd = textureSampleLevel(gNormals, samplerGBuffer, uv, 0.0).xy;
+        tileNX[k] = nd.x;
+        tileNY[k] = nd.y;
+    }
+    workgroupBarrier();
+
+    let coords = vec2<i32>(gid.xy);
     if (coords.x >= dstSize.x || coords.y >= dstSize.y) { return; }
 
-    let centerUV = (vec2<f32>(coords) + 0.5) / vec2<f32>(dstSize);
+    // Center position within tile (lid.x + halo offset for X)
+    let lx = i32(lid.x) + BILATERAL_RADIUS;
+    let ly = i32(lid.y);
+    let centerIdx = u32(ly) * TILE_W_H + u32(lx);
 
-    // Early exit for sky pixels
-    let centerDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, centerUV, 0.0).x;
+    let centerDepth = tileDepth[centerIdx];
     if (centerDepth > 0.99) {
         textureStore(outputAO, coords, vec4<f32>(1.0, 0.0, 0.0, 1.0));
         return;
     }
 
-    let normalRoughnessData = textureSampleLevel(gNormals, samplerGBuffer, centerUV, 0.0);
-    let centerNormal = octahedral01ToNormal(normalRoughnessData.xy);
-    let centerAO = textureSampleLevel(aoTexture, samplerAO, centerUV, 0.0).r;
+    let centerN  = octahedral01ToNormal(vec2<f32>(tileNX[centerIdx], tileNY[centerIdx]));
+    let centerAO = tileAO[centerIdx];
 
-    // Full-resolution texel size — same offsets as the fragment version so the
-    // filter kernel radius is identical.
-    let texelSize = 1.0 / camera.screenSize;
+    var filteredAO  = 0.0;
+    var totalWeight = 0.0;
 
-    var filteredAO   = 0.0;
-    var totalWeight  = 0.0;
+    for (var r = -BILATERAL_RADIUS; r <= BILATERAL_RADIUS; r++) {
+        let idx    = u32(ly) * TILE_W_H + u32(lx + r);
+        let sAO    = tileAO[idx];
+        let sDepth = tileDepth[idx];
+        let sN     = octahedral01ToNormal(vec2<f32>(tileNX[idx], tileNY[idx]));
 
-    for (var x = -BILATERAL_RADIUS; x <= BILATERAL_RADIUS; x++) {
-        for (var y = -BILATERAL_RADIUS; y <= BILATERAL_RADIUS; y++) {
-            let offset    = vec2<f32>(f32(x), f32(y)) * texelSize;
-            let sampleUV  = clamp(centerUV + offset, vec2<f32>(0.0), vec2<f32>(1.0));
+        let depthDiff  = abs(centerDepth - sDepth);
+        let normalDiff = 1.0 - max(dot(centerN, sN), 0.0);
+        let w = exp(-f32(r * r) / (2.0 * f32(BILATERAL_RADIUS * BILATERAL_RADIUS)))
+              * exp(-depthDiff  / SIGMA_DEPTH)
+              * exp(-normalDiff / SIGMA_NORMAL);
 
-            let sampleDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, sampleUV, 0.0).x;
-            let sampleNormalData = textureSampleLevel(gNormals, samplerGBuffer, sampleUV, 0.0);
-            let sampleNormal = octahedral01ToNormal(sampleNormalData.xy);
-            let sampleAO = textureSampleLevel(aoTexture, samplerAO, sampleUV, 0.0).r;
-
-            let depthDiff  = abs(centerDepth - sampleDepth);
-            let normalDiff = 1.0 - max(dot(centerNormal, sampleNormal), 0.0);
-
-            let r2 = f32(x * x + y * y);
-            let spatialWeight = exp(-r2 / (2.0 * f32(BILATERAL_RADIUS * BILATERAL_RADIUS)));
-            let depthWeight   = exp(-depthDiff  / BILATERAL_SIGMA_DEPTH);
-            let normalWeight  = exp(-normalDiff / BILATERAL_SIGMA_NORMAL);
-
-            let weight = spatialWeight * depthWeight * normalWeight;
-            filteredAO   += sampleAO * weight;
-            totalWeight  += weight;
-        }
+        filteredAO  += sAO * w;
+        totalWeight += w;
     }
 
-    let result = select(centerAO, filteredAO / totalWeight, totalWeight > 0.0);
+    let result = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
+    textureStore(outputAO, coords, vec4<f32>(result, 0.0, 0.0, 1.0));
+}
+
+// ── Vertical pass — 8×16 workgroup, halo in Y ────────────────────────────────
+@compute @workgroup_size(8, 16, 1)
+fn cs_v(
+    @builtin(global_invocation_id) gid: vec3<u32>,
+    @builtin(local_invocation_id)  lid: vec3<u32>,
+    @builtin(workgroup_id)         wid: vec3<u32>,
+) {
+    let dstSize   = vec2<i32>(textureDimensions(outputAO));
+    let texelSize = 1.0 / vec2<f32>(dstSize);
+    let groupBase = vec2<i32>(wid.xy) * vec2<i32>(8, 16);
+
+    // ── Cooperative tile load: 8×22 = 176 elements, halo ±R in Y ────────────
+    let localIdx = lid.y * 8u + lid.x; // 128 threads → 2 iterations to cover 176
+    for (var k = localIdx; k < TILE_ELEM; k += 128u) {
+        let tx = i32(k % TILE_W_V);
+        let ty = i32(k / TILE_W_V);
+        let srcCoord = clamp(
+            groupBase + vec2<i32>(tx, ty - BILATERAL_RADIUS),
+            vec2<i32>(0), dstSize - vec2<i32>(1)
+        );
+        let uv = (vec2<f32>(srcCoord) + 0.5) * texelSize;
+        tileAO[k]    = textureSampleLevel(aoTexture,    samplerAO,     uv, 0.0).r;
+        tileDepth[k] = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).x;
+        let nd = textureSampleLevel(gNormals, samplerGBuffer, uv, 0.0).xy;
+        tileNX[k] = nd.x;
+        tileNY[k] = nd.y;
+    }
+    workgroupBarrier();
+
+    let coords = vec2<i32>(gid.xy);
+    if (coords.x >= dstSize.x || coords.y >= dstSize.y) { return; }
+
+    // Center position within tile (lid.y + halo offset for Y)
+    let lx = i32(lid.x);
+    let ly = i32(lid.y) + BILATERAL_RADIUS;
+    let centerIdx = u32(ly) * TILE_W_V + u32(lx);
+
+    let centerDepth = tileDepth[centerIdx];
+    if (centerDepth > 0.99) {
+        textureStore(outputAO, coords, vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        return;
+    }
+
+    let centerN  = octahedral01ToNormal(vec2<f32>(tileNX[centerIdx], tileNY[centerIdx]));
+    let centerAO = tileAO[centerIdx];
+
+    var filteredAO  = 0.0;
+    var totalWeight = 0.0;
+
+    for (var r = -BILATERAL_RADIUS; r <= BILATERAL_RADIUS; r++) {
+        let idx    = u32(ly + r) * TILE_W_V + u32(lx);
+        let sAO    = tileAO[idx];
+        let sDepth = tileDepth[idx];
+        let sN     = octahedral01ToNormal(vec2<f32>(tileNX[idx], tileNY[idx]));
+
+        let depthDiff  = abs(centerDepth - sDepth);
+        let normalDiff = 1.0 - max(dot(centerN, sN), 0.0);
+        let w = exp(-f32(r * r) / (2.0 * f32(BILATERAL_RADIUS * BILATERAL_RADIUS)))
+              * exp(-depthDiff  / SIGMA_DEPTH)
+              * exp(-normalDiff / SIGMA_NORMAL);
+
+        filteredAO  += sAO * w;
+        totalWeight += w;
+    }
+
+    let result = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
     textureStore(outputAO, coords, vec4<f32>(result, 0.0, 0.0, 1.0));
 }

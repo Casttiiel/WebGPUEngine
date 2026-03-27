@@ -186,18 +186,14 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let texelAO  = 1.0 / aoRes;
     let dirScale = texelAO * stride;
 
-    // Jitter — same interleaved 4×4 pattern as the fragment version
-    // pos.xy in the fragment shader was in framebuffer space (AO half-res).
-    // Here we use global_id.xy directly (same coordinate).
-    let fullResPx = vec2<f32>(coords) * 2.0;
-
-    let patternPx  = vec2<u32>(vec2<i32>(fullResPx)) % vec2<u32>(4u, 4u);
-    let patternIdx = f32(patternPx.y * 4u + patternPx.x);
-    let hashVal    = hash1(fullResPx);
-
+    // Jitter — pure spatial hash per pixel.
+    // The old interleaved 4×4 + hash mix produced structured noise that the
+    // bilateral filter cannot remove without deinterlacing logic. A single
+    // hash gives uniform, unstructured noise that the separable bilateral
+    // smooths correctly without artefacts.
     let sliceCount = i32(params.sliceCount);
     let sliceStep  = TWO_PI / f32(sliceCount);
-    let jitter     = (patternIdx + hashVal) / 16.0 * sliceStep;
+    let jitter     = hash1(vec2<f32>(coords)) * sliceStep;
 
     var visibility = 0.0;
     let numSamples = i32(params.sampleCount);

@@ -101,7 +101,8 @@ export class ModuleRender extends Module {
     'Spot Lights with Shadows': { value: '-' },
     // Compute effects
     'GTAO Compute': { value: '-' },
-    'AO Bilateral Filter Compute': { value: '-' },
+    'AO Bilateral Horizontal': { value: '-' },
+    'AO Bilateral Vertical': { value: '-' },
     'SSR Compute': { value: '-' },
     'SSR Blur': { value: '-' },
     SSGI: { value: '-' },

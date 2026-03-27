@@ -22,8 +22,9 @@ export class AmbientOcclusionComponent extends Component {
   private device: GPUDevice;
   private loaded = false;
 
-  // Render targets — both need STORAGE_BINDING (compute write) + TEXTURE_BINDING (read input)
+  // Render targets — all need STORAGE_BINDING (compute write) + TEXTURE_BINDING (read input)
   private rawAOTarget!: RenderTarget;
+  private intermediateAOTarget!: RenderTarget; // horizontal bilateral pass output
   private finalAOResult!: RenderTarget;
   private aoWidth = 0;
   private aoHeight = 0;
@@ -48,7 +49,8 @@ export class AmbientOcclusionComponent extends Component {
 
   // ── Compute pipelines ────────────────────────────────────────────────────────
   private gtaoPipeline!: GPUComputePipeline;
-  private bilateralPipeline!: GPUComputePipeline;
+  private bilateralHPipeline!: GPUComputePipeline; // horizontal pass (cs_h, 16×8)
+  private bilateralVPipeline!: GPUComputePipeline; // vertical   pass (cs_v,  8×16)
 
   // ── Bind group layouts (custom to this component) ────────────────────────────
   /** Group 2 of GTAO pass: UBO + hbaoSampler + noiseTexture + noiseSampler */
@@ -64,10 +66,14 @@ export class AmbientOcclusionComponent extends Component {
   private gtaoParamsBindGroup: GPUBindGroup | null = null;
   /** GTAO group 3 — storage write into rawAOTarget. Rebuilt on resize. */
   private gtaoOutputBindGroup: GPUBindGroup | null = null;
-  /** Bilateral group 2 — rawAOTarget as read texture. Rebuilt on resize. */
-  private bilateralInputBindGroup: GPUBindGroup | null = null;
-  /** Bilateral group 3 — storage write into finalAOResult. Rebuilt on resize. */
-  private bilateralOutputBindGroup: GPUBindGroup | null = null;
+  /** Bilateral-H group 2 — rawAOTarget as read texture. Rebuilt on resize. */
+  private bilateralHInputBindGroup: GPUBindGroup | null = null;
+  /** Bilateral-H group 3 — storage write into intermediateAOTarget. Rebuilt on resize. */
+  private bilateralHOutputBindGroup: GPUBindGroup | null = null;
+  /** Bilateral-V group 2 — intermediateAOTarget as read texture. Rebuilt on resize. */
+  private bilateralVInputBindGroup: GPUBindGroup | null = null;
+  /** Bilateral-V group 3 — storage write into finalAOResult. Rebuilt on resize. */
+  private bilateralVOutputBindGroup: GPUBindGroup | null = null;
 
   constructor() {
     super();
@@ -96,12 +102,21 @@ export class AmbientOcclusionComponent extends Component {
 
     // RENDER_ATTACHMENT: needed for the "disabled AO" clear render pass
     // TEXTURE_BINDING:   bilateral filter reads rawAOTarget as sampled texture
-    // STORAGE_BINDING:   compute shaders write to both targets
+    // STORAGE_BINDING:   compute shaders write to all targets
     const extraUsage = GPUTextureUsage.STORAGE_BINDING;
 
     this.rawAOTarget = new RenderTarget();
     this.rawAOTarget.createRT(
       'raw_ao_result.dds',
+      this.aoWidth,
+      this.aoHeight,
+      aoStorageFormat,
+      extraUsage,
+    );
+
+    this.intermediateAOTarget = new RenderTarget();
+    this.intermediateAOTarget.createRT(
+      'intermediate_ao_result.dds',
       this.aoWidth,
       this.aoHeight,
       aoStorageFormat,
@@ -135,10 +150,18 @@ export class AmbientOcclusionComponent extends Component {
     const extraUsage = GPUTextureUsage.STORAGE_BINDING;
 
     if (this.rawAOTarget) this.rawAOTarget.destroy();
+    if (this.intermediateAOTarget) this.intermediateAOTarget.destroy();
     if (this.finalAOResult) this.finalAOResult.destroy();
 
     this.rawAOTarget.createRT(
       'raw_ao_result.dds',
+      this.aoWidth,
+      this.aoHeight,
+      aoStorageFormat,
+      extraUsage,
+    );
+    this.intermediateAOTarget.createRT(
+      'intermediate_ao_result.dds',
       this.aoWidth,
       this.aoHeight,
       aoStorageFormat,
@@ -154,8 +177,10 @@ export class AmbientOcclusionComponent extends Component {
 
     // Texture-view bind groups reference stale GPU textures — must regenerate lazily
     this.gtaoOutputBindGroup = null;
-    this.bilateralInputBindGroup = null;
-    this.bilateralOutputBindGroup = null;
+    this.bilateralHInputBindGroup = null;
+    this.bilateralHOutputBindGroup = null;
+    this.bilateralVInputBindGroup = null;
+    this.bilateralVOutputBindGroup = null;
   }
 
   // ─── Setup helpers ────────────────────────────────────────────────────────────
@@ -208,7 +233,7 @@ export class AmbientOcclusionComponent extends Component {
     };
     this.gtaoPipeline = PipelineFactory.createComputePipeline(gtaoConfig);
 
-    // ── Bilateral filter ──────────────────────────────────────────────────────
+    // ── Bilateral filter (separable: horizontal + vertical) ──────────────────
     const bilateralCode = await ResourceManager.loadShader(
       'post-processing/ao_bilateral_filter.cs',
     );
@@ -216,17 +241,26 @@ export class AmbientOcclusionComponent extends Component {
       label: 'ao_bilateral_cs',
       code: bilateralCode,
     });
-    const bilateralConfig: ComputePipelineConfig = {
-      label: 'AO Bilateral Filter Compute Pipeline',
-      layout: PipelineFactory.createPipelineLayout('ao_bilateral_pipeline_layout', [
-        cameraLayout,
-        gbufferLayout,
-        BindGroupFactory.getSingleTextureComputeLayout(),
-        this.storageWriteR32Layout,
-      ]),
-      compute: { module: bilateralModule, entryPoint: 'cs' },
+    const bilateralLayout = PipelineFactory.createPipelineLayout('ao_bilateral_pipeline_layout', [
+      cameraLayout,
+      gbufferLayout,
+      BindGroupFactory.getSingleTextureComputeLayout(),
+      this.storageWriteR32Layout,
+    ]);
+
+    const bilateralHConfig: ComputePipelineConfig = {
+      label: 'AO Bilateral Filter Horizontal',
+      layout: bilateralLayout,
+      compute: { module: bilateralModule, entryPoint: 'cs_h' },
     };
-    this.bilateralPipeline = PipelineFactory.createComputePipeline(bilateralConfig);
+    this.bilateralHPipeline = PipelineFactory.createComputePipeline(bilateralHConfig);
+
+    const bilateralVConfig: ComputePipelineConfig = {
+      label: 'AO Bilateral Filter Vertical',
+      layout: bilateralLayout,
+      compute: { module: bilateralModule, entryPoint: 'cs_v' },
+    };
+    this.bilateralVPipeline = PipelineFactory.createComputePipeline(bilateralVConfig);
   }
 
   private createParamsBindGroup(): void {
@@ -272,10 +306,10 @@ export class AmbientOcclusionComponent extends Component {
     return this.gtaoOutputBindGroup;
   }
 
-  private getBilateralInputBindGroup(): GPUBindGroup {
-    if (!this.bilateralInputBindGroup) {
-      this.bilateralInputBindGroup = BindGroupFactory.createBindGroup(
-        'ao_bilateral_input_bindgroup',
+  private getBilateralHInputBindGroup(): GPUBindGroup {
+    if (!this.bilateralHInputBindGroup) {
+      this.bilateralHInputBindGroup = BindGroupFactory.createBindGroup(
+        'ao_bilateral_h_input_bindgroup',
         BindGroupFactory.getSingleTextureComputeLayout(),
         [
           { binding: 0, resource: this.rawAOTarget.getView() },
@@ -283,18 +317,43 @@ export class AmbientOcclusionComponent extends Component {
         ],
       );
     }
-    return this.bilateralInputBindGroup;
+    return this.bilateralHInputBindGroup;
   }
 
-  private getBilateralOutputBindGroup(): GPUBindGroup {
-    if (!this.bilateralOutputBindGroup) {
-      this.bilateralOutputBindGroup = BindGroupFactory.createBindGroup(
-        'ao_bilateral_output_bindgroup',
+  private getBilateralHOutputBindGroup(): GPUBindGroup {
+    if (!this.bilateralHOutputBindGroup) {
+      this.bilateralHOutputBindGroup = BindGroupFactory.createBindGroup(
+        'ao_bilateral_h_output_bindgroup',
+        this.storageWriteR32Layout,
+        [{ binding: 0, resource: this.intermediateAOTarget.getStorageView() }],
+      );
+    }
+    return this.bilateralHOutputBindGroup;
+  }
+
+  private getBilateralVInputBindGroup(): GPUBindGroup {
+    if (!this.bilateralVInputBindGroup) {
+      this.bilateralVInputBindGroup = BindGroupFactory.createBindGroup(
+        'ao_bilateral_v_input_bindgroup',
+        BindGroupFactory.getSingleTextureComputeLayout(),
+        [
+          { binding: 0, resource: this.intermediateAOTarget.getView() },
+          { binding: 1, resource: SamplerLibrary.simpleSampler },
+        ],
+      );
+    }
+    return this.bilateralVInputBindGroup;
+  }
+
+  private getBilateralVOutputBindGroup(): GPUBindGroup {
+    if (!this.bilateralVOutputBindGroup) {
+      this.bilateralVOutputBindGroup = BindGroupFactory.createBindGroup(
+        'ao_bilateral_v_output_bindgroup',
         this.storageWriteR32Layout,
         [{ binding: 0, resource: this.finalAOResult.getStorageView() }],
       );
     }
-    return this.bilateralOutputBindGroup;
+    return this.bilateralVOutputBindGroup;
   }
 
   // ─── Main compute entry point ─────────────────────────────────────────────────
@@ -316,6 +375,14 @@ export class AmbientOcclusionComponent extends Component {
     this.updateUniforms();
 
     const encoder = Render.getInstance().getCommandEncoder();
+
+    // Horizontal bilateral: workgroup 16×8 → dispatch ceil(W/16) × ceil(H/8)
+    const wHX = Math.ceil(this.aoWidth / 16);
+    const wHY = Math.ceil(this.aoHeight / 8);
+    // Vertical bilateral: workgroup 8×16 → dispatch ceil(W/8) × ceil(H/16)
+    const wVX = Math.ceil(this.aoWidth / 8);
+    const wVY = Math.ceil(this.aoHeight / 16);
+    // GTAO: workgroup 8×8
     const wX = Math.ceil(this.aoWidth / 8);
     const wY = Math.ceil(this.aoHeight / 8);
 
@@ -333,19 +400,33 @@ export class AmbientOcclusionComponent extends Component {
     gtaoPass.dispatchWorkgroups(wX, wY, 1);
     gtaoPass.end();
 
-    // ── Pass 2: Bilateral filter ──────────────────────────────────────────────
-    const bilateralTs = GPUProfiler.getInstance().getTimestampWrites('AO Bilateral Filter Compute');
-    const bilateralPass = encoder.beginComputePass({
-      label: 'AO Bilateral Filter Compute',
-      ...(bilateralTs ? { timestampWrites: bilateralTs } : {}),
+    // ── Pass 2: Bilateral filter — horizontal (cs_h) ─────────────────────────
+    const bilHTs = GPUProfiler.getInstance().getTimestampWrites('AO Bilateral Horizontal');
+    const bilHPass = encoder.beginComputePass({
+      label: 'AO Bilateral Filter Horizontal',
+      ...(bilHTs ? { timestampWrites: bilHTs } : {}),
     });
-    bilateralPass.setPipeline(this.bilateralPipeline);
-    bilateralPass.setBindGroup(0, cameraBindGroup);
-    bilateralPass.setBindGroup(1, gBufferComputeBindGroup);
-    bilateralPass.setBindGroup(2, this.getBilateralInputBindGroup());
-    bilateralPass.setBindGroup(3, this.getBilateralOutputBindGroup());
-    bilateralPass.dispatchWorkgroups(wX, wY, 1);
-    bilateralPass.end();
+    bilHPass.setPipeline(this.bilateralHPipeline);
+    bilHPass.setBindGroup(0, cameraBindGroup);
+    bilHPass.setBindGroup(1, gBufferComputeBindGroup);
+    bilHPass.setBindGroup(2, this.getBilateralHInputBindGroup());
+    bilHPass.setBindGroup(3, this.getBilateralHOutputBindGroup());
+    bilHPass.dispatchWorkgroups(wHX, wHY, 1);
+    bilHPass.end();
+
+    // ── Pass 3: Bilateral filter — vertical (cs_v) ───────────────────────────
+    const bilVTs = GPUProfiler.getInstance().getTimestampWrites('AO Bilateral Vertical');
+    const bilVPass = encoder.beginComputePass({
+      label: 'AO Bilateral Filter Vertical',
+      ...(bilVTs ? { timestampWrites: bilVTs } : {}),
+    });
+    bilVPass.setPipeline(this.bilateralVPipeline);
+    bilVPass.setBindGroup(0, cameraBindGroup);
+    bilVPass.setBindGroup(1, gBufferComputeBindGroup);
+    bilVPass.setBindGroup(2, this.getBilateralVInputBindGroup());
+    bilVPass.setBindGroup(3, this.getBilateralVOutputBindGroup());
+    bilVPass.dispatchWorkgroups(wVX, wVY, 1);
+    bilVPass.end();
 
     return this.finalAOResult.getView();
   }
