@@ -118,7 +118,7 @@ fn fs(input: StoneVertexOutput) -> FragmentOutput {
     let brushDirection = abs(dot(Nw, normalize(vec3<f32>(0.3, 1.0, 0.2))));
     let directionalMask = mix(brushMask * 0.6, brushMask, brushDirection);
 
-    let baseColor = albedo_color.rgb * factors.baseColorFactor.rgb;
+    let baseColor = pow(abs(albedo_color.rgb), vec3<f32>(2.2)) * factors.baseColorFactor.rgb;
 
     // Variación pictórica de valor
     let paintedColor = mix(
@@ -137,9 +137,16 @@ fn fs(input: StoneVertexOutput) -> FragmentOutput {
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);
     
-    let roughness = textureSample(txRoughness, samplerState, input.Uv).g * factors.roughnessFactor;
+    let roughness_raw = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
+
+    // Specular Anti-Aliasing — same as gbuffer.fs
+    let dndx = dpdx(N);
+    let dndy = dpdy(N);
+    let variance = dot(dndx, dndx) + dot(dndy, dndy);
+    let kernelRough2 = min(2.0 * variance * 0.25, 0.18);
+    let rough2 = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
     let finalRoughness = clamp(
-        roughness * mix(0.85, 1.15, brush),
+        sqrt(rough2) * mix(0.85, 1.15, brush),
         0.04,
         1.0
     );

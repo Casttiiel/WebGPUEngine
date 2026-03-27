@@ -99,9 +99,6 @@ fn shade_psx(iPosition: vec2<f32>, fragPos: vec4<f32>, use_shadows: bool, fix_sh
 
     let NdL = max(dot(g.normal, light_dir), 0.0);
     let NdV = max(dot(g.normal, g.viewDir), 0.0);
-    if (NdL <= 0.0 || NdV <= 0.0) {
-        return vec4<f32>(0.0);
-    }
     let h = normalize(light_dir + g.viewDir);
 
     let NdH = saturate(dot(g.normal, h));

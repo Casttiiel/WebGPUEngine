@@ -53,9 +53,6 @@ fn shade(iPosition: vec2<f32>, use_shadows: bool, fix_shadows: bool) -> vec4<f32
     
     let NdL = max(dot(g.normal, light_dir), 0.0); // No minimum lighting on back faces
     let NdV = max(dot(g.normal, g.viewDir), 0.0);
-    if (NdL <= 0.0 || NdV <= 0.0) {
-        return vec4<f32>(0.0);
-    }
     let h = normalize(light_dir + g.viewDir); // half vector
     
     let NdH = saturate(dot(g.normal, h));

@@ -52,9 +52,6 @@ fn fs(@location(0) uv: vec2<f32>,) -> @location(0) vec4<f32> {
     
     let NdL = max(saturate(dot(g.normal, light_dir)), 0.05);
     let NdV = max(saturate(dot(g.normal, g.viewDir)), 0.05);
-    if (NdL <= 0.0 || NdV <= 0.0) {
-        return vec4<f32>(0.0);
-    }
     let h = normalize(light_dir + g.viewDir); // half vector
     
     let NdH = saturate(dot(g.normal, h));

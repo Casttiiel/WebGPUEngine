@@ -121,9 +121,6 @@ fn PS_point_lights_shadow(@builtin(position) fragPos: vec4<f32>) -> @location(0)
 
     let NdL = max(NdL_raw, 0.0);
     let NdV = max(dot(g.normal, g.viewDir), 0.0);
-    if (NdL <= 0.0 || NdV <= 0.0) {
-        return vec4<f32>(0.0);
-    }
 
     let h   = normalize(light_dir + g.viewDir);
     let NdH = saturate(dot(g.normal, h));

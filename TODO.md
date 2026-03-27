@@ -1,26 +1,24 @@
 ### Engine
 
-1. Transparency dithered?
-2. (Quitar Decal) Normal de suelo con luces raro en spot light
-3. Point light usa normal?
-4. DBuffer (Compare my Deferred renderer with UE)
-5. HZB Culling regulero
-6. Baja resolución — 320×240 con upscaling
+1. DBuffer (Compare my Deferred renderer with UE)
+2. HZB Culling regulero
+3. Transparency dithered
+4. Baja resolución — 320×240 con upscaling
 
-7. Froxel Self Occlusion
-8. Froxel Density Volumes
-9. Light Shafts pixelados
-10. Voxel Cone Tracing
-11. Enemy AI
-    Fase 2 — Navegación real
-    ├── Waypoint graph (authorado en Blender → JSON)
-    ├── A\* sobre el grafo
-    └── PathFollower / Steering (seek + arrive)
-    → El enemigo ahora rodea obstáculos
+5. Froxel Self Occlusion
+6. Froxel Density Volumes
+7. Light Shafts pixelados
+8. Voxel Cone Tracing
+9. Enemy AI
+   Fase 2 — Navegación real
+   ├── Waypoint graph (authorado en Blender → JSON)
+   ├── A\* sobre el grafo
+   └── PathFollower / Steering (seek + arrive)
+   → El enemigo ahora rodea obstáculos
 
-    Fase 3 — Polish
-    └── AnimationStateMachine driven by BT state
-    (idle → patrol → chase → attack)
+   Fase 3 — Polish
+   └── AnimationStateMachine driven by BT state
+   (idle → patrol → chase → attack)
 
 ## Gameplay
 
