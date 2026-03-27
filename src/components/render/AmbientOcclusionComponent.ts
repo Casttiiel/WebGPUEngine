@@ -49,8 +49,8 @@ export class AmbientOcclusionComponent extends Component {
 
   // ── Compute pipelines ────────────────────────────────────────────────────────
   private gtaoPipeline!: GPUComputePipeline;
-  private bilateralHPipeline!: GPUComputePipeline;    // horizontal pass (cs_h, 16×8)
-  private bilateralVPipeline!: GPUComputePipeline;    // vertical   pass (cs_v,  8×16)
+  private bilateralHPipeline!: GPUComputePipeline; // horizontal pass (cs_h, 16×8)
+  private bilateralVPipeline!: GPUComputePipeline; // vertical   pass (cs_v,  8×16)
   private bilateralVPSXPipeline!: GPUComputePipeline; // vertical PSX   pass (cs_v_psx, 8×16)
 
   // ── Bind group layouts (custom to this component) ────────────────────────────
