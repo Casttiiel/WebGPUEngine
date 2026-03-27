@@ -49,8 +49,9 @@ export class AmbientOcclusionComponent extends Component {
 
   // ── Compute pipelines ────────────────────────────────────────────────────────
   private gtaoPipeline!: GPUComputePipeline;
-  private bilateralHPipeline!: GPUComputePipeline; // horizontal pass (cs_h, 16×8)
-  private bilateralVPipeline!: GPUComputePipeline; // vertical   pass (cs_v,  8×16)
+  private bilateralHPipeline!: GPUComputePipeline;    // horizontal pass (cs_h, 16×8)
+  private bilateralVPipeline!: GPUComputePipeline;    // vertical   pass (cs_v,  8×16)
+  private bilateralVPSXPipeline!: GPUComputePipeline; // vertical PSX   pass (cs_v_psx, 8×16)
 
   // ── Bind group layouts (custom to this component) ────────────────────────────
   /** Group 2 of GTAO pass: UBO + hbaoSampler + noiseTexture + noiseSampler */
@@ -261,6 +262,13 @@ export class AmbientOcclusionComponent extends Component {
       compute: { module: bilateralModule, entryPoint: 'cs_v' },
     };
     this.bilateralVPipeline = PipelineFactory.createComputePipeline(bilateralVConfig);
+
+    const bilateralVPSXConfig: ComputePipelineConfig = {
+      label: 'AO Bilateral Filter Vertical PSX',
+      layout: bilateralLayout,
+      compute: { module: bilateralModule, entryPoint: 'cs_v_psx' },
+    };
+    this.bilateralVPSXPipeline = PipelineFactory.createComputePipeline(bilateralVPSXConfig);
   }
 
   private createParamsBindGroup(): void {
@@ -414,13 +422,14 @@ export class AmbientOcclusionComponent extends Component {
     bilHPass.dispatchWorkgroups(wHX, wHY, 1);
     bilHPass.end();
 
-    // ── Pass 3: Bilateral filter — vertical (cs_v) ───────────────────────────
+    // ── Pass 3: Bilateral filter — vertical (cs_v / cs_v_psx) ─────────────────
+    const isPSX = QualitySettings.getInstance().getSettings().ditheringMode === 'psx';
     const bilVTs = GPUProfiler.getInstance().getTimestampWrites('AO Bilateral Vertical');
     const bilVPass = encoder.beginComputePass({
       label: 'AO Bilateral Filter Vertical',
       ...(bilVTs ? { timestampWrites: bilVTs } : {}),
     });
-    bilVPass.setPipeline(this.bilateralVPipeline);
+    bilVPass.setPipeline(isPSX ? this.bilateralVPSXPipeline : this.bilateralVPipeline);
     bilVPass.setBindGroup(0, cameraBindGroup);
     bilVPass.setBindGroup(1, gBufferComputeBindGroup);
     bilVPass.setBindGroup(2, this.getBilateralVInputBindGroup());
