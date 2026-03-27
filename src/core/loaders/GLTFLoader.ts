@@ -288,8 +288,13 @@ export class GLTFLoader {
       technique = 'utility/oit_gather.tech';
       fs = 'utility/oit_gather.fs';
     } else if (isBlend) {
-      technique = 'utility/transparent.tech';
-      fs = 'utility/transparent.fs';
+      if (isDither) {
+        technique = 'gbuffer/gbuffer_dither.tech';
+        fs = 'gbuffer/gbuffer_dither.fs';
+      } else {
+        technique = 'utility/transparent.tech';
+        fs = 'utility/transparent.fs';
+      }
     }
 
     // Decals always need an inline techniqueData (GBufferUniforms at group 3).
