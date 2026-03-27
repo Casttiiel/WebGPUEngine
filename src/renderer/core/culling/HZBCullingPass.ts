@@ -39,6 +39,9 @@ export class HZBCullingPass {
   private cameraBuffer!: GPUBuffer;
   private cpuCamera = new Float32Array(CAMERA_HZB_SIZE / 4); // 20 floats
   private viewProj = mat4.create();
+  /** Previous frame's viewProj — the one actually used to build the current HZB. */
+  private prevViewProj = mat4.create();
+  private hasPrevViewProj = false;
 
   // ---- Debug readback: count objects culled by HZB each frame -------------
   /** Atomic counter written by the shader (STORAGE | COPY_SRC | COPY_DST). */
@@ -215,11 +218,23 @@ export class HZBCullingPass {
     this.device.queue.writeBuffer(this.counterBuffer, 0, this.zeroU32);
 
     // ---- Update camera uniform ---------------------------------------------
+    // Compute the CURRENT frame's viewProj to store for next frame.
     mat4.multiply(this.viewProj, camera.getProjection(), camera.getView());
 
-    // viewProj mat4 (floats 0..15)
+    // The HZB was built from the PREVIOUS frame's depth buffer, which was rendered
+    // with the previous frame's viewProj.  Using the current frame's matrices would
+    // project AABBs to UV coordinates that don't correspond to the HZB content,
+    // causing false culling whenever the camera moves.
+    // Skip culling on the very first frame (no prev matrix yet).
+    if (!this.hasPrevViewProj) {
+      mat4.copy(this.prevViewProj, this.viewProj);
+      this.hasPrevViewProj = true;
+      return;
+    }
+
+    // Use PREVIOUS frame's viewProj for the projection — matches the HZB content.
     for (let i = 0; i < 16; i++) {
-      this.cpuCamera[i] = this.viewProj[i]!;
+      this.cpuCamera[i] = this.prevViewProj[i]!;
     }
     // hzbWidth (float 16), hzbHeight (float 17), hzbMipCount (float 18), _pad (float 19)
     this.cpuCamera[16] = hzbBuilder.getWidth();
@@ -228,6 +243,9 @@ export class HZBCullingPass {
     this.cpuCamera[19] = 0.0;
 
     this.device.queue.writeBuffer(this.cameraBuffer, 0, this.cpuCamera);
+
+    // Store current viewProj so next frame can use it as "previous".
+    mat4.copy(this.prevViewProj, this.viewProj);
 
     // ---- Build bind group (cached — only recreate when inputs change) ------
     if (

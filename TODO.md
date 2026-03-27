@@ -1,14 +1,13 @@
 ### Engine
 
-1. HZB Culling regulero
-2. Transparency dithered
-3. Baja resolución — 320×240 con upscaling
+1. Transparency dithered
+2. Baja resolución — 320×240 con upscaling
 
-4. Froxel Self Occlusion
-5. Froxel Density Volumes
-6. Light Shafts pixelados
-7. Voxel Cone Tracing
-8. Enemy AI
+3. Froxel Self Occlusion
+4. Froxel Density Volumes
+5. Light Shafts pixelados
+6. Voxel Cone Tracing
+7. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo

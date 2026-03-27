@@ -138,21 +138,25 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let uvMinY = 1.0 - (ndcMaxXY.y * 0.5 + 0.5);  // flip Y
   let uvMaxY = 1.0 - (ndcMinXY.y * 0.5 + 0.5);
 
-  // --- Select HZB mip level (floor strategy, 4-corner sampling) ------------
-  // Use floor(log2) so the projected footprint spans AT MOST 2×2 texels at
-  // the chosen mip.  We then sample all 4 corners of the footprint and take
-  // the maximum — this guarantees a conservative (highest) depth value over
-  // the entire projected area without ever under-estimating the occluder depth.
+  // --- Select HZB mip level (ceil strategy, 4-corner sampling) -------------
+  // Use ceil(log2) so the projected footprint spans AT MOST 1 texel at the
+  // chosen mip.  With < 1 texel footprint the footprint can cross at most ONE
+  // texel boundary, so the 4-corner samples (tx0/tx1 × ty0/ty1) always cover
+  // every HZB texel that the projection touches — no texel is ever skipped.
   //
-  // Why NOT ceil(log2) + centre sample:
-  //   - ceil forces a coarser mip where the footprint fits in 1 texel, but
-  //     the footprint may straddle two texels → the centre sample misses half.
-  //   - At large distances (projPixels < 1) ceil = 0 and the centre texel
-  //     may not coincide with the wall at all.
+  // floor(log2) was previously used here but it is incorrect: a footprint of
+  // e.g. 1.999 mip-texels starting at fractional offset 0.001 straddles 3
+  // unique texels, yet corner sampling only reads 2 of them.  If the skipped
+  // middle texel is the only open region (background depth = 1.0) the test
+  // sees hzbMaxDepth = occluder_depth < ndcMinZ and incorrectly culls an
+  // object that is partially visible through that gap.
+  //
+  // The cost is one extra mip level (fewer culled objects per frame), but
+  // correctness is more important than cull rate for partially-visible objects.
   let projPixelW = (uvMaxX - uvMinX) * camera.hzbWidth;
   let projPixelH = (uvMaxY - uvMinY) * camera.hzbHeight;
   let projPixelMax = max(max(projPixelW, projPixelH), 1.0);
-  let mip = i32(clamp(floor(log2(projPixelMax)), 0.0, camera.hzbMipCount - 1.0));
+  let mip = i32(clamp(ceil(log2(projPixelMax)), 0.0, camera.hzbMipCount - 1.0));
 
   // --- Sample the 4 corners of the projected footprint at this mip ---------
   let mipDims = vec2<f32>(textureDimensions(hzbTexture, mip));
