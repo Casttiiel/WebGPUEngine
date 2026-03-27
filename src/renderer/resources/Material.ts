@@ -158,7 +158,8 @@ export class Material extends GPUResource {
         materialData?.emissiveFactor !== undefined ? materialData.emissiveFactor : 1.0,
       uvXScale: materialData?.uvXScale !== undefined ? materialData.uvXScale : 1.0,
       uvYScale: materialData?.uvYScale !== undefined ? materialData.uvYScale : 1.0,
-      appearanceBlend: materialData?.appearanceBlend !== undefined ? materialData.appearanceBlend : 1.0,
+      appearanceBlend:
+        materialData?.appearanceBlend !== undefined ? materialData.appearanceBlend : 1.0,
       surfaceBlend: materialData?.surfaceBlend !== undefined ? materialData.surfaceBlend : 1.0,
       castsShadows: materialData?.casts_shadows !== undefined ? materialData.casts_shadows : true,
       shadows: materialData?.shadows !== undefined ? materialData.shadows : false,
@@ -260,9 +261,18 @@ export class Material extends GPUResource {
     GPUUtils.writeBuffer(
       uniformBuffer,
       16,
-      new Float32Array([this.roughnessFactor, this.metallicFactor, this.emissiveFactor, this.appearanceBlend]),
+      new Float32Array([
+        this.roughnessFactor,
+        this.metallicFactor,
+        this.emissiveFactor,
+        this.appearanceBlend,
+      ]),
     );
-    GPUUtils.writeBuffer(uniformBuffer, 32, new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, 0]));
+    GPUUtils.writeBuffer(
+      uniformBuffer,
+      32,
+      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, 0]),
+    );
 
     entries.push({
       binding: 6,
