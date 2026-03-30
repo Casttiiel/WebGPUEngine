@@ -1,22 +1,26 @@
 ### Engine
 
-1. Area light
-2. Consistency between dither / Dither size
+1. MIP Fog - Sun Volumetrics - Run Volumetrics - Horizon Blend Fog - Distance Contrast - Near Fog Color Override
+2. Cubemap Specular Occlusion
+3. Voxel Ray Tracing / Voxel Cone Tracing
+4. Tile based light culling
+5. SMAA + TAA
+6. Area light
 
-3. Froxel Self Occlusion
-4. Froxel Density Volumes
-5. Light Shafts pixelados
-6. Voxel Cone Tracing
-7. Enemy AI
-   Fase 2 — Navegación real
-   ├── Waypoint graph (authorado en Blender → JSON)
-   ├── A\* sobre el grafo
-   └── PathFollower / Steering (seek + arrive)
-   → El enemigo ahora rodea obstáculos
+7. Consistency between dither / Dither size
+8. Froxel Self Occlusion
+9. Froxel Density Volumes
+10. Light Shafts pixelados
+11. Enemy AI
+    Fase 2 — Navegación real
+    ├── Waypoint graph (authorado en Blender → JSON)
+    ├── A\* sobre el grafo
+    └── PathFollower / Steering (seek + arrive)
+    → El enemigo ahora rodea obstáculos
 
-   Fase 3 — Polish
-   └── AnimationStateMachine driven by BT state
-   (idle → patrol → chase → attack)
+    Fase 3 — Polish
+    └── AnimationStateMachine driven by BT state
+    (idle → patrol → chase → attack)
 
 ## Gameplay
 
@@ -44,3 +48,4 @@
 13. Thin-film / Iridescence - Interferencia de películas finas (burbujas, insectos, nácar)
 14. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
 15. Staggered cascades
+16. Glass (Uncharted)

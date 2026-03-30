@@ -157,6 +157,22 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * G-Buffer layout extended with AO texture + sampler (bindings 4 and 5).
+   * Used by all lighting shaders so they can read the AO micro-shadow term
+   * without needing an extra bind group slot.
+   */
+  public static getGBufferWithAOLayout(): GPUBindGroupLayout {
+    return this.getLayout('gbuffer_with_ao', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } }, // AO micro-shadow
+      { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } }, // AO sampler
+    ]);
+  }
+
   /** Same structure as getGBufferLayout() but with COMPUTE visibility — for AO/SSGI compute passes. */
   public static getGBufferComputeLayout(): GPUBindGroupLayout {
     return this.getLayout('gbuffer_compute', [
@@ -1524,6 +1540,8 @@ export class BindGroupFactory {
         return this.getAmbientUniformsLayout();
       case PipelineBindGroupLayouts.GBUFFER_UNIFORMS:
         return this.getGBufferLayout();
+      case PipelineBindGroupLayouts.GBUFFER_WITH_AO_UNIFORMS:
+        return this.getGBufferWithAOLayout();
       case PipelineBindGroupLayouts.BUFFER_UNIFORM:
         return this.getBufferUniformLayout();
       case PipelineBindGroupLayouts.DEPTH_TEXTURE:

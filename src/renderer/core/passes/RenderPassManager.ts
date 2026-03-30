@@ -186,6 +186,25 @@ export class RenderPassManager {
   }
 
   /**
+   * Propagates the extended G-Buffer+AO bind group to all four lighting render passes.
+   * Call this once per frame in renderAccLight(), after computing the AO result.
+   */
+  public updateLightingPassesGBufferWithAO(gBufferWithAOBindGroup: GPUBindGroup): void {
+    (
+      this.renderPasses.get('pointLights') as PointLightRenderPass | undefined
+    )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
+    (
+      this.renderPasses.get('pointLightsWithShadows') as PointLightWithShadowsRenderPass | undefined
+    )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
+    (
+      this.renderPasses.get('spotLights') as SpotLightRenderPass | undefined
+    )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
+    (
+      this.renderPasses.get('spotLightsWithShadows') as SpotLightWithShadowsRenderPass | undefined
+    )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
+  }
+
+  /**
    * Execute a dynamic render pass directly without registration
    */
   public executeDynamicPass(

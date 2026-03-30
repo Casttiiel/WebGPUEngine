@@ -14,6 +14,7 @@ export class PointLightRenderPass extends BaseRenderPass {
   private technique!: Technique;
   private mesh!: Mesh;
   private gBufferBindGroup!: GPUBindGroup;
+  private gBufferWithAOBindGroup: GPUBindGroup | null = null;
 
   constructor(
     config: RenderPassConfig,
@@ -25,6 +26,10 @@ export class PointLightRenderPass extends BaseRenderPass {
     this.technique = technique;
     this.mesh = mesh;
     this.gBufferBindGroup = gBufferBindGroup;
+  }
+
+  public updateGBufferWithAOBindGroup(bg: GPUBindGroup): void {
+    this.gBufferWithAOBindGroup = bg;
   }
 
   protected render(pass: GPURenderPassEncoder): void {
@@ -39,7 +44,7 @@ export class PointLightRenderPass extends BaseRenderPass {
 
     // 3. Set bind groups
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+    pass.setBindGroup(1, this.gBufferWithAOBindGroup ?? this.gBufferBindGroup); // GBuffer + AO
 
     // 4. Render all point lights WITHOUT shadows
     for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
@@ -67,6 +72,7 @@ export class SpotLightRenderPass extends BaseRenderPass {
   private technique!: Technique;
   private mesh!: Mesh;
   private gBufferBindGroup!: GPUBindGroup;
+  private gBufferWithAOBindGroup: GPUBindGroup | null = null;
 
   constructor(
     config: RenderPassConfig,
@@ -78,6 +84,10 @@ export class SpotLightRenderPass extends BaseRenderPass {
     this.technique = technique;
     this.mesh = mesh;
     this.gBufferBindGroup = gBufferBindGroup;
+  }
+
+  public updateGBufferWithAOBindGroup(bg: GPUBindGroup): void {
+    this.gBufferWithAOBindGroup = bg;
   }
 
   protected render(pass: GPURenderPassEncoder): void {
@@ -92,7 +102,7 @@ export class SpotLightRenderPass extends BaseRenderPass {
 
     // 3. Set bind groups
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+    pass.setBindGroup(1, this.gBufferWithAOBindGroup ?? this.gBufferBindGroup); // GBuffer + AO
 
     // 4. Render all spot lights
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
@@ -112,6 +122,7 @@ export class SpotLightWithShadowsRenderPass extends BaseRenderPass {
   private technique!: Technique;
   private mesh!: Mesh;
   private gBufferBindGroup!: GPUBindGroup;
+  private gBufferWithAOBindGroup: GPUBindGroup | null = null;
 
   constructor(
     config: RenderPassConfig,
@@ -123,6 +134,10 @@ export class SpotLightWithShadowsRenderPass extends BaseRenderPass {
     this.technique = technique;
     this.mesh = mesh;
     this.gBufferBindGroup = gBufferBindGroup;
+  }
+
+  public updateGBufferWithAOBindGroup(bg: GPUBindGroup): void {
+    this.gBufferWithAOBindGroup = bg;
   }
 
   protected render(pass: GPURenderPassEncoder): void {
@@ -137,7 +152,7 @@ export class SpotLightWithShadowsRenderPass extends BaseRenderPass {
 
     // 3. Set bind groups
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // Camera uniforms
-    pass.setBindGroup(1, this.gBufferBindGroup); // GBuffer textures
+    pass.setBindGroup(1, this.gBufferWithAOBindGroup ?? this.gBufferBindGroup); // GBuffer + AO
 
     // 4. Render all spot lights
     for (const comp of Engine.getEntities().getObjectManagerByName('spot_light')?.getList() ?? []) {
@@ -160,6 +175,7 @@ export class PointLightWithShadowsRenderPass extends BaseRenderPass {
   private technique!: Technique;
   private mesh!: Mesh;
   private gBufferBindGroup!: GPUBindGroup;
+  private gBufferWithAOBindGroup: GPUBindGroup | null = null;
 
   constructor(
     config: RenderPassConfig,
@@ -173,13 +189,17 @@ export class PointLightWithShadowsRenderPass extends BaseRenderPass {
     this.gBufferBindGroup = gBufferBindGroup;
   }
 
+  public updateGBufferWithAOBindGroup(bg: GPUBindGroup): void {
+    this.gBufferWithAOBindGroup = bg;
+  }
+
   protected render(pass: GPURenderPassEncoder): void {
     GPUUtils.configureViewportAndScissor(pass);
     this.technique.activatePipeline(pass);
     this.mesh.activate(pass);
 
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
-    pass.setBindGroup(1, this.gBufferBindGroup);
+    pass.setBindGroup(1, this.gBufferWithAOBindGroup ?? this.gBufferBindGroup); // GBuffer + AO
 
     for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
       []) {

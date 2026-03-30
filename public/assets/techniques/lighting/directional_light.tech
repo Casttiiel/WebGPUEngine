@@ -6,7 +6,7 @@
     "blend": "additive",
     "uniforms": [
         "CameraUniforms",
-        "GBufferUniforms",
+        "GBufferWithAOUniforms",
         "DirectionalLightUniforms"
     ]
 }

@@ -4,7 +4,7 @@
     "fsEntryPoint": "PS_point_lights_shadow",
     "uniforms": [
         "CameraUniforms",
-        "GBufferUniforms",
+        "GBufferWithAOUniforms",
         "ObjectUniforms",
         "PointLightShadowUniforms"
     ],

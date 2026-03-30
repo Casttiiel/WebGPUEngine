@@ -37,6 +37,9 @@ struct LightUniforms {
 @group(3) @binding(3) var projectorTexture: texture_2d<f32>; // bound to white, unused
 @group(3) @binding(4) var projectorSampler: sampler;
 
+@group(1) @binding(4) var gAOMicroShadow:       texture_2d<f32>;
+@group(1) @binding(5) var aoMicroShadowSampler: sampler;
+
 @fragment
 fn PS_point_lights_shadow(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pos = position.xy / camera.screenSize;
@@ -94,6 +97,8 @@ fn PS_point_lights_shadow(@builtin(position) position: vec4<f32>) -> @location(0
     let specular_contrib = cSpec;
 
     let hl = halfLambert(NdL);
-    let final_color = light.color.xyz * light.intensity * shadow_factor * (diffuse_contrib * hl + specular_contrib * NdL) * att;
+    let ao  = textureSampleLevel(gAOMicroShadow, aoMicroShadowSampler, pos, 0.0).r;
+    let ms  = microShadow(ao, NdL);
+    let final_color = light.color.xyz * light.intensity * shadow_factor * (diffuse_contrib * hl + specular_contrib * NdL) * att * ms;
     return vec4<f32>(final_color, 1.0);
 }

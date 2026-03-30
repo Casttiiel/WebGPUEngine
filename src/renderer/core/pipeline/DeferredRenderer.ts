@@ -53,6 +53,9 @@ export class DeferredRenderer {
   private oitComposeBindGroup!: GPUBindGroup;
   private oitGlassEnvBindGroup: GPUBindGroup | null = null;
   private aoResult!: GPUTextureView;
+  // Cached extended G-Buffer+AO bind group for lighting shaders. Rebuilt when aoResult changes.
+  private gBufferWithAOBindGroup: GPUBindGroup | null = null;
+  private lastAOViewForGBuffer: GPUTextureView | null = null;
 
   private rtCopyAlbedos!: RenderTarget;
   private rtCopyNormals!: RenderTarget;
@@ -454,23 +457,44 @@ export class DeferredRenderer {
   }
 
   private renderAccLight(): void {
+    // Build (or reuse) the extended G-Buffer+AO bind group once per frame.
+    if (!this.gBufferWithAOBindGroup || this.aoResult !== this.lastAOViewForGBuffer) {
+      const rts = this.gBufferPass.getRenderTargets();
+      this.gBufferWithAOBindGroup = BindGroupFactory.createBindGroup(
+        'gbuffer_with_ao_bg',
+        BindGroupFactory.getGBufferWithAOLayout(),
+        [
+          { binding: 0, resource: rts.albedos.getView()! },
+          { binding: 1, resource: rts.normals.getView()! },
+          { binding: 2, resource: rts.linearDepth.getView()! },
+          { binding: 3, resource: SamplerLibrary.nonFilteringSampler! },
+          { binding: 4, resource: this.aoResult },
+          { binding: 5, resource: SamplerLibrary.simpleSampler! },
+        ],
+      );
+      this.lastAOViewForGBuffer = this.aoResult;
+    }
+
     this.ambientLight.renderDiffuse(
       this.rtAccLight.getView(),
       this.gBufferBindGroup,
       this.aoResult,
     );
 
-    // Directional lights receive the shadow factor and apply it to their own contribution only
+    // Directional lights: pass the extended G-Buffer+AO bind group as their group 1
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
       const directionalLightComponent = comp as DirectionalLightComponent;
       directionalLightComponent.render(
         this.rtAccLight.getView(),
-        this.gBufferBindGroup,
+        this.gBufferWithAOBindGroup!,
         this.whiteTexture.getTextureView()!,
       );
     }
+
+    // Propagate extended G-Buffer+AO bind group to point/spot light passes.
+    this.renderPassManager.updateLightingPassesGBufferWithAO(this.gBufferWithAOBindGroup!);
     this.renderPassManager.executePass('pointLights');
     this.renderPassManager.executePass('pointLightsWithShadows');
     this.renderPassManager.executePass('spotLights');
@@ -561,6 +585,8 @@ export class DeferredRenderer {
     }
 
     this.aoResult = null as any;
+    this.gBufferWithAOBindGroup = null;
+    this.lastAOViewForGBuffer = null;
   }
 
   public destroy(): void {

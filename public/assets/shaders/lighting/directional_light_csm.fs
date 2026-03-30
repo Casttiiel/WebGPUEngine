@@ -27,6 +27,10 @@ alias LightUniformsCSM = DirectionalLightCSMUniforms;
 @group(2) @binding(5) var contactShadowMap:     texture_2d<f32>;
 @group(2) @binding(6) var contactShadowSampler: sampler;
 
+// Micro-shadow AO (baked or screen-space). Sampled at half-res so simpleSampler is sufficient.
+@group(1) @binding(4) var gAOMicroShadow:       texture_2d<f32>;
+@group(1) @binding(5) var aoMicroShadowSampler: sampler;
+
 fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
     if (cascadeIndex == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.x, gShadowMap0, gShadowSampler, false); }
@@ -128,7 +132,9 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let specular_contrib = cSpec;
 
     let hl = halfLambert(NdL);
-    let final_color = light.color.xyz * (diffuse_contrib * hl + specular_contrib * NdL) * light.intensity * shadow_factor;
+    let ao  = textureSampleLevel(gAOMicroShadow, aoMicroShadowSampler, uv, 0.0).r;
+    let ms  = microShadow(ao, NdL);
+    let final_color = light.color.xyz * (diffuse_contrib * hl + specular_contrib * NdL) * light.intensity * shadow_factor * ms;
 
     // Apply contact shadow factor (1.0 = lit, 0.0 = occluded)
     let contactFactor = textureSampleLevel(contactShadowMap, contactShadowSampler, uv, 0.0).r;

@@ -29,3 +29,18 @@ fn halfLambert(NdL: f32) -> f32 {
     let h = NdL * 0.5 + 0.5;
     return h * h;
 }
+
+// Micro-shadow term (Jimenez 2016, "Practical Realtime Strategies for Accurate
+// Indirect Occlusion", eq. 18).
+// Converts baked AO to the cosine of the hemisphere cone half-angle and compares
+// it against NdotL so that geometry encoded in normal/AO maps casts a shadow on
+// direct illumination — at essentially zero GPU cost (one sqrt + one divide).
+//
+// ao    : AO value [0..1], where 0 = fully occluded, 1 = fully exposed.
+// NdotL : dot(N, L) clamped to [0..1].
+// Returns a visibility factor in [0..1] that attenuates the direct contribution
+// in concave areas without affecting IBL (which is already modulated by AO).
+fn microShadow(ao: f32, NdotL: f32) -> f32 {
+    let cosTheta = sqrt(1.0 - ao);   // cos of AO cone half-angle (eq. 18)
+    return saturate(NdotL / (cosTheta + 0.0001));
+}

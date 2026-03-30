@@ -8,6 +8,7 @@ export enum PipelineBindGroupLayouts {
   AMBIENT_UNIFORMS = 'AmbientUniforms',
   SKYBOX_UNIFORMS = 'SkyboxUniforms',
   GBUFFER_UNIFORMS = 'GBufferUniforms',
+  GBUFFER_WITH_AO_UNIFORMS = 'GBufferWithAOUniforms',
   BUFFER_UNIFORM = 'BufferUniform',
   DEPTH_TEXTURE = 'DepthTexture',
   FOUR_TEXTURE = 'FourTexture',
