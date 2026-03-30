@@ -1514,6 +1514,36 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getAtmosphericFogUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('atmospheric_fog_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float', viewDimension: 'cube' },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
   /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
@@ -1596,6 +1626,8 @@ export class BindGroupFactory {
         return this.getOITComposeTexturesLayout();
       case PipelineBindGroupLayouts.PALETTE_QUANTIZE:
         return this.getPaletteQuantizeLayout();
+      case PipelineBindGroupLayouts.ATMOSPHERIC_FOG_UNIFORMS:
+        return this.getAtmosphericFogUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

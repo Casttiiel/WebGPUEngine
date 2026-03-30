@@ -37,4 +37,5 @@ export enum PipelineBindGroupLayouts {
   OIT_COMPOSE_TEXTURES = 'OITComposeTextures',
   OIT_GLASS_ENV = 'OITGlassEnv',
   PALETTE_QUANTIZE = 'PaletteQuantize',
+  ATMOSPHERIC_FOG_UNIFORMS = 'AtmosphericFogUniforms',
 }

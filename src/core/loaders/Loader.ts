@@ -46,6 +46,7 @@ import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { SphereColliderComponent } from '../../components/physics/SphereColliderComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
+import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
@@ -345,6 +346,8 @@ export class Loader {
         return new WeaponComponent();
       case 'height_fog':
         return new HeightFogComponent();
+      case 'atmospheric_fog':
+        return new AtmosphericFogComponent();
       case 'contact_shadows':
         return new ContactShadowsComponent();
       default:

@@ -1,25 +1,24 @@
 ### Engine
 
-1. MIP Fog - Sun Volumetrics - Run Volumetrics - Horizon Blend Fog - Distance Contrast - Near Fog Color Override
-2. Tile based light culling
-3. SMAA + TAA
+1. Tile based light culling
+2. SMAA + TAA
+3. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
 4. Area light
 5. GI Precomputed + probes o Staggered/Radiance cascades
 
 6. Consistency between dither / Dither size
 7. Froxel Self Occlusion
 8. Froxel Density Volumes
-9. Light Shafts pixelados
-10. Enemy AI
-    Fase 2 — Navegación real
-    ├── Waypoint graph (authorado en Blender → JSON)
-    ├── A\* sobre el grafo
-    └── PathFollower / Steering (seek + arrive)
-    → El enemigo ahora rodea obstáculos
+9. Enemy AI
+   Fase 2 — Navegación real
+   ├── Waypoint graph (authorado en Blender → JSON)
+   ├── A\* sobre el grafo
+   └── PathFollower / Steering (seek + arrive)
+   → El enemigo ahora rodea obstáculos
 
-    Fase 3 — Polish
-    └── AnimationStateMachine driven by BT state
-    (idle → patrol → chase → attack)
+   Fase 3 — Polish
+   └── AnimationStateMachine driven by BT state
+   (idle → patrol → chase → attack)
 
 ## Gameplay
 

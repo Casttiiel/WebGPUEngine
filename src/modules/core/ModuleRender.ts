@@ -22,6 +22,7 @@ import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
+import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
@@ -275,6 +276,11 @@ export class ModuleRender extends Module {
       (comp as HeightFogComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('atmospheric_fog')?.getList() ??
+      []) {
+      (comp as AtmosphericFogComponent).resize();
+    }
+
     for (const comp of Engine.getEntities().getObjectManagerByName('motion_blur')?.getList() ??
       []) {
       (comp as MotionBlurComponent).resize();
@@ -362,6 +368,15 @@ export class ModuleRender extends Module {
         const heightFog = mainCameraEntity.getComponent('height_fog') as HeightFogComponent;
         if (heightFog && heightFog.hasLoaded()) {
           result = heightFog.apply(result, this.deferred.getGBufferBindGroup());
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('atmospheric_fog')) {
+        const atmosphericFog = mainCameraEntity.getComponent(
+          'atmospheric_fog',
+        ) as AtmosphericFogComponent;
+        if (atmosphericFog && atmosphericFog.hasLoaded()) {
+          result = atmosphericFog.apply(result, this.deferred.getGBufferBindGroup());
         }
       }
 
@@ -730,7 +745,12 @@ export class ModuleRender extends Module {
     // Get main camera for post-processing components
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
     if (mainCamera && this.beginGUIWindow('Post-Processing')) {
-      // Render post-processing component controls
+      if (mainCamera.hasComponent('atmospheric_fog')) {
+        const atmosphericFog = mainCamera.getComponent(
+          'atmospheric_fog',
+        ) as AtmosphericFogComponent;
+        if (atmosphericFog.hasLoaded()) atmosphericFog.renderInMenu();
+      }
       this.endGUIWindow();
     }
 
