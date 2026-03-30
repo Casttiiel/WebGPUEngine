@@ -23,10 +23,12 @@ const TILE_ELEM: u32 = 176u;
 const TILE_W_H:  u32 = 22u;  // horizontal stride
 const TILE_W_V:  u32 = 8u;   // vertical stride
 
-var<workgroup> tileAO:    array<f32, TILE_ELEM>;
+var<workgroup> tileAO:    array<f32, TILE_ELEM>; // AO scalar   (from .b channel)
 var<workgroup> tileDepth: array<f32, TILE_ELEM>;
-var<workgroup> tileNX:    array<f32, TILE_ELEM>;
-var<workgroup> tileNY:    array<f32, TILE_ELEM>;
+var<workgroup> tileNX:    array<f32, TILE_ELEM>; // G-buffer normal X (oct01)
+var<workgroup> tileNY:    array<f32, TILE_ELEM>; // G-buffer normal Y (oct01)
+var<workgroup> tileBX:    array<f32, TILE_ELEM>; // bent normal oct01 X (from .r channel)
+var<workgroup> tileBY:    array<f32, TILE_ELEM>; // bent normal oct01 Y (from .g channel)
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
@@ -60,7 +62,10 @@ fn cs_h(
             vec2<i32>(0), dstSize - vec2<i32>(1)
         );
         let uv = (vec2<f32>(srcCoord) + 0.5) * texelSize;
-        tileAO[k]    = textureSampleLevel(aoTexture,    samplerAO,     uv, 0.0).r;
+        let aoSample = textureSampleLevel(aoTexture, samplerAO, uv, 0.0);
+        tileAO[k]    = aoSample.b; // AO scalar in .b
+        tileBX[k]    = aoSample.r; // bent normal oct01.x in .r
+        tileBY[k]    = aoSample.g; // bent normal oct01.y in .g
         tileDepth[k] = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).x;
         let nd = textureSampleLevel(gNormals, samplerGBuffer, uv, 0.0).xy;
         tileNX[k] = nd.x;
@@ -78,7 +83,7 @@ fn cs_h(
 
     let centerDepth = tileDepth[centerIdx];
     if (centerDepth > 0.99) {
-        textureStore(outputAO, coords, vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        textureStore(outputAO, coords, vec4<f32>(0.5, 0.5, 1.0, 1.0)); // neutral bent normal, AO=1
         return;
     }
 
@@ -86,6 +91,8 @@ fn cs_h(
     let centerAO = tileAO[centerIdx];
 
     var filteredAO  = 0.0;
+    var filteredBX  = 0.0;
+    var filteredBY  = 0.0;
     var totalWeight = 0.0;
 
     for (var r = -BILATERAL_RADIUS; r <= BILATERAL_RADIUS; r++) {
@@ -96,16 +103,21 @@ fn cs_h(
 
         let depthDiff  = abs(centerDepth - sDepth);
         let normalDiff = 1.0 - max(dot(centerN, sN), 0.0);
-        let w = exp(-f32(r * r) / (2.0 * f32(BILATERAL_RADIUS * BILATERAL_RADIUS)))
+        let sigma_s = f32(BILATERAL_RADIUS) * 0.5;
+        let w = exp(-f32(r * r) / (2.0 * sigma_s * sigma_s))
               * exp(-depthDiff  / SIGMA_DEPTH)
               * exp(-normalDiff / SIGMA_NORMAL);
 
-        filteredAO  += sAO * w;
+        filteredAO  += sAO         * w;
+        filteredBX  += tileBX[idx] * w;
+        filteredBY  += tileBY[idx] * w;
         totalWeight += w;
     }
 
-    let result = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
-    textureStore(outputAO, coords, vec4<f32>(result, 0.0, 0.0, 1.0));
+    let ao = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
+    let bx = select(tileBX[centerIdx], filteredBX / totalWeight, totalWeight > 1e-5);
+    let by = select(tileBY[centerIdx], filteredBY / totalWeight, totalWeight > 1e-5);
+    textureStore(outputAO, coords, vec4<f32>(bx, by, ao, 1.0));
 }
 
 // ── Vertical pass — 8×16 workgroup, halo in Y ────────────────────────────────
@@ -129,7 +141,10 @@ fn cs_v(
             vec2<i32>(0), dstSize - vec2<i32>(1)
         );
         let uv = (vec2<f32>(srcCoord) + 0.5) * texelSize;
-        tileAO[k]    = textureSampleLevel(aoTexture,    samplerAO,     uv, 0.0).r;
+        let aoSample = textureSampleLevel(aoTexture, samplerAO, uv, 0.0);
+        tileAO[k]    = aoSample.b;
+        tileBX[k]    = aoSample.r;
+        tileBY[k]    = aoSample.g;
         tileDepth[k] = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).x;
         let nd = textureSampleLevel(gNormals, samplerGBuffer, uv, 0.0).xy;
         tileNX[k] = nd.x;
@@ -147,7 +162,7 @@ fn cs_v(
 
     let centerDepth = tileDepth[centerIdx];
     if (centerDepth > 0.99) {
-        textureStore(outputAO, coords, vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        textureStore(outputAO, coords, vec4<f32>(0.5, 0.5, 1.0, 1.0));
         return;
     }
 
@@ -155,6 +170,8 @@ fn cs_v(
     let centerAO = tileAO[centerIdx];
 
     var filteredAO  = 0.0;
+    var filteredBX  = 0.0;
+    var filteredBY  = 0.0;
     var totalWeight = 0.0;
 
     for (var r = -BILATERAL_RADIUS; r <= BILATERAL_RADIUS; r++) {
@@ -165,16 +182,21 @@ fn cs_v(
 
         let depthDiff  = abs(centerDepth - sDepth);
         let normalDiff = 1.0 - max(dot(centerN, sN), 0.0);
-        let w = exp(-f32(r * r) / (2.0 * f32(BILATERAL_RADIUS * BILATERAL_RADIUS)))
+        let sigma_s = f32(BILATERAL_RADIUS) * 0.5;
+        let w = exp(-f32(r * r) / (2.0 * sigma_s * sigma_s))
               * exp(-depthDiff  / SIGMA_DEPTH)
               * exp(-normalDiff / SIGMA_NORMAL);
 
-        filteredAO  += sAO * w;
+        filteredAO  += sAO         * w;
+        filteredBX  += tileBX[idx] * w;
+        filteredBY  += tileBY[idx] * w;
         totalWeight += w;
     }
 
-    let result = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
-    textureStore(outputAO, coords, vec4<f32>(result, 0.0, 0.0, 1.0));
+    let ao = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
+    let bx = select(tileBX[centerIdx], filteredBX / totalWeight, totalWeight > 1e-5);
+    let by = select(tileBY[centerIdx], filteredBY / totalWeight, totalWeight > 1e-5);
+    textureStore(outputAO, coords, vec4<f32>(bx, by, ao, 1.0));
 }
 
 // ── PSX variant — Bayer 4×4 dither applied to filtered AO ────────────────────
@@ -209,7 +231,10 @@ fn cs_v_psx(
             vec2<i32>(0), dstSize - vec2<i32>(1)
         );
         let uv = (vec2<f32>(srcCoord) + 0.5) * texelSize;
-        tileAO[k]    = textureSampleLevel(aoTexture,    samplerAO,     uv, 0.0).r;
+        let aoSample = textureSampleLevel(aoTexture, samplerAO, uv, 0.0);
+        tileAO[k]    = aoSample.b;
+        tileBX[k]    = aoSample.r;
+        tileBY[k]    = aoSample.g;
         tileDepth[k] = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).x;
         let nd = textureSampleLevel(gNormals, samplerGBuffer, uv, 0.0).xy;
         tileNX[k] = nd.x;
@@ -226,7 +251,7 @@ fn cs_v_psx(
 
     let centerDepth = tileDepth[centerIdx];
     if (centerDepth > 0.99) {
-        textureStore(outputAO, coords, vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        textureStore(outputAO, coords, vec4<f32>(0.5, 0.5, 1.0, 1.0));
         return;
     }
 
@@ -234,6 +259,8 @@ fn cs_v_psx(
     let centerAO = tileAO[centerIdx];
 
     var filteredAO  = 0.0;
+    var filteredBX  = 0.0;
+    var filteredBY  = 0.0;
     var totalWeight = 0.0;
 
     for (var r = -BILATERAL_RADIUS; r <= BILATERAL_RADIUS; r++) {
@@ -244,16 +271,21 @@ fn cs_v_psx(
 
         let depthDiff  = abs(centerDepth - sDepth);
         let normalDiff = 1.0 - max(dot(centerN, sN), 0.0);
-        let w = exp(-f32(r * r) / (2.0 * f32(BILATERAL_RADIUS * BILATERAL_RADIUS)))
+        let sigma_s = f32(BILATERAL_RADIUS) * 0.5;
+        let w = exp(-f32(r * r) / (2.0 * sigma_s * sigma_s))
               * exp(-depthDiff  / SIGMA_DEPTH)
               * exp(-normalDiff / SIGMA_NORMAL);
 
-        filteredAO  += sAO * w;
+        filteredAO  += sAO         * w;
+        filteredBX  += tileBX[idx] * w;
+        filteredBY  += tileBY[idx] * w;
         totalWeight += w;
     }
 
-    let result = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
-    // Threshold smooth AO against Bayer matrix → hard 0 or 1 per pixel (PSX stipple)
-    let ditheredAO = select(0.0, 1.0, result > bayer4ao(vec2<u32>(gid.xy)));
-    textureStore(outputAO, coords, vec4<f32>(ditheredAO, 0.0, 0.0, 1.0));
+    let smoothAO = select(centerAO, filteredAO / totalWeight, totalWeight > 1e-5);
+    let bx = select(tileBX[centerIdx], filteredBX / totalWeight, totalWeight > 1e-5);
+    let by = select(tileBY[centerIdx], filteredBY / totalWeight, totalWeight > 1e-5);
+    // Threshold AO against Bayer matrix → hard 0 or 1 (PSX stipple). Bent normal stays smooth.
+    let ditheredAO = select(0.0, 1.0, smoothAO > bayer4ao(vec2<u32>(gid.xy)));
+    textureStore(outputAO, coords, vec4<f32>(bx, by, ditheredAO, 1.0));
 }

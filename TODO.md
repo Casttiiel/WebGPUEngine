@@ -1,17 +1,16 @@
 ### Engine
 
 1. MIP Fog - Sun Volumetrics - Run Volumetrics - Horizon Blend Fog - Distance Contrast - Near Fog Color Override
-2. Cubemap Specular Occlusion
-3. Voxel Ray Tracing / Voxel Cone Tracing
-4. Tile based light culling
-5. SMAA + TAA
-6. Area light
+2. Tile based light culling
+3. SMAA + TAA
+4. Area light
+5. GI Precomputed + probes o Staggered/Radiance cascades
 
-7. Consistency between dither / Dither size
-8. Froxel Self Occlusion
-9. Froxel Density Volumes
-10. Light Shafts pixelados
-11. Enemy AI
+6. Consistency between dither / Dither size
+7. Froxel Self Occlusion
+8. Froxel Density Volumes
+9. Light Shafts pixelados
+10. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo
@@ -47,5 +46,4 @@
 12. Sheen - Retroreflexión de telas
 13. Thin-film / Iridescence - Interferencia de películas finas (burbujas, insectos, nácar)
 14. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
-15. Staggered cascades
-16. Glass (Uncharted)
+15. Glass (Uncharted)

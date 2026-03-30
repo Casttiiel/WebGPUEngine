@@ -103,12 +103,11 @@ fn findHorizon(
         if (len > params.radius) { continue; }
 
         let cosHorizon = dot(vView, diff / len);
-        let falloff = clamp(1.0 - (len / params.radius), 0.0, 1.0);
-        let blended = mix(maxCos, cosHorizon, falloff);
 
-        if (blended > maxCos) {
-            maxCos = blended;
-            maxCos = mix(maxCos, cosHorizon, params.thicknessMix * (1.0 - falloff));
+        if (cosHorizon > maxCos) {
+            let falloff = clamp(1.0 - (len / params.radius), 0.0, 1.0);
+            let w = falloff * (1.0 - params.thicknessMix) + params.thicknessMix;
+            maxCos = mix(maxCos, cosHorizon, w);
         }
 
         if (maxCos > 0.99) { break; }
@@ -124,7 +123,7 @@ fn computeSlice(
     normalVS  : vec3<f32>,
     vView     : vec3<f32>,
     numSamples: i32,
-) -> f32 {
+) -> vec4<f32> { // xy = weighted bentNormal contribution (view-space), z = visibility, w = unused
     let farUV      = uv + aoDir * 4.0;
     let farPos     = sampleViewPos(farUV);
     let sliceDir3D = normalize(farPos - centerPos);
@@ -133,7 +132,7 @@ fn computeSlice(
 
     let projNormalRaw = normalVS - planeN * dot(normalVS, planeN);
     let projLen       = length(projNormalRaw);
-    if (projLen < 1e-5) { return 1.0; }
+    if (projLen < 1e-5) { return vec4<f32>(vView, 1.0); } // degenerate: unoccluded, vView as fallback
 
     let projNormal = projNormalRaw / projLen;
 
@@ -150,7 +149,22 @@ fn computeSlice(
     let h2 = n + min(h2a - n,  PI_HALF);
 
     let sliceVis = integrateArc(h1, h2, n);
-    return mix(1.0, sliceVis, clamp(projLen, 0.0, 1.0));
+    let vis = mix(1.0, sliceVis, clamp(projLen, 0.0, 1.0));
+
+    // Bent normal contribution: midpoint angle of visible arc in the slice plane.
+    // slicePerp = unit vector perpendicular to vView toward +sliceDir3D in the slice plane.
+    let perpRaw = sliceDir3D - vView * dot(vView, sliceDir3D);
+    let perpLen = length(perpRaw);
+    var bentContrib: vec3<f32>;
+    if (perpLen > 1e-5) {
+        let slicePerp  = perpRaw / perpLen;
+        let thetaBent  = (h1 + h2) * 0.5;
+        bentContrib = cos(thetaBent) * vView + sin(thetaBent) * slicePerp;
+    } else {
+        bentContrib = vView;
+    }
+    // Weight by projLen so slices where the normal is nearly perpendicular contribute less
+    return vec4<f32>(bentContrib * clamp(projLen, 0.0, 1.0), vis);
 }
 
 @compute @workgroup_size(8, 8, 1)
@@ -166,7 +180,7 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let linearZ = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).x;
     if (linearZ >= 1.0) {
-        textureStore(outputAO, coords, vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        textureStore(outputAO, coords, vec4<f32>(0.5, 0.5, 1.0, 1.0)); // oct01(0,0,1) = neutral, AO=1
         return;
     }
 
@@ -188,8 +202,8 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // controls sampling density, not the reach of the effect.
     // proj[0][0] = cot(fovX/2) → radius_px = radius * proj[0][0] * aoRes.x / (2 * depth)
     let radiusPx       = params.radius * camera.projectionMatrix[0][0] * aoRes.x / (2.0 * distToCamera);
-    let radiusPxClamped = clamp(radiusPx, 1.0, params.maxStride * params.sampleCount);
-    let dirScale       = texelAO * (radiusPxClamped / params.sampleCount);
+    let radiusPxClamped = min(radiusPx, params.maxStride * params.sampleCount);
+    let dirScale       = texelAO * max(1.0, radiusPxClamped / params.sampleCount);
 
     // Jitter — pure spatial hash per pixel.
     // The old interleaved 4×4 + hash mix produced structured noise that the
@@ -200,8 +214,10 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let sliceStep  = TWO_PI / f32(sliceCount);
     let jitter     = hash1(vec2<f32>(coords)) * sliceStep;
 
-    var visibility = 0.0;
-    let numSamples = i32(params.sampleCount);
+    var visibility    = 0.0;
+    var bentAccum     = vec3<f32>(0.0);
+    var projWeightSum = 0.0;
+    let numSamples    = i32(params.sampleCount);
 
     for (var s: i32 = 0; s < sliceCount; s++) {
         let baseAngle  = sliceStep * (f32(s) + 0.5);
@@ -209,10 +225,21 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
         let aoDir = dirScale * vec2<f32>(sin(sliceAngle), cos(sliceAngle));
 
-        visibility += computeSlice(aoDir, uv, centerPos, normalVS, vView, numSamples);
+        let r     = computeSlice(aoDir, uv, centerPos, normalVS, vView, numSamples);
+        let projW = clamp(length(r.xyz), 0.0, 1.0); // ≈ projLen (bentContrib is unit vector)
+        visibility    += r.w * projW;
+        bentAccum     += r.xyz;
+        projWeightSum += projW;
     }
 
-    visibility /= f32(sliceCount);
+    // Weighted average by projLen; fall back to no-occlusion when all slices degenerate
+    visibility = select(1.0, visibility / projWeightSum, projWeightSum > 1e-4);
 
-    textureStore(outputAO, coords, vec4<f32>(clamp(pow(visibility, params.aoStrength), 0.0, 1.0), 0.0, 0.0, 1.0));
+    // Normalize accumulated bent normal; fall back to vView if degenerate
+    let bentNormalVS   = select(vView, normalize(bentAccum), dot(bentAccum, bentAccum) > 1e-5);
+    let bentNormalOct  = normalToOctahedral01(bentNormalVS);
+    let ao             = clamp(pow(visibility, params.aoStrength), 0.0, 1.0);
+
+    // Pack: rg = bent normal oct01, b = AO scalar, a = 1
+    textureStore(outputAO, coords, vec4<f32>(bentNormalOct.x, bentNormalOct.y, ao, 1.0));
 }

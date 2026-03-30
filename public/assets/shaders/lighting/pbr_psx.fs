@@ -126,7 +126,7 @@ fn shade_psx(iPosition: vec2<f32>, fragPos: vec4<f32>, use_shadows: bool, fix_sh
     let specular_contrib = cSpec;
 
     let hl = halfLambert(NdL);
-    let ao  = textureSampleLevel(gAOMicroShadow, aoMicroShadowSampler, iPosition, 0.0).r;
+    let ao  = textureSampleLevel(gAOMicroShadow, aoMicroShadowSampler, iPosition, 0.0).b;
     let ms  = microShadow(ao, NdL);
     let final_color = light.color.xyz * light.intensity * shadow_factor * (diffuse_contrib * hl + specular_contrib * NdL) * att * ms;
     return vec4<f32>(final_color, 1.0);

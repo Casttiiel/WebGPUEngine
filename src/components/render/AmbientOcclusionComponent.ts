@@ -448,7 +448,7 @@ export class AmbientOcclusionComponent extends Component {
       colorAttachments: [
         {
           view: this.rawAOTarget.getView(),
-          clearValue: { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+          clearValue: { r: 0.5, g: 0.5, b: 1.0, a: 1.0 }, // oct01(0,0,1) = neutral bent normal, AO=1
           loadOp: 'clear',
           storeOp: 'store',
         },

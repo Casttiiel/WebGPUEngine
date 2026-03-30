@@ -105,14 +105,11 @@ fn findHorizon(
 
         let cosHorizon = dot(vView, diff / len);
 
-        // Falloff suave hacia el borde del radio
-        let falloff = clamp(1.0 - (len / params.radius), 0.0, 1.0);
-        let blended = mix(maxCos, cosHorizon, falloff);
-
-        if (blended > maxCos) {
-            maxCos = blended;
-            // thickness: evita oclusión excesiva por objetos muy finos
-            maxCos = mix(maxCos, cosHorizon, params.thicknessMix * (1.0 - falloff));
+        if (cosHorizon > maxCos) {
+            // Falloff suave hacia el borde del radio; thickness evita oclusión por objetos finos
+            let falloff = clamp(1.0 - (len / params.radius), 0.0, 1.0);
+            let w = falloff * (1.0 - params.thicknessMix) + params.thicknessMix;
+            maxCos = mix(maxCos, cosHorizon, w);
         }
 
         if (maxCos > 0.99) { break; }  // horizonte casi vertical, no hay más que ganar
@@ -121,7 +118,6 @@ fn findHorizon(
     return maxCos;
 }
 
-// ----- visibilidad de una slice -----------------------------
 fn computeSlice(
     aoDir     : vec2<f32>,
     uv        : vec2<f32>,
@@ -129,7 +125,7 @@ fn computeSlice(
     normalVS  : vec3<f32>,
     vView     : vec3<f32>,
     numSamples: i32,
-) -> f32 {
+) -> vec4<f32> { // xyz = weighted bentNormal contribution (view-space), w = visibility
     // Dirección 3D de la slice en view space (punto lejano en esa dirección UV)
     let farUV      = uv + aoDir * 4.0;  // punto de referencia lejos
     let farPos     = sampleViewPos(farUV);
@@ -141,7 +137,7 @@ fn computeSlice(
     // Proyectar la normal de superficie en el plano de la slice
     let projNormalRaw = normalVS - planeN * dot(normalVS, planeN);
     let projLen       = length(projNormalRaw);
-    if (projLen < 1e-5) { return 1.0; }  // normal perpendicular al plano → sin oclusión
+    if (projLen < 1e-5) { return vec4<f32>(vView, 1.0); }  // normal perpendicular al plano → sin oclusión
 
     let projNormal = projNormalRaw / projLen;
 
@@ -161,18 +157,29 @@ fn computeSlice(
     let h2 = n + min(h2a - n,  PI_HALF);
 
     let sliceVis = integrateArc(h1, h2, n);
+    let vis = mix(1.0, sliceVis, clamp(projLen, 0.0, 1.0));
 
-    // Ponderar por cuánto de la normal está en el plano de la slice
-    return mix(1.0, sliceVis, clamp(projLen, 0.0, 1.0));
+    // Bent normal: midpoint of visible arc in the slice plane
+    let perpRaw = sliceDir3D - vView * dot(vView, sliceDir3D);
+    let perpLen = length(perpRaw);
+    var bentContrib: vec3<f32>;
+    if (perpLen > 1e-5) {
+        let slicePerp = perpRaw / perpLen;
+        let thetaBent = (h1 + h2) * 0.5;
+        bentContrib = cos(thetaBent) * vView + sin(thetaBent) * slicePerp;
+    } else {
+        bentContrib = vView;
+    }
+    return vec4<f32>(bentContrib * clamp(projLen, 0.0, 1.0), vis);
 }
 
 // ----- fragment principal -----------------------------------
 @fragment
-fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) f32 {
+fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     // Depth del píxel central
     let linearZ = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).x;
-    if (linearZ >= 1.0) { return 1.0; }  // sky → sin oclusión
+    if (linearZ >= 1.0) { return vec4<f32>(0.5, 0.5, 1.0, 1.0); }  // sky: neutral bent normal, AO=1
 
     // Posición view-space del píxel central
     let centerPos = reconstructViewPos(uv, linearZ);
@@ -200,8 +207,8 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     // controls sampling density, not the reach of the effect.
     // proj[0][0] = cot(fovX/2) → radius_px = radius * proj[0][0] * aoRes.x / (2 * depth)
     let radiusPx        = params.radius * camera.projectionMatrix[0][0] * aoRes.x / (2.0 * distToCamera);
-    let radiusPxClamped = clamp(radiusPx, 1.0, params.maxStride * params.sampleCount);
-    let dirScale        = texelAO * (radiusPxClamped / params.sampleCount);
+    let radiusPxClamped = min(radiusPx, params.maxStride * params.sampleCount);
+    let dirScale        = texelAO * max(1.0, radiusPxClamped / params.sampleCount);
 
     // ---- Jitter ----
     // Coordenada en full-res para que el patrón sea consistente
@@ -223,8 +230,10 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     let jitter     = (patternIdx + hashVal) / 16.0 * sliceStep;
 
     // ---- Loop de slices ----
-    var visibility = 0.0;
-    let numSamples = i32(params.sampleCount);
+    var visibility    = 0.0;
+    var bentAccum     = vec3<f32>(0.0);
+    var projWeightSum = 0.0;
+    let numSamples    = i32(params.sampleCount);
 
     for (var s: i32 = 0; s < sliceCount; s++) {
         // Ángulo base estratificado + jitter
@@ -233,10 +242,20 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
 
         let aoDir = dirScale * vec2<f32>(sin(sliceAngle), cos(sliceAngle));
 
-        visibility += computeSlice(aoDir, uv, centerPos, normalVS, vView, numSamples);
+        let r     = computeSlice(aoDir, uv, centerPos, normalVS, vView, numSamples);
+        let projW = clamp(length(r.xyz), 0.0, 1.0); // ≈ projLen (bentContrib is unit vector)
+        visibility    += r.w * projW;
+        bentAccum     += r.xyz;
+        projWeightSum += projW;
     }
 
-    visibility /= f32(sliceCount);
+    // Weighted average by projLen; fall back to no-occlusion when all slices degenerate
+    visibility = select(1.0, visibility / projWeightSum, projWeightSum > 1e-4);
 
-    return clamp(pow(visibility, params.aoStrength), 0.0, 1.0);
+    let bentNormalVS  = select(vView, normalize(bentAccum), dot(bentAccum, bentAccum) > 1e-5);
+    let bentNormalOct = normalToOctahedral01(bentNormalVS);
+    let ao            = clamp(pow(visibility, params.aoStrength), 0.0, 1.0);
+
+    // Pack: rg = bent normal oct01, b = AO scalar, a = 1
+    return vec4<f32>(bentNormalOct.x, bentNormalOct.y, ao, 1.0);
 }

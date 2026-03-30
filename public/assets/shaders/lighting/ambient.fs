@@ -25,14 +25,15 @@ struct AmbientUniforms {
 @group(2) @binding(4) var samplerIrradiance: sampler;
 
 
-fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
+fn calculateIBL(g: GBuffer, ao: f32, bentNormalWS: vec3<f32>) -> vec3<f32> {
     let N   = normalize(g.normal);
     let V   = normalize(g.viewDir);
     let NdV = max(dot(N, V), 0.0);
-    let irradiance = textureSample(irradianceMap, samplerIrradiance, N).rgb;
+    // Bent normal re-orients irradiance lookup toward the unoccluded hemispherecc.
+    // When ao=1 (no occlusion) the blend is 0 — no change. When ao→0, fully use bent normal.
+    let irradianceDir = normalize(mix(N, bentNormalWS, saturate(1.0 - ao)));
+    let irradiance = textureSample(irradianceMap, samplerIrradiance, irradianceDir).rgb;
     let F0  = g.specularColor;
-    // View-dependent Fresnel gives the correct energy split between diffuse and specular.
-    // Using just F0 (constant) over-counts kS for smooth dielectrics at grazing angles.
     let F   = Fresnel_Schlick_Roughness(NdV, F0, g.roughness);
     let kS  = F;
     let kD  = (1.0 - kS) * (1.0 - g.metallic);
@@ -44,9 +45,14 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {   
     let g  = decodeGBuffer(uv);
-    let ao = textureSample(gAO, samplerEnv, uv).r;
+    let aoSample = textureSample(gAO, samplerEnv, uv);
+    let ao = aoSample.b;  // AO scalar packed in .b
 
-    let ibl = calculateIBL(g, ao);
+    // Decode bent normal (view-space) from rg channels → world space
+    let bentNormalVS = octahedral01ToNormal(aoSample.rg);
+    let bentNormalWS = normalize((camera.invView * vec4<f32>(bentNormalVS, 0.0)).xyz);
+
+    let ibl = calculateIBL(g, ao, bentNormalWS);
 
     return vec4<f32>(ibl + g.selfIllum, 1.0);
 }

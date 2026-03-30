@@ -60,11 +60,24 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     if(g.zlinear > 0.999){
         discard;
     }
-    let ao = textureSampleLevel(aoTexture, texSampler, uv, 0.0).r;
+    let aoSample = textureSampleLevel(aoTexture, texSampler, uv, 0.0);
+    let ao  = aoSample.b;  // AO scalar packed in .b
     let N = normalize(g.normal);
     let V = normalize(g.viewDir);
     let NoV = max(dot(N, V), 0.0);
     let so = computeSpecularOcclusion(ao, NoV, g.roughness);
+
+    // Decode bent normal (view-space) and transform to world space for cubemap sampling
+    let bentNormalVS = octahedral01ToNormal(aoSample.rg);
+    let bentNormalWS = normalize((camera.invView * vec4<f32>(bentNormalVS, 0.0)).xyz);
+
+    // Reflection direction: blend geometric reflection toward bent-normal reflection.
+    // Smooth surfaces (narrow specular lobe) benefit most from per-pixel correcton.
+    // Occluded surfaces pull toward unoccluded hemisphere captured by bent normal.
+    let R_geom = normalize(g.reflectedDir);
+    let R_bent = reflect(-g.viewDir, bentNormalWS);
+    let bentBlend = saturate((1.0 - ao) * (1.0 - g.roughness * g.roughness));
+    var R = normalize(mix(R_geom, R_bent, bentBlend));
 
     // Specular strength
     let specularStrength = g.metallic * (1.0 - g.roughness);
@@ -74,8 +87,6 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let ssrAlpha = ssrColor.a;
 
     // Pre-filtered specular IBL: sample mip proportional to roughness (split-sum approximation).
-    // diffuseBoost is intentionally NOT applied here — it belongs only to the diffuse IBL pass.
-    var R = normalize(g.reflectedDir);
     let maxMipLevel = 7.0;
     let mipLevel = g.roughness * maxMipLevel;
     let fallbackColor = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb * ssrParams.globalAmbientBoost;

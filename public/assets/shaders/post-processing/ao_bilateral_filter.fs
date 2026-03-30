@@ -33,7 +33,7 @@ fn bilateralFilter(centerUV: vec2<f32>) -> f32 {
 
     let normalRoughnessData = textureSampleLevel(gNormals, samplerGBuffer, centerUV, 0.0);
     let centerNormal = octahedral01ToNormal(normalRoughnessData.xy);
-    let centerAO = textureSampleLevel(aoTexture, samplerAO, centerUV, 0.0).r;
+    let centerAO = textureSampleLevel(aoTexture, samplerAO, centerUV, 0.0).b;
     
     // Muestrear en un patrón 5x5 alrededor del pixel central
     for (var x = -i32(BILATERAL_RADIUS); x <= i32(BILATERAL_RADIUS); x++) {
@@ -45,7 +45,7 @@ fn bilateralFilter(centerUV: vec2<f32>) -> f32 {
             let sampleDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, sampleUV, 0.0).x;
             let normalRoughnessData2 = textureSampleLevel(gNormals, samplerGBuffer, sampleUV, 0.0);
             let sampleNormal = octahedral01ToNormal(normalRoughnessData2.xy);
-            let sampleAO = textureSampleLevel(aoTexture, samplerAO, sampleUV, 0.0).r;
+            let sampleAO = textureSampleLevel(aoTexture, samplerAO, sampleUV, 0.0).b;
             
             // Calcular pesos basados en similitud de profundidad y normal
             let depthDiff = abs(centerDepth - sampleDepth);
