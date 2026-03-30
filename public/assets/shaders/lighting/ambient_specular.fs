@@ -76,11 +76,11 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Occluded surfaces pull toward unoccluded hemisphere captured by bent normal.
     let R_geom = normalize(g.reflectedDir);
     let R_bent = reflect(-g.viewDir, bentNormalWS);
-    let bentBlend = saturate((1.0 - ao) * (1.0 - g.roughness * g.roughness));
+    let bentBlend = saturate(1.0 - ao);
     var R = normalize(mix(R_geom, R_bent, bentBlend));
 
-    // Specular strength
-    let specularStrength = g.metallic * (1.0 - g.roughness);
+    let avgF0 = dot(g.specularColor, vec3<f32>(0.333));
+    let specularStrength = max(avgF0, g.metallic) * (1.0 - g.roughness * 0.8);
 
     // SSR color y alpha
     let ssrColor = textureSample(ssrTexture, ssrSampler, uv);
@@ -91,8 +91,17 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let mipLevel = g.roughness * maxMipLevel;
     let fallbackColor = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb * ssrParams.globalAmbientBoost;
 
-    // Mezcla SSR y fallback según alpha
-    var finalSpecular = applyFresnelBRDF(mix(fallbackColor, ssrColor.rgb, ssrAlpha), g) * ssrParams.specularBoost * so;
+    // IBL: raw prefiltered radiance needs full split-sum BRDF applied
+    let iblSpecular = applyFresnelBRDF(fallbackColor, g);
+
+    // SSR: already contains full specular response (its own Fresnel baked in at ray march time).
+    // Re-apply only the split-sum weight so both paths share the same scale.
+    let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NoV, 0.0, 1.0));
+    let brdf       = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
+    let F          = Fresnel_Schlick_Roughness(NoV, g.specularColor, g.roughness);
+    let ssrSpecular = ssrColor.rgb * (F * brdf.x + brdf.y);
+
+    var finalSpecular = mix(iblSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost * so;
 
     // Composición final: suma a la escena base fuera de este shader.
     // Blend mode = additive_by_src_alpha → dst += finalSpecular * alpha.
