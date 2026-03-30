@@ -92,7 +92,30 @@ export class FSRComponent extends Component {
   private dispatchX = 0;
   private dispatchY = 0;
 
+  // ── Scale mode ────────────────────────────────────────────────────────────
+  /** 'ratio' = renderScale fraction; 'target' = absolute pixel dimensions. */
+  private scaleMode: 'ratio' | 'target' = 'ratio';
+  /** Last committed target render width in pixels (target mode). 0 = unset. */
+  private _targetWidth = 0;
+  /** Last committed target render height in pixels (target mode). 0 = unset. */
+  private _targetHeight = 0;
+
   // ── Component lifecycle ────────────────────────────────────────────────────
+
+  /**
+   * Computes the render scale from an absolute pixel target on one axis,
+   * preserving the canvas aspect ratio.  Updates `_targetWidth/_targetHeight`,
+   * writes the scale to QualitySettings, and triggers a G-Buffer resize.
+   */
+  private applyTargetResolution(pixels: number, axis: 'width' | 'height'): void {
+    const canvas = Render.canvasSize;
+    const axisSize = axis === 'width' ? canvas.width : canvas.height;
+    const scale = Math.max(0.25, Math.min(1.0, pixels / axisSize));
+    this._targetWidth = Math.round(canvas.width * scale);
+    this._targetHeight = Math.round(canvas.height * scale);
+    QualitySettings.getInstance().setRenderResolution(scale);
+    Render.applyRenderResolution();
+  }
 
   /**
    * Called by the ECS loader with the JSON component data.
@@ -106,7 +129,17 @@ export class FSRComponent extends Component {
     if (data.enableRCAS !== undefined) this.enableRCAS = data.enableRCAS;
     if (data.rcasSharpness !== undefined) this.rcasSharpness = data.rcasSharpness;
 
-    if (data.renderScale !== undefined) {
+    if (data.targetWidth !== undefined || data.targetHeight !== undefined) {
+      // Target-resolution mode: derive scale from absolute pixel dimensions.
+      this.scaleMode = 'target';
+      if (data.targetWidth !== undefined) {
+        this.applyTargetResolution(data.targetWidth, 'width');
+      } else {
+        this.applyTargetResolution(data.targetHeight!, 'height');
+      }
+    } else if (data.renderScale !== undefined) {
+      // Ratio mode: scale is a fraction of canvas resolution.
+      this.scaleMode = 'ratio';
       const scale = Math.max(0.25, Math.min(1.0, data.renderScale));
       QualitySettings.getInstance().setRenderResolution(scale);
       Render.applyRenderResolution();
@@ -428,6 +461,14 @@ export class FSRComponent extends Component {
     },
   };
 
+  // Mutable object holding the mode dropdown value (synced each frame)
+  private readonly modeControl = { scaleMode: 'ratio' as 'ratio' | 'target' };
+
+  // Editable target pixel dimensions (target mode).  Updated on GUI change and on
+  // first entry into target mode.
+  private readonly targetInput = { width: 0, height: 0 };
+  private _targetSyncNeeded = true;
+
   public override renderInMenu(): void {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
@@ -455,10 +496,61 @@ export class FSRComponent extends Component {
     folder.add(this, 'enabled').name('Enable FSR').listen();
     folder.add(this, 'enableRCAS').name('Enable RCAS Sharpening').listen();
     folder.add(this, 'rcasSharpness', 0.0, 2.0, 0.05).name('RCAS Sharpness').listen();
+
+    // Scale mode selector
+    this.modeControl.scaleMode = this.scaleMode;
     folder
-      .add(this.renderResProxy, 'resolution', 0.25, 1.0, 0.05)
-      .name('Render Resolution')
-      .listen();
+      .add(this.modeControl, 'scaleMode', ['ratio', 'target'])
+      .name('Scale Mode')
+      .listen()
+      .onChange((v: 'ratio' | 'target') => {
+        this.scaleMode = v;
+        this._targetSyncNeeded = true;
+      });
+
+    if (this.scaleMode === 'ratio') {
+      folder
+        .add(this.renderResProxy, 'resolution', 0.25, 1.0, 0.05)
+        .name('Render Resolution')
+        .listen();
+    } else {
+      // Initialise target inputs from actual render dimensions on first entry
+      if (this._targetSyncNeeded) {
+        this.targetInput.width = this._targetWidth > 0 ? this._targetWidth : Render.width;
+        this.targetInput.height = this._targetHeight > 0 ? this._targetHeight : Render.height;
+        this._targetSyncNeeded = false;
+      }
+
+      folder
+        .add(this.targetInput, 'width', 1, canvas.width, 1)
+        .name('Target Width (px)')
+        .listen()
+        .onChange((v: number) => {
+          const c = Render.canvasSize;
+          const scale = Math.max(0.25, Math.min(1.0, v / c.width));
+          this._targetWidth = Math.round(c.width * scale);
+          this._targetHeight = Math.round(c.height * scale);
+          this.targetInput.width = this._targetWidth;
+          this.targetInput.height = this._targetHeight;
+          QualitySettings.getInstance().setRenderResolution(scale);
+          Render.applyRenderResolution();
+        });
+
+      folder
+        .add(this.targetInput, 'height', 1, canvas.height, 1)
+        .name('Target Height (px)')
+        .listen()
+        .onChange((v: number) => {
+          const c = Render.canvasSize;
+          const scale = Math.max(0.25, Math.min(1.0, v / c.height));
+          this._targetWidth = Math.round(c.width * scale);
+          this._targetHeight = Math.round(c.height * scale);
+          this.targetInput.width = this._targetWidth;
+          this.targetInput.height = this._targetHeight;
+          QualitySettings.getInstance().setRenderResolution(scale);
+          Render.applyRenderResolution();
+        });
+    }
 
     gui.endWindow();
   }

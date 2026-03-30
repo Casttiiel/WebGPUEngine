@@ -180,11 +180,16 @@ fn cs(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let vView = normalize(-centerPos);
 
     let distToCamera = max(-centerPos.z, 0.1);
-    let stride = clamp(params.limit / distToCamera, 1.0, params.maxStride);
 
     let aoRes    = vec2<f32>(dstSize);
     let texelAO  = 1.0 / aoRes;
-    let dirScale = texelAO * stride;
+
+    // Project world-space radius to pixels at this depth so that numSamples
+    // controls sampling density, not the reach of the effect.
+    // proj[0][0] = cot(fovX/2) → radius_px = radius * proj[0][0] * aoRes.x / (2 * depth)
+    let radiusPx       = params.radius * camera.projectionMatrix[0][0] * aoRes.x / (2.0 * distToCamera);
+    let radiusPxClamped = clamp(radiusPx, 1.0, params.maxStride * params.sampleCount);
+    let dirScale       = texelAO * (radiusPxClamped / params.sampleCount);
 
     // Jitter — pure spatial hash per pixel.
     // The old interleaved 4×4 + hash mix produced structured noise that the

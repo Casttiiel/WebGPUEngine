@@ -142,7 +142,7 @@ export class QualitySettings {
       aoSampleCount: 8.0,
       aoRadius: 1.5,
       aoStrength: 1.0,
-      aoSliceCount: 3.0,
+      aoSliceCount: 6.0,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -157,7 +157,7 @@ export class QualitySettings {
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
-      ditheringMode: 'psx',
+      ditheringMode: 'off',
     } as GraphicsQualitySettings,
   };
 

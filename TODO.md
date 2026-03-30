@@ -1,12 +1,13 @@
 ### Engine
 
-1. Baja resolución — 320×240 con upscaling + Dither Size
+1. Area light
+2. Consistency between dither / Dither size
 
-2. Froxel Self Occlusion
-3. Froxel Density Volumes
-4. Light Shafts pixelados
-5. Voxel Cone Tracing
-6. Enemy AI
+3. Froxel Self Occlusion
+4. Froxel Density Volumes
+5. Light Shafts pixelados
+6. Voxel Cone Tracing
+7. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo

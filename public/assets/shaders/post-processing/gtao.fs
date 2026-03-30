@@ -190,16 +190,18 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     // Vector hacia cámara en view space
     let vView = normalize(-centerPos);
 
-    // Stride adaptativo: más pequeño lejos, más grande cerca
     let distToCamera = max(-centerPos.z, 0.1);
-    let stride = clamp(params.limit / distToCamera, 1.0, params.maxStride);
 
     // Tamaño de texel del buffer de AO (half res)
-    // pos.xy son coordenadas en el framebuffer de AO (half res)
-    // Para el jitter usamos coordenadas full-res equivalentes
     let aoRes    = camera.screenSize * 0.5;
     let texelAO  = 1.0 / aoRes;
-    let dirScale = texelAO * stride;
+
+    // Project world-space radius to pixels at this depth so that numSamples
+    // controls sampling density, not the reach of the effect.
+    // proj[0][0] = cot(fovX/2) → radius_px = radius * proj[0][0] * aoRes.x / (2 * depth)
+    let radiusPx        = params.radius * camera.projectionMatrix[0][0] * aoRes.x / (2.0 * distToCamera);
+    let radiusPxClamped = clamp(radiusPx, 1.0, params.maxStride * params.sampleCount);
+    let dirScale        = texelAO * (radiusPxClamped / params.sampleCount);
 
     // ---- Jitter ----
     // Coordenada en full-res para que el patrón sea consistente

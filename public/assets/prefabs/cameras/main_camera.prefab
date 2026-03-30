@@ -8,7 +8,7 @@
       "bloom": {},
       "auto_exposure": {},
       "fsr":{
-        "renderScale": 0.77
+        "renderScale": 1.0
       }
     }
   }
