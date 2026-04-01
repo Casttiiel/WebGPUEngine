@@ -23,30 +23,7 @@
 @group(2) @binding(6) var envSampler: sampler;
 @group(2) @binding(7) var<uniform> ssrParams: SSRUniforms;
 
-fn applyFresnelBRDF(color: vec3<f32>, g: GBuffer) -> vec3<f32> {
-    let N     = normalize(g.normal);
-    let V     = normalize(g.viewDir);    
-    let NdotV = max(dot(N, V), 0.0);
-    let F0    = g.specularColor;
-    let F     = Fresnel_Schlick_Roughness(NdotV, F0, g.roughness);
-    let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NdotV, 0.0, 1.0));
-    let brdf  = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
 
-    // Kulla-Conty multi-scattering energy compensation.
-    // Single-scatter GGX does not integrate to 1 over the hemisphere — the missing
-    // energy grows with roughness and makes rough metals appear too dark.
-    // We add the multi-scatter complement using the average-Fresnel approximation:
-    //   E(NdV)  = brdf.x + brdf.y   (total single-scatter directional albedo)
-    //   E_ms    = 1 - E             (missing energy fraction)
-    //   F_avg   = F0 + (1-F0)/21   (hemisphere-average Fresnel)
-    //   f_ms    = F_avg*E_ms / (1 - F_avg*E_ms)   (Turquin 2019)
-    let E    = brdf.x + brdf.y;
-    let Ems  = 1.0 - E;
-    let Favg = F0 + (1.0 - F0) / 21.0;
-    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
-
-    return color * (F * brdf.x + brdf.y + Fms);
-}
 
 fn computeSpecularOcclusion(ao: f32, NoV: f32, roughness: f32) -> f32 {
     let exponent: f32 = exp2((-16.0 * roughness) - 1.0);
@@ -57,45 +34,45 @@ fn computeSpecularOcclusion(ao: f32, NoV: f32, roughness: f32) -> f32 {
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let g = decodeGBuffer(uv);
-    if(g.zlinear > 0.999){
-        discard;
-    }
+    if (g.zlinear > 0.999) { discard; }
+
     let aoSample = textureSampleLevel(aoTexture, texSampler, uv, 0.0);
-    let ao  = aoSample.b;  // AO scalar packed in .b
-    let N = normalize(g.normal);
-    let V = normalize(g.viewDir);
+    let ao  = aoSample.b;
+    let N   = normalize(g.normal);
+    let V   = normalize(g.viewDir);
     let NoV = max(dot(N, V), 0.0);
-    let so = computeSpecularOcclusion(ao, NoV, g.roughness);
+    let so  = computeSpecularOcclusion(ao, NoV, g.roughness);
 
-    var R = normalize(g.reflectedDir);
+    let R = normalize(g.reflectedDir);
 
-    let avgF0 = dot(g.specularColor, vec3<f32>(0.333));
-    let specularStrength = max(avgF0, g.metallic) * (1.0 - g.roughness * 0.8);
-
-    // SSR color y alpha
-    let ssrColor = textureSample(ssrTexture, ssrSampler, uv);
-    let ssrAlpha = ssrColor.a;
-
-    // Pre-filtered specular IBL: sample mip proportional to roughness (split-sum approximation).
-    let maxMipLevel = 7.0;
-    let mipLevel = g.roughness * maxMipLevel;
-    let fallbackColor = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb * ssrParams.globalAmbientBoost;
-
-    // IBL: raw prefiltered radiance needs full split-sum BRDF applied
-    let iblSpecular = applyFresnelBRDF(fallbackColor, g);
-
-    // SSR: already contains full specular response (its own Fresnel baked in at ray march time).
-    // Re-apply only the split-sum weight so both paths share the same scale.
+    // ── Shared split-sum BRDF — computed once for both IBL and SSR paths ──────
     let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NoV, 0.0, 1.0));
-    let brdf       = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
-    let F          = Fresnel_Schlick_Roughness(NoV, g.specularColor, g.roughness);
-    let ssrSpecular = ssrColor.rgb * F;
+    let brdf  = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
+    let F0    = g.specularColor;
+    let F     = Fresnel_Schlick_Roughness(NoV, F0, g.roughness);
+    // Kulla-Conty multi-scattering energy compensation (Turquin 2019)
+    let E    = brdf.x + brdf.y;
+    let Ems  = 1.0 - E;
+    let Favg = F0 + (1.0 - F0) / 21.0;
+    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+    let splitSum = F * brdf.x + brdf.y + Fms;
 
-    var finalSpecular = mix(iblSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost * so;
+    // ── IBL: prefiltered env radiance × split-sum BRDF ────────────────────────
+    let maxMipLevel = 7.0;
+    let mipLevel    = g.roughness * maxMipLevel;
+    let envRadiance = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+    let iblSpecular = envRadiance * splitSum;
 
-    // Composición final: suma a la escena base fuera de este shader.
-    // Blend mode = additive_by_src_alpha → dst += finalSpecular * alpha.
-    // specularStrength gates dielectrics out (metallic=0 → alpha=0 → nothing added)
-    // and scales rough metal specular down proportionally to roughness.
-    return vec4<f32>(finalSpecular, specularStrength);
+    // ── SSR: raw hit radiance × same split-sum BRDF (same energy space as IBL) ─
+    let ssrColor    = textureSample(ssrTexture, ssrSampler, uv);
+    let ssrAlpha    = ssrColor.a;
+    let ssrSpecular = ssrColor.rgb * splitSum;
+
+    let finalSpecular = mix(iblSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost;
+
+    // Alpha = average specular energy × specular occlusion.
+    // With additive_by_src_alpha: dst += finalSpecular * alpha
+    // → rough=1 or occluded surfaces contribute nothing, metals/glossy contribute fully.
+    let specularEnergy = dot(splitSum, vec3<f32>(0.333));
+    return vec4<f32>(finalSpecular, specularEnergy * so);
 }

@@ -470,12 +470,13 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: 'filtering' },
       },
+      {
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' },
+      },
     ]);
   }
-
-  /**
-   * Creates a buffer uniform bind group layout
-   */
   public static getBufferUniformLayout(): GPUBindGroupLayout {
     return this.getLayout('buffer_uniform', [
       {

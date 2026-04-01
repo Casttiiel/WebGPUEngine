@@ -8,8 +8,8 @@
       "point_light": {
         "color": [1.0, 1.0, 1.0, 1.0],
         "intensity": 5,
-        "radius": 5,
-        "startFallof": 2,
+        "radius": 15,
+        "startFallof": 0,
         "hasShadows": true,
         "shadowResolution": 512
       }

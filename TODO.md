@@ -1,20 +1,18 @@
 ### Engine
 
-1. Review Ambient y specular shader
-2. Regenerate environment/irradiance texture
-3. Procedural Skybox better
-4. Test Mip Fog with skybox
-5. SMAA + TAA
-6. Area light
-7. HZB Pocho
-8. GI Precomputed + probes o Staggered/Radiance cascades
+1. Procedural Skybox better
+2. Test Mip Fog with skybox
+3. SMAA + TAA
+4. Area light
+5. HZB Pocho
+6. GI Precomputed + probes o Staggered/Radiance cascades
 
-9. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
-10. Froxel Self Occlusion
-11. Froxel Density Volumes
-12. UE Retro Shaders
-13. Consistency between dither / Dither size
-14. Enemy AI
+7. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
+8. Froxel Self Occlusion
+9. Froxel Density Volumes
+10. UE Retro Shaders
+11. Consistency between dither / Dither size
+12. Enemy AI
     Fase 2 — Navegación real
     ├── Waypoint graph (authorado en Blender → JSON)
     ├── A\* sobre el grafo

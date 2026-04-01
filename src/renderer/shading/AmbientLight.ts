@@ -160,6 +160,10 @@ export class AmbientLight {
             .getAmbientLightData()
             .irradianceCubemap.getSampler()!,
         },
+        {
+          binding: 5,
+          resource: this.brdfLUT.getTextureView()!,
+        },
       ],
     );
   }

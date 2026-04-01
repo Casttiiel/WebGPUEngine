@@ -6,7 +6,7 @@
     "irradianceCubemap": "ReflectionProbe_irradiance_cubemap_T.png"
   },
   "skybox": "qwantani_mid_morning_puresky_1k.hdr",
-  "skyboxType": "procedural",
+  "skyboxType": "skybox",
   "timeOfDay": 0.4,
   "ssrEnvironment": "ReflectionProbe_cubemap_T.png"
 }
