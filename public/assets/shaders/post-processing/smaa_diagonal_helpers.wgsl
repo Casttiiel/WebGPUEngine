@@ -90,7 +90,7 @@ fn SMAASearchDiag1(
     var coord = vec4<f32>(texcoord, -1.0, 1.0);
     let t = vec3<f32>(texelSize, 1.0);
     
-    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
+    for (var i = 0; i < i32(blendParams.maxSearchStepsDiag); i++) {
         if (!(coord.z < f32(blendParams.maxSearchStepsDiag - 1) && coord.w > 0.9)) { break; }
         coord = vec4<f32>(mad_vec2(t.xy, dir, coord.xy), mad_f32(t.z, 1.0, coord.z), coord.w);
         let e = textureSampleLevel(edgesTex, edgesSampler, coord.xy, 0.0).rg;
@@ -113,7 +113,7 @@ fn SMAASearchDiag2(
     coord.x += 0.25 * texelSize.x;
     let t = vec3<f32>(texelSize, 1.0);
     
-    for (var i = 0; i < i32(blendParams.maxSearchSteps); i++) {
+    for (var i = 0; i < i32(blendParams.maxSearchStepsDiag); i++) {
         if (!(coord.z < f32(blendParams.maxSearchStepsDiag - 1) && coord.w > 0.9)) { break; }
         coord = vec4<f32>(mad_vec2(t.xy, dir, coord.xy), mad_f32(t.z, 1.0, coord.z), coord.w);
         

@@ -1,8 +1,8 @@
 ### Engine
 
-1. Revisar SMAA
-2. Screen-space god rays — (occlusion mask → radial blur → Kawase → composite).
-3. GI Precomputed + probes o Staggered/Radiance cascades
+1. Screen-space god rays — (occlusion mask → radial blur → Kawase → composite).
+2. GI Precomputed + probes o Staggered/Radiance cascades
+3. Revisar SMAA
 4. HZB Pocho
 5. Froxel Self Occlusion
 6. Froxel Density Volumes

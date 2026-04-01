@@ -63,7 +63,7 @@ export class SMAAComponent extends Component {
     predicationStrength: 2.0,
     // Pass 2 (Blending Weights) parameters
     maxSearchSteps: 16, // Higher = longer edge patterns detected (was 32)
-    maxSearchStepsDiag: 4, // Higher = better diagonal detection (was 16)
+    maxSearchStepsDiag: 8, // Higher = better diagonal detection — 4 was too low to catch most diagonals
     cornerRounding: 25.0,
     disableDiagDetection: false,
     useDirectWeights: false,
@@ -394,7 +394,7 @@ export class SMAAComponent extends Component {
           },
           {
             binding: 5,
-            resource: sampler, // Same sampler for searchTex
+            resource: SamplerLibrary.nonFilteringSampler, // SearchTex MUST use nearest filtering — it encodes binary edge patterns
           },
         ],
       );
