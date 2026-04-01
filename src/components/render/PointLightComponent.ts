@@ -97,7 +97,6 @@ export class PointLightComponent extends Component {
     this.projectorTexture = await Texture.getAsync('white.png');
     this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
-
     if (this._hasShadows) {
       this.initShadowResources();
     } else {
@@ -170,9 +169,7 @@ export class PointLightComponent extends Component {
     const layout = BindGroupFactory.getLayoutFromEnum(
       PipelineBindGroupLayouts.POINT_LIGHT_SHADOW_UNIFORMS,
     );
-    const shadowResource = this._hasShadows
-      ? this.shadowCubeView
-      : this.dummyShadowTextureView;
+    const shadowResource = this._hasShadows ? this.shadowCubeView : this.dummyShadowTextureView;
 
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
       'point light uniform bind group',
