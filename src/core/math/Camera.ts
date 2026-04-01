@@ -346,6 +346,14 @@ export class Camera {
     // cameraFront + cameraZFar (offset 88-91 = 352-367 bytes) vec4
     this.uniformData.set([cameraFront[0], cameraFront[1], cameraFront[2], this.getFar()], 88);
 
+    // jitterOffset (offset 92-93 = 368-375 bytes) vec2  — UV-space sub-pixel offset
+    // getJitterOffset() returns [(pattern[0]-0.5)/width, (pattern[1]-0.5)/height]
+    // In the shader, multiply by screenSize to get pixel-space offsets.
+    const [jx, jy] = this.getJitterOffset();
+    this.uniformData[92] = jx;
+    this.uniformData[93] = jy;
+    // _pad0 (offset 94-95): left as zero from array initialization
+
     // Single GPU write instead of 7 separate writes
     GPUUtils.writeBuffer(this.uniformBuffer, 0, this.uniformData);
 

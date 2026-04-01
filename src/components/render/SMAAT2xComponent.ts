@@ -48,7 +48,6 @@ export class SMAAT2xComponent extends Component {
   // SMAA lookup textures
   private areaTex!: Texture;
   private searchTex!: Texture;
-  private whiteTexture!: Texture; // Placeholder for unused bindings
 
   // Uniform buffers
   private uniformBuffer!: GPUBuffer; // SMAA edge params
@@ -70,10 +69,6 @@ export class SMAAT2xComponent extends Component {
 
   // Temporal state
   private frameIndex: number = 0;
-  private jitterPattern: number[][] = [
-    [-0.25, 0.0], // Frame 0: offset left
-    [0.25, 0.0], // Frame 1: offset right
-  ];
   private currentJitter: number[] = [0, 0];
 
   // SMAA parameters
@@ -210,7 +205,7 @@ export class SMAAT2xComponent extends Component {
    * Apply SMAA T2x to the input texture
    * Usa el velocity buffer global del VelocityBufferManager
    */
-  public apply(inputTexture: GPUTextureView): GPUTextureView {
+  public apply(inputTexture: GPUTextureView, linearDepthView: GPUTextureView): GPUTextureView {
     if (!this.loaded) {
       return inputTexture;
     }
@@ -243,13 +238,13 @@ export class SMAAT2xComponent extends Component {
     );
     this.executeNeighborhoodPass(neighborhoodColorBindGroup, neighborhoodBlendBindGroup);
 
-    // Pass 4: Temporal Resolve (blend with history using velocity)
-    // Obtener velocity buffer del manager global
+    // Pass 4: Temporal Resolve (blend with history using velocity and depth)
     const velocityTexture = VelocityBufferManager.getInstance().getVelocityTextureView();
     const temporalBindGroup = this.getOrCreateTemporalBindGroup(
       this.smaaResultRT.getView(),
       this.historyRT.getView(),
       velocityTexture,
+      linearDepthView,
     );
     this.executeTemporalResolvePass(temporalBindGroup);
 
@@ -458,6 +453,7 @@ export class SMAAT2xComponent extends Component {
     currentTexture: GPUTextureView,
     historyTexture: GPUTextureView,
     velocityTexture: GPUTextureView,
+    linearDepthView: GPUTextureView,
   ): GPUBindGroup {
     const key = `temporal_${currentTexture}_${historyTexture}`;
     if (this.temporalBindGroupCache.has(key)) {
@@ -473,7 +469,7 @@ export class SMAAT2xComponent extends Component {
         { binding: 1, resource: currentTexture },
         { binding: 2, resource: historyTexture },
         { binding: 3, resource: velocityTexture },
-        { binding: 4, resource: this.whiteTexture.getTextureView()! }, // Unused placeholder
+        { binding: 4, resource: linearDepthView }, // linear depth for closest-depth velocity
       ],
     );
 

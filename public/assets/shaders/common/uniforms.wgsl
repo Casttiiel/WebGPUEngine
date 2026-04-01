@@ -12,6 +12,11 @@ struct CameraUniforms {
     timeDelta: f32,
     cameraFront: vec3<f32>,
     cameraFar: f32,
+    // Sub-pixel jitter offset in UV space: (pattern - 0.5) / screenSize
+    // Used by GBuffer shaders to unjitter texture UVs and prevent TAA-induced texture blur.
+    // Multiply by screenSize to get pixel-space offsets.
+    jitterOffset: vec2<f32>,
+    _pad0: vec2<f32>,                 // padding to keep struct size a multiple of 16 bytes
 }
 
 struct OldCameraUniforms {

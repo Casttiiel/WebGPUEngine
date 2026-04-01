@@ -478,7 +478,7 @@ export class ModuleRender extends Module {
       if (mainCameraEntity?.hasComponent('smaa_t2x')) {
         const smaaT2x = mainCameraEntity.getComponent('smaa_t2x') as SMAAT2xComponent;
         if (smaaT2x.hasLoaded()) {
-          result = smaaT2x.apply(result);
+          result = smaaT2x.apply(result, this.deferred.getLinearDepthView());
         }
       }
 

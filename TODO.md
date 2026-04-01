@@ -1,15 +1,13 @@
 ### Engine
 
-1. SMAAT2x
-
+1. Revisar SMAA
 2. Screen-space god rays — (occlusion mask → radial blur → Kawase → composite).
-3. History Froxel Volumetrics / GTAO
-4. Froxel Self Occlusion
-5. GI Precomputed + probes o Staggered/Radiance cascades
-6. HZB Pocho
-7. Froxel Density Volumes
-8. Consistency between dither / Dither size
-9. Enemy AI
+3. GI Precomputed + probes o Staggered/Radiance cascades
+4. HZB Pocho
+5. Froxel Self Occlusion
+6. Froxel Density Volumes
+7. Consistency between dither / Dither size
+8. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo

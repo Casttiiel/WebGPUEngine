@@ -50,7 +50,7 @@ const FACE_TARGETS: Array<[[number, number, number], [number, number, number]]> 
 //   cameraFar: f32             =   4 B
 //   -----------------------------------
 //   Total                      = 368 B
-const CAMERA_UNIFORM_BYTES = 368;
+const CAMERA_UNIFORM_BYTES = 384;
 
 export class ProceduralSkyCubemap {
   private cubemapTexture!: GPUTexture;

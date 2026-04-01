@@ -17,7 +17,14 @@
 fn fs(input: VertexOutput) -> FragmentOutput {
     let Uv = input.Uv * vec2<f32>(factors.uvXScale,factors.uvYScale);
 
-    let albedo_color = textureSample(txAlbedo, samplerState, Uv);
+    // UV unjittering: TAA jitters the camera projection each frame by a sub-pixel offset,
+    // which shifts the interpolated mesh UVs and causes mip-selection variance → texture blur.
+    // Subtract the jitter displacement (estimated via screen-space derivatives) to restore
+    // the UV the pixel would have had without jitter.
+    let jitter_px = camera.jitterOffset * camera.screenSize;
+    let uvUnjittered = Uv - dpdx(Uv) * jitter_px.x - dpdy(Uv) * jitter_px.y;
+
+    let albedo_color = textureSample(txAlbedo, samplerState, uvUnjittered);
     
     var output: FragmentOutput;
 
@@ -25,16 +32,16 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     // not sRGB-encoded values. Sketchfab / glTF reference: pow(sRGB, 2.2) * linearFactor.
     let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
     output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
-    output.albedo.a = textureSample(txMetallic, samplerState, Uv).b * factors.metallicFactor;
+    output.albedo.a = textureSample(txMetallic, samplerState, uvUnjittered).b * factors.metallicFactor;
 
     // Obtener la normal del normal map
-    let N_tangent_space = textureSample(txNormal, samplerState, Uv) * 2.0 - 1.0;
+    let N_tangent_space = textureSample(txNormal, samplerState, uvUnjittered) * 2.0 - 1.0;
     
     // Calcular TBN y transformar la normal
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);    
     
-    let roughness_raw = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
+    let roughness_raw = textureSample(txRoughness, samplerState, uvUnjittered).g * factors.roughnessFactor;
 
     // ── Specular Anti-Aliasing (Toksvigs / Kanis 2013) ───────────────────────
     // High-frequency normal maps introduce specular variance that is not captured
@@ -55,7 +62,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     // ─────────────────────────────────────────────────────────────────────────
     let encodedNormal = normalToOctahedral01(N);
 
-    let emissive = textureSample(txEmissive, samplerState, Uv).x * factors.emissiveFactor;
+    let emissive = textureSample(txEmissive, samplerState, uvUnjittered).x * factors.emissiveFactor;
 
     // Pack octahedral normal + roughness en RGBA8
     output.normal = vec4<f32>(

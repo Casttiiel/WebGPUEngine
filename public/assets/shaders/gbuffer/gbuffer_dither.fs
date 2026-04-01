@@ -46,7 +46,11 @@ fn bayer4(coord: vec2<u32>) -> f32 {
 fn fs(input: VertexOutput) -> FragmentOutput {
     let Uv = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
 
-    let albedo_color = textureSample(txAlbedo, samplerState, Uv);
+    // UV unjittering: remove per-frame jitter displacement to prevent TAA-induced texture blur.
+    let jitter_px = camera.jitterOffset * camera.screenSize;
+    let uvUnjittered = Uv - dpdx(Uv) * jitter_px.x - dpdy(Uv) * jitter_px.y;
+
+    let albedo_color = textureSample(txAlbedo, samplerState, uvUnjittered);
 
     // Dither discard: pixel survives iff alpha > its Bayer threshold.
     // Combine texture alpha with the material baseColorFactor alpha so that
@@ -64,13 +68,13 @@ fn fs(input: VertexOutput) -> FragmentOutput {
 
     let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
     output.albedo     = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
-    output.albedo.a   = textureSample(txMetallic, samplerState, Uv).b * factors.metallicFactor;
+    output.albedo.a   = textureSample(txMetallic, samplerState, uvUnjittered).b * factors.metallicFactor;
 
-    let N_tangent_space = textureSample(txNormal, samplerState, Uv) * 2.0 - 1.0;
+    let N_tangent_space = textureSample(txNormal, samplerState, uvUnjittered) * 2.0 - 1.0;
     let TBN = computeTBN(normalize(input.N), input.T);
     let N   = normalize(TBN * N_tangent_space.xyz);
 
-    let roughness_raw = textureSample(txRoughness, samplerState, Uv).g * factors.roughnessFactor;
+    let roughness_raw = textureSample(txRoughness, samplerState, uvUnjittered).g * factors.roughnessFactor;
     let dndx = dpdx(N);
     let dndy = dpdy(N);
     let variance     = dot(dndx, dndx) + dot(dndy, dndy);
@@ -79,7 +83,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let roughness    = sqrt(rough2);
     let encodedNormal = normalToOctahedral01(N);
 
-    let emissive = textureSample(txEmissive, samplerState, Uv).x * factors.emissiveFactor;
+    let emissive = textureSample(txEmissive, samplerState, uvUnjittered).x * factors.emissiveFactor;
 
     output.normal = vec4<f32>(
         encodedNormal.x,
