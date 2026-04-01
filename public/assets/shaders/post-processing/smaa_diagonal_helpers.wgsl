@@ -150,8 +150,7 @@ fn SMAAAreaDiag(
     
     // Move to proper place, according to the subpixel offset:
     texcoord.y += SMAA_AREATEX_SUBTEX_SIZE * offset;
-    
-    // Do it!
+
     return textureSampleLevel(areaTex, areaSampler, texcoord, 0.0).rg;
 }
 
@@ -171,8 +170,7 @@ fn SMAAArea(
     
     // Move to proper place, according to the subpixel offset:
     texcoord.y = mad_f32(SMAA_AREATEX_SUBTEX_SIZE, offset, texcoord.y);
-    
-    // Do it!
+
     return textureSampleLevel(areaTex, areaSampler, texcoord, 0.0).rg;
 }
 

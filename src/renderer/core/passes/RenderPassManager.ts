@@ -293,7 +293,11 @@ export class RenderPassManager {
     result: RenderTarget,
     label = 'Antialiasing',
   ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(result, undefined, label);
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      Render.canvasSize,
+      label,
+    );
     const pass = new AntialiasingRenderPass(passConfig, mesh, technique, bindGroup);
     this.executeDynamicPass(pass);
   }

@@ -6,8 +6,7 @@
 // -----------------------------------------------------------------------------
 
 struct SMAAParams {
-    threshold: f32,           // 0.05–0.15 típico
-    contrastAdaptationFactor: f32, // 0.0–1.0 (0 = sin adaptativo, 0.5–1.0 = más adaptativo)
+    threshold: f32,  // 0.05–0.15 typical
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -60,8 +59,10 @@ fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
     maxDelta = max(maxDelta.xy, vec2<f32>(deltaZ, deltaW));
     let finalDelta = max(maxDelta.x, maxDelta.y);
 
-    // Local contrast adaptation:
-    edges = edges * step(vec2<f32>(finalDelta), params.contrastAdaptationFactor * vec2<f32>(deltaX, deltaY));
+    // Local contrast adaptation (fixed factor 2.0 per SMAA spec):
+    // Keep an edge only when its local delta is >= half the maximum neighbourhood delta.
+    // This suppresses detector noise on low-contrast gradients while preserving real edges.
+    edges = edges * step(vec2<f32>(finalDelta * 0.5), vec2<f32>(deltaX, deltaY));
 
     return edges;
 }

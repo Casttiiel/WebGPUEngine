@@ -60,7 +60,6 @@ export class SMAAComponent extends Component {
   private smaaParams = {
     enabled: true,
     edgeThreshold: 0.05, // Lower = more edges detected (was 0.1, reference uses 0.1, but we want stronger effect)
-    predicationStrength: 2.0,
     // Pass 2 (Blending Weights) parameters
     maxSearchSteps: 16, // Higher = longer edge patterns detected (was 32)
     maxSearchStepsDiag: 8, // Higher = better diagonal detection — 4 was too low to catch most diagonals
@@ -171,7 +170,6 @@ export class SMAAComponent extends Component {
     // Upload edge params only when changed
     if (this.edgeParamsDirty) {
       this.edgeParamsData[0] = this.smaaParams.edgeThreshold;
-      this.edgeParamsData[1] = this.smaaParams.predicationStrength;
       this.device.queue.writeBuffer(this.uniformBuffer, 0, this.edgeParamsData);
       this.edgeParamsDirty = false;
     }
@@ -450,18 +448,6 @@ export class SMAAComponent extends Component {
       max: 1.5,
       step: 0.01,
     });
-
-    debugUI.addInteractiveControl(
-      'SMAA',
-      this.smaaParams,
-      'predicationStrength',
-      'Contrast Adaptation',
-      {
-        min: 0.0,
-        max: 3.0,
-        step: 0.1,
-      },
-    );
 
     // Pass 2 parameters
     debugUI.addInteractiveControl('SMAA', this.smaaParams, 'maxSearchSteps', 'Max Search Steps', {

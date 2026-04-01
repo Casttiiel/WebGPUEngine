@@ -1,13 +1,14 @@
 ### Engine
 
-1. Screen-space god rays — (occlusion mask → radial blur → Kawase → composite).
-2. GI Precomputed + probes o Staggered/Radiance cascades
-3. Revisar SMAA
-4. HZB Pocho
-5. Froxel Self Occlusion
-6. Froxel Density Volumes
-7. Consistency between dither / Dither size
-8. Enemy AI
+1. FSR from FullHD to 4K -> UI is small -> FSR Correctness
+2. Screen-space god rays — (occlusion mask → radial blur → Kawase → composite).
+3. GI Precomputed + probes o Staggered/Radiance cascades
+4. AA/TAA
+5. HZB Pocho
+6. Froxel Self Occlusion
+7. Froxel Density Volumes
+8. Consistency between dither / Dither size
+9. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo

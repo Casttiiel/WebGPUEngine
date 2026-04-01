@@ -34,7 +34,7 @@ export class FXAAComponent extends Component {
 
   public async load(): Promise<void> {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.technique = await Technique.getAsync('fxaa.tech');
+    this.technique = await Technique.getAsync('post-processing/fxaa.tech');
 
     const aliasingFormat = QualitySettings.getInstance().getSettings().aliasingTexture;
 

@@ -1,6 +1,6 @@
 {
     "vs": "utility/presentation.vs",
-    "fs": "fxaa.fs",
+    "fs": "post-processing/fxaa.fs",
     "writesOn": "texture",
     "z": "disable_all",
     "uniforms":["CameraUniforms","SingleTexture"]

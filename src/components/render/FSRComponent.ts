@@ -33,7 +33,7 @@ export class FSRComponent extends Component {
   private isLoaded = false;
 
   // ── Public settings (exposed in debug UI) ─────────────────────────────────
-  public enabled = true;
+  public override enabled = true;
   /** Run RCAS sharpening pass after EASU.  Can be disabled to save GPU time. */
   public enableRCAS = true;
   /**
