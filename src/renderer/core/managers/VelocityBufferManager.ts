@@ -47,6 +47,9 @@ export class VelocityBufferManager {
   // Bind groups
   private velocityBindGroup!: GPUBindGroup;
 
+  // Persistent uniform buffer for previous ViewProjection (reused every frame)
+  private previousVPBuffer!: GPUBuffer;
+
   // Previous frame camera matrices
   private previousViewProjection: mat4 = mat4.create();
   private hasHistory: boolean = false;
@@ -79,6 +82,13 @@ export class VelocityBufferManager {
       'rgba16float', // Formato HDR estándar (velocity en RG, BA sin usar)
       0, // No extra usage
     );
+
+    // Pre-allocate persistent uniform buffer for previous VP matrix (reused every frame)
+    this.previousVPBuffer = this.device.createBuffer({
+      label: 'previous_view_projection',
+      size: 64, // mat4x4<f32> = 64 bytes
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
 
     this.isInitialized = true;
   }
@@ -166,15 +176,9 @@ export class VelocityBufferManager {
    * Crea el bind group para la generación del velocity buffer
    */
   private createVelocityBindGroup(): void {
-    // Crear uniform buffer con previous ViewProjection matrix
-    const previousVPBuffer = this.device.createBuffer({
-      label: 'previous_view_projection',
-      size: 64, // mat4x4<f32> = 64 bytes
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
+    // Reuse the pre-allocated buffer — just upload new data (zero GPU allocation)
     this.device.queue.writeBuffer(
-      previousVPBuffer,
+      this.previousVPBuffer,
       0,
       new Float32Array(this.previousViewProjection as unknown as ArrayLike<number>),
     );
@@ -190,7 +194,7 @@ export class VelocityBufferManager {
         {
           binding: 0,
           resource: {
-            buffer: previousVPBuffer,
+            buffer: this.previousVPBuffer,
           },
         },
       ],
@@ -247,7 +251,7 @@ export class VelocityBufferManager {
     if (!this.isInitialized) {
       return;
     }
-    this.velocityRT.createRT('velocity_buffer', width, height, 'rg16float', 0);
+    this.velocityRT.createRT('velocity_buffer', width, height, 'rgba16float', 0);
 
     // Reset history después de resize
     this.hasHistory = false;

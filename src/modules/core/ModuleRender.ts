@@ -19,6 +19,7 @@ import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldCompo
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
+import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
@@ -257,6 +258,9 @@ export class ModuleRender extends Module {
     for (const comp of Engine.getEntities().getObjectManagerByName('smaa')?.getList() ?? []) {
       (comp as SMAAComponent).resize();
     }
+    for (const comp of Engine.getEntities().getObjectManagerByName('smaa_t2x')?.getList() ?? []) {
+      (comp as SMAAT2xComponent).resize();
+    }
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -471,6 +475,13 @@ export class ModuleRender extends Module {
         }
       }
 
+      if (mainCameraEntity?.hasComponent('smaa_t2x')) {
+        const smaaT2x = mainCameraEntity.getComponent('smaa_t2x') as SMAAT2xComponent;
+        if (smaaT2x.hasLoaded()) {
+          result = smaaT2x.apply(result);
+        }
+      }
+
       if (mainCameraEntity?.hasComponent('speed_lines_vfx')) {
         const speedLines = mainCameraEntity.getComponent(
           'speed_lines_vfx',
@@ -518,14 +529,15 @@ export class ModuleRender extends Module {
       ],
     });
 
-    // Set viewport to physical pixels (GPU renders at physical resolution)
-    const canvas = render.getCanvas();
-    const physicalWidth = canvas.width;
-    const physicalHeight = canvas.height;
+    // Set viewport to the render target dimensions (Render.width/height), NOT canvas
+    // physical pixels. The result texture is always Render.width × Render.height;
+    // using canvas.width/height would exceed the attachment bounds on HiDPI displays.
+    const rtWidth = Render.width;
+    const rtHeight = Render.height;
 
     // Configure viewport and scissor for UI rendering
-    renderPass.setViewport(0, 0, physicalWidth, physicalHeight, 0.0, 1.0);
-    renderPass.setScissorRect(0, 0, physicalWidth, physicalHeight);
+    renderPass.setViewport(0, 0, rtWidth, rtHeight, 0.0, 1.0);
+    renderPass.setScissorRect(0, 0, rtWidth, rtHeight);
 
     // Render all active UI widgets
     moduleUI.render(renderPass);

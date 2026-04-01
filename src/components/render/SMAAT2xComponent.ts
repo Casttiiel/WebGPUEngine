@@ -215,9 +215,9 @@ export class SMAAT2xComponent extends Component {
       return inputTexture;
     }
 
-    // Update jitter pattern for this frame
-    const pattern = this.jitterPattern[this.frameIndex % this.jitterPattern.length]!;
-    this.currentJitter = pattern;
+    // jitterOffset is no longer used for reprojection (velocity already encodes it);
+    // zero it out and only update the per-frame temporal params.
+    this.currentJitter = [0, 0];
 
     // Update jitter for next frame
     this.updateUniformBuffers();

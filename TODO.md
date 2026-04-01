@@ -1,8 +1,8 @@
 ### Engine
 
-1. TAA + SMAA
+1. SMAAT2x
 
-2. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
+2. Screen-space god rays — (occlusion mask → radial blur → Kawase → composite).
 3. UE Retro Shaders
 4. Froxel Volumetrics
 5. Froxel Self Occlusion

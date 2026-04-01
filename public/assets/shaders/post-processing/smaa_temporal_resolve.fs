@@ -78,9 +78,10 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // 2. Sample velocity (motion vector)
     let velocity = textureSample(txVelocity, txSampler, uv).xy;
     
-    // 3. Compute history UV with velocity reprojection
-    // Subtract jitter offset to compensate for camera jittering
-    let historyUV = uv - velocity - params.jitterOffset;
+    // 3. Compute history UV with velocity reprojection.
+    // The velocity buffer is computed from jittered VP matrices, so it already
+    // encodes the jitter difference between frames — no extra jitter correction needed.
+    let historyUV = uv - velocity;
     
     // 4. Check if history UV is valid (inside screen bounds)
     let isHistoryValid = historyUV.x >= 0.0 && historyUV.x <= 1.0 && 
@@ -102,7 +103,7 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     
     // 8. Temporal blend (mix current with clamped history)
     // blendFactor = 0.1 means 90% history, 10% current (high temporal stability)
-    let finalColor = mix(clampedHistory, currentColor, 0.5);
+    let finalColor = mix(clampedHistory, currentColor, params.blendFactor);
     
     return finalColor;
 }

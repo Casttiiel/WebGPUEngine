@@ -1,6 +1,6 @@
 {
   "vs": "utility/presentation.vs",
-  "fs": "smaa_temporal_resolve.fs",
+  "fs": "post-processing/smaa_temporal_resolve.fs",
   "z": "disable_all",
   "writesOn": "texture",
   "uniforms": ["FourTexture", "BufferUniform"]
