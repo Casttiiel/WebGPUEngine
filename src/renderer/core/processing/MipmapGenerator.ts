@@ -19,6 +19,17 @@ export class MipmapGenerator {
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
 
+  // Per-texture cache for cubemap mip-gen resources.
+  // Avoids creating 42 bind groups + 84 texture views every frame for live cubemaps.
+  private cubemapMipCache: Map<
+    GPUTexture,
+    {
+      pipeline: GPUComputePipeline;
+      // [face][mipLevel-1]: { bindGroup, workgroupsX, workgroupsY }
+      passes: Array<Array<{ bindGroup: GPUBindGroup; workgroupsX: number; workgroupsY: number }>>;
+    }
+  > = new Map();
+
   private constructor() {
     // Private constructor for singleton pattern
   }
@@ -132,66 +143,65 @@ export class MipmapGenerator {
       throw new Error('MipmapGenerator not initialized');
     }
 
-    // Get pipeline and bind group layout for this texture format
-    const { pipeline, bindGroupLayout } = await this.getOrCreatePipeline(texture.format);
+    // Build the per-texture cache once; reuse every subsequent frame.
+    if (!this.cubemapMipCache.has(texture)) {
+      const { pipeline, bindGroupLayout } = await this.getOrCreatePipeline(texture.format);
+      const passes: Array<
+        Array<{ bindGroup: GPUBindGroup; workgroupsX: number; workgroupsY: number }>
+      > = [];
+      for (let face = 0; face < 6; face++) {
+        const facePasses: Array<{
+          bindGroup: GPUBindGroup;
+          workgroupsX: number;
+          workgroupsY: number;
+        }> = [];
+        for (let mipLevel = 1; mipLevel < mipLevelCount; mipLevel++) {
+          const currentSize = Math.max(1, texture.width >> mipLevel);
+          const sourceView = texture.createView({
+            label: `sky_cubemap_mip_src_f${face}_m${mipLevel - 1}`,
+            dimension: '2d',
+            baseArrayLayer: face,
+            arrayLayerCount: 1,
+            baseMipLevel: mipLevel - 1,
+            mipLevelCount: 1,
+          });
+          const destView = texture.createView({
+            label: `sky_cubemap_mip_dst_f${face}_m${mipLevel}`,
+            dimension: '2d',
+            baseArrayLayer: face,
+            arrayLayerCount: 1,
+            baseMipLevel: mipLevel,
+            mipLevelCount: 1,
+          });
+          facePasses.push({
+            bindGroup: BindGroupFactory.createBindGroup(
+              `sky_cubemap_mip_bg_f${face}_m${mipLevel}`,
+              bindGroupLayout,
+              [
+                { binding: 0, resource: sourceView },
+                { binding: 1, resource: destView },
+              ],
+            ),
+            workgroupsX: Math.ceil(currentSize / 8),
+            workgroupsY: Math.ceil(currentSize / 8),
+          });
+        }
+        passes.push(facePasses);
+      }
+      this.cubemapMipCache.set(texture, { pipeline, passes });
+    }
 
+    const cached = this.cubemapMipCache.get(texture)!;
     const commandEncoder = this.device.createCommandEncoder({
       label: 'Cubemap Mipmap Generation Command Encoder',
     });
 
-    // Generate mipmaps for each face (0-5) and each mip level
     for (let face = 0; face < 6; face++) {
-      for (let mipLevel = 1; mipLevel < mipLevelCount; mipLevel++) {
-        // Calculate dimensions for this mip level
-        const currentSize = Math.max(1, texture.width >> mipLevel);
-
-        // Create views for source (previous mip level) and destination (current mip level)
-        const sourceView = texture.createView({
-          label: `Cubemap Face ${face} Mip ${mipLevel - 1} Source`,
-          dimension: '2d',
-          baseArrayLayer: face,
-          arrayLayerCount: 1,
-          baseMipLevel: mipLevel - 1,
-          mipLevelCount: 1,
-        });
-
-        const destView = texture.createView({
-          label: `Cubemap Face ${face} Mip ${mipLevel} Destination`,
-          dimension: '2d',
-          baseArrayLayer: face,
-          arrayLayerCount: 1,
-          baseMipLevel: mipLevel,
-          mipLevelCount: 1,
-        });
-        // Create bind group for this mip level generation
-        const bindGroup = BindGroupFactory.createBindGroup(
-          `Mipmap Generation Face ${face} Level ${mipLevel}`,
-          bindGroupLayout,
-          [
-            {
-              binding: 0,
-              resource: sourceView,
-            },
-            {
-              binding: 1,
-              resource: destView,
-            },
-          ],
-        );
-
-        // Dispatch compute shader
-        const computePass = commandEncoder.beginComputePass({
-          label: `Mipmap Generation Face ${face} Level ${mipLevel}`,
-        });
-
-        computePass.setPipeline(pipeline);
-        computePass.setBindGroup(0, bindGroup);
-
-        // Calculate workgroup dispatch size
-        const workgroupsX = Math.ceil(currentSize / 8);
-        const workgroupsY = Math.ceil(currentSize / 8);
-        computePass.dispatchWorkgroups(workgroupsX, workgroupsY);
-
+      for (const pass of cached.passes[face]!) {
+        const computePass = commandEncoder.beginComputePass();
+        computePass.setPipeline(cached.pipeline);
+        computePass.setBindGroup(0, pass.bindGroup);
+        computePass.dispatchWorkgroups(pass.workgroupsX, pass.workgroupsY);
         computePass.end();
       }
     }
@@ -379,6 +389,11 @@ export class MipmapGenerator {
     this.destroy();
   }
 
+  /** Remove the cached mip-gen resources for a specific texture (call from dispose()). */
+  public releaseCubemapMipCache(texture: GPUTexture): void {
+    this.cubemapMipCache.delete(texture);
+  }
+
   public destroy(): void {
     console.log('Destroying MipmapGenerator...');
 
@@ -389,6 +404,7 @@ export class MipmapGenerator {
     this.normalMapPipelines.clear();
     this.normalMapPipelinePromises.clear();
     this.normalMapBindGroupLayouts.clear();
+    this.cubemapMipCache.clear();
 
     // Clear device reference
     this.device = null!;

@@ -9,6 +9,7 @@ import { Technique } from '../../resources/Technique';
 import { Texture } from '../../resources/Texture';
 import { AmbientLight } from '../../shading/AmbientLight';
 import { Skybox } from '../../shading/Skybox';
+import { ProceduralSkyCubemap } from '../../shading/ProceduralSkyCubemap';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { GBufferPass } from '../passes/GBufferPass';
 import { DepthPrepass } from '../passes/DepthPrepass';
@@ -29,6 +30,7 @@ import { TiledLightManager } from '../managers/TiledLightManager';
 export class DeferredRenderer {
   private isLoaded = false;
   private skybox!: Skybox;
+  private proceduralSkyCubemap: ProceduralSkyCubemap | null = null;
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
   private froxelVolumetrics!: FroxelVolumetricScattering;
@@ -266,6 +268,11 @@ export class DeferredRenderer {
   public async load(): Promise<void> {
     this.skybox = new Skybox();
     await this.skybox.load();
+
+    if (Engine.getEnvironmentManager().getSkyboxType() === 'procedural') {
+      this.proceduralSkyCubemap = new ProceduralSkyCubemap();
+      await this.proceduralSkyCubemap.load();
+    }
 
     this.ambientLight = new AmbientLight();
     await this.ambientLight.load();
@@ -525,6 +532,10 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('pointLightsWithShadows');
     this.renderPassManager.executePass('spotLightsWithShadows');
 
+    // Update the procedural sky cubemap before the main skybox draw so the
+    // fog pass (post-processing) can sample it with correct frame-N sky colours.
+    this.proceduralSkyCubemap?.render();
+
     const prepassDepthView = this.depthPrepass.getDepthTextureView();
     this.skybox.render(this.rtAccLight.getView(), prepassDepthView);
   }
@@ -625,6 +636,8 @@ export class DeferredRenderer {
     this.hzbBuilder?.dispose();
 
     this.ssgi?.dispose();
+    this.proceduralSkyCubemap?.dispose();
+    this.proceduralSkyCubemap = null;
     this.gBufferBindGroup = null as any;
     this.gBufferLayout = null as any;
     this.aoResult = null as any;
@@ -651,5 +664,10 @@ export class DeferredRenderer {
 
   public getAccLightRenderTarget(): RenderTarget {
     return this.rtAccLight;
+  }
+
+  /** Returns the live procedural sky cubemap, or null when not in procedural mode. */
+  public getProceduralSkyCubemap(): ProceduralSkyCubemap | null {
+    return this.proceduralSkyCubemap;
   }
 }

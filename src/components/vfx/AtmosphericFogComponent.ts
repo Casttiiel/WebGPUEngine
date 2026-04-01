@@ -10,8 +10,9 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { ProceduralSkyCubemap } from '../../renderer/shading/ProceduralSkyCubemap';
 
-// Uniform buffer layout (112 bytes, 7 vec4):
+// Uniform buffer layout (128 bytes, 8 vec4):
 //   [0..3]   fogColor.rgb + fogDensity
 //   [4..7]   fogHeightStart, fogHeightEnd, fogFalloff, pad
 //   [8..11]  distanceFogStart, distanceFogEnd, distanceExponent, pad
@@ -19,7 +20,8 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 //   [16..19] nearFogStart, nearFogEnd, pad, pad
 //   [20..23] mipFogStart, mipFogEnd, mipFogMaxMip, mipFogStrength
 //   [24..27] globalAmbientBoost, pad, pad, pad
-const UNIFORM_SIZE = 112;
+//   [28..31] reserved / padding (16 bytes)
+const UNIFORM_SIZE = 128;
 const UNIFORM_FLOATS = UNIFORM_SIZE / 4;
 
 export class AtmosphericFogComponent extends Component {
@@ -33,6 +35,9 @@ export class AtmosphericFogComponent extends Component {
 
   // Bind group cache: keyed by input texture view (changes when upscaling or pipeline changes)
   private bindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+  // Track which sky cubemap instance was used to build the cache so we can invalidate
+  // when it transitions from null → loaded (or changes for any other reason).
+  private cachedSkyCubemap: ProceduralSkyCubemap | null | undefined = undefined;
 
   // Fog parameters — set from component data
   private fogColor: [number, number, number] = [0.65, 0.72, 0.85];
@@ -49,7 +54,7 @@ export class AtmosphericFogComponent extends Component {
   public mipFogStart: number = 150.0;
   public mipFogEnd: number = 350.0;
   public mipFogMaxMip: number = 5.0;
-  public mipFogStrength: number = 0.8;
+  public mipFogStrength: number = 0.95;
   public globalAmbientBoost: number = 1.0;
 
   constructor() {
@@ -117,9 +122,23 @@ export class AtmosphericFogComponent extends Component {
       this.uniformsDirty = false;
     }
 
+    // Resolve environment source: live procedural sky cubemap when available,
+    // otherwise fall back to the baked SSR environment cubemap.
+    const deferred = Engine.getRender().getDeferredRenderer();
+    const skyCubemap: ProceduralSkyCubemap | null = deferred.getProceduralSkyCubemap();
+
+    // If the available sky cubemap changed (e.g. null → loaded), the cached bind groups
+    // reference the wrong texture — clear and rebuild.
+    if (skyCubemap !== this.cachedSkyCubemap) {
+      this.bindGroupCache.clear();
+      this.cachedSkyCubemap = skyCubemap;
+    }
+
     let bindGroup = this.bindGroupCache.get(inputTexture);
     if (!bindGroup) {
-      const envTexture = Engine.getEnvironmentManager().getSSREnvironmentTexture();
+      const ssrEnv = Engine.getEnvironmentManager().getSSREnvironmentTexture();
+      const envView = skyCubemap ? skyCubemap.getCubemapView() : ssrEnv.getTextureView()!;
+      const envSampler = skyCubemap ? skyCubemap.getSampler() : ssrEnv.getSampler()!;
       bindGroup = BindGroupFactory.createBindGroup(
         'atmospheric_fog_bindgroup',
         this.technique.getPipeline().getBindGroupLayout(2),
@@ -127,8 +146,8 @@ export class AtmosphericFogComponent extends Component {
           { binding: 0, resource: { buffer: this.uniformBuffer } },
           { binding: 1, resource: inputTexture },
           { binding: 2, resource: SamplerLibrary.simpleSampler },
-          { binding: 3, resource: envTexture.getTextureView()! },
-          { binding: 4, resource: envTexture.getSampler()! },
+          { binding: 3, resource: envView },
+          { binding: 4, resource: envSampler },
         ],
       );
       this.bindGroupCache.set(inputTexture, bindGroup);

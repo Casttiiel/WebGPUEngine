@@ -46,21 +46,22 @@ fn heightFogFactor(posWS: vec3<f32>) -> f32 {
     return pow(max(0.0, 1.0 - t), params.fogHeight.z);
 }
 
-// MIP fog: instead of blending toward a flat fogColor, blend toward the blurred
-// environment cubemap so distant geometry dissolves into the skybox naturally.
-fn getMipFogColor(posWS: vec3<f32>, dist: f32, baseColor: vec3<f32>) -> vec3<f32> {
-    let mipT    = saturate(
+// Naughty Dog inverted mip-fog: fog colour ALWAYS derived from the sky cubemap.
+//   Near (dist=0):             mip = maxMip  → fully blurred = average sky tone.
+//                                              Dark at night, bright at day — adapts automatically.
+//   Far  (dist = mipFog.y):    mip = 0       → directional sky colour matching the skybox.
+// mipFog.x = fade-in start, mipFog.y = full-range distance, mipFog.z = maxMip, mipFog.w = strength.
+fn getMipFogColor(posWS: vec3<f32>, dist: f32) -> vec3<f32> {
+    let dir = normalize(posWS - camera.cameraPosition.xyz);
+    // t: 0 at mipFog.x, 1 at mipFog.y.  Below mipFog.x the fog stays at maxMip (avg colour).
+    let t   = saturate(
         (dist - params.mipFog.x) /
         max(params.mipFog.y - params.mipFog.x, 0.001)
     );
-    // Early out: no mip fog contribution, skip unnecessary cubemap fetch.
-    if (mipT <= 0.0) { return baseColor; }
-    let mip     = mipT * params.mipFog.z;
-    let dir     = normalize(posWS - camera.cameraPosition.xyz);
-    let envCol  = textureSampleLevel(txEnvironment, envSampler, dir, mip).rgb
-                  * params.globalBoost.x;
-    // Blend baseColor → blurred environment as distance increases.
-    return mix(baseColor, envCol, mipT * params.mipFog.w);
+    // Inverted: near → maxMip (blurry/ambient), far → 0 (directional/vivid).
+    let mip = params.mipFog.z * (1.0 - t);
+    return textureSampleLevel(txEnvironment, envSampler, dir, mip).rgb
+           * params.globalBoost.x;
 }
 
 // Near fog color override blends nearFogColor toward baseFogColor as distance increases.
@@ -85,15 +86,10 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let heightFactor = heightFogFactor(posWS);
     let fogFactor    = saturate(distFactor * heightFactor * params.fogColor.w);
 
-    // Near override blends nearFogColor → flat fogColor as distance increases.
-    // This produces a clean base color before any environment tinting.
-    let nearT     = saturate(
-        (distToCamera - params.nearFogRange.x) /
-        max(params.nearFogRange.y - params.nearFogRange.x, 0.001)
-    );
-    let nearColor = mix(params.nearFogColor.rgb, params.fogColor.rgb, nearT);
-    // Mip fog then blends that result toward the blurred environment at distance.
-    var fogCol    = getMipFogColor(posWS, distToCamera, nearColor);
+    // Fog colour: always sky-derived (inverted mip formula).
+    // mipFog.w blends between scene fog colour and sky fog for overall strength control.
+    let skyFogCol  = getMipFogColor(posWS, distToCamera);
+    let fogCol     = mix(params.fogColor.rgb, skyFogCol, params.mipFog.w);
 
     // Final blend: scene → fogColor
     let finalColor = mix(scene, fogCol, fogFactor);
