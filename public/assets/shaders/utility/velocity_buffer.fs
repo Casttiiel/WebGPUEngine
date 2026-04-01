@@ -16,7 +16,13 @@
 @group(1) @binding(1) var gNormals: texture_2d<f32>;
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
 @group(1) @binding(3) var samplerGBuffer: sampler;
-@group(2) @binding(0) var<uniform> previousViewProjection: mat4x4<f32>;
+// @group(2) — Unjittered matrices for velocity generation.
+// Using unjittered matrices on BOTH sides ensures that for a perfectly static scene with
+// a static camera the velocity is exactly zero, even when camera jitter is active.
+// Using the jittered VP (from CameraUniforms) for reconstruction causes the jitter-sign
+// alternation (A→B→A→B each frame) to produce a non-zero oscillating velocity → vibration.
+@group(2) @binding(0) var<uniform> previousUnjitteredVP:   mat4x4<f32>; // prev frame unjittered VP
+@group(2) @binding(1) var<uniform> currentUnjitteredInvVP: mat4x4<f32>; // current frame unjittered inv VP
 
 struct VertexOutput {
     @builtin(position) Position: vec4<f32>,
@@ -33,8 +39,10 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.0, 0.0, 0.0);
     }
     
-    // 2. Reconstruir posición world del frame actual
-    // NDC coordinates (rango [-1, 1])
+    // 2. Reconstruir posición world del frame actual usando unjittered inv VP.
+    // IMPORTANTE: NO usar camera.invViewProjection aquí — ese tiene el jitter del frame actual
+    // incorporado. El jitter alterna signo cada frame, por lo que worldPos oscilaría
+    // ligeramente cada frame → velocity oscila → vibración de cámara.
     let ndcX = input.Uv.x * 2.0 - 1.0;
     let ndcY = (1.0 - input.Uv.y) * 2.0 - 1.0; // Invertir Y (texture UV vs NDC)
     let ndcZ = depth;
@@ -42,13 +50,12 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     
     let clipSpacePos = vec4<f32>(ndcX, ndcY, ndcZ, ndcW);
     
-    // Inverse ViewProjection para obtener world position
-    let invViewProjection = camera.invViewProjection;
-    var worldPos = invViewProjection * clipSpacePos;
-    worldPos = worldPos / worldPos.w; // Perspective divide
+    var worldPos = currentUnjitteredInvVP * clipSpacePos;
+    worldPos = worldPos / worldPos.w;
     
-    // 3. Reproyectar world position usando previous ViewProjection
-    let previousClipSpace = previousViewProjection * worldPos;
+    // 3. Reproyectar world position usando previousUnjitteredVP.
+    // Static camera + static scene → prevNDC == currentNDC → velocity = 0 ✓
+    let previousClipSpace = previousUnjitteredVP * worldPos;
     var previousNDC = previousClipSpace.xyz / previousClipSpace.w;
     
     // 4. Convertir previous NDC a UV coordinates

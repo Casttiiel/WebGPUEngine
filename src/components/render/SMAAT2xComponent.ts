@@ -90,8 +90,8 @@ export class SMAAT2xComponent extends Component {
 
   // Temporal parameters
   private temporalParams = {
-    blendFactor: 0.1, // How much current frame vs history (0.1 = 90% history)
-    neighborhoodClampFactor: 1.0, // Color clamp strength (reduce ghosting)
+    blendFactor: 0.15, // Base blend toward current frame (0.15 = 85% history at rest)
+    neighborhoodClampFactor: 1.0, // Kept for uniform layout — clamping now uses variance AABB
   };
 
   constructor() {

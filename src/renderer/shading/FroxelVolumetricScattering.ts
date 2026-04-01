@@ -81,7 +81,7 @@ export class FroxelVolumetricScattering {
   private fogFalloff: number = 0.08; // Exponential falloff above layer
   private ambientVolumetricIntensity: number = 0.0; // Ambient contribution to volumetric (keep low, 0.0-0.1)
   private nearPlane: number = 0.1;
-  private farPlane: number = 100.0;
+  private farPlane: number = 50.0;
   private gLightFactor: number = 0.33;
 
   // Uniform buffers

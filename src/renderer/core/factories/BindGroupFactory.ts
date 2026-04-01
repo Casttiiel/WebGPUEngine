@@ -1419,12 +1419,18 @@ export class BindGroupFactory {
 
   /**
    * Creates velocity buffer uniforms bind group layout
-   * @group(1) @binding(0) var<uniform> previousViewProjection: mat4x4<f32>;
+   * @group(2) @binding(0) var<uniform> previousUnjitteredVP:    mat4x4<f32>;
+   * @group(2) @binding(1) var<uniform> currentUnjitteredInvVP:  mat4x4<f32>;
    */
   public static getVelocityBufferUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('velocity_buffer_uniforms', [
       {
         binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+      {
+        binding: 1,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },

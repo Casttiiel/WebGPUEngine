@@ -33,39 +33,42 @@ struct VertexOutput {
     @location(0) Uv: vec2<f32>,
 }
 
-struct NeighborhoodMinMax {
-    minColor: vec4<f32>,
-    maxColor: vec4<f32>,
+struct NeighborhoodStats {
+    mean:   vec4<f32>,
+    stddev: vec4<f32>,
 }
 
 /**
- * Sample 3x3 neighborhood and compute min/max for color clamping
+ * Sample 3x3 neighborhood and compute mean + stddev for variance-based AABB clamping.
+ *
+ * Variance clamp (Unreal-style):
+ *   bounds = [mean - k*stddev, mean + k*stddev]
+ *
+ * Advantages over pure min/max AABB:
+ *   - Flat areas → tight bounds → ghosts are rejected fast
+ *   - Edge areas → wider bounds → avoids over-rejection / flickering
+ *   - Reduces ghosting during headbob and camera movement
  */
-fn computeNeighborhoodMinMax(uv: vec2<f32>) -> NeighborhoodMinMax {
+fn computeNeighborhoodStats(uv: vec2<f32>) -> NeighborhoodStats {
     let texelSize = vec2<f32>(1.0) / vec2<f32>(textureDimensions(txCurrent));
-    
-    // Sample 3x3 neighborhood
-    var minColor = vec4<f32>(1e10);
-    var maxColor = vec4<f32>(-1e10);
-    
+
+    var mean = vec4<f32>(0.0);
+    var m2   = vec4<f32>(0.0);
+
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
             let offset = vec2<f32>(f32(x), f32(y)) * texelSize;
-            let neighborColor = textureSampleLevel(txCurrent, txSampler, uv + offset, 0.0);
-            minColor = min(minColor, neighborColor);
-            maxColor = max(maxColor, neighborColor);
+            let c = textureSampleLevel(txCurrent, txSampler, uv + offset, 0.0);
+            mean += c;
+            m2   += c * c;
         }
     }
-    
-    return NeighborhoodMinMax(minColor, maxColor);
-}
 
-/**
- * Clamp history color to neighborhood to reduce ghosting
- */
-fn clampHistory(historyColor: vec4<f32>, minColor: vec4<f32>, maxColor: vec4<f32>) -> vec4<f32> {
-    // Clamp each channel independently
-    return clamp(historyColor, minColor, maxColor);
+    mean /= 9.0;
+    let variance = max(m2 / 9.0 - mean * mean, vec4<f32>(0.0));
+    let stddev   = sqrt(variance);
+
+    return NeighborhoodStats(mean, stddev);
 }
 
 @fragment
@@ -95,15 +98,23 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // 5. Sample history
     let historyColor = textureSampleLevel(txHistory, txSampler, historyUV, 0.0);
     
-    // 6. Compute neighborhood min/max for clamping
-    let minMax = computeNeighborhoodMinMax(uv);
-    
-    // 7. Clamp history to neighborhood to reduce ghosting
-    let clampedHistory = clampHistory(historyColor, minMax.minColor, minMax.maxColor);
-    
+    // 6. Variance-based AABB neighborhood clamping
+    //    k = 1.0 → clamp to [mean - 1σ, mean + 1σ]
+    //    Tighter than pure min/max: flat areas reject ghosts faster,
+    //    edge areas allow a little more leeway to avoid flicker.
+    let stats  = computeNeighborhoodStats(uv);
+    let gamma  = 1.0; // std-dev multiplier — lower = tighter = less ghosting
+    let clampMin = stats.mean - gamma * stats.stddev;
+    let clampMax = stats.mean + gamma * stats.stddev;
+    let clampedHistory = clamp(historyColor, clampMin, clampMax);
+
+    // 7. Adaptive blend factor based on motion magnitude.
+    //    Static camera  → params.blendFactor (e.g. 0.1)  = 90% history → sharp temporal AA
+    //    Moving/rotating → up to 0.3 = 70% history       → fast convergence, less ghosting
+    //    This is the standard AAA approach (Unreal, Frostbite, etc.)
+    let motionLength  = length(velocity);
+    let adaptiveBlend = mix(params.blendFactor, 0.3, saturate(motionLength * 20.0));
+
     // 8. Temporal blend (mix current with clamped history)
-    // blendFactor = 0.1 means 90% history, 10% current (high temporal stability)
-    let finalColor = mix(clampedHistory, currentColor, params.blendFactor);
-    
-    return finalColor;
+    return mix(clampedHistory, currentColor, adaptiveBlend);
 }

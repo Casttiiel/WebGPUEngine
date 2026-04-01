@@ -7,7 +7,10 @@ import { RenderKey } from '../../renderer/core/managers/RenderKeyManager';
 export class Camera {
   private view: mat4 = mat4.create();
   private projection: mat4 = mat4.create();
+  private unjitteredProjection: mat4 = mat4.create(); // projection without jitter — stored before jitter is added
   private viewProjection: mat4 = mat4.create();
+  private unjitteredViewProjection: mat4 = mat4.create(); // VP without jitter — for velocity buffer
+  private unjitteredInvViewProjection: mat4 = mat4.create(); // inv(unjitteredVP) — for velocity buffer world reconstruction
   private invViewProjection: mat4 = mat4.create();
   private invProjection: mat4 = mat4.create();
   private invView: mat4 = mat4.create();
@@ -74,6 +77,10 @@ export class Camera {
 
   private updateViewProjection(): void {
     mat4.multiply(this.viewProjection, this.projection, this.view);
+    // Always keep unjittered VP in sync — lookAt() only updates this.view, so
+    // recomputing here ensures rotation + translation changes are always reflected.
+    mat4.multiply(this.unjitteredViewProjection, this.unjitteredProjection, this.view);
+    mat4.invert(this.unjitteredInvViewProjection, this.unjitteredViewProjection);
     this.calculateInvViewMatrix();
     this.calculateInvViewProjectionMatrix();
   }
@@ -119,8 +126,14 @@ export class Camera {
           this.zFar,
         );
       }
+      // Ortho cameras never use jitter — unjitteredProjection == projection.
+      mat4.copy(this.unjitteredProjection, this.projection);
     } else {
       mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
+
+      // Snapshot the clean (unjittered) projection — updateViewProjection() will use
+      // this to keep unjitteredViewProjection always current regardless of view changes.
+      mat4.copy(this.unjitteredProjection, this.projection);
 
       // Apply jittering to projection matrix if enabled
       if (this.jitterEnabled) {
@@ -534,5 +547,23 @@ export class Camera {
 
   public getJitterOffset(): [number, number] {
     return [this.jitterOffsetX / 2.0, this.jitterOffsetY / 2.0];
+  }
+
+  /**
+   * Returns the view-projection matrix computed WITHOUT jitter offset.
+   * Use this for velocity/motion-vector generation so that completely static
+   * pixels produce zero velocity instead of a frame-to-frame jitter delta.
+   */
+  public getUnjitteredViewProjection(): mat4 {
+    return this.unjitteredViewProjection;
+  }
+
+  /**
+   * Returns the INVERSE of the unjittered VP.
+   * Use this in the velocity buffer shader to reconstruct world positions —
+   * avoids the per-frame jitter-sign alternation that causes camera vibration.
+   */
+  public getUnjitteredInvViewProjection(): mat4 {
+    return this.unjitteredInvViewProjection;
   }
 }

@@ -47,8 +47,9 @@ export class VelocityBufferManager {
   // Bind groups
   private velocityBindGroup!: GPUBindGroup;
 
-  // Persistent uniform buffer for previous ViewProjection (reused every frame)
-  private previousVPBuffer!: GPUBuffer;
+  // Persistent uniform buffers for velocity generation (reused every frame, zero GPU alloc)
+  private previousVPBuffer!: GPUBuffer; // unjittered VP from last frame
+  private currentUnjitteredInvVPBuffer!: GPUBuffer; // unjittered inv-VP from current frame
 
   // Previous frame camera matrices
   private previousViewProjection: mat4 = mat4.create();
@@ -83,10 +84,16 @@ export class VelocityBufferManager {
       0, // No extra usage
     );
 
-    // Pre-allocate persistent uniform buffer for previous VP matrix (reused every frame)
+    // Pre-allocate persistent uniform buffers (reused every frame, zero GPU alloc per-frame)
     this.previousVPBuffer = this.device.createBuffer({
       label: 'previous_view_projection',
       size: 64, // mat4x4<f32> = 64 bytes
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    this.currentUnjitteredInvVPBuffer = this.device.createBuffer({
+      label: 'current_unjittered_inv_view_projection',
+      size: 64,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -128,15 +135,26 @@ export class VelocityBufferManager {
   public generate(camera: Camera, gBufferBindGroup: GPUBindGroup): void {
     if (!this.enabled) return;
 
-    const currentViewProjection = camera.getViewProjection();
+    // Both matrices must be unjittered so that static-scene pixels produce zero velocity.
+    // Using the jittered VP for either causes the jitter-sign alternation (A→B→A→B) to
+    // appear as a per-frame oscillation in the velocity vector → camera vibration.
+    const currentUnjitteredVP = camera.getUnjitteredViewProjection();
+    const currentUnjitteredInvVP = camera.getUnjitteredInvViewProjection();
 
     // En el primer frame, no hay velocidad (no hay historia)
     if (!this.hasHistory) {
       this.clearVelocityBuffer();
-      mat4.copy(this.previousViewProjection, currentViewProjection);
+      mat4.copy(this.previousViewProjection, currentUnjitteredVP);
       this.hasHistory = true;
       return;
     }
+
+    // Upload current unjittered inv VP (for world-position reconstruction in shader)
+    this.device.queue.writeBuffer(
+      this.currentUnjitteredInvVPBuffer,
+      0,
+      new Float32Array(currentUnjitteredInvVP as unknown as ArrayLike<number>),
+    );
 
     // Crear bind group con matrices current y previous
     this.createVelocityBindGroup();
@@ -144,8 +162,8 @@ export class VelocityBufferManager {
     // Ejecutar velocity generation pass manualmente
     this.executeVelocityPass(gBufferBindGroup);
 
-    // Guardar ViewProjection actual para el siguiente frame
-    mat4.copy(this.previousViewProjection, currentViewProjection);
+    // Guardar VP unjittered actual como "previous" para el siguiente frame
+    mat4.copy(this.previousViewProjection, currentUnjitteredVP);
   }
 
   /**
@@ -183,20 +201,15 @@ export class VelocityBufferManager {
       new Float32Array(this.previousViewProjection as unknown as ArrayLike<number>),
     );
 
-    // Bind group layout:
-    // @group(0) = camera uniforms (current frame)
-    // @group(1) = G-Buffer textures (albedo, normal, depth, sampler)
-    // @group(2) = previousViewProjection
+    // Bind group layout (group 2):
+    // binding(0) = previousUnjitteredVP     — reproject world pos to last frame's screen
+    // binding(1) = currentUnjitteredInvVP   — reconstruct world pos without jitter offset
     this.velocityBindGroup = BindGroupFactory.createBindGroup(
       'velocity_generation_bindgroup',
       this.velocityTechnique.getPipeline()!.getBindGroupLayout(2),
       [
-        {
-          binding: 0,
-          resource: {
-            buffer: this.previousVPBuffer,
-          },
-        },
+        { binding: 0, resource: { buffer: this.previousVPBuffer } },
+        { binding: 1, resource: { buffer: this.currentUnjitteredInvVPBuffer } },
       ],
     );
   }
