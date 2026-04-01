@@ -14,6 +14,7 @@ import { DirectionalLightComponent } from '../../components/render/DirectionalLi
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { RenderTarget } from '../resources/RenderTarget';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { Wind } from '../../core/engine/Wind';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -22,6 +23,9 @@ import { GPUProfiler } from '../../core/debug/GPUProfiler';
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
   private isEnabled: boolean = true;
+
+  // Maps sky UV speed (0.08/s) → ~1.2 world-units/s froxel noise (same as original hardcoded wind magnitude)
+  private static readonly FROXEL_WORLD_SPEED_SCALE = 15.0;
 
   // Froxel grid dimensions
   private froxelDimensions = {
@@ -855,6 +859,12 @@ export class FroxelVolumetricScattering {
     this.volumetricUniformData[offset++] = this.gLightFactor;
     this.volumetricUniformData[offset++] = Render.width;
     this.volumetricUniformData[offset++] = Render.height;
+    // Wind direction (world-space, pre-scaled). At default speed=0.08 matches original vec3(1,0,0.7) magnitude.
+    const froxelWindScale = FroxelVolumetricScattering.FROXEL_WORLD_SPEED_SCALE * Wind.speed;
+    this.volumetricUniformData[offset++] = Wind.getDirX() * froxelWindScale; // windDir.x
+    this.volumetricUniformData[offset++] = 0.0; // windDir.y
+    this.volumetricUniformData[offset++] = Wind.getDirZ() * froxelWindScale; // windDir.z
+    this.volumetricUniformData[offset++] = 0.0; // windDir.w (padding)
 
     // Froxel grid parameters
     offset = 0;

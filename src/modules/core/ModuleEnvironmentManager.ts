@@ -20,6 +20,7 @@ import { ResourceType } from '../../types/ResourceType.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
+import { Wind } from '../../core/engine/Wind';
 
 // Math utilities for atmospheric lighting
 const lerp = (a: number, b: number, alpha: number): number => a + alpha * (b - a);
@@ -45,6 +46,10 @@ export class ModuleEnvironmentManager extends Module {
   private sunDir: vec3 = vec3.fromValues(0, 1, 0); // ALWAYS the real sun direction (for sky scattering)
 
   private blendState: EnvironmentBlendState | null = null;
+
+  // Cloud parameters (sky-only, exposed via renderInMenu)
+  public cloudThickness: number = 3.2;
+  public cloudDistanceFade: number = 0.15;
 
   // Generador de irradiance
   private irradianceGenerator: IrradianceGenerator | null = null;
@@ -657,6 +662,16 @@ export class ModuleEnvironmentManager extends Module {
 
     // Time of Day slider with .listen() for automatic updates
     folder.add(this, 'timeOfDay', 0.0, 1.0).name('Time of Day').listen();
+
+    // ── Cloud controls (procedural skybox only) ──
+    if (this.skyboxType === 'procedural') {
+      folder.add(this, 'cloudThickness', 0.0, 8.0).name('Cloud Thickness').listen();
+      folder.add(this, 'cloudDistanceFade', 0.01, 0.5).name('Cloud Horizon Fade').listen();
+    }
+
+    // ── Wind (affects clouds + volumetric fog) ──
+    folder.add(Wind, 'speed', 0.0, 0.5).name('Wind Speed').listen();
+    folder.add(Wind, 'dirAngle', 0.0, 360.0).name('Wind Direction (°)').listen();
 
     gui.endWindow();
   }

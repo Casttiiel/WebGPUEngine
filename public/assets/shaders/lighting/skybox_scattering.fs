@@ -3,8 +3,13 @@
 
 // Procedural skybox uniforms
 struct SkyboxProceduralUniforms {
-  sunDirection: vec3<f32>,  // Real sun direction (for scattering)
-  timeOfDay: f32,           // Time of day [0, 1]
+  sunDirection: vec3<f32>,    // Real sun direction (for scattering)
+  timeOfDay: f32,             // Time of day [0, 1]         | offset 12
+  windDirection: vec2<f32>,   // Normalized XZ wind direction | offset 16
+  cloudThickness: f32,        // Cloud density multiplier     | offset 24
+  cloudDistanceFade: f32,     // Elevation at which clouds fully appear | offset 28
+  windOffset: f32,            // Accumulated wind displacement | offset 32
+  // implicit padding to 48 bytes (struct align 16)
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -123,6 +128,87 @@ fn render_moon(view_dir: vec3<f32>, moon_dir: vec3<f32>, night_factor: f32) -> v
     return (moon_color * moon_disk + moon_color * moon_glow * 0.5) * MOON_INTENSITY * night_factor;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Cloud rendering (FBM value noise, top-down UV projection)
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn hash12(p: vec2<f32>) -> f32 {
+    var p3 = fract(vec3f(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+fn value_noise(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f); // Smoothstep
+    let a = hash12(i);
+    let b = hash12(i + vec2f(1.0, 0.0));
+    let c = hash12(i + vec2f(0.0, 1.0));
+    let d = hash12(i + vec2f(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+fn fbm_clouds(p: vec2<f32>) -> f32 {
+    var value = 0.0;
+    var amplitude = 0.5;
+    var freq = 1.0;
+    for (var i = 0; i < 4; i++) {
+        value += amplitude * value_noise(p * freq);
+        amplitude *= 0.5;
+        freq *= 2.1; // Slightly off 2.0 to prevent tiling artefacts
+    }
+    return value;
+}
+
+// Composites procedural clouds onto an existing sky color.
+// Stars and moon should already be in sky_color so clouds can correctly occlude them.
+fn render_clouds(
+    world_dir: vec3<f32>,
+    sun_dir: vec3<f32>,
+    sky_color: vec3<f32>,
+    night_factor: f32,
+    sun_height: f32,
+) -> vec3<f32> {
+    // Only draw clouds in the upper hemisphere
+    if (world_dir.y <= 0.001) {
+        return sky_color;
+    }
+
+    // Top-down planar UV projection: maps hemisphere → flat plane.
+    // Scale of 2.0 gives ~3 distinct cloud masses from zenith to 45°.
+    // Seed offset breaks the hash12(0,0)=0 degeneracy so zenith always has clouds.
+    var uv = world_dir.xz / world_dir.y;
+    uv += u_procedural.windDirection * u_procedural.windOffset;
+    uv = uv * 2.0 + vec2f(47.3, 31.7);
+
+    // Shape: subtract threshold so noise forms distinct cloud masses
+    let raw = fbm_clouds(uv);
+    let cloud_density = saturate((raw - 0.42) * u_procedural.cloudThickness);
+
+    // Fade out near horizon to hide UV singularity stretching
+    let horizon_fade = smoothstep(0.0, u_procedural.cloudDistanceFade, world_dir.y);
+    let final_density = cloud_density * horizon_fade;
+
+    if (final_density < 0.001) {
+        return sky_color;
+    }
+
+    // Base cloud color — bright white day / dark blue night
+    let cloud_day   = vec3f(0.93, 0.95, 0.97);
+    let cloud_night = vec3f(0.03, 0.04, 0.09);
+    var cloud_color = mix(cloud_night, cloud_day, 1.0 - night_factor);
+
+    // Sunset tint: orange-red when sun is near horizon and clouds align toward sun
+    let sunset_window = smoothstep(-0.3, 0.1, sun_height) * smoothstep(0.3, -0.1, sun_height);
+    let cos_to_sun    = dot(world_dir, sun_dir);
+    let sunset_cloud  = saturate(sunset_window * max(0.0, cos_to_sun));
+    cloud_color = mix(cloud_color, SUNSET_ORANGE * 0.75, sunset_cloud);
+
+    return mix(sky_color, cloud_color, final_density);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Simplified atmospheric scattering
 fn rayleigh_phase(cos_theta: f32) -> f32 {
     // Simplified Rayleigh phase function (blue sky effect)
@@ -210,13 +296,16 @@ fn fs(@location(0) position_clip: vec3<f32>) -> @location(0) vec4<f32> {
     // Base atmospheric sky
     var sky_color = atmosphere_scattering(world_dir, sun_dir);
     
-    // Add stars (only visible at night)
+    // Add stars (only visible at night) — before clouds so they get occluded
     sky_color += generate_stars(world_dir, night_factor);
     
-    // Add moon (only visible at night when moon is above horizon)
+    // Add moon (only visible at night when moon is above horizon) — before clouds
     if (moon_height > 0.0) {
         sky_color += render_moon(world_dir, moon_dir, night_factor);
     }
+
+    // Composite clouds on top (correctly occludes stars and moon)
+    sky_color = render_clouds(world_dir, sun_dir, sky_color, night_factor, sun_height);
     
     return vec4<f32>(sky_color, 1.0);
 }

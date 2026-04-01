@@ -20,4 +20,5 @@ struct VolumetricUniforms {
   gLightFactor: f32,
   renderWidth: f32,
   renderHeight: f32,
+  windDir: vec4<f32>,  // pre-scaled wind vector (XZ plane, world units/s); set from Wind singleton
 }

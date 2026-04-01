@@ -5,6 +5,7 @@ import { Technique } from '../resources/Technique';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { Wind } from '../../core/engine/Wind';
 
 export class Skybox {
   private fullscreenQuadMesh!: Mesh;
@@ -14,6 +15,10 @@ export class Skybox {
 
   // Procedural skybox resources
   private proceduralUniformBuffer!: GPUBuffer;
+
+  // Cloud / wind animation state
+  private windOffset: number = 0.0;
+  private lastRenderTime: number = 0;
 
   constructor() {}
 
@@ -62,16 +67,20 @@ export class Skybox {
 
   /**
    * Creates bind group for procedural skybox with uniform buffer
-   * Uniform buffer layout:
-   * - vec3 sunDirection (12 bytes + 4 padding = 16 bytes)
-   * - float timeOfDay (4 bytes + 12 padding = 16 bytes)
-   * Total: 32 bytes
+   * Uniform buffer layout (WGSL std layout, struct align = 16):
+   *   vec3  sunDirection      offset  0, size 12
+   *   f32   timeOfDay         offset 12, size  4  → 16 bytes
+   *   vec2  windDirection     offset 16, size  8
+   *   f32   cloudThickness    offset 24, size  4
+   *   f32   cloudDistanceFade offset 28, size  4  → 32 bytes
+   *   f32   windOffset        offset 32, size  4
+   *   (12 bytes padding)                          → 48 bytes (align to 16)
    */
   private createProceduralBindGroup(): void {
     // Create uniform buffer for procedural skybox parameters
     this.proceduralUniformBuffer = GPUUtils.createBuffer(
       'skybox_procedural_uniforms',
-      32, // vec3 (16 bytes aligned) + float (16 bytes aligned)
+      48, // 12 floats × 4 bytes, rounded up to struct alignment 16
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
@@ -99,14 +108,30 @@ export class Skybox {
     const sunDir = envManager.getSunDirection();
     const timeOfDay = envManager.getTimeOfDay();
 
-    // Pack data: vec3 sunDirection (16 bytes) + float timeOfDay (16 bytes)
-    const uniformData = new Float32Array(8); // 32 bytes / 4 = 8 floats
-    uniformData[0] = sunDir[0];
-    uniformData[1] = sunDir[1];
-    uniformData[2] = sunDir[2];
-    // uniformData[3] = padding
-    uniformData[4] = timeOfDay;
-    // uniformData[5-7] = padding
+    // Accumulate wind offset using a local timer (self-contained, no dt dependency)
+    const now = performance.now() * 0.001; // seconds
+    if (this.lastRenderTime > 0) {
+      const dt = now - this.lastRenderTime;
+      this.windOffset += Wind.speed * dt;
+    }
+    this.lastRenderTime = now;
+
+    // Normalized wind direction from Wind singleton
+    const windDirX = Wind.getDirX();
+    const windDirZ = Wind.getDirZ();
+
+    // WGSL struct layout (see createProceduralBindGroup for byte map):
+    const uniformData = new Float32Array(12); // 48 bytes
+    uniformData[0] = sunDir[0]; // sunDirection.x  | byte  0
+    uniformData[1] = sunDir[1]; // sunDirection.y  | byte  4
+    uniformData[2] = sunDir[2]; // sunDirection.z  | byte  8
+    uniformData[3] = timeOfDay; // timeOfDay       | byte 12
+    uniformData[4] = windDirX; // windDirection.x | byte 16
+    uniformData[5] = windDirZ; // windDirection.y | byte 20
+    uniformData[6] = envManager.cloudThickness; // cloudThickness  | byte 24
+    uniformData[7] = envManager.cloudDistanceFade; // distanceFade    | byte 28
+    uniformData[8] = this.windOffset; // windOffset      | byte 32
+    // [9..11] = 0 padding                                                  | bytes 36-47
 
     device.queue.writeBuffer(this.proceduralUniformBuffer, 0, uniformData);
   }

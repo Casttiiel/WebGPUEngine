@@ -18,10 +18,8 @@
 // Función para samplear noise 3D desde textura 2D RGB tileable
 fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
     let scale = 0.02;
-    let wind = vec3<f32>(1.0, 0.0, 0.7);
-
-    // Separar el scale del noise del movimiento temporal para control independiente
-    let p = (worldPos + wind * camera.time) * scale;
+    // Wind direction from VolumetricUniforms.windDir (pre-scaled world units/s, set by Wind singleton)
+    let p = (worldPos + volumetricParams.windDir.xyz * camera.time) * scale;
 
     let dims = vec2<f32>(textureDimensions(noiseTex));
 
