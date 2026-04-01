@@ -25,11 +25,12 @@ struct RCASParams {
 @group(1) @binding(0) var outputTex: texture_storage_2d<rgba16float, write>;
 @group(2) @binding(0) var<uniform>   params: RCASParams;
 
+// Cheap luma — AMD FSR1 reference approximation (saves one dot-product MAD).
 fn luma(c: vec3<f32>) -> f32 {
-  return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+  return 0.5 * c.g + 0.25 * (c.r + c.b);
 }
 
-@compute @workgroup_size(8, 8, 1)
+@compute @workgroup_size(16, 16, 1)
 fn cs_rcas(@builtin(global_invocation_id) gid: vec3<u32>) {
   let coord   = vec2<i32>(gid.xy);
   let texSize = vec2<i32>(textureDimensions(inputTex));

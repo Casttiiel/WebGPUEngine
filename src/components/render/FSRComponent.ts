@@ -83,7 +83,7 @@ export class FSRComponent extends Component {
   private easuInputCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
   // ── Reusable typed arrays for GPU buffer uploads (avoid per-frame allocation) ──
-  private readonly easuParamsData = new Float32Array(4);
+  private readonly easuParamsData = new Float32Array(8);
   private readonly rcasParamsData = new Float32Array(4);
   private lastRcasSharpness = NaN;
   private easuParamsDirty = true;
@@ -213,6 +213,10 @@ export class FSRComponent extends Component {
         this.easuParamsData[1] = Render.height;
         this.easuParamsData[2] = canvas.width;
         this.easuParamsData[3] = canvas.height;
+        this.easuParamsData[4] = Render.width / canvas.width;
+        this.easuParamsData[5] = Render.height / canvas.height;
+        this.easuParamsData[6] = 1.0 / Render.width;
+        this.easuParamsData[7] = 1.0 / Render.height;
         this.device.queue.writeBuffer(this.easuParamsBuffer, 0, this.easuParamsData);
         this.easuParamsDirty = false;
       }
@@ -325,10 +329,10 @@ export class FSRComponent extends Component {
   }
 
   private createParamsBuffers(): void {
-    // EASU params: [inputW, inputH, outputW, outputH] — 16 bytes
+    // EASU params: [inputW, inputH, outputW, outputH, scaleX, scaleY, invW, invH] — 32 bytes
     this.easuParamsBuffer = GPUUtils.createBuffer(
       'fsr_easu_params',
-      16,
+      32,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
@@ -344,7 +348,16 @@ export class FSRComponent extends Component {
     this.device.queue.writeBuffer(
       this.easuParamsBuffer,
       0,
-      new Float32Array([Render.width, Render.height, canvas.width, canvas.height]),
+      new Float32Array([
+        Render.width,
+        Render.height,
+        canvas.width,
+        canvas.height,
+        Render.width / canvas.width,
+        Render.height / canvas.height,
+        1.0 / Render.width,
+        1.0 / Render.height,
+      ]),
     );
     this.device.queue.writeBuffer(
       this.rcasParamsBuffer,

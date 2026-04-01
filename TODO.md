@@ -1,6 +1,6 @@
 ### Engine
 
-1. FSR from FullHD to 4K -> UI is small -> FSR Correctness
+1. UI is small
 2. Screen-space god rays — (occlusion mask → radial blur → Kawase → composite).
 3. GI Precomputed + probes o Staggered/Radiance cascades
 4. AA/TAA

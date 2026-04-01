@@ -529,11 +529,11 @@ export class ModuleRender extends Module {
       ],
     });
 
-    // Set viewport to the render target dimensions (Render.width/height), NOT canvas
-    // physical pixels. The result texture is always Render.width × Render.height;
-    // using canvas.width/height would exceed the attachment bounds on HiDPI displays.
-    const rtWidth = Render.width;
-    const rtHeight = Render.height;
+    // Set viewport to the result texture dimensions.
+    // After FSR + FXAA the result is at canvas resolution, not render resolution.
+    const canvas = Render.canvasSize;
+    const rtWidth = canvas.width;
+    const rtHeight = canvas.height;
 
     // Configure viewport and scissor for UI rendering
     renderPass.setViewport(0, 0, rtWidth, rtHeight, 0.0, 1.0);

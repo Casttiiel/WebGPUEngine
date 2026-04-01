@@ -1,121 +1,168 @@
 // FSR 1.0 — EASU (Edge-Adaptive Spatial Upsampling)
-// Upscales from render resolution to canvas/display resolution.
 //
-// Algorithm: 12-tap Catmull-Rom bicubic reconstruction with per-channel
-// min/max clamping that eliminates the ringing artefacts bicubic normally
-// produces across sharp edges.  This clamping step is the defining
-// property of FSR1 EASU.
+// Algorithm: proper edge-adaptive reconstruction matching the AMD FSR1 reference.
+// The filter kernel is an AMD-style Lanczos2 approximation whose shape is
+// ROTATED to align with the detected edge direction and COMPRESSED across the
+// edge to preserve sharpness on geometry boundaries — this is the defining
+// difference from plain bicubic reconstruction.
 //
 // 12-tap sample layout (relative to p = floor(inputPos)):
-//   .  b  c  .     y = -1  (arm: x positions 0, 1 only)
+//   .  b  c  .     y = -1  (arm: x = 0, 1)
 //   d  e  f  g     y =  0  (full row: x = -1, 0, 1, 2)
 //   h  i  j  k     y = +1  (full row: x = -1, 0, 1, 2)
-//   .  l  m  .     y = +2  (arm: x positions 0, 1 only)
-//
-// The fractional sub-pixel position f = (fx, fy) lies inside the [e,f,i,j]
-// 2×2 texel quad (the four QUAD samples below).
+//   .  l  m  .     y = +2  (arm: x = 0, 1)
 
 struct EASUParams {
-  inputSize:  vec2<f32>,  // Render resolution (source)
-  outputSize: vec2<f32>,  // Canvas/display resolution (destination)
+    inputSize:    vec2<f32>,  // Render resolution (source)
+    outputSize:   vec2<f32>,  // Canvas/display resolution (destination)
+    scale:        vec2<f32>,  // inputSize / outputSize  (precomputed on CPU)
+    invInputSize: vec2<f32>,  // 1.0 / inputSize         (precomputed on CPU)
 }
 
 @group(0) @binding(0) var inputTex:  texture_2d<f32>;
 @group(1) @binding(0) var outputTex: texture_storage_2d<rgba16float, write>;
 @group(2) @binding(0) var<uniform>   params: EASUParams;
 
-// Catmull-Rom cubic kernel, alpha = -0.5
-// Branchless via select() — avoids warp/wave divergence.
-fn catr(t: f32) -> f32 {
-  let x  = abs(t);
-  let v1 = (1.5 * x - 2.5) * x * x + 1.0;           // x < 1
-  let v2 = ((-0.5 * x + 2.5) * x - 4.0) * x + 2.0;  // 1 ≤ x < 2
-  return select(select(0.0, v2, x < 2.0), v1, x < 1.0);
+// Cheap luma — AMD FSR1 reference approximation.
+fn lumaOf(c: vec3<f32>) -> f32 {
+    return 0.5 * c.g + 0.25 * (c.r + c.b);
 }
 
-fn load(p: vec2<i32>, maxC: vec2<i32>) -> vec4<f32> {
-  return textureLoad(inputTex, clamp(p, vec2<i32>(0), maxC), 0);
+fn loadAt(p: vec2<i32>, maxC: vec2<i32>) -> vec3<f32> {
+    return textureLoad(inputTex, clamp(p, vec2<i32>(0), maxC), 0).rgb;
 }
 
-@compute @workgroup_size(8, 8, 1)
+// AMD FSR1 anisotropic Lanczos2 approximation — accumulate one tap.
+//   off  — pixel offset from the fractional sub-pixel position (unrotated)
+//   dir  — gradient direction = edge-perpendicular unit vector
+//   len  — (lenAcross, lenAlong): filter scale factors for each axis
+//   lob  — negative-lobe amplitude (AMD default: -0.5)
+//   clp  — kernel support clip point (= 1.0 / (-lob * 2.0) = 1.0)
+fn tap(
+    aC: ptr<function, vec3<f32>>,
+    aW: ptr<function, f32>,
+    off: vec2<f32>,
+    dir: vec2<f32>,
+    len: vec2<f32>,
+    lob: f32,
+    clp: f32,
+    c:   vec3<f32>,
+) {
+    // Rotate offset into edge-aligned space:
+    //   v.x = component across the edge (along gradient)
+    //   v.y = component along  the edge (perpendicular to gradient)
+    var v: vec2<f32>;
+    v.x = dot(off, vec2<f32>( dir.x,  dir.y));
+    v.y = dot(off, vec2<f32>(-dir.y,  dir.x));
+
+    // Anisotropic stretch: compress across edge, normal along edge.
+    v *= len;
+
+    // Clip squared distance to kernel support radius.
+    let d2 = min(v.x * v.x + v.y * v.y, clp);
+
+    // AMD FSR1 Lanczos2 polynomial approximation.
+    // wBf: main lobe shape (positive ≈ d² < 0.25, negative ≈ d² > 0.25)
+    // wAs: windowing function that tapers to 0 at d²=clp
+    let wB  = (4.0 / 5.0) * d2 - (4.0 / 5.0);
+    let wBf = (25.0 / 16.0) * (wB * wB) - (25.0 / 16.0 - 1.0);
+    let wA  = lob * d2 - lob;
+    let w   = wBf * (wA * wA);
+
+    *aC += c * w;
+    *aW += w;
+}
+
+@compute @workgroup_size(16, 16, 1)
 fn cs_easu(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let outCoord = vec2<i32>(gid.xy);
-  let outSize  = vec2<i32>(i32(params.outputSize.x), i32(params.outputSize.y));
-  if (outCoord.x >= outSize.x || outCoord.y >= outSize.y) { return; }
+    let outCoord = vec2<i32>(gid.xy);
+    let outSize  = vec2<i32>(i32(params.outputSize.x), i32(params.outputSize.y));
+    if (outCoord.x >= outSize.x || outCoord.y >= outSize.y) { return; }
 
-  // Map output pixel centre → input space
-  // ip is the continuous input position; p is its floor, f is the fractional part.
-  let ip  = (vec2<f32>(outCoord) + 0.5) * params.inputSize / params.outputSize - 0.5;
-  let p   = vec2<i32>(i32(floor(ip.x)), i32(floor(ip.y)));
-  let f   = ip - floor(ip); // sub-pixel offset ∈ [0, 1)²
+    let maxC = vec2<i32>(i32(params.inputSize.x) - 1, i32(params.inputSize.y) - 1);
 
-  let maxC = vec2<i32>(i32(params.inputSize.x) - 1, i32(params.inputSize.y) - 1);
+    // Map output pixel centre → input space using precomputed scale (avoids per-pixel division).
+    let ip = (vec2<f32>(outCoord) + 0.5) * params.scale - 0.5;
+    let p  = vec2<i32>(i32(floor(ip.x)), i32(floor(ip.y)));
+    let f  = ip - floor(ip); // sub-pixel offset ∈ [0, 1)²
 
-  // ── Load 12 samples ──────────────────────────────────────────────────────
-  // y = -1 arm (x = 0, 1)
-  let b = load(p + vec2<i32>( 0, -1), maxC);
-  let c = load(p + vec2<i32>( 1, -1), maxC);
-  // y = 0 full row (x = -1, 0, 1, 2)
-  let d = load(p + vec2<i32>(-1,  0), maxC);
-  let e = load(p + vec2<i32>( 0,  0), maxC);  // ← QUAD top-left
-  let fe = load(p + vec2<i32>( 1,  0), maxC); // ← QUAD top-right  (using 'fe' to avoid keyword clash)
-  let g = load(p + vec2<i32>( 2,  0), maxC);
-  // y = +1 full row (x = -1, 0, 1, 2)
-  let h = load(p + vec2<i32>(-1,  1), maxC);
-  let ii = load(p + vec2<i32>( 0,  1), maxC); // ← QUAD bottom-left  ('ii' avoids WGSL built-in)
-  let j = load(p + vec2<i32>( 1,  1), maxC);  // ← QUAD bottom-right
-  let k = load(p + vec2<i32>( 2,  1), maxC);
-  // y = +2 arm (x = 0, 1)
-  let l = load(p + vec2<i32>( 0,  2), maxC);
-  let m = load(p + vec2<i32>( 1,  2), maxC);
+    // ── Load 12 samples ──────────────────────────────────────────────────────
+    let b  = loadAt(p + vec2<i32>( 0, -1), maxC);
+    let c  = loadAt(p + vec2<i32>( 1, -1), maxC);
+    let d  = loadAt(p + vec2<i32>(-1,  0), maxC);
+    let e  = loadAt(p + vec2<i32>( 0,  0), maxC);
+    let fe = loadAt(p + vec2<i32>( 1,  0), maxC);  // 'f' is a WGSL keyword
+    let g  = loadAt(p + vec2<i32>( 2,  0), maxC);
+    let h  = loadAt(p + vec2<i32>(-1,  1), maxC);
+    let ii = loadAt(p + vec2<i32>( 0,  1), maxC);  // 'i' is a WGSL built-in
+    let j  = loadAt(p + vec2<i32>( 1,  1), maxC);
+    let k  = loadAt(p + vec2<i32>( 2,  1), maxC);
+    let l  = loadAt(p + vec2<i32>( 0,  2), maxC);
+    let m  = loadAt(p + vec2<i32>( 1,  2), maxC);
 
-  // ── Catmull-Rom weights ───────────────────────────────────────────────────
-  // wx[n] = weight for x position (-1, 0, 1, 2) evaluated at fx
-  // wy[n] = weight for y position (-1, 0, 1, 2) evaluated at fy
-  let wx = vec4<f32>(
-    catr(-1.0 - f.x),   // x = -1
-    catr( 0.0 - f.x),   // x =  0
-    catr( 1.0 - f.x),   // x =  1
-    catr( 2.0 - f.x),   // x =  2
-  );
-  let wy = vec4<f32>(
-    catr(-1.0 - f.y),   // y = -1
-    catr( 0.0 - f.y),   // y =  0
-    catr( 1.0 - f.y),   // y =  1
-    catr( 2.0 - f.y),   // y =  2
-  );
+    let lb  = lumaOf(b);  let lc  = lumaOf(c);
+    let ld  = lumaOf(d);  let le  = lumaOf(e);
+    let lfe = lumaOf(fe); let lg  = lumaOf(g);
+    let lh  = lumaOf(h);  let lii = lumaOf(ii);
+    let lj  = lumaOf(j);  let lk  = lumaOf(k);
+    let ll  = lumaOf(l);  let lm  = lumaOf(m);
 
-  // ── Weighted sum over the 12 available samples ────────────────────────────
-  var col = vec4<f32>(0.0);
-  col += b  * (wy[0] * wx[1]);
-  col += c  * (wy[0] * wx[2]);
-  col += d  * (wy[1] * wx[0]);
-  col += e  * (wy[1] * wx[1]);
-  col += fe * (wy[1] * wx[2]);
-  col += g  * (wy[1] * wx[3]);
-  col += h  * (wy[2] * wx[0]);
-  col += ii * (wy[2] * wx[1]);
-  col += j  * (wy[2] * wx[2]);
-  col += k  * (wy[2] * wx[3]);
-  col += l  * (wy[3] * wx[1]);
-  col += m  * (wy[3] * wx[2]);
+    // ── Edge direction analysis ───────────────────────────────────────────────
+    // Compute gradient from the 2×2 center quad plus arm contributions.
+    // gx > 0 = brighter on the right; gy > 0 = brighter below.
+    let gx = (lfe + lj) - (le + lii)
+           + 0.5 * ((lc - lb) + (lk - lh) + (lg - ld) + (lm - ll));
+    let gy = (lii + lj) - (le + lfe)
+           + 0.5 * ((lb + lc) - (lh + lk) + (ld - lh) + (lg - lk));
 
-  // Renormalise: the four missing corner taps (at (x=-1,y=-1), (x=2,y=-1),
-  // (x=-1,y=2), (x=2,y=2)) mean the weights no longer sum to 1 exactly.
-  let wSum = wy[0] * (              wx[1] + wx[2]              )
-           + wy[1] * (wx[0] + wx[1] + wx[2] + wx[3])
-           + wy[2] * (wx[0] + wx[1] + wx[2] + wx[3])
-           + wy[3] * (              wx[1] + wx[2]              );
-  col /= max(wSum, 0.0001);
+    let gMag = max(sqrt(gx * gx + gy * gy), 0.0001);
 
-  // ── Anti-ringing clamp (key FSR1 feature) ─────────────────────────────────
-  // Clamp the bicubic result to the convex hull of the 4 immediate neighbours
-  // (the QUAD). This suppresses the negative-weight overshoot that Catmull-Rom
-  // normally produces across hard edges without sacrificing sharpness on smooth
-  // gradients.
-  let cMin = min(min(e, fe), min(ii, j));
-  let cMax = max(max(e, fe), max(ii, j));
-  col = clamp(col, cMin, cMax);
+    // Gradient unit vector — points across the edge (from dark to bright).
+    let dir = vec2<f32>(gx, gy) / gMag;
 
-  textureStore(outputTex, outCoord, vec4<f32>(col.rgb, 1.0));
+    // ── Anisotropy ────────────────────────────────────────────────────────────
+    // Measure how "edge-like" this region is relative to its local contrast.
+    let lumaMax   = max(max(le, lfe), max(lii, lj));
+    let lumaMin   = min(min(le, lfe), min(lii, lj));
+    let edgeRatio = min(gMag / max((lumaMax - lumaMin) * 4.0, 0.0001), 1.0);
+
+    // Compress filter across the edge proportionally to edge strength.
+    // lenAcross < 1 → tighter kernel perpendicular to edge → sharper boundary.
+    // lenAlong  = 1 → normal reconstruction along the edge.
+    let lenAcross = 1.0 / (1.0 + edgeRatio * 2.0);
+    let len = vec2<f32>(lenAcross, 1.0);
+
+    // AMD FSR1 standard negative-lobe parameters.
+    let lob = -0.5;
+    let clp =  1.0; // 1.0 / (-lob * 2.0)
+
+    // ── Accumulate 12 anisotropic taps ───────────────────────────────────────
+    var aC = vec3<f32>(0.0);
+    var aW = 0.0;
+
+    tap(&aC, &aW, vec2<f32>( 0.0-f.x, -1.0-f.y), dir, len, lob, clp, b);
+    tap(&aC, &aW, vec2<f32>( 1.0-f.x, -1.0-f.y), dir, len, lob, clp, c);
+    tap(&aC, &aW, vec2<f32>(-1.0-f.x,  0.0-f.y), dir, len, lob, clp, d);
+    tap(&aC, &aW, vec2<f32>( 0.0-f.x,  0.0-f.y), dir, len, lob, clp, e);
+    tap(&aC, &aW, vec2<f32>( 1.0-f.x,  0.0-f.y), dir, len, lob, clp, fe);
+    tap(&aC, &aW, vec2<f32>( 2.0-f.x,  0.0-f.y), dir, len, lob, clp, g);
+    tap(&aC, &aW, vec2<f32>(-1.0-f.x,  1.0-f.y), dir, len, lob, clp, h);
+    tap(&aC, &aW, vec2<f32>( 0.0-f.x,  1.0-f.y), dir, len, lob, clp, ii);
+    tap(&aC, &aW, vec2<f32>( 1.0-f.x,  1.0-f.y), dir, len, lob, clp, j);
+    tap(&aC, &aW, vec2<f32>( 2.0-f.x,  1.0-f.y), dir, len, lob, clp, k);
+    tap(&aC, &aW, vec2<f32>( 0.0-f.x,  2.0-f.y), dir, len, lob, clp, l);
+    tap(&aC, &aW, vec2<f32>( 1.0-f.x,  2.0-f.y), dir, len, lob, clp, m);
+
+    // Normalize by actual accumulated weight — no renormalization error.
+    var col = aC / max(aW, 0.0001);
+
+    // ── Anti-ringing clamp ────────────────────────────────────────────────────
+    // Clip to convex hull of the 4 nearest input texels.
+    // Eliminates negative-lobe overshoot across hard edges.
+    let cMin = min(min(e, fe), min(ii, j));
+    let cMax = max(max(e, fe), max(ii, j));
+    col = clamp(col, cMin, cMax);
+
+    textureStore(outputTex, outCoord, vec4<f32>(col, 1.0));
 }
+
