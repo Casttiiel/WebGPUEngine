@@ -2,6 +2,7 @@
   "update": [
     "point_light",
     "directional_light",
+    "area_light",
     "particle_system",
     "character_controller",
     "enemy_controller",

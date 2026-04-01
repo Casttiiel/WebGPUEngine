@@ -1569,6 +1569,13 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Fragment bind group layout for a single area light uniform buffer (group 2). */
+  public static getAreaLightUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('area_light_uniforms', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+    ]);
+  }
+
   /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
@@ -1657,6 +1664,8 @@ export class BindGroupFactory {
         return this.getTiledLightComputeCullingLayout();
       case PipelineBindGroupLayouts.TILED_LIGHT_RENDER:
         return this.getTiledLightRenderLayout();
+      case PipelineBindGroupLayouts.AREA_LIGHT_UNIFORMS:
+        return this.getAreaLightUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

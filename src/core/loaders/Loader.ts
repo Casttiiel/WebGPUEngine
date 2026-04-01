@@ -35,6 +35,7 @@ import { InfinitePlaneColliderComponent } from '../../components/physics/Infinit
 import { MeshColliderComponent } from '../../components/physics/MeshColliderComponent';
 import { ParticleSystemComponent } from '../../components/render/ParticleSystemComponent';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
+import { AreaLightComponent } from '../../components/render/AreaLightComponent';
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
@@ -292,6 +293,8 @@ export class Loader {
         return new SpotLightComponent();
       case 'directional_light':
         return new DirectionalLightComponent();
+      case 'area_light':
+        return new AreaLightComponent();
       case 'bloom':
         return new BloomComponent();
       case 'box_collider':

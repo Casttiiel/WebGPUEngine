@@ -16,6 +16,7 @@ import { DepthPrepass } from '../passes/DepthPrepass';
 import { RenderPassManager } from '../passes/RenderPassManager';
 import { Render } from './Render';
 import { DirectionalLightComponent } from '../../../components/render/DirectionalLightComponent';
+import { AreaLightComponent } from '../../../components/render/AreaLightComponent';
 import { PointLightComponent } from '../../../components/render/PointLightComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
@@ -519,6 +520,13 @@ export class DeferredRenderer {
 
     // Propagate extended G-Buffer+AO bind group to shadow lighting passes.
     this.renderPassManager.updateLightingPassesGBufferWithAO(this.gBufferWithAOBindGroup!);
+
+    // Area lights (rectangular emitters, MRP technique)
+    for (const comp of Engine.getEntities().getObjectManagerByName('area_light')?.getList() ?? []) {
+      const areaLight = comp as AreaLightComponent;
+      //if (!areaLight.isVisible()) continue;
+      areaLight.render(this.rtAccLight.getView(), this.gBufferWithAOBindGroup!);
+    }
 
     // Tiled lighting (shadowless point + spot lights)
     this.tiledLightManager.prepare();

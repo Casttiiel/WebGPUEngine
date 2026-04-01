@@ -1,13 +1,13 @@
 ### Engine
 
-1. Area light
-2. TAA + SMAA
+1. TAA + SMAA
 
-3. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
-4. UE Retro Shaders
-5. GI Precomputed + probes o Staggered/Radiance cascades
-6. HZB Pocho
-7. Froxel Self Occlusion
+2. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
+3. UE Retro Shaders
+4. Froxel Volumetrics
+5. Froxel Self Occlusion
+6. GI Precomputed + probes o Staggered/Radiance cascades
+7. HZB Pocho
 8. Froxel Density Volumes
 9. Consistency between dither / Dither size
 10. Enemy AI

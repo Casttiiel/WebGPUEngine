@@ -40,4 +40,5 @@ export enum PipelineBindGroupLayouts {
   ATMOSPHERIC_FOG_UNIFORMS = 'AtmosphericFogUniforms',
   TILED_LIGHT_COMPUTE_CULLING = 'TiledLightComputeCulling',
   TILED_LIGHT_RENDER = 'TiledLightData',
+  AREA_LIGHT_UNIFORMS = 'AreaLightUniforms',
 }
