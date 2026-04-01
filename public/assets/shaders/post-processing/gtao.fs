@@ -190,10 +190,6 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     var normalVS = normalize((camera.viewMatrix * vec4<f32>(nWorld, 0.0)).xyz);
     normalVS *= vec3<f32>(-1.0, 1.0, -1.0);
 
-    // Verificación de convención: normalVS.z debería ser > 0 para superficies
-    // que miran a cámara en right-handed con Z negativo hacia la escena.
-    // Si ves toda la escena gris, prueba negar normalVS aquí.
-
     // Vector hacia cámara en view space
     let vView = normalize(-centerPos);
 
@@ -252,10 +248,8 @@ fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @locatio
     // Weighted average by projLen; fall back to no-occlusion when all slices degenerate
     visibility = select(1.0, visibility / projWeightSum, projWeightSum > 1e-4);
 
-    let bentNormalVS  = select(vView, normalize(bentAccum), dot(bentAccum, bentAccum) > 1e-5);
-    let bentNormalOct = normalToOctahedral01(bentNormalVS);
-    let ao            = clamp(pow(visibility, params.aoStrength), 0.0, 1.0);
+    let ao = clamp(pow(visibility, params.aoStrength), 0.0, 1.0);
 
-    // Pack: rg = bent normal oct01, b = AO scalar, a = 1
-    return vec4<f32>(bentNormalOct.x, bentNormalOct.y, ao, 1.0);
+    // Pack: rg unused (0.5,0.5), b = AO scalar, a = 1
+    return vec4<f32>(0.5, 0.5, ao, 1.0);
 }

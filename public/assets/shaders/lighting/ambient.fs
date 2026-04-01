@@ -25,12 +25,12 @@ struct AmbientUniforms {
 @group(2) @binding(4) var samplerIrradiance: sampler;
 
 
-fn calculateIBL(g: GBuffer, ao: f32, bentNormalWS: vec3<f32>) -> vec3<f32> {
+fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let N   = normalize(g.normal);
     let V   = normalize(g.viewDir);
     let NdV = max(dot(N, V), 0.0);
 
-    let irradianceDir = bentNormalWS;
+    let irradianceDir = N;
     let irradiance = textureSample(irradianceMap, samplerIrradiance, irradianceDir).rgb;
     let F0  = g.specularColor;
     let F   = Fresnel_Schlick_Roughness(NdV, F0, g.roughness);
@@ -47,11 +47,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let aoSample = textureSample(gAO, samplerEnv, uv);
     let ao = aoSample.b;  // AO scalar packed in .b
 
-    // Decode bent normal (view-space) from rg channels → world space
-    let bentNormalVS = octahedral01ToNormal(aoSample.rg);
-    let bentNormalWS = normalize((camera.invView * vec4<f32>(bentNormalVS, 0.0)).xyz);
-
-    let ibl = calculateIBL(g, ao, bentNormalWS);
+    let ibl = calculateIBL(g, ao);
 
     return vec4<f32>(ibl + g.selfIllum, 1.0);
 }

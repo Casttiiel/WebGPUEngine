@@ -67,17 +67,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let NoV = max(dot(N, V), 0.0);
     let so = computeSpecularOcclusion(ao, NoV, g.roughness);
 
-    // Decode bent normal (view-space) and transform to world space for cubemap sampling
-    let bentNormalVS = octahedral01ToNormal(aoSample.rg);
-    let bentNormalWS = normalize((camera.invView * vec4<f32>(bentNormalVS, 0.0)).xyz);
-
-    // Reflection direction: blend geometric reflection toward bent-normal reflection.
-    // Smooth surfaces (narrow specular lobe) benefit most from per-pixel correcton.
-    // Occluded surfaces pull toward unoccluded hemisphere captured by bent normal.
-    let R_geom = normalize(g.reflectedDir);
-    let R_bent = reflect(-g.viewDir, bentNormalWS);
-    let bentBlend = saturate(1.0 - ao) * g.roughness;
-    var R = normalize(mix(R_geom, R_bent, bentBlend));
+    var R = normalize(g.reflectedDir);
 
     let avgF0 = dot(g.specularColor, vec3<f32>(0.333));
     let specularStrength = max(avgF0, g.metallic) * (1.0 - g.roughness * 0.8);
