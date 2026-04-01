@@ -216,3 +216,40 @@ export class PointLightWithShadowsRenderPass extends BaseRenderPass {
     }
   }
 }
+
+/**
+ * Full-screen tiled lighting render pass.
+ * Replaces per-light sphere/frustum draw calls for all shadowless point and spot lights.
+ * Shadow lights still use the geometry-volume passes above.
+ */
+export class TiledLightingRenderPass extends BaseRenderPass {
+  private technique: Technique;
+  private mesh: Mesh;
+  private gBufferWithAOBindGroup: GPUBindGroup | null = null;
+  private tiledDataBindGroup: GPUBindGroup | null = null;
+
+  constructor(config: RenderPassConfig, technique: Technique, mesh: Mesh) {
+    super(config);
+    this.technique = technique;
+    this.mesh = mesh;
+  }
+
+  public updateGBufferWithAOBindGroup(bg: GPUBindGroup): void {
+    this.gBufferWithAOBindGroup = bg;
+  }
+
+  public updateTiledDataBindGroup(bg: GPUBindGroup): void {
+    this.tiledDataBindGroup = bg;
+  }
+
+  protected render(pass: GPURenderPassEncoder): void {
+    if (!this.gBufferWithAOBindGroup || !this.tiledDataBindGroup) return;
+    GPUUtils.configureViewportAndScissor(pass);
+    this.technique.activatePipeline(pass);
+    this.mesh.activate(pass);
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.gBufferWithAOBindGroup);
+    pass.setBindGroup(2, this.tiledDataBindGroup);
+    this.mesh.renderGroup(pass);
+  }
+}

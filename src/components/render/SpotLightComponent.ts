@@ -329,6 +329,26 @@ export class SpotLightComponent extends CameraComponent {
     return this.uniformBuffer;
   }
 
+  public override getCamera() {
+    return this.camera;
+  }
+
+  public getColor(): vec4 {
+    return this.color;
+  }
+
+  public getIntensity(): number {
+    return this.intensity;
+  }
+
+  public getRadius(): number {
+    return this.radius;
+  }
+
+  public getStartFalloff(): number {
+    return this.startFallof;
+  }
+
   public getShadowDepthView(): GPUTextureView {
     return this.shadowDepthView;
   }

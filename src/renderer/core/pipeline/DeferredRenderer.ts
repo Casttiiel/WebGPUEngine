@@ -1,5 +1,4 @@
 import { AmbientOcclusionComponent } from '../../../components/render/AmbientOcclusionComponent';
-import { ContactShadowsComponent } from '../../../components/render/ContactShadowsComponent';
 import { FroxelVolumetricScattering } from '../../shading/FroxelVolumetricScattering';
 import { Entity } from '../../../core/ecs/Entity';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
@@ -25,6 +24,7 @@ import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { HZBBuilder } from '../culling/HZBBuilder';
 import { RenderManagerV2 } from '../managers/RenderManagerV2';
+import { TiledLightManager } from '../managers/TiledLightManager';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -71,6 +71,10 @@ export class DeferredRenderer {
   private spotLightWithShadowsTechnique!: Technique;
   private unitSphere!: Mesh;
   private unitFrustum!: Mesh;
+
+  private tiledLightManager!: TiledLightManager;
+  private tiledLightTechnique!: Technique;
+  private tiledLightMesh!: Mesh;
 
   constructor() {}
 
@@ -237,6 +241,14 @@ export class DeferredRenderer {
       this.gBufferBindGroup,
     );
 
+    // Initialize tiled lighting pass (shadowless point + spot lights)
+    this.tiledLightManager.resize(width, height);
+    this.renderPassManager.initializeTiledLightingPass(
+      this.rtAccLight,
+      this.tiledLightTechnique,
+      this.tiledLightMesh,
+    );
+
     this.ssr.dispose();
     this.ssgi?.resize();
 
@@ -304,6 +316,11 @@ export class DeferredRenderer {
     );
     this.unitSphere = await Mesh.getAsync('unit_sphere.obj');
     this.unitFrustum = await Mesh.getAsync('unit_frustum.obj');
+
+    this.tiledLightTechnique = await Technique.getAsync('lighting/tiled_lighting.tech');
+    this.tiledLightMesh = await Mesh.getAsync('fullscreenquad.obj');
+    this.tiledLightManager = new TiledLightManager();
+    await this.tiledLightManager.load();
 
     // OIT compose resources
     this.oitComposeTechnique = await Technique.getAsync('utility/oit_compose.tech');
@@ -493,11 +510,19 @@ export class DeferredRenderer {
       );
     }
 
-    // Propagate extended G-Buffer+AO bind group to point/spot light passes.
+    // Propagate extended G-Buffer+AO bind group to shadow lighting passes.
     this.renderPassManager.updateLightingPassesGBufferWithAO(this.gBufferWithAOBindGroup!);
-    this.renderPassManager.executePass('pointLights');
+
+    // Tiled lighting (shadowless point + spot lights)
+    this.tiledLightManager.prepare();
+    this.tiledLightManager.dispatchCulling(Render.getInstance().getCommandEncoder());
+    this.renderPassManager.updateTiledLightBindGroups(
+      this.gBufferWithAOBindGroup!,
+      this.tiledLightManager.getRenderDataBindGroup(),
+    );
+    this.renderPassManager.executePass('tiledLighting');
+
     this.renderPassManager.executePass('pointLightsWithShadows');
-    this.renderPassManager.executePass('spotLights');
     this.renderPassManager.executePass('spotLightsWithShadows');
 
     const prepassDepthView = this.depthPrepass.getDepthTextureView();

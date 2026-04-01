@@ -1,24 +1,30 @@
 ### Engine
 
-1. Tile based light culling
-2. SMAA + TAA
-3. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
-4. Area light
-5. GI Precomputed + probes o Staggered/Radiance cascades
+1. Irradiance esta mal calculado (bentnormals)
+2. Review Ambient y specular shader
+3. Regenerate environment/irradiance texture
+4. Procedural Skybox better
+5. Test Mip Fog with skybox
+6. SMAA + TAA
+7. Area light
+8. HZB Pocho
+9. GI Precomputed + probes o Staggered/Radiance cascades
 
-6. Consistency between dither / Dither size
-7. Froxel Self Occlusion
-8. Froxel Density Volumes
-9. Enemy AI
-   Fase 2 — Navegación real
-   ├── Waypoint graph (authorado en Blender → JSON)
-   ├── A\* sobre el grafo
-   └── PathFollower / Steering (seek + arrive)
-   → El enemigo ahora rodea obstáculos
+10. Screen-space god rays / sun volumetrics — el sistema de 4 passes que ya tienes (occlusion mask → radial blur → Kawase → composite).
+11. Froxel Self Occlusion
+12. Froxel Density Volumes
+13. UE Retro Shaders
+14. Consistency between dither / Dither size
+15. Enemy AI
+    Fase 2 — Navegación real
+    ├── Waypoint graph (authorado en Blender → JSON)
+    ├── A\* sobre el grafo
+    └── PathFollower / Steering (seek + arrive)
+    → El enemigo ahora rodea obstáculos
 
-   Fase 3 — Polish
-   └── AnimationStateMachine driven by BT state
-   (idle → patrol → chase → attack)
+    Fase 3 — Polish
+    └── AnimationStateMachine driven by BT state
+    (idle → patrol → chase → attack)
 
 ## Gameplay
 

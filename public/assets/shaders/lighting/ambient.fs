@@ -29,16 +29,15 @@ fn calculateIBL(g: GBuffer, ao: f32, bentNormalWS: vec3<f32>) -> vec3<f32> {
     let N   = normalize(g.normal);
     let V   = normalize(g.viewDir);
     let NdV = max(dot(N, V), 0.0);
-    // Bent normal re-orients irradiance lookup toward the unoccluded hemispherecc.
-    // When ao=1 (no occlusion) the blend is 0 — no change. When ao→0, fully use bent normal.
-    let irradianceDir = normalize(mix(N, bentNormalWS, saturate(1.0 - ao)));
+
+    let irradianceDir = bentNormalWS;
     let irradiance = textureSample(irradianceMap, samplerIrradiance, irradianceDir).rgb;
     let F0  = g.specularColor;
     let F   = Fresnel_Schlick_Roughness(NdV, F0, g.roughness);
     let kS  = F;
     let kD  = (1.0 - kS) * (1.0 - g.metallic);
     let diffuse = kD * Diffuse(g.albedo) * irradiance;
-    
+
     return diffuse * ambient.diffuseBoost * ambient.globalAmbientBoost * ao;
 }
 

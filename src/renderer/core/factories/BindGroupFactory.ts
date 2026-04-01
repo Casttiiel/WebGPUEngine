@@ -1544,6 +1544,30 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Compute bind group layout for the tile-culling pass (group 1). */
+  public static getTiledLightComputeCullingLayout(): GPUBindGroupLayout {
+    return this.getLayout('tiled_light_compute_culling', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+    ]);
+  }
+
+  /** Fragment bind group layout for the tiled lighting pass (group 2). */
+  public static getTiledLightRenderLayout(): GPUBindGroupLayout {
+    return this.getLayout('tiled_light_render', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 4, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 5, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+    ]);
+  }
+
   /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
@@ -1628,6 +1652,10 @@ export class BindGroupFactory {
         return this.getPaletteQuantizeLayout();
       case PipelineBindGroupLayouts.ATMOSPHERIC_FOG_UNIFORMS:
         return this.getAtmosphericFogUniformsLayout();
+      case PipelineBindGroupLayouts.TILED_LIGHT_COMPUTE_CULLING:
+        return this.getTiledLightComputeCullingLayout();
+      case PipelineBindGroupLayouts.TILED_LIGHT_RENDER:
+        return this.getTiledLightRenderLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

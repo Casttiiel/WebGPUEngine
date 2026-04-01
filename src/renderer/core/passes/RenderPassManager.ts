@@ -7,10 +7,9 @@ import {
   GlassOITGatherRenderPass,
 } from './DeferredRenderPasses';
 import {
-  PointLightRenderPass,
   PointLightWithShadowsRenderPass,
-  SpotLightRenderPass,
   SpotLightWithShadowsRenderPass,
+  TiledLightingRenderPass,
 } from './LightingRenderPasses';
 import {
   ToneMappingRenderPass,
@@ -130,26 +129,16 @@ export class RenderPassManager {
   public initializeLightingPasses(
     accLight: RenderTarget,
     singleDepthView: GPUTextureView,
-    pointLightTechnique: Technique,
+    _pointLightTechnique: Technique,
     pointLightWithShadowsTechnique: Technique,
-    spotLightTechnique: Technique,
+    _spotLightTechnique: Technique,
     spotLightWithShadowsTechnique: Technique,
     unitSphere: Mesh,
     unitFrustum: Mesh,
     gBufferBindGroup: GPUBindGroup,
   ): void {
-    // Create Point Light pass
-    const pointLightConfig = RenderPassFactory.createPointLightPassConfig(
-      accLight,
-      singleDepthView,
-    );
-    const pointLightPass = new PointLightRenderPass(
-      pointLightConfig,
-      pointLightTechnique,
-      unitSphere,
-      gBufferBindGroup,
-    );
-    this.renderPasses.set('pointLights', pointLightPass);
+    // Shadowless point/spot passes are replaced by the tiled lighting pass.
+    // Only register shadow passes here.
 
     // Create Point Light with shadows pass
     const pointLightWithShadowsConfig = RenderPassFactory.createPointLightPassConfig(
@@ -165,16 +154,8 @@ export class RenderPassManager {
     pointLightWithShadowsPass.updateConfig({ label: 'Point Lights with Shadows' });
     this.renderPasses.set('pointLightsWithShadows', pointLightWithShadowsPass);
 
-    // Create Spot Light pass
+    // Create Spot Light with shadows pass
     const spotLightConfig = RenderPassFactory.createSpotLightPassConfig(accLight, singleDepthView);
-    const spotLightPass = new SpotLightRenderPass(
-      spotLightConfig,
-      spotLightTechnique,
-      unitFrustum,
-      gBufferBindGroup,
-    );
-    this.renderPasses.set('spotLights', spotLightPass);
-
     const spotLightWithShadowsPass = new SpotLightWithShadowsRenderPass(
       spotLightConfig,
       spotLightWithShadowsTechnique,
@@ -186,22 +167,42 @@ export class RenderPassManager {
   }
 
   /**
-   * Propagates the extended G-Buffer+AO bind group to all four lighting render passes.
+   * Propagates the extended G-Buffer+AO bind group to the shadow lighting render passes.
    * Call this once per frame in renderAccLight(), after computing the AO result.
    */
   public updateLightingPassesGBufferWithAO(gBufferWithAOBindGroup: GPUBindGroup): void {
     (
-      this.renderPasses.get('pointLights') as PointLightRenderPass | undefined
-    )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
-    (
       this.renderPasses.get('pointLightsWithShadows') as PointLightWithShadowsRenderPass | undefined
-    )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
-    (
-      this.renderPasses.get('spotLights') as SpotLightRenderPass | undefined
     )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
     (
       this.renderPasses.get('spotLightsWithShadows') as SpotLightWithShadowsRenderPass | undefined
     )?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
+  }
+
+  /**
+   * Registers the tiled lighting full-screen pass.
+   * Must be called once during create(), after initializeLightingPasses().
+   */
+  public initializeTiledLightingPass(
+    accLight: RenderTarget,
+    technique: Technique,
+    fullscreenMesh: Mesh,
+  ): void {
+    const config = RenderPassFactory.createTiledLightingPassConfig(accLight);
+    const pass = new TiledLightingRenderPass(config, technique, fullscreenMesh);
+    this.renderPasses.set('tiledLighting', pass);
+  }
+
+  /**
+   * Updates the tiled lighting pass's bind groups each frame (call in renderAccLight).
+   */
+  public updateTiledLightBindGroups(
+    gBufferWithAOBindGroup: GPUBindGroup,
+    tiledDataBindGroup: GPUBindGroup,
+  ): void {
+    const pass = this.renderPasses.get('tiledLighting') as TiledLightingRenderPass | undefined;
+    pass?.updateGBufferWithAOBindGroup(gBufferWithAOBindGroup);
+    pass?.updateTiledDataBindGroup(tiledDataBindGroup);
   }
 
   /**

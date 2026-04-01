@@ -97,18 +97,22 @@ export class PointLightComponent extends Component {
     this.projectorTexture = await Texture.getAsync('white.png');
     this.projectorTextureView = this.projectorTexture.getTextureView()!;
 
+
     if (this._hasShadows) {
       this.initShadowResources();
     } else {
-      // Dummy 2D shadow texture to satisfy the non-shadow bind group layout
-      this.dummyShadowTexture = GPUUtils.createTexture(
-        'dummy_shadow_texture_point_light',
-        1,
-        1,
-        'depth32float',
-        GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
-      );
-      this.dummyShadowTextureView = this.dummyShadowTexture.createView();
+      // Dummy cubemap shadow texture to satisfy the bind group layout (must be cubemap, not 2D)
+      this.dummyShadowTexture = GPUUtils.getDevice().createTexture({
+        label: 'dummy_shadow_texture_point_light',
+        size: [1, 1, 6],
+        dimension: '2d',
+        format: 'depth32float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      this.dummyShadowTextureView = this.dummyShadowTexture.createView({
+        dimension: 'cube',
+        aspect: 'depth-only',
+      });
     }
 
     this.buildBindGroup();
@@ -168,7 +172,7 @@ export class PointLightComponent extends Component {
     );
     const shadowResource = this._hasShadows
       ? this.shadowCubeView
-      : this.dummyShadowTexture.createView();
+      : this.dummyShadowTextureView;
 
     this.uniformBindGroup = BindGroupFactory.createBindGroup(
       'point light uniform bind group',
@@ -296,6 +300,26 @@ export class PointLightComponent extends Component {
   }
   public getUniformBuffer(): GPUBuffer {
     return this.uniformBuffer;
+  }
+
+  public getWorldPosition(): vec3 {
+    return this.position;
+  }
+
+  public getColor(): vec4 {
+    return this.color;
+  }
+
+  public getIntensity(): number {
+    return this.intensity;
+  }
+
+  public getRadius(): number {
+    return this.radius;
+  }
+
+  public getStartFalloff(): number {
+    return this.startFallof;
   }
 
   public getShadowDepthView(): GPUTextureView {

@@ -263,6 +263,24 @@ export class RenderPassFactory {
   }
 
   /**
+   * Creates the render pass config for the tiled lighting full-screen pass.
+   * No depth attachment — the technique uses "z: disable_all".
+   * The pass additively accumulates all shadowless point/spot lights into accLight.
+   */
+  public static createTiledLightingPassConfig(accLight: RenderTarget): RenderPassConfig {
+    return {
+      label: 'Tiled Lighting Pass',
+      colorAttachments: [
+        {
+          view: accLight.getRenderView()!,
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+    };
+  }
+
+  /**
    * Creates configuration for the Weighted Blended OIT gather pass.
    * Renders glass into two dual render targets:
    *   [0] accumulation (RGBA16F) — cleared to (0,0,0,0), additive blend

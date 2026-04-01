@@ -76,7 +76,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Occluded surfaces pull toward unoccluded hemisphere captured by bent normal.
     let R_geom = normalize(g.reflectedDir);
     let R_bent = reflect(-g.viewDir, bentNormalWS);
-    let bentBlend = saturate(1.0 - ao);
+    let bentBlend = saturate(1.0 - ao) * g.roughness;
     var R = normalize(mix(R_geom, R_bent, bentBlend));
 
     let avgF0 = dot(g.specularColor, vec3<f32>(0.333));
@@ -99,7 +99,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NoV, 0.0, 1.0));
     let brdf       = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
     let F          = Fresnel_Schlick_Roughness(NoV, g.specularColor, g.roughness);
-    let ssrSpecular = ssrColor.rgb * (F * brdf.x + brdf.y);
+    let ssrSpecular = ssrColor.rgb * F;
 
     var finalSpecular = mix(iblSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost * so;
 

@@ -38,4 +38,6 @@ export enum PipelineBindGroupLayouts {
   OIT_GLASS_ENV = 'OITGlassEnv',
   PALETTE_QUANTIZE = 'PaletteQuantize',
   ATMOSPHERIC_FOG_UNIFORMS = 'AtmosphericFogUniforms',
+  TILED_LIGHT_COMPUTE_CULLING = 'TiledLightComputeCulling',
+  TILED_LIGHT_RENDER = 'TiledLightData',
 }
