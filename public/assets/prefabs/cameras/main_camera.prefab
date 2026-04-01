@@ -8,7 +8,6 @@
       "bloom": {},
       "auto_exposure": {},
       "atmospheric_fog": {},
-      "fsr": { "renderScale": 1.0 },
-      "god_rays": {}
+      "fsr": { "renderScale": 1.0 }
     }
   }

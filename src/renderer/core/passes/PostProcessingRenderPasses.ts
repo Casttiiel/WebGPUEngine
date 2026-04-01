@@ -451,6 +451,7 @@ export class GodRaysKawaseRenderPass extends PostProcessingRenderPass {
 export class GodRaysCompositeRenderPass extends PostProcessingRenderPass {
   private inputBindGroup: GPUBindGroup;
   private paramsBindGroup: GPUBindGroup;
+  private exposureBindGroup: GPUBindGroup;
 
   constructor(
     config: RenderPassConfig,
@@ -458,16 +459,19 @@ export class GodRaysCompositeRenderPass extends PostProcessingRenderPass {
     technique: Technique,
     inputBindGroup: GPUBindGroup,
     paramsBindGroup: GPUBindGroup,
+    exposureBindGroup: GPUBindGroup,
   ) {
     super(config, mesh, technique);
     this.inputBindGroup = inputBindGroup;
     this.paramsBindGroup = paramsBindGroup;
+    this.exposureBindGroup = exposureBindGroup;
   }
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, this.inputBindGroup);
     pass.setBindGroup(2, this.paramsBindGroup);
+    pass.setBindGroup(3, this.exposureBindGroup);
   }
 }
 

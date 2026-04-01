@@ -434,6 +434,14 @@ export class ModuleRender extends Module {
       if (mainCameraEntity?.hasComponent('god_rays')) {
         const godRays = mainCameraEntity.getComponent('god_rays') as GodRaysComponent;
         if (godRays.hasLoaded()) {
+          if (mainCameraEntity.hasComponent('auto_exposure')) {
+            const autoExposure = mainCameraEntity.getComponent(
+              'auto_exposure',
+            ) as AutoExposureComponent;
+            if (autoExposure.hasLoaded()) {
+              godRays.setExposureBuffer(autoExposure.getExposureBuffer());
+            }
+          }
           result = godRays.apply(result, this.deferred.getGBufferBindGroup());
         }
       }
@@ -729,6 +737,11 @@ export class ModuleRender extends Module {
     if (mainCameraForMenu?.hasComponent('auto_exposure')) {
       const autoExposure = mainCameraForMenu.getComponent('auto_exposure') as AutoExposureComponent;
       if (autoExposure.hasLoaded()) autoExposure.renderInMenu();
+    }
+
+    if (mainCameraForMenu?.hasComponent('god_rays')) {
+      const godRays = mainCameraForMenu.getComponent('god_rays') as GodRaysComponent;
+      if (godRays.hasLoaded()) godRays.renderInMenu();
     }
 
     if (mainCameraForMenu?.hasComponent('fsr')) {

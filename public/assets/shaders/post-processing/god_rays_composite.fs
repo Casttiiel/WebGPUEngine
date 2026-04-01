@@ -18,6 +18,7 @@
 //   group(0)  CameraUniforms         (standard engine binding)
 //   group(1)  Kawase output texture + sampler   (SingleTexture)
 //   group(2)  GodRaysCompositeParams uniform    (GodRaysUniforms re-used)
+//   group(3)  AutoExposureRead — adapted scene exposure f32 (read-only storage)
 
 // ─── Composite params struct ─────────────────────────────────────────────────
 // 4 × f32 = 16 bytes.
@@ -38,6 +39,9 @@ struct GodRaysCompositeParams {
 // Composite params (reuses GodRaysUniforms layout — same buffer binding)
 @group(2) @binding(0) var<uniform> params: GodRaysCompositeParams;
 
+// Auto-exposure buffer — adapted exposure computed by AutoExposureComponent each frame
+@group(3) @binding(0) var<storage, read> exposureData: array<f32>;
+
 // ─── Fragment entry ───────────────────────────────────────────────────────────
 @fragment
 fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
@@ -49,7 +53,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Bilinear upscale from ¼ resolution is handled by the sampler.
     let shafts = textureSampleLevel(kawaseTexture, kawaseSampler, uv, 0.0).r;
 
-    let contribution = vec3<f32>(params.sunR, params.sunG, params.sunB) * shafts * params.scale;
+    let contribution = vec3<f32>(params.sunR, params.sunG, params.sunB) * shafts * params.scale * exposureData[0];
 
     // Alpha = 0 — additive blend ignores dst alpha, only src RGB matters.
     return vec4<f32>(contribution, 0.0);

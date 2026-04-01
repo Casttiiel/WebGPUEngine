@@ -54,6 +54,9 @@ export class GodRaysComponent extends Component {
   private paramsBindGroup: GPUBindGroup | null = null;
   private radialParamsBindGroup: GPUBindGroup | null = null;
   private compositeParamsBindGroup: GPUBindGroup | null = null;
+  private defaultExposureBuffer!: GPUBuffer;
+  private compositeExposureBindGroup!: GPUBindGroup;
+  private trackedExposureBuffer: GPUBuffer | null = null;
   private inputBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
   private radialInputBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
   private kawaseOutputBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
@@ -167,6 +170,19 @@ export class GodRaysComponent extends Component {
       'god_rays_composite_params_bindgroup',
       this.compositeTechnique.getPipeline().getBindGroupLayout(2),
       [{ binding: 0, resource: { buffer: this.compositeParamsBuffer } }],
+    );
+
+    // Default exposure buffer (1.0) used until AutoExposureComponent provides its own.
+    this.defaultExposureBuffer = GPUUtils.createBuffer(
+      'god_rays_default_exposure',
+      4,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    );
+    GPUUtils.writeBuffer(this.defaultExposureBuffer, 0, new Float32Array([1.0]));
+    this.compositeExposureBindGroup = BindGroupFactory.createBindGroup(
+      'god_rays_composite_exposure_bindgroup',
+      this.compositeTechnique.getPipeline().getBindGroupLayout(3),
+      [{ binding: 0, resource: { buffer: this.defaultExposureBuffer } }],
     );
 
     // Kawase: 4 pre-written offset buffers (k = 0..3) to avoid per-frame writes inside
@@ -311,6 +327,7 @@ export class GodRaysComponent extends Component {
       hdrTexture,
       kawaseOutputBG,
       this.compositeParamsBindGroup!,
+      this.compositeExposureBindGroup,
     );
 
     // The composite blended in-place; return the same view.
@@ -338,11 +355,35 @@ export class GodRaysComponent extends Component {
 
   public override update(_dt: number): void {}
 
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (!gui.beginWindow('God Rays', true)) return;
+
+    const folder = (gui as any).folders?.get('God Rays');
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    folder.add(this, 'isEnabled').name('Enable').listen();
+    folder.add(this, 'occlusionThreshold', 0.0, 1.0, 0.01).name('Occlusion Threshold').listen();
+    folder.add(this, 'intensity', 0.0, 5.0, 0.05).name('Intensity').listen();
+    folder.add(this, 'density', 0.5, 1.0, 0.01).name('Density').listen();
+    folder.add(this, 'decay', 0.8, 1.0, 0.005).name('Decay').listen();
+    folder.add(this, 'weight', 0.0, 1.0, 0.01).name('Weight').listen();
+    folder.add(this, 'compositeScale', 0.0, 4.0, 0.05).name('Composite Scale').listen();
+
+    gui.endWindow();
+  }
+
   public override renderDebug(): void {}
 
   public override dispose(): void {
     this.paramsBuffer?.destroy();
     this.compositeParamsBuffer?.destroy();
+    this.defaultExposureBuffer?.destroy();
     this.occlusionMask?.destroy();
     this.radialBlurRT?.destroy();
     this.kawasePingA?.destroy();
@@ -352,12 +393,32 @@ export class GodRaysComponent extends Component {
 
   // ─── Internal helpers ─────────────────────────────────────────────────────
 
+  /**
+   * Wire the GPU exposure buffer from AutoExposureComponent into the composite pass.
+   * If the buffer reference is unchanged, the existing bind group is reused.
+   */
+  public setExposureBuffer(buf: GPUBuffer): void {
+    if (buf === this.trackedExposureBuffer) return;
+    this.trackedExposureBuffer = buf;
+    this.compositeExposureBindGroup = BindGroupFactory.createBindGroup(
+      'god_rays_composite_exposure_bindgroup',
+      this.compositeTechnique.getPipeline().getBindGroupLayout(3),
+      [{ binding: 0, resource: { buffer: buf } }],
+    );
+  }
+
   private maskWidth(): number {
     return Math.max(1, Render.width >> 2);
   }
 
   private maskHeight(): number {
     return Math.max(1, Render.height >> 2);
+  }
+
+  /** Standard cubic smoothstep — returns 0 at edge0, 1 at edge1 (reversed range supported). */
+  private smoothstep(edge0: number, edge1: number, x: number): number {
+    const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
   }
 
   /**
@@ -418,7 +479,8 @@ export class GodRaysComponent extends Component {
     this.paramsData[4] = this.intensity;
     this.paramsData[5] = this.density;
     this.paramsData[6] = this.decay;
-    this.paramsData[7] = this.weight;
+    const edgeDist = Math.max(Math.abs(sunNdcX), Math.abs(sunNdcY));
+    this.paramsData[7] = this.weight * this.smoothstep(1.2, 0.8, edgeDist);
     GPUUtils.writeBuffer(this.paramsBuffer, 0, this.paramsData);
 
     this.compositeParamsData[0] = sunR;

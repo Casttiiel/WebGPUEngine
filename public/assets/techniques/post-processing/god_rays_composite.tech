@@ -4,5 +4,5 @@
     "writesOn": "texture",
     "z": "disable_all",
     "blend": "additive",
-    "uniforms": ["CameraUniforms", "SingleTexture", "GodRaysUniforms"]
+    "uniforms": ["CameraUniforms", "SingleTexture", "GodRaysUniforms", "AutoExposureRead"]
 }

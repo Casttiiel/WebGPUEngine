@@ -563,6 +563,7 @@ export class RenderPassManager {
     hdrView: GPUTextureView,
     inputBindGroup: GPUBindGroup,
     paramsBindGroup: GPUBindGroup,
+    exposureBindGroup: GPUBindGroup,
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
       hdrView,
@@ -575,6 +576,7 @@ export class RenderPassManager {
       technique,
       inputBindGroup,
       paramsBindGroup,
+      exposureBindGroup,
     );
     this.executeDynamicPass(pass);
   }
