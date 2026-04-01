@@ -32,6 +32,7 @@ import { BloomComponent } from '../../components/render/BloomComponent';
 import { AutoExposureComponent } from '../../components/render/AutoExposureComponent';
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
+import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { Profiler } from '../../core/debug/Profiler';
@@ -299,6 +300,10 @@ export class ModuleRender extends Module {
       (comp as PaletteQuantizeComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('god_rays')?.getList() ?? []) {
+      (comp as GodRaysComponent).resize();
+    }
+
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -423,6 +428,13 @@ export class ModuleRender extends Module {
         ) as AutoExposureComponent;
         if (autoExposure.hasLoaded() && autoExposure.enabled) {
           autoExposure.apply(result, this.lastDt);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('god_rays')) {
+        const godRays = mainCameraEntity.getComponent('god_rays') as GodRaysComponent;
+        if (godRays.hasLoaded()) {
+          result = godRays.apply(result, this.deferred.getGBufferBindGroup());
         }
       }
 

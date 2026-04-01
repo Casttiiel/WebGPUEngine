@@ -21,6 +21,8 @@ import {
   SpeedLinesVFXRenderPass,
   HeightFogRenderPass,
   ContactShadowsRenderPass,
+  GodRaysOcclusionRenderPass,
+  GodRaysRadialRenderPass,
 } from './PostProcessingRenderPasses';
 import { FullScreenPass } from './BaseRenderPass';
 import { RenderPassFactory } from './RenderPassFactory';
@@ -458,6 +460,62 @@ export class RenderPassManager {
       mesh,
       technique,
       gBufferBindGroup,
+      paramsBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Create and execute a god rays occlusion mask pass at a custom (typically
+   * quarter) resolution.  group(1) = GBuffer, group(2) = HDR scene, group(3) = params.
+   */
+  public executeGodRaysOcclusionPass(
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      { width: result.getWidth(), height: result.getHeight() },
+      'God Rays Occlusion',
+    );
+    const pass = new GodRaysOcclusionRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      gBufferBindGroup,
+      inputBindGroup,
+      paramsBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Execute the god rays radial blur pass (Step 2).
+   * Marches 64 samples from each pixel toward the sun NDC position,
+   * accumulating the occlusion mask with exponential decay.
+   * group(1) = occlusion mask, group(2) = GodRaysParams.
+   */
+  public executeGodRaysRadialPass(
+    mesh: Mesh,
+    technique: Technique,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      { width: result.getWidth(), height: result.getHeight() },
+      'God Rays Radial Blur',
+    );
+    const pass = new GodRaysRadialRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      inputBindGroup,
       paramsBindGroup,
     );
     this.executeDynamicPass(pass);

@@ -50,6 +50,7 @@ import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
+import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
@@ -353,6 +354,8 @@ export class Loader {
         return new AtmosphericFogComponent();
       case 'contact_shadows':
         return new ContactShadowsComponent();
+      case 'god_rays':
+        return new GodRaysComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

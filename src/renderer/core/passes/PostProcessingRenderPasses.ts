@@ -353,6 +353,67 @@ export class ContactShadowsRenderPass extends PostProcessingRenderPass {
 }
 
 /**
+ * God rays occlusion mask render pass (Step 1).
+ * Renders a quarter-resolution bright-pixel mask from the HDR scene.
+ * group(0) = CameraUniforms (auto), group(1) = GBuffer, group(2) = HDR input, group(3) = GodRaysParams.
+ */
+export class GodRaysOcclusionRenderPass extends PostProcessingRenderPass {
+  private gBufferBindGroup: GPUBindGroup;
+  private inputBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.gBufferBindGroup = gBufferBindGroup;
+    this.inputBindGroup = inputBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.gBufferBindGroup);
+    pass.setBindGroup(2, this.inputBindGroup);
+    pass.setBindGroup(3, this.paramsBindGroup);
+  }
+}
+
+/**
+ * God rays radial blur render pass (Step 2).
+ * Marches 64 samples from each pixel toward the sun, accumulating the
+ * occlusion mask with exponential decay to produce light shafts.
+ * group(0) = CameraUniforms (auto), group(1) = occlusion mask, group(2) = GodRaysParams.
+ */
+export class GodRaysRadialRenderPass extends PostProcessingRenderPass {
+  private inputBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.inputBindGroup = inputBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.inputBindGroup);
+    pass.setBindGroup(2, this.paramsBindGroup);
+  }
+}
+
+/**
  * Height Fog post-processing render pass
  */
 export class HeightFogRenderPass extends PostProcessingRenderPass {

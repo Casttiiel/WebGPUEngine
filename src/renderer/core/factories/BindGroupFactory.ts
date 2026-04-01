@@ -1438,6 +1438,20 @@ export class BindGroupFactory {
   }
 
   /**
+   * God rays params bind group layout (group 2).
+   * binding 0: GodRaysParams uniform (32 bytes)
+   */
+  public static getGodRaysUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('god_rays_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
+  /**
    * Contact shadows bind group layout (group 2).
    * Now outputs a shadow-factor map — only needs the params uniform buffer.
    * binding 0: ContactShadowParams uniform
@@ -1672,6 +1686,8 @@ export class BindGroupFactory {
         return this.getTiledLightRenderLayout();
       case PipelineBindGroupLayouts.AREA_LIGHT_UNIFORMS:
         return this.getAreaLightUniformsLayout();
+      case PipelineBindGroupLayouts.GOD_RAYS_UNIFORMS:
+        return this.getGodRaysUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

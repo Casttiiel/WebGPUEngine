@@ -286,6 +286,8 @@ export class Technique extends GPUResource {
         return this.createTextureTarget();
       case FragmentShaderTargets.SINGLE_CHANNEL:
         return this.createSingleChannelTarget();
+      case FragmentShaderTargets.MASK:
+        return this.createMaskTarget();
       case FragmentShaderTargets.SCREEN:
         return this.createScreenTarget();
       case FragmentShaderTargets.DEPTH_ONLY:
@@ -326,6 +328,10 @@ export class Technique extends GPUResource {
 
   private createSingleChannelTarget(): GPUColorTargetState[] {
     return [{ format: QualitySettings.getInstance().getSettings().aoTexture }];
+  }
+
+  private createMaskTarget(): GPUColorTargetState[] {
+    return [{ format: 'rgba8unorm' }];
   }
 
   /**
