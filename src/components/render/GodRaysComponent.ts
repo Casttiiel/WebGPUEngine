@@ -14,20 +14,16 @@ import { Engine } from '../../core/engine/Engine';
 import { GodRaysComponentData } from '../../types/GodRaysComponentData.type';
 
 /**
- * GodRaysComponent — Steps 1 & 2: Occlusion mask + Radial blur.
+ * GodRaysComponent — Steps 1–4: Occlusion mask + Radial blur + Kawase + Composite.
  *
- * Step 1 — Occlusion mask pass:
- *   Produces a quarter-resolution RGBA mask where pixels brighter than
- *   `occlusionThreshold` (sky / sun halo) are white and everything else
- *   (geometry that occludes light) is black.
+ * Step 1 — Occlusion mask:   quarter-res RGBA mask — geometry = black, sky/sun = white.
+ * Step 2 — Radial blur:      64-sample Crytek march toward the sun NDC with decay.
+ * Step 3 — Kawase blur:      5 ping-pong passes (offsets 0,1,2,2,3).
+ * Step 4 — Composite:        additive blend of the blurred shafts onto the HDR frame,
+ *                              tinted by the DirectionalLight sun color.
  *
- * Step 2 — Radial blur (Crytek light shafts):
- *   Marches 64 samples from each fragment toward the sun NDC position,
- *   accumulating the occlusion mask with exponential decay to produce
- *   directional light shafts at quarter resolution.
- *
- * apply() still returns the input HDR texture UNCHANGED — composite
- * blending is reserved for Step 4.
+ * apply() returns the same HDR texture view; the composite is done in-place
+ * via pipeline additive blending (ONE+ONE, loadOp: 'load').
  *
  * GodRaysParams uniform layout (32 bytes — 8 × f32):
  *   [0] sunNdcX            — sun X in NDC [-1, 1]
@@ -43,17 +39,28 @@ export class GodRaysComponent extends Component {
   // ─── GPU resources ────────────────────────────────────────────────────────
   private technique!: Technique;
   private radialTechnique!: Technique;
+  private kawaseTechnique!: Technique;
+  private compositeTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private occlusionMask!: RenderTarget;
   private radialBlurRT!: RenderTarget;
+  private kawasePingA!: RenderTarget;
+  private kawasePingB!: RenderTarget;
   private renderPassManager!: RenderPassManager;
   private paramsBuffer!: GPUBuffer;
+  private compositeParamsBuffer!: GPUBuffer;
 
   // ─── Bind group caches ────────────────────────────────────────────────────
   private paramsBindGroup: GPUBindGroup | null = null;
   private radialParamsBindGroup: GPUBindGroup | null = null;
+  private compositeParamsBindGroup: GPUBindGroup | null = null;
   private inputBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
   private radialInputBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+  private kawaseOutputBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+  // Kawase: 3 pre-built input BGs [radial, pingA, pingB]; 4 offset param BGs [k=0..3]
+  private kawaseInputBGs: GPUBindGroup[] = [];
+  private kawaseOffsetBuffers: GPUBuffer[] = [];
+  private kawaseOffsetBindGroups: GPUBindGroup[] = [];
 
   // ─── Tuneable parameters ───────────────────────────────────────────────────
   public isEnabled: boolean = true;
@@ -67,11 +74,14 @@ export class GodRaysComponent extends Component {
   public decay: number = 0.97;
   /** Final accumulated-rays weight (Step 2). */
   public weight: number = 0.4;
+  /** Composite-pass multiplier applied on top of intensity (Step 4). */
+  public compositeScale: number = 1.0;
 
   private loaded = false;
 
   // ─── Reusable arrays to avoid hot-path allocations ────────────────────────
   private readonly paramsData = new Float32Array(8);
+  private readonly compositeParamsData = new Float32Array(4);
   private readonly clipPos = vec4.create();
   private readonly sunWorld = vec4.create();
 
@@ -90,6 +100,8 @@ export class GodRaysComponent extends Component {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.getAsync('post-processing/god_rays_occlusion.tech');
     this.radialTechnique = await Technique.getAsync('post-processing/god_rays_radial.tech');
+    this.kawaseTechnique = await Technique.getAsync('post-processing/god_rays_kawase.tech');
+    this.compositeTechnique = await Technique.getAsync('post-processing/god_rays_composite.tech');
 
     this.occlusionMask = new RenderTarget();
     this.occlusionMask.createRT(
@@ -102,6 +114,22 @@ export class GodRaysComponent extends Component {
     this.radialBlurRT = new RenderTarget();
     this.radialBlurRT.createRT(
       'god_rays_radial.dds',
+      this.maskWidth(),
+      this.maskHeight(),
+      'rgba8unorm',
+    );
+
+    this.kawasePingA = new RenderTarget();
+    this.kawasePingA.createRT(
+      'god_rays_kawase_a.dds',
+      this.maskWidth(),
+      this.maskHeight(),
+      'rgba8unorm',
+    );
+
+    this.kawasePingB = new RenderTarget();
+    this.kawasePingB.createRT(
+      'god_rays_kawase_b.dds',
       this.maskWidth(),
       this.maskHeight(),
       'rgba8unorm',
@@ -128,6 +156,41 @@ export class GodRaysComponent extends Component {
       [{ binding: 0, resource: { buffer: this.paramsBuffer } }],
     );
 
+    // Composite params: 4 × f32 = 16 bytes { sunR, sunG, sunB, scale }.
+    // Uses GodRaysUniforms layout (group 2 of composite technique).
+    this.compositeParamsBuffer = GPUUtils.createBuffer(
+      'god_rays_composite_params_buffer',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+    this.compositeParamsBindGroup = BindGroupFactory.createBindGroup(
+      'god_rays_composite_params_bindgroup',
+      this.compositeTechnique.getPipeline().getBindGroupLayout(2),
+      [{ binding: 0, resource: { buffer: this.compositeParamsBuffer } }],
+    );
+
+    // Kawase: 4 pre-written offset buffers (k = 0..3) to avoid per-frame writes inside
+    // a single command encoder (writeBuffer is applied before submit, so a single buffer
+    // written 5× would only see the last value for all passes).
+    const kawaseParamsLayout = this.kawaseTechnique.getPipeline().getBindGroupLayout(2);
+    for (let k = 0; k < 4; k++) {
+      const buf = GPUUtils.createBuffer(
+        `god_rays_kawase_offset_${k}`,
+        16,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+      GPUUtils.writeBuffer(buf, 0, new Float32Array([k, 0, 0, 0]));
+      const bg = BindGroupFactory.createBindGroup(
+        `god_rays_kawase_params_bindgroup_${k}`,
+        kawaseParamsLayout,
+        [{ binding: 0, resource: { buffer: buf } }],
+      );
+      this.kawaseOffsetBuffers.push(buf);
+      this.kawaseOffsetBindGroups.push(bg);
+    }
+
+    this.rebuildKawaseInputBindGroups();
+
     this.renderPassManager = new RenderPassManager();
     this.loaded = true;
   }
@@ -153,19 +216,41 @@ export class GodRaysComponent extends Component {
       'rgba8unorm',
     );
 
+    this.kawasePingA.destroy();
+    this.kawasePingA = new RenderTarget();
+    this.kawasePingA.createRT(
+      'god_rays_kawase_a.dds',
+      this.maskWidth(),
+      this.maskHeight(),
+      'rgba8unorm',
+    );
+
+    this.kawasePingB.destroy();
+    this.kawasePingB = new RenderTarget();
+    this.kawasePingB.createRT(
+      'god_rays_kawase_b.dds',
+      this.maskWidth(),
+      this.maskHeight(),
+      'rgba8unorm',
+    );
+
     // Cached bind groups reference stale texture views after resize — clear them.
     this.inputBindGroupCache.clear();
     this.radialInputBindGroupCache.clear();
+    this.kawaseOutputBindGroupCache.clear();
+    this.rebuildKawaseInputBindGroups();
   }
 
   // ─── Per-frame apply ──────────────────────────────────────────────────────
 
   /**
-   * Run the god rays pipeline (Steps 1 & 2) and return the input HDR
-   * texture unchanged.  Composite blending is reserved for Step 4.
+   * Run the complete god rays pipeline (Steps 1–4) and return the HDR
+   * texture with the god rays additively blended in.
    *
-   * Step 1 — Occlusion mask: quarter-res RGBA mask from HDR + GBuffer depth.
-   * Step 2 — Radial blur:    64-sample march toward the sun with decay.
+   * Step 1 — Occlusion mask:  quarter-res RGBA mask from HDR + GBuffer depth.
+   * Step 2 — Radial blur:     64-sample march toward the sun with decay.
+   * Step 3 — Kawase blur:     5 ping-pong passes (offsets 0,1,2,2,3).
+   * Step 4 — Composite:       additive blend of shafts onto HDR in-place.
    */
   public apply(hdrTexture: GPUTextureView, gBufferBindGroup: GPUBindGroup): GPUTextureView {
     if (!this.loaded) return hdrTexture;
@@ -193,6 +278,42 @@ export class GodRaysComponent extends Component {
       this.radialBlurRT,
     );
 
+    // ── Step 3: Kawase blur — 5 ping-pong passes ─────────────────────────────
+    const PASS_INPUT_IDX = [0, 1, 2, 1, 2] as const;
+    const PASS_OFFSET_IDX = [0, 1, 2, 2, 3] as const;
+    const PASS_OUTPUT_RT: RenderTarget[] = [
+      this.kawasePingA,
+      this.kawasePingB,
+      this.kawasePingA,
+      this.kawasePingB,
+      this.kawasePingA,
+    ];
+
+    for (let i = 0; i < 5; i++) {
+      const inputIdx = PASS_INPUT_IDX[i]!;
+      const offsetIdx = PASS_OFFSET_IDX[i]!;
+      const outputRT = PASS_OUTPUT_RT[i]!;
+      this.renderPassManager.executeGodRaysKawasePass(
+        this.fullscreenQuadMesh,
+        this.kawaseTechnique,
+        this.kawaseInputBGs[inputIdx]!,
+        this.kawaseOffsetBindGroups[offsetIdx]!,
+        outputRT,
+        `God Rays Kawase k=${offsetIdx}`,
+      );
+    }
+
+    // ── Step 4: composite — additive blend onto HDR in-place ───────────────────
+    const kawaseOutputBG = this.getOrCreateKawaseOutputBindGroup(this.kawasePingA.getView());
+    this.renderPassManager.executeGodRaysCompositePass(
+      this.fullscreenQuadMesh,
+      this.compositeTechnique,
+      hdrTexture,
+      kawaseOutputBG,
+      this.compositeParamsBindGroup!,
+    );
+
+    // The composite blended in-place; return the same view.
     return hdrTexture;
   }
 
@@ -206,6 +327,11 @@ export class GodRaysComponent extends Component {
     return this.radialBlurRT.getView();
   }
 
+  /** Quarter-resolution Kawase-blurred light shafts (Step 3 output, input for Step 4). */
+  public getKawaseOutputView(): GPUTextureView {
+    return this.kawasePingA.getView();
+  }
+
   public hasLoaded(): boolean {
     return this.loaded;
   }
@@ -216,8 +342,12 @@ export class GodRaysComponent extends Component {
 
   public override dispose(): void {
     this.paramsBuffer?.destroy();
+    this.compositeParamsBuffer?.destroy();
     this.occlusionMask?.destroy();
     this.radialBlurRT?.destroy();
+    this.kawasePingA?.destroy();
+    this.kawasePingB?.destroy();
+    for (const buf of this.kawaseOffsetBuffers) buf?.destroy();
   }
 
   // ─── Internal helpers ─────────────────────────────────────────────────────
@@ -231,13 +361,16 @@ export class GodRaysComponent extends Component {
   }
 
   /**
-   * Write GodRaysParams into the uniform buffer.
-   * Sun NDC position is computed from the first directional light in the scene
-   * using the camera's view-projection matrix (CPU-side).
+   * Write GodRaysParams into the main uniform buffer, and GodRaysCompositeParams
+   * into the composite buffer (sun color from the first directional light).
+   * Both buffers share the same CPU-side directional light lookup.
    */
   private updateParamsBuffer(): void {
     let sunNdcX = 0.0;
     let sunNdcY = 0.0;
+    let sunR = 1.0;
+    let sunG = 1.0;
+    let sunB = 1.0;
 
     try {
       const cameraEntity = Engine.getEntities().getEntityByName('MainCamera');
@@ -252,6 +385,12 @@ export class GodRaysComponent extends Component {
         const dir = dl.getLightDirectionToSource(); // world-space direction TO the light
         const camPos = cam.getPosition();
         const vp = cam.getViewProjection();
+
+        // Read sun color from the directional light.
+        const color = dl.getColor();
+        sunR = color[0] ?? 1.0;
+        sunG = color[1] ?? 1.0;
+        sunB = color[2] ?? 1.0;
 
         // Project a point far in the light direction to get sun clip-space position.
         const farDist = 1e5;
@@ -269,7 +408,7 @@ export class GodRaysComponent extends Component {
         }
       }
     } catch {
-      // If any lookup fails, leave sunNdc at (0, 0) — harmless for Step 1.
+      // If any lookup fails, use defaults.
     }
 
     this.paramsData[0] = sunNdcX;
@@ -280,8 +419,13 @@ export class GodRaysComponent extends Component {
     this.paramsData[5] = this.density;
     this.paramsData[6] = this.decay;
     this.paramsData[7] = this.weight;
-
     GPUUtils.writeBuffer(this.paramsBuffer, 0, this.paramsData);
+
+    this.compositeParamsData[0] = sunR;
+    this.compositeParamsData[1] = sunG;
+    this.compositeParamsData[2] = sunB;
+    this.compositeParamsData[3] = this.isEnabled ? this.compositeScale : 0.0;
+    GPUUtils.writeBuffer(this.compositeParamsBuffer, 0, this.compositeParamsData);
   }
 
   /** Get (or lazily create) the HDR input bind group for the occlusion pass.
@@ -318,5 +462,43 @@ export class GodRaysComponent extends Component {
       this.radialInputBindGroupCache.set(texture, bindGroup);
     }
     return bindGroup;
+  }
+
+  /** Get (or lazily create) the Kawase-output bind group for the composite pass.
+   * Kawase output is at group(1) of the composite technique (SingleTexture). */
+  private getOrCreateKawaseOutputBindGroup(texture: GPUTextureView): GPUBindGroup {
+    let bindGroup = this.kawaseOutputBindGroupCache.get(texture);
+    if (!bindGroup) {
+      bindGroup = BindGroupFactory.createBindGroup(
+        'god_rays_kawase_output_bindgroup',
+        this.compositeTechnique.getPipeline().getBindGroupLayout(1),
+        [
+          { binding: 0, resource: texture },
+          { binding: 1, resource: SamplerLibrary.simpleSampler },
+        ],
+      );
+      this.kawaseOutputBindGroupCache.set(texture, bindGroup);
+    }
+    return bindGroup;
+  }
+
+  /**
+   * (Re-)build the 3 Kawase ping-pong input bind groups.
+   * Must be called after the RTs are (re-)created at load and resize time.
+   * Uses pre-determined texture views so there is zero per-frame allocation.
+   */
+  private rebuildKawaseInputBindGroups(): void {
+    const layout = this.kawaseTechnique.getPipeline().getBindGroupLayout(1);
+    const views = [
+      this.radialBlurRT.getView(), // index 0: Step 2 output → Kawase pass 0 input
+      this.kawasePingA.getView(), // index 1: Kawase pingA
+      this.kawasePingB.getView(), // index 2: Kawase pingB
+    ];
+    this.kawaseInputBGs = views.map((view, i) =>
+      BindGroupFactory.createBindGroup(`god_rays_kawase_input_${i}`, layout, [
+        { binding: 0, resource: view },
+        { binding: 1, resource: SamplerLibrary.simpleSampler },
+      ]),
+    );
   }
 }

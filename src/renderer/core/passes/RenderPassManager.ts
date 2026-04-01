@@ -23,6 +23,8 @@ import {
   ContactShadowsRenderPass,
   GodRaysOcclusionRenderPass,
   GodRaysRadialRenderPass,
+  GodRaysKawaseRenderPass,
+  GodRaysCompositeRenderPass,
 } from './PostProcessingRenderPasses';
 import { FullScreenPass } from './BaseRenderPass';
 import { RenderPassFactory } from './RenderPassFactory';
@@ -512,6 +514,62 @@ export class RenderPassManager {
       'God Rays Radial Blur',
     );
     const pass = new GodRaysRadialRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      inputBindGroup,
+      paramsBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Execute one Kawase blur pass (Step 3).
+   * Call 5× in ping-pong with pre-written offset bind groups (k = 0,1,2,2,3).
+   * group(1) = ping-pong input, group(2) = KawaseParams (offset).
+   */
+  public executeGodRaysKawasePass(
+    mesh: Mesh,
+    technique: Technique,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+    result: RenderTarget,
+    passLabel: string = 'God Rays Kawase',
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      { width: result.getWidth(), height: result.getHeight() },
+      passLabel,
+    );
+    const pass = new GodRaysKawaseRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      inputBindGroup,
+      paramsBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Execute the god rays composite pass (Step 4).
+   * Renders additively onto the existing HDR view (loadOp: 'load' + ONE+ONE blend).
+   * No new RT needed — the god rays contribution is blended directly in-place.
+   * group(1) = Kawase output (quarter-res), group(2) = composite params.
+   */
+  public executeGodRaysCompositePass(
+    mesh: Mesh,
+    technique: Technique,
+    hdrView: GPUTextureView,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
+      hdrView,
+      undefined,
+      'God Rays Composite',
+    );
+    const pass = new GodRaysCompositeRenderPass(
       passConfig,
       mesh,
       technique,

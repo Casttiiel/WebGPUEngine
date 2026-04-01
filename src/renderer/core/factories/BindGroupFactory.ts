@@ -1452,6 +1452,20 @@ export class BindGroupFactory {
   }
 
   /**
+   * Kawase blur step params layout (group 2).
+   * binding 0: KawaseParams uniform (16 bytes — offset f32 + 3× padding)
+   */
+  public static getKawaseUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('kawase_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
+  /**
    * Contact shadows bind group layout (group 2).
    * Now outputs a shadow-factor map — only needs the params uniform buffer.
    * binding 0: ContactShadowParams uniform
@@ -1688,6 +1702,8 @@ export class BindGroupFactory {
         return this.getAreaLightUniformsLayout();
       case PipelineBindGroupLayouts.GOD_RAYS_UNIFORMS:
         return this.getGodRaysUniformsLayout();
+      case PipelineBindGroupLayouts.KAWASE_UNIFORMS:
+        return this.getKawaseUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

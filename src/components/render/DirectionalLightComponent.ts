@@ -703,6 +703,10 @@ export class DirectionalLightComponent extends Component {
     this.color = color;
   }
 
+  public getColor(): number[] {
+    return this.color;
+  }
+
   public setIntensity(intensity: number): void {
     this.intensity = intensity;
   }

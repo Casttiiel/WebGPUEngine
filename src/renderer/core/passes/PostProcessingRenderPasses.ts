@@ -414,6 +414,64 @@ export class GodRaysRadialRenderPass extends PostProcessingRenderPass {
 }
 
 /**
+ * God rays Kawase blur render pass (Step 3).
+ * One ping-pong pass of the 4-tap diagonal Kawase kernel.
+ * Run 5× with pre-written offset buffers: k ∈ {0, 1, 2, 2, 3}.
+ * group(0) = CameraUniforms (auto), group(1) = ping-pong input, group(2) = KawaseParams.
+ */
+export class GodRaysKawaseRenderPass extends PostProcessingRenderPass {
+  private inputBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.inputBindGroup = inputBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.inputBindGroup);
+    pass.setBindGroup(2, this.paramsBindGroup);
+  }
+}
+
+/**
+ * God rays composite render pass (Step 4).
+ * Additively blends the blurred light-shaft buffer onto the full-resolution
+ * HDR frame in-place (loadOp: 'load' + ONE+ONE pipeline blend).
+ * group(0) = CameraUniforms (auto), group(1) = Kawase output, group(2) = composite params.
+ */
+export class GodRaysCompositeRenderPass extends PostProcessingRenderPass {
+  private inputBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    inputBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.inputBindGroup = inputBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.inputBindGroup);
+    pass.setBindGroup(2, this.paramsBindGroup);
+  }
+}
+
+/**
  * Height Fog post-processing render pass
  */
 export class HeightFogRenderPass extends PostProcessingRenderPass {
