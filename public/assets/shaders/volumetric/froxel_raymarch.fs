@@ -39,13 +39,20 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let fx = clamp(uv.x * dimsF.x, 0.0, dimsF.x - 1.0);
   let fy = clamp(uv.y * dimsF.y, 0.0, dimsF.y - 1.0);
 
-  let noiseUV = uv * vec2<f32>(volumetricSettings.renderWidth, volumetricSettings.renderHeight) / 64.0;
+  // Animate blue noise offset with golden-ratio frame progression so TAA
+  // can average out the dithering pattern across frames.
+  let frameTime   = volumetricSettings.windDir.w;           // camera.time packed into unused w component
+  let frameOffset = fract(frameTime * 0.61803398874);       // golden ratio per-frame shift
+  let noiseUV = fract(uv * vec2<f32>(volumetricSettings.renderWidth, volumetricSettings.renderHeight) / 64.0 + frameOffset);
   let dither = textureSample(blueNoiseTex, nearestSampler, noiseUV).r - 0.5;
 
-  // Dither en Z en view space
+  // Dither en Z en view space.
+  // Clamp the dithered Z so it never exceeds the true scene depth — without
+  // this a positive dither on a pixel right in front of a surface would push
+  // the froxel lookup past the surface and leak fog from behind it.
   let depth01 = textureSample(gLinearDepth, samplerGBuffer, uv).x;
   let viewZ = depth01ToViewZ(depth01);
-  let ditherViewZ = viewZ * (1.0 + dither * 0.02);
+  let ditherViewZ = min(viewZ * (1.0 + dither * 0.02), viewZ);
   let z01 = viewZToFroxelZLog(ditherViewZ, froxelParams.nearPlane, froxelParams.farPlane);
   let fz = clamp(z01 * dimsF.z, 0.0, dimsF.z - 1.0);
 

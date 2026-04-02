@@ -964,7 +964,12 @@ export class FroxelVolumetricScattering {
     this.volumetricUniformData[offset++] = Wind.getDirX() * froxelWindScale; // windDir.x
     this.volumetricUniformData[offset++] = 0.0; // windDir.y
     this.volumetricUniformData[offset++] = Wind.getDirZ() * froxelWindScale; // windDir.z
-    this.volumetricUniformData[offset++] = 0.0; // windDir.w (padding)
+    // windDir.w repurposed as camera.time for temporal blue-noise animation in the raymarch pass
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    const cameraTime =
+      (mainCamera?.getComponent('camera') as CameraComponent | undefined)?.getCamera().getTime() ??
+      0;
+    this.volumetricUniformData[offset++] = cameraTime;
 
     // Froxel grid parameters
     offset = 0;
