@@ -5,7 +5,7 @@
  *
  * Implements (per TAA.txt plan):
  *  Step 4 — Reprojection via closest-depth velocity dilation (3×3 neighbourhood)
- *  Step 5 — Neighbourhood clamping in YCoCg space (mean ± gamma*stddev)
+ *  Step 5 — Variance clipping in Reinhard+YCoCg space (cross+3×3 averaged AABB, adaptive expansion)
  *  Step 6 — Adaptive blend factor (motion magnitude + disocclusion + clamp-boost)
  *  Step 7 — Luminance-weighted blend (anti-flicker for specular highlights)
  *  Step 8 — Optional unsharp-mask sharpening after blend
@@ -79,6 +79,23 @@ fn reinhardInverse(c: vec3<f32>) -> vec3<f32> {
     // luma_c = luma_orig / (1 + luma_orig)  ⇒  1 + luma_orig = 1 / (1 - luma_c)
     let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
     return c / max(1.0 - luma, 0.0001);
+}
+
+// ── Variance clipping (center→history ray clip) ───────────────────────────────
+// More lenient than per-component clamp(): instead of projecting each channel
+// independently to its [min, max] bound (always landing on an AABB corner),
+// this clips the history along the ray from the AABB centre toward history —
+// landing on the AABB face closest to the outside point.
+// Result: distant ghosts are rejected equally fast, but a history value that is
+// only slightly out-of-bounds gets clipped less aggressively → reduced temporal
+// flicker and colour shift on fine geometry at low sample counts.
+fn varianceClip(history: vec3<f32>, colorMin: vec3<f32>, colorMax: vec3<f32>) -> vec3<f32> {
+    let center  = (colorMin + colorMax) * 0.5;
+    let extents = (colorMax - colorMin) * 0.5 + vec3<f32>(0.0001);
+    let vUnit   = (history - center) / extents;   // history in AABB-normalised space
+    let maxA    = max(abs(vUnit.x), max(abs(vUnit.y), abs(vUnit.z)));
+    if (maxA > 1.0) { return center + (vUnit / maxA) * extents; } // clip to face
+    return history;                                                // already inside
 }
 
 // ── Closest-depth velocity dilation (3×3) ────────────────────────────────────
@@ -188,12 +205,21 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // ── 3. History sample — Catmull-Rom bicubic ───────────────────────────────
     let historyColor = sampleHistoryCatmullRom(historyUV);
 
-    // ── 4. Neighbourhood AABB clamping in YCoCg (Step 5 of TAA plan) ─────────
-    // Collect 3×3 neighbourhood of current frame, compute per-channel mean + variance,
-    // clamp history to [mean − γ·σ, mean + γ·σ].
-    // YCoCg separates luma from chroma → tighter bounds / better ghost rejection.
+    // ── 4. Variance clipping in Reinhard+YCoCg space (Step 5 of TAA plan) ──────
+    // Three improvements over plain clamp():
+    //  a) Cross+3×3 averaged AABB: compute min/max for the 5-tap cross (C,N,S,E,W) and
+    //     the full 3×3 separately, then average them.  The cross is tighter (better at flat
+    //     surfaces) and the 3×3 is looser (better at edges); averaging balances both.
+    //  b) Adaptive AABB expansion: when the neighbourhood spans a high-contrast colour
+    //     edge, expand the bounds by stddev × contrastEdge → less over-clamping at edges.
+    //  c) varianceClip() instead of clamp(): clips history along the AABB-centre→history
+    //     ray rather than per-component → avoids hard corner artefacts.
     var meanYCoCg = vec3<f32>(0.0);
     var m2YCoCg   = vec3<f32>(0.0);
+    var minCross  = vec3<f32>( 1e9);
+    var maxCross  = vec3<f32>(-1e9);
+    var min3x3    = vec3<f32>( 1e9);
+    var max3x3    = vec3<f32>(-1e9);
 
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
@@ -204,17 +230,33 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
             let ycocg  = rgbToYCoCg(reinhardTonemap(c.rgb));
             meanYCoCg += ycocg;
             m2YCoCg   += ycocg * ycocg;
+            min3x3     = min(min3x3, ycocg);
+            max3x3     = max(max3x3, ycocg);
+            // Cross neighbourhood: C + cardinal 4 (|dx|+|dy| ≤ 1)
+            if (abs(x) + abs(y) <= 1) {
+                minCross = min(minCross, ycocg);
+                maxCross = max(maxCross, ycocg);
+            }
         }
     }
     meanYCoCg /= 9.0;
-    let variance     = max(m2YCoCg / 9.0 - meanYCoCg * meanYCoCg, vec3<f32>(0.0));
-    let stddev       = sqrt(variance);
+    let variance = max(m2YCoCg / 9.0 - meanYCoCg * meanYCoCg, vec3<f32>(0.0));
+    let stddev   = sqrt(variance);
 
-    // Clamp history in the same Reinhard+YCoCg space, then restore to linear RGB.
-    let histYCoCg    = rgbToYCoCg(reinhardTonemap(historyColor.rgb));
-    let colorMin     = meanYCoCg - params.gamma * stddev;
-    let colorMax     = meanYCoCg + params.gamma * stddev;
-    let clampedYCoCg = clamp(histYCoCg, colorMin, colorMax);
+    // Cross+3×3 averaged base bounds
+    let rawColorMin  = (minCross + min3x3) * 0.5;
+    let rawColorMax  = (maxCross + max3x3) * 0.5;
+
+    // Adaptive expansion: wide colour range → crossing a contrast edge → give
+    // extra margin so the AABB doesn't over-clamp valid history on those pixels.
+    let colorRange   = length(rawColorMax - rawColorMin);
+    let contrastEdge = saturate(colorRange * 2.0);
+    let colorMin     = rawColorMin - contrastEdge * stddev;
+    let colorMax     = rawColorMax + contrastEdge * stddev;
+
+    // Clip history to AABB along centre→history ray, then restore to linear RGB.
+    let histYCoCg      = rgbToYCoCg(reinhardTonemap(historyColor.rgb));
+    let clampedYCoCg   = varianceClip(histYCoCg, colorMin, colorMax);
     let clampedHistory = vec4<f32>(reinhardInverse(yCoCgToRGB(clampedYCoCg)), historyColor.a);
 
     // ── 5. Adaptive blend factor (Step 6 of TAA plan) ────────────────────────
