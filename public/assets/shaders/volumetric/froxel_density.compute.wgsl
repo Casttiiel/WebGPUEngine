@@ -15,39 +15,38 @@
 @group(3) @binding(1) var noiseSampler: sampler;
 @group(3) @binding(2) var linearDepth: texture_2d<f32>;
 
-// Función para samplear noise 3D desde textura 2D RGB tileable
-fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
-    let scale = 0.02;
-    // Wind direction from VolumetricUniforms.windDir (pre-scaled world units/s, set by Wind singleton)
-    let p = (worldPos + volumetricParams.windDir.xyz * camera.time) * scale;
-
+// Triplanar sample of the RGB tileable noise texture at a given world position and scale.
+// Uses the 3 channels for independent variation across projections.
+fn triplanarNoise(worldPos: vec3<f32>, scale: f32, windOffset: vec3<f32>) -> f32 {
+    let p    = (worldPos + windOffset) * scale;
     let dims = vec2<f32>(textureDimensions(noiseTex));
 
-    // Proyecciones 2D para simular 3D
-    let uv1 = fract(p.xy);
-    let uv2 = fract(p.yz);
-    let uv3 = fract(p.zx);
+    let uv1 = fract(p.xy); let uv2 = fract(p.yz); let uv3 = fract(p.zx);
 
-    let c1 = textureLoad(
-        noiseTex,
-        vec2<i32>(uv1 * dims),
-        0
-    ).r;
+    // Each projection uses a different channel so they blend independently
+    let c1 = textureLoad(noiseTex, vec2<i32>(uv1 * dims), 0).r;  // XY → R
+    let c2 = textureLoad(noiseTex, vec2<i32>(uv2 * dims), 0).g;  // YZ → G
+    let c3 = textureLoad(noiseTex, vec2<i32>(uv3 * dims), 0).b;  // ZX → B
+    return (c1 + c2 + c3) * 0.3333;
+}
 
-    let c2 = textureLoad(
-        noiseTex,
-        vec2<i32>(uv2 * dims),
-        0
-    ).r;
+// FBM: 3 octaves of triplanar noise with wind advection per octave.
+// Slower-moving large scales + faster-moving small details = turbulent wisps.
+// windDir.xz = Wind singleton direction×speed (world units/s, XZ plane only).
+// windDir.y is repurposed for cameraFar — never use it as wind.
+fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
+    // Horizontal wind only (Y=0 keeps fog layer from drifting vertically)
+    let wind = vec3<f32>(volumetricParams.windDir.x, 0.0, volumetricParams.windDir.z) * camera.time;
 
-    let c3 = textureLoad(
-        noiseTex,
-        vec2<i32>(uv3 * dims),
-        0
-    ).r;
+    // Octave 1 – large base shape (slow)
+    let n1 = triplanarNoise(worldPos, 0.012, wind * 1.0);
+    // Octave 2 – medium detail (medium speed)
+    let n2 = triplanarNoise(worldPos, 0.030, wind * 1.7);
+    // Octave 3 – fine wisps (fast)
+    let n3 = triplanarNoise(worldPos, 0.075, wind * 2.8);
 
-    // Promedio para volumen suave
-    return (c1 + c2 + c3) * (1.0 / 3.0);
+    // FBM weights: 1 + 0.5 + 0.25 = 1.75
+    return (n1 + n2 * 0.5 + n3 * 0.25) / 1.75;
 }
 
 @compute @workgroup_size(8, 8, 4)

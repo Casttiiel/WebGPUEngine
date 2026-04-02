@@ -121,7 +121,7 @@ export class FroxelVolumetricScattering {
   }
 
   public async load(): Promise<void> {
-    this.noiseTexture = await Texture.getAsync('white.png'); //noiseRGBTileable.jpg
+    this.noiseTexture = await Texture.getAsync('noiseRGBTileable.jpg');
     this.blueNoiseTexture = await Texture.getAsync('bluenoise64.png');
     await this.initializeComputeShaders();
 

@@ -1,16 +1,15 @@
 ### Engine
 
 1. Froxel Density Volumes
-2. Froxel Wind/Noise de aqui: https://www.reddit.com/r/GraphicsProgramming/comments/1qu2fzz/faking_fog_volumes_in_screen_space_by_using_depth/
-3. Enemy AI
+2. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo
    └── PathFollower / Steering (seek + arrive)
    → El enemigo ahora rodea obstáculos
-4. GI Precomputed + probes
-5. SSR Temporal
-6. HZB Pocho
+3. GI Precomputed + probes
+4. SSR Temporal
+5. HZB Pocho
 
 ## Gameplay
 
