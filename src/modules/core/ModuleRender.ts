@@ -762,6 +762,11 @@ export class ModuleRender extends Module {
       if (fsr.hasLoaded()) fsr.renderInMenu();
     }
 
+    if (mainCameraForMenu?.hasComponent('taa')) {
+      const taa = mainCameraForMenu.getComponent('taa') as TAAComponent;
+      if (taa.hasLoaded()) taa.renderInMenu();
+    }
+
     // Create main window for render stats
     if (this.beginGUIWindow('Render Statistics')) {
       // Add dynamic text displays that auto-update

@@ -1,4 +1,5 @@
 ﻿import { Component } from '../../core/ecs/Component';
+import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
@@ -43,7 +44,6 @@ export class TAAComponent extends Component {
   private paramsBuffer!: GPUBuffer;
   private seedParamsBuffer!: GPUBuffer; // blendFactor=1 → 100% current (no history blend)
   private paramsData = new Float32Array(4); // [blendFactor, sharpenStrength, gamma, _pad]
-  private paramsDirty = true;
 
   // Cached bind groups — invalidated on resize
   // NOTE: textures bind group is NOT cached because GPUTextureView objects all
@@ -59,7 +59,7 @@ export class TAAComponent extends Component {
   private taaParams = {
     enabled: true,
     blendFactor: 0.1, // base blend toward current frame (0.1 = 90% history at rest)
-    sharpenStrength: 0.3, // unsharp-mask post-blend sharpening (0 = off)
+    sharpenStrength: 0.0, // unsharp-mask post-blend sharpening (0 = off)
     gamma: 1.25, // variance AABB std-dev multiplier (1.0–1.5)
   };
 
@@ -269,20 +269,38 @@ export class TAAComponent extends Component {
   }
 
   private uploadParamsIfDirty(): void {
-    if (!this.paramsDirty) return;
+    // Always upload — GUI edits mutate taaParams directly with no onChange hook.
+    // 16-byte writeBuffer is negligible cost.
     this.paramsData[0] = this.taaParams.blendFactor;
     this.paramsData[1] = this.taaParams.sharpenStrength;
     this.paramsData[2] = this.taaParams.gamma;
     this.paramsData[3] = 0.0;
     this.device.queue.writeBuffer(this.paramsBuffer, 0, this.paramsData);
-    this.paramsDirty = false;
   }
 
   // ── Component lifecycle ────────────────────────────────────────────────────
 
   public update(_dt: number): void {}
 
-  public override renderInMenu(): void {}
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (!gui.beginWindow('TAA', true)) return;
+
+    const folder = (gui as any).folders?.get('TAA');
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    folder.add(this.taaParams, 'enabled').name('Enabled').listen();
+    folder.add(this.taaParams, 'blendFactor', 0.01, 0.5, 0.01).name('Blend Factor').listen();
+    folder.add(this.taaParams, 'gamma', 0.5, 2.0, 0.05).name('Clamp Gamma').listen();
+    folder.add(this.taaParams, 'sharpenStrength', 0.0, 1.0, 0.05).name('Sharpen Strength').listen();
+
+    gui.endWindow();
+  }
 
   public debugInMenu(): void {}
   public renderDebug(): void {}
