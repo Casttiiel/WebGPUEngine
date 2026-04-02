@@ -29,7 +29,11 @@ struct DecalFlatOutput {
 
 @fragment
 fn fs(input: VertexOutput) -> DecalFlatOutput {
-    let uv = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
+    let uvScaled = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
+    // UV unjittering: remove per-frame jitter displacement so texture samples
+    // are stable across frames (jitter should only shift vertex positions, not UVs).
+    let jitter_px = camera.jitterOffset * camera.screenSize;
+    let uv = uvScaled - dpdx(uvScaled) * jitter_px.x - dpdy(uvScaled) * jitter_px.y;
 
     // ── Sample decal textures ────────────────────────────────────────────────
     let albedo_srgb     = textureSample(txAlbedo,    samplerState, uv);

@@ -44,11 +44,22 @@ fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
 }
 
 // ── View-space helper: project a view-space position to screen UV + linear depth ──
+// Uses the jittered projectionMatrix but then removes the jitter from the UV so
+// that hit lookups into gLinearDepth and accLight address the same texel every
+// frame for a perfectly static reflection.  Without this correction the hit UV
+// shifts by ±½ pixel each frame → TAA sees it as temporal noise and clamps it away.
+//
+// Derivation (Y flipped, jitterOffset from Camera.ts = NDC/2):
+//   uv_unjit.x = uv_jit.x + jitterOffset.x
+//   uv_unjit.y = uv_jit.y - jitterOffset.y
 fn viewToScreen(viewPos: vec3<f32>) -> vec3<f32> {
     let clip  = camera.projectionMatrix * vec4<f32>(viewPos, 1.0);
     let ndc   = clip.xyz / clip.w;
     var uv    = ndc.xy * 0.5 + 0.5;
     uv.y      = 1.0 - uv.y;
+    // Remove TAA jitter so SSR hit UVs are stable across frames.
+    uv.x     += camera.jitterOffset.x;
+    uv.y     -= camera.jitterOffset.y;
     let depth = -viewPos.z / camera.cameraFar; // normalised linear depth [0,1]
     return vec3<f32>(uv, depth);
 }

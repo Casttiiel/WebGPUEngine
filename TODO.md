@@ -1,6 +1,6 @@
 ### Engine
 
-1. AA/TAA
+1. TAA
 2. Froxel Self Occlusion
 3. Froxel Temporal Fixes
 4. GI Precomputed + probes

@@ -62,6 +62,25 @@ fn yCoCgToRGB(c: vec3<f32>) -> vec3<f32> {
     );
 }
 
+// ── Reinhard luminance compression for AABB clamping ─────────────────────────
+// Applied to every sample BEFORE building the neighbourhood AABB.
+// A single specular highlight in the 3×3 kernel makes the linear AABB huge,
+// letting the history through unclipped; on the next frame the highlight has
+// shifted, the bounds tighten and the history gets clamped all the way down
+// → flicker.  Compressing through Reinhard keeps all samples in a comparable
+// range so the AABB reflects typical neighbourhood colour, not its worst outlier.
+fn reinhardTonemap(c: vec3<f32>) -> vec3<f32> {
+    let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
+    return c / (1.0 + luma);
+}
+
+fn reinhardInverse(c: vec3<f32>) -> vec3<f32> {
+    // Invert c = orig / (1 + luma_orig).
+    // luma_c = luma_orig / (1 + luma_orig)  ⇒  1 + luma_orig = 1 / (1 - luma_c)
+    let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
+    return c / max(1.0 - luma, 0.0001);
+}
+
 // ── Closest-depth velocity dilation (3×3) ────────────────────────────────────
 // Foreground objects at object/background boundaries have a different motion
 // vector from background pixels directly behind them.  Using the centre pixel's
@@ -180,7 +199,9 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
         for (var x = -1; x <= 1; x++) {
             let offset = vec2<f32>(f32(x), f32(y)) * texelSize;
             let c      = textureSampleLevel(txCurrent, txSampler, uv + offset, 0.0);
-            let ycocg  = rgbToYCoCg(c.rgb);
+            // Reinhard-compress before stats: prevents one bright specular pixel
+            // from dominating the AABB and causing alternating tight/loose clamping.
+            let ycocg  = rgbToYCoCg(reinhardTonemap(c.rgb));
             meanYCoCg += ycocg;
             m2YCoCg   += ycocg * ycocg;
         }
@@ -189,11 +210,12 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     let variance     = max(m2YCoCg / 9.0 - meanYCoCg * meanYCoCg, vec3<f32>(0.0));
     let stddev       = sqrt(variance);
 
-    let histYCoCg    = rgbToYCoCg(historyColor.rgb);
+    // Clamp history in the same Reinhard+YCoCg space, then restore to linear RGB.
+    let histYCoCg    = rgbToYCoCg(reinhardTonemap(historyColor.rgb));
     let colorMin     = meanYCoCg - params.gamma * stddev;
     let colorMax     = meanYCoCg + params.gamma * stddev;
     let clampedYCoCg = clamp(histYCoCg, colorMin, colorMax);
-    let clampedHistory = vec4<f32>(yCoCgToRGB(clampedYCoCg), historyColor.a);
+    let clampedHistory = vec4<f32>(reinhardInverse(yCoCgToRGB(clampedYCoCg)), historyColor.a);
 
     // ── 5. Adaptive blend factor (Step 6 of TAA plan) ────────────────────────
     // - Motion magnitude   → faster convergence during camera/object movement
@@ -204,10 +226,16 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     let motionLen     = length(velocity);
     let edgeFactor    = depthEdgeFactor(uv, texelSize);
     let blendMotion   = mix(params.blendFactor, 0.3, saturate(motionLen * 20.0));
-    let edgeBlend     = mix(blendMotion, 0.5, edgeFactor);
+    // NOTE: Do NOT boost blend at depth edges (edgeBlend removed).
+    // At a static dark/bright edge the AABB spans both sides, so clampDelta ≈ 0 and
+    // the only thing driving blend would be edgeFactor — but with jitter the current
+    // pixel alternates dark/bright every frame, so any blend > ~0.1 on a static edge
+    // produces visible flicker.  Disocclusion (genuinely new geometry) is detected by
+    // clampBoost below, which fires when history was clamped far from its raw value
+    // (i.e. the background is a very different colour from the now-revealed surface).
     let clampDelta    = length(clampedHistory.rgb - historyColor.rgb);
     let clampBoost    = saturate(clampDelta * 8.0);
-    let adaptiveBlend = max(edgeBlend, clampBoost * 0.6 * edgeFactor);
+    let adaptiveBlend = max(blendMotion, clampBoost * 0.6 * edgeFactor);
 
     // ── 6. Luminance-weighted blend (Step 7 — anti-flicker) ──────────────────
     // Explicit weight formulation: blend ratios and luma weights are kept separate
