@@ -6,6 +6,12 @@
 //   @location(1) revealage    (RGBA8)   — multiplicative (1-alpha) blend
 //
 // A second compose pass resolves these over the opaque accLight buffer.
+//
+// Screen-space refraction (Uncharted 4 style):
+//   Before this pass, accLight is copied to txRefraction (binding 3).
+//   The gather shader offsets the sample UV by the view-space surface normal,
+//   so the background seen through the glass appears distorted. Rougher
+//   materials (e.g. frosted glass) produce a stronger distortion.
 
 #include "common/structs"
 #include "common/uniforms"
@@ -19,9 +25,10 @@
 @group(1) @binding(5) var samplerState: sampler;
 @group(1) @binding(6) var<uniform> factors: MaterialFactors;
 // Environment cubemap + BRDF LUT for IBL specular (injected by GlassOITGatherRenderPass)
-@group(3) @binding(0) var txEnv:     texture_cube<f32>;
-@group(3) @binding(1) var envSampler: sampler;
-@group(3) @binding(2) var txBRDF:    texture_2d<f32>;  // split-sum LUT: U=NdotV, V=roughness
+@group(3) @binding(0) var txEnv:        texture_cube<f32>;
+@group(3) @binding(1) var envSampler:   sampler;
+@group(3) @binding(2) var txBRDF:       texture_2d<f32>;  // split-sum LUT: U=NdotV, V=roughness
+@group(3) @binding(3) var txRefraction: texture_2d<f32>;  // accLight snapshot before glass pass
 
 struct OITOutput {
     @location(0) accumulation: vec4<f32>,
@@ -56,35 +63,51 @@ fn fs(input: VertexOutput) -> OITOutput {
     let fresnel = 0.04 + 0.96 * pow(1.0 - NdotV, 5.0);
 
     // ── IBL specular con split-sum BRDF (Karis / UE4 2013) ────────────────────
-    // Without the LUT the reflection weight is plain Fresnel, which ignores that
-    // high roughness disperses the specular lobe — overestimates by ~35% at r=0.6.
     let R        = reflect(-V, worldNormal);
     let envMip   = roughness * 10.0;
     let envColor = textureSampleLevel(txEnv, envSampler, R, envMip).rgb;
 
     // BRDF LUT: U = NdotV, V = roughness  →  .r = F0 scale,  .g = additive bias
     let brdf        = textureSampleLevel(txBRDF, samplerState, vec2<f32>(NdotV, roughness), 0.0).rg;
-    let F0          = vec3<f32>(0.04);                       // glass IOR 1.5
-    let envStrength = F0 * brdf.r + brdf.g;                 // vec3 split-sum weight
+    let F0          = vec3<f32>(0.04);
+    let envStrength = F0 * brdf.r + brdf.g;
+
+    // ── Screen-space refraction ────────────────────────────────────────────────
+    // Project the fragment world position into clip space to get the base screen UV.
+    let clipPos4   = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(input.WorldPos, 1.0);
+    let ndcPos     = clipPos4.xyz / clipPos4.w;
+    // WebGPU UV: x = 0.5 + ndcX*0.5, y = 0.5 - ndcY*0.5 (Y flipped vs NDC)
+    let baseUV     = vec2<f32>(ndcPos.x * 0.5 + 0.5, 0.5 - ndcPos.y * 0.5);
+
+    // Use the view-space normal's XY as the screen-space displacement vector.
+    // View-space Z (depth) doesn't affect left/right or up/down on screen.
+    // Multiply by (1 + roughness) so frosted glass distorts more than clear glass.
+    let viewNormal       = (camera.viewMatrix * vec4<f32>(worldNormal, 0.0)).xy;
+    let refractionStrength = 0.05 * (1.0 + roughness);
+    let refrUV           = clamp(
+        baseUV + viewNormal * refractionStrength,
+        vec2<f32>(0.001, 0.001),
+        vec2<f32>(0.999, 0.999),
+    );
+    // Sample the pre-glass scene — this is what we see *through* the glass (distorted).
+    let refractionColor = textureSample(txRefraction, samplerState, refrUV).rgb;
+
+    // ── Color mixing ───────────────────────────────────────────────────────────
+    // Transmission: distorted background tinted by the glass's base color.
+    // Reflection: environment cubemap weighted by the split-sum Fresnel term.
+    // At face-on (NdotV≈1 → fresnel≈0.04): mostly shows the refracted background.
+    // At grazing (NdotV≈0 → fresnel≈1.00): mostly shows the environment reflection.
+    let transmitted = refractionColor * baseColor;
+    let color = transmitted * (1.0 - envStrength) + envColor * envStrength;
 
     // ── Alpha with Fresnel coupling ────────────────────────────────────────────
-    // At grazing angles Fresnel is high → more light reflected → less transmitted
-    // → glass should appear more opaque there. factor 0.6 is conservative.
-    // baseAlpha=0.08 + fresnel=0.72 → alpha≈0.48 at grazing (physically correct rim)
     let fresnelAlphaBoost = fresnel * (1.0 - baseAlpha) * 0.6;
     let alpha = clamp(baseAlpha + fresnelAlphaBoost, 0.0, 1.0);
 
-    // Color: glass tint for transmitted light + env for reflected, weighted by split-sum
-    let color = baseColor * (1.0 - envStrength) + envColor * envStrength;
-
     // ── OIT weight function — near-range aware ─────────────────────────────────
-    // Problem: with far=1000, z = depth/far compresses 0–5m into z < 0.005.
-    // Everything clamps to the same weight → OIT can't order near-field layers.
-    // Fix: normalise to nearRange so [0, nearRange] maps to [0, 1] — the region
-    // with the most detail (interior glass, windows, displays).
     let viewDepth = -(camera.viewMatrix * vec4<f32>(input.WorldPos, 1.0)).z;
-    let nearRange = 5.0;   // metres — tune for your scene (interiors: 2–5m)
-    let z_near    = clamp(viewDepth / nearRange,       0.0, 1.0);
+    let nearRange = 5.0;
+    let z_near    = clamp(viewDepth / nearRange,        0.0, 1.0);
     let z_far     = clamp(viewDepth / camera.cameraFar, 0.0, 1.0);
     let z_blend   = max(z_near, z_far * 0.1);
     let depthTerm = 10.0 / (1e-5 + pow(z_blend / 0.1, 2.0) + pow(z_blend / 0.5, 6.0));

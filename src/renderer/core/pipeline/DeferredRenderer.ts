@@ -63,6 +63,7 @@ export class DeferredRenderer {
   private rtAccLight!: RenderTarget;
   private rtOITAccumulation!: RenderTarget;
   private rtOITRevealage!: RenderTarget;
+  private rtGlassRefraction!: RenderTarget;
   private oitComposeTechnique!: Technique;
   private oitComposeMesh!: Mesh;
   private oitComposeBindGroup!: GPUBindGroup;
@@ -137,6 +138,15 @@ export class DeferredRenderer {
     this.rtOITAccumulation.createRT('oit_accumulation', width, height, 'rgba16float');
     if (!this.rtOITRevealage) this.rtOITRevealage = new RenderTarget();
     this.rtOITRevealage.createRT('oit_revealage', width, height, 'rgba8unorm');
+    // Snapshot of accLight right before the glass pass — used for screen-space refraction
+    if (!this.rtGlassRefraction) this.rtGlassRefraction = new RenderTarget();
+    this.rtGlassRefraction.createRT(
+      'glass_refraction',
+      width,
+      height,
+      QualitySettings.getInstance().getSettings().hdrTexture,
+      GPUTextureUsage.COPY_DST,
+    );
 
     if (!this.rtCopyAlbedos) {
       this.rtCopyAlbedos = new RenderTarget();
@@ -416,6 +426,19 @@ export class DeferredRenderer {
 
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
+    // Snapshot accLight before glass so the glass shader can sample the undistorted scene
+    // (screen-space refraction: offset UVs → shows displaced background through glass)
+    const encoderForRefraction = Render.getInstance().getCommandEncoder();
+    encoderForRefraction.copyTextureToTexture(
+      { texture: this.rtAccLight.getTexture() },
+      { texture: this.rtGlassRefraction.getTexture() },
+      {
+        width: this.rtGlassRefraction.getWidth(),
+        height: this.rtGlassRefraction.getHeight(),
+        depthOrArrayLayers: 1,
+      },
+    );
+
     this.ensureOITGlassEnvBindGroup();
     this.renderPassManager.executePass('oit_gather', RenderCategory.GLASS);
     this.renderPassManager.executeOITComposePass(
@@ -624,6 +647,7 @@ export class DeferredRenderer {
         { binding: 0, resource: envTex.getTextureView()! },
         { binding: 1, resource: envTex.getSampler()! },
         { binding: 2, resource: brdfLUT.getTextureView()! },
+        { binding: 3, resource: this.rtGlassRefraction.getView() },
       ]);
       this.renderPassManager.setOITGatherEnvBindGroup(this.oitGlassEnvBindGroup);
     }
@@ -641,6 +665,9 @@ export class DeferredRenderer {
     }
     if (this.rtOITRevealage) {
       this.rtOITRevealage.destroy();
+    }
+    if (this.rtGlassRefraction) {
+      this.rtGlassRefraction.destroy();
     }
     this.oitGlassEnvBindGroup = null;
 

@@ -443,6 +443,7 @@ export class BindGroupFactory {
    *   binding 0 — prefiltered env cubemap
    *   binding 1 — env sampler
    *   binding 2 — BRDF LUT (split-sum, U=NdotV V=roughness)
+   *   binding 3 — accLight snapshot before glass pass (screen-space refraction)
    */
   public static getOITGlassEnvLayout(): GPUBindGroupLayout {
     return this.getLayout('oit_glass_env', [
@@ -464,6 +465,11 @@ export class BindGroupFactory {
         binding: 2,
         visibility: GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' }, // screen-space refraction snapshot
       },
     ]);
   }
