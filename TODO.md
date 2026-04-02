@@ -1,12 +1,13 @@
 ### Engine
 
-1. TAA
-2. Froxel Self Occlusion
-3. Froxel Temporal Fixes
-4. GI Precomputed + probes
-5. HZB Pocho
-6. Froxel Density Volumes
-7. Enemy AI
+1. SSR Temporal
+2. Froxel Volumetrics Temporal
+3. Froxel Self Occlusion
+4. Froxel Temporal Fixes
+5. GI Precomputed + probes
+6. HZB Pocho
+7. Froxel Density Volumes
+8. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo

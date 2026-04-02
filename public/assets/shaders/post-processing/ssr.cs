@@ -182,8 +182,13 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Mip-smoothed normal for ray direction — suppresses normal-map high-frequency
     // detail that causes adjacent pixels to fire divergent rays (sparkle noise).
     // Rougher surfaces sample higher mips for more spatially averaged normals.
+    // Sample at unjittered UV: the GBuffer was rendered with camera jitter, so the
+    // texel addressed by `uv` shifts ±½ pixel every frame → the decoded normal
+    // oscillates slightly → reflection direction changes → different ray hits each
+    // frame → visible vibration.  Removing the jitter keeps the sample stable.
+    let uvNoJitter    = vec2<f32>(uv.x - camera.jitterOffset.x, uv.y + camera.jitterOffset.y);
     let smoothMip     = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
-    let smoothNData   = textureSampleLevel(gNormals, samplerGBuffer, uv, smoothMip);
+    let smoothNData   = textureSampleLevel(gNormals, samplerGBuffer, uvNoJitter, smoothMip);
     let smoothN       = normalize(octahedral01ToNormal(smoothNData.xy));
     let incidentDir   = normalize(g.worldPos - camera.cameraPosition.xyz);
     let smoothReflDir = normalize(reflect(incidentDir, smoothN));

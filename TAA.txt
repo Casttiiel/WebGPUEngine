@@ -4,7 +4,6 @@ TAA — Planning de implementación paso a paso
 
 **Objetivo**: evitar artefactos en situaciones problemáticas conocidas.
 
-- [ ] **SSR Vibra**
 - [ ] **Dynamic Objects**
 - [ ] **Transparencias**: escribir motion vectors como si fueran sólidas si opacity > 0.5, o renderizar transparencias después de TAA
 - [ ] **Partículas y efectos**: marcar con "responsive AA" flag — blend factor `0.5` forzado para que no acumulen ghosting
