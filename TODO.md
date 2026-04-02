@@ -1,17 +1,16 @@
 ### Engine
 
-1. Blender Export with player spawn
-2. Glass (Uncharted)
-3. Enemy AI
+1. Glass (Uncharted)
+2. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo
    └── PathFollower / Steering (seek + arrive)
    → El enemigo ahora rodea obstáculos
-4. GI Precomputed + probes
-5. SSR Temporal
-6. HZB Pocho
-7. TAA: Dynamic Objects
+3. GI Precomputed + probes
+4. SSR Temporal
+5. HZB Pocho
+6. TAA: Dynamic Objects
 
 ## Gameplay
 

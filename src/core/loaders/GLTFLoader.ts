@@ -102,12 +102,23 @@ export class GLTFLoader {
       if (mesh) {
         nodeEntity = this.processMeshNode(node, folderName);
       } else {
-        nodeEntity = {
-          children: [],
-          components: {
-            transform: {},
-          },
-        };
+        const extras = node.getExtras() as Record<string, unknown> | null;
+        if (extras && extras['type'] === 'player_spawn') {
+          nodeEntity = {
+            children: [],
+            components: {
+              transform: this.getNodeTransform(node),
+              player_spawn: {},
+            },
+          };
+        } else {
+          nodeEntity = {
+            children: [],
+            components: {
+              transform: {},
+            },
+          };
+        }
       }
 
       if (node.listChildren().length > 0) {

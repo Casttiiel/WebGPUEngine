@@ -8,6 +8,8 @@ import { KeyCode } from '../../types/KeyCode.enum';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { CharacterControllerComponent } from '../../components/game/CharacterControllerComponent';
+import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
+import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
 import { LinearInterpolator } from '../../core/math/Interpolators';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { GUIManager } from '../../core/debug/GUIManager';
@@ -51,6 +53,19 @@ export class ModuleBoot extends Module {
     LoadingStatus.updateStatus('Loading entities...');
     tStep = performance.now();
     await Loader.loadSceneFromJSON(flaggedJson);
+
+    // Teleport player to spawn point if a player_spawn marker was found in the scene's GLTF
+    const spawnPos = PlayerSpawnComponent.pendingPosition;
+    if (spawnPos) {
+      const playerEntity = Engine.getEntities().getEntityByName('Player');
+      if (playerEntity) {
+        const capsule = playerEntity.getComponent('capsule_collider') as CapsuleColliderComponent;
+        capsule
+          ?.getRigidBody()
+          ?.setTranslation({ x: spawnPos[0], y: spawnPos[1], z: spawnPos[2] }, true);
+      }
+      PlayerSpawnComponent.pendingPosition = null;
+    }
 
     LoadingStatus.updateStatus('Creating instance groups...');
     tStep = performance.now();
