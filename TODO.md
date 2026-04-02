@@ -1,15 +1,11 @@
 ### Engine
 
-1. Froxel Density Volumes
-2. Enemy AI
+1. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo
    └── PathFollower / Steering (seek + arrive)
-   → El enemigo ahora rodea obstáculos
-3. GI Precomputed + probes
-4. SSR Temporal
-5. HZB Pocho
+   → El enemigo ahora rodea obstáculos 3. GI Precomputed + probes 4. SSR Temporal 5. HZB Pocho
 
 ## Gameplay
 

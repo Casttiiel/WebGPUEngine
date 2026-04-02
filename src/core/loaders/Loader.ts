@@ -57,6 +57,7 @@ import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
 import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
 import { WeaponComponent } from '../../components/game/WeaponComponent';
+import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -359,6 +360,8 @@ export class Loader {
         return new ContactShadowsComponent();
       case 'god_rays':
         return new GodRaysComponent();
+      case 'fog_volume':
+        return new FogVolumeComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

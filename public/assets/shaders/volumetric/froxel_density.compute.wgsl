@@ -14,6 +14,7 @@
 @group(3) @binding(0) var noiseTex: texture_2d<f32>;
 @group(3) @binding(1) var noiseSampler: sampler;
 @group(3) @binding(2) var linearDepth: texture_2d<f32>;
+@group(3) @binding(3) var<uniform> fogVolumeData: FogVolumeData;
 
 // Triplanar sample of the RGB tileable noise texture at a given world position and scale.
 // Uses the 3 channels for independent variation across projections.
@@ -47,6 +48,60 @@ fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
 
     // FBM weights: 1 + 0.5 + 0.25 = 1.75
     return (n1 + n2 * 0.5 + n3 * 0.25) / 1.75;
+}
+
+// -----------------------------------------------------------------------
+// Fog Volume SDF helpers
+// -----------------------------------------------------------------------
+
+/// Signed distance to an axis-aligned box centered at the origin.
+fn sdfBox(p: vec3<f32>, halfExtents: vec3<f32>) -> f32 {
+    let d = abs(p) - halfExtents;
+    return length(max(d, vec3<f32>(0.0))) + min(max(d.x, max(d.y, d.z)), 0.0);
+}
+
+/// Signed distance to a sphere centered at the origin.
+fn sdfSphere(p: vec3<f32>, radius: f32) -> f32 {
+    return length(p) - radius;
+}
+
+/// Applies all active fog volumes on top of the base sigmaS / sigmaT values.
+/// Returns vec2(finalSigmaS, finalSigmaT).
+fn applyFogVolumes(worldPos: vec3<f32>, baseSigmaS: f32, baseSigmaT: f32) -> vec2<f32> {
+    var outS = baseSigmaS;
+    var outT = baseSigmaT;
+
+    for (var i = 0u; i < fogVolumeData.count; i++) {
+        let vol = fogVolumeData.volumes[i];
+
+        // Signed distance from froxel world position to volume surface
+        let localPos = worldPos - vol.center;
+        var sdf: f32;
+        if (vol.shape < 0.5) {
+            // Sphere — halfExtents.x stores the radius
+            sdf = sdfSphere(localPos, vol.halfExtents.x);
+        } else {
+            // Box
+            sdf = sdfBox(localPos, vol.halfExtents);
+        }
+
+        // blend = 1 inside, smoothly falls to 0 over [0, falloff] outside the surface
+        let blend = saturate(smoothstep(0.0, vol.falloff, -sdf));
+
+        if (blend > 0.0) {
+            if (vol.blendMode < 0.5) {
+                // "add" — accumulate density on top of the global fog
+                outS += vol.sigmaS * blend;
+                outT += vol.sigmaT * blend;
+            } else {
+                // "override" — lerp toward the volume's density (clears fog in interiors)
+                outS = mix(outS, vol.sigmaS, blend);
+                outT = mix(outT, vol.sigmaT, blend);
+            }
+        }
+    }
+
+    return vec2<f32>(outS, outT);
 }
 
 @compute @workgroup_size(8, 8, 4)
@@ -115,7 +170,10 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let sigmaS = densityFinal * volumetricParams.scatteringCoeff;
   let sigmaA = densityFinal * volumetricParams.absorptionCoeff;
   let sigmaT = sigmaS + sigmaA;
+
+  // Apply world-space density volumes (SDF blend)
+  let finalParams = applyFogVolumes(froxelWS, sigmaS, sigmaT);
   
   // Store density in 3D texture (R32F format)
-  textureStore(froxelDensityTexture, froxelCoord, vec4<f32>(sigmaS, sigmaT, 0.0, 0.0));
+  textureStore(froxelDensityTexture, froxelCoord, vec4<f32>(finalParams.x, finalParams.y, 0.0, 0.0));
 }

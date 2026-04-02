@@ -25,7 +25,8 @@
     "projectile",
     "bullet_pool",
     "weapon",
-    "trail_renderer"
+    "trail_renderer",
+    "fog_volume"
   ],
   "render_debug": []
 }

@@ -233,6 +233,35 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * Extended density input layout adding binding(3) for the fog volume uniform buffer.
+   * Used exclusively by the density pipeline so other pipelines are unaffected.
+   */
+  public static getDensityInputWithFogVolumeLayout(): GPUBindGroupLayout {
+    return this.getLayout('density_input_with_fog_volume', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   public static getSSRUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('ssr_uniforms', [
       {

@@ -15,6 +15,7 @@ import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { RenderTarget } from '../resources/RenderTarget';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { Wind } from '../../core/engine/Wind';
+import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 
 /**
  * Modern Froxel-based Volumetric Scattering System
@@ -76,7 +77,7 @@ export class FroxelVolumetricScattering {
   private densityTexturesBindGroup!: GPUBindGroup;
   private cameraBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 0.1;
+  private fogDensity: number = 0.0001;
   private scatteringCoeff: number = 1.0;
   private absorptionCoeff: number = 0.2; // Aumentado para god rays más definidos (antes 1.5)
   private multipleScatteringBoost: number = 1.3; // Energy compensation for multiple scattering (1.1-1.6)
@@ -104,6 +105,20 @@ export class FroxelVolumetricScattering {
   private selfOcclusionIOBindGroup!: GPUBindGroup;
   private selfOcclusionDirLightBindGroup!: GPUBindGroup;
   private lastCameraBuffer: GPUBuffer | null = null;
+  private fogVolumeBuffer!: GPUBuffer;
+
+  private static readonly MAX_FOG_VOLUMES = 16;
+  /** Floats per FogVolume (64 bytes / 4 = 16 floats). Must match WGSL struct layout. */
+  private static readonly FOG_VOLUME_FLOATS = 16;
+  /** Bytes per FogVolume entry. */
+  private static readonly FOG_VOLUME_STRIDE = 64;
+  /**
+   * Total fog volume buffer size:
+   *   4 × u32 header (count + 3 padding = 16 bytes) +
+   *   MAX_VOLUMES × FOG_VOLUME_STRIDE (1024 bytes) = 1040 bytes.
+   */
+  private static readonly FOG_VOLUME_BUFFER_SIZE =
+    16 + FroxelVolumetricScattering.MAX_FOG_VOLUMES * FroxelVolumetricScattering.FOG_VOLUME_STRIDE;
 
   private pointLightTexturesBindGroups: Map<PointLightComponent, GPUBindGroup[]> = new Map();
   private pointLightDataBindGroups: Map<PointLightComponent, GPUBindGroup> = new Map();
@@ -196,7 +211,7 @@ export class FroxelVolumetricScattering {
         BindGroupFactory.getCameraComputeLayout(),
         BindGroupFactory.getFroxelParametersLayout(),
         BindGroupFactory.getFroxelDensityTexturesLayout(),
-        BindGroupFactory.getDensityInputTextureLayout(),
+        BindGroupFactory.getDensityInputWithFogVolumeLayout(),
       ],
     );
 
@@ -399,6 +414,12 @@ export class FroxelVolumetricScattering {
       16,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
+
+    this.fogVolumeBuffer = GPUUtils.createBuffer(
+      'froxel_fog_volume_data',
+      FroxelVolumetricScattering.FOG_VOLUME_BUFFER_SIZE,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
   }
 
   private createBindGroups(): void {
@@ -507,7 +528,7 @@ export class FroxelVolumetricScattering {
     if (!this.noiseTextureBindGroup) {
       this.noiseTextureBindGroup = BindGroupFactory.createBindGroup(
         'froxel_directional_light_noise_texture_bind_group',
-        BindGroupFactory.getDensityInputTextureLayout(),
+        BindGroupFactory.getDensityInputWithFogVolumeLayout(),
         [
           {
             binding: 0,
@@ -520,6 +541,10 @@ export class FroxelVolumetricScattering {
           {
             binding: 2,
             resource: linearDepth.getRenderView(),
+          },
+          {
+            binding: 3,
+            resource: { buffer: this.fogVolumeBuffer },
           },
         ],
       );
@@ -995,6 +1020,30 @@ export class FroxelVolumetricScattering {
       const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
       const ambientUniform = new Float32Array([0.7, 0.8, 0.9, ambientData.globalFactor]);
       this.device.queue.writeBuffer(this.ambientUniformBuffer, 0, ambientUniform.buffer);
+    }
+
+    // Upload fog volume instances collected from ECS
+    if (this.fogVolumeBuffer) {
+      const fogVolumeList = Engine.getEntities().getObjectManagerByName('fog_volume')?.getList() as
+        | FogVolumeComponent[]
+        | undefined;
+      const count = Math.min(
+        fogVolumeList?.length ?? 0,
+        FroxelVolumetricScattering.MAX_FOG_VOLUMES,
+      );
+
+      // Buffer: 16 bytes header (count u32 + 3 u32 padding) + MAX_VOLUMES * 64 bytes volumes
+      const rawBuffer = new ArrayBuffer(FroxelVolumetricScattering.FOG_VOLUME_BUFFER_SIZE);
+      const u32View = new Uint32Array(rawBuffer, 0, 4);
+      const f32View = new Float32Array(rawBuffer, 16); // volumes start at byte 16
+      u32View[0] = count;
+      if (fogVolumeList) {
+        for (let i = 0; i < count; i++) {
+          const vol = fogVolumeList[i];
+          if (vol) f32View.set(vol.getGPUData(), i * FroxelVolumetricScattering.FOG_VOLUME_FLOATS);
+        }
+      }
+      this.device.queue.writeBuffer(this.fogVolumeBuffer, 0, rawBuffer);
     }
 
     if (!this.parametersBindGroup && this.froxelUniformBuffer && this.volumetricUniformBuffer) {

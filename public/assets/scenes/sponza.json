@@ -44,5 +44,23 @@
   },
   {
     "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "components": {
+      "name": "FogVolumeBox",
+      "transform": {
+        "position": [0, 3, 0],
+        "scale": [1, 1, 1]
+      },
+      "fog_volume": {
+        "shape": "box",
+        "size": [5, 5, 6],
+        "density": 0.01,
+        "scatteringCoeff": 1.0,
+        "absorptionCoeff": 0.2,
+        "falloff": 3.0,
+        "blendMode": "add"
+      }
+    }
   }
 ]
