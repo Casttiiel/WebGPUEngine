@@ -43,6 +43,8 @@ export class Camera {
   private jitterIndex: number = 0;
   private jitterOffsetX: number = 0;
   private jitterOffsetY: number = 0;
+  private prevJitterOffsetX: number = 0;
+  private prevJitterOffsetY: number = 0;
 
   private uniformData = new Float32Array(128); // 512 bytes / 4 = 128 floats
 
@@ -52,11 +54,17 @@ export class Camera {
   private readonly TIME_RESET_INTERVAL = 3600.0; // Reset every hour to avoid float precision loss
 
   // Jitter patterns
-  private static readonly JITTER_2X2: [number, number][] = [
-    [0.25, 0.25],
-    [0.75, 0.25],
-    [0.25, 0.75],
-    [0.75, 0.75],
+  // Halton(2,3) 8-point sequence — indexed from 1, centred around 0.5
+  // Better sample distribution than 2×2 grid: avoids clumping, superior TAA convergence.
+  private static readonly HALTON_8: [number, number][] = [
+    [0.5, 1.0 / 3.0],
+    [0.25, 2.0 / 3.0],
+    [0.75, 1.0 / 9.0],
+    [0.125, 4.0 / 9.0],
+    [0.625, 7.0 / 9.0],
+    [0.375, 2.0 / 9.0],
+    [0.875, 5.0 / 9.0],
+    [0.0625, 8.0 / 9.0],
   ];
 
   // Viewport
@@ -352,7 +360,15 @@ export class Camera {
     const [jx, jy] = this.getJitterOffset();
     this.uniformData[92] = jx;
     this.uniformData[93] = jy;
-    // _pad0 (offset 94-95): left as zero from array initialization
+    // prevJitterOffset (offset 94-95 = 376-383 bytes) vec2 — jitter from the previous frame
+    // Used by TAA to remove jitter contribution from motion vectors of static geometry.
+    this.uniformData[94] = this.prevJitterOffsetX;
+    this.uniformData[95] = this.prevJitterOffsetY;
+    // mipBias (offset 96 = 384 bytes): -0.5 when jitter is active (TAA), 0.0 otherwise.
+    // GBuffer shaders use this to request a half-mip-level sharper sample each frame;
+    // TAA accumulation then recovers the expected detail without perceptual blur.
+    this.uniformData[96] = this.jitterEnabled ? -0.5 : 0.0;
+    this.uniformData[97] = 0.0; // _pad_mip
 
     // Single GPU write instead of 7 separate writes
     GPUUtils.writeBuffer(this.uniformBuffer, 0, this.uniformData);
@@ -525,6 +541,8 @@ export class Camera {
     this.jitterEnabled = false;
     this.jitterOffsetX = 0;
     this.jitterOffsetY = 0;
+    this.prevJitterOffsetX = 0;
+    this.prevJitterOffsetY = 0;
     this.isDirty = true;
     this.updateProjection();
   }
@@ -536,16 +554,19 @@ export class Camera {
   public nextJitter(): void {
     if (!this.jitterEnabled) return;
 
-    // Get next jitter offset from pattern
-    const pattern = Camera.JITTER_2X2[this.jitterIndex];
-    this.jitterIndex = (this.jitterIndex + 1) % Camera.JITTER_2X2.length;
+    // Save current jitter as previous before advancing
+    this.prevJitterOffsetX = this.jitterOffsetX / 2.0;
+    this.prevJitterOffsetY = this.jitterOffsetY / 2.0;
 
-    // Convert from [0,1] range to NDC offset
-    // Subtract 0.5 to center the pattern around origin
+    // Get next jitter offset from Halton(2,3) 8-point sequence
+    const pattern = Camera.HALTON_8[this.jitterIndex];
+    this.jitterIndex = (this.jitterIndex + 1) % Camera.HALTON_8.length;
+
+    // NDC offset: jitter = (halton - 0.5) * 2.0 / screenSize
+    // Stored as UV-space first (divide by size), then *2 for projection matrix column offsets.
     const offsetX = (pattern[0] - 0.5) / this.viewport.width;
     const offsetY = (pattern[1] - 0.5) / this.viewport.height;
 
-    // Store jitter offsets (multiplied by 2 for projection matrix)
     this.jitterOffsetX = 2.0 * offsetX;
     this.jitterOffsetY = 2.0 * offsetY;
 
@@ -555,6 +576,12 @@ export class Camera {
 
   public getJitterOffset(): [number, number] {
     return [this.jitterOffsetX / 2.0, this.jitterOffsetY / 2.0];
+  }
+
+  /** Returns the jitter UV-space offset from the previous frame. Used by TAA to cancel
+   *  the jitter contribution from static-geometry motion vectors. */
+  public getPrevJitterOffset(): [number, number] {
+    return [this.prevJitterOffsetX, this.prevJitterOffsetY];
   }
 
   /**

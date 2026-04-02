@@ -32,10 +32,10 @@ struct VertexOutput {
 @fragment
 fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // 1. Sample depth del frame actual
-    let depth = textureSample(gLinearDepth, samplerGBuffer, input.Uv).x;
+    let linearDepth = textureSample(gLinearDepth, samplerGBuffer, input.Uv).x;
     
     // Early exit si es skybox (depth = 1.0)
-    if (depth >= 0.9999) {
+    if (linearDepth >= 0.9999) {
         return vec4<f32>(0.0, 0.0, 0.0, 0.0);
     }
     
@@ -43,9 +43,21 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // IMPORTANTE: NO usar camera.invViewProjection aquí — ese tiene el jitter del frame actual
     // incorporado. El jitter alterna signo cada frame, por lo que worldPos oscilaría
     // ligeramente cada frame → velocity oscila → vibración de cámara.
+    //
+    // gLinearDepth almacena depth lineal = dot(worldPos-camPos, camFront) / cameraFar [0..1].
+    // La matriz invVP espera NDC Z (no lineal, perspectiveZO de gl-matrix [0..1]).
+    // Conversión: near = P[14]/P[10], ndcZ = far*(viewZ-near) / (viewZ*(far-near))
+    // donde viewZ = linearDepth * far.
+    let P10  = camera.projectionMatrix[2][2]; // far / (near - far)  — siempre negativo
+    let P14  = camera.projectionMatrix[3][2]; // near * far / (near - far)
+    let near = P14 / P10;                     // = near (positivo)
+    let far  = camera.cameraFar;
+    let viewZ = linearDepth * far;            // view-space depth (positivo, distancia a cámara)
+    // perspectiveZO NDC Z ∈ [0,1]: 0 en near, 1 en far
+    let ndcZ = far * (viewZ - near) / (viewZ * (far - near));
+
     let ndcX = input.Uv.x * 2.0 - 1.0;
     let ndcY = (1.0 - input.Uv.y) * 2.0 - 1.0; // Invertir Y (texture UV vs NDC)
-    let ndcZ = depth;
     let ndcW = 1.0;
     
     let clipSpacePos = vec4<f32>(ndcX, ndcY, ndcZ, ndcW);

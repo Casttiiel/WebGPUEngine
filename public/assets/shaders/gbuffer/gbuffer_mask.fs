@@ -22,7 +22,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let jitter_px = camera.jitterOffset * camera.screenSize;
     let uvUnjittered = Uv - dpdx(Uv) * jitter_px.x - dpdy(Uv) * jitter_px.y;
 
-    let albedo_color = textureSample(txAlbedo, samplerState, uvUnjittered);
+    let albedo_color = textureSampleBias(txAlbedo, samplerState, uvUnjittered, camera.mipBias);
     
     if(albedo_color.a < 0.5){
         discard;
@@ -32,16 +32,16 @@ fn fs(input: VertexOutput) -> FragmentOutput {
 
     let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
     output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
-    output.albedo.a = textureSample(txMetallic, samplerState, uvUnjittered).b * factors.metallicFactor;
+    output.albedo.a = textureSampleBias(txMetallic, samplerState, uvUnjittered, camera.mipBias).b * factors.metallicFactor;
 
     // Obtener la normal del normal map
-    let N_tangent_space = textureSample(txNormal, samplerState, uvUnjittered) * 2.0 - 1.0;
+    let N_tangent_space = textureSampleBias(txNormal, samplerState, uvUnjittered, camera.mipBias) * 2.0 - 1.0;
     
     // Calcular TBN y transformar la normal
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);    
     
-    let roughness_raw = textureSample(txRoughness, samplerState, uvUnjittered).g * factors.roughnessFactor;
+    let roughness_raw = textureSampleBias(txRoughness, samplerState, uvUnjittered, camera.mipBias).g * factors.roughnessFactor;
     let dndx = dpdx(N);
     let dndy = dpdy(N);
     let variance      = dot(dndx, dndx) + dot(dndy, dndy);
@@ -50,7 +50,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let roughness     = sqrt(rough2);
     let encodedNormal = normalToOctahedral01(N);
 
-    let emissive = textureSample(txEmissive, samplerState, uvUnjittered).x * factors.emissiveFactor;
+    let emissive = textureSampleBias(txEmissive, samplerState, uvUnjittered, camera.mipBias).x * factors.emissiveFactor;
 
     // Pack octahedral normal + roughness en RGBA8
     output.normal = vec4<f32>(

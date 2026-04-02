@@ -97,6 +97,17 @@ export class VelocityBufferManager {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    // Bind group is created once — only buffer *contents* change per frame via writeBuffer.
+    // Bind groups reference the GPUBuffer objects, not their data, so no recreation needed.
+    this.velocityBindGroup = BindGroupFactory.createBindGroup(
+      'velocity_generation_bindgroup',
+      this.velocityTechnique.getPipeline()!.getBindGroupLayout(2),
+      [
+        { binding: 0, resource: { buffer: this.previousVPBuffer } },
+        { binding: 1, resource: { buffer: this.currentUnjitteredInvVPBuffer } },
+      ],
+    );
+
     this.isInitialized = true;
   }
 
@@ -149,15 +160,17 @@ export class VelocityBufferManager {
       return;
     }
 
-    // Upload current unjittered inv VP (for world-position reconstruction in shader)
+    // Upload both matrices — bind group references the buffers, GPU reads data at draw time
+    this.device.queue.writeBuffer(
+      this.previousVPBuffer,
+      0,
+      new Float32Array(this.previousViewProjection as unknown as ArrayLike<number>),
+    );
     this.device.queue.writeBuffer(
       this.currentUnjitteredInvVPBuffer,
       0,
       new Float32Array(currentUnjitteredInvVP as unknown as ArrayLike<number>),
     );
-
-    // Crear bind group con matrices current y previous
-    this.createVelocityBindGroup();
 
     // Ejecutar velocity generation pass manualmente
     this.executeVelocityPass(gBufferBindGroup);
@@ -188,30 +201,6 @@ export class VelocityBufferManager {
 
     renderPass.end();
     this.device.queue.submit([commandEncoder.finish()]);
-  }
-
-  /**
-   * Crea el bind group para la generación del velocity buffer
-   */
-  private createVelocityBindGroup(): void {
-    // Reuse the pre-allocated buffer — just upload new data (zero GPU allocation)
-    this.device.queue.writeBuffer(
-      this.previousVPBuffer,
-      0,
-      new Float32Array(this.previousViewProjection as unknown as ArrayLike<number>),
-    );
-
-    // Bind group layout (group 2):
-    // binding(0) = previousUnjitteredVP     — reproject world pos to last frame's screen
-    // binding(1) = currentUnjitteredInvVP   — reconstruct world pos without jitter offset
-    this.velocityBindGroup = BindGroupFactory.createBindGroup(
-      'velocity_generation_bindgroup',
-      this.velocityTechnique.getPipeline()!.getBindGroupLayout(2),
-      [
-        { binding: 0, resource: { buffer: this.previousVPBuffer } },
-        { binding: 1, resource: { buffer: this.currentUnjitteredInvVPBuffer } },
-      ],
-    );
   }
 
   /**

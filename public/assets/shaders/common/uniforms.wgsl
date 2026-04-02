@@ -16,7 +16,15 @@ struct CameraUniforms {
     // Used by GBuffer shaders to unjitter texture UVs and prevent TAA-induced texture blur.
     // Multiply by screenSize to get pixel-space offsets.
     jitterOffset: vec2<f32>,
-    _pad0: vec2<f32>,                 // padding to keep struct size a multiple of 16 bytes
+    // Jitter offset from the previous frame (UV space). Used by TAA to remove
+    // the jitter contribution from static-geometry motion vectors.
+    prevJitterOffset: vec2<f32>,
+    // Negative mip bias applied to all GBuffer texture samples when camera jitter is
+    // active (TAA enabled).  Value = -0.5 → one half mip sharper per frame; the TAA
+    // accumulation then converges to a result that is net-sharper than no jitter.
+    // Reads 0.0 when jitter is disabled so non-TAA paths are unaffected.
+    mipBias: f32,
+    _pad_mip: f32,  // align to vec2 boundary
 }
 
 struct OldCameraUniforms {

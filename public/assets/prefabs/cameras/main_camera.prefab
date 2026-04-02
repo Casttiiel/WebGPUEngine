@@ -3,7 +3,7 @@
       "name": "MainCamera",
       "camera": {},
       "tone_mapping": {},
-      "fxaa": {}, 
+      "taa": {}, 
       "ambient_occlusion": {},
       "bloom": {},
       "auto_exposure": {},

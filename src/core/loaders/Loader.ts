@@ -39,6 +39,7 @@ import { AreaLightComponent } from '../../components/render/AreaLightComponent';
 import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
 import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
 import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
+import { TAAComponent } from '../../components/render/TAAComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { HeadTiltComponent } from '../../components/game/HeadTiltComponent';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
@@ -284,6 +285,8 @@ export class Loader {
         return new SMAAComponent();
       case 'smaa_t2x':
         return new SMAAT2xComponent();
+      case 'taa':
+        return new TAAComponent();
       case 'reflection_probe':
         return new ReflectionProbeComponent();
       case 'ambient_occlusion':

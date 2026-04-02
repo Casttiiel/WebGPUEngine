@@ -20,9 +20,9 @@ fn triplanarSample(
     blend: vec3<f32>,
     scale: f32
 ) -> vec4<f32> {
-    let xProj = textureSample(tex, smp, worldPos.yz * scale);
-    let yProj = textureSample(tex, smp, worldPos.xz * scale);
-    let zProj = textureSample(tex, smp, worldPos.xy * scale);
+    let xProj = textureSampleBias(tex, smp, worldPos.yz * scale, camera.mipBias);
+    let yProj = textureSampleBias(tex, smp, worldPos.xz * scale, camera.mipBias);
+    let zProj = textureSampleBias(tex, smp, worldPos.xy * scale, camera.mipBias);
 
     return xProj * blend.x + yProj * blend.y + zProj * blend.z;
 }
@@ -41,9 +41,9 @@ fn triplanarNormal(
     scale: f32
 ) -> vec3<f32> {
     // Leer los 3 normales proyectados
-    let nX = textureSample(tex, smp, worldPos.yz * scale).xyz * 2.0 - 1.0;
-    let nY = textureSample(tex, smp, worldPos.xz * scale).xyz * 2.0 - 1.0;
-    let nZ = textureSample(tex, smp, worldPos.xy * scale).xyz * 2.0 - 1.0;
+    let nX = textureSampleBias(tex, smp, worldPos.yz * scale, camera.mipBias).xyz * 2.0 - 1.0;
+    let nY = textureSampleBias(tex, smp, worldPos.xz * scale, camera.mipBias).xyz * 2.0 - 1.0;
+    let nZ = textureSampleBias(tex, smp, worldPos.xy * scale, camera.mipBias).xyz * 2.0 - 1.0;
 
     // Asignar los ejes correctos (son "normales en espacio de proyección")
     let nx = vec3<f32>(nX.z, nX.x, nX.y);

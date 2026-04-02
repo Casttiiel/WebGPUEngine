@@ -20,6 +20,7 @@ import { MotionBlurComponent } from '../../components/render/MotionBlurComponent
 import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
+import { TAAComponent } from '../../components/render/TAAComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
@@ -262,6 +263,9 @@ export class ModuleRender extends Module {
     for (const comp of Engine.getEntities().getObjectManagerByName('smaa_t2x')?.getList() ?? []) {
       (comp as SMAAT2xComponent).resize();
     }
+    for (const comp of Engine.getEntities().getObjectManagerByName('taa')?.getList() ?? []) {
+      (comp as TAAComponent).resize();
+    }
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -334,7 +338,8 @@ export class ModuleRender extends Module {
       this.mainCamera = camera;
 
       // Enable camera jittering if temporal AA components are present
-      const needsJitter = mainCameraEntity?.hasComponent('smaa_t2x');
+      const needsJitter =
+        mainCameraEntity?.hasComponent('smaa_t2x') || mainCameraEntity?.hasComponent('taa');
 
       if (needsJitter && !camera.isJitterEnabled()) {
         camera.enableJitter();
@@ -366,7 +371,8 @@ export class ModuleRender extends Module {
       Profiler.getInstance().cpu.begin('Post-Process');
       // Enable velocity buffer if any component needs it
       const velocityMgr = VelocityBufferManager.getInstance();
-      const needsVelocity = mainCameraEntity?.hasComponent('smaa_t2x');
+      const needsVelocity =
+        mainCameraEntity?.hasComponent('smaa_t2x') || mainCameraEntity?.hasComponent('taa');
       velocityMgr.setEnabled(needsVelocity);
       // Generar velocity buffer si está activo
       if (velocityMgr.isEnabled()) {
@@ -443,6 +449,13 @@ export class ModuleRender extends Module {
             }
           }
           result = godRays.apply(result, this.deferred.getGBufferBindGroup());
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('taa')) {
+        const taa = mainCameraEntity.getComponent('taa') as TAAComponent;
+        if (taa.hasLoaded()) {
+          result = taa.apply(result, this.deferred.getLinearDepthView());
         }
       }
 

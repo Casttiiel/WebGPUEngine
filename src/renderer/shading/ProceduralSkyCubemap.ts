@@ -50,7 +50,9 @@ const FACE_TARGETS: Array<[[number, number, number], [number, number, number]]> 
 //   cameraFar: f32             =   4 B
 //   -----------------------------------
 //   Total                      = 368 B
-const CAMERA_UNIFORM_BYTES = 384;
+// Must match the full CameraUniforms struct size in uniforms.wgsl / Camera.ts (512 bytes).
+// Keep in sync whenever new fields are added to CameraUniforms.
+const CAMERA_UNIFORM_BYTES = 512;
 
 export class ProceduralSkyCubemap {
   private cubemapTexture!: GPUTexture;

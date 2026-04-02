@@ -1,11 +1,11 @@
 ### Engine
 
-1. GI Precomputed + probes o Staggered/Radiance cascades
-2. AA/TAA
-3. HZB Pocho
-4. Froxel Self Occlusion
-5. Froxel Density Volumes
-6. Consistency between dither / Dither size
+1. AA/TAA
+2. Froxel Self Occlusion
+3. Froxel Temporal Fixes
+4. GI Precomputed + probes
+5. HZB Pocho
+6. Froxel Density Volumes
 7. Enemy AI
    Fase 2 — Navegación real
    ├── Waypoint graph (authorado en Blender → JSON)
