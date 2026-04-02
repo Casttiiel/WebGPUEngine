@@ -500,3 +500,60 @@ export class HeightFogRenderPass extends PostProcessingRenderPass {
     pass.setBindGroup(2, this.paramsBindGroup);
   }
 }
+
+/**
+ * Lens flare occlusion mask render pass (Step 1).
+ * Renders a quarter-resolution sky-visibility mask near the sun disc.
+ * group(0) = CameraUniforms (auto), group(1) = GBuffer, group(2) = LensFlareParams.
+ */
+export class LensFlareOcclusionRenderPass extends PostProcessingRenderPass {
+  private gBufferBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.gBufferBindGroup = gBufferBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.gBufferBindGroup);
+    pass.setBindGroup(2, this.paramsBindGroup);
+  }
+}
+
+/**
+ * Lens flare composite render pass (Step 2).
+ * Additively blends all flare elements (glow, ghosts, ring, streak) onto the
+ * full-resolution HDR frame using the occlusion mask for visibility gating.
+ * group(0) = CameraUniforms (auto), group(1) = occlusion mask, group(2) = LensFlareParams.
+ */
+export class LensFlareCompositeRenderPass extends PostProcessingRenderPass {
+  private occlusionBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    occlusionBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.occlusionBindGroup = occlusionBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.occlusionBindGroup);
+    pass.setBindGroup(2, this.paramsBindGroup);
+  }
+}

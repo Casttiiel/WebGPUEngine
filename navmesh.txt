@@ -1,0 +1,65 @@
+Plan: NavMesh + IA + Probe Auto-Placement
+Respuesta a tu pregunta: Sí, la NavMesh sirve perfectamente para ambas cosas. Los puntos accesibles de la NavMesh son exactamente donde el jugador y los enemigos van a estar → donde más importan las reflecciones. Es arquitectura elegante, cero trabajo duplicado.
+
+FASE 1 — NavMesh: Exportación y carga
+Blender:
+
+Crear malla simplificada de navegación del nivel (solo suelo accesible, sin paredes)
+Añadir custom property al objeto: type = "navmesh" → esto aparece en GLTF como node.extras.type
+Exportar dentro del GLTF del nivel normal (o como navmesh.gltf separado)
+GLTFLoader.ts — en processNodeList() interceptar nodos donde node.getExtras()?.type === "navmesh":
+
+Extraer vértices (vec3[]) e índices (u32[]) del mesh
+Saltar creación de entidad render (no se dibuja en escena)
+Pasar a NavMeshBuilder.build(vertices, indices)
+NavMesh.ts / NavMeshBuilder.ts (nuevos en src/ai/nav/):
+
+Construye lista de triángulos, centroide por triangulo
+Detecta adyacencia (triángulos que comparten arista) → grafo de adyacencia
+Singleton con findClosestTriangle(worldPos), isPointOnMesh(p)
+FASE 2 — A* y Path Following para la IA
+AStar.ts (nuevo en src/ai/nav/):
+
+findPath(startPos, goalPos): vec3[]
+Snap de ambas posiciones al triángulo más cercano
+A* sobre grafo de centroides, heurística Euclidea con binary heap
+String-pulling (Simple Stupid Funnel Algorithm) para eliminar zigzag → waypoints limpios
+Nuevos BT Action Nodes:
+
+RequestPathAction — llama AStar.findPath(), escribe resultado en blackboard('currentPath'); devuelve FAILURE si unreachable
+FollowPathAction — lee currentPath, mueve enemigo waypoint a waypoint, pop al llegar (dist < threshold)
+EnemyControllerComponent.ts — reemplazar BT:
+
+
+Selector  └─ Sequence [canSeePlayer → RequestPathAction → FollowPathAction]  └─ Idle
+FASE 3 — Auto-Placement de Reflection Probes
+ProbeAutoPlacement.ts (nuevo en shading). Corre en debug/editor mode ("debugProbeAutoPlace": true en environment.json), nunca en release:
+
+Muestreo: centroide de cada triángulo de NavMesh + grid 3m para no duplicar → lista de N candidatos
+Clasificación interior/exterior: Rapier.castRay(punto, up, toi=20) — si hay hit → INTERIOR; sin hit → EXTERIOR (exterior usa IBL global del skybox, no necesita probe local)
+Clustering: grid 3D de celdas 5×5×5m sobre candidatos interiores → un probe por celda, posición = centroide del grupo + 1.5m vertical
+Output: JSON { position, estimatedExtents }[] → el artista lo usa en Blender para colocar cámaras de bake → exporta Probe_N_env.png + Probe_N_irradiance.png
+FASE 4 — Runtime Multi-Probe Blending
+ReflectionProbeComponent.ts: N probes en scene JSON con extents (box collider ya existente como volumen de influencia)
+AmbientLight / DeferredRenderer: pasar array de hasta 4 probes simultáneos al shader (cabe en uniform sin allocación dinámica)
+Fragment shader (ambient.fs): blend por distancia + box-intersection weight + parallax correction individual por probe
+Archivos afectados
+Archivo	Tipo
+src/ai/nav/NavMesh.ts	Nuevo
+src/ai/nav/NavMeshBuilder.ts	Nuevo
+src/ai/nav/AStar.ts	Nuevo
+src/ai/nodes/RequestPathAction.ts	Nuevo
+src/ai/nodes/FollowPathAction.ts	Nuevo
+GLTFLoader.ts	Modif — hook navmesh
+EnemyControllerComponent.ts	Modif — BT nuevo
+src/renderer/shading/ProbeAutoPlacement.ts	Nuevo
+ReflectionProbeComponent.ts	Modif — multi-probe
+public/assets/shaders/ambient/ambient.fs	Modif — blend 4 probes
+public/assets/meshes/sponza/navmesh.gltf	Asset artista
+Decisiones clave
+NavMesh en GLTF del nivel via extras.type = "navmesh" — no fichero separado, unificado con el resto del nivel
+A* sobre centroides de triángulos + string-pulling — sencillo, sin grid auxiliar de altura
+Auto-placement es OFFLINE (debug mode) — el artista bake desde esas posiciones en Blender; no hay RT capture en runtime (no prioritario)
+Cap 4 probes en shader — sin allocación dinámica, encaja en WebGPU uniform limits
+Exterior = solo IBL global — el skybox ya cubre el exterior; los probes son exclusivamente para interiores donde el skybox no es visible
+Para implementarlo cambia al modo Edit y dilo. Las fases son independientes entre sí — Fase 1+2 (IA) y Fase 3+4 (probes) pueden hacerse en paralelo una vez la NavMesh está cargada.

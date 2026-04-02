@@ -25,6 +25,8 @@ import {
   GodRaysRadialRenderPass,
   GodRaysKawaseRenderPass,
   GodRaysCompositeRenderPass,
+  LensFlareOcclusionRenderPass,
+  LensFlareCompositeRenderPass,
 } from './PostProcessingRenderPasses';
 import { FullScreenPass } from './BaseRenderPass';
 import { RenderPassFactory } from './RenderPassFactory';
@@ -577,6 +579,60 @@ export class RenderPassManager {
       inputBindGroup,
       paramsBindGroup,
       exposureBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Lens flare occlusion mask pass (Step 1).
+   * Renders a quarter-resolution sky-visibility mask around the sun disc.
+   * group(1) = GBuffer, group(2) = LensFlareParams.
+   */
+  public executeLensFlareOcclusionPass(
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      { width: result.getWidth(), height: result.getHeight() },
+      'Lens Flare Occlusion',
+    );
+    const pass = new LensFlareOcclusionRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      gBufferBindGroup,
+      paramsBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Lens flare composite pass (Step 2).
+   * Additively blends flare elements (glow, ghosts, ring, streak) onto the HDR frame.
+   * group(1) = occlusion mask, group(2) = LensFlareParams.
+   */
+  public executeLensFlareCompositePass(
+    mesh: Mesh,
+    technique: Technique,
+    hdrView: GPUTextureView,
+    occlusionBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
+      hdrView,
+      undefined,
+      'Lens Flare Composite',
+    );
+    const pass = new LensFlareCompositeRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      occlusionBindGroup,
+      paramsBindGroup,
     );
     this.executeDynamicPass(pass);
   }

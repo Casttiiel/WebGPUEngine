@@ -52,6 +52,7 @@ import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComp
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
+import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
@@ -360,6 +361,8 @@ export class Loader {
         return new ContactShadowsComponent();
       case 'god_rays':
         return new GodRaysComponent();
+      case 'lens_flare':
+        return new LensFlareComponent();
       case 'fog_volume':
         return new FogVolumeComponent();
       default:

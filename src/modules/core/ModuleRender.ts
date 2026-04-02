@@ -34,6 +34,7 @@ import { AutoExposureComponent } from '../../components/render/AutoExposureCompo
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
+import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { Profiler } from '../../core/debug/Profiler';
@@ -308,6 +309,10 @@ export class ModuleRender extends Module {
       (comp as GodRaysComponent).resize();
     }
 
+    for (const comp of Engine.getEntities().getObjectManagerByName('lens_flare')?.getList() ?? []) {
+      (comp as LensFlareComponent).resize();
+    }
+
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -458,6 +463,13 @@ export class ModuleRender extends Module {
             }
           }
           result = godRays.apply(result, this.deferred.getGBufferBindGroup());
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('lens_flare')) {
+        const lensFlare = mainCameraEntity.getComponent('lens_flare') as LensFlareComponent;
+        if (lensFlare.hasLoaded()) {
+          result = lensFlare.apply(result, this.deferred.getGBufferBindGroup());
         }
       }
 
