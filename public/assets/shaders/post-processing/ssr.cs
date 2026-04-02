@@ -44,23 +44,16 @@ fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
 }
 
 // ── View-space helper: project a view-space position to screen UV + linear depth ──
-// Uses the jittered projectionMatrix but then removes the jitter from the UV so
-// that hit lookups into gLinearDepth and accLight address the same texel every
-// frame for a perfectly static reflection.  Without this correction the hit UV
-// shifts by ±½ pixel each frame → TAA sees it as temporal noise and clamps it away.
-//
-// Derivation (Y flipped, jitterOffset from Camera.ts = NDC/2):
-//   uv_unjit.x = uv_jit.x + jitterOffset.x
-//   uv_unjit.y = uv_jit.y - jitterOffset.y
+// Projects using the UNJITTERED projection matrix so hit UVs are stable every frame.
+// Using the jittered matrix would shift the resulting UV by ±jitterOffset each frame,
+// causing TAA to see every SSR texel as "moving" and clamp/ghost it — no manual
+// sign arithmetic needed when the matrix itself has no jitter baked in.
 fn viewToScreen(viewPos: vec3<f32>) -> vec3<f32> {
-    let clip  = camera.projectionMatrix * vec4<f32>(viewPos, 1.0);
+    let clip  = camera.unjitteredProjectionMatrix * vec4<f32>(viewPos, 1.0);
     let ndc   = clip.xyz / clip.w;
     var uv    = ndc.xy * 0.5 + 0.5;
     uv.y      = 1.0 - uv.y;
-    // Remove TAA jitter so SSR hit UVs are stable across frames.
-    uv.x     += camera.jitterOffset.x;
-    uv.y     -= camera.jitterOffset.y;
-    let depth = -viewPos.z / camera.cameraFar; // normalised linear depth [0,1]
+    let depth = -viewPos.z / camera.cameraFar;
     return vec3<f32>(uv, depth);
 }
 
@@ -151,7 +144,14 @@ fn performSSRMarch(
             let distFade  = 1.0 - saturate(hitDist / maxDistance);  // distant hits fade to IBL
             let edgeFade  = calculateEdgeFade(hitUV);                // screen-border hits fade to IBL
             let roughFade = 1.0 - smoothstep(0.0, 0.4, roughness);   // rough surfaces fall back to IBL
-            let finalFade = edgeFade * roughFade;//distFade not used
+            // Slab-depth fade: smoothstep from full alpha at the front of the thickness slab
+            // to zero at its back face.  With jitter, a pixel near the hit/miss boundary would
+            // otherwise alternate between alpha=finalFade and alpha=0 every frame (the ray
+            // barely hits / barely misses).  This ramp turns that cliff into a gradient so TAA
+            // can accumulate it smoothly instead of flickering between two discrete values.
+            let slabT     = 1.0 - saturate((scr.z - sceneDep) / adaptiveThickness);
+            let slabFade  = smoothstep(0.0, 1.0, slabT);
+            let finalFade = edgeFade * roughFade * slabFade; //distFade not used
             return vec4<f32>(hitColor.rgb, finalFade);
         }
     }
@@ -177,18 +177,14 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
 
-    // uvNoJitter: remove TAA jitter from the screen UV so all GBuffer reads that
-    // feed ray construction use a stable texel address every frame.
-    // Convention matches viewToScreen(): unjit.x = uv.x - jitterOffset.x
-    //                                    unjit.y = uv.y + jitterOffset.y  (Y flipped)
-    let uvNoJitter = vec2<f32>(uv.x - camera.jitterOffset.x, uv.y + camera.jitterOffset.y);
-
-    var g = decodeGBuffer(uv);
-    // Override worldPos: decodeGBuffer calls getWorldCoords(uv,...) which unprojects
-    // through jittered NDC → ray origin shifts ±½ pixel every frame → different
-    // geometry intersected at grazing angles → alpha/hit flickering.
-    // Re-reconstruct using the unjittered UV for a stable ray origin.
-    g.worldPos = getWorldCoords(uvNoJitter, g.zlinear, camera);
+    // uv is pixel-center: (coords + 0.5) / dims — a fixed stable value that never
+    // changes between frames for this invocation. There is no jitter to remove here.
+    // Jitter only affects GBuffer *content* (which sub-pixel point was rasterised);
+    // it does NOT move the UV we use to look up that content.
+    // The ONLY place jitter removal is needed is viewToScreen() below — where a 3D
+    // point is projected through the jittered projectionMatrix and the resulting UV
+    // must be un-shifted before sampling gLinearDepth / accLight.
+    let g = decodeGBuffer(uv);
 
     // Soft metallic fade: ramps 0→1 between metallic 0.1 and 0.4, giving smooth
     // SSR entry on partially metallic materials instead of a hard cutoff.
@@ -201,20 +197,21 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
 
-    // Mip-smoothed normal for ray direction — suppresses normal-map high-frequency
+    // Mip-smoothed normal for ray direction: suppresses normal-map high-frequency
     // detail that causes adjacent pixels to fire divergent rays (sparkle noise).
-    // Rougher surfaces sample higher mips for more spatially averaged normals.
-    // Sampled at uvNoJitter (declared above) for the same stability reason.
+    // Rougher surfaces sample higher mips → more spatially averaged normals.
     let smoothMip   = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
-    let smoothNData = textureSampleLevel(gNormals, samplerGBuffer, uvNoJitter, smoothMip);
+    let smoothNData = textureSampleLevel(gNormals, samplerGBuffer, uv, smoothMip);
     let smoothN       = normalize(octahedral01ToNormal(smoothNData.xy));
     let incidentDir   = normalize(g.worldPos - camera.cameraPosition.xyz);
     let smoothReflDir = normalize(reflect(incidentDir, smoothN));
 
-    // Per-pixel noise seed for temporal dithering — alternates with TAA's Halton
-    // sequence so consecutive frames cover complementary ray portions.
-    // Uses a simple interleaved gradient noise based on pixel position.
-    let pixelSeed = fract(sin(dot(vec2<f32>(coords), vec2<f32>(12.9898, 78.233))) * 43758.5453);
+    // Per-pixel temporal dither seed — must vary each frame so TAA integrates
+    // different ray offsets over time rather than seeing a static noise pattern.
+    // camera.time increases every frame, golden-ratio step ensures good
+    // low-discrepancy distribution across the 8-frame Halton sequence.
+    let seed      = f32(coords.x) * 0.5 + f32(coords.y) * 1.5 + camera.time * 0.61803398;
+    let pixelSeed = fract(seed);
 
     // Raw hit color — BRDF applied once in ambient_specular.fs (with Kulla-Conty).
     // metallicFade baked into alpha for smooth SSR entry on partially metallic surfaces.

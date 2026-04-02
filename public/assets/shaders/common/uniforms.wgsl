@@ -25,6 +25,10 @@ struct CameraUniforms {
     // Reads 0.0 when jitter is disabled so non-TAA paths are unaffected.
     mipBias: f32,
     _pad_mip: f32,  // align to vec2 boundary
+    // Projection matrix WITHOUT jitter — used by SSR viewToScreen() to project 3D hits
+    // into stable screen UVs without relying on manual jitter-offset sign arithmetic.
+    // Uploading the pre-built matrix avoids any sign convention confusion.
+    unjitteredProjectionMatrix: mat4x4<f32>,
 }
 
 struct OldCameraUniforms {

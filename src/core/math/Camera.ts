@@ -369,6 +369,9 @@ export class Camera {
     // TAA accumulation then recovers the expected detail without perceptual blur.
     this.uniformData[96] = this.jitterEnabled ? -0.5 : 0.0;
     this.uniformData[97] = 0.0; // _pad_mip
+    // unjitteredProjectionMatrix (offset 98-113 = 392-455 bytes) mat4x4
+    // Used by SSR viewToScreen() to project view-space hit positions without jitter.
+    this.uniformData.set(this.unjitteredProjection, 98);
 
     // Single GPU write instead of 7 separate writes
     GPUUtils.writeBuffer(this.uniformBuffer, 0, this.uniformData);
