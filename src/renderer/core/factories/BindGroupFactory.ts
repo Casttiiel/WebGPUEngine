@@ -510,6 +510,15 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
+      {
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          viewDimension: 'cube',
+          sampleType: 'float',
+          multisampled: false,
+        },
+      },
     ]);
   }
   public static getBufferUniformLayout(): GPUBindGroupLayout {

@@ -10,6 +10,13 @@ export { Selector } from './nodes/Selector';
 // Leaf nodes
 export { Action } from './nodes/Action';
 export { Condition } from './nodes/Condition';
+export { RequestPathAction } from './nodes/RequestPathAction';
+export { FollowPathAction } from './nodes/FollowPathAction';
 
 // Decorators
 export { Inverter, AlwaysSucceed, Repeat } from './nodes/Decorators';
+
+// Navigation
+export { NavMesh } from './nav/NavMesh';
+export { NavMeshBuilder } from './nav/NavMeshBuilder';
+export { AStar } from './nav/AStar';

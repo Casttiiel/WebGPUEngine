@@ -18,6 +18,7 @@ import { MipmapGenerator } from '../../renderer/core/processing/MipmapGenerator'
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { ResourceType } from '../../types/ResourceType.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
+import { ProbeAutoPlacement } from '../../renderer/shading/ProbeAutoPlacement';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { Wind } from '../../core/engine/Wind';
@@ -128,6 +129,10 @@ export class ModuleEnvironmentManager extends Module {
       if (this.blendState.blendedWeight >= 1.0) {
         this.blendState = null;
       }
+    }
+
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F7)) {
+      ProbeAutoPlacement.generate();
     }
 
     if (Engine.getInput().isKeyJustPressed(KeyCode.F8)) {

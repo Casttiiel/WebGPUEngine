@@ -7,6 +7,7 @@ import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { Texture } from '../resources/Texture';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { ProbeManager } from '../core/managers/ProbeManager';
 
 export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
@@ -24,6 +25,10 @@ export class AmbientLight {
 
   /** Cached views for bind-group invalidation on resize or SSGI toggle. */
   private lastAoView: GPUTextureView | null = null;
+
+  /** Cached probe views for bind-group invalidation when the player moves between probes. */
+  private lastProbeAView: GPUTextureView | null = null;
+  private lastProbeBView: GPUTextureView | null = null;
 
   private brdfLUT!: Texture;
 
@@ -55,9 +60,20 @@ export class AmbientLight {
     gBufferBindGroup: GPUBindGroup,
     aoResult: GPUTextureView,
   ): void {
-    if (!this.ambientDiffuseBindGroup || this.lastAoView !== aoResult) {
-      this.createAmbientDiffuseBindGroup(aoResult);
+    const probeViews = this._getProbeViews();
+    const probeAChanged = probeViews.viewA !== this.lastProbeAView;
+    const probeBChanged = probeViews.viewB !== this.lastProbeBView;
+
+    if (
+      !this.ambientDiffuseBindGroup ||
+      this.lastAoView !== aoResult ||
+      probeAChanged ||
+      probeBChanged
+    ) {
+      this.createAmbientDiffuseBindGroup(aoResult, probeViews.viewA, probeViews.viewB);
       this.lastAoView = aoResult;
+      this.lastProbeAView = probeViews.viewA;
+      this.lastProbeBView = probeViews.viewB;
     }
     const render = Render.getInstance();
 
@@ -131,7 +147,11 @@ export class AmbientLight {
     pass.end();
   }
 
-  private createAmbientDiffuseBindGroup(aoResult: GPUTextureView): void {
+  private createAmbientDiffuseBindGroup(
+    aoResult: GPUTextureView,
+    irradianceViewA: GPUTextureView,
+    irradianceViewB: GPUTextureView,
+  ): void {
     this.ambientDiffuseBindGroup = BindGroupFactory.createBindGroup(
       'ambient_bindgroup',
       this.ambientDiffuseTechnique.getPipeline().getBindGroupLayout(2),
@@ -150,9 +170,7 @@ export class AmbientLight {
         },
         {
           binding: 3,
-          resource: Engine.getEnvironmentManager()
-            .getAmbientLightData()
-            .irradianceCubemap.getTextureView()!,
+          resource: irradianceViewA,
         },
         {
           binding: 4,
@@ -163,6 +181,10 @@ export class AmbientLight {
         {
           binding: 5,
           resource: this.brdfLUT.getTextureView()!,
+        },
+        {
+          binding: 6,
+          resource: irradianceViewB,
         },
       ],
     );
@@ -214,7 +236,9 @@ export class AmbientLight {
     this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
     this.ambientDiffuseUniformArray[1] = ambientData.diffuseFactor;
     this.ambientDiffuseUniformArray[2] = 0.0;
-    this.ambientDiffuseUniformArray[3] = 0.0;
+    // [3] = probeBlendWeight — updated by _getProbeViews() side-effect via renderDiffuse
+    const blend = ProbeManager.getInstance().getBlendedProbes();
+    this.ambientDiffuseUniformArray[3] = blend.probeB !== null ? blend.blendWeight : 0.0;
     GPUUtils.writeBuffer(this.ambientDiffuseUniformBuffer, 0, this.ambientDiffuseUniformArray);
 
     this.ambientSpecularUniformArray[0] = ambientData.globalFactor;
@@ -237,5 +261,22 @@ export class AmbientLight {
     this.ambientDiffuseBindGroup = null!;
     this.ambientSpecularBindGroup = null!;
     this.lastAoView = null;
+    this.lastProbeAView = null;
+    this.lastProbeBView = null;
+  }
+
+  /**
+   * Returns the irradiance cubemap views to bind for the two dominant probes.
+   * Falls back to the global/environment irradiance when no probe covers the player.
+   */
+  private _getProbeViews(): { viewA: GPUTextureView; viewB: GPUTextureView } {
+    const globalView = Engine.getEnvironmentManager()
+      .getAmbientLightData()
+      .irradianceCubemap.getTextureView()!;
+
+    const blend = ProbeManager.getInstance().getBlendedProbes();
+    const viewA = blend.probeA?.getIrradianceView() ?? globalView;
+    const viewB = blend.probeB?.getIrradianceView() ?? viewA;
+    return { viewA, viewB };
   }
 }

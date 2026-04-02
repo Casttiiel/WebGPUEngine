@@ -13,6 +13,7 @@ import { mat4 } from 'gl-matrix';
 import { BlendModes } from '../../types/BlendModes.enum';
 import { DepthModes } from '../../types/DepthModes.enum';
 import { QualitySettings } from '../engine/QualitySettings';
+import { NavMeshBuilder } from '../../ai/nav/NavMeshBuilder';
 
 export class GLTFLoader {
   // Singleton para no re-registrar ~40 extensiones en cada carga
@@ -100,7 +101,14 @@ export class GLTFLoader {
       const mesh = node.getMesh();
       let nodeEntity = null;
       if (mesh) {
-        nodeEntity = this.processMeshNode(node, folderName);
+        const meshExtras = node.getExtras() as Record<string, unknown> | null;
+        if (meshExtras && meshExtras['type'] === 'navmesh') {
+          this.processNavMeshNode(node);
+          // Invisible placeholder — navmesh is never rendered
+          nodeEntity = { children: [], components: { transform: {} } };
+        } else {
+          nodeEntity = this.processMeshNode(node, folderName);
+        }
       } else {
         const extras = node.getExtras() as Record<string, unknown> | null;
         if (extras && extras['type'] === 'player_spawn') {
@@ -417,6 +425,39 @@ export class GLTFLoader {
     // Strip leading "./" so URIs like "./textures/foo.png" don't produce double path segments
     const texName = texture.getURI().replace(/^\.\//, '');
     return `${gltfBaseName}/${texName}`;
+  }
+
+  private static processNavMeshNode(node: Node): void {
+    const mesh = node.getMesh()!;
+    const primitive = mesh.listPrimitives()[0];
+    if (!primitive) return;
+
+    const posAttr = primitive.getAttribute('POSITION');
+    const indicesAcc = primitive.getIndices();
+    if (!posAttr || !indicesAcc) {
+      console.warn('[GLTFLoader] NavMesh node has no POSITION or indices — skipped.');
+      return;
+    }
+
+    const positions = posAttr.getArray() as Float32Array;
+    const indices = indicesAcc.getArray() as Uint32Array | Uint16Array;
+    const worldMatrix = this.getNodeMatrix(node);
+    NavMeshBuilder.build(positions, indices, worldMatrix);
+  }
+
+  /** Reconstructs the node's local-to-parent matrix from its TRS (or stored matrix). */
+  private static getNodeMatrix(node: Node): mat4 {
+    const out = mat4.create();
+    const stored = node.getMatrix();
+    if (stored) {
+      for (let i = 0; i < 16; i++) out[i] = stored[i]!;
+      return out;
+    }
+    const t = node.getTranslation();
+    const r = node.getRotation();
+    const s = node.getScale();
+    mat4.fromRotationTranslationScale(out, r as any, t as any, s as any);
+    return out;
   }
 
   private static getNodeTransform(node: Node): TransformComponentDataType {

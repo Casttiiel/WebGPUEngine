@@ -7,6 +7,8 @@ import { TransformComponent } from '../core/TransformComponent';
 import { Blackboard } from '../../ai/Blackboard';
 import { BehaviorTree } from '../../ai/BehaviorTree';
 import { Action, Condition, Selector, Sequence, Status } from '../../ai';
+import { RequestPathAction } from '../../ai/nodes/RequestPathAction';
+import { FollowPathAction } from '../../ai/nodes/FollowPathAction';
 import { BehaviorNode } from '../../ai/BehaviorNode';
 import { EnemyControllerComponentDataType } from '../../types/EnemyControllerComponentData.type';
 
@@ -238,27 +240,14 @@ export class EnemyControllerComponent extends Component {
   protected buildTree(): BehaviorNode {
     return new Selector(
       [
-        // ── Priority 1: Chase player when visible ──────────────────────────
+        // ── Priority 1: Navigate to player when visible ────────────────────
         new Sequence([
           new Condition('CanSeePlayer', (bb) => bb.get<boolean>('canSeePlayer', false)),
-          new Action('ChasePlayer', (bb) => {
-            const self = bb.get<EnemyControllerComponent>('self')!;
-            const myPos = bb.get<vec3>('position')!;
-            const target = bb.get<vec3>('playerPosition')!;
-
-            const toTarget = vec3.subtract(vec3.create(), target, myPos);
-            toTarget[1] = 0; // ignore Y — horizontal only
-            const dist = vec3.length(toTarget);
-
-            // Stop and succeed when within melee range
-            if (dist < 1.5) return Status.SUCCESS;
-
-            // Move toward player
-            vec3.normalize(toTarget, toTarget);
-            self.setDesiredHorizontal(toTarget);
-            self.faceToward(target);
-            return Status.RUNNING;
-          }),
+          // Request a NavMesh path (A*). Returns FAILURE if NavMesh not built or
+          // goal unreachable — falls through to Idle so the enemy doesn't freeze.
+          new RequestPathAction(),
+          // Follow the computed path waypoint-by-waypoint.
+          new FollowPathAction(),
         ]),
 
         // ── Priority 2: Idle ───────────────────────────────────────────────

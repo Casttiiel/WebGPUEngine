@@ -8,7 +8,7 @@ struct AmbientUniforms {
     globalAmbientBoost: f32,
     diffuseBoost:       f32,
     padding:        f32,
-    padding2:      f32, 
+    probeBlendWeight: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -24,6 +24,7 @@ struct AmbientUniforms {
 @group(2) @binding(3) var irradianceMap:    texture_cube<f32>;
 @group(2) @binding(4) var samplerIrradiance: sampler;
 @group(2) @binding(5) var brdfLUT:         texture_2d<f32>;
+@group(2) @binding(6) var irradianceMapB:   texture_cube<f32>;
 
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
@@ -32,7 +33,9 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let NdV = max(dot(N, V), 0.0);
 
     let irradianceDir = N;
-    let irradiance = textureSample(irradianceMap, samplerIrradiance, irradianceDir).rgb;
+    let irradianceA = textureSample(irradianceMap, samplerIrradiance, irradianceDir).rgb;
+    let irradianceB = textureSample(irradianceMapB, samplerIrradiance, irradianceDir).rgb;
+    let irradiance = mix(irradianceA, irradianceB, ambient.probeBlendWeight);
 
     // Use LUT-integrated directional albedo E = brdf.x + brdf.y for kD so that
     // energy conservation is consistent with the Kulla-Conty splitSum in the specular pass.
