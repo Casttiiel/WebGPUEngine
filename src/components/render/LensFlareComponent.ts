@@ -184,6 +184,10 @@ export class LensFlareComponent extends Component {
     let sunR = 1.0;
     let sunG = 0.95;
     let sunB = 0.8;
+    // Luminance-scaled effective intensity (accounts for day/night brightness).
+    let effectiveIntensity = this.intensity;
+    // Only render when the sun is in front of the camera and within screen bounds.
+    let sunInFront = false;
 
     try {
       const cameraEntity = Engine.getEntities().getEntityByName('MainCamera');
@@ -204,6 +208,15 @@ export class LensFlareComponent extends Component {
         sunG = color[1] ?? 0.95;
         sunB = color[2] ?? 0.8;
 
+        // Effective luminance = perceptual luminance × light intensity, normalised
+        // against typical sun max (10.0).  This correctly distinguishes:
+        //   Day sun  : color luma ≈ 0.96 × intensity 10  → normalised ≈ 0.96 → flare full
+        //   Night moon: color luma ≈ 0.70 × intensity 0.2 → normalised ≈ 0.014 → flare ~0%
+        const colorLuminance = sunR * 0.2126 + sunG * 0.7152 + sunB * 0.0722;
+        const lightIntensity = dl.getIntensity();
+        const normalised = Math.min(1.0, (colorLuminance * lightIntensity) / 10.0);
+        effectiveIntensity = this.intensity * Math.pow(Math.max(0, normalised), 2.0);
+
         const farDist = 1e5;
         this.sunWorld[0] = camPos[0] + dir[0] * farDist;
         this.sunWorld[1] = camPos[1] + dir[1] * farDist;
@@ -212,9 +225,18 @@ export class LensFlareComponent extends Component {
 
         vec4.transformMat4(this.clipPos, this.sunWorld, vp);
 
+        // clipPos[3] (w) > 0 means the point is in front of the near plane.
+        // Additionally guard against degenerate NDC coords far outside screen
+        // bounds (NDC magnitude > 3 in either axis means deeply off-screen).
         if (this.clipPos[3] > 0.0) {
           sunNdcX = this.clipPos[0] / this.clipPos[3];
           sunNdcY = this.clipPos[1] / this.clipPos[3];
+
+          // Only mark in-front if NDC is within a generous off-screen margin.
+          // The shader's edge-fade handles the [1, 2] range smoothly.
+          if (Math.abs(sunNdcX) < 3.0 && Math.abs(sunNdcY) < 3.0) {
+            sunInFront = true;
+          }
         }
       }
     } catch {
@@ -223,8 +245,8 @@ export class LensFlareComponent extends Component {
 
     this.paramsData[0] = sunNdcX;
     this.paramsData[1] = sunNdcY;
-    this.paramsData[2] = this.intensity;
-    this.paramsData[3] = this.isEnabled ? 1.0 : 0.0;
+    this.paramsData[2] = effectiveIntensity;
+    this.paramsData[3] = this.isEnabled && sunInFront ? 1.0 : 0.0;
     this.paramsData[4] = sunR;
     this.paramsData[5] = sunG;
     this.paramsData[6] = sunB;

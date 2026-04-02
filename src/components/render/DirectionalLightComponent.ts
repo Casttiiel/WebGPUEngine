@@ -711,6 +711,10 @@ export class DirectionalLightComponent extends Component {
     this.intensity = intensity;
   }
 
+  public getIntensity(): number {
+    return this.intensity;
+  }
+
   public setLightDirection(direction: vec3): void {
     vec3.normalize(this.lightDirection, direction);
   }
