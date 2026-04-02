@@ -5,7 +5,11 @@
    ├── Waypoint graph (authorado en Blender → JSON)
    ├── A\* sobre el grafo
    └── PathFollower / Steering (seek + arrive)
-   → El enemigo ahora rodea obstáculos 3. GI Precomputed + probes 4. SSR Temporal 5. HZB Pocho
+   → El enemigo ahora rodea obstáculos
+2. GI Precomputed + probes
+3. SSR Temporal
+4. HZB Pocho
+5. TAA: Dynamic Objects
 
 ## Gameplay
 

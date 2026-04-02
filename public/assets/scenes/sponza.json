@@ -43,13 +43,22 @@
     "prefab": "lighting/spot_light.prefab"
   },
   {
+    "prefab": "effects/cube_transparent.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 3, 7],
+        "scale": [1, 1, 1]
+      }
+    }
+  },
+  {
     "prefab": "lighting/directional_light.prefab"
   },
   {
     "components": {
       "name": "FogVolumeBox",
       "transform": {
-        "position": [0, 3, 0],
+        "position": [0, 10, 0],
         "scale": [1, 1, 1]
       },
       "fog_volume": {

@@ -10,7 +10,7 @@
             "maxParticles": 1000,
             "emissionRate": 10,
             "spawnRadius": [1.0, 1.0, 1.0],
-            "velocitySpread": 0.5,
+            "velocitySpread": 1.5,
             "baseVelocity": [0, 0, 0],
             "gravity": [0, 0.0, 0],
             "startSize": 0.05,
@@ -18,8 +18,8 @@
             "particleLife": 0.0,
             "particleLifeVarianceMin": 0.5,
             "particleLifeVarianceMax": 1.5,
-            "startColor": [1.0, 0.5, 0.0, 1.0],
-            "endColor": [1.0, 1.0, 1.0, 1.0]
+            "startColor": [1.0, 0.5, 0.0, 0.1],
+            "endColor": [1.0, 1.0, 1.0, 0.5]
         }
     }
 }
