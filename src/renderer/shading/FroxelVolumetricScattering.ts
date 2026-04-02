@@ -963,12 +963,12 @@ export class FroxelVolumetricScattering {
     const froxelWindScale = FroxelVolumetricScattering.FROXEL_WORLD_SPEED_SCALE * Wind.speed;
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
     const cam = (mainCamera?.getComponent('camera') as CameraComponent | undefined)?.getCamera();
-    const cameraFar  = cam?.getFar()  ?? 1000;
+    const cameraFar = cam?.getFar() ?? 1000;
     const cameraTime = cam?.getTime() ?? 0;
     this.volumetricUniformData[offset++] = Wind.getDirX() * froxelWindScale; // windDir.x
-    this.volumetricUniformData[offset++] = cameraFar;                        // windDir.y — actual cameraFar for raymarch depth
+    this.volumetricUniformData[offset++] = cameraFar; // windDir.y — actual cameraFar for raymarch depth
     this.volumetricUniformData[offset++] = Wind.getDirZ() * froxelWindScale; // windDir.z
-    this.volumetricUniformData[offset++] = cameraTime;                       // windDir.w — temporal noise animation
+    this.volumetricUniformData[offset++] = cameraTime; // windDir.w — temporal noise animation
 
     // Froxel grid parameters
     offset = 0;
