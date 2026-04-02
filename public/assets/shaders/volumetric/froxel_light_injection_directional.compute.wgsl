@@ -12,6 +12,9 @@
 
 @group(2) @binding(0) var froxelLightTexture: texture_storage_3d<rgba16float, write>;
 @group(2) @binding(1) var<uniform> ambientLight: AmbientLightUniforms;
+// Self-occlusion transmittance computed by froxel_self_occlusion pass.
+// Value of 1.0 = full light, 0.0 = fully occluded by the medium itself.
+@group(2) @binding(2) var froxelSelfOcclusionTexture: texture_3d<f32>;
 
 @group(3) @binding(0) var<uniform> directionalLight: DirectionalLightCSMUniforms;
 @group(3) @binding(1) var shadowMap0: texture_depth_2d;
@@ -126,9 +129,14 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     // Peso típico: casi todo Mie para shafts
     let phase = mix(phaseRayleigh, phaseMie, 0.9);
 
+    // Self-occlusion: transmittance of the participating medium between this
+    // froxel and the directional light source (computed by froxel_self_occlusion pass).
+    // 1.0 = full light reaches here, 0.0 = fully occluded by the fog itself.
+    let selfShadow = textureLoad(froxelSelfOcclusionTexture, froxelCoord, 0).r;
+
     // Aplicar phase function directamente (sin mezclar con isotropic)
     // Esto da god rays claros cuando miras hacia la luz directional
-    let scattering = ambientScattering + (directionalScattering * visibility * phase);
+    let scattering = ambientScattering + (directionalScattering * visibility * selfShadow * phase);
     
     textureStore(froxelLightTexture, froxelCoord, vec4<f32>(scattering, 0.0));
 }

@@ -765,6 +765,16 @@ export class BindGroupFactory {
           type: 'uniform',
         },
       },
+      {
+        // Self-occlusion transmittance texture (read-only, r32float)
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
     ]);
   }
 
@@ -941,6 +951,53 @@ export class BindGroupFactory {
           format: 'rg32float',
           viewDimension: '3d',
         }, // Output density texture
+      },
+    ]);
+  }
+
+  /**
+   * Layout for the self-occlusion compute pass (@group(2)):
+   *   binding 0 — density texture (read, unfilterable-float 3D)
+   *   binding 1 — self-occlusion texture (write, r32float storage 3D)
+   */
+  public static getFroxelSelfOcclusionIOLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_self_occlusion_io_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only',
+          format: 'r32float',
+          viewDimension: '3d',
+        },
+      },
+    ]);
+  }
+
+  /**
+   * Layout for reading the self-occlusion texture in the directional injection
+   * pass (@group(4)):
+   *   binding 0 — self-occlusion texture (read, unfilterable-float 3D)
+   */
+  public static getFroxelSelfOcclusionReadLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_self_occlusion_read_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'unfilterable-float',
+          viewDimension: '3d',
+          multisampled: false,
+        },
       },
     ]);
   }

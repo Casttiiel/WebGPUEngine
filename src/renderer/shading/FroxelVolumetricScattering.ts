@@ -40,6 +40,9 @@ export class FroxelVolumetricScattering {
   private volumetricIntegrationComputeShader!: GPUShaderModule;
   private volumetricIntegrationComputePipeline!: GPUComputePipeline;
 
+  private selfOcclusionShader!: GPUShaderModule;
+  private selfOcclusionPipeline!: GPUComputePipeline;
+
   private directionalLightInjectionShader!: GPUShaderModule;
   private directionalLightInjectionPipeline!: GPUComputePipeline;
 
@@ -66,12 +69,14 @@ export class FroxelVolumetricScattering {
 
   private froxelLightTextureViewA!: GPUTextureView; // Siempre apunta a froxel_light_3d
   private froxelLightTempTextureViewB!: GPUTextureView; // Siempre apunta a froxel_light_3d_temp
+  private froxelSelfOcclusionTexture!: GPUTexture;
+  private froxelSelfOcclusionTextureView!: GPUTextureView;
 
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
   private cameraBindGroup!: GPUBindGroup;
 
-  private fogDensity: number = 0.0;
+  private fogDensity: number = 0.1;
   private scatteringCoeff: number = 1.0;
   private absorptionCoeff: number = 0.2; // Aumentado para god rays más definidos (antes 1.5)
   private multipleScatteringBoost: number = 1.3; // Energy compensation for multiple scattering (1.1-1.6)
@@ -96,6 +101,8 @@ export class FroxelVolumetricScattering {
   private rayMarchBindGroup!: GPUBindGroup;
   private ambientBindGroup!: GPUBindGroup;
   private directionalLightDataBindGroup!: GPUBindGroup;
+  private selfOcclusionIOBindGroup!: GPUBindGroup;
+  private selfOcclusionDirLightBindGroup!: GPUBindGroup;
   private lastCameraBuffer: GPUBuffer | null = null;
 
   private pointLightTexturesBindGroups: Map<PointLightComponent, GPUBindGroup[]> = new Map();
@@ -150,6 +157,15 @@ export class FroxelVolumetricScattering {
     this.directionalLightInjectionShader = this.device.createShaderModule({
       label: 'Froxel Directional Light Injection Compute Shader',
       code: directionalLightInjectionCode,
+    });
+
+    const selfOcclusionCode = await ResourceManager.loadShader(
+      'volumetric/froxel_self_occlusion.compute.wgsl',
+    );
+
+    this.selfOcclusionShader = this.device.createShaderModule({
+      label: 'Froxel Self-Occlusion Compute Shader',
+      code: selfOcclusionCode,
     });
 
     const pointLightInjectionCode = await ResourceManager.loadShader(
@@ -221,7 +237,7 @@ export class FroxelVolumetricScattering {
       [
         BindGroupFactory.getCameraComputeLayout(),
         BindGroupFactory.getFroxelParametersLayout(),
-        BindGroupFactory.getAmbientLightInjectionTexturesLayout(),
+        BindGroupFactory.getAmbientLightInjectionTexturesLayout(), // includes self-occlusion at binding 2
         BindGroupFactory.getDirectionalLightDataLayout(),
       ],
     );
@@ -237,6 +253,27 @@ export class FroxelVolumetricScattering {
 
     this.directionalLightInjectionPipeline =
       PipelineFactory.createComputePipeline(directionalLightConfig);
+
+    const selfOcclusionPipelineLayout = PipelineFactory.createPipelineLayout(
+      'froxel_self_occlusion_pipeline_layout',
+      [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getFroxelSelfOcclusionIOLayout(),
+        BindGroupFactory.getFroxelLightParametersLayout(), // binding 3: dir light dir
+      ],
+    );
+
+    const selfOcclusionConfig: ComputePipelineConfig = {
+      label: 'Froxel Self-Occlusion Compute Pipeline',
+      layout: selfOcclusionPipelineLayout,
+      compute: {
+        module: this.selfOcclusionShader,
+        entryPoint: 'main',
+      },
+    };
+
+    this.selfOcclusionPipeline = PipelineFactory.createComputePipeline(selfOcclusionConfig);
 
     const pointLightInjectionPipelineLayout = PipelineFactory.createPipelineLayout(
       'froxel_point_light_injection_pipeline_layout',
@@ -332,6 +369,16 @@ export class FroxelVolumetricScattering {
 
     this.froxelLightTempTextureView = this.froxelLightTempTexture.createView();
     this.froxelLightTempTextureViewB = this.froxelLightTempTextureView;
+
+    // Self-occlusion volume: one f32 transmittance value per froxel
+    this.froxelSelfOcclusionTexture = this.device.createTexture({
+      label: 'froxel_self_occlusion_3d',
+      size: [x, y, z],
+      dimension: '3d',
+      format: 'r32float',
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    });
+    this.froxelSelfOcclusionTextureView = this.froxelSelfOcclusionTexture.createView();
   }
 
   private createUniformBuffers(): void {
@@ -420,6 +467,8 @@ export class FroxelVolumetricScattering {
 
     this.executeDensityPass(commandEncoder, linearDepth);
 
+    this.executeSelfOcclusionPass(commandEncoder);
+
     this.executeDirectionalLightInjectionPass(commandEncoder);
 
     this.executePointLightInjectionPass(commandEncoder);
@@ -493,6 +542,53 @@ export class FroxelVolumetricScattering {
     computePass.end();
   }
 
+  private executeSelfOcclusionPass(commandEncoder: GPUCommandEncoder): void {
+    const directionalLightComponent = Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList()[0] as DirectionalLightComponent;
+
+    if (!directionalLightComponent || !directionalLightComponent.getHasShadows()) {
+      // No directional light — fill self-occlusion with 1.0 (no occlusion) so
+      // the directional injection pass sees full transmittance.
+      return;
+    }
+
+    const ts = GPUProfiler.getInstance().getTimestampWrites('froxel_self_occlusion_compute');
+    const computePass = commandEncoder.beginComputePass({
+      label: 'froxel_self_occlusion_compute',
+      ...(ts ? { timestampWrites: ts } : {}),
+    });
+
+    if (!this.selfOcclusionIOBindGroup) {
+      this.selfOcclusionIOBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_self_occlusion_io_bind_group',
+        BindGroupFactory.getFroxelSelfOcclusionIOLayout(),
+        [
+          { binding: 0, resource: this.froxelDensityTextureView },
+          { binding: 1, resource: this.froxelSelfOcclusionTextureView },
+        ],
+      );
+    }
+
+    if (!this.selfOcclusionDirLightBindGroup) {
+      this.selfOcclusionDirLightBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_self_occlusion_dir_light_bind_group',
+        BindGroupFactory.getFroxelLightParametersLayout(),
+        [{ binding: 0, resource: { buffer: directionalLightComponent.getUniformBuffer() } }],
+      );
+    }
+
+    computePass.setPipeline(this.selfOcclusionPipeline);
+    computePass.setBindGroup(0, this.cameraBindGroup);
+    computePass.setBindGroup(1, this.parametersBindGroup);
+    computePass.setBindGroup(2, this.selfOcclusionIOBindGroup);
+    computePass.setBindGroup(3, this.selfOcclusionDirLightBindGroup);
+
+    const { x, y, z } = this.froxelDimensions;
+    computePass.dispatchWorkgroups(Math.ceil(x / 8), Math.ceil(y / 8), Math.ceil(z / 4));
+    computePass.end();
+  }
+
   private executeVolumetricIntegrationPass(commandEncoder: GPUCommandEncoder): void {
     const integrationTs = GPUProfiler.getInstance().getTimestampWrites(
       'froxel_volumetrict_integration_compute',
@@ -553,6 +649,10 @@ export class FroxelVolumetricScattering {
             resource: {
               buffer: this.ambientUniformBuffer,
             },
+          },
+          {
+            binding: 2,
+            resource: this.froxelSelfOcclusionTextureView,
           },
         ],
       );
@@ -963,6 +1063,7 @@ export class FroxelVolumetricScattering {
     this.froxelIntegratedTexture?.destroy();
     this.froxelLightTexture?.destroy();
     this.froxelLightTempTexture?.destroy();
+    this.froxelSelfOcclusionTexture?.destroy();
 
     this.pointLightTexturesBindGroups.clear();
     this.pointLightDataBindGroups.clear();

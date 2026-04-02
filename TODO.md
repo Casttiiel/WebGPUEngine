@@ -1,10 +1,9 @@
 ### Engine
 
-1. SSR Temporal
-2. Froxel Self Occlusion
-3. Froxel Volumetrics Temporal
-4. GI Precomputed + probes
-5. HZB Pocho
+1. Froxel Volumetrics Temporal
+2. SSR Temporal
+3. GI Precomputed + probes
+4. HZB Pocho
 
 ## Gameplay
 
