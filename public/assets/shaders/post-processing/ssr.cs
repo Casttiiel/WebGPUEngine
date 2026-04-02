@@ -90,8 +90,14 @@ fn performSSRMarch(
     reflWorld:  vec3<f32>,
     startDepth: f32,
     roughness:  f32,
+    pixelSeed:  f32,   // per-pixel noise [0,1) for temporal dithering
 ) -> vec4<f32> {
-    let maxSteps    = i32(ssrParams.maxSteps);
+    // When TAA is active, halve the step count: TAA accumulates hits from
+    // previous frames, so the effective quality matches 2× the step count.
+    // When TAA is absent (temporalMode=0) full steps are used.
+    let maxSteps    = select(i32(ssrParams.maxSteps),
+                             max(i32(ssrParams.maxSteps) / 2, 4),
+                             ssrParams.temporalMode > 0.5);
     let stepSize    = ssrParams.stepSize;
     let maxDistance = ssrParams.maxDistance;
 
@@ -103,7 +109,12 @@ fn performSSRMarch(
     if (viewDir.z > 0.0) { return vec4<f32>(0.0); }
 
     // Offset by 2 steps to avoid self-intersection with coplanar geometry
-    let viewStart = viewStartRaw + viewDir * stepSize * 2.0;
+    // Per-pixel temporal dither: offset the ray start by a fraction of one step
+    // so that adjacent pixels and consecutive frames cover different portions of
+    // the ray, hiding the reduced step count when TAA is active.  The offset is
+    // a no-op (0) when temporalMode=0 because pixelSeed is passed as 0 then.
+    let dither    = select(0.0, pixelSeed, ssrParams.temporalMode > 0.5);
+    let viewStart = viewStartRaw + viewDir * stepSize * (2.0 + dither);
     var prevVP    = viewStart;
     var currentVP = viewStart;
 
@@ -166,7 +177,18 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
 
-    let g = decodeGBuffer(uv);
+    // uvNoJitter: remove TAA jitter from the screen UV so all GBuffer reads that
+    // feed ray construction use a stable texel address every frame.
+    // Convention matches viewToScreen(): unjit.x = uv.x - jitterOffset.x
+    //                                    unjit.y = uv.y + jitterOffset.y  (Y flipped)
+    let uvNoJitter = vec2<f32>(uv.x - camera.jitterOffset.x, uv.y + camera.jitterOffset.y);
+
+    var g = decodeGBuffer(uv);
+    // Override worldPos: decodeGBuffer calls getWorldCoords(uv,...) which unprojects
+    // through jittered NDC → ray origin shifts ±½ pixel every frame → different
+    // geometry intersected at grazing angles → alpha/hit flickering.
+    // Re-reconstruct using the unjittered UV for a stable ray origin.
+    g.worldPos = getWorldCoords(uvNoJitter, g.zlinear, camera);
 
     // Soft metallic fade: ramps 0→1 between metallic 0.1 and 0.4, giving smooth
     // SSR entry on partially metallic materials instead of a hard cutoff.
@@ -182,19 +204,20 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     // Mip-smoothed normal for ray direction — suppresses normal-map high-frequency
     // detail that causes adjacent pixels to fire divergent rays (sparkle noise).
     // Rougher surfaces sample higher mips for more spatially averaged normals.
-    // Sample at unjittered UV: the GBuffer was rendered with camera jitter, so the
-    // texel addressed by `uv` shifts ±½ pixel every frame → the decoded normal
-    // oscillates slightly → reflection direction changes → different ray hits each
-    // frame → visible vibration.  Removing the jitter keeps the sample stable.
-    let uvNoJitter    = vec2<f32>(uv.x - camera.jitterOffset.x, uv.y + camera.jitterOffset.y);
-    let smoothMip     = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
-    let smoothNData   = textureSampleLevel(gNormals, samplerGBuffer, uvNoJitter, smoothMip);
+    // Sampled at uvNoJitter (declared above) for the same stability reason.
+    let smoothMip   = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
+    let smoothNData = textureSampleLevel(gNormals, samplerGBuffer, uvNoJitter, smoothMip);
     let smoothN       = normalize(octahedral01ToNormal(smoothNData.xy));
     let incidentDir   = normalize(g.worldPos - camera.cameraPosition.xyz);
     let smoothReflDir = normalize(reflect(incidentDir, smoothN));
 
+    // Per-pixel noise seed for temporal dithering — alternates with TAA's Halton
+    // sequence so consecutive frames cover complementary ray portions.
+    // Uses a simple interleaved gradient noise based on pixel position.
+    let pixelSeed = fract(sin(dot(vec2<f32>(coords), vec2<f32>(12.9898, 78.233))) * 43758.5453);
+
     // Raw hit color — BRDF applied once in ambient_specular.fs (with Kulla-Conty).
     // metallicFade baked into alpha for smooth SSR entry on partially metallic surfaces.
-    let result = performSSRMarch(g.worldPos, smoothReflDir, g.zlinear, g.roughness);
+    let result = performSSRMarch(g.worldPos, smoothReflDir, g.zlinear, g.roughness, pixelSeed);
     textureStore(outputSSR, coords, vec4<f32>(result.rgb, result.a * metallicFade));
 }

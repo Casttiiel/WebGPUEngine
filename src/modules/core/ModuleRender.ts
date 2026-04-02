@@ -361,6 +361,15 @@ export class ModuleRender extends Module {
 
       RenderManager.getInstance().setCamera(camera);
 
+      // Inform SSR whether TAA is active so it can halve its step count.
+      // TAA accumulates SSR hits across frames, so half the steps gives
+      // equivalent quality. When TAA is absent, SSR reverts to full steps.
+      const taaActive =
+        (mainCameraEntity?.hasComponent('taa') &&
+          (mainCameraEntity.getComponent('taa') as TAAComponent).hasLoaded()) ??
+        false;
+      this.deferred.setSSRTemporalMode(!!taaActive);
+
       Profiler.getInstance().cpu.begin('Deferred');
       result = this.deferred.render(mainCameraEntity);
       Profiler.getInstance().cpu.end();

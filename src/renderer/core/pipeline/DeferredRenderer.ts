@@ -34,6 +34,18 @@ export class DeferredRenderer {
   private proceduralSkyCubemap: ProceduralSkyCubemap | null = null;
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
+
+  /**
+   * Optional stable color source for SSR hit sampling.
+   * When TAA is active, set to TAAComponent.getHistoryView() before render() —
+   * the history is the previous frame's resolved (non-jittered) result which
+   * gives SSR stable hit colors.  Null falls back to the current accLight.
+   */
+  private ssrColorSource: GPUTextureView | null = null;
+
+  public setSSRColorSource(view: GPUTextureView | null): void {
+    this.ssrColorSource = view;
+  }
   private froxelVolumetrics!: FroxelVolumetricScattering;
   private ssgi!: ScreenSpaceGlobalIllumination;
   private depthPrepass!: DepthPrepass;
@@ -581,6 +593,14 @@ export class DeferredRenderer {
     this.ssr.dispose();
     this.ssr = new ScreenSpaceReflections();
     this.ssr.load();
+  }
+
+  /**
+   * Inform SSR whether TAA is currently active so it can adapt its step count.
+   * Called every frame from ModuleRender before rendering.
+   */
+  public setSSRTemporalMode(active: boolean): void {
+    this.ssr.setTemporalMode(active);
   }
 
   public resetAmbientLightResources(): void {

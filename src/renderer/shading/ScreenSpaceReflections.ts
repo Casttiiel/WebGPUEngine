@@ -42,6 +42,10 @@ export class ScreenSpaceReflections {
   private ssrOutputBindGroup: GPUBindGroup | null = null;
   private cameraComputeBindGroup: GPUBindGroup | null = null;
   private lastCameraBuffer: GPUBuffer | null = null;
+  /** Tracks which texture view is bound as the SSR color source.
+   *  When it changes (e.g. switch between accLight and TAA history after resize
+   *  or on first valid history frame) the bind group must be rebuilt. */
+  private lastAccLightsView: GPUTextureView | null = null;
 
   // ── Buffers / textures ────────────────────────────────────────────────────
   private ssrUniformBuffer!: GPUBuffer;
@@ -56,6 +60,7 @@ export class ScreenSpaceReflections {
     metallicMin: 0.4,
     roughnessMax: 0.6,
     enabled: 1.0,
+    temporalMode: 0.0, // set externally by DeferredRenderer when TAA is active
   };
 
   constructor() {}
@@ -185,6 +190,12 @@ export class ScreenSpaceReflections {
       return this.renderDisabledSSR();
     }
 
+    // Rebuild bind group whenever the color source changes (first valid TAA
+    // history frame, resize, or TAA toggled on/off).
+    if (accLights !== this.lastAccLightsView) {
+      this.ssrBindGroup = null;
+      this.lastAccLightsView = accLights;
+    }
     if (!this.ssrBindGroup) {
       this.createSSRBindGroup(accLights, ao);
     }
@@ -311,6 +322,17 @@ export class ScreenSpaceReflections {
     if (!this.isInitialized) return;
   }
 
+  /**
+   * Tell SSR whether TAA is currently active.
+   * When active, the ray marcher uses half the normal step count because TAA
+   * accumulates hits from previous frames — effective quality stays equivalent.
+   * Call this every frame (or whenever TAA state changes) from DeferredRenderer.
+   * SSR has no direct import of TAAComponent — the flag is purely a numeric hint.
+   */
+  public setTemporalMode(active: boolean): void {
+    this.debugParams.temporalMode = active ? 1.0 : 0.0;
+  }
+
   public getBRDFLUT(): Texture {
     return this.brdfLUT;
   }
@@ -376,7 +398,7 @@ export class ScreenSpaceReflections {
         ambientData.diffuseFactor,
         this.debugParams.metallicMin,
         this.debugParams.roughnessMax,
-        0.0, // _pad0
+        this.debugParams.temporalMode, // 1.0 when TAA active → halve march steps
         0.0, // _pad1
       ]),
     );
@@ -387,6 +409,7 @@ export class ScreenSpaceReflections {
     this.ssrOutputBindGroup = null;
     this.cameraComputeBindGroup = null;
     this.lastCameraBuffer = null;
+    this.lastAccLightsView = null;
     this.blurInputBindGroup = null;
     this.blurGBufferBindGroup = null;
     this.blurOutputBindGroup = null;

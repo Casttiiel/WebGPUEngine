@@ -67,6 +67,6 @@ struct SSRUniforms {
     diffuseBoost: f32,
     metallicMin: f32,
     roughnessMax: f32,
-    _pad0: f32,
+    temporalMode: f32,  // 1.0 = TAA active (halve march steps), 0.0 = standalone
     _pad1: f32,
 }

@@ -124,6 +124,19 @@ export class TAAComponent extends Component {
     return this.loaded;
   }
 
+  /**
+   * Returns the TAA-resolved result from the previous frame — stable, no jitter,
+   * temporally accumulated. Ideal for SSR hit-color sampling instead of the
+   * current jittered accLight.
+   *
+   * Returns null when there is no valid history yet (first frame, not loaded,
+   * or TAA disabled) so callers can fall back to accLight.
+   */
+  public getHistoryView(): GPUTextureView | null {
+    if (!this.loaded || this.isFirstFrame || !this.taaParams.enabled) return null;
+    return this.historyRT.getView();
+  }
+
   public resize(): void {
     if (!this.loaded) return;
 
