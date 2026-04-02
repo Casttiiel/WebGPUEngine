@@ -1,9 +1,16 @@
 ### Engine
 
-1. Froxel Volumetrics Temporal
-2. SSR Temporal
-3. GI Precomputed + probes
-4. HZB Pocho
+1. Froxel Density Volumes
+2. Froxel Wind/Noise de aqui: https://www.reddit.com/r/GraphicsProgramming/comments/1qu2fzz/faking_fog_volumes_in_screen_space_by_using_depth/
+3. Enemy AI
+   Fase 2 — Navegación real
+   ├── Waypoint graph (authorado en Blender → JSON)
+   ├── A\* sobre el grafo
+   └── PathFollower / Steering (seek + arrive)
+   → El enemigo ahora rodea obstáculos
+4. GI Precomputed + probes
+5. SSR Temporal
+6. HZB Pocho
 
 ## Gameplay
 
@@ -16,32 +23,20 @@
 
 ### Non Priority
 
-1. Froxel Density Volumes
-2. Enemy AI
-   Fase 2 — Navegación real
-   ├── Waypoint graph (authorado en Blender → JSON)
-   ├── A\* sobre el grafo
-   └── PathFollower / Steering (seek + arrive)
-   → El enemigo ahora rodea obstáculos
-
-   Fase 3 — Polish
-   └── AnimationStateMachine driven by BT state
-   (idle → patrol → chase → attack)
-
-3. Glass (Uncharted)
-4. Epipolar light scattering
-5. Light shafts occlusion
-6. Editor Point Lights (Render Debug / Gizmo / Menu)
-7. Editor Spot Lights (Render Debug / Gizmo / Menu)
-8. Editor Light Probes (Render Debug / Gizmo)
-9. Editor Camera (Render Debug / Gizmo / Menu)
-10. Blender Export with player spawn
-11. Asset Browser + Spawn + Delete
-12. Chromatic Aberration - Desplazamiento RGB radial en los bordes 🔵 Bajo
-13. Vignette - Oscurecimiento suave en bordes de pantalla 🔵 Bajo
-14. Grain / Film grain - Ruido animado de película
-15. Lens flares Oclusión + flare radial para el sol
-16. Clearcoat - Segunda capa especular encima del PBR base
-17. Sheen - Retroreflexión de telas
-18. Thin-film / Iridescence - Interferencia de películas finas (burbujas, insectos, nácar)
-19. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple
+1. Glass (Uncharted)
+2. Epipolar light scattering
+3. Light shafts occlusion
+4. Editor Point Lights (Render Debug / Gizmo / Menu)
+5. Editor Spot Lights (Render Debug / Gizmo / Menu)
+6. Editor Light Probes (Render Debug / Gizmo)
+7. Editor Camera (Render Debug / Gizmo / Menu)
+8. Blender Export with player spawn
+9. Asset Browser + Spawn + Delete
+10. Chromatic Aberration - Desplazamiento RGB radial en los bordes 🔵 Bajo
+11. Vignette - Oscurecimiento suave en bordes de pantalla 🔵 Bajo
+12. Grain / Film grain - Ruido animado de película
+13. Lens flares Oclusión + flare radial para el sol
+14. Clearcoat - Segunda capa especular encima del PBR base
+15. Sheen - Retroreflexión de telas
+16. Thin-film / Iridescence - Interferencia de películas finas (burbujas, insectos, nácar)
+17. Transmission + refracción física - Sketchfab traza el rayo real a través del material; tú tienes distorsión simple

@@ -18,8 +18,8 @@
 
 
 fn depth01ToViewZ(depth01: f32) -> f32 {
-  // gLinearDepth debe ser lineal 0..1, hardcoded near/far as we don't receive camera data
-  return depth01 * 1000.0; // depth01 * cameraFar
+  // cameraFar is packed into volumetricSettings.windDir.y by FroxelVolumetricScattering.ts
+  return depth01 * volumetricSettings.windDir.y;
 }
 
 fn viewZToFroxelZLog(viewZ: f32, nearZ: f32, farZ: f32) -> f32 {
@@ -46,15 +46,17 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let noiseUV = fract(uv * vec2<f32>(volumetricSettings.renderWidth, volumetricSettings.renderHeight) / 64.0 + frameOffset);
   let dither = textureSample(blueNoiseTex, nearestSampler, noiseUV).r - 0.5;
 
-  // Dither en Z en view space.
-  // Clamp the dithered Z so it never exceeds the true scene depth — without
-  // this a positive dither on a pixel right in front of a surface would push
-  // the froxel lookup past the surface and leak fog from behind it.
+  // Dither in froxel Z-space (±0.5 froxels) so each pair of adjacent frames
+  // samples on opposite sides of a slice boundary.  TAA then averages them,
+  // eliminating the visible step between slices.
+  // We also clamp the final fz to scene depth so we never leak fog from
+  // behind geometry.
   let depth01 = textureSample(gLinearDepth, samplerGBuffer, uv).x;
-  let viewZ = depth01ToViewZ(depth01);
-  let ditherViewZ = min(viewZ * (1.0 + dither * 0.02), viewZ);
-  let z01 = viewZToFroxelZLog(ditherViewZ, froxelParams.nearPlane, froxelParams.farPlane);
-  let fz = clamp(z01 * dimsF.z, 0.0, dimsF.z - 1.0);
+  let viewZ   = depth01ToViewZ(depth01);
+  let z01     = viewZToFroxelZLog(viewZ, froxelParams.nearPlane, froxelParams.farPlane);
+  // ±0.5 froxel dither — spans exactly one slice at any depth
+  let fzScene = z01 * dimsF.z;
+  let fz      = clamp(fzScene + dither, 0.0, fzScene);  // never exceed scene depth
 
   // Dither XY
   let ditherX = dither * 0.5;
