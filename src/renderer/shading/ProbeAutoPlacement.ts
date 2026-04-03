@@ -8,7 +8,7 @@ export interface ProbeCandidate {
   estimatedExtents: [number, number, number];
 }
 
-const CELL_SIZE = 5.0;   // metres — one probe per cell
+const CELL_SIZE = 5.0; // metres — one probe per cell
 const FLOOR_OFFSET = 1.5; // metres above navmesh floor
 const EXTERIOR_RAY = 20.0; // metres — sky ray length for interior classification
 const MIN_CLEARANCE = 0.6; // metres — minimum horizontal clearance from walls/objects
@@ -64,20 +64,20 @@ export class ProbeAutoPlacement {
     //  c) Horizontal clearance: 4 cardinal rays at head height.
     //     Any hit within MIN_CLEARANCE → too close to a wall/object → reject.
     const physics = Engine.getPhysics();
-    const up   = vec3.fromValues(0,  1, 0);
+    const up = vec3.fromValues(0, 1, 0);
     const down = vec3.fromValues(0, -1, 0);
     const cardinals = [
-      vec3.fromValues( 1, 0,  0),
-      vec3.fromValues(-1, 0,  0),
-      vec3.fromValues( 0, 0,  1),
-      vec3.fromValues( 0, 0, -1),
+      vec3.fromValues(1, 0, 0),
+      vec3.fromValues(-1, 0, 0),
+      vec3.fromValues(0, 0, 1),
+      vec3.fromValues(0, 0, -1),
     ];
 
     const interior: vec3[] = candidates.filter((pos) => {
       // ── a) Vertical: valid floor below, not inside solid ──────────────────
       const downHit = physics.raycast(pos, down, FLOOR_OFFSET * 3, true);
-      if (!downHit) return false;                          // no floor found
-      if (downHit.timeOfImpact < 0.05) return false;      // inside solid geometry
+      if (!downHit) return false; // no floor found
+      if (downHit.timeOfImpact < 0.05) return false; // inside solid geometry
       if (downHit.timeOfImpact > FLOOR_OFFSET * 2) return false; // floor too far
 
       // ── b) Ceiling above → interior ───────────────────────────────────────
