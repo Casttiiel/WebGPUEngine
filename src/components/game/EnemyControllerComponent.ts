@@ -133,7 +133,7 @@ export class EnemyControllerComponent extends Component {
     this.bb.set<vec3>('spawnPosition', vec3.clone(this.spawnPosition));
 
     // Create on-screen state label
-    const id = `enemy-state-${this.getOwner().getName()}`;   
+    const id = `enemy-state-${this.getOwner().getName()}`;
     let el = document.getElementById(id);
     if (!el) {
       el = document.createElement('div');

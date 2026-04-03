@@ -2,10 +2,9 @@
 
 1. Enemy AI
 2. GI Precomputed + probes
-3. Check enemy_basic.prefab, seems like scale is affecting position of child elements?
-4. HZB Pocho
-5. SSR Temporal
-6. TAA: Dynamic Objects
+3. HZB Pocho
+4. SSR Temporal
+5. TAA: Dynamic Objects
 
 ## Gameplay
 

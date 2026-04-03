@@ -41,6 +41,7 @@
     "gl-matrix": "^3.4.3",
     "hdr.js": "^0.2.0",
     "lil-gui": "^0.21.0",
-    "mikktspace": "^1.1.1"
+    "mikktspace": "^1.1.1",
+    "recast-navigation": "^0.42.1"
   }
 }

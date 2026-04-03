@@ -13,11 +13,11 @@ export class NavMeshBuilder {
    * @param indices    Index accessor data (Uint16Array or Uint32Array)
    * @param worldMatrix  Optional node-to-world transform (column-major, gl-matrix order)
    */
-  public static build(
+  public static async build(
     positions: Float32Array,
     indices: Uint32Array | Uint16Array,
     worldMatrix?: mat4,
-  ): void {
-    NavMesh.getInstance().build(positions, indices, worldMatrix);
+  ): Promise<void> {
+    await NavMesh.getInstance().build(positions, indices, worldMatrix);
   }
 }

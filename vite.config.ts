@@ -129,7 +129,7 @@ export default defineConfig({
   base: '/WebGPUEngine/', // Ajusta esto si cambias el nombre del repo
   plugins: [wgslIncludePlugin(), no404FallbackPlugin(), wasm(), topLevelAwait()],
   optimizeDeps: {
-    exclude: ['@dimforge/rapier3d'], // Excluir Rapier de la optimización de deps
+    exclude: ['@dimforge/rapier3d', 'recast-navigation'], // Excluir Rapier de la optimización de deps
   },
   server: {
     fs: {

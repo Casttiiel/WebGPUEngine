@@ -90,12 +90,15 @@ export class GLTFLoader {
       },
     };
 
-    const childs = this.processNodeList(scene.listChildren(), folderName);
+    const childs = await this.processNodeList(scene.listChildren(), folderName);
     res.children = childs;
     return res;
   }
 
-  private static processNodeList(nodeList: Node[], folderName: string): Array<EntityDataType> {
+  private static async processNodeList(
+    nodeList: Node[],
+    folderName: string,
+  ): Promise<Array<EntityDataType>> {
     const res = [];
     for (const node of nodeList) {
       const mesh = node.getMesh();
@@ -103,7 +106,7 @@ export class GLTFLoader {
       if (mesh) {
         const meshExtras = node.getExtras() as Record<string, unknown> | null;
         if (meshExtras && meshExtras['type'] === 'navmesh') {
-          this.processNavMeshNode(node);
+          await this.processNavMeshNode(node);
           // Invisible placeholder — navmesh is never rendered
           nodeEntity = { children: [], components: { transform: {} } };
         } else {
@@ -130,7 +133,7 @@ export class GLTFLoader {
       }
 
       if (node.listChildren().length > 0) {
-        nodeEntity.children = this.processNodeList(node.listChildren(), folderName);
+        nodeEntity.children = await this.processNodeList(node.listChildren(), folderName);
       }
       res.push(nodeEntity);
     }
@@ -427,7 +430,7 @@ export class GLTFLoader {
     return `${gltfBaseName}/${texName}`;
   }
 
-  private static processNavMeshNode(node: Node): void {
+  private static async processNavMeshNode(node: Node): Promise<void> {
     const mesh = node.getMesh()!;
     const primitive = mesh.listPrimitives()[0];
     if (!primitive) return;
@@ -442,7 +445,7 @@ export class GLTFLoader {
     const positions = posAttr.getArray() as Float32Array;
     const indices = indicesAcc.getArray() as Uint32Array | Uint16Array;
     const worldMatrix = this.getNodeMatrix(node);
-    NavMeshBuilder.build(positions, indices, worldMatrix);
+    await NavMeshBuilder.build(positions, indices, worldMatrix);
   }
 
   /** Reconstructs the node's local-to-parent matrix from its TRS (or stored matrix). */
