@@ -161,15 +161,21 @@ export class EnemyControllerComponent extends Component {
     vec3.set(this.desiredHorizontal, direction[0] * s, 0, direction[2] * s);
   }
 
-  /** Immediately face toward `target` (yaw-only rotation via TransformComponent). */
+  /** Immediately face toward `target` (yaw-only rotation via the rigid body). */
   public faceToward(target: vec3): void {
     const pos = this.bb.get<vec3>('position')!;
     const dx = target[0] - pos[0];
     const dz = target[2] - pos[2];
     if (Math.abs(dx) < 0.001 && Math.abs(dz) < 0.001) return;
     const yaw = Math.atan2(dx, dz);
-    const transform = this.getOwner().getComponent('transform') as TransformComponent;
-    if (transform) transform.getTransform().setAngles(yaw, 0, 0);
+
+    // Write rotation directly to the rigid body. The KINEMATIC body's rotation is
+    // read back into the TransformComponent by ColliderComponent.update() every
+    // frame, so setting only the TransformComponent would be overwritten immediately.
+    const halfYaw = yaw / 2;
+    this.capsuleCollider
+      .getRigidBody()
+      .setRotation({ x: 0, y: Math.sin(halfYaw), z: 0, w: Math.cos(halfYaw) }, true);
 
     // Keep 'facing' in sync so PerceptionComponent can use it for FOV cone checks
     const len = Math.sqrt(dx * dx + dz * dz);

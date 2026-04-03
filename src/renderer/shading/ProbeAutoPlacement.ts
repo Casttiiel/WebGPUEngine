@@ -8,10 +8,10 @@ export interface ProbeCandidate {
   estimatedExtents: [number, number, number];
 }
 
-const CELL_SIZE = 5.0; // metres — one probe per cell
-const GRID_STEP = 3.0; // metres — extra grid coverage around centroids
+const CELL_SIZE = 5.0;   // metres — one probe per cell
 const FLOOR_OFFSET = 1.5; // metres above navmesh floor
 const EXTERIOR_RAY = 20.0; // metres — sky ray length for interior classification
+const MIN_CLEARANCE = 0.6; // metres — minimum horizontal clearance from walls/objects
 
 /**
  * ProbeAutoPlacement — offline debug tool (FASE 3).
@@ -36,13 +36,16 @@ export class ProbeAutoPlacement {
       return [];
     }
 
-    // ── Step 1: Seed candidates ───────────────────────────────────────────────
+    // ── Step 1: Seed candidates from NavMesh centroids only ──────────────────
+    // Centroids are guaranteed to lie on walkable geometry.
+    // We do NOT expand a blind XZ grid around them — grid-expanded points can
+    // fall inside columns, pillars, furniture, etc.
     const seen = new Set<string>();
     const candidates: vec3[] = [];
 
     const add = (x: number, y: number, z: number): void => {
-      // Deduplicate on a coarse grid (GRID_STEP resolution)
-      const key = `${Math.round(x / GRID_STEP)},${Math.round(z / GRID_STEP)}`;
+      // Deduplicate on a coarse grid (CELL_SIZE resolution)
+      const key = `${Math.round(x / CELL_SIZE)},${Math.round(z / CELL_SIZE)}`;
       if (seen.has(key)) return;
       seen.add(key);
       candidates.push(vec3.fromValues(x, y + FLOOR_OFFSET, z));
@@ -50,21 +53,44 @@ export class ProbeAutoPlacement {
 
     for (const c of navMesh.getCentroids()) {
       add(c[0], c[1], c[2]);
-      for (let dx = -GRID_STEP; dx <= GRID_STEP; dx += GRID_STEP) {
-        for (let dz = -GRID_STEP; dz <= GRID_STEP; dz += GRID_STEP) {
-          if (dx === 0 && dz === 0) continue;
-          add(c[0] + dx, c[1], c[2] + dz);
-        }
-      }
     }
 
-    // ── Step 2: Classify interior vs exterior via upward raycast ─────────────
+    // ── Step 2: Filter candidates ─────────────────────────────────────────────
+    // Three checks must all pass:
+    //  a) Downward ray (solid=true): toi≈0 → inside a solid → reject.
+    //     No hit or toi too large → not near any walkable floor → reject.
+    //  b) Upward ray (solid=false): must find a ceiling → interior point.
+    //     solid=false avoids false toi=0 when origin is inside geometry.
+    //  c) Horizontal clearance: 4 cardinal rays at head height.
+    //     Any hit within MIN_CLEARANCE → too close to a wall/object → reject.
     const physics = Engine.getPhysics();
-    const up = vec3.fromValues(0, 1, 0);
+    const up   = vec3.fromValues(0,  1, 0);
+    const down = vec3.fromValues(0, -1, 0);
+    const cardinals = [
+      vec3.fromValues( 1, 0,  0),
+      vec3.fromValues(-1, 0,  0),
+      vec3.fromValues( 0, 0,  1),
+      vec3.fromValues( 0, 0, -1),
+    ];
 
     const interior: vec3[] = candidates.filter((pos) => {
-      const hit = physics.raycast(pos, up, EXTERIOR_RAY, true);
-      return hit !== null; // has ceiling → interior
+      // ── a) Vertical: valid floor below, not inside solid ──────────────────
+      const downHit = physics.raycast(pos, down, FLOOR_OFFSET * 3, true);
+      if (!downHit) return false;                          // no floor found
+      if (downHit.timeOfImpact < 0.05) return false;      // inside solid geometry
+      if (downHit.timeOfImpact > FLOOR_OFFSET * 2) return false; // floor too far
+
+      // ── b) Ceiling above → interior ───────────────────────────────────────
+      const ceilHit = physics.raycast(pos, up, EXTERIOR_RAY, false);
+      if (!ceilHit) return false;
+
+      // ── c) Horizontal clearance — no wall/object within MIN_CLEARANCE ─────
+      for (const dir of cardinals) {
+        const wallHit = physics.raycast(pos, dir, MIN_CLEARANCE, false);
+        if (wallHit !== null) return false;
+      }
+
+      return true;
     });
 
     // ── Step 3: Cluster into CELL_SIZE³ cells ────────────────────────────────

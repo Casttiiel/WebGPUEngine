@@ -102,6 +102,7 @@ export class GLTFLoader {
       let nodeEntity = null;
       if (mesh) {
         const meshExtras = node.getExtras() as Record<string, unknown> | null;
+        console.log('Mesh found:', mesh.getName(), 'with extras:', meshExtras);
         if (meshExtras && meshExtras['type'] === 'navmesh') {
           this.processNavMeshNode(node);
           // Invisible placeholder — navmesh is never rendered
