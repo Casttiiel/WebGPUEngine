@@ -17,6 +17,8 @@ import { vec3 } from 'gl-matrix';
  */
 export class PlayerSpawnComponent extends Component {
   public static pendingPosition: vec3 | null = null;
+  /** Spawn yaw in degrees, derived from the spawn empty's world rotation. */
+  public static pendingYawDeg: number | null = null;
 
   public async load(_data: unknown): Promise<void> {}
 
@@ -26,9 +28,14 @@ export class PlayerSpawnComponent extends Component {
 
     // TransformComponent.load() already called updateWorldTransform(), so
     // getWorldPosition() is correct even before the first per-frame update.
-    const worldPos = (tc as TransformComponent).getTransform().getWorldPosition();
+    const transform = (tc as TransformComponent).getTransform();
+    const worldPos = transform.getWorldPosition();
 
     PlayerSpawnComponent.pendingPosition = vec3.clone(worldPos);
+
+    // Extract yaw (in radians) from the spawn empty's world rotation, convert to degrees.
+    const { yaw } = transform.getAngles();
+    PlayerSpawnComponent.pendingYawDeg = (yaw * 180) / Math.PI;
   }
 
   public update(): void {}

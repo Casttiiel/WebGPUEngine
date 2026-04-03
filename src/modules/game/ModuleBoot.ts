@@ -56,6 +56,7 @@ export class ModuleBoot extends Module {
 
     // Teleport player to spawn point if a player_spawn marker was found in the scene's GLTF
     const spawnPos = PlayerSpawnComponent.pendingPosition;
+    const spawnYawDeg = PlayerSpawnComponent.pendingYawDeg;
     if (spawnPos) {
       const playerEntity = Engine.getEntities().getEntityByName('Player');
       if (playerEntity) {
@@ -68,8 +69,17 @@ export class ModuleBoot extends Module {
             .getRigidBody()
             .setTranslation({ x: spawnPos[0], y: spawnY, z: spawnPos[2] }, true);
         }
+
+        // Apply spawn rotation to the FPS camera controller
+        if (spawnYawDeg !== null) {
+          const fpsCamera = playerEntity.getComponent(
+            'fps_camera_controller',
+          ) as FPSCameraControllerComponent;
+          fpsCamera?.setInitialYaw(spawnYawDeg);
+        }
       }
       PlayerSpawnComponent.pendingPosition = null;
+      PlayerSpawnComponent.pendingYawDeg = null;
     }
 
     LoadingStatus.updateStatus('Creating instance groups...');

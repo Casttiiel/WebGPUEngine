@@ -214,6 +214,12 @@ export class FPSCameraControllerComponent extends Component {
     this.isActive = active;
   }
 
+  /** Override the current yaw (degrees). Useful for spawn-point orientation. */
+  public setInitialYaw(yawDeg: number): void {
+    this.yaw = yawDeg;
+    this.targetYaw = yawDeg;
+  }
+
   public getEyeOffset(): vec3 {
     return this.eyeOffset;
   }
