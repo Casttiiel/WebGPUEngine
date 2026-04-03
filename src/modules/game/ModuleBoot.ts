@@ -60,9 +60,14 @@ export class ModuleBoot extends Module {
       const playerEntity = Engine.getEntities().getEntityByName('Player');
       if (playerEntity) {
         const capsule = playerEntity.getComponent('capsule_collider') as CapsuleColliderComponent;
-        capsule
-          ?.getRigidBody()
-          ?.setTranslation({ x: spawnPos[0], y: spawnPos[1], z: spawnPos[2] }, true);
+        if (capsule?.getRigidBody()) {
+          // The rigid body origin is at the capsule center, so offset Y by half the
+          // total capsule height + the radius so the bottom hemisphere clears the ground.
+          const spawnY = spawnPos[1] + capsule.getCapsuleHeight() / 2 + capsule.getCapsuleRadius();
+          capsule
+            .getRigidBody()
+            .setTranslation({ x: spawnPos[0], y: spawnY, z: spawnPos[2] }, true);
+        }
       }
       PlayerSpawnComponent.pendingPosition = null;
     }
