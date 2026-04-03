@@ -397,6 +397,24 @@ export class BindGroupFactory {
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },
+      // Parallax Corrected Cubemap probe data (PCCSpecularUniforms)
+      {
+        binding: 8,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: 'uniform' },
+      },
+      // Per-probe prefiltered env cubemap A
+      {
+        binding: 9,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
+      },
+      // Per-probe prefiltered env cubemap B
+      {
+        binding: 10,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
+      },
     ]);
   }
 

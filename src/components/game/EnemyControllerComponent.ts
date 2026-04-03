@@ -181,15 +181,26 @@ export class EnemyControllerComponent extends Component {
     const bbSpawn = this.bb.get<vec3>('spawnPosition');
     const bbPosNow = this.bb.get<vec3>('position');
     const atHome = !bbPosNow || !bbSpawn || vec3.distance(bbPosNow, bbSpawn) <= 1.5;
+    let newState: string;
     if (canSee) {
-      this.currentState = 'CHASE';
+      newState = 'CHASE';
     } else if (hasLast) {
-      this.currentState = 'INVESTIGATE';
+      newState = 'INVESTIGATE';
     } else if (!atHome) {
-      this.currentState = 'RETURN HOME';
+      newState = 'RETURN HOME';
     } else {
-      this.currentState = 'IDLE';
+      newState = 'IDLE';
     }
+    if (newState !== this.currentState) {
+      const pos = this.capsuleCollider.getRigidBody().translation();
+      const target = this.bb.get<vec3>('playerPosition');
+      console.log(
+        `[AI] ${this.currentState} → ${newState}` +
+          `  enemyPos=(${pos.x.toFixed(1)},${pos.z.toFixed(1)})` +
+          (target ? `  lastKnown=(${target[0].toFixed(1)},${target[2].toFixed(1)})` : ''),
+      );
+    }
+    this.currentState = newState;
     if (this.stateEl) this.stateEl.textContent = `AI: ${this.currentState}`;
 
     // 5. Smooth horizontal velocity toward desired (exponential acceleration)

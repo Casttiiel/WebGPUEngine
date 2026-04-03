@@ -119,10 +119,10 @@ export class NavMesh {
         walkableSlopeAngle: 45,
         walkableHeight: 20, // voxels = 2.0 m / 0.1 ch
         walkableClimb: 3, // voxels = 0.3 m / 0.1 ch
-        walkableRadius: 2, // voxels = 0.2 m / 0.1 cs
+        walkableRadius: 0, // no erosion — Rapier physics handles wall avoidance
         maxEdgeLen: 120, // voxels
         maxSimplificationError: 1.3,
-        minRegionArea: 8,
+        minRegionArea: 2, // was 8 — tiny island regions now kept (avoids discarding thin areas)
         mergeRegionArea: 20,
         maxVertsPerPoly: 6,
         detailSampleDist: 6,

@@ -4,7 +4,8 @@
       "name": "ReflectionProbe",
       "transform": {},
       "reflection_probe": {
-        "resolution": 512
+        "resolution": 512,
+        "type": "indoor"
       },
       "box_collider": {
         "isSensor": true,

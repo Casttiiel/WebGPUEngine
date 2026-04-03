@@ -449,7 +449,7 @@ export class DeferredRenderer {
     );
 
     // Si es para reflection probes, devolver aquí (sin SSR ni volumetrics)
-    if (skipPostProcessing) {
+    if (skipPostProcessing || true) {
       return this.rtAccLight.getView();
     }
 

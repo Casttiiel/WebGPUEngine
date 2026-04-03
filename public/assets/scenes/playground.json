@@ -42,5 +42,14 @@
         "rotation": [0, 180, 0]
       }
     }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "ReflectionProbe_01",
+      "transform": {
+        "position": [0, 2, 8]
+      }
+    }
   }
 ]

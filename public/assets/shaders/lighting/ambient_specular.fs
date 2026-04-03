@@ -3,6 +3,7 @@
 #include "common/pbr/core"
 #include "common/octahedral"
 #include "common/gbuffer"
+#include "common/pcc"
 
 // Camera uniforms
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -22,6 +23,24 @@
 @group(2) @binding(5) var txEnvironment: texture_cube<f32>;
 @group(2) @binding(6) var envSampler: sampler;
 @group(2) @binding(7) var<uniform> ssrParams: SSRUniforms;
+
+// Parallax Corrected Cubemap data for the two dominant reflection probes.
+// hasProbeA/B (w component): 1.0 = probe active, 0.0 = use raw R or global env.
+struct PCCSpecularUniforms {
+    probeAPos: vec4<f32>,   // xyz = world pos, w = hasProbeA
+    probeAMin: vec4<f32>,
+    probeAMax: vec4<f32>,
+    probeBPos: vec4<f32>,   // xyz = world pos, w = hasProbeB
+    probeBMin: vec4<f32>,
+    probeBMax: vec4<f32>,
+    blendWeight: f32, _pad0: f32, _pad1: f32, _pad2: f32,
+}
+@group(2) @binding(8) var<uniform> pccData: PCCSpecularUniforms;
+
+// Per-probe prefiltered env cubemaps for PCC specular.
+// When no probe is active these point to the global env (bound by CPU as fallback).
+@group(2) @binding(9)  var probeEnvA: texture_cube<f32>;
+@group(2) @binding(10) var probeEnvB: texture_cube<f32>;
 
 
 
@@ -45,6 +64,21 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     let R = normalize(g.reflectedDir);
 
+    // ── Parallax Corrected directions for probe A and probe B ─────────────────
+    // probeXPos.w encoding: 0=no probe, 1=outdoor(no PCC), 2=indoor(PCC)
+    let R_a = select(
+        R,
+        parallaxCorrectDir(g.worldPos, R, pccData.probeAPos.xyz,
+                           pccData.probeAMin.xyz, pccData.probeAMax.xyz),
+        pccData.probeAPos.w > 1.5,  // only apply PCC for indoor probes
+    );
+    let R_b = select(
+        R,
+        parallaxCorrectDir(g.worldPos, R, pccData.probeBPos.xyz,
+                           pccData.probeBMin.xyz, pccData.probeBMax.xyz),
+        pccData.probeBPos.w > 1.5,
+    );
+
     // ── Shared split-sum BRDF — computed once for both IBL and SSR paths ──────
     let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NoV, 0.0, 1.0));
     let brdf  = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
@@ -57,10 +91,20 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
     let splitSum = F * brdf.x + brdf.y + Fms;
 
-    // ── IBL: prefiltered env radiance × split-sum BRDF ────────────────────────
+    // ── IBL: per-probe prefiltered env with PCC, blended, fallback to global ──
     let maxMipLevel = 7.0;
     let mipLevel    = g.roughness * maxMipLevel;
-    let envRadiance = textureSampleLevel(txEnvironment, envSampler, R, mipLevel).rgb;
+
+    let envGlobal = textureSampleLevel(txEnvironment, envSampler, R,   mipLevel).rgb;
+    let envA      = textureSampleLevel(probeEnvA,     envSampler, R_a, mipLevel).rgb;
+    let envB      = textureSampleLevel(probeEnvB,     envSampler, R_b, mipLevel).rgb;
+
+    // Select: no probe → global env; probe active → probe env (PCC or not); A+B → blend
+    let hasA        = pccData.probeAPos.w > 0.5;  // w > 0 means any probe
+    let hasB        = pccData.probeBPos.w > 0.5;
+    let envBlended  = mix(envA, envB, pccData.blendWeight);
+    let envRadiance = select(select(envGlobal, envA, hasA), envBlended, hasA && hasB);
+
     let iblSpecular = envRadiance * splitSum;
 
     // ── SSR: raw hit radiance × same split-sum BRDF (same energy space as IBL) ─

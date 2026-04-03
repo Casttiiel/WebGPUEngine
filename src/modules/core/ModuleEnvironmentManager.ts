@@ -22,6 +22,8 @@ import { ProbeAutoPlacement } from '../../renderer/shading/ProbeAutoPlacement';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { Wind } from '../../core/engine/Wind';
+import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
+import { AmbientLight } from '../../renderer/shading/AmbientLight';
 
 // Math utilities for atmospheric lighting
 const lerp = (a: number, b: number, alpha: number): number => a + alpha * (b - a);
@@ -286,6 +288,12 @@ export class ModuleEnvironmentManager extends Module {
     tempCameraComponent.setCamera(camera);
     tempCameraEntity.addComponent('camera', tempCameraComponent);
 
+    // ─── Baking mode: use white irradiance in shader to avoid feedback loop ──────
+    // Prevents existing probe irradiance from contaminating the capture (feedback darkening).
+    AmbientLight.setBakingMode(true);
+    ProbeManager.getInstance().setBakingMode(true);
+    // ─────────────────────────────────────────────────────────────────────────────
+
     // Renderizar cada cara
     for (let face = 0; face < 6; face++) {
       const [direction, up] = faceDirections[face]!;
@@ -355,6 +363,10 @@ export class ModuleEnvironmentManager extends Module {
     // ✅ IMPORTANTE: Restaurar la cámara principal original
     const moduleRender = Engine.getRender();
     moduleRender.restoreMainCamera();
+
+    // Desactivar baking mode y restaurar
+    AmbientLight.setBakingMode(false);
+    ProbeManager.getInstance().setBakingMode(false);
 
     // Limpiar renderer temporal
     tempRenderer.destroy();

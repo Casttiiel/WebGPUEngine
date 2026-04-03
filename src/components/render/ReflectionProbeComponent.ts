@@ -15,8 +15,18 @@ export class ReflectionProbeComponent extends Component {
   /** Half-extents of the probe influence box (x, y, z). Defaults to (radius, radius, radius). */
   private extents: vec3 = vec3.fromValues(10, 10, 10);
 
+  /**
+   * 'indoor'  — AABB is a real room boundary: apply PCC to align reflections with geometry.
+   * 'outdoor' — environment is effectively infinite: skip PCC, just use the probe's env cubemap.
+   * Default: 'indoor'
+   */
+  private probeType: 'indoor' | 'outdoor' = 'indoor';
+
   /** Own pre-baked irradiance cubemap for multi-probe blending. */
   private irradianceCubemap: Cubemap | null = null;
+
+  /** Own pre-baked prefiltered env cubemap for per-probe specular PCC. */
+  private envCubemap: Cubemap | null = null;
 
   // Tracking de entidades dentro del trigger
   private entitiesInside: Set<number> = new Set();
@@ -30,9 +40,11 @@ export class ReflectionProbeComponent extends Component {
       radius?: number;
       resolution?: number;
       extents?: [number, number, number];
+      type?: 'indoor' | 'outdoor';
     };
     this.radius = probeData?.radius ?? 10.0;
     this.resolution = probeData?.resolution ?? 512;
+    this.probeType = probeData?.type ?? 'indoor';
 
     if (probeData?.extents) {
       vec3.set(this.extents, probeData.extents[0], probeData.extents[1], probeData.extents[2]);
@@ -52,11 +64,16 @@ export class ReflectionProbeComponent extends Component {
     // Esperar un frame para asegurar que el box_collider está cargado
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Load own irradiance cubemap for multi-probe blending
-    const irrName = this.getOwner().getName() + '_irradiance_cubemap_T.png';
-    this.irradianceCubemap = await Cubemap.getAsync(irrName).catch(() => null);
+    // Load own irradiance and env cubemaps for per-probe PCC blending
+    const baseName = this.getOwner().getName();
+    const [irr, env] = await Promise.all([
+      Cubemap.getAsync(baseName + '_irradiance_cubemap_T.png').catch(() => null),
+      Cubemap.getAsync(baseName + '_env_cubemap_T.png').catch(() => null),
+    ]);
+    this.irradianceCubemap = irr;
+    this.envCubemap = env;
 
-    // Register with ProbeManager so AmbientLight can blend between probes
+    // Register with ProbeManager so AmbientLight can drive per-probe PCC
     ProbeManager.getInstance().register(this);
 
     // Registrar callbacks del trigger
@@ -84,19 +101,8 @@ export class ReflectionProbeComponent extends Component {
 
   private onEntityEnter(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    const envTextureName = this.getOwner().getName() + '_env_cubemap_T.png';
-    const irrTextureName = this.getOwner().getName() + '_irradiance_cubemap_T.png';
-
-    if (
-      entity &&
-      entity.hasComponent('character_controller') &&
-      Engine.getEnvironmentManager().getSSREnvironmentTexture().getName() !== envTextureName &&
-      Engine.getEnvironmentManager().getAmbientLightData().irradianceCubemap.getName() !==
-        irrTextureName
-    ) {
+    if (entity && entity.hasComponent('character_controller')) {
       this.entitiesInside.add(entityId);
-      Engine.getEnvironmentManager().changeSSREnvironmentTexture(envTextureName);
-      Engine.getEnvironmentManager().changeIrradianceTexture(irrTextureName);
     }
   }
 
@@ -145,6 +151,21 @@ export class ReflectionProbeComponent extends Component {
   /** Returns the GPU view for this probe's pre-baked irradiance cubemap, or null if not loaded. */
   public getIrradianceView(): GPUTextureView | null {
     return this.irradianceCubemap?.getTextureView() ?? null;
+  }
+
+  /** Returns the GPU view for this probe's prefiltered env cubemap (specular PCC), or null if not loaded. */
+  public getEnvView(): GPUTextureView | null {
+    return this.envCubemap?.getTextureView() ?? null;
+  }
+
+  /**
+   * Returns the probe mode as a float packed into the w component of probePos uniforms:
+   *   0.0 = no probe (handled by caller)
+   *   1.0 = outdoor — use probe env, no PCC correction
+   *   2.0 = indoor  — use probe env + PCC AABB correction
+   */
+  public getProbeTypeFlag(): number {
+    return this.probeType === 'indoor' ? 2.0 : 1.0;
   }
 
   public override dispose(): void {

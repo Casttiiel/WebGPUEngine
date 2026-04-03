@@ -25,6 +25,8 @@ export interface BlendedProbes {
 export class ProbeManager {
   private static _instance: ProbeManager | null = null;
   private _probes: ReflectionProbeComponent[] = [];
+  /** When true, getBlendedProbes() returns null probes — used during probe baking to avoid irradiance feedback. */
+  private _bakingMode: boolean = false;
 
   private constructor() {}
 
@@ -42,6 +44,11 @@ export class ProbeManager {
     if (idx !== -1) this._probes.splice(idx, 1);
   }
 
+  /** Set during probe baking so irradiance from existing probes doesn't contaminate the capture. */
+  public setBakingMode(enabled: boolean): void {
+    this._bakingMode = enabled;
+  }
+
   /**
    * Returns the two probes with the highest box-intersection weights for the
    * current player position, plus the blend factor between them.
@@ -50,7 +57,7 @@ export class ProbeManager {
    * Only probes whose box volume contains the player contribute.
    */
   public getBlendedProbes(): BlendedProbes {
-    if (this._probes.length === 0) {
+    if (this._bakingMode || this._probes.length === 0) {
       return { probeA: null, probeB: null, blendWeight: 0 };
     }
 
