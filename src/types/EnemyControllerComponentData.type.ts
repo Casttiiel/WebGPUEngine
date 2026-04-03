@@ -5,4 +5,6 @@ export interface EnemyControllerComponentDataType {
   gravity?: number;
   /** Exponential acceleration factor for horizontal movement. Default: 10 */
   acceleration?: number;
+  /** Maximum rotation speed in degrees/second. Default: 240 */
+  turnSpeed?: number;
 }

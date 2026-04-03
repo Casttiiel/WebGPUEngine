@@ -65,6 +65,7 @@ export class PerceptionComponent extends Component {
   private playerEntity: Entity | null = null;
   private playerCollider: CapsuleColliderComponent | null = null;
   private timer: number = 0;
+  private prevCanSee: boolean = false;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -118,15 +119,14 @@ export class PerceptionComponent extends Component {
     const toPlayer = vec3.subtract(vec3.create(), playerPos, ownPos);
     const dist = vec3.length(toPlayer);
 
-    // Always write distance
     this.bb.set<number>('distToPlayer', dist);
 
     // ── Hearing ──────────────────────────────────────────────────────────────
-    const canHear = dist <= this.hearRadius;
-    this.bb.set<boolean>('canHearPlayer', canHear);
+    this.bb.set<boolean>('canHearPlayer', dist <= this.hearRadius);
 
     // ── Sight: distance gate ─────────────────────────────────────────────────
     if (dist > this.sightRadius) {
+      if (this.prevCanSee) this.prevCanSee = false;
       this.bb.set<boolean>('canSeePlayer', false);
       return;
     }
@@ -134,11 +134,10 @@ export class PerceptionComponent extends Component {
     // ── Sight: FOV cone gate ─────────────────────────────────────────────────
     const facing = this.bb.get<vec3>('facing', vec3.fromValues(0, 0, 1));
     const dirToPlayer = vec3.normalize(vec3.create(), toPlayer);
-    const dot = vec3.dot(facing, dirToPlayer); // both normalised
+    const dot = vec3.dot(facing, dirToPlayer);
 
     if (dot < this.fovCosHalf) {
-      // Player is outside the cone — keep previous canSeePlayer
-      // (gradual exit feels more natural than an instant snap to false)
+      if (this.prevCanSee) this.prevCanSee = false;
       this.bb.set<boolean>('canSeePlayer', false);
       return;
     }
@@ -147,11 +146,15 @@ export class PerceptionComponent extends Component {
     const canSee = this.castLOS(ownPos, dirToPlayer, dist);
     this.bb.set<boolean>('canSeePlayer', canSee);
 
+    if (canSee && !this.prevCanSee) {
+      // First detection — mark that we have a last-known position to investigate
+      this.bb.set<boolean>('hasLastKnown', true);
+    }
+    this.prevCanSee = canSee;
+
     if (canSee) {
-      // Update last-known position
       const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
-      const playerBodyPos = this.getPlayerBodyPos();
-      vec3.copy(stored, playerBodyPos);
+      vec3.copy(stored, this.getPlayerBodyPos());
       this.bb.set('playerPosition', stored);
     }
   }

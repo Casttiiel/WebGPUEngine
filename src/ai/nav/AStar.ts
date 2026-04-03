@@ -122,37 +122,85 @@ export class AStar {
     actualStart: vec3,
     actualGoal: vec3,
   ): vec3[] {
-    const waypoints: vec3[] = [];
+    // Rebuild the triangle sequence (goal → start, then reverse)
+    const triSeq: number[] = [];
     let node = goalIdx;
     while (node !== -1) {
-      waypoints.push(vec3.clone(tris[node]!.centroid));
+      triSeq.push(node);
       node = parent[node]!;
     }
-    waypoints.reverse();
-    waypoints[0] = vec3.clone(actualStart);
-    waypoints[waypoints.length - 1] = vec3.clone(actualGoal);
+    triSeq.reverse();
+
+    // Build waypoints using shared portal-edge midpoints rather than centroids.
+    // This keeps the path physically accurate (midpoints lie on walkable edges)
+    // and eliminates the zig-zag that comes from alternating triangle centroids.
+    const waypoints: vec3[] = [vec3.clone(actualStart)];
+    for (let i = 0; i < triSeq.length - 1; i++) {
+      const t1 = tris[triSeq[i]!]!;
+      const t2 = tris[triSeq[i + 1]!]!;
+      const mid = AStar._sharedEdgeMidpoint(t1, t2);
+      if (mid) waypoints.push(mid);
+    }
+    waypoints.push(vec3.clone(actualGoal));
+
     return AStar._stringPull(waypoints);
   }
 
   /**
-   * Simple string-pulling: removes intermediate waypoints that don't
-   * represent a significant direction change (dot product threshold).
-   * Equivalent to the first pass of the Funnel Algorithm without portal edges.
+   * Finds the midpoint of the shared edge between two adjacent NavTriangles.
+   * Returns null if the triangles don't share an edge (shouldn't happen for
+   * adjacent pairs from the A* path).
+   */
+  private static _sharedEdgeMidpoint(t1: NavTriangle, t2: NavTriangle): vec3 | null {
+    const verts1 = [t1.v0, t1.v1, t1.v2];
+    const verts2 = [t2.v0, t2.v1, t2.v2];
+    const shared: vec3[] = [];
+    for (const v1 of verts1) {
+      for (const v2 of verts2) {
+        if (vec3.squaredDistance(v1, v2) < 0.0001) {
+          shared.push(v1);
+          if (shared.length === 2) return vec3.lerp(vec3.create(), shared[0]!, shared[1]!, 0.5);
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Greedy string-pull: from each anchor point, jump as far ahead as possible
+   * while the overall direction from the anchor stays consistent (dot ≥ 0.97,
+   * i.e. within ~14°). This collapses quasi-collinear waypoints in open space
+   * while preserving genuine turns (e.g. around corners or columns).
    */
   private static _stringPull(waypoints: vec3[]): vec3[] {
     if (waypoints.length <= 2) return waypoints;
     const result: vec3[] = [waypoints[0]!];
-    for (let i = 1; i < waypoints.length - 1; i++) {
-      const prev = result[result.length - 1]!;
-      const curr = waypoints[i]!;
-      const next = waypoints[i + 1]!;
-      const d1 = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(), curr, prev));
-      const d2 = vec3.normalize(vec3.create(), vec3.subtract(vec3.create(), next, prev));
-      if (vec3.dot(d1, d2) < 0.98) {
-        result.push(curr);
+    let anchor = 0;
+
+    while (anchor < waypoints.length - 1) {
+      // Initial direction from this anchor
+      const dAnchorFirst = vec3.normalize(
+        vec3.create(),
+        vec3.subtract(vec3.create(), waypoints[anchor + 1]!, waypoints[anchor]!),
+      );
+
+      let furthest = anchor + 1;
+      for (let j = anchor + 2; j < waypoints.length; j++) {
+        const dAnchorJ = vec3.normalize(
+          vec3.create(),
+          vec3.subtract(vec3.create(), waypoints[j]!, waypoints[anchor]!),
+        );
+        if (vec3.dot(dAnchorFirst, dAnchorJ) >= 0.97) {
+          furthest = j; // still heading the same way — skip the intermediate point
+        } else {
+          break; // direction has changed significantly — stop here
+        }
       }
+
+      result.push(waypoints[furthest]!);
+      anchor = furthest;
     }
-    result.push(waypoints[waypoints.length - 1]!);
+
     return result;
   }
 }

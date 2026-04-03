@@ -3,7 +3,7 @@
     "name": "Enemy",
     "transform": {
       "position": [0, 0.9, 0],
-      "rotation": [0, 180, 0],
+      "rotation": [0, 0, 0],
       "scale": [0.6, 1.8, 0.6]
     },
     "capsule_collider": {
@@ -22,7 +22,7 @@
       "meshes": [
         {
           "mesh": "unit_cube.obj",
-          "material": "emissive.mat"
+          "material": "stone.mat"
         }
       ]
     },
@@ -38,5 +38,24 @@
       "eyeHeightOffset": 0.7,
       "checkInterval": 0.1
     }
-  }
+  },
+  "children": [
+    {
+      "components": {
+        "name": "ForwardIndicator",
+        "transform": {
+          "position": [0, 0.2, 0.5],
+          "scale": [0.35, 0.12, 0.35]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    }
+  ]
 }
