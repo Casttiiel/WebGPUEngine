@@ -492,6 +492,38 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * group(3) in water.fs:
+   *   binding 0 — filtering sampler for linearDepth
+   *   binding 1 — scene linear depth (r16float 2D texture from G-Buffer)
+   *   binding 2 — prefiltered env cubemap for reflections
+   *   binding 3 — filtering sampler for env cubemap
+   */
+  public static getWaterSceneLayout(): GPUBindGroupLayout {
+    return this.getLayout('water_scene', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float', viewDimension: '2d', multisampled: false },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: 'filtering' },
+      },
+    ]);
+  }
+
   public static getAmbientUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('ambient uniforms layout', [
       {
@@ -1751,6 +1783,8 @@ export class BindGroupFactory {
         return this.getCubemapTextureLayout();
       case PipelineBindGroupLayouts.OIT_GLASS_ENV:
         return this.getOITGlassEnvLayout();
+      case PipelineBindGroupLayouts.WATER_SCENE:
+        return this.getWaterSceneLayout();
       case PipelineBindGroupLayouts.AMBIENT_UNIFORMS:
         return this.getAmbientUniformsLayout();
       case PipelineBindGroupLayouts.GBUFFER_UNIFORMS:

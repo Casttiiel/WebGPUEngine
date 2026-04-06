@@ -68,6 +68,7 @@ export class DeferredRenderer {
   private oitComposeMesh!: Mesh;
   private oitComposeBindGroup!: GPUBindGroup;
   private oitGlassEnvBindGroup: GPUBindGroup | null = null;
+  private waterSceneBindGroup: GPUBindGroup | null = null;
   private aoResult!: GPUTextureView;
   // Cached extended G-Buffer+AO bind group for lighting shaders. Rebuilt when aoResult changes.
   private gBufferWithAOBindGroup: GPUBindGroup | null = null;
@@ -424,6 +425,7 @@ export class DeferredRenderer {
     this.aoResult = this.renderAO(camera);
     this.renderAccLight();
 
+    this.ensureWaterSceneBindGroup();
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     // Snapshot accLight before glass so the glass shader can sample the undistorted scene
@@ -660,6 +662,25 @@ export class DeferredRenderer {
     }
   }
 
+  /**
+   * Creates or rebuilds the water scene bind group (linearDepth + env cubemap).
+   * Caches the result — only rebuilds if null (first frame or after resize/dispose).
+   */
+  private ensureWaterSceneBindGroup(): void {
+    const envTex = Engine.getEnvironmentManager().getSSREnvironmentTexture();
+    if (!envTex) return;
+    if (!this.waterSceneBindGroup) {
+      const layout = BindGroupFactory.getWaterSceneLayout();
+      this.waterSceneBindGroup = BindGroupFactory.createBindGroup('water_scene_bg', layout, [
+        { binding: 0, resource: SamplerLibrary.simpleSampler },
+        { binding: 1, resource: this.getLinearDepthView() },
+        { binding: 2, resource: envTex.getTextureView()! },
+        { binding: 3, resource: envTex.getSampler()! },
+      ]);
+      this.renderPassManager.setTransparentWaterBindGroup(this.waterSceneBindGroup);
+    }
+  }
+
   private dispose(): void {
     if (this.gBufferPass) {
       this.gBufferPass.dispose();
@@ -677,6 +698,7 @@ export class DeferredRenderer {
       this.rtGlassRefraction.destroy();
     }
     this.oitGlassEnvBindGroup = null;
+    this.waterSceneBindGroup = null;
 
     if (this.ambientLight) {
       this.ambientLight.destroy();

@@ -1,0 +1,14 @@
+{
+    "vs": "water/water.vs",
+    "fs": "water/water.fs",
+    "writesOn": "texture",
+    "z": "test_but_no_write",
+    "blend": "combinative",
+    "rs": "double_sided",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms",
+        "WaterScene"
+    ]
+}

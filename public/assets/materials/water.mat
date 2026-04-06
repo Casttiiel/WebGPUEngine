@@ -1,0 +1,17 @@
+{
+    "technique": "water/water.tech",
+    "textures": {
+        "txAlbedo": "noiseRGBTileable.jpg",
+        "txNormal": "noiseRGBTileable.jpg",
+        "txMetallic": "black.png",
+        "txRoughness": "black.png",
+        "txEmissive": "black.png"
+    },
+    "casts_shadows": false,
+    "category": "transparent",
+    "baseColorFactor": [0.05, 0.3, 0.7, 0.45],
+    "roughnessFactor": 0.05,
+    "metallicFactor": 0.0,
+    "uvXScale": 3.0,
+    "uvYScale": 2.0
+}

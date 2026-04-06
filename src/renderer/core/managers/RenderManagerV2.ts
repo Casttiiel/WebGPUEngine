@@ -33,6 +33,10 @@ export class RenderManagerV2 {
   private techniqueOverrideMaskInstanced: Technique | null = null;
   private gpuCullingEstimatedVisible: number = 0;
 
+  // Pass-level group 3 fallback: applied before indirect draws that have no per-key renderBindGroup.
+  // Set by TransparentRenderPass (water scene data); cleared after the pass completes.
+  private passGroup3: GPUBindGroup | null = null;
+
   // Cached shadow keys — rebuilt only when markDirty() fires (addKey/delKeys)
   private cachedShadowKeys: RenderKey[] | null = null;
   // Pre-sorted shadow keys — same sort used for every cascade, built once per key-change
@@ -72,9 +76,16 @@ export class RenderManagerV2 {
   }
 
   /**
-   * Registers the HZBBuilder built each frame by DeferredRenderer.
-   * The HZB pyramid is used to perform occlusion culling after frustum culling.
+   * Sets (or clears) the pass-level group 3 bind group that is applied before
+   * every indirect draw that does not provide its own per-key renderBindGroup.
+   * Used by TransparentRenderPass to inject the water scene data (linearDepth +
+   * env cubemap) even after particles/trails override group 3 with their own data.
+   * Call with `null` after the pass completes to avoid leaking into other passes.
    */
+  public setPassGroup3(bindGroup: GPUBindGroup | null): void {
+    this.passGroup3 = bindGroup;
+  }
+
   public setHZBBuilder(hzbBuilder: HZBBuilder): void {
     this.hzbBuilder = hzbBuilder;
   }
@@ -368,6 +379,9 @@ export class RenderManagerV2 {
         // Particles or main-camera GPU-culled keys
         if (key.renderBindGroup) {
           this.stateManager.setBindGroup(pass, 3, key.renderBindGroup);
+        } else if (this.passGroup3) {
+          // Restore the pass-level group 3 if a previous key overrode it
+          this.stateManager.setBindGroup(pass, 3, this.passGroup3);
         }
         pass.drawIndexedIndirect(key.indirectDrawBuffer, key.indirectDrawOffset);
       } else if (key.shadowIndirectOffset >= 0 && this.currentShadowIndirectBuffer) {
