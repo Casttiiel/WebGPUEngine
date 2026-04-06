@@ -134,3 +134,15 @@ The engine derives the texture filenames from `probe.getOwner().getName()`. The 
 - Bake **after** all static geometry, lights, and emissive materials are final, otherwise re-baking will be needed.
 - The irradiance cubemap is generated at 32 × 32 px per face internally before download; the downloaded PNG is the full-res capture.
 - Probe baking includes the **skybox** contribution, so bake with the intended time-of-day set in `environment.json`.
+
+Pasos para arreglarlo en el Shader Editor:
+Usa Separate Color (o Separate RGB): Si estás usando texturas separadas, el exportador a menudo falla. La mejor práctica es empaquetarlas tú mismo o usar un nodo para decirle a Blender cómo unirlas.
+La configuración recomendada:
+Usa un nodo Combine Color (o Combine RGB).
+Conecta tu textura de Rugosidad (escala de grises) al canal Verde.
+Conecta tu textura Metálica (escala de grises) al canal Azul.
+Conecta la salida del Combine Color a un nodo Image Texture (previamente guardado) y luego al Principled BSDF, o usa la configuración de "glTF Settings" (ver punto 3).
+Asegúrate de que sean "Non-Color": Las texturas de roughness y metallic deben tener el Color Space establecido en Non-Color en el nodo Image Texture.
+YouTube
+YouTube
++3

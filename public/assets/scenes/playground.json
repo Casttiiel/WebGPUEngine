@@ -38,7 +38,7 @@
     "components": {
       "name": "Enemy_01",
       "transform": {
-        "position": [5, 0.9, 5],
+        "position": [5, 0.9, 15],
         "rotation": [0, 180, 0]
       }
     }

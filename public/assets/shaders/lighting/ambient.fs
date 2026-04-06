@@ -3,21 +3,12 @@
 #include "common/pbr/brdf"
 #include "common/octahedral"
 #include "common/gbuffer"
-#include "common/pcc"
 
 struct AmbientUniforms {
     globalAmbientBoost: f32,
     diffuseBoost:       f32,
-    isBaking:           f32,  // 1.0 during probe bake — skips irradiance to avoid feedback
-    probeBlendWeight:   f32,
-    // Probe A PCC data — xyz = world position, w = hasProbe (1.0 or 0.0)
-    probeAPos: vec4<f32>,
-    probeAMin: vec4<f32>,
-    probeAMax: vec4<f32>,
-    // Probe B PCC data
-    probeBPos: vec4<f32>,
-    probeBMin: vec4<f32>,
-    probeBMax: vec4<f32>,
+    isBaking:       f32,  // 1.0 during probe bake — skips irradiance sampling to avoid feedback
+    probeBlendWeight: f32,
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -39,25 +30,11 @@ struct AmbientUniforms {
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let N   = normalize(g.normal);
     let V   = normalize(g.viewDir);
-    let NdV = max(dot(N, V), 0.0);
+    let NdV = clamp(dot(N, V), 0.001, 1.0);
 
-    // Parallax-correct irradiance sampling directions for indoor probes only.
-    // probeXPos.w encoding: 0=no probe, 1=outdoor(no PCC), 2=indoor(PCC)
-    let irradDirA = select(
-        N,
-        parallaxCorrectDir(g.worldPos, N, ambient.probeAPos.xyz,
-                           ambient.probeAMin.xyz, ambient.probeAMax.xyz),
-        ambient.probeAPos.w > 1.5,  // only apply PCC for indoor probes
-    );
-    let irradDirB = select(
-        N,
-        parallaxCorrectDir(g.worldPos, N, ambient.probeBPos.xyz,
-                           ambient.probeBMin.xyz, ambient.probeBMax.xyz),
-        ambient.probeBPos.w > 1.5,
-    );
-
-    let irradianceA = textureSample(irradianceMap, samplerIrradiance, irradDirA).rgb;
-    let irradianceB = textureSample(irradianceMapB, samplerIrradiance, irradDirB).rgb;
+    let irradianceDir = N;
+    let irradianceA = textureSample(irradianceMap, samplerIrradiance, irradianceDir).rgb;
+    let irradianceB = textureSample(irradianceMapB, samplerIrradiance, irradianceDir).rgb;
     let sampledIrradiance = mix(irradianceA, irradianceB, ambient.probeBlendWeight);
     // During probe baking use white irradiance to avoid feedback darkening
     let irradiance = select(sampledIrradiance, vec3<f32>(1.0), ambient.isBaking > 0.5);
@@ -65,10 +42,16 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     // Use LUT-integrated directional albedo E = brdf.x + brdf.y for kD so that
     // energy conservation is consistent with the Kulla-Conty splitSum in the specular pass.
     // Point-Fresnel F would under-subtract from kD compared to the hemisphere-integrated F.
-    let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NdV, 0.0, 1.0));
+    let brdfCoords = vec2<f32>(clamp(NdV, 0.0, 1.0), 1.0 - clamp(g.roughness, 0.0, 1.0));
     let brdf = textureSampleLevel(brdfLUT, samplerAO, brdfCoords, 0.0).rg;
-    let E  = brdf.x + brdf.y; // hemisphere-integrated directional albedo
-    let kD = (1.0 - E) * (1.0 - g.metallic);
+    // Per-channel energy conservation: E = F0 * brdf.x + brdf.y (vec3).
+    // Using F0=1 (scalar) overestimates E at normal incidence on smooth surfaces,
+    // collapsing kD to ~0 at screen-center and creating a visible bright halo ring.
+    let E    = g.specularColor * brdf.x + brdf.y;
+    let Ems  = 1.0 - (brdf.x + brdf.y);  // scalar Ems
+    let Favg = g.specularColor + (1.0 - g.specularColor) / 21.0;
+    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+    let kD   = (1.0 - E - Fms) * (1.0 - g.metallic);
 
     let diffuse = kD * Diffuse(g.albedo) * irradiance;
 

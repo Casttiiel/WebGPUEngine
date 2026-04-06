@@ -449,7 +449,7 @@ export class DeferredRenderer {
     );
 
     // Si es para reflection probes, devolver aquí (sin SSR ni volumetrics)
-    if (skipPostProcessing || true) {
+    if (skipPostProcessing) {
       return this.rtAccLight.getView();
     }
 
@@ -629,7 +629,14 @@ export class DeferredRenderer {
   public resetAmbientLightResources(): void {
     this.ambientLight.destroy();
     this.ambientLight = new AmbientLight();
-    this.ambientLight.load();
+    this.ambientLight
+      .load()
+      .then(() => {
+        console.log('[DeferredRenderer] new AmbientLight.load() completed OK');
+      })
+      .catch((e) => {
+        console.error('[DeferredRenderer] new AmbientLight.load() FAILED:', e);
+      });
   }
 
   /**

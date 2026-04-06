@@ -80,7 +80,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     );
 
     // ── Shared split-sum BRDF — computed once for both IBL and SSR paths ──────
-    let brdfCoords = vec2<f32>(clamp(g.roughness, 0.0, 1.0), clamp(1.0 - NoV, 0.0, 1.0));
+    let brdfCoords = vec2<f32>(clamp(NoV, 0.0, 1.0), 1.0 - clamp(g.roughness, 0.0, 1.0));
     let brdf  = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
     let F0    = g.specularColor;
     let F     = Fresnel_Schlick_Roughness(NoV, F0, g.roughness);

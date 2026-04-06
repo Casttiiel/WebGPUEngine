@@ -55,30 +55,33 @@ export class AmbientLight {
   constructor() {}
 
   public async load(): Promise<void> {
-    this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
-    this.ambientDiffuseTechnique = await Technique.getAsync('lighting/ambient.tech');
+    try {
+      this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
+      this.ambientDiffuseTechnique = await Technique.getAsync('lighting/ambient.tech');
 
-    this.ambientDiffuseUniformBuffer = GPUUtils.createBuffer(
-      'ambient diffuse uniform buffer',
-      112, // 28 floats: 4 scalars + 6 vec4s for PCC probe A/B
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
+      this.ambientDiffuseUniformBuffer = GPUUtils.createBuffer(
+        'ambient diffuse uniform buffer',
+        112, // 28 floats: 4 scalars + 6 vec4s for PCC probe A/B
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
 
-    this.ambientSpecularTechnique = await Technique.getAsync('lighting/ambient_specular.tech');
+      this.ambientSpecularTechnique = await Technique.getAsync('lighting/ambient_specular.tech');
+      this.brdfLUT = await Texture.getAsync('brdfLUT.png');
 
-    this.brdfLUT = await Texture.getAsync('brdfLUT.png');
+      this.ambientSpecularUniformBuffer = GPUUtils.createBuffer(
+        'ambient specular uniform buffer',
+        48,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
 
-    this.ambientSpecularUniformBuffer = GPUUtils.createBuffer(
-      'ambient specular uniform buffer',
-      48,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
-
-    this.pccSpecularUniformBuffer = GPUUtils.createBuffer(
-      'ambient specular PCC uniform buffer',
-      112, // 28 floats: probeA(pos/min/max) + probeB(pos/min/max) + blendWeight
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
+      this.pccSpecularUniformBuffer = GPUUtils.createBuffer(
+        'ambient specular PCC uniform buffer',
+        112, // 28 floats: probeA(pos/min/max) + probeB(pos/min/max) + blendWeight
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+    } catch (e) {
+      console.error('[AmbientLight] load() FAILED:', e);
+    }
   }
 
   public renderDiffuse(
@@ -139,6 +142,7 @@ export class AmbientLight {
     ao: GPUTextureView,
     gBufferBindGroup: GPUBindGroup,
   ): void {
+    if (!this.pccSpecularUniformBuffer || !this.ambientSpecularUniformBuffer) return;
     const envViews = this._getProbeEnvViews();
     if (
       !this.ambientSpecularBindGroup ||
@@ -282,13 +286,14 @@ export class AmbientLight {
   }
 
   public update(_dt: number): void {
-    // Guard: load() is async and may not have finished yet (e.g. after resetAmbientLightResources)
+    // Guard: load() is async and may not have finished yet on the very first frame.
     if (
       !this.pccSpecularUniformBuffer ||
       !this.ambientDiffuseUniformBuffer ||
       !this.ambientSpecularUniformBuffer
-    )
+    ) {
       return;
+    }
 
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
     this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
@@ -390,6 +395,9 @@ export class AmbientLight {
   }
 
   public destroy(): void {
+    // Invalidates bind groups and cached texture references so they are rebuilt
+    // on the next render call after a resize. Uniform buffers are intentionally
+    // kept alive because their contents are independent of render-target size.
     this.ambientDiffuseBindGroup = null!;
     this.ambientSpecularBindGroup = null!;
     this.lastAoView = null;
@@ -397,8 +405,6 @@ export class AmbientLight {
     this.lastProbeBView = null;
     this.lastProbeEnvAView = null;
     this.lastProbeEnvBView = null;
-    this.pccSpecularUniformBuffer?.destroy();
-    this.pccSpecularUniformBuffer = null!;
   }
 
   /**
