@@ -622,8 +622,24 @@ class ObjectManager {
       component.update(delta);
     }
   }
+
+  public getList(): Component[] {
+    return this.list;
+  }
 }
 ```
+
+**Getting all components of a given type from outside the module:**
+
+```typescript
+// Returns null if no component of this type is registered
+const list = Engine.getEntities().getObjectManagerByName('bloom')?.getList() ?? [];
+for (const comp of list) {
+  (comp as BloomComponent).resize();
+}
+```
+
+This pattern is how `ModuleRender.onResolutionUpdated()` resizes every post-processing component without having hard references to each one.
 
 #### **Categorization:**
 

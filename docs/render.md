@@ -7,10 +7,11 @@ The WebGPU Engine's rendering system is built around a sophisticated modular arc
 The render module implements a modern deferred rendering pipeline with the following key features:
 
 - **Deferred Rendering**: G-Buffer based approach for efficient multi-light scenarios
-- **Physically-Based Rendering (PBR)**: Metallic-roughness workflow with Image-Based Lighting
-- **Modular Post-Processing**: Extensible effects pipeline including high-performance compute-based bloom, tone mapping, anti-aliasing, ambient occlusion, and Screen Space Reflections (SSR)
-- **Performance Optimization**: CPU-based frustum culling for reliable object culling and SamplerLibrary for GPU resource optimization
-- **Quality Management**: Adaptive rendering quality based on performance requirements with comprehensive quality presets
+- **Physically-Based Rendering (PBR)**: Metallic-roughness workflow with Image-Based Lighting (diffuse irradiance + specular env/BRDF-LUT)
+- **Modular Post-Processing**: Extensible effects pipeline including compute-based bloom, tone mapping, FXAA/SMAA/TAA anti-aliasing, ambient occlusion, SSR, DOF, motion blur, god rays, lens flare, volumetrics, and more
+- **Performance Optimization**: GPU-based frustum culling (primary) + HZB occlusion culling + CPU culling fallback; SamplerLibrary for GPU resource optimization
+- **Transparent & Glass**: Water/transparent pass (TRANSPARENT category), OIT Weighted-Blended glass pass (GLASS category) with screen-space refraction
+- **Quality Management**: Adaptive rendering quality based on performance requirements with four quality presets
 - **WebGPU Optimization**: Optimized for 2K@60fps performance with dynamic resolution scaling and efficient resource management
 
 ### SamplerLibrary - GPU Resource Optimization
@@ -19,17 +20,23 @@ The engine features a comprehensive sampler library system that eliminates redun
 
 - **Centralized Management**: Pre-created samplers for all common use cases
 - **Performance Optimization**: Avoids expensive GPU sampler creation during runtime
-- **15+ Specialized Samplers**: Optimized configurations for FXAA, bloom, tone mapping, 3D rendering, anisotropic filtering
-- **Quality Adaptive**: Anisotropic filtering levels (2x, 4x, 8x, 16x) based on quality settings
+- **10 Specialized Samplers**: `simpleSampler`, `bloom`, `ambientOcclusionSampler`, `shadows`, `anisotropic16x`, `skybox`, `environmentCubemap`, `nonFilteringSampler`, `froxelRaymarchSampler`, `nearestRepeat`
+- **Single Anisotropic Preset**: `anisotropic16x` — the only anisotropic sampler (16×)
 - **Memory Efficient**: Proper initialization and cleanup lifecycle
 
 ```typescript
 // SamplerLibrary usage examples
 SamplerLibrary.initialize(); // Called during engine startup
-const fxaaSampler = SamplerLibrary.simpleSampler; // For FXAA antialiasing
+const postProcessSampler = SamplerLibrary.simpleSampler; // For FXAA, bilateral filter
 const bloomSampler = SamplerLibrary.bloom; // For bloom post-processing
-const diffuseSampler = SamplerLibrary.diffuse; // For albedo textures
-const anisotropicSampler = SamplerLibrary.anisotropic8x; // High-quality filtering
+const aoSampler = SamplerLibrary.ambientOcclusionSampler; // For AO techniques
+const shadowSampler = SamplerLibrary.shadows; // Comparison sampler for shadow maps
+const anisotropicSampler = SamplerLibrary.anisotropic16x; // High-quality anisotropic filtering
+const skyboxSampler = SamplerLibrary.skybox; // For skybox / cubemap sampling
+const envSampler = SamplerLibrary.environmentCubemap; // For IBL environment cubemap
+const nearestSampler = SamplerLibrary.nonFilteringSampler; // Nearest neighbor (no filter)
+const volumetricSampler = SamplerLibrary.froxelRaymarchSampler; // For froxel volumetrics
+const nearestRepeatSampler = SamplerLibrary.nearestRepeat; // Nearest + repeat wrapping
 ```
 
 ### Quality Settings System
@@ -41,9 +48,15 @@ The engine includes comprehensive quality management with four preset levels:
 - **HIGH**: 100% resolution, full effects, MSAA 4x, high-quality visuals
 - **ULTRA**: 100% resolution, maximum effects, MSAA 4x, highest visual quality
 
-### Note on Specular Reflections and Ambient Pass
+### Ambient Lighting and Specular IBL
 
-**Specular IBL is not implemented in the ambient light shader pass.** Instead, specular reflections are handled in a later stage by the SSR (Screen Space Reflections) system. If a valid SSR reflection is found, it is composited as the physically-based specular. If no SSR hit is found, the fallback is to compute a generic specular value (not using the environment map). This means the ambient pass only provides diffuse (irradiance) lighting, and all specular environment or reflection effects are deferred to the SSR/compositing stage. This approach matches the engine's current implementation and is important for understanding the separation of responsibilities in the PBR pipeline.
+The ambient light pass runs in two sub-passes:
+
+1. **Diffuse pass** (`renderAccLight` → `ambientLight.render()`): Applies diffuse irradiance from the environment cubemap using the precomputed irradiance map, plus the directional light, tiled point/spot lights, and skybox. This is the main lighting accumulation pass.
+
+2. **Specular pass** (`ambientLight.renderSpecular()`): After the SSR compute step, blends SSR hit colors with the environment cubemap specular using the BRDF LUT (split-sum approximation). This ensures energy-conserving PBR specular — surfaces with a valid SSR hit get screen-space reflections; surfaces with roughness too high or no SSR hit fall back to the prefiltered env cubemap.
+
+The split between diffuse and specular passes allows SSR to run as a compute shader between them, so the specular composite has access to the full SSR result.
 
 ---
 
@@ -134,63 +147,75 @@ The main rendering pipeline executes in a specific order to ensure correct visua
 public generateFrame(): void {
   Render.getInstance().beginFrame();
 
-  // 1. Get main camera and setup
-  const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-  const cameraComponent = mainCamera?.getComponent('camera') as CameraComponent;
-  const camera = cameraComponent.getCamera();
+  // 1. Get main camera entity
+  const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
+  let result: GPUTextureView;
 
-  // 2. Set up render manager with camera
-  RenderManager.getInstance().setCamera(camera);
+  if (!mainCameraEntity) {
+    // No 3D camera — output black texture (UI-only mode)
+    result = this.createBlackTexture();
+  } else {
+    const camera = (mainCameraEntity.getComponent('camera') as CameraComponent).getCamera();
+    camera.setViewport(Render.width, Render.height);
 
-  // 3. Deferred rendering (G-Buffer + Lighting + SSR)
-  let result = this.deferred.render(mainCamera);
+    // Enable / advance temporal jitter (SMAA T2x / TAA)
+    const needsJitter =
+      mainCameraEntity.hasComponent('smaa_t2x') || mainCameraEntity.hasComponent('taa');
+    if (needsJitter) camera.nextJitter();
 
-  // 4. Post-processing chain
-  if (mainCamera?.hasComponent('bloom')) {
-    const bloom = mainCamera.getComponent('bloom') as BloomComponent;
-    result = bloom.apply(result);
+    // GPU frustum culling + tiled light culling
+    RenderManager.getInstance().performCulling(camera);
+    RenderManager.getInstance().performLightCulling(camera);
+
+    // Shadow maps for all shadow-casting lights
+    this.deferred.generateShadowMaps();
+    RenderManager.getInstance().setCamera(camera);
+
+    // Core deferred render:
+    //   DepthPrepass → GBuffer → HZB build → Decals →
+    //   AO → AccLight (diffuse) →
+    //   Transparent (water) → copy→refraction →
+    //   OIT gather (glass) → OIT compose →
+    //   SSR compute → AccLight specular →
+    //   Volumetrics
+    result = this.deferred.render(mainCameraEntity);
   }
 
-  // 5. Distortion effects
-  this.renderDistorsions(result);
+  // ── Post-processing chain (per-camera optional components) ──────────────
+  if (mainCameraEntity) {
+    // Velocity buffer for motion blur / TAA
+    velocityMgr.generate(this.mainCamera, this.deferred.getGBufferBindGroup());
 
-  // 6. Tone mapping (HDR → LDR)
-  if (mainCamera?.hasComponent('tone_mapping')) {
-    const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
-    result = toneMapping.apply(result);
+    result = heightFog.apply(result, gbuffer);           // Height-based fog
+    result = atmosphericFog.apply(result, gbuffer);      // Atmospheric scattering
+    result = bloom.apply(result, gbuffer);               // Compute-based bloom
+    result = motionBlur.apply(result, gbuffer);          // Per-object motion blur
+
+    this.distorsions.render(result, depthStencilView);   // Heat/refraction distortion overlays
+
+    result = depthOfField.apply(result, gbuffer, linearDepth);   // Depth of field
+    autoExposure.apply(result, dt);                              // Auto-exposure histogram
+    result = godRays.apply(result, gbuffer);                     // Kawase god rays
+    result = lensFlare.apply(result, gbuffer);                   // Lens flare
+
+    result = taa.apply(result, linearDepth);                     // TAA (temporal accumulation)
+    result = toneMapping.apply(result);                          // HDR → LDR tone mapping
+    result = paletteQuantize.apply(result);                      // Optional palette quantization
+    result = fsr.apply(result, encoder);                         // FSR upscale (EASU + RCAS)
+    result = fxaa.apply(result);                                 // FXAA edge AA
+    result = smaa.apply(result);                                 // SMAA 1x
+    result = smaaT2x.apply(result, linearDepth);                 // SMAA T2x (temporal)
+    speedLinesVFX.apply(result);                                 // Speed-lines overlay
+
+    this.renderUIOnTexture(result);   // UI widgets composited on top
   }
 
-  // 7. Anti-aliasing (FXAA)
-  if (mainCamera?.hasComponent('antialiasing')) {
-    const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
-    result = antialiasing.apply(result);
-  }
-
-  // 8. Final presentation
   this.presentResult(result);
-
   Render.getInstance().endFrame();
 }
 ```
 
-if (mainCamera?.hasComponent('tone_mapping')) {
-const toneMapping = mainCamera.getComponent('tone_mapping') as ToneMappingComponent;
-result = toneMapping.apply(result);
-}
-
-// 7. Anti-aliasing (FXAA)
-if (mainCamera?.hasComponent('antialiasing')) {
-const antialiasing = mainCamera.getComponent('antialiasing') as AntialiasingComponent;
-result = antialiasing.apply(result);
-}
-
-// 8. Final presentation
-this.presentResult(result);
-
-Render.getInstance().endFrame();
-}
-
-````
+> All post-processing steps are optional camera components. Absent or quality-disabled components are simply skipped.
 
 #### 3. **Quality Management Integration**
 
@@ -206,7 +231,7 @@ private applyBloomQualitySettings(bloom: BloomComponent): void {
     bloom.setIntensity(bloomConfig.intensity);
   }
 }
-````
+```
 
 **Bloom Integration:**
 The system includes advanced compute-based bloom that adapts to quality settings through:
@@ -270,30 +295,49 @@ export class DeferredRenderer {
   private gBufferPass!: GBufferPass;
 
   public render(camera: Entity): GPUTextureView {
-    // Pre-render GPU culling
-    RenderManager.getInstance().performPreRenderCulling();
+    // 0. Depth prepass (hardware early-Z for GBuffer overdraw reduction)
+    renderManager.setTechniqueOverride(depthPrepassTechnique, ...);
+    this.renderPassManager.executePass('depth_prepass', RenderCategory.SOLIDS);
+    renderManager.clearTechniqueOverride();
 
-    // Execute G-Buffer pass
+    // 1. G-Buffer pass — SOLIDS category; uses depth from prepass
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
 
-    // Execute Decal pass
+    // 2. Build HZB pyramid for NEXT frame's occlusion culling
+    this.hzbBuilder.build(encoder, depthTexture);
+
+    // 3. Copy GBuffer textures; Decal pass
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 
-    // Ambient occlusion with optimized texture usage
-    this.renderAO(camera, this.rtAO);
+    // 4. Ambient occlusion (SSAO/SSGI compute)
+    this.aoResult = this.renderAO(camera);
 
-    // Lighting accumulation
+    // 5. Lighting accumulation: ambient IBL diffuse, directional, tiled point/spot lights, skybox
     this.renderAccLight();
 
-    // Screen Space Reflections
-    this.renderSSR(camera);
-
-    // Transparent objects
+    // 6. Water / transparent pass (TRANSPARENT category)
+    //    — ensureWaterSceneBindGroup() lazily builds the water scene data bind group
+    //      (linear depth + env cubemap) and sets it as passGroup3 in RenderManagerV2
+    this.ensureWaterSceneBindGroup();
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
-    // Final composition with SSR
-    return this.composeSSR();
+    // 7. Copy rtAccLight → rtGlassRefraction (for screen-space refraction in glass)
+    encoder.copyTextureToTexture(rtAccLight, rtGlassRefraction, size);
+
+    // 8. OIT glass pass (GLASS category; Weighted-Blended OIT)
+    this.ensureOITGlassEnvBindGroup();
+    this.renderPassManager.executePass('oit_gather', RenderCategory.GLASS);
+    this.renderPassManager.executeOITComposePass(..., this.rtAccLight);
+
+    // 9. SSR compute pass → then ambient specular (blends SSR + env cubemap BRDF-LUT)
+    const ssr = this.ssr.generateSSR(rtAccLight, aoResult, gBufferComputeBindGroup, ...);
+    this.ambientLight.renderSpecular(rtAccLight, ssr, aoResult, gBufferBindGroup);
+
+    // 10. Froxel volumetric scattering (if enabled)
+    this.froxelVolumetrics.renderVolumetrics(rtAccLight.getView(), gBufferBindGroup);
+
+    return this.rtAccLight.getView();
   }
 }
 ```
@@ -303,42 +347,36 @@ export class DeferredRenderer {
 The deferred renderer manages multiple render targets and GPU resources:
 
 ```typescript
-private rtAccLight!: RenderTarget;        // Accumulated lighting
-private rtFinalComposite!: RenderTarget;  // Final composite with SSR
-private rtAO!: RenderTarget;              // Ambient occlusion
-private rtAOBinding!: RenderTarget;       // AO binding copy
-private rtCopyAlbedos!: RenderTarget;     // G-Buffer copies for decals
-private rtCopyNormals!: RenderTarget;
-private rtCopySelfIllum!: RenderTarget;
-private ssr!: ScreenSpaceReflections;     // SSR system
+private rtAccLight!: RenderTarget;         // Accumulated lighting (output from deferred pass)
+private rtOITAccumulation!: RenderTarget;  // OIT weighted color accumulation
+private rtOITRevealage!: RenderTarget;     // OIT revealage (alpha coverage)
+private rtGlassRefraction!: RenderTarget;  // Copy of rtAccLight before glass pass (refraction source)
+private rtCopyAlbedos!: RenderTarget;      // G-Buffer albedo copy (for decals)
+private rtCopyNormals!: RenderTarget;      // G-Buffer normal copy (for decals)
+private ssr!: ScreenSpaceReflections;      // SSR compute system
+private froxelVolumetrics!: FroxelVolumetricScattering; // Froxel volumetric lighting
+private waterSceneBindGroup: GPUBindGroup | null;   // Lazy: linear depth + env cube for water
+private oitGlassEnvBindGroup: GPUBindGroup | null;  // Lazy: env cube + refraction buf for glass
 ```
 
 #### 4. **Screen Space Reflections Integration**
 
-The renderer includes a complete SSR pipeline:
+SSR now runs as a **compute shader** between the main lighting pass and the ambient specular pass:
 
 ```typescript
-private renderSSR(camera: Entity): void {
-  if (!this.ssr || !this.ssr.isEnabled()) return;
-
-  // Execute SSR pass with G-Buffer and lighting data
-  this.ssr.executeSSRPass(this.gBufferBindGroup, this.rtAccLight.getView());
-}
-
-private composeSSR(): GPUTextureView {
-  if (!this.ssr || !this.ssr.isEnabled()) {
-    return this.rtAccLight.getView();
-  }
-
-  // Compose SSR with lighting
-  this.ssr.composeSSR(
-    this.rtAccLight.getView(),    // Lighting result
-    this.rtFinalComposite.getView() // Final output
-  );
-
-  return this.rtFinalComposite.getView();
-}
+// After OIT compose, inside DeferredRenderer.render():
+const ssr = this.ssr.generateSSR(
+  this.rtAccLight.getView(),
+  this.aoResult,
+  this.gBufferComputeBindGroup,   // COMPUTE-visibility bind group
+  gBufferRTs.normals.getView(),
+  gBufferRTs.linearDepth.getView(),
+);
+// SSR result is then consumed by the specular pass:
+this.ambientLight.renderSpecular(this.rtAccLight.getView(), ssr, this.aoResult, this.gBufferBindGroup);
 ```
+
+The final image in `rtAccLight` contains diffuse + direct lighting + OIT glass + SSR-blended specular IBL.
 
 #### 5. **Lighting System Integration**
 
@@ -346,19 +384,26 @@ The renderer integrates multiple lighting systems:
 
 ```typescript
 private renderAccLight(): void {
-  // Ambient lighting with IBL
-  this.ambientLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+  // Ambient IBL diffuse pass (irradiance cubemap; specular is deferred until after SSR)
+  this.ambientLight.render(this.rtAccLight.getView(), this.gBufferWithAOBindGroup);
 
-  // Directional lighting (sun/shadows)
+  // Directional light + PCF shadow map
   this.directionalLight.render(this.rtAccLight.getView(), this.gBufferBindGroup);
 
-  // Dynamic point and spot lights
+  // Area lights (rect/disk area lights)
+  this.areaLight?.render(this.rtAccLight.getView(), this.gBufferBindGroup);
+
+  // Tiled point and spot lights (clustered/tiled deferred)
+  this.tiledLightManager.render(
+    this.rtAccLight.getView(), this.tiledLightMesh, this.tiledLightTechnique, ...
+  );
+
+  // Per-light shadow variants (point lights with shadow maps)
   this.renderPassManager.executePass('pointLights');
   this.renderPassManager.executePass('spotLights');
 
-  // Skybox rendering
-  const gBufferDepthTextures = this.gBufferPass.getDepthTextures();
-  this.skybox.render(this.rtAccLight.getView(), gBufferDepthTextures.singleDepthView);
+  // Skybox rendered last (uses depth buffer for correct blending)
+  this.skybox.render(this.rtAccLight.getView(), depthView);
 }
 ```
 
@@ -399,7 +444,7 @@ public create(width: number, height: number) {
 
 ## RenderManagerV2
 
-`RenderManagerV2` serves as the bridge between the ECS system and the GPU, managing render keys, performing culling operations, and coordinating draw calls. This component implements CPU-based frustum culling for reliable and efficient object culling.
+`RenderManagerV2` serves as the bridge between the ECS system and the GPU, managing render keys, performing culling operations, and coordinating draw calls.
 
 ### Core Architecture
 
@@ -411,17 +456,17 @@ The system organizes renderable objects through a render key system:
 export class RenderManagerV2 {
   private keyManager: RenderKeyManager;
   private stateManager: RenderStateManager;
-  private cpuCuller: CPUCullingManager | null = null;
+  private cpuCuller: CPUCullingManager | null = null;  // Shadow cameras & fallback
+  private gpuCuller: GPUCullingManager | null = null;  // Main camera (PRIMARY)
+  private hzbCullingPass: HZBCullingPass | null = null; // Occlusion culling (layered on GPU)
 
-  public addKey(
-    owner: RenderComponent,
-    mesh: Mesh,
-    material: Material,
-    transform: TransformComponent,
-  ): void {
+  // Pass-level group 3 fallback for indirect draws that lack a per-key renderBindGroup.
+  // TransparentRenderPass sets this to the water scene bind group before the transparent
+  // pass and clears it afterward (null) to prevent leaking into other passes.
+  private passGroup3: GPUBindGroup | null = null;
+
+  public addKey(owner: RenderComponent, mesh: Mesh, material: Material, transform: TransformComponent): void {
     this.keyManager.addKey(owner, mesh, material, transform);
-
-    // Add shadow casting variant if needed
     if (material.getCastsShadows()) {
       this.keyManager.addKey(owner, mesh, material.getShadowsMaterial(), transform);
     }
@@ -429,92 +474,47 @@ export class RenderManagerV2 {
 }
 ```
 
-#### 2. **CPU Frustum Culling System**
+#### 2. **Culling System (GPU primary, CPU fallback)**
 
-RenderManagerV2 implements a reliable CPU-based frustum culling system:
+`RenderManagerV2` initialises three culling layers that work together:
 
-**CPU Frustum Culling:**
+| Layer | Class | Used for |
+|---|---|---|
+| **GPU frustum** (primary) | `GPUCullingManager` | Main camera — compute dispatch, zero CPU overhead |
+| **HZB occlusion** (layered) | `HZBCullingPass` | Second pass over GPU-visible set, reads previous-frame HZB pyramid |
+| **CPU frustum** (fallback) | `CPUCullingManager` | Shadow cameras; fallback if GPU culling unavailable |
 
 ```typescript
-// Initialize CPU culling system
-this.cpuCuller = new CPUCullingManager();
+public async initialize(): Promise<void> {
+  this.cpuCuller = new CPUCullingManager();       // always available
+  this.gpuCuller = new GPUCullingManager();
+  await this.gpuCuller.initialize();              // compute pipelines
+  this.hzbCullingPass = new HZBCullingPass();
+  await this.hzbCullingPass.initialize();
+}
 
-public performPreRenderCulling(): void {
-  if (!this.camera) return;
+public performCulling(camera: Camera): void {
+  // 1. GPU frustum cull all keys → indirect draw buffer
+  this.gpuCuller.dispatch(this.keyManager.getAllKeys(), camera);
 
-  const allKeys = this.keyManager.getAllKeys();
-
-  // Direct CPU frustum culling - reliable and immediate
-  this.culledKeys = this.cpuCuller!.performCulling(allKeys, this.camera);
+  // 2. HZB occlusion cull the surviving set (using last frame's depth pyramid)
+  this.hzbCullingPass.dispatch(this.gpuCuller.getVisibleBuffer(), camera);
 }
 ```
 
-#### 3. **CPU Culling Implementation**
+#### 3. **passGroup3 Mechanism**
 
-The CPU culling system provides reliable frustum testing:
+`passGroup3` solves a bind-group slot collision between water draws and particle/trail draws:
 
-**Key Features:**
-
-- **World Space Transformation**: Properly transforms object AABBs to world space using model matrices
-- **Robust Algorithm**: Uses center + half-extents method (same as GPU shader implementation)
-- **Immediate Results**: No frame lag - culling results available immediately
-- **Debug Statistics**: Performance monitoring and culling efficiency tracking
-
-**Culling Algorithm:**
-
-````typescript
-// Quadratic motion prediction: position = p0 + v*t + 0.5*a*t^2
-private predictCameraPosition(currentCamera: Camera, frameDelta: number): Camera {
-  // Calculate velocity from recent camera history
-  const velocity = this.calculateVelocity();
-  const acceleration = this.calculateAcceleration();
-
-```typescript
-// Transform AABB to world space using model matrix
-const worldAABB = this.transformAABBToWorldSpace(key.aabb, modelMatrix);
-
-// Calculate AABB center and half extents (matches GPU shader algorithm)
-const aabbCenter = vec3.create();
-const aabbHalf = vec3.create();
-
-vec3.add(aabbCenter, worldAABB.min, worldAABB.max);
-vec3.scale(aabbCenter, aabbCenter, 0.5);
-
-vec3.subtract(aabbHalf, worldAABB.max, worldAABB.min);
-vec3.scale(aabbHalf, aabbHalf, 0.5);
-
-// Test against frustum planes using center + half-extents method
-for (const plane of frustumPlanes) {
-  const r = dot(abs(plane.normal), aabbHalf);
-  const c = dot(plane.normal, aabbCenter) + plane.distance;
-
-  if (c < -r) {
-    return false; // Object is outside frustum
-  }
-}
-````
-
-**AABB Transformation:**
-
-```typescript
-private transformAABBToWorldSpace(aabb: AABB, modelMatrix: mat4): AABB {
-  // Transform all 8 corners to world space
-  for (let i = 0; i < 8; i++) {
-    const corner = vec3.fromValues(
-      (i & 1) !== 0 ? aabb.max[0] : aabb.min[0],
-      (i & 2) !== 0 ? aabb.max[1] : aabb.min[1],
-      (i & 4) !== 0 ? aabb.max[2] : aabb.min[2]
-    );
-
-    vec3.transformMat4(worldCorner, corner, modelMatrix);
-    // Update world AABB bounds
-  }
-}
-```
+- Water materials declare `WATER_SCENE` at `group(3)` (linear depth + env cubemap).
+- Trails and particles bind a **dummy** empty bind group at `group(3)` to match their pipeline layout.
+- Without correction the stale trail dummy bind group would remain bound when water draw calls run, causing a pipeline layout mismatch.
+- `TransparentRenderPass.execute()` calls `RenderManagerV2.setPassGroup3(waterBindGroup)` **before** the transparent render, then `setPassGroup3(null)` **after**.
+- Inside `renderKeys()`, every indirect draw that does not carry its own `renderBindGroup` re-binds `passGroup3` (if non-null) right before the draw.
 
 #### 4. **State Management and Optimization**
 
-The render manager implements sophisticated state management to minimize GPU state changes:
+The render manager implements sophisticated state management to minimise GPU state changes:
 
 ```typescript
 private renderKeys(keys: RenderKey[], pass: GPURenderPassEncoder): number {
@@ -634,9 +634,9 @@ public initialize(): Promise<void> {
 
 The three components work together in a coordinated fashion:
 
-1. **ModuleRender** orchestrates the overall frame generation
-2. **DeferredRenderer** handles the core G-Buffer and lighting passes
-3. **RenderManagerV2** provides reliable CPU-based frustum culling and rendering
+1. **ModuleRender** orchestrates the overall frame generation and post-processing chain
+2. **DeferredRenderer** handles the core G-Buffer, lighting, transparent, OIT glass, SSR, and volumetrics passes
+3. **RenderManagerV2** provides GPU-based frustum + HZB occlusion culling and indirect GPU draw dispatch
 
 ### Bloom System Integration
 
@@ -678,9 +678,9 @@ const upsampleEncoder = device.createCommandEncoder({ label: 'Bloom Upsample' })
 
 This architecture provides:
 
-- **High Performance**: Efficient CPU-based culling with immediate results
-- **Visual Quality**: Physically-based deferred rendering with advanced compute-based bloom
-- **Reliability**: Direct frustum testing without frame lag or cache dependencies
+- **High Performance**: GPU-based frustum + HZB occlusion culling with zero CPU readback overhead
+- **Visual Quality**: Physically-based deferred rendering with PBR specular IBL, OIT glass, water, SSR, and compute-based bloom
+- **Correctness**: passGroup3 mechanism prevents bind group slot collisions across transparent, water, and particle passes
 - **Maintainability**: Clear separation of concerns and responsibilities
 
 The system is designed to handle complex 3D scenes efficiently while maintaining high visual fidelity and providing the flexibility needed for modern real-time rendering applications.
@@ -1247,75 +1247,74 @@ public static initialize(): void {
 
 #### **1. Post-Processing Samplers**
 
-**FXAA/Simple Sampler:**
+**FXAA/Simple Sampler (`simpleSampler`):**
 
 ```typescript
-public static get simpleSampler(): GPUSampler {
-  // Used for: FXAA antialiasing, bilateral filtering, simple post-processing
-  // Configuration: Linear filtering, clamp-to-edge, no mipmaps
-}
+// Linear filtering, clamp-to-edge, no mipmaps
+// Used for: FXAA, bilateral filter, general screen-space post-process
+const sampler = SamplerLibrary.simpleSampler;
 ```
 
-**Bloom Sampler:**
+**Bloom Sampler (`bloom`):**
 
 ```typescript
-public static get bloom(): GPUSampler {
-  // Used for: Bloom downsampling, upsampling, and composition
-  // Configuration: Linear filtering, clamp-to-edge, with mipmaps
-}
+// Linear filtering, clamp-to-edge, mipmaps — for bloom downsample / upsample
+const sampler = SamplerLibrary.bloom;
 ```
 
-**Ambient Occlusion Sampler:**
+**Ambient Occlusion Sampler (`ambientOcclusionSampler`):**
 
 ```typescript
-public static get ambientOcclusionSampler(): GPUSampler {
-  // Used for: SSAO noise textures, AO parameter sampling
-  // Configuration: Nearest filtering, clamp-to-edge, optimized for noise
-}
+// Nearest + clamp — optimized for AO passes
+const sampler = SamplerLibrary.ambientOcclusionSampler;
 ```
 
 #### **2. 3D Rendering Samplers**
 
-**Diffuse/Albedo Sampler:**
+**Anisotropic Sampler (`anisotropic16x`):**
 
 ```typescript
-public static get diffuse(): GPUSampler {
-  // Used for: Albedo textures, diffuse maps
-  // Configuration: Linear filtering, repeat addressing, 4x anisotropic
-}
+// 16× anisotropic, linear, repeat — for surface albedo / normal maps
+const sampler = SamplerLibrary.anisotropic16x;
 ```
 
-**Normal Map Sampler:**
+**Environment Cubemap Sampler (`environmentCubemap`):**
 
 ```typescript
-public static get normalMap(): GPUSampler {
-  // Used for: Normal maps, bump maps
-  // Configuration: Linear filtering, repeat addressing, 8x anisotropic
-}
+// Linear, clamp-to-edge — for IBL environment specular
+const sampler = SamplerLibrary.environmentCubemap;
 ```
 
-**Shadow Map Sampler:**
+**Shadow Sampler (`shadows`):**
 
 ```typescript
-public static get shadowMap(): GPUSampler {
-  // Used for: Shadow depth comparison
-  // Configuration: Linear filtering, clamp-to-edge, depth comparison enabled
-}
+// Depth comparison sampler — for PCF shadow map sampling
+const sampler = SamplerLibrary.shadows;
 ```
 
-#### **3. Quality-Adaptive Samplers**
-
-**Anisotropic Filtering Levels:**
+**Skybox Sampler (`skybox`):**
 
 ```typescript
-public static getAnisotropicByLevel(level: number): GPUSampler {
-  if (level >= 16) return SamplerLibrary.anisotropic16x;
-  if (level >= 8) return SamplerLibrary.anisotropic8x;
-  if (level >= 4) return SamplerLibrary.anisotropic4x;
-  if (level >= 2) return SamplerLibrary.anisotropic2x;
-  return SamplerLibrary.linearRepeat;
-}
+// For skybox / procedural sky cubemap sampling
+const sampler = SamplerLibrary.skybox;
 ```
+
+#### **3. Available Samplers (complete list)**
+
+| Getter | Use case |
+|---|---|
+| `SamplerLibrary.simpleSampler` | Linear filter — FXAA, bilateral filter, general post-process |
+| `SamplerLibrary.bloom` | Linear clamp — bloom downsample / upsample |
+| `SamplerLibrary.ambientOcclusionSampler` | AO passes |
+| `SamplerLibrary.shadows` | Depth comparison sampler for shadow maps |
+| `SamplerLibrary.anisotropic16x` | 16× anisotropic — diffuse / normal surface textures |
+| `SamplerLibrary.skybox` | Cubemap / skybox sampling |
+| `SamplerLibrary.environmentCubemap` | IBL environment cubemap (specular) |
+| `SamplerLibrary.nonFilteringSampler` | Nearest neighbour — G-buffer reads, depth buffer |
+| `SamplerLibrary.froxelRaymarchSampler` | Froxel volumetric raymarch |
+| `SamplerLibrary.nearestRepeat` | Nearest + repeat — noise/LUT textures |
+
+> `SamplerLibrary.anisotropic16x` is the only anisotropic preset. Use it for all surface texture sampling. There are no `anisotropic8x` / `4x` / `2x` variants.
 
 ### Component Integration
 
@@ -1325,7 +1324,7 @@ public static getAnisotropicByLevel(level: number): GPUSampler {
 // Old approach - creating samplers in each component
 export class AntialiasingComponent extends Component {
   private createBindGroup(): void {
-    // ❌ Creates new sampler every time
+    // ❌ Creates new sampler every time — expensive GPU allocation
     const sampler = device.createSampler({
       magFilter: 'linear',
       minFilter: 'linear',
@@ -1346,7 +1345,7 @@ export class AntialiasingComponent extends Component {
 // New approach - using pre-created samplers
 export class AntialiasingComponent extends Component {
   private createBindGroup(): void {
-    // ✅ Uses pre-created optimized sampler
+    // ✅ Uses pre-created optimized sampler — zero allocation cost
     const sampler = SamplerLibrary.simpleSampler;
 
     this.bindGroup = device.createBindGroup({
@@ -1391,11 +1390,10 @@ const aoSampler = SamplerLibrary.ambientOcclusionSampler;
 #### **Material System Integration**
 
 ```typescript
-// Materials automatically select appropriate samplers
+// Materials use SamplerLibrary for all GPU samplers — never create samplers manually
 export class Material extends GPUResource {
   private createTextureBindGroup(): void {
-    const diffuseSampler = SamplerLibrary.diffuse; // For albedo
-    const normalSampler = SamplerLibrary.normalMap; // For normals
+    const anisotropicSampler = SamplerLibrary.anisotropic16x; // For albedo / normal textures
 
     // Bind group creation with optimized samplers...
   }

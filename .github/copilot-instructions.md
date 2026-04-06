@@ -108,10 +108,12 @@ export class CustomPostProcessComponent extends Component {
 export class OptimizedComponent extends Component {
   private createBindGroup(): void {
     // ✅ Always use pre-created samplers from SamplerLibrary
-    const sampler = SamplerLibrary.simpleSampler; // For FXAA, bilateral filtering
+    const sampler = SamplerLibrary.simpleSampler; // For FXAA, bilateral filtering, general post-process
     const bloomSampler = SamplerLibrary.bloom; // For bloom operations
-    const diffuseSampler = SamplerLibrary.diffuse; // For albedo textures
+    const anisotropicSampler = SamplerLibrary.anisotropic16x; // For surface albedo / normal textures
     const aoSampler = SamplerLibrary.ambientOcclusionSampler; // For AO techniques
+    const envSampler = SamplerLibrary.environmentCubemap; // For IBL env cubemap (specular)
+    const shadowSampler = SamplerLibrary.shadows; // Depth comparison for shadow maps
 
     // ❌ Never create samplers manually in components
     // const sampler = device.createSampler({ /* config */ });
@@ -172,9 +174,8 @@ export class QualityAwareComponent extends Component {
     this.numMips = settings.bloomNumMips; // For bloom component
     this.resolution = settings.renderResolution; // For resolution scaling
 
-    // Use quality-adaptive samplers
-    const anisotropicLevel = settings.anisotropicFiltering || 4;
-    const sampler = SamplerLibrary.getAnisotropicByLevel(anisotropicLevel);
+    // SamplerLibrary has a single anisotropic preset: anisotropic16x
+    const sampler = SamplerLibrary.anisotropic16x;
   }
 }
 ```

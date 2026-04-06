@@ -224,7 +224,8 @@ Coordinates the entire rendering pipeline and visual effects of the engine.
 **Performance Optimization:**
 
 - **SamplerLibrary**: Pre-created samplers eliminate redundant GPU resource creation
-- **CPU Frustum Culling**: Reliable object culling with immediate results
+- **GPU Frustum Culling (primary)**: `GPUCullingManager` compute dispatch + `HZBCullingPass` occlusion culling, zero CPU readback
+- **CPU Frustum Culling (fallback)**: `CPUCullingManager` used for shadow cameras and as fallback path
 - **2K@60fps Target**: Optimized for high-performance rendering with dynamic resolution scaling
 - **WebGPU Best Practices**: Efficient resource management and synchronization
 
@@ -244,12 +245,72 @@ Coordinates the entire rendering pipeline and visual effects of the engine.
 
 #### **Responsibilities:**
 
-- Coordinate rendering passes (G-Buffer, lighting, post-processing, SSR)
+- Coordinate rendering passes (G-Buffer, lighting, transparent, OIT glass, SSR, volumetrics)
 - Manage render targets and GPU resources with proper cleanup
 - Apply quality configurations in real-time with engine restart capability
 - Integrate with lighting and material systems through optimized samplers
-- Apply quality configurations in real-time
-- Integrate with lighting and material systems
+- Execute the full post-processing chain as per-camera components
+
+---
+
+## 🎮 Game Modules
+
+Game modules live in `src/modules/game/` and are registered as gamestate-scoped modules (not system modules). They are loaded/unloaded when gamestates change.
+
+### **ModulePhysics - Physics Simulation**
+
+#### **Purpose:**
+
+Wraps the Rapier physics engine and bridges it with the ECS system.
+
+#### **Functionalities:**
+
+- Maintains a `ColliderToEntity` map and `EntityToCollider` map for O(1) lookups
+- Steps the physics world each frame
+- Exposes `removeColliderEntry(collider, entityId)` for safe mid-simulation removal (used when resizing box colliders)
+- Provides `raycast()` for physics-based picking in the editor
+
+---
+
+### **ModuleEditorSelection - Scene Editor (F1)**
+
+#### **Purpose:**
+
+Editor mode module (toggle with **F1**) that provides the full scene-editing experience: selection, transformation gizmos, and reflection probe volume editing.
+
+#### **Functionalities:**
+
+##### **Entity Selection:**
+
+- Click-to-select via physics raycast or reflection probe ray test
+- Selected entity outline rendered by `GizmoRenderer`
+- Escape to deselect; Delete to remove selected entity
+
+##### **Transform Gizmos:**
+
+```typescript
+// Gizmo modes
+GizmoMode.TRANSLATE   // XYZ axis arrows
+GizmoMode.ROTATE      // XYZ rotation rings
+GizmoMode.SCALE       // XYZ scale handles
+GizmoMode.PROBE_RESIZE // Reflection probe face handles
+```
+
+Each gizmo axis maps to a `GizmoAxis` enum value (`X`, `Y`, `Z`, `PROBE_PX/NX/PY/NY/PZ/NZ`). The selected axis is highlighted, and the editor listens for mouse drag to apply the transformation.
+
+##### **Reflection Probe Editing:**
+
+When the selected entity has a `ReflectionProbeComponent`:
+
+- `renderProbeVolume()` draws a filled + wireframe box via `GizmoRenderer.renderProbeBox()`
+- Face-drag handles on each of the 6 faces let the artist resize the probe volume
+- `startProbeFaceDrag()` / `processProbeFaceDrag()` update `ReflectionProbeComponent.extents` and resize the underlying `BoxColliderComponent`
+
+##### **Integration:**
+
+- Uses `ModulePhysics.raycast()` to pick entities
+- Calls `GizmoRenderer.renderProbeBox()` and `GizmoRenderer.detectProbeHandleHover()` each frame
+- Reads `GizmoAxis` / `GizmoMode` enums from `src/types/`
 
 ---
 

@@ -1,17 +1,16 @@
 ### Engine
 
-1. MD Files Recreation?
-2. Architecture so any material can have any texture?
-3. Editor Light Probes (Render Debug / Gizmo)
-4. Water Shader
-5. GLTF Exporter unifies metallic and roughness? In right channel?
-6. Light probe generation fails on some face
-7. Test Paralax Corrected Cubemaps
-8. Glass Shader
-9. Enemy AI / NavMesh
-10. HZB Pocho
-11. SSR Temporal
-12. TAA: Dynamic Objects
+1. Architecture so any material can have any texture?
+2. Editor Light Probes (Render Debug / Gizmo)
+3. Water Shader
+4. GLTF Exporter unifies metallic and roughness? In right channel?
+5. Light probe generation fails on some face
+6. Test Paralax Corrected Cubemaps
+7. Glass Shader
+8. Enemy AI / NavMesh
+9. HZB Pocho
+10. SSR Temporal
+11. TAA: Dynamic Objects
 
 ## Gameplay
 

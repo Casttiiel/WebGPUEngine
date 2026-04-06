@@ -207,10 +207,29 @@ export class Engine {
 3. Main Loop (main.ts)
    ├── Calculate deltaTime
    ├── Engine.update(deltaTime)
-   │   ├── Update all modules
-   │   └── Render debug UI
+   │   ├── Update all modules (entities, input, physics, camera, game, editor…)
+   │   └── Render debug UI (Tweakpane + ImGui modules)
    ├── Engine.render()
    │   └── ModuleRender.generateFrame()
+   │       ├── GPU culling + tiled light culling
+   │       ├── Shadow map generation
+   │       ├── DeferredRenderer.render()
+   │       │   ├── Depth prepass
+   │       │   ├── G-Buffer pass (SOLIDS)
+   │       │   ├── HZB pyramid build
+   │       │   ├── Decals
+   │       │   ├── AO (SSAO/SSGI compute)
+   │       │   ├── Lighting accumulation (ambient diffuse, directional, tiled lights, skybox)
+   │       │   ├── Transparent pass (water + TRANSPARENT category)
+   │       │   ├── OIT glass pass (GLASS category, screen-space refraction)
+   │       │   ├── SSR compute + ambient specular
+   │       │   └── Froxel volumetric scattering
+   │       └── Post-processing chain (per-camera components):
+   │           velocity buffer → height fog → atmospheric fog → bloom →
+   │           motion blur → distorsions → DOF → auto-exposure →
+   │           god rays → lens flare → TAA → tone mapping →
+   │           palette quantize → FSR → FXAA → SMAA → SMAA T2x →
+   │           speed lines → UI overlay → present
    └── requestAnimationFrame(next frame)
 ```
 

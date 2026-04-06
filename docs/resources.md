@@ -327,11 +327,20 @@ const dynamicMaterial = await Material.get(matData);
 material.setBindGroup(renderPass, 2); // Bind group 2 for textures
 ```
 
-#### **.mat File (JSON):**
+#### **.mat File (JSON) — full field reference:**
 
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `technique` | string | — | Path to `.tech` file |
+| `textures` | object | `{}` | Map of texture slot name → image path |
+| `category` | string | `"SOLIDS"` | Render category: `SOLIDS`, `TRANSPARENT`, `GLASS`, `DISTORTION`, `DECALS` |
+| `castsShadows` | boolean | `true` | Whether the material casts a shadow |
+| `baseColorFactor` | number[4] | `[1,1,1,1]` | RGBA multiplier applied to the albedo texture |
+
+**Example — standard PBR solid:**
 ```json
 {
-  "technique": "pbr.tech",
+  "technique": "pbr/pbr.tech",
   "textures": {
     "txAlbedo": "metal_albedo.png",
     "txNormal": "metal_normal.png",
@@ -342,6 +351,19 @@ material.setBindGroup(renderPass, 2); // Bind group 2 for textures
   "category": "SOLIDS",
   "castsShadows": true,
   "baseColorFactor": [1.0, 1.0, 1.0, 1.0]
+}
+```
+
+**Example — water (TRANSPARENT category):**
+```json
+{
+  "technique": "water/water.tech",
+  "textures": {
+    "txNoise": "textures/noiseRGBTileable.ktx2"
+  },
+  "category": "TRANSPARENT",
+  "castsShadows": false,
+  "baseColorFactor": [0.05, 0.3, 0.7, 0.45]
 }
 ```
 
@@ -380,8 +402,20 @@ export class Technique extends GPUResource {
 }
 ```
 
-#### **.tech File (JSON):**
+#### **.tech File (JSON) — full field reference:**
 
+| Field | Type | Description |
+|---|---|---|
+| `vs` | string | Vertex shader path relative to `assets/shaders/` |
+| `fs` | string | Fragment shader path relative to `assets/shaders/` |
+| `writesOn` | string | Output targets: `GBUFFER`, `SCREEN`, `DEPTH_ONLY`, `OIT_GBUFFER` |
+| `z` | string | Depth mode: `LESS`, `LESS_EQUAL`, `ALWAYS`, `NONE`, `test_but_no_write` |
+| `blend` | string | Blend mode: `OPAQUE`, `ALPHA`, `ADDITIVE`, `OIT`, `COMBINATIVE` |
+| `rs` | string | Rasterizer: `FILL`, `WIREFRAME`; add `double_sided: true` for no back-face cull |
+| `uniforms` | string[] | Bind group layout names (e.g. `CAMERA_UNIFORMS`, `MATERIAL_TEXTURES`, `WATER_SCENE`) |
+| `double_sided` | boolean? | If true, disables back-face culling |
+
+**Example — standard PBR opaque:**
 ```json
 {
   "vs": "pbr.vs",
@@ -392,6 +426,30 @@ export class Technique extends GPUResource {
   "writesOn": "GBUFFER",
   "uniforms": ["CAMERA_UNIFORMS", "OBJECT_UNIFORMS", "MATERIAL_TEXTURES"]
 }
+```
+
+**Example — water (transparent, double-sided, depth test but no write):**
+```json
+{
+  "vs": "water/water.vs",
+  "fs": "water/water.fs",
+  "blend": "COMBINATIVE",
+  "z": "test_but_no_write",
+  "rs": "FILL",
+  "double_sided": true,
+  "writesOn": "SCREEN",
+  "uniforms": ["CAMERA_UNIFORMS", "OBJECT_UNIFORMS", "MATERIAL_TEXTURES", "WATER_SCENE"]
+}
+```
+
+#### **Usage:**
+
+```typescript
+// Async load (preferred — returns cached instance on repeat calls)
+const tech = await Technique.getAsync('pbr/pbr.tech');
+
+// Sync get from cache (throws if not yet loaded)
+const tech = Technique.get('pbr/pbr.tech');
 ```
 
 #### **Shader Preprocessing:**
