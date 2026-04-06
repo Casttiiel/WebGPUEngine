@@ -13,6 +13,8 @@ import { GizmoRenderer } from '../../renderer/editor/GizmoRenderer';
 import { GizmoMode } from '../../types/GizmoMode.enum';
 import { GizmoAxis } from '../../types/GizmoAxis.enum';
 import { KeyCode } from '../../types/KeyCode.enum';
+import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
+import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
 
 export class ModuleEditorSelection extends Module {
   private selectedEntity: Entity | null = null;
@@ -41,6 +43,16 @@ export class ModuleEditorSelection extends Module {
 
   // Store initial scale for drag (for scale gizmo)
   private _dragStartScale: vec3 | null = null;
+
+  // ---- Probe resize state ----
+  // Which face handle is being dragged (PROBE_PX … PROBE_NZ)
+  private probeDragFace: GizmoAxis = GizmoAxis.NONE;
+  // Current hovered face handle (for highlight)
+  private probeHoveredHandle: GizmoAxis = GizmoAxis.NONE;
+  // Half-extents at drag-start (so we can compute delta from origin)
+  private _probeDragStartHalfExtents: vec3 | null = null;
+  // Face center world position at drag-start
+  private _probeDragStartFaceCenter: vec3 | null = null;
 
   // Gizmo dragging state
   private isDragging: boolean = false;
@@ -265,6 +277,12 @@ export class ModuleEditorSelection extends Module {
    * Cambia el modo de gizmo (TRANSLATE, SCALE, ROTATE, ...)
    */
   private cycleGizmoMode(): void {
+    if (this.selectedEntity && this.isProbeEntity(this.selectedEntity)) {
+      // For probes: toggle between TRANSLATE and PROBE_RESIZE
+      this.gizmoMode =
+        this.gizmoMode === GizmoMode.TRANSLATE ? GizmoMode.PROBE_RESIZE : GizmoMode.TRANSLATE;
+      return;
+    }
     // El orden será: TRANSLATE → SCALE → ROTATE → TRANSLATE ...
     const modes = [GizmoMode.TRANSLATE, GizmoMode.SCALE, GizmoMode.ROTATE];
     const currentIdx = modes.indexOf(this.gizmoMode);
@@ -285,12 +303,34 @@ export class ModuleEditorSelection extends Module {
     // Convertir mouse position a ray en world space
     const ray = this.screenToWorldRay(mousePos, camera);
 
-    // 1. Primero verificar si se hizo clic en el gizmo (si hay objeto seleccionado)
-    if (this.selectedEntity) {
+    // 1. Si hay probe seleccionado en modo PROBE_RESIZE, verificar clic en face handle
+    if (this.selectedEntity && this.gizmoMode === GizmoMode.PROBE_RESIZE) {
+      const probeComp = this.selectedEntity.getComponent(
+        'reflection_probe',
+      ) as ReflectionProbeComponent;
+      const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+      const boxComp = this.selectedEntity.getComponent('box_collider') as BoxColliderComponent;
+      if (probeComp && transformComp && boxComp) {
+        const center = transformComp.getTransform().getWorldPosition();
+        const half = boxComp.getHalfExtents();
+        const clickedHandle = this.gizmoRenderer.detectProbeHandleHover(
+          center,
+          half,
+          ray.origin,
+          ray.direction,
+        );
+        if (clickedHandle !== GizmoAxis.NONE) {
+          this.startProbeFaceDrag(clickedHandle, center, half, mousePos, camera);
+          return;
+        }
+      }
+    }
+
+    // 2. Si hay objeto seleccionado en modo TRANSLATE/SCALE, verificar clic en gizmo
+    if (this.selectedEntity && this.gizmoMode !== GizmoMode.PROBE_RESIZE) {
       const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
       if (transformComp) {
         const gizmoPosition = transformComp.getTransform().getWorldPosition();
-        // Obtener cámara real para calcular adaptiveScale
         const cameraObj = camera.getCamera();
         const cameraPos = cameraObj.getPosition();
         const adaptiveScale = this.gizmoRenderer.calculateAdaptiveScale(
@@ -306,7 +346,6 @@ export class ModuleEditorSelection extends Module {
           this.gizmoMode === GizmoMode.SCALE,
         );
 
-        // Si se hizo clic en un eje del gizmo, iniciar arrastre
         if (clickedAxis !== GizmoAxis.NONE) {
           this.startDragging(clickedAxis, gizmoPosition, mousePos, camera);
           return;
@@ -314,21 +353,34 @@ export class ModuleEditorSelection extends Module {
       }
     }
 
-    // 2. Si no se hizo clic en el gizmo, hacer selección normal
-    // Usar el módulo de physics para hacer raycast (ignora sensores, selecciona el más cercano)
+    // 3. Selección normal: primero non-sensor raycast, luego probe sphere test
     const physics = Engine.getPhysics();
-    const result = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
+    const rayResult = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
 
-    if (result) {
-      const entity = Engine.getEntities().getEntityById(result.entityId);
+    const nonSensorDist = rayResult
+      ? vec3.distance(ray.origin, (rayResult as any).point ?? ray.origin)
+      : Infinity;
 
+    // Probe sphere test — since probe box_collider is a sensor it's skipped by raycastClosestNonSensor
+    const probeHit = this.findProbeEntityAtRay(ray.origin, ray.direction, nonSensorDist);
+
+    if (probeHit) {
+      if (probeHit !== this.selectedEntity) {
+        this.selectedEntity = probeHit;
+        this.gizmoMode = GizmoMode.TRANSLATE;
+      }
+    } else if (rayResult) {
+      const entity = Engine.getEntities().getEntityById(rayResult.entityId);
       if (entity && entity !== this.selectedEntity) {
         this.selectedEntity = entity;
+        if (this.isProbeEntity(entity)) {
+          this.gizmoMode = GizmoMode.TRANSLATE;
+        }
       }
     } else {
-      // No hit - deseleccionar
       if (this.selectedEntity) {
         this.selectedEntity = null;
+        this.gizmoMode = GizmoMode.TRANSLATE;
       }
     }
   }
@@ -342,15 +394,32 @@ export class ModuleEditorSelection extends Module {
     const input = Engine.getInput();
     const mousePos = input.getMousePosition();
 
-    // Convertir mouse position a ray en world space
     const ray = this.screenToWorldRay(mousePos, camera);
 
-    // 1. Primero verificar hover sobre el gizmo (si hay objeto seleccionado)
-    if (this.selectedEntity) {
+    // 1. If a probe is selected in PROBE_RESIZE mode, check handle hover
+    if (this.selectedEntity && this.gizmoMode === GizmoMode.PROBE_RESIZE) {
+      const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+      const boxComp = this.selectedEntity.getComponent('box_collider') as BoxColliderComponent;
+      if (transformComp && boxComp) {
+        const center = transformComp.getTransform().getWorldPosition();
+        const half = boxComp.getHalfExtents();
+        this.probeHoveredHandle = this.gizmoRenderer.detectProbeHandleHover(
+          center,
+          half,
+          ray.origin,
+          ray.direction,
+        );
+        this.hoveredEntity = null;
+        return;
+      }
+    }
+    this.probeHoveredHandle = GizmoAxis.NONE;
+
+    // 2. Verificar hover sobre el gizmo (si hay objeto seleccionado, modo no-probe)
+    if (this.selectedEntity && this.gizmoMode !== GizmoMode.PROBE_RESIZE) {
       const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
       if (transformComp) {
         const gizmoPosition = transformComp.getTransform().getWorldPosition();
-        // Obtener cámara real para calcular adaptiveScale
         const cameraObj = camera.getCamera();
         const cameraPos = cameraObj.getPosition();
         const adaptiveScale = this.gizmoRenderer.calculateAdaptiveScale(
@@ -366,10 +435,8 @@ export class ModuleEditorSelection extends Module {
           this.gizmoMode === GizmoMode.SCALE,
         );
 
-        // Actualizar el estado de hover del gizmo
         this.gizmoRenderer.setHoveredAxis(hoveredAxis);
 
-        // Si hay hover sobre el gizmo, no detectar hover sobre entidades
         if (hoveredAxis !== GizmoAxis.NONE) {
           this.hoveredEntity = null;
           return;
@@ -377,19 +444,12 @@ export class ModuleEditorSelection extends Module {
       }
     }
 
-    // 2. Si no hay hover sobre el gizmo, detectar hover sobre entidades
-    // Usar el módulo de physics para hacer raycast (ignora sensores, selecciona el más cercano)
+    // 3. Hover sobre entidades (non-sensor)
     const physics = Engine.getPhysics();
     const result = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
-
     const newHoveredEntity = result ? Engine.getEntities().getEntityById(result.entityId) : null;
 
-    // Solo actualizar si cambió el hover
     if (newHoveredEntity !== this.hoveredEntity) {
-      // Log de cambio de hover (opcional, para debug)
-      if (newHoveredEntity) {
-      }
-
       this.hoveredEntity = newHoveredEntity;
     }
   }
@@ -494,6 +554,11 @@ export class ModuleEditorSelection extends Module {
     if (this.selectedEntity) {
       this.renderWireframeInFrame(this.selectedEntity, [10.0, 0.0, 0.0, 1.0]);
 
+      // Si es probe, dibujar el volumen del collider
+      if (this.isProbeEntity(this.selectedEntity)) {
+        this.renderProbeVolume();
+      }
+
       // Renderizar gizmo en la posición del objeto seleccionado
       this.renderGizmo();
     }
@@ -514,6 +579,9 @@ export class ModuleEditorSelection extends Module {
 
     // Set the current transform for object space axes
     this.gizmoRenderer.currentTransform = transformComp.getTransform();
+
+    // En modo PROBE_RESIZE no mostramos el gizmo XYZ (los handles de cara lo reemplazan)
+    if (this.gizmoMode === GizmoMode.PROBE_RESIZE) return;
 
     // Renderizar según el modo activo
     switch (this.gizmoMode) {
@@ -662,8 +730,205 @@ export class ModuleEditorSelection extends Module {
     return this.selectedEntity;
   }
 
+  public getSelectedEntity(): Entity | null {
+    return this.selectedEntity;
+  }
+
   public getHoveredEntity(): Entity | null {
     return this.hoveredEntity;
+  }
+
+  // ==================== Probe helpers ====================
+
+  /** Returns true if the entity has a reflection_probe component. */
+  private isProbeEntity(entity: Entity): boolean {
+    return entity.hasComponent('reflection_probe');
+  }
+
+  /**
+   * Ray-sphere test against all probe entities.
+   * Returns the closest probe within `maxDist` or null.
+   */
+  private findProbeEntityAtRay(rayOrigin: vec3, rayDir: vec3, maxDist: number): Entity | null {
+    const probeList =
+      Engine.getEntities().getObjectManagerByName('reflection_probe')?.getList() ?? [];
+
+    let closest: Entity | null = null;
+    let closestT = maxDist;
+
+    for (const comp of probeList) {
+      const entity: Entity = (comp as any).getOwner();
+      const transformComp = entity.getComponent('transform') as TransformComponent;
+      if (!transformComp) continue;
+
+      const center = transformComp.getTransform().getWorldPosition();
+      const oc = vec3.create();
+      vec3.subtract(oc, rayOrigin, center);
+
+      const SPHERE_RADIUS = 0.5;
+      const b = 2.0 * vec3.dot(oc, rayDir);
+      const c_ = vec3.dot(oc, oc) - SPHERE_RADIUS * SPHERE_RADIUS;
+      const disc = b * b - 4.0 * c_;
+      if (disc < 0) continue;
+
+      const t = (-b - Math.sqrt(disc)) / 2.0;
+      if (t > 0 && t < closestT) {
+        closestT = t;
+        closest = entity;
+      }
+    }
+
+    return closest;
+  }
+
+  /** Renders the probe volume box + face handles using GizmoRenderer. */
+  private renderProbeVolume(): void {
+    if (!this.selectedEntity) return;
+    const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+    const boxComp = this.selectedEntity.getComponent('box_collider') as BoxColliderComponent;
+    const camera = this.getEditorCamera();
+    if (!transformComp || !boxComp || !camera) return;
+
+    const center = transformComp.getTransform().getWorldPosition();
+    const half = boxComp.getHalfExtents();
+    const hoveredHandle =
+      this.gizmoMode === GizmoMode.PROBE_RESIZE ? this.probeHoveredHandle : GizmoAxis.NONE;
+
+    this.gizmoRenderer.renderProbeBox(center, half, camera.getCamera(), hoveredHandle);
+  }
+
+  // ==================== Probe resize drag ====================
+
+  /**
+   * Starts a probe face resize drag.
+   * `face` is one of PROBE_PX … PROBE_NZ.
+   */
+  private startProbeFaceDrag(
+    face: GizmoAxis,
+    center: vec3,
+    halfExtents: vec3,
+    mousePos: { x: number; y: number },
+    camera: CameraComponent,
+  ): void {
+    this.isDragging = true;
+    this.probeDragFace = face;
+    this._probeDragStartHalfExtents = vec3.clone(halfExtents);
+
+    // Face center = point on the face being dragged
+    const faceCenter = vec3.clone(center);
+    switch (face) {
+      case GizmoAxis.PROBE_PX:
+        faceCenter[0] += halfExtents[0];
+        break;
+      case GizmoAxis.PROBE_NX:
+        faceCenter[0] -= halfExtents[0];
+        break;
+      case GizmoAxis.PROBE_PY:
+        faceCenter[1] += halfExtents[1];
+        break;
+      case GizmoAxis.PROBE_NY:
+        faceCenter[1] -= halfExtents[1];
+        break;
+      case GizmoAxis.PROBE_PZ:
+        faceCenter[2] += halfExtents[2];
+        break;
+      case GizmoAxis.PROBE_NZ:
+        faceCenter[2] -= halfExtents[2];
+        break;
+    }
+    this._probeDragStartFaceCenter = faceCenter;
+
+    // Drag plane at the face center, normal = face axis direction
+    const axisDir = this.probeFaceToAxisDir(face);
+    const cameraDir = camera.getCamera().getFront();
+    vec3.cross(this.dragPlaneNormal, axisDir, cameraDir);
+    vec3.cross(this.dragPlaneNormal, this.dragPlaneNormal, axisDir);
+    vec3.normalize(this.dragPlaneNormal, this.dragPlaneNormal);
+    vec3.copy(this.dragPlanePoint, faceCenter);
+    vec3.copy(this.dragStartWorldPos, faceCenter);
+    this.dragStartMousePos = { ...mousePos };
+    this.draggedAxis = GizmoAxis.NONE; // not a translate drag
+  }
+
+  private probeFaceToAxisDir(face: GizmoAxis): vec3 {
+    switch (face) {
+      case GizmoAxis.PROBE_PX:
+        return vec3.fromValues(1, 0, 0);
+      case GizmoAxis.PROBE_NX:
+        return vec3.fromValues(-1, 0, 0);
+      case GizmoAxis.PROBE_PY:
+        return vec3.fromValues(0, 1, 0);
+      case GizmoAxis.PROBE_NY:
+        return vec3.fromValues(0, -1, 0);
+      case GizmoAxis.PROBE_PZ:
+        return vec3.fromValues(0, 0, 1);
+      case GizmoAxis.PROBE_NZ:
+        return vec3.fromValues(0, 0, -1);
+      default:
+        return vec3.fromValues(0, 1, 0);
+    }
+  }
+
+  /**
+   * Processes an active probe face resize drag.
+   * Called from processDragging() when probeDragFace !== NONE.
+   */
+  private processProbeFaceDrag(): void {
+    if (!this.selectedEntity || !this._probeDragStartHalfExtents || !this._probeDragStartFaceCenter)
+      return;
+
+    const camera = this.getEditorCamera();
+    if (!camera) return;
+
+    const input = Engine.getInput();
+    const mousePos = input.getMousePosition();
+    const ray = this.screenToWorldRay(mousePos, camera);
+
+    const hitPoint = this.rayPlaneIntersection(
+      ray.origin,
+      ray.direction,
+      this.dragPlanePoint,
+      this.dragPlaneNormal,
+    );
+    if (!hitPoint) return;
+
+    const axisDir = this.probeFaceToAxisDir(this.probeDragFace);
+    const isNeg =
+      this.probeDragFace === GizmoAxis.PROBE_NX ||
+      this.probeDragFace === GizmoAxis.PROBE_NY ||
+      this.probeDragFace === GizmoAxis.PROBE_NZ;
+
+    // How far has the face moved along its outward direction?
+    const dragVec = vec3.create();
+    vec3.subtract(dragVec, hitPoint, this._probeDragStartFaceCenter);
+    // For negative faces, convert sign so "pulling out" = positive delta
+    let delta = vec3.dot(dragVec, axisDir) * (isNeg ? -1 : 1);
+
+    // Snap to 0.1 m
+    delta = Math.round(delta / 0.1) * 0.1;
+
+    const startH = this._probeDragStartHalfExtents;
+    const axisIdx = axisDir[0] !== 0 ? 0 : axisDir[1] !== 0 ? 1 : 2;
+    const newHalfExtents = vec3.clone(startH);
+    newHalfExtents[axisIdx] = Math.max(0.1, startH[axisIdx] + delta);
+
+    const boxComp = this.selectedEntity.getComponent('box_collider') as BoxColliderComponent;
+    if (!boxComp) return;
+
+    const newSize = vec3.fromValues(
+      newHalfExtents[0] * 2,
+      newHalfExtents[1] * 2,
+      newHalfExtents[2] * 2,
+    );
+    boxComp.resizeBox(newSize);
+
+    // Keep ReflectionProbeComponent.extents in sync
+    const probeComp = this.selectedEntity.getComponent(
+      'reflection_probe',
+    ) as ReflectionProbeComponent;
+    if (probeComp) {
+      probeComp.setExtents(newHalfExtents);
+    }
   }
 
   /**
@@ -671,6 +936,12 @@ export class ModuleEditorSelection extends Module {
    */
   private processDragging(): void {
     if (!this.selectedEntity) return;
+
+    // Route to probe face resize if active
+    if (this.probeDragFace !== GizmoAxis.NONE) {
+      this.processProbeFaceDrag();
+      return;
+    }
 
     const camera = this.getEditorCamera();
     if (!camera) return;
@@ -790,7 +1061,15 @@ export class ModuleEditorSelection extends Module {
    */
   private stopDragging(): void {
     this.isDragging = false;
-    this.draggedAxis = GizmoAxis.NONE;
+
+    // Clear probe face drag state
+    if (this.probeDragFace !== GizmoAxis.NONE) {
+      this.probeDragFace = GizmoAxis.NONE;
+      this._probeDragStartHalfExtents = null;
+      this._probeDragStartFaceCenter = null;
+      this.draggedAxis = GizmoAxis.NONE;
+      return;
+    }
     // Si se acaba de hacer drag de escala, recrear el collider si existe
     if (this.gizmoMode === GizmoMode.SCALE && this.selectedEntity) {
       const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
@@ -828,6 +1107,7 @@ export class ModuleEditorSelection extends Module {
     }
     // Limpiar escala inicial de drag para futuros drags
     this._dragStartScale = null;
+    this.draggedAxis = GizmoAxis.NONE;
   }
 
   /**

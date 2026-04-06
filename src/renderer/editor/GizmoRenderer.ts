@@ -13,6 +13,30 @@ import { Transform } from '../../core/math/Transform';
 export class GizmoRenderer {
   private device: GPUDevice;
 
+  // Pipeline para renderizar triángulos (semi-transparent fill)
+  private fillPipeline!: GPURenderPipeline;
+
+  // Probe box geometry buffers
+  private probeVertexBuffer!: GPUBuffer;
+  private probeEdgeColorBuffer!: GPUBuffer;
+  private probeFillColorBuffer!: GPUBuffer;
+  private probeHandleDefaultBuffer!: GPUBuffer;
+  private probeHandleHoveredBuffer!: GPUBuffer;
+  private probeEdgeColorBindGroup!: GPUBindGroup;
+  private probeFillColorBindGroup!: GPUBindGroup;
+  private probeHandleDefaultBindGroup!: GPUBindGroup;
+  private probeHandleHoveredBindGroup!: GPUBindGroup;
+
+  // Probe box vertex budget:
+  //  - 36 filled triangles (fill pass)
+  //  - 24 wireframe edge verts (line pass)
+  //  - 24 face-handle cross verts (line pass)
+  //  = 84 verts max, store in one buffer; passes select offset/count
+  private static readonly PROBE_FILL_VERT_COUNT = 36;
+  private static readonly PROBE_EDGE_VERT_COUNT = 24;
+  private static readonly PROBE_HANDLE_VERT_COUNT = 24; // 6 handles × 4 verts (2 lines × 2)
+  private static readonly PROBE_TOTAL_VERT_COUNT = 84;
+
   // Pipeline para renderizar líneas
   private linePipeline!: GPURenderPipeline;
 
@@ -57,6 +81,7 @@ export class GizmoRenderer {
     await this.createPipeline();
     this.createUniformBuffers();
     this.createVertexBuffer();
+    this.createProbeBuffers();
     console.log('✅ GizmoRenderer initialized');
   }
 
@@ -175,6 +200,47 @@ export class GizmoRenderer {
       },
       primitive: {
         topology: 'line-list',
+        cullMode: 'none',
+      },
+    });
+
+    // Pipeline para triángulos (relleno semitransparente de volumes de probe)
+    this.fillPipeline = device.createRenderPipeline({
+      label: 'gizmo_fill_pipeline',
+      layout: pipelineLayout,
+      vertex: {
+        module: shaderModule,
+        entryPoint: 'vs_main',
+        buffers: [
+          {
+            arrayStride: 3 * 4,
+            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
+          },
+        ],
+      },
+      fragment: {
+        module: shaderModule,
+        entryPoint: 'fs_main',
+        targets: [
+          {
+            format: 'bgra8unorm',
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+              alpha: {
+                srcFactor: 'one',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+            },
+          },
+        ],
+      },
+      primitive: {
+        topology: 'triangle-list',
         cullMode: 'none',
       },
     });
@@ -579,5 +645,341 @@ export class GizmoRenderer {
     this.uniformBufferY?.destroy();
     this.uniformBufferZ?.destroy();
     this.vertexBuffer?.destroy();
+    this.probeVertexBuffer?.destroy();
+    this.probeEdgeColorBuffer?.destroy();
+    this.probeFillColorBuffer?.destroy();
+    this.probeHandleDefaultBuffer?.destroy();
+    this.probeHandleHoveredBuffer?.destroy();
+  }
+
+  // ==================== Probe box ====================
+
+  private createProbeBuffers(): void {
+    const device = this.device;
+
+    this.probeVertexBuffer = device.createBuffer({
+      label: 'probe_box_vertices',
+      size: GizmoRenderer.PROBE_TOTAL_VERT_COUNT * 3 * 4,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+
+    const mkBuf = (label: string, color: number[]): GPUBuffer => {
+      const buf = device.createBuffer({
+        label,
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      device.queue.writeBuffer(buf, 0, new Float32Array(color));
+      return buf;
+    };
+    const mkBG = (label: string, buf: GPUBuffer): GPUBindGroup =>
+      device.createBindGroup({
+        label,
+        layout: this.uniformBindGroupLayout,
+        entries: [{ binding: 0, resource: { buffer: buf } }],
+      });
+
+    this.probeFillColorBuffer = mkBuf('probe_fill_color', [0.0, 0.8, 0.8, 0.12]);
+    this.probeEdgeColorBuffer = mkBuf('probe_edge_color', [0.0, 0.95, 0.95, 0.9]);
+    this.probeHandleDefaultBuffer = mkBuf('probe_handle_def', [1.0, 0.9, 0.0, 1.0]);
+    this.probeHandleHoveredBuffer = mkBuf('probe_handle_hov', [1.0, 1.0, 1.0, 1.0]);
+
+    this.probeFillColorBindGroup = mkBG('probe_fill_bg', this.probeFillColorBuffer);
+    this.probeEdgeColorBindGroup = mkBG('probe_edge_bg', this.probeEdgeColorBuffer);
+    this.probeHandleDefaultBindGroup = mkBG('probe_handle_def_bg', this.probeHandleDefaultBuffer);
+    this.probeHandleHoveredBindGroup = mkBG('probe_handle_hov_bg', this.probeHandleHoveredBuffer);
+  }
+
+  /**
+   * Builds the 8 corners of an AABB box.
+   * Corner index layout:
+   *  0: (-hx,-hy,-hz)  1: (+hx,-hy,-hz)  2: (+hx,-hy,+hz)  3: (-hx,-hy,+hz)
+   *  4: (-hx,+hy,-hz)  5: (+hx,+hy,-hz)  6: (+hx,+hy,+hz)  7: (-hx,+hy,+hz)
+   */
+  private buildBoxCorners(center: vec3, half: vec3): vec3[] {
+    const [cx, cy, cz] = [center[0], center[1], center[2]];
+    const [hx, hy, hz] = [half[0], half[1], half[2]];
+    return [
+      vec3.fromValues(cx - hx, cy - hy, cz - hz),
+      vec3.fromValues(cx + hx, cy - hy, cz - hz),
+      vec3.fromValues(cx + hx, cy - hy, cz + hz),
+      vec3.fromValues(cx - hx, cy - hy, cz + hz),
+      vec3.fromValues(cx - hx, cy + hy, cz - hz),
+      vec3.fromValues(cx + hx, cy + hy, cz - hz),
+      vec3.fromValues(cx + hx, cy + hy, cz + hz),
+      vec3.fromValues(cx - hx, cy + hy, cz + hz),
+    ];
+  }
+
+  /**
+   * Writes 36 positions for a filled box into `out` starting at `offset`.
+   * Returns next offset.
+   */
+  private writeFilledBox(out: Float32Array, offset: number, c: vec3[]): number {
+    // 6 faces × 2 triangles × 3 verts
+    const faces: [number, number, number, number][] = [
+      [0, 1, 2, 3], // bottom (Y-)
+      [7, 6, 5, 4], // top    (Y+)
+      [3, 2, 6, 7], // front  (Z+)
+      [0, 4, 5, 1], // back   (Z-)
+      [0, 3, 7, 4], // left   (X-)
+      [1, 5, 6, 2], // right  (X+)
+    ];
+    for (const [a, b, d_, e] of faces) {
+      // Triangle 1: a, b, d
+      out[offset++] = c[a]![0];
+      out[offset++] = c[a]![1];
+      out[offset++] = c[a]![2];
+      out[offset++] = c[b]![0];
+      out[offset++] = c[b]![1];
+      out[offset++] = c[b]![2];
+      out[offset++] = c[d_]![0];
+      out[offset++] = c[d_]![1];
+      out[offset++] = c[d_]![2];
+      // Triangle 2: a, d, e
+      out[offset++] = c[a]![0];
+      out[offset++] = c[a]![1];
+      out[offset++] = c[a]![2];
+      out[offset++] = c[d_]![0];
+      out[offset++] = c[d_]![1];
+      out[offset++] = c[d_]![2];
+      out[offset++] = c[e]![0];
+      out[offset++] = c[e]![1];
+      out[offset++] = c[e]![2];
+    }
+    return offset;
+  }
+
+  /**
+   * Writes 24 positions for the 12 wireframe edges into `out` starting at `offset`.
+   */
+  private writeBoxEdges(out: Float32Array, offset: number, c: vec3[]): number {
+    const edges: [number, number][] = [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 0], // bottom ring
+      [4, 5],
+      [5, 6],
+      [6, 7],
+      [7, 4], // top ring
+      [0, 4],
+      [1, 5],
+      [2, 6],
+      [3, 7], // verticals
+    ];
+    for (const [a, b] of edges) {
+      out[offset++] = c[a]![0];
+      out[offset++] = c[a]![1];
+      out[offset++] = c[a]![2];
+      out[offset++] = c[b]![0];
+      out[offset++] = c[b]![1];
+      out[offset++] = c[b]![2];
+    }
+    return offset;
+  }
+
+  /**
+   * Writes 4 positions for a face cross marker (2 perpendicular lines) into `out`.
+   * Returns [startIndex, nextOffset] so we can draw by handle.
+   */
+  private writeFaceCross(
+    out: Float32Array,
+    offset: number,
+    faceCenter: vec3,
+    tangU: vec3,
+    tangV: vec3,
+    size: number,
+  ): number {
+    // Line 1 along tangU
+    out[offset++] = faceCenter[0] - tangU[0] * size;
+    out[offset++] = faceCenter[1] - tangU[1] * size;
+    out[offset++] = faceCenter[2] - tangU[2] * size;
+    out[offset++] = faceCenter[0] + tangU[0] * size;
+    out[offset++] = faceCenter[1] + tangU[1] * size;
+    out[offset++] = faceCenter[2] + tangU[2] * size;
+    // Line 2 along tangV
+    out[offset++] = faceCenter[0] - tangV[0] * size;
+    out[offset++] = faceCenter[1] - tangV[1] * size;
+    out[offset++] = faceCenter[2] - tangV[2] * size;
+    out[offset++] = faceCenter[0] + tangV[0] * size;
+    out[offset++] = faceCenter[1] + tangV[1] * size;
+    out[offset++] = faceCenter[2] + tangV[2] * size;
+    return offset;
+  }
+
+  /**
+   * Renders the probe volume as:
+   *  1. A semi-transparent filled box (alpha ~0.12)
+   *  2. A cyan wireframe outline
+   *  3. Six face cross-handles (yellow, white if hovered)
+   */
+  public renderProbeBox(
+    center: vec3,
+    halfExtents: vec3,
+    camera: Camera,
+    hoveredHandle: GizmoAxis = GizmoAxis.NONE,
+  ): void {
+    const device = this.device;
+    const corners = this.buildBoxCorners(center, halfExtents);
+
+    const verts = new Float32Array(GizmoRenderer.PROBE_TOTAL_VERT_COUNT * 3);
+    let off = 0;
+
+    // [0..35] filled box triangles (36 vertices)
+    off = this.writeFilledBox(verts, off, corners);
+
+    // [36..59] wireframe edges (24 vertices)
+    off = this.writeBoxEdges(verts, off, corners);
+
+    // [60..83] face handle crosses (24 vertices, 4 per handle in order PX,NX,PY,NY,PZ,NZ)
+    const cs = Math.min(halfExtents[0], halfExtents[1], halfExtents[2]) * 0.15 + 0.05;
+    const xDir = vec3.fromValues(1, 0, 0);
+    const yDir = vec3.fromValues(0, 1, 0);
+    const zDir = vec3.fromValues(0, 0, 1);
+    const handles: { center: vec3; u: vec3; v: vec3 }[] = [
+      {
+        center: vec3.fromValues(center[0] + halfExtents[0], center[1], center[2]),
+        u: yDir,
+        v: zDir,
+      }, // PX
+      {
+        center: vec3.fromValues(center[0] - halfExtents[0], center[1], center[2]),
+        u: yDir,
+        v: zDir,
+      }, // NX
+      {
+        center: vec3.fromValues(center[0], center[1] + halfExtents[1], center[2]),
+        u: xDir,
+        v: zDir,
+      }, // PY
+      {
+        center: vec3.fromValues(center[0], center[1] - halfExtents[1], center[2]),
+        u: xDir,
+        v: zDir,
+      }, // NY
+      {
+        center: vec3.fromValues(center[0], center[1], center[2] + halfExtents[2]),
+        u: xDir,
+        v: yDir,
+      }, // PZ
+      {
+        center: vec3.fromValues(center[0], center[1], center[2] - halfExtents[2]),
+        u: xDir,
+        v: yDir,
+      }, // NZ
+    ];
+    for (const h of handles) {
+      off = this.writeFaceCross(verts, off, h.center, h.u, h.v, cs);
+    }
+
+    device.queue.writeBuffer(this.probeVertexBuffer, 0, verts);
+
+    const encoder = device.createCommandEncoder({ label: 'probe_box_encoder' });
+    const renderPass = encoder.beginRenderPass({
+      label: 'probe_box_pass',
+      colorAttachments: [
+        {
+          view: Render.getInstance().getContext().getCurrentTexture().createView(),
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+    });
+
+    const camBG = camera.getBindGroup();
+    renderPass.setVertexBuffer(0, this.probeVertexBuffer);
+
+    // 1. Filled box (semi-transparent)
+    renderPass.setPipeline(this.fillPipeline);
+    renderPass.setBindGroup(0, camBG);
+    renderPass.setBindGroup(1, this.probeFillColorBindGroup);
+    renderPass.draw(GizmoRenderer.PROBE_FILL_VERT_COUNT, 1, 0, 0);
+
+    // 2. Wireframe edges
+    renderPass.setPipeline(this.linePipeline);
+    renderPass.setBindGroup(1, this.probeEdgeColorBindGroup);
+    renderPass.draw(GizmoRenderer.PROBE_EDGE_VERT_COUNT, 1, GizmoRenderer.PROBE_FILL_VERT_COUNT, 0);
+
+    // 3. Face handle crosses
+    const handleAxes: GizmoAxis[] = [
+      GizmoAxis.PROBE_PX,
+      GizmoAxis.PROBE_NX,
+      GizmoAxis.PROBE_PY,
+      GizmoAxis.PROBE_NY,
+      GizmoAxis.PROBE_PZ,
+      GizmoAxis.PROBE_NZ,
+    ];
+    const handleBase = GizmoRenderer.PROBE_FILL_VERT_COUNT + GizmoRenderer.PROBE_EDGE_VERT_COUNT;
+    for (let i = 0; i < 6; i++) {
+      const bg =
+        hoveredHandle === handleAxes[i]
+          ? this.probeHandleHoveredBindGroup
+          : this.probeHandleDefaultBindGroup;
+      renderPass.setBindGroup(1, bg);
+      renderPass.draw(4, 1, handleBase + i * 4, 0); // 4 verts = 2 lines
+    }
+
+    renderPass.end();
+    device.queue.submit([encoder.finish()]);
+  }
+
+  /**
+   * Tests a world-space ray against the 6 face handle points of the probe box.
+   * Returns the closest hovered GizmoAxis or NONE.
+   */
+  public detectProbeHandleHover(
+    center: vec3,
+    halfExtents: vec3,
+    rayOrigin: vec3,
+    rayDirection: vec3,
+  ): GizmoAxis {
+    const handleDefs: { pos: vec3; axis: GizmoAxis }[] = [
+      {
+        pos: vec3.fromValues(center[0] + halfExtents[0], center[1], center[2]),
+        axis: GizmoAxis.PROBE_PX,
+      },
+      {
+        pos: vec3.fromValues(center[0] - halfExtents[0], center[1], center[2]),
+        axis: GizmoAxis.PROBE_NX,
+      },
+      {
+        pos: vec3.fromValues(center[0], center[1] + halfExtents[1], center[2]),
+        axis: GizmoAxis.PROBE_PY,
+      },
+      {
+        pos: vec3.fromValues(center[0], center[1] - halfExtents[1], center[2]),
+        axis: GizmoAxis.PROBE_NY,
+      },
+      {
+        pos: vec3.fromValues(center[0], center[1], center[2] + halfExtents[2]),
+        axis: GizmoAxis.PROBE_PZ,
+      },
+      {
+        pos: vec3.fromValues(center[0], center[1], center[2] - halfExtents[2]),
+        axis: GizmoAxis.PROBE_NZ,
+      },
+    ];
+
+    let closest = GizmoAxis.NONE;
+    let minDist = 0.4; // world-space threshold
+
+    for (const { pos, axis } of handleDefs) {
+      const dist = this.rayPointDistance(rayOrigin, rayDirection, pos);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = axis;
+      }
+    }
+    return closest;
+  }
+
+  private rayPointDistance(rayOrigin: vec3, rayDir: vec3, point: vec3): number {
+    const toPoint = vec3.create();
+    vec3.subtract(toPoint, point, rayOrigin);
+    const t = Math.max(0, vec3.dot(toPoint, rayDir));
+    const closest = vec3.create();
+    vec3.scaleAndAdd(closest, rayOrigin, rayDir, t);
+    return vec3.distance(closest, point);
   }
 }

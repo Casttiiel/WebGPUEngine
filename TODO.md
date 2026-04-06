@@ -1,13 +1,15 @@
 ### Engine
 
-1. GLTF Exporter unifies metallic and roughness? In right channel?
-2. Refletion probe texture generation should use ambient with no irradiance (or white texture)
-3. Editor Light Probes (Render Debug / Gizmo)
-4. Test Paralax Corrected Cubemaps
-5. Enemy AI / NavMesh
-6. HZB Pocho
-7. SSR Temporal
-8. TAA: Dynamic Objects
+1. Water Shader
+2. Editor Light Probes (Render Debug / Gizmo)
+3. GLTF Exporter unifies metallic and roughness? In right channel?
+4. Light probe generation fails on some face
+5. Test Paralax Corrected Cubemaps
+6. Glass Shader
+7. Enemy AI / NavMesh
+8. HZB Pocho
+9. SSR Temporal
+10. TAA: Dynamic Objects
 
 ## Gameplay
 

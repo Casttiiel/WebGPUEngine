@@ -307,6 +307,22 @@ export class ModulePhysics extends Module {
   }
 
   /**
+   * Removes a collider from Rapier world and cleans up internal tracking maps.
+   * Used when resizing a collider at runtime.
+   */
+  public removeColliderEntry(collider: RAPIER.Collider, entityId: number): void {
+    this.world.removeCollider(collider, false);
+
+    const colls = this.colliders.get(entityId);
+    if (colls) {
+      const idx = colls.indexOf(collider);
+      if (idx !== -1) colls.splice(idx, 1);
+    }
+
+    this.colliderHandleToEntityId.delete(collider.handle);
+  }
+
+  /**
    * Obtiene el ID de la entidad asociada a un collider handle
    */
   public getEntityIdFromCollider(colliderHandle: number): number | undefined {

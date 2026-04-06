@@ -119,6 +119,14 @@ export class ReflectionProbeComponent extends Component {
 
   public renderDebug(): void {}
 
+  public getExtents(): vec3 {
+    return vec3.clone(this.extents);
+  }
+
+  public setExtents(e: vec3): void {
+    vec3.copy(this.extents, e);
+  }
+
   public getRadius(): number {
     return this.radius;
   }
@@ -141,11 +149,6 @@ export class ReflectionProbeComponent extends Component {
 
   public getEntitiesInside(): Set<number> {
     return this.entitiesInside;
-  }
-
-  /** Half-extents of the probe influence box (x, y, z). */
-  public getExtents(): vec3 {
-    return this.extents;
   }
 
   /** Returns the GPU view for this probe's pre-baked irradiance cubemap, or null if not loaded. */
