@@ -8,7 +8,15 @@
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",
-        "ObjectUniforms",
-        "WaterScene"
+        "ObjectUniforms"
+    ],
+    "materialSlots": [
+        { "name": "txNoise1",     "binding": 0, "type": "texture2d" },
+        { "name": "txNoise2",     "binding": 1, "type": "texture2d" },
+        { "name": "txSceneDepth", "binding": 2, "type": "texture2d",   "defaultValue": "@engine:linear_depth" },
+        { "name": "txEnvCubemap", "binding": 3, "type": "texturecube", "defaultValue": "@engine:env_cubemap" },
+        { "name": "samplerState", "binding": 4, "type": "sampler",     "defaultValue": "@sampler:simpleSampler" },
+        { "name": "envSampler",   "binding": 5, "type": "sampler",     "defaultValue": "@sampler:environmentCubemap" },
+        { "name": "factors",      "binding": 6, "type": "uniform" }
     ]
 }

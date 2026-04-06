@@ -3,12 +3,15 @@ import { ResourceType } from '../../types/ResourceType.enum';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { MaterialDataType } from '../../types/MaterialData.type';
+import { TechniqueMaterialSlot } from '../../types/TechniqueData.type';
 import { Technique } from './Technique';
 import { Texture } from './Texture';
 import { Engine } from '../../core/engine/Engine';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { GPUUtils } from '../core/utils/GPUUtils';
+import { EngineTextureRegistry } from '../core/utils/EngineTextureRegistry';
+import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 
 export interface MaterialTexturesOptions {
   albedo: string;
@@ -34,11 +37,13 @@ export interface MaterialBaseOptions {
   appearanceBlend?: number;
   /** Decal blend weight for roughness + metallic channels. 1 = full blend, 0 = no change. Default 1. */
   surfaceBlend?: number;
+  /** Raw texture map forwarded from .mat file, used by the custom-slot path. */
+  rawTextures?: Record<string, string>;
 }
 
 export type MaterialCreateOptions = MaterialBaseOptions & Omit<IGPUResourceOptions, 'type'>;
-export type MaterialOptions = Required<Pick<MaterialBaseOptions, 'textures' | 'technique'>> &
-  Omit<MaterialCreateOptions, 'textures' | 'technique'> &
+export type MaterialOptions = Required<Pick<MaterialBaseOptions, 'technique'>> &
+  Omit<MaterialCreateOptions, 'technique'> &
   IGPUResourceOptions;
 
 export class Material extends GPUResource {
@@ -59,8 +64,18 @@ export class Material extends GPUResource {
   private castsShadows: boolean;
   private shadows: boolean;
   private textureBindGroup?: GPUBindGroup;
-  private textureFiles: MaterialTexturesOptions;
+  private textureFiles: MaterialTexturesOptions | undefined;
   private shadowsMaterial?: Material;
+
+  // --- Custom material slot state ---
+  /** Raw texture map from the .mat file, used by the custom-slot path. */
+  private rawTextures: Record<string, string> = {};
+  /** Pre-loaded file-based textures for custom slots (async-loaded at Material.load() time). */
+  private customSlotTextures: Map<string, Texture> = new Map();
+  /** GPUBuffer for the material-factors uniform in custom-slot materials. */
+  private customUniformBuffer: GPUBuffer | undefined;
+  /** Unsubscribe functions from EngineTextureRegistry — called in release(). */
+  private customUnsubscribes: Array<() => void> = [];
 
   constructor(options: MaterialOptions) {
     super({
@@ -73,6 +88,7 @@ export class Material extends GPUResource {
     this.shadows = options.shadows ?? false;
     this.technique = options.technique;
     this.textureFiles = options.textures;
+    this.rawTextures = options.rawTextures ?? {};
     this.baseColorFactor = options.baseColorFactor ?? [1, 1, 1, 1];
     this.roughnessFactor = options.roughnessFactor ?? 1;
     this.metallicFactor = options.metallicFactor ?? 1;
@@ -136,11 +152,11 @@ export class Material extends GPUResource {
     }
 
     const textures: MaterialTexturesOptions = {
-      albedo: materialData?.textures.txAlbedo || 'white.png',
-      normal: materialData?.textures.txNormal || 'no-normal.jpg',
-      metallic: materialData?.textures.txMetallic || 'black.png',
-      roughness: materialData?.textures.txRoughness || 'black.png',
-      emissive: materialData?.textures.txEmissive || 'black.png',
+      albedo: materialData?.textures?.txAlbedo || 'white.png',
+      normal: materialData?.textures?.txNormal || 'no-normal.jpg',
+      metallic: materialData?.textures?.txMetallic || 'black.png',
+      roughness: materialData?.textures?.txRoughness || 'black.png',
+      emissive: materialData?.textures?.txEmissive || 'black.png',
     };
 
     const material = new Material({
@@ -148,6 +164,7 @@ export class Material extends GPUResource {
       type: ResourceType.MATERIAL,
       technique: techniqueToUse,
       textures,
+      rawTextures: (materialData?.textures as Record<string, string>) ?? {},
       category: materialData?.category,
       baseColorFactor: materialData?.baseColorFactor || [1.0, 1.0, 1.0, 1.0],
       roughnessFactor:
@@ -172,40 +189,170 @@ export class Material extends GPUResource {
 
   public override async load(): Promise<void> {
     try {
-      // Build the shadow material promise (if needed) and the 5 texture promises,
-      // then await all of them in parallel — shadow fetch no longer blocks textures.
-      const shadowPromise = this.castsShadows
-        ? (() => {
-            const isInstancedTechnique = this.technique?.path.includes('_instanced.tech');
-            if (isInstancedTechnique) {
-              return Material.get({
-                technique: 'shadows/shadows_instanced.tech',
-                textures: {},
-                category: 'shadows' as any,
-                casts_shadows: false,
-              }).then((m) => {
-                this.shadowsMaterial = m;
-              });
-            } else {
-              return Material.get('shadows.mat').then((m) => {
-                this.shadowsMaterial = m;
-              });
-            }
-          })()
-        : Promise.resolve();
+      const slots = this.technique?.getMaterialSlots();
+      if (slots) {
+        // ── Custom-slot path ─────────────────────────────────────────────────
+        await this.createCustomBindGroup(slots);
+      } else {
+        // ── PBR path (unchanged) ──────────────────────────────────────────────
+        // Build the shadow material promise (if needed) and the 5 texture promises,
+        // then await all of them in parallel — shadow fetch no longer blocks textures.
+        const shadowPromise = this.castsShadows
+          ? (() => {
+              const isInstancedTechnique = this.technique?.path.includes('_instanced.tech');
+              if (isInstancedTechnique) {
+                return Material.get({
+                  technique: 'shadows/shadows_instanced.tech',
+                  textures: {},
+                  category: 'shadows' as any,
+                  casts_shadows: false,
+                }).then((m) => {
+                  this.shadowsMaterial = m;
+                });
+              } else {
+                return Material.get('shadows.mat').then((m) => {
+                  this.shadowsMaterial = m;
+                });
+              }
+            })()
+          : Promise.resolve();
 
-      await Promise.all([
-        shadowPromise,
-        this.loadTexture('albedo', this.textureFiles.albedo),
-        this.loadTexture('normal', this.textureFiles.normal),
-        this.loadTexture('metallic', this.textureFiles.metallic),
-        this.loadTexture('roughness', this.textureFiles.roughness),
-        this.loadTexture('emissive', this.textureFiles.emissive),
-      ]);
-      this.createBindGroup();
+        await Promise.all([
+          shadowPromise,
+          this.loadTexture('albedo', this.textureFiles?.albedo ?? 'white.png'),
+          this.loadTexture('normal', this.textureFiles?.normal ?? 'no-normal.jpg'),
+          this.loadTexture('metallic', this.textureFiles?.metallic ?? 'black.png'),
+          this.loadTexture('roughness', this.textureFiles?.roughness ?? 'black.png'),
+          this.loadTexture('emissive', this.textureFiles?.emissive ?? 'black.png'),
+        ]);
+        this.createBindGroup();
+      }
     } catch (error) {
       throw new Error(`Failed to create GPU resources for material ${this.path}: ${error}`);
     }
+  }
+
+  /**
+   * Custom-slot path: loads all file-based textures, subscribes to engine textures,
+   * and builds the bind group once all resources are available.
+   */
+  private async createCustomBindGroup(slots: ReadonlyArray<TechniqueMaterialSlot>): Promise<void> {
+    // 1. Collect all file-based texture paths and load them in parallel.
+    const fileLoadPromises: Promise<void>[] = [];
+    for (const slot of slots) {
+      if (slot.type === 'sampler' || slot.type === 'uniform') continue;
+      const matValue = this.rawTextures[slot.name];
+      const value = matValue ?? slot.defaultValue;
+      if (!value) continue;
+      if (!value.startsWith('@engine:') && !value.startsWith('@sampler:')) {
+        fileLoadPromises.push(
+          Texture.getAsync(value, false).then((tex) => {
+            this.customSlotTextures.set(slot.name, tex);
+          }),
+        );
+      }
+    }
+    await Promise.all(fileLoadPromises);
+
+    // 2. Create the material-factors uniform buffer (used by 'uniform' slots).
+    this.customUniformBuffer = GPUUtils.createBuffer(
+      `${this.label}_custom_uniform`,
+      48,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+    GPUUtils.writeBuffer(this.customUniformBuffer, 0, new Float32Array(this.baseColorFactor));
+    GPUUtils.writeBuffer(
+      this.customUniformBuffer,
+      16,
+      new Float32Array([
+        this.roughnessFactor,
+        this.metallicFactor,
+        this.emissiveFactor,
+        this.appearanceBlend,
+      ]),
+    );
+    GPUUtils.writeBuffer(
+      this.customUniformBuffer,
+      32,
+      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, 0]),
+    );
+
+    // 3. Subscribe to all engine textures used by this material.
+    //    When views change (e.g. after resize), rebuild the bind group synchronously.
+    const rebuild = () => this.tryBuildCustomBindGroup(slots);
+    for (const slot of slots) {
+      if (slot.type === 'sampler' || slot.type === 'uniform') continue;
+      const matValue = this.rawTextures[slot.name];
+      const value = matValue ?? slot.defaultValue ?? '';
+      if (value.startsWith('@engine:')) {
+        const engineName = value.slice(1); // strip leading '@' → 'engine:linear_depth'
+        this.customUnsubscribes.push(EngineTextureRegistry.subscribe(engineName, rebuild));
+      }
+    }
+
+    // 4. Attempt an initial build (may be a no-op if engine textures aren't registered yet).
+    this.tryBuildCustomBindGroup(slots);
+  }
+
+  /**
+   * Synchronously builds the custom bind group from already-loaded resources.
+   * Silently returns if any engine texture is not yet available — it will be
+   * called again when that texture gets registered.
+   */
+  private tryBuildCustomBindGroup(slots: ReadonlyArray<TechniqueMaterialSlot>): void {
+    const layout = this.technique?.getCustomMaterialLayout();
+    if (!layout) return;
+
+    const entries: GPUBindGroupEntry[] = [];
+
+    for (const slot of slots) {
+      const matValue = this.rawTextures[slot.name];
+      const value = matValue ?? slot.defaultValue ?? '';
+
+      if (slot.type === 'uniform') {
+        if (!this.customUniformBuffer) return;
+        entries.push({ binding: slot.binding, resource: { buffer: this.customUniformBuffer } });
+        continue;
+      }
+
+      if (slot.type === 'sampler') {
+        const sampler = this.resolveSampler(value);
+        if (!sampler) return;
+        entries.push({ binding: slot.binding, resource: sampler });
+        continue;
+      }
+
+      // Texture slot
+      if (value.startsWith('@engine:')) {
+        const engineName = value.slice(1); // 'engine:linear_depth'
+        const view = EngineTextureRegistry.get(engineName);
+        if (!view) return; // Not ready yet — will rebuild when registered
+        entries.push({ binding: slot.binding, resource: view });
+      } else if (value.startsWith('@sampler:')) {
+        // @sampler: prefix in a texture slot shouldn't happen, but guard anyway
+        return;
+      } else {
+        const tex = this.customSlotTextures.get(slot.name);
+        if (!tex) return;
+        const view = tex.getTextureView();
+        if (!view) return;
+        entries.push({ binding: slot.binding, resource: view });
+      }
+    }
+
+    this.textureBindGroup = BindGroupFactory.createBindGroup(
+      `${this.label}_custom_bindgroup`,
+      layout,
+      entries,
+    );
+  }
+
+  /** Resolves a sampler from a "@sampler:<key>" reference or returns null. */
+  private resolveSampler(value: string): GPUSampler | null {
+    if (!value.startsWith('@sampler:')) return null;
+    const key = value.slice('@sampler:'.length) as keyof typeof SamplerLibrary;
+    const sampler = (SamplerLibrary as any)[key] as GPUSampler | undefined;
+    return sampler ?? null;
   }
 
   private async createBindGroup(): Promise<void> {
@@ -323,7 +470,7 @@ export class Material extends GPUResource {
     return this.textureBindGroup;
   }
 
-  public getTextureFiles(): MaterialTexturesOptions {
+  public getTextureFiles(): MaterialTexturesOptions | undefined {
     return this.textureFiles;
   }
 
@@ -355,5 +502,13 @@ export class Material extends GPUResource {
     return this.uvYScale;
   }
 
-  public override release(): void {}
+  public override release(): void {
+    // Unsubscribe from all engine texture change notifications.
+    for (const unsub of this.customUnsubscribes) unsub();
+    this.customUnsubscribes = [];
+    if (this.customUniformBuffer) {
+      this.customUniformBuffer.destroy();
+      this.customUniformBuffer = undefined;
+    }
+  }
 }

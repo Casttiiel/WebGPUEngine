@@ -6,6 +6,7 @@ import { DepthModes } from '../../types/DepthModes.enum';
 import { FragmentShaderTargets } from '../../types/FragmentShaderTargets.enum';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
+import { TechniqueMaterialSlot } from '../../types/TechniqueData.type';
 import { Mesh } from './Mesh';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
@@ -23,6 +24,8 @@ export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'
   writesOn?: FragmentShaderTargets;
   uniforms?: ReadonlyArray<PipelineBindGroupLayouts>;
   instanced?: boolean;
+  /** When present, Material uses a dynamic bind group instead of the fixed PBR schema. */
+  materialSlots?: ReadonlyArray<TechniqueMaterialSlot>;
 }
 
 export type TechniqueOptions = TechniqueCreateOptions & IGPUResourceOptions;
@@ -35,6 +38,7 @@ export class Technique extends GPUResource {
   // Pipeline resources
   private pipeline?: GPURenderPipeline;
   private pipelineLayouts?: GPUBindGroupLayout[];
+  private customMaterialLayout?: GPUBindGroupLayout;
 
   // Shader modules
   private vsModule?: GPUShaderModule;
@@ -51,6 +55,7 @@ export class Technique extends GPUResource {
   private fsFile?: string;
   private vsEntryPoint: string;
   private fsEntryPoint: string;
+  private readonly materialSlots: ReadonlyArray<TechniqueMaterialSlot> | undefined;
 
   constructor(options: TechniqueOptions) {
     super({
@@ -68,6 +73,7 @@ export class Technique extends GPUResource {
     this.vsFile = options.vs;
     this.fsFile = options.fs;
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
+    this.materialSlots = options.materialSlots;
   }
 
   public static async getAsync(
@@ -132,6 +138,9 @@ export class Technique extends GPUResource {
       writesOn: techniqueData.writesOn ?? FragmentShaderTargets.SCREEN,
       uniforms: techniqueData.uniforms ?? [],
       instanced: techniqueData.instanced ?? false,
+      ...(techniqueData.materialSlots !== undefined
+        ? { materialSlots: techniqueData.materialSlots }
+        : {}),
     };
 
     // Add optional properties only if they exist
@@ -179,6 +188,11 @@ export class Technique extends GPUResource {
       );
     }
 
+    // When materialSlots are declared, build the custom layout once and cache it.
+    if (this.materialSlots && this.materialSlots.length > 0) {
+      this.customMaterialLayout = BindGroupFactory.createCustomMaterialLayout(this.materialSlots);
+    }
+
     const layouts: GPUBindGroupLayout[] = [];
 
     // Create bind group layouts based on uniform configuration
@@ -192,6 +206,11 @@ export class Technique extends GPUResource {
   }
 
   private createBindGroupLayout(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
+    // When the technique declares materialSlots, substitute the fixed PBR layout with
+    // the dynamic one so the pipeline layout matches the actual bind group entries.
+    if (layout === PipelineBindGroupLayouts.MATERIAL_TEXTURES && this.customMaterialLayout) {
+      return this.customMaterialLayout;
+    }
     return BindGroupFactory.getLayoutFromEnum(layout);
   }
 
@@ -492,5 +511,15 @@ export class Technique extends GPUResource {
       return undefined;
     }
     return this.pipelineLayouts[idx];
+  }
+
+  /** Returns the materialSlots declaration, or null for PBR techniques. */
+  public getMaterialSlots(): ReadonlyArray<TechniqueMaterialSlot> | null {
+    return this.materialSlots ?? null;
+  }
+
+  /** Returns the custom material bind group layout, or null for PBR techniques. */
+  public getCustomMaterialLayout(): GPUBindGroupLayout | null {
+    return this.customMaterialLayout ?? null;
   }
 }

@@ -114,15 +114,6 @@ export class RenderPassManager {
   }
 
   /**
-   * Sets the water scene bind group on the transparent pass (group 3).
-   * Should be called every frame before executing the transparent pass.
-   */
-  public setTransparentWaterBindGroup(bindGroup: GPUBindGroup): void {
-    const pass = this.renderPasses.get('transparent') as TransparentRenderPass | undefined;
-    pass?.setWaterBindGroup(bindGroup);
-  }
-
-  /**
    * Creates and executes the OIT compose pass dynamically each frame.
    * Blends the resolved accumulation/revealage into accLight using premultiplied alpha.
    */

@@ -14,16 +14,23 @@ export type MaterialDataType = Readonly<{
   appearanceBlend?: number;
   /** Decal blend weight for roughness + metallic channels. 1 = full blend, 0 = no change. Default 1. */
   surfaceBlend?: number;
-  textures: MaterialTextureDataType;
+  /**
+   * PBR materials use the named keys (txAlbedo, txNormal, …).
+   * Custom-slot materials use arbitrary keys that match their technique's materialSlots.
+   * Optional at the type level — custom materials may omit slots covered by defaultValue.
+   */
+  textures?: MaterialTextureDataType;
   casts_shadows?: boolean;
   category: RenderCategory;
   shadows?: boolean;
 }>;
 
-type MaterialTextureDataType = Readonly<{
+export type MaterialTextureDataType = Readonly<{
   txAlbedo?: string;
   txNormal?: string;
   txMetallic?: string;
   txRoughness?: string;
   txEmissive?: string;
+  /** Allow arbitrary keys for custom material slot declarations. */
+  [key: string]: string | undefined;
 }>;

@@ -4,14 +4,11 @@
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var txNoise1: texture_2d<f32>;
 @group(1) @binding(1) var txNoise2: texture_2d<f32>;
-@group(1) @binding(5) var samplerState: sampler;
+@group(1) @binding(2) var txSceneDepth: texture_2d<f32>;
+@group(1) @binding(3) var txEnvCubemap: texture_cube<f32>;
+@group(1) @binding(4) var samplerState: sampler;
+@group(1) @binding(5) var envSampler: sampler;
 @group(1) @binding(6) var<uniform> factors: MaterialFactors;
-
-// Water scene bindings (group 3): linear depth + env cubemap for foam and reflections
-@group(3) @binding(0) var sceneSampler: sampler;
-@group(3) @binding(1) var txSceneDepth: texture_2d<f32>;
-@group(3) @binding(2) var txEnvCubemap: texture_cube<f32>;
-@group(3) @binding(3) var envSampler: sampler;
 
 @fragment
 fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
@@ -44,7 +41,7 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // linear depth.  A small difference means an object is just below the surface
     // → add white foam at the intersection edge.
     let screenUV = input.position.xy / camera.screenSize;
-    let sceneLinearDepth = textureSample(txSceneDepth, sceneSampler, screenUV).r;
+    let sceneLinearDepth = textureSample(txSceneDepth, samplerState, screenUV).r;
 
     // Reconstruct the water fragment's linear depth in the same normalised space
     // used by gbuffer.fs: dot(worldPos - camPos, cameraFront) / cameraFar

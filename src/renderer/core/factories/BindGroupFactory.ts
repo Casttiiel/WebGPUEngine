@@ -1,5 +1,6 @@
 import { GPUUtils } from '../utils/GPUUtils';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
+import { TechniqueMaterialSlot } from '../../../types/TechniqueData.type';
 
 export interface BindGroupEntry {
   binding: number;
@@ -488,38 +489,6 @@ export class BindGroupFactory {
         binding: 3,
         visibility: GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' }, // screen-space refraction snapshot
-      },
-    ]);
-  }
-
-  /**
-   * group(3) in water.fs:
-   *   binding 0 — filtering sampler for linearDepth
-   *   binding 1 — scene linear depth (r16float 2D texture from G-Buffer)
-   *   binding 2 — prefiltered env cubemap for reflections
-   *   binding 3 — filtering sampler for env cubemap
-   */
-  public static getWaterSceneLayout(): GPUBindGroupLayout {
-    return this.getLayout('water_scene', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: 'float', viewDimension: '2d', multisampled: false },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
       },
     ]);
   }
@@ -1762,6 +1731,65 @@ export class BindGroupFactory {
   }
 
   /**
+   * Builds a GPUBindGroupLayout from a TechniqueMaterialSlot[] declaration.
+   * Used when a technique defines custom materialSlots instead of the fixed PBR schema.
+   * The resulting layout replaces MATERIAL_TEXTURES at @group(1).
+   */
+  public static createCustomMaterialLayout(
+    slots: ReadonlyArray<TechniqueMaterialSlot>,
+  ): GPUBindGroupLayout {
+    const vis = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
+    const entries: BindGroupLayoutEntry[] = slots.map((slot) => {
+      switch (slot.type) {
+        case 'texture2d':
+          return {
+            binding: slot.binding,
+            visibility: vis,
+            texture: {
+              sampleType: 'float' as GPUTextureSampleType,
+              viewDimension: '2d' as GPUTextureViewDimension,
+            },
+          };
+        case 'texturecube':
+          return {
+            binding: slot.binding,
+            visibility: vis,
+            texture: {
+              sampleType: 'float' as GPUTextureSampleType,
+              viewDimension: 'cube' as GPUTextureViewDimension,
+              multisampled: false,
+            },
+          };
+        case 'depth_texture':
+          return {
+            binding: slot.binding,
+            visibility: vis,
+            texture: {
+              sampleType: 'depth' as GPUTextureSampleType,
+              viewDimension: '2d' as GPUTextureViewDimension,
+            },
+          };
+        case 'sampler':
+          return {
+            binding: slot.binding,
+            visibility: vis,
+            sampler: { type: 'filtering' as GPUSamplerBindingType },
+          };
+        case 'uniform':
+          return {
+            binding: slot.binding,
+            visibility: vis,
+            buffer: { type: 'uniform' as GPUBufferBindingType },
+          };
+      }
+    });
+
+    // Build a stable cache key derived from slot signatures.
+    const cacheKey = 'custom_mat_' + slots.map((s) => `${s.binding}:${s.type}`).join('|');
+    return this.getLayout(cacheKey, entries);
+  }
+
+  /**
    * Creates bind group layout from enum
    */ public static getLayoutFromEnum(layout: PipelineBindGroupLayouts): GPUBindGroupLayout {
     switch (layout) {
@@ -1783,8 +1811,6 @@ export class BindGroupFactory {
         return this.getCubemapTextureLayout();
       case PipelineBindGroupLayouts.OIT_GLASS_ENV:
         return this.getOITGlassEnvLayout();
-      case PipelineBindGroupLayouts.WATER_SCENE:
-        return this.getWaterSceneLayout();
       case PipelineBindGroupLayouts.AMBIENT_UNIFORMS:
         return this.getAmbientUniformsLayout();
       case PipelineBindGroupLayouts.GBUFFER_UNIFORMS:

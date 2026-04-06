@@ -27,6 +27,7 @@ import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayout
 import { HZBBuilder } from '../culling/HZBBuilder';
 import { RenderManagerV2 } from '../managers/RenderManagerV2';
 import { TiledLightManager } from '../managers/TiledLightManager';
+import { EngineTextureRegistry, ENGINE_TEXTURES } from '../utils/EngineTextureRegistry';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -68,11 +69,12 @@ export class DeferredRenderer {
   private oitComposeMesh!: Mesh;
   private oitComposeBindGroup!: GPUBindGroup;
   private oitGlassEnvBindGroup: GPUBindGroup | null = null;
-  private waterSceneBindGroup: GPUBindGroup | null = null;
   private aoResult!: GPUTextureView;
   // Cached extended G-Buffer+AO bind group for lighting shaders. Rebuilt when aoResult changes.
   private gBufferWithAOBindGroup: GPUBindGroup | null = null;
   private lastAOViewForGBuffer: GPUTextureView | null = null;
+  // Cached env view pointer — used to detect changes and avoid redundant registrations.
+  private lastRegisteredEnvView: GPUTextureView | null = null;
 
   private rtCopyAlbedos!: RenderTarget;
   private rtCopyNormals!: RenderTarget;
@@ -253,6 +255,13 @@ export class DeferredRenderer {
       ],
     );
 
+    // Register linear depth for custom material slots (e.g. water, SSR composite).
+    // Re-registered on every resize so materials rebuild their bind groups automatically.
+    EngineTextureRegistry.register(
+      ENGINE_TEXTURES.LINEAR_DEPTH,
+      gBufferRenderTargets.linearDepth.getView()!,
+    );
+
     // Initialize lighting passes after gBufferBindGroup is created
     // Use depth from prepass for all lighting effects
     this.renderPassManager.initializeLightingPasses(
@@ -425,7 +434,7 @@ export class DeferredRenderer {
     this.aoResult = this.renderAO(camera);
     this.renderAccLight();
 
-    this.ensureWaterSceneBindGroup();
+    this.ensureEngineTextureRegistrations();
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
     // Snapshot accLight before glass so the glass shader can sample the undistorted scene
@@ -663,21 +672,17 @@ export class DeferredRenderer {
   }
 
   /**
-   * Creates or rebuilds the water scene bind group (linearDepth + env cubemap).
-   * Caches the result — only rebuilds if null (first frame or after resize/dispose).
+   * Lazily registers the environment cubemap in EngineTextureRegistry.
+   * Only re-registers when the underlying GPUTextureView pointer changes
+   * (e.g. after a light probe update) to avoid redundant rebuild callbacks.
    */
-  private ensureWaterSceneBindGroup(): void {
+  private ensureEngineTextureRegistrations(): void {
     const envTex = Engine.getEnvironmentManager().getSSREnvironmentTexture();
     if (!envTex) return;
-    if (!this.waterSceneBindGroup) {
-      const layout = BindGroupFactory.getWaterSceneLayout();
-      this.waterSceneBindGroup = BindGroupFactory.createBindGroup('water_scene_bg', layout, [
-        { binding: 0, resource: SamplerLibrary.simpleSampler },
-        { binding: 1, resource: this.getLinearDepthView() },
-        { binding: 2, resource: envTex.getTextureView()! },
-        { binding: 3, resource: envTex.getSampler()! },
-      ]);
-      this.renderPassManager.setTransparentWaterBindGroup(this.waterSceneBindGroup);
+    const view = envTex.getTextureView();
+    if (view && view !== this.lastRegisteredEnvView) {
+      this.lastRegisteredEnvView = view;
+      EngineTextureRegistry.register(ENGINE_TEXTURES.ENV_CUBEMAP, view);
     }
   }
 
@@ -698,7 +703,6 @@ export class DeferredRenderer {
       this.rtGlassRefraction.destroy();
     }
     this.oitGlassEnvBindGroup = null;
-    this.waterSceneBindGroup = null;
 
     if (this.ambientLight) {
       this.ambientLight.destroy();
@@ -707,6 +711,7 @@ export class DeferredRenderer {
     this.aoResult = null as any;
     this.gBufferWithAOBindGroup = null;
     this.lastAOViewForGBuffer = null;
+    this.lastRegisteredEnvView = null;
   }
 
   public destroy(): void {

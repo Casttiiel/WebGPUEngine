@@ -96,14 +96,8 @@ export class DecalRenderPass extends BaseRenderPass {
  * Transparent objects render pass
  */
 export class TransparentRenderPass extends BaseRenderPass {
-  private waterBindGroup: GPUBindGroup | null = null;
-
   constructor(config: RenderPassConfig) {
     super(config);
-  }
-
-  public setWaterBindGroup(bindGroup: GPUBindGroup): void {
-    this.waterBindGroup = bindGroup;
   }
 
   protected render(
@@ -119,16 +113,8 @@ export class TransparentRenderPass extends BaseRenderPass {
       GPUUtils.configureViewportAndScissor(pass, Render.width, Render.height);
     }
 
-    // Register water scene bind group as the pass-level group 3 fallback.
-    // This is restored before every indirect draw that has no per-key renderBindGroup,
-    // so it survives being overridden by trail/particle draws that own their group 3 data.
-    RenderManager.getInstance().setPassGroup3(this.waterBindGroup);
-
     // Render transparent objects
     RenderManager.getInstance().render(RenderCategory.TRANSPARENT, pass);
-
-    // Clear to avoid leaking into other passes
-    RenderManager.getInstance().setPassGroup3(null);
   }
 }
 
