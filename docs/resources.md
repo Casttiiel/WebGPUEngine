@@ -329,15 +329,16 @@ material.setBindGroup(renderPass, 2); // Bind group 2 for textures
 
 #### **.mat File (JSON) — full field reference:**
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `technique` | string | — | Path to `.tech` file |
-| `textures` | object | `{}` | Map of texture slot name → image path |
-| `category` | string | `"SOLIDS"` | Render category: `SOLIDS`, `TRANSPARENT`, `GLASS`, `DISTORTION`, `DECALS` |
-| `castsShadows` | boolean | `true` | Whether the material casts a shadow |
-| `baseColorFactor` | number[4] | `[1,1,1,1]` | RGBA multiplier applied to the albedo texture |
+| Field             | Type      | Default     | Description                                                               |
+| ----------------- | --------- | ----------- | ------------------------------------------------------------------------- |
+| `technique`       | string    | —           | Path to `.tech` file                                                      |
+| `textures`        | object    | `{}`        | Map of texture slot name → image path                                     |
+| `category`        | string    | `"SOLIDS"`  | Render category: `SOLIDS`, `TRANSPARENT`, `GLASS`, `DISTORTION`, `DECALS` |
+| `castsShadows`    | boolean   | `true`      | Whether the material casts a shadow                                       |
+| `baseColorFactor` | number[4] | `[1,1,1,1]` | RGBA multiplier applied to the albedo texture                             |
 
 **Example — standard PBR solid:**
+
 ```json
 {
   "technique": "pbr/pbr.tech",
@@ -355,6 +356,7 @@ material.setBindGroup(renderPass, 2); // Bind group 2 for textures
 ```
 
 **Example — water (TRANSPARENT category):**
+
 ```json
 {
   "technique": "water/water.tech",
@@ -404,18 +406,19 @@ export class Technique extends GPUResource {
 
 #### **.tech File (JSON) — full field reference:**
 
-| Field | Type | Description |
-|---|---|---|
-| `vs` | string | Vertex shader path relative to `assets/shaders/` |
-| `fs` | string | Fragment shader path relative to `assets/shaders/` |
-| `writesOn` | string | Output targets: `GBUFFER`, `SCREEN`, `DEPTH_ONLY`, `OIT_GBUFFER` |
-| `z` | string | Depth mode: `LESS`, `LESS_EQUAL`, `ALWAYS`, `NONE`, `test_but_no_write` |
-| `blend` | string | Blend mode: `OPAQUE`, `ALPHA`, `ADDITIVE`, `OIT`, `COMBINATIVE` |
-| `rs` | string | Rasterizer: `FILL`, `WIREFRAME`; add `double_sided: true` for no back-face cull |
-| `uniforms` | string[] | Bind group layout names (e.g. `CAMERA_UNIFORMS`, `MATERIAL_TEXTURES`, `WATER_SCENE`) |
-| `double_sided` | boolean? | If true, disables back-face culling |
+| Field          | Type     | Description                                                                          |
+| -------------- | -------- | ------------------------------------------------------------------------------------ |
+| `vs`           | string   | Vertex shader path relative to `assets/shaders/`                                     |
+| `fs`           | string   | Fragment shader path relative to `assets/shaders/`                                   |
+| `writesOn`     | string   | Output targets: `GBUFFER`, `SCREEN`, `DEPTH_ONLY`, `OIT_GBUFFER`                     |
+| `z`            | string   | Depth mode: `LESS`, `LESS_EQUAL`, `ALWAYS`, `NONE`, `test_but_no_write`              |
+| `blend`        | string   | Blend mode: `OPAQUE`, `ALPHA`, `ADDITIVE`, `OIT`, `COMBINATIVE`                      |
+| `rs`           | string   | Rasterizer: `FILL`, `WIREFRAME`; add `double_sided: true` for no back-face cull      |
+| `uniforms`     | string[] | Bind group layout names (e.g. `CAMERA_UNIFORMS`, `MATERIAL_TEXTURES`, `WATER_SCENE`) |
+| `double_sided` | boolean? | If true, disables back-face culling                                                  |
 
 **Example — standard PBR opaque:**
+
 ```json
 {
   "vs": "pbr.vs",
@@ -429,6 +432,7 @@ export class Technique extends GPUResource {
 ```
 
 **Example — water (transparent, double-sided, depth test but no write):**
+
 ```json
 {
   "vs": "water/water.vs",

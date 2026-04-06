@@ -368,12 +368,17 @@ SSR now runs as a **compute shader** between the main lighting pass and the ambi
 const ssr = this.ssr.generateSSR(
   this.rtAccLight.getView(),
   this.aoResult,
-  this.gBufferComputeBindGroup,   // COMPUTE-visibility bind group
+  this.gBufferComputeBindGroup, // COMPUTE-visibility bind group
   gBufferRTs.normals.getView(),
   gBufferRTs.linearDepth.getView(),
 );
 // SSR result is then consumed by the specular pass:
-this.ambientLight.renderSpecular(this.rtAccLight.getView(), ssr, this.aoResult, this.gBufferBindGroup);
+this.ambientLight.renderSpecular(
+  this.rtAccLight.getView(),
+  ssr,
+  this.aoResult,
+  this.gBufferBindGroup,
+);
 ```
 
 The final image in `rtAccLight` contains diffuse + direct lighting + OIT glass + SSR-blended specular IBL.
@@ -456,8 +461,8 @@ The system organizes renderable objects through a render key system:
 export class RenderManagerV2 {
   private keyManager: RenderKeyManager;
   private stateManager: RenderStateManager;
-  private cpuCuller: CPUCullingManager | null = null;  // Shadow cameras & fallback
-  private gpuCuller: GPUCullingManager | null = null;  // Main camera (PRIMARY)
+  private cpuCuller: CPUCullingManager | null = null; // Shadow cameras & fallback
+  private gpuCuller: GPUCullingManager | null = null; // Main camera (PRIMARY)
   private hzbCullingPass: HZBCullingPass | null = null; // Occlusion culling (layered on GPU)
 
   // Pass-level group 3 fallback for indirect draws that lack a per-key renderBindGroup.
@@ -465,7 +470,12 @@ export class RenderManagerV2 {
   // pass and clears it afterward (null) to prevent leaking into other passes.
   private passGroup3: GPUBindGroup | null = null;
 
-  public addKey(owner: RenderComponent, mesh: Mesh, material: Material, transform: TransformComponent): void {
+  public addKey(
+    owner: RenderComponent,
+    mesh: Mesh,
+    material: Material,
+    transform: TransformComponent,
+  ): void {
     this.keyManager.addKey(owner, mesh, material, transform);
     if (material.getCastsShadows()) {
       this.keyManager.addKey(owner, mesh, material.getShadowsMaterial(), transform);
@@ -478,11 +488,11 @@ export class RenderManagerV2 {
 
 `RenderManagerV2` initialises three culling layers that work together:
 
-| Layer | Class | Used for |
-|---|---|---|
-| **GPU frustum** (primary) | `GPUCullingManager` | Main camera — compute dispatch, zero CPU overhead |
-| **HZB occlusion** (layered) | `HZBCullingPass` | Second pass over GPU-visible set, reads previous-frame HZB pyramid |
-| **CPU frustum** (fallback) | `CPUCullingManager` | Shadow cameras; fallback if GPU culling unavailable |
+| Layer                       | Class               | Used for                                                           |
+| --------------------------- | ------------------- | ------------------------------------------------------------------ |
+| **GPU frustum** (primary)   | `GPUCullingManager` | Main camera — compute dispatch, zero CPU overhead                  |
+| **HZB occlusion** (layered) | `HZBCullingPass`    | Second pass over GPU-visible set, reads previous-frame HZB pyramid |
+| **CPU frustum** (fallback)  | `CPUCullingManager` | Shadow cameras; fallback if GPU culling unavailable                |
 
 ```typescript
 public async initialize(): Promise<void> {
@@ -1301,18 +1311,18 @@ const sampler = SamplerLibrary.skybox;
 
 #### **3. Available Samplers (complete list)**
 
-| Getter | Use case |
-|---|---|
-| `SamplerLibrary.simpleSampler` | Linear filter — FXAA, bilateral filter, general post-process |
-| `SamplerLibrary.bloom` | Linear clamp — bloom downsample / upsample |
-| `SamplerLibrary.ambientOcclusionSampler` | AO passes |
-| `SamplerLibrary.shadows` | Depth comparison sampler for shadow maps |
-| `SamplerLibrary.anisotropic16x` | 16× anisotropic — diffuse / normal surface textures |
-| `SamplerLibrary.skybox` | Cubemap / skybox sampling |
-| `SamplerLibrary.environmentCubemap` | IBL environment cubemap (specular) |
-| `SamplerLibrary.nonFilteringSampler` | Nearest neighbour — G-buffer reads, depth buffer |
-| `SamplerLibrary.froxelRaymarchSampler` | Froxel volumetric raymarch |
-| `SamplerLibrary.nearestRepeat` | Nearest + repeat — noise/LUT textures |
+| Getter                                   | Use case                                                     |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| `SamplerLibrary.simpleSampler`           | Linear filter — FXAA, bilateral filter, general post-process |
+| `SamplerLibrary.bloom`                   | Linear clamp — bloom downsample / upsample                   |
+| `SamplerLibrary.ambientOcclusionSampler` | AO passes                                                    |
+| `SamplerLibrary.shadows`                 | Depth comparison sampler for shadow maps                     |
+| `SamplerLibrary.anisotropic16x`          | 16× anisotropic — diffuse / normal surface textures          |
+| `SamplerLibrary.skybox`                  | Cubemap / skybox sampling                                    |
+| `SamplerLibrary.environmentCubemap`      | IBL environment cubemap (specular)                           |
+| `SamplerLibrary.nonFilteringSampler`     | Nearest neighbour — G-buffer reads, depth buffer             |
+| `SamplerLibrary.froxelRaymarchSampler`   | Froxel volumetric raymarch                                   |
+| `SamplerLibrary.nearestRepeat`           | Nearest + repeat — noise/LUT textures                        |
 
 > `SamplerLibrary.anisotropic16x` is the only anisotropic preset. Use it for all surface texture sampling. There are no `anisotropic8x` / `4x` / `2x` variants.
 

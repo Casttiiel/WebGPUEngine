@@ -290,10 +290,10 @@ Editor mode module (toggle with **F1**) that provides the full scene-editing exp
 
 ```typescript
 // Gizmo modes
-GizmoMode.TRANSLATE   // XYZ axis arrows
-GizmoMode.ROTATE      // XYZ rotation rings
-GizmoMode.SCALE       // XYZ scale handles
-GizmoMode.PROBE_RESIZE // Reflection probe face handles
+GizmoMode.TRANSLATE; // XYZ axis arrows
+GizmoMode.ROTATE; // XYZ rotation rings
+GizmoMode.SCALE; // XYZ scale handles
+GizmoMode.PROBE_RESIZE; // Reflection probe face handles
 ```
 
 Each gizmo axis maps to a `GizmoAxis` enum value (`X`, `Y`, `Z`, `PROBE_PX/NX/PY/NY/PZ/NZ`). The selected axis is highlighted, and the editor listens for mouse drag to apply the transformation.
