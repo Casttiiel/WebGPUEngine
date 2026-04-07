@@ -20,20 +20,28 @@ fn vs(
 
     let t = camera.time;
 
-    // Two noise layers scrolling in different directions for wave animation
-    let noiseUV1 = uv * vec2<f32>(factors.uvXScale) + vec2<f32>(t * 0.06, t * 0.04);
-    let noiseUV2 = uv * vec2<f32>(factors.uvYScale) + vec2<f32>(-t * 0.04, t * 0.07);
+    // Undisplaced world position — used for world-space noise UVs so cube
+    // faces (or any tiled meshes) sample the same noise at shared edges.
+    let undisplacedWorld = object.modelMatrix * vec4<f32>(position, 1.0);
+    let worldXZ = undisplacedWorld.xz;
+
+    // Two noise layers scrolling in different directions for wave animation.
+    // Scale by uvXScale/uvYScale so the user can tune tile frequency.
+    let noiseUV1 = worldXZ * factors.uvXScale * 0.05 + vec2<f32>(t * 0.06, t * 0.04);
+    let noiseUV2 = worldXZ * factors.uvYScale * 0.05 + vec2<f32>(-t * 0.04, t * 0.07);
 
     let noise1 = textureSampleLevel(txNoise1, samplerState, noiseUV1, 0.0).r;
     let noise2 = textureSampleLevel(txNoise2, samplerState, noiseUV2, 0.0).g;
 
     // Combine layers for displacement along surface normal (max 0.2 world units)
     let displacement = (noise1 * 0.6 + noise2 * 0.4 - 0.5) * 0.2;
-    let displacedPos = position + normal * displacement;
 
-    let worldPos = object.modelMatrix * vec4<f32>(displacedPos, 1.0);
-
+    // Apply displacement in world-normal direction
     let model3x3 = get3x3From4x4(object.modelMatrix);
+    let worldNormal = normalize(model3x3 * normal);
+    let displacedWorld = undisplacedWorld.xyz + worldNormal * displacement;
+    let worldPos = vec4<f32>(displacedWorld, 1.0);
+
     output.N = normalize(model3x3 * normal);
     output.T = vec4<f32>(normalize(model3x3 * tangent.xyz), tangent.w);
     output.WorldPos = worldPos.xyz;
