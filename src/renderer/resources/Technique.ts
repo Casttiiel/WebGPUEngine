@@ -73,6 +73,7 @@ export class Technique extends GPUResource {
     this.vsFile = options.vs;
     this.fsFile = options.fs;
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
+    this.vsEntryPoint = options.vsEntryPoint || 'vs';
     this.materialSlots = options.materialSlots;
   }
 

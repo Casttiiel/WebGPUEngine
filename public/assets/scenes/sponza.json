@@ -52,18 +52,6 @@
     }
   },
   {
-    "components": {
-      "transform": { "position": [0, 0, 0] },
-      "water_volume": {
-        "material": "assets/materials/water.mat",
-        "tilesX": 8,
-        "tilesZ": 8,
-        "patchSize": 10.0,
-        "lodDistances": [20.0, 60.0]
-      }
-    }
-  },
-  {
     "prefab": "lighting/directional_light.prefab"
   },
   {

@@ -60,7 +60,6 @@ import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
 import { WeaponComponent } from '../../components/game/WeaponComponent';
 import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
-import { WaterVolumeComponent } from '../../components/vfx/WaterVolumeComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -369,8 +368,6 @@ export class Loader {
         return new FogVolumeComponent();
       case 'player_spawn':
         return new PlayerSpawnComponent();
-      case 'water_volume':
-        return new WaterVolumeComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }

@@ -51,5 +51,23 @@
         "position": [0, 2, 8]
       }
     }
+  },
+  {
+    "components": {
+      "name": "Water",
+      "transform": {
+        "position": [0, 0.9, 0],
+        "rotation": [0, 0, 0],
+        "scale": [50, 1, 50]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "large_plane.obj",
+            "material": "water.mat"
+          }
+        ]
+      }
+    }
   }
 ]
