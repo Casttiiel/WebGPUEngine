@@ -353,16 +353,12 @@ export class ModuleEditorSelection extends Module {
       }
     }
 
-    // 3. Selección normal: primero non-sensor raycast, luego probe sphere test
+    // 3. Selección normal: primero non-sensor raycast, luego probe pick test
     const physics = Engine.getPhysics();
     const rayResult = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
 
-    const nonSensorDist = rayResult
-      ? vec3.distance(ray.origin, (rayResult as any).point ?? ray.origin)
-      : Infinity;
-
-    // Probe sphere test — since probe box_collider is a sensor it's skipped by raycastClosestNonSensor
-    const probeHit = this.findProbeEntityAtRay(ray.origin, ray.direction, nonSensorDist);
+    // Probes solo tienen sensor — el test es puramente matemático, sin guardia de oclusión
+    const probeHit = this.findProbeEntityAtRay(ray.origin, ray.direction, camera.getCamera());
 
     if (probeHit) {
       if (probeHit !== this.selectedEntity) {
@@ -447,7 +443,9 @@ export class ModuleEditorSelection extends Module {
     // 3. Hover sobre entidades (non-sensor)
     const physics = Engine.getPhysics();
     const result = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
-    const newHoveredEntity = result ? Engine.getEntities().getEntityById(result.entityId) : null;
+    const probeHover = this.findProbeEntityAtRay(ray.origin, ray.direction, camera.getCamera());
+    const newHoveredEntity =
+      probeHover ?? (result ? Engine.getEntities().getEntityById(result.entityId) : null);
 
     if (newHoveredEntity !== this.hoveredEntity) {
       this.hoveredEntity = newHoveredEntity;
@@ -545,14 +543,20 @@ export class ModuleEditorSelection extends Module {
   }
 
   public renderDebug(): void {
-    // Renderizar wireframe del hovered entity (verde)
-    if (this.hoveredEntity && this.selectedEntity !== this.hoveredEntity) {
+    // Renderizar wireframe del hovered entity (verde) — no para probes
+    if (
+      this.hoveredEntity &&
+      this.selectedEntity !== this.hoveredEntity &&
+      !this.isProbeEntity(this.hoveredEntity)
+    ) {
       this.renderWireframeInFrame(this.hoveredEntity, [0.0, 10.0, 0.0, 1.0]);
     }
 
-    // Renderizar wireframe del selected entity (rojo)
+    // Renderizar wireframe del selected entity (rojo) — no para probes
     if (this.selectedEntity) {
-      this.renderWireframeInFrame(this.selectedEntity, [10.0, 0.0, 0.0, 1.0]);
+      if (!this.isProbeEntity(this.selectedEntity)) {
+        this.renderWireframeInFrame(this.selectedEntity, [10.0, 0.0, 0.0, 1.0]);
+      }
 
       // Si es probe, dibujar el volumen del collider
       if (this.isProbeEntity(this.selectedEntity)) {
@@ -746,15 +750,27 @@ export class ModuleEditorSelection extends Module {
   }
 
   /**
-   * Ray-sphere test against all probe entities.
-   * Returns the closest probe within `maxDist` or null.
+   * Ray-to-point distance test against all probe entities.
+   * Uses a screen-space adaptive threshold (~15px) so picking works at any distance.
+   * No occlusion guard — probes should always be selectable in the editor.
    */
-  private findProbeEntityAtRay(rayOrigin: vec3, rayDir: vec3, maxDist: number): Entity | null {
+  private findProbeEntityAtRay(
+    rayOrigin: vec3,
+    rayDir: vec3,
+    camera: import('../../core/math/Camera').Camera,
+  ): Entity | null {
     const probeList =
       Engine.getEntities().getObjectManagerByName('reflection_probe')?.getList() ?? [];
 
+    // Screen-space pick radius in pixels → world-space threshold at depth t.
+    // worldThreshold = t * tan(fovY/2) * (PICK_PX * 2 / viewportHeight)
+    const PICK_PX = 15;
+    const fovY = camera.getFov(); // radians
+    const viewportHeight = camera.getViewport().height;
+    const fovFactor = Math.tan(fovY / 2) * ((PICK_PX * 2) / viewportHeight);
+
     let closest: Entity | null = null;
-    let closestT = maxDist;
+    let closestT = Infinity;
 
     for (const comp of probeList) {
       const entity: Entity = (comp as any).getOwner();
@@ -762,17 +778,21 @@ export class ModuleEditorSelection extends Module {
       if (!transformComp) continue;
 
       const center = transformComp.getTransform().getWorldPosition();
-      const oc = vec3.create();
-      vec3.subtract(oc, rayOrigin, center);
 
-      const SPHERE_RADIUS = 0.5;
-      const b = 2.0 * vec3.dot(oc, rayDir);
-      const c_ = vec3.dot(oc, oc) - SPHERE_RADIUS * SPHERE_RADIUS;
-      const disc = b * b - 4.0 * c_;
-      if (disc < 0) continue;
+      // t = signed distance along ray to closest point to center
+      const toCam = vec3.create();
+      vec3.subtract(toCam, center, rayOrigin);
+      const t = vec3.dot(toCam, rayDir);
+      if (t <= 0) continue; // behind camera
 
-      const t = (-b - Math.sqrt(disc)) / 2.0;
-      if (t > 0 && t < closestT) {
+      // Perpendicular distance from ray to center
+      const closestPt = vec3.scaleAndAdd(vec3.create(), rayOrigin, rayDir, t);
+      const perpDist = vec3.distance(closestPt, center);
+
+      // World-space threshold grows with depth → constant screen-space feel
+      const worldThreshold = t * fovFactor;
+
+      if (perpDist < worldThreshold && t < closestT) {
         closestT = t;
         closest = entity;
       }
@@ -1056,6 +1076,39 @@ export class ModuleEditorSelection extends Module {
     }
   }
 
+  /** Logs the current probe transform + collider size to the console. */
+  private logProbeProperties(): void {
+    if (!this.selectedEntity || !this.isProbeEntity(this.selectedEntity)) return;
+    const transformComp = this.selectedEntity.getComponent('transform') as TransformComponent;
+    const boxComp = this.selectedEntity.getComponent('box_collider') as BoxColliderComponent;
+    if (!transformComp) return;
+
+    const t = transformComp.getTransform();
+    const pos = t.getLocalPosition();
+    const rot = t.getLocalRotation(); // quaternion [x,y,z,w]
+    const scl = t.getLocalScale();
+    const name =
+      (this.selectedEntity.getComponent('name') as any)?.getName?.() ?? this.selectedEntity.getId();
+
+    const round = (v: number) => Math.round(v * 10000) / 10000;
+    const fmtVec3 = (v: ArrayLike<number>) => `[${round(v[0])}, ${round(v[1])}, ${round(v[2])}]`;
+    const fmtVec4 = (v: ArrayLike<number>) =>
+      `[${round(v[0])}, ${round(v[1])}, ${round(v[2])}, ${round(v[3])}]`;
+
+    console.group(`%c📍 Probe: ${name}`, 'color:#7eb8f7;font-weight:bold');
+    console.log(`  "position": ${fmtVec3(pos)},`);
+    console.log(`  "rotation": ${fmtVec4(rot)},`);
+    console.log(`  "scale":    ${fmtVec3(scl)},`);
+    if (boxComp) {
+      const half = boxComp.getHalfExtents();
+      const size = [round(half[0] * 2), round(half[1] * 2), round(half[2] * 2)];
+      console.log(
+        `  "box_collider": { "isSensor": true, "bodyType": "static", "size": [${size.join(', ')}] }`,
+      );
+    }
+    console.groupEnd();
+  }
+
   /**
    * Detiene el arrastre
    */
@@ -1068,7 +1121,13 @@ export class ModuleEditorSelection extends Module {
       this._probeDragStartHalfExtents = null;
       this._probeDragStartFaceCenter = null;
       this.draggedAxis = GizmoAxis.NONE;
+      this.logProbeProperties();
       return;
+    }
+
+    // Log probe properties after translate/scale drag
+    if (this.selectedEntity && this.isProbeEntity(this.selectedEntity)) {
+      this.logProbeProperties();
     }
     // Si se acaba de hacer drag de escala, recrear el collider si existe
     if (this.gizmoMode === GizmoMode.SCALE && this.selectedEntity) {

@@ -1,15 +1,14 @@
 ### Engine
 
-1. Editor Light Probes (Render Debug / Gizmo)
-2. Water Shader / Tesellation
-3. GLTF Exporter unifies metallic and roughness? In right channel?
-4. Light probe generation fails on some face
-5. Test Paralax Corrected Cubemaps
-6. Glass Shader
-7. Enemy AI / NavMesh
-8. HZB Pocho
-9. SSR Temporal
-10. TAA: Dynamic Objects
+1. Water Shader / Tesellation
+2. GLTF Exporter unifies metallic and roughness? In right channel?
+3. Light probe generation fails on some face
+4. Test Paralax Corrected Cubemaps
+5. Glass Shader
+6. Enemy AI / NavMesh
+7. HZB Pocho
+8. SSR Temporal
+9. TAA: Dynamic Objects
 
 ## Gameplay
 
