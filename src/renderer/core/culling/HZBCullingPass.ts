@@ -54,19 +54,15 @@ export class HZBCullingPass {
   private lastCulledCount = 0;
 
   /**
-   * Readback state machine (3 mutually-exclusive phases):
+   * Readback state machine (2 mutually-exclusive phases):
    *
-   *  IDLE         copyScheduled=F  mapPending=F  stagingMapped=F
-   *    → Frame N end:   record copyBufferToBuffer → copyScheduled=T
-   *  COPY_SCHEDULED
-   *    → Frame N+1 start: call mapAsync()           → copyScheduled=F, mapPending=T
-   *      (the encoder from frame N has been submitted by now — safe to mapAsync)
+   *  IDLE         mapPending=F  stagingMapped=F
+   *    → End of dispatch():  submit isolated copy encoder, call mapAsync()  → mapPending=T
    *  MAP_PENDING
-   *    → mapAsync resolves:                         → mapPending=F, stagingMapped=T
+   *    → mapAsync resolves:                                                  → mapPending=F, stagingMapped=T
    *  STAGED
-   *    → Frame N+2 start: read + unmap              → stagingMapped=F  (back to IDLE)
+   *    → Next dispatch() start: read + unmap                                → stagingMapped=F  (back to IDLE)
    */
-  private copyScheduled = false; // copy recorded in encoder, not yet submitted
   private mapPending = false; // mapAsync in flight
   private stagingMapped = false; // data ready to read via getMappedRange
 
@@ -186,25 +182,11 @@ export class HZBCullingPass {
     const hzbView = hzbBuilder.getHZBView();
     if (!hzbView) return;
 
-    // ---- Readback state machine (runs at the TOP of dispatch, before submit) ----
+    // ---- Readback state machine ----------------------------------------------------
     //
-    // Phase 1 → 2: the previous frame's encoder (containing copyBufferToBuffer) has
-    // now been submitted.  Safe to call mapAsync — staging is not used this frame.
-    if (this.copyScheduled) {
-      this.copyScheduled = false;
-      this.mapPending = true;
-      this.stagingBuffer
-        .mapAsync(GPUMapMode.READ)
-        .then(() => {
-          this.mapPending = false;
-          this.stagingMapped = true;
-        })
-        .catch(() => {
-          // Device lost or buffer destroyed — reset to IDLE.
-          this.mapPending = false;
-          this.stagingMapped = false;
-        });
-    }
+    // MAP_PENDING → STAGED: mapAsync has resolved; data ready to read next dispatch.
+    // STAGED → IDLE: consume the staged data, unmap, reset.
+    // (IDLE → MAP_PENDING transition now happens at the END of dispatch, not here.)
 
     // Phase 3 → IDLE: consume the staged data.
     if (this.stagingMapped) {
@@ -287,14 +269,32 @@ export class HZBCullingPass {
     pass.dispatchWorkgroups(workgroups, 1, 1);
     pass.end();
 
-    // ---- Schedule readback — IDLE phase only --------------------------------
-    // copyScheduled/mapPending/stagingMapped all false → staging is 'unmapped'.
-    // Record the copy into the encoder NOW; mapAsync will be called next frame
-    // (after this encoder has been submitted) to avoid the
-    // "used in submit while pending map" validation error.
+    // ---- Readback — IDLE phase only -----------------------------------------------
+    // Submit the counter copy in its OWN encoder immediately after the compute pass,
+    // then call mapAsync right away.  This avoids the race where:
+    //   1. copy is recorded into the shared frame encoder (copyScheduled = true)
+    //   2. a second dispatch() call in the same frame (e.g. probe baking calls
+    //      performCulling() twice per face) sees copyScheduled=true and calls
+    //      mapAsync() while the shared encoder — which still contains the copy —
+    //      has not yet been submitted → "buffer used in submit while mapped" error.
+    // By submitting the copy immediately here, mapAsync is always called on an
+    // already-submitted buffer, making the state machine race-free.
     if (!this.copyScheduled && !this.mapPending && !this.stagingMapped) {
-      encoder.copyBufferToBuffer(this.counterBuffer, 0, this.stagingBuffer, 0, 4);
-      this.copyScheduled = true; // mapAsync deferred to next dispatch()
+      const readbackEncoder = this.device.createCommandEncoder({ label: 'hzb_counter_readback' });
+      readbackEncoder.copyBufferToBuffer(this.counterBuffer, 0, this.stagingBuffer, 0, 4);
+      this.device.queue.submit([readbackEncoder.finish()]);
+      // Buffer copy is now submitted → safe to map immediately.
+      this.mapPending = true;
+      this.stagingBuffer
+        .mapAsync(GPUMapMode.READ)
+        .then(() => {
+          this.mapPending = false;
+          this.stagingMapped = true;
+        })
+        .catch(() => {
+          this.mapPending = false;
+          this.stagingMapped = false;
+        });
     }
   }
 

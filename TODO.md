@@ -1,17 +1,15 @@
 ### Engine
 
 1. Water Shader
-2. UE4 Shading Models
-3. Test Paralax Corrected Cubemaps
-4. Test Irradiance Blend Map
-5. GLTF Exporter unifies metallic and roughness? In right channel?
-6. Light probe generation fails on some face
-7. Test Shadows
+2. Test Paralax Corrected Cubemaps
+3. Test Irradiance Blend Map
+4. GLTF Exporter unifies metallic and roughness? In right channel?
+5. Test Shadows
 
-8. Enemy AI / NavMesh
-9. HZB Pocho
-10. SSR Temporal
-11. TAA: Dynamic Objects
+6. Enemy AI / NavMesh
+7. HZB Pocho
+8. SSR Temporal
+9. TAA: Dynamic Objects
 
 ## Gameplay
 
