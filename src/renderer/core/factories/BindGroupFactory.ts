@@ -493,6 +493,36 @@ export class BindGroupFactory {
     ]);
   }
 
+  /**
+   * Water composite bind group layout — group(1) in water_composite.fs.
+   *   binding 0 — txSceneBeforeWater (lit scene snapshot, RGBA16F)
+   *   binding 1 — txWaterAlbedo      (water base colour + metallic)
+   *   binding 2 — txWaterNormal      (octahedral normal + roughness)
+   *   binding 3 — txWaterDepth       (water linear depth, 0 = no water)
+   *   binding 4 — txSolidDepth       (solid scene linear depth)
+   *   binding 5 — txEnvCubemap       (environment cubemap for reflections)
+   *   binding 6 — samplerState       (filtering sampler)
+   *   binding 7 — envSampler         (cubemap sampler)
+   *   binding 8 — txWaterLit         (water surface after ambient + directional lighting)
+   */
+  public static getWaterCompositeLayout(): GPUBindGroupLayout {
+    return this.getLayout('water_composite', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      {
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
+      },
+      { binding: 6, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 7, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+    ]);
+  }
+
   public static getAmbientUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('ambient uniforms layout', [
       {
@@ -1883,6 +1913,8 @@ export class BindGroupFactory {
         return this.getGodRaysUniformsLayout();
       case PipelineBindGroupLayouts.KAWASE_UNIFORMS:
         return this.getKawaseUniformsLayout();
+      case PipelineBindGroupLayouts.WATER_COMPOSITE_UNIFORMS:
+        return this.getWaterCompositeLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

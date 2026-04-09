@@ -4,6 +4,8 @@ import { RenderManagerV2 as RenderManager } from '../managers/RenderManagerV2';
 import { Render } from '../pipeline/Render';
 import { GPUUtils } from '../utils/GPUUtils';
 import { RenderKey } from '../managers/RenderKeyManager';
+import { Mesh } from '../../resources/Mesh';
+import { Technique } from '../../resources/Technique';
 
 /**
  * Depth prepass render pass
@@ -152,5 +154,41 @@ export class GlassOITGatherRenderPass extends BaseRenderPass {
     }
 
     RenderManager.getInstance().render(RenderCategory.GLASS, pass);
+  }
+}
+
+/**
+ * Water composite render pass — fullscreen quad executed after the water GBuffer pass.
+ * Blends the lit water surface with the pre-water scene colour using depth-based
+ * absorption (Beer–Lambert) and Schlick Fresnel.
+ *
+ * Requires two bind groups set per frame:
+ *   group(0) = CameraUniforms
+ *   group(1) = WaterCompositeUniforms (scene snapshot + water GBuffer + env cubemap)
+ */
+export class WaterCompositeRenderPass extends BaseRenderPass {
+  private mesh: Mesh;
+  private technique: Technique;
+  private cameraBindGroup: GPUBindGroup | null = null;
+  private waterBindGroup: GPUBindGroup | null = null;
+
+  constructor(config: RenderPassConfig, mesh: Mesh, technique: Technique) {
+    super(config);
+    this.mesh = mesh;
+    this.technique = technique;
+  }
+
+  public updateBindGroups(cameraBindGroup: GPUBindGroup, waterBindGroup: GPUBindGroup): void {
+    this.cameraBindGroup = cameraBindGroup;
+    this.waterBindGroup = waterBindGroup;
+  }
+
+  protected render(pass: GPURenderPassEncoder): void {
+    if (!this.cameraBindGroup || !this.waterBindGroup) return;
+    this.technique.activatePipeline(pass);
+    this.mesh.activate(pass);
+    pass.setBindGroup(0, this.cameraBindGroup);
+    pass.setBindGroup(1, this.waterBindGroup);
+    this.mesh.renderGroup(pass);
   }
 }

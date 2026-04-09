@@ -1,6 +1,6 @@
 ### Engine
 
-1. Water Shader / Tesellation
+1. Water Shader
 2. GLTF Exporter unifies metallic and roughness? In right channel?
 3. Light probe generation fails on some face
 4. Test Paralax Corrected Cubemaps

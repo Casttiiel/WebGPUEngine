@@ -337,4 +337,71 @@ export class RenderPassFactory {
       viewport,
     };
   }
+
+  /**
+   * Creates configuration for the water GBuffer pass.
+   * Writes water geometry into 3 dedicated render targets (separate from the solid GBuffer).
+   * All targets are cleared to 0 so a depth value of 0 unambiguously means "no water".
+   * Depth is read-only — tested against the prepass depth but never written.
+   */
+  public static createWaterGBufferPassConfig(
+    waterAlbedo: RenderTarget,
+    waterNormals: RenderTarget,
+    waterDepth: RenderTarget,
+    prepassDepthView: GPUTextureView,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    return {
+      label: 'Water GBuffer Pass',
+      colorAttachments: [
+        {
+          view: waterAlbedo.getRenderView()!,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+        {
+          view: waterNormals.getRenderView()!,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+        {
+          view: waterDepth.getRenderView()!,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 }, // 0 = no water
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: prepassDepthView,
+        depthLoadOp: 'load',
+        depthStoreOp: 'store', // test only (technique uses test_but_no_write)
+      },
+      viewport,
+    };
+  }
+
+  /**
+   * Creates configuration for the water composite pass.
+   * Replaces the entire accLight buffer with the composited water+scene output.
+   * Every pixel is overwritten by the fullscreen quad, so loadOp: 'clear' is safe.
+   */
+  public static createWaterCompositePassConfig(
+    accLight: RenderTarget,
+    viewport?: { width: number; height: number },
+  ): RenderPassConfig {
+    return {
+      label: 'Water Composite Pass',
+      colorAttachments: [
+        {
+          view: accLight.getRenderView()!,
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+      viewport,
+    };
+  }
 }

@@ -1,11 +1,11 @@
 {
-    "technique": "water/water.tech",
+    "technique": "water/water_gbuffer.tech",
     "textures": {
         "txNoise1": "noiseRGBTileable.jpg",
         "txNoise2": "noiseRGBTileable.jpg"
     },
     "casts_shadows": false,
-    "category": "transparent",
+    "category": "water",
     "baseColorFactor": [0.05, 0.3, 0.7, 0.45],
     "roughnessFactor": 0.05,
     "metallicFactor": 0.0,

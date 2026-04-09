@@ -70,6 +70,26 @@ export class DeferredRenderer {
   private oitComposeBindGroup!: GPUBindGroup;
   private oitGlassEnvBindGroup: GPUBindGroup | null = null;
   private aoResult!: GPUTextureView;
+
+  // ── Water hybrid pass resources ──────────────────────────────────────────
+  /** Snapshot of rtAccLight taken right after lighting, before water is composited. */
+  private rtSceneBeforeWater!: RenderTarget;
+  /** Separate water GBuffer: base colour + metallic */
+  private rtWaterAlbedo!: RenderTarget;
+  /** Separate water GBuffer: octahedral normal + roughness */
+  private rtWaterNormals!: RenderTarget;
+  /** Separate water GBuffer: linear depth (0 = no water pixel) */
+  private rtWaterDepth!: RenderTarget;
+  /** Accumulated lit water surface (ambient + directional lights evaluated against water GBuffer) */
+  private rtWaterLit!: RenderTarget;
+  private waterCompositeTechnique!: Technique;
+  private waterCompositeMesh!: Mesh;
+  private waterCompositeBindGroup: GPUBindGroup | null = null;
+  /** Simple GBuffer layout bind group pointing at water GBuffer (for ambient pass, group 1). */
+  private waterGBufferBindGroup: GPUBindGroup | null = null;
+  /** GBuffer+AO layout bind group pointing at water GBuffer (for directional lights, group 1). */
+  private waterGBufferWithAOBindGroup: GPUBindGroup | null = null;
+  // ─────────────────────────────────────────────────────────────────────────
   // Cached extended G-Buffer+AO bind group for lighting shaders. Rebuilt when aoResult changes.
   private gBufferWithAOBindGroup: GPUBindGroup | null = null;
   private lastAOViewForGBuffer: GPUTextureView | null = null;
@@ -151,6 +171,47 @@ export class DeferredRenderer {
       GPUTextureUsage.COPY_DST,
     );
 
+    // ── Water hybrid pass render targets ──────────────────────────────────────
+    if (!this.rtSceneBeforeWater) this.rtSceneBeforeWater = new RenderTarget();
+    this.rtSceneBeforeWater.createRT(
+      'scene_before_water',
+      width,
+      height,
+      QualitySettings.getInstance().getSettings().hdrTexture,
+      GPUTextureUsage.COPY_DST,
+    );
+    if (!this.rtWaterAlbedo) this.rtWaterAlbedo = new RenderTarget();
+    this.rtWaterAlbedo.createRT(
+      'water_gbuffer_albedo',
+      width,
+      height,
+      QualitySettings.getInstance().getSettings().albedoTexture,
+    );
+    if (!this.rtWaterNormals) this.rtWaterNormals = new RenderTarget();
+    this.rtWaterNormals.createRT(
+      'water_gbuffer_normals',
+      width,
+      height,
+      QualitySettings.getInstance().getSettings().normalTexture,
+    );
+    if (!this.rtWaterDepth) this.rtWaterDepth = new RenderTarget();
+    this.rtWaterDepth.createRT(
+      'water_gbuffer_depth',
+      width,
+      height,
+      QualitySettings.getInstance().getSettings().linearDepthTexture,
+    );
+    if (!this.rtWaterLit) this.rtWaterLit = new RenderTarget();
+    this.rtWaterLit.createRT(
+      'water_lit',
+      width,
+      height,
+      QualitySettings.getInstance().getSettings().hdrTexture,
+    );
+    // Invalidate water GBuffer bind groups on resize — they reference the new texture views.
+    this.waterGBufferBindGroup = null;
+    this.waterGBufferWithAOBindGroup = null;
+
     if (!this.rtCopyAlbedos) {
       this.rtCopyAlbedos = new RenderTarget();
     }
@@ -218,6 +279,26 @@ export class DeferredRenderer {
       this.rtOITRevealage,
       prepassDepthView,
     );
+
+    // Initialize water GBuffer pass (writes to separate water RTs, tests prepass depth)
+    this.renderPassManager.initializeWaterGBufferPass(
+      this.rtWaterAlbedo,
+      this.rtWaterNormals,
+      this.rtWaterDepth,
+      prepassDepthView,
+    );
+
+    // waterComposite pass is initialized in load() after the technique is loaded.
+    // It is (re)created each resize via initializeWaterCompositePass which is called
+    // later in create() once waterCompositeTechnique/Mesh are available.
+    if (this.waterCompositeTechnique && this.waterCompositeMesh) {
+      this.renderPassManager.initializeWaterCompositePass(
+        this.rtAccLight,
+        this.waterCompositeTechnique,
+        this.waterCompositeMesh,
+      );
+      this.waterCompositeBindGroup = null; // force rebuild on next frame
+    }
 
     // Create bind group with G-Buffer targets and linear depth from G-Buffer
     this.gBufferBindGroup = BindGroupFactory.createBindGroup(
@@ -366,6 +447,10 @@ export class DeferredRenderer {
     this.oitComposeTechnique = await Technique.getAsync('utility/oit_compose.tech');
     this.oitComposeMesh = await Mesh.getAsync('fullscreenquad.obj');
 
+    // Water composite resources
+    this.waterCompositeTechnique = await Technique.getAsync('water/water_composite.tech');
+    this.waterCompositeMesh = await Mesh.getAsync('fullscreenquad.obj');
+
     this.whiteTexture = await Texture.getAsync('white.png');
 
     this.isLoaded = true;
@@ -433,6 +518,34 @@ export class DeferredRenderer {
     // 3. Render ambient occlusion and lighting
     this.aoResult = this.renderAO(camera);
     this.renderAccLight();
+
+    // 4. Water hybrid pass ───────────────────────────────────────────────────
+    // Snapshot lit scene (solids only) before water pixels are composited.
+    const encoderForWaterSnapshot = Render.getInstance().getCommandEncoder();
+    encoderForWaterSnapshot.copyTextureToTexture(
+      { texture: this.rtAccLight.getTexture() },
+      { texture: this.rtSceneBeforeWater.getTexture() },
+      {
+        width: this.rtSceneBeforeWater.getWidth(),
+        height: this.rtSceneBeforeWater.getHeight(),
+        depthOrArrayLayers: 1,
+      },
+    );
+    // Water writes its surface properties into the dedicated water GBuffer.
+    this.renderPassManager.executePass('waterGBuffer', RenderCategory.WATER);
+    // Run full deferred lighting (ambient + directional) on the water surface GBuffer,
+    // producing a lit surface color equivalent to what the main deferred path gives opaques.
+    this.renderWaterAccLight();
+    // Composite water over the scene using depth-based absorption + Fresnel.
+    this.ensureWaterCompositeBindGroup();
+    if (this.waterCompositeBindGroup) {
+      this.renderPassManager.updateWaterCompositeBindGroups(
+        Engine.getRender().getMainCameraBindGroup(),
+        this.waterCompositeBindGroup,
+      );
+      this.renderPassManager.executePass('waterComposite');
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     this.ensureEngineTextureRegistrations();
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
@@ -651,6 +764,81 @@ export class DeferredRenderer {
   }
 
   /**
+   * Lazily creates (or rebuilds) the water composite bind group.
+   * Rebuilds whenever the env texture changes (same pattern as ensureOITGlassEnvBindGroup).
+   */
+  private ensureWaterCompositeBindGroup(): void {
+    const envTex = Engine.getEnvironmentManager().getSSREnvironmentTexture();
+    if (!envTex) return;
+    if (this.waterCompositeBindGroup) return; // already built; rebuild on resize (null set in create())
+
+    const gBufferRTs = this.gBufferPass.getRenderTargets();
+    const layout = BindGroupFactory.getLayoutFromEnum(
+      PipelineBindGroupLayouts.WATER_COMPOSITE_UNIFORMS,
+    );
+    this.waterCompositeBindGroup = BindGroupFactory.createBindGroup('water_composite_bg', layout, [
+      { binding: 0, resource: this.rtSceneBeforeWater.getView() },
+      { binding: 1, resource: this.rtWaterAlbedo.getView() },
+      { binding: 2, resource: this.rtWaterNormals.getView() },
+      { binding: 3, resource: this.rtWaterDepth.getView() },
+      { binding: 4, resource: gBufferRTs.linearDepth.getView()! },
+      { binding: 5, resource: envTex.getTextureView()! },
+      { binding: 6, resource: SamplerLibrary.simpleSampler! },
+      { binding: 7, resource: SamplerLibrary.environmentCubemap! },
+      { binding: 8, resource: this.rtWaterLit.getView() },
+    ]);
+  }
+
+  /**
+   * Evaluates the full deferred lighting chain (ambient + directional lights) against the
+   * dedicated water GBuffer, writing the result into rtWaterLit.  The water composite pass
+   * then adds this lit-surface colour to the Fresnel-weighted reflection term.
+   */
+  private renderWaterAccLight(): void {
+    // Lazily build (and invalidate-on-resize) the two water GBuffer bind group variants.
+    if (!this.waterGBufferBindGroup) {
+      this.waterGBufferBindGroup = BindGroupFactory.createBindGroup(
+        'water_gbuffer_bg',
+        this.gBufferLayout,
+        [
+          { binding: 0, resource: this.rtWaterAlbedo.getView()! },
+          { binding: 1, resource: this.rtWaterNormals.getView()! },
+          { binding: 2, resource: this.rtWaterDepth.getView()! },
+          { binding: 3, resource: SamplerLibrary.nonFilteringSampler! },
+        ],
+      );
+    }
+    if (!this.waterGBufferWithAOBindGroup) {
+      this.waterGBufferWithAOBindGroup = BindGroupFactory.createBindGroup(
+        'water_gbuffer_with_ao_bg',
+        BindGroupFactory.getGBufferWithAOLayout(),
+        [
+          { binding: 0, resource: this.rtWaterAlbedo.getView()! },
+          { binding: 1, resource: this.rtWaterNormals.getView()! },
+          { binding: 2, resource: this.rtWaterDepth.getView()! },
+          { binding: 3, resource: SamplerLibrary.nonFilteringSampler! },
+          // Water surface has no baked AO — use white texture (AO = 1, fully lit).
+          { binding: 4, resource: this.whiteTexture.getTextureView()! },
+          { binding: 5, resource: SamplerLibrary.simpleSampler! },
+        ],
+      );
+    }
+
+    const white = this.whiteTexture.getTextureView()!;
+
+    // Ambient diffuse (uses loadOp:'clear' internally, so this also clears rtWaterLit).
+    this.ambientLight.renderDiffuse(this.rtWaterLit.getView(), this.waterGBufferBindGroup, white);
+
+    // Directional lights — additive, same bind groups they use for the main GBuffer.
+    for (const comp of Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList() ?? []) {
+      const dl = comp as DirectionalLightComponent;
+      dl.render(this.rtWaterLit.getView(), this.waterGBufferWithAOBindGroup, white);
+    }
+  }
+
+  /**
    * Creates or rebuilds the OIT glass env bind group from the current environment cubemap.
    * Caches the result — only rebuilds if the cubemap texture view changed.
    */
@@ -703,6 +891,15 @@ export class DeferredRenderer {
       this.rtGlassRefraction.destroy();
     }
     this.oitGlassEnvBindGroup = null;
+
+    if (this.rtSceneBeforeWater) this.rtSceneBeforeWater.destroy();
+    if (this.rtWaterAlbedo) this.rtWaterAlbedo.destroy();
+    if (this.rtWaterNormals) this.rtWaterNormals.destroy();
+    if (this.rtWaterDepth) this.rtWaterDepth.destroy();
+    if (this.rtWaterLit) this.rtWaterLit.destroy();
+    this.waterCompositeBindGroup = null;
+    this.waterGBufferBindGroup = null;
+    this.waterGBufferWithAOBindGroup = null;
 
     if (this.ambientLight) {
       this.ambientLight.destroy();

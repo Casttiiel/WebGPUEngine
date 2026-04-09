@@ -5,4 +5,5 @@ export enum RenderCategory {
   DISTORSIONS = 'distorsions',
   DECALS = 'decals',
   SHADOWS = 'shadows',
+  WATER = 'water',
 }

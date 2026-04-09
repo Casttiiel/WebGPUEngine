@@ -1,0 +1,10 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "water/water_composite.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": [
+        "CameraUniforms",
+        "WaterCompositeUniforms"
+    ]
+}

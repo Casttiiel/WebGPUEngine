@@ -5,6 +5,7 @@ import {
   TransparentRenderPass,
   DepthPrepassRenderPass,
   GlassOITGatherRenderPass,
+  WaterCompositeRenderPass,
 } from './DeferredRenderPasses';
 import {
   PointLightWithShadowsRenderPass,
@@ -635,5 +636,56 @@ export class RenderPassManager {
       paramsBindGroup,
     );
     this.executeDynamicPass(pass);
+  }
+
+  // ── Water passes ──────────────────────────────────────────────────────────
+
+  /**
+   * Registers the water GBuffer pass that writes water geometry into 3 dedicated
+   * render targets (separate from the solid GBuffer).
+   * Uses the same GBufferRenderPass class — the difference is the render targets
+   * and the RenderCategory.WATER draw category.
+   */
+  public initializeWaterGBufferPass(
+    waterAlbedo: RenderTarget,
+    waterNormals: RenderTarget,
+    waterDepth: RenderTarget,
+    prepassDepthView: GPUTextureView,
+  ): void {
+    const config = RenderPassFactory.createWaterGBufferPassConfig(
+      waterAlbedo,
+      waterNormals,
+      waterDepth,
+      prepassDepthView,
+    );
+    this.renderPasses.set('waterGBuffer', new GBufferRenderPass(config));
+  }
+
+  /**
+   * Registers the persistent water composite pass.
+   * Call updateWaterCompositeBindGroups() each frame before executePass('waterComposite').
+   */
+  public initializeWaterCompositePass(
+    accLight: RenderTarget,
+    technique: Technique,
+    fullscreenMesh: Mesh,
+  ): void {
+    const config = RenderPassFactory.createWaterCompositePassConfig(accLight);
+    this.renderPasses.set(
+      'waterComposite',
+      new WaterCompositeRenderPass(config, fullscreenMesh, technique),
+    );
+  }
+
+  /**
+   * Updates both bind groups on the water composite pass.
+   * Must be called each frame before executePass('waterComposite').
+   */
+  public updateWaterCompositeBindGroups(
+    cameraBindGroup: GPUBindGroup,
+    waterBindGroup: GPUBindGroup,
+  ): void {
+    const pass = this.renderPasses.get('waterComposite') as WaterCompositeRenderPass | undefined;
+    pass?.updateBindGroups(cameraBindGroup, waterBindGroup);
   }
 }

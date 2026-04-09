@@ -404,6 +404,13 @@ export class RenderManagerV2 {
       return false;
     }
 
+    // For custom-slot materials, the bind group is built lazily once all engine
+    // textures are registered.  Skip silently until it's ready to avoid submitting
+    // draw calls with an unbound group 1.
+    if (technique.getMaterialSlots() !== null && !key.material.getTextureBindGroup()) {
+      return false;
+    }
+
     return true;
   }
 

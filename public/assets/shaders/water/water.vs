@@ -39,7 +39,7 @@ fn vs(
     // Apply displacement in world-normal direction
     let model3x3 = get3x3From4x4(object.modelMatrix);
     let worldNormal = normalize(model3x3 * normal);
-    let displacedWorld = undisplacedWorld.xyz + worldNormal * displacement;
+    let displacedWorld = undisplacedWorld.xyz;// + worldNormal * displacement
     let worldPos = vec4<f32>(displacedWorld, 1.0);
 
     output.N = normalize(model3x3 * normal);
