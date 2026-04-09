@@ -6,6 +6,7 @@ import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Cubemap } from '../../renderer/resources/Cubemap';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
+import { ReflectionProbeComponentData } from '../../types/ReflectionProbeComponentData.type';
 
 export class ReflectionProbeComponent extends Component {
   private radius: number = 10.0; // Radio de influencia
@@ -35,13 +36,7 @@ export class ReflectionProbeComponent extends Component {
     super();
   }
 
-  public load(data: unknown): void {
-    const probeData = data as {
-      radius?: number;
-      resolution?: number;
-      extents?: [number, number, number];
-      type?: 'indoor' | 'outdoor';
-    };
+  public load(probeData: ReflectionProbeComponentData): void {
     this.radius = probeData?.radius ?? 10.0;
     this.resolution = probeData?.resolution ?? 512;
     this.probeType = probeData?.type ?? 'indoor';

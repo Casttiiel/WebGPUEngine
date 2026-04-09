@@ -1,24 +1,28 @@
 {
-    "children": [],
-    "components": {
-      "name": "ReflectionProbe",
-      "transform": {},
-      "reflection_probe": {
-        "resolution": 512,
-        "type": "indoor"
-      },
-      "box_collider": {
-        "isSensor": true,
-        "bodyType": "static",
-        "size": [1, 1, 1]
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "sphere.obj",
-            "material": "textured.mat"
-          }
-        ]
-      }
+  "children": [],
+  "components": {
+    "name": "ReflectionProbe",
+    "transform": {},
+    "reflection_probe": {
+      "resolution": 512,
+      "type": "indoor"
+    },
+    "box_collider": {
+      "isSensor": true,
+      "bodyType": "static",
+      "size": [
+        1,
+        1,
+        1
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "sphere.obj",
+          "material": "textured.mat"
+        }
+      ]
     }
   }
+}
