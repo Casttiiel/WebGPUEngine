@@ -368,7 +368,7 @@ export class RenderPassFactory {
         },
         {
           view: waterDepth.getRenderView()!,
-          clearValue: { r: 0, g: 0, b: 0, a: 0 }, // 0 = no water
+          clearValue: { r: 1, g: 1, b: 1, a: 1 }, // 1 = no water; shaders discard depth >= 0.999
           loadOp: 'clear',
           storeOp: 'store',
         },

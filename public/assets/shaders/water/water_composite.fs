@@ -47,7 +47,8 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let waterLinDepth = textureSampleLevel(txWaterDepth, samplerState, uv, 0.0).r;
 
     // ── Passthrough for non-water pixels ─────────────────────────────────────
-    if (waterLinDepth <= 0.0) {
+    // Water depth clears to 1.0; water pixels write values in (0, 1).
+    if (waterLinDepth >= 1.0) {
         return textureSampleLevel(txSceneBeforeWater, samplerState, uv, 0.0);
     }
 
@@ -116,14 +117,17 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     // ── Composite ─────────────────────────────────────────────────────────────
     // Fresnel-blend: normal incidence → see transmitted background, grazing → mirror reflection.
-    var finalColor = mix(transmitted, reflColor, fresnel);
+    var finalColor = mix(transmitted, reflColor, clamp(fresnel,0.0,1.0));
 
     // Add the fully-lit water surface (ambient IBL diffuse + directional light diffuse+specular).
     // This is the deferred lighting result evaluated on the water GBuffer, equivalent to what
     // opaque surfaces receive.  It is added on top of the Fresnel blend because the surface
     // PBR terms (NdL, VdH Fresnel, GGX specular) have already been computed in the lighting
     // passes and are independent of the view-angle Fresnel transmission/reflection split.
-    let litSurface = textureSampleLevel(txWaterLit, samplerState, uv, 0.0).rgb;
+    // Use textureLoad (nearest texel, no filter) to avoid bilinear bleeding of
+    // invalid values from non-water pixels at the water/land boundary.
+    let litTexel   = vec2<i32>(floor(uv * camera.screenSize));
+    let litSurface = textureLoad(txWaterLit, litTexel, 0).rgb;
     finalColor += litSurface;
 
     // Foam / shoreline on top of everything.
