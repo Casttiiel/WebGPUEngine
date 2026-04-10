@@ -53,6 +53,20 @@ fn viewToScreen(viewPos: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(uv, depth);
 }
 
+// ── View-space reconstruction: screen UV + linear depth → view-space position ──
+// Inverse of viewToScreen's UV mapping.  Used to validate hits in 3D rather than
+// comparing raw depth scalars that may belong to completely different objects
+// (e.g. a near object A that projects onto the same UVs as the ray position B).
+fn screenToView(uv: vec2<f32>, linearDepth: f32) -> vec3<f32> {
+    let ndc   = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
+    let viewZ = -linearDepth * camera.cameraFar;
+    // Invert perspective: ndc.x = proj[0][0] * viewX / (-viewZ)
+    //                  → viewX = ndc.x * (-viewZ) / proj[0][0]
+    let viewX = ndc.x * (-viewZ) / camera.projectionMatrix[0][0];
+    let viewY = ndc.y * (-viewZ) / camera.projectionMatrix[1][1];
+    return vec3<f32>(viewX, viewY, viewZ);
+}
+
 // ── Binary search refinement ─────────────────────────────────────────────────
 // Bisects between the last miss (loVP) and first hit (hiVP) in view space
 // to find the actual surface crossing more precisely (8 iterations = ~1/256 step).
@@ -64,10 +78,13 @@ fn binarySearchRefine(loVP: vec3<f32>, hiVP: vec3<f32>) -> vec3<f32> {
         let midScr = viewToScreen(midVP);
         if (midScr.x < 0.0 || midScr.x > 1.0 || midScr.y < 0.0 || midScr.y > 1.0) { break; }
         let sceneDep = textureSampleLevel(gLinearDepth, samplerGBuffer, midScr.xy, 0.0).r;
-        if (midScr.z > sceneDep) {
-            hi = midVP; // mid is inside geometry → move hi back
+        let midThickness = ssrParams.thickness * (1.0 + sceneDep * 2.0);
+        // Use crossing condition consistent with the march: penetrating → refine
+        // from the hi side; in front or beyond slab → push lo forward.
+        if (midScr.z > sceneDep && (midScr.z - sceneDep) < midThickness) {
+            hi = midVP; // mid is inside the hit slab → move hi back
         } else {
-            lo = midVP; // mid is in front → move lo forward
+            lo = midVP; // mid is in front or past the slab → move lo forward
         }
     }
     return hi; // refined hit point (view space)
@@ -91,8 +108,14 @@ fn performSSRMarch(
     // Reject rays going toward the camera (behind near plane)
     if (viewDir.z > 0.0) { return vec4<f32>(0.0); }
 
-    // Offset by 2 steps to avoid self-intersection with coplanar geometry
-    let viewStart = viewStartRaw + viewDir * stepSize * 2.0;
+    // Normalized depth of the reflection surface, used below to reject hits on
+    // objects that are closer to the camera than the reflector itself.
+    let rayStartDepth = -viewStartRaw.z / camera.cameraFar;
+
+    // Offset by a fixed world-space bias to avoid self-intersection — independent
+    // of stepSize so that small steps don't leave the ray inside the surface and
+    // large steps don't skip valid close hits.
+    let viewStart = viewStartRaw + viewDir * 0.05;
     var prevVP    = viewStart;
     var currentVP = viewStart;
 
@@ -110,11 +133,31 @@ fn performSSRMarch(
 
         let sceneDep = textureSampleLevel(gLinearDepth, samplerGBuffer, scr.xy, 0.0).r;
 
-        // Adaptive thickness: wider slab at distance prevents false misses and
-        // false positives — scales proportionally with the linear depth value.
-        let adaptiveThickness = ssrParams.thickness * (1.0 + sceneDep * 8.0);
+        // Adaptive thickness: slightly wider slab at distance, but conservatively
+        // capped (2× instead of 8×) to avoid false hits on distant thin objects.
+        let adaptiveThickness = ssrParams.thickness * (1.0 + sceneDep * 2.0);
 
-        if (scr.z > sceneDep && (scr.z - sceneDep) < adaptiveThickness) {
+        // 3-D proximity test: reconstruct the view-space position of the scene
+        // surface at scr.xy, then measure how far it is from the ray line.
+        // This rules out false positives caused by a near object A whose screen
+        // projection overlaps the ray's projected UV even though the ray never
+        // physically passes through A.  A pure depth comparison can't distinguish
+        // that case because scr.xy may belong to a completely different object.
+        let sceneViewPos = screenToView(scr.xy, sceneDep);
+        let tScene       = dot(sceneViewPos - viewStart, viewDir);
+        let lateralDist  = length(sceneViewPos - (viewStart + viewDir * tScene));
+
+        // Valid hit conditions (all must hold):
+        //  scr.z > sceneDep          — ray passed through the surface depth
+        //  sceneDep > rayStartDepth  — the hit object is behind the reflector (not a closer occluder)
+        //  tScene > 0.0              — object is ahead along the ray
+        //  lateralDist < stepSize    — object is genuinely close to the ray in 3-D
+        //  depth diff < thickness    — ray hasn't penetrated unrealistically deep
+        if (scr.z > sceneDep
+            && sceneDep > rayStartDepth
+            && tScene > 0.0
+            && lateralDist < stepSize
+            && (scr.z - sceneDep) < adaptiveThickness) {
             // Binary search refinement
             let refinedVP  = binarySearchRefine(prevVP, currentVP);
             let refinedScr = viewToScreen(refinedVP);
