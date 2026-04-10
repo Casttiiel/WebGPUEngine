@@ -11,9 +11,9 @@
       "isSensor": true,
       "bodyType": "static",
       "size": [
-        1,
-        1,
-        1
+        3.2,
+        6.2,
+        22.8
       ]
     },
     "render": {

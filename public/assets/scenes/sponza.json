@@ -52,6 +52,14 @@
     }
   },
   {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 3, 0]
+      }
+    }
+  },
+  {
     "prefab": "lighting/directional_light.prefab"
   },
   {
