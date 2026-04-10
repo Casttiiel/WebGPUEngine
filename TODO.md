@@ -1,13 +1,10 @@
 ### Engine
 
-1. Test Shadows
-2. Test Irradiance Blend Map
-3. GLTF Exporter unifies metallic and roughness? In right channel?
-
-4. Enemy AI / NavMesh
-5. HZB Pocho
-6. SSR Temporal
-7. TAA: Dynamic Objects
+1. SSR Temporal + SSR Objetos reflejan cuando no toca
+2. GLTF Exporter unifies metallic and roughness? In right channel?
+3. Test Irradiance Blend Map
+4. HZB Pocho
+5. Enemy AI / NavMesh
 
 ## Gameplay
 

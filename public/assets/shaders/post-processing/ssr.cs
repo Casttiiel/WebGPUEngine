@@ -44,16 +44,12 @@ fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
 }
 
 // ── View-space helper: project a view-space position to screen UV + linear depth ──
-// Projects using the UNJITTERED projection matrix so hit UVs are stable every frame.
-// Using the jittered matrix would shift the resulting UV by ±jitterOffset each frame,
-// causing TAA to see every SSR texel as "moving" and clamp/ghost it — no manual
-// sign arithmetic needed when the matrix itself has no jitter baked in.
 fn viewToScreen(viewPos: vec3<f32>) -> vec3<f32> {
-    let clip  = camera.unjitteredProjectionMatrix * vec4<f32>(viewPos, 1.0);
+    let clip  = camera.projectionMatrix * vec4<f32>(viewPos, 1.0);
     let ndc   = clip.xyz / clip.w;
     var uv    = ndc.xy * 0.5 + 0.5;
     uv.y      = 1.0 - uv.y;
-    let depth = -viewPos.z / camera.cameraFar;
+    let depth = -viewPos.z / camera.cameraFar; // normalised linear depth [0,1]
     return vec3<f32>(uv, depth);
 }
 
@@ -83,14 +79,8 @@ fn performSSRMarch(
     reflWorld:  vec3<f32>,
     startDepth: f32,
     roughness:  f32,
-    pixelSeed:  f32,   // per-pixel noise [0,1) for temporal dithering
 ) -> vec4<f32> {
-    // When TAA is active, halve the step count: TAA accumulates hits from
-    // previous frames, so the effective quality matches 2× the step count.
-    // When TAA is absent (temporalMode=0) full steps are used.
-    let maxSteps    = select(i32(ssrParams.maxSteps),
-                             max(i32(ssrParams.maxSteps) / 2, 4),
-                             ssrParams.temporalMode > 0.5);
+    let maxSteps    = i32(ssrParams.maxSteps);
     let stepSize    = ssrParams.stepSize;
     let maxDistance = ssrParams.maxDistance;
 
@@ -102,12 +92,7 @@ fn performSSRMarch(
     if (viewDir.z > 0.0) { return vec4<f32>(0.0); }
 
     // Offset by 2 steps to avoid self-intersection with coplanar geometry
-    // Per-pixel temporal dither: offset the ray start by a fraction of one step
-    // so that adjacent pixels and consecutive frames cover different portions of
-    // the ray, hiding the reduced step count when TAA is active.  The offset is
-    // a no-op (0) when temporalMode=0 because pixelSeed is passed as 0 then.
-    let dither    = select(0.0, pixelSeed, ssrParams.temporalMode > 0.5);
-    let viewStart = viewStartRaw + viewDir * stepSize * (2.0 + dither);
+    let viewStart = viewStartRaw + viewDir * stepSize * 2.0;
     var prevVP    = viewStart;
     var currentVP = viewStart;
 
@@ -144,14 +129,7 @@ fn performSSRMarch(
             let distFade  = 1.0 - saturate(hitDist / maxDistance);  // distant hits fade to IBL
             let edgeFade  = calculateEdgeFade(hitUV);                // screen-border hits fade to IBL
             let roughFade = 1.0 - smoothstep(0.0, 0.4, roughness);   // rough surfaces fall back to IBL
-            // Slab-depth fade: smoothstep from full alpha at the front of the thickness slab
-            // to zero at its back face.  With jitter, a pixel near the hit/miss boundary would
-            // otherwise alternate between alpha=finalFade and alpha=0 every frame (the ray
-            // barely hits / barely misses).  This ramp turns that cliff into a gradient so TAA
-            // can accumulate it smoothly instead of flickering between two discrete values.
-            let slabT     = 1.0 - saturate((scr.z - sceneDep) / adaptiveThickness);
-            let slabFade  = smoothstep(0.0, 1.0, slabT);
-            let finalFade = edgeFade * roughFade * slabFade; //distFade not used
+            let finalFade = edgeFade * roughFade;//distFade not used
             return vec4<f32>(hitColor.rgb, finalFade);
         }
     }
@@ -177,13 +155,6 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
 
-    // uv is pixel-center: (coords + 0.5) / dims — a fixed stable value that never
-    // changes between frames for this invocation. There is no jitter to remove here.
-    // Jitter only affects GBuffer *content* (which sub-pixel point was rasterised);
-    // it does NOT move the UV we use to look up that content.
-    // The ONLY place jitter removal is needed is viewToScreen() below — where a 3D
-    // point is projected through the jittered projectionMatrix and the resulting UV
-    // must be un-shifted before sampling gLinearDepth / accLight.
     let g = decodeGBuffer(uv);
 
     // Soft metallic fade: ramps 0→1 between metallic 0.1 and 0.4, giving smooth
@@ -197,24 +168,17 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
 
-    // Mip-smoothed normal for ray direction: suppresses normal-map high-frequency
+    // Mip-smoothed normal for ray direction — suppresses normal-map high-frequency
     // detail that causes adjacent pixels to fire divergent rays (sparkle noise).
-    // Rougher surfaces sample higher mips → more spatially averaged normals.
-    let smoothMip   = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
-    let smoothNData = textureSampleLevel(gNormals, samplerGBuffer, uv, smoothMip);
+    // Rougher surfaces sample higher mips for more spatially averaged normals.
+    let smoothMip     = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
+    let smoothNData   = textureSampleLevel(gNormals, samplerGBuffer, uv, smoothMip);
     let smoothN       = normalize(octahedral01ToNormal(smoothNData.xy));
     let incidentDir   = normalize(g.worldPos - camera.cameraPosition.xyz);
     let smoothReflDir = normalize(reflect(incidentDir, smoothN));
 
-    // Per-pixel temporal dither seed — must vary each frame so TAA integrates
-    // different ray offsets over time rather than seeing a static noise pattern.
-    // camera.time increases every frame, golden-ratio step ensures good
-    // low-discrepancy distribution across the 8-frame Halton sequence.
-    let seed      = f32(coords.x) * 0.5 + f32(coords.y) * 1.5 + camera.time * 0.61803398;
-    let pixelSeed = fract(seed);
-
     // Raw hit color — BRDF applied once in ambient_specular.fs (with Kulla-Conty).
     // metallicFade baked into alpha for smooth SSR entry on partially metallic surfaces.
-    let result = performSSRMarch(g.worldPos, smoothReflDir, g.zlinear, g.roughness, pixelSeed);
+    let result = performSSRMarch(g.worldPos, smoothReflDir, g.zlinear, g.roughness);
     textureStore(outputSSR, coords, vec4<f32>(result.rgb, result.a * metallicFade));
 }
