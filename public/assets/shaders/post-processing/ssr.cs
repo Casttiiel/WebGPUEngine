@@ -31,11 +31,24 @@
 // ── Group 2: SSR params ───────────────────────────────────────────────────────
 @group(2) @binding(0) var accLight:           texture_2d<f32>;
 @group(2) @binding(1) var<uniform> ssrParams: SSRUniforms;
+@group(2) @binding(2) var txBlueNoise:        texture_2d<f32>;
 
 // ── Group 3: output ───────────────────────────────────────────────────────────
 @group(3) @binding(0) var outputSSR: texture_storage_2d<rgba16float, write>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Blue-noise helpers ───────────────────────────────────────────────────────
+// Sample the 64×64 blue-noise tile, animating it per-frame so the same texel
+// never hits the same screen pixel on consecutive frames.
+fn sampleBlueNoise(coord: vec2<u32>) -> vec2<f32> {
+    let frame = u32(ssrParams.frameIndex);
+    let nc    = vec2<i32>(
+        i32((coord.x + frame * 17u) & 63u),
+        i32((coord.y + frame * 11u) & 63u),
+    );
+    return textureLoad(txBlueNoise, nc, 0).rg;
+}
 
 fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
     // 10 % fade bands on all four edges; multiply X×Y for smooth corners.
@@ -92,10 +105,11 @@ fn binarySearchRefine(loVP: vec3<f32>, hiVP: vec3<f32>) -> vec3<f32> {
 
 // ── Main ray march (view-space) ───────────────────────────────────────────────
 fn performSSRMarch(
-    worldPos:   vec3<f32>,
-    reflWorld:  vec3<f32>,
-    startDepth: f32,
-    roughness:  f32,
+    worldPos:     vec3<f32>,
+    reflWorld:    vec3<f32>,
+    startDepth:   f32,
+    roughness:    f32,
+    ditherOffset: f32,   // [0, stepSize) per-pixel random offset — breaks staircase banding
 ) -> vec4<f32> {
     let maxSteps    = i32(ssrParams.maxSteps);
     let stepSize    = ssrParams.stepSize;
@@ -115,7 +129,9 @@ fn performSSRMarch(
     // Offset by a fixed world-space bias to avoid self-intersection — independent
     // of stepSize so that small steps don't leave the ray inside the surface and
     // large steps don't skip valid close hits.
-    let viewStart = viewStartRaw + viewDir * 0.05;
+    // ditherOffset adds a per-pixel blue-noise shift within [0, stepSize) to break
+    // the uniform staircase banding that appears when all rays start at the same offset.
+    let viewStart = viewStartRaw + viewDir * (0.05 + ditherOffset);
     var prevVP    = viewStart;
     var currentVP = viewStart;
 
@@ -220,8 +236,34 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     let incidentDir   = normalize(g.worldPos - camera.cameraPosition.xyz);
     let smoothReflDir = normalize(reflect(incidentDir, smoothN));
 
+    // ── Stochastic ray improvements ──────────────────────────────────────────────
+    // Sample the blue-noise tile for this pixel (frame-animated for temporal jitter).
+    let noise = sampleBlueNoise(vec2<u32>(gid.xy));
+
+    // Step dithering: shift the ray start within [0, stepSize) per pixel so the
+    // march grid is not aligned across adjacent pixels → staircase bands vanish.
+    let ditherOffset = noise.x * ssrParams.stepSize;
+
+    // Roughness-scaled normal jitter: rotate the reflect direction within a GGX lobe
+    // (half-angle ∝ roughness²) using the second blue-noise channel as the disk angle.
+    // Smooth surfaces (roughness≈0) get no jitter; rough surfaces get spread rays that
+    // the bilateral blur then averages, matching the GGX specular lobe width.
+    let jitterRadius = min(g.roughness * g.roughness * 0.4, 0.15);
+    var jitteredDir  = smoothReflDir;
+    if jitterRadius > 0.001 {
+        // Build right-handed tangent frame around the reflection direction.
+        let up        = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0),
+                               abs(smoothReflDir.y) < 0.99);
+        let tangent   = normalize(cross(up, smoothReflDir));
+        let bitangent = cross(smoothReflDir, tangent);
+        let angle     = noise.y * 6.28318530718; // [0, 2π]
+        jitteredDir   = normalize(smoothReflDir
+                                  + tangent   * cos(angle) * jitterRadius
+                                  + bitangent * sin(angle) * jitterRadius);
+    }
+
     // Raw hit color — BRDF applied once in ambient_specular.fs (with Kulla-Conty).
     // metallicFade baked into alpha for smooth SSR entry on partially metallic surfaces.
-    let result = performSSRMarch(g.worldPos, smoothReflDir, g.zlinear, g.roughness);
+    let result = performSSRMarch(g.worldPos, jitteredDir, g.zlinear, g.roughness, ditherOffset);
     textureStore(outputSSR, coords, vec4<f32>(result.rgb, result.a * metallicFade));
 }

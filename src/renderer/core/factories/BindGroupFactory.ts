@@ -298,6 +298,8 @@ export class BindGroupFactory {
     return this.getLayout('ssr_uniforms_compute', [
       { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
       { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      // binding 2: blue-noise 64×64 tiling texture for step dithering + ray jitter
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
     ]);
   }
 

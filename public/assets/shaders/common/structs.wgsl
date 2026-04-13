@@ -68,5 +68,5 @@ struct SSRUniforms {
     metallicMin: f32,
     roughnessMax: f32,
     temporalMode: f32,  // 1.0 = TAA active (halve march steps), 0.0 = standalone
-    _pad1: f32,
+    frameIndex: f32,    // incremented each frame — drives blue-noise temporal animation
 }

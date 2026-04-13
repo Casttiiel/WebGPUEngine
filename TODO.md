@@ -1,7 +1,7 @@
 ### Engine
 
-1. GLTF Exporter unifies metallic and roughness? In right channel?
-2. Test Irradiance Blend Map
+1. Water Shader (Noise texture) (Ondas)
+2. Smoke Shader
 3. HZB Pocho
 4. Enemy AI / NavMesh
 
@@ -17,9 +17,8 @@
 ### Non Priority
 
 1. Epipolar light scattering
-2. Water Shader
-3. Glass Shader
-4. Editor Point Lights (Render Debug / Gizmo / Menu)
-5. Editor Spot Lights (Render Debug / Gizmo / Menu)
-6. Editor Camera (Render Debug / Gizmo / Menu)
-7. Asset Browser + Spawn + Delete
+2. Glass Shader
+3. Editor Point Lights (Render Debug / Gizmo / Menu)
+4. Editor Spot Lights (Render Debug / Gizmo / Menu)
+5. Editor Camera (Render Debug / Gizmo / Menu)
+6. Asset Browser + Spawn + Delete

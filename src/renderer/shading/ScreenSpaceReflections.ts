@@ -50,6 +50,9 @@ export class ScreenSpaceReflections {
   // ── Buffers / textures ────────────────────────────────────────────────────
   private ssrUniformBuffer!: GPUBuffer;
   private brdfLUT!: Texture;
+  private blueNoiseTexture!: Texture;
+  /** Incremented every frame — drives blue-noise temporal animation in ssr.cs */
+  private frameIndex: number = 0;
 
   // ── Debug-tweakable parameters (exposed in renderInMenu) ─────────────────
   private debugParams = {
@@ -69,6 +72,7 @@ export class ScreenSpaceReflections {
     try {
       this.isInitialized = true;
       this.brdfLUT = await Texture.getAsync('brdfLUT.png');
+      this.blueNoiseTexture = await Texture.getAsync('bluenoise64.png');
 
       this.createRenderTarget();
 
@@ -347,6 +351,10 @@ export class ScreenSpaceReflections {
         binding: 1,
         resource: { buffer: this.ssrUniformBuffer },
       },
+      {
+        binding: 2,
+        resource: this.blueNoiseTexture.getTextureView(),
+      },
     ]);
   }
 
@@ -399,9 +407,10 @@ export class ScreenSpaceReflections {
         this.debugParams.metallicMin,
         this.debugParams.roughnessMax,
         this.debugParams.temporalMode, // 1.0 when TAA active → halve march steps
-        0.0, // _pad1
+        this.frameIndex,               // drives blue-noise tile animation in ssr.cs
       ]),
     );
+    this.frameIndex = (this.frameIndex + 1) % 8192;
   }
 
   public dispose(): void {
