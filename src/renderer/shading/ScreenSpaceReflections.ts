@@ -407,7 +407,7 @@ export class ScreenSpaceReflections {
         this.debugParams.metallicMin,
         this.debugParams.roughnessMax,
         this.debugParams.temporalMode, // 1.0 when TAA active → halve march steps
-        this.frameIndex,               // drives blue-noise tile animation in ssr.cs
+        this.frameIndex, // drives blue-noise tile animation in ssr.cs
       ]),
     );
     this.frameIndex = (this.frameIndex + 1) % 8192;
