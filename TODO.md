@@ -1,9 +1,7 @@
 ### Engine
 
-1. Water Shader (Iluminado si, pero se oscurece?)
-2. Smoke Shader
-3. HZB Pocho
-4. Enemy AI / NavMesh
+1. HZB Pocho
+2. Enemy AI / NavMesh
 
 ## Gameplay
 
@@ -18,7 +16,8 @@
 
 1. Epipolar light scattering
 2. Glass Shader
-3. Editor Point Lights (Render Debug / Gizmo / Menu)
-4. Editor Spot Lights (Render Debug / Gizmo / Menu)
-5. Editor Camera (Render Debug / Gizmo / Menu)
-6. Asset Browser + Spawn + Delete
+3. Water Shader Reflections + Better Foam
+4. Editor Point Lights (Render Debug / Gizmo / Menu)
+5. Editor Spot Lights (Render Debug / Gizmo / Menu)
+6. Editor Camera (Render Debug / Gizmo / Menu)
+7. Asset Browser + Spawn + Delete
