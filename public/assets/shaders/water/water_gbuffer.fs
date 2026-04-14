@@ -13,10 +13,10 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     let t = camera.time;
 
     // ── Animated noise UVs ────────────────────────────────────────────────────
-    let noiseUV1 = input.Uv * factors.uvXScale + vec2<f32>(t * 0.06, t * 0.04);
-    let noiseUV2 = input.Uv * factors.uvYScale + vec2<f32>(-t * 0.03, t * 0.08);
+    let noiseUV1 = fract(input.Uv * factors.uvYScale + vec2<f32>(t * 0.06, t * 0.04));
+    let noiseUV2 = fract(input.Uv * factors.uvYScale + vec2<f32>(-t * 0.03, t * 0.08));
 
-    let n1 = textureSample(txNoise1, samplerState, noiseUV1).rgb * 2.0 - 1.0;
+    let n1 = textureSample(txNoise1, samplerState, noiseUV1).rgb;
     let n2 = textureSample(txNoise2, samplerState, noiseUV2).rgb * 2.0 - 1.0;
 
     // ── Perturbed surface normal ──────────────────────────────────────────────

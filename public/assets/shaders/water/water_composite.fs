@@ -112,7 +112,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Thin water (<0.3 world units) gets a white foam overlay, matching the
     // shoreline break where turbulence aerates the water surface.
     let foamColor    = vec3<f32>(0.95, 0.97, 1.0);
-    let foamStrength = smoothstep(0.0, 0.3, 1.0 - waterVolDepth);
+    let foamStrength = smoothstep(0.3, 0.0, waterVolDepth);
     let foamMask     = foamStrength * 0.85; // max opacity cap
 
     // ── Composite ─────────────────────────────────────────────────────────────
@@ -133,5 +133,5 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     // Foam / shoreline on top of everything.
     finalColor = mix(finalColor, foamColor, foamMask);
 
-    return vec4<f32>(finalColor, 1.0);
+    return vec4<f32>(finalColor,1.0);
 }
