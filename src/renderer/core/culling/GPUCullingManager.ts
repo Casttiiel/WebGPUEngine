@@ -172,11 +172,16 @@ export class GPUCullingManager {
       key.indirectDrawOffset = 0;
     }
 
-    // Filter to cullable keys
+    // Filter to cullable keys.
+    // Only SOLIDS write to the depth prepass, so only SOLIDS should be tested
+    // against the HZB (which is built from that depth prepass).
+    // WATER, TRANSPARENT, GLASS, DISTORSIONS, and DECALS do NOT contribute to
+    // the depth prepass — including them in GPU culling would compare their AABB
+    // depth against opaque geometry BEHIND them, causing false occlusion culls.
     this.managedKeys = allKeys.filter(
       (key) =>
         !key.isInstanced && // instanced groups: always visible (multi-AABB would be needed)
-        key.material.getCategory() !== RenderCategory.SHADOWS && // shadow keys use CPU culling
+        key.material.getCategory() === RenderCategory.SOLIDS && // only depth-writing objects
         !key.renderBindGroup, // particles / custom indirect already own their buffer
     );
 
@@ -200,9 +205,14 @@ export class GPUCullingManager {
       this.indirectArgsBuffer = this.device.createBuffer({
         label: 'gpu_culling_indirect_args',
         // STORAGE so the compute shader can write to it;
-        // INDIRECT so drawIndexedIndirect can read from it.
+        // INDIRECT so drawIndexedIndirect can read from it;
+        // COPY_SRC so the debug readback can copy it to a staging buffer.
         size: n * INDIRECT_STRIDE,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+        usage:
+          GPUBufferUsage.STORAGE |
+          GPUBufferUsage.INDIRECT |
+          GPUBufferUsage.COPY_DST |
+          GPUBufferUsage.COPY_SRC,
       });
 
       this.capacity = n;

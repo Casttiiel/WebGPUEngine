@@ -502,16 +502,22 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('depth_prepass', RenderCategory.SOLIDS);
     renderManager.clearTechniqueOverride();
 
-    // 1. G-Buffer pass - loads depth from prepass (hardware early-Z active)
-    this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
-
-    // 2. Build the HZB pyramid from this frame's depth buffer.
-    //    The pyramid will be consumed NEXT frame by HZBCullingPass (after frustum culling)
-    //    to perform occlusion culling at zero CPU readback cost.
+    // 1. Build the HZB pyramid from this frame's depth BEFORE the GBuffer pass.
+    //    depth_prepass above ran with frustum-culling only (no HZB applied), so it
+    //    includes every frustum-visible object — the depth buffer is complete.
+    //    Building here and immediately dispatching HZB culling means:
+    //      • The pyramid is always accurate (no self-reinforcing false-cull loop).
+    //      • Only the GBuffer benefits from HZB culling (the expensive pass).
+    //      • depth_prepass stays fast (early-Z for GBuffer overdraw elimination).
     if (this.hzbBuilder?.isInitialized()) {
       const encoder = Render.getInstance().getCommandEncoder();
       this.hzbBuilder.build(encoder, this.depthPrepass.getDepthTexture());
+      renderManager.dispatchHZBCulling(encoder);
     }
+
+    // 2. G-Buffer pass — loads depth from prepass (hardware early-Z active).
+    //    HZB culling above may have zeroed instanceCount for fully-occluded objects.
+    this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
 

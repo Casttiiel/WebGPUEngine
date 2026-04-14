@@ -88,7 +88,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   var ndcMinZ  = f32(1e20);   // smallest Z = closest corner to camera
 
   var anyVisible = false;
-  var anyClipped = false;   // true if at least one corner is behind the near plane
 
   for (var i = 0u; i < 8u; i++) {
     let lx = select(obj.bounds.min.x, obj.bounds.max.x, (i & 1u) != 0u);
@@ -98,10 +97,13 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let worldPos = obj.modelMatrix * vec4<f32>(lx, ly, lz, 1.0);
     let clipPos  = camera.viewProj * worldPos;
 
-    // Corner is behind the near plane (camera inside / straddling the AABB)
+    // Any corner behind the near plane means the object straddles it (camera inside
+    // or very close). The HZB cannot represent this case — keep visible immediately.
+    // Returning here (instead of continue + anyClipped flag) prevents accumulating
+    // ndcMinZ only from far corners, which would produce a falsely large ndcMinZ
+    // and incorrectly cull objects that are partially visible from up close.
     if (clipPos.w <= 0.0 || clipPos.z < 0.0) {
-      anyClipped = true;
-      continue;
+      return;
     }
 
     let rcpW   = 1.0 / clipPos.w;
@@ -112,12 +114,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     ndcMaxXY = max(ndcMaxXY, ndcXY);
     ndcMinZ  = min(ndcMinZ,  ndcZ );
     anyVisible = true;
-  }
-
-  // If ANY corner is clipped the object straddles the near plane (camera is inside
-  // or very close). The HZB cannot represent this case — keep the object visible.
-  if (anyClipped) {
-    return;
   }
 
   // All corners behind near plane — frustum should have caught this, but skip.
@@ -182,7 +178,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   // swamps that difference and prevents culling.  Use a depth-proportional
   // bias instead: it's negligible at close range (handled by anyClipped) and
   // stays below the actual NDC precision loss at far range.
-  let DEPTH_BIAS = ndcMinZ * 0.001;
+  // Proportional bias keeps false culls rare at all distances; the absolute
+  // minimum of 0.0001 prevents the bias from disappearing at very small ndcMinZ
+  // values where non-reversed Z precision is already low.
+  let DEPTH_BIAS = max(ndcMinZ * 0.001, 0.0001);
   if (ndcMinZ > hzbMaxDepth + DEPTH_BIAS) {
     indirectArgs[idx].instanceCount = 0u;
     atomicAdd(&culledCount, 1u);

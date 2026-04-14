@@ -12,6 +12,7 @@ import { HZBCullingPass } from '../culling/HZBCullingPass';
 import { RenderKeyManager, RenderKey } from './RenderKeyManager';
 import { RenderStateManager } from './RenderStateManager';
 import { Render } from '../pipeline/Render';
+import { HZBBuilder } from '../culling/HZBBuilder';
 
 export class RenderManagerV2 {
   private static instance: RenderManagerV2 | null = null;
@@ -23,6 +24,18 @@ export class RenderManagerV2 {
   private gpuCuller: GPUCullingManager | null = null;
   private hzbCullingPass: HZBCullingPass | null = null;
   private hzbBuilder: HZBBuilder | null = null;
+  /** Diagnostic flag: set to false to bypass HZB occlusion culling without recompiling. */
+  private hzbEnabled = true;
+
+  // ---- HZB false-cull debug readback ----------------------------------------
+  private debugHZBEnabled = false;
+  /** Staging buffer for reading indirectArgsBuffer back to CPU. */
+  private debugStagingBuffer: GPUBuffer | null = null;
+  private debugStagingCapacity = 0;
+  private debugMapPending = false;
+  private debugStagingMapped = false;
+  /** Camera snapshot used for the CPU reference culling comparison. */
+  private debugLastCamera: Camera | null = null;
 
   // State
   private camera: Camera | null = null;
@@ -190,24 +203,14 @@ export class RenderManagerV2 {
       const encoder = Render.getInstance().getCommandEncoder();
       this.gpuCuller.dispatch(encoder, camera);
 
-      // HZB occlusion culling — further refines indirect args using the
-      // depth pyramid built from the previous frame.  Runs in the same
-      // encoder immediately after the frustum dispatch so the GPU sees a
-      // single contiguous workload before the GBuffer render pass.
-      if (this.hzbCullingPass && this.hzbBuilder?.isReady()) {
-        const objBuf = this.gpuCuller.getObjectDataBuffer();
-        const indBuf = this.gpuCuller.getIndirectArgsBuffer();
-        if (objBuf && indBuf) {
-          this.hzbCullingPass.dispatch(
-            encoder,
-            camera,
-            objBuf,
-            indBuf,
-            this.gpuCuller.getManagedCount(),
-            this.hzbBuilder,
-          );
-        }
-      }
+      // NOTE: HZB occlusion culling is NOT dispatched here.  It runs later, between
+      // the depth_prepass and the GBuffer pass, via dispatchHZBCulling() called from
+      // DeferredRenderer.  This ordering guarantees:
+      //   1. depth_prepass always renders ALL frustum-visible objects (no HZB applied).
+      //   2. HZB is built from a complete depth buffer (no missing occluded objects).
+      //   3. HZB culling only affects the GBuffer, which skips fully-occluded geometry.
+      // Without this separation the HZB creates a self-reinforcing loop: culled objects
+      // are absent from depth → absent from HZB → culled again the next frame, forever.
 
       // CPU-side estimate for the debug UI (pure AABB math, no array alloc)
       this.gpuCullingEstimatedVisible = this.cpuCuller!.countVisible(
@@ -228,6 +231,41 @@ export class RenderManagerV2 {
 
   public performLightCulling(camera: Camera): void {
     this.cpuCuller!.performLightCulling(camera);
+  }
+
+  /**
+   * Dispatches HZB occlusion culling on the shared frame encoder.
+   *
+   * Must be called AFTER the depth prepass and AFTER HZBBuilder.build() so the
+   * pyramid reflects the current frame's complete depth.  Call from DeferredRenderer
+   * between the depth_prepass and the GBuffer render passes.
+   *
+   * Using this.camera (set by setCamera() before DeferredRenderer.render() is called).
+   */
+  public dispatchHZBCulling(encoder: GPUCommandEncoder): void {
+    if (!this.hzbEnabled || !this.hzbCullingPass || !this.hzbBuilder?.isReady()) return;
+    if (!this.camera || !this.gpuCuller?.isInitialized()) return;
+
+    const objBuf = this.gpuCuller.getObjectDataBuffer();
+    const indBuf = this.gpuCuller.getIndirectArgsBuffer();
+    if (!objBuf || !indBuf) return;
+
+    this.hzbCullingPass.dispatch(
+      encoder,
+      this.camera,
+      objBuf,
+      indBuf,
+      this.gpuCuller.getManagedCount(),
+      this.hzbBuilder,
+    );
+
+    // Debug readback: compare GPU result vs CPU frustum to isolate HZB false culls
+    if (this.debugHZBEnabled && !this.debugMapPending) {
+      if (this.debugStagingMapped) {
+        this.processDebugReadback();
+      }
+      this.scheduleDebugReadback(indBuf, this.gpuCuller.getManagedCount(), this.camera);
+    }
   }
 
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
@@ -298,6 +336,103 @@ export class RenderManagerV2 {
    */
   public getHZBCulledCount(): number {
     return this.hzbCullingPass?.getCulledCount() ?? 0;
+  }
+
+  /** Toggle HZB occlusion culling on/off at runtime for diagnostic purposes. */
+  public setHZBEnabled(enabled: boolean): void {
+    this.hzbEnabled = enabled;
+  }
+
+  public isHZBEnabled(): boolean {
+    return this.hzbEnabled;
+  }
+
+  /**
+   * Enable/disable the HZB false-cull debug readback.
+   * When enabled, every frame that has HZB culls will console.warn() the mesh names
+   * of objects that the CPU frustum culler considers visible but the GPU HZB cull set
+   * to instanceCount=0.  Those are the HZB false positives causing disappearances.
+   *
+   * Usage (browser console):
+   *   Engine.getRender().getRenderManager().setHZBDebugEnabled(true)
+   */
+  public setHZBDebugEnabled(enabled: boolean): void {
+    this.debugHZBEnabled = enabled;
+    if (!enabled) {
+      this.debugStagingBuffer?.destroy();
+      this.debugStagingBuffer = null;
+      this.debugStagingCapacity = 0;
+      this.debugMapPending = false;
+      this.debugStagingMapped = false;
+    }
+  }
+
+  private scheduleDebugReadback(indBuf: GPUBuffer, n: number, camera: Camera): void {
+    const size = n * 20; // INDIRECT_STRIDE = 5 × u32 = 20 bytes
+    const device = Render.getInstance().getDevice();
+    if (!device) return;
+
+    if (!this.debugStagingBuffer || this.debugStagingCapacity < size) {
+      this.debugStagingBuffer?.destroy();
+      this.debugStagingBuffer = device.createBuffer({
+        label: 'hzb_debug_staging',
+        size: Math.max(size, 64),
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      });
+      this.debugStagingCapacity = size;
+    }
+
+    this.debugLastCamera = camera;
+
+    // Submit in its own encoder so mapAsync can be called immediately.
+    const enc = device.createCommandEncoder({ label: 'hzb_debug_copy' });
+    enc.copyBufferToBuffer(indBuf, 0, this.debugStagingBuffer, 0, size);
+    device.queue.submit([enc.finish()]);
+
+    this.debugMapPending = true;
+    this.debugStagingBuffer
+      .mapAsync(GPUMapMode.READ)
+      .then(() => {
+        this.debugMapPending = false;
+        this.debugStagingMapped = true;
+      })
+      .catch(() => {
+        this.debugMapPending = false;
+      });
+  }
+
+  private processDebugReadback(): void {
+    if (!this.debugStagingMapped || !this.debugStagingBuffer || !this.debugLastCamera) return;
+
+    const managedKeys = this.gpuCuller!.getManagedKeys();
+    const n = managedKeys.length;
+    const mapped = new Uint32Array(this.debugStagingBuffer.getMappedRange(0, n * 20));
+
+    // CPU reference: which keys does the frustum culler consider visible?
+    const cpuVisible = new Set(this.cpuCuller!.performCulling(managedKeys, this.debugLastCamera));
+
+    const falseCulled: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const instanceCount = mapped[i * 5 + 1]; // u32 index 1 = instanceCount
+      if (instanceCount === 0) {
+        const key = managedKeys[i]!;
+        if (cpuVisible.has(key)) {
+          const m = key.transform.getTransform().getWorldMatrix();
+          const pos = `(${m[12]?.toFixed(1)}, ${m[13]?.toFixed(1)}, ${m[14]?.toFixed(1)})`;
+          const aabb = key.aabb
+            ? `min(${key.aabb.min.map((v) => v.toFixed(2)).join(',')}) max(${key.aabb.max.map((v) => v.toFixed(2)).join(',')})`
+            : 'no aabb';
+          falseCulled.push(`  [${i}] ${key.mesh.getName()} @ ${pos}  ${aabb}`);
+        }
+      }
+    }
+
+    this.debugStagingBuffer.unmap();
+    this.debugStagingMapped = false;
+
+    if (falseCulled.length > 0) {
+      console.warn(`[HZB FALSE CULLS] ${falseCulled.length} objects:\n` + falseCulled.join('\n'));
+    }
   }
 
   private renderKeys(keys: RenderKey[], pass: GPURenderPassEncoder): number {

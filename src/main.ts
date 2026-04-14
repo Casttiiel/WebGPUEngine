@@ -1,6 +1,11 @@
 import { Engine } from './core/engine/Engine';
 import { Time } from './core/engine/Time';
 import { LoadingStatus } from './core/engine/LoadingStatus';
+import { RenderManagerV2 } from './renderer/core/managers/RenderManagerV2';
+
+// Expose globals for browser console debugging
+(window as any).Engine = Engine;
+(window as any).RenderManager = RenderManagerV2;
 import { ProfilerOverlay } from './core/debug/ProfilerOverlay';
 import { Profiler } from './core/debug/Profiler';
 
