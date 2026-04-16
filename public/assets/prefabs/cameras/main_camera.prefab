@@ -4,7 +4,7 @@
     "camera": {},
     "tone_mapping": {},
     "tsr": {
-      "renderScale": 0.77
+      "renderScale": 0.67
     },
     "ambient_occlusion": {},
     "bloom": {},

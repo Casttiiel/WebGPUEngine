@@ -247,12 +247,27 @@ fn fs(in: VertexOutput) -> @location(0) vec4<f32> {
     let clampedHistory = vec4<f32>(reinhardInverse(yCoCgToRGB(clampedYCoCg)), historyColor.a);
 
     // ── 5. Adaptive blend factor ───────────────────────────────────────────────
+    // clampBoost is gated by motion: at a sub-pixel thin edge (e.g. door crack)
+    // jitter causes the pixel to alternate colours every frame in a static scene,
+    // making clampDelta large and triggering the disocclusion boost every frame →
+    // visible oscillation.  Real disocclusion always has non-trivial velocity, so
+    // gating by disoccMotion eliminates the artifact without harming real events.
     let motionLen     = length(velocity);
     let edgeFactor    = depthEdgeFactor(uv, inputTexelSize);
     let blendMotion   = mix(params.blendFactor, 0.3, saturate(motionLen * 20.0));
     let clampDelta    = length(clampedHistory.rgb - historyColor.rgb);
     let clampBoost    = saturate(clampDelta * 8.0);
-    let adaptiveBlend = max(blendMotion, clampBoost * 0.6 * edgeFactor);
+    let disoccMotion  = saturate(motionLen * 30.0);
+    // Thin-feature protection: high neighbourhood stddev signals a complex or sub-pixel
+    // feature (1px crack, thin wire, geometry edge) that jitter alternates every frame.
+    // Reducing the current-frame blend weight at these pixels bounds the per-frame
+    // oscillation amplitude — with blend=0.04 the steady-state shimmer is only ~2% of
+    // the colour difference, which is imperceptible.  Ghost convergence slows at these
+    // pixels but they are typically too thin to ghost visibly anyway.
+    let thinFeatureProtect = saturate(length(stddev) * 5.0 - 0.2);
+    let clampBoostTerm = clampBoost * 0.6 * edgeFactor * disoccMotion
+                         * (1.0 - thinFeatureProtect * 0.6);
+    let adaptiveBlend  = max(blendMotion, clampBoostTerm);
 
     // ── 6. Luminance-weighted blend (anti-flicker for specular highlights) ─────
     let lumaC  = dot(currentColor.rgb,   vec3<f32>(0.299, 0.587, 0.114));

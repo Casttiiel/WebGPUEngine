@@ -54,17 +54,28 @@ export class Camera {
   private readonly TIME_RESET_INTERVAL = 3600.0; // Reset every hour to avoid float precision loss
 
   // Jitter patterns
-  // Halton(2,3) 8-point sequence — indexed from 1, centred around 0.5
-  // Better sample distribution than 2×2 grid: avoids clumping, superior TAA convergence.
+  // Halton(2,3) 16-point sequence — indexed from 1, centred around 0.5.
+  // 16 points instead of 8: the longer period reduces perceptible periodic patterns
+  // at sub-pixel features (1-pixel cracks, thin geometry edges) where a short 8-frame
+  // cycle causes visible temporal shimmer at each full repetition.
   private static readonly HALTON_8: [number, number][] = [
-    [0.5, 1.0 / 3.0],
-    [0.25, 2.0 / 3.0],
-    [0.75, 1.0 / 9.0],
-    [0.125, 4.0 / 9.0],
-    [0.625, 7.0 / 9.0],
-    [0.375, 2.0 / 9.0],
-    [0.875, 5.0 / 9.0],
-    [0.0625, 8.0 / 9.0],
+    // base-2,         base-3           index
+    [0.5, 1.0 / 3.0], // 1
+    [0.25, 2.0 / 3.0], // 2
+    [0.75, 1.0 / 9.0], // 3
+    [0.125, 4.0 / 9.0], // 4
+    [0.625, 7.0 / 9.0], // 5
+    [0.375, 2.0 / 9.0], // 6
+    [0.875, 5.0 / 9.0], // 7
+    [0.0625, 8.0 / 9.0], // 8
+    [0.5625, 1.0 / 27.0], // 9
+    [0.3125, 10.0 / 27.0], // 10
+    [0.8125, 19.0 / 27.0], // 11
+    [0.1875, 4.0 / 27.0], // 12
+    [0.6875, 13.0 / 27.0], // 13
+    [0.4375, 22.0 / 27.0], // 14
+    [0.9375, 7.0 / 27.0], // 15
+    [0.03125, 16.0 / 27.0], // 16
   ];
 
   // Viewport

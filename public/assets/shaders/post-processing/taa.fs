@@ -275,9 +275,28 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // produces visible flicker.  Disocclusion (genuinely new geometry) is detected by
     // clampBoost below, which fires when history was clamped far from its raw value
     // (i.e. the background is a very different colour from the now-revealed surface).
+    //
+    // THIN-EDGE FIX: gate clampBoost by motion magnitude.
+    // At a sub-pixel crack (e.g. door frame), jitter causes the pixel to alternate
+    // between two very different colours every frame even in a fully static scene.
+    // This makes clampDelta large → clampBoost fires → adaptiveBlend stays near 0.6
+    // on every frame → the pixel oscillates visibly between the two colours.
+    // Real disocclusion always comes with non-trivial velocity (moving camera or
+    // object). Gating by disoccMotion suppresses the oscillation at static edges
+    // without disabling the boost for genuine disocclusion events.
     let clampDelta    = length(clampedHistory.rgb - historyColor.rgb);
     let clampBoost    = saturate(clampDelta * 8.0);
-    let adaptiveBlend = max(blendMotion, clampBoost * 0.6 * edgeFactor);
+    let disoccMotion  = saturate(motionLen * 30.0);
+    // Thin-feature protection: high neighbourhood stddev signals a complex or sub-pixel
+    // feature (1px crack, thin wire, geometry edge) that jitter alternates every frame.
+    // Reducing the current-frame blend weight at these pixels bounds the per-frame
+    // oscillation amplitude — with blend=0.04 the steady-state shimmer is only ~2% of
+    // the colour difference, which is imperceptible.  Ghost convergence slows at these
+    // pixels but they are typically too thin to ghost visibly anyway.
+    let thinFeatureProtect = saturate(length(stddev) * 5.0 - 0.2);
+    let clampBoostTerm = clampBoost * 0.6 * edgeFactor * disoccMotion
+                         * (1.0 - thinFeatureProtect * 0.6);
+    let adaptiveBlend  = max(blendMotion, clampBoostTerm);
 
     // ── 6. Luminance-weighted blend (Step 7 — anti-flicker) ──────────────────
     // Explicit weight formulation: blend ratios and luma weights are kept separate
