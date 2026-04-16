@@ -64,6 +64,12 @@ struct DrawArgs {
 @group(0) @binding(2) var<storage, read_write> indirectArgs: array<DrawArgs>;
 @group(0) @binding(3) var                      hzbTexture  : texture_2d<f32>;
 @group(0) @binding(4) var<storage, read_write> culledCount : atomic<u32>;
+// Debug output: hzbDebug[0] = atomic cull count (max 32 entries).
+// Entry i (i < 32) occupies hzbDebug[1 + i*12 .. 1 + i*12 + 11]:
+//   [0] objectIdx  [1] ndcMinZ_bits  [2] hzbMaxDepth_bits  [3] mip
+//   [4] tx0  [5] ty0  [6] tx1  [7] ty1
+//   [8] uvMinX_bits  [9] uvMaxX_bits  [10] uvMinY_bits  [11] uvMaxY_bits
+@group(0) @binding(5) var<storage, read_write> hzbDebug    : array<atomic<u32>>;
 
 // ---- Main ------------------------------------------------------------------
 
@@ -134,38 +140,55 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let uvMinY = 1.0 - (ndcMaxXY.y * 0.5 + 0.5);  // flip Y
   let uvMaxY = 1.0 - (ndcMinXY.y * 0.5 + 0.5);
 
-  // --- Select HZB mip level (ceil strategy, 4-corner sampling) -------------
-  // Use ceil(log2) so the projected footprint spans AT MOST 1 texel at the
-  // chosen mip.  With < 1 texel footprint the footprint can cross at most ONE
-  // texel boundary, so the 4-corner samples (tx0/tx1 × ty0/ty1) always cover
-  // every HZB texel that the projection touches — no texel is ever skipped.
-  //
-  // floor(log2) was previously used here but it is incorrect: a footprint of
-  // e.g. 1.999 mip-texels starting at fractional offset 0.001 straddles 3
-  // unique texels, yet corner sampling only reads 2 of them.  If the skipped
-  // middle texel is the only open region (background depth = 1.0) the test
-  // sees hzbMaxDepth = occluder_depth < ndcMinZ and incorrectly culls an
-  // object that is partially visible through that gap.
-  //
-  // The cost is one extra mip level (fewer culled objects per frame), but
-  // correctness is more important than cull rate for partially-visible objects.
   let projPixelW = (uvMaxX - uvMinX) * camera.hzbWidth;
   let projPixelH = (uvMaxY - uvMinY) * camera.hzbHeight;
   let projPixelMax = max(max(projPixelW, projPixelH), 1.0);
-  let mip = i32(clamp(ceil(log2(projPixelMax)), 0.0, camera.hzbMipCount - 1.0));
 
-  // --- Sample the 4 corners of the projected footprint at this mip ---------
-  let mipDims = vec2<f32>(textureDimensions(hzbTexture, mip));
-  let tx0 = clamp(i32(uvMinX * mipDims.x), 0, i32(mipDims.x) - 1);
-  let ty0 = clamp(i32(uvMinY * mipDims.y), 0, i32(mipDims.y) - 1);
-  let tx1 = clamp(i32(uvMaxX * mipDims.x), 0, i32(mipDims.x) - 1);
-  let ty1 = clamp(i32(uvMaxY * mipDims.y), 0, i32(mipDims.y) - 1);
+  // Skip tiny footprints: HZB depth at the required mip is dominated by
+  // surrounding geometry, not the actual occluder.  Cull savings for sub-4px
+  // objects don't justify the false-cull risk.
+  if (projPixelMax < 4.0) {
+    return;
+  }
 
-  let d00 = textureLoad(hzbTexture, vec2<i32>(tx0, ty0), mip).r;
-  let d10 = textureLoad(hzbTexture, vec2<i32>(tx1, ty0), mip).r;
-  let d01 = textureLoad(hzbTexture, vec2<i32>(tx0, ty1), mip).r;
-  let d11 = textureLoad(hzbTexture, vec2<i32>(tx1, ty1), mip).r;
-  let hzbMaxDepth = max(max(d00, d10), max(d01, d11));
+  // Skip large objects: anything that occupies more than half the screen in
+  // either dimension is almost never fully occluded and its depth contaminates
+  // adjacent HZB texels via MAX downsample, causing false culls on background
+  // objects that project to the same mip region.
+  if (projPixelW > camera.hzbWidth * 0.5 || projPixelH > camera.hzbHeight * 0.5) {
+    return;
+  }
+
+  // --- Select HZB mip level -------------------------------------------------
+  // Add a proportional margin before log2 so footprints near a power-of-2
+  // boundary round up to the next mip, reducing contamination from the
+  // MAX-downsample depth of large near-objects at the same mip boundary.
+  let footprintMargin    = max(projPixelMax * 0.05, 2.0);
+  let projPixelMaxBiased = projPixelMax + footprintMargin;
+  let mip = i32(clamp(ceil(log2(projPixelMaxBiased)), 0.0, camera.hzbMipCount - 1.0));
+
+  // --- Sample the projected footprint at mip-1 (one level finer) -----------
+  // mip was selected so the footprint fits in ≤1 texel at that level.
+  // Sampling at mip-1 halves each texel's screen coverage, so the depth
+  // values are less likely to be contaminated by the MAX-downsample of a
+  // large near-object from a neighbouring region.  The cost is up to 3×3
+  // samples at the finer level instead of 1–2 at the coarser one, which is
+  // acceptable given the reduced false-cull rate.
+  let mipFine  = max(mip - 1, 0);
+  let mipDims  = vec2<f32>(textureDimensions(hzbTexture, mipFine));
+  let mipDimsI = vec2<i32>(textureDimensions(hzbTexture, mipFine));
+  let tx0 = clamp(i32(uvMinX * mipDims.x) - 1, 0, mipDimsI.x - 1);
+  let ty0 = clamp(i32(uvMinY * mipDims.y) - 1, 0, mipDimsI.y - 1);
+  let tx1 = clamp(i32(uvMaxX * mipDims.x) + 1, 0, mipDimsI.x - 1);
+  let ty1 = clamp(i32(uvMaxY * mipDims.y) + 1, 0, mipDimsI.y - 1);
+
+  var hzbMaxDepth = 0.0;
+  for (var ty = ty0; ty <= ty1; ty++) {
+    for (var tx = tx0; tx <= tx1; tx++) {
+      let d = textureLoad(hzbTexture, vec2<i32>(tx, ty), mipFine).r;
+      hzbMaxDepth = max(hzbMaxDepth, d);
+    }
+  }
 
   // --- Occlusion test -------------------------------------------------------
   // Depth convention: 0 = near, 1 = far (standard non-reversed-Z).
@@ -185,5 +208,23 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   if (ndcMinZ > hzbMaxDepth + DEPTH_BIAS) {
     indirectArgs[idx].instanceCount = 0u;
     atomicAdd(&culledCount, 1u);
+
+    // Record debug data for CPU readback (capped at 32 entries).
+    let debugSlot = atomicAdd(&hzbDebug[0], 1u);
+    if (debugSlot < 32u) {
+      let base = 1u + debugSlot * 12u;
+      atomicStore(&hzbDebug[base +  0u], idx);
+      atomicStore(&hzbDebug[base +  1u], bitcast<u32>(ndcMinZ));
+      atomicStore(&hzbDebug[base +  2u], bitcast<u32>(hzbMaxDepth));
+      atomicStore(&hzbDebug[base +  3u], u32(mipFine));
+      atomicStore(&hzbDebug[base +  4u], u32(tx0));
+      atomicStore(&hzbDebug[base +  5u], u32(ty0));
+      atomicStore(&hzbDebug[base +  6u], u32(tx1));
+      atomicStore(&hzbDebug[base +  7u], u32(ty1));
+      atomicStore(&hzbDebug[base +  8u], bitcast<u32>(uvMinX));
+      atomicStore(&hzbDebug[base +  9u], bitcast<u32>(uvMaxX));
+      atomicStore(&hzbDebug[base + 10u], bitcast<u32>(uvMinY));
+      atomicStore(&hzbDebug[base + 11u], bitcast<u32>(uvMaxY));
+    }
   }
 }

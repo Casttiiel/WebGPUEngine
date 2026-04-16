@@ -34,6 +34,8 @@ export class RenderManagerV2 {
   private debugStagingCapacity = 0;
   private debugMapPending = false;
   private debugStagingMapped = false;
+  /** Set when the indirect args copy was recorded into the current frame's main encoder. */
+  private debugIndirectCopyInMainEncoder = false;
   /** Camera snapshot used for the CPU reference culling comparison. */
   private debugLastCamera: Camera | null = null;
 
@@ -250,6 +252,9 @@ export class RenderManagerV2 {
     const indBuf = this.gpuCuller.getIndirectArgsBuffer();
     if (!objBuf || !indBuf) return;
 
+    // Sync debug flag so HZBCullingPass logs the per-cull breakdown when enabled.
+    this.hzbCullingPass.debugEnabled = this.debugHZBEnabled;
+
     this.hzbCullingPass.dispatch(
       encoder,
       this.camera,
@@ -260,11 +265,34 @@ export class RenderManagerV2 {
     );
 
     // Debug readback: compare GPU result vs CPU frustum to isolate HZB false culls
-    if (this.debugHZBEnabled && !this.debugMapPending) {
+    if (this.debugHZBEnabled && !this.debugMapPending && !this.debugIndirectCopyInMainEncoder) {
       if (this.debugStagingMapped) {
         this.processDebugReadback();
       }
-      this.scheduleDebugReadback(indBuf, this.gpuCuller.getManagedCount(), this.camera);
+      this.scheduleDebugReadback(encoder, indBuf, this.gpuCuller.getManagedCount(), this.camera);
+    }
+  }
+
+  /**
+   * Must be called AFTER Render.endFrame() submits the main frame encoder.
+   * Starts GPU readback mapAsync for HZB counters and debug buffers that were
+   * copied into the main encoder this frame.
+   */
+  public postFrame(): void {
+    this.hzbCullingPass?.postFrame();
+
+    // Indirect args debug readback (for [HZB FALSE CULLS] output)
+    if (this.debugIndirectCopyInMainEncoder && !this.debugMapPending && !this.debugStagingMapped) {
+      this.debugIndirectCopyInMainEncoder = false;
+      this.debugMapPending = true;
+      this.debugStagingBuffer!.mapAsync(GPUMapMode.READ)
+        .then(() => {
+          this.debugMapPending = false;
+          this.debugStagingMapped = true;
+        })
+        .catch(() => {
+          this.debugMapPending = false;
+        });
     }
   }
 
@@ -364,10 +392,16 @@ export class RenderManagerV2 {
       this.debugStagingCapacity = 0;
       this.debugMapPending = false;
       this.debugStagingMapped = false;
+      this.debugIndirectCopyInMainEncoder = false;
     }
   }
 
-  private scheduleDebugReadback(indBuf: GPUBuffer, n: number, camera: Camera): void {
+  private scheduleDebugReadback(
+    encoder: GPUCommandEncoder,
+    indBuf: GPUBuffer,
+    n: number,
+    camera: Camera,
+  ): void {
     const size = n * 20; // INDIRECT_STRIDE = 5 × u32 = 20 bytes
     const device = Render.getInstance().getDevice();
     if (!device) return;
@@ -384,21 +418,10 @@ export class RenderManagerV2 {
 
     this.debugLastCamera = camera;
 
-    // Submit in its own encoder so mapAsync can be called immediately.
-    const enc = device.createCommandEncoder({ label: 'hzb_debug_copy' });
-    enc.copyBufferToBuffer(indBuf, 0, this.debugStagingBuffer, 0, size);
-    device.queue.submit([enc.finish()]);
-
-    this.debugMapPending = true;
-    this.debugStagingBuffer
-      .mapAsync(GPUMapMode.READ)
-      .then(() => {
-        this.debugMapPending = false;
-        this.debugStagingMapped = true;
-      })
-      .catch(() => {
-        this.debugMapPending = false;
-      });
+    // Record copy into the MAIN frame encoder so the HZB cull's writes are
+    // guaranteed visible before the copy executes.  postFrame() calls mapAsync.
+    encoder.copyBufferToBuffer(indBuf, 0, this.debugStagingBuffer, 0, size);
+    this.debugIndirectCopyInMainEncoder = true;
   }
 
   private processDebugReadback(): void {

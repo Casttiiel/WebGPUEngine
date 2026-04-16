@@ -555,6 +555,11 @@ export class ModuleRender extends Module {
     this.presentResult(result);
 
     Render.getInstance().endFrame();
+
+    // Trigger GPU readback mapAsync calls AFTER the main encoder is submitted.
+    // HZBCullingPass copies counter/debug buffers into the main encoder;
+    // mapAsync must start only once the encoder has been submitted (endFrame above).
+    RenderManager.getInstance().postFrame();
   }
 
   /**

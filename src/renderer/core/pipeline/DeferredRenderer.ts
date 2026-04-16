@@ -485,12 +485,28 @@ export class DeferredRenderer {
    * @returns Vista de textura con el resultado final
    */
   public render(camera: Entity, skipPostProcessing: boolean = false): GPUTextureView {
-    // 0. Depth prepass — fills the shared depth buffer so the GBuffer can use
-    //    hardware early-Z to eliminate overdraw.  Alpha-masked materials use a
-    //    dedicated technique that discards transparent fragments so depth is only
-    //    written for genuinely opaque pixels.
     const renderManager = RenderManagerV2.getInstance();
     const isDithered = QualitySettings.getInstance().getSettings().ditheringMode === 'psx';
+    const encoder = Render.getInstance().getCommandEncoder();
+
+    // 0. HZB occlusion culling using the PREVIOUS frame's depth pyramid.
+    //    Must run before both the depth prepass and the GBuffer so that culled
+    //    objects are skipped in BOTH passes — otherwise objects zeroed only from
+    //    the GBuffer still have depth written by the prepass, leaving black pixels
+    //    in the accLight (prepass depth blocks skybox; ambient discards cleared
+    //    GBuffer pixels as "sky").
+    //
+    //    Using last frame's HZB is conservative and correct:
+    //      • Objects visible last frame appear in the HZB → never falsely culled.
+    //      • Truly occluded objects → culled in both prepass and GBuffer.
+    //      • One-frame lag is acceptable for occlusion culling.
+    if (this.hzbBuilder?.isInitialized()) {
+      renderManager.dispatchHZBCulling(encoder);
+    }
+
+    // 1. Depth prepass — fills the shared depth buffer with the HZB-culled set.
+    //    After HZB culling the prepass skips truly-occluded objects, so only
+    //    potentially visible objects write depth — no orphaned depth values.
     renderManager.setTechniqueOverride(
       this.depthPrepassTechnique,
       this.depthPrepassInstancedTechnique,
@@ -502,21 +518,15 @@ export class DeferredRenderer {
     this.renderPassManager.executePass('depth_prepass', RenderCategory.SOLIDS);
     renderManager.clearTechniqueOverride();
 
-    // 1. Build the HZB pyramid from this frame's depth BEFORE the GBuffer pass.
-    //    depth_prepass above ran with frustum-culling only (no HZB applied), so it
-    //    includes every frustum-visible object — the depth buffer is complete.
-    //    Building here and immediately dispatching HZB culling means:
-    //      • The pyramid is always accurate (no self-reinforcing false-cull loop).
-    //      • Only the GBuffer benefits from HZB culling (the expensive pass).
-    //      • depth_prepass stays fast (early-Z for GBuffer overdraw elimination).
+    // 2. Build the HZB pyramid from this frame's depth for use NEXT frame.
+    //    The prepass ran with the combined frustum+HZB culled set, so the new
+    //    pyramid accurately reflects what is actually visible this frame.
     if (this.hzbBuilder?.isInitialized()) {
-      const encoder = Render.getInstance().getCommandEncoder();
       this.hzbBuilder.build(encoder, this.depthPrepass.getDepthTexture());
-      renderManager.dispatchHZBCulling(encoder);
     }
 
-    // 2. G-Buffer pass — loads depth from prepass (hardware early-Z active).
-    //    HZB culling above may have zeroed instanceCount for fully-occluded objects.
+    // 3. G-Buffer pass — loads depth from prepass (hardware early-Z active).
+    //    Uses the same HZB-culled indirect args as the depth prepass.
     this.renderPassManager.executePass('gbuffer', RenderCategory.SOLIDS);
     this.copyGBufferTexturesToBindGroup();
     this.renderPassManager.executePass('decals', RenderCategory.DECALS);
