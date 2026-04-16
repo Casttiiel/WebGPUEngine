@@ -21,6 +21,7 @@ import { FXAAComponent } from '../../components/render/FXAAComponent';
 import { SMAAComponent } from '../../components/render/SMAAComponent';
 import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
 import { TAAComponent } from '../../components/render/TAAComponent';
+import { TSRComponent } from '../../components/render/TSRComponent';
 import { VelocityBufferManager } from '../../renderer/core/managers/VelocityBufferManager';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
@@ -267,6 +268,9 @@ export class ModuleRender extends Module {
     for (const comp of Engine.getEntities().getObjectManagerByName('taa')?.getList() ?? []) {
       (comp as TAAComponent).resize();
     }
+    for (const comp of Engine.getEntities().getObjectManagerByName('tsr')?.getList() ?? []) {
+      (comp as TSRComponent).resize();
+    }
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('ambient_occlusion')
       ?.getList() ?? []) {
@@ -344,7 +348,9 @@ export class ModuleRender extends Module {
 
       // Enable camera jittering if temporal AA components are present
       const needsJitter =
-        mainCameraEntity?.hasComponent('smaa_t2x') || mainCameraEntity?.hasComponent('taa');
+        mainCameraEntity?.hasComponent('smaa_t2x') ||
+        mainCameraEntity?.hasComponent('taa') ||
+        mainCameraEntity?.hasComponent('tsr');
 
       if (needsJitter && !camera.isJitterEnabled()) {
         camera.enableJitter();
@@ -366,14 +372,17 @@ export class ModuleRender extends Module {
 
       RenderManager.getInstance().setCamera(camera);
 
-      // Inform SSR whether TAA is active so it can halve its step count.
-      // TAA accumulates SSR hits across frames, so half the steps gives
-      // equivalent quality. When TAA is absent, SSR reverts to full steps.
+      // Inform SSR whether a temporal component is active so it can halve its step count.
+      // TAA/TSR accumulate SSR hits across frames, giving equivalent quality at half steps.
       const taaActive =
         (mainCameraEntity?.hasComponent('taa') &&
           (mainCameraEntity.getComponent('taa') as TAAComponent).hasLoaded()) ??
         false;
-      this.deferred.setSSRTemporalMode(!!taaActive);
+      const tsrActive =
+        (mainCameraEntity?.hasComponent('tsr') &&
+          (mainCameraEntity.getComponent('tsr') as TSRComponent).hasLoaded()) ??
+        false;
+      this.deferred.setSSRTemporalMode(!!(taaActive || tsrActive));
 
       Profiler.getInstance().cpu.begin('Deferred');
       result = this.deferred.render(mainCameraEntity);
@@ -386,7 +395,9 @@ export class ModuleRender extends Module {
       // Enable velocity buffer if any component needs it
       const velocityMgr = VelocityBufferManager.getInstance();
       const needsVelocity =
-        mainCameraEntity?.hasComponent('smaa_t2x') || mainCameraEntity?.hasComponent('taa');
+        mainCameraEntity?.hasComponent('smaa_t2x') ||
+        mainCameraEntity?.hasComponent('taa') ||
+        mainCameraEntity?.hasComponent('tsr');
       velocityMgr.setEnabled(needsVelocity);
       // Generar velocity buffer si está activo
       if (velocityMgr.isEnabled()) {
@@ -473,7 +484,12 @@ export class ModuleRender extends Module {
         }
       }
 
-      if (mainCameraEntity?.hasComponent('taa')) {
+      if (mainCameraEntity?.hasComponent('tsr')) {
+        const tsr = mainCameraEntity.getComponent('tsr') as TSRComponent;
+        if (tsr.hasLoaded()) {
+          result = tsr.apply(result, this.deferred.getLinearDepthView());
+        }
+      } else if (mainCameraEntity?.hasComponent('taa')) {
         const taa = mainCameraEntity.getComponent('taa') as TAAComponent;
         if (taa.hasLoaded()) {
           result = taa.apply(result, this.deferred.getLinearDepthView());
@@ -483,6 +499,15 @@ export class ModuleRender extends Module {
       if (mainCameraEntity?.hasComponent('tone_mapping')) {
         const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
         if (toneMapping.hasLoaded()) {
+          // When TSR has already upscaled to canvas resolution, tone mapping must
+          // output at canvas size too — otherwise it would shrink the result back
+          // to render resolution and break the scissor rect in the UI overlay pass.
+          if (mainCameraEntity.hasComponent('tsr')) {
+            const canvas = Render.canvasSize;
+            toneMapping.setOutputSize(canvas.width, canvas.height);
+          } else {
+            toneMapping.setOutputSize(Render.width, Render.height);
+          }
           // Wire auto-exposure buffer into tone mapping on first frame (and whenever it changes)
           if (mainCameraEntity.hasComponent('auto_exposure')) {
             const autoExposure = mainCameraEntity.getComponent(

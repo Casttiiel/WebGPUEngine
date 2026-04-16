@@ -66,6 +66,18 @@ export class ToneMappingComponent extends Component {
   }
 
   /**
+   * Resize the output RT to explicit dimensions.
+   * Called by ModuleRender when an upstream pass (e.g. TSR) has already
+   * upscaled the result to canvas resolution before tone mapping runs.
+   */
+  public setOutputSize(width: number, height: number): void {
+    const toneMappingFormat = QualitySettings.getInstance().getSettings().toneMappingTexture;
+    if (this.result.getWidth() === width && this.result.getHeight() === height) return;
+    this.result.createRT('tone_mapping_result.dds', width, height, toneMappingFormat);
+    this.bindGroupCache.clear();
+  }
+
+  /**
    * Provide the GPU buffer written by AutoExposureComponent so tone mapping
    * reads the current adapted exposure value.
    * Call once after AutoExposureComponent is loaded; the bind group is cached.

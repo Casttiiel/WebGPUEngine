@@ -1,14 +1,15 @@
 {
-    "components": {
-      "name": "MainCamera",
-      "camera": {},
-      "tone_mapping": {},
-      "taa": {}, 
-      "ambient_occlusion": {},
-      "bloom": {},
-      "auto_exposure": {},
-      "lens_flare":{},
-      "atmospheric_fog": {},
-      "fsr": { "renderScale": 1.0 }
-    }
+  "components": {
+    "name": "MainCamera",
+    "camera": {},
+    "tone_mapping": {},
+    "tsr": {
+      "renderScale": 0.77
+    },
+    "ambient_occlusion": {},
+    "bloom": {},
+    "auto_exposure": {},
+    "lens_flare": {},
+    "atmospheric_fog": {}
   }
+}

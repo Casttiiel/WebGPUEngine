@@ -234,9 +234,10 @@ export class RenderPassManager {
     result: RenderTarget,
     exposureBindGroup?: GPUBindGroup,
   ): void {
+    const viewport = { width: result.getWidth(), height: result.getHeight() };
     const passConfig = RenderPassFactory.createPostProcessPassConfig(
       result,
-      undefined,
+      viewport,
       'Tone Mapping',
     );
     const pass = new ToneMappingRenderPass(
