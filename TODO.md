@@ -1,9 +1,7 @@
 ### Engine
 
-1. HZB Pocho (Render Statistics wrong)
-2. Glass Shader
-3. GLTF Exporter unifies metallic and roughness? In right channel?
-4. Enemy AI / NavMesh
+1. GLTF Exporter unifies metallic and roughness? In right channel?
+2. Enemy AI / NavMesh
 
 ## Gameplay
 

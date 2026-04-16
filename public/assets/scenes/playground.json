@@ -59,5 +59,8 @@
         ]
       }
     }
+  },
+  {
+    "prefab": "props/glass_panel.prefab"
   }
 ]
