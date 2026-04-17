@@ -419,6 +419,32 @@ export class RenderPassManager {
   }
 
   /**
+   * Composites filtered SSGI irradiance × albedo additively onto accLight.
+   * Uses loadOp:'load' so the additive blend state on the technique adds on top of existing lighting.
+   */
+  public executeSSGICompositePass(
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    ssgiBindGroup: GPUBindGroup,
+    accLightView: GPUTextureView,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
+      accLightView,
+      undefined,
+      'SSGI Composite',
+    );
+    const pass = new AOBilateralFilterRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      gBufferBindGroup,
+      ssgiBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
    * Create and execute a motion blur pass dynamically
    */
   public executeMotionBlurPass(

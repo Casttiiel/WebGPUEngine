@@ -20,7 +20,8 @@
       "meshes": [
         {
           "mesh": "sphere.obj",
-          "material": "textured.mat"
+          "material": "textured.mat",
+          "visible": false
         }
       ]
     }

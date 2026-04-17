@@ -24,6 +24,7 @@ export interface GraphicsQualitySettings {
   ssrMaxSteps: number;
   directionalShadowMapResolution: number;
   ssgiScale: number;
+  enableSSGI: boolean;
   useKTX2: boolean;
   meshTextureFilter: 'trilinear' | 'nearest';
   ditheringMode: 'off' | 'psx';
@@ -61,6 +62,7 @@ export class QualitySettings {
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 256,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: false,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -92,6 +94,7 @@ export class QualitySettings {
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 512,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -123,6 +126,7 @@ export class QualitySettings {
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 1024,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -154,6 +158,7 @@ export class QualitySettings {
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 2048,
       ssgiScale: 0.25,
+      enableSSGI: false,
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -189,6 +194,7 @@ export class QualitySettings {
       aoStrength: 3.0,
       aoSliceCount: 0.01,
       ssgiScale: 0.25,
+      enableSSGI: false,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
       linearDepthTexture: 'r16float',

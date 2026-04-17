@@ -22,6 +22,10 @@ export class ScreenSpaceGlobalIllumination {
   private bilateralBindGroupDirty: boolean = true;
   private renderPassManager!: RenderPassManager;
 
+  // Composite pass — blends finalSSGIResult × albedo additively onto accLight
+  private ssgiCompositeTechnique!: Technique;
+  private ssgiCompositeBindGroup: GPUBindGroup | null = null;
+
   constructor() {
     this.renderPassManager = new RenderPassManager();
   }
@@ -33,6 +37,7 @@ export class ScreenSpaceGlobalIllumination {
       this.bilateralFilterTechnique = await Technique.getAsync(
         'post-processing/ssgi_bilateral_filter.tech',
       );
+      this.ssgiCompositeTechnique = await Technique.getAsync('post-processing/ssgi_composite.tech');
 
       this.createRenderTarget();
 
@@ -68,6 +73,8 @@ export class ScreenSpaceGlobalIllumination {
 
     // The bilateral bind group references ssgiResult — mark dirty after (re)create
     this.bilateralBindGroupDirty = true;
+    // The composite bind group references finalSSGIResult — invalidate after resize
+    this.ssgiCompositeBindGroup = null;
   }
 
   public render(gBufferBindGroup: GPUBindGroup): GPUTextureView | undefined {
@@ -144,6 +151,34 @@ export class ScreenSpaceGlobalIllumination {
     return this.finalSSGIResult.getView();
   }
 
+  /**
+   * Composites the filtered SSGI irradiance × albedo additively onto accLight.
+   * Must be called after render() returns a valid view.
+   */
+  public composite(accLightView: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+    if (!this.isInitialized || !this.finalSSGIResult || !this.ssgiCompositeTechnique) return;
+
+    // Lazily build bind group — rebuilt after resize (null set in createRenderTarget)
+    if (!this.ssgiCompositeBindGroup) {
+      this.ssgiCompositeBindGroup = BindGroupFactory.createBindGroup(
+        'ssgi_composite_bg',
+        BindGroupFactory.getSingleTextureLayout(),
+        [
+          { binding: 0, resource: this.finalSSGIResult.getView()! },
+          { binding: 1, resource: SamplerLibrary.simpleSampler! },
+        ],
+      );
+    }
+
+    this.renderPassManager.executeSSGICompositePass(
+      this.fullscreenQuadMesh,
+      this.ssgiCompositeTechnique,
+      gBufferBindGroup,
+      this.ssgiCompositeBindGroup,
+      accLightView,
+    );
+  }
+
   private setupBilateralFilterBindGroup(): void {
     const sampler = SamplerLibrary.simpleSampler;
 
@@ -177,5 +212,6 @@ export class ScreenSpaceGlobalIllumination {
     this.finalSSGIResult = null as any;
     this.bilateralFilterBindGroup = null;
     this.bilateralBindGroupDirty = true;
+    this.ssgiCompositeBindGroup = null;
   }
 }

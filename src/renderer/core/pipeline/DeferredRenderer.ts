@@ -36,17 +36,6 @@ export class DeferredRenderer {
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
 
-  /**
-   * Optional stable color source for SSR hit sampling.
-   * When TAA is active, set to TAAComponent.getHistoryView() before render() —
-   * the history is the previous frame's resolved (non-jittered) result which
-   * gives SSR stable hit colors.  Null falls back to the current accLight.
-   */
-  private ssrColorSource: GPUTextureView | null = null;
-
-  public setSSRColorSource(view: GPUTextureView | null): void {
-    this.ssrColorSource = view;
-  }
   private froxelVolumetrics!: FroxelVolumetricScattering;
   private ssgi!: ScreenSpaceGlobalIllumination;
   private depthPrepass!: DepthPrepass;
@@ -534,6 +523,14 @@ export class DeferredRenderer {
     // 3. Render ambient occlusion and lighting
     this.aoResult = this.renderAO(camera);
     this.renderAccLight();
+
+    // 3b. Screen-Space Global Illumination — indirect diffuse, composited additively onto accLight
+    if (QualitySettings.getInstance().getSettings().enableSSGI) {
+      const ssgiView = this.ssgi?.render(this.gBufferBindGroup);
+      if (ssgiView) {
+        this.ssgi.composite(this.rtAccLight.getView(), this.gBufferBindGroup);
+      }
+    }
 
     // 4. Water hybrid pass ───────────────────────────────────────────────────
     // Snapshot lit scene (solids only) before water pixels are composited.

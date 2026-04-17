@@ -22,8 +22,8 @@ const MAX_RAY_STEPS:    i32 = 32;
 // Temporally varied with camera.time so each rendered frame gets a different
 // noise pattern, enabling temporal accumulation / denoising.
 fn IGN(pixelCoord: vec2<f32>, sampleIndex: u32) -> f32 {
-    // Ruido estático — mismo patrón cada frame, el bilateral lo suaviza
-    let p = pixelCoord + f32(sampleIndex) * vec2<f32>(1.6180339887, 2.6180339887);
+    let p = pixelCoord + f32(sampleIndex) * vec2<f32>(1.6180339887, 2.6180339887)
+          + camera.time * vec2<f32>(1.0, 0.6180339887);
     return fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))));
 }
 
@@ -84,10 +84,8 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         let hemisphereDir = transformToNormalSpace(localDir, g.normal);
         
         let sampleResult = performScreenSpaceRayMarching(
-            g.worldPos,
+            g.worldPos + g.normal * 0.05,
             hemisphereDir,
-            uv,
-            g.zlinear
         );
         
         if (sampleResult.a > 0.0) {
@@ -98,18 +96,14 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         }
     }
     
-    if (validSamples > 0u) {
-        accumColor /= f32(validSamples);
-    }
+    accumColor /= f32(NUM_SSGI_SAMPLES);
     
     return vec4<f32>(accumColor, 1.0);
 }
 
 fn performScreenSpaceRayMarching(
-    startPos:  vec3<f32>,
-    rayDir:    vec3<f32>,
-    startUV:   vec2<f32>,
-    startDepth: f32
+    startPos: vec3<f32>,
+    rayDir:   vec3<f32>,
 ) -> vec4<f32> {
     
     let maxDistance = 50.0;
@@ -122,7 +116,7 @@ fn performScreenSpaceRayMarching(
     for (var i = 0; i < MAX_RAY_STEPS; i++) {
         
         currentPos += rayDir * stepSize;
-        stepSize   *= 1.25;   // geometric growth
+        stepSize   = min(stepSize * 1.25, 2.0);   // geometric growth, capped to avoid wasting samples at absurd distances
 
         let currentDistance = length(currentPos - startPos);
         if (currentDistance > maxDistance) { break; }
@@ -136,14 +130,14 @@ fn performScreenSpaceRayMarching(
         var screenUV = ndc.xy * 0.5 + 0.5;
         screenUV.y   = 1.0 - screenUV.y;
 
-        if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) { break; }
+        if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) { continue; }
         
         let sampledDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, screenUV, 0.0).r;
         let camb2obj     = currentPos - camera.cameraPosition.xyz;
         let currentDepth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
         
         // Adaptive thickness: looser at distance to avoid missing hits with large steps
-        let adaptiveThickness = 0.02 + currentDistance * 0.01;
+        let adaptiveThickness = min(0.02 + currentDistance * 0.005, 0.1);
         
         if (currentDepth > sampledDepth && (currentDepth - sampledDepth) < adaptiveThickness) {
             // Direct albedo sample — cheaper than full decodeGBuffer on every hit
