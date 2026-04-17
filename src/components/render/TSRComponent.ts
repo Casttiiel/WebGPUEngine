@@ -52,6 +52,12 @@ export class TSRComponent extends Component {
   // Cached bind groups — invalidated on resize
   private paramsBindGroupCached: GPUBindGroup | null = null;
   private seedParamsBindGroupCached: GPUBindGroup | null = null;
+  // Cached textures bind group — invalidated when any input view pointer changes
+  private texturesBGCached: GPUBindGroup | null = null;
+  private lastTSRCurrent: GPUTextureView | null = null;
+  private lastTSRHistory: GPUTextureView | null = null;
+  private lastTSRVelocity: GPUTextureView | null = null;
+  private lastTSRDepth: GPUTextureView | null = null;
 
   // First-frame guard: seed historyRT with current frame so frame 2 has valid history
   private isFirstFrame = true;
@@ -177,6 +183,11 @@ export class TSRComponent extends Component {
     this.isFirstFrame = true;
     this.paramsBindGroupCached = null;
     this.seedParamsBindGroupCached = null;
+    this.texturesBGCached = null;
+    this.lastTSRCurrent = null;
+    this.lastTSRHistory = null;
+    this.lastTSRVelocity = null;
+    this.lastTSRDepth = null;
   }
 
   /**
@@ -229,17 +240,29 @@ export class TSRComponent extends Component {
     linearDepth: GPUTextureView,
     paramsBindGroup: GPUBindGroup,
   ): void {
-    const texturesBG = BindGroupFactory.createBindGroup(
-      'tsr_textures_bg',
-      this.technique.getPipeline().getBindGroupLayout(0),
-      [
-        { binding: 0, resource: SamplerLibrary.simpleSampler },
-        { binding: 1, resource: current },
-        { binding: 2, resource: history },
-        { binding: 3, resource: velocity },
-        { binding: 4, resource: linearDepth },
-      ],
-    );
+    if (
+      !this.texturesBGCached ||
+      this.lastTSRCurrent !== current ||
+      this.lastTSRHistory !== history ||
+      this.lastTSRVelocity !== velocity ||
+      this.lastTSRDepth !== linearDepth
+    ) {
+      this.texturesBGCached = BindGroupFactory.createBindGroup(
+        'tsr_textures_bg',
+        this.technique.getPipeline().getBindGroupLayout(0),
+        [
+          { binding: 0, resource: SamplerLibrary.simpleSampler },
+          { binding: 1, resource: current },
+          { binding: 2, resource: history },
+          { binding: 3, resource: velocity },
+          { binding: 4, resource: linearDepth },
+        ],
+      );
+      this.lastTSRCurrent = current;
+      this.lastTSRHistory = history;
+      this.lastTSRVelocity = velocity;
+      this.lastTSRDepth = linearDepth;
+    }
 
     const encoder = Render.getInstance().getCommandEncoder();
     const pass = encoder.beginRenderPass({
@@ -256,7 +279,7 @@ export class TSRComponent extends Component {
 
     this.technique.activatePipeline(pass);
     this.fullscreenQuadMesh.activate(pass);
-    pass.setBindGroup(0, texturesBG);
+    pass.setBindGroup(0, this.texturesBGCached!);
     pass.setBindGroup(1, paramsBindGroup);
     this.fullscreenQuadMesh.renderGroup(pass);
     pass.end();

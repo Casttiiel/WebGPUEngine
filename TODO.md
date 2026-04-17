@@ -2,7 +2,6 @@
 
 1. GLTF Exporter unifies metallic and roughness? In right channel?
 2. Enemy AI / NavMesh
-3. Bind group Creation
 
 ## Gameplay
 

@@ -13,7 +13,8 @@ export class AmbientLight {
   private fullscreenQuadMesh!: Mesh;
 
   private ambientDiffuseTechnique!: Technique;
-  private ambientDiffuseBindGroup!: GPUBindGroup;
+  /** Cached per-aoResult — allows main scene (real AO) and water (white) to coexist without thrashing. */
+  private ambientDiffuseBindGroupCache = new Map<GPUTextureView, GPUBindGroup>();
   private ambientDiffuseUniformBuffer!: GPUBuffer;
 
   private ambientSpecularTechnique!: Technique;
@@ -34,8 +35,8 @@ export class AmbientLight {
   private pccSpecularUniformBuffer!: GPUBuffer;
   private pccSpecularUniformArray = new Float32Array(28);
 
-  /** Cached views for bind-group invalidation on resize or SSGI toggle. */
-  private lastAoView: GPUTextureView | null = null;
+  /** Cached views for bind-group invalidation on resize or SSGI toggle.
+   * lastAoView removed — bind group is now keyed by aoResult in ambientDiffuseBindGroupCache. */
 
   /** Cached probe views for bind-group invalidation when the player moves between probes. */
   private lastProbeAView: GPUTextureView | null = null;
@@ -93,16 +94,17 @@ export class AmbientLight {
     const probeAChanged = probeViews.viewA !== this.lastProbeAView;
     const probeBChanged = probeViews.viewB !== this.lastProbeBView;
 
-    if (
-      !this.ambientDiffuseBindGroup ||
-      this.lastAoView !== aoResult ||
-      probeAChanged ||
-      probeBChanged
-    ) {
-      this.createAmbientDiffuseBindGroup(aoResult, probeViews.viewA, probeViews.viewB);
-      this.lastAoView = aoResult;
+    if (probeAChanged || probeBChanged) {
+      // Probe changed — all cached bind groups are stale (they embed the irradiance views).
+      this.ambientDiffuseBindGroupCache.clear();
       this.lastProbeAView = probeViews.viewA;
       this.lastProbeBView = probeViews.viewB;
+    }
+
+    let diffuseBG = this.ambientDiffuseBindGroupCache.get(aoResult);
+    if (!diffuseBG) {
+      diffuseBG = this.createAmbientDiffuseBindGroup(aoResult, probeViews.viewA, probeViews.viewB);
+      this.ambientDiffuseBindGroupCache.set(aoResult, diffuseBG);
     }
     const render = Render.getInstance();
 
@@ -128,7 +130,7 @@ export class AmbientLight {
     // 3. Set bind groups
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, gBufferBindGroup);
-    pass.setBindGroup(2, this.ambientDiffuseBindGroup);
+    pass.setBindGroup(2, diffuseBG);
 
     // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
@@ -188,8 +190,8 @@ export class AmbientLight {
     aoResult: GPUTextureView,
     irradianceViewA: GPUTextureView,
     irradianceViewB: GPUTextureView,
-  ): void {
-    this.ambientDiffuseBindGroup = BindGroupFactory.createBindGroup(
+  ): GPUBindGroup {
+    return BindGroupFactory.createBindGroup(
       'ambient_bindgroup',
       this.ambientDiffuseTechnique.getPipeline().getBindGroupLayout(2),
       [
@@ -395,12 +397,8 @@ export class AmbientLight {
   }
 
   public destroy(): void {
-    // Invalidates bind groups and cached texture references so they are rebuilt
-    // on the next render call after a resize. Uniform buffers are intentionally
-    // kept alive because their contents are independent of render-target size.
-    this.ambientDiffuseBindGroup = null!;
+    this.ambientDiffuseBindGroupCache.clear();
     this.ambientSpecularBindGroup = null!;
-    this.lastAoView = null;
     this.lastProbeAView = null;
     this.lastProbeBView = null;
     this.lastProbeEnvAView = null;
