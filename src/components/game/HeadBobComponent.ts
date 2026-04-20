@@ -71,7 +71,9 @@ export class HeadBobComponent extends Component {
       return;
     }
     // Extras opcionales solo disponibles con parkour controller
-    const parkour = this.getOwner().getComponent('parkour_controller') as CharacterControllerComponent | null;
+    const parkour = this.getOwner().getComponent(
+      'parkour_controller',
+    ) as CharacterControllerComponent | null;
 
     const currentSpeed = base.getCurrentSpeed() || 0.0;
     const isGrounded = base.getIsGrounded();

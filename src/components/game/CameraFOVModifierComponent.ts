@@ -92,7 +92,9 @@ export class CameraFOVModifierComponent extends Component {
     if (!this.cameraComponent) return;
 
     // Obtener velocidad del character controller
-    const characterController = this.getOwner().getComponent('player_controller') as BasePlayerController | null;
+    const characterController = this.getOwner().getComponent(
+      'player_controller',
+    ) as BasePlayerController | null;
     if (!characterController) return;
 
     // Lazy loading: obtener baseFOV de la cámara solo la primera vez que se necesita
@@ -109,8 +111,7 @@ export class CameraFOVModifierComponent extends Component {
       this.maxSpeed = characterController.getMaxSpeed();
     }
 
-    const currentSpeed =
-      (characterController as BasePlayerController).getCurrentSpeed() || 0.0;
+    const currentSpeed = (characterController as BasePlayerController).getCurrentSpeed() || 0.0;
 
     // Calcular FOV objetivo basado en velocidad
     if (currentSpeed < this.speedThreshold) {

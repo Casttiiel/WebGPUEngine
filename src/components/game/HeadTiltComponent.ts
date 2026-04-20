@@ -85,7 +85,9 @@ export class HeadTiltComponent extends Component {
       return;
     }
     // Extras opcionales solo disponibles con parkour controller
-    const parkour = this.getOwner().getComponent('parkour_controller') as CharacterControllerComponent | null;
+    const parkour = this.getOwner().getComponent(
+      'parkour_controller',
+    ) as CharacterControllerComponent | null;
     const cameraEntity = Engine.getEntities().getEntityByName('PlayerCamera');
     if (!cameraEntity) {
       return;
