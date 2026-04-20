@@ -1,7 +1,7 @@
 {
     "technique": "utility/stone.tech",
     "textures":{
-        "txAlbedo": "wood_0034_color_1k.jpg",
+        "txAlbedo": "white.png",
         "txNormal": "stone_normal.png",
         "txMetallic": "wood_0034_metallic_1k.jpg",
         "txRoughness": "wood_0034_roughness_1k.jpg",

@@ -1,5 +1,5 @@
 import { Component } from '../../core/ecs/Component';
-import { CharacterControllerComponent } from './CharacterControllerComponent';
+import { BasePlayerController } from './BasePlayerController';
 
 export interface LandingCameraComponentData {
   /**
@@ -58,7 +58,7 @@ export class LandingCameraComponent extends Component {
   private maxPitchPunch: number = 3.0;
   private pitchStiffness: number = 120;
   private pitchDamping: number = 18;
-  private enabled: boolean = true;
+  public override enabled: boolean = true;
 
   // ── Y dip spring  (offset toward 0) ─────────────────────────────────
   private yOffset: number = 0; // metres added to eyePos.y
@@ -93,8 +93,8 @@ export class LandingCameraComponent extends Component {
 
     // ── Landing detection ────────────────────────────────────────────
     const charCtrl = this.getOwner().getComponent(
-      'character_controller',
-    ) as CharacterControllerComponent | null;
+      'player_controller',
+    ) as BasePlayerController | null;
 
     if (charCtrl) {
       const isGrounded = charCtrl.getIsGrounded();
@@ -158,5 +158,5 @@ export class LandingCameraComponent extends Component {
 
   public override renderInMenu(): void {}
   public renderDebug(): void {}
-  public dispose(): void {}
+  public override dispose(): void {}
 }

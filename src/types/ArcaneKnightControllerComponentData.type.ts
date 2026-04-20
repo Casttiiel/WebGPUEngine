@@ -1,0 +1,22 @@
+export type ArcaneKnightControllerComponentDataType = {
+  // Movement
+  moveSpeed?: number;
+  maxSpeed?: number;
+  groundAcceleration?: number;
+  groundDeceleration?: number;
+  airControl?: number;
+  airDrag?: number;
+
+  // Jump / gravity
+  jumpHeight?: number;
+  jumpTimeToPeak?: number;
+  jumpTimeToDescent?: number;
+  coyoteTime?: number;
+
+  // Combat
+  dashDistance?: number;
+  dashDuration?: number;
+  lightAttackDuration?: number;
+  heavyAttackDuration?: number;
+  parryWindow?: number;
+};

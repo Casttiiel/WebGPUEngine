@@ -4,7 +4,7 @@
     "directional_light",
     "area_light",
     "particle_system",
-    "character_controller",
+    "player_controller",
     "enemy_controller",
     "perception",
     "flow",

@@ -1,6 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { BasePlayerController } from './BasePlayerController';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
 
 export interface HeadBobComponentData {
@@ -29,7 +30,7 @@ export class HeadBobComponent extends Component {
   private verticalAmplitude: number = 0.02; // Movimiento vertical (5cm)
   private horizontalAmplitude: number = 0.02; // Movimiento horizontal (3cm)
   private speedThreshold: number = 0.5; // Velocidad mínima para activar (m/s)
-  private enabled: boolean = true; // Activar head bob
+  public override enabled: boolean = true; // Activar head bob
 
   // Estado
   private headBobTimer: number = 0.0; // Timer para el ciclo de bobbing
@@ -64,19 +65,18 @@ export class HeadBobComponent extends Component {
     }
 
     // Obtener estado del character controller
-    const characterController = this.getOwner().getComponent('character_controller');
-    if (!characterController) {
+    const base = this.getOwner().getComponent('player_controller') as BasePlayerController | null;
+    if (!base) {
       vec3.set(this.headBobOffset, 0, 0, 0);
       return;
     }
+    // Extras opcionales solo disponibles con parkour controller
+    const parkour = this.getOwner().getComponent('parkour_controller') as CharacterControllerComponent | null;
 
-    const currentSpeed =
-      (characterController as CharacterControllerComponent).getCurrentSpeed() || 0.0;
-    const isGrounded =
-      (characterController as CharacterControllerComponent).getIsGrounded() ?? false;
-    const isRolling = (characterController as CharacterControllerComponent).getIsRolling() ?? false;
-    const isWallRunning =
-      (characterController as CharacterControllerComponent).getIsWallRunning() ?? false;
+    const currentSpeed = base.getCurrentSpeed() || 0.0;
+    const isGrounded = base.getIsGrounded();
+    const isRolling = parkour?.getIsRolling() ?? false;
+    const isWallRunning = parkour?.getIsWallRunning() ?? false;
 
     // Solo aplicar head bob si:
     // 1. Está en el suelo (no saltando)
@@ -230,7 +230,7 @@ export class HeadBobComponent extends Component {
     // TODO: Visualización debug del head bob
   }
 
-  public dispose(): void {
+  public override dispose(): void {
     // Limpieza si es necesario
   }
 }

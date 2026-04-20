@@ -57,7 +57,7 @@ export class PerceptionComponent extends Component {
   // Offset from rigid body CENTER (capsule midpoint). 0.7 ≈ eye level for a 1.8m capsule.
   private eyeHeightOffset: number = 0.7;
   private checkInterval: number = 0.1;
-  private playerComponentKey: string = 'character_controller';
+  private playerComponentKey: string = 'player_controller';
 
   // ─── Internal ──────────────────────────────────────────────────────────────
   private bb!: Blackboard;
@@ -219,7 +219,7 @@ export class PerceptionComponent extends Component {
   }
 
   /**
-   * Searches all entities for the one with a `character_controller` component.
+   * Searches all entities for the one with a `player_controller` component.
    * Caches the result so this is only called once.
    */
   private findPlayer(): void {

@@ -1,5 +1,4 @@
 import { Component } from '../../core/ecs/Component';
-import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
 import { FPSCameraControllerComponent } from './FPSCameraControllerComponent';
 
@@ -24,7 +23,7 @@ export class CameraCrouchComponent extends Component {
   // Configuración
   private slideCrouchHeight: number = 0.3; // Altura durante slide (metros)
   private crouchSpeed: number = 8.0; // Velocidad de interpolación
-  private enabled: boolean = true;
+  public override enabled: boolean = true;
 
   // Estado
   private baseEyeHeight: number = 0.8; // Altura base (capturada del FPSCamera)
@@ -77,10 +76,11 @@ export class CameraCrouchComponent extends Component {
     if (!this.fpsCamera) return;
 
     // Obtener estado del character controller
-    const characterController = this.getOwner().getComponent('character_controller');
-    if (!characterController) return;
+    const charCtrl = this.getOwner().getComponent(
+      'parkour_controller',
+    ) as CharacterControllerComponent | null;
+    if (!charCtrl) return;
 
-    const charCtrl = characterController as CharacterControllerComponent;
     const isRolling = charCtrl.getIsRolling();
 
     // Si está haciendo roll, calcular altura basada en función seno negada
@@ -120,7 +120,7 @@ export class CameraCrouchComponent extends Component {
     // TODO: Visualización debug
   }
 
-  public dispose(): void {
+  public override dispose(): void {
     // Restaurar altura original si es necesario
     if (this.fpsCamera) {
       const eyeOffset = this.fpsCamera.getEyeOffset();

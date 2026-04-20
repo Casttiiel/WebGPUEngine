@@ -96,14 +96,14 @@ export class ReflectionProbeComponent extends Component {
 
   private onEntityEnter(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('character_controller')) {
+    if (entity && entity.hasComponent('player_controller')) {
       this.entitiesInside.add(entityId);
     }
   }
 
   private onEntityExit(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('character_controller')) {
+    if (entity && entity.hasComponent('player_controller')) {
       this.entitiesInside.delete(entityId);
     }
   }

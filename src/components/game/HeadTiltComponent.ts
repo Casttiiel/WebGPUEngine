@@ -1,5 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { BasePlayerController } from './BasePlayerController';
 import { CharacterControllerComponent } from './CharacterControllerComponent';
 import { GameAction } from '../../types/GameAction.enum';
 import { vec3 } from 'gl-matrix';
@@ -33,7 +34,7 @@ export class HeadTiltComponent extends Component {
   private mantlingTiltSpeed: number = 2.0; // Velocidad de inclinación al hacer mantling
   private wallRunningTiltAmplitude: number = 0.1; // Inclinación máxima al hacer wall running
   private wallRunningTiltSpeed: number = 1.0; // Velocidad de inclinación al hacer wall running
-  private enabled: boolean = true; // Activar head tilt
+  public override enabled: boolean = true; // Activar head tilt
 
   // Estado
   private headTiltOffset: number = 0.0; // Offset actual del tilt
@@ -78,27 +79,27 @@ export class HeadTiltComponent extends Component {
     }
 
     // Obtener estado del character controller
-    const characterController = this.getOwner().getComponent('character_controller');
-    if (!characterController) {
+    const base = this.getOwner().getComponent('player_controller') as BasePlayerController | null;
+    if (!base) {
       this.headTiltOffset = 0.0;
       return;
     }
+    // Extras opcionales solo disponibles con parkour controller
+    const parkour = this.getOwner().getComponent('parkour_controller') as CharacterControllerComponent | null;
     const cameraEntity = Engine.getEntities().getEntityByName('PlayerCamera');
     if (!cameraEntity) {
       return;
     }
 
     const mainCamera = cameraEntity.getComponent('camera') as CameraComponent;
-    if (!characterController || !mainCamera) {
+    if (!base || !mainCamera) {
       this.headTiltOffset = 0.0;
       return;
     }
 
-    const isRolling = (characterController as CharacterControllerComponent).getIsRolling() ?? false;
-    const isMantling =
-      (characterController as CharacterControllerComponent).getIsMantling() ?? false;
-    const isWallRunning =
-      (characterController as CharacterControllerComponent).getIsWallRunning() ?? false;
+    const isRolling = parkour?.getIsRolling() ?? false;
+    const isMantling = parkour?.getIsMantling() ?? false;
+    const isWallRunning = parkour?.getIsWallRunning() ?? false;
     let leftKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_LEFT);
     let rightKeyPressed = Engine.getInput().isActionPressed(GameAction.MOVE_RIGHT);
 
@@ -127,7 +128,7 @@ export class HeadTiltComponent extends Component {
       speed = this.mantlingTiltSpeed;
     } else if (isWallRunning) {
       // Si está haciendo wall running, inclinar hacia el lado contrario a la pared
-      const wallNormal = (characterController as CharacterControllerComponent).getWallNormal();
+      const wallNormal = parkour?.getWallNormal() ?? vec3.fromValues(0, 0, 1);
       const cam = mainCamera.getCamera();
       const camLeft = cam.getLeft();
       const d = vec3.dot(camLeft, wallNormal);
@@ -165,7 +166,7 @@ export class HeadTiltComponent extends Component {
     // TODO: Visualización debug del head bob
   }
 
-  public dispose(): void {
+  public override dispose(): void {
     // Limpieza si es necesario
   }
 }

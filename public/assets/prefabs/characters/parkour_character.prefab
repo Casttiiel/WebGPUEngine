@@ -3,10 +3,16 @@
   "components": {
     "name": "Player",
     "transform": {
-      "position": [0, 0.9, 0],
-      "scale": [0.6,
-          1.8,
-          0.6]
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "scale": [
+        0.6,
+        1.8,
+        0.6
+      ]
     },
     "capsule_collider": {
       "height": 1.8,
@@ -15,80 +21,82 @@
       "lockRotationX": true,
       "lockRotationZ": true,
       "ignoreTransformScale": true,
-      "friction": 0.0,
-      "mass": 70.0,
+      "friction": 0,
+      "mass": 70,
       "collisionGroups": "PLAYER",
       "collisionMask": "PLAYER_INTERACTIONS"
     },
-    "character_controller": {
-      "moveSpeed": 11.0,
-      "maxSpeed": 18.0,
+    "parkour_controller": {
+      "moveSpeed": 11,
+      "maxSpeed": 18,
       "airControl": 0.7,
-      "groundAcceleration": 65.0,
-      "groundDeceleration": 65.0,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
       "airDrag": 0.3,
       "jumpHeight": 1.2,
       "jumpTimeToPeak": 0.35,
       "jumpTimeToDescent": 0.3,
       "jumpCutFactor": 0.7,
-      "jumpCutVerticalVelocityLimit": 1.0,
+      "jumpCutVerticalVelocityLimit": 1,
       "coyoteTime": 0.4,
-      "slideMinStartSpeedThreshold": 5.0,
-      "minSlideVelocityThreshold": 2.0,
-      "slideDownhillAccel": 4.0,
-      "slideFriction": 4.0,
-      "slideUphillBrake": 5.0,
+      "slideMinStartSpeedThreshold": 5,
+      "minSlideVelocityThreshold": 2,
+      "slideDownhillAccel": 4,
+      "slideFriction": 4,
+      "slideUphillBrake": 5,
       "slideMinDuration": 0.75,
-      "wallRunGravity": -2.0,
+      "wallRunGravity": -2,
       "startWallRunGravity": 2.5,
-      "wallRunAcceleration": 65.0,
+      "wallRunAcceleration": 65,
       "detectWallDistance": 0.5,
-      "wallJumpForce": 7.0,
+      "wallJumpForce": 7,
       "disableInputAfterWallJumpTime": 0.3,
       "disableMantleAfterWallJumpTime": 0.3,
       "mantleDetectionDistance": 1.5,
       "mantleMaxHeight": -0.025,
-      "mantlingMinVerticalVelocity": -9.0,
-      "minMantleVelocity": 8.0,
-      "divingGravityMultiplier": 4.0,
-      "minSwingSpeed": 11.0,
+      "mantlingMinVerticalVelocity": -9,
+      "minMantleVelocity": 8,
+      "divingGravityMultiplier": 4,
+      "minSwingSpeed": 11,
       "impulsePadInputDisableTime": 0.3
     },
     "fps_camera_controller": {
-      "eyeOffset": [0, 0.8, 0],
+      "eyeOffset": [
+        0,
+        0.8,
+        0
+      ],
       "mouseSensitivity": 0.1,
       "invertY": true
     },
     "camera_crouch": {
       "slideCrouchHeight": -0.3,
-      "crouchSpeed": 8.0,
+      "crouchSpeed": 8,
       "enabled": true
     },
     "head_tilt": {
-      "maxTiltAmplitude" : 0.03,
+      "maxTiltAmplitude": 0.03,
       "tiltSpeed": 0.3,
       "mantlingTiltAmplitude": 0.15,
-      "mantlingTiltSpeed": 1.0,
+      "mantlingTiltSpeed": 1,
       "enabled": true
     },
-    "head_bob": {
-
-    },
+    "head_bob": {},
     "landing_camera": {
-      "maxDipAmplitude": 0.20,
-      "maxImpactSpeed": 12.0,
-      "minImpactSpeed": 2.0,
+      "maxDipAmplitude": 0.2,
+      "maxImpactSpeed": 12,
+      "minImpactSpeed": 2,
       "dipStiffness": 200,
       "dipDamping": 18,
-      "maxPitchPunch": 3.0,
+      "maxPitchPunch": 3,
       "pitchStiffness": 120,
       "pitchDamping": 18,
       "enabled": true
     },
     "camera_fov_modifier": {
-      "maxFOVIncrease": 6.0,
-      "speedThreshold": 3.0,
-      "lerpSpeed": 5.0,
+      "maxFOVIncrease": 6,
+      "speedThreshold": 3,
+      "lerpSpeed": 5,
       "enabled": true
     },
     "weapon": {

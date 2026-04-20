@@ -1,5 +1,5 @@
 import { vec3 } from 'gl-matrix';
-import { Component } from '../../core/ecs/Component';
+import { BasePlayerController } from './BasePlayerController';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { CameraComponent } from '../render/CameraComponent';
 import { Engine } from '../../core/engine/Engine';
@@ -40,7 +40,7 @@ import { PlayerModifiersComponent } from './PlayerModifiersComponent';
  * - CapsuleColliderComponent en la misma entidad
  * - CameraComponent como hijo de la entidad
  */
-export class CharacterControllerComponent extends Component {
+export class CharacterControllerComponent extends BasePlayerController {
   // ============================================
   // REFERENCIAS FÍSICAS
   // ============================================
@@ -174,7 +174,7 @@ export class CharacterControllerComponent extends Component {
   // ============================================
 
   // Velocidades
-  public getVerticalVelocity(): number {
+  public override getVerticalVelocity(): number {
     return this.currentVerticalVelocity;
   }
   public setVerticalVelocity(v: number): void {
@@ -188,7 +188,7 @@ export class CharacterControllerComponent extends Component {
     vec3.copy(this.currentHorizontalVelocity, v);
   }
 
-  public getCurrentSpeed(): number {
+  public override getCurrentSpeed(): number {
     return vec3.length(this.currentHorizontalVelocity);
   }
 
@@ -200,7 +200,7 @@ export class CharacterControllerComponent extends Component {
   }
 
   // Estados (flags)
-  public getIsGrounded(): boolean {
+  public override getIsGrounded(): boolean {
     return this.isGrounded;
   }
 
@@ -509,7 +509,7 @@ export class CharacterControllerComponent extends Component {
     return this.wallRunSystem.getWallNormal();
   }
 
-  public getMaxSpeed(): number {
+  public override getMaxSpeed(): number {
     return this.movementSystem.getMaxSpeed();
   }
 
@@ -533,7 +533,7 @@ export class CharacterControllerComponent extends Component {
     // TODO: Render debug info
   }
 
-  public dispose(): void {
+  public override dispose(): void {
     // Cleanup if needed
   }
 

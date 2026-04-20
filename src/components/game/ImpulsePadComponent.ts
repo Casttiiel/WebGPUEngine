@@ -48,17 +48,17 @@ export class ImpulsePadComponent extends Component {
   private onEntityEnter(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
 
-    if (entity && entity.hasComponent('character_controller')) {
+    if (entity && entity.hasComponent('parkour_controller')) {
       this.entitiesInside.add(entityId);
       (
-        entity.getComponent('character_controller') as CharacterControllerComponent
+        entity.getComponent('parkour_controller') as CharacterControllerComponent
       )?.applyImpulseFromPad(vec3.scale(vec3.create(), this.getUp(), this.force));
     }
   }
 
   private onEntityExit(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('character_controller')) {
+    if (entity && entity.hasComponent('parkour_controller')) {
       this.entitiesInside.delete(entityId);
     }
   }

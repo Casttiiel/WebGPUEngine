@@ -1,6 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { CameraComponent } from '../render/CameraComponent';
-import { CharacterControllerComponent } from './CharacterControllerComponent';
+import { BasePlayerController } from './BasePlayerController';
 
 export interface CameraFOVModifierComponentData {
   baseFOV?: number; // FOV base en reposo (grados)
@@ -30,7 +30,7 @@ export class CameraFOVModifierComponent extends Component {
   private speedThreshold: number = 1.0; // Velocidad mínima para activar (m/s)
   private maxSpeed!: number; // Velocidad para FOV máximo (m/s)
   private lerpSpeed: number = 5.0; // Velocidad de interpolación
-  private enabled: boolean = true;
+  public override enabled: boolean = true;
 
   // Estado
   private currentFOV!: number; // FOV actual interpolado
@@ -92,7 +92,7 @@ export class CameraFOVModifierComponent extends Component {
     if (!this.cameraComponent) return;
 
     // Obtener velocidad del character controller
-    const characterController = this.getOwner().getComponent('character_controller');
+    const characterController = this.getOwner().getComponent('player_controller') as BasePlayerController | null;
     if (!characterController) return;
 
     // Lazy loading: obtener baseFOV de la cámara solo la primera vez que se necesita
@@ -106,11 +106,11 @@ export class CameraFOVModifierComponent extends Component {
 
     // Lazy loading: obtener maxSpeed solo la primera vez que se necesita
     if (this.maxSpeed === undefined) {
-      this.maxSpeed = (characterController as CharacterControllerComponent).getMaxSpeed();
+      this.maxSpeed = characterController.getMaxSpeed();
     }
 
     const currentSpeed =
-      (characterController as CharacterControllerComponent).getCurrentSpeed() || 0.0;
+      (characterController as BasePlayerController).getCurrentSpeed() || 0.0;
 
     // Calcular FOV objetivo basado en velocidad
     if (currentSpeed < this.speedThreshold) {
@@ -144,7 +144,7 @@ export class CameraFOVModifierComponent extends Component {
     // TODO: Visualización debug
   }
 
-  public dispose(): void {
+  public override dispose(): void {
     // Restaurar FOV base (convertir grados a radianes)
     if (this.cameraComponent && this.baseFOV !== undefined) {
       const camera = this.cameraComponent.getCamera();

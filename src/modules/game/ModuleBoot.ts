@@ -7,7 +7,7 @@ import { Logger } from '../../core/debug/Logger';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
-import { CharacterControllerComponent } from '../../components/game/CharacterControllerComponent';
+import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
 import { LinearInterpolator } from '../../core/math/Interpolators';
@@ -17,7 +17,7 @@ import { GUIManager } from '../../core/debug/GUIManager';
 export class ModuleBoot extends Module {
   private playerCameraControllerComponent!: FPSCameraControllerComponent;
   private debugCameraComponent!: CameraComponent;
-  private playerCharacterControllerComponent!: CharacterControllerComponent;
+  private playerCharacterControllerComponent!: BasePlayerController;
   private lastGamestate: string = '';
 
   constructor(name: string) {
@@ -111,10 +111,10 @@ export class ModuleBoot extends Module {
     }
     if (!this.playerCharacterControllerComponent) {
       const player = Engine.getEntities().getEntityByName('Player')!;
-      if (player.hasComponent('character_controller')) {
+      if (player.hasComponent('player_controller')) {
         this.playerCharacterControllerComponent = player.getComponent(
-          'character_controller',
-        ) as CharacterControllerComponent;
+          'player_controller',
+        ) as BasePlayerController;
       }
     }
     if (!this.debugCameraComponent) {

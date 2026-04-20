@@ -21,6 +21,16 @@ export enum GameAction {
   LOOK_LEFT = 'look_left',
   LOOK_RIGHT = 'look_right',
 
+  // Combat
+  LIGHT_ATTACK = 'light_attack',
+  HEAVY_ATTACK = 'heavy_attack',
+  SHIELD = 'shield',
+
+  // Abilities
+  ABILITY_Q = 'ability_q',
+  ABILITY_E = 'ability_e',
+  ABILITY_R = 'ability_r',
+
   // UI
   PAUSE = 'pause',
 }

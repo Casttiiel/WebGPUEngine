@@ -18,7 +18,7 @@ export interface PerceptionComponentDataType {
   checkInterval?: number;
   /**
    * Component key used to identify the player entity.
-   * Default: 'character_controller'
+   * Default: 'player_controller'
    */
   playerComponentKey?: string;
 }

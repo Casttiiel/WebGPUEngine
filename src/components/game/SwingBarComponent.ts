@@ -160,14 +160,12 @@ export class SwingBarComponent extends Component {
 
     const entity = Engine.getPhysics().getEntityById(entityId);
 
-    if (entity && entity.hasComponent('character_controller')) {
+    if (entity && entity.hasComponent('player_controller')) {
       this.entitiesInside.add(entityId);
       const swingData = this.computeSwingEntry(entity);
       if (!swingData) return;
       // Iniciar el swing y activar el cooldown
-      (entity.getComponent('character_controller') as CharacterControllerComponent)?.startSwing(
-        swingData,
-      );
+      (entity.getComponent('player_controller') as BasePlayerController)?.startSwing(swingData);
 
       // Desactivar la barra por 2 segundos
       this.startCooldown();
@@ -176,7 +174,7 @@ export class SwingBarComponent extends Component {
 
   private onEntityExit(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('character_controller')) {
+    if (entity && entity.hasComponent('parkour_controller')) {
       this.entitiesInside.delete(entityId);
     }
   }

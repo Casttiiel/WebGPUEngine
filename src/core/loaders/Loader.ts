@@ -55,6 +55,8 @@ import { ContactShadowsComponent } from '../../components/render/ContactShadowsC
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
+import { ArcaneKnightControllerComponent } from '../../components/game/ArcaneKnightControllerComponent';
+import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
 import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
@@ -248,8 +250,16 @@ export class Loader {
       const promise = (async () => {
         const comp = this.createComponentFromJSON(type);
         entity.addComponent(type, comp);
+        // Alias genérico: cualquier BasePlayerController también es localizable
+        // con 'player_controller' sin saber qué controlador concreto hay en escena.
+        // El update loop usa 'player_controller' (ya está en components.json),
+        // así un solo entry cubre todos los controllers futuros.
+        const updateKey = comp instanceof BasePlayerController ? 'player_controller' : type;
+        if (comp instanceof BasePlayerController) {
+          entity.addComponent('player_controller', comp);
+        }
         await comp.load(compData);
-        Engine.getEntities().addComponentToManager(comp, type);
+        Engine.getEntities().addComponentToManager(comp, updateKey);
         return { type, comp };
       })();
 
@@ -314,7 +324,10 @@ export class Loader {
       case 'sphere_collider':
         return new SphereColliderComponent();
       case 'character_controller':
+      case 'parkour_controller':
         return new CharacterControllerComponent();
+      case 'arcane_knight_controller':
+        return new ArcaneKnightControllerComponent();
       case 'camera_arm':
         return new CameraArmComponent();
       case 'fps_camera_controller':
