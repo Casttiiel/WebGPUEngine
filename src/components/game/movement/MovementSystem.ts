@@ -1,5 +1,5 @@
 import { vec3 } from 'gl-matrix';
-import type { CharacterControllerComponent } from '../CharacterControllerComponent';
+import type { IMovementController } from './IMovementController';
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
 
@@ -17,7 +17,7 @@ export class MovementSystem {
   private airDrag: number = 0.1;
 
   constructor(
-    private controller: CharacterControllerComponent,
+    private controller: IMovementController,
     private _modifiers: PlayerModifiersComponent | null,
     data: CharacterControllerComponentDataType,
   ) {

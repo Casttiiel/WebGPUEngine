@@ -1,5 +1,5 @@
 import { Component } from '../../core/ecs/Component';
-import { CharacterControllerComponent } from './CharacterControllerComponent';
+import { ParkourControllerComponent } from './ParkourControllerComponent';
 import { FPSCameraControllerComponent } from './FPSCameraControllerComponent';
 
 export interface CameraCrouchComponentData {

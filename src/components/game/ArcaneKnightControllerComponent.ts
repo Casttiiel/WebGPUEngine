@@ -6,34 +6,21 @@ import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { CameraComponent } from '../render/CameraComponent';
 import { TransformComponent } from '../core/TransformComponent';
 import { GameAction } from '../../types/GameAction.enum';
-import { AbilitySlot } from '../../types/AbilitySlot.enum';
 import type { ArcaneKnightControllerComponentDataType } from '../../types/ArcaneKnightControllerComponentData.type';
 
 import { CombatSystem } from './combat/CombatSystem';
-import { AbilitySystem } from './abilities/AbilitySystem';
+import { MantleSystem } from './movement/MantleSystem';
+import { MovementSystem } from './movement/MovementSystem';
+import { JumpSystem } from './movement/JumpSystem';
+import { IMantleController } from './movement/IMantleController';
+import { IMovementController } from './movement/IMovementController';
+import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
+import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 
-/**
- * ArcaneKnightControllerComponent — Controlador de jugador para gameplay de combate y magia.
- *
- * A diferencia de CharacterControllerComponent (enfocado en parkour), este
- * controlador gestiona:
- *  - Movimiento básico en primera persona (WASD + salto + gravedad)
- *  - CombatSystem: ataque ligero/pesado, bloqueo/parry, dash de combate
- *  - AbilitySystem: habilidades mágicas desbloqueables y equipables en slots Q/E/R
- *
- * Arquitectura:
- *  - Estado centralizado aquí (velocidades, grounded, cámara).
- *  - Lógica de combate delegada a CombatSystem.
- *  - Lógica de habilidades delegada a AbilitySystem.
- *  - Sistemas leen/escriben el estado a través de la API pública (getters/setters).
- *
- * Requiere en la misma entidad:
- *  - CapsuleColliderComponent
- *
- * Requiere como hijo de la entidad:
- *  - CameraComponent
- */
-export class ArcaneKnightControllerComponent extends BasePlayerController {
+export class ArcaneKnightControllerComponent
+  extends BasePlayerController
+  implements IMantleController, IMovementController
+{
   // ============================================
   // REFERENCIAS FÍSICAS
   // ============================================
@@ -47,38 +34,24 @@ export class ArcaneKnightControllerComponent extends BasePlayerController {
   // ============================================
   private isActive: boolean = true;
   private isGrounded: boolean = false;
+  private isJumping: boolean = false;
   private currentVerticalVelocity: number = 0.0;
+  private boostedSpeed: number = 0.0;
   private currentHorizontalVelocity: vec3 = vec3.create();
+  private movementState: CharacterMovementState = CharacterMovementState.IDLE;
 
   // ──── Parámetros de movimiento ────
-  private moveSpeed: number = 6.0;
-  private maxSpeed: number = 10.0;
-  private groundAcceleration: number = 30.0;
-  private groundDeceleration: number = 18.0;
-  private airControl: number = 0.5;
-  private airDrag: number = 0.1;
+  private inputDisableTimer: number = -10.0;
+  private groundNormal: vec3 = vec3.fromValues(0, 1, 0);
 
-  // ──── Parámetros de salto (física parabólica) ────
-  private jumpVelocity: number = 0.0;
-  private jumpGravity: number = 0.0;
-  private fallGravity: number = 0.0;
-  private coyoteTime: number = 0.12;
-  private timeSinceGrounded: number = 0.0;
-  private isJumping: boolean = false;
-
-  // ============================================
-  // SISTEMAS MODULARES
-  // ============================================
   private combatSystem!: CombatSystem;
-  private abilitySystem!: AbilitySystem;
+  private mantleSystem!: MantleSystem;
+  private movementSystem!: MovementSystem;
+  private jumpSystem!: JumpSystem;
 
   constructor() {
     super();
   }
-
-  // ============================================
-  // INICIALIZACIÓN
-  // ============================================
 
   public async load(data: ArcaneKnightControllerComponentDataType): Promise<void> {
     // 1. Componente físico requerido
@@ -91,29 +64,21 @@ export class ArcaneKnightControllerComponent extends BasePlayerController {
       return;
     }
 
-    // 2. Parámetros de movimiento
-    this.moveSpeed = data.moveSpeed ?? this.moveSpeed;
-    this.maxSpeed = data.maxSpeed ?? this.maxSpeed;
-    this.groundAcceleration = data.groundAcceleration ?? this.groundAcceleration;
-    this.groundDeceleration = data.groundDeceleration ?? this.groundDeceleration;
-    this.airControl = data.airControl ?? this.airControl;
-    this.airDrag = data.airDrag ?? this.airDrag;
-
-    // 3. Física de salto parabólica (igual que CharacterControllerComponent)
-    const jumpHeight = data.jumpHeight ?? 2.0;
-    const timeToPeak = data.jumpTimeToPeak ?? 0.5;
-    const timeToDescent = data.jumpTimeToDescent ?? 0.45;
-    this.coyoteTime = data.coyoteTime ?? this.coyoteTime;
-
-    this.jumpVelocity = (2.0 * jumpHeight) / timeToPeak;
-    this.jumpGravity = (-2.0 * jumpHeight) / (timeToPeak * timeToPeak);
-    this.fallGravity = (-2.0 * jumpHeight) / (timeToDescent * timeToDescent);
-
-    // 4. Sistemas
+    // 2. Sistemas
     this.combatSystem = new CombatSystem(data);
-    this.abilitySystem = new AbilitySystem();
+    this.mantleSystem = new MantleSystem(this, data);
+    this.movementSystem = new MovementSystem(
+      this,
+      null,
+      data as unknown as CharacterControllerComponentDataType,
+    );
+    this.jumpSystem = new JumpSystem(
+      this,
+      null,
+      data as unknown as CharacterControllerComponentDataType,
+    );
 
-    // 5. Controlador cinemático de Rapier
+    // 3. Controlador cinemático de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 
@@ -127,146 +92,52 @@ export class ArcaneKnightControllerComponent extends BasePlayerController {
     this.findCamera();
     if (!this.capsuleCollider || !this.camera) return;
 
+    /*if (this.isMantling) {
+      const mantleMovement = this.mantleSystem.updateMantleDirection();
+      this.applyMovement(deltaTime, mantleMovement);
+      this.combatSystem.update(deltaTime);
+      return;
+    }*/
+
     this.updateGroundedState();
-    this.updateMovement(deltaTime);
-    this.updateJump(deltaTime);
-    this.applyMovement(deltaTime);
 
-    this.combatSystem.update(deltaTime);
-    this.processAbilityInput();
-    this.abilitySystem.update(deltaTime);
-  }
+    switch (this.movementState) {
+      case CharacterMovementState.MANTLING:
+        const mantleMovement = this.mantleSystem.updateMantleDirection();
+        this.applyMovement(mantleMovement, deltaTime);
+        break;
 
-  // ============================================
-  // MOVIMIENTO
-  // ============================================
-
-  private updateMovement(dt: number): void {
-    const inputDir = this.getInputVector();
-    const targetMovement = this.getTargetMovementWorld(inputDir);
-    const hasInput = vec3.length(targetMovement) > 0.01;
-
-    if (this.isGrounded) {
-      this.updateGroundMovement(dt, targetMovement, hasInput);
-    } else {
-      this.updateAirMovement(dt, targetMovement, hasInput);
+      case CharacterMovementState.IDLE:
+      default:
+        // Movimiento normal
+        const inputDir = this.getInputVector();
+        const targetMovement = this.getTargetMovement(inputDir);
+        this.movementSystem.update(deltaTime, targetMovement);
+        this.jumpSystem.update(deltaTime);
+        const finalVelocity = this.mergeMovements();
+        this.applyMovement(finalVelocity, deltaTime);
+        break;
     }
   }
-
-  private updateGroundMovement(dt: number, target: vec3, hasInput: boolean): void {
-    const currentSpeed = vec3.length(this.currentHorizontalVelocity);
-    const targetSpeed = hasInput ? this.moveSpeed : 0.0;
-    const accel = hasInput ? this.groundAcceleration : this.groundDeceleration;
-    const newSpeed = this.approach(currentSpeed, targetSpeed, accel * dt);
-    vec3.scale(
-      this.currentHorizontalVelocity,
-      hasInput ? target : this.normalizeOrZero(this.currentHorizontalVelocity),
-      newSpeed,
-    );
-  }
-
-  private updateAirMovement(dt: number, target: vec3, hasInput: boolean): void {
-    if (hasInput) {
-      const desired = vec3.scale(vec3.create(), target, this.moveSpeed);
-      const airAccel = this.groundAcceleration * this.airControl;
-      const diff = vec3.sub(vec3.create(), desired, this.currentHorizontalVelocity);
-      const step = vec3.scale(vec3.create(), diff, Math.min(1.0, airAccel * dt));
-      vec3.add(this.currentHorizontalVelocity, this.currentHorizontalVelocity, step);
-    } else {
-      const drag = Math.max(0.0, 1.0 - this.airDrag * dt);
-      vec3.scale(this.currentHorizontalVelocity, this.currentHorizontalVelocity, drag);
-    }
-
-    // Clamp velocidad horizontal en el aire
-    const speed = vec3.length(this.currentHorizontalVelocity);
-    if (speed > this.maxSpeed) {
-      vec3.scale(
-        this.currentHorizontalVelocity,
-        this.currentHorizontalVelocity,
-        this.maxSpeed / speed,
-      );
-    }
-  }
-
-  private updateJump(dt: number): void {
-    // Coyote time
-    if (this.isGrounded) {
-      this.timeSinceGrounded = 0.0;
-      if (this.currentVerticalVelocity < 0) {
-        this.currentVerticalVelocity = 0.0;
-        this.isJumping = false;
-      }
-    } else {
-      this.timeSinceGrounded += dt;
-    }
-
-    // Input de salto
-    const input = Engine.getInput();
-    const canJump = this.isGrounded || this.timeSinceGrounded < this.coyoteTime;
-    if (input.isActionJustPressed(GameAction.JUMP) && canJump && !this.isJumping) {
-      this.currentVerticalVelocity = this.jumpVelocity;
-      this.isJumping = true;
-      this.timeSinceGrounded = this.coyoteTime; // consumir coyote
-    }
-
-    // Jump cut (soltar salto reduce velocidad ascendente)
-    if (
-      this.isJumping &&
-      !input.isActionPressed(GameAction.JUMP) &&
-      this.currentVerticalVelocity > 0
-    ) {
-      this.currentVerticalVelocity *= 0.7;
-    }
-
-    // Gravedad
-    const gravity = this.currentVerticalVelocity > 0 ? this.jumpGravity : this.fallGravity;
-    this.currentVerticalVelocity += gravity * dt;
-  }
-
-  private applyMovement(dt: number): void {
-    const velocity = vec3.fromValues(
-      this.currentHorizontalVelocity[0],
-      this.currentVerticalVelocity,
-      this.currentHorizontalVelocity[2],
-    );
-
-    const movement = vec3.scale(vec3.create(), velocity, dt);
-
-    this.characterController.computeColliderMovement(
-      this.capsuleCollider.getCollider(),
-      new RAPIER.Vector3(movement[0], movement[1], movement[2]),
-      QueryFilterFlags.EXCLUDE_SENSORS,
-    );
-
-    const corrected = this.characterController.computedMovement();
-    this.capsuleCollider
-      .getRigidBody()
-      .setLinvel({ x: corrected.x / dt, y: corrected.y / dt, z: corrected.z / dt }, true);
-  }
-
-  // ============================================
-  // HABILIDADES
-  // ============================================
-
-  private processAbilityInput(): void {
-    const input = Engine.getInput();
-    if (input.isActionJustPressed(GameAction.ABILITY_Q)) {
-      this.abilitySystem.activateSlot(AbilitySlot.Q);
-    }
-    if (input.isActionJustPressed(GameAction.ABILITY_E)) {
-      this.abilitySystem.activateSlot(AbilitySlot.E);
-    }
-    if (input.isActionJustPressed(GameAction.ABILITY_R)) {
-      this.abilitySystem.activateSlot(AbilitySlot.R);
-    }
-  }
-
-  // ============================================
-  // API PÚBLICA
-  // ============================================
 
   public override setActive(active: boolean): void {
     this.isActive = active;
+  }
+
+  public getIsMantling(): boolean {
+    return this.movementState === CharacterMovementState.MANTLING;
+  }
+
+  public setIsMantling(value: boolean): void {
+    this.movementState = value ? CharacterMovementState.MANTLING : CharacterMovementState.IDLE;
+  }
+
+  public setIsJumping(value: boolean): void {
+    this.isJumping = value;
+  }
+
+  public setHorizontalVelocity(v: vec3): void {
+    vec3.copy(this.currentHorizontalVelocity, v);
   }
 
   public override getIsGrounded(): boolean {
@@ -281,7 +152,7 @@ export class ArcaneKnightControllerComponent extends BasePlayerController {
   }
 
   public override getMaxSpeed(): number {
-    return this.maxSpeed;
+    return this.movementSystem.getMaxSpeed();
   }
   public setVerticalVelocity(v: number): void {
     this.currentVerticalVelocity = v;
@@ -291,12 +162,56 @@ export class ArcaneKnightControllerComponent extends BasePlayerController {
     return this.currentHorizontalVelocity;
   }
 
-  public getCombatSystem(): CombatSystem {
-    return this.combatSystem;
+  // ── IMovementController ──────────────────────────────────────────────────
+  public getIsJumping(): boolean {
+    return this.isJumping;
   }
 
-  public getAbilitySystem(): AbilitySystem {
-    return this.abilitySystem;
+  public getBoostedSpeed(): number {
+    return this.boostedSpeed;
+  }
+  public setBoostedSpeed(speed: number): void {
+    this.boostedSpeed = speed;
+  }
+
+  public getIsWallRunning(): boolean {
+    return false;
+  }
+  public setIsWallRunning(_value: boolean): void {}
+
+  public getIsDashing(): boolean {
+    return false;
+  }
+  public setIsDashing(_value: boolean): void {}
+
+  public getIsSwinging(): boolean {
+    return false;
+  }
+  public setIsSwinging(_value: boolean): void {}
+
+  public getIsRolling(): boolean {
+    return false;
+  }
+  public setIsRolling(_value: boolean): void {}
+
+  public isInputDisabled(): boolean {
+    return this.inputDisableTimer > 0.0;
+  }
+  public setInputDisableTimer(time: number): void {
+    this.inputDisableTimer = time;
+  }
+
+  public getGroundNormal(): vec3 {
+    return this.groundNormal;
+  }
+
+  public applyJumpFromSystem(): void {
+    const jumpVel = this.jumpSystem.getJumpVelocity();
+    this.jumpSystem.applyJump(jumpVel);
+  }
+
+  public getCombatSystem(): CombatSystem {
+    return this.combatSystem;
   }
 
   public getCamera(): CameraComponent | null {
@@ -311,10 +226,6 @@ export class ArcaneKnightControllerComponent extends BasePlayerController {
     return this.getOwner().getComponent('transform') as TransformComponent;
   }
 
-  // ============================================
-  // HELPERS INTERNOS
-  // ============================================
-
   private findCamera(): void {
     if (this.cameraFound) return;
     for (const child of this.getOwner().getChildren()) {
@@ -328,61 +239,188 @@ export class ArcaneKnightControllerComponent extends BasePlayerController {
   }
 
   private updateGroundedState(): void {
-    const hit = this.capsuleCollider.raycastGrounded(0.2);
+    const snapDistance = 0.2;
+    const hit = this.capsuleCollider.raycastGrounded(snapDistance);
     this.isGrounded = hit !== null;
+
+    if (this.isGrounded && hit) {
+      const isFloor = hit.normal.y > 0.1;
+
+      if (isFloor) {
+        this.groundNormal = vec3.fromValues(hit.normal.x, hit.normal.y, hit.normal.z);
+        vec3.normalize(this.groundNormal, this.groundNormal);
+      }
+    } else {
+      this.groundNormal = vec3.fromValues(0, 1, 0);
+    }
   }
 
   private getInputVector(): vec3 {
     const input = Engine.getInput();
-    const dir = vec3.create();
-    if (input.isActionPressed(GameAction.MOVE_FORWARD)) dir[2] -= 1;
-    if (input.isActionPressed(GameAction.MOVE_BACKWARD)) dir[2] += 1;
-    if (input.isActionPressed(GameAction.MOVE_LEFT)) dir[0] -= 1;
-    if (input.isActionPressed(GameAction.MOVE_RIGHT)) dir[0] += 1;
-    if (vec3.length(dir) > 0.01) vec3.normalize(dir, dir);
-    return dir;
+    const inputDir = vec3.create();
+
+    if (input.isActionPressed(GameAction.MOVE_FORWARD)) {
+      inputDir[2] -= 1;
+    }
+    if (input.isActionPressed(GameAction.MOVE_BACKWARD)) {
+      inputDir[2] += 1;
+    }
+    if (input.isActionPressed(GameAction.MOVE_LEFT)) {
+      inputDir[0] -= 1;
+    }
+    if (input.isActionPressed(GameAction.MOVE_RIGHT)) {
+      inputDir[0] += 1;
+    }
+
+    if (vec3.length(inputDir) > 0.01) {
+      vec3.normalize(inputDir, inputDir);
+    }
+
+    return inputDir;
   }
 
-  private getTargetMovementWorld(inputDir: vec3): vec3 {
-    if (vec3.length(inputDir) < 0.01) return vec3.create();
+  private getTargetMovement(inputDir: vec3): vec3 {
+    let targetMovement = vec3.create();
 
     const cameraObj = this.camera!.getCamera();
     const forward = cameraObj.getFront();
     const up = vec3.fromValues(0, 1, 0);
-    const right = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), up, forward));
 
-    const forwardXZ = vec3.normalize(vec3.create(), vec3.fromValues(forward[0], 0, forward[2]));
-    const rightXZ = vec3.normalize(vec3.create(), vec3.fromValues(right[0], 0, right[2]));
+    const right = vec3.cross(vec3.create(), up, forward);
+    vec3.normalize(right, right);
 
-    const fwd = vec3.scale(vec3.create(), forwardXZ, -inputDir[2]);
-    const rgt = vec3.scale(vec3.create(), rightXZ, -inputDir[0]);
-    const result = vec3.add(vec3.create(), fwd, rgt);
+    const forwardXZ = vec3.fromValues(forward[0], 0, forward[2]);
+    const rightXZ = vec3.fromValues(right[0], 0, right[2]);
 
-    if (vec3.length(result) > 0.01) vec3.normalize(result, result);
-    return result;
+    vec3.normalize(forwardXZ, forwardXZ);
+    vec3.normalize(rightXZ, rightXZ);
+
+    const forwardMovement = vec3.scale(vec3.create(), forwardXZ, -inputDir[2]);
+    const rightMovement = vec3.scale(vec3.create(), rightXZ, -inputDir[0]);
+
+    vec3.add(targetMovement, forwardMovement, rightMovement);
+
+    if (this.isGrounded) {
+      if (vec3.length(targetMovement) > 0.01) {
+        vec3.normalize(targetMovement, targetMovement);
+      }
+      const horizontal = vec3.fromValues(targetMovement[0], 0, targetMovement[2]);
+      const projected = this.projectOnPlane(horizontal, this.groundNormal);
+      targetMovement = projected;
+    }
+
+    if (vec3.length(targetMovement) > 0.01) {
+      vec3.normalize(targetMovement, targetMovement);
+    }
+
+    return targetMovement;
+  }
+
+  private mergeMovements(): vec3 {
+    if (this.currentHorizontalVelocity[1] < 0 && this.currentVerticalVelocity > 0) {
+      return vec3.fromValues(
+        this.currentHorizontalVelocity[0],
+        this.currentVerticalVelocity,
+        this.currentHorizontalVelocity[2],
+      );
+    }
+    return vec3.fromValues(
+      this.currentHorizontalVelocity[0],
+      this.currentHorizontalVelocity[1] + this.currentVerticalVelocity,
+      this.currentHorizontalVelocity[2],
+    );
+  }
+
+  private applyMovement(velocity: vec3, dt: number): void {
+    const movement = vec3.fromValues(velocity[0] * dt, velocity[1] * dt, velocity[2] * dt);
+
+    this.characterController.computeColliderMovement(
+      this.capsuleCollider.getCollider(),
+      new RAPIER.Vector3(movement[0], movement[1], movement[2]),
+      QueryFilterFlags.EXCLUDE_SENSORS,
+    );
+
+    let correctedMovement = this.characterController.computedMovement();
+
+    const newVel = {
+      x: correctedMovement.x / dt,
+      y: correctedMovement.y / dt,
+      z: correctedMovement.z / dt,
+    };
+    this.capsuleCollider.getRigidBody().setLinvel(newVel, true);
+
+    for (var i = 0; i < this.characterController.numComputedCollisions(); i++) {
+      const collision = this.characterController.computedCollision(i);
+      if (!collision || !collision.collider) continue;
+
+      const rigidBody = collision.collider.parent();
+      if (!rigidBody) continue;
+
+      const type = rigidBody.bodyType();
+
+      const isFloor = Math.abs(collision.normal1.y) > 0.1 && collision.normal1.y > 0.0;
+      if (isFloor) {
+        continue;
+      }
+
+      const collisionNormal = vec3.fromValues(
+        collision.normal1.x,
+        collision.normal1.y,
+        collision.normal1.z,
+      );
+
+      if (type === RAPIER.RigidBodyType.Fixed) {
+        const isCeiling = collisionNormal[1] < -0.7;
+        const isWall = Math.abs(collisionNormal[1]) < 0.5;
+
+        // Cancelar estados especiales al chocar con geometría
+        if (
+          this.movementState === CharacterMovementState.DASHING ||
+          this.movementState === CharacterMovementState.ROLLING
+        ) {
+          this.movementState = CharacterMovementState.IDLE;
+        }
+
+        if (
+          this.movementState !== CharacterMovementState.WALL_RUNNING &&
+          this.movementState !== CharacterMovementState.MANTLING &&
+          isWall
+        ) {
+          this.removeVelocityIntoWall(collisionNormal);
+          this.boostedSpeed = 0.0;
+        }
+        if (isCeiling && this.currentVerticalVelocity > 0) {
+          this.currentVerticalVelocity = 0;
+          this.isJumping = false;
+        }
+      }
+    }
+  }
+
+  private removeVelocityIntoWall(collisionNormal: vec3): void {
+    const dot =
+      this.currentHorizontalVelocity[0] * collisionNormal[0] +
+      this.currentHorizontalVelocity[1] * collisionNormal[1] +
+      this.currentHorizontalVelocity[2] * collisionNormal[2];
+
+    if (dot < 0) {
+      this.currentHorizontalVelocity[0] -= dot * collisionNormal[0];
+      this.currentHorizontalVelocity[1] -= dot * collisionNormal[1];
+      this.currentHorizontalVelocity[2] -= dot * collisionNormal[2];
+    }
   }
 
   /** Interpolación lineal hacia target con paso máximo de step. */
-  private approach(current: number, target: number, step: number): number {
-    if (current < target) return Math.min(current + step, target);
-    return Math.max(current - step, target);
+  private projectOnPlane(v: vec3, normal: vec3): vec3 {
+    const dot = vec3.dot(v, normal);
+    const projected = vec3.create();
+    vec3.scaleAndAdd(projected, v, normal, -dot);
+    return projected;
   }
-
-  private normalizeOrZero(v: vec3): vec3 {
-    const len = vec3.length(v);
-    if (len < 0.001) return vec3.create();
-    return vec3.scale(vec3.create(), v, 1.0 / len);
-  }
-
-  // ============================================
-  // CICLO DE VIDA
-  // ============================================
 
   public renderDebug(): void {
     // TODO: visualizar estado de combate y abilities en el HUD de debug
   }
 
-  public override dispose(): void {
-    this.abilitySystem.dispose();
-  }
+  public override dispose(): void {}
 }

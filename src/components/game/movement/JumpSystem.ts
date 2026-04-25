@@ -1,4 +1,4 @@
-import type { CharacterControllerComponent } from '../CharacterControllerComponent';
+import type { IMovementController } from './IMovementController';
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
@@ -24,7 +24,7 @@ export class JumpSystem {
   private wallRunGravity: number = -2.0;
 
   constructor(
-    private controller: CharacterControllerComponent,
+    private controller: IMovementController,
     private _modifiers: PlayerModifiersComponent | null,
     data: CharacterControllerComponentDataType,
   ) {

@@ -16,11 +16,13 @@ import { RollSystem } from './movement/RollSystem';
 import { WallRunSystem } from './movement/WallRunSystem';
 import { DashSystem } from './movement/DashSystem';
 import { MantleSystem } from './movement/MantleSystem';
+import { IMantleController } from './movement/IMantleController';
+import { IMovementController } from './movement/IMovementController';
 import { SwingSystem } from './movement/SwingSystem';
 import { PlayerModifiersComponent } from './PlayerModifiersComponent';
 
 /**
- * CharacterControllerComponent - FPS Character Controller (Refactorizado)
+ * ParkourControllerComponent - FPS Character Controller (Refactorizado)
  *
  * ARQUITECTURA MODULAR:
  * - Estado centralizado en este componente
@@ -40,7 +42,10 @@ import { PlayerModifiersComponent } from './PlayerModifiersComponent';
  * - CapsuleColliderComponent en la misma entidad
  * - CameraComponent como hijo de la entidad
  */
-export class CharacterControllerComponent extends BasePlayerController {
+export class ParkourControllerComponent
+  extends BasePlayerController
+  implements IMantleController, IMovementController
+{
   // ============================================
   // REFERENCIAS FÍSICAS
   // ============================================
@@ -480,7 +485,7 @@ export class CharacterControllerComponent extends BasePlayerController {
       }
 
       if (!this.camera) {
-        console.warn('CharacterControllerComponent: No camera found in children.');
+        console.warn('ParkourControllerComponent: No camera found in children.');
       }
     }
   }
@@ -526,7 +531,7 @@ export class CharacterControllerComponent extends BasePlayerController {
   // ============================================
 
   public override renderInMenu(): void {
-    alert("CharacterControllerComponent doesn't support in-menu editing yet.");
+    alert("ParkourControllerComponent doesn't support in-menu editing yet.");
   }
 
   public renderDebug(): void {
@@ -549,7 +554,7 @@ export class CharacterControllerComponent extends BasePlayerController {
 
     if (!this.capsuleCollider) {
       console.error(
-        'CharacterControllerComponent requires CapsuleColliderComponent on the same entity!',
+        'ParkourControllerComponent requires CapsuleColliderComponent on the same entity!',
       );
       return;
     }
@@ -566,7 +571,7 @@ export class CharacterControllerComponent extends BasePlayerController {
     this.rollSystem = new RollSystem(this, this.modifiers);
     this.wallRunSystem = new WallRunSystem(this, this.modifiers, data);
     this.dashSystem = new DashSystem(this, this.modifiers);
-    this.mantleSystem = new MantleSystem(this, this.modifiers, data);
+    this.mantleSystem = new MantleSystem(this, data);
     this.swingSystem = new SwingSystem(this, this.modifiers, data);
 
     // 4. Crear character controller de Rapier

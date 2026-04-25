@@ -24,7 +24,7 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { RenderComponent } from '../../components/render/RenderComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
 import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
-import { CharacterControllerComponent } from '../../components/game/CharacterControllerComponent';
+import { ParkourControllerComponent } from '../../components/game/ParkourControllerComponent';
 import { CameraArmComponent } from '../../components/game/CameraArmComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { HeadBobComponent } from '../../components/game/HeadBobComponent';
@@ -325,7 +325,7 @@ export class Loader {
         return new SphereColliderComponent();
       case 'character_controller':
       case 'parkour_controller':
-        return new CharacterControllerComponent();
+        return new ParkourControllerComponent();
       case 'arcane_knight_controller':
         return new ArcaneKnightControllerComponent();
       case 'camera_arm':

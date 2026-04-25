@@ -19,4 +19,10 @@ export type ArcaneKnightControllerComponentDataType = {
   lightAttackDuration?: number;
   heavyAttackDuration?: number;
   parryWindow?: number;
+
+  // Mantling
+  mantleDetectionDistance?: number;
+  mantleMaxHeight?: number;
+  minMantleVelocity?: number;
+  mantlingMinVerticalVelocity?: number;
 };

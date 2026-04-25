@@ -1,5 +1,5 @@
 import { vec3 } from 'gl-matrix';
-import type { CharacterControllerComponent } from '../CharacterControllerComponent';
+import type { IMovementController } from './IMovementController';
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { SwingEntryData } from '../../../types/SwingEntryData.type';
 import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
@@ -23,7 +23,7 @@ export class SwingSystem {
   private swingDirection: number = 1;
 
   constructor(
-    private controller: CharacterControllerComponent,
+    private controller: IMovementController,
     private _modifiers: PlayerModifiersComponent | null,
     data: CharacterControllerComponentDataType,
   ) {

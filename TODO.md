@@ -5,32 +5,25 @@
 
 ## Combat Gameplay
 
-1. Dash
-2. Daggers
-3. Light Attack
-4. Heavy Attack
-5. Shield
-6. Parry
+1. Daggers
+2. Light Attack
+3. Dash
+4. Shield
+5. Parry
 
 ## Movement Gameplay
 
-1. Jump
+1. Mantling
 2. Vertical Wall Jump
-3. Mantling
-4. Hook
-5. Sliding
-6. Horizontal Wall Jump
-
-## Magic Gameplay
-
-1. Levitation
-2. Push
-3. Spawn Chain
+3. Hook
+4. Sliding
+5. Horizontal Wall Jump
 
 ## Environment Gameplay
 
-1. Traps [...]
-2. Moving Platforms
+1. Swing Bar
+2. Traps [...]
+3. Moving Platforms
 
 ## Visuals and Sound
 

@@ -2,7 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { BasePlayerController } from './BasePlayerController';
-import { CharacterControllerComponent } from './CharacterControllerComponent';
+import { CharacterControllerComponent } from './ParkourControllerComponent';
 
 export interface HeadBobComponentData {
   frequency?: number; // Frecuencia del bobbing (Hz)

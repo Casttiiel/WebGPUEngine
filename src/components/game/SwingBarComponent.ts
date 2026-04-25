@@ -3,7 +3,6 @@ import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
 import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
-import { CharacterControllerComponent } from './CharacterControllerComponent';
 import { Entity } from '../../core/ecs/Entity';
 import { SwingEntryData } from '../../types/SwingEntryData.type';
 import { CameraComponent } from '../render/CameraComponent';

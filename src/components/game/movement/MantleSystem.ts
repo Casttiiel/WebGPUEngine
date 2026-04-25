@@ -1,10 +1,8 @@
 import { vec3 } from 'gl-matrix';
-import type { CharacterControllerComponent } from '../CharacterControllerComponent';
-import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
+import { IMantleController, MantleSystemData } from './IMantleController';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
-import { CharacterControllerComponentDataType } from '../../../types/CharacterControllerComponentData.type';
 
 /**
  * MantleSystem - Gestiona el trepar (mantling)
@@ -23,9 +21,8 @@ export class MantleSystem {
   private originalRadius: number = 0.0;
 
   constructor(
-    private controller: CharacterControllerComponent,
-    private _modifiers: PlayerModifiersComponent | null,
-    data: CharacterControllerComponentDataType,
+    private controller: IMantleController,
+    data: MantleSystemData,
   ) {
     const collider = this.controller.getCollider();
     this.originalHeight = collider.getCapsuleHeight();
@@ -43,7 +40,7 @@ export class MantleSystem {
 
     if (
       this.controller.getVerticalVelocity() < this.mantlingMinVerticalVelocity ||
-      this.controller.getIsWallRunning() ||
+      (this.controller.getIsWallRunning?.() ?? false) ||
       this.controller.getIsGrounded() ||
       this.controller.getIsMantling()
     ) {

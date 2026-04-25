@@ -1,7 +1,7 @@
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { BasePlayerController } from './BasePlayerController';
-import { CharacterControllerComponent } from './CharacterControllerComponent';
+import { CharacterControllerComponent } from './ParkourControllerComponent';
 import { GameAction } from '../../types/GameAction.enum';
 import { vec3 } from 'gl-matrix';
 import { CameraComponent } from '../render/CameraComponent';

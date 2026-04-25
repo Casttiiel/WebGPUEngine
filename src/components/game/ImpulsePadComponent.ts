@@ -3,7 +3,7 @@ import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
 import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
-import { CharacterControllerComponent } from './CharacterControllerComponent';
+import { CharacterControllerComponent } from './ParkourControllerComponent';
 
 export class ImpulsePadComponent extends Component {
   // Tracking de entidades dentro del trigger
