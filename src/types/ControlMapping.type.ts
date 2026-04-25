@@ -44,6 +44,7 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
   roll: { type: InputType.KEYBOARD, key: KeyCode.SHIFT },
   dive: { type: InputType.KEYBOARD, key: KeyCode.CTRL },
   dash: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
+  throw: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },
 
   // Combat
   fire: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },

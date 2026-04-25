@@ -9,6 +9,8 @@ import { GameAction } from '../../types/GameAction.enum';
 import type { ArcaneKnightControllerComponentDataType } from '../../types/ArcaneKnightControllerComponentData.type';
 
 import { CombatSystem } from './combat/CombatSystem';
+import { ThrowSystem } from './combat/ThrowSystem';
+import { DaggerHUDSystem } from './combat/DaggerHUDSystem';
 import { MantleSystem } from './movement/MantleSystem';
 import { MovementSystem } from './movement/MovementSystem';
 import { JumpSystem } from './movement/JumpSystem';
@@ -48,6 +50,8 @@ export class ArcaneKnightControllerComponent
   private groundNormal: vec3 = vec3.fromValues(0, 1, 0);
 
   private combatSystem!: CombatSystem;
+  private throwSystem!: ThrowSystem;
+  private daggerHUD!: DaggerHUDSystem;
   private mantleSystem!: MantleSystem;
   private movementSystem!: MovementSystem;
   private jumpSystem!: JumpSystem;
@@ -71,6 +75,7 @@ export class ArcaneKnightControllerComponent
 
     // 2. Sistemas
     this.combatSystem = new CombatSystem(data);
+    this.throwSystem = new ThrowSystem(data);
     this.mantleSystem = new MantleSystem(this, data);
     this.movementSystem = new MovementSystem(
       this,
@@ -88,6 +93,7 @@ export class ArcaneKnightControllerComponent
       data as unknown as CharacterControllerComponentDataType,
     );
     this.dodgeSystem = new DodgeSystem(this, data);
+    this.daggerHUD = new DaggerHUDSystem();
 
     // 3. Controlador cinemático de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
@@ -102,6 +108,8 @@ export class ArcaneKnightControllerComponent
     this.updateGroundedState();
     this.mantleSystem.update();
     this.dodgeSystem.update(deltaTime);
+    this.throwSystem.update(deltaTime, this.camera);
+    this.daggerHUD.update(this.throwSystem);
 
     switch (this.movementState) {
       case CharacterMovementState.MANTLING:
@@ -239,6 +247,10 @@ export class ArcaneKnightControllerComponent
 
   public getCombatSystem(): CombatSystem {
     return this.combatSystem;
+  }
+
+  public getThrowSystem(): ThrowSystem {
+    return this.throwSystem;
   }
 
   public startSwing(data: SwingEntryData): void {

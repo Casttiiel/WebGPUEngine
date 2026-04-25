@@ -5,10 +5,9 @@
 
 ## Combat Gameplay
 
-1. Daggers
-2. Light Attack
-3. Shield
-4. Parry
+1. Light Attack
+2. Shield
+3. Parry
 
 ## Movement Gameplay
 

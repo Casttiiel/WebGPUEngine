@@ -14,6 +14,7 @@ export enum GameAction {
   ROLL = 'roll',
   DIVE = 'dive',
   DASH = 'dash',
+  THROW = 'throw',
 
   // Camera
   LOOK_UP = 'look_up',

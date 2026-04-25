@@ -16,6 +16,16 @@
     }
   },
   {
+    "components": {
+      "name": "DaggerManager",
+      "transform": { "position": [0, 0, 0] },
+      "bullet_pool": {
+        "prefab": "gameplay/dagger.prefab",
+        "size": 6
+      }
+    }
+  },
+  {
     "prefab": "cameras/debug_camera.prefab"
   },
   {

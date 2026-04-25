@@ -58,7 +58,8 @@
       "minMantleVelocity": 8,
       "divingGravityMultiplier": 4,
       "minSwingSpeed": 11,
-      "impulsePadInputDisableTime": 0.3
+      "impulsePadInputDisableTime": 0.3,
+      "daggerPoolName": "DaggerManager"
     },
     "fps_camera_controller": {
       "eyeOffset": [

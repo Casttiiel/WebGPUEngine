@@ -30,4 +30,9 @@ export type ArcaneKnightControllerComponentDataType = {
   dodgeSpeed?: number;
   dodgeDuration?: number;
   dodgeCooldown?: number;
+
+  // Throwing daggers
+  daggerMaxCharges?: number;
+  daggerRegenTime?: number;
+  daggerPoolName?: string;
 };
