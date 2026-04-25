@@ -1,27 +1,43 @@
 {
-    "children": [],
-    "components": {
-      "name": "Impulse Pad",
-      "transform": {
-        "position": [0, 0, 0],
-        "rotation": [0, 0, 0],
-        "scale": [2, 1, 2]
-      },
-      "impulse_pad":{
-        "force": 10
-      },
-      "box_collider": {
-        "isSensor": true,
-        "bodyType": "static",
-        "size": [1, 1, 1]
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "unit_cube.obj",
-            "material": "textured.mat"
-          }
-        ]
-      }
+  "children": [],
+  "components": {
+    "name": "Impulse Pad",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        2,
+        1,
+        2
+      ]
+    },
+    "impulse_pad": {
+      "force": 10
+    },
+    "box_collider": {
+      "isSensor": true,
+      "bodyType": "static",
+      "size": [
+        1,
+        1,
+        1
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "textured.mat"
+        }
+      ]
     }
   }
+}

@@ -3,6 +3,7 @@ import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
 import type { CameraComponent } from '../../render/CameraComponent';
 import { BulletPoolComponent } from '../BulletPoolComponent';
+import { DaggerProjectileComponent } from './DaggerProjectileComponent';
 
 /**
  * ThrowSystem — Gestiona el lanzamiento de dagas del ArcaneKnight.
@@ -27,6 +28,13 @@ export class ThrowSystem {
 
   // Lazily resolved on first throw
   private pool: BulletPoolComponent | null = null;
+
+  /** Callback instalado por ArcaneKnightControllerComponent para iniciar el grapple. */
+  private onGrappleHit: ((hitPoint: vec3) => void) | null = null;
+
+  public setGrappleCallback(cb: (hitPoint: vec3) => void): void {
+    this.onGrappleHit = cb;
+  }
 
   constructor(data: {
     daggerMaxCharges?: number;
@@ -100,6 +108,11 @@ export class ThrowSystem {
 
     const dagger = this.pool.acquire();
     if (!dagger) return; // all daggers already in flight
+
+    // Wire grapple callback if it's a DaggerProjectileComponent
+    if (dagger instanceof DaggerProjectileComponent && this.onGrappleHit) {
+      dagger.setGrappleCallback(this.onGrappleHit);
+    }
 
     const cam = camera.getCamera();
     const origin = cam.getPosition();

@@ -16,6 +16,7 @@ import { MovementSystem } from './movement/MovementSystem';
 import { JumpSystem } from './movement/JumpSystem';
 import { SwingSystem } from './movement/SwingSystem';
 import { DodgeSystem } from './movement/DodgeSystem';
+import { GrappleSystem } from './movement/GrappleSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
@@ -57,6 +58,7 @@ export class ArcaneKnightControllerComponent
   private jumpSystem!: JumpSystem;
   private swingSystem!: SwingSystem;
   private dodgeSystem!: DodgeSystem;
+  private grappleSystem!: GrappleSystem;
 
   constructor() {
     super();
@@ -93,7 +95,13 @@ export class ArcaneKnightControllerComponent
       data as unknown as CharacterControllerComponentDataType,
     );
     this.dodgeSystem = new DodgeSystem(this, data);
+    this.grappleSystem = new GrappleSystem(this, data);
     this.daggerHUD = new DaggerHUDSystem();
+
+    // Registrar callback de grapple en ThrowSystem
+    this.throwSystem.setGrappleCallback((hitPoint) => {
+      this.grappleSystem.startGrapple(hitPoint);
+    });
 
     // 3. Controlador cinemático de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
@@ -125,6 +133,15 @@ export class ArcaneKnightControllerComponent
           dodgeVel[2],
         );
         this.applyMovement(dodgeWithGravity, deltaTime);
+        break;
+      }
+
+      case CharacterMovementState.GRAPPLING: {
+        const active = this.grappleSystem.update(deltaTime);
+        if (active) {
+          const grappleVel = this.grappleSystem.getGrappleVelocity();
+          this.applyMovement(grappleVel, deltaTime);
+        }
         break;
       }
 
@@ -210,6 +227,13 @@ export class ArcaneKnightControllerComponent
   }
   public setIsDodging(value: boolean): void {
     this.movementState = value ? CharacterMovementState.DODGING : CharacterMovementState.IDLE;
+  }
+
+  public getIsGrappling(): boolean {
+    return this.movementState === CharacterMovementState.GRAPPLING;
+  }
+  public setIsGrappling(value: boolean): void {
+    this.movementState = value ? CharacterMovementState.GRAPPLING : CharacterMovementState.IDLE;
   }
 
   public getIsDashing(): boolean {

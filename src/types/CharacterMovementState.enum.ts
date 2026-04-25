@@ -23,4 +23,7 @@ export enum CharacterMovementState {
 
   /** Esquivando (dodge corto en dirección de input) */
   DODGING = 'dodging',
+
+  /** Tirón hacia un punto de grapple (daga enganchada) */
+  GRAPPLING = 'grappling',
 }

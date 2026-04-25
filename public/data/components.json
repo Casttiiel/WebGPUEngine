@@ -23,10 +23,14 @@
     "camera",
     "speed_lines_vfx",
     "projectile",
+    "dagger_projectile",
     "bullet_pool",
     "weapon",
     "trail_renderer",
-    "fog_volume"
+    "fog_volume",
+    "arcane_knight_controller",
+    "parkour_controller",
+    "grapple_hook"
   ],
   "render_debug": []
 }

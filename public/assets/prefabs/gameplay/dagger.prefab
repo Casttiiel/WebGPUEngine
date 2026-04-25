@@ -26,7 +26,7 @@
         }
       ]
     },
-    "projectile": {
+    "dagger_projectile": {
       "speed": 50,
       "maxRange": 80,
       "damage": 40,

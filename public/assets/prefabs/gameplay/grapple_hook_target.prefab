@@ -1,7 +1,6 @@
 {
-  "children": [],
   "components": {
-    "name": "Impulse Pad",
+    "name": "GrappleHookTarget",
     "transform": {
       "position": [
         0,
@@ -14,30 +13,30 @@
         0
       ],
       "scale": [
-        2,
-        1,
-        2
+        0.4,
+        0.4,
+        0.4
       ]
     },
-    "impulse_pad": {
-      "force": 15
-    },
     "box_collider": {
-      "isSensor": true,
       "bodyType": "static",
       "size": [
         1,
         1,
         1
-      ]
+      ],
+      "mass": 0,
+      "friction": 0,
+      "restitution": 0
     },
     "render": {
       "meshes": [
         {
           "mesh": "unit_cube.obj",
-          "material": "textured.mat"
+          "material": "emissive.mat"
         }
       ]
-    }
+    },
+    "grapple_hook": {}
   }
 }

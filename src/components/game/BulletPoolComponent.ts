@@ -12,6 +12,8 @@ export type BulletPoolComponentData = {
   prefab: string;
   /** Number of bullets to pre-allocate. Defaults to 20. */
   size?: number;
+  /** Component type key to retrieve from the spawned entity. Defaults to 'projectile'. */
+  projectileType?: string;
 };
 
 const PARK_POSITION = vec3.fromValues(0, -1000, 0);
@@ -30,10 +32,12 @@ export class BulletPoolComponent extends Component {
   private pool: ProjectileComponent[] = [];
   private prefabPath: string = '';
   private poolSize: number = 20;
+  private projectileType: string = 'projectile';
 
   public async load(data: BulletPoolComponentData): Promise<void> {
     this.prefabPath = data.prefab;
     this.poolSize = data.size ?? 20;
+    this.projectileType = data.projectileType ?? 'projectile';
     await this.prewarm();
   }
 
@@ -54,10 +58,12 @@ export class BulletPoolComponent extends Component {
     }
 
     const entity = await Loader.loadEntityFromJSON(data, undefined, false);
-    const projectile = entity.getComponent('projectile') as ProjectileComponent | null;
+    const projectile = entity.getComponent(this.projectileType) as ProjectileComponent | null;
 
     if (!projectile) {
-      console.warn('[BulletPoolComponent] Bullet prefab has no "projectile" component — skipping.');
+      console.warn(
+        `[BulletPoolComponent] Prefab has no "${this.projectileType}" component — skipping.`,
+      );
       return;
     }
 

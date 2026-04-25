@@ -59,6 +59,8 @@ import { ArcaneKnightControllerComponent } from '../../components/game/ArcaneKni
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
+import { DaggerProjectileComponent } from '../../components/game/combat/DaggerProjectileComponent';
+import { GrappleHookComponent } from '../../components/game/GrappleHookComponent';
 import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
 import { WeaponComponent } from '../../components/game/WeaponComponent';
 import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
@@ -366,6 +368,10 @@ export class Loader {
         return new PerceptionComponent();
       case 'projectile':
         return new ProjectileComponent();
+      case 'dagger_projectile':
+        return new DaggerProjectileComponent();
+      case 'grapple_hook':
+        return new GrappleHookComponent();
       case 'bullet_pool':
         return new BulletPoolComponent();
       case 'weapon':

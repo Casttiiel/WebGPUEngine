@@ -249,6 +249,10 @@ export class ParkourControllerComponent
     return false;
   }
   public setIsDodging(_value: boolean): void {}
+  public getIsGrappling(): boolean {
+    return false;
+  }
+  public setIsGrappling(_value: boolean): void {}
   public getIsMantling(): boolean {
     return this.movementState === CharacterMovementState.MANTLING;
   }
