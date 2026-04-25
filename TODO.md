@@ -13,11 +13,10 @@
 
 ## Movement Gameplay
 
-1. Mantling
-2. Vertical Wall Jump
-3. Hook
-4. Sliding
-5. Horizontal Wall Jump
+1. Vertical Wall Jump
+2. Hook
+3. Sliding
+4. Horizontal Wall Jump
 
 ## Environment Gameplay
 

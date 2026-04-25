@@ -92,14 +92,8 @@ export class ArcaneKnightControllerComponent
     this.findCamera();
     if (!this.capsuleCollider || !this.camera) return;
 
-    /*if (this.isMantling) {
-      const mantleMovement = this.mantleSystem.updateMantleDirection();
-      this.applyMovement(deltaTime, mantleMovement);
-      this.combatSystem.update(deltaTime);
-      return;
-    }*/
-
     this.updateGroundedState();
+    this.mantleSystem.update();
 
     switch (this.movementState) {
       case CharacterMovementState.MANTLING:

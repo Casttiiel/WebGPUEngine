@@ -249,6 +249,7 @@ export class ParkourControllerComponent
   public getIsMantling(): boolean {
     return this.movementState === CharacterMovementState.MANTLING;
   }
+
   public setIsMantling(value: boolean): void {
     this.movementState = value ? CharacterMovementState.MANTLING : CharacterMovementState.IDLE;
   }
