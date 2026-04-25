@@ -12,10 +12,12 @@ import { CombatSystem } from './combat/CombatSystem';
 import { MantleSystem } from './movement/MantleSystem';
 import { MovementSystem } from './movement/MovementSystem';
 import { JumpSystem } from './movement/JumpSystem';
+import { SwingSystem } from './movement/SwingSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
+import { SwingEntryData } from '../../types/SwingEntryData.type';
 
 export class ArcaneKnightControllerComponent
   extends BasePlayerController
@@ -48,6 +50,7 @@ export class ArcaneKnightControllerComponent
   private mantleSystem!: MantleSystem;
   private movementSystem!: MovementSystem;
   private jumpSystem!: JumpSystem;
+  private swingSystem!: SwingSystem;
 
   constructor() {
     super();
@@ -77,6 +80,11 @@ export class ArcaneKnightControllerComponent
       null,
       data as unknown as CharacterControllerComponentDataType,
     );
+    this.swingSystem = new SwingSystem(
+      this,
+      null,
+      data as unknown as CharacterControllerComponentDataType,
+    );
 
     // 3. Controlador cinemático de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
@@ -99,6 +107,12 @@ export class ArcaneKnightControllerComponent
       case CharacterMovementState.MANTLING:
         const mantleMovement = this.mantleSystem.updateMantleDirection();
         this.applyMovement(mantleMovement, deltaTime);
+        break;
+
+      case CharacterMovementState.SWINGING:
+        this.swingSystem.updateSwingMovement(deltaTime);
+        const swingVelocity = this.mergeMovements();
+        this.applyMovement(swingVelocity, deltaTime);
         break;
 
       case CharacterMovementState.IDLE:
@@ -179,9 +193,11 @@ export class ArcaneKnightControllerComponent
   public setIsDashing(_value: boolean): void {}
 
   public getIsSwinging(): boolean {
-    return false;
+    return this.movementState === CharacterMovementState.SWINGING;
   }
-  public setIsSwinging(_value: boolean): void {}
+  public setIsSwinging(value: boolean): void {
+    this.movementState = value ? CharacterMovementState.SWINGING : CharacterMovementState.IDLE;
+  }
 
   public getIsRolling(): boolean {
     return false;
@@ -206,6 +222,10 @@ export class ArcaneKnightControllerComponent
 
   public getCombatSystem(): CombatSystem {
     return this.combatSystem;
+  }
+
+  public startSwing(data: SwingEntryData): void {
+    this.swingSystem.startSwing(data);
   }
 
   public getCamera(): CameraComponent | null {
