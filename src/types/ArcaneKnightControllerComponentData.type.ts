@@ -25,4 +25,9 @@ export type ArcaneKnightControllerComponentDataType = {
   mantleMaxHeight?: number;
   minMantleVelocity?: number;
   mantlingMinVerticalVelocity?: number;
+
+  // Dodge
+  dodgeSpeed?: number;
+  dodgeDuration?: number;
+  dodgeCooldown?: number;
 };

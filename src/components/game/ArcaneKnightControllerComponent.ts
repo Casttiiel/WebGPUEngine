@@ -13,6 +13,7 @@ import { MantleSystem } from './movement/MantleSystem';
 import { MovementSystem } from './movement/MovementSystem';
 import { JumpSystem } from './movement/JumpSystem';
 import { SwingSystem } from './movement/SwingSystem';
+import { DodgeSystem } from './movement/DodgeSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
@@ -51,6 +52,7 @@ export class ArcaneKnightControllerComponent
   private movementSystem!: MovementSystem;
   private jumpSystem!: JumpSystem;
   private swingSystem!: SwingSystem;
+  private dodgeSystem!: DodgeSystem;
 
   constructor() {
     super();
@@ -85,14 +87,11 @@ export class ArcaneKnightControllerComponent
       null,
       data as unknown as CharacterControllerComponentDataType,
     );
+    this.dodgeSystem = new DodgeSystem(this, data);
 
     // 3. Controlador cinemático de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
-
-  // ============================================
-  // UPDATE PRINCIPAL
-  // ============================================
 
   public update(deltaTime: number): void {
     if (!this.isActive) return;
@@ -102,12 +101,24 @@ export class ArcaneKnightControllerComponent
 
     this.updateGroundedState();
     this.mantleSystem.update();
+    this.dodgeSystem.update(deltaTime);
 
     switch (this.movementState) {
       case CharacterMovementState.MANTLING:
         const mantleMovement = this.mantleSystem.updateMantleDirection();
         this.applyMovement(mantleMovement, deltaTime);
         break;
+
+      case CharacterMovementState.DODGING: {
+        const dodgeVel = this.dodgeSystem.getDodgeVelocity();
+        const dodgeWithGravity = vec3.fromValues(
+          dodgeVel[0],
+          this.currentVerticalVelocity,
+          dodgeVel[2],
+        );
+        this.applyMovement(dodgeWithGravity, deltaTime);
+        break;
+      }
 
       case CharacterMovementState.SWINGING:
         this.swingSystem.updateSwingMovement(deltaTime);
@@ -117,7 +128,6 @@ export class ArcaneKnightControllerComponent
 
       case CharacterMovementState.IDLE:
       default:
-        // Movimiento normal
         const inputDir = this.getInputVector();
         const targetMovement = this.getTargetMovement(inputDir);
         this.movementSystem.update(deltaTime, targetMovement);
@@ -186,6 +196,13 @@ export class ArcaneKnightControllerComponent
     return false;
   }
   public setIsWallRunning(_value: boolean): void {}
+
+  public getIsDodging(): boolean {
+    return this.movementState === CharacterMovementState.DODGING;
+  }
+  public setIsDodging(value: boolean): void {
+    this.movementState = value ? CharacterMovementState.DODGING : CharacterMovementState.IDLE;
+  }
 
   public getIsDashing(): boolean {
     return false;

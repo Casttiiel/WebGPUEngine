@@ -245,7 +245,10 @@ export class ParkourControllerComponent
   public setIsDashing(value: boolean): void {
     this.movementState = value ? CharacterMovementState.DASHING : CharacterMovementState.IDLE;
   }
-
+  public getIsDodging(): boolean {
+    return false;
+  }
+  public setIsDodging(_value: boolean): void {}
   public getIsMantling(): boolean {
     return this.movementState === CharacterMovementState.MANTLING;
   }

@@ -20,4 +20,7 @@ export enum CharacterMovementState {
 
   /** Ejecutando un dash hacia un punto específico */
   DASHING = 'dashing',
+
+  /** Esquivando (dodge corto en dirección de input) */
+  DODGING = 'dodging',
 }

@@ -5,18 +5,17 @@
 
 ## Combat Gameplay
 
-1. Dash
-2. Daggers
-3. Light Attack
-4. Shield
-5. Parry
+1. Daggers
+2. Light Attack
+3. Shield
+4. Parry
 
 ## Movement Gameplay
 
-1. Vertical Wall Jump
-2. Hook
-3. Sliding
-4. Horizontal Wall Jump
+1. Hook
+2. Vertical Wall Jump
+3. Horizontal Wall Jump
+4. Sliding
 
 ## Environment Gameplay
 
