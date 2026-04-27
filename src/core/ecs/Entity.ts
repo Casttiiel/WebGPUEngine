@@ -1,6 +1,8 @@
 import { NameComponent } from '../../components/core/NameComponent';
 import { Component } from './Component';
 import { Engine } from '../../core/engine/Engine';
+import { MsgDispatcher } from './MsgDispatcher';
+import type { IMsg } from './Msg';
 
 export class Entity {
   private static nextId = 0;
@@ -54,6 +56,18 @@ export class Entity {
   public getName(): string {
     const nameComponent = this.getComponent('name') as NameComponent;
     return nameComponent?.getName() || `Entity_${this.id}`;
+  }
+
+  /**
+   * Envía un mensaje a esta entidad. Todos los componentes suscritos
+   * a ese tipo de mensaje recibirán la llamada (si la entidad los posee).
+   *
+   * ```ts
+   * entity.sendMsg(Msg.damage({ amount: 10, instigator: null }));
+   * ```
+   */
+  public sendMsg(msg: IMsg): void {
+    MsgDispatcher.dispatch(this, msg);
   }
 
   public toString(): string {

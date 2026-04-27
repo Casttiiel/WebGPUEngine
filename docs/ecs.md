@@ -764,3 +764,88 @@ This pattern is how `ModuleRender.onResolutionUpdated()` resizes every post-proc
 ```
 
 This ECS system provides a solid and flexible foundation for the WebGPU Engine, enabling the creation of complex entities through composition of simple and specialized components.
+
+---
+
+## 📨 Message System
+
+Inspired by the C++ engine's `sendMsg` pattern. Allows decoupled communication between components of the **same entity** without direct references between them.
+
+### **Architecture**
+
+- **`MsgType`** (`src/types/MsgType.enum.ts`) — Enum of all message types.
+- **`IMsg<T>`** (`src/core/ecs/Msg.ts`) — Generic message wrapper with `type` + `payload`.
+- **`Msg`** — Factory helpers to build messages without repeating the type.
+- **`MsgDispatcher`** (`src/core/ecs/MsgDispatcher.ts`) — Global registry. Maps `MsgType → [{componentKey, handler}]`.
+- **`entity.sendMsg(msg)`** — Dispatches a message to all subscribed components that the entity owns.
+
+### **Message Types**
+
+| Type | Direction | Description |
+|---|---|---|
+| `DAMAGE` | Input | Send damage to an entity |
+| `ON_DAMAGED` | Output | Entity received damage (emitted by `HealthComponent`) |
+| `ON_DEATH` | Output | Entity died (emitted by `HealthComponent`) |
+| `ON_HEALED` | Output | Entity was healed (emitted by `HealthComponent`) |
+| `ON_CONTACT` | Event | Physical contact (bullets, traps, etc.) |
+| `ENTITY_CREATED` | Lifecycle | Entity fully loaded and ready |
+
+### **Sending a Message**
+
+```typescript
+// Deal 25 damage to an entity
+entity.sendMsg(Msg.damage({ amount: 25, instigator: attackerEntity }));
+
+// No need to know if the entity has a HealthComponent — if it doesn't, nothing happens.
+```
+
+### **Subscribing a Component**
+
+Each component declares a `static registerMsgs()` method where it subscribes **only to the messages it cares about**:
+
+```typescript
+export class MyComponent extends Component {
+  public static registerMsgs(): void {
+    // Subscribe to ON_DEATH — called when the entity on which this component lives dies
+    MsgDispatcher.register(MsgType.ON_DEATH, 'my_component_key', (comp, msg) => {
+      const payload = (msg as IMsg<TMsgOnDeath>).payload;
+      (comp as MyComponent).onEntityDied(payload.instigator);
+    });
+  }
+
+  private onEntityDied(killer: Entity | null): void {
+    // React to death — e.g. play animation, drop items, etc.
+  }
+}
+```
+
+Then register it in `Engine.registerAllMsgs()`:
+
+```typescript
+// Engine.ts → registerAllMsgs()
+private static registerAllMsgs(): void {
+  HealthComponent.registerMsgs();
+  MyComponent.registerMsgs();
+}
+```
+
+### **How Dispatch Works**
+
+```
+entity.sendMsg(Msg.damage({ amount: 10, instigator: null }))
+  → MsgDispatcher.dispatch(entity, msg)
+    → finds all slots registered for MsgType.DAMAGE
+    → for each slot: entity.getComponent(slot.componentKey)
+      → if found: slot.handler(component, msg)
+        → HealthComponent.takeDamage(10, null)
+          → entity.sendMsg(Msg.onDamaged({ amount: 10, currentHp: 90, instigator: null }))
+            → any component subscribed to ON_DAMAGED receives the event
+```
+
+### **Adding New Messages**
+
+1. Add entry to `MsgType` enum (`src/types/MsgType.enum.ts`)
+2. Add payload interface and `Msg.xxx()` helper to `src/core/ecs/Msg.ts`
+3. In the emitting component, call `this.getOwner().sendMsg(Msg.xxx(payload))`
+4. In subscribing components, add `MsgDispatcher.register(...)` to their `static registerMsgs()`
+5. Call `NewComponent.registerMsgs()` from `Engine.registerAllMsgs()`

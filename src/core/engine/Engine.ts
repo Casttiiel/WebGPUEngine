@@ -18,6 +18,7 @@ import { ResourceManager } from './ResourceManager';
 import { ModuleUI } from '../../modules/core/ModuleUI';
 import { GUIManager } from '../debug/GUIManager';
 import { Logger } from '../debug/Logger';
+import { HealthComponent } from '../../components/game/HealthComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -99,6 +100,9 @@ export class Engine {
       this._modules.registerGameModule(new ModuleEditorSelection('editor_selection'));
       this._modules.registerGameModule(new ModuleMainMenu('main_menu'));
 
+      // Register all component message subscriptions (once, before modules start)
+      Engine.registerAllMsgs();
+
       // Module Initialization: 40% -> 100% (dinámico según módulos)
       LoadingStatus.updateStatus('Starting modules...', 40);
       await this._modules.start();
@@ -124,6 +128,17 @@ export class Engine {
 
     // Update GUI (no-op for lil-gui, kept for compatibility)
     this._guiManager.update(dt * this._timeScale);
+  }
+
+  /**
+   * Registra las suscripciones de mensajes de todos los componentes del motor.
+   * Añadir aquí el `ComponentClass.registerMsgs()` de cada nuevo componente.
+   */
+  private static registerAllMsgs(): void {
+    HealthComponent.registerMsgs();
+    // Nuevos componentes con mensajes se añaden aquí:
+    // StaminaComponent.registerMsgs();
+    // EnemyControllerComponent.registerMsgs();
   }
 
   public static renderInMenu(): void {
