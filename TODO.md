@@ -5,10 +5,10 @@
 
 ## Combat Gameplay
 
-1. Health (Player and Enemy)
-2. Light Attack
-3. Enemy attack
-4. Shield
+1. Light Attack
+2. Enemy attack
+3. Shield
+4. Stamina
 
 ## Environment Gameplay
 
