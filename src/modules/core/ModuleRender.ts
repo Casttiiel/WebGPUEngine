@@ -1,6 +1,7 @@
 import { CameraComponent } from '../../components/render/CameraComponent';
-import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { Engine } from '../../core/engine/Engine';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { Msg } from '../../core/ecs/Msg';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
@@ -252,76 +253,12 @@ export class ModuleRender extends Module {
       cameraComponent.getCamera().setViewport(Render.width, Render.height);
     }
 
-    for (const comp of Engine.getEntities().getObjectManagerByName('tone_mapping')?.getList() ??
-      []) {
-      (comp as ToneMappingComponent).resize();
-    }
-    for (const comp of Engine.getEntities().getObjectManagerByName('fxaa')?.getList() ?? []) {
-      (comp as FXAAComponent).resize();
-    }
-    for (const comp of Engine.getEntities().getObjectManagerByName('smaa')?.getList() ?? []) {
-      (comp as SMAAComponent).resize();
-    }
-    for (const comp of Engine.getEntities().getObjectManagerByName('smaa_t2x')?.getList() ?? []) {
-      (comp as SMAAT2xComponent).resize();
-    }
-    for (const comp of Engine.getEntities().getObjectManagerByName('taa')?.getList() ?? []) {
-      (comp as TAAComponent).resize();
-    }
-    for (const comp of Engine.getEntities().getObjectManagerByName('tsr')?.getList() ?? []) {
-      (comp as TSRComponent).resize();
-    }
-    for (const comp of Engine.getEntities()
-      .getObjectManagerByName('ambient_occlusion')
-      ?.getList() ?? []) {
-      (comp as AmbientOcclusionComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('bloom')?.getList() ?? []) {
-      (comp as BloomComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('depth_of_field')?.getList() ??
-      []) {
-      (comp as DepthOfFieldComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('height_fog')?.getList() ?? []) {
-      (comp as HeightFogComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('atmospheric_fog')?.getList() ??
-      []) {
-      (comp as AtmosphericFogComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('motion_blur')?.getList() ??
-      []) {
-      (comp as MotionBlurComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('fsr')?.getList() ?? []) {
-      (comp as FSRComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('palette_quantize')?.getList() ??
-      []) {
-      (comp as PaletteQuantizeComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('god_rays')?.getList() ?? []) {
-      (comp as GodRaysComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities().getObjectManagerByName('lens_flare')?.getList() ?? []) {
-      (comp as LensFlareComponent).resize();
-    }
-
-    for (const comp of Engine.getEntities()
-      .getObjectManagerByName('ambient_occlusion')
-      ?.getList() ?? []) {
-      (comp as AmbientOcclusionComponent).resize();
-    }
+    // Notificar a todos los componentes suscritos a RESIZE
+    const allEntities = Engine.getEntities().getAllEntities();
+    MsgDispatcher.broadcast(
+      allEntities,
+      Msg.resize({ width: Render.width, height: Render.height }),
+    );
   }
 
   public generateFrame(): void {

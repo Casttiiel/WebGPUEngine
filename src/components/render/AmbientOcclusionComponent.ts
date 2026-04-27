@@ -1,4 +1,6 @@
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
@@ -139,6 +141,13 @@ export class AmbientOcclusionComponent extends Component {
     this.createParamsBindGroup();
 
     this.loaded = true;
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'ambient_occlusion', (comp) => {
+      const c = comp as AmbientOcclusionComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

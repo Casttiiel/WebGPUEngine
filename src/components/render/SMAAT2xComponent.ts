@@ -1,4 +1,6 @@
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
@@ -484,6 +486,13 @@ export class SMAAT2xComponent extends Component {
       this.temporalResolveTechnique.getPipeline()!.getBindGroupLayout(1),
       [{ binding: 0, resource: { buffer: this.temporalUniformBuffer } }],
     );
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'smaa_t2x', (comp) => {
+      const c = comp as SMAAT2xComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

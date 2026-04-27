@@ -19,6 +19,22 @@ import { ModuleUI } from '../../modules/core/ModuleUI';
 import { GUIManager } from '../debug/GUIManager';
 import { Logger } from '../debug/Logger';
 import { HealthComponent } from '../../components/game/HealthComponent';
+import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
+import { FXAAComponent } from '../../components/render/FXAAComponent';
+import { SMAAComponent } from '../../components/render/SMAAComponent';
+import { SMAAT2xComponent } from '../../components/render/SMAAT2xComponent';
+import { TAAComponent } from '../../components/render/TAAComponent';
+import { TSRComponent } from '../../components/render/TSRComponent';
+import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
+import { BloomComponent } from '../../components/render/BloomComponent';
+import { DepthOfFieldComponent } from '../../components/render/DepthOfFieldComponent';
+import { MotionBlurComponent } from '../../components/render/MotionBlurComponent';
+import { FSRComponent } from '../../components/render/FSRComponent';
+import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
+import { GodRaysComponent } from '../../components/render/GodRaysComponent';
+import { LensFlareComponent } from '../../components/render/LensFlareComponent';
+import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
+import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -136,6 +152,23 @@ export class Engine {
    */
   private static registerAllMsgs(): void {
     HealthComponent.registerMsgs();
+    // Render / Post-process — RESIZE
+    ToneMappingComponent.registerMsgs();
+    FXAAComponent.registerMsgs();
+    SMAAComponent.registerMsgs();
+    SMAAT2xComponent.registerMsgs();
+    TAAComponent.registerMsgs();
+    TSRComponent.registerMsgs();
+    AmbientOcclusionComponent.registerMsgs();
+    BloomComponent.registerMsgs();
+    DepthOfFieldComponent.registerMsgs();
+    MotionBlurComponent.registerMsgs();
+    FSRComponent.registerMsgs();
+    PaletteQuantizeComponent.registerMsgs();
+    GodRaysComponent.registerMsgs();
+    LensFlareComponent.registerMsgs();
+    HeightFogComponent.registerMsgs();
+    AtmosphericFogComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
     // EnemyControllerComponent.registerMsgs();

@@ -1,4 +1,6 @@
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { AtmosphericFogComponentData } from '../../types/AtmosphericFogComponentData.type';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
@@ -102,6 +104,13 @@ export class AtmosphericFogComponent extends Component {
     this.result.createRT('atmospheric_fog_result.dds', Render.width, Render.height, fogFormat);
 
     this.isLoaded = true;
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'atmospheric_fog', (comp) => {
+      const c = comp as AtmosphericFogComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

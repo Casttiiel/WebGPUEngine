@@ -1,4 +1,6 @@
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
@@ -54,6 +56,13 @@ export class PaletteQuantizeComponent extends Component {
     );
 
     this.loaded = true;
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'palette_quantize', (comp) => {
+      const c = comp as PaletteQuantizeComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

@@ -1,4 +1,6 @@
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { HeightFogComponentData } from '../../types/HeightFogComponentData.type';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
@@ -80,6 +82,13 @@ export class HeightFogComponent extends Component {
     this.result.createRT('height_fog_result.dds', Render.width, Render.height, fogFormat);
 
     this.isLoaded = true;
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'height_fog', (comp) => {
+      const c = comp as HeightFogComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

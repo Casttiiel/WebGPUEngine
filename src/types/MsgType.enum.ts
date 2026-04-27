@@ -17,6 +17,9 @@ export enum MsgType {
   // ── Física / Colisiones ────────────────────────────────────────────────
   ON_CONTACT = 'on_contact', // Contacto físico (balas, trampas, etc.)
 
+  // ── Render / Resolución ─────────────────────────────────────────────
+  RESIZE = 'resize', // Resolución del render ha cambiado
+
   // ── Ciclo de vida ──────────────────────────────────────────────────
   ENTITY_CREATED = 'entity_created', // Entidad recién creada y lista
 }

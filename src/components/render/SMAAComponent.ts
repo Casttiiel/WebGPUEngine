@@ -1,4 +1,6 @@
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
@@ -132,6 +134,13 @@ export class SMAAComponent extends Component {
     );
 
     this.loaded = true;
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'smaa', (comp) => {
+      const c = comp as SMAAComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

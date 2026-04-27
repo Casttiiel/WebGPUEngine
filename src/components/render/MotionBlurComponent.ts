@@ -9,6 +9,8 @@ import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { CameraComponent } from './CameraComponent';
 
@@ -212,6 +214,13 @@ export class MotionBlurComponent extends Component {
     );
 
     return this.result.getView();
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'motion_blur', (comp) => {
+      const c = comp as MotionBlurComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

@@ -38,6 +38,12 @@ export interface TMsgEntityCreated {
   // Sin payload adicional — la propia entidad receptora es la creada.
 }
 
+/** Emitido por ModuleRender cuando cambia la resolución del render. */
+export interface TMsgResize {
+  width: number;
+  height: number;
+}
+
 // ── Tipo discriminado base ────────────────────────────────────────────────────
 
 /**
@@ -73,5 +79,8 @@ export const Msg = {
   },
   entityCreated(): IMsg<TMsgEntityCreated> {
     return { type: MsgType.ENTITY_CREATED, payload: {} };
+  },
+  resize(payload: TMsgResize): IMsg<TMsgResize> {
+    return { type: MsgType.RESIZE, payload };
   },
 };

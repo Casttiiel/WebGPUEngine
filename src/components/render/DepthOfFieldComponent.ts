@@ -12,6 +12,8 @@ import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { Entity } from '../../core/ecs/Entity';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { CameraComponent } from './CameraComponent';
@@ -214,6 +216,13 @@ export class DepthOfFieldComponent extends Component {
       label: 'af_depth_staging',
       size: 4,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'depth_of_field', (comp) => {
+      const c = comp as DepthOfFieldComponent;
+      if (c.hasLoaded()) c.resize();
     });
   }
 

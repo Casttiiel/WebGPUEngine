@@ -11,6 +11,8 @@ import { Mesh } from '../../renderer/resources/Mesh';
 import { Technique } from '../../renderer/resources/Technique';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { BlurKawaseComponent } from './BlurKawaseComponent';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 
 export class BloomComponent extends BlurKawaseComponent {
   private whiteTexture!: Texture;
@@ -72,6 +74,13 @@ export class BloomComponent extends BlurKawaseComponent {
 
     this.updateBloomFilterParams();
     this.updateBloomCombineParams();
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'bloom', (comp) => {
+      const c = comp as BloomComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public override resize(): void {

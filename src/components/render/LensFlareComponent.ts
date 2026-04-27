@@ -1,5 +1,7 @@
 import { vec4 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { CameraComponent } from './CameraComponent';
 import { DirectionalLightComponent } from './DirectionalLightComponent';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
@@ -109,6 +111,13 @@ export class LensFlareComponent extends Component {
 
     this.renderPassManager = new RenderPassManager();
     this.loaded = true;
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'lens_flare', (comp) => {
+      const c = comp as LensFlareComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

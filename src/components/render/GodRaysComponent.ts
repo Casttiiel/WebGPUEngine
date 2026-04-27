@@ -1,5 +1,7 @@
 import { vec4 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { CameraComponent } from './CameraComponent';
 import { DirectionalLightComponent } from './DirectionalLightComponent';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
@@ -209,6 +211,13 @@ export class GodRaysComponent extends Component {
 
     this.renderPassManager = new RenderPassManager();
     this.loaded = true;
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'god_rays', (comp) => {
+      const c = comp as GodRaysComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

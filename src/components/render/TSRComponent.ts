@@ -1,4 +1,6 @@
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
@@ -157,6 +159,13 @@ export class TSRComponent extends Component {
   public getHistoryView(): GPUTextureView | null {
     if (!this.loaded || this.isFirstFrame || !this.tsrParams.enabled) return null;
     return this.historyRT.getView();
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'tsr', (comp) => {
+      const c = comp as TSRComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   public resize(): void {

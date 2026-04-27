@@ -64,6 +64,21 @@ export class MsgDispatcher {
     }
   }
 
+  /**
+   * Emite un mensaje a todas las entidades de la lista.
+   * Cada entidad procesará el mensaje si tiene algún componente suscrito.
+   *
+   * Uso típico para eventos globales como resize:
+   * ```ts
+   * MsgDispatcher.broadcast(Engine.getEntities().getAllEntities(), Msg.resize({ width, height }));
+   * ```
+   */
+  public static broadcast(entities: Entity[], msg: IMsg): void {
+    for (const entity of entities) {
+      MsgDispatcher.dispatch(entity, msg);
+    }
+  }
+
   /** Limpia todas las suscripciones (útil para tests). */
   public static clear(): void {
     MsgDispatcher.slots.clear();

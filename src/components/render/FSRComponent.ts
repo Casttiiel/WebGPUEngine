@@ -1,5 +1,7 @@
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { Component } from '../../core/ecs/Component';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
@@ -255,6 +257,13 @@ export class FSRComponent extends Component {
     }
 
     return this.enableRCAS ? this.rcasResult.getView() : this.easuResult.getView();
+  }
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'fsr', (comp) => {
+      const c = comp as FSRComponent;
+      if (c.hasLoaded()) c.resize();
+    });
   }
 
   /** Recreate render targets when the canvas / render resolution changes. */
