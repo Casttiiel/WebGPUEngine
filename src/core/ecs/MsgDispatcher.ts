@@ -39,11 +39,7 @@ export class MsgDispatcher {
    * @param componentKey  Clave del componente en la entidad (e.g. `'health'`).
    * @param handler  Función que recibe el componente resuelto y el mensaje.
    */
-  public static register(
-    msgType: MsgType,
-    componentKey: string,
-    handler: MsgHandler,
-  ): void {
+  public static register(msgType: MsgType, componentKey: string, handler: MsgHandler): void {
     let list = MsgDispatcher.slots.get(msgType);
     if (!list) {
       list = [];

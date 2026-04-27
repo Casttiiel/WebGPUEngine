@@ -42,7 +42,10 @@ export class HealthComponent extends Component {
 
   // ── API pública ───────────────────────────────────────────────────────────
 
-  public takeDamage(amount: number, instigator: import('../../core/ecs/Entity').Entity | null = null): void {
+  public takeDamage(
+    amount: number,
+    instigator: import('../../core/ecs/Entity').Entity | null = null,
+  ): void {
     if (amount <= 0) return;
     if (this.isDead()) return;
     if (this.invincibilityTimer > 0) return;
@@ -51,7 +54,9 @@ export class HealthComponent extends Component {
     this.currentHp -= actual;
     this.invincibilityTimer = this.invincibilityTime;
 
-    this.getOwner().sendMsg(Msg.onDamaged({ amount: actual, currentHp: this.currentHp, instigator }));
+    this.getOwner().sendMsg(
+      Msg.onDamaged({ amount: actual, currentHp: this.currentHp, instigator }),
+    );
 
     if (this.currentHp <= 0) {
       this.getOwner().sendMsg(Msg.onDeath({ instigator }));

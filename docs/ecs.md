@@ -781,14 +781,14 @@ Inspired by the C++ engine's `sendMsg` pattern. Allows decoupled communication b
 
 ### **Message Types**
 
-| Type | Direction | Description |
-|---|---|---|
-| `DAMAGE` | Input | Send damage to an entity |
-| `ON_DAMAGED` | Output | Entity received damage (emitted by `HealthComponent`) |
-| `ON_DEATH` | Output | Entity died (emitted by `HealthComponent`) |
-| `ON_HEALED` | Output | Entity was healed (emitted by `HealthComponent`) |
-| `ON_CONTACT` | Event | Physical contact (bullets, traps, etc.) |
-| `ENTITY_CREATED` | Lifecycle | Entity fully loaded and ready |
+| Type             | Direction | Description                                           |
+| ---------------- | --------- | ----------------------------------------------------- |
+| `DAMAGE`         | Input     | Send damage to an entity                              |
+| `ON_DAMAGED`     | Output    | Entity received damage (emitted by `HealthComponent`) |
+| `ON_DEATH`       | Output    | Entity died (emitted by `HealthComponent`)            |
+| `ON_HEALED`      | Output    | Entity was healed (emitted by `HealthComponent`)      |
+| `ON_CONTACT`     | Event     | Physical contact (bullets, traps, etc.)               |
+| `ENTITY_CREATED` | Lifecycle | Entity fully loaded and ready                         |
 
 ### **Sending a Message**
 

@@ -11,7 +11,7 @@ export interface TMsgDamage {
 
 /** Emitido por HealthComponent tras procesar el daño. */
 export interface TMsgOnDamaged {
-  amount: number;     // Daño real aplicado (clampado a vida restante)
+  amount: number; // Daño real aplicado (clampado a vida restante)
   currentHp: number; // Vida resultante
   instigator: Entity | null;
 }
@@ -23,7 +23,7 @@ export interface TMsgOnDeath {
 
 /** Emitido por HealthComponent tras curar. */
 export interface TMsgOnHealed {
-  amount: number;     // Cantidad curada real
+  amount: number; // Cantidad curada real
   currentHp: number; // Vida resultante
 }
 
