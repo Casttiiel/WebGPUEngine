@@ -3,21 +3,18 @@
 1. GLTF Exporter unifies metallic and roughness? In right channel?
 2. Enemy AI / NavMesh
 
-## Movement Gameplay
+## Combat Gameplay
 
-1. Vertical Wall Jump
-2. Horizontal Wall Jump
+1. Health (Player and Enemy)
+2. Light Attack
+3. Enemy attack
+4. Shield
 
 ## Environment Gameplay
 
-1. Traps [...]
-2. Moving Platforms
-
-## Combat Gameplay
-
-1. Light Attack
-2. Shield
-3. Parry
+1. Impulse Pad
+2. Pared Rompible
+3. Traps [...]
 
 ## Visuals and Sound
 

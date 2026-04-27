@@ -17,6 +17,7 @@ import { JumpSystem } from './movement/JumpSystem';
 import { SwingSystem } from './movement/SwingSystem';
 import { DodgeSystem } from './movement/DodgeSystem';
 import { GrappleSystem } from './movement/GrappleSystem';
+import { WallKickSystem } from './movement/WallKickSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
@@ -59,6 +60,7 @@ export class ArcaneKnightControllerComponent
   private swingSystem!: SwingSystem;
   private dodgeSystem!: DodgeSystem;
   private grappleSystem!: GrappleSystem;
+  private wallKickSystem!: WallKickSystem;
 
   constructor() {
     super();
@@ -96,6 +98,7 @@ export class ArcaneKnightControllerComponent
     );
     this.dodgeSystem = new DodgeSystem(this, data);
     this.grappleSystem = new GrappleSystem(this, data);
+    this.wallKickSystem = new WallKickSystem(this, data);
     this.daggerHUD = new DaggerHUDSystem();
 
     // Registrar callback de grapple en ThrowSystem
@@ -157,6 +160,9 @@ export class ArcaneKnightControllerComponent
         const targetMovement = this.getTargetMovement(inputDir);
         this.movementSystem.update(deltaTime, targetMovement);
         this.jumpSystem.update(deltaTime);
+        if (!this.isGrounded) {
+          this.wallKickSystem.update(deltaTime);
+        }
         const finalVelocity = this.mergeMovements();
         this.applyMovement(finalVelocity, deltaTime);
         break;
@@ -311,6 +317,7 @@ export class ArcaneKnightControllerComponent
     this.isGrounded = hit !== null;
 
     if (this.isGrounded && hit) {
+      this.wallKickSystem?.onGrounded();
       const isFloor = hit.normal.y > 0.1;
 
       if (isFloor) {

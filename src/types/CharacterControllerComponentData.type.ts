@@ -40,4 +40,7 @@ export type CharacterControllerComponentDataType = {
   minSwingSpeed?: number; // Minimum speed to start swinging (default: 2.0)
 
   impulsePadInputDisableTime?: number; // Time to disable input after impulse pad in seconds (default: 0.5)
+
+  wallKickDetectionDistance?: number; // Distance ahead to detect a kickable wall in units (default: 0.8)
+  wallKickInputDisableTime?: number; // Time to disable input after wall kick in seconds (default: 0.15)
 };

@@ -40,4 +40,8 @@ export type ArcaneKnightControllerComponentDataType = {
   grappleSpeed?: number;
   grappleArrivalDistance?: number;
   grappleMaxDuration?: number;
+
+  // Wall kick
+  wallKickDetectionDistance?: number;
+  wallKickInputDisableTime?: number;
 };
