@@ -24,7 +24,7 @@ export class StaminaComponent extends Component {
   private maxStamina: number = 100;
   private currentStamina: number = 100;
   private regenRate: number = 20;
-  private regenDelay: number = 1.0;
+  private regenDelay: number = 2.0;
   private regenDelayTimer: number = 0;
 
   // ── Callbacks ─────────────────────────────────────────────────────────────

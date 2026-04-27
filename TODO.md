@@ -8,7 +8,6 @@
 1. Light Attack
 2. Enemy attack
 3. Shield
-4. Stamina
 
 ## Environment Gameplay
 

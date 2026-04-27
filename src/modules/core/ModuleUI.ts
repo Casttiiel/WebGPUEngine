@@ -6,6 +6,7 @@ import { Engine } from '../../core/engine/Engine';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { UIParser } from '../../core/ui/UIParser';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
+import { HUDController } from '../../core/ui/controllers/HUDController';
 import { Render } from '../../renderer/core/pipeline/Render';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
@@ -59,7 +60,7 @@ export class ModuleUI extends Module {
     await this.registerWidgetClass('MAIN_MENU_BUTTONS', 'main_menu_buttons.json', parser);
 
     // Gameplay HUD
-    await this.registerWidgetClass('HUD', 'hud.json', parser);
+    await this.registerWidgetClass('HUD', 'hud.json', parser, new HUDController());
 
     // TODO: Create MenuController for main menu buttons
     // const menuController = new MenuController();

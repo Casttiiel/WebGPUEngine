@@ -30,6 +30,7 @@ export type ArcaneKnightControllerComponentDataType = {
   dodgeSpeed?: number;
   dodgeDuration?: number;
   dodgeCooldown?: number;
+  dodgeStaminaCost?: number; // Stamina cost per dodge (default: 0)
 
   // Throwing daggers
   daggerMaxCharges?: number;

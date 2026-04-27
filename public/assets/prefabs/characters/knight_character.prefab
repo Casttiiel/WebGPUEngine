@@ -59,7 +59,17 @@
       "divingGravityMultiplier": 4,
       "minSwingSpeed": 11,
       "impulsePadInputDisableTime": 0.3,
-      "daggerPoolName": "DaggerManager"
+      "daggerPoolName": "DaggerManager",
+      "dodgeStaminaCost": 20
+    },
+    "health": {
+      "maxHp": 100,
+      "invincibilityTime": 0.3
+    },
+    "stamina": {
+      "maxStamina": 100,
+      "regenRate": 20,
+      "regenDelay": 2
     },
     "fps_camera_controller": {
       "eyeOffset": [

@@ -18,6 +18,7 @@ import { SwingSystem } from './movement/SwingSystem';
 import { DodgeSystem } from './movement/DodgeSystem';
 import { GrappleSystem } from './movement/GrappleSystem';
 import { WallKickSystem } from './movement/WallKickSystem';
+import { StaminaComponent } from './StaminaComponent';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
@@ -97,7 +98,11 @@ export class ArcaneKnightControllerComponent
       null,
       data as unknown as CharacterControllerComponentDataType,
     );
-    this.dodgeSystem = new DodgeSystem(this, data);
+    this.dodgeSystem = new DodgeSystem(
+      this,
+      data,
+      () => this.getOwner().getComponent('stamina') as StaminaComponent | null,
+    );
     this.grappleSystem = new GrappleSystem(this, data);
     this.wallKickSystem = new WallKickSystem(
       this,

@@ -2,11 +2,13 @@ import { vec3 } from 'gl-matrix';
 import type { IMovementController } from './IMovementController';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
+import type { StaminaComponent } from '../StaminaComponent';
 
 export interface DodgeSystemData {
   dodgeSpeed?: number;
   dodgeDuration?: number;
   dodgeCooldown?: number;
+  dodgeStaminaCost?: number; // Stamina cost per dodge (default: 0 = free)
 }
 
 /**
@@ -18,6 +20,7 @@ export class DodgeSystem {
   private dodgeSpeed: number;
   private dodgeDuration: number;
   private dodgeCooldown: number;
+  private staminaCost: number;
 
   private dodgeTimer: number = 0.0;
   private cooldownTimer: number = 0.0;
@@ -26,10 +29,12 @@ export class DodgeSystem {
   constructor(
     private controller: IMovementController,
     data: DodgeSystemData,
+    private getStamina: (() => StaminaComponent | null) | null = null,
   ) {
     this.dodgeSpeed = data.dodgeSpeed ?? 16.0;
     this.dodgeDuration = data.dodgeDuration ?? 0.2;
     this.dodgeCooldown = data.dodgeCooldown ?? 0.8;
+    this.staminaCost = data.dodgeStaminaCost ?? 20;
   }
 
   /**
@@ -72,6 +77,12 @@ export class DodgeSystem {
   }
 
   private startDodge(): void {
+    // Comprobar y gastar stamina antes de ejecutar (lazy lookup)
+    const stamina = this.getStamina ? this.getStamina() : null;
+    if (this.staminaCost > 0 && stamina !== null) {
+      if (!stamina.spend(this.staminaCost)) return;
+    }
+
     const dir = this.computeDodgeDirection();
     vec3.copy(this.dodgeDirection, dir);
 
