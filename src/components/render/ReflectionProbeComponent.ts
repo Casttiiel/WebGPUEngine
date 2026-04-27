@@ -2,11 +2,13 @@ import { Component } from '../../core/ecs/Component';
 import { Camera } from '../../core/math/Camera';
 import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
-import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Cubemap } from '../../renderer/resources/Cubemap';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
 import { ReflectionProbeComponentData } from '../../types/ReflectionProbeComponentData.type';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
+import type { IMsg, TMsgTriggerEnter, TMsgTriggerExit } from '../../core/ecs/Msg';
 
 export class ReflectionProbeComponent extends Component {
   private radius: number = 10.0; // Radio de influencia
@@ -56,9 +58,6 @@ export class ReflectionProbeComponent extends Component {
   }
 
   public override async onAttach(): Promise<void> {
-    // Esperar un frame para asegurar que el box_collider está cargado
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
     // Load own irradiance and env cubemaps for per-probe PCC blending
     const baseName = this.getOwner().getName();
     const [irr, env] = await Promise.all([
@@ -70,27 +69,16 @@ export class ReflectionProbeComponent extends Component {
 
     // Register with ProbeManager so AmbientLight can drive per-probe PCC
     ProbeManager.getInstance().register(this);
-
-    // Registrar callbacks del trigger
-    this.setupTriggerCallbacks();
   }
 
-  private setupTriggerCallbacks(): void {
-    const boxCollider = this.getOwner().getComponent('box_collider') as BoxColliderComponent;
-
-    if (!boxCollider) {
-      console.warn('ReflectionProbe: No se encontró box_collider (necesario para triggers)');
-      return;
-    }
-
-    // Registrar callback para cuando algo ENTRA en el trigger
-    boxCollider.onTriggerEnter((otherEntityId: number) => {
-      this.onEntityEnter(otherEntityId);
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.TRIGGER_ENTER, 'reflection_probe', (comp, msg) => {
+      const { otherEntityId } = (msg as IMsg<TMsgTriggerEnter>).payload;
+      (comp as ReflectionProbeComponent).onEntityEnter(otherEntityId);
     });
-
-    // Registrar callback para cuando algo SALE del trigger
-    boxCollider.onTriggerExit((otherEntityId: number) => {
-      this.onEntityExit(otherEntityId);
+    MsgDispatcher.register(MsgType.TRIGGER_EXIT, 'reflection_probe', (comp, msg) => {
+      const { otherEntityId } = (msg as IMsg<TMsgTriggerExit>).payload;
+      (comp as ReflectionProbeComponent).onEntityExit(otherEntityId);
     });
   }
 

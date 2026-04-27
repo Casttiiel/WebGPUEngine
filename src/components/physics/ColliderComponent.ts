@@ -4,6 +4,7 @@ import { Component } from '../../core/ecs/Component';
 import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
 import { CollisionGroups, CollisionMasks } from '../../types/CollisionGroups.enum';
+import { Msg } from '../../core/ecs/Msg';
 
 /**
  * Convierte un string del enum CollisionGroups a su valor numérico
@@ -123,8 +124,6 @@ export class ColliderComponent extends Component {
   protected enableCCD: boolean = false;
 
   // Callbacks para triggers (sensores)
-  private _onTriggerEnter?: (otherEntityId: number) => void;
-  private _onTriggerExit?: (otherEntityId: number) => void;
 
   constructor() {
     super();
@@ -492,36 +491,18 @@ export class ColliderComponent extends Component {
   }
 
   /**
-   * Registra callback para cuando otro collider ENTRA en este trigger
-   * Solo funciona si isSensor = true
-   */
-  public onTriggerEnter(callback: (otherEntityId: number) => void): void {
-    this._onTriggerEnter = callback;
-  }
-
-  /**
-   * Registra callback para cuando otro collider SALE de este trigger
-   * Solo funciona si isSensor = true
-   */
-  public onTriggerExit(callback: (otherEntityId: number) => void): void {
-    this._onTriggerExit = callback;
-  }
-
-  /**
-   * Método interno llamado por ModulePhysics cuando se detecta entrada al trigger
+   * Método interno llamado por ModulePhysics cuando se detecta entrada al trigger.
+   * Emite MsgType.TRIGGER_ENTER a todos los componentes de esta entidad.
    */
   public _notifyTriggerEnter(otherEntityId: number): void {
-    if (this._onTriggerEnter) {
-      this._onTriggerEnter(otherEntityId);
-    }
+    this.getOwner().sendMsg(Msg.triggerEnter({ otherEntityId }));
   }
 
   /**
-   * Método interno llamado por ModulePhysics cuando se detecta salida del trigger
+   * Método interno llamado por ModulePhysics cuando se detecta salida del trigger.
+   * Emite MsgType.TRIGGER_EXIT a todos los componentes de esta entidad.
    */
   public _notifyTriggerExit(otherEntityId: number): void {
-    if (this._onTriggerExit) {
-      this._onTriggerExit(otherEntityId);
-    }
+    this.getOwner().sendMsg(Msg.triggerExit({ otherEntityId }));
   }
 }

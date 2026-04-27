@@ -1,11 +1,14 @@
 import { Component } from '../../core/ecs/Component';
 import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
-import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
 import { SwingEntryData } from '../../types/SwingEntryData.type';
 import { CameraComponent } from '../render/CameraComponent';
+import { BasePlayerController } from './BasePlayerController';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
+import type { IMsg, TMsgTriggerEnter, TMsgTriggerExit } from '../../core/ecs/Msg';
 
 export class SwingBarComponent extends Component {
   // Tracking de entidades dentro del trigger
@@ -124,30 +127,14 @@ export class SwingBarComponent extends Component {
     return projected;
   }
 
-  public override async onAttach(): Promise<void> {
-    // Esperar un frame para asegurar que el box_collider está cargado
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Registrar callbacks del trigger
-    this.setupTriggerCallbacks();
-  }
-
-  private setupTriggerCallbacks(): void {
-    const boxCollider = this.getOwner().getComponent('box_collider') as BoxColliderComponent;
-
-    if (!boxCollider) {
-      console.warn('Swing bar: No se encontró box_collider (necesario para triggers)');
-      return;
-    }
-
-    // Registrar callback para cuando algo ENTRA en el trigger
-    boxCollider.onTriggerEnter((otherEntityId: number) => {
-      this.onEntityEnter(otherEntityId);
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.TRIGGER_ENTER, 'swing_bar', (comp, msg) => {
+      const { otherEntityId } = (msg as IMsg<TMsgTriggerEnter>).payload;
+      (comp as SwingBarComponent).onEntityEnter(otherEntityId);
     });
-
-    // Registrar callback para cuando algo SALE del trigger
-    boxCollider.onTriggerExit((otherEntityId: number) => {
-      this.onEntityExit(otherEntityId);
+    MsgDispatcher.register(MsgType.TRIGGER_EXIT, 'swing_bar', (comp, msg) => {
+      const { otherEntityId } = (msg as IMsg<TMsgTriggerExit>).payload;
+      (comp as SwingBarComponent).onEntityExit(otherEntityId);
     });
   }
 

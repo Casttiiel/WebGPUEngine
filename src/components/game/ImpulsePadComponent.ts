@@ -1,9 +1,12 @@
 import { Component } from '../../core/ecs/Component';
 import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
-import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
 import { BasePlayerController } from './BasePlayerController';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
+import type { IMsg } from '../../core/ecs/Msg';
+import type { TMsgTriggerEnter, TMsgTriggerExit } from '../../core/ecs/Msg';
 
 export class ImpulsePadComponent extends Component {
   // Tracking de entidades dentro del trigger
@@ -15,33 +18,17 @@ export class ImpulsePadComponent extends Component {
   }
 
   public load(data: unknown): void {
-    this.force = data.force ?? 1.0;
+    this.force = (data as { force?: number }).force ?? 1.0;
   }
 
-  public override async onAttach(): Promise<void> {
-    // Esperar un frame para asegurar que el box_collider está cargado
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Registrar callbacks del trigger
-    this.setupTriggerCallbacks();
-  }
-
-  private setupTriggerCallbacks(): void {
-    const boxCollider = this.getOwner().getComponent('box_collider') as BoxColliderComponent;
-
-    if (!boxCollider) {
-      console.warn('Impulse pad: No se encontró box_collider (necesario para triggers)');
-      return;
-    }
-
-    // Registrar callback para cuando algo ENTRA en el trigger
-    boxCollider.onTriggerEnter((otherEntityId: number) => {
-      this.onEntityEnter(otherEntityId);
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.TRIGGER_ENTER, 'impulse_pad', (comp, msg) => {
+      const { otherEntityId } = (msg as IMsg<TMsgTriggerEnter>).payload;
+      (comp as ImpulsePadComponent).onEntityEnter(otherEntityId);
     });
-
-    // Registrar callback para cuando algo SALE del trigger
-    boxCollider.onTriggerExit((otherEntityId: number) => {
-      this.onEntityExit(otherEntityId);
+    MsgDispatcher.register(MsgType.TRIGGER_EXIT, 'impulse_pad', (comp, msg) => {
+      const { otherEntityId } = (msg as IMsg<TMsgTriggerExit>).payload;
+      (comp as ImpulsePadComponent).onEntityExit(otherEntityId);
     });
   }
 

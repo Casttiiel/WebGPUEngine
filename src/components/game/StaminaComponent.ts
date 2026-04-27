@@ -1,24 +1,22 @@
 import { Component } from '../../core/ecs/Component';
 import { StaminaComponentDataType } from '../../types/StaminaComponentData.type';
+import { Msg } from '../../core/ecs/Msg';
 
 /**
  * StaminaComponent — Componente de stamina para el jugador.
  *
- * Gestiona el gasto y regeneración de stamina. No contiene lógica de UI;
- * usa callbacks para notificar cambios.
+ * Gestiona el gasto y regeneración de stamina. Emite mensajes ECS para
+ * notificar cambios a otros componentes interesados.
  *
  * Uso en JSON:
  * ```json
  * "stamina": { "maxStamina": 100, "regenRate": 20, "regenDelay": 1.0 }
  * ```
  *
- * Callbacks:
- * ```ts
- * const st = entity.getComponent('stamina') as StaminaComponent;
- * st.onSpent.push((amount, current) => { ... });
- * st.onDepleted.push(() => { ... });    // llega a 0
- * st.onFullyRestored.push(() => { ... }); // vuelve al máximo
- * ```
+ * Mensajes emitidos:
+ *   STAMINA_SPENT    — cada vez que se gasta stamina
+ *   STAMINA_DEPLETED — cuando la stamina llega a 0
+ *   STAMINA_RESTORED — cuando la stamina vuelve al máximo
  */
 export class StaminaComponent extends Component {
   private maxStamina: number = 100;
@@ -26,11 +24,6 @@ export class StaminaComponent extends Component {
   private regenRate: number = 20;
   private regenDelay: number = 2.0;
   private regenDelayTimer: number = 0;
-
-  // ── Callbacks ─────────────────────────────────────────────────────────────
-  public onSpent: Array<(amount: number, current: number) => void> = [];
-  public onDepleted: Array<() => void> = [];
-  public onFullyRestored: Array<() => void> = [];
 
   public load(data: StaminaComponentDataType): void {
     this.maxStamina = data.maxStamina ?? this.maxStamina;
@@ -58,7 +51,7 @@ export class StaminaComponent extends Component {
         // Salió de agotamiento — no notificamos onFullyRestored aún
       }
       if (this.currentStamina >= this.maxStamina) {
-        for (const cb of this.onFullyRestored) cb();
+        this.getOwner().sendMsg(Msg.staminaRestored());
       }
     }
   }
@@ -73,15 +66,14 @@ export class StaminaComponent extends Component {
     if (amount <= 0) return true;
     if (this.currentStamina < amount) return false;
 
-    const wasFull = this.currentStamina >= this.maxStamina;
     this.currentStamina -= amount;
     this.regenDelayTimer = this.regenDelay;
 
-    for (const cb of this.onSpent) cb(amount, this.currentStamina);
+    this.getOwner().sendMsg(Msg.staminaSpent({ amount, current: this.currentStamina }));
 
     if (this.currentStamina <= 0) {
       this.currentStamina = 0;
-      for (const cb of this.onDepleted) cb();
+      this.getOwner().sendMsg(Msg.staminaDepleted());
     }
 
     return true;
@@ -120,11 +112,7 @@ export class StaminaComponent extends Component {
     return this.currentStamina / this.maxStamina;
   }
 
-  public override dispose(): void {
-    this.onSpent.length = 0;
-    this.onDepleted.length = 0;
-    this.onFullyRestored.length = 0;
-  }
+  public override dispose(): void {}
 
   public override renderInMenu(): void {}
 

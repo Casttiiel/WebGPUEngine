@@ -35,6 +35,9 @@ import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
+import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
+import { SwingBarComponent } from '../../components/game/SwingBarComponent';
+import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -169,6 +172,10 @@ export class Engine {
     LensFlareComponent.registerMsgs();
     HeightFogComponent.registerMsgs();
     AtmosphericFogComponent.registerMsgs();
+    // Triggers / Física — TRIGGER_ENTER / TRIGGER_EXIT
+    ImpulsePadComponent.registerMsgs();
+    SwingBarComponent.registerMsgs();
+    ReflectionProbeComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
     // EnemyControllerComponent.registerMsgs();

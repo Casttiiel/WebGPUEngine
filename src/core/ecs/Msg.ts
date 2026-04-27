@@ -34,6 +34,34 @@ export interface TMsgOnContact {
   position?: [number, number, number];
 }
 
+/** Emitido por ColliderComponent (sensor) cuando otro collider ENTRA. */
+export interface TMsgTriggerEnter {
+  /** ID de física de la entidad que entró en el sensor. */
+  otherEntityId: number;
+}
+
+/** Emitido por ColliderComponent (sensor) cuando otro collider SALE. */
+export interface TMsgTriggerExit {
+  /** ID de física de la entidad que salió del sensor. */
+  otherEntityId: number;
+}
+
+/** Emitido por StaminaComponent cuando se gasta stamina. */
+export interface TMsgStaminaSpent {
+  amount: number; // Cantidad gastada
+  current: number; // Stamina restante
+}
+
+/** Emitido por StaminaComponent cuando la stamina llega a 0. */
+export interface TMsgStaminaDepleted {
+  // Sin payload adicional.
+}
+
+/** Emitido por StaminaComponent cuando la stamina vuelve al máximo. */
+export interface TMsgStaminaRestored {
+  // Sin payload adicional.
+}
+
 export interface TMsgEntityCreated {
   // Sin payload adicional — la propia entidad receptora es la creada.
 }
@@ -76,6 +104,21 @@ export const Msg = {
   },
   onContact(payload: TMsgOnContact): IMsg<TMsgOnContact> {
     return { type: MsgType.ON_CONTACT, payload };
+  },
+  triggerEnter(payload: TMsgTriggerEnter): IMsg<TMsgTriggerEnter> {
+    return { type: MsgType.TRIGGER_ENTER, payload };
+  },
+  triggerExit(payload: TMsgTriggerExit): IMsg<TMsgTriggerExit> {
+    return { type: MsgType.TRIGGER_EXIT, payload };
+  },
+  staminaSpent(payload: TMsgStaminaSpent): IMsg<TMsgStaminaSpent> {
+    return { type: MsgType.STAMINA_SPENT, payload };
+  },
+  staminaDepleted(): IMsg<TMsgStaminaDepleted> {
+    return { type: MsgType.STAMINA_DEPLETED, payload: {} };
+  },
+  staminaRestored(): IMsg<TMsgStaminaRestored> {
+    return { type: MsgType.STAMINA_RESTORED, payload: {} };
   },
   entityCreated(): IMsg<TMsgEntityCreated> {
     return { type: MsgType.ENTITY_CREATED, payload: {} };
