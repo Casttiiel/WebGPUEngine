@@ -50,6 +50,7 @@ export class ArcaneKnightControllerComponent
   // ──── Parámetros de movimiento ────
   private inputDisableTimer: number = -10.0;
   private groundNormal: vec3 = vec3.fromValues(0, 1, 0);
+  private impulsePadInputDisableTime: number = 0.5;
 
   private combatSystem!: CombatSystem;
   private throwSystem!: ThrowSystem;
@@ -98,7 +99,12 @@ export class ArcaneKnightControllerComponent
     );
     this.dodgeSystem = new DodgeSystem(this, data);
     this.grappleSystem = new GrappleSystem(this, data);
-    this.wallKickSystem = new WallKickSystem(this, data);
+    this.wallKickSystem = new WallKickSystem(
+      this,
+      data as unknown as CharacterControllerComponentDataType,
+    );
+    this.impulsePadInputDisableTime =
+      data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
     this.daggerHUD = new DaggerHUDSystem();
 
     // Registrar callback de grapple en ThrowSystem
@@ -273,6 +279,13 @@ export class ArcaneKnightControllerComponent
   public applyJumpFromSystem(): void {
     const jumpVel = this.jumpSystem.getJumpVelocity();
     this.jumpSystem.applyJump(jumpVel);
+  }
+
+  public applyImpulseFromPad(impulse: vec3): void {
+    const horizontal = vec3.fromValues(impulse[0], 0, impulse[2]);
+    this.jumpSystem.applyJump(impulse[1]);
+    this.currentHorizontalVelocity = vec3.clone(horizontal);
+    this.inputDisableTimer = this.impulsePadInputDisableTime;
   }
 
   public getCombatSystem(): CombatSystem {

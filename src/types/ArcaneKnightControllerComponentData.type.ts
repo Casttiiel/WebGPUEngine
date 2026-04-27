@@ -44,4 +44,7 @@ export type ArcaneKnightControllerComponentDataType = {
   // Wall kick
   wallKickDetectionDistance?: number;
   wallKickInputDisableTime?: number;
+
+  // Impulse pad
+  impulsePadInputDisableTime?: number;
 };

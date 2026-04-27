@@ -12,9 +12,8 @@
 
 ## Environment Gameplay
 
-1. Impulse Pad
-2. Pared Rompible
-3. Traps [...]
+1. Pared Rompible
+2. Traps [...]
 
 ## Visuals and Sound
 

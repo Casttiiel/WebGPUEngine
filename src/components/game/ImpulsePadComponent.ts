@@ -3,7 +3,7 @@ import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
 import { BoxColliderComponent } from '../physics/BoxColliderComponent';
 import { Engine } from '../../core/engine/Engine';
-import { CharacterControllerComponent } from './ParkourControllerComponent';
+import { BasePlayerController } from './BasePlayerController';
 
 export class ImpulsePadComponent extends Component {
   // Tracking de entidades dentro del trigger
@@ -47,18 +47,17 @@ export class ImpulsePadComponent extends Component {
 
   private onEntityEnter(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-
-    if (entity && entity.hasComponent('parkour_controller')) {
+    if (entity && entity.hasComponent('player_controller')) {
       this.entitiesInside.add(entityId);
-      (
-        entity.getComponent('parkour_controller') as CharacterControllerComponent
-      )?.applyImpulseFromPad(vec3.scale(vec3.create(), this.getUp(), this.force));
+      (entity.getComponent('player_controller') as BasePlayerController)?.applyImpulseFromPad(
+        vec3.scale(vec3.create(), this.getUp(), this.force),
+      );
     }
   }
 
   private onEntityExit(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('parkour_controller')) {
+    if (entity && entity.hasComponent('player_controller')) {
       this.entitiesInside.delete(entityId);
     }
   }

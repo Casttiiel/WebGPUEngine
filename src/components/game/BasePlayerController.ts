@@ -39,4 +39,7 @@ export abstract class BasePlayerController extends Component {
 
   /** Velocidad vertical actual (positiva = subiendo). */
   public abstract getVerticalVelocity(): number;
+
+  /** Aplica un impulso de un pad de lanzamiento. */
+  public abstract applyImpulseFromPad(impulse: import('gl-matrix').vec3): void;
 }
