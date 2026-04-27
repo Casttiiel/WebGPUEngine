@@ -66,6 +66,7 @@ import { WeaponComponent } from '../../components/game/WeaponComponent';
 import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { HealthComponent } from '../../components/game/HealthComponent';
+import { StaminaComponent } from '../../components/game/StaminaComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -393,6 +394,8 @@ export class Loader {
         return new PlayerSpawnComponent();
       case 'health':
         return new HealthComponent();
+      case 'stamina':
+        return new StaminaComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }
