@@ -1110,7 +1110,11 @@ export class SkinnedMeshComponent extends Component {
 
     // Forward axis in world space
     const fwdLocal = c.forwardAxis ?? [0, 0, 1];
-    const worldFwd = vec3.transformQuat(vec3.create(), fwdLocal as vec3, currentRot as unknown as quat);
+    const worldFwd = vec3.transformQuat(
+      vec3.create(),
+      fwdLocal as vec3,
+      currentRot as unknown as quat,
+    );
 
     // Shortest-arc rotation from current forward to target direction
     const q = quat.create();
@@ -1150,12 +1154,7 @@ export class SkinnedMeshComponent extends Component {
 
     const scale = vec3.create();
     mat4.getScaling(scale, M as unknown as mat4);
-    mat4.fromRotationTranslationScale(
-      M as unknown as mat4,
-      newRot as unknown as quat,
-      pos,
-      scale,
-    );
+    mat4.fromRotationTranslationScale(M as unknown as mat4, newRot as unknown as quat, pos, scale);
     this._ikFrozenJoints.add(jointIdx);
   }
 
@@ -1204,9 +1203,10 @@ export class SkinnedMeshComponent extends Component {
     }
 
     // Law of cosines: angle at root between (root→target) and upper bone
-    const cosA = Math.max(-1, Math.min(1,
-      (d1 * d1 + clampedDist * clampedDist - d2 * d2) / (2 * d1 * clampedDist),
-    ));
+    const cosA = Math.max(
+      -1,
+      Math.min(1, (d1 * d1 + clampedDist * clampedDist - d2 * d2) / (2 * d1 * clampedDist)),
+    );
     const angleA = Math.acos(cosA);
 
     // New mid-joint position: pA + d1*(cos(angleA)*dir + sin(angleA)*polePerp)
@@ -1225,7 +1225,7 @@ export class SkinnedMeshComponent extends Component {
 
     // --- Update root joint ---
     const origAB = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pB, pA));
-    const newAB  = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pB_new, pA));
+    const newAB = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pB_new, pA));
     const qRoot = quat.create();
     quat.rotationTo(qRoot as unknown as quat, origAB, newAB);
 
@@ -1263,7 +1263,7 @@ export class SkinnedMeshComponent extends Component {
 
     // --- Update mid joint ---
     const origBC = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pC, pB));
-    const newBC  = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pT_final, pB_final));
+    const newBC = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pT_final, pB_final));
     const qMid = quat.create();
     quat.rotationTo(qMid as unknown as quat, origBC, newBC);
 
@@ -1299,7 +1299,7 @@ export class SkinnedMeshComponent extends Component {
     if (jointIdx < 0) return;
 
     const M = this.globalMats[jointIdx]!;
-    const pos   = vec3.fromValues(M[12]!, M[13]!, M[14]!);
+    const pos = vec3.fromValues(M[12]!, M[13]!, M[14]!);
     const scale = vec3.create();
     mat4.getScaling(scale, M as unknown as mat4);
     const rot = quat.create();
@@ -1322,12 +1322,7 @@ export class SkinnedMeshComponent extends Component {
       vec3.add(pos, pos, scaledOffset);
     }
 
-    mat4.fromRotationTranslationScale(
-      M as unknown as mat4,
-      rot as unknown as quat,
-      pos,
-      scale,
-    );
+    mat4.fromRotationTranslationScale(M as unknown as mat4, rot as unknown as quat, pos, scale);
     this._ikFrozenJoints.add(jointIdx);
   }
 
