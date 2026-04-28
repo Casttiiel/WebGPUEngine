@@ -7,7 +7,7 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { SkeletonData, AnimationClip, AnimationChannel } from '../../types/SkinData.type';
 import { RenderCategory } from '../../types/RenderCategory.enum';
-import { mat4, quat } from 'gl-matrix';
+import { mat4, quat, vec3 } from 'gl-matrix';
 import {
   WebIO,
   Node as GltfNode,
@@ -32,6 +32,47 @@ export interface SkinnedMeshComponentData {
 const MAX_JOINTS = 128; // Must match gbuffer_skinned.vs expectation
 const MAT4_BYTES = 64; // 16 floats × 4 bytes
 
+// ─── Animation layer options (public API) ─────────────────────────────────────
+export interface AnimLayerOptions {
+  /** Blend weight for this layer, 0–1 (default 1.0). */
+  weight?: number;
+  /** Seconds to blend this layer in (default 0 = instant). */
+  blendInTime?: number;
+  /** Whether to loop this layer's clip (default true). */
+  loop?: boolean;
+  /** Playback speed multiplier (default 1.0). */
+  speed?: number;
+  /**
+   * Joint names that this layer affects (and all their children).
+   * Omit to affect every joint.
+   */
+  jointMask?: string[];
+}
+
+interface InternalAnimLayer {
+  id: number;
+  clipIndex: number;
+  time: number;
+  weight: number; // target weight set by caller
+  currentWeight: number; // actual weight (interpolated)
+  blendInTime: number;
+  fadingOut: boolean;
+  fadeOutDuration: number;
+  fadeOutElapsed: number;
+  loop: boolean;
+  speed: number;
+  jointMask: boolean[] | null; // null = all joints
+}
+/**
+ * Controls how the root joint's translation is handled.
+ * - `'none'`    : root joint animated normally (in-place animations work fine).
+ * - `'extract'` : root joint is locked to bind pose; per-frame delta is stored in
+ *                 `rootMotionDelta` and available via `getRootMotionDelta()` for
+ *                 consumption by a physics controller.
+ * - `'apply'`   : like `'extract'` but also automatically moves the entity's
+ *                 TransformComponent by the delta each frame.
+ */
+export type RootMotionMode = 'none' | 'extract' | 'apply';
 export class SkinnedMeshComponent extends Component {
   // Render resources (one SkinnedMesh per mesh node; shared material + skinBindGroup)
   private skinnedMeshes: SkinnedMesh[] = [];
@@ -56,8 +97,30 @@ export class SkinnedMeshComponent extends Component {
   private localT: Float32Array[] = []; // per-joint translation
   private localR: Float32Array[] = []; // per-joint rotation (quat xyzw)
   private localS: Float32Array[] = []; // per-joint scale
+  private tempT: Float32Array[] = []; // scratch for blending
+  private tempR: Float32Array[] = [];
+  private tempS: Float32Array[] = [];
   private globalMats: mat4[] = [];
   private jointPalette: Float32Array; // flattened mat4 array for GPU upload
+
+  // ── Crossfade state (base-layer transition) ──────────────────────────────
+  private crossfadeFrom: { clipIndex: number; time: number } | null = null;
+  private crossfadeDuration: number = 0;
+  private crossfadeElapsed: number = 0;
+
+  // ── Animation layers ─────────────────────────────────────────────────────
+  private animLayers: InternalAnimLayer[] = [];
+  private nextLayerId: number = 0;
+
+  // ── Root motion ───────────────────────────────────────────────────────────
+  private rootMotionMode: RootMotionMode = 'none';
+  private rootMotionIncludeY: boolean = false;
+  private rootMotionDelta: vec3 = vec3.create();
+  private rootJointIndex: number = -1;
+  private prevRootLocalT: Float32Array = new Float32Array(3);
+  private rootPreRotation: quat = quat.create();
+  private _rootMotionFirstFrame: boolean = true;
+  private _rootMotionDidLoop: boolean = false;
 
   constructor() {
     super();
@@ -208,12 +271,25 @@ export class SkinnedMeshComponent extends Component {
       this.localT.push(new Float32Array([0, 0, 0]));
       this.localR.push(new Float32Array([0, 0, 0, 1]));
       this.localS.push(new Float32Array([1, 1, 1]));
+      this.tempT.push(new Float32Array([0, 0, 0]));
+      this.tempR.push(new Float32Array([0, 0, 0, 1]));
+      this.tempS.push(new Float32Array([1, 1, 1]));
       this.globalMats.push(mat4.create());
     }
 
     // Precompute topological order (parents before children).
     // Mixamo exports joints leaf-first, so we can't just iterate 0..n.
     this.evalOrder = this.computeTopoOrder(this.skeleton.parents);
+
+    // Root joint index (first joint with no parent)
+    this.rootJointIndex = this.skeleton.parents.indexOf(-1);
+
+    // Extract rotation part of rootPreTransform for root motion direction mapping
+    mat4.getRotation(
+      this.rootPreRotation as unknown as quat,
+      this.skeleton.rootPreTransform as unknown as mat4,
+    );
+    quat.normalize(this.rootPreRotation as unknown as quat, this.rootPreRotation as unknown as quat);
 
     // ── Extract animation clips ──────────────────────────────────────────────
     this.clips = this.extractAnimations(root.listAnimations(), root.listNodes());
@@ -307,17 +383,79 @@ export class SkinnedMeshComponent extends Component {
       return;
     }
 
+    // ── Advance base clip ──────────────────────────────────────────────────
     const clip = this.clips[this.activeClipIndex];
     if (!clip) return;
 
     this.playbackTime += dt * this.playbackSpeed;
-
     if (this.playbackTime > clip.duration) {
       if (this.loop) {
         this.playbackTime = this.playbackTime % clip.duration;
+        this._rootMotionDidLoop = true;
       } else {
         this.playbackTime = clip.duration;
         this.playing = false;
+      }
+    }
+
+    // ── Advance crossfade ──────────────────────────────────────────────────
+    if (this.crossfadeFrom) {
+      this.crossfadeElapsed += dt;
+      const fromClip = this.clips[this.crossfadeFrom.clipIndex];
+      if (fromClip) {
+        this.crossfadeFrom.time += dt * this.playbackSpeed;
+        if (this.crossfadeFrom.time > fromClip.duration) {
+          this.crossfadeFrom.time = this.crossfadeFrom.time % fromClip.duration;
+        }
+      }
+      if (this.crossfadeElapsed >= this.crossfadeDuration) {
+        this.crossfadeFrom = null;
+      }
+    }
+
+    // ── Advance layers ─────────────────────────────────────────────────────
+    for (let i = this.animLayers.length - 1; i >= 0; i--) {
+      const layer = this.animLayers[i]!;
+      const layerClip = this.clips[layer.clipIndex];
+      if (!layerClip) continue;
+
+      layer.time += dt * layer.speed;
+      if (layer.time > layerClip.duration) {
+        if (layer.loop) {
+          layer.time = layer.time % layerClip.duration;
+        } else {
+          layer.time = layerClip.duration;
+          if (!layer.fadingOut) {
+            layer.fadingOut = true;
+            layer.fadeOutDuration = layer.blendInTime > 0 ? layer.blendInTime : 0;
+            layer.fadeOutElapsed = 0;
+          }
+        }
+      }
+
+      if (!layer.fadingOut) {
+        // Blend in
+        if (layer.blendInTime > 0) {
+          layer.currentWeight = Math.min(
+            layer.currentWeight + dt / layer.blendInTime,
+            layer.weight,
+          );
+        } else {
+          layer.currentWeight = layer.weight;
+        }
+      } else {
+        // Fade out
+        layer.fadeOutElapsed += dt;
+        if (layer.fadeOutDuration > 0) {
+          layer.currentWeight =
+            layer.weight * Math.max(1 - layer.fadeOutElapsed / layer.fadeOutDuration, 0);
+        } else {
+          layer.currentWeight = 0;
+        }
+        if (layer.currentWeight <= 0) {
+          this.animLayers.splice(i, 1);
+          continue;
+        }
       }
     }
 
@@ -349,17 +487,127 @@ export class SkinnedMeshComponent extends Component {
 
   // ── Public animation controls ──────────────────────────────────────────────
 
-  public play(indexOrName?: number | string): void {
+  /**
+   * Play a clip by index or name.
+   * @param indexOrName  Clip index or name. Omit to resume current.
+   * @param blendTime    Seconds to crossfade from the current pose (0 = instant).
+   */
+  public play(indexOrName?: number | string, blendTime: number = 0): void {
+    let targetIndex = this.activeClipIndex;
     if (indexOrName !== undefined) {
       if (typeof indexOrName === 'string') {
         const idx = this.clips.findIndex((c) => c.name === indexOrName);
-        if (idx >= 0) this.activeClipIndex = idx;
+        if (idx >= 0) targetIndex = idx;
       } else {
-        this.activeClipIndex = Math.min(indexOrName, this.clips.length - 1);
+        targetIndex = Math.min(indexOrName, this.clips.length - 1);
       }
-      this.playbackTime = 0;
     }
+
+    if (blendTime > 0 && targetIndex !== this.activeClipIndex) {
+      // Save current state as the blend-from snapshot
+      this.crossfadeFrom = { clipIndex: this.activeClipIndex, time: this.playbackTime };
+      this.crossfadeDuration = blendTime;
+      this.crossfadeElapsed = 0;
+    } else {
+      this.crossfadeFrom = null;
+    }
+
+    this.activeClipIndex = targetIndex;
+    this.playbackTime = 0;
     this.playing = true;
+    this._rootMotionFirstFrame = true; // reset root motion baseline on clip change
+  }
+
+  /**
+   * Add an override animation layer on top of the base animation.
+   * Returns a layer ID used with removeLayer / setLayerWeight.
+   */
+  public addLayer(clipIndexOrName: number | string, options?: AnimLayerOptions): number {
+    let clipIndex: number;
+    if (typeof clipIndexOrName === 'string') {
+      const idx = this.clips.findIndex((c) => c.name === clipIndexOrName);
+      clipIndex = idx >= 0 ? idx : 0;
+    } else {
+      clipIndex = Math.min(clipIndexOrName, this.clips.length - 1);
+    }
+
+    const weight = options?.weight ?? 1.0;
+    const blendInTime = options?.blendInTime ?? 0;
+
+    // Build joint mask if requested (propagate to children)
+    let jointMask: boolean[] | null = null;
+    if (options?.jointMask && options.jointMask.length > 0) {
+      jointMask = new Array(this.jointCount).fill(false);
+      for (const name of options.jointMask) {
+        const idx = this.skeleton.names.indexOf(name);
+        if (idx >= 0) this.markJointAndChildren(idx, jointMask);
+      }
+    }
+
+    const id = this.nextLayerId++;
+    this.animLayers.push({
+      id,
+      clipIndex,
+      time: 0,
+      weight,
+      currentWeight: blendInTime > 0 ? 0 : weight,
+      blendInTime,
+      fadingOut: false,
+      fadeOutDuration: 0,
+      fadeOutElapsed: 0,
+      loop: options?.loop ?? true,
+      speed: options?.speed ?? 1.0,
+      jointMask,
+    });
+    return id;
+  }
+
+  /**
+   * Remove a layer by ID.
+   * @param fadeOutTime  Seconds to fade the layer out before removing (0 = instant).
+   */
+  public removeLayer(id: number, fadeOutTime: number = 0): void {
+    const layer = this.animLayers.find((l) => l.id === id);
+    if (!layer) return;
+
+    if (fadeOutTime > 0 && !layer.fadingOut) {
+      layer.fadingOut = true;
+      layer.fadeOutDuration = fadeOutTime;
+      layer.fadeOutElapsed = 0;
+    } else {
+      const idx = this.animLayers.findIndex((l) => l.id === id);
+      if (idx >= 0) this.animLayers.splice(idx, 1);
+    }
+  }
+
+  /** Set the target blend weight for a layer (0–1). */
+  public setLayerWeight(id: number, weight: number): void {
+    const layer = this.animLayers.find((l) => l.id === id);
+    if (layer) layer.weight = Math.max(0, Math.min(1, weight));
+  }
+
+  /**
+   * Configure root motion handling.
+   * @param mode
+   *   - `'none'`    : default — root joint animated normally (good for in-place clips).
+   *   - `'extract'` : root translation locked to bind pose; delta available via `getRootMotionDelta()`.
+   *   - `'apply'`   : like `'extract'` but the delta is also applied to the entity's Transform.
+   * @param includeY  If true, vertical (Y) displacement is included in the delta (e.g. for jump animations).
+   */
+  public setRootMotion(mode: RootMotionMode, includeY: boolean = false): void {
+    this.rootMotionMode = mode;
+    this.rootMotionIncludeY = includeY;
+    this._rootMotionFirstFrame = true; // reset baseline when mode changes
+    vec3.set(this.rootMotionDelta, 0, 0, 0);
+  }
+
+  /**
+   * Returns the root motion displacement in world space accumulated this frame.
+   * Only non-zero when rootMotionMode is `'extract'` or `'apply'`.
+   * Read this in a physics controller to drive a character body.
+   */
+  public getRootMotionDelta(): Readonly<vec3> {
+    return this.rootMotionDelta;
   }
 
   public pause(): void {
@@ -541,34 +789,150 @@ export class SkinnedMeshComponent extends Component {
 
   // ── Animation evaluation ───────────────────────────────────────────────────
 
-  private evaluateAnimation(time: number): void {
-    const clip = this.clips[this.activeClipIndex];
-
-    // Reset to bind pose
+  /**
+   * Evaluate a single clip into the provided per-joint TRS arrays.
+   * Resets to bind pose first, then applies the clip's channels.
+   */
+  private evaluateClip(
+    clipIndex: number,
+    time: number,
+    outT: Float32Array[],
+    outR: Float32Array[],
+    outS: Float32Array[],
+  ): void {
+    const bp = this.skeleton.bindPoseLocal;
     for (let i = 0; i < this.jointCount; i++) {
       const off = i * 10;
-      const bp = this.skeleton.bindPoseLocal;
-      this.localT[i]!.set([bp[off]!, bp[off + 1]!, bp[off + 2]!]);
-      this.localR[i]!.set([bp[off + 3]!, bp[off + 4]!, bp[off + 5]!, bp[off + 6]!]);
-      this.localS[i]!.set([bp[off + 7]!, bp[off + 8]!, bp[off + 9]!]);
+      outT[i]!.set([bp[off]!, bp[off + 1]!, bp[off + 2]!]);
+      outR[i]!.set([bp[off + 3]!, bp[off + 4]!, bp[off + 5]!, bp[off + 6]!]);
+      outS[i]!.set([bp[off + 7]!, bp[off + 8]!, bp[off + 9]!]);
+    }
+    const clip = this.clips[clipIndex];
+    if (!clip) return;
+    for (const channel of clip.channels) {
+      const { jointIndex, path, times, values, interpolation } = channel;
+      if (jointIndex >= this.jointCount) continue;
+      if (path === 'translation') {
+        sampleVec3(times, values, time, interpolation, outT[jointIndex]!);
+      } else if (path === 'rotation') {
+        sampleQuat(times, values, time, interpolation, outR[jointIndex]!);
+      } else if (path === 'scale') {
+        sampleVec3(times, values, time, interpolation, outS[jointIndex]!);
+      }
+    }
+  }
+
+  private evaluateAnimation(time: number): void {
+    // ── Step 1: evaluate active ("to") clip ───────────────────────────────
+    this.evaluateClip(this.activeClipIndex, time, this.localT, this.localR, this.localS);
+
+    // ── Step 2: crossfade blend ───────────────────────────────────────────
+    if (this.crossfadeFrom) {
+      const alpha = Math.min(this.crossfadeElapsed / this.crossfadeDuration, 1.0);
+      this.evaluateClip(
+        this.crossfadeFrom.clipIndex,
+        this.crossfadeFrom.time,
+        this.tempT,
+        this.tempR,
+        this.tempS,
+      );
+      // Blend: result = from*(1-alpha) + to*alpha
+      for (let i = 0; i < this.jointCount; i++) {
+        const lT = this.localT[i]!;
+        const tT = this.tempT[i]!;
+        lT[0] = tT[0]! + (lT[0]! - tT[0]!) * alpha;
+        lT[1] = tT[1]! + (lT[1]! - tT[1]!) * alpha;
+        lT[2] = tT[2]! + (lT[2]! - tT[2]!) * alpha;
+        const lS = this.localS[i]!;
+        const tS = this.tempS[i]!;
+        lS[0] = tS[0]! + (lS[0]! - tS[0]!) * alpha;
+        lS[1] = tS[1]! + (lS[1]! - tS[1]!) * alpha;
+        lS[2] = tS[2]! + (lS[2]! - tS[2]!) * alpha;
+        quat.slerp(this.localR[i] as any, this.tempR[i] as any, this.localR[i] as any, alpha);
+      }
     }
 
-    if (clip) {
-      for (const channel of clip.channels) {
-        const { jointIndex, path, times, values, interpolation } = channel;
-        if (jointIndex >= this.jointCount) continue;
+    // ── Step 3: apply override layers ────────────────────────────────────
+    for (const layer of this.animLayers) {
+      if (layer.currentWeight <= 0) continue;
+      this.evaluateClip(layer.clipIndex, layer.time, this.tempT, this.tempR, this.tempS);
+      const w = layer.currentWeight;
+      for (let i = 0; i < this.jointCount; i++) {
+        if (layer.jointMask && !layer.jointMask[i]) continue;
+        const lT = this.localT[i]!;
+        const tT = this.tempT[i]!;
+        const lT0 = lT[0]!,
+          lT1 = lT[1]!,
+          lT2 = lT[2]!;
+        lT[0] = lT0 + (tT[0]! - lT0) * w;
+        lT[1] = lT1 + (tT[1]! - lT1) * w;
+        lT[2] = lT2 + (tT[2]! - lT2) * w;
+        const lS = this.localS[i]!;
+        const tS = this.tempS[i]!;
+        const lS0 = lS[0]!,
+          lS1 = lS[1]!,
+          lS2 = lS[2]!;
+        lS[0] = lS0 + (tS[0]! - lS0) * w;
+        lS[1] = lS1 + (tS[1]! - lS1) * w;
+        lS[2] = lS2 + (tS[2]! - lS2) * w;
+        quat.slerp(this.localR[i] as any, this.localR[i] as any, this.tempR[i] as any, w);
+      }
+    }
 
-        if (path === 'translation') {
-          sampleVec3(times, values, time, interpolation, this.localT[jointIndex]!);
-        } else if (path === 'rotation') {
-          sampleQuat(times, values, time, interpolation, this.localR[jointIndex]!);
-        } else if (path === 'scale') {
-          sampleVec3(times, values, time, interpolation, this.localS[jointIndex]!);
+    // ── Step 4 (optional): root motion extraction ─────────────────────────
+    if (this.rootMotionMode !== 'none' && this.rootJointIndex >= 0) {
+      const rootT = this.localT[this.rootJointIndex]!;
+
+      if (this._rootMotionFirstFrame || this._rootMotionDidLoop) {
+        // First frame or loop boundary: store baseline, no displacement
+        this.prevRootLocalT.set(rootT);
+        vec3.set(this.rootMotionDelta, 0, 0, 0);
+        this._rootMotionFirstFrame = false;
+        this._rootMotionDidLoop = false;
+      } else {
+        // Compute local-space delta
+        const dx = rootT[0]! - this.prevRootLocalT[0]!;
+        const dy = this.rootMotionIncludeY ? rootT[1]! - this.prevRootLocalT[1]! : 0;
+        const dz = rootT[2]! - this.prevRootLocalT[2]!;
+        const delta = vec3.fromValues(dx, dy, dz);
+
+        // Map through rootPreTransform rotation (e.g. Blender armature Z→Y up)
+        vec3.transformQuat(delta, delta, this.rootPreRotation as unknown as quat);
+
+        // Map through entity world rotation so delta is in world space
+        const ownerTransform = (
+          this.getOwner().getComponent('transform') as TransformComponent | null
+        )?.getTransform();
+        if (ownerTransform) {
+          vec3.transformQuat(delta, delta, ownerTransform.getWorldRotation());
+        }
+
+        vec3.copy(this.rootMotionDelta, delta);
+        this.prevRootLocalT.set(rootT);
+      }
+
+      // Lock root joint to bind pose (prevent mesh from drifting from entity origin)
+      const bp = this.skeleton.bindPoseLocal;
+      const bpOff = this.rootJointIndex * 10;
+      this.localT[this.rootJointIndex]!.set([
+        bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!,
+      ]);
+
+      // Optionally drive entity transform directly
+      if (this.rootMotionMode === 'apply') {
+        const ownerTransform = (
+          this.getOwner().getComponent('transform') as TransformComponent | null
+        )?.getTransform();
+        if (ownerTransform) {
+          const pos = ownerTransform.getLocalPosition();
+          ownerTransform.setLocalPosition(
+            vec3.add(vec3.create(), pos, this.rootMotionDelta),
+          );
         }
       }
     }
 
-    // Compute global matrices in topological order (parents guaranteed before children)
+    // ── Step 5: compute global matrices (parents before children) ─────────
     const ibm = this.skeleton.inverseBindMatrices;
     const parents = this.skeleton.parents;
     const rootPre = this.skeleton.rootPreTransform as unknown as mat4;
@@ -580,17 +944,25 @@ export class SkinnedMeshComponent extends Component {
         this.localT[i] as any,
         this.localS[i] as any,
       );
-
       const parentIdx = parents[i]!;
       if (parentIdx < 0) {
-        // Root joint: prepend the non-joint ancestor transform (e.g. Armature's rotation+scale)
         this.globalMats[i] = mat4.mul(mat4.create(), rootPre, local);
       } else {
         this.globalMats[i] = mat4.mul(mat4.create(), this.globalMats[parentIdx]!, local);
       }
-
       const ibmSlice = ibm.subarray(i * 16, i * 16 + 16) as unknown as mat4;
       this.jointPalette.set(mat4.mul(mat4.create(), this.globalMats[i]!, ibmSlice), i * 16);
+    }
+  }
+
+  /** Recursively marks jointIdx and all its children as true in mask. */
+  private markJointAndChildren(jointIdx: number, mask: boolean[]): void {
+    mask[jointIdx] = true;
+    const parents = this.skeleton.parents;
+    for (let i = 0; i < this.jointCount; i++) {
+      if (parents[i] === jointIdx && !mask[i]) {
+        this.markJointAndChildren(i, mask);
+      }
     }
   }
 

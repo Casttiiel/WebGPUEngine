@@ -4,6 +4,7 @@
 2. Enemy AI / NavMesh
 3. Technique, Material, skinned autocomplete
 4. Material Editor
+5. Procedural materials
 
 ## Combat Gameplay
 
