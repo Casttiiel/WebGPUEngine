@@ -73,6 +73,72 @@ interface InternalAnimLayer {
  *                 TransformComponent by the delta each frame.
  */
 export type RootMotionMode = 'none' | 'extract' | 'apply';
+
+// ─── IK / Procedural constraint types ────────────────────────────────────────
+
+/**
+ * Rotates a single joint so that its `forwardAxis` (local space) points at
+ * a world-space `target` position.  Good for head look-at, eye tracking, etc.
+ */
+export interface LookAtConstraint {
+  type: 'lookat';
+  /** Name of the joint to rotate. */
+  jointName: string;
+  /** World-space target to look at.  Update in-place each frame. */
+  target: vec3;
+  /**
+   * Which local-space axis of the joint is the "forward" direction.
+   * Default [0, 0, 1] (+Z, standard GLTF/glTF).
+   */
+  forwardAxis?: vec3;
+  /** Blend weight 0–1. */
+  weight: number;
+  /** Maximum rotation angle (degrees) from the joint's bind orientation. */
+  limitAngleDeg?: number;
+}
+
+/**
+ * Classic analytic two-bone IK (arm, leg).
+ * Solves for root and mid rotations so that the tip reaches `target`.
+ * `poleTarget` controls which side the mid joint bends toward.
+ */
+export interface TwoBoneIkConstraint {
+  type: 'twobone';
+  /** Upper bone root (shoulder / hip). */
+  rootJointName: string;
+  /** Mid joint (elbow / knee). */
+  midJointName: string;
+  /** End effector (wrist / ankle). */
+  tipJointName: string;
+  /** World-space IK target.  Update in-place each frame. */
+  target: vec3;
+  /** World-space pole vector (controls elbow/knee direction). */
+  poleTarget?: vec3;
+  /** Blend weight 0–1. */
+  weight: number;
+}
+
+/**
+ * Adds a procedural additive offset to a single joint's world-space transform
+ * every frame.  Useful for breathing, secondary motion, jiggle, etc.
+ * Update `rotationOffset` / `translationOffset` each frame from your own code.
+ */
+export interface ProceduralOffsetConstraint {
+  type: 'procedural_offset';
+  /** Name of the joint to offset. */
+  jointName: string;
+  /** Additive world-space translation (updated by caller). */
+  translationOffset?: vec3;
+  /**
+   * Additive rotation applied on top of the animated rotation (world space,
+   * right-multiplied).  Update in-place each frame.
+   */
+  rotationOffset?: quat;
+  /** Blend weight 0–1. */
+  weight: number;
+}
+
+export type IkConstraint = LookAtConstraint | TwoBoneIkConstraint | ProceduralOffsetConstraint;
 export class SkinnedMeshComponent extends Component {
   // Render resources (one SkinnedMesh per mesh node; shared material + skinBindGroup)
   private skinnedMeshes: SkinnedMesh[] = [];
@@ -121,6 +187,10 @@ export class SkinnedMeshComponent extends Component {
   private rootPreRotation: quat = quat.create();
   private _rootMotionFirstFrame: boolean = true;
   private _rootMotionDidLoop: boolean = false;
+
+  // ── IK / Procedural constraints ───────────────────────────────────────────
+  private ikConstraints: IkConstraint[] = [];
+  private _ikFrozenJoints: Set<number> = new Set();
 
   constructor() {
     super();
@@ -932,7 +1002,6 @@ export class SkinnedMeshComponent extends Component {
     }
 
     // ── Step 5: compute global matrices (parents before children) ─────────
-    const ibm = this.skeleton.inverseBindMatrices;
     const parents = this.skeleton.parents;
     const rootPre = this.skeleton.rootPreTransform as unknown as mat4;
 
@@ -949,6 +1018,16 @@ export class SkinnedMeshComponent extends Component {
       } else {
         this.globalMats[i] = mat4.mul(mat4.create(), this.globalMats[parentIdx]!, local);
       }
+    }
+
+    // ── Step 6: IK & procedural constraints ──────────────────────────────
+    if (this.ikConstraints.length > 0) {
+      this.applyIkConstraints();
+    }
+
+    // ── Step 7: compute joint palette from final global matrices ──────────
+    const ibm = this.skeleton.inverseBindMatrices;
+    for (let i = 0; i < this.jointCount; i++) {
       const ibmSlice = ibm.subarray(i * 16, i * 16 + 16) as unknown as mat4;
       this.jointPalette.set(mat4.mul(mat4.create(), this.globalMats[i]!, ibmSlice), i * 16);
     }
@@ -963,6 +1042,318 @@ export class SkinnedMeshComponent extends Component {
         this.markJointAndChildren(i, mask);
       }
     }
+  }
+
+  // ── IK / Procedural constraint solvers ────────────────────────────────────
+
+  private applyIkConstraints(): void {
+    this._ikFrozenJoints.clear();
+    for (const c of this.ikConstraints) {
+      if (c.weight <= 0) continue;
+      if (c.type === 'lookat') this.applyLookAt(c);
+      else if (c.type === 'twobone') this.applyTwoBoneIK(c);
+      else if (c.type === 'procedural_offset') this.applyProceduralOffset(c);
+    }
+    if (this._ikFrozenJoints.size > 0) this.repropagateMats();
+  }
+
+  /**
+   * After IK modifies some globalMats, re-traverse in topological order
+   * so that non-frozen joints downstream of frozen ones are updated.
+   */
+  private repropagateMats(): void {
+    const parents = this.skeleton.parents;
+    const rootPre = this.skeleton.rootPreTransform as unknown as mat4;
+
+    for (const i of this.evalOrder) {
+      if (this._ikFrozenJoints.has(i)) continue;
+      const parentIdx = parents[i]!;
+      // Only re-propagate if parent was touched (frozen or already re-propagated)
+      if (parentIdx >= 0 && !this._ikFrozenJoints.has(parentIdx)) continue;
+
+      const local = mat4.fromRotationTranslationScale(
+        mat4.create(),
+        this.localR[i] as any,
+        this.localT[i] as any,
+        this.localS[i] as any,
+      );
+      if (parentIdx < 0) {
+        const rootPre2 = this.skeleton.rootPreTransform as unknown as mat4;
+        this.globalMats[i] = mat4.mul(mat4.create(), rootPre2, local);
+      } else {
+        this.globalMats[i] = mat4.mul(mat4.create(), this.globalMats[parentIdx]!, local);
+      }
+      // Mark as updated so its children get re-propagated too
+      this._ikFrozenJoints.add(i);
+    }
+    void rootPre; // suppress unused warning
+  }
+
+  // ── LookAt ────────────────────────────────────────────────────────────────
+
+  private applyLookAt(c: LookAtConstraint): void {
+    const jointIdx = this.skeleton.names.indexOf(c.jointName);
+    if (jointIdx < 0) return;
+
+    const M = this.globalMats[jointIdx]!;
+    const pos = vec3.fromValues(M[12]!, M[13]!, M[14]!);
+
+    const toTarget = vec3.sub(vec3.create(), c.target, pos);
+    const dist = vec3.length(toTarget);
+    if (dist < 0.0001) return;
+    vec3.scale(toTarget, toTarget, 1.0 / dist);
+
+    // Current world rotation
+    const currentRot = quat.create();
+    mat4.getRotation(currentRot as unknown as quat, M as unknown as mat4);
+    quat.normalize(currentRot as unknown as quat, currentRot as unknown as quat);
+
+    // Forward axis in world space
+    const fwdLocal = c.forwardAxis ?? [0, 0, 1];
+    const worldFwd = vec3.transformQuat(vec3.create(), fwdLocal as vec3, currentRot as unknown as quat);
+
+    // Shortest-arc rotation from current forward to target direction
+    const q = quat.create();
+    quat.rotationTo(q as unknown as quat, worldFwd, toTarget);
+
+    // Apply angular limit
+    if (c.limitAngleDeg !== undefined) {
+      const limitRad = c.limitAngleDeg * (Math.PI / 180);
+      // angle of a quaternion: theta = 2*acos(|w|)
+      const w = Math.min(1, Math.abs((q as unknown as Float32Array)[3]!));
+      const angle = 2 * Math.acos(w);
+      if (angle > limitRad && angle > 0.0001) {
+        quat.slerp(
+          q as unknown as quat,
+          quat.create() as unknown as quat,
+          q as unknown as quat,
+          limitRad / angle,
+        );
+      }
+    }
+
+    // Blend with weight
+    quat.slerp(
+      q as unknown as quat,
+      quat.create() as unknown as quat,
+      q as unknown as quat,
+      c.weight,
+    );
+
+    // Apply delta rotation to current world rotation
+    const newRot = quat.mul(
+      quat.create() as unknown as quat,
+      q as unknown as quat,
+      currentRot as unknown as quat,
+    );
+    quat.normalize(newRot as unknown as quat, newRot as unknown as quat);
+
+    const scale = vec3.create();
+    mat4.getScaling(scale, M as unknown as mat4);
+    mat4.fromRotationTranslationScale(
+      M as unknown as mat4,
+      newRot as unknown as quat,
+      pos,
+      scale,
+    );
+    this._ikFrozenJoints.add(jointIdx);
+  }
+
+  // ── Two-bone IK ───────────────────────────────────────────────────────────
+
+  private applyTwoBoneIK(c: TwoBoneIkConstraint): void {
+    const rootIdx = this.skeleton.names.indexOf(c.rootJointName);
+    const midIdx = this.skeleton.names.indexOf(c.midJointName);
+    const tipIdx = this.skeleton.names.indexOf(c.tipJointName);
+    if (rootIdx < 0 || midIdx < 0 || tipIdx < 0) return;
+
+    const MR = this.globalMats[rootIdx]!;
+    const MM = this.globalMats[midIdx]!;
+    const MT = this.globalMats[tipIdx]!;
+
+    const pA = vec3.fromValues(MR[12]!, MR[13]!, MR[14]!);
+    const pB = vec3.fromValues(MM[12]!, MM[13]!, MM[14]!);
+    const pC = vec3.fromValues(MT[12]!, MT[13]!, MT[14]!);
+
+    const d1 = vec3.distance(pA, pB);
+    const d2 = vec3.distance(pB, pC);
+    if (d1 < 0.0001 || d2 < 0.0001) return;
+
+    // Direction from root to target
+    const toTarget = vec3.sub(vec3.create(), c.target, pA);
+    let rawDist = vec3.length(toTarget);
+    if (rawDist < 0.0001) return;
+
+    // Clamp to reachable distance
+    const maxReach = d1 + d2 - 0.001;
+    const minReach = Math.abs(d1 - d2) + 0.001;
+    const clampedDist = Math.max(minReach, Math.min(maxReach, rawDist));
+    const dir = vec3.scale(vec3.create(), toTarget, 1 / rawDist);
+
+    // Pole direction: perpendicular to dir, using poleTarget or original mid joint
+    const poleSource = c.poleTarget ?? pB;
+    const toPole = vec3.sub(vec3.create(), poleSource, pA);
+    const dp = vec3.dot(toPole, dir);
+    const polePerp = vec3.sub(vec3.create(), toPole, vec3.scale(vec3.create(), dir, dp));
+    const poleLen = vec3.length(polePerp);
+    if (poleLen < 0.0001) {
+      // Degenerate: pole is colinear with target, use world up
+      vec3.set(polePerp, 0, 1, 0);
+    } else {
+      vec3.scale(polePerp, polePerp, 1 / poleLen);
+    }
+
+    // Law of cosines: angle at root between (root→target) and upper bone
+    const cosA = Math.max(-1, Math.min(1,
+      (d1 * d1 + clampedDist * clampedDist - d2 * d2) / (2 * d1 * clampedDist),
+    ));
+    const angleA = Math.acos(cosA);
+
+    // New mid-joint position: pA + d1*(cos(angleA)*dir + sin(angleA)*polePerp)
+    const pB_new = vec3.add(
+      vec3.create(),
+      pA,
+      vec3.add(
+        vec3.create(),
+        vec3.scale(vec3.create(), dir, Math.cos(angleA) * d1),
+        vec3.scale(vec3.create(), polePerp, Math.sin(angleA) * d1),
+      ),
+    );
+
+    // Clamped target position
+    const pT_adj = vec3.add(vec3.create(), pA, vec3.scale(vec3.create(), dir, clampedDist));
+
+    // --- Update root joint ---
+    const origAB = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pB, pA));
+    const newAB  = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pB_new, pA));
+    const qRoot = quat.create();
+    quat.rotationTo(qRoot as unknown as quat, origAB, newAB);
+
+    // Apply weight as a partial delta
+    quat.slerp(
+      qRoot as unknown as quat,
+      quat.create() as unknown as quat,
+      qRoot as unknown as quat,
+      c.weight,
+    );
+
+    const rootRot = quat.create();
+    mat4.getRotation(rootRot as unknown as quat, MR as unknown as mat4);
+    quat.normalize(rootRot as unknown as quat, rootRot as unknown as quat);
+    const newRootRot = quat.mul(
+      quat.create() as unknown as quat,
+      qRoot as unknown as quat,
+      rootRot as unknown as quat,
+    );
+    quat.normalize(newRootRot as unknown as quat, newRootRot as unknown as quat);
+
+    const rootScale = vec3.create();
+    mat4.getScaling(rootScale, MR as unknown as mat4);
+    mat4.fromRotationTranslationScale(
+      MR as unknown as mat4,
+      newRootRot as unknown as quat,
+      pA,
+      rootScale,
+    );
+    this._ikFrozenJoints.add(rootIdx);
+
+    // Blended mid-joint and target positions
+    const pB_final = c.weight < 1 ? vec3.lerp(vec3.create(), pB, pB_new, c.weight) : pB_new;
+    const pT_final = c.weight < 1 ? vec3.lerp(vec3.create(), pC, pT_adj, c.weight) : pT_adj;
+
+    // --- Update mid joint ---
+    const origBC = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pC, pB));
+    const newBC  = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pT_final, pB_final));
+    const qMid = quat.create();
+    quat.rotationTo(qMid as unknown as quat, origBC, newBC);
+
+    const midRot = quat.create();
+    mat4.getRotation(midRot as unknown as quat, MM as unknown as mat4);
+    quat.normalize(midRot as unknown as quat, midRot as unknown as quat);
+    const newMidRot = quat.mul(
+      quat.create() as unknown as quat,
+      qMid as unknown as quat,
+      midRot as unknown as quat,
+    );
+    quat.normalize(newMidRot as unknown as quat, newMidRot as unknown as quat);
+
+    const midScale = vec3.create();
+    mat4.getScaling(midScale, MM as unknown as mat4);
+    mat4.fromRotationTranslationScale(
+      MM as unknown as mat4,
+      newMidRot as unknown as quat,
+      pB_final,
+      midScale,
+    );
+    this._ikFrozenJoints.add(midIdx);
+
+    // Tip is re-propagated automatically (not frozen); its world mat becomes
+    // MM_new * localMat[tip], placing the wrist/ankle at roughly pT_final.
+    void tipIdx;
+  }
+
+  // ── Procedural offset ─────────────────────────────────────────────────────
+
+  private applyProceduralOffset(c: ProceduralOffsetConstraint): void {
+    const jointIdx = this.skeleton.names.indexOf(c.jointName);
+    if (jointIdx < 0) return;
+
+    const M = this.globalMats[jointIdx]!;
+    const pos   = vec3.fromValues(M[12]!, M[13]!, M[14]!);
+    const scale = vec3.create();
+    mat4.getScaling(scale, M as unknown as mat4);
+    const rot = quat.create();
+    mat4.getRotation(rot as unknown as quat, M as unknown as mat4);
+    quat.normalize(rot as unknown as quat, rot as unknown as quat);
+
+    if (c.rotationOffset) {
+      const blendedRot = quat.slerp(
+        quat.create() as unknown as quat,
+        quat.create() as unknown as quat,
+        c.rotationOffset as unknown as quat,
+        c.weight,
+      );
+      quat.mul(rot as unknown as quat, rot as unknown as quat, blendedRot as unknown as quat);
+      quat.normalize(rot as unknown as quat, rot as unknown as quat);
+    }
+
+    if (c.translationOffset) {
+      const scaledOffset = vec3.scale(vec3.create(), c.translationOffset, c.weight);
+      vec3.add(pos, pos, scaledOffset);
+    }
+
+    mat4.fromRotationTranslationScale(
+      M as unknown as mat4,
+      rot as unknown as quat,
+      pos,
+      scale,
+    );
+    this._ikFrozenJoints.add(jointIdx);
+  }
+
+  // ── Public IK API ─────────────────────────────────────────────────────────
+
+  /**
+   * Register an IK or procedural constraint.
+   * Returns the constraint object itself — update its `target` / `weight` /
+   * `rotationOffset` fields in-place each frame.
+   */
+  public addIkConstraint<T extends IkConstraint>(constraint: T): T {
+    this.ikConstraints.push(constraint);
+    return constraint;
+  }
+
+  /**
+   * Remove a constraint by reference.
+   */
+  public removeIkConstraint(constraint: IkConstraint): void {
+    const idx = this.ikConstraints.indexOf(constraint);
+    if (idx >= 0) this.ikConstraints.splice(idx, 1);
+  }
+
+  /** Remove all IK / procedural constraints. */
+  public clearIkConstraints(): void {
+    this.ikConstraints.length = 0;
   }
 
   private uploadJointMatrices(): void {
