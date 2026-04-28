@@ -27,10 +27,47 @@ export interface SkinnedMeshComponentData {
   loop?: boolean;
   /** Playback speed multiplier (default 1.0). */
   playbackSpeed?: number;
+  /**
+   * Additional animation GLTF files to load, relative to assets/animations/.
+   * Joints are matched by name against the skeleton loaded from the main gltf.
+   */
+  extraAnimations?: string[];
+  /**
+   * Automatically play a clip on a repeating interval.
+   * The clip plays as a non-looping layer on top of the base animation,
+   * then removes itself when finished so the base animation is restored.
+   */
+  autoPlayInterval?: {
+    /** Clip name or index to play. */
+    clip: string | number;
+    /** Seconds between auto-play triggers. */
+    intervalSeconds: number;
+    /** Crossfade blend duration in seconds (default 0.2). */
+    blendTime?: number;
+  };
 }
 
 const MAX_JOINTS = 128; // Must match gbuffer_skinned.vs expectation
 const MAT4_BYTES = 64; // 16 floats × 4 bytes
+
+// Minimal GLTF JSON types used for raw animation parsing (avoids gltf-transform buffer bugs)
+interface GltfRawJson {
+  nodes?: { name?: string }[];
+  buffers?: { uri?: string; byteLength: number }[];
+  bufferViews?: { buffer: number; byteOffset?: number; byteLength: number }[];
+  accessors?: {
+    bufferView?: number;
+    byteOffset?: number;
+    componentType: number;
+    count: number;
+    type: string;
+  }[];
+  animations?: {
+    name?: string;
+    channels: { sampler: number; target: { node?: number; path: string } }[];
+    samplers: { input: number; output: number; interpolation?: string }[];
+  }[];
+}
 
 // ─── Animation layer options (public API) ─────────────────────────────────────
 export interface AnimLayerOptions {
@@ -177,6 +214,12 @@ export class SkinnedMeshComponent extends Component {
   // ── Animation layers ─────────────────────────────────────────────────────
   private animLayers: InternalAnimLayer[] = [];
   private nextLayerId: number = 0;
+
+  // ── Auto-play interval ───────────────────────────────────────────────────
+  private autoPlayIntervalSeconds: number = 0;
+  private autoPlayClip: string | number | null = null;
+  private autoPlayBlendTime: number = 0.2;
+  private autoPlayTimer: number = 0;
 
   // ── Root motion ───────────────────────────────────────────────────────────
   private rootMotionMode: RootMotionMode = 'none';
@@ -386,12 +429,25 @@ export class SkinnedMeshComponent extends Component {
       this.evalOrder.slice(0, 10).map((i) => this.skeleton.names[i]),
     );
 
+    // Load extra animations from assets/animations/ (matched by joint name)
+    if (data.extraAnimations && data.extraAnimations.length > 0) {
+      await this.loadExtraAnimations(data.extraAnimations);
+    }
+
     // Resolve active clip
     if (typeof data.animation === 'string') {
       const idx = this.clips.findIndex((c) => c.name === data.animation);
       this.activeClipIndex = idx >= 0 ? idx : 0;
     } else {
       this.activeClipIndex = Math.min(data.animation ?? 0, this.clips.length - 1);
+    }
+
+    // Configure auto-play interval
+    if (data.autoPlayInterval) {
+      this.autoPlayClip = data.autoPlayInterval.clip;
+      this.autoPlayIntervalSeconds = data.autoPlayInterval.intervalSeconds;
+      this.autoPlayBlendTime = data.autoPlayInterval.blendTime ?? 0.2;
+      this.autoPlayTimer = 0;
     }
 
     // ── Create GPU joint matrix buffer + bind group ───────────────────────────
@@ -454,6 +510,20 @@ export class SkinnedMeshComponent extends Component {
         this._debugFrames++;
       }
       return;
+    }
+
+    // ── Auto-play interval ─────────────────────────────────────────────────
+    if (this.autoPlayIntervalSeconds > 0 && this.autoPlayClip !== null) {
+      this.autoPlayTimer += dt;
+      if (this.autoPlayTimer >= this.autoPlayIntervalSeconds) {
+        this.autoPlayTimer = 0;
+        this.addLayer(this.autoPlayClip, {
+          weight: 1.0,
+          blendInTime: this.autoPlayBlendTime,
+          loop: false,
+          speed: 1.0,
+        });
+      }
     }
 
     // ── Advance base clip ──────────────────────────────────────────────────
@@ -598,8 +668,17 @@ export class SkinnedMeshComponent extends Component {
   public addLayer(clipIndexOrName: number | string, options?: AnimLayerOptions): number {
     let clipIndex: number;
     if (typeof clipIndexOrName === 'string') {
-      const idx = this.clips.findIndex((c) => c.name === clipIndexOrName);
-      clipIndex = idx >= 0 ? idx : 0;
+      // Case-insensitive search
+      const lower = clipIndexOrName.toLowerCase();
+      const idx = this.clips.findIndex((c) => c.name.toLowerCase() === lower);
+      if (idx < 0) {
+        console.warn(
+          `[SkinnedMesh] addLayer: clip "${clipIndexOrName}" not found. Available:`,
+          this.clips.map((c) => `"${c.name}"`).join(', '),
+        );
+        return -1;
+      }
+      clipIndex = idx;
     } else {
       clipIndex = Math.min(clipIndexOrName, this.clips.length - 1);
     }
@@ -694,6 +773,144 @@ export class SkinnedMeshComponent extends Component {
   }
   public getClips(): string[] {
     return this.clips.map((c) => c.name);
+  }
+
+  // ── Extra animation loading ────────────────────────────────────────────────
+
+  /**
+   * Loads additional AnimationClips from separate GLTF files in assets/animations/.
+   * Joints are matched by name against the already-loaded skeleton, so the mesh GLTF
+   * and the animation GLTF don't need to share node indices.
+   */
+  private async loadExtraAnimations(paths: string[]): Promise<void> {
+    // Build name → joint-index map from the existing skeleton.
+    // Lowercase keys for case-insensitive matching against animation node names.
+    const nameToJointIdx = new Map<string, number>();
+    this.skeleton.names.forEach((name, idx) => nameToJointIdx.set(name.toLowerCase(), idx));
+
+    for (const path of paths) {
+      const baseUrl = `assets/animations/`;
+      const url = `${baseUrl}${path}`;
+
+      // Parse GLTF JSON directly — avoids gltf-transform buffer-length mismatches.
+      let gltfJson: GltfRawJson;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        gltfJson = (await res.json()) as GltfRawJson;
+      } catch (e) {
+        console.warn(`[SkinnedMesh] loadExtraAnimations: could not fetch "${url}"`, e);
+        continue;
+      }
+
+      // Fetch all binary buffer sidecars referenced by this GLTF.
+      const bufferData: ArrayBuffer[] = [];
+      for (const buf of gltfJson.buffers ?? []) {
+        if (!buf.uri) {
+          bufferData.push(new ArrayBuffer(0));
+        } else if (buf.uri.startsWith('data:')) {
+          const b64 = buf.uri.split(',')[1]!;
+          const binary = atob(b64);
+          const ab = new ArrayBuffer(binary.length);
+          const u8 = new Uint8Array(ab);
+          for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
+          bufferData.push(ab);
+        } else {
+          try {
+            const r = await fetch(`${baseUrl}${buf.uri}`);
+            bufferData.push(await r.arrayBuffer());
+          } catch {
+            bufferData.push(new ArrayBuffer(0));
+          }
+        }
+      }
+
+      /** Read a flat Float32Array from a GLTF accessor index. */
+      const readAccessor = (accIdx: number): Float32Array | null => {
+        const acc = gltfJson.accessors?.[accIdx];
+        if (!acc || acc.bufferView === undefined) return null;
+        const bv = gltfJson.bufferViews?.[acc.bufferView];
+        if (!bv) return null;
+        const buffer = bufferData[bv.buffer];
+        if (!buffer) return null;
+        const componentCount =
+          acc.type === 'SCALAR'
+            ? 1
+            : acc.type === 'VEC2'
+              ? 2
+              : acc.type === 'VEC3'
+                ? 3
+                : acc.type === 'VEC4'
+                  ? 4
+                  : acc.type === 'MAT4'
+                    ? 16
+                    : 1;
+        const byteOffset = (bv.byteOffset ?? 0) + (acc.byteOffset ?? 0);
+        const elementBytes = acc.componentType === 5126 ? 4 : 1; // FLOAT=5126
+        const totalBytes = acc.count * componentCount * elementBytes;
+        // Guard against out-of-bounds access (malformed GLTF)
+        if (byteOffset + totalBytes > buffer.byteLength) {
+          console.warn(`[SkinnedMesh] accessor ${accIdx} out of bounds, skipping`);
+          return null;
+        }
+        if (acc.componentType === 5126) {
+          return new Float32Array(buffer, byteOffset, acc.count * componentCount);
+        }
+        // For non-float, convert via DataView
+        const out = new Float32Array(acc.count * componentCount);
+        const dv = new DataView(buffer, byteOffset);
+        for (let i = 0; i < out.length; i++) out[i] = dv.getUint8(i);
+        return out;
+      };
+
+      const newClips = (gltfJson.animations ?? []).map((anim) => {
+        let duration = 0;
+        const channels: AnimationChannel[] = [];
+
+        for (const ch of anim.channels) {
+          const nodeIdx = ch.target.node;
+          if (nodeIdx === undefined) continue;
+          const nodeName = gltfJson.nodes?.[nodeIdx]?.name;
+          if (!nodeName) continue;
+
+          // Case-insensitive name match
+          const jointIndex = nameToJointIdx.get(nodeName.toLowerCase());
+          if (jointIndex === undefined) continue;
+
+          const sampler = anim.samplers[ch.sampler];
+          if (!sampler) continue;
+          const times = readAccessor(sampler.input);
+          const values = readAccessor(sampler.output);
+          if (!times || !values) continue;
+
+          const animPath = ch.target.path as 'translation' | 'rotation' | 'scale';
+          const interp = (sampler.interpolation ?? 'LINEAR') as AnimationChannel['interpolation'];
+
+          if (times.length > 0) duration = Math.max(duration, times[times.length - 1]!);
+          channels.push({
+            jointIndex,
+            path: animPath,
+            times: new Float32Array(times),
+            values: new Float32Array(values),
+            interpolation: interp,
+          });
+        }
+
+        // Mixamo exports all clips as "mixamo.com" — use the filename instead.
+        const filenameBase = path.replace(/\.[^.]+$/, '');
+        const clipName = !anim.name || anim.name === 'mixamo.com' ? filenameBase : anim.name;
+        return { name: clipName, duration, channels };
+      });
+
+      this.clips.push(...newClips);
+      console.log(
+        `[SkinnedMesh] extra animations from "${path}":`,
+        newClips
+          .map((c) => `"${c.name}" dur=${c.duration.toFixed(2)}s channels=${c.channels.length}`)
+          .join(', '),
+        `| skeleton joints matched: ${newClips.reduce((s, c) => s + c.channels.length, 0)}`,
+      );
+    }
   }
 
   // ── Topological sort ──────────────────────────────────────────────────────

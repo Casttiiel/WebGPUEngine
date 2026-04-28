@@ -18,7 +18,13 @@
         "gltf": "idle.gltf",
         "animation": 0,
         "loop": true,
-        "playbackSpeed": 1.0
+        "playbackSpeed": 1.0,
+        "extraAnimations": ["Kick.gltf"],
+        "autoPlayInterval": {
+          "clip": "Kick",
+          "intervalSeconds": 7,
+          "blendTime": 0.2
+        }
       }
     }
   },
