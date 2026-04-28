@@ -48,6 +48,7 @@ export class DeferredRenderer {
   private depthPrepassInstancedTechnique!: Technique;
   private depthPrepassMaskTechnique!: Technique;
   private depthPrepassMaskInstancedTechnique!: Technique;
+  private depthPrepassSkinnedTechnique!: Technique;
   private depthPrepassDitherTechnique!: Technique;
   private depthPrepassDitherInstancedTechnique!: Technique;
   private rtAccLight!: RenderTarget;
@@ -410,6 +411,9 @@ export class DeferredRenderer {
     this.depthPrepassDitherInstancedTechnique = await Technique.getAsync(
       'utility/depth_prepass_dither_instanced.tech',
     );
+    this.depthPrepassSkinnedTechnique = await Technique.getAsync(
+      'utility/depth_prepass_skinned.tech',
+    );
 
     // HZB Builder — async pipeline setup, resources created on first create()
     this.hzbBuilder = new HZBBuilder();
@@ -503,6 +507,7 @@ export class DeferredRenderer {
       isDithered
         ? this.depthPrepassDitherInstancedTechnique
         : this.depthPrepassMaskInstancedTechnique,
+      this.depthPrepassSkinnedTechnique,
     );
     this.renderPassManager.executePass('depth_prepass', RenderCategory.SOLIDS);
     renderManager.clearTechniqueOverride();

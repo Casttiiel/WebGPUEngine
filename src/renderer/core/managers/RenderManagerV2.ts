@@ -46,6 +46,7 @@ export class RenderManagerV2 {
   private techniqueOverrideInstanced: Technique | null = null;
   private techniqueOverrideMask: Technique | null = null;
   private techniqueOverrideMaskInstanced: Technique | null = null;
+  private techniqueOverrideSkinned: Technique | null = null;
   private gpuCullingEstimatedVisible: number = 0;
 
   // Cached shadow keys — rebuilt only when markDirty() fires (addKey/delKeys)
@@ -95,11 +96,13 @@ export class RenderManagerV2 {
     instancedTechnique?: Technique,
     maskTechnique?: Technique,
     maskInstancedTechnique?: Technique,
+    skinnedTechnique?: Technique,
   ): void {
     this.techniqueOverride = technique;
     this.techniqueOverrideInstanced = instancedTechnique || null;
     this.techniqueOverrideMask = maskTechnique || null;
     this.techniqueOverrideMaskInstanced = maskInstancedTechnique || null;
+    this.techniqueOverrideSkinned = skinnedTechnique || null;
   }
 
   public clearTechniqueOverride(): void {
@@ -107,6 +110,7 @@ export class RenderManagerV2 {
     this.techniqueOverrideInstanced = null;
     this.techniqueOverrideMask = null;
     this.techniqueOverrideMaskInstanced = null;
+    this.techniqueOverrideSkinned = null;
   }
 
   public addKey(
@@ -472,11 +476,18 @@ export class RenderManagerV2 {
       let technique: Technique;
       if (this.techniqueOverride) {
         // Use override technique for depth prepass, shadows, etc.
-        // Alpha-masked materials use the mask variant (supports alpha-test discard).
-        const origName = key.material.getTechnique()?.getName() ?? '';
+        const origTechnique = key.material.getTechnique();
+        const origName = origTechnique?.getName() ?? '';
         const isMasked = origName.includes('mask') || origName.includes('dither');
+        const isSkinned = origTechnique?.getIsSkinned() ?? false;
 
-        if (isMasked && this.techniqueOverrideMask) {
+        if (isSkinned && this.techniqueOverrideSkinned) {
+          // Skinned meshes get a dedicated override that applies joint transforms
+          technique = this.techniqueOverrideSkinned;
+        } else if (isSkinned) {
+          // No skinned override provided — skip to avoid GPU pipeline mismatch
+          continue;
+        } else if (isMasked && this.techniqueOverrideMask) {
           if (key.isInstanced && this.techniqueOverrideMaskInstanced) {
             technique = this.techniqueOverrideMaskInstanced;
           } else if (key.isInstanced) {

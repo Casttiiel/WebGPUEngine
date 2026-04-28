@@ -531,4 +531,9 @@ export class Technique extends GPUResource {
   public getCustomMaterialLayout(): GPUBindGroupLayout | null {
     return this.customMaterialLayout ?? null;
   }
+
+  /** Returns true if this technique uses the two-slot skinned vertex buffer layout. */
+  public getIsSkinned(): boolean {
+    return this.isSkinned;
+  }
 }
