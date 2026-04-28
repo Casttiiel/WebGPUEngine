@@ -28,6 +28,7 @@ import { HZBBuilder } from '../culling/HZBBuilder';
 import { RenderManagerV2 } from '../managers/RenderManagerV2';
 import { TiledLightManager } from '../managers/TiledLightManager';
 import { EngineTextureRegistry, ENGINE_TEXTURES } from '../utils/EngineTextureRegistry';
+import { ViewModelPass } from '../passes/ViewModelPass';
 
 export class DeferredRenderer {
   private isLoaded = false;
@@ -104,6 +105,9 @@ export class DeferredRenderer {
   private tiledLightManager!: TiledLightManager;
   private tiledLightTechnique!: Technique;
   private tiledLightMesh!: Mesh;
+
+  /** First-person view-model pass (dedicated depth, bypasses world frustum culling) */
+  private viewModelPass: ViewModelPass = new ViewModelPass();
 
   constructor() {}
 
@@ -346,6 +350,9 @@ export class DeferredRenderer {
       this.unitFrustum,
       this.gBufferBindGroup,
     );
+
+    // Initialize view-model pass (dedicated depth, identity-view camera)
+    this.viewModelPass.resize(width, height);
 
     // Initialize tiled lighting pass (shadowless point + spot lights)
     this.tiledLightManager.resize(width, height);
@@ -616,6 +623,14 @@ export class DeferredRenderer {
       const gBufferRenderTargets = this.gBufferPass.getRenderTargets();
       this.froxelVolumetrics.updateFroxelData(gBufferRenderTargets.linearDepth);
       this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
+    }
+
+    // View-model pass — renders first-person weapons into accLight with a dedicated
+    // depth buffer (cleared to 1.0 each frame), so weapons never clip against world
+    // geometry.  Runs after volumetrics so the weapon sits on top of all world effects,
+    // but before post-processing so it participates in bloom and tonemapping.
+    if (this.viewModelPass.isReady()) {
+      this.viewModelPass.execute(this.rtAccLight.getView());
     }
 
     return this.rtAccLight.getView();
@@ -927,6 +942,7 @@ export class DeferredRenderer {
     this.gBufferWithAOBindGroup = null;
     this.lastAOViewForGBuffer = null;
     this.lastRegisteredEnvView = null;
+    this.viewModelPass.dispose();
   }
 
   public destroy(): void {

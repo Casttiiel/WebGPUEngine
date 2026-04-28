@@ -6,4 +6,5 @@ export enum RenderCategory {
   DECALS = 'decals',
   SHADOWS = 'shadows',
   WATER = 'water',
+  VIEW_MODEL = 'view_model',
 }

@@ -334,6 +334,45 @@ export class RenderManagerV2 {
     this.drawCallsPerCategory.set(category, drawCalls);
   }
 
+  /**
+   * Renders VIEW_MODEL category keys using the provided camera, bypassing
+   * all frustum/HZB culling. First-person weapons are always visible.
+   */
+  public renderViewModelKeys(camera: Camera, pass: GPURenderPassEncoder): void {
+    const allKeys = this.keyManager.getAllKeys();
+    this.stateManager.reset();
+    this.stateManager.setBindGroup(pass, 0, camera.getBindGroup());
+
+    let drawCalls = 0;
+    for (let i = 0; i < allKeys.length; i++) {
+      const key = allKeys[i]!;
+      if (key.material.getCategory() !== RenderCategory.VIEW_MODEL) continue;
+      if (!this.validateRenderKey(key)) continue;
+
+      const technique = key.material.getTechnique();
+      if (!technique) continue;
+
+      this.stateManager.setPipeline(pass, technique.getPipeline()!, () =>
+        technique.activatePipeline(pass),
+      );
+      this.stateManager.setMeshBuffers(pass, key.mesh.getName(), () => key.mesh.activate(pass));
+      this.stateManager.setMaterialBindings(
+        pass,
+        key.material.getName(),
+        key.material.getTextureBindGroup(),
+        1,
+      );
+      this.stateManager.setBindGroup(pass, 2, key.transform.getModelBindGroup());
+      if (key.renderBindGroup) {
+        this.stateManager.setBindGroup(pass, 3, key.renderBindGroup);
+      }
+
+      key.mesh.renderGroup(pass);
+      drawCalls++;
+    }
+    this.drawCallsPerCategory.set(RenderCategory.VIEW_MODEL, drawCalls);
+  }
+
   public getDrawCallsForCategory(category: RenderCategory): number {
     return this.drawCallsPerCategory.get(category) || 0;
   }

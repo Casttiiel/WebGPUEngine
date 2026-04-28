@@ -68,6 +68,8 @@ import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent
 import { HealthComponent } from '../../components/game/HealthComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { SkinnedMeshComponent } from '../../components/render/SkinnedMeshComponent';
+import { ViewModelComponent } from '../../components/render/ViewModelComponent';
+import { ViewModelMeshComponent } from '../../components/render/ViewModelMeshComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -399,6 +401,10 @@ export class Loader {
         return new HealthComponent();
       case 'stamina':
         return new StaminaComponent();
+      case 'view_model':
+        return new ViewModelComponent();
+      case 'view_model_mesh':
+        return new ViewModelMeshComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }
