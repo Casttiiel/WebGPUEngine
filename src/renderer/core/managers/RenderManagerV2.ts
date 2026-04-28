@@ -518,11 +518,14 @@ export class RenderManagerV2 {
         this.stateManager.setBindGroup(pass, 2, key.transform.getModelBindGroup());
       }
 
+      // @group(3): Optional per-key bind group (skinning, particles, custom pass data).
+      // Bind whenever present, regardless of draw mode.
+      if (key.renderBindGroup) {
+        this.stateManager.setBindGroup(pass, 3, key.renderBindGroup);
+      }
+
       if (key.indirectDrawBuffer) {
         // Particles or main-camera GPU-culled keys
-        if (key.renderBindGroup) {
-          this.stateManager.setBindGroup(pass, 3, key.renderBindGroup);
-        }
         pass.drawIndexedIndirect(key.indirectDrawBuffer, key.indirectDrawOffset);
       } else if (key.shadowIndirectOffset >= 0 && this.currentShadowIndirectBuffer) {
         // Shadow key — GPU-culled via per-dispatch indirect buffer

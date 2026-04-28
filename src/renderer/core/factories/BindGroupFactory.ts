@@ -507,6 +507,20 @@ export class BindGroupFactory {
    *   binding 7 — envSampler         (cubemap sampler)
    *   binding 8 — txWaterLit         (water surface after ambient + directional lighting)
    */
+  /**
+   * Skin matrices layout (group 3 in skinned GBuffer passes).
+   * binding 0: read-only-storage array<mat4x4<f32>> — joint palette.
+   */
+  public static getSkinMatricesLayout(): GPUBindGroupLayout {
+    return this.getLayout('skin_matrices', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'read-only-storage' },
+      },
+    ]);
+  }
+
   public static getWaterCompositeLayout(): GPUBindGroupLayout {
     return this.getLayout('water_composite', [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
@@ -1917,6 +1931,8 @@ export class BindGroupFactory {
         return this.getKawaseUniformsLayout();
       case PipelineBindGroupLayouts.WATER_COMPOSITE_UNIFORMS:
         return this.getWaterCompositeLayout();
+      case PipelineBindGroupLayouts.SKIN_MATRICES:
+        return this.getSkinMatricesLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

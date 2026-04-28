@@ -6,6 +6,23 @@
     "prefab": "characters/knight_character.prefab"
   },
   {
+    "children": [],
+    "components": {
+      "name": "Idle",
+      "transform": {
+        "position": [0, 0.0, 1],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "skinned_mesh": {
+        "gltf": "idle.gltf",
+        "animation": 0,
+        "loop": true,
+        "playbackSpeed": 1.0
+      }
+    }
+  },
+  {
     "components": {
       "name": "DaggerManager",
       "transform": { "position": [0, 0, 0] },

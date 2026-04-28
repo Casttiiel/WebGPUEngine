@@ -35,4 +35,6 @@ export type TechniqueDataType = Readonly<{
   uniforms: ReadonlyArray<PipelineBindGroupLayouts>;
   /** When present, Material builds a dynamic bind group instead of the fixed PBR schema. */
   materialSlots?: ReadonlyArray<TechniqueMaterialSlot>;
+  /** When true, the pipeline uses the two-slot skinned vertex buffer layout (pos/norm/uv/tan + joints/weights). */
+  skinned?: boolean;
 }>;

@@ -31,7 +31,8 @@
     "fog_volume",
     "arcane_knight_controller",
     "parkour_controller",
-    "grapple_hook"
+    "grapple_hook",
+    "skinned_mesh"
   ],
   "render_debug": []
 }

@@ -8,6 +8,7 @@ import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.e
 import { RasterizationMode } from '../../types/RasterizationMode.enum';
 import { TechniqueMaterialSlot } from '../../types/TechniqueData.type';
 import { Mesh } from './Mesh';
+import { SkinnedMesh } from './SkinnedMesh';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { PipelineFactory, PipelineConfig } from '../core/factories/PipelineFactory';
 import { QualitySettings } from '../../core/engine/QualitySettings';
@@ -26,6 +27,8 @@ export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'
   instanced?: boolean;
   /** When present, Material uses a dynamic bind group instead of the fixed PBR schema. */
   materialSlots?: ReadonlyArray<TechniqueMaterialSlot>;
+  /** When true, the pipeline uses the two-slot skinned vertex layout (adds joints/weights in slot 1). */
+  skinned?: boolean;
 }
 
 export type TechniqueOptions = TechniqueCreateOptions & IGPUResourceOptions;
@@ -56,6 +59,7 @@ export class Technique extends GPUResource {
   private vsEntryPoint: string;
   private fsEntryPoint: string;
   private readonly materialSlots: ReadonlyArray<TechniqueMaterialSlot> | undefined;
+  private readonly isSkinned: boolean;
 
   constructor(options: TechniqueOptions) {
     super({
@@ -75,6 +79,7 @@ export class Technique extends GPUResource {
     this.fsEntryPoint = options.fsEntryPoint || 'fs';
     this.vsEntryPoint = options.vsEntryPoint || 'vs';
     this.materialSlots = options.materialSlots;
+    this.isSkinned = options.skinned ?? false;
   }
 
   public static async getAsync(
@@ -139,6 +144,7 @@ export class Technique extends GPUResource {
       writesOn: techniqueData.writesOn ?? FragmentShaderTargets.SCREEN,
       uniforms: techniqueData.uniforms ?? [],
       instanced: techniqueData.instanced ?? false,
+      skinned: techniqueData.skinned ?? false,
       ...(techniqueData.materialSlots !== undefined
         ? { materialSlots: techniqueData.materialSlots }
         : {}),
@@ -239,7 +245,9 @@ export class Technique extends GPUResource {
       vertex: {
         module: this.vsModule,
         entryPoint: this.vsEntryPoint,
-        buffers: Mesh.getVertexBufferLayout(),
+        buffers: this.isSkinned
+          ? SkinnedMesh.getSkinnedVertexBufferLayout()
+          : Mesh.getVertexBufferLayout(),
       },
       primitive: {
         topology: 'triangle-list',

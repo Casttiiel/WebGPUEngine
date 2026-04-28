@@ -67,6 +67,7 @@ import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { HealthComponent } from '../../components/game/HealthComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
+import { SkinnedMeshComponent } from '../../components/render/SkinnedMeshComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -287,6 +288,8 @@ export class Loader {
         return new TransformComponent();
       case 'render':
         return new RenderComponent();
+      case 'skinned_mesh':
+        return new SkinnedMeshComponent();
       case 'camera':
         return new CameraComponent();
       case 'tone_mapping':
