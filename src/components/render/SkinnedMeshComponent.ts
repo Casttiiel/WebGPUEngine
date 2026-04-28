@@ -289,7 +289,10 @@ export class SkinnedMeshComponent extends Component {
       this.rootPreRotation as unknown as quat,
       this.skeleton.rootPreTransform as unknown as mat4,
     );
-    quat.normalize(this.rootPreRotation as unknown as quat, this.rootPreRotation as unknown as quat);
+    quat.normalize(
+      this.rootPreRotation as unknown as quat,
+      this.rootPreRotation as unknown as quat,
+    );
 
     // ── Extract animation clips ──────────────────────────────────────────────
     this.clips = this.extractAnimations(root.listAnimations(), root.listNodes());
@@ -914,9 +917,7 @@ export class SkinnedMeshComponent extends Component {
       // Lock root joint to bind pose (prevent mesh from drifting from entity origin)
       const bp = this.skeleton.bindPoseLocal;
       const bpOff = this.rootJointIndex * 10;
-      this.localT[this.rootJointIndex]!.set([
-        bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!,
-      ]);
+      this.localT[this.rootJointIndex]!.set([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
 
       // Optionally drive entity transform directly
       if (this.rootMotionMode === 'apply') {
@@ -925,9 +926,7 @@ export class SkinnedMeshComponent extends Component {
         )?.getTransform();
         if (ownerTransform) {
           const pos = ownerTransform.getLocalPosition();
-          ownerTransform.setLocalPosition(
-            vec3.add(vec3.create(), pos, this.rootMotionDelta),
-          );
+          ownerTransform.setLocalPosition(vec3.add(vec3.create(), pos, this.rootMotionDelta));
         }
       }
     }
