@@ -338,7 +338,11 @@ export class RenderManagerV2 {
    * Renders VIEW_MODEL category keys using the provided camera, bypassing
    * all frustum/HZB culling. First-person weapons are always visible.
    */
-  public renderViewModelKeys(camera: Camera, pass: GPURenderPassEncoder, mainCameraBindGroup?: GPUBindGroup): void {
+  public renderViewModelKeys(
+    camera: Camera,
+    pass: GPURenderPassEncoder,
+    mainCameraBindGroup?: GPUBindGroup,
+  ): void {
     const allKeys = this.keyManager.getAllKeys();
     this.stateManager.reset();
     this.stateManager.setBindGroup(pass, 0, camera.getBindGroup());

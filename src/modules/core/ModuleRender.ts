@@ -441,8 +441,15 @@ export class ModuleRender extends Module {
       if (vmPass.isReady()) {
         const cameraComponent = mainCameraEntity?.getComponent('camera') as CameraComponent;
         if (cameraComponent) {
-          const vmCanvas = mainCameraEntity?.hasComponent('tsr') ? Render.canvasSize : { width: Render.width, height: Render.height };
-          vmPass.execute(result, cameraComponent.getCamera().getBindGroup(), vmCanvas.width, vmCanvas.height);
+          const vmCanvas = mainCameraEntity?.hasComponent('tsr')
+            ? Render.canvasSize
+            : { width: Render.width, height: Render.height };
+          vmPass.execute(
+            result,
+            cameraComponent.getCamera().getBindGroup(),
+            vmCanvas.width,
+            vmCanvas.height,
+          );
         }
       }
 
