@@ -433,6 +433,19 @@ export class ModuleRender extends Module {
         }
       }
 
+      // View-model pass — runs AFTER TAA/TSR so the weapon is never included in the
+      // temporal accumulation buffer, eliminating ghosting/trails on first-person weapons.
+      // Renders into whatever texture `result` currently points to (accLight or TSR output).
+      // The depth texture is resized automatically when TSR has upscaled to canvas resolution.
+      const vmPass = this.deferred.getViewModelPass();
+      if (vmPass.isReady()) {
+        const cameraComponent = mainCameraEntity?.getComponent('camera') as CameraComponent;
+        if (cameraComponent) {
+          const vmCanvas = mainCameraEntity?.hasComponent('tsr') ? Render.canvasSize : { width: Render.width, height: Render.height };
+          vmPass.execute(result, cameraComponent.getCamera().getBindGroup(), vmCanvas.width, vmCanvas.height);
+        }
+      }
+
       if (mainCameraEntity?.hasComponent('tone_mapping')) {
         const toneMapping = mainCameraEntity.getComponent('tone_mapping') as ToneMappingComponent;
         if (toneMapping.hasLoaded()) {

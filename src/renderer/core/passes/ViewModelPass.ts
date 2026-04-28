@@ -64,11 +64,26 @@ export class ViewModelPass {
   }
 
   /**
-   * Renders all VIEW_MODEL category keys into accLightView.
-   * Call once per frame after the main world render, before post-processing.
-   * @param accLightView colour target to composite into (loadOp: 'load')
+   * Renders all VIEW_MODEL category keys into colorTargetView.
+   * Call once per frame AFTER TAA/TSR to avoid temporal ghosting.
+   * @param colorTargetView  colour target to composite into (loadOp: 'load')
+   * @param mainCameraBindGroup  main camera bind group forwarded to group(3) in the shader
+   *                             for world-space lighting calculations.
+   * @param width  pixel width of colorTargetView — depth texture is resized to match if needed.
+   * @param height pixel height of colorTargetView — depth texture is resized to match if needed.
    */
-  public execute(accLightView: GPUTextureView): void {
+  public execute(
+    colorTargetView: GPUTextureView,
+    mainCameraBindGroup: GPUBindGroup,
+    width: number,
+    height: number,
+  ): void {
+    // Re-create depth texture whenever the target resolution changes (e.g. TSR upscales
+    // from render resolution to canvas resolution).
+    if (width !== this.width || height !== this.height) {
+      this.resize(width, height);
+    }
+
     if (!this.depthView) return;
 
     // Keep camera uniforms current (time advances, prevents stale values)
@@ -79,7 +94,7 @@ export class ViewModelPass {
       label: 'viewmodel_pass',
       colorAttachments: [
         {
-          view: accLightView,
+          view: colorTargetView,
           loadOp: 'load',
           storeOp: 'store',
         },
@@ -95,7 +110,7 @@ export class ViewModelPass {
     pass.setViewport(0, 0, this.width, this.height, 0.0, 1.0);
     pass.setScissorRect(0, 0, this.width, this.height);
 
-    RenderManagerV2.getInstance().renderViewModelKeys(this.camera, pass);
+    RenderManagerV2.getInstance().renderViewModelKeys(this.camera, pass, mainCameraBindGroup);
 
     pass.end();
   }

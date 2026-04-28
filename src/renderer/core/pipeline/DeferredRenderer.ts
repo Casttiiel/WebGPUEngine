@@ -625,15 +625,12 @@ export class DeferredRenderer {
       this.froxelVolumetrics.renderVolumetrics(this.rtAccLight.getView(), this.gBufferBindGroup);
     }
 
-    // View-model pass — renders first-person weapons into accLight with a dedicated
-    // depth buffer (cleared to 1.0 each frame), so weapons never clip against world
-    // geometry.  Runs after volumetrics so the weapon sits on top of all world effects,
-    // but before post-processing so it participates in bloom and tonemapping.
-    if (this.viewModelPass.isReady()) {
-      this.viewModelPass.execute(this.rtAccLight.getView());
-    }
-
     return this.rtAccLight.getView();
+  }
+
+  /** Returns the ViewModelPass so ModuleRender can execute it after TAA/TSR. */
+  public getViewModelPass(): ViewModelPass {
+    return this.viewModelPass;
   }
 
   private copyGBufferTexturesToBindGroup(): void {

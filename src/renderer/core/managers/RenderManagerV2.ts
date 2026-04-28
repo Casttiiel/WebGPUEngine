@@ -338,7 +338,7 @@ export class RenderManagerV2 {
    * Renders VIEW_MODEL category keys using the provided camera, bypassing
    * all frustum/HZB culling. First-person weapons are always visible.
    */
-  public renderViewModelKeys(camera: Camera, pass: GPURenderPassEncoder): void {
+  public renderViewModelKeys(camera: Camera, pass: GPURenderPassEncoder, mainCameraBindGroup?: GPUBindGroup): void {
     const allKeys = this.keyManager.getAllKeys();
     this.stateManager.reset();
     this.stateManager.setBindGroup(pass, 0, camera.getBindGroup());
@@ -363,8 +363,13 @@ export class RenderManagerV2 {
         1,
       );
       this.stateManager.setBindGroup(pass, 2, key.transform.getModelBindGroup());
+
+      // group(3): per-key renderBindGroup takes precedence, then the pass-level extra bind group
+      // (used by viewmodel pass to supply the main camera for world-space lighting).
       if (key.renderBindGroup) {
         this.stateManager.setBindGroup(pass, 3, key.renderBindGroup);
+      } else if (mainCameraBindGroup) {
+        this.stateManager.setBindGroup(pass, 3, mainCameraBindGroup);
       }
 
       key.mesh.renderGroup(pass);

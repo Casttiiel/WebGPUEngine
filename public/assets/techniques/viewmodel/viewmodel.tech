@@ -6,6 +6,7 @@
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",
-        "ObjectUniforms"
+        "ObjectUniforms",
+        "CameraUniforms"
     ]
 }
