@@ -186,7 +186,15 @@ export class ViewModelComponent extends Component {
       ? quat.clone(transform.getTransform().getLocalRotation())
       : quat.create();
 
-    return { entityName: slotData.entityName, socketOffset, socketRotation, animator, transform, baseScale, baseRotation };
+    return {
+      entityName: slotData.entityName,
+      socketOffset,
+      socketRotation,
+      animator,
+      transform,
+      baseScale,
+      baseRotation,
+    };
   }
 
   private updateSlot(slot: RuntimeSlot, procPos: vec3, procRot: quat, dt: number): void {
