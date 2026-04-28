@@ -52,6 +52,7 @@ export class SkinnedMeshComponent extends Component {
   private playing: boolean = true;
 
   // Cached CPU-side joint matrices (reused every frame to avoid allocations)
+  private evalOrder: number[] = []; // joint indices in parent-before-child order
   private localT: Float32Array[] = []; // per-joint translation
   private localR: Float32Array[] = []; // per-joint rotation (quat xyzw)
   private localS: Float32Array[] = []; // per-joint scale
@@ -210,8 +211,31 @@ export class SkinnedMeshComponent extends Component {
       this.globalMats.push(mat4.create());
     }
 
+    // Precompute topological order (parents before children).
+    // Mixamo exports joints leaf-first, so we can't just iterate 0..n.
+    this.evalOrder = this.computeTopoOrder(this.skeleton.parents);
+
     // ── Extract animation clips ──────────────────────────────────────────────
     this.clips = this.extractAnimations(root.listAnimations(), root.listNodes());
+
+    console.log(
+      `[SkinnedMesh] ${gltfName} — joints: ${this.jointCount}, evalOrder[0]: ${this.evalOrder[0]} (root), clips: ${this.clips.length}`,
+    );
+    this.clips.forEach((c, i) =>
+      console.log(
+        `  clip[${i}] "${c.name}" dur=${c.duration.toFixed(2)}s channels=${c.channels.length}`,
+      ),
+    );
+    console.log(`  evalOrder (first 10):`, this.evalOrder.slice(0, 10));
+    console.log(`  parents (first 10):`, this.skeleton.parents.slice(0, 10));
+    console.log(
+      `  bindPoseLocal root T:`,
+      this.skeleton.bindPoseLocal.slice(this.evalOrder[0]! * 10, this.evalOrder[0]! * 10 + 3),
+    );
+    console.log(
+      `  skeleton names (topo order, first 10):`,
+      this.evalOrder.slice(0, 10).map((i) => this.skeleton.names[i]),
+    );
 
     // Resolve active clip
     if (typeof data.animation === 'string') {
@@ -254,10 +278,34 @@ export class SkinnedMeshComponent extends Component {
     // Do a first evaluation so the skeleton is in a valid pose before first render
     this.evaluateAnimation(0);
     this.uploadJointMatrices();
+
+    // Debug: verify joint palette has non-identity values after first eval
+    const p = this.jointPalette;
+    const rootIdx = this.evalOrder[0]!;
+    const b = rootIdx * 16;
+    console.log(
+      `[SkinnedMesh] initial palette root joint[${rootIdx}] diagonal:`,
+      (p[b] ?? 0).toFixed(3),
+      (p[b + 5] ?? 0).toFixed(3),
+      (p[b + 10] ?? 0).toFixed(3),
+      (p[b + 15] ?? 0).toFixed(3),
+    );
+    console.log(`[SkinnedMesh] skinBindGroup:`, this.skinBindGroup?.label ?? 'MISSING');
+    console.log(`[SkinnedMesh] render keys registered: ${this.skinnedMeshes.length}`);
   }
 
+  private _debugFrames = 0;
+
   public update(dt: number): void {
-    if (!this.playing || this.clips.length === 0) return;
+    if (!this.playing || this.clips.length === 0) {
+      if (this._debugFrames < 3) {
+        console.warn(
+          `[SkinnedMesh] update() early exit — playing:${this.playing} clips:${this.clips.length}`,
+        );
+        this._debugFrames++;
+      }
+      return;
+    }
 
     const clip = this.clips[this.activeClipIndex];
     if (!clip) return;
@@ -275,6 +323,19 @@ export class SkinnedMeshComponent extends Component {
 
     this.evaluateAnimation(this.playbackTime);
     this.uploadJointMatrices();
+
+    if (this._debugFrames < 5) {
+      const rootIdx = this.evalOrder[0]!;
+      const base = rootIdx * 16;
+      console.log(
+        `[SkinnedMesh] frame ${this._debugFrames} t=${this.playbackTime.toFixed(3)} root palette diag:`,
+        (this.jointPalette[base] ?? 0).toFixed(3),
+        (this.jointPalette[base + 5] ?? 0).toFixed(3),
+        (this.jointPalette[base + 10] ?? 0).toFixed(3),
+        (this.jointPalette[base + 15] ?? 0).toFixed(3),
+      );
+      this._debugFrames++;
+    }
   }
 
   public renderDebug(): void {}
@@ -314,6 +375,29 @@ export class SkinnedMeshComponent extends Component {
     return this.clips.map((c) => c.name);
   }
 
+  // ── Topological sort ──────────────────────────────────────────────────────
+  // Returns joint indices sorted so every parent appears before its children.
+  // Required because Mixamo exports joints leaf-first in the skin joint array.
+  private computeTopoOrder(parents: number[]): number[] {
+    const n = parents.length;
+    const order: number[] = [];
+    const done = new Uint8Array(n); // 0=pending, 1=processed
+    let added = 1;
+    while (added > 0) {
+      added = 0;
+      for (let i = 0; i < n; i++) {
+        if (done[i]) continue;
+        const p = parents[i]!;
+        if (p < 0 || done[p]) {
+          order.push(i);
+          done[i] = 1;
+          added++;
+        }
+      }
+    }
+    return order;
+  }
+
   // ── Skeleton extraction ────────────────────────────────────────────────────
 
   private extractSkeleton(skin: GltfSkin, allNodes: GltfNode[]): SkeletonData {
@@ -326,7 +410,6 @@ export class SkinnedMeshComponent extends Component {
     if (ibmArray) {
       inverseBindMatrices.set(ibmArray.subarray(0, n * 16));
     } else {
-      // Default IBM = identity
       for (let i = 0; i < n; i++)
         mat4.identity(inverseBindMatrices.subarray(i * 16, i * 16 + 16) as any);
     }
@@ -364,15 +447,56 @@ export class SkinnedMeshComponent extends Component {
       bindPoseLocal[off + 9] = s[2];
     }
 
-    // GLTF node indices for each joint (used to match animation channel targets)
+    // ── Compute rootPreTransform ──────────────────────────────────────────────
+    // Walk up the GLTF hierarchy from the first root joint, accumulating the
+    // transforms of all non-joint ancestor nodes (e.g. the Blender Armature
+    // that carries a Z-up→Y-up rotation and cm→m scale).
+    // These are baked into the IBMs but absent from the joint local transforms,
+    // so we must re-introduce them when computing joint world matrices.
+    const rootPreTransformMat = mat4.create(); // identity by default
+    const firstRootIdx = parents.indexOf(-1);
+    if (firstRootIdx >= 0) {
+      const ancestors: GltfNode[] = [];
+      let ancestor = jointNodes[firstRootIdx]!.getParentNode?.() ?? null;
+      while (ancestor) {
+        ancestors.push(ancestor);
+        ancestor = ancestor.getParentNode?.() ?? null;
+      }
+      // Multiply from root down (ancestors[last] is outermost)
+      for (let i = ancestors.length - 1; i >= 0; i--) {
+        const a = ancestors[i]!;
+        const at = a.getTranslation();
+        const ar = a.getRotation();
+        const as_ = a.getScale();
+        const am = mat4.fromRotationTranslationScale(
+          mat4.create(),
+          ar as any,
+          at as any,
+          as_ as any,
+        );
+        mat4.mul(rootPreTransformMat, rootPreTransformMat, am);
+      }
+    }
+    const rootPreTransform = new Float32Array(rootPreTransformMat);
+
+    console.log(
+      '[SkinnedMesh] rootPreTransform diagonal:',
+      (rootPreTransform[0] ?? 0).toFixed(4),
+      (rootPreTransform[5] ?? 0).toFixed(4),
+      (rootPreTransform[10] ?? 0).toFixed(4),
+      (rootPreTransform[15] ?? 0).toFixed(4),
+    );
+
+    // GLTF node indices for each joint
     const jointGltfIndices = jointNodes.map((node) => allNodes.indexOf(node));
 
     return {
       inverseBindMatrices,
       joints: jointGltfIndices,
       parents,
-      names: jointNodes.map((n) => n.getName()),
+      names: jointNodes.map((nd) => nd.getName()),
       bindPoseLocal,
+      rootPreTransform,
     };
   }
 
@@ -444,11 +568,12 @@ export class SkinnedMeshComponent extends Component {
       }
     }
 
-    // Compute global matrices (topological order: parents before children)
+    // Compute global matrices in topological order (parents guaranteed before children)
     const ibm = this.skeleton.inverseBindMatrices;
     const parents = this.skeleton.parents;
+    const rootPre = this.skeleton.rootPreTransform as unknown as mat4;
 
-    for (let i = 0; i < this.jointCount; i++) {
+    for (const i of this.evalOrder) {
       const local = mat4.fromRotationTranslationScale(
         mat4.create(),
         this.localR[i] as any,
@@ -458,16 +583,14 @@ export class SkinnedMeshComponent extends Component {
 
       const parentIdx = parents[i]!;
       if (parentIdx < 0) {
-        this.globalMats[i] = local;
+        // Root joint: prepend the non-joint ancestor transform (e.g. Armature's rotation+scale)
+        this.globalMats[i] = mat4.mul(mat4.create(), rootPre, local);
       } else {
         this.globalMats[i] = mat4.mul(mat4.create(), this.globalMats[parentIdx]!, local);
       }
 
-      // Final joint matrix = globalMat * inverseBindMatrix
       const ibmSlice = ibm.subarray(i * 16, i * 16 + 16) as unknown as mat4;
-      const finalMat = mat4.mul(mat4.create(), this.globalMats[i]!, ibmSlice);
-
-      this.jointPalette.set(finalMat, i * 16);
+      this.jointPalette.set(mat4.mul(mat4.create(), this.globalMats[i]!, ibmSlice), i * 16);
     }
   }
 

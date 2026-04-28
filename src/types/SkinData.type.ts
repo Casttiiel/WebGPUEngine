@@ -22,6 +22,12 @@ export interface SkeletonData {
   names: string[]; // bone names
   /** Local TRS for each joint in bind pose (translation x3, rotation x4, scale x3) */
   bindPoseLocal: Float32Array; // [jointCount * 10]  (t3 + r4 + s3)
+  /**
+   * Accumulated world-space transform of all non-joint ancestor nodes above the skeleton root
+   * (e.g. the Blender "Armature" node with its Z-up→Y-up rotation and cm→m scale).
+   * Applied as the base matrix for all root joints (parents[i] == -1).
+   */
+  rootPreTransform: Float32Array; // mat4 column-major, 16 floats
 }
 
 /** Keyframe interpolation mode (matches GLTF spec). */
