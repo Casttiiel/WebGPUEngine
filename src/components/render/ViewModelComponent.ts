@@ -1,4 +1,4 @@
-import { mat4, quat, vec3 } from 'gl-matrix';
+import { quat, vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { TransformComponent } from '../core/TransformComponent';
@@ -38,6 +38,10 @@ interface RuntimeSlot {
   socketRotation: quat;
   animator: ViewModelAnimator;
   transform: TransformComponent | null;
+  /** Scale read from the entity's TransformComponent once resolved — preserved across frames */
+  baseScale: vec3;
+  /** Rotation read from the entity's TransformComponent once resolved — applied on top of socketRotation */
+  baseRotation: quat;
 }
 
 /**
@@ -64,13 +68,12 @@ export class ViewModelComponent extends Component {
   private leftHand: RuntimeSlot | null = null;
   private procSystem: ProceduralViewModelSystem = new ProceduralViewModelSystem();
 
-  // Scratch matrices / vectors (avoid per-frame allocations)
-  private readonly _slotMat: mat4 = mat4.create();
+  // Scratch vectors (avoid per-frame allocations)
   private readonly _animPos: vec3 = vec3.create();
   private readonly _animRot: quat = quat.create();
   private readonly _finalPos: vec3 = vec3.create();
   private readonly _finalRot: quat = quat.create();
-  private readonly _identity: mat4 = mat4.create();
+  private readonly _finalScale: vec3 = vec3.create();
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -88,19 +91,20 @@ export class ViewModelComponent extends Component {
   }
 
   public update(dt: number): void {
-    // Gather input for procedural sway
-    const input = InputManager.getInstance();
-    const mouseDX =
-      input.getActionValue(GameAction.LOOK_LEFT) - input.getActionValue(GameAction.LOOK_RIGHT);
-    const mouseDY =
-      input.getActionValue(GameAction.LOOK_UP) - input.getActionValue(GameAction.LOOK_DOWN);
+    // Gather mouse delta from the input module (raw pixels).
+    // Normalize so a typical fast mouse movement (~10 px/frame) maps to ≈1.0,
+    // which is the expected range for ProceduralViewModelSystem.updateSway().
+    const rawDelta = Engine.getInput().getMouseDelta();
+    const NORM = 0.1; // px → normalized sway input
+    const mouseDX = rawDelta.x * NORM;
+    const mouseDY = rawDelta.y * NORM;
 
     // Estimate move speed from camera movement direction usage
+    const im = InputManager.getInstance();
     const moveX =
-      input.getActionValue(GameAction.MOVE_RIGHT) - input.getActionValue(GameAction.MOVE_LEFT);
+      im.getActionValue(GameAction.MOVE_RIGHT) - im.getActionValue(GameAction.MOVE_LEFT);
     const moveZ =
-      input.getActionValue(GameAction.MOVE_FORWARD) -
-      input.getActionValue(GameAction.MOVE_BACKWARD);
+      im.getActionValue(GameAction.MOVE_FORWARD) - im.getActionValue(GameAction.MOVE_BACKWARD);
     const moveSpeed = Math.sqrt(moveX * moveX + moveZ * moveZ); // 0–√2, good proxy
 
     const procPose = this.procSystem.update(dt, mouseDX, mouseDY, moveSpeed);
@@ -175,8 +179,14 @@ export class ViewModelComponent extends Component {
     // Resolve entity transform (may not be present at load time, retry in update)
     const entity = Engine.getEntities().getEntityByName(slotData.entityName);
     const transform = (entity?.getComponent('transform') as TransformComponent) ?? null;
+    const baseScale = transform
+      ? vec3.clone(transform.getTransform().getLocalScale())
+      : vec3.fromValues(1, 1, 1);
+    const baseRotation = transform
+      ? quat.clone(transform.getTransform().getLocalRotation())
+      : quat.create();
 
-    return { entityName: slotData.entityName, socketOffset, socketRotation, animator, transform };
+    return { entityName: slotData.entityName, socketOffset, socketRotation, animator, transform, baseScale, baseRotation };
   }
 
   private updateSlot(slot: RuntimeSlot, procPos: vec3, procRot: quat, dt: number): void {
@@ -186,6 +196,9 @@ export class ViewModelComponent extends Component {
       if (!entity) return;
       slot.transform = entity.getComponent('transform') as TransformComponent;
       if (!slot.transform) return;
+      // Capture initial scale and rotation now that the transform is resolved
+      vec3.copy(slot.baseScale, slot.transform.getTransform().getLocalScale());
+      quat.copy(slot.baseRotation, slot.transform.getTransform().getLocalRotation());
     }
 
     // Advance animator
@@ -197,20 +210,21 @@ export class ViewModelComponent extends Component {
     vec3.add(this._finalPos, slot.socketOffset, this._animPos);
     vec3.add(this._finalPos, this._finalPos, procPos);
 
-    // Final rotation = socketRotation * animRot * procRot
-    quat.multiply(this._finalRot, slot.socketRotation, this._animRot);
+    // Final rotation = socketRotation * baseRotation * animRot * procRot
+    // baseRotation preserves the model's rotation set in level-1.json (or any scene file)
+    quat.multiply(this._finalRot, slot.socketRotation, slot.baseRotation);
+    quat.multiply(this._finalRot, this._finalRot, this._animRot);
     quat.multiply(this._finalRot, this._finalRot, procRot);
     quat.normalize(this._finalRot, this._finalRot);
 
-    // Build TRS matrix for the slot and write it into the entity transform
-    mat4.fromRotationTranslationScale(
-      this._slotMat,
-      this._finalRot,
-      this._finalPos,
-      animPose.scale,
-    );
+    // Final scale = entity base scale × animator scale
+    vec3.multiply(this._finalScale, slot.baseScale, animPose.scale);
 
-    slot.transform.getTransform().fromMatrix(this._slotMat);
+    // Set P/R/S directly — avoids mat4 decomposition artifacts with non-uniform scale
+    const t = slot.transform.getTransform();
+    t.setLocalPosition(this._finalPos);
+    t.setLocalRotation(this._finalRot);
+    t.setLocalScale(this._finalScale);
     slot.transform.update();
   }
 }

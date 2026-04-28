@@ -1,10 +1,13 @@
 ### Engine
 
-1. GLTF Exporter unifies metallic and roughness? In right channel?
-2. Enemy AI / NavMesh
-3. Technique, Material, skinned autocomplete
-4. Material Editor
+1. View Model Sword causes ghosting with TAA
+2. View Model affected by light
+3. Deactivate like on old engine, model view/gameplay actions on F1
+4. Technique, Material, ViewModel, skinned autocomplete
 5. Procedural materials
+6. Material Editor
+7. GLTF Exporter unifies metallic and roughness? In right channel?
+8. Enemy AI / NavMesh
 
 ## Combat Gameplay
 

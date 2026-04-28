@@ -52,7 +52,7 @@ export class ViewModelPass {
     this.depthTexture = device.createTexture({
       label: 'viewmodel_depth',
       size: [width, height, 1],
-      format: 'depth24plus',
+      format: 'depth32float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
     this.depthView = this.depthTexture.createView({ label: 'viewmodel_depth_view' });

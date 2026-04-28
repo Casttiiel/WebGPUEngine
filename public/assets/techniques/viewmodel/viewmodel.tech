@@ -1,0 +1,11 @@
+{
+    "vs": "viewmodel/viewmodel.vs",
+    "fs": "viewmodel/viewmodel.fs",
+    "writesOn": "texture",
+    "z": "less_equal_write",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms"
+    ]
+}

@@ -390,5 +390,19 @@
         ]
       }
     }
+  },
+  {
+    "components": {
+      "name": "ViewModelSword",
+      "transform": {
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0],
+        "scale": [0.1, 1.0, 0.1]
+      },
+      "view_model_mesh": {
+        "mesh": "cube.obj",
+        "material": "view_model.mat"
+      }
+    }
   }
 ]

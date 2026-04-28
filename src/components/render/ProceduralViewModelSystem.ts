@@ -141,18 +141,21 @@ export class ProceduralViewModelSystem {
     mouseDeltaY: number,
     moveSpeed: number,
   ): Readonly<ProceduralPose> {
-    const posX = this.updateSway(dt, mouseDeltaX, mouseDeltaY);
     const bobPos = this.updateBob(dt, moveSpeed);
     const breathePos = this.updateBreathing(dt, moveSpeed);
     const landY = this.updateSpring('landing', dt);
     const recoilZ = this.updateSpring('recoil', dt);
 
-    // Accumulate position offsets
+    // Sway only contributes rotation — no positional shift so the weapon stays
+    // at its socket position when looking around.
+    this.updateSway(dt, mouseDeltaX, mouseDeltaY);
+
+    // Accumulate position offsets (bob + breathing + springs only)
     vec3.set(
       this.pose.posOffset,
-      posX[0] + bobPos[0] + breathePos[0],
-      posX[1] + bobPos[1] + breathePos[1] + landY,
-      posX[2] + recoilZ,
+      bobPos[0] + breathePos[0],
+      bobPos[1] + breathePos[1] + landY,
+      recoilZ,
     );
 
     // Rotation from sway: tilt X-axis by -swayX (pitch), tilt Y-axis by swayY (yaw)
