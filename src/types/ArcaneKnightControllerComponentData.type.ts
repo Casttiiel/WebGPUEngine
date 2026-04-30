@@ -37,8 +37,12 @@ export type ArcaneKnightControllerComponentDataType = {
   daggerRegenTime?: number;
   daggerPoolName?: string;
 
-  // Grapple
-  grappleSpeed?: number;
+  // Grapple (Far Reach)
+  grappleMaxDistance?: number;
+  grappleTravelTime?: number;
+  grappleUpwardBias?: number;
+  grappleFlightGravity?: number;
+  grappleReachingDuration?: number;
   grappleArrivalDistance?: number;
   grappleMaxDuration?: number;
 

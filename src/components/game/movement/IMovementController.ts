@@ -29,9 +29,6 @@ export interface IMovementController extends IMantleController {
   getIsDashing(): boolean;
   setIsDashing(value: boolean): void;
 
-  getIsDodging(): boolean;
-  setIsDodging(value: boolean): void;
-
   getIsGrappling(): boolean;
   setIsGrappling(value: boolean): void;
 

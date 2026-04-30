@@ -432,19 +432,6 @@ export class SkinnedMeshComponent extends Component {
 
     this.evaluateAnimation(this.playbackTime);
     this.uploadJointMatrices();
-
-    if (this._debugFrames < 5) {
-      const rootIdx = this.evalOrder[0]!;
-      const base = rootIdx * 16;
-      console.log(
-        `[SkinnedMesh] frame ${this._debugFrames} t=${this.playbackTime.toFixed(3)} root palette diag:`,
-        (this.jointPalette[base] ?? 0).toFixed(3),
-        (this.jointPalette[base + 5] ?? 0).toFixed(3),
-        (this.jointPalette[base + 10] ?? 0).toFixed(3),
-        (this.jointPalette[base + 15] ?? 0).toFixed(3),
-      );
-      this._debugFrames++;
-    }
   }
 
   public renderDebug(): void {}
@@ -619,9 +606,6 @@ export class SkinnedMeshComponent extends Component {
       const cached = SkinnedMeshComponent.extraAnimCache.get(path);
       if (cached) {
         this.clips.push(...cached);
-        console.log(
-          `[SkinnedMesh] extra anim "${path}" loaded from cache (${cached.length} clips)`,
-        );
         continue;
       }
       const baseUrl = `assets/animations/`;
@@ -740,12 +724,6 @@ export class SkinnedMeshComponent extends Component {
       // Store in static cache so the next instance skips the fetch entirely
       SkinnedMeshComponent.extraAnimCache.set(path, newClips);
       this.clips.push(...newClips);
-      console.log(
-        `[SkinnedMesh] extra animations from "${path}":`,
-        newClips
-          .map((c) => `"${c.name}" dur=${c.duration.toFixed(2)}s channels=${c.channels.length}`)
-          .join(', '),
-      );
     }
   }
 

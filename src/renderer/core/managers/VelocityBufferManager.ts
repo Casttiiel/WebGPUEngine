@@ -117,7 +117,6 @@ export class VelocityBufferManager {
   public setEnabled(enabled: boolean): void {
     if (this.enabled !== enabled) {
       this.enabled = enabled;
-      console.log('[VelocityBufferManager] Enabled:', enabled);
 
       if (!enabled) {
         // Reset history cuando se desactiva

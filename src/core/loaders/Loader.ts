@@ -45,6 +45,7 @@ import { ReflectionProbeComponent } from '../../components/render/ReflectionProb
 import { HeadTiltComponent } from '../../components/game/HeadTiltComponent';
 import { SpeedLinesVFXComponent } from '../../components/vfx/SpeedLinesVFXComponent';
 import { TrailRendererComponent } from '../../components/vfx/TrailRendererComponent';
+import { FarReachTentacleComponent } from '../../components/vfx/FarReachTentacleComponent';
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { SphereColliderComponent } from '../../components/physics/SphereColliderComponent';
@@ -359,6 +360,8 @@ export class Loader {
         return new ParticleSystemComponent();
       case 'trail_renderer':
         return new TrailRendererComponent();
+      case 'far_reach_tentacle':
+        return new FarReachTentacleComponent();
       case 'depth_of_field':
         return new DepthOfFieldComponent();
       case 'motion_blur':

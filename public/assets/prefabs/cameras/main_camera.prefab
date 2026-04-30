@@ -10,32 +10,6 @@
     "bloom": {},
     "auto_exposure": {},
     "lens_flare": {},
-    "atmospheric_fog": {},
-    "view_model": {
-      "rightHand": {
-        "entityName": "ViewModelSword",
-        "socketOffset": [
-          0.5,
-          -0.1,
-          -0.95
-        ],
-        "socketRotation": [
-          10,
-          -10,
-          0
-        ]
-      },
-      "procedural": {
-        "swayAmount": 0.04,
-        "swaySpeed": 8,
-        "bobAmplitudeX": 0.005,
-        "bobAmplitudeY": 0.007,
-        "bobFrequency": 1.8,
-        "breatheAmplitude": 0.002,
-        "breatheFrequency": 0.25,
-        "landingImpactAmount": 0.06,
-        "recoilAmount": 0.05
-      }
-    }
+    "atmospheric_fog": {}
   }
 }

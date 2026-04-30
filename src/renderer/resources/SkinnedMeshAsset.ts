@@ -163,11 +163,6 @@ export class SkinnedMeshAsset extends BaseResource {
 
     // ── Extract animation clips ──────────────────────────────────────────
     this.clips = this.extractAnimations(root.listAnimations(), root.listNodes());
-
-    console.log(
-      `[SkinnedMeshAsset] parsed "${gltfName}" — joints: ${this.skeleton.joints.length}, clips: ${this.clips.length}`,
-      this.clips.map((c) => `"${c.name}" ${c.duration.toFixed(2)}s`).join(', '),
-    );
   }
 
   // ── Build a single GPU SkinnedMesh from a GLTF mesh ──────────────────────

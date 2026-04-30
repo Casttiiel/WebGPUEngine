@@ -9,16 +9,11 @@ import { GameAction } from '../../types/GameAction.enum';
 import type { ArcaneKnightControllerComponentDataType } from '../../types/ArcaneKnightControllerComponentData.type';
 
 import { CombatSystem } from './combat/CombatSystem';
-import { ThrowSystem } from './combat/ThrowSystem';
-import { DaggerHUDSystem } from './combat/DaggerHUDSystem';
 import { MantleSystem } from './movement/MantleSystem';
 import { MovementSystem } from './movement/MovementSystem';
 import { JumpSystem } from './movement/JumpSystem';
 import { SwingSystem } from './movement/SwingSystem';
-import { DodgeSystem } from './movement/DodgeSystem';
 import { GrappleSystem } from './movement/GrappleSystem';
-import { WallKickSystem } from './movement/WallKickSystem';
-import { StaminaComponent } from './StaminaComponent';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
@@ -54,15 +49,11 @@ export class ArcaneKnightControllerComponent
   private impulsePadInputDisableTime: number = 0.5;
 
   private combatSystem!: CombatSystem;
-  private throwSystem!: ThrowSystem;
-  private daggerHUD!: DaggerHUDSystem;
   private mantleSystem!: MantleSystem;
   private movementSystem!: MovementSystem;
   private jumpSystem!: JumpSystem;
   private swingSystem!: SwingSystem;
-  private dodgeSystem!: DodgeSystem;
   private grappleSystem!: GrappleSystem;
-  private wallKickSystem!: WallKickSystem;
 
   constructor() {
     super();
@@ -81,7 +72,6 @@ export class ArcaneKnightControllerComponent
 
     // 2. Sistemas
     this.combatSystem = new CombatSystem(data);
-    this.throwSystem = new ThrowSystem(data);
     this.mantleSystem = new MantleSystem(this, data);
     this.movementSystem = new MovementSystem(
       this,
@@ -98,24 +88,9 @@ export class ArcaneKnightControllerComponent
       null,
       data as unknown as CharacterControllerComponentDataType,
     );
-    this.dodgeSystem = new DodgeSystem(
-      this,
-      data,
-      () => this.getOwner().getComponent('stamina') as StaminaComponent | null,
-    );
     this.grappleSystem = new GrappleSystem(this, data);
-    this.wallKickSystem = new WallKickSystem(
-      this,
-      data as unknown as CharacterControllerComponentDataType,
-    );
     this.impulsePadInputDisableTime =
       data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
-    this.daggerHUD = new DaggerHUDSystem();
-
-    // Registrar callback de grapple en ThrowSystem
-    this.throwSystem.setGrappleCallback((hitPoint) => {
-      this.grappleSystem.startGrapple(hitPoint);
-    });
 
     // 3. Controlador cinemático de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
@@ -129,9 +104,6 @@ export class ArcaneKnightControllerComponent
 
     this.updateGroundedState();
     this.mantleSystem.update();
-    this.dodgeSystem.update(deltaTime);
-    this.throwSystem.update(deltaTime, this.camera);
-    this.daggerHUD.update(this.throwSystem);
 
     switch (this.movementState) {
       case CharacterMovementState.MANTLING:
@@ -139,22 +111,15 @@ export class ArcaneKnightControllerComponent
         this.applyMovement(mantleMovement, deltaTime);
         break;
 
-      case CharacterMovementState.DODGING: {
-        const dodgeVel = this.dodgeSystem.getDodgeVelocity();
-        const dodgeWithGravity = vec3.fromValues(
-          dodgeVel[0],
-          this.currentVerticalVelocity,
-          dodgeVel[2],
-        );
-        this.applyMovement(dodgeWithGravity, deltaTime);
-        break;
-      }
-
       case CharacterMovementState.GRAPPLING: {
         const active = this.grappleSystem.update(deltaTime);
         if (active) {
           const grappleVel = this.grappleSystem.getGrappleVelocity();
           this.applyMovement(grappleVel, deltaTime);
+        } else {
+          // Grapple ended — bleed off momentum so the character doesn't keep flying.
+          vec3.zero(this.currentHorizontalVelocity);
+          this.currentVerticalVelocity = 0;
         }
         break;
       }
@@ -167,13 +132,11 @@ export class ArcaneKnightControllerComponent
 
       case CharacterMovementState.IDLE:
       default:
+        this.tryActivateFarReach();
         const inputDir = this.getInputVector();
         const targetMovement = this.getTargetMovement(inputDir);
         this.movementSystem.update(deltaTime, targetMovement);
         this.jumpSystem.update(deltaTime);
-        if (!this.isGrounded) {
-          this.wallKickSystem.update(deltaTime);
-        }
         const finalVelocity = this.mergeMovements();
         this.applyMovement(finalVelocity, deltaTime);
         break;
@@ -189,6 +152,7 @@ export class ArcaneKnightControllerComponent
   }
 
   public setIsMantling(value: boolean): void {
+    if (value) this.grappleSystem?.cancel();
     this.movementState = value ? CharacterMovementState.MANTLING : CharacterMovementState.IDLE;
   }
 
@@ -239,13 +203,6 @@ export class ArcaneKnightControllerComponent
   }
   public setIsWallRunning(_value: boolean): void {}
 
-  public getIsDodging(): boolean {
-    return this.movementState === CharacterMovementState.DODGING;
-  }
-  public setIsDodging(value: boolean): void {
-    this.movementState = value ? CharacterMovementState.DODGING : CharacterMovementState.IDLE;
-  }
-
   public getIsGrappling(): boolean {
     return this.movementState === CharacterMovementState.GRAPPLING;
   }
@@ -262,6 +219,7 @@ export class ArcaneKnightControllerComponent
     return this.movementState === CharacterMovementState.SWINGING;
   }
   public setIsSwinging(value: boolean): void {
+    if (value) this.grappleSystem?.cancel();
     this.movementState = value ? CharacterMovementState.SWINGING : CharacterMovementState.IDLE;
   }
 
@@ -297,8 +255,8 @@ export class ArcaneKnightControllerComponent
     return this.combatSystem;
   }
 
-  public getThrowSystem(): ThrowSystem {
-    return this.throwSystem;
+  public getGrappleSystem(): GrappleSystem {
+    return this.grappleSystem;
   }
 
   public startSwing(data: SwingEntryData): void {
@@ -315,6 +273,43 @@ export class ArcaneKnightControllerComponent
 
   public getTransform(): TransformComponent {
     return this.getOwner().getComponent('transform') as TransformComponent;
+  }
+
+  /**
+   * Attempts to activate Far Reach toward whatever surface the camera crosshair points at.
+   * Only triggers when ABILITY_Q is just pressed and the ability is not already active.
+   */
+  private tryActivateFarReach(): void {
+    if (this.movementState !== CharacterMovementState.IDLE) return;
+    if (!this.camera) return;
+
+    const input = Engine.getInput();
+    if (!input.isActionJustPressed(GameAction.THROW)) return;
+
+    const cam = this.camera.getCamera();
+    const origin = cam.getPosition();
+    const dir = cam.getFront();
+
+    const ray = new RAPIER.Ray(
+      { x: origin[0], y: origin[1], z: origin[2] },
+      { x: dir[0], y: dir[1], z: dir[2] },
+    );
+
+    const hit = Engine.getPhysics()
+      .getWorld()
+      .castRay(
+        ray,
+        this.grappleSystem.getMaxDistance(),
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        this.capsuleCollider.getCollider(),
+      );
+
+    if (!hit) return;
+
+    const hitPoint = vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
+    this.grappleSystem.startGrapple(hitPoint);
   }
 
   private findCamera(): void {
@@ -335,7 +330,6 @@ export class ArcaneKnightControllerComponent
     this.isGrounded = hit !== null;
 
     if (this.isGrounded && hit) {
-      this.wallKickSystem?.onGrounded();
       const isFloor = hit.normal.y > 0.1;
 
       if (isFloor) {

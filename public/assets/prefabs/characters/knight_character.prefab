@@ -71,6 +71,7 @@
       "invertY": true
     },
     "head_bob": {},
+    "far_reach_tentacle": {},
     "landing_camera": {
       "maxDipAmplitude": 0.2,
       "maxImpactSpeed": 12,

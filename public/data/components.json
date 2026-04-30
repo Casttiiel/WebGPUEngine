@@ -28,6 +28,7 @@
     "bullet_pool",
     "weapon",
     "trail_renderer",
+    "far_reach_tentacle",
     "fog_volume",
     "arcane_knight_controller",
     "parkour_controller",
