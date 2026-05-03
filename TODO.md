@@ -1,11 +1,12 @@
 ### Engine
 
-1. Deactivate like on old engine, model view/gameplay actions on F1
-2. Technique, Material, ViewModel, skinned autocomplete
-3. Procedural materials
-4. Material Editor
+1. Technique, Material, ViewModel, skinned autocomplete
+2. Procedural materials
+3. Material Editor
+4. TAA Dynamic objects ghosting
 5. GLTF Exporter unifies metallic and roughness? In right channel?
 6. Enemy AI / NavMesh
+   (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay
 

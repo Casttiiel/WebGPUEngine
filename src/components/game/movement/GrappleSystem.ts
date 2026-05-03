@@ -1,6 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import type { IMovementController } from './IMovementController';
 import { TransformComponent } from '../../core/TransformComponent';
+import { GrappleTargetType } from '../../../types/GrappleTargetType.enum';
 
 export interface GrappleSystemData {
   /** Maximum range (metres) for the Far Reach raycast. Default 20. */
@@ -17,6 +18,10 @@ export interface GrappleSystemData {
   grappleArrivalDistance?: number;
   /** Safety timeout (seconds) before the grapple is forcefully cancelled. Default 2.0. */
   grappleMaxDuration?: number;
+  /** Maximum number of grapple charges. Default 3. */
+  grappleMaxCharges?: number;
+  /** Time (seconds) to recharge one charge after use. Default 8. */
+  grappleRechargeTime?: number;
 }
 
 /** Internal phases of the Far Reach ability (Dishonored 2 style). */
@@ -55,13 +60,23 @@ export class GrappleSystem {
   private readonly reachingDuration: number;
   private readonly arrivalDistance: number;
   private readonly maxDuration: number;
+  private readonly rechargeTime: number;
+
+  // ── Charge economy ────────────────────────────────────────
+  private maxCharges: number;
+  private chargeCount: number;
+  /** Per-used-charge recharge countdown timers (seconds remaining). */
+  private rechargeTimers: number[] = [];
 
   private phase: FarReachPhase = FarReachPhase.INACTIVE;
   private reachingTimer: number = 0;
   private safetyTimer: number = 0;
+  private currentTargetType: GrappleTargetType = GrappleTargetType.LEDGE;
 
   private targetPoint: vec3 = vec3.create();
   private startPoint: vec3 = vec3.create();
+  /** Visual-only target — the raw raycast hit point (no capsule-height offset). */
+  private visualTargetPoint: vec3 = vec3.create();
   /** Velocity applied each frame during PULLING. Gravity accumulates into [1]. */
   private flyVelocity: vec3 = vec3.create();
   /** Last computed velocity, exposed via getGrappleVelocity(). */
@@ -78,6 +93,9 @@ export class GrappleSystem {
     this.reachingDuration = data.grappleReachingDuration ?? 0.1;
     this.arrivalDistance = data.grappleArrivalDistance ?? 0.8;
     this.maxDuration = data.grappleMaxDuration ?? 2.0;
+    this.maxCharges = data.grappleMaxCharges ?? 3;
+    this.rechargeTime = data.grappleRechargeTime ?? 8;
+    this.chargeCount = this.maxCharges;
   }
 
   // ──────────────────────────────────────────────────────────
@@ -89,14 +107,70 @@ export class GrappleSystem {
     return this.maxDistance;
   }
 
+  // ── Charge economy ────────────────────────────────────────
+
+  /** Current available charges. */
+  public getCharges(): number {
+    return this.chargeCount;
+  }
+
+  /** Maximum charges (default 3, unlockable to 5). */
+  public getMaxCharges(): number {
+    return this.maxCharges;
+  }
+
+  /**
+   * Normalised recharge progress [0..1] for the i-th used charge (0 = just used, 1 = recharged).
+   * Used by the HUD to animate the fill animation per slot.
+   */
+  public getRechargeProgress(index: number): number {
+    const timer = this.rechargeTimers[index];
+    if (timer === undefined) return 1;
+    return 1 - timer / this.rechargeTime;
+  }
+
+  /** Expand max charges — call from the progression system. */
+  public setMaxCharges(n: number): void {
+    const delta = n - this.maxCharges;
+    this.maxCharges = n;
+    if (delta > 0) this.chargeCount = Math.min(this.chargeCount + delta, this.maxCharges);
+  }
+
+  /**
+   * Advances per-charge recharge timers. Must be called every frame from the
+   * controller regardless of movement state.
+   */
+  public tickRecharge(dt: number): void {
+    for (let i = this.rechargeTimers.length - 1; i >= 0; i--) {
+      const t = this.rechargeTimers[i]!;
+      this.rechargeTimers[i] = t - dt;
+      if (this.rechargeTimers[i]! <= 0) {
+        this.chargeCount = Math.min(this.chargeCount + 1, this.maxCharges);
+        this.rechargeTimers.splice(i, 1);
+      }
+    }
+  }
+
+  // ── Target type ───────────────────────────────────────────
+
+  /** The grapple target type set on the last successful startGrapple() call. */
+  public getTargetType(): GrappleTargetType {
+    return this.currentTargetType;
+  }
+
   /** World-space position of the player at the moment the grapple was activated. */
   public getStartPoint(): vec3 {
     return this.startPoint;
   }
 
-  /** World-space position of the grapple target. */
+  /** World-space position of the grapple target (movement destination, capsule-center). */
   public getTargetPoint(): vec3 {
     return this.targetPoint;
+  }
+
+  /** World-space position of the raw raycast hit point — used for VFX alignment. */
+  public getVisualTargetPoint(): vec3 {
+    return this.visualTargetPoint;
   }
 
   /**
@@ -124,17 +198,30 @@ export class GrappleSystem {
 
   /**
    * Activates Far Reach toward the given world-space point.
-   * Returns false if the point is beyond maxDistance or another grapple is active.
+   *
+   * @param point        Movement destination (capsule-centre aligned).
+   * @param visualTarget Raw raycast hit point for VFX. Defaults to `point` if omitted.
+   * @param targetType   Classified surface type that drives arrival behaviour.
    */
-  public startGrapple(point: vec3): boolean {
+  public startGrapple(
+    point: vec3,
+    visualTarget?: vec3,
+    targetType: GrappleTargetType = GrappleTargetType.LEDGE,
+  ): boolean {
     if (this.phase !== FarReachPhase.INACTIVE) return false;
+    if (this.chargeCount <= 0) return false;
 
     const playerPos = this.getPlayerPos();
     const dist = vec3.distance(playerPos, point);
     if (dist > this.maxDistance) return false;
 
+    this.currentTargetType = targetType;
+    this.chargeCount--;
+    this.rechargeTimers.push(this.rechargeTime);
+
     vec3.copy(this.targetPoint, point);
     vec3.copy(this.startPoint, playerPos);
+    vec3.copy(this.visualTargetPoint, visualTarget ?? point);
 
     console.log(
       `[GrappleSystem] START — origin: (${playerPos[0].toFixed(2)}, ${playerPos[1].toFixed(2)}, ${playerPos[2].toFixed(2)})` +

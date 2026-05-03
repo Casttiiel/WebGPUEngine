@@ -196,7 +196,7 @@ export class FarReachTentacleComponent extends Component {
     }
 
     const pulling = this.grapple.isPulling();
-    const targetPos = this.grapple.getTargetPoint();
+    const targetPos = this.grapple.getVisualTargetPoint();
 
     // Start = current player position during PULLING (tentacle shrinks naturally),
     //         fixed activation position during REACHING.

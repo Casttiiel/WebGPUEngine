@@ -55,6 +55,14 @@ export class MantleSystem {
     }
   }
 
+  /**
+   * Starts a mantle toward a pre-computed target position.
+   * Called by the controller after arriving at a LEDGE via grapple.
+   */
+  public startMantleAtPoint(targetPosition: vec3): void {
+    this.startMantle(targetPosition);
+  }
+
   public updateMantleDirection(): vec3 {
     const collider = this.controller.getCollider();
     const currentPos = collider.getRigidBody().translation();

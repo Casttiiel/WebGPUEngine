@@ -17,6 +17,7 @@ import { GrappleSystem } from './movement/GrappleSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
+import { GrappleTargetType } from '../../types/GrappleTargetType.enum';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import { SwingEntryData } from '../../types/SwingEntryData.type';
 
@@ -54,6 +55,17 @@ export class ArcaneKnightControllerComponent
   private jumpSystem!: JumpSystem;
   private swingSystem!: SwingSystem;
   private grappleSystem!: GrappleSystem;
+
+  // ── Snap targeting ─────────────────────────────────────────
+  /** Best valid grapple candidate found this frame. Null if none in range. */
+  private pendingGrappleTarget: {
+    point: vec3;
+    visualPoint: vec3;
+    type: GrappleTargetType;
+  } | null = null;
+
+  /** Half-angle (radians) of the snap cone. ~10° spread. */
+  private static readonly SNAP_CONE_HALF_ANGLE = (10 * Math.PI) / 180;
 
   constructor() {
     super();
@@ -104,6 +116,7 @@ export class ArcaneKnightControllerComponent
 
     this.updateGroundedState();
     this.mantleSystem.update();
+    this.grappleSystem.tickRecharge(deltaTime);
 
     switch (this.movementState) {
       case CharacterMovementState.MANTLING:
@@ -117,9 +130,15 @@ export class ArcaneKnightControllerComponent
           const grappleVel = this.grappleSystem.getGrappleVelocity();
           this.applyMovement(grappleVel, deltaTime);
         } else {
-          // Grapple ended — bleed off momentum so the character doesn't keep flying.
-          vec3.zero(this.currentHorizontalVelocity);
-          this.currentVerticalVelocity = 0;
+          // Arrival: behaviour depends on the target type.
+          if (this.grappleSystem.getTargetType() === GrappleTargetType.LEDGE) {
+            // Transition into mantle at the arrival point.
+            this.mantleSystem.startMantleAtPoint(this.grappleSystem.getTargetPoint());
+          } else {
+            // Bleed off momentum so the character doesn't keep flying.
+            vec3.zero(this.currentHorizontalVelocity);
+            this.currentVerticalVelocity = 0;
+          }
         }
         break;
       }
@@ -132,6 +151,7 @@ export class ArcaneKnightControllerComponent
 
       case CharacterMovementState.IDLE:
       default:
+        this.updateGrappleTarget();
         this.tryActivateFarReach();
         const inputDir = this.getInputVector();
         const targetMovement = this.getTargetMovement(inputDir);
@@ -255,6 +275,15 @@ export class ArcaneKnightControllerComponent
     return this.combatSystem;
   }
 
+  /** Returns the current best-candidate grapple target (used by HUD). */
+  public getPendingGrappleTarget(): {
+    point: vec3;
+    visualPoint: vec3;
+    type: GrappleTargetType;
+  } | null {
+    return this.pendingGrappleTarget;
+  }
+
   public getGrappleSystem(): GrappleSystem {
     return this.grappleSystem;
   }
@@ -276,40 +305,158 @@ export class ArcaneKnightControllerComponent
   }
 
   /**
-   * Attempts to activate Far Reach toward whatever surface the camera crosshair points at.
-   * Only triggers when ABILITY_Q is just pressed and the ability is not already active.
+   * Scans for valid grapple targets every frame (called in IDLE).
+   * Casts a 3×3 ray cone + scans RING entities. Stores the best candidate.
    */
-  private tryActivateFarReach(): void {
-    if (this.movementState !== CharacterMovementState.IDLE) return;
-    if (!this.camera) return;
-
-    const input = Engine.getInput();
-    if (!input.isActionJustPressed(GameAction.THROW)) return;
+  private updateGrappleTarget(): void {
+    if (!this.camera) {
+      this.pendingGrappleTarget = null;
+      return;
+    }
 
     const cam = this.camera.getCamera();
     const origin = cam.getPosition();
-    const dir = cam.getFront();
+    const front = cam.getFront();
+    const up = cam.getUp();
+    const right = vec3.cross(vec3.create(), front, up);
+    vec3.normalize(right, right);
 
-    const ray = new RAPIER.Ray(
-      { x: origin[0], y: origin[1], z: origin[2] },
-      { x: dir[0], y: dir[1], z: dir[2] },
-    );
+    const maxDist = this.grappleSystem.getMaxDistance();
+    const world = Engine.getPhysics().getWorld();
 
-    const hit = Engine.getPhysics()
-      .getWorld()
-      .castRay(
-        ray,
-        this.grappleSystem.getMaxDistance(),
+    // — Cast 3×3 rays in a cone —
+    const offsets = [-1, 0, 1];
+    const spreadRad = ArcaneKnightControllerComponent.SNAP_CONE_HALF_ANGLE * 0.5;
+    let bestCandidate: {
+      point: vec3;
+      visualPoint: vec3;
+      type: GrappleTargetType;
+      dot: number;
+    } | null = null;
+
+    for (const ox of offsets) {
+      for (const oy of offsets) {
+        const dir = vec3.create();
+        vec3.scaleAndAdd(dir, front, right, ox * spreadRad);
+        vec3.scaleAndAdd(dir, dir, up, oy * spreadRad);
+        vec3.normalize(dir, dir);
+
+        const ray = new RAPIER.Ray(
+          { x: origin[0], y: origin[1], z: origin[2] },
+          { x: dir[0], y: dir[1], z: dir[2] },
+        );
+        const hit = world.castRayAndGetNormal(
+          ray,
+          maxDist,
+          true,
+          QueryFilterFlags.EXCLUDE_SENSORS,
+          undefined,
+          this.capsuleCollider.getCollider(),
+        );
+        if (!hit) continue;
+
+        const hitPoint = vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
+
+        // Classify
+        let type: GrappleTargetType;
+        const entityId = Engine.getPhysics().getEntityIdFromCollider(hit.collider.handle);
+        if (
+          entityId !== undefined &&
+          Engine.getEntities().getEntityById(entityId)?.getComponent('grapple_hook') != null
+        ) {
+          type = GrappleTargetType.RING;
+        } else {
+          // Only accept LEDGE or CORNER — discard horizontal floors (pure top hits)
+          const ny = hit.normal.y;
+          if (ny > 0.85) continue; // walking surface — not a grapple ledge
+          type = ny > 0.3 ? GrappleTargetType.LEDGE : GrappleTargetType.CORNER;
+        }
+
+        const dot = vec3.dot(front, dir);
+        if (!bestCandidate || dot > bestCandidate.dot) {
+          const movementTarget = vec3.clone(hitPoint);
+          movementTarget[1] += this.capsuleCollider.getCapsuleHeight() * 0.5;
+          bestCandidate = { point: movementTarget, visualPoint: hitPoint, type, dot };
+        }
+      }
+    }
+
+    // — Also scan RING entities directly (GrappleHookComponent prefabs) —
+    for (const entity of Engine.getEntities().getAllEntities()) {
+      if (!entity.getComponent('grapple_hook')) continue;
+      const transform = entity.getComponent('transform') as
+        | import('../core/TransformComponent').TransformComponent
+        | null;
+      if (!transform) continue;
+      const worldPos = transform.getTransform().getWorldPosition();
+      const toTarget = vec3.subtract(vec3.create(), worldPos, origin);
+      const dist = vec3.length(toTarget);
+      if (dist > maxDist || dist < 0.1) continue;
+      const dirToTarget = vec3.scale(vec3.create(), toTarget, 1 / dist);
+      const dot = vec3.dot(front, dirToTarget);
+      const coneThreshold = Math.cos(ArcaneKnightControllerComponent.SNAP_CONE_HALF_ANGLE);
+      if (dot < coneThreshold) continue;
+      if (!bestCandidate || dot > bestCandidate.dot) {
+        bestCandidate = {
+          point: vec3.clone(worldPos),
+          visualPoint: vec3.clone(worldPos),
+          type: GrappleTargetType.RING,
+          dot,
+        };
+      }
+    }
+
+    this.pendingGrappleTarget = bestCandidate
+      ? {
+          point: bestCandidate.point,
+          visualPoint: bestCandidate.visualPoint,
+          type: bestCandidate.type,
+        }
+      : null;
+
+    // Refine LEDGE target: find the actual top-of-ledge surface via a downward raycast.
+    if (this.pendingGrappleTarget?.type === GrappleTargetType.LEDGE) {
+      const vp = this.pendingGrappleTarget.visualPoint;
+      const forwardXZ = vec3.fromValues(front[0], 0, front[2]);
+      vec3.normalize(forwardXZ, forwardXZ);
+      const capsuleH = this.capsuleCollider.getCapsuleHeight();
+      const castOrigin = {
+        x: vp[0] + forwardXZ[0] * 0.5,
+        y: vp[1] + capsuleH,
+        z: vp[2] + forwardXZ[2] * 0.5,
+      };
+      const downRay = new RAPIER.Ray(castOrigin, { x: 0, y: -1, z: 0 });
+      const surfaceHit = world.castRay(
+        downRay,
+        capsuleH * 2,
         true,
         QueryFilterFlags.EXCLUDE_SENSORS,
         undefined,
         this.capsuleCollider.getCollider(),
       );
+      if (surfaceHit) {
+        const surfaceY = castOrigin.y - surfaceHit.timeOfImpact;
+        this.pendingGrappleTarget.point = vec3.fromValues(
+          castOrigin.x,
+          surfaceY + capsuleH * 0.5,
+          castOrigin.z,
+        );
+      }
+    }
+  }
 
-    if (!hit) return;
+  /**
+   * Fires the grapple toward pendingGrappleTarget when the input is pressed.
+   */
+  private tryActivateFarReach(): void {
+    if (this.movementState !== CharacterMovementState.IDLE) return;
+    if (!this.pendingGrappleTarget) return;
 
-    const hitPoint = vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
-    this.grappleSystem.startGrapple(hitPoint);
+    const input = Engine.getInput();
+    if (!input.isActionJustPressed(GameAction.THROW)) return;
+
+    const { point, visualPoint, type } = this.pendingGrappleTarget;
+    this.grappleSystem.startGrapple(point, visualPoint, type);
   }
 
   private findCamera(): void {

@@ -76,5 +76,185 @@
         }
       }
     ]
+  },
+  {
+    "name": "grapple_charges_container",
+    "type": "image",
+    "anchor": "bottom-center",
+    "visible": true,
+    "x": -112,
+    "y": -50,
+    "width": 224,
+    "height": 24,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [224, 24],
+      "color": [0, 0, 0, 0]
+    },
+    "children": [
+      {
+        "name": "grapple_charge_slot_0",
+        "type": "image",
+        "x": 0,
+        "y": 0,
+        "width": 40,
+        "height": 24,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [40, 24],
+          "color": [0.08, 0.08, 0.1, 0.6]
+        },
+        "children": [
+          {
+            "name": "grapple_charge_fill_0",
+            "alias": "grapple_charge_fill_0",
+            "type": "image",
+            "x": 2,
+            "y": 2,
+            "width": 36,
+            "height": 20,
+            "imageParams": {
+              "texture": "white.png",
+              "size": [36, 20],
+              "color": [0.8, 0.85, 1.0, 1]
+            }
+          }
+        ]
+      },
+      {
+        "name": "grapple_charge_slot_1",
+        "type": "image",
+        "x": 46,
+        "y": 0,
+        "width": 40,
+        "height": 24,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [40, 24],
+          "color": [0.08, 0.08, 0.1, 0.6]
+        },
+        "children": [
+          {
+            "name": "grapple_charge_fill_1",
+            "alias": "grapple_charge_fill_1",
+            "type": "image",
+            "x": 2,
+            "y": 2,
+            "width": 36,
+            "height": 20,
+            "imageParams": {
+              "texture": "white.png",
+              "size": [36, 20],
+              "color": [0.8, 0.85, 1.0, 1]
+            }
+          }
+        ]
+      },
+      {
+        "name": "grapple_charge_slot_2",
+        "type": "image",
+        "x": 92,
+        "y": 0,
+        "width": 40,
+        "height": 24,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [40, 24],
+          "color": [0.08, 0.08, 0.1, 0.6]
+        },
+        "children": [
+          {
+            "name": "grapple_charge_fill_2",
+            "alias": "grapple_charge_fill_2",
+            "type": "image",
+            "x": 2,
+            "y": 2,
+            "width": 36,
+            "height": 20,
+            "imageParams": {
+              "texture": "white.png",
+              "size": [36, 20],
+              "color": [0.8, 0.85, 1.0, 1]
+            }
+          }
+        ]
+      },
+      {
+        "name": "grapple_charge_slot_3",
+        "type": "image",
+        "x": 138,
+        "y": 0,
+        "width": 40,
+        "height": 24,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [40, 24],
+          "color": [0.08, 0.08, 0.1, 0.6]
+        },
+        "children": [
+          {
+            "name": "grapple_charge_fill_3",
+            "alias": "grapple_charge_fill_3",
+            "type": "image",
+            "x": 2,
+            "y": 2,
+            "width": 36,
+            "height": 20,
+            "imageParams": {
+              "texture": "white.png",
+              "size": [36, 20],
+              "color": [0.8, 0.85, 1.0, 1]
+            }
+          }
+        ]
+      },
+      {
+        "name": "grapple_charge_slot_4",
+        "type": "image",
+        "x": 184,
+        "y": 0,
+        "width": 40,
+        "height": 24,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [40, 24],
+          "color": [0.08, 0.08, 0.1, 0.6]
+        },
+        "children": [
+          {
+            "name": "grapple_charge_fill_4",
+            "alias": "grapple_charge_fill_4",
+            "type": "image",
+            "x": 2,
+            "y": 2,
+            "width": 36,
+            "height": 20,
+            "imageParams": {
+              "texture": "white.png",
+              "size": [36, 20],
+              "color": [0.8, 0.85, 1.0, 1]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "grapple_target_indicator",
+    "alias": "grapple_target_indicator",
+    "type": "image",
+    "anchor": "top-left",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 24,
+    "height": 24,
+    "pivotX": 0.5,
+    "pivotY": 0.5,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [24, 24],
+      "color": [1, 1, 1, 0.9]
+    }
   }
 ]
