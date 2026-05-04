@@ -1,12 +1,18 @@
 ### Engine
 
-1. Technique, Material, ViewModel, skinned autocomplete
-2. Procedural materials
-3. Material Editor
-4. TAA Dynamic objects ghosting
-5. GLTF Exporter unifies metallic and roughness? In right channel?
-6. Enemy AI / NavMesh
-   (pensar en epipolar shadow map sampling)
+1. Punto de agarre en ledge
+2. Grapple to ledge
+3. Grapple to corner
+4. Grapple to swing bars
+5. Grapple to ring
+
+6. Technique, Material, ViewModel, skinned autocomplete
+7. Procedural materials
+8. Material Editor
+9. TAA Dynamic objects ghosting
+10. GLTF Exporter unifies metallic and roughness? In right channel?
+11. Enemy AI / NavMesh
+    (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay
 

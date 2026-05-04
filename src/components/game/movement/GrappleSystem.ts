@@ -86,7 +86,7 @@ export class GrappleSystem {
     private readonly controller: IMovementController,
     data: GrappleSystemData = {},
   ) {
-    this.maxDistance = data.grappleMaxDistance ?? 20;
+    this.maxDistance = data.grappleMaxDistance ?? 10;
     this.travelTime = data.grappleTravelTime ?? 0.35;
     this.upwardBias = data.grappleUpwardBias ?? 0.2;
     this.flightGravity = data.grappleFlightGravity ?? -8;

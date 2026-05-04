@@ -33,9 +33,9 @@ export class HUDController extends WidgetController {
   // Crosshair
   private crosshair: ImageWidget | null = null;
   private static readonly COLOR_DEFAULT = [1.0, 1.0, 1.0, 0.8] as const;
-  private static readonly COLOR_LEDGE = [1.0, 1.0, 1.0, 0.9] as const;
-  private static readonly COLOR_CORNER = [0.3, 0.9, 1.0, 0.9] as const;
-  private static readonly COLOR_RING = [1.0, 0.8, 0.2, 0.9] as const;
+  private static readonly COLOR_LEDGE = [1.0, 0.0, 0.0, 0.9] as const;
+  private static readonly COLOR_CORNER = [0.0, 1.0, 0.0, 0.9] as const;
+  private static readonly COLOR_RING = [0.0, 0.0, 1.0, 0.9] as const;
 
   // ── Player components (lazy) ──────────────────────────────────────────────
   private playerEntity: Entity | null = null;
