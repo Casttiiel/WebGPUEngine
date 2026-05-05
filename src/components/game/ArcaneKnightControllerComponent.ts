@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+﻿import { vec3 } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { BasePlayerController } from './BasePlayerController';
 import { Engine } from '../../core/engine/Engine';
@@ -26,7 +26,7 @@ export class ArcaneKnightControllerComponent
   implements IMantleController, IMovementController
 {
   // ============================================
-  // REFERENCIAS FÍSICAS
+  // REFERENCIAS FÃSICAS
   // ============================================
   private capsuleCollider!: CapsuleColliderComponent;
   private characterController!: RAPIER.KinematicCharacterController;
@@ -44,7 +44,7 @@ export class ArcaneKnightControllerComponent
   private currentHorizontalVelocity: vec3 = vec3.create();
   private movementState: CharacterMovementState = CharacterMovementState.IDLE;
 
-  // ──── Parámetros de movimiento ────
+  // â”€â”€â”€â”€ ParÃ¡metros de movimiento â”€â”€â”€â”€
   private inputDisableTimer: number = -10.0;
   private groundNormal: vec3 = vec3.fromValues(0, 1, 0);
   private impulsePadInputDisableTime: number = 0.5;
@@ -56,30 +56,12 @@ export class ArcaneKnightControllerComponent
   private swingSystem!: SwingSystem;
   private grappleSystem!: GrappleSystem;
 
-  // ── Snap targeting ─────────────────────────────────────────
-  /** Best valid grapple candidate found this frame. Null if none in range. */
-  private pendingGrappleTarget: {
-    point: vec3;
-    visualPoint: vec3;
-    type: GrappleTargetType;
-  } | null = null;
-
-  /** Half-angle (radians) of the snap cone. ~10° spread. */
-  private static readonly SNAP_CONE_HALF_ANGLE = (10 * Math.PI) / 180;
-  /** Frames a new LEDGE/CORNER call must be stable before the type is accepted. */
-  private static readonly CLASSIFICATION_DEBOUNCE_FRAMES = 4;
-  /** A hit more than this multiple of minHitDist away is considered an outlier. */
-  private static readonly OUTLIER_DISTANCE_FACTOR = 2.0;
-  private lastClassifiedType: GrappleTargetType | null = null;
-  private pendingClassificationType: GrappleTargetType | null = null;
-  private classificationStableFrames: number = 0;
-
   constructor() {
     super();
   }
 
   public async load(data: ArcaneKnightControllerComponentDataType): Promise<void> {
-    // 1. Componente físico requerido
+    // 1. Componente fÃ­sico requerido
     this.capsuleCollider = this.getOwner().getComponent(
       'capsule_collider',
     ) as CapsuleColliderComponent;
@@ -111,7 +93,7 @@ export class ArcaneKnightControllerComponent
     this.impulsePadInputDisableTime =
       data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
 
-    // 3. Controlador cinemático de Rapier
+    // 3. Controlador cinemÃ¡tico de Rapier
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 
@@ -217,7 +199,7 @@ export class ArcaneKnightControllerComponent
     return this.currentHorizontalVelocity;
   }
 
-  // ── IMovementController ──────────────────────────────────────────────────
+  // â”€â”€ IMovementController â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   public getIsJumping(): boolean {
     return this.isJumping;
   }
@@ -292,7 +274,7 @@ export class ArcaneKnightControllerComponent
     visualPoint: vec3;
     type: GrappleTargetType;
   } | null {
-    return this.pendingGrappleTarget;
+    return this.grappleSystem.getPendingTarget();
   }
 
   public getGrappleSystem(): GrappleSystem {
@@ -315,448 +297,8 @@ export class ArcaneKnightControllerComponent
     return this.getOwner().getComponent('transform') as TransformComponent;
   }
 
-  /**
-   * Scans for valid grapple targets every frame (called in IDLE).
-   * 5-ray cross + RING entity scan (with LOS). Scored by distance (40 %) + angular centre (60 %).
-   */
   private updateGrappleTarget(): void {
-    if (!this.camera) {
-      this.pendingGrappleTarget = null;
-      return;
-    }
-
-    const cam = this.camera.getCamera();
-    const origin = cam.getPosition();
-    const front = cam.getFront();
-    const up = cam.getUp();
-    const right = vec3.cross(vec3.create(), front, up);
-    vec3.normalize(right, right);
-
-    const maxDist = this.grappleSystem.getMaxDistance();
-    const world = Engine.getPhysics().getWorld();
-    const capsuleH = this.capsuleCollider.getCapsuleHeight();
-
-    const spreadRad = ArcaneKnightControllerComponent.SNAP_CONE_HALF_ANGLE;
-    const coneThreshold = Math.cos(spreadRad);
-
-    // ── 5-ray cross (named) ──────────────────────────────────────────────
-    const castDir = (dir: vec3) =>
-      world.castRayAndGetNormal(
-        new RAPIER.Ray(
-          { x: origin[0], y: origin[1], z: origin[2] },
-          { x: dir[0], y: dir[1], z: dir[2] },
-        ),
-        maxDist,
-        false,
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined,
-        this.capsuleCollider.getCollider(),
-      );
-
-    const dirC = vec3.clone(front);
-    const dirU = vec3.normalize(
-      vec3.create(),
-      vec3.scaleAndAdd(vec3.create(), front, up, spreadRad),
-    );
-    const dirD = vec3.normalize(
-      vec3.create(),
-      vec3.scaleAndAdd(vec3.create(), front, up, -spreadRad),
-    );
-    const dirL = vec3.normalize(
-      vec3.create(),
-      vec3.scaleAndAdd(vec3.create(), front, right, -spreadRad),
-    );
-    const dirR = vec3.normalize(
-      vec3.create(),
-      vec3.scaleAndAdd(vec3.create(), front, right, spreadRad),
-    );
-
-    let hitC = castDir(dirC);
-    let hitU = castDir(dirU);
-    let hitD = castDir(dirD);
-    let hitL = castDir(dirL);
-    let hitR = castDir(dirR);
-
-    const isSameSurface = (
-      a: NonNullable<ReturnType<typeof castDir>>,
-      b: NonNullable<ReturnType<typeof castDir>>,
-    ): boolean =>
-      a.normal.x * b.normal.x + a.normal.y * b.normal.y + a.normal.z * b.normal.z > 0.85;
-
-    // minHitDistRaw from all 5 unfiltered hits — most conservative reference for outlier detection.
-    const minHitDistRaw = Math.min(
-      hitC?.timeOfImpact ?? Infinity,
-      hitU?.timeOfImpact ?? Infinity,
-      hitD?.timeOfImpact ?? Infinity,
-      hitL?.timeOfImpact ?? Infinity,
-      hitR?.timeOfImpact ?? Infinity,
-    );
-
-    // Pass 1: filter the four offset rays.
-    // Outlier distance is only applied when the normal differs from hitC — diagonal geometry
-    // on the same surface produces larger distances but identical normals, so we keep those.
-    // If hitC is null, no surface reference exists → outlier based on minHitDistRaw.
-    const applyHitFilters = (hit: ReturnType<typeof castDir>) => {
-      if (hit === null) return null;
-      //if (hit.normal.y > 0.85) return null;
-      if (hitC === null || !isSameSurface(hit, hitC)) {
-        if (
-          hit.timeOfImpact >
-          minHitDistRaw * ArcaneKnightControllerComponent.OUTLIER_DISTANCE_FACTOR
-        )
-          return null;
-      }
-      return hit;
-    };
-
-    hitC = applyHitFilters(hitC);
-    hitU = applyHitFilters(hitU);
-    hitD = applyHitFilters(hitD);
-    hitL = applyHitFilters(hitL);
-    hitR = applyHitFilters(hitR);
-
-    const freeU = hitU === null;
-    const freeD = hitD === null;
-    const freeL = hitL === null;
-    const freeR = hitR === null;
-
-    const hasAnyHit =
-      hitC !== null || hitU !== null || hitD !== null || hitL !== null || hitR !== null;
-
-    let bestCandidate: {
-      point: vec3;
-      visualPoint: vec3;
-      type: GrappleTargetType;
-      score: number;
-    } | null = null;
-
-    if (hasAnyHit) {
-      let surfaceType: GrappleTargetType | null = null;
-
-      // Recursive classifier: cast 4 rays at a narrower spread to disambiguate
-      // when both axes appear free. Returns null if it cannot converge.
-      const classifyWithSpread = (
-        currentSpread: number,
-        depth: number,
-      ): GrappleTargetType | null => {
-        if (depth > 4 || currentSpread < 0.005) return null;
-        const dU = vec3.normalize(
-          vec3.create(),
-          vec3.scaleAndAdd(vec3.create(), front, up, currentSpread),
-        );
-        const dD = vec3.normalize(
-          vec3.create(),
-          vec3.scaleAndAdd(vec3.create(), front, up, -currentSpread),
-        );
-        const dL = vec3.normalize(
-          vec3.create(),
-          vec3.scaleAndAdd(vec3.create(), front, right, -currentSpread),
-        );
-        const dR = vec3.normalize(
-          vec3.create(),
-          vec3.scaleAndAdd(vec3.create(), front, right, currentSpread),
-        );
-        const hU = castDir(dU);
-        const hD = castDir(dD);
-        const hL = castDir(dL);
-        const hR = castDir(dR);
-        const ok = (h: ReturnType<typeof castDir>) => h !== null && h.normal.y <= 0.85;
-        const vFree = !ok(hU) || !ok(hD);
-        const lFree = !ok(hL) || !ok(hR);
-        if (vFree && !lFree) return GrappleTargetType.LEDGE;
-        if (lFree && !vFree) return GrappleTargetType.CORNER;
-        if (vFree && lFree) return classifyWithSpread(currentSpread * 0.5, depth + 1);
-        return GrappleTargetType.LEDGE;
-      };
-
-      if (hitC !== null) {
-        // ── Flow A: center hit — you're looking at a surface ──────────────
-        const vFree = freeU || freeD;
-        const lFree = freeL || freeR;
-
-        if (vFree && !lFree) {
-          surfaceType = GrappleTargetType.LEDGE;
-        } else if (lFree && !vFree) {
-          surfaceType = GrappleTargetType.CORNER;
-        } else if (vFree && lFree) {
-          // Ambiguous — refine with narrower spread; null if it can't resolve
-          surfaceType = classifyWithSpread(spreadRad * 0.5, 1);
-        }
-        // else: no axis free → flat wall → surfaceType stays null
-      } else {
-        // ── Flow B: center misses — you're aiming at the gap near an edge ──
-        const hasLateralHit = hitL !== null || hitR !== null;
-        const hasVerticalHit = hitU !== null || hitD !== null;
-
-        if (hasLateralHit && !hasVerticalHit) {
-          surfaceType = GrappleTargetType.CORNER;
-        } else if (hasVerticalHit && !hasLateralHit) {
-          surfaceType = GrappleTargetType.LEDGE;
-        } else if (hasLateralHit && hasVerticalHit) {
-          // Compare closest hit on each axis to pick the dominant one
-          const distLateral = (hitL ?? hitR)!.timeOfImpact;
-          const distVertical = (hitU ?? hitD)!.timeOfImpact;
-          surfaceType =
-            distLateral < distVertical ? GrappleTargetType.CORNER : GrappleTargetType.LEDGE;
-        }
-        // else: no hits at all → surfaceType stays null
-      }
-
-      if (surfaceType !== null) {
-        // Reference hit: prefer center; if null, pick highest-scoring non-null ray.
-        const namedRays = [
-          { dir: dirC, hit: hitC },
-          { dir: dirU, hit: hitU },
-          { dir: dirD, hit: hitD },
-          { dir: dirL, hit: hitL },
-          { dir: dirR, hit: hitR },
-        ];
-
-        let referenceHit = hitC;
-        let referenceDir = dirC;
-
-        if (referenceHit === null) {
-          let bestRefScore = -Infinity;
-          for (const { dir, hit } of namedRays) {
-            if (hit === null) continue;
-            const dot = vec3.dot(front, dir);
-            const s =
-              (1 - hit.timeOfImpact / maxDist) * 0.4 +
-              ((dot - coneThreshold) / (1 - coneThreshold)) * 0.6;
-            if (s > bestRefScore) {
-              bestRefScore = s;
-              referenceHit = hit;
-              referenceDir = dir;
-            }
-          }
-        }
-
-        if (referenceHit !== null) {
-          const dist = referenceHit.timeOfImpact;
-          const hitPoint = vec3.scaleAndAdd(vec3.create(), origin, referenceDir, dist);
-
-          // ── Edge refinement ──────────────────────────────────────────────
-          // From hitPoint, cast along the free direction to find the exact
-          // ledge top edge or corner side edge.
-          //   LEDGE  → vertical ray   (up   if freeU, down  if freeD)
-          //   CORNER → horizontal ray (left if freeL, right if freeR)
-          let edgeScanDir: vec3 | null = null;
-          if (surfaceType === GrappleTargetType.LEDGE) {
-            edgeScanDir = vec3.cross(
-              vec3.create(),
-              vec3.fromValues(referenceHit.normal.x, referenceHit.normal.y, referenceHit.normal.z),
-              right,
-            );
-          } else {
-            // CORNER — use horizontal component of the free lateral ray
-            edgeScanDir = vec3.cross(
-              vec3.create(),
-              vec3.fromValues(referenceHit.normal.x, referenceHit.normal.y, referenceHit.normal.z),
-              up,
-            );
-            vec3.scale(edgeScanDir, edgeScanDir, freeL ? 1 : -1);
-          }
-
-          let visualPoint: vec3 | null = null;
-          if (edgeScanDir !== null) {
-            // Start 10 cm behind hitPoint along the hit normal to ensure
-            // the ray origin is inside the geometry so the edge is found.
-            const hitNormal = vec3.fromValues(
-              referenceHit.normal.x,
-              referenceHit.normal.y,
-              referenceHit.normal.z,
-            );
-            const scanOrigin = vec3.scaleAndAdd(vec3.create(), hitPoint, hitNormal, -0.01);
-            const edgeHit = world.castRay(
-              new RAPIER.Ray(
-                { x: scanOrigin[0], y: scanOrigin[1], z: scanOrigin[2] },
-                { x: edgeScanDir[0], y: edgeScanDir[1], z: edgeScanDir[2] },
-              ),
-              3.0,
-              false,
-              QueryFilterFlags.EXCLUDE_SENSORS,
-              undefined,
-              this.capsuleCollider.getCollider(),
-            );
-            if (edgeHit) {
-              visualPoint = vec3.scaleAndAdd(
-                vec3.create(),
-                scanOrigin,
-                edgeScanDir,
-                edgeHit.timeOfImpact,
-              );
-            }
-            // Scan missed → no valid edge exists here
-          }
-
-          if (visualPoint !== null) {
-            // Validate that the actual edge point is within grapple range.
-            const edgeDist = vec3.distance(origin, visualPoint);
-            if (edgeDist <= maxDist) {
-              // Recompute score based on real edge distance and direction.
-              const edgeDir = vec3.scale(
-                vec3.create(),
-                vec3.subtract(vec3.create(), visualPoint, origin),
-                1 / edgeDist,
-              );
-              const edgeDot = vec3.dot(front, edgeDir);
-              const edgeDistanceScore = 1 - edgeDist / maxDist;
-              const edgeCenterScore = (edgeDot - coneThreshold) / (1 - coneThreshold);
-              const edgeScore = edgeDistanceScore * 0.4 + edgeCenterScore * 0.6;
-
-              // LEDGE gets capsule-half Y offset (refined further by downward ray at the end);
-              // CORNER arrives at the edge hit Y.
-              const movementTarget = vec3.clone(visualPoint);
-              if (surfaceType === GrappleTargetType.LEDGE) {
-                movementTarget[1] += capsuleH * 0.5;
-              }
-              bestCandidate = {
-                point: movementTarget,
-                visualPoint,
-                type: surfaceType,
-                score: edgeScore,
-              };
-            }
-          }
-        }
-      }
-    }
-
-    // — Scan RING entities (GrappleHookComponent prefabs) with LOS check —
-    for (const entity of Engine.getEntities().getAllEntities()) {
-      if (!entity.getComponent('grapple_hook')) continue;
-      const transform = entity.getComponent('transform') as
-        | import('../core/TransformComponent').TransformComponent
-        | null;
-      if (!transform) continue;
-      const worldPos = transform.getTransform().getWorldPosition();
-      const toTarget = vec3.subtract(vec3.create(), worldPos, origin);
-      const dist = vec3.length(toTarget);
-      if (dist > maxDist || dist < 0.1) continue;
-      const dirToTarget = vec3.scale(vec3.create(), toTarget, 1 / dist);
-      const dot = vec3.dot(front, dirToTarget);
-      if (dot < coneThreshold) continue;
-
-      // Line-of-sight: skip rings behind geometry.
-      // Exclude both the player capsule and the ring's own collider so
-      // the ring's box_collider doesn't falsely report itself as an occluder.
-      const ringColliderComp = entity.getComponent('box_collider') as
-        | import('../physics/ColliderComponent').ColliderComponent
-        | null;
-      const ringCol = ringColliderComp?.getCollider();
-      const playerCol = this.capsuleCollider.getCollider();
-      const occluded = world.castRay(
-        new RAPIER.Ray(
-          { x: origin[0], y: origin[1], z: origin[2] },
-          { x: dirToTarget[0], y: dirToTarget[1], z: dirToTarget[2] },
-        ),
-        dist - 0.1,
-        true,
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined,
-        undefined,
-        undefined,
-        (col: RAPIER.Collider) =>
-          col.handle !== playerCol.handle && (!ringCol || col.handle !== ringCol.handle),
-      );
-      if (occluded) continue;
-
-      const distanceScore = 1 - dist / maxDist;
-      const centerScore = (dot - coneThreshold) / (1 - coneThreshold);
-      const score = distanceScore * 0.4 + centerScore * 0.6;
-
-      if (!bestCandidate || score > bestCandidate.score) {
-        bestCandidate = {
-          point: vec3.clone(worldPos),
-          visualPoint: vec3.clone(worldPos),
-          type: GrappleTargetType.RING,
-          score,
-        };
-      }
-    }
-
-    // — Classification debounce (LEDGE ↔ CORNER only) —
-    // Counts consecutive frames where the *same* new type appears before accepting it.
-    // RING switches are always immediate.
-    if (bestCandidate) {
-      const newType = bestCandidate.type;
-      const isAmbiguous = (t: GrappleTargetType): boolean =>
-        t === GrappleTargetType.LEDGE || t === GrappleTargetType.CORNER;
-
-      if (
-        this.lastClassifiedType !== null &&
-        newType !== this.lastClassifiedType &&
-        isAmbiguous(newType) &&
-        isAmbiguous(this.lastClassifiedType)
-      ) {
-        // Type wants to change — only accept after DEBOUNCE_FRAMES consecutive frames
-        // with the same candidate to avoid flickering.
-        if (newType === this.pendingClassificationType) {
-          this.classificationStableFrames++;
-        } else {
-          // Different candidate than last frame — restart the counter
-          this.pendingClassificationType = newType;
-          this.classificationStableFrames = 1;
-        }
-
-        if (
-          this.classificationStableFrames >=
-          ArcaneKnightControllerComponent.CLASSIFICATION_DEBOUNCE_FRAMES
-        ) {
-          this.lastClassifiedType = newType;
-          this.pendingClassificationType = null;
-          this.classificationStableFrames = 0;
-        } else {
-          bestCandidate.type = this.lastClassifiedType; // hold previous type
-        }
-      } else {
-        // Type is stable or no previous type — accept immediately and reset pending
-        this.lastClassifiedType = newType;
-        this.pendingClassificationType = null;
-        this.classificationStableFrames = 0;
-      }
-    } else {
-      this.lastClassifiedType = null;
-      this.pendingClassificationType = null;
-      this.classificationStableFrames = 0;
-    }
-
-    this.pendingGrappleTarget = bestCandidate
-      ? {
-          point: bestCandidate.point,
-          visualPoint: bestCandidate.visualPoint,
-          type: bestCandidate.type,
-        }
-      : null;
-
-    // Refine LEDGE target: find actual top-of-ledge surface via downward raycast.
-    if (this.pendingGrappleTarget?.type === GrappleTargetType.LEDGE) {
-      const vp = this.pendingGrappleTarget.visualPoint;
-      const forwardXZ = vec3.fromValues(front[0], 0, front[2]);
-      vec3.normalize(forwardXZ, forwardXZ);
-      const castOrigin = {
-        x: vp[0] + forwardXZ[0] * 0.5,
-        y: vp[1] + capsuleH,
-        z: vp[2] + forwardXZ[2] * 0.5,
-      };
-      const downRay = new RAPIER.Ray(castOrigin, { x: 0, y: -1, z: 0 });
-      const surfaceHit = world.castRay(
-        downRay,
-        capsuleH * 2,
-        true,
-        QueryFilterFlags.EXCLUDE_SENSORS,
-        undefined,
-        this.capsuleCollider.getCollider(),
-      );
-      if (surfaceHit) {
-        const surfaceY = castOrigin.y - surfaceHit.timeOfImpact;
-        this.pendingGrappleTarget.point = vec3.fromValues(
-          castOrigin.x,
-          surfaceY + capsuleH * 0.5,
-          castOrigin.z,
-        );
-      }
-    }
+    this.grappleSystem.updatePendingTarget();
   }
 
   /**
@@ -764,12 +306,13 @@ export class ArcaneKnightControllerComponent
    */
   private tryActivateFarReach(): void {
     if (this.movementState !== CharacterMovementState.IDLE) return;
-    if (!this.pendingGrappleTarget) return;
+    const pendingTarget = this.grappleSystem.getPendingTarget();
+    if (!pendingTarget) return;
 
     const input = Engine.getInput();
     if (!input.isActionJustPressed(GameAction.THROW)) return;
 
-    const { point, visualPoint, type } = this.pendingGrappleTarget;
+    const { point, visualPoint, type } = pendingTarget;
     this.grappleSystem.startGrapple(point, visualPoint, type);
   }
 
@@ -920,7 +463,7 @@ export class ArcaneKnightControllerComponent
         const isCeiling = collisionNormal[1] < -0.7;
         const isWall = Math.abs(collisionNormal[1]) < 0.5;
 
-        // Cancelar estados especiales al chocar con geometría
+        // Cancelar estados especiales al chocar con geometrÃ­a
         if (
           this.movementState === CharacterMovementState.DASHING ||
           this.movementState === CharacterMovementState.ROLLING
@@ -957,7 +500,7 @@ export class ArcaneKnightControllerComponent
     }
   }
 
-  /** Interpolación lineal hacia target con paso máximo de step. */
+  /** InterpolaciÃ³n lineal hacia target con paso mÃ¡ximo de step. */
   private projectOnPlane(v: vec3, normal: vec3): vec3 {
     const dot = vec3.dot(v, normal);
     const projected = vec3.create();
