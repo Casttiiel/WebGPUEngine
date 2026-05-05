@@ -158,6 +158,10 @@ export class ArcaneKnightControllerComponent
 
       case CharacterMovementState.IDLE:
       default:
+        // Tick trail-only grapple phase even in IDLE (character stays still).
+        if (this.grappleSystem.trailOnlyMode && this.grappleSystem.isActive()) {
+          this.grappleSystem.update(deltaTime);
+        }
         this.updateGrappleTarget();
         this.tryActivateFarReach();
         const inputDir = this.getInputVector();
@@ -498,64 +502,6 @@ export class ArcaneKnightControllerComponent
         // else: no hits at all → surfaceType stays null
       }
 
-      console.log('[GrappleTarget]', {
-        C: hitC
-          ? {
-              dist: hitC.timeOfImpact.toFixed(2),
-              n: {
-                x: hitC.normal.x.toFixed(2),
-                y: hitC.normal.y.toFixed(2),
-                z: hitC.normal.z.toFixed(2),
-              },
-            }
-          : null,
-        U: hitU
-          ? {
-              dist: hitU.timeOfImpact.toFixed(2),
-              n: {
-                x: hitU.normal.x.toFixed(2),
-                y: hitU.normal.y.toFixed(2),
-                z: hitU.normal.z.toFixed(2),
-              },
-            }
-          : null,
-        D: hitD
-          ? {
-              dist: hitD.timeOfImpact.toFixed(2),
-              n: {
-                x: hitD.normal.x.toFixed(2),
-                y: hitD.normal.y.toFixed(2),
-                z: hitD.normal.z.toFixed(2),
-              },
-            }
-          : null,
-        L: hitL
-          ? {
-              dist: hitL.timeOfImpact.toFixed(2),
-              n: {
-                x: hitL.normal.x.toFixed(2),
-                y: hitL.normal.y.toFixed(2),
-                z: hitL.normal.z.toFixed(2),
-              },
-            }
-          : null,
-        R: hitR
-          ? {
-              dist: hitR.timeOfImpact.toFixed(2),
-              n: {
-                x: hitR.normal.x.toFixed(2),
-                y: hitR.normal.y.toFixed(2),
-                z: hitR.normal.z.toFixed(2),
-              },
-            }
-          : null,
-        freeU,
-        freeD,
-        freeL,
-        freeR,
-        surfaceType,
-      });
-
       if (surfaceType !== null) {
         // Reference hit: prefer center; if null, pick highest-scoring non-null ray.
         const namedRays = [
@@ -596,14 +542,19 @@ export class ArcaneKnightControllerComponent
           //   CORNER → horizontal ray (left if freeL, right if freeR)
           let edgeScanDir: vec3 | null = null;
           if (surfaceType === GrappleTargetType.LEDGE) {
-            edgeScanDir = freeU ? vec3.fromValues(0, 1, 0) : vec3.fromValues(0, -1, 0);
+            edgeScanDir = vec3.cross(
+              vec3.create(),
+              vec3.fromValues(referenceHit.normal.x, referenceHit.normal.y, referenceHit.normal.z),
+              right,
+            );
           } else {
             // CORNER — use horizontal component of the free lateral ray
-            const latDir = freeL ? dirL : dirR;
-            const hLen = Math.sqrt(latDir[0] ** 2 + latDir[2] ** 2);
-            if (hLen > 0.001) {
-              edgeScanDir = vec3.fromValues(latDir[0] / hLen, 0, latDir[2] / hLen);
-            }
+            edgeScanDir = vec3.cross(
+              vec3.create(),
+              vec3.fromValues(referenceHit.normal.x, referenceHit.normal.y, referenceHit.normal.z),
+              up,
+            );
+            vec3.scale(edgeScanDir, edgeScanDir, freeL ? 1 : -1);
           }
 
           let visualPoint: vec3 | null = null;

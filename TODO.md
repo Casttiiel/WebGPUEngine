@@ -1,6 +1,6 @@
 ### Engine
 
-1. Punto de agarre en ledge
+1. Refactor function
 2. Grapple to ledge
 3. Grapple to corner
 4. Grapple to swing bars

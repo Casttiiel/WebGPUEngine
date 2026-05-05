@@ -72,6 +72,8 @@ export class GrappleSystem {
   private reachingTimer: number = 0;
   private safetyTimer: number = 0;
   private currentTargetType: GrappleTargetType = GrappleTargetType.LEDGE;
+  /** When true, startGrapple only plays the trail VFX — no character movement. */
+  public trailOnlyMode: boolean = true;
 
   private targetPoint: vec3 = vec3.create();
   private startPoint: vec3 = vec3.create();
@@ -216,7 +218,7 @@ export class GrappleSystem {
     if (dist > this.maxDistance) return false;
 
     this.currentTargetType = targetType;
-    this.chargeCount--;
+    //this.chargeCount--;
     this.rechargeTimers.push(this.rechargeTime);
 
     vec3.copy(this.targetPoint, point);
@@ -228,6 +230,18 @@ export class GrappleSystem {
         `  target: (${point[0].toFixed(2)}, ${point[1].toFixed(2)}, ${point[2].toFixed(2)})` +
         `  dist: ${dist.toFixed(2)} m`,
     );
+
+    if (this.trailOnlyMode) {
+      // Trail-only: show VFX without moving the character.
+      // Enter REACHING so the tentacle animates, but skip movement setup and
+      // do NOT call setIsGrappling so the controller stays in IDLE.
+      vec3.zero(this.flyVelocity);
+      vec3.zero(this.currentVelocity);
+      this.phase = FarReachPhase.REACHING;
+      this.reachingTimer = this.reachingDuration;
+      this.safetyTimer = this.maxDuration;
+      return true;
+    }
 
     // Compute launch velocity: direction with upward bias, speed = distance / travelTime.
     const toTarget = vec3.subtract(vec3.create(), point, playerPos);
@@ -255,7 +269,9 @@ export class GrappleSystem {
    * Returns true while active, false when the grapple ends.
    */
   public update(dt: number): boolean {
-    if (!this.controller.getIsGrappling()) return false;
+    // In trail-only mode the controller stays in IDLE, so we drive the phase
+    // directly without checking getIsGrappling().
+    if (!this.trailOnlyMode && !this.controller.getIsGrappling()) return false;
 
     this.safetyTimer -= dt;
     if (this.safetyTimer <= 0) {
@@ -304,6 +320,11 @@ export class GrappleSystem {
     vec3.zero(this.currentVelocity);
 
     if (this.reachingTimer <= 0) {
+      if (this.trailOnlyMode) {
+        // Trail only — end here without launching the character.
+        this.phase = FarReachPhase.INACTIVE;
+        return false;
+      }
       this.phase = FarReachPhase.PULLING;
       const origin = this.startPoint;
       const target = this.targetPoint;
