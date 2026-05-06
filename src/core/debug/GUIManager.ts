@@ -386,6 +386,37 @@ export class GUIManager {
   }
 
   /**
+   * Returns the raw lil-gui folder with the given name, or null if not found.
+   * Useful for dynamic inspector panels that need to destroy and recreate controls.
+   */
+  public getFolder(name: string): GUI | null {
+    return this.folders.get(name) ?? null;
+  }
+
+  /**
+   * Removes a folder from the internal registry so it can be re-created.
+   * Call this after calling folder.destroy() to keep the registry in sync.
+   */
+  public unregisterFolder(name: string): void {
+    this.folders.delete(name);
+  }
+
+  /**
+   * Creates a new folder as a child of an existing folder (or the root GUI).
+   * Returns the raw lil-gui GUI instance so callers can add controls directly.
+   */
+  public createChildFolder(parentName: string, childName: string, open: boolean = false): GUI | null {
+    if (!this.initialized || !this.isVisible || !this.gui) return null;
+    const parent = this.folders.get(parentName) ?? this.gui;
+    const existing = this.folders.get(childName);
+    if (existing) return existing;
+    const folder = parent.addFolder(childName);
+    if (open) folder.open(); else folder.close();
+    this.folders.set(childName, folder);
+    return folder;
+  }
+
+  /**
    * Cleanup
    */
   public dispose(): void {

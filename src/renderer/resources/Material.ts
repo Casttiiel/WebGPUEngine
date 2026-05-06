@@ -77,6 +77,8 @@ export class Material extends GPUResource {
   private customSlotTextures: Map<string, Texture> = new Map();
   /** GPUBuffer for the material-factors uniform in custom-slot materials. */
   private customUniformBuffer: GPUBuffer | undefined;
+  /** GPUBuffer for the material-factors uniform in the standard PBR path. */
+  private uniformBuffer: GPUBuffer | undefined;
   /** Unsubscribe functions from EngineTextureRegistry — called in release(). */
   private customUnsubscribes: Array<() => void> = [];
 
@@ -265,22 +267,7 @@ export class Material extends GPUResource {
       48,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-    GPUUtils.writeBuffer(this.customUniformBuffer, 0, new Float32Array(this.baseColorFactor));
-    GPUUtils.writeBuffer(
-      this.customUniformBuffer,
-      16,
-      new Float32Array([
-        this.roughnessFactor,
-        this.metallicFactor,
-        this.emissiveFactor,
-        this.appearanceBlend,
-      ]),
-    );
-    GPUUtils.writeBuffer(
-      this.customUniformBuffer,
-      32,
-      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale]),
-    );
+    this.writeFactorsToGPU();
 
     // 3. Subscribe to all engine textures used by this material.
     //    When views change (e.g. after resize), rebuild the bind group synchronously.
@@ -403,32 +390,16 @@ export class Material extends GPUResource {
 
     bindingIndex++;
 
-    const uniformBuffer = GPUUtils.createBuffer(
+    this.uniformBuffer = GPUUtils.createBuffer(
       'material uniform buffer',
       48,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-
-    GPUUtils.writeBuffer(uniformBuffer, 0, new Float32Array(this.baseColorFactor));
-    GPUUtils.writeBuffer(
-      uniformBuffer,
-      16,
-      new Float32Array([
-        this.roughnessFactor,
-        this.metallicFactor,
-        this.emissiveFactor,
-        this.appearanceBlend,
-      ]),
-    );
-    GPUUtils.writeBuffer(
-      uniformBuffer,
-      32,
-      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale]),
-    );
+    this.writeFactorsToGPU();
 
     entries.push({
       binding: 6,
-      resource: { buffer: uniformBuffer },
+      resource: { buffer: this.uniformBuffer },
     });
 
     const textureBingGroupLayout = BindGroupFactory.getLayoutFromEnum(
@@ -507,6 +478,58 @@ export class Material extends GPUResource {
     return this.uvYScale;
   }
 
+  public getAppearanceBlend(): number {
+    return this.appearanceBlend;
+  }
+
+  public getSurfaceBlend(): number {
+    return this.surfaceBlend;
+  }
+
+  public getPomScale(): number {
+    return this.pomScale;
+  }
+
+  /**
+   * Update one or more material factors and immediately write them to the GPU uniform buffer.
+   * Works for both the standard PBR path and the custom-slot path.
+   */
+  public setFactors(data: {
+    pomScale?: number;
+    roughnessFactor?: number;
+    metallicFactor?: number;
+    emissiveFactor?: number;
+    uvXScale?: number;
+    uvYScale?: number;
+    appearanceBlend?: number;
+    surfaceBlend?: number;
+    baseColorFactor?: number[];
+  }): void {
+    if (data.pomScale !== undefined)        this.pomScale        = data.pomScale;
+    if (data.roughnessFactor !== undefined) this.roughnessFactor = data.roughnessFactor;
+    if (data.metallicFactor !== undefined)  this.metallicFactor  = data.metallicFactor;
+    if (data.emissiveFactor !== undefined)  this.emissiveFactor  = data.emissiveFactor;
+    if (data.uvXScale !== undefined)        this.uvXScale        = data.uvXScale;
+    if (data.uvYScale !== undefined)        this.uvYScale        = data.uvYScale;
+    if (data.appearanceBlend !== undefined) this.appearanceBlend = data.appearanceBlend;
+    if (data.surfaceBlend !== undefined)    this.surfaceBlend    = data.surfaceBlend;
+    if (data.baseColorFactor !== undefined) this.baseColorFactor = data.baseColorFactor;
+    this.writeFactorsToGPU();
+  }
+
+  /** Writes all in-memory factor values to the active GPU uniform buffer. */
+  private writeFactorsToGPU(): void {
+    const buf = this.customUniformBuffer ?? this.uniformBuffer;
+    if (!buf) return;
+    GPUUtils.writeBuffer(buf, 0,  new Float32Array(this.baseColorFactor));
+    GPUUtils.writeBuffer(buf, 16, new Float32Array([
+      this.roughnessFactor, this.metallicFactor, this.emissiveFactor, this.appearanceBlend,
+    ]));
+    GPUUtils.writeBuffer(buf, 32, new Float32Array([
+      this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale,
+    ]));
+  }
+
   public override release(): void {
     // Unsubscribe from all engine texture change notifications.
     for (const unsub of this.customUnsubscribes) unsub();
@@ -514,6 +537,10 @@ export class Material extends GPUResource {
     if (this.customUniformBuffer) {
       this.customUniformBuffer.destroy();
       this.customUniformBuffer = undefined;
+    }
+    if (this.uniformBuffer) {
+      this.uniformBuffer.destroy();
+      this.uniformBuffer = undefined;
     }
   }
 }

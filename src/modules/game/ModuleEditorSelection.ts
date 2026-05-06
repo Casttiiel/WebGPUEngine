@@ -15,10 +15,29 @@ import { GizmoAxis } from '../../types/GizmoAxis.enum';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
+import { Material } from '../../renderer/resources/Material';
 
 export class ModuleEditorSelection extends Module {
   private selectedEntity: Entity | null = null;
   private hoveredEntity: Entity | null = null;
+
+  // ── Material Inspector ──────────────────────────────────────────────────────
+  /** Tracks which entity was last synced to avoid re-syncing every frame. */
+  private _lastInspectedEntity: Entity | null = null;
+  /** Proxy object bound to lil-gui sliders via .listen(). Synced on selection change. */
+  private _matProxy = {
+    meshName:        '— none —',
+    materialName:    '— none —',
+    technique:       '— none —',
+    pomScale:        0,
+    roughnessFactor: 1,
+    metallicFactor:  1,
+    emissiveFactor:  1,
+    uvXScale:        1,
+    uvYScale:        1,
+    appearanceBlend: 1,
+    surfaceBlend:    1,
+  };
   private hoverCheckInterval: number = 0.05; // Check hover cada 50ms para performance
   private hoverCheckTimer: number = 0;
   private lastMousePosition: { x: number; y: number } = { x: 0, y: 0 };
@@ -271,6 +290,9 @@ export class ModuleEditorSelection extends Module {
       this.lastMousePosition = { ...mousePos };
       this.performHoverDetection();
     }
+
+    // Refresh the material inspector proxy whenever the selection changes.
+    this.refreshMaterialInspector();
   }
 
   /**
@@ -728,6 +750,101 @@ export class ModuleEditorSelection extends Module {
     // Limpiar buffers temporales
     objectUniformBuffer.destroy();
     edgeIndexBuffer.destroy();
+  }
+
+  // ==================== Material Inspector ====================
+
+  /**
+   * Called once when the editor GUI becomes visible.
+   * Builds a "Material Inspector" window with sliders bound via .listen() to _matProxy.
+   * The proxy values are synced in update() whenever the selection changes — lil-gui
+   * auto-refreshes the displayed values so no folder rebuild is needed.
+   */
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+    if (!gui.beginWindow('Material Inspector')) return; // only runs once per editor session
+
+    const folder = gui.getFolder('Material Inspector');
+    if (!folder) return;
+    folder.open();
+
+    // ── Read-only info ────────────────────────────────────────────────────────
+    (folder as any).add(this._matProxy, 'meshName').name('Mesh').disable().listen();
+    (folder as any).add(this._matProxy, 'materialName').name('Material').disable().listen();
+    (folder as any).add(this._matProxy, 'technique').name('Technique').disable().listen();
+
+    // ── UV tiling ─────────────────────────────────────────────────────────────
+    (folder as any).add(this._matProxy, 'uvXScale', 0.1, 50, 0.1).name('UV Scale X').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ uvXScale: v }));
+    (folder as any).add(this._matProxy, 'uvYScale', 0.1, 50, 0.1).name('UV Scale Y').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ uvYScale: v }));
+
+    // ── PBR factors ───────────────────────────────────────────────────────────
+    (folder as any).add(this._matProxy, 'roughnessFactor', 0, 2, 0.01).name('Roughness').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ roughnessFactor: v }));
+    (folder as any).add(this._matProxy, 'metallicFactor', 0, 1, 0.01).name('Metallic').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ metallicFactor: v }));
+    (folder as any).add(this._matProxy, 'emissiveFactor', 0, 5, 0.05).name('Emissive').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ emissiveFactor: v }));
+
+    // ── Blending ──────────────────────────────────────────────────────────────
+    (folder as any).add(this._matProxy, 'appearanceBlend', 0, 1, 0.01).name('Appearance Blend').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ appearanceBlend: v }));
+    (folder as any).add(this._matProxy, 'surfaceBlend', 0, 1, 0.01).name('Surface Blend').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ surfaceBlend: v }));
+
+    // ── POM ───────────────────────────────────────────────────────────────────
+    (folder as any).add(this._matProxy, 'pomScale', 0, 0.2, 0.001).name('POM Scale').listen()
+      .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ pomScale: v }));
+  }
+
+  /**
+   * Syncs the _matProxy object from the currently selected entity's first material part.
+   * Called every frame in update(); early-returns if the selection hasn't changed.
+   */
+  private refreshMaterialInspector(): void {
+    if (this._lastInspectedEntity === this.selectedEntity) return;
+    this._lastInspectedEntity = this.selectedEntity;
+
+    const mat = this.getCurrentMaterial();
+    if (!mat) {
+      this._matProxy.meshName        = '— none —';
+      this._matProxy.materialName    = '— none —';
+      this._matProxy.technique       = '— none —';
+      this._matProxy.pomScale        = 0;
+      this._matProxy.roughnessFactor = 1;
+      this._matProxy.metallicFactor  = 1;
+      this._matProxy.emissiveFactor  = 1;
+      this._matProxy.uvXScale        = 1;
+      this._matProxy.uvYScale        = 1;
+      this._matProxy.appearanceBlend = 1;
+      this._matProxy.surfaceBlend    = 1;
+      return;
+    }
+
+    const rc = this.selectedEntity!.getComponent('render') as RenderComponent | null;
+    const firstPart = rc?.getParts()?.[0];
+    this._matProxy.meshName        = firstPart?.mesh?.path?.split('/').pop() ?? '—';
+    this._matProxy.materialName    = mat.getName().split('/').pop() ?? mat.getName();
+    this._matProxy.technique       = mat.getTechnique()?.path?.split('/').pop() ?? '—';
+    this._matProxy.pomScale        = mat.getPomScale();
+    this._matProxy.roughnessFactor = mat.getRoughnessFactor();
+    this._matProxy.metallicFactor  = mat.getMetallicFactor();
+    this._matProxy.emissiveFactor  = mat.getEmissiveFactor();
+    this._matProxy.uvXScale        = mat.getUvXScale();
+    this._matProxy.uvYScale        = mat.getUvYScale();
+    this._matProxy.appearanceBlend = mat.getAppearanceBlend();
+    this._matProxy.surfaceBlend    = mat.getSurfaceBlend();
+  }
+
+  /** Returns the Material from the first visible render part of the selected entity, or null. */
+  private getCurrentMaterial(): Material | null {
+    if (!this.selectedEntity) return null;
+    const rc = this.selectedEntity.getComponent('render') as RenderComponent | null;
+    const parts = rc?.getParts();
+    if (!parts || parts.length === 0) return null;
+    return parts[0]?.material ?? null;
   }
 
   public getSelectedEntity(): Entity | null {
