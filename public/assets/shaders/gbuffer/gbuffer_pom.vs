@@ -39,16 +39,9 @@ fn vs(
     output.Uv       = uv;
     output.position = camera.projectionMatrix * camera.viewMatrix * worldPos4;
 
-    // Build TBN^T (transpose = inverse for orthonormal) to go world→tangent.
-    let tbnT = mat3x3<f32>(
-        vec3<f32>(T.x, B.x, N.x),
-        vec3<f32>(T.y, B.y, N.y),
-        vec3<f32>(T.z, B.z, N.z)
-    );
-
-    // View direction world-space (vertex to camera), then into tangent space.
-    let viewDirWS = normalize(camera.cameraPosition.xyz - worldPos4.xyz);
-    output.ViewDirTS = normalize(tbnT * viewDirWS);
+    // ViewDirTS is now computed per-fragment in the FS using the interpolated TBN.
+    // Setting it to zero here; the FS ignores this interpolated value.
+    output.ViewDirTS = vec3<f32>(0.0, 0.0, 0.0);
 
     return output;
 }

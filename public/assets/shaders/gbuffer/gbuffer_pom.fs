@@ -55,7 +55,7 @@ fn parallaxOcclusionMapping(
     // Clamp z to 0.2 (~78° max from normal) — beyond this angle POM can't work
     // reliably without tile-crossing artifacts, so we simply stop extrapolating further.
     let viewClamped = vec3<f32>(viewDirTS.xy, max(viewDirTS.z, 0.2));
-    let uvDelta = (-viewClamped.xy / viewClamped.z) * pomScale * layerDepth;
+    let uvDelta = (viewDirTS.xy / max(viewDirTS.z, 0.2)) * pomScale * layerDepth;
 
     var currentLayerDepth: f32 = 0.0;
     var currentUV         = uv;
@@ -98,9 +98,15 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     // ── Parallax UV displacement ──────────────────────────────────────────────
     let baseUv = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
     var dispUv = baseUv;
-    let viewDirNorm  = normalize(input.ViewDirTS);
+    // Recompute ViewDirTS per-fragment using the same TBN path as normal mapping.
+    // This is essential: the VS-interpolated value uses per-vertex TBN which does
+    // not match the per-fragment TBN used below, producing radial artifacts.
+    let TBN_pom    = computeTBN(normalize(input.N), input.T);
+    let tbnInv     = transpose(TBN_pom);
+    let vdWS       = normalize(camera.cameraPosition.xyz - input.WorldPos);
+    let viewDirTS  = normalize(tbnInv * vdWS);
+    let viewDirNorm = viewDirTS;
     // Fade POM to zero at grazing angles (viewDirTS.z → 0) to prevent explosions.
-    // smoothstep(0, 0.15) → full effect starts once the ray is >~8.6° from the surface.
     let grazingFade  = smoothstep(0.05, 0.25, viewDirNorm.z);
     if (pomScale > 0.0 && grazingFade > 0.001) {
         let pomUv = parallaxOcclusionMapping(

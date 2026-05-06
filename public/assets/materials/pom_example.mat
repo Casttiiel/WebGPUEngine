@@ -7,11 +7,11 @@
     "roughnessFactor": 1.0,
     "metallicFactor": 1.0,
     "textures": {
-        "txAlbedo":    "stonewall_28_roughness-1K.png",
-        "txNormal":    "stonewall_28_height-1K.png",
-        "txMetallic":  "stonewall_28_roughness-1K.png",
-        "txRoughness": "stonewall_28_roughness-1K.png",
+        "txAlbedo":    "stonewall_23_basecolor-1K.png",
+        "txNormal":    "stonewall_23_normal-1K.png",
+        "txMetallic":  "stonewall_23_roughness-1K.png",
+        "txRoughness": "stonewall_23_roughness-1K.png",
         "txEmissive":  "black.png",
-        "txHeight":    "stonewall_28_basecolor-1K.png"
+        "txHeight":    "stonewall_23_height-1K.png"
     }
 }

@@ -29,13 +29,12 @@
 
 ### Non Priority
 
-1. Paralax occlusion mapping
 1. Water Shader Reflections + Better Foam
-1. Contact Shadows — sombras de alta frecuencia cerca de los contactos geométricos. Complementan las CSM en zonas donde las cascades tienen resolución baja.
-1. Mesh LOD
-1. Virtual Textures / Texture Streaming — ya en wishlist. Sin streaming, escenas grandes explotan en VRAM.
-1. Epipolar light scattering
-1. Editor Point Lights (Render Debug / Gizmo / Menu)
-1. Editor Spot Lights (Render Debug / Gizmo / Menu)
-1. Editor Camera (Render Debug / Gizmo / Menu)
-1. Asset Browser + Spawn + Delete
+2. Contact Shadows — sombras de alta frecuencia cerca de los contactos geométricos. Complementan las CSM en zonas donde las cascades tienen resolución baja.
+3. Mesh LOD
+4. Virtual Textures / Texture Streaming — ya en wishlist. Sin streaming, escenas grandes explotan en VRAM.
+5. Epipolar light scattering
+6. Editor Point Lights (Render Debug / Gizmo / Menu)
+7. Editor Spot Lights (Render Debug / Gizmo / Menu)
+8. Editor Camera (Render Debug / Gizmo / Menu)
+9. Asset Browser + Spawn + Delete
