@@ -37,6 +37,8 @@ export interface MaterialBaseOptions {
   appearanceBlend?: number;
   /** Decal blend weight for roughness + metallic channels. 1 = full blend, 0 = no change. Default 1. */
   surfaceBlend?: number;
+  /** Parallax Occlusion Mapping height scale. 0 = disabled (default). Typical range 0.01–0.1. */
+  pomScale?: number;
   /** Raw texture map forwarded from .mat file, used by the custom-slot path. */
   rawTextures?: Record<string, string>;
 }
@@ -60,6 +62,7 @@ export class Material extends GPUResource {
   private uvYScale!: number;
   private appearanceBlend!: number;
   private surfaceBlend!: number;
+  private pomScale!: number;
   private category: RenderCategory;
   private castsShadows: boolean;
   private shadows: boolean;
@@ -97,6 +100,7 @@ export class Material extends GPUResource {
     this.uvYScale = options.uvYScale ?? 1;
     this.appearanceBlend = options.appearanceBlend ?? 1;
     this.surfaceBlend = options.surfaceBlend ?? 1;
+    this.pomScale = (options as any).pomScale ?? 0;
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
@@ -178,6 +182,7 @@ export class Material extends GPUResource {
       appearanceBlend:
         materialData?.appearanceBlend !== undefined ? materialData.appearanceBlend : 1.0,
       surfaceBlend: materialData?.surfaceBlend !== undefined ? materialData.surfaceBlend : 1.0,
+      pomScale: materialData?.pomScale !== undefined ? materialData.pomScale : 0.0,
       castsShadows: materialData?.casts_shadows !== undefined ? materialData.casts_shadows : true,
       shadows: materialData?.shadows !== undefined ? materialData.shadows : false,
     });
@@ -274,7 +279,7 @@ export class Material extends GPUResource {
     GPUUtils.writeBuffer(
       this.customUniformBuffer,
       32,
-      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, 0]),
+      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale]),
     );
 
     // 3. Subscribe to all engine textures used by this material.
@@ -418,7 +423,7 @@ export class Material extends GPUResource {
     GPUUtils.writeBuffer(
       uniformBuffer,
       32,
-      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, 0]),
+      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale]),
     );
 
     entries.push({

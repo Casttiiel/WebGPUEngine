@@ -3,16 +3,15 @@
 1. Grapple Acceleration
 2. Grapple stop
 3. Grapple mantle
-4. Grapple Visual point
-5. Slow Time to yourself
-6. Slow time on bubble
+4. Slow Time to yourself
+5. Slow time on bubble
 
-7. Technique, Material, skinned autocomplete
-8. Froxel Volumetrict Scattering noise ugly + fog leaking
-9. Material Editor
-10. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-11. Procedural materials
-12. Enemy AI / NavMesh
+6. Technique, Material, skinned component autocomplete
+7. Froxel Volumetrict Scattering noise ugly + fog leaking
+8. Material Editor
+9. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+10. Procedural materials
+11. Enemy AI / NavMesh
     (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay

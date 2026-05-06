@@ -44,6 +44,9 @@ export class RenderKeyManager {
     renderBindGroup?: GPUBindGroup,
     indirectDrawBuffer?: GPUBuffer,
   ): void {
+    if (!material) {
+      return;
+    }
     const key: RenderKey = {
       mesh,
       material,

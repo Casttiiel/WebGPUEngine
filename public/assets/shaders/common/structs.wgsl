@@ -53,7 +53,7 @@ struct MaterialFactors {
     uvXScale: f32,
     uvYScale: f32,
     surfaceBlend: f32,     // decal: blend weight for roughness+metallic (1=full, 0=no change)
-    padding3: f32
+    pomScale: f32          // POM height scale (0 = disabled, typical 0.01-0.1)
 }
 
 struct SSRUniforms {

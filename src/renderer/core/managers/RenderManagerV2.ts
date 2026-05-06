@@ -56,6 +56,15 @@ export class RenderManagerV2 {
   // Indirect buffer written by the last dispatchShadow() call; consumed by renderKeys()
   private currentShadowIndirectBuffer: GPUBuffer | null = null;
 
+  /**
+   * Cached bind group compatible with the standard MaterialTextures pipeline layout.
+   * Used as a placeholder for group 1 when a custom-slot material is rendered via a
+   * technique override (depth prepass, shadows) whose pipeline layout still declares
+   * MaterialTextures but whose shader never samples it.
+   * Populated lazily on the first standard PBR draw call.
+   */
+  private standardMaterialBindGroup: GPUBindGroup | null = null;
+
   private constructor() {
     this.keyManager = new RenderKeyManager();
     this.stateManager = new RenderStateManager();
@@ -563,12 +572,35 @@ export class RenderManagerV2 {
       // Use state manager to minimize state changes
       this.stateManager.setPipeline(pass, pipeline, () => technique.activatePipeline(pass));
       this.stateManager.setMeshBuffers(pass, key.mesh.getName(), () => key.mesh.activate(pass));
-      this.stateManager.setMaterialBindings(
-        pass,
-        key.material.getName(),
-        key.material.getTextureBindGroup(),
-        1,
-      );
+
+      // When a technique override is active (depth prepass, shadows) and the material uses a
+      // custom-slot layout, skip setting group 1: the override pipeline has the standard
+      // MaterialTextures layout which is incompatible with the custom bind group.
+      // Depth-only and shadow passes don't sample textures for opaque objects, so this is safe.
+      const materialHasCustomSlots = key.material.getTechnique()?.getMaterialSlots() != null;
+      const usingOverride = this.techniqueOverride != null;
+      if (!usingOverride || !materialHasCustomSlots) {
+        const bg = key.material.getTextureBindGroup();
+        // Cache the first standard PBR bind group as a placeholder for custom-slot
+        // materials when they are drawn via a technique override (depth prepass, etc.)
+        if (bg && !materialHasCustomSlots) {
+          this.standardMaterialBindGroup ??= bg;
+        }
+        this.stateManager.setMaterialBindings(pass, key.material.getName(), bg, 1);
+      } else if (this.standardMaterialBindGroup) {
+        // Custom-slot material + override: pipeline layout still requires group 1.
+        // Bind the cached standard PBR group — the depth prepass shader never reads it.
+        this.stateManager.setMaterialBindings(
+          pass,
+          'std_placeholder',
+          this.standardMaterialBindGroup,
+          1,
+        );
+      } else {
+        // No fallback available yet (first frame before any PBR material renders).
+        // Skip this draw call — it will be included next frame once a fallback is cached.
+        continue;
+      }
 
       // @group(2): Instance storage buffer for instanced rendering, or object uniforms for normal rendering
       if (key.isInstanced && key.instanceBindGroup) {

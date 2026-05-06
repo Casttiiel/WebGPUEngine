@@ -14,6 +14,8 @@ export type MaterialDataType = Readonly<{
   appearanceBlend?: number;
   /** Decal blend weight for roughness + metallic channels. 1 = full blend, 0 = no change. Default 1. */
   surfaceBlend?: number;
+  /** Parallax Occlusion Mapping height scale. 0 = disabled (default). Typical range 0.01–0.1. */
+  pomScale?: number;
   /**
    * PBR materials use the named keys (txAlbedo, txNormal, …).
    * Custom-slot materials use arbitrary keys that match their technique's materialSlots.

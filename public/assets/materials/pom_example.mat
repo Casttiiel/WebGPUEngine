@@ -1,0 +1,17 @@
+{
+    "technique": "gbuffer/gbuffer_pom.tech",
+    "category": "solids",
+    "pomScale": 0.01,
+    "uvXScale": 10.0,
+    "uvYScale": 10.0,
+    "roughnessFactor": 1.0,
+    "metallicFactor": 1.0,
+    "textures": {
+        "txAlbedo":    "stonewall_28_roughness-1K.png",
+        "txNormal":    "stonewall_28_height-1K.png",
+        "txMetallic":  "stonewall_28_roughness-1K.png",
+        "txRoughness": "stonewall_28_roughness-1K.png",
+        "txEmissive":  "black.png",
+        "txHeight":    "stonewall_28_basecolor-1K.png"
+    }
+}

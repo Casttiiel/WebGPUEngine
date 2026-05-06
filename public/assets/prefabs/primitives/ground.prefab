@@ -31,8 +31,8 @@
       "meshes": [
         {
           "mesh": "unit_cube.obj",
-          "material": "stone_proc.mat",
-          "visible": false
+          "material": "pom_example.mat",
+          "visible": true
         }
       ]
     }
