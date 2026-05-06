@@ -1,0 +1,7 @@
+{
+  "vs": "utility/velocity_per_object.vs",
+  "fs": "utility/velocity_per_object.fs",
+  "z": "less_equal_no_write",
+  "writesOn": "texture",
+  "uniforms": ["CameraUniforms", "BufferUniform", "ObjectUniforms"]
+}

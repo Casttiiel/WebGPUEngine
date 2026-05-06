@@ -1,24 +1,21 @@
 ### Engine
 
-1. Grapple arc
-2. Grapple Acceleration
-3. Grapple stop
-4. Grapple mantle
-5. Grapple Visual point
+1. Grapple Acceleration
+2. Grapple stop
+3. Grapple mantle
+4. Grapple Visual point
+5. Slow Time to yourself
+6. Slow time on bubble
 
-6. Technique, Material, ViewModel, skinned autocomplete
-7. Procedural materials
-8. Material Editor
-9. TAA Dynamic objects ghosting
-10. GLTF Exporter unifies metallic and roughness? In right channel?
-11. Enemy AI / NavMesh
+7.
+8. Technique, Material, skinned autocomplete
+9. Material Editor
+10. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+11. Procedural materials
+12. Enemy AI / NavMesh
     (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay
-
-1. Light Attack
-2. Enemy attack
-3. Shield
 
 ## Environment Gameplay
 
@@ -34,7 +31,7 @@
 
 ### Non Priority
 
-1. Screen space displacement
+1. Paralax occlusion mapping
 1. Water Shader Reflections + Better Foam
 1. Contact Shadows — sombras de alta frecuencia cerca de los contactos geométricos. Complementan las CSM en zonas donde las cascades tienen resolución baja.
 1. Mesh LOD

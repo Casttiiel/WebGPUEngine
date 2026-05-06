@@ -37,5 +37,6 @@ struct OldCameraUniforms {
 }
 
 struct ObjectUniforms {
-    modelMatrix: mat4x4<f32>,
+    modelMatrix:         mat4x4<f32>, // current world matrix  (offset   0, 64 bytes)
+    previousModelMatrix: mat4x4<f32>, // previous-frame world  (offset  64, 64 bytes)
 }

@@ -2,11 +2,12 @@ import { Render } from '../pipeline/Render';
 import { RenderTarget } from '../../resources/RenderTarget';
 import { Technique } from '../../resources/Technique';
 import { Mesh } from '../../resources/Mesh';
-import { RenderPassManager } from '../passes/RenderPassManager';
 import { BindGroupFactory } from '../factories/BindGroupFactory';
 import { Camera } from '../../../core/math/Camera';
 import { mat4 } from 'gl-matrix';
 import { Engine } from '../../../core/engine/Engine';
+import { RenderKey } from './RenderKeyManager';
+import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 
 /**
  * VelocityBufferManager
@@ -44,6 +45,11 @@ export class VelocityBufferManager {
   private velocityTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
 
+  // Per-object velocity technique (writes correct velocity for moving geometry)
+  private perObjectTechnique!: Technique;
+  // Bind group that exposes previousVPBuffer via the BufferUniform layout (1 binding, VS+FS)
+  private previousVPBufferUniformBindGroup!: GPUBindGroup;
+
   // Bind groups
   private velocityBindGroup!: GPUBindGroup;
 
@@ -73,6 +79,9 @@ export class VelocityBufferManager {
     // Load velocity technique
     this.velocityTechnique = await Technique.getAsync('utility/velocity_buffer.tech');
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
+
+    // Load per-object velocity technique
+    this.perObjectTechnique = await Technique.getAsync('utility/velocity_per_object.tech');
 
     // Create velocity render target (RGBA16Float - usar formato HDR estándar)
     this.velocityRT = new RenderTarget();
@@ -106,6 +115,14 @@ export class VelocityBufferManager {
         { binding: 0, resource: { buffer: this.previousVPBuffer } },
         { binding: 1, resource: { buffer: this.currentUnjitteredInvVPBuffer } },
       ],
+    );
+
+    // Bind previousVPBuffer under the BufferUniform layout (1 VERTEX+FRAGMENT binding).
+    // Used by the per-object velocity pass at group(1).
+    this.previousVPBufferUniformBindGroup = BindGroupFactory.createBindGroup(
+      'velocity_per_object_prevVP_bindgroup',
+      BindGroupFactory.getLayoutFromEnum(PipelineBindGroupLayouts.BUFFER_UNIFORM),
+      [{ binding: 0, resource: { buffer: this.previousVPBuffer } }],
     );
 
     this.isInitialized = true;
@@ -243,6 +260,59 @@ export class VelocityBufferManager {
    */
   public getVelocityRenderTarget(): RenderTarget {
     return this.velocityRT;
+  }
+
+  /**
+   * Per-object velocity pass — overwrites velocity for dynamic (moving) objects.
+   *
+   * The preceding fullscreen camera-velocity pass only accounts for camera motion.
+   * Objects that moved between frames need an additional pass that uses their
+   * current AND previous model matrices to emit the correct screen-space velocity.
+   *
+   * Runs with less-equal depth testing (read-only) so occluded objects do NOT
+   * overwrite the velocity of foreground geometry.
+   *
+   * Only non-instanced solid render keys are processed.  Instanced geometry is
+   * rarely dynamic and would require a separate per-instance approach.
+   *
+   * @param renderKeys    Visible solid render keys (e.g. from camera.getCulledKeys())
+   * @param depthView     GBuffer depth view for depth testing
+   */
+  public generatePerObject(renderKeys: RenderKey[], depthView: GPUTextureView): void {
+    if (!this.enabled || !this.isInitialized || !this.hasHistory) return;
+
+    const encoder = Render.getInstance().getCommandEncoder();
+
+    const pass = encoder.beginRenderPass({
+      label: 'velocity_per_object_pass',
+      colorAttachments: [
+        {
+          view: this.velocityRT.getRenderView(),
+          loadOp: 'load', // preserve the fullscreen camera-velocity pass result
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: depthView,
+        depthReadOnly: true,
+        // depthLoadOp / depthStoreOp must NOT be set when depthReadOnly is true (WebGPU spec)
+      },
+    });
+
+    this.perObjectTechnique.activatePipeline(pass);
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // CameraUniforms
+    pass.setBindGroup(1, this.previousVPBufferUniformBindGroup); // previousVP
+
+    for (const key of renderKeys) {
+      // Skip instanced geometry — per-instance previous matrices not supported yet
+      if (key.isInstanced) continue;
+
+      pass.setBindGroup(2, key.transform.getModelBindGroup()); // ObjectUniforms (cur + prev)
+      key.mesh.activate(pass);
+      key.mesh.renderGroup(pass);
+    }
+
+    pass.end();
   }
 
   /**

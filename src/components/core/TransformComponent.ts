@@ -12,15 +12,22 @@ export class TransformComponent extends Component {
   private transform: Transform;
   private uniformBuffer!: GPUBuffer;
   private modelBindGroup!: GPUBindGroup;
+  // CPU-side copy of the world matrix from the previous frame, used to fill
+  // the previousModelMatrix slot in the GPU uniform buffer.
+  private previousWorldMatrix: Float32Array = new Float32Array(16);
+  // Reusable 128-byte staging array: [0..15]=current, [16..31]=previous (one GPU write)
+  private readonly modelMatrixData: Float32Array = new Float32Array(32);
+  private isFirstModelUpdate = true;
 
   constructor() {
     super();
     this.transform = new Transform();
 
-    // Crear buffer uniforme para la model matrix
+    // Crear buffer uniforme para la model matrix + previous model matrix
+    // Layout: modelMatrix (offset 0, 64 bytes) + previousModelMatrix (offset 64, 64 bytes)
     this.uniformBuffer = GPUUtils.createBuffer(
       'transform_uniformBuffer',
-      16 * 4, // 1 matriz 4x4 (model)
+      16 * 4 * 2, // 2 matrices 4x4 (current + previous)
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
@@ -81,7 +88,23 @@ export class TransformComponent extends Component {
   }
 
   private updateModelMatrix(): void {
-    GPUUtils.writeBuffer(this.uniformBuffer, 0, new Float32Array(this.transform.getWorldMatrix()));
+    // GPU uniform buffer layout (128 bytes):
+    //   offset   0: currentModelMatrix  (floats 0-15)
+    //   offset  64: previousModelMatrix (floats 16-31)
+    //
+    // On the very first call both slots are initialised to the same matrix so
+    // newly-spawned objects produce zero velocity (no TAA ghost on spawn).
+    const worldMatrix = new Float32Array(
+      this.transform.getWorldMatrix() as unknown as ArrayLike<number>,
+    );
+    if (this.isFirstModelUpdate) {
+      this.previousWorldMatrix.set(worldMatrix);
+      this.isFirstModelUpdate = false;
+    }
+    this.modelMatrixData.set(worldMatrix, 0); // current  → floats 0-15
+    this.modelMatrixData.set(this.previousWorldMatrix, 16); // previous → floats 16-31
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, this.modelMatrixData); // single write
+    this.previousWorldMatrix.set(worldMatrix); // save for next frame
     // Si la entidad es instanciada, actualizar el buffer de instancias
     const entity = this.getOwner();
     const renderComp = entity.getComponent('render') as RenderComponent;

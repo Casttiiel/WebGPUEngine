@@ -339,6 +339,12 @@ export class ModuleRender extends Module {
       // Generar velocity buffer si está activo
       if (velocityMgr.isEnabled()) {
         velocityMgr.generate(this.mainCamera, this.deferred.getGBufferBindGroup());
+        // Per-object pass: overwrites velocity for dynamic (moving) objects so that
+        // TAA reprojects history correctly instead of ghosting on moving geometry.
+        const depthView = this.deferred.getDepthStencilView();
+        if (depthView) {
+          velocityMgr.generatePerObject(this.mainCamera.getCulledKeys(), depthView);
+        }
       }
 
       if (mainCameraEntity?.hasComponent('height_fog')) {
