@@ -12,7 +12,7 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/player_character.prefab"
+    "prefab": "characters/knight_character.prefab"
   },
   {
     "components": {

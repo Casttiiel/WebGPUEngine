@@ -32,7 +32,7 @@
         {
           "mesh": "unit_cube.obj",
           "material": "stone_proc.mat",
-          "visible": true
+          "visible": false
         }
       ]
     }

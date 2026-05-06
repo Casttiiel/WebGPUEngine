@@ -175,7 +175,7 @@ export class SpotLightComponent extends CameraComponent {
 
     this.modelUniformBuffer = GPUUtils.createBuffer(
       'spot_light_transform_uniformBuffer',
-      16 * 4, // 1 matriz 4x4 (model)
+      16 * 4 * 2, // ObjectUniforms = modelMatrix (64) + previousModelMatrix (64) = 128 bytes
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     const res = mat4.create();

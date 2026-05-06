@@ -7,12 +7,11 @@
 5. Slow Time to yourself
 6. Slow time on bubble
 
-7.
-8. Technique, Material, skinned autocomplete
-9. Material Editor
-10. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-11. Procedural materials
-12. Enemy AI / NavMesh
+7. Technique, Material, skinned autocomplete
+8. Material Editor
+9. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+10. Procedural materials
+11. Enemy AI / NavMesh
     (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay

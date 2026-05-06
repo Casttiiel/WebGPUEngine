@@ -410,7 +410,11 @@ export class ScreenSpaceReflections {
         this.frameIndex, // drives blue-noise tile animation in ssr.cs
       ]),
     );
-    this.frameIndex = (this.frameIndex + 1) % 8192;
+    // Only animate blue-noise when TAA is accumulating; without temporal
+    // accumulation each frame would show a different ray offset → flickering.
+    if (this.debugParams.temporalMode > 0.0) {
+      this.frameIndex = (this.frameIndex + 1) % 8192;
+    }
   }
 
   public dispose(): void {
