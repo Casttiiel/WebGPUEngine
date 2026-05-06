@@ -372,6 +372,7 @@ export class VelocityBufferManager {
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // CameraUniforms
     pass.setBindGroup(1, this.previousVPBufferUniformBindGroup); // previousVP
 
+    let skinnedDraws = 0;
     for (const key of renderKeys) {
       if (key.isInstanced) continue;
       // Technique may not be loaded yet on the first frame after spawn.
@@ -380,14 +381,17 @@ export class VelocityBufferManager {
       if (key.mesh.getIndexCount() === 0) continue;
 
       // For skinned meshes, key.owner IS the SkinnedMeshComponent itself
-      // (it calls addKey(this, ...) in its load method).
+      // (it calls addKey(this as any, ...) in its load method).
+      // Use duck-typing: check for the method introduced specifically for this pass.
+      const maybeComp = key.owner as unknown as Record<string, unknown>;
+      if (typeof maybeComp['getVelocitySkinPairBindGroup'] !== 'function') continue;
       const skinnedComp = key.owner as unknown as SkinnedMeshComponent;
-      if (!skinnedComp.getVelocitySkinPairBindGroup) continue;
 
       pass.setBindGroup(2, key.transform.getModelBindGroup()); // ObjectUniforms
       pass.setBindGroup(3, skinnedComp.getVelocitySkinPairBindGroup()); // current+previous joints
       key.mesh.activate(pass);
       key.mesh.renderGroup(pass);
+      skinnedDraws++;
     }
 
     pass.end();
