@@ -1,44 +1,100 @@
 {
-    "children": [
-      {
-        "prefab": "gameplay/dash_trigger.prefab",
-        "components": {
-          "transform": {
-            "position": [0, -1, 0]
-          }
-        }
-      },
-      {
-        "components": {
-          "name": "Swing Bar Mesh",
-          "transform": {
-            "position": [0, 0, 0],
-            "rotation": [0, 0, 0],
-            "scale": [0.1, 0.1, 2]
-          },
-          "render": {
-            "meshes": [
-              {
-                "mesh": "unit_cube.obj",
-                "material": "textured.mat"
-              }
-            ]
-          }
+  "children": [
+    {
+      "prefab": "gameplay/dash_trigger.prefab",
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            -1,
+            0
+          ]
         }
       }
-    ],
-    "components": {
-      "name": "Swing Bar",
-      "transform": {},
-      "swing_bar":{
-      },
-      "box_collider": {
-        "isSensor": true,
-        "bodyType": "static",
-        "size": [2, 2, 2],
-        "ignoreTransformScale": true,
-        "collisionGroups": "SWING_TRIGGER",
-        "collisionMask": "PLAYER"
+    },
+    {
+      "components": {
+        "name": "Swing Bar Mesh",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.1,
+            0.1,
+            2
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "textured.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Swing Bar Grapple",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "sphere_collider": {
+          "bodyType": "static",
+          "radius": 15,
+          "mass": 0,
+          "friction": 0,
+          "restitution": 0,
+          "isSensor": true,
+          "collisionGroups": "GRAPPLE_TRIGGER",
+          "collisionMask": "TRIGGER_PLAYER",
+          "ignoreTransformScale": true
+        },
+        "grapple_target": {
+          "hookType": "LEDGE",
+          "shape": "SEGMENT",
+          "pointA": [
+            0,
+            0,
+            -1
+          ],
+          "pointB": [
+            0,
+            0,
+            1
+          ]
+        }
       }
     }
+  ],
+  "components": {
+    "name": "Swing Bar",
+    "transform": {},
+    "swing_bar": {},
+    "box_collider": {
+      "isSensor": true,
+      "bodyType": "static",
+      "size": [
+        2,
+        2,
+        2
+      ],
+      "ignoreTransformScale": true,
+      "collisionGroups": "SWING_TRIGGER",
+      "collisionMask": "PLAYER"
+    }
   }
+}

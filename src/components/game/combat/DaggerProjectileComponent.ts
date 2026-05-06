@@ -2,7 +2,7 @@ import RAPIER from '@dimforge/rapier3d';
 import { vec3 } from 'gl-matrix';
 import { ProjectileComponent } from '../ProjectileComponent';
 import { Engine } from '../../../core/engine/Engine';
-import { GrappleHookComponent } from '../GrappleHookComponent';
+import { GrappleTargetComponent } from '../GrappleTargetComponent';
 
 /**
  * DaggerProjectileComponent — Extiende ProjectileComponent para añadir
@@ -28,7 +28,7 @@ export class DaggerProjectileComponent extends ProjectileComponent {
 
     if (entityId !== undefined) {
       const entity = Engine.getEntities().getEntityById(entityId);
-      const isGrappleTarget = entity?.getComponent('grapple_hook') != null;
+      const isGrappleTarget = entity?.getComponent('grapple_target') != null;
 
       if (isGrappleTarget && this.onGrappleHit) {
         // La daga se "queda clavada" — sólo la liberamos del pool, no llamamos release

@@ -5,7 +5,7 @@ import { TransformComponent } from '../../core/TransformComponent';
 import { GrappleTargetType } from '../../../types/GrappleTargetType.enum';
 import { Engine } from '../../../core/engine/Engine';
 import type { ColliderComponent } from '../../physics/ColliderComponent';
-import { GrappleHookComponent } from '../GrappleHookComponent';
+import { GrappleTargetComponent } from '../GrappleTargetComponent';
 
 export interface GrappleSystemData {
   /** Distance threshold (metres) at which arrival is detected. Default 0.4. */
@@ -150,6 +150,32 @@ export class GrappleSystem {
 
   /** Cosine of the max allowed angle between camera forward and a hook target direction (~45Â°). */
   private static readonly HOOK_CONE_COS_THRESHOLD = Math.cos((45 * Math.PI) / 180);
+
+  /**
+   * Devuelve el punto del segmento [segA, segB] más cercano al ray (origin, dir).
+   * Puramente geométrico, sin colliders.
+   */
+  private static closestPointOnSegmentToRay(
+    rayOrigin: vec3,
+    rayDir: vec3,
+    segA: vec3,
+    segB: vec3,
+  ): vec3 {
+    const d = vec3.subtract(vec3.create(), segB, segA);
+    const w = vec3.subtract(vec3.create(), segA, rayOrigin);
+
+    const a = vec3.dot(d, d);
+    const b = vec3.dot(d, rayDir);
+    const c = vec3.dot(rayDir, rayDir);
+    const e = vec3.dot(d, w);
+    const f = vec3.dot(rayDir, w);
+
+    const denom = a * c - b * b;
+    // Si denom ≈ 0 el ray y el segmento son (casi) paralelos → midpoint como fallback.
+    const t = denom > 1e-6 ? Math.max(0, Math.min(1, (b * f - c * e) / denom)) : 0.5;
+
+    return vec3.scaleAndAdd(vec3.create(), segA, d, t);
+  }
 
   constructor(
     private readonly controller: IMovementController,
@@ -438,21 +464,33 @@ export class GrappleSystem {
       score: number;
     } | null = null;
 
-    for (const hookComp of GrappleHookComponent.getInRangeComponents(playerEntityId)) {
+    for (const hookComp of GrappleTargetComponent.getInRangeComponents(playerEntityId)) {
       const entity = hookComp.getOwner();
-      const transform = entity.getComponent('transform') as TransformComponent | null;
-      if (!transform) continue;
-      const worldPos = transform.getTransform().getWorldPosition();
 
-      const toTarget = vec3.subtract(vec3.create(), worldPos, origin);
-      const dist = vec3.length(toTarget);
-      if (dist < 0.1) continue;
+      // Obtiene el segmento en world space (degenerado a un punto si shape === POINT).
+      const { a, b } = hookComp.getWorldSegment();
 
-      const dirToTarget = vec3.scale(vec3.create(), toTarget, 1 / dist);
+      // ── Cono check preliminar (vs. centro del segmento) ─────────────────────
+      const center = vec3.lerp(vec3.create(), a, b, 0.5);
+      const toCenter = vec3.subtract(vec3.create(), center, origin);
+      const distToCenter = vec3.length(toCenter);
+      if (distToCenter < 0.1) continue;
 
-      // Must be within the forward cone.
-      const dot = vec3.dot(front, dirToTarget);
+      const dirToCenter = vec3.scale(vec3.create(), toCenter, 1 / distToCenter);
+      const dot = vec3.dot(front, dirToCenter);
       if (dot < coneThreshold) continue;
+
+      // ── Punto de agarre real ─────────────────────────────────────────────────
+      // Para POINT: a === b, la función devuelve ese único punto.
+      // Para SEGMENT: devuelve el punto de la barra más cercano a la línea de visión.
+      const graspPoint = GrappleSystem.closestPointOnSegmentToRay(origin, front, a, b);
+
+      // ── LOS hacia graspPoint ─────────────────────────────────────────────────
+      const toGrasp = vec3.subtract(vec3.create(), graspPoint, origin);
+      const distToGrasp = vec3.length(toGrasp);
+      if (distToGrasp < 0.1) continue;
+
+      const dirToGrasp = vec3.scale(vec3.create(), toGrasp, 1 / distToGrasp);
 
       // LOS: exclude sensors, the player capsule, and the hook's own sphere collider.
       const hookColliderComp = entity.getComponent('sphere_collider') as ColliderComponent | null;
@@ -460,9 +498,9 @@ export class GrappleSystem {
       const occluded = world.castRay(
         new RAPIER.Ray(
           { x: origin[0], y: origin[1], z: origin[2] },
-          { x: dirToTarget[0], y: dirToTarget[1], z: dirToTarget[2] },
+          { x: dirToGrasp[0], y: dirToGrasp[1], z: dirToGrasp[2] },
         ),
-        dist - 0.1,
+        distToGrasp - 0.05,
         true,
         QueryFilterFlags.EXCLUDE_SENSORS,
         undefined,
@@ -474,17 +512,16 @@ export class GrappleSystem {
       );
       if (occluded) continue;
 
-      // Score: centrality [0..1] weighted 60%, proximity [0..1] weighted 40%.
-      // Centrality: how close to screen center (dot == 1 → 1, dot == coneThreshold → 0).
-      // Proximity: normalised against referenceDistance so both terms are dimensionless.
-      const centerScore = (dot - coneThreshold) / (1 - coneThreshold);
-      const proximityScore = Math.max(0, 1 - dist / this.referenceDistance);
+      // ── Score en base al graspPoint ──────────────────────────────────────────
+      const dotGrasp = vec3.dot(front, dirToGrasp);
+      const centerScore = (dotGrasp - coneThreshold) / (1 - coneThreshold);
+      const proximityScore = Math.max(0, 1 - distToGrasp / this.referenceDistance);
       const score = centerScore * 0.6 + proximityScore * 0.4;
 
       if (!bestCandidate || score > bestCandidate.score) {
         bestCandidate = {
-          point: vec3.clone(worldPos),
-          visualPoint: vec3.clone(worldPos),
+          point: graspPoint,
+          visualPoint: graspPoint,
           type: hookComp.getHookType(),
           score,
         };
