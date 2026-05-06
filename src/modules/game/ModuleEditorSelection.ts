@@ -26,17 +26,17 @@ export class ModuleEditorSelection extends Module {
   private _lastInspectedEntity: Entity | null = null;
   /** Proxy object bound to lil-gui sliders via .listen(). Synced on selection change. */
   private _matProxy = {
-    meshName:        '— none —',
-    materialName:    '— none —',
-    technique:       '— none —',
-    pomScale:        0,
+    meshName: '— none —',
+    materialName: '— none —',
+    technique: '— none —',
+    pomScale: 0,
     roughnessFactor: 1,
-    metallicFactor:  1,
-    emissiveFactor:  1,
-    uvXScale:        1,
-    uvYScale:        1,
+    metallicFactor: 1,
+    emissiveFactor: 1,
+    uvXScale: 1,
+    uvYScale: 1,
     appearanceBlend: 1,
-    surfaceBlend:    1,
+    surfaceBlend: 1,
   };
   private hoverCheckInterval: number = 0.05; // Check hover cada 50ms para performance
   private hoverCheckTimer: number = 0;
@@ -775,27 +775,51 @@ export class ModuleEditorSelection extends Module {
     (folder as any).add(this._matProxy, 'technique').name('Technique').disable().listen();
 
     // ── UV tiling ─────────────────────────────────────────────────────────────
-    (folder as any).add(this._matProxy, 'uvXScale', 0.1, 50, 0.1).name('UV Scale X').listen()
+    (folder as any)
+      .add(this._matProxy, 'uvXScale', 0.1, 50, 0.1)
+      .name('UV Scale X')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ uvXScale: v }));
-    (folder as any).add(this._matProxy, 'uvYScale', 0.1, 50, 0.1).name('UV Scale Y').listen()
+    (folder as any)
+      .add(this._matProxy, 'uvYScale', 0.1, 50, 0.1)
+      .name('UV Scale Y')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ uvYScale: v }));
 
     // ── PBR factors ───────────────────────────────────────────────────────────
-    (folder as any).add(this._matProxy, 'roughnessFactor', 0, 2, 0.01).name('Roughness').listen()
+    (folder as any)
+      .add(this._matProxy, 'roughnessFactor', 0, 2, 0.01)
+      .name('Roughness')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ roughnessFactor: v }));
-    (folder as any).add(this._matProxy, 'metallicFactor', 0, 1, 0.01).name('Metallic').listen()
+    (folder as any)
+      .add(this._matProxy, 'metallicFactor', 0, 1, 0.01)
+      .name('Metallic')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ metallicFactor: v }));
-    (folder as any).add(this._matProxy, 'emissiveFactor', 0, 5, 0.05).name('Emissive').listen()
+    (folder as any)
+      .add(this._matProxy, 'emissiveFactor', 0, 5, 0.05)
+      .name('Emissive')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ emissiveFactor: v }));
 
     // ── Blending ──────────────────────────────────────────────────────────────
-    (folder as any).add(this._matProxy, 'appearanceBlend', 0, 1, 0.01).name('Appearance Blend').listen()
+    (folder as any)
+      .add(this._matProxy, 'appearanceBlend', 0, 1, 0.01)
+      .name('Appearance Blend')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ appearanceBlend: v }));
-    (folder as any).add(this._matProxy, 'surfaceBlend', 0, 1, 0.01).name('Surface Blend').listen()
+    (folder as any)
+      .add(this._matProxy, 'surfaceBlend', 0, 1, 0.01)
+      .name('Surface Blend')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ surfaceBlend: v }));
 
     // ── POM ───────────────────────────────────────────────────────────────────
-    (folder as any).add(this._matProxy, 'pomScale', 0, 0.2, 0.001).name('POM Scale').listen()
+    (folder as any)
+      .add(this._matProxy, 'pomScale', 0, 0.2, 0.001)
+      .name('POM Scale')
+      .listen()
       .onChange((v: number) => this.getCurrentMaterial()?.setFactors({ pomScale: v }));
   }
 
@@ -809,33 +833,33 @@ export class ModuleEditorSelection extends Module {
 
     const mat = this.getCurrentMaterial();
     if (!mat) {
-      this._matProxy.meshName        = '— none —';
-      this._matProxy.materialName    = '— none —';
-      this._matProxy.technique       = '— none —';
-      this._matProxy.pomScale        = 0;
+      this._matProxy.meshName = '— none —';
+      this._matProxy.materialName = '— none —';
+      this._matProxy.technique = '— none —';
+      this._matProxy.pomScale = 0;
       this._matProxy.roughnessFactor = 1;
-      this._matProxy.metallicFactor  = 1;
-      this._matProxy.emissiveFactor  = 1;
-      this._matProxy.uvXScale        = 1;
-      this._matProxy.uvYScale        = 1;
+      this._matProxy.metallicFactor = 1;
+      this._matProxy.emissiveFactor = 1;
+      this._matProxy.uvXScale = 1;
+      this._matProxy.uvYScale = 1;
       this._matProxy.appearanceBlend = 1;
-      this._matProxy.surfaceBlend    = 1;
+      this._matProxy.surfaceBlend = 1;
       return;
     }
 
     const rc = this.selectedEntity!.getComponent('render') as RenderComponent | null;
     const firstPart = rc?.getParts()?.[0];
-    this._matProxy.meshName        = firstPart?.mesh?.path?.split('/').pop() ?? '—';
-    this._matProxy.materialName    = mat.getName().split('/').pop() ?? mat.getName();
-    this._matProxy.technique       = mat.getTechnique()?.path?.split('/').pop() ?? '—';
-    this._matProxy.pomScale        = mat.getPomScale();
+    this._matProxy.meshName = firstPart?.mesh?.path?.split('/').pop() ?? '—';
+    this._matProxy.materialName = mat.getName().split('/').pop() ?? mat.getName();
+    this._matProxy.technique = mat.getTechnique()?.path?.split('/').pop() ?? '—';
+    this._matProxy.pomScale = mat.getPomScale();
     this._matProxy.roughnessFactor = mat.getRoughnessFactor();
-    this._matProxy.metallicFactor  = mat.getMetallicFactor();
-    this._matProxy.emissiveFactor  = mat.getEmissiveFactor();
-    this._matProxy.uvXScale        = mat.getUvXScale();
-    this._matProxy.uvYScale        = mat.getUvYScale();
+    this._matProxy.metallicFactor = mat.getMetallicFactor();
+    this._matProxy.emissiveFactor = mat.getEmissiveFactor();
+    this._matProxy.uvXScale = mat.getUvXScale();
+    this._matProxy.uvYScale = mat.getUvYScale();
     this._matProxy.appearanceBlend = mat.getAppearanceBlend();
-    this._matProxy.surfaceBlend    = mat.getSurfaceBlend();
+    this._matProxy.surfaceBlend = mat.getSurfaceBlend();
   }
 
   /** Returns the Material from the first visible render part of the selected entity, or null. */

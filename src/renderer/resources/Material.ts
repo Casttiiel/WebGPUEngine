@@ -505,14 +505,14 @@ export class Material extends GPUResource {
     surfaceBlend?: number;
     baseColorFactor?: number[];
   }): void {
-    if (data.pomScale !== undefined)        this.pomScale        = data.pomScale;
+    if (data.pomScale !== undefined) this.pomScale = data.pomScale;
     if (data.roughnessFactor !== undefined) this.roughnessFactor = data.roughnessFactor;
-    if (data.metallicFactor !== undefined)  this.metallicFactor  = data.metallicFactor;
-    if (data.emissiveFactor !== undefined)  this.emissiveFactor  = data.emissiveFactor;
-    if (data.uvXScale !== undefined)        this.uvXScale        = data.uvXScale;
-    if (data.uvYScale !== undefined)        this.uvYScale        = data.uvYScale;
+    if (data.metallicFactor !== undefined) this.metallicFactor = data.metallicFactor;
+    if (data.emissiveFactor !== undefined) this.emissiveFactor = data.emissiveFactor;
+    if (data.uvXScale !== undefined) this.uvXScale = data.uvXScale;
+    if (data.uvYScale !== undefined) this.uvYScale = data.uvYScale;
     if (data.appearanceBlend !== undefined) this.appearanceBlend = data.appearanceBlend;
-    if (data.surfaceBlend !== undefined)    this.surfaceBlend    = data.surfaceBlend;
+    if (data.surfaceBlend !== undefined) this.surfaceBlend = data.surfaceBlend;
     if (data.baseColorFactor !== undefined) this.baseColorFactor = data.baseColorFactor;
     this.writeFactorsToGPU();
   }
@@ -521,13 +521,22 @@ export class Material extends GPUResource {
   private writeFactorsToGPU(): void {
     const buf = this.customUniformBuffer ?? this.uniformBuffer;
     if (!buf) return;
-    GPUUtils.writeBuffer(buf, 0,  new Float32Array(this.baseColorFactor));
-    GPUUtils.writeBuffer(buf, 16, new Float32Array([
-      this.roughnessFactor, this.metallicFactor, this.emissiveFactor, this.appearanceBlend,
-    ]));
-    GPUUtils.writeBuffer(buf, 32, new Float32Array([
-      this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale,
-    ]));
+    GPUUtils.writeBuffer(buf, 0, new Float32Array(this.baseColorFactor));
+    GPUUtils.writeBuffer(
+      buf,
+      16,
+      new Float32Array([
+        this.roughnessFactor,
+        this.metallicFactor,
+        this.emissiveFactor,
+        this.appearanceBlend,
+      ]),
+    );
+    GPUUtils.writeBuffer(
+      buf,
+      32,
+      new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale]),
+    );
   }
 
   public override release(): void {

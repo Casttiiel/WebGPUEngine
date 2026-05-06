@@ -405,13 +405,18 @@ export class GUIManager {
    * Creates a new folder as a child of an existing folder (or the root GUI).
    * Returns the raw lil-gui GUI instance so callers can add controls directly.
    */
-  public createChildFolder(parentName: string, childName: string, open: boolean = false): GUI | null {
+  public createChildFolder(
+    parentName: string,
+    childName: string,
+    open: boolean = false,
+  ): GUI | null {
     if (!this.initialized || !this.isVisible || !this.gui) return null;
     const parent = this.folders.get(parentName) ?? this.gui;
     const existing = this.folders.get(childName);
     if (existing) return existing;
     const folder = parent.addFolder(childName);
-    if (open) folder.open(); else folder.close();
+    if (open) folder.open();
+    else folder.close();
     this.folders.set(childName, folder);
     return folder;
   }
