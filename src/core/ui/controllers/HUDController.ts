@@ -6,7 +6,7 @@ import { StaminaComponent } from '../../../components/game/StaminaComponent';
 import { ArcaneKnightControllerComponent } from '../../../components/game/ArcaneKnightControllerComponent';
 import { GrappleTargetType } from '../../../types/GrappleTargetType.enum';
 import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
-import { vec4 } from 'gl-matrix';
+import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
 import type { Widget } from '../../../components/ui/Widget';
 import type { Entity } from '../../ecs/Entity';
 
@@ -36,6 +36,7 @@ export class HUDController extends WidgetController {
   private static readonly COLOR_LEDGE = [1.0, 0.0, 0.0, 0.9] as const;
   private static readonly COLOR_CORNER = [0.0, 1.0, 0.0, 0.9] as const;
   private static readonly COLOR_RING = [0.0, 0.0, 1.0, 0.9] as const;
+  private static readonly COLOR_PUNCTUAL = [1.0, 0.6, 0.0, 0.9] as const;
 
   // ── Player components (lazy) ──────────────────────────────────────────────
   private playerEntity: Entity | null = null;
@@ -192,35 +193,19 @@ export class HUDController extends WidgetController {
       return;
     }
 
-    // Project world-space visual point to screen space (1920×1080 reference)
-    const camera = Engine.getEntities().getEntityByName('PlayerCamera');
-    const camComp = camera?.getComponent('camera') as
-      | import('../../../components/render/CameraComponent').CameraComponent
-      | null;
-    if (!camComp) {
-      this.targetIndicator.setVisible(false);
-      return;
-    }
+    // NDC pre-computado en GrappleSystem con la misma camara y mismo frame.
+    const { ndcX, ndcY } = target;
 
-    const vp = camComp.getCamera().getViewProjection();
-    const wp = target.visualPoint;
-    const clip = vec4.fromValues(wp[0], wp[1], wp[2], 1.0);
-    vec4.transformMat4(clip, clip, vp);
+    // NDC -> physical pixels (con offset de letterbox), luego coordenadas de referencia.
+    const [canvasOffX, canvasOffY] = UIRenderUtils.getCanvasOffset();
+    const gs = UIRenderUtils.getGlobalScale();
+    const physX = canvasOffX + (ndcX * 0.5 + 0.5) * 1920 * gs;
+    const physY = canvasOffY + (1.0 - (ndcY * 0.5 + 0.5)) * 1080 * gs;
 
-    // Behind camera — don’t show
-    if (clip[3] <= 0) {
-      this.targetIndicator.setVisible(false);
-      return;
-    }
-
-    const ndcX = clip[0] / clip[3];
-    const ndcY = clip[1] / clip[3];
-
-    // NDC [-1,1] → reference space [0, 1920] x [0, 1080] (Y flipped)
-    const refX = (ndcX * 0.5 + 0.5) * 1920;
-    const refY = (1.0 - (ndcY * 0.5 + 0.5)) * 1080;
-
-    // Centre the 24x24 indicator on the projected point
+    // anchor top-left: originX = 0 + refX * gs  =>  refX = physX / gs
+    // pivotX=0.5: centro del widget en (refX+12), restamos 12 para centrarlo.
+    const refX = physX / gs;
+    const refY = physY / gs;
     this.targetIndicator.setPosition(refX - 12, refY - 12);
     this.targetIndicator.setVisible(true);
 
@@ -235,6 +220,11 @@ export class HUDController extends WidgetController {
       case GrappleTargetType.RING:
         this.targetIndicator.setColor(1.0, 0.8, 0.2, 0.9);
         break;
+      case GrappleTargetType.PUNCTUAL:
+        this.targetIndicator.setColor(1.0, 0.6, 0.0, 0.9);
+        break;
+      default:
+        this.targetIndicator.setColor(1.0, 1.0, 1.0, 0.9);
     }
   }
 
@@ -260,6 +250,9 @@ export class HUDController extends WidgetController {
         break;
       case GrappleTargetType.RING:
         color = HUDController.COLOR_RING;
+        break;
+      case GrappleTargetType.PUNCTUAL:
+        color = HUDController.COLOR_PUNCTUAL;
         break;
       default:
         color = HUDController.COLOR_DEFAULT;

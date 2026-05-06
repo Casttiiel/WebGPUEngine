@@ -273,6 +273,8 @@ export class ArcaneKnightControllerComponent
     point: vec3;
     visualPoint: vec3;
     type: GrappleTargetType;
+    ndcX: number;
+    ndcY: number;
   } | null {
     return this.grappleSystem.getPendingTarget();
   }

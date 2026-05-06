@@ -1,4 +1,4 @@
-﻿import { vec3 } from 'gl-matrix';
+﻿import { vec3, vec4 } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import type { IMovementController } from './IMovementController';
 import { TransformComponent } from '../../core/TransformComponent';
@@ -146,6 +146,9 @@ export class GrappleSystem {
     point: vec3;
     visualPoint: vec3;
     type: GrappleTargetType;
+    /** NDC X in [-1, 1] and NDC Y in [-1, 1] of the visualPoint this frame. */
+    ndcX: number;
+    ndcY: number;
   } | null = null;
 
   /** Cosine of the max allowed angle between camera forward and a hook target direction (~45Â°). */
@@ -462,6 +465,8 @@ export class GrappleSystem {
       visualPoint: vec3;
       type: GrappleTargetType;
       score: number;
+      ndcX: number;
+      ndcY: number;
     } | null = null;
 
     for (const hookComp of GrappleTargetComponent.getInRangeComponents(playerEntityId)) {
@@ -519,11 +524,20 @@ export class GrappleSystem {
       const score = centerScore * 0.6 + proximityScore * 0.4;
 
       if (!bestCandidate || score > bestCandidate.score) {
+        // Compute NDC of graspPoint here, using the same camera, before storing.
+        const vp = cam.getUnjitteredViewProjection();
+        const clip = vec4.fromValues(graspPoint[0], graspPoint[1], graspPoint[2], 1.0);
+        vec4.transformMat4(clip, clip, vp);
+        const targetNdcX = clip[3] > 0 ? clip[0] / clip[3] : 0;
+        const targetNdcY = clip[3] > 0 ? clip[1] / clip[3] : 0;
+
         bestCandidate = {
           point: graspPoint,
           visualPoint: graspPoint,
           type: hookComp.getHookType(),
           score,
+          ndcX: targetNdcX,
+          ndcY: targetNdcY,
         };
       }
     }
@@ -533,6 +547,8 @@ export class GrappleSystem {
           point: bestCandidate.point,
           visualPoint: bestCandidate.visualPoint,
           type: bestCandidate.type,
+          ndcX: bestCandidate.ndcX,
+          ndcY: bestCandidate.ndcY,
         }
       : null;
   }
@@ -542,6 +558,8 @@ export class GrappleSystem {
     point: vec3;
     visualPoint: vec3;
     type: GrappleTargetType;
+    ndcX: number;
+    ndcY: number;
   } | null {
     return this.pendingTarget;
   }
