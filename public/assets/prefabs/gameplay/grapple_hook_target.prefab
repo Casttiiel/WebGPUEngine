@@ -18,16 +18,16 @@
         0.4
       ]
     },
-    "box_collider": {
+    "sphere_collider": {
       "bodyType": "static",
-      "size": [
-        1,
-        1,
-        1
-      ],
+      "radius": 10,
       "mass": 0,
       "friction": 0,
-      "restitution": 0
+      "restitution": 0,
+      "isSensor": true,
+      "collisionGroups": "GRAPPLE_TRIGGER",
+      "collisionMask": "TRIGGER_PLAYER",
+      "ignoreTransformScale": true
     },
     "render": {
       "meshes": [
@@ -37,6 +37,8 @@
         }
       ]
     },
-    "grapple_hook": {}
+    "grapple_hook": {
+      "hookType": "PUNCTUAL"
+    }
   }
 }

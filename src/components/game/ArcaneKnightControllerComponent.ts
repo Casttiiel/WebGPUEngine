@@ -120,14 +120,14 @@ export class ArcaneKnightControllerComponent
           this.applyMovement(grappleVel, deltaTime);
         } else {
           // Arrival: behaviour depends on the target type.
-          if (this.grappleSystem.getTargetType() === GrappleTargetType.LEDGE) {
+          /*if (this.grappleSystem.getTargetType() === GrappleTargetType.LEDGE) {
             // Transition into mantle at the arrival point.
             this.mantleSystem.startMantleAtPoint(this.grappleSystem.getTargetPoint());
           } else {
             // Bleed off momentum so the character doesn't keep flying.
             vec3.zero(this.currentHorizontalVelocity);
             this.currentVerticalVelocity = 0;
-          }
+          }*/
         }
         break;
       }
