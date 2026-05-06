@@ -8,6 +8,7 @@ import { mat4 } from 'gl-matrix';
 import { Engine } from '../../../core/engine/Engine';
 import { RenderKey } from './RenderKeyManager';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
+import { SkinnedMeshComponent } from '../../../components/render/SkinnedMeshComponent';
 
 /**
  * VelocityBufferManager
@@ -47,6 +48,8 @@ export class VelocityBufferManager {
 
   // Per-object velocity technique (writes correct velocity for moving geometry)
   private perObjectTechnique!: Technique;
+  // Skinned per-object velocity technique (applies current + previous bone palettes)
+  private skinnedTechnique!: Technique;
   // Bind group that exposes previousVPBuffer via the BufferUniform layout (1 binding, VS+FS)
   private previousVPBufferUniformBindGroup!: GPUBindGroup;
 
@@ -82,6 +85,9 @@ export class VelocityBufferManager {
 
     // Load per-object velocity technique
     this.perObjectTechnique = await Technique.getAsync('utility/velocity_per_object.tech');
+
+    // Load skinned per-object velocity technique
+    this.skinnedTechnique = await Technique.getAsync('utility/velocity_skinned.tech');
 
     // Create velocity render target (RGBA16Float - usar formato HDR estándar)
     this.velocityRT = new RenderTarget();
@@ -307,7 +313,79 @@ export class VelocityBufferManager {
       // Skip instanced geometry — per-instance previous matrices not supported yet
       if (key.isInstanced) continue;
 
+      // Skip static objects — their velocity is already correct from the fullscreen
+      // camera-velocity pass. Running a second calculation via mesh vertices produces
+      // floating-point discrepancies that appear as micro-jitter under TAA.
+      if (!key.transform.hasMovedThisFrame()) continue;
+
+      // Skip skinned meshes — the model matrix only captures root motion; bone-driven
+      // vertex displacement is ignored. A dedicated skinned-velocity pass would be
+      // required to handle this correctly. For now, the fullscreen pass provides a
+      // better approximation (camera velocity only) than a wrong per-root velocity.
+      if (key.material.getTechnique()?.getIsSkinned()) continue;
+
+      // Skip meshes with no geometry (e.g. not yet loaded, or zero-index procedural meshes).
+      if (key.mesh.getIndexCount() === 0) continue;
+
       pass.setBindGroup(2, key.transform.getModelBindGroup()); // ObjectUniforms (cur + prev)
+      key.mesh.activate(pass);
+      key.mesh.renderGroup(pass);
+    }
+
+    pass.end();
+  }
+
+  /**
+   * Skinned per-object velocity pass.
+   *
+   * Applies BOTH the current and previous joint palettes to compute per-vertex
+   * screen-space velocity for animated characters.  This correctly handles:
+   *   - Pure skeletal animation with no root motion (walk/idle cycles): each vertex
+   *     gets the exact bone-driven displacement encoded as a velocity.
+   *   - Root motion + animation: previousModelMatrix carries the entity translation,
+   *     previousJoints carry the bone pose — both contributions are combined.
+   *
+   * @param renderKeys   Visible render keys (same list passed to generatePerObject)
+   * @param depthView    GBuffer depth for read-only depth testing
+   */
+  public generatePerObjectSkinned(renderKeys: RenderKey[], depthView: GPUTextureView): void {
+    if (!this.enabled || !this.isInitialized || !this.hasHistory) return;
+
+    const encoder = Render.getInstance().getCommandEncoder();
+
+    const pass = encoder.beginRenderPass({
+      label: 'velocity_skinned_pass',
+      colorAttachments: [
+        {
+          view: this.velocityRT.getRenderView(),
+          loadOp: 'load',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: depthView,
+        depthReadOnly: true,
+      },
+    });
+
+    this.skinnedTechnique.activatePipeline(pass);
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup()); // CameraUniforms
+    pass.setBindGroup(1, this.previousVPBufferUniformBindGroup); // previousVP
+
+    for (const key of renderKeys) {
+      if (key.isInstanced) continue;
+      // Technique may not be loaded yet on the first frame after spawn.
+      const tech = key.material.getTechnique();
+      if (!tech?.getIsSkinned()) continue;
+      if (key.mesh.getIndexCount() === 0) continue;
+
+      // For skinned meshes, key.owner IS the SkinnedMeshComponent itself
+      // (it calls addKey(this, ...) in its load method).
+      const skinnedComp = key.owner as unknown as SkinnedMeshComponent;
+      if (!skinnedComp.getVelocitySkinPairBindGroup) continue;
+
+      pass.setBindGroup(2, key.transform.getModelBindGroup()); // ObjectUniforms
+      pass.setBindGroup(3, skinnedComp.getVelocitySkinPairBindGroup()); // current+previous joints
       key.mesh.activate(pass);
       key.mesh.renderGroup(pass);
     }

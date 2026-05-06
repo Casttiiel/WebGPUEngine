@@ -18,6 +18,9 @@ export class TransformComponent extends Component {
   // Reusable 128-byte staging array: [0..15]=current, [16..31]=previous (one GPU write)
   private readonly modelMatrixData: Float32Array = new Float32Array(32);
   private isFirstModelUpdate = true;
+  // True if the world matrix changed between the previous frame and this one.
+  // Read by VelocityBufferManager to skip static objects in the per-object velocity pass.
+  private matrixChangedThisFrame: boolean = false;
 
   constructor() {
     super();
@@ -104,6 +107,17 @@ export class TransformComponent extends Component {
     this.modelMatrixData.set(worldMatrix, 0); // current  → floats 0-15
     this.modelMatrixData.set(this.previousWorldMatrix, 16); // previous → floats 16-31
     GPUUtils.writeBuffer(this.uniformBuffer, 0, this.modelMatrixData); // single write
+
+    // Track whether the world matrix changed so the velocity pass can skip static objects.
+    let changed = false;
+    for (let i = 0; i < 16; i++) {
+      if (Math.abs(worldMatrix[i]! - this.previousWorldMatrix[i]!) > 1e-7) {
+        changed = true;
+        break;
+      }
+    }
+    this.matrixChangedThisFrame = changed;
+
     this.previousWorldMatrix.set(worldMatrix); // save for next frame
     // Si la entidad es instanciada, actualizar el buffer de instancias
     const entity = this.getOwner();
@@ -151,5 +165,11 @@ export class TransformComponent extends Component {
 
   public getModelBindGroup(): GPUBindGroup {
     return this.modelBindGroup;
+  }
+
+  /** True if the world matrix changed between the previous frame and this frame.
+   *  Used by the per-object velocity pass to skip static geometry. */
+  public hasMovedThisFrame(): boolean {
+    return this.matrixChangedThisFrame;
   }
 }

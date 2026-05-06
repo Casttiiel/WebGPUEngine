@@ -174,6 +174,15 @@ export class SkinnedMeshComponent extends Component {
   private material!: Material;
   private jointMatrixBuffer!: GPUBuffer;
   private skinBindGroup!: GPUBindGroup;
+  // Previous-frame joint palette — uploaded BEFORE updating current joints each frame.
+  // Used by the skinned velocity pass to reconstruct last-frame bone deformation.
+  private previousJointMatrixBuffer!: GPUBuffer;
+  private previousSkinBindGroup!: GPUBindGroup;
+  // Combined bind group for the skinned velocity pass:
+  // binding(0)=currentJoints, binding(1)=previousJoints (fits in one group = 4-group WebGPU limit).
+  private velocitySkinPairBindGroup!: GPUBindGroup;
+  // Staging copy of the joint palette to detect first frame (avoids zero-velocity ghost on spawn).
+  private previousJointPalette: Float32Array = new Float32Array(MAX_JOINTS * 16);
 
   // Skeleton
   private skeleton!: SkeletonData;
@@ -304,6 +313,27 @@ export class SkinnedMeshComponent extends Component {
       label: `${gltfName}_skinBG`,
       layout: bgl,
       entries: [{ binding: 0, resource: { buffer: this.jointMatrixBuffer } }],
+    });
+
+    this.previousJointMatrixBuffer = GPUUtils.getDevice().createBuffer({
+      label: `${gltfName}_previousJointMatrices`,
+      size: MAX_JOINTS * MAT4_BYTES,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    this.previousSkinBindGroup = GPUUtils.getDevice().createBindGroup({
+      label: `${gltfName}_previousSkinBG`,
+      layout: bgl,
+      entries: [{ binding: 0, resource: { buffer: this.previousJointMatrixBuffer } }],
+    });
+
+    // Combined pair bind group for the skinned velocity pass (both palettes, one group).
+    this.velocitySkinPairBindGroup = GPUUtils.getDevice().createBindGroup({
+      label: `${gltfName}_velocitySkinPairBG`,
+      layout: BindGroupFactory.getSkinMatricesPairLayout(),
+      entries: [
+        { binding: 0, resource: { buffer: this.jointMatrixBuffer } },
+        { binding: 1, resource: { buffer: this.previousJointMatrixBuffer } },
+      ],
     });
 
     // ── Register render keys ──────────────────────────────────────────────────
@@ -440,6 +470,7 @@ export class SkinnedMeshComponent extends Component {
     RenderManagerV2.getInstance().delKeys(this as any);
     // Only destroy per-instance GPU resource; skinnedMeshes are shared via SkinnedMeshAsset.
     this.jointMatrixBuffer?.destroy();
+    this.previousJointMatrixBuffer?.destroy();
   }
 
   // ── Public animation controls ──────────────────────────────────────────────
@@ -1219,13 +1250,45 @@ export class SkinnedMeshComponent extends Component {
   }
 
   private uploadJointMatrices(): void {
-    GPUUtils.getDevice().queue.writeBuffer(
-      this.jointMatrixBuffer,
+    const device = GPUUtils.getDevice();
+    const byteCount = this.jointCount * 16; // floats
+
+    // Copy the current joints to the previous buffer BEFORE overwriting current.
+    // On the very first frame previousJointPalette is all zeros so we prime it
+    // with the bind-pose to avoid a ghost flash on spawn.
+    if (this.previousJointPalette.every((v) => v === 0)) {
+      this.previousJointPalette.set(this.jointPalette.subarray(0, byteCount));
+    }
+    device.queue.writeBuffer(
+      this.previousJointMatrixBuffer,
       0,
-      this.jointPalette,
+      this.previousJointPalette,
       0,
-      this.jointCount * 16,
+      byteCount,
     );
+
+    // Save current palette as "previous" for next frame.
+    this.previousJointPalette.set(this.jointPalette.subarray(0, byteCount));
+
+    // Upload current palette.
+    device.queue.writeBuffer(this.jointMatrixBuffer, 0, this.jointPalette, 0, byteCount);
+  }
+
+  /** Returns the bind group containing the PREVIOUS frame's joint palette.
+   *  Used by VelocityBufferManager for the skinned velocity pass. */
+  public getPreviousSkinBindGroup(): GPUBindGroup {
+    return this.previousSkinBindGroup;
+  }
+
+  /** Returns the bind group containing the CURRENT frame's joint palette. */
+  public getSkinBindGroup(): GPUBindGroup {
+    return this.skinBindGroup;
+  }
+
+  /** Returns the combined pair bind group for the skinned velocity pass.
+   *  group(3): binding(0)=currentJoints, binding(1)=previousJoints. */
+  public getVelocitySkinPairBindGroup(): GPUBindGroup {
+    return this.velocitySkinPairBindGroup;
   }
 }
 

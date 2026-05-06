@@ -344,6 +344,8 @@ export class ModuleRender extends Module {
         const depthView = this.deferred.getDepthStencilView();
         if (depthView) {
           velocityMgr.generatePerObject(this.mainCamera.getCulledKeys(), depthView);
+          // Skinned pass: uses current + previous bone palettes for per-vertex accuracy.
+          velocityMgr.generatePerObjectSkinned(this.mainCamera.getCulledKeys(), depthView);
         }
       }
 

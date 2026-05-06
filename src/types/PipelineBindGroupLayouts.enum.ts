@@ -45,4 +45,5 @@ export enum PipelineBindGroupLayouts {
   KAWASE_UNIFORMS = 'KawaseUniforms',
   WATER_COMPOSITE_UNIFORMS = 'WaterCompositeUniforms',
   SKIN_MATRICES = 'SkinMatrices',
+  SKIN_MATRICES_PAIR = 'SkinMatricesPair',
 }

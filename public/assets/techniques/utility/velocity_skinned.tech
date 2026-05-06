@@ -1,0 +1,13 @@
+{
+    "vs": "utility/velocity_skinned.vs",
+    "fs": "utility/velocity_per_object.fs",
+    "z": "less_equal_no_write",
+    "writesOn": "texture",
+    "skinned": true,
+    "uniforms": [
+        "CameraUniforms",
+        "BufferUniform",
+        "ObjectUniforms",
+        "SkinMatricesPair"
+    ]
+}

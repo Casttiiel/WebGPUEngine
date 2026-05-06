@@ -521,6 +521,23 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Two storage buffers in one group: binding(0)=current joints, binding(1)=previous joints.
+   *  Used by the skinned velocity pass to stay within WebGPU's 4-group limit. */
+  public static getSkinMatricesPairLayout(): GPUBindGroupLayout {
+    return this.getLayout('skin_matrices_pair', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'read-only-storage' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'read-only-storage' },
+      },
+    ]);
+  }
+
   public static getWaterCompositeLayout(): GPUBindGroupLayout {
     return this.getLayout('water_composite', [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
@@ -1933,6 +1950,8 @@ export class BindGroupFactory {
         return this.getWaterCompositeLayout();
       case PipelineBindGroupLayouts.SKIN_MATRICES:
         return this.getSkinMatricesLayout();
+      case PipelineBindGroupLayouts.SKIN_MATRICES_PAIR:
+        return this.getSkinMatricesPairLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }
