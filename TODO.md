@@ -1,10 +1,10 @@
 ### Engine
 
-1. Refactor function
-2. Grapple to ledge
-3. Grapple to corner
-4. Grapple to swing bars
-5. Grapple to ring
+1. Grapple arc
+2. Grapple Acceleration
+3. Grapple stop
+4. Grapple mantle
+5. Grapple Visual point
 
 6. Technique, Material, ViewModel, skinned autocomplete
 7. Procedural materials
@@ -34,12 +34,13 @@
 
 ### Non Priority
 
+1. Screen space displacement
 1. Water Shader Reflections + Better Foam
-2. Contact Shadows — sombras de alta frecuencia cerca de los contactos geométricos. Complementan las CSM en zonas donde las cascades tienen resolución baja.
-3. Mesh LOD
-4. Virtual Textures / Texture Streaming — ya en wishlist. Sin streaming, escenas grandes explotan en VRAM.
-5. Epipolar light scattering
-6. Editor Point Lights (Render Debug / Gizmo / Menu)
-7. Editor Spot Lights (Render Debug / Gizmo / Menu)
-8. Editor Camera (Render Debug / Gizmo / Menu)
-9. Asset Browser + Spawn + Delete
+1. Contact Shadows — sombras de alta frecuencia cerca de los contactos geométricos. Complementan las CSM en zonas donde las cascades tienen resolución baja.
+1. Mesh LOD
+1. Virtual Textures / Texture Streaming — ya en wishlist. Sin streaming, escenas grandes explotan en VRAM.
+1. Epipolar light scattering
+1. Editor Point Lights (Render Debug / Gizmo / Menu)
+1. Editor Spot Lights (Render Debug / Gizmo / Menu)
+1. Editor Camera (Render Debug / Gizmo / Menu)
+1. Asset Browser + Spawn + Delete

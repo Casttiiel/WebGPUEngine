@@ -8,7 +8,7 @@ import { CharacterControllerComponentDataType } from '../../../types/CharacterCo
  */
 export class MovementSystem {
   // Parámetros de movimiento
-  private runSpeed: number = 9.0;
+  private runSpeed: number = 11.0;
   private maxSpeed: number = 14.0;
   private boostedSpeedDecayRate: number = 4.0;
   private groundAcceleration: number = 36.0;

@@ -24,6 +24,7 @@ export enum CollisionGroups {
   SWING_TRIGGER = 0x00000020, // 0b00100000 - Barras de swing
   IMPULSE_TRIGGER = 0x00000040, // 0b01000000 - Plataformas de impulso
   CHECKPOINT = 0x00000080, // 0b10000000 - Checkpoints
+  GRAPPLE_TRIGGER = 0x00000100, // 0b100000000 - Zonas de rango de grapple hook
 
   // Utilidades
   ALL = 0xffffffff, // Todos los grupos
@@ -42,7 +43,8 @@ export const CollisionMasks = {
     CollisionGroups.DASH_TRIGGER |
     CollisionGroups.SWING_TRIGGER |
     CollisionGroups.IMPULSE_TRIGGER |
-    CollisionGroups.CHECKPOINT,
+    CollisionGroups.CHECKPOINT |
+    CollisionGroups.GRAPPLE_TRIGGER,
 
   // Environment solo colisiona con player, enemigos y proyectiles
   ENVIRONMENT: CollisionGroups.PLAYER | CollisionGroups.ENEMY | CollisionGroups.PROJECTILE,

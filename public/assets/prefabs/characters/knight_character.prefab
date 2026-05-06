@@ -27,8 +27,8 @@
       "collisionMask": "PLAYER_INTERACTIONS"
     },
     "arcane_knight_controller": {
-      "moveSpeed": 6,
-      "maxSpeed": 6,
+      "moveSpeed": 9,
+      "maxSpeed": 9,
       "airControl": 0.7,
       "groundAcceleration": 65,
       "groundDeceleration": 65,
@@ -69,6 +69,13 @@
       ],
       "mouseSensitivity": 0.1,
       "invertY": true
+    },
+    "head_tilt": {
+      "maxTiltAmplitude": 0.03,
+      "tiltSpeed": 0.3,
+      "mantlingTiltAmplitude": 0.15,
+      "mantlingTiltSpeed": 1,
+      "enabled": true
     },
     "head_bob": {},
     "far_reach_tentacle": {},

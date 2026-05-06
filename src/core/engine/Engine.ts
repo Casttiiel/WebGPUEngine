@@ -38,6 +38,7 @@ import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComp
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
+import { GrappleHookComponent } from '../../components/game/GrappleHookComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -176,6 +177,7 @@ export class Engine {
     ImpulsePadComponent.registerMsgs();
     SwingBarComponent.registerMsgs();
     ReflectionProbeComponent.registerMsgs();
+    GrappleHookComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
     // EnemyControllerComponent.registerMsgs();

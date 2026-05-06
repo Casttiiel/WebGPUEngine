@@ -42,4 +42,28 @@ export abstract class BasePlayerController extends Component {
 
   /** Aplica un impulso de un pad de lanzamiento. */
   public abstract applyImpulseFromPad(impulse: import('gl-matrix').vec3): void;
+
+  // ── Estados opcionales de movimiento ───────────────────────────────
+  // Implementación por defecto: false/null. Las subclases que soporten
+  // estas mecánicas las sobreescriben.
+
+  /** true si el personaje está en animación de roll/dodge. */
+  public getIsRolling(): boolean {
+    return false;
+  }
+
+  /** true si el personaje está haciendo mantle (trepar un saliente). */
+  public getIsMantling(): boolean {
+    return false;
+  }
+
+  /** true si el personaje está corriendo por una pared. */
+  public getIsWallRunning(): boolean {
+    return false;
+  }
+
+  /** Normal de la pared en la que corre el personaje, o null si no aplica. */
+  public getWallNormal(): import('gl-matrix').vec3 | null {
+    return null;
+  }
 }
