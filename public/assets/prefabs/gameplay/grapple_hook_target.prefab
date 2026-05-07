@@ -13,9 +13,9 @@
         0
       ],
       "scale": [
-        0.4,
-        0.4,
-        0.4
+        3,
+        4,
+        4
       ]
     },
     "sphere_collider": {
@@ -33,7 +33,7 @@
       "meshes": [
         {
           "mesh": "unit_cube.obj",
-          "material": "emissive.mat"
+          "material": "magic_infusion_decal.mat"
         }
       ]
     },
