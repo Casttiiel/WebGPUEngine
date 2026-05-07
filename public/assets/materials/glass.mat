@@ -1,16 +1,21 @@
 {
-    "technique": "utility/oit_gather.tech",
-    "textures": {
-        "txAlbedo":    "white.png",
-        "txNormal":    "no-normal.jpg",
-        "txMetallic":  "white.png",
-        "txRoughness": "black.png",
-        "txEmissive":  "black.png"
-    },
-    "casts_shadows": false,
-    "shadows": false,
-    "category": "glass",
-    "baseColorFactor": [0.85, 0.95, 1.0, 0.08],
-    "roughnessFactor": 0.05,
-    "metallicFactor": 0.0
+  "technique": "utility/oit_gather.tech",
+  "textures": {
+    "txAlbedo": "white.png",
+    "txNormal": "no-normal.jpg",
+    "txMetallic": "white.png",
+    "txRoughness": "black.png",
+    "txEmissive": "black.png"
+  },
+  "casts_shadows": false,
+  "shadows": false,
+  "category": "glass",
+  "baseColorFactor": [
+    0.85,
+    0.95,
+    1,
+    0.08
+  ],
+  "roughnessFactor": 0.05,
+  "metallicFactor": 0
 }

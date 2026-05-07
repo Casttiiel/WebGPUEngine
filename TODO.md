@@ -6,12 +6,10 @@
 4. Slow Time to yourself
 5. Slow time on bubble
 
-6. Technique, Material, skinned component autocomplete
-7. Froxel Volumetrict Scattering noise ugly + fog leaking
-8. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-9. Procedural materials
-10. Enemy AI / NavMesh
-    (pensar en epipolar shadow map sampling)
+6. Froxel Volumetrict Scattering noise ugly + fog leaking
+7. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+8. Enemy AI / NavMesh
+   (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay
 
@@ -29,12 +27,13 @@
 
 ### Non Priority
 
-1. Water Shader Reflections + Better Foam
-2. Contact Shadows — sombras de alta frecuencia cerca de los contactos geométricos. Complementan las CSM en zonas donde las cascades tienen resolución baja.
-3. Mesh LOD
-4. Virtual Textures / Texture Streaming — ya en wishlist. Sin streaming, escenas grandes explotan en VRAM.
-5. Epipolar light scattering
-6. Editor Point Lights (Render Debug / Gizmo / Menu)
-7. Editor Spot Lights (Render Debug / Gizmo / Menu)
-8. Editor Camera (Render Debug / Gizmo / Menu)
-9. Asset Browser + Spawn + Delete
+1. Procedural materials
+2. Water Shader Reflections + Better Foam
+3. Contact Shadows — sombras de alta frecuencia cerca de los contactos geométricos. Complementan las CSM en zonas donde las cascades tienen resolución baja.
+4. Mesh LOD
+5. Virtual Textures / Texture Streaming — ya en wishlist. Sin streaming, escenas grandes explotan en VRAM.
+6. Epipolar light scattering
+7. Editor Point Lights (Render Debug / Gizmo / Menu)
+8. Editor Spot Lights (Render Debug / Gizmo / Menu)
+9. Editor Camera (Render Debug / Gizmo / Menu)
+10. Asset Browser + Spawn + Delete
