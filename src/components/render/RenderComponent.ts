@@ -113,6 +113,19 @@ export class RenderComponent extends Component {
     return this.parts;
   }
 
+  /**
+   * Replaces the material on one part and re-registers the render key.
+   * Used by the editor to assign per-entity material overrides.
+   */
+  public setPartMaterial(partIndex: number, material: Material): void {
+    const part = this.parts[partIndex];
+    if (!part) return;
+    part.material = material;
+    if (!this.isInstanced) {
+      this.updateRenderManager();
+    }
+  }
+
   public isVisible(): boolean {
     return this._isVisible;
   }

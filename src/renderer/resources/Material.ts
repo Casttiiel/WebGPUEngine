@@ -539,6 +539,112 @@ export class Material extends GPUResource {
     );
   }
 
+  /**
+   * Synchronously creates a per-entity material clone for the editor.
+   * Handles both standard PBR and custom-slot materials.
+   * All GPU textures are reused from the original (already loaded / cached).
+   * The clone gets its own uniform buffer + bind group so setFactors() on it
+   * does NOT affect any other entity.
+   * NOT registered in ResourceManager — caller owns the lifetime.
+   * Returns null only if the original hasn't finished loading yet.
+   */
+  public static cloneFrom(original: Material): Material | null {
+    if (!original.technique) return null;
+
+    const clone = new Material({
+      path: `${original.path}__editor_clone_${Engine.generateDynamicId()}`,
+      type: ResourceType.MATERIAL,
+      technique: original.technique,
+      textures: original.textureFiles ?? {
+        albedo: 'white.png',
+        normal: 'no-normal.jpg',
+        metallic: 'black.png',
+        roughness: 'black.png',
+        emissive: 'black.png',
+      },
+      rawTextures: { ...original.rawTextures },
+      category: original.category,
+      baseColorFactor: [...original.baseColorFactor],
+      roughnessFactor: original.roughnessFactor,
+      metallicFactor: original.metallicFactor,
+      emissiveFactor: original.emissiveFactor,
+      uvXScale: original.uvXScale,
+      uvYScale: original.uvYScale,
+      appearanceBlend: original.appearanceBlend,
+      surfaceBlend: original.surfaceBlend,
+      pomScale: original.pomScale,
+      castsShadows: false,
+      shadows: original.shadows,
+    });
+
+    const slots = original.technique.getMaterialSlots();
+
+    if (slots !== null) {
+      // ─── Custom-slot path ──────────────────────────────────────────────────
+      // Share already-loaded file-based textures.
+      clone.customSlotTextures = new Map(original.customSlotTextures);
+
+      // Own uniform buffer with current factor values.
+      clone.customUniformBuffer = GPUUtils.createBuffer(
+        `${clone.path}_custom_ub`,
+        48,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+      clone.writeFactorsToGPU();
+
+      // Build bind group immediately using clone's own uniform buffer.
+      clone.tryBuildCustomBindGroup(slots);
+      if (!clone.textureBindGroup) return null; // engine textures not ready yet
+
+      // Subscribe to engine texture changes so the bind group stays current.
+      const rebuild = () => clone.tryBuildCustomBindGroup(slots);
+      for (const slot of slots) {
+        if (slot.type === 'sampler' || slot.type === 'uniform') continue;
+        const value = clone.rawTextures[slot.name] ?? slot.defaultValue ?? '';
+        if (value.startsWith('@engine:')) {
+          clone.customUnsubscribes.push(EngineTextureRegistry.subscribe(value.slice(1), rebuild));
+        }
+      }
+    } else {
+      // ─── Standard PBR path ─────────────────────────────────────────────────
+      if (!original.uniformBuffer) return null;
+
+      const textureTypes = ['albedo', 'normal', 'metallic', 'roughness', 'emissive'] as const;
+      for (const type of textureTypes) {
+        if (!original.textures.get(type)?.getTextureView()) return null;
+      }
+
+      // Share already-loaded GPU textures — no re-upload.
+      clone.textures = new Map(original.textures);
+      if (original.shadowsMaterial) clone.shadowsMaterial = original.shadowsMaterial;
+
+      // Own uniform buffer with current factor values.
+      clone.uniformBuffer = GPUUtils.createBuffer(
+        `${clone.path}_ub`,
+        48,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+      clone.writeFactorsToGPU();
+
+      // Build bind group (synchronous, textures already loaded).
+      const entries: GPUBindGroupEntry[] = [];
+      let idx = 0;
+      for (const type of textureTypes) {
+        entries.push({ binding: idx++, resource: clone.textures.get(type)!.getTextureView()! });
+      }
+      entries.push({ binding: idx++, resource: clone.textures.get('albedo')!.getSampler()! });
+      entries.push({ binding: 6, resource: { buffer: clone.uniformBuffer } });
+
+      clone.textureBindGroup = BindGroupFactory.createBindGroup(
+        `${clone.path}_bg`,
+        BindGroupFactory.getLayoutFromEnum(PipelineBindGroupLayouts.MATERIAL_TEXTURES),
+        entries,
+      );
+    }
+
+    return clone;
+  }
+
   public override release(): void {
     // Unsubscribe from all engine texture change notifications.
     for (const unsub of this.customUnsubscribes) unsub();

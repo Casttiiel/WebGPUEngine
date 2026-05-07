@@ -38,6 +38,31 @@ export class ModuleEditorSelection extends Module {
     appearanceBlend: 1,
     surfaceBlend: 1,
   };
+  // ── Entity List Panel ───────────────────────────────────────────────────────
+  /** Raw lil-gui folder for the "Scene Entities" panel; null until first created. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _entityListFolder: any = null;
+  /** Per-entity proxy objects bound to lil-gui sliders via .listen(). */
+  private _entityProxies: Map<
+    number,
+    {
+      posProxy: { x: number; y: number; z: number };
+      rotProxy: { x: number; y: number; z: number }; // pitch=x, yaw=y, roll=z in degrees
+      scaleProxy: { x: number; y: number; z: number };
+      matProxy: {
+        materialName: string;
+        roughnessFactor: number;
+        metallicFactor: number;
+        emissiveFactor: number;
+        uvXScale: number;
+        uvYScale: number;
+        appearanceBlend: number;
+        surfaceBlend: number;
+        pomScale: number;
+      } | null;
+    }
+  > = new Map();
+
   private hoverCheckInterval: number = 0.05; // Check hover cada 50ms para performance
   private hoverCheckTimer: number = 0;
   private lastMousePosition: { x: number; y: number } = { x: 0, y: 0 };
@@ -250,6 +275,16 @@ export class ModuleEditorSelection extends Module {
       this.gizmoRenderer.destroy();
     }
 
+    // Destroy the entity list panel so it rebuilds cleanly on next editor entry.
+    const guiInst = Engine.getGUI();
+    const entityFolder = guiInst.getFolder('Scene Entities');
+    if (entityFolder) {
+      (entityFolder as any).destroy();
+      guiInst.unregisterFolder('Scene Entities');
+    }
+    this._entityListFolder = null;
+    this._entityProxies.clear();
+
     console.log('ModuleEditorSelection stopped');
   }
 
@@ -293,6 +328,8 @@ export class ModuleEditorSelection extends Module {
 
     // Refresh the material inspector proxy whenever the selection changes.
     this.refreshMaterialInspector();
+    // Keep entity list sliders in sync with current transform values (gizmo, physics, etc.).
+    this.syncEntityProxies();
   }
 
   /**
@@ -763,11 +800,15 @@ export class ModuleEditorSelection extends Module {
   public override renderInMenu(): void {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
+
+    // Entity list: builds lazily every frame, manages its own once-creation guard.
+    this.renderEntityListPanel();
+
     if (!gui.beginWindow('Material Inspector')) return; // only runs once per editor session
 
     const folder = gui.getFolder('Material Inspector');
     if (!folder) return;
-    folder.open();
+    folder.close();
 
     // ── Read-only info ────────────────────────────────────────────────────────
     (folder as any).add(this._matProxy, 'meshName').name('Mesh').disable().listen();
@@ -869,6 +910,251 @@ export class ModuleEditorSelection extends Module {
     const parts = rc?.getParts();
     if (!parts || parts.length === 0) return null;
     return parts[0]?.material ?? null;
+  }
+
+  // ─── Entity List Panel ────────────────────────────────────────────────────
+
+  /**
+   * Called every frame from renderInMenu().
+   * Creates the "Scene Entities" top-level folder once, then checks for new entities
+   * and adds a sub-folder (Transform + Material) for each one that hasn't been registered yet.
+   */
+  private renderEntityListPanel(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    // Ensure the top-level folder exists (beginWindow creates it on first call).
+    if (!this._entityListFolder) {
+      gui.beginWindow('Scene Entities'); // returns false if already exists — don't care
+      this._entityListFolder = gui.getFolder('Scene Entities');
+      if (!this._entityListFolder) return;
+    }
+
+    // Register any entity that has appeared since last check.
+    for (const entity of Engine.getEntities().getAllEntities()) {
+      if (!this._entityProxies.has(entity.id)) {
+        this.addEntityToPanel(entity);
+      }
+    }
+  }
+
+  /**
+   * Creates a lil-gui sub-folder inside "Scene Entities" for one entity.
+   * Adds Transform (Position / Rotation / Scale) and Material sub-folders.
+   * Sliders use .listen() so they reflect external changes (gizmo drags, etc.).
+   */
+  private addEntityToPanel(entity: Entity): void {
+    const RAD2DEG = 180 / Math.PI;
+    const DEG2RAD = Math.PI / 180;
+
+    const tc = entity.getComponent('transform') as TransformComponent | null;
+    const rc = entity.getComponent('render') as RenderComponent | null;
+    const mat = rc?.getParts()?.[0]?.material ?? null;
+
+    // Initialise proxy from current state.
+    const pos = tc ? tc.getTransform().getLocalPosition() : vec3.create();
+    const angles = tc ? tc.getTransform().getAngles() : { yaw: 0, pitch: 0, roll: 0 };
+    const scale = tc ? tc.getTransform().getLocalScale() : vec3.fromValues(1, 1, 1);
+
+    const proxy = {
+      posProxy: { x: pos[0]!, y: pos[1]!, z: pos[2]! },
+      rotProxy: {
+        x: angles.pitch * RAD2DEG,
+        y: angles.yaw * RAD2DEG,
+        z: angles.roll * RAD2DEG,
+      },
+      scaleProxy: { x: scale[0]!, y: scale[1]!, z: scale[2]! },
+      matProxy: mat
+        ? {
+            materialName: mat.getName().split('/').pop() ?? mat.getName(),
+            roughnessFactor: mat.getRoughnessFactor(),
+            metallicFactor: mat.getMetallicFactor(),
+            emissiveFactor: mat.getEmissiveFactor(),
+            uvXScale: mat.getUvXScale(),
+            uvYScale: mat.getUvYScale(),
+            appearanceBlend: mat.getAppearanceBlend(),
+            surfaceBlend: mat.getSurfaceBlend(),
+            pomScale: mat.getPomScale(),
+          }
+        : null,
+    };
+    this._entityProxies.set(entity.id, proxy);
+
+    // Create entity folder (raw lil-gui, not through GUIManager wrapper).
+    const entityFolder = (this._entityListFolder as any).addFolder(
+      `${entity.getName()} [${entity.id}]`,
+    );
+    entityFolder.close();
+
+    // ── Transform ──────────────────────────────────────────────────────────────
+    if (tc) {
+      const tFolder = entityFolder.addFolder('Transform');
+      tFolder.close();
+
+      // Helper: add a no-range number input + step buttons for one axis.
+      // Uses no min/max → lil-gui renders a type-in field; shift-drag for fine control.
+      // The ± buttons give quick increments without needing to drag.
+      const addAxisControls = (
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        folder: any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        proxyObj: any,
+        key: string,
+        label: string,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stepRef: { v: number },
+        onChange: () => void,
+      ): void => {
+        folder.add(proxyObj, key).step(0.001).name(label).listen().onChange(onChange);
+        folder
+          .add(
+            {
+              fn: () => {
+                proxyObj[key] -= stepRef.v;
+                onChange();
+              },
+            },
+            'fn',
+          )
+          .name(`${label}  −`);
+        folder
+          .add(
+            {
+              fn: () => {
+                proxyObj[key] += stepRef.v;
+                onChange();
+              },
+            },
+            'fn',
+          )
+          .name(`${label}  +`);
+      };
+
+      // Position
+      const posStep = { v: 0.1 };
+      const applyPos = () =>
+        tc
+          .getTransform()
+          .setLocalPosition(vec3.fromValues(proxy.posProxy.x, proxy.posProxy.y, proxy.posProxy.z));
+      const posF = tFolder.addFolder('Position');
+      posF.close();
+      posF.add(posStep, 'v').step(0.001).name('± Step');
+      addAxisControls(posF, proxy.posProxy, 'x', 'X', posStep, applyPos);
+      addAxisControls(posF, proxy.posProxy, 'y', 'Y', posStep, applyPos);
+      addAxisControls(posF, proxy.posProxy, 'z', 'Z', posStep, applyPos);
+
+      // Rotation (degrees)
+      const rotStep = { v: 5.0 };
+      const applyRot = () =>
+        tc
+          .getTransform()
+          .setAngles(
+            proxy.rotProxy.y * DEG2RAD,
+            proxy.rotProxy.x * DEG2RAD,
+            proxy.rotProxy.z * DEG2RAD,
+          );
+      const rotF = tFolder.addFolder('Rotation');
+      rotF.close();
+      rotF.add(rotStep, 'v').step(0.1).name('± Step °');
+      addAxisControls(rotF, proxy.rotProxy, 'x', 'Pitch', rotStep, applyRot);
+      addAxisControls(rotF, proxy.rotProxy, 'y', 'Yaw', rotStep, applyRot);
+      addAxisControls(rotF, proxy.rotProxy, 'z', 'Roll', rotStep, applyRot);
+
+      // Scale
+      const scaStep = { v: 0.1 };
+      const applySca = () =>
+        tc
+          .getTransform()
+          .setLocalScale(
+            vec3.fromValues(proxy.scaleProxy.x, proxy.scaleProxy.y, proxy.scaleProxy.z),
+          );
+      const scaF = tFolder.addFolder('Scale');
+      scaF.close();
+      scaF.add(scaStep, 'v').step(0.001).name('± Step');
+      addAxisControls(scaF, proxy.scaleProxy, 'x', 'X', scaStep, applySca);
+      addAxisControls(scaF, proxy.scaleProxy, 'y', 'Y', scaStep, applySca);
+      addAxisControls(scaF, proxy.scaleProxy, 'z', 'Z', scaStep, applySca);
+    }
+
+    // ── Material ───────────────────────────────────────────────────────────────
+    if (mat && proxy.matProxy) {
+      const mp = proxy.matProxy;
+      const mFolder = entityFolder.addFolder('Material');
+      mFolder.close();
+
+      mFolder.add(mp, 'materialName').name('Material').disable().listen();
+      mFolder
+        .add(mp, 'roughnessFactor', 0, 2, 0.01)
+        .name('Roughness')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ roughnessFactor: v }));
+      mFolder
+        .add(mp, 'metallicFactor', 0, 1, 0.01)
+        .name('Metallic')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ metallicFactor: v }));
+      mFolder
+        .add(mp, 'emissiveFactor', 0, 5, 0.05)
+        .name('Emissive')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ emissiveFactor: v }));
+      mFolder
+        .add(mp, 'uvXScale', 0.1, 50, 0.1)
+        .name('UV Scale X')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ uvXScale: v }));
+      mFolder
+        .add(mp, 'uvYScale', 0.1, 50, 0.1)
+        .name('UV Scale Y')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ uvYScale: v }));
+      mFolder
+        .add(mp, 'appearanceBlend', 0, 1, 0.01)
+        .name('Appearance Blend')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ appearanceBlend: v }));
+      mFolder
+        .add(mp, 'surfaceBlend', 0, 1, 0.01)
+        .name('Surface Blend')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ surfaceBlend: v }));
+      mFolder
+        .add(mp, 'pomScale', 0, 0.2, 0.001)
+        .name('POM Scale')
+        .listen()
+        .onChange((v: number) => mat.setFactors({ pomScale: v }));
+    }
+  }
+
+  /**
+   * Reads current transform values from each entity and writes them into the proxy objects
+   * so that lil-gui .listen() sliders reflect live changes (gizmo drags, animations, etc.).
+   * Called every frame from update().
+   */
+  private syncEntityProxies(): void {
+    const RAD2DEG = 180 / Math.PI;
+    for (const entity of Engine.getEntities().getAllEntities()) {
+      const proxy = this._entityProxies.get(entity.id);
+      if (!proxy) continue;
+
+      const tc = entity.getComponent('transform') as TransformComponent | null;
+      if (!tc) continue;
+
+      const pos = tc.getTransform().getLocalPosition();
+      proxy.posProxy.x = pos[0]!;
+      proxy.posProxy.y = pos[1]!;
+      proxy.posProxy.z = pos[2]!;
+
+      const angles = tc.getTransform().getAngles();
+      proxy.rotProxy.x = angles.pitch * RAD2DEG;
+      proxy.rotProxy.y = angles.yaw * RAD2DEG;
+      proxy.rotProxy.z = angles.roll * RAD2DEG;
+
+      const scale = tc.getTransform().getLocalScale();
+      proxy.scaleProxy.x = scale[0]!;
+      proxy.scaleProxy.y = scale[1]!;
+      proxy.scaleProxy.z = scale[2]!;
+    }
   }
 
   public getSelectedEntity(): Entity | null {
