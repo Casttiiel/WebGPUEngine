@@ -349,6 +349,37 @@ export class SpotLightComponent extends CameraComponent {
     return this.startFallof;
   }
 
+  public getFov(): number {
+    return this.camera.getFov();
+  }
+
+  public setColor(r: number, g: number, b: number): void {
+    vec4.set(this.color, r, g, b, this.color[3]);
+    this.updateLightUniforms();
+  }
+
+  public setIntensity(v: number): void {
+    this.intensity = v;
+    this.updateLightUniforms();
+  }
+
+  public setRadius(v: number): void {
+    this.radius = v;
+    this.updateLightUniforms();
+  }
+
+  public setStartFalloff(v: number): void {
+    this.startFallof = v;
+    this.updateLightUniforms();
+  }
+
+  public setFov(degrees: number): void {
+    this.camera.setFov(degrees);
+    this.camera.updateUniforms(0);
+    this.updateLightUniforms();
+    this.calculateWorldAABB();
+  }
+
   public getShadowDepthView(): GPUTextureView {
     return this.shadowDepthView;
   }

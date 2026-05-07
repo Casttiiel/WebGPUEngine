@@ -16,6 +16,8 @@ import { KeyCode } from '../../types/KeyCode.enum';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
 import { Material } from '../../renderer/resources/Material';
+import { PointLightComponent } from '../../components/render/PointLightComponent';
+import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 
 export class ModuleEditorSelection extends Module {
   private selectedEntity: Entity | null = null;
@@ -59,6 +61,14 @@ export class ModuleEditorSelection extends Module {
         appearanceBlend: number;
         surfaceBlend: number;
         pomScale: number;
+      } | null;
+      pointLightProxy: {
+        r: number; g: number; b: number;
+        intensity: number; radius: number; startFalloff: number;
+      } | null;
+      spotLightProxy: {
+        r: number; g: number; b: number;
+        intensity: number; radius: number; startFalloff: number; fov: number;
       } | null;
     }
   > = new Map();
@@ -950,6 +960,8 @@ export class ModuleEditorSelection extends Module {
     const tc = entity.getComponent('transform') as TransformComponent | null;
     const rc = entity.getComponent('render') as RenderComponent | null;
     const mat = rc?.getParts()?.[0]?.material ?? null;
+    const pl = entity.getComponent('point_light') as PointLightComponent | null;
+    const sl = entity.getComponent('spot_light') as SpotLightComponent | null;
 
     // Initialise proxy from current state.
     const pos = tc ? tc.getTransform().getLocalPosition() : vec3.create();
@@ -977,6 +989,27 @@ export class ModuleEditorSelection extends Module {
             pomScale: mat.getPomScale(),
           }
         : null,
+      pointLightProxy: pl
+        ? {
+            r: pl.getColor()[0]!,
+            g: pl.getColor()[1]!,
+            b: pl.getColor()[2]!,
+            intensity: pl.getIntensity(),
+            radius: pl.getRadius(),
+            startFalloff: pl.getStartFalloff(),
+          }
+        : null,
+      spotLightProxy: sl
+        ? {
+            r: sl.getColor()[0]!,
+            g: sl.getColor()[1]!,
+            b: sl.getColor()[2]!,
+            intensity: sl.getIntensity(),
+            radius: sl.getRadius(),
+            startFalloff: sl.getStartFalloff(),
+            fov: sl.getFov(),
+          }
+        : null,
     };
     this._entityProxies.set(entity.id, proxy);
 
@@ -987,48 +1020,26 @@ export class ModuleEditorSelection extends Module {
     entityFolder.close();
 
     // ── Transform ──────────────────────────────────────────────────────────────
+    // Helper: add a no-range number input + step buttons for one axis.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addAxisControls = (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      folder: any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      proxyObj: any,
+      key: string,
+      label: string,
+      stepRef: { v: number },
+      onChange: () => void,
+    ): void => {
+      folder.add(proxyObj, key).step(0.001).name(label).listen().onChange(onChange);
+      folder.add({ fn: () => { proxyObj[key] -= stepRef.v; onChange(); } }, 'fn').name(`${label}  −`);
+      folder.add({ fn: () => { proxyObj[key] += stepRef.v; onChange(); } }, 'fn').name(`${label}  +`);
+    };
+
     if (tc) {
       const tFolder = entityFolder.addFolder('Transform');
       tFolder.close();
-
-      // Helper: add a no-range number input + step buttons for one axis.
-      // Uses no min/max → lil-gui renders a type-in field; shift-drag for fine control.
-      // The ± buttons give quick increments without needing to drag.
-      const addAxisControls = (
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        folder: any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        proxyObj: any,
-        key: string,
-        label: string,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        stepRef: { v: number },
-        onChange: () => void,
-      ): void => {
-        folder.add(proxyObj, key).step(0.001).name(label).listen().onChange(onChange);
-        folder
-          .add(
-            {
-              fn: () => {
-                proxyObj[key] -= stepRef.v;
-                onChange();
-              },
-            },
-            'fn',
-          )
-          .name(`${label}  −`);
-        folder
-          .add(
-            {
-              fn: () => {
-                proxyObj[key] += stepRef.v;
-                onChange();
-              },
-            },
-            'fn',
-          )
-          .name(`${label}  +`);
-      };
 
       // Position
       const posStep = { v: 0.1 };
@@ -1123,6 +1134,69 @@ export class ModuleEditorSelection extends Module {
         .name('POM Scale')
         .listen()
         .onChange((v: number) => mat.setFactors({ pomScale: v }));
+    }
+
+    // ── Point Light ────────────────────────────────────────────────────────────
+    if (pl && proxy.pointLightProxy) {
+      const plp = proxy.pointLightProxy;
+      const applyPLColor = () => pl.setColor(plp.r, plp.g, plp.b);
+      const plFolder = entityFolder.addFolder('Point Light');
+      plFolder.close();
+
+      const colorStep = { v: 0.05 };
+      plFolder.add(colorStep, 'v').step(0.001).name('± Step (color)');
+      addAxisControls(plFolder, plp, 'r', 'R', colorStep, applyPLColor);
+      addAxisControls(plFolder, plp, 'g', 'G', colorStep, applyPLColor);
+      addAxisControls(plFolder, plp, 'b', 'B', colorStep, applyPLColor);
+
+      const plIntStep = { v: 0.1 };
+      plFolder.add(plIntStep, 'v').step(0.001).name('± Step (intensity)');
+      addAxisControls(plFolder, plp, 'intensity', 'Intensity', plIntStep,
+        () => pl.setIntensity(plp.intensity));
+
+      const plRadStep = { v: 0.5 };
+      plFolder.add(plRadStep, 'v').step(0.001).name('± Step (radius)');
+      addAxisControls(plFolder, plp, 'radius', 'Radius', plRadStep,
+        () => pl.setRadius(plp.radius));
+
+      const plFallStep = { v: 0.1 };
+      plFolder.add(plFallStep, 'v').step(0.001).name('± Step (falloff)');
+      addAxisControls(plFolder, plp, 'startFalloff', 'Start Falloff', plFallStep,
+        () => pl.setStartFalloff(plp.startFalloff));
+    }
+
+    // ── Spot Light ─────────────────────────────────────────────────────────────
+    if (sl && proxy.spotLightProxy) {
+      const slp = proxy.spotLightProxy;
+      const applySLColor = () => sl.setColor(slp.r, slp.g, slp.b);
+      const slFolder = entityFolder.addFolder('Spot Light');
+      slFolder.close();
+
+      const slColorStep = { v: 0.05 };
+      slFolder.add(slColorStep, 'v').step(0.001).name('± Step (color)');
+      addAxisControls(slFolder, slp, 'r', 'R', slColorStep, applySLColor);
+      addAxisControls(slFolder, slp, 'g', 'G', slColorStep, applySLColor);
+      addAxisControls(slFolder, slp, 'b', 'B', slColorStep, applySLColor);
+
+      const slIntStep = { v: 0.1 };
+      slFolder.add(slIntStep, 'v').step(0.001).name('± Step (intensity)');
+      addAxisControls(slFolder, slp, 'intensity', 'Intensity', slIntStep,
+        () => sl.setIntensity(slp.intensity));
+
+      const slRadStep = { v: 0.5 };
+      slFolder.add(slRadStep, 'v').step(0.001).name('± Step (radius)');
+      addAxisControls(slFolder, slp, 'radius', 'Radius', slRadStep,
+        () => sl.setRadius(slp.radius));
+
+      const slFallStep = { v: 0.1 };
+      slFolder.add(slFallStep, 'v').step(0.001).name('± Step (falloff)');
+      addAxisControls(slFolder, slp, 'startFalloff', 'Start Falloff', slFallStep,
+        () => sl.setStartFalloff(slp.startFalloff));
+
+      const slFovStep = { v: 5.0 };
+      slFolder.add(slFovStep, 'v').step(0.1).name('± Step (fov°)');
+      addAxisControls(slFolder, slp, 'fov', 'FOV °', slFovStep,
+        () => sl.setFov(slp.fov));
     }
   }
 

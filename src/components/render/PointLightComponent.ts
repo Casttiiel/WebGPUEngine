@@ -319,6 +319,26 @@ export class PointLightComponent extends Component {
     return this.startFallof;
   }
 
+  public setColor(r: number, g: number, b: number): void {
+    vec4.set(this.color, r, g, b, this.color[3]);
+    this.isDirty = true;
+  }
+
+  public setIntensity(v: number): void {
+    this.intensity = v;
+    this.isDirty = true;
+  }
+
+  public setRadius(v: number): void {
+    this.radius = v;
+    this.isDirty = true;
+  }
+
+  public setStartFalloff(v: number): void {
+    this.startFallof = v;
+    this.isDirty = true;
+  }
+
   public getShadowDepthView(): GPUTextureView {
     return this._hasShadows ? this.shadowCubeView : this.dummyShadowTextureView;
   }
