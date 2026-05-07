@@ -1635,6 +1635,35 @@ export class BindGroupFactory {
   }
 
   /**
+   * Volumetric god rays CSM layout (group 2 of god_rays_volumetric.fs).
+   * binding 0: DirectionalLightCSMUniforms uniform buffer
+   * binding 1-3: texture_depth_2d cascade shadow maps (cascades 0, 1, 2)
+   * binding 4: sampler_comparison
+   * Simpler than getDirectionalLightCSMUniformsLayout — no contact-shadow bindings.
+   */
+  public static getGodRaysVolumetricCSMLayout(): GPUBindGroupLayout {
+    return this.getLayout('god_rays_volumetric_csm', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'depth', viewDimension: '2d', multisampled: false },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'depth', viewDimension: '2d', multisampled: false },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'depth', viewDimension: '2d', multisampled: false },
+      },
+      { binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'comparison' } },
+    ]);
+  }
+
+  /**
    * Kawase blur step params layout (group 2).
    * binding 0: KawaseParams uniform (16 bytes — offset f32 + 3× padding)
    */
@@ -1944,6 +1973,8 @@ export class BindGroupFactory {
         return this.getAreaLightUniformsLayout();
       case PipelineBindGroupLayouts.GOD_RAYS_UNIFORMS:
         return this.getGodRaysUniformsLayout();
+      case PipelineBindGroupLayouts.GOD_RAYS_VOLUMETRIC_CSM:
+        return this.getGodRaysVolumetricCSMLayout();
       case PipelineBindGroupLayouts.KAWASE_UNIFORMS:
         return this.getKawaseUniformsLayout();
       case PipelineBindGroupLayouts.WATER_COMPOSITE_UNIFORMS:

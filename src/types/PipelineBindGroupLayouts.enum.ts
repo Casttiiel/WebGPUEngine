@@ -42,6 +42,7 @@ export enum PipelineBindGroupLayouts {
   TILED_LIGHT_RENDER = 'TiledLightData',
   AREA_LIGHT_UNIFORMS = 'AreaLightUniforms',
   GOD_RAYS_UNIFORMS = 'GodRaysUniforms',
+  GOD_RAYS_VOLUMETRIC_CSM = 'GodRaysVolumetricCSM',
   KAWASE_UNIFORMS = 'KawaseUniforms',
   WATER_COMPOSITE_UNIFORMS = 'WaterCompositeUniforms',
   SKIN_MATRICES = 'SkinMatrices',

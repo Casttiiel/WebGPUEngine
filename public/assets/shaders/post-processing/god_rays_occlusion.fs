@@ -22,7 +22,7 @@
 //   group(3)  GodRaysParams uniform
 
 // ─── Uniform struct ───────────────────────────────────────────────────────────
-// 8 × f32 = 32 bytes.
+// 12 × f32 = 48 bytes.
 struct GodRaysParams {
     sunNdcX:            f32,  // sun X in NDC [-1, 1]  (reserved for Step 2)
     sunNdcY:            f32,  // sun Y in NDC [-1, 1]  (reserved for Step 2)
@@ -32,6 +32,17 @@ struct GodRaysParams {
     density:            f32,  // reserved for Step 2
     decay:              f32,  // reserved for Step 2
     weight:             f32,  // reserved for Step 2
+    // Near-depth cutoff: geometry with linearDepth <= nearCutoff is excluded from
+    // the screen-space occlusion mask.  The froxel volumetric system (with CSM
+    // shadow sampling) handles light shafts through near objects (trees, foliage).
+    // Set to 0 to disable the cutoff (all geometry occludes screen-space shafts).
+    nearCutoff:         f32,
+    // Proximity falloff: sky pixels further than ~(1/sunFalloff) UV from the sun
+    // contribute less to the shaft mask.  Prevents a broad fog-like brightening.
+    // exp(-dist * sunFalloff): ~4 = wide shafts, ~8 = tight/focused.  0 = no falloff.
+    sunFalloff:         f32,
+    _pad1:              f32,
+    _pad2:              f32,
 }
 
 // ─── Bind groups ─────────────────────────────────────────────────────────────
@@ -57,25 +68,50 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
-    // Read linearDepth from GBuffer.  The GBuffer stores
-    //   linearDepth = dot(worldPos - cameraPos, cameraFront) / zFar
-    // Sky pixels were never written to by geometry, so they retain the
-    // clear value of 1.0 (or very close to it).
+    // ── Sun screen-space position ──────────────────────────────────────────────
+    // WebGPU NDC: x ∈ [-1,1] → u = x*0.5+0.5; y flipped for y-down UV.
+    let sunUV = vec2<f32>(
+        params.sunNdcX *  0.5 + 0.5,
+        params.sunNdcY * -0.5 + 0.5,
+    );
+
+    // ── Sun occlusion test ─────────────────────────────────────────────────────
+    // If geometry is at the sun's screen-space position (a mountain in front of the
+    // sun), suppress the entire mask.  Without this, the procedural sky's bright
+    // solar aureole (which extends many pixels around the sun disk) creates a halo
+    // even when the sun is fully hidden behind terrain.
+    var sunVisibility = 1.0;
+    let sunOnScreen = sunUV.x >= 0.0 && sunUV.x <= 1.0 &&
+                      sunUV.y >= 0.0 && sunUV.y <= 1.0;
+    if (sunOnScreen) {
+        let sunLinearDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, sunUV, 0.0).r;
+        // 1.0 if sky at sun center (sun visible), 0.0 if geometry covers the sun.
+        sunVisibility = step(0.9999, sunLinearDepth);
+    }
+
+    // ── Current fragment depth ─────────────────────────────────────────────────
     let linearDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).r;
 
-    // Geometry occluder: linearDepth < 1.0 means a surface was rendered here.
-    // Output black regardless of HDR brightness (prevents bright geometry like
-    // emissive surfaces from leaking into the mask).
-    if (linearDepth < 0.9999) {
+    // Geometry → black.  Near-depth exclusion: near objects fall through to luma
+    // check so the froxel volumetric system handles their beams via CSM shadows.
+    let isNear = params.nearCutoff > 0.0 && linearDepth <= params.nearCutoff;
+    if (linearDepth < 0.9999 && !isNear) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
-    // Sky pixel — apply luma threshold on the HDR frame.
+    // ── Luma threshold ─────────────────────────────────────────────────────────
     let color = textureSampleLevel(hdrTexture, hdrSampler, uv, 0.0).rgb;
+    let luma  = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
+    if (luma <= params.occlusionThreshold) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
 
-    // Perceptual luminance (ITU-R BT.709).
-    let luma = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
+    // ── Sun proximity weight ───────────────────────────────────────────────────
+    // Prevents fog: sky pixels far from the sun contribute very little to the mask.
+    // sunFalloff=0 → no falloff (legacy binary mask); default ~5 gives focused shafts.
+    let distToSun  = length(uv - sunUV);
+    let proximity  = select(1.0, exp(-distToSun * params.sunFalloff), params.sunFalloff > 0.0);
+    let mask       = sunVisibility * proximity;
 
-    let mask = select(0.0, 1.0, luma > params.occlusionThreshold);
     return vec4<f32>(mask, mask, mask, 1.0);
 }

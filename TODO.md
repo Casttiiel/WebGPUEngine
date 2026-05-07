@@ -1,14 +1,15 @@
 ### Engine
 
 1. Grapple stop
-2. Grapple mantle
+2. Grapple Direction
 3. Grapple Acceleration
 4. Slow Time to yourself
 5. Slow time on bubble
 
-6. Froxel Volumetrict Scattering noise ugly + fog leaking
-7. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-8. Enemy AI / NavMesh
+6. Multifaced decals
+7. Froxel Volumetrict Scattering noise ugly + fog leaking
+8. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+9. Enemy AI / NavMesh
    (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay

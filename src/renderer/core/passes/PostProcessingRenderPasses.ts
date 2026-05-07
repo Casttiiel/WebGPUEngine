@@ -353,6 +353,39 @@ export class ContactShadowsRenderPass extends PostProcessingRenderPass {
 }
 
 /**
+ * Volumetric god rays render pass (Step 1 replacement).
+ * Per-pixel view-ray march through CSM shadow maps — works from any camera angle.
+ * group(0) = CameraUniforms (auto), group(1) = GBufferUniforms (linearDepth),
+ * group(2) = GodRaysVolumetricCSM (shadow maps), group(3) = VolumetricGodRaysParams.
+ */
+export class GodRaysVolumetricRenderPass extends PostProcessingRenderPass {
+  private gBufferBindGroup: GPUBindGroup;
+  private csmBindGroup: GPUBindGroup;
+  private paramsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    csmBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.gBufferBindGroup = gBufferBindGroup;
+    this.csmBindGroup = csmBindGroup;
+    this.paramsBindGroup = paramsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.gBufferBindGroup);
+    pass.setBindGroup(2, this.csmBindGroup);
+    pass.setBindGroup(3, this.paramsBindGroup);
+  }
+}
+
+/**
  * God rays occlusion mask render pass (Step 1).
  * Renders a quarter-resolution bright-pixel mask from the HDR scene.
  * group(0) = CameraUniforms (auto), group(1) = GBuffer, group(2) = HDR input, group(3) = GodRaysParams.

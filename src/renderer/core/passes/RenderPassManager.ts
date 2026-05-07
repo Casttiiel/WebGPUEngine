@@ -26,6 +26,7 @@ import {
   GodRaysRadialRenderPass,
   GodRaysKawaseRenderPass,
   GodRaysCompositeRenderPass,
+  GodRaysVolumetricRenderPass,
   LensFlareOcclusionRenderPass,
   LensFlareCompositeRenderPass,
 } from './PostProcessingRenderPasses';
@@ -492,6 +493,35 @@ export class RenderPassManager {
       mesh,
       technique,
       gBufferBindGroup,
+      paramsBindGroup,
+    );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Execute the volumetric god rays pass (replaces occlusion + radial blur).
+   * Per-pixel view-ray march through CSM shadow maps at quarter resolution.
+   * group(1) = GBuffer (linearDepth), group(2) = CSM shadow maps, group(3) = params.
+   */
+  public executeGodRaysVolumetricPass(
+    mesh: Mesh,
+    technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
+    csmBindGroup: GPUBindGroup,
+    paramsBindGroup: GPUBindGroup,
+    result: RenderTarget,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfig(
+      result,
+      { width: result.getWidth(), height: result.getHeight() },
+      'God Rays Volumetric',
+    );
+    const pass = new GodRaysVolumetricRenderPass(
+      passConfig,
+      mesh,
+      technique,
+      gBufferBindGroup,
+      csmBindGroup,
       paramsBindGroup,
     );
     this.executeDynamicPass(pass);

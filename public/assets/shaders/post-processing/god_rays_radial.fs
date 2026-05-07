@@ -17,6 +17,7 @@
 //   group(2)  GodRaysParams uniform       (GodRaysUniforms)
 
 // ─── Uniform struct ───────────────────────────────────────────────────────────
+// 12 × f32 = 48 bytes (matches occlusion pass — same buffer).
 struct GodRaysParams {
     sunNdcX:            f32,  // sun X in NDC [-1, 1]
     sunNdcY:            f32,  // sun Y in NDC [-1, 1]
@@ -26,6 +27,10 @@ struct GodRaysParams {
     density:            f32,  // step-length factor (higher = wider march)
     decay:              f32,  // per-step illumination falloff < 1
     weight:             f32,  // per-sample contribution weight
+    nearCutoff:         f32,  // (unused here — used by occlusion pass)
+    sunFalloff:         f32,  // (unused here — used by occlusion pass)
+    _pad1:              f32,
+    _pad2:              f32,
 }
 
 // ─── Bind groups ─────────────────────────────────────────────────────────────
