@@ -63,12 +63,21 @@ export class ModuleEditorSelection extends Module {
         pomScale: number;
       } | null;
       pointLightProxy: {
-        r: number; g: number; b: number;
-        intensity: number; radius: number; startFalloff: number;
+        r: number;
+        g: number;
+        b: number;
+        intensity: number;
+        radius: number;
+        startFalloff: number;
       } | null;
       spotLightProxy: {
-        r: number; g: number; b: number;
-        intensity: number; radius: number; startFalloff: number; fov: number;
+        r: number;
+        g: number;
+        b: number;
+        intensity: number;
+        radius: number;
+        startFalloff: number;
+        fov: number;
       } | null;
     }
   > = new Map();
@@ -1033,8 +1042,28 @@ export class ModuleEditorSelection extends Module {
       onChange: () => void,
     ): void => {
       folder.add(proxyObj, key).step(0.001).name(label).listen().onChange(onChange);
-      folder.add({ fn: () => { proxyObj[key] -= stepRef.v; onChange(); } }, 'fn').name(`${label}  −`);
-      folder.add({ fn: () => { proxyObj[key] += stepRef.v; onChange(); } }, 'fn').name(`${label}  +`);
+      folder
+        .add(
+          {
+            fn: () => {
+              proxyObj[key] -= stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  −`);
+      folder
+        .add(
+          {
+            fn: () => {
+              proxyObj[key] += stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  +`);
     };
 
     if (tc) {
@@ -1151,18 +1180,19 @@ export class ModuleEditorSelection extends Module {
 
       const plIntStep = { v: 0.1 };
       plFolder.add(plIntStep, 'v').step(0.001).name('± Step (intensity)');
-      addAxisControls(plFolder, plp, 'intensity', 'Intensity', plIntStep,
-        () => pl.setIntensity(plp.intensity));
+      addAxisControls(plFolder, plp, 'intensity', 'Intensity', plIntStep, () =>
+        pl.setIntensity(plp.intensity),
+      );
 
       const plRadStep = { v: 0.5 };
       plFolder.add(plRadStep, 'v').step(0.001).name('± Step (radius)');
-      addAxisControls(plFolder, plp, 'radius', 'Radius', plRadStep,
-        () => pl.setRadius(plp.radius));
+      addAxisControls(plFolder, plp, 'radius', 'Radius', plRadStep, () => pl.setRadius(plp.radius));
 
       const plFallStep = { v: 0.1 };
       plFolder.add(plFallStep, 'v').step(0.001).name('± Step (falloff)');
-      addAxisControls(plFolder, plp, 'startFalloff', 'Start Falloff', plFallStep,
-        () => pl.setStartFalloff(plp.startFalloff));
+      addAxisControls(plFolder, plp, 'startFalloff', 'Start Falloff', plFallStep, () =>
+        pl.setStartFalloff(plp.startFalloff),
+      );
     }
 
     // ── Spot Light ─────────────────────────────────────────────────────────────
@@ -1180,23 +1210,23 @@ export class ModuleEditorSelection extends Module {
 
       const slIntStep = { v: 0.1 };
       slFolder.add(slIntStep, 'v').step(0.001).name('± Step (intensity)');
-      addAxisControls(slFolder, slp, 'intensity', 'Intensity', slIntStep,
-        () => sl.setIntensity(slp.intensity));
+      addAxisControls(slFolder, slp, 'intensity', 'Intensity', slIntStep, () =>
+        sl.setIntensity(slp.intensity),
+      );
 
       const slRadStep = { v: 0.5 };
       slFolder.add(slRadStep, 'v').step(0.001).name('± Step (radius)');
-      addAxisControls(slFolder, slp, 'radius', 'Radius', slRadStep,
-        () => sl.setRadius(slp.radius));
+      addAxisControls(slFolder, slp, 'radius', 'Radius', slRadStep, () => sl.setRadius(slp.radius));
 
       const slFallStep = { v: 0.1 };
       slFolder.add(slFallStep, 'v').step(0.001).name('± Step (falloff)');
-      addAxisControls(slFolder, slp, 'startFalloff', 'Start Falloff', slFallStep,
-        () => sl.setStartFalloff(slp.startFalloff));
+      addAxisControls(slFolder, slp, 'startFalloff', 'Start Falloff', slFallStep, () =>
+        sl.setStartFalloff(slp.startFalloff),
+      );
 
       const slFovStep = { v: 5.0 };
       slFolder.add(slFovStep, 'v').step(0.1).name('± Step (fov°)');
-      addAxisControls(slFolder, slp, 'fov', 'FOV °', slFovStep,
-        () => sl.setFov(slp.fov));
+      addAxisControls(slFolder, slp, 'fov', 'FOV °', slFovStep, () => sl.setFov(slp.fov));
     }
   }
 
