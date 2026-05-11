@@ -3,12 +3,21 @@
 1. Grapple stop
 2. Grapple Direction
 3. Grapple Acceleration
-4. Slow Time to yourself
-5. Slow time on bubble
+4. Slide Superficies
+5. Slow Time to yourself
+6. Slow time on bubble
 
-6. Froxel Volumetrict Scattering noise ugly + fog leaking
-7. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-8. Enemy AI / NavMesh
+7. Depth fade y blending suave
+
+Para evitar bordes visibles:
+
+usaban depth fade,
+soft particles,
+blending exponencial.
+
+7. Froxel Volumetrict Scattering noise ugly + fog leaking
+8. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+9. Enemy AI / NavMesh
    (pensar en epipolar shadow map sampling)
 
 ## Combat Gameplay

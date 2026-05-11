@@ -193,7 +193,7 @@ export class GrappleSystem {
     this.easeInEnd = data.grappleEaseInEnd ?? 0.3;
     this.easeOutStart = data.grappleEaseOutStart ?? 0.8;
     this.momentumTransfer = data.grappleMomentumTransfer ?? 0.9;
-    this.reachingDuration = data.grappleReachingDuration ?? 0.05;
+    this.reachingDuration = data.grappleReachingDuration ?? 0.5;
     this.rechargeTime = data.grappleRechargeTime ?? 2;
     this.maxCharges = data.grappleMaxCharges ?? 3;
     this.chargeCount = this.maxCharges;

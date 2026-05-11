@@ -33,7 +33,7 @@
       "meshes": [
         {
           "mesh": "unit_cube.obj",
-          "material": "magic_infusion_decal.mat"
+          "material": "decal_cracks_mana.mat"
         }
       ]
     },
