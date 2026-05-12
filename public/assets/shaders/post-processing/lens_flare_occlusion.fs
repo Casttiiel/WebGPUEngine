@@ -64,8 +64,17 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
-    // Geometry test: linearDepth < 1.0 means a surface occluded this pixel.
-    let linearDepth = textureSampleLevel(gLinearDepth, samplerGBuffer, uv, 0.0).r;
+    // Geometry test: use textureLoad (nearest-neighbor, no bilinear) so wall/sky
+    // boundary pixels are never falsely blended to depth >= 1.0.  Bilinear sampling
+    // at grazing angles produces averaged depth values that can exceed 0.9999 even
+    // for solid geometry, causing the flare to leak through walls.
+    let texDims  = textureDimensions(gLinearDepth);
+    let texCoord = clamp(
+        vec2<i32>(vec2<f32>(texDims) * uv),
+        vec2<i32>(0),
+        vec2<i32>(texDims) - vec2<i32>(1),
+    );
+    let linearDepth = textureLoad(gLinearDepth, texCoord, 0).r;
     if (linearDepth < 0.9999) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }

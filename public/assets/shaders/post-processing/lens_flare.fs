@@ -77,6 +77,14 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
         params.sunNdcY * -0.5 + 0.5,
     );
 
+    // ── Early-out: sun off-screen → skip entirely ───────────────────────────
+    // When sunUV is outside [0,1] the occlusion texture is sampled with
+    // clamp-to-edge, which can return non-zero values from the screen border
+    // (spurious visibility).  Bail out with a small margin instead.
+    if (sunUV.x < -0.05 || sunUV.x > 1.05 || sunUV.y < -0.05 || sunUV.y > 1.05) {
+        return vec4<f32>(0.0, 0.0, 0.0, 0.0);
+    }
+
     // ── Visibility: sample occlusion mask near sun ───────────────────────────
     let aspect = camera.screenSize.x / camera.screenSize.y;
     let OCC_SAMPLE_RADIUS: f32 = 0.025;
