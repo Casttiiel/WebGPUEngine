@@ -171,9 +171,32 @@ export class ContactShadowsComponent extends Component {
 
   public override update(_dt: number): void {}
 
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (!gui.beginWindow('Contact Shadows', true)) return;
+
+    const guiManager = gui as any;
+    const folder = guiManager.folders?.get('Contact Shadows');
+
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    folder.add(this, 'isEnabled').name('Enable').listen();
+    folder.add(this, 'intensity', 0.0, 1.0).name('Intensity').listen();
+    folder.add(this, 'stepLength', 0.005, 0.2).name('Step Length').listen();
+    folder.add(this, 'maxDistance', 0.05, 2.0).name('Max Distance').listen();
+    folder.add(this, 'thickness', 0.001, 0.1).name('Thickness').listen();
+
+    gui.endWindow();
+  }
+
   public renderDebug(): void {}
 
-  public dispose(): void {
+  public override dispose(): void {
     this.paramsBuffer?.destroy();
     this.result?.destroy();
   }

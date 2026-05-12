@@ -1,4 +1,5 @@
 import { AmbientOcclusionComponent } from '../../../components/render/AmbientOcclusionComponent';
+import { ContactShadowsComponent } from '../../../components/render/ContactShadowsComponent';
 import { FroxelVolumetricScattering } from '../../shading/FroxelVolumetricScattering';
 import { Entity } from '../../../core/ecs/Entity';
 import { QualitySettings } from '../../../core/engine/QualitySettings';
@@ -61,6 +62,7 @@ export class DeferredRenderer {
   private oitComposeBindGroup!: GPUBindGroup;
   private oitGlassEnvBindGroup: GPUBindGroup | null = null;
   private aoResult!: GPUTextureView;
+  private csResult!: GPUTextureView; // Contact shadow factor map (1=lit, 0=occluded)
 
   // ── Water hybrid pass resources ──────────────────────────────────────────
   /** Snapshot of rtAccLight taken right after lighting, before water is composited. */
@@ -534,6 +536,7 @@ export class DeferredRenderer {
 
     // 3. Render ambient occlusion and lighting
     this.aoResult = this.renderAO(camera);
+    this.csResult = this.renderContactShadows(camera);
     this.renderAccLight();
 
     // 3b. Screen-Space Global Illumination — indirect diffuse, composited additively onto accLight
@@ -670,6 +673,14 @@ export class DeferredRenderer {
     return ambientOcclusionComponent.compute(this.gBufferComputeBindGroup);
   }
 
+  private renderContactShadows(camera: Entity): GPUTextureView {
+    const cs = camera?.getComponent('contact_shadows') as ContactShadowsComponent;
+    if (!cs || !cs.hasLoaded()) {
+      return this.whiteTexture.getTextureView()!;
+    }
+    return cs.computeShadowFactor(this.gBufferBindGroup);
+  }
+
   private renderAccLight(): void {
     // Build (or reuse) the extended G-Buffer+AO bind group once per frame.
     if (!this.gBufferWithAOBindGroup || this.aoResult !== this.lastAOViewForGBuffer) {
@@ -689,13 +700,21 @@ export class DeferredRenderer {
       this.lastAOViewForGBuffer = this.aoResult;
     }
 
+    // Push the contact shadow view to all directional lights once — they will only
+    // reallocate their bind group if the view pointer actually changed (first load / resize).
+    for (const comp of Engine.getEntities()
+      .getObjectManagerByName('directional_light')
+      ?.getList() ?? []) {
+      (comp as DirectionalLightComponent).setContactShadowView(this.csResult);
+    }
+
     this.ambientLight.renderDiffuse(
       this.rtAccLight.getView(),
       this.gBufferBindGroup,
       this.aoResult,
     );
 
-    // Directional lights: pass the extended G-Buffer+AO bind group as their group 1
+    // Directional lights: primary bind group (with contact shadows)
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
@@ -703,7 +722,6 @@ export class DeferredRenderer {
       directionalLightComponent.render(
         this.rtAccLight.getView(),
         this.gBufferWithAOBindGroup!,
-        this.whiteTexture.getTextureView()!,
       );
     }
 
@@ -763,6 +781,13 @@ export class DeferredRenderer {
     ) as AmbientOcclusionComponent;
     if (ambientOcclusionComponent) {
       ambientOcclusionComponent.renderInMenu();
+    }
+
+    const contactShadowsComponent = mainCameraEntity?.getComponent(
+      'contact_shadows',
+    ) as ContactShadowsComponent;
+    if (contactShadowsComponent) {
+      contactShadowsComponent.renderInMenu();
     }
   }
 
@@ -859,12 +884,12 @@ export class DeferredRenderer {
     // Ambient diffuse (uses loadOp:'clear' internally, so this also clears rtWaterLit).
     this.ambientLight.renderDiffuse(this.rtWaterLit.getView(), this.waterGBufferBindGroup, white);
 
-    // Directional lights — additive, same bind groups they use for the main GBuffer.
+    // Directional lights — secondary bind group (white CS), no rebuild triggered.
     for (const comp of Engine.getEntities()
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
       const dl = comp as DirectionalLightComponent;
-      dl.render(this.rtWaterLit.getView(), this.waterGBufferWithAOBindGroup, white);
+      dl.render(this.rtWaterLit.getView(), this.waterGBufferWithAOBindGroup, true);
     }
   }
 

@@ -44,7 +44,11 @@ export class DirectionalLightComponent extends Component {
   // Contact shadows integration
   /** 1×1 white texture used as fallback when no ContactShadowsComponent is present. */
   private contactShadowFallbackView!: GPUTextureView;
-  /** Tracks the last contact shadow view bound, to detect when a rebuild is needed. */
+  /** Separate bind group for secondary passes (water, probes) — always uses white CS. */
+  private secondaryLightBindGroup!: GPUBindGroup;
+  /** Cached layout for the light bind group — avoids getPipeline() calls after load. */
+  private _lightBindGroupLayout!: GPUBindGroupLayout;
+  /** Last CS view installed in directionalLightBindGroup (for change detection). */
   private lastContactShadowView!: GPUTextureView;
 
   // CSM configuration
@@ -139,6 +143,12 @@ export class DirectionalLightComponent extends Component {
       this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!,
       bindGroupEntries,
     );
+
+    // Secondary bind group (water, probes) — always white CS, never rebuilt.
+    this.secondaryLightBindGroup = this.directionalLightBindGroup;
+
+    // Cache the layout so setContactShadowView() doesn't call getPipeline() every time.
+    this._lightBindGroupLayout = this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!;
 
     // Track the initial contact shadow view so the first real view triggers a rebuild
     this.lastContactShadowView = this.contactShadowFallbackView;
@@ -503,40 +513,37 @@ export class DirectionalLightComponent extends Component {
   }
 
   /**
-   * Rebuilds the directional light bind group with a new contact shadow view.
-   * Called automatically by render() whenever the view reference changes.
+   * Updates the contact shadow view in the primary bind group.
+   * Called once from DeferredRenderer when the CS view becomes available or changes
+   * (e.g. first load, window resize). Never called from the hot render path.
    */
-  private rebuildLightBindGroup(contactShadowView: GPUTextureView): void {
-    // Always use CSM layout — single cascade reuses view[0] for all 3 slots.
+  public setContactShadowView(contactShadowView: GPUTextureView): void {
+    if (contactShadowView === this.lastContactShadowView) return;
+    this.lastContactShadowView = contactShadowView;
     const v0 = this.shadowDepthViews[0]!;
-    const bindGroupEntries: GPUBindGroupEntry[] = [
-      { binding: 0, resource: { buffer: this.uniformBuffer } },
-      { binding: 1, resource: v0 },
-      { binding: 2, resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)] ?? v0 },
-      { binding: 3, resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)] ?? v0 },
-      { binding: 4, resource: this.shadowSampler },
-      { binding: 5, resource: contactShadowView },
-      { binding: 6, resource: SamplerLibrary.simpleSampler },
-    ];
-
     this.directionalLightBindGroup = BindGroupFactory.createBindGroup(
       'directional_light_bindgroup',
-      this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!,
-      bindGroupEntries,
+      this._lightBindGroupLayout,
+      [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: v0 },
+        { binding: 2, resource: this.shadowDepthViews[Math.min(1, this.cascadeCount - 1)] ?? v0 },
+        { binding: 3, resource: this.shadowDepthViews[Math.min(2, this.cascadeCount - 1)] ?? v0 },
+        { binding: 4, resource: this.shadowSampler },
+        { binding: 5, resource: contactShadowView },
+        { binding: 6, resource: SamplerLibrary.simpleSampler },
+      ],
     );
   }
 
   public render(
     rtAccLight: GPUTextureView,
     gBufferBindGroup: GPUBindGroup,
-    contactShadowView?: GPUTextureView,
+    useSecondaryBindGroup: boolean = false,
   ): void {
-    // Rebuild bind group if the contact shadow view changed (e.g. first frame or after resize)
-    const csView = contactShadowView ?? this.contactShadowFallbackView;
-    if (csView !== this.lastContactShadowView) {
-      this.rebuildLightBindGroup(csView);
-      this.lastContactShadowView = csView;
-    }
+    const bindGroup = useSecondaryBindGroup
+      ? this.secondaryLightBindGroup
+      : this.directionalLightBindGroup;
 
     const render = Render.getInstance();
 
@@ -562,7 +569,7 @@ export class DirectionalLightComponent extends Component {
     // 3. Set bind groups
     pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
     pass.setBindGroup(1, gBufferBindGroup);
-    pass.setBindGroup(2, this.directionalLightBindGroup);
+    pass.setBindGroup(2, bindGroup);
 
     // 4. Draw the mesh
     this.fullscreenQuadMesh.renderGroup(pass);
