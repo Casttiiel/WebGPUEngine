@@ -56,7 +56,20 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let z01     = viewZToFroxelZLog(viewZ, froxelParams.nearPlane, froxelParams.farPlane);
   // ±0.5 froxel dither — spans exactly one slice at any depth
   let fzScene = z01 * dimsF.z;
-  let fz      = clamp(fzScene + dither, 0.0, fzScene);  // never exceed scene depth
+
+  // Cap the Z lookup to floor(fzScene): the last froxel slice whose texel
+  // centre sits strictly in front of the GBuffer surface.
+  //
+  // Why floor and not fzScene directly?
+  //   textureSampleLevel maps fz → uvw.z = (fz + 0.5) / numSlices.
+  //   Trilinear then blends between floor(uvw.z * N - 0.5) and ceil() texels.
+  //   When fz = K (integer), uvw.z lands exactly on texel K's centre → zero
+  //   blending with texel K+1 (the wall slice).
+  //   When fz = K + ε, the GPU starts pulling in texel K+1 → leak.
+  //   Capping at floor(fzScene) ensures fz ≤ K so the ceil texel is always
+  //   K or less — never the slice that straddles the geometry boundary.
+  let fzMax = floor(fzScene);
+  let fz    = clamp(fzScene + dither, 0.0, fzMax);  // never reach the wall slice
 
   // Dither XY
   let ditherX = dither * 0.5;
