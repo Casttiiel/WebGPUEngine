@@ -719,10 +719,7 @@ export class DeferredRenderer {
       .getObjectManagerByName('directional_light')
       ?.getList() ?? []) {
       const directionalLightComponent = comp as DirectionalLightComponent;
-      directionalLightComponent.render(
-        this.rtAccLight.getView(),
-        this.gBufferWithAOBindGroup!,
-      );
+      directionalLightComponent.render(this.rtAccLight.getView(), this.gBufferWithAOBindGroup!);
     }
 
     // Propagate extended G-Buffer+AO bind group to shadow lighting passes.

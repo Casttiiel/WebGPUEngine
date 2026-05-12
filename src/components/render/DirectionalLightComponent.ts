@@ -148,7 +148,9 @@ export class DirectionalLightComponent extends Component {
     this.secondaryLightBindGroup = this.directionalLightBindGroup;
 
     // Cache the layout so setContactShadowView() doesn't call getPipeline() every time.
-    this._lightBindGroupLayout = this.directionalLightTechnique.getPipeline().getBindGroupLayout(2)!;
+    this._lightBindGroupLayout = this.directionalLightTechnique
+      .getPipeline()
+      .getBindGroupLayout(2)!;
 
     // Track the initial contact shadow view so the first real view triggers a rebuild
     this.lastContactShadowView = this.contactShadowFallbackView;
