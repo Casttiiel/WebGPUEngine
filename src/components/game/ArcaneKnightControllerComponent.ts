@@ -10,6 +10,7 @@ import type { ArcaneKnightControllerComponentDataType } from '../../types/Arcane
 
 import { CombatSystem } from './combat/CombatSystem';
 import { MantleSystem } from './movement/MantleSystem';
+import { VaultSystem } from './movement/VaultSystem';
 import { MovementSystem } from './movement/MovementSystem';
 import { JumpSystem } from './movement/JumpSystem';
 import { SwingSystem } from './movement/SwingSystem';
@@ -51,6 +52,7 @@ export class ArcaneKnightControllerComponent
 
   private combatSystem!: CombatSystem;
   private mantleSystem!: MantleSystem;
+  private vaultSystem!: VaultSystem;
   private movementSystem!: MovementSystem;
   private jumpSystem!: JumpSystem;
   private swingSystem!: SwingSystem;
@@ -74,6 +76,7 @@ export class ArcaneKnightControllerComponent
     // 2. Sistemas
     this.combatSystem = new CombatSystem(data);
     this.mantleSystem = new MantleSystem(this, data);
+    this.vaultSystem = new VaultSystem(this);
     this.movementSystem = new MovementSystem(
       this,
       null,
@@ -105,12 +108,18 @@ export class ArcaneKnightControllerComponent
 
     this.updateGroundedState();
     this.mantleSystem.update();
+    this.vaultSystem.update();
     this.grappleSystem.tickRecharge(deltaTime);
 
     switch (this.movementState) {
       case CharacterMovementState.MANTLING:
         const mantleMovement = this.mantleSystem.updateMantleDirection();
         this.applyMovement(mantleMovement, deltaTime);
+        break;
+
+      case CharacterMovementState.VAULTING:
+        const vaultMovement = this.vaultSystem.updateVaultMovement();
+        this.applyMovement(vaultMovement, deltaTime);
         break;
 
       case CharacterMovementState.GRAPPLING: {
@@ -160,13 +169,21 @@ export class ArcaneKnightControllerComponent
     this.isActive = active;
   }
 
-  public getIsMantling(): boolean {
+  public override getIsMantling(): boolean {
     return this.movementState === CharacterMovementState.MANTLING;
   }
 
   public setIsMantling(value: boolean): void {
     if (value) this.grappleSystem?.cancel();
     this.movementState = value ? CharacterMovementState.MANTLING : CharacterMovementState.IDLE;
+  }
+
+  public getIsVaulting(): boolean {
+    return this.movementState === CharacterMovementState.VAULTING;
+  }
+  public setIsVaulting(value: boolean): void {
+    if (value) this.grappleSystem?.cancel();
+    this.movementState = value ? CharacterMovementState.VAULTING : CharacterMovementState.IDLE;
   }
 
   public setIsJumping(value: boolean): void {

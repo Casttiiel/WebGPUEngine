@@ -12,6 +12,9 @@ export enum CharacterMovementState {
   /** Trepando un obstáculo (mantling) */
   MANTLING = 'mantling',
 
+  /** Saltando por encima de un obstáculo bajo (vault) */
+  VAULTING = 'vaulting',
+
   /** Columpiándose en una barra */
   SWINGING = 'swinging',
 

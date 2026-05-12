@@ -33,7 +33,7 @@
       "groundAcceleration": 65,
       "groundDeceleration": 65,
       "airDrag": 0.3,
-      "jumpHeight": 1.2,
+      "jumpHeight": 1,
       "jumpTimeToPeak": 0.35,
       "jumpTimeToDescent": 0.3,
       "jumpCutFactor": 0.7,

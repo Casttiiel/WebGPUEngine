@@ -261,6 +261,14 @@ export class ParkourControllerComponent
     this.movementState = value ? CharacterMovementState.MANTLING : CharacterMovementState.IDLE;
   }
 
+  // ParkourController no usa vault pero debe satisfacer la interfaz
+  public getIsVaulting(): boolean {
+    return this.movementState === CharacterMovementState.VAULTING;
+  }
+  public setIsVaulting(value: boolean): void {
+    this.movementState = value ? CharacterMovementState.VAULTING : CharacterMovementState.IDLE;
+  }
+
   public getIsSwinging(): boolean {
     return this.movementState === CharacterMovementState.SWINGING;
   }

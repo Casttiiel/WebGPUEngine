@@ -53,6 +53,11 @@ export class ModuleEnvironmentManager extends Module {
   // Cloud parameters (sky-only, exposed via renderInMenu)
   public cloudThickness: number = 3.2;
   public cloudDistanceFade: number = 0.15;
+  public cloudCoverage: number = 0.0; // 0=sparse (default), 1=overcast
+  public cloudScale: number = 1.0; // >1 = bigger clouds
+  public cloudLayers: number = 4; // FBM octave count [1..8]
+  public cloudOpacity: number = 1.0; // max cloud opacity
+  public cloudColor: [number, number, number] = [1, 1, 1]; // normalized 0-1 (white = no tint)
 
   // Generador de irradiance
   private irradianceGenerator: IrradianceGenerator | null = null;
@@ -682,8 +687,13 @@ export class ModuleEnvironmentManager extends Module {
 
     // ── Cloud controls (procedural skybox only) ──
     if (this.skyboxType === 'procedural') {
+      folder.add(this, 'cloudCoverage', 0.0, 1.0).name('Cloud Coverage').listen();
       folder.add(this, 'cloudThickness', 0.0, 8.0).name('Cloud Thickness').listen();
+      folder.add(this, 'cloudScale', 0.1, 5.0).name('Cloud Size').listen();
+      folder.add(this, 'cloudLayers', 1, 8).step(1).name('Cloud Layers').listen();
+      folder.add(this, 'cloudOpacity', 0.0, 1.0).name('Cloud Opacity').listen();
       folder.add(this, 'cloudDistanceFade', 0.01, 0.5).name('Cloud Horizon Fade').listen();
+      folder.addColor(this, 'cloudColor').name('Cloud Color').listen();
     }
 
     // ── Wind (affects clouds + volumetric fog) ──

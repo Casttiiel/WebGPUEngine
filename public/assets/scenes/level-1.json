@@ -29,21 +29,13 @@
     }
   },
   {
-    "components": {
-      "name": "DaggerManager",
-      "transform": { "position": [0, 0, 0] },
-      "bullet_pool": {
-        "prefab": "gameplay/dagger.prefab",
-        "size": 6,
-        "projectileType": "dagger_projectile"
-      }
-    }
-  },
-  {
     "prefab": "cameras/debug_camera.prefab"
   },
   {
     "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "prefab": "primitives/ground.prefab"
   },
   {
     "prefab": "gameplay/grapple_hook_target.prefab",
@@ -54,9 +46,7 @@
       }
     }
   },
-  {
-    "prefab": "primitives/ground.prefab"
-  },
+
   {
     "prefab": "gameplay/impulse_pad_15.prefab",
     "components": {

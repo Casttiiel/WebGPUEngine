@@ -74,13 +74,19 @@ export class Skybox {
    *   f32   cloudThickness    offset 24, size  4
    *   f32   cloudDistanceFade offset 28, size  4  → 32 bytes
    *   f32   windOffset        offset 32, size  4
-   *   (12 bytes padding)                          → 48 bytes (align to 16)
+   *   f32   cloudScale        offset 36, size  4
+   *   f32   cloudCoverage     offset 40, size  4
+   *   f32   cloudOpacity      offset 44, size  4  → 48 bytes
+   *   f32   cloudLayers       offset 48, size  4
+   *   f32   cloudColorR       offset 52, size  4
+   *   f32   cloudColorG       offset 56, size  4
+   *   f32   cloudColorB       offset 60, size  4  → 64 bytes
    */
   private createProceduralBindGroup(): void {
     // Create uniform buffer for procedural skybox parameters
     this.proceduralUniformBuffer = GPUUtils.createBuffer(
       'skybox_procedural_uniforms',
-      48, // 12 floats × 4 bytes, rounded up to struct alignment 16
+      64, // 16 floats × 4 bytes
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
@@ -121,7 +127,7 @@ export class Skybox {
     const windDirZ = Wind.getDirZ();
 
     // WGSL struct layout (see createProceduralBindGroup for byte map):
-    const uniformData = new Float32Array(12); // 48 bytes
+    const uniformData = new Float32Array(16); // 64 bytes
     uniformData[0] = sunDir[0]; // sunDirection.x  | byte  0
     uniformData[1] = sunDir[1]; // sunDirection.y  | byte  4
     uniformData[2] = sunDir[2]; // sunDirection.z  | byte  8
@@ -129,9 +135,15 @@ export class Skybox {
     uniformData[4] = windDirX; // windDirection.x | byte 16
     uniformData[5] = windDirZ; // windDirection.y | byte 20
     uniformData[6] = envManager.cloudThickness; // cloudThickness  | byte 24
-    uniformData[7] = envManager.cloudDistanceFade; // distanceFade    | byte 28
+    uniformData[7] = envManager.cloudDistanceFade; // distanceFade  | byte 28
     uniformData[8] = this.windOffset; // windOffset      | byte 32
-    // [9..11] = 0 padding                                                  | bytes 36-47
+    uniformData[9] = envManager.cloudScale; // cloudScale      | byte 36
+    uniformData[10] = envManager.cloudCoverage; // cloudCoverage  | byte 40
+    uniformData[11] = envManager.cloudOpacity; // cloudOpacity    | byte 44
+    uniformData[12] = envManager.cloudLayers; // cloudLayers     | byte 48
+    uniformData[13] = envManager.cloudColor[0]; // cloudColorR | byte 52
+    uniformData[14] = envManager.cloudColor[1]; // cloudColorG | byte 56
+    uniformData[15] = envManager.cloudColor[2]; // cloudColorB | byte 60
 
     device.queue.writeBuffer(this.proceduralUniformBuffer, 0, uniformData);
   }

@@ -12,6 +12,8 @@ export interface IMantleController {
   getIsGrounded(): boolean;
   getIsMantling(): boolean;
   setIsMantling(value: boolean): void;
+  getIsVaulting(): boolean;
+  setIsVaulting(value: boolean): void;
   getCurrentSpeed(): number;
   getHorizontalVelocity(): vec3;
   setHorizontalVelocity(v: vec3): void;

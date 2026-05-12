@@ -9,7 +9,13 @@ struct SkyboxProceduralUniforms {
   cloudThickness: f32,        // Cloud density multiplier     | offset 24
   cloudDistanceFade: f32,     // Elevation at which clouds fully appear | offset 28
   windOffset: f32,            // Accumulated wind displacement | offset 32
-  // implicit padding to 48 bytes (struct align 16)
+  cloudScale: f32,            // Cloud size (1=default, >1=bigger clouds) | offset 36
+  cloudCoverage: f32,         // Cloud coverage [0=sparse, 1=overcast]  | offset 40
+  cloudOpacity: f32,          // Max cloud opacity [0..1]               | offset 44
+  cloudLayers: f32,           // FBM octave count [1..8]                | offset 48
+  cloudColorR: f32,           // Cloud tint red   [0..1]                | offset 52
+  cloudColorG: f32,           // Cloud tint green [0..1]                | offset 56
+  cloudColorB: f32,           // Cloud tint blue  [0..1]                | offset 60 → 64 bytes
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -129,7 +135,7 @@ fn render_moon(view_dir: vec3<f32>, moon_dir: vec3<f32>, night_factor: f32) -> v
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cloud rendering (FBM value noise, top-down UV projection)
+// Cloud rendering — double domain-warped FBM + edge-lit density shading
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn hash12(p: vec2<f32>) -> f32 {
@@ -141,28 +147,49 @@ fn hash12(p: vec2<f32>) -> f32 {
 fn value_noise(p: vec2<f32>) -> f32 {
     let i = floor(p);
     let f = fract(p);
-    let u = f * f * (3.0 - 2.0 * f); // Smoothstep
-    let a = hash12(i);
-    let b = hash12(i + vec2f(1.0, 0.0));
-    let c = hash12(i + vec2f(0.0, 1.0));
-    let d = hash12(i + vec2f(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    let u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash12(i), hash12(i + vec2f(1.0, 0.0)), u.x),
+        mix(hash12(i + vec2f(0.0, 1.0)), hash12(i + vec2f(1.0, 1.0)), u.x),
+        u.y
+    );
 }
 
-fn fbm_clouds(p: vec2<f32>) -> f32 {
-    var value = 0.0;
-    var amplitude = 0.5;
+// Cheap 2-octave FBM for domain warp passes (fixed cost)
+fn fbm2(p: vec2<f32>) -> f32 {
+    return value_noise(p) * 0.5 + value_noise(p * 2.1) * 0.25;
+}
+
+// FBM with variable octave count
+fn fbm_n(p: vec2<f32>, octaves: i32) -> f32 {
+    var v = 0.0;
+    var amp = 0.5;
     var freq = 1.0;
-    for (var i = 0; i < 4; i++) {
-        value += amplitude * value_noise(p * freq);
-        amplitude *= 0.5;
-        freq *= 2.1; // Slightly off 2.0 to prevent tiling artefacts
+    for (var i = 0; i < octaves; i++) {
+        v += amp * value_noise(p * freq);
+        amp  *= 0.5;
+        freq *= 2.1;
     }
-    return value;
+    return v;
+}
+
+// Double domain warping: two chained UV perturbation passes.
+// Pass 1 stretches noise into large organic masses.
+// Pass 2 adds medium-scale turbulence that breaks up any regularity.
+// Result: highly irregular, non-repeating cloud shapes without circular Worley blobs.
+fn cloud_density_at(uv: vec2<f32>, octaves: i32) -> f32 {
+    let w1 = vec2f(fbm2(uv + vec2f(1.7, 9.2)),
+                   fbm2(uv + vec2f(8.3, 2.8))) * 1.4;
+    let p1 = uv + w1;
+
+    let w2 = vec2f(fbm2(p1 + vec2f(3.1, 5.4)),
+                   fbm2(p1 + vec2f(7.2, 1.6))) * 0.6;
+    let p2 = p1 + w2;
+
+    return fbm_n(p2, octaves);
 }
 
 // Composites procedural clouds onto an existing sky color.
-// Stars and moon should already be in sky_color so clouds can correctly occlude them.
 fn render_clouds(
     world_dir: vec3<f32>,
     sun_dir: vec3<f32>,
@@ -170,42 +197,52 @@ fn render_clouds(
     night_factor: f32,
     sun_height: f32,
 ) -> vec3<f32> {
-    // Only draw clouds in the upper hemisphere
     if (world_dir.y <= 0.001) {
         return sky_color;
     }
 
-    // Top-down planar UV projection: maps hemisphere → flat plane.
-    // Scale of 2.0 gives ~3 distinct cloud masses from zenith to 45°.
-    // Seed offset breaks the hash12(0,0)=0 degeneracy so zenith always has clouds.
+    // Planar UV. cloudScale >1 → bigger/fewer clouds (lower UV frequency)
     var uv = world_dir.xz / world_dir.y;
     uv += u_procedural.windDirection * u_procedural.windOffset;
-    uv = uv * 2.0 + vec2f(47.3, 31.7);
+    uv = uv * (1.5 / max(u_procedural.cloudScale, 0.01)) + vec2f(47.3, 31.7);
 
-    // Shape: subtract threshold so noise forms distinct cloud masses
-    let raw = fbm_clouds(uv);
-    let cloud_density = saturate((raw - 0.42) * u_procedural.cloudThickness);
+    let octaves = i32(clamp(u_procedural.cloudLayers, 1.0, 8.0));
 
-    // Fade out near horizon to hide UV singularity stretching
-    let horizon_fade = smoothstep(0.0, u_procedural.cloudDistanceFade, world_dir.y);
+    // Coverage: 0=sparse, 1=overcast
+    let threshold     = 0.50 * (1.0 - clamp(u_procedural.cloudCoverage, 0.0, 1.0));
+    let raw           = cloud_density_at(uv, octaves);
+    let cloud_density = saturate((raw - threshold) * u_procedural.cloudThickness);
+
+    // Horizon fade to hide UV singularity stretching near equator
+    let horizon_fade  = smoothstep(0.0, u_procedural.cloudDistanceFade, world_dir.y);
     let final_density = cloud_density * horizon_fade;
 
     if (final_density < 0.001) {
         return sky_color;
     }
 
-    // Base cloud color — bright white day / dark blue night
-    let cloud_day   = vec3f(0.93, 0.95, 0.97);
+    // Edge-lit density shading:
+    // Low density (cloud edges) → fully lit bright white.
+    // High density (cloud interior) → darker, simulates light attenuation through thickness.
+    let cloud_day   = vec3f(0.96, 0.97, 1.00);
     let cloud_night = vec3f(0.03, 0.04, 0.09);
-    var cloud_color = mix(cloud_night, cloud_day, 1.0 - night_factor);
+    var cloud_lit   = mix(cloud_night, cloud_day, 1.0 - night_factor);
 
-    // Sunset tint: orange-red when sun is near horizon and clouds align toward sun
+    let interior     = final_density * final_density;
+    let shadow_color = cloud_lit * vec3f(0.45, 0.48, 0.58);
+    var cloud_color  = mix(cloud_lit, shadow_color, interior * 0.70);
+
+    // Sunset tint on sun-facing clouds
+    let cos_to_sun    = dot(normalize(world_dir), sun_dir);
     let sunset_window = smoothstep(-0.3, 0.1, sun_height) * smoothstep(0.3, -0.1, sun_height);
-    let cos_to_sun    = dot(world_dir, sun_dir);
     let sunset_cloud  = saturate(sunset_window * max(0.0, cos_to_sun));
     cloud_color = mix(cloud_color, SUNSET_ORANGE * 0.75, sunset_cloud);
 
-    return mix(sky_color, cloud_color, final_density);
+    // User color tint (0-1, white = no tint, dark gray = storm/rain)
+    let cloud_tint = vec3f(u_procedural.cloudColorR, u_procedural.cloudColorG, u_procedural.cloudColorB);
+    cloud_color = cloud_color * cloud_tint;
+
+    return mix(sky_color, cloud_color, final_density * clamp(u_procedural.cloudOpacity, 0.0, 1.0));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

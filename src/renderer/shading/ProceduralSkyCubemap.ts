@@ -112,10 +112,10 @@ export class ProceduralSkyCubemap {
       mipLevelCount: MIP_COUNT,
     });
 
-    // Procedural params uniform buffer (layout identical to Skybox: 48 bytes / 12 floats)
+    // Procedural params uniform buffer (layout identical to Skybox: 64 bytes / 16 floats)
     this.proceduralUniformBuffer = GPUUtils.createBuffer(
       'sky_cubemap_procedural_uniforms',
-      48,
+      64,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
@@ -194,7 +194,7 @@ export class ProceduralSkyCubemap {
     const windRad = (Wind.dirAngle * Math.PI) / 180.0;
 
     // Layout mirrors SkyboxProceduralUniforms in skybox_scattering.fs
-    const data = new Float32Array(12); // 48 bytes
+    const data = new Float32Array(16); // 64 bytes
     data[0] = sunDir[0];
     data[1] = sunDir[1];
     data[2] = sunDir[2];
@@ -204,7 +204,13 @@ export class ProceduralSkyCubemap {
     data[6] = envManager.cloudThickness;
     data[7] = envManager.cloudDistanceFade;
     data[8] = this.windOffset;
-    // [9..11] = padding (already zero)
+    data[9] = envManager.cloudScale;
+    data[10] = envManager.cloudCoverage;
+    data[11] = envManager.cloudOpacity;
+    data[12] = envManager.cloudLayers;
+    data[13] = envManager.cloudColor[0];
+    data[14] = envManager.cloudColor[1];
+    data[15] = envManager.cloudColor[2];
     device.queue.writeBuffer(this.proceduralUniformBuffer, 0, data);
   }
 
