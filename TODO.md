@@ -14,10 +14,10 @@
 
 ## Gameplay
 
-1. Dash
-2. Blood
-3. Dagas (Sin UI) (Rafaga)
-4. Jump/Mantle (Scale of floor/building)
+1. Blood
+2. Dagas (Sin UI) (Rafaga)
+3. Dash/Charge
+4. Jump/Mantle
 5. Vault
 6. Impulse Pad
 7. Swingbar

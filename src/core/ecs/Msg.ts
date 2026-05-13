@@ -62,6 +62,22 @@ export interface TMsgStaminaRestored {
   // Sin payload adicional.
 }
 
+/** Emitido por BloodComponent cuando se gasta sangre. */
+export interface TMsgBloodSpent {
+  amount: number; // Cantidad gastada
+  current: number; // Sangre restante
+}
+
+/** Emitido por BloodComponent cuando la sangre llega a 0. */
+export interface TMsgBloodDepleted {
+  // Sin payload adicional.
+}
+
+/** Emitido por BloodComponent cuando la sangre vuelve al máximo. */
+export interface TMsgBloodRestored {
+  // Sin payload adicional.
+}
+
 export interface TMsgEntityCreated {
   // Sin payload adicional — la propia entidad receptora es la creada.
 }
@@ -119,6 +135,15 @@ export const Msg = {
   },
   staminaRestored(): IMsg<TMsgStaminaRestored> {
     return { type: MsgType.STAMINA_RESTORED, payload: {} };
+  },
+  bloodSpent(payload: TMsgBloodSpent): IMsg<TMsgBloodSpent> {
+    return { type: MsgType.BLOOD_SPENT, payload };
+  },
+  bloodDepleted(): IMsg<TMsgBloodDepleted> {
+    return { type: MsgType.BLOOD_DEPLETED, payload: {} };
+  },
+  bloodRestored(): IMsg<TMsgBloodRestored> {
+    return { type: MsgType.BLOOD_RESTORED, payload: {} };
   },
   entityCreated(): IMsg<TMsgEntityCreated> {
     return { type: MsgType.ENTITY_CREATED, payload: {} };

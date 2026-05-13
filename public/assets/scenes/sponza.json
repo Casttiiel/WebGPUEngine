@@ -12,7 +12,7 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/knight_character.prefab"
+    "prefab": "characters/bloodmancer_character.prefab"
   },
   {
     "components": {
@@ -21,6 +21,17 @@
       "bullet_pool": {
         "prefab": "gameplay/bullet.prefab",
         "size": 30
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "DaggerManager",
+      "transform": { "position": [0, 0, 0] },
+      "bullet_pool": {
+        "prefab": "gameplay/dagger.prefab",
+        "size": 15,
+        "projectileType": "dagger_projectile"
       }
     }
   },

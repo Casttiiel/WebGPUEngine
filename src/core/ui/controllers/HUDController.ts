@@ -65,10 +65,6 @@ export class HUDController extends WidgetController {
       const newW = Math.max(0, ratio * this.staminaBarMaxWidth);
       this.staminaBar.setSize(newW, this.staminaBar.getHeight());
     }
-
-    this.updateGrappleCharges();
-    this.updateTargetIndicator();
-    this.updateCrosshair();
   }
 
   private resolveWidgets(): void {
@@ -179,52 +175,6 @@ export class HUDController extends WidgetController {
         fill.setColor(0.35, 0.37, 0.45, 0.8);
         fill.setSize(fillW, fill.getHeight());
       }
-    }
-  }
-
-  // ── Grapple target indicator ─────────────────────────────────────
-
-  private updateTargetIndicator(): void {
-    if (!this.targetIndicator || !this.grappleController) return;
-
-    const target = this.grappleController.getPendingGrappleTarget();
-    if (!target) {
-      this.targetIndicator.setVisible(false);
-      return;
-    }
-
-    // NDC pre-computado en GrappleSystem con la misma camara y mismo frame.
-    const { ndcX, ndcY } = target;
-
-    // NDC -> physical pixels (con offset de letterbox), luego coordenadas de referencia.
-    const [canvasOffX, canvasOffY] = UIRenderUtils.getCanvasOffset();
-    const gs = UIRenderUtils.getGlobalScale();
-    const physX = canvasOffX + (ndcX * 0.5 + 0.5) * 1920 * gs;
-    const physY = canvasOffY + (1.0 - (ndcY * 0.5 + 0.5)) * 1080 * gs;
-
-    // anchor top-left: originX = 0 + refX * gs  =>  refX = physX / gs
-    // pivotX=0.5: centro del widget en (refX+12), restamos 12 para centrarlo.
-    const refX = physX / gs;
-    const refY = physY / gs;
-    this.targetIndicator.setPosition(refX - 12, refY - 12);
-    this.targetIndicator.setVisible(true);
-
-    // Colour by type
-    switch (target.type) {
-      case GrappleTargetType.LEDGE:
-        this.targetIndicator.setColor(1.0, 1.0, 1.0, 0.9);
-        break;
-      case GrappleTargetType.CORNER:
-        this.targetIndicator.setColor(0.3, 0.9, 1.0, 0.9);
-        break;
-      case GrappleTargetType.RING:
-        this.targetIndicator.setColor(1.0, 0.8, 0.2, 0.9);
-        break;
-      case GrappleTargetType.PUNCTUAL:
-        this.targetIndicator.setColor(1.0, 0.6, 0.0, 0.9);
-        break;
-      default:
-        this.targetIndicator.setColor(1.0, 1.0, 1.0, 0.9);
     }
   }
 

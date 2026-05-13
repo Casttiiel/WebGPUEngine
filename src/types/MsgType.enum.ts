@@ -25,7 +25,10 @@ export enum MsgType {
   STAMINA_SPENT = 'stamina_spent', // Se gastó stamina (emitido por StaminaComponent)
   STAMINA_DEPLETED = 'stamina_depleted', // Stamina llegó a 0 (emitido por StaminaComponent)
   STAMINA_RESTORED = 'stamina_restored', // Stamina volvió al máximo (emitido por StaminaComponent)
-
+  // ── Blood (salida) ──────────────────────────────────────────────────
+  BLOOD_SPENT = 'blood_spent', // Se gastó sangre (emitido por BloodComponent)
+  BLOOD_DEPLETED = 'blood_depleted', // Sangre llegó a 0 (emitido por BloodComponent)
+  BLOOD_RESTORED = 'blood_restored', // Sangre volvió al máximo (emitido por BloodComponent)
   // ── Ciclo de vida ──────────────────────────────────────────────────
   ENTITY_CREATED = 'entity_created', // Entidad recién creada y lista
 }

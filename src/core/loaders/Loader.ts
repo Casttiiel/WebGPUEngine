@@ -57,6 +57,7 @@ import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { ArcaneKnightControllerComponent } from '../../components/game/ArcaneKnightControllerComponent';
+import { BloodmancerControllerComponent } from '../../components/game/BloodmancerControllerComponent';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
@@ -68,6 +69,7 @@ import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { HealthComponent } from '../../components/game/HealthComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
+import { BloodComponent } from '../../components/game/BloodComponent';
 import { SkinnedMeshComponent } from '../../components/render/SkinnedMeshComponent';
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
 import { ViewModelMeshComponent } from '../../components/render/ViewModelMeshComponent';
@@ -340,6 +342,8 @@ export class Loader {
         return new ParkourControllerComponent();
       case 'arcane_knight_controller':
         return new ArcaneKnightControllerComponent();
+      case 'bloodmancer_controller':
+        return new BloodmancerControllerComponent();
       case 'camera_arm':
         return new CameraArmComponent();
       case 'fps_camera_controller':
@@ -406,6 +410,8 @@ export class Loader {
         return new HealthComponent();
       case 'stamina':
         return new StaminaComponent();
+      case 'blood':
+        return new BloodComponent();
       case 'view_model':
         return new ViewModelComponent();
       case 'view_model_mesh':
