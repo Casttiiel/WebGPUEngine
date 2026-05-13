@@ -1,15 +1,16 @@
 ### Engine
 
-1. Grass + Physics Grass
-2. Trees Generator
-3. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-4. Water Shader Reflections + Better Foam
-5. Virtual Textures / Texture Streaming. Sin streaming, escenas grandes explotan en VRAM.
-6. Procedural materials
-7. Mesh LOD (also on terrain?)
-8. Editor Camera (Render Debug / Gizmo / Menu)
-9. Asset Spawn + Delete
-10. Enemy AI / NavMesh
+1. Grass (eliminar grass mesh builder)
+2. Fix Contact Shadows
+3. Trees Generator
+4. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+5. Water Shader Reflections + Better Foam
+6. Virtual Textures / Texture Streaming. Sin streaming, escenas grandes explotan en VRAM.
+7. Procedural materials
+8. Mesh LOD (also on terrain?)
+9. Editor Camera (Render Debug / Gizmo / Menu)
+10. Asset Spawn + Delete
+11. Enemy AI / NavMesh
     (pensar en epipolar shadow map sampling)
 
 ## Gameplay

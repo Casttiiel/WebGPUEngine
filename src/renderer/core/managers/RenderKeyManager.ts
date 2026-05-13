@@ -4,6 +4,7 @@ import { Camera } from '../../../core/math/Camera';
 import { RenderCategory } from '../../../types/RenderCategory.enum';
 import { Material } from '../../resources/Material';
 import { Mesh } from '../../resources/Mesh';
+import { Technique } from '../../resources/Technique';
 import { vec3 } from 'gl-matrix';
 import { AABB } from '../../../types/AABB';
 
@@ -20,6 +21,10 @@ export interface RenderKey {
   indirectDrawBuffer?: GPUBuffer | undefined; // Optional indirect draw buffer for GPU-driven rendering
   indirectDrawOffset: number; // Byte offset into indirectDrawBuffer (0 for dedicated per-key buffers)
   shadowIndirectOffset: number; // Byte offset into the per-dispatch shadow indirect buffer (-1 = not GPU shadow culled)
+  /** Skip this key in the depth prepass (for vertex-animated geometry like wind grass). */
+  skipDepthPrepass?: boolean;
+  /** Override technique used only during the depth prepass for this key. */
+  customPrepassTechnique?: Technique;
   id: number;
 }
 
@@ -43,6 +48,8 @@ export class RenderKeyManager {
     instanceBindGroup?: GPUBindGroup,
     renderBindGroup?: GPUBindGroup,
     indirectDrawBuffer?: GPUBuffer,
+    skipDepthPrepass?: boolean,
+    customPrepassTechnique?: Technique,
   ): void {
     if (!material) {
       return;
@@ -60,6 +67,8 @@ export class RenderKeyManager {
       indirectDrawBuffer,
       indirectDrawOffset: 0,
       shadowIndirectOffset: -1,
+      ...(skipDepthPrepass !== undefined && { skipDepthPrepass }),
+      ...(customPrepassTechnique !== undefined && { customPrepassTechnique }),
       id: this.nextObjectId++,
     };
 

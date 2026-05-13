@@ -96,7 +96,19 @@ export class RenderComponent extends Component {
 
     for (const part of this.parts) {
       if (!part.isVisible || !this._isVisible) continue;
-      renderManager.addKey(this, part.mesh, part.material, transformComponent);
+      const skipPrepass = part.material.getTechnique()?.getSkipDepthPrepass() ?? false;
+      renderManager.addKey(
+        this,
+        part.mesh,
+        part.material,
+        transformComponent,
+        false,
+        1,
+        undefined,
+        undefined,
+        undefined,
+        skipPrepass || undefined,
+      );
     }
   }
 

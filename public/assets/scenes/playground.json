@@ -114,5 +114,14 @@
         ]
       }
     }
+  },
+  {
+    "prefab": "props/grass_blade.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 0, 3],
+        "scale": [1.0, 1.0, 1.0]
+      }
+    }
   }
 ]

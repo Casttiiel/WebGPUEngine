@@ -1,0 +1,8 @@
+{
+  "technique": "grass/grass_blade_mask.tech",
+  "category": "solids",
+  "casts_shadows": false,
+  "textures": {
+    "txAlbedo": "blood.png"
+  }
+}

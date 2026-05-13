@@ -94,9 +94,6 @@ export class GrassVolumeComponent extends Component {
   private grassMaterial: Material | null = null;
   private renderComponent: RenderComponent | null = null;
 
-  // ── Instance count (resolved in buildInstances) ────────────────────────────
-  private instanceCount = 0;
-
   // ---------------------------------------------------------------------------
   // Component lifecycle
   // ---------------------------------------------------------------------------
@@ -152,7 +149,6 @@ export class GrassVolumeComponent extends Component {
     // Compute instance count
     const area = this.width * this.depth;
     const count = Math.max(1, Math.min(Math.floor(area * this.density), this.maxInstances));
-    this.instanceCount = count;
 
     // ── Build CPU-side instance data ─────────────────────────────────────────
     const instanceData = new Float32Array(count * FLOATS_PER_INSTANCE);

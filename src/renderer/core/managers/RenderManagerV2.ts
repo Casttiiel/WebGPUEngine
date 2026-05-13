@@ -132,6 +132,8 @@ export class RenderManagerV2 {
     instanceBindGroup?: GPUBindGroup,
     renderBindGroup?: GPUBindGroup,
     indirectDrawBuffer?: GPUBuffer,
+    skipDepthPrepass?: boolean,
+    customPrepassTechnique?: Technique,
   ): void {
     this.keyManager.addKey(
       owner,
@@ -143,6 +145,8 @@ export class RenderManagerV2 {
       instanceBindGroup,
       renderBindGroup,
       indirectDrawBuffer,
+      skipDepthPrepass,
+      customPrepassTechnique,
     );
     if (material.getCastsShadows()) {
       this.keyManager.addKey(
@@ -532,35 +536,44 @@ export class RenderManagerV2 {
       // Select technique based on override and instancing
       let technique: Technique;
       if (this.techniqueOverride) {
-        // Use override technique for depth prepass, shadows, etc.
-        const origTechnique = key.material.getTechnique();
-        const origName = origTechnique?.getName() ?? '';
-        const isMasked = origName.includes('mask') || origName.includes('dither');
-        const isSkinned = origTechnique?.getIsSkinned() ?? false;
-
-        if (isSkinned && this.techniqueOverrideSkinned) {
-          // Skinned meshes get a dedicated override that applies joint transforms
-          technique = this.techniqueOverrideSkinned;
-        } else if (isSkinned) {
-          // No skinned override provided — skip to avoid GPU pipeline mismatch
-          continue;
-        } else if (isMasked && this.techniqueOverrideMask) {
-          if (key.isInstanced && this.techniqueOverrideMaskInstanced) {
-            technique = this.techniqueOverrideMaskInstanced;
-          } else if (key.isInstanced) {
-            // No instanced mask override — fall back to non-instanced mask
-            technique = this.techniqueOverrideMask;
-          } else {
-            technique = this.techniqueOverrideMask;
-          }
-        } else if (key.isInstanced && this.techniqueOverrideInstanced) {
-          technique = this.techniqueOverrideInstanced;
-        } else if (key.isInstanced) {
-          // No instanced override available, skip this object
-          console.warn('Instanced object skipped - no instanced technique override available');
+        // Key with a custom depth prepass technique — use it directly.
+        if (key.customPrepassTechnique) {
+          technique = key.customPrepassTechnique;
+        } else if (key.skipDepthPrepass) {
+          // Vertex-animated geometry (e.g. wind grass) — skip entirely so the
+          // static prepass depth doesn't fight the animated GBuffer positions.
           continue;
         } else {
-          technique = this.techniqueOverride;
+          // Use override technique for depth prepass, shadows, etc.
+          const origTechnique = key.material.getTechnique();
+          const origName = origTechnique?.getName() ?? '';
+          const isMasked = origName.includes('mask') || origName.includes('dither');
+          const isSkinned = origTechnique?.getIsSkinned() ?? false;
+
+          if (isSkinned && this.techniqueOverrideSkinned) {
+            // Skinned meshes get a dedicated override that applies joint transforms
+            technique = this.techniqueOverrideSkinned;
+          } else if (isSkinned) {
+            // No skinned override provided — skip to avoid GPU pipeline mismatch
+            continue;
+          } else if (isMasked && this.techniqueOverrideMask) {
+            if (key.isInstanced && this.techniqueOverrideMaskInstanced) {
+              technique = this.techniqueOverrideMaskInstanced;
+            } else if (key.isInstanced) {
+              // No instanced mask override — fall back to non-instanced mask
+              technique = this.techniqueOverrideMask;
+            } else {
+              technique = this.techniqueOverrideMask;
+            }
+          } else if (key.isInstanced && this.techniqueOverrideInstanced) {
+            technique = this.techniqueOverrideInstanced;
+          } else if (key.isInstanced) {
+            // No instanced override available, skip this object
+            console.warn('Instanced object skipped - no instanced technique override available');
+            continue;
+          } else {
+            technique = this.techniqueOverride;
+          }
         }
       } else {
         // Normal rendering - use material's technique

@@ -29,6 +29,8 @@ export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'
   materialSlots?: ReadonlyArray<TechniqueMaterialSlot>;
   /** When true, the pipeline uses the two-slot skinned vertex layout (adds joints/weights in slot 1). */
   skinned?: boolean;
+  /** Skip the depth prepass for this technique (use for vertex-animated geometry like grass wind). */
+  skipDepthPrepass?: boolean;
 }
 
 export type TechniqueOptions = TechniqueCreateOptions & IGPUResourceOptions;
@@ -60,6 +62,7 @@ export class Technique extends GPUResource {
   private fsEntryPoint: string;
   private readonly materialSlots: ReadonlyArray<TechniqueMaterialSlot> | undefined;
   private readonly isSkinned: boolean;
+  private readonly _skipDepthPrepass: boolean;
 
   constructor(options: TechniqueOptions) {
     super({
@@ -80,6 +83,7 @@ export class Technique extends GPUResource {
     this.vsEntryPoint = options.vsEntryPoint || 'vs';
     this.materialSlots = options.materialSlots;
     this.isSkinned = options.skinned ?? false;
+    this._skipDepthPrepass = options.skipDepthPrepass ?? false;
   }
 
   public static async getAsync(
@@ -148,6 +152,7 @@ export class Technique extends GPUResource {
       ...(techniqueData.materialSlots !== undefined
         ? { materialSlots: techniqueData.materialSlots }
         : {}),
+      ...(techniqueData.skipDepthPrepass ? { skipDepthPrepass: true } : {}),
     };
 
     // Add optional properties only if they exist
@@ -535,5 +540,10 @@ export class Technique extends GPUResource {
   /** Returns true if this technique uses the two-slot skinned vertex buffer layout. */
   public getIsSkinned(): boolean {
     return this.isSkinned;
+  }
+
+  /** Returns true if objects using this technique should be skipped in the depth prepass. */
+  public getSkipDepthPrepass(): boolean {
+    return this._skipDepthPrepass;
   }
 }

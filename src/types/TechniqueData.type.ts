@@ -37,4 +37,11 @@ export type TechniqueDataType = Readonly<{
   materialSlots?: ReadonlyArray<TechniqueMaterialSlot>;
   /** When true, the pipeline uses the two-slot skinned vertex buffer layout (pos/norm/uv/tan + joints/weights). */
   skinned?: boolean;
+  /**
+   * When true, objects using this technique are skipped during the depth prepass.
+   * Use for geometry that has vertex animation (wind, particles) so the static
+   * depth prepass doesn't write wrong depths that clash with GBuffer positions.
+   * The technique must use z="less_equal" so the GBuffer pass writes correct depth.
+   */
+  skipDepthPrepass?: boolean;
 }>;
