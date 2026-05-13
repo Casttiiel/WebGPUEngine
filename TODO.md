@@ -1,14 +1,13 @@
 ### Engine
 
-1. Froxel Volumetrict Scattering noise ugly + fog leaking
-2. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-3. Water Shader Reflections + Better Foam
-4. Virtual Textures / Texture Streaming. Sin streaming, escenas grandes explotan en VRAM.
-5. Procedural materials
-6. Mesh LOD
-7. Editor Camera (Render Debug / Gizmo / Menu)
-8. Asset Spawn + Delete
-9. Enemy AI / NavMesh
+1. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+2. Water Shader Reflections + Better Foam
+3. Virtual Textures / Texture Streaming. Sin streaming, escenas grandes explotan en VRAM.
+4. Procedural materials
+5. Mesh LOD
+6. Editor Camera (Render Debug / Gizmo / Menu)
+7. Asset Spawn + Delete
+8. Enemy AI / NavMesh
    (pensar en epipolar shadow map sampling)
 
 ## Gameplay

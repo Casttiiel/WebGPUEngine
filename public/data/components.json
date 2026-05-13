@@ -34,7 +34,9 @@
     "parkour_controller",
     "grapple_target",
     "skinned_mesh",
-    "view_model"
+    "view_model",
+    "terrain",
+    "terrain_chunk"
   ],
   "render_debug": []
 }

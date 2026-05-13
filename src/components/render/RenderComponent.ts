@@ -234,6 +234,11 @@ export class RenderComponent extends Component {
     }
   }
 
+  public override dispose(): void {
+    RenderManager.getInstance().delKeys(this);
+    this.parts = [];
+  }
+
   public renderDebug(): void {
     throw new Error('Method not implemented.');
   }

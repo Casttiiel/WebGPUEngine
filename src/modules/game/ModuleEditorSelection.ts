@@ -18,6 +18,7 @@ import { BoxColliderComponent } from '../../components/physics/BoxColliderCompon
 import { Material } from '../../renderer/resources/Material';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
+import { TerrainComponent } from '../../components/render/TerrainComponent';
 
 export class ModuleEditorSelection extends Module {
   private selectedEntity: Entity | null = null;
@@ -323,6 +324,16 @@ export class ModuleEditorSelection extends Module {
     // Cambiar modo de gizmo con Space si hay selección y no estamos arrastrando
     if (this.selectedEntity && !this.isDragging && input.isKeyJustPressed(KeyCode.SPACE)) {
       this.cycleGizmoMode();
+    }
+
+    // ── Terrain brush painting (Phase 8) ───────────────────────────────────
+    const terrainComp = this.selectedEntity?.getComponent('terrain') as TerrainComponent | null;
+    if (terrainComp?.brushActive && input.isMouseButtonPressed(MouseButton.LEFT)) {
+      this.applyTerrainBrushAtMouse(terrainComp);
+      // Skip normal selection/drag while painting
+      this.refreshMaterialInspector();
+      this.syncEntityProxies();
+      return;
     }
 
     // Click izquierdo para seleccionar o iniciar arrastre
@@ -1195,6 +1206,12 @@ export class ModuleEditorSelection extends Module {
       );
     }
 
+    // ── Terrain ────────────────────────────────────────────────────────────────
+    const terrain = entity.getComponent('terrain') as TerrainComponent | null;
+    if (terrain) {
+      terrain.addToEntityPanel(entityFolder);
+    }
+
     // ── Spot Light ─────────────────────────────────────────────────────────────
     if (sl && proxy.spotLightProxy) {
       const slp = proxy.spotLightProxy;
@@ -1271,6 +1288,38 @@ export class ModuleEditorSelection extends Module {
 
   public getHoveredEntity(): Entity | null {
     return this.hoveredEntity;
+  }
+
+  // ── Terrain brush ─────────────────────────────────────────────────────────
+
+  /**
+   * Casts a ray from the current mouse position into the scene and, if it
+   * hits a terrain chunk collider, calls terrain.applyBrush() at the hit point.
+   */
+  private applyTerrainBrushAtMouse(terrain: TerrainComponent): void {
+    const camera = this.getEditorCamera();
+    if (!camera) return;
+
+    const mousePos = Engine.getInput().getMousePosition();
+    const ray = this.screenToWorldRay(mousePos, camera);
+
+    const physics = Engine.getPhysics();
+    const result = physics.raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
+    if (!result) return;
+
+    // Only paint if we hit an entity that is a child of the terrain
+    const hitEntity = Engine.getEntities().getEntityById(result.entityId);
+    if (!hitEntity) return;
+    const parentEnt = hitEntity.getParent();
+    if (parentEnt?.getComponent('terrain') == null && hitEntity.getComponent('terrain') == null) {
+      return;
+    }
+
+    const toi = result.hit.timeOfImpact;
+    const hitX = (ray.origin[0] ?? 0) + (ray.direction[0] ?? 0) * toi;
+    const hitZ = (ray.origin[2] ?? 0) + (ray.direction[2] ?? 0) * toi;
+
+    terrain.applyBrush(hitX, hitZ);
   }
 
   // ==================== Probe helpers ====================
