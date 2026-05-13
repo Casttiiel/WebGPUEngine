@@ -19,7 +19,7 @@ import { BulletPoolComponent } from '../BulletPoolComponent';
 export class DaggerBurstSystem {
   private readonly burstCount: number;
   private readonly burstInterval: number; // seconds between shots within a burst
-  private readonly cooldown: number;      // seconds between bursts
+  private readonly cooldown: number; // seconds between bursts
   private readonly poolName: string;
 
   private cooldownTimer: number = 0;
