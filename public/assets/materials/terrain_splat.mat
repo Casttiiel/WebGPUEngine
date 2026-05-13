@@ -1,0 +1,15 @@
+{
+  "technique": "terrain/terrain_splat.tech",
+  "category": "solids",
+  "casts_shadows": false,
+  "uvXScale": 8,
+  "uvYScale": 8,
+  "textures": {
+    "txLayer0Alb": "Asphalt01_Color.png",
+    "txLayer0Nrm": "Asphalt01_Normal.png",
+    "txLayer1Alb": "Carbon01_Color.png",
+    "txLayer1Nrm": "no-normal.jpg",
+    "txLayer2Alb": "white.png",
+    "txLayer2Nrm": "no-normal.jpg"
+  }
+}

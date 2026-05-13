@@ -90,7 +90,7 @@
         "maxHeight": 20,
         "chunkSize": 64,
         "vertsPerSide": 33,
-        "material": "terrain_test.mat",
+        "material": "terrain_splat.mat",
         "noise": {
           "octaves": 6,
           "persistence": 0.5,

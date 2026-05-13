@@ -67,6 +67,74 @@ export class Texture extends GPUResource {
     }
   }
 
+  /**
+   * Creates a GPU texture directly from raw RGBA8 pixel data (Uint8Array).
+   * If a texture with `label` is already registered in the ResourceManager, its
+   * GPU data is updated in-place (no allocation overhead on rebuild).
+   * The texture is registered under `label` so Material.loadTexture() can find it.
+   *
+   * @param label      Unique identifier used as the resource path.
+   * @param width      Texture width in pixels.
+   * @param height     Texture height in pixels.
+   * @param data       RGBA8 pixel data, row-major, length must equal width * height * 4.
+   */
+  public static createFromPixelData(
+    label: string,
+    width: number,
+    height: number,
+    data: Uint8Array,
+  ): Texture {
+    // Reuse existing instance so the ResourceManager path stays stable.
+    try {
+      const existing = ResourceManager.getResource<Texture>(label);
+      existing.uploadPixelData(width, height, data);
+      return existing;
+    } catch {
+      // Not registered yet — create fresh.
+    }
+
+    const tex = new Texture({
+      path: label,
+      type: ResourceType.TEXTURE,
+      genMipmaps: false,
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    ResourceManager.registerResource(tex);
+    tex.uploadPixelData(width, height, data);
+    return tex;
+  }
+
+  /** Uploads raw RGBA8 pixels to the GPU texture, replacing any previous content. */
+  private uploadPixelData(width: number, height: number, data: Uint8Array): void {
+    // Destroy previous GPU texture to free VRAM before allocating a new one.
+    this.texture?.destroy();
+
+    this.texture = this.device.createTexture({
+      label: `${this.label}_texture`,
+      size: { width, height, depthOrArrayLayers: 1 },
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      mipLevelCount: 1,
+    });
+
+    this.device.queue.writeTexture(
+      { texture: this.texture },
+      data,
+      { bytesPerRow: width * 4, rowsPerImage: height },
+      { width, height, depthOrArrayLayers: 1 },
+    );
+
+    this.textureView = this.texture.createView({
+      label: `${this.label}_textureView`,
+      baseMipLevel: 0,
+      mipLevelCount: 1,
+    });
+
+    this.sampler = SamplerLibrary.anisotropic16x;
+    this.setHasData();
+  }
+
   public static async getAsync(path: string, isNormalMap = false): Promise<Texture> {
     // 1. Fully loaded and registered — return immediately.
     try {
