@@ -36,7 +36,8 @@
     "skinned_mesh",
     "view_model",
     "terrain",
-    "terrain_chunk"
+    "terrain_chunk",
+    "grass_volume"
   ],
   "render_debug": []
 }

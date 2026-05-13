@@ -14,17 +14,13 @@
 
 ## Gameplay
 
-1. Jump/Mantle (Scale of floor/building)
-2. Vault
-3. Impulse Pad
-4. Swingbar
-5. Grapple to Swing Bar
-6. Grapple to Ledge
-7. Roll to small space
-8. Roll to fence
-9. Slide
-10. Wall Grab
-11. Grapple to Street Light
+1. Dash
+2. Blood
+3. Dagas (Sin UI) (Rafaga)
+4. Jump/Mantle (Scale of floor/building)
+5. Vault
+6. Impulse Pad
+7. Swingbar
 
 ## Visuals and Sound
 

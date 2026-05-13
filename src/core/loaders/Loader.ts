@@ -72,6 +72,7 @@ import { SkinnedMeshComponent } from '../../components/render/SkinnedMeshCompone
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
 import { ViewModelMeshComponent } from '../../components/render/ViewModelMeshComponent';
 import { TerrainComponent } from '../../components/render/TerrainComponent';
+import { GrassVolumeComponent } from '../../components/render/GrassVolumeComponent';
 
 type Operation = 'add' | 'multiply';
 
@@ -411,6 +412,8 @@ export class Loader {
         return new ViewModelMeshComponent();
       case 'terrain':
         return new TerrainComponent();
+      case 'grass_volume':
+        return new GrassVolumeComponent();
       default:
         throw new Error(`Unknown component type: ${type}`);
     }
