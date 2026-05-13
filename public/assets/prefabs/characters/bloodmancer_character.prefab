@@ -82,6 +82,23 @@
   "children": [
     {
       "prefab": "cameras/player_camera.prefab"
+    },
+    {
+      "components": {
+        "name": "DaggerManager",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "bullet_pool": {
+          "prefab": "gameplay/dagger.prefab",
+          "size": 15,
+          "projectileType": "dagger_projectile"
+        }
+      }
     }
   ]
 }
