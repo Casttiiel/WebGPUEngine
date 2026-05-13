@@ -114,7 +114,7 @@
         "maxInstances": 30000,
         "minScale": 0.15,
         "maxScale": 0.4,
-        "material": "grass.mat",
+        "material": "grass_instanced.mat",
         "terrainName": "Terrain"
       }
     }

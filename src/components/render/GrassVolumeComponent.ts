@@ -30,8 +30,6 @@ import { Mesh } from '../../renderer/resources/Mesh';
 import { Material } from '../../renderer/resources/Material';
 import { RenderComponent } from './RenderComponent';
 import { RenderManagerV2 } from '../../renderer/core/managers/RenderManagerV2';
-import { GrassMeshBuilder } from '../../core/grass/GrassMeshBuilder';
-import { MeshData } from '../../types/MeshData.type';
 import { TerrainComponent } from './TerrainComponent';
 import { TerrainData } from '../../core/terrain/TerrainData';
 
@@ -51,7 +49,7 @@ export interface GrassVolumeData {
   minScale?: number;
   /** Maximum per-blade height scale. Default: 1.2. */
   maxScale?: number;
-  /** Asset path for the grass material. Default: 'grass.mat'. */
+  /** Asset path for the grass material. Default: 'grass_instanced.mat'. */
   material?: string;
   /** Name of the terrain entity to sample heights from. Default: 'Terrain'. */
   terrainName?: string;
@@ -81,7 +79,7 @@ export class GrassVolumeComponent extends Component {
   private maxInstances = 50_000;
   private minScale = 0.6;
   private maxScale = 1.2;
-  private materialPath = 'grass.mat';
+  private materialPath = 'grass_instanced.mat';
   private terrainName = 'Terrain';
 
   // ── GPU resources ──────────────────────────────────────────────────────────
@@ -106,7 +104,7 @@ export class GrassVolumeComponent extends Component {
     this.maxInstances = d.maxInstances ?? 50_000;
     this.minScale = d.minScale ?? 0.6;
     this.maxScale = d.maxScale ?? 1.2;
-    this.materialPath = d.material ?? 'grass.mat';
+    this.materialPath = d.material ?? 'grass_instanced.mat';
     this.terrainName = d.terrainName ?? 'Terrain';
   }
 
@@ -227,9 +225,8 @@ export class GrassVolumeComponent extends Component {
     });
     device.queue.writeBuffer(this.indirectDrawBuffer, 0, indirectArgs);
 
-    // ── Mesh (procedural cross-blade) ─────────────────────────────────────────
-    const rawMesh = GrassMeshBuilder.build();
-    this.grassMesh = await Mesh.getAsync(rawMesh as unknown as MeshData);
+    // ── Mesh ──────────────────────────────────────────────────────────────────
+    this.grassMesh = await Mesh.getAsync('grass_blade.obj');
 
     // ── Material ──────────────────────────────────────────────────────────────
     this.grassMaterial = await Material.get(this.materialPath);
@@ -251,6 +248,7 @@ export class GrassVolumeComponent extends Component {
       this.instanceBindGroup, // @group(2): GrassInstance storage
       undefined, // renderBindGroup: not used
       this.indirectDrawBuffer, // GPU-driven indirect draw
+      true, // skipDepthPrepass — wind animation is incompatible with static prepass
     );
   }
 

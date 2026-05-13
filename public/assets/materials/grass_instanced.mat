@@ -1,5 +1,5 @@
 {
-  "technique": "grass/grass_blade_mask.tech",
+  "technique": "grass/grass_instanced.tech",
   "category": "solids",
   "casts_shadows": false,
   "textures": {

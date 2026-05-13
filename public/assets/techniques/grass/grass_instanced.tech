@@ -1,6 +1,6 @@
 {
-  "vs": "grass/grass_single.vs",
-  "fs": "grass/grass_single.fs",
+  "vs": "grass/grass_instanced.vs",
+  "fs": "grass/grass.fs",
   "z": "less_equal_write",
   "rs": "double_sided",
   "writesOn": "gbuffer",
@@ -8,6 +8,6 @@
   "uniforms": [
     "CameraUniforms",
     "MaterialTextures",
-    "ObjectUniforms"
+    "InstanceStorage"
   ]
 }

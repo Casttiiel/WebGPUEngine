@@ -23,7 +23,7 @@
       "meshes": [
         {
           "mesh": "grass_blade.obj",
-          "material": "grass_single.mat",
+          "material": "grass.mat",
           "visible": true
         }
       ]

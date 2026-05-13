@@ -1,26 +1,13 @@
 {
   "vs": "grass/grass.vs",
   "fs": "grass/grass.fs",
-  "z": "less_equal_no_write",
+  "z": "less_equal_write",
   "rs": "double_sided",
   "writesOn": "gbuffer",
+  "skipDepthPrepass": true,
   "uniforms": [
     "CameraUniforms",
     "MaterialTextures",
-    "InstanceStorage"
-  ],
-  "materialSlots": [
-    {
-      "name": "txAlbedo",
-      "binding": 0,
-      "type": "texture2d",
-      "defaultValue": "white.png"
-    },
-    {
-      "name": "samplerState",
-      "binding": 1,
-      "type": "sampler",
-      "defaultValue": "@sampler:anisotropic16x"
-    }
+    "ObjectUniforms"
   ]
 }
