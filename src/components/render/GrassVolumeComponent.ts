@@ -189,13 +189,13 @@ export class GrassVolumeComponent extends Component {
       instanceData[base + 0] = worldX;
       instanceData[base + 1] = worldY;
       instanceData[base + 2] = worldZ;
-      instanceData[base + 3] = 0;        // vec3 alignment padding (offset 12)
-      instanceData[base + 4] = seed;     // offset 16
+      instanceData[base + 3] = 0; // vec3 alignment padding (offset 12)
+      instanceData[base + 4] = seed; // offset 16
       instanceData[base + 5] = rotation; // offset 20
-      instanceData[base + 6] = scale;    // offset 24
-      instanceData[base + 7] = 0;        // _pad.x (offset 28)
-      instanceData[base + 8] = 0;        // _pad.y (offset 32)
-      instanceData[base + 9]  = 0;       // alignment pad to 48
+      instanceData[base + 6] = scale; // offset 24
+      instanceData[base + 7] = 0; // _pad.x (offset 28)
+      instanceData[base + 8] = 0; // _pad.y (offset 32)
+      instanceData[base + 9] = 0; // alignment pad to 48
       instanceData[base + 10] = 0;
       instanceData[base + 11] = 0;
     }
