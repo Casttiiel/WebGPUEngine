@@ -3,10 +3,17 @@
 #include "common/octahedral"
 
 // ---------------------------------------------------------------------------
-// Grass single-blade fragment shader — alpha cutout, GBuffer output.
-// Uses the standard MaterialTextures layout (txAlbedo at binding 0).
-// Procedural taper discards fragments outside the blade silhouette.
-// UV layout (grass_blade.obj): U=0..1 across width, V=1 at base, V=0 at tip.
+// Grass blade fragment shader — UV-based two-colour gradient, GBuffer output.
+//
+// MaterialFactors fields are repurposed for the gradient:
+//   baseColorFactor.rgb  = colorBottom  colour at UV.y = 0
+//   roughnessFactor      = colorTop.r   }
+//   metallicFactor       = colorTop.g   }  colour at UV.y = 1
+//   emissiveFactor       = colorTop.b   }
+//   appearanceBlend      = blendStart   UV.y <= this  → 100 % colorBottom
+//   surfaceBlend         = blendEnd     UV.y >= this  → 100 % colorTop
+//
+// All colour values are in linear space.
 // ---------------------------------------------------------------------------
 
 @group(0) @binding(0) var<uniform>  camera:       CameraUniforms;
@@ -18,29 +25,27 @@
 fn fs(input: VertexOutput) -> FragmentOutput {
   let uv = input.Uv;
 
-  // ── Texture alpha discard ────────────────────────────────────────────────
-  let raw = textureSample(txAlbedo, samplerState, uv);
-  if (raw.a < 0.5) {
-    discard;
-  }
+  // ── UV gradient ──────────────────────────────────────────────────────────
+  let colorBottom = factors.baseColorFactor.rgb;
+  let colorTop    = vec3<f32>(factors.roughnessFactor, factors.metallicFactor, factors.emissiveFactor);
+  // smoothstep: 0.0 below blendStart, 1.0 above blendEnd, smooth S-curve between.
+  let t           = smoothstep(factors.appearanceBlend, factors.surfaceBlend, uv.y);
+  let albedo      = mix(colorBottom, colorTop, t);
 
-  // ── Albedo (sRGB → linear) ────────────────────────────────────────────────
-  let albedo_linear = pow(abs(raw.rgb), vec3<f32>(2.2));
-
-  // ── Normal (flat up for grass blades) ────────────────────────────────────
-  let N = normalize(input.N);
+  // ── Normal ────────────────────────────────────────────────────────────────
+  let N           = normalize(input.N);
   let encodedNorm = normalToOctahedral01(N);
 
   let roughness = 0.85;
   let metallic  = 0.0;
   let emissive  = 0.0;
 
-  // ── Linear depth ────────────────────────────────────────────────────────
-  let camToWorld = input.WorldPos - camera.cameraPosition.xyz;
+  // ── Linear depth ──────────────────────────────────────────────────────────
+  let camToWorld  = input.WorldPos - camera.cameraPosition.xyz;
   let linearDepth = dot(camToWorld, camera.cameraFront.xyz) / camera.cameraFar;
 
   var output: FragmentOutput;
-  output.albedo = vec4<f32>(albedo_linear, metallic);
+  output.albedo = vec4<f32>(albedo, metallic);
   output.normal = vec4<f32>(encodedNorm.x, encodedNorm.y, roughness, emissive);
   output.depth  = linearDepth;
   return output;

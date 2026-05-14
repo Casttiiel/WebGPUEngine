@@ -110,10 +110,10 @@
       "grass_volume": {
         "width": 10,
         "depth": 10,
-        "density": 0.9,
+        "density": 1.9,
         "maxInstances": 30000,
-        "minScale": 0.15,
-        "maxScale": 0.4,
+        "minScale": 0.1,
+        "maxScale": 0.2,
         "material": "grass_instanced.mat",
         "terrainName": "Terrain"
       }

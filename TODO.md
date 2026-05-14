@@ -1,6 +1,6 @@
 ### Engine
 
-1. Grass (Texture) (Better wind movement, not from the root, distort more on edge? use wind class data) (Better spawn ratio/algorithm?)
+1. Grass (Should grass generate AO? paint on gbuffer?) (Better spawn ratio/algorithm?) (Grass forms aliasing)
 2. Mesh Generator each chunk has some space between
 3. Fix Contact Shadows
 4. Trees Generator

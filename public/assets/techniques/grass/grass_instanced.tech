@@ -8,6 +8,7 @@
   "uniforms": [
     "CameraUniforms",
     "MaterialTextures",
-    "InstanceStorage"
+    "InstanceStorage",
+    "GrassUniforms"
   ]
 }

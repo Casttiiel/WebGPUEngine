@@ -538,6 +538,17 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Bind group layout for GrassUniforms (@group(3), binding 0: uniform buffer). */
+  public static getGrassUniformsLayout(): GPUBindGroupLayout {
+    return this.getLayout('grass_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'uniform' },
+      },
+    ]);
+  }
+
   public static getWaterCompositeLayout(): GPUBindGroupLayout {
     return this.getLayout('water_composite', [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
@@ -1983,6 +1994,8 @@ export class BindGroupFactory {
         return this.getSkinMatricesLayout();
       case PipelineBindGroupLayouts.SKIN_MATRICES_PAIR:
         return this.getSkinMatricesPairLayout();
+      case PipelineBindGroupLayouts.GRASS_UNIFORMS:
+        return this.getGrassUniformsLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }

@@ -33,6 +33,7 @@ import { RenderManagerV2 } from '../../renderer/core/managers/RenderManagerV2';
 import { TerrainComponent } from './TerrainComponent';
 import { TerrainData } from '../../core/terrain/TerrainData';
 import { GLTFLoader } from '../../core/loaders/GLTFLoader';
+import { Wind } from '../../core/engine/Wind';
 
 // ---------------------------------------------------------------------------
 // JSON input shape
@@ -54,6 +55,20 @@ export interface GrassVolumeData {
   material?: string;
   /** Name of the terrain entity to sample heights from. Default: 'Terrain'. */
   terrainName?: string;
+  /** Phase 1 wiggle: max chaotic XZ displacement in metres. Default: 0.06. */
+  wiggleIntensity?: number;
+  /** Phase 1 wiggle: spatial frequency. Default: 1.5. */
+  wiggleFrequency?: number;
+  /** Phase 2 sway: max directional displacement in metres. Default: 0.12. */
+  swayIntensity?: number;
+  /** Phase 2 sway: oscillation frequency. Default: 0.8. */
+  swayFrequency?: number;
+  /** Phase 3 gusts: spatial stripe frequency. Default: 0.25. */
+  gustFrequency?: number;
+  /** Phase 3 gusts: stripe travel speed. Default: 2.5. */
+  gustSpeed?: number;
+  /** Phase 3 gusts: amplitude boost at peak (1.0 = no boost). Default: 1.2. */
+  gustIntensity?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,10 +97,21 @@ export class GrassVolumeComponent extends Component {
   private materialPath = 'grass_instanced.mat';
   private terrainName = 'Terrain';
 
+  // ── Wind params (loaded from JSON, written to GPU every frame) ─────────────
+  private wiggleIntensity = 0.06;
+  private wiggleFrequency = 1.5;
+  private swayIntensity = 0.12;
+  private swayFrequency = 0.8;
+  private gustFrequency = 0.25;
+  private gustSpeed = 2.5;
+  private gustIntensity = 1.2;
+
   // ── GPU resources ──────────────────────────────────────────────────────────
   private instanceBuffer: GPUBuffer | null = null;
   private instanceBindGroup: GPUBindGroup | null = null;
   private indirectDrawBuffer: GPUBuffer | null = null;
+  private grassUniformBuffer: GPUBuffer | null = null;
+  private grassBindGroup: GPUBindGroup | null = null;
 
   // ── Render resources ───────────────────────────────────────────────────────
   private grassMesh: Mesh | null = null;
@@ -106,6 +132,13 @@ export class GrassVolumeComponent extends Component {
     this.maxScale = d.maxScale ?? 1.2;
     this.materialPath = d.material ?? 'grass_instanced.mat';
     this.terrainName = d.terrainName ?? 'Terrain';
+    this.wiggleIntensity = d.wiggleIntensity ?? 0.06;
+    this.wiggleFrequency = d.wiggleFrequency ?? 1.5;
+    this.swayIntensity = d.swayIntensity ?? 0.12;
+    this.swayFrequency = d.swayFrequency ?? 0.8;
+    this.gustFrequency = d.gustFrequency ?? 0.25;
+    this.gustSpeed = d.gustSpeed ?? 2.5;
+    this.gustIntensity = d.gustIntensity ?? 1.2;
   }
 
   /** Runs after all components on the entity are loaded — terrain is available. */
@@ -113,7 +146,28 @@ export class GrassVolumeComponent extends Component {
     await this.buildInstances();
   }
 
-  update(_dt: number): void {}
+  update(_dt: number): void {
+    if (!this.grassUniformBuffer) return;
+    const device = GPUUtils.getDevice();
+    // GrassUniforms layout (40 bytes, buffer allocated as 48):
+    //   [0] windDir.x  [1] windDir.y  [2] windSpeed
+    //   [3] wiggleIntensity  [4] wiggleFrequency
+    //   [5] swayIntensity    [6] swayFrequency
+    //   [7] gustFrequency    [8] gustSpeed  [9] gustIntensity
+    const data = new Float32Array(12); // 48 bytes (10 fields + 2 padding)
+    data[0] = Wind.getDirX();
+    data[1] = Wind.getDirZ();
+    data[2] = Wind.speed * 12.0; // scale sky-UV speed to grass shader range
+    data[3] = this.wiggleIntensity;
+    data[4] = this.wiggleFrequency;
+    data[5] = this.swayIntensity;
+    data[6] = this.swayFrequency;
+    data[7] = this.gustFrequency;
+    data[8] = this.gustSpeed;
+    data[9] = this.gustIntensity;
+    // data[10], data[11]: buffer padding (zero)
+    device.queue.writeBuffer(this.grassUniformBuffer, 0, data);
+  }
   renderDebug(): void {}
 
   override dispose(): void {
@@ -128,6 +182,9 @@ export class GrassVolumeComponent extends Component {
     this.indirectDrawBuffer?.destroy();
     this.indirectDrawBuffer = null;
     this.instanceBindGroup = null;
+    this.grassUniformBuffer?.destroy();
+    this.grassUniformBuffer = null;
+    this.grassBindGroup = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -210,6 +267,25 @@ export class GrassVolumeComponent extends Component {
       entries: [{ binding: 0, resource: { buffer: this.instanceBuffer } }],
     });
 
+    // ── Wind uniform buffer (GrassUniforms at @group(3)) ─────────────────────
+    this.grassUniformBuffer = device.createBuffer({
+      label: 'grass_uniforms_buffer',
+      size: 48, // GrassUniforms struct: 10 × f32 (40 bytes) + 8 bytes alignment padding
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const grassUniformLayout = BindGroupFactory.getLayout('grass_uniforms', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'uniform' as GPUBufferBindingType },
+      },
+    ]);
+    this.grassBindGroup = device.createBindGroup({
+      label: 'grass_uniforms_bindgroup',
+      layout: grassUniformLayout,
+      entries: [{ binding: 0, resource: { buffer: this.grassUniformBuffer } }],
+    });
+
     // ── Mesh (loaded first — index count feeds the indirect buffer) ───────────
     this.grassMesh = await GLTFLoader.loadAsMesh('leaf_uv.gltf');
 
@@ -241,7 +317,7 @@ export class GrassVolumeComponent extends Component {
       true, // isInstanced — enables instance_index in VS
       count, // instanceCount (informational; indirect buffer controls draw)
       this.instanceBindGroup, // @group(2): GrassInstance storage
-      undefined, // renderBindGroup: not used
+      this.grassBindGroup, // @group(3): GrassUniforms (wind params, updated per-frame)
       this.indirectDrawBuffer, // GPU-driven indirect draw
       true, // skipDepthPrepass — wind animation is incompatible with static prepass
     );

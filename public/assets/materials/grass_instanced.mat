@@ -3,6 +3,17 @@
   "category": "solids",
   "casts_shadows": false,
   "textures": {
-    "txAlbedo": "grass.png"
-  }
+    "txAlbedo": "white.png"
+  },
+  "baseColorFactor": [
+    0.38,
+    0.62,
+    0.09,
+    1
+  ],
+  "roughnessFactor": 0.1,
+  "metallicFactor": 0.32,
+  "emissiveFactor": 0.03,
+  "appearanceBlend": 0.25,
+  "surfaceBlend": 0.75
 }
