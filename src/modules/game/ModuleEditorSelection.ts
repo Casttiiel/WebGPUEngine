@@ -1236,30 +1236,49 @@ export class ModuleEditorSelection extends Module {
       const bcf = gvMat.getBaseColorFactor();
       const gvProxy = {
         colorBottom: toHex(bcf[0] ?? 0, bcf[1] ?? 0, bcf[2] ?? 0),
-        colorTop: toHex(gvMat.getRoughnessFactor(), gvMat.getMetallicFactor(), gvMat.getEmissiveFactor()),
+        colorTop: toHex(
+          gvMat.getRoughnessFactor(),
+          gvMat.getMetallicFactor(),
+          gvMat.getEmissiveFactor(),
+        ),
         colorTall: toHex(gvMat.getUvXScale(), gvMat.getUvYScale(), gvMat.getPomScale()),
         blendStart: gvMat.getAppearanceBlend(),
         blendEnd: gvMat.getSurfaceBlend(),
       };
 
-      gvFolder.addColor(gvProxy, 'colorBottom').name('Color Bottom').onChange((v: string) => {
-        const [r, g, b] = fromHex(v);
-        gvMat.setFactors({ baseColorFactor: [r, g, b, 1] });
-      });
-      gvFolder.addColor(gvProxy, 'colorTop').name('Color Top').onChange((v: string) => {
-        const [r, g, b] = fromHex(v);
-        gvMat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });
-      });
-      gvFolder.addColor(gvProxy, 'colorTall').name('Color Tall Zones').onChange((v: string) => {
-        const [r, g, b] = fromHex(v);
-        gvMat.setFactors({ uvXScale: r, uvYScale: g, pomScale: b });
-      });
-      gvFolder.add(gvProxy, 'blendStart', 0, 1, 0.01).name('Blend Start').onChange((v: number) => {
-        gvMat.setFactors({ appearanceBlend: v });
-      });
-      gvFolder.add(gvProxy, 'blendEnd', 0, 1, 0.01).name('Blend End').onChange((v: number) => {
-        gvMat.setFactors({ surfaceBlend: v });
-      });
+      gvFolder
+        .addColor(gvProxy, 'colorBottom')
+        .name('Color Bottom')
+        .onChange((v: string) => {
+          const [r, g, b] = fromHex(v);
+          gvMat.setFactors({ baseColorFactor: [r, g, b, 1] });
+        });
+      gvFolder
+        .addColor(gvProxy, 'colorTop')
+        .name('Color Top')
+        .onChange((v: string) => {
+          const [r, g, b] = fromHex(v);
+          gvMat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });
+        });
+      gvFolder
+        .addColor(gvProxy, 'colorTall')
+        .name('Color Tall Zones')
+        .onChange((v: string) => {
+          const [r, g, b] = fromHex(v);
+          gvMat.setFactors({ uvXScale: r, uvYScale: g, pomScale: b });
+        });
+      gvFolder
+        .add(gvProxy, 'blendStart', 0, 1, 0.01)
+        .name('Blend Start')
+        .onChange((v: number) => {
+          gvMat.setFactors({ appearanceBlend: v });
+        });
+      gvFolder
+        .add(gvProxy, 'blendEnd', 0, 1, 0.01)
+        .name('Blend End')
+        .onChange((v: number) => {
+          gvMat.setFactors({ surfaceBlend: v });
+        });
     }
 
     // ── Spot Light ─────────────────────────────────────────────────────────────

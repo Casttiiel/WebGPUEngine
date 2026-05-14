@@ -213,38 +213,53 @@ export class GrassVolumeComponent extends Component {
     // Color Bottom — stored in baseColorFactor.rgb
     const bcf = mat.getBaseColorFactor();
     const bottomObj = { color: toHex(bcf[0] ?? 0, bcf[1] ?? 0, bcf[2] ?? 0) };
-    folder.addColor(bottomObj, 'color').name('Color Bottom').onChange((v: string) => {
-      const [r, g, b] = fromHex(v);
-      mat.setFactors({ baseColorFactor: [r, g, b, 1] });
-    });
+    folder
+      .addColor(bottomObj, 'color')
+      .name('Color Bottom')
+      .onChange((v: string) => {
+        const [r, g, b] = fromHex(v);
+        mat.setFactors({ baseColorFactor: [r, g, b, 1] });
+      });
 
     // Color Top — repurposed roughnessFactor / metallicFactor / emissiveFactor
     const topObj = {
       color: toHex(mat.getRoughnessFactor(), mat.getMetallicFactor(), mat.getEmissiveFactor()),
     };
-    folder.addColor(topObj, 'color').name('Color Top').onChange((v: string) => {
-      const [r, g, b] = fromHex(v);
-      mat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });
-    });
+    folder
+      .addColor(topObj, 'color')
+      .name('Color Top')
+      .onChange((v: string) => {
+        const [r, g, b] = fromHex(v);
+        mat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });
+      });
 
     // Color Tall Zones — repurposed uvXScale / uvYScale / pomScale
     const tallObj = { color: toHex(mat.getUvXScale(), mat.getUvYScale(), mat.getPomScale()) };
-    folder.addColor(tallObj, 'color').name('Color Tall Zones').onChange((v: string) => {
-      const [r, g, b] = fromHex(v);
-      mat.setFactors({ uvXScale: r, uvYScale: g, pomScale: b });
-    });
+    folder
+      .addColor(tallObj, 'color')
+      .name('Color Tall Zones')
+      .onChange((v: string) => {
+        const [r, g, b] = fromHex(v);
+        mat.setFactors({ uvXScale: r, uvYScale: g, pomScale: b });
+      });
 
     // Gradient blend range sliders
     const blendObj = {
       blendStart: mat.getAppearanceBlend(),
       blendEnd: mat.getSurfaceBlend(),
     };
-    folder.add(blendObj, 'blendStart', 0, 1, 0.01).name('Blend Start').onChange((v: number) => {
-      mat.setFactors({ appearanceBlend: v });
-    });
-    folder.add(blendObj, 'blendEnd', 0, 1, 0.01).name('Blend End').onChange((v: number) => {
-      mat.setFactors({ surfaceBlend: v });
-    });
+    folder
+      .add(blendObj, 'blendStart', 0, 1, 0.01)
+      .name('Blend Start')
+      .onChange((v: number) => {
+        mat.setFactors({ appearanceBlend: v });
+      });
+    folder
+      .add(blendObj, 'blendEnd', 0, 1, 0.01)
+      .name('Blend End')
+      .onChange((v: number) => {
+        mat.setFactors({ surfaceBlend: v });
+      });
   }
 
   override dispose(): void {
