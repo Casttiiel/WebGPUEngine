@@ -24,7 +24,8 @@ struct GrassInstance {
   seed:     f32,         // offset 12 — immediately after vec3 (AlignOf(f32)=4, no gap)
   rotation: f32,         // offset 16
   scale:    f32,         // offset 20
-  _pad:     vec2<f32>,   // offset 24 (8 bytes) — struct stride = 32 bytes = 8 floats
+  zone:     f32,         // offset 24 — height-map zone [0,1] baked at spawn
+  _pad:     f32,         // offset 28 — struct stride = 32 bytes = 8 floats
 }
 
 // Wind parameters uploaded every frame from Wind.ts via GrassVolumeComponent.update().
@@ -125,7 +126,7 @@ fn vs(
   output.WorldPos = animatedPos;
   output.position = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(animatedPos, 1.0);
   output.N  = normal;
-  output.T  = vec4<f32>(1.0, 0.0, 0.0, inst.seed); // seed packed in T.w for FS tint
+  output.T  = vec4<f32>(1.0, 0.0, inst.zone, inst.seed); // zone in T.z for FS colour tint, seed in T.w
   output.Uv = uv;
   return output;
 }

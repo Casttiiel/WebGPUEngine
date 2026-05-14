@@ -29,12 +29,24 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   let colorBottom = factors.baseColorFactor.rgb;
   let colorTop    = vec3<f32>(factors.roughnessFactor, factors.metallicFactor, factors.emissiveFactor);
   // smoothstep: 0.0 below blendStart, 1.0 above blendEnd, smooth S-curve between.
-  let t           = smoothstep(factors.appearanceBlend, factors.surfaceBlend, uv.y);
-  let albedo      = mix(colorBottom, colorTop, t);
+  let t              = smoothstep(factors.appearanceBlend, factors.surfaceBlend, uv.y);
+  let gradientAlbedo = mix(colorBottom, colorTop, t);
+
+  // ── Zone colour tint ──────────────────────────────────────────────────────
+  // Tall zones (zone → 1) blend toward colorTall (stored in repurposed material
+  // fields uvXScale / uvYScale / pomScale).  Threshold: starts at zone 0.4.
+  // When no heightMap is used all blades have zone = 0, so this is a no-op.
+  let colorTall = vec3<f32>(factors.uvXScale, factors.uvYScale, factors.pomScale);
+  let zone      = input.T.z;
+  let albedo    = mix(gradientAlbedo, colorTall, smoothstep(0.4, 1.0, zone));
 
   // ── Normal ────────────────────────────────────────────────────────────────
+  // Blend the geometric normal toward world-up so that SSAO treats the grass
+  // like a smooth hill surface instead of a vertical plane (avoids dark halos).
+  // Technique mirrors Unreal Engine's grass shading.
   let N           = normalize(input.N);
-  let encodedNorm = normalToOctahedral01(N);
+  let bentN       = normalize(mix(N, vec3<f32>(0.0, 1.0, 0.0), 0.8));
+  let encodedNorm = normalToOctahedral01(bentN);
 
   let roughness = 0.85;
   let metallic  = 0.0;

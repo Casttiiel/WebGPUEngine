@@ -108,10 +108,10 @@
         "position": [0, 0, 0]
       },
       "grass_volume": {
-        "width": 10,
-        "depth": 10,
-        "density": 1.9,
-        "maxInstances": 30000,
+        "width": 100,
+        "depth": 100,
+        "density": 10,
+        "maxInstances": 100000,
         "minScale": 0.1,
         "maxScale": 0.2,
         "material": "grass_instanced.mat",

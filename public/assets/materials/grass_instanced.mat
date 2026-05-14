@@ -15,5 +15,8 @@
   "metallicFactor": 0.32,
   "emissiveFactor": 0.03,
   "appearanceBlend": 0.25,
-  "surfaceBlend": 0.75
+  "surfaceBlend": 0.75,
+  "uvXScale": 0.82,
+  "uvYScale": 0.72,
+  "pomScale": 0.18
 }

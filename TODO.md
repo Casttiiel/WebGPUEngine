@@ -1,6 +1,6 @@
 ### Engine
 
-1. Grass (Should grass generate AO? paint on gbuffer?) (Better spawn ratio/algorithm?) (Grass forms aliasing)
+1. Grass (Better spawn ratio/algorithm?)
 2. Mesh Generator each chunk has some space between
 3. Fix Contact Shadows
 4. Trees Generator

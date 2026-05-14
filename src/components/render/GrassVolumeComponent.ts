@@ -69,6 +69,12 @@ export interface GrassVolumeData {
   gustSpeed?: number;
   /** Phase 3 gusts: amplitude boost at peak (1.0 = no boost). Default: 1.2. */
   gustIntensity?: number;
+  /**
+   * Path (relative to /assets/textures/) to a greyscale PNG that drives height
+   * and colour variation by zone.  White = tall + colourTall tint, black = short
+   * + base gradient colour.  Omit to disable zone variation.
+   */
+  heightMap?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +102,9 @@ export class GrassVolumeComponent extends Component {
   private maxScale = 1.2;
   private materialPath = 'grass_instanced.mat';
   private terrainName = 'Terrain';
+
+  // ── Zone height map ────────────────────────────────────────────────────────
+  private heightMap: string | null = null;
 
   // ── Wind params (loaded from JSON, written to GPU every frame) ─────────────
   private wiggleIntensity = 0.06;
@@ -139,6 +148,7 @@ export class GrassVolumeComponent extends Component {
     this.gustFrequency = d.gustFrequency ?? 0.25;
     this.gustSpeed = d.gustSpeed ?? 2.5;
     this.gustIntensity = d.gustIntensity ?? 1.2;
+    this.heightMap = d.heightMap ?? null;
   }
 
   /** Runs after all components on the entity are loaded — terrain is available. */
@@ -201,6 +211,9 @@ export class GrassVolumeComponent extends Component {
     // Find terrain for height sampling
     const terrainInfo = this.findTerrain();
 
+    // Load zone heightmap (optional) — drives per-blade height scale and colour tint
+    const heightMapData = this.heightMap ? await this.loadHeightMapData(this.heightMap) : null;
+
     // Compute instance count
     const area = this.width * this.depth;
     const count = Math.max(1, Math.min(Math.floor(area * this.density), this.maxInstances));
@@ -234,7 +247,16 @@ export class GrassVolumeComponent extends Component {
 
       const seed = rand();
       const rotation = rand() * Math.PI * 2;
-      const scale = this.minScale + rand() * (this.maxScale - this.minScale);
+      let scale = this.minScale + rand() * (this.maxScale - this.minScale);
+
+      // Zone from heightmap: [0,1] where 1 = tall + colourTall tint, 0 = short + base colour
+      let zone = 0.0;
+      if (heightMapData) {
+        const u = (worldX - (cx - halfW)) / this.width;
+        const v = (worldZ - (cz - halfD)) / this.depth;
+        zone = this.sampleHeightMap(heightMapData, u, v);
+        scale *= 0.35 + zone * 0.65; // lerp(0.35 → 1.0) — short zones get ≈35 % height
+      }
 
       const base = i * FLOATS_PER_INSTANCE;
       instanceData[base + 0] = worldX;
@@ -243,8 +265,8 @@ export class GrassVolumeComponent extends Component {
       instanceData[base + 3] = seed; // byte 12 — vec3 size=12, so seed is here
       instanceData[base + 4] = rotation; // byte 16
       instanceData[base + 5] = scale; // byte 20
-      instanceData[base + 6] = 0; // _pad.x (byte 24)
-      instanceData[base + 7] = 0; // _pad.y (byte 28)
+      instanceData[base + 6] = zone; // byte 24 — zone [0,1] passed to FS for colour tint
+      instanceData[base + 7] = 0; // byte 28 — padding
     }
 
     const device = GPUUtils.getDevice();
@@ -321,6 +343,47 @@ export class GrassVolumeComponent extends Component {
       this.indirectDrawBuffer, // GPU-driven indirect draw
       true, // skipDepthPrepass — wind animation is incompatible with static prepass
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Height-map zone helpers
+  // ---------------------------------------------------------------------------
+
+  /** Loads a greyscale PNG from /assets/textures/<path> and returns its pixel data. */
+  private async loadHeightMapData(
+    path: string,
+  ): Promise<{ data: Uint8ClampedArray; width: number; height: number } | null> {
+    try {
+      const response = await fetch(`/assets/textures/${path}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const bitmap = await createImageBitmap(blob);
+      const { width, height } = bitmap;
+      const canvas = new OffscreenCanvas(width, height);
+      const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
+      if (!ctx) {
+        bitmap.close();
+        return null;
+      }
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const imageData = ctx.getImageData(0, 0, width, height);
+      return { data: imageData.data, width, height };
+    } catch (e) {
+      console.warn(`GrassVolumeComponent: could not load heightMap "${path}":`, e);
+      return null;
+    }
+  }
+
+  /** Samples the red channel of the decoded heightmap at normalised UV [0,1]. */
+  private sampleHeightMap(
+    hm: { data: Uint8ClampedArray; width: number; height: number },
+    u: number,
+    v: number,
+  ): number {
+    const px = Math.min(hm.width - 1, Math.floor(Math.max(0, u) * hm.width));
+    const py = Math.min(hm.height - 1, Math.floor(Math.max(0, v) * hm.height));
+    return (hm.data[(py * hm.width + px) * 4] ?? 0) / 255;
   }
 
   // ---------------------------------------------------------------------------
