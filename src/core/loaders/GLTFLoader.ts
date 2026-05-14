@@ -14,10 +14,85 @@ import { BlendModes } from '../../types/BlendModes.enum';
 import { DepthModes } from '../../types/DepthModes.enum';
 import { QualitySettings } from '../engine/QualitySettings';
 import { NavMeshBuilder } from '../../ai/nav/NavMeshBuilder';
+import type { Mesh } from '../../renderer/resources/Mesh';
+import { ResourceManager } from '../engine/ResourceManager';
+import { ResourceType } from '../../types/ResourceType.enum';
 
 export class GLTFLoader {
   // Singleton para no re-registrar ~40 extensiones en cada carga
   private static io = new WebIO().registerExtensions(ALL_EXTENSIONS);
+
+  /**
+   * Loads the first renderable mesh primitive from a GLTF file as a cached Mesh resource.
+   * @param path GLTF filename (e.g. 'leaf_uv.gltf'). File must live in assets/meshes/<basename>/.
+   */
+  public static async loadAsMesh(path: string): Promise<Mesh> {
+    // Cache hit
+    try {
+      return ResourceManager.getResource<Mesh>(path);
+    } catch {
+      /* not cached — load it */
+    }
+
+    const folderName = path.split('.')[0];
+    const gltfUrl = `assets/meshes/${folderName}/${path}`;
+
+    // Fetch GLTF JSON
+    const jsonResponse = await fetch(gltfUrl);
+    const json = await jsonResponse.json();
+
+    // Fetch geometry buffers only — skip textures (same as loadGLTF)
+    const resources: Record<string, Uint8Array> = {};
+    for (const image of (json.images ?? []) as { uri?: string }[]) {
+      if (image.uri && !image.uri.startsWith('data:')) {
+        resources[image.uri] = new Uint8Array(0);
+      }
+    }
+    const buffers = ((json.buffers ?? []) as { uri?: string }[]).filter(
+      (b) => b.uri && !b.uri.startsWith('data:'),
+    );
+    await Promise.all(
+      buffers.map(async (buffer) => {
+        const res = await fetch(`assets/meshes/${folderName}/${buffer.uri}`);
+        resources[buffer.uri!] = new Uint8Array(await res.arrayBuffer());
+      }),
+    );
+
+    const doc = await GLTFLoader.io.readJSON({ json, resources });
+
+    // Find first primitive with geometry
+    for (const mesh of doc.getRoot().listMeshes()) {
+      for (const prim of mesh.listPrimitives()) {
+        const posAccessor = prim.getAttribute('POSITION');
+        const idxAccessor = prim.getIndices();
+        if (!posAccessor || !idxAccessor) continue;
+
+        const meshData = {
+          attributes: {
+            POSITION: posAccessor.getArray()!,
+            NORMAL: prim.getAttribute('NORMAL')?.getArray() ?? new Float32Array(0),
+            TEXCOORD_0: prim.getAttribute('TEXCOORD_0')?.getArray() ?? new Float32Array(0),
+            TANGENT: prim.getAttribute('TANGENT')?.getArray() ?? undefined,
+          },
+          indices: idxAccessor.getArray()!,
+        };
+
+        // Dynamic import avoids the static-import cycle:
+        // Mesh → GPUResource → GPUUtils → Render → Texture → GPUResource (TDZ)
+        const { Mesh: MeshCtor } = await import('../../renderer/resources/Mesh');
+        const result = new MeshCtor({
+          path,
+          type: ResourceType.MESH,
+          meshData: meshData as never,
+        });
+        ResourceManager.registerResource(result);
+        await result.loadAsync(); // hasData already true → skips fetch, calls initBuffers()
+        return result as Mesh;
+      }
+    }
+
+    throw new Error(`[GLTFLoader.loadAsMesh] No mesh primitive found in: ${path}`);
+  }
 
   public static async loadGLTF(path: string): Promise<Array<EntityDataType>> {
     const folderName = path.split('.')[0];

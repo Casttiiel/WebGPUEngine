@@ -32,6 +32,7 @@ import { RenderComponent } from './RenderComponent';
 import { RenderManagerV2 } from '../../renderer/core/managers/RenderManagerV2';
 import { TerrainComponent } from './TerrainComponent';
 import { TerrainData } from '../../core/terrain/TerrainData';
+import { GLTFLoader } from '../../core/loaders/GLTFLoader';
 
 // ---------------------------------------------------------------------------
 // JSON input shape
@@ -209,19 +210,18 @@ export class GrassVolumeComponent extends Component {
       entries: [{ binding: 0, resource: { buffer: this.instanceBuffer } }],
     });
 
+    // ── Mesh (loaded first — index count feeds the indirect buffer) ───────────
+    this.grassMesh = await GLTFLoader.loadAsMesh('leaf_uv.gltf');
+
     // ── Indirect draw buffer ─────────────────────────────────────────────────
     // Layout: [indexCount, instanceCount, firstIndex, baseVertex, firstInstance]
-    const GRASS_INDEX_COUNT = 12; // 2 quads × 2 tris × 3 verts
-    const indirectArgs = new Uint32Array([GRASS_INDEX_COUNT, count, 0, 0, 0]);
+    const indirectArgs = new Uint32Array([this.grassMesh.getIndexCount(), count, 0, 0, 0]);
     this.indirectDrawBuffer = device.createBuffer({
       label: 'grass_indirect_buffer',
       size: indirectArgs.byteLength,
       usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(this.indirectDrawBuffer, 0, indirectArgs);
-
-    // ── Mesh ──────────────────────────────────────────────────────────────────
-    this.grassMesh = await Mesh.getAsync('grass_blade.obj');
 
     // ── Material ──────────────────────────────────────────────────────────────
     this.grassMaterial = await Material.get(this.materialPath);
