@@ -1,7 +1,7 @@
 ### Engine
 
-1. Grass (Better spawn ratio/algorithm?)
-2. Mesh Generator each chunk has some space between
+1. Grass Influence Map
+2. Mesh Generator each chunk has some space betweenw
 3. Fix Contact Shadows
 4. Trees Generator
 5. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?

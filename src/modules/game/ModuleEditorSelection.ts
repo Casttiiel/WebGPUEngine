@@ -19,6 +19,7 @@ import { Material } from '../../renderer/resources/Material';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { TerrainComponent } from '../../components/render/TerrainComponent';
+import { GrassVolumeComponent } from '../../components/render/GrassVolumeComponent';
 
 export class ModuleEditorSelection extends Module {
   private selectedEntity: Entity | null = null;
@@ -1210,6 +1211,55 @@ export class ModuleEditorSelection extends Module {
     const terrain = entity.getComponent('terrain') as TerrainComponent | null;
     if (terrain) {
       terrain.addToEntityPanel(entityFolder);
+    }
+
+    // ── Grass Volume ──────────────────────────────────────────────────────────
+    const gv = entity.getComponent('grass_volume') as GrassVolumeComponent | null;
+    const gvMat = gv?.getGrassMaterial() ?? null;
+    if (gvMat) {
+      const gvFolder = entityFolder.addFolder('Grass Colors');
+      gvFolder.close();
+
+      const toHex = (r: number, g: number, b: number): string => {
+        const ch = (v: number) =>
+          Math.round(Math.max(0, Math.min(1, v)) * 255)
+            .toString(16)
+            .padStart(2, '0');
+        return `#${ch(r)}${ch(g)}${ch(b)}`;
+      };
+      const fromHex = (hex: string): [number, number, number] => [
+        parseInt(hex.slice(1, 3), 16) / 255,
+        parseInt(hex.slice(3, 5), 16) / 255,
+        parseInt(hex.slice(5, 7), 16) / 255,
+      ];
+
+      const bcf = gvMat.getBaseColorFactor();
+      const gvProxy = {
+        colorBottom: toHex(bcf[0] ?? 0, bcf[1] ?? 0, bcf[2] ?? 0),
+        colorTop: toHex(gvMat.getRoughnessFactor(), gvMat.getMetallicFactor(), gvMat.getEmissiveFactor()),
+        colorTall: toHex(gvMat.getUvXScale(), gvMat.getUvYScale(), gvMat.getPomScale()),
+        blendStart: gvMat.getAppearanceBlend(),
+        blendEnd: gvMat.getSurfaceBlend(),
+      };
+
+      gvFolder.addColor(gvProxy, 'colorBottom').name('Color Bottom').onChange((v: string) => {
+        const [r, g, b] = fromHex(v);
+        gvMat.setFactors({ baseColorFactor: [r, g, b, 1] });
+      });
+      gvFolder.addColor(gvProxy, 'colorTop').name('Color Top').onChange((v: string) => {
+        const [r, g, b] = fromHex(v);
+        gvMat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });
+      });
+      gvFolder.addColor(gvProxy, 'colorTall').name('Color Tall Zones').onChange((v: string) => {
+        const [r, g, b] = fromHex(v);
+        gvMat.setFactors({ uvXScale: r, uvYScale: g, pomScale: b });
+      });
+      gvFolder.add(gvProxy, 'blendStart', 0, 1, 0.01).name('Blend Start').onChange((v: number) => {
+        gvMat.setFactors({ appearanceBlend: v });
+      });
+      gvFolder.add(gvProxy, 'blendEnd', 0, 1, 0.01).name('Blend End').onChange((v: number) => {
+        gvMat.setFactors({ surfaceBlend: v });
+      });
     }
 
     // ── Spot Light ─────────────────────────────────────────────────────────────

@@ -45,7 +45,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   // like a smooth hill surface instead of a vertical plane (avoids dark halos).
   // Technique mirrors Unreal Engine's grass shading.
   let N           = normalize(input.N);
-  let bentN       = normalize(mix(N, vec3<f32>(0.0, 1.0, 0.0), 0.8));
+  let bentN       = normalize(mix(N, vec3<f32>(0.0, 1.0, 0.0), 0.5));
   let encodedNorm = normalToOctahedral01(bentN);
 
   let roughness = 0.85;

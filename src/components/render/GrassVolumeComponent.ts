@@ -180,6 +180,73 @@ export class GrassVolumeComponent extends Component {
   }
   renderDebug(): void {}
 
+  public override renderInMenu(): void {
+    if (!this.grassMaterial) return;
+
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (!gui.beginWindow('Grass Colors', true)) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const folder = (gui as any).folders?.get('Grass Colors');
+    if (!folder) return;
+
+    const mat = this.grassMaterial;
+
+    /** Converts linear [0,1] floats to a '#rrggbb' hex string for lil-gui. */
+    const toHex = (r: number, g: number, b: number): string => {
+      const ch = (v: number) =>
+        Math.round(Math.max(0, Math.min(1, v)) * 255)
+          .toString(16)
+          .padStart(2, '0');
+      return `#${ch(r)}${ch(g)}${ch(b)}`;
+    };
+
+    /** Converts a '#rrggbb' hex string back to linear [0,1] components. */
+    const fromHex = (hex: string): [number, number, number] => [
+      parseInt(hex.slice(1, 3), 16) / 255,
+      parseInt(hex.slice(3, 5), 16) / 255,
+      parseInt(hex.slice(5, 7), 16) / 255,
+    ];
+
+    // Color Bottom — stored in baseColorFactor.rgb
+    const bcf = mat.getBaseColorFactor();
+    const bottomObj = { color: toHex(bcf[0] ?? 0, bcf[1] ?? 0, bcf[2] ?? 0) };
+    folder.addColor(bottomObj, 'color').name('Color Bottom').onChange((v: string) => {
+      const [r, g, b] = fromHex(v);
+      mat.setFactors({ baseColorFactor: [r, g, b, 1] });
+    });
+
+    // Color Top — repurposed roughnessFactor / metallicFactor / emissiveFactor
+    const topObj = {
+      color: toHex(mat.getRoughnessFactor(), mat.getMetallicFactor(), mat.getEmissiveFactor()),
+    };
+    folder.addColor(topObj, 'color').name('Color Top').onChange((v: string) => {
+      const [r, g, b] = fromHex(v);
+      mat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });
+    });
+
+    // Color Tall Zones — repurposed uvXScale / uvYScale / pomScale
+    const tallObj = { color: toHex(mat.getUvXScale(), mat.getUvYScale(), mat.getPomScale()) };
+    folder.addColor(tallObj, 'color').name('Color Tall Zones').onChange((v: string) => {
+      const [r, g, b] = fromHex(v);
+      mat.setFactors({ uvXScale: r, uvYScale: g, pomScale: b });
+    });
+
+    // Gradient blend range sliders
+    const blendObj = {
+      blendStart: mat.getAppearanceBlend(),
+      blendEnd: mat.getSurfaceBlend(),
+    };
+    folder.add(blendObj, 'blendStart', 0, 1, 0.01).name('Blend Start').onChange((v: number) => {
+      mat.setFactors({ appearanceBlend: v });
+    });
+    folder.add(blendObj, 'blendEnd', 0, 1, 0.01).name('Blend End').onChange((v: number) => {
+      mat.setFactors({ surfaceBlend: v });
+    });
+  }
+
   override dispose(): void {
     // Remove from render pipeline
     if (this.renderComponent) {
@@ -373,6 +440,11 @@ export class GrassVolumeComponent extends Component {
       console.warn(`GrassVolumeComponent: could not load heightMap "${path}":`, e);
       return null;
     }
+  }
+
+  /** Returns the grass material, or null if buildInstances has not completed yet. */
+  public getGrassMaterial(): Material | null {
+    return this.grassMaterial;
   }
 
   /** Samples the red channel of the decoded heightmap at normalised UV [0,1]. */
