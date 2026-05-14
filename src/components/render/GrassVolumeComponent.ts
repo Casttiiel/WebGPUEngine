@@ -56,20 +56,19 @@ export interface GrassVolumeData {
 }
 
 // ---------------------------------------------------------------------------
-// Per-instance GPU struct (must match GrassInstance in grass.vs)
-// GrassInstance WGSL layout (vec3 has alignment=16 in storage buffers):
+// Per-instance GPU struct (must match GrassInstance in grass_instanced.vs)
+// WGSL vec3<f32> has AlignOf=16 but SizeOf=12. The next f32 after it starts
+// at byte 12 (not 16) — vec3 alignment only controls where vec3 itself starts.
 //   offset  0: pos.x
 //   offset  4: pos.y
 //   offset  8: pos.z
-//   offset 12: (implicit padding — vec3 stride is 16 in storage)
-//   offset 16: seed
-//   offset 20: rotation
-//   offset 24: scale
-//   offset 28: _pad.x
-//   offset 32: _pad.y
-//   offset 36: (alignment padding to next 16-byte boundary)
-//   Total stride: 48 bytes = 12 floats per instance
-const FLOATS_PER_INSTANCE = 12; // 48 bytes — matches WGSL array<GrassInstance> stride
+//   offset 12: seed      ← immediately after the 12-byte vec3
+//   offset 16: rotation
+//   offset 20: scale
+//   offset 24: _pad.x
+//   offset 28: _pad.y
+//   Total stride: 32 bytes = 8 floats per instance
+const FLOATS_PER_INSTANCE = 8; // 32 bytes — matches WGSL array<GrassInstance> stride
 
 export class GrassVolumeComponent extends Component {
   // ── Params ─────────────────────────────────────────────────────────────────
@@ -183,15 +182,11 @@ export class GrassVolumeComponent extends Component {
       instanceData[base + 0] = worldX;
       instanceData[base + 1] = worldY;
       instanceData[base + 2] = worldZ;
-      instanceData[base + 3] = 0; // vec3 alignment padding (offset 12)
-      instanceData[base + 4] = seed; // offset 16
-      instanceData[base + 5] = rotation; // offset 20
-      instanceData[base + 6] = scale; // offset 24
-      instanceData[base + 7] = 0; // _pad.x (offset 28)
-      instanceData[base + 8] = 0; // _pad.y (offset 32)
-      instanceData[base + 9] = 0; // alignment pad to 48
-      instanceData[base + 10] = 0;
-      instanceData[base + 11] = 0;
+      instanceData[base + 3] = seed; // byte 12 — vec3 size=12, so seed is here
+      instanceData[base + 4] = rotation; // byte 16
+      instanceData[base + 5] = scale; // byte 20
+      instanceData[base + 6] = 0; // _pad.x (byte 24)
+      instanceData[base + 7] = 0; // _pad.y (byte 28)
     }
 
     const device = GPUUtils.getDevice();

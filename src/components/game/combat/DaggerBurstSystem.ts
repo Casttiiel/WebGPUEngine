@@ -3,6 +3,8 @@ import { Engine } from '../../../core/engine/Engine';
 import { MouseButton } from '../../../types/MouseButton.enum';
 import type { CameraComponent } from '../../render/CameraComponent';
 import { BulletPoolComponent } from '../BulletPoolComponent';
+import type { BloodComponent } from '../BloodComponent';
+import type { HealthComponent } from '../HealthComponent';
 
 /**
  * DaggerBurstSystem — Lanza una ráfaga de 3 dagas al pulsar click izquierdo.
@@ -21,6 +23,9 @@ export class DaggerBurstSystem {
   private readonly burstInterval: number; // seconds between shots within a burst
   private readonly cooldown: number; // seconds between bursts
   private readonly poolName: string;
+  private readonly bloodCostPerShot: number;
+  private readonly getBlood: (() => BloodComponent | null) | null;
+  private readonly getHealth: (() => HealthComponent | null) | null;
 
   private cooldownTimer: number = 0;
   private pendingShots: number = 0;
@@ -34,11 +39,17 @@ export class DaggerBurstSystem {
     burstInterval?: number;
     cooldown?: number;
     poolName?: string;
+    bloodCostPerShot?: number;
+    getBlood?: () => BloodComponent | null;
+    getHealth?: () => HealthComponent | null;
   }) {
     this.burstCount = data?.burstCount ?? 3;
     this.burstInterval = data?.burstInterval ?? 0.08;
     this.cooldown = data?.cooldown ?? 0.6;
     this.poolName = data?.poolName ?? 'DaggerManager';
+    this.bloodCostPerShot = data?.bloodCostPerShot ?? 0;
+    this.getBlood = data?.getBlood ?? null;
+    this.getHealth = data?.getHealth ?? null;
   }
 
   // ──────────────────────────────────────────────────────────
@@ -58,6 +69,9 @@ export class DaggerBurstSystem {
       this.cooldownTimer <= 0 &&
       this.pendingShots === 0
     ) {
+      // Block the burst if the player is dead
+      if (this.getHealth?.()?.isDead()) return;
+
       this.pendingShots = this.burstCount;
       this.burstTimer = 0; // fire first shot on the very next tick
       this.cooldownTimer = this.cooldown;
@@ -83,6 +97,14 @@ export class DaggerBurstSystem {
 
   private fireOne(camera: CameraComponent | null): void {
     if (!camera) return;
+
+    // Spend blood; if insufficient, consume health instead
+    if (this.bloodCostPerShot > 0) {
+      const blood = this.getBlood?.();
+      if (blood && !blood.spend(this.bloodCostPerShot)) {
+        this.getHealth?.()?.takeDamage(this.bloodCostPerShot);
+      }
+    }
 
     if (!this.pool) {
       const entity = Engine.getEntities().getEntityByName(this.poolName);

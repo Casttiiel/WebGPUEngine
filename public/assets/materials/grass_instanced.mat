@@ -3,6 +3,6 @@
   "category": "solids",
   "casts_shadows": false,
   "textures": {
-    "txAlbedo": "blood.png"
+    "txAlbedo": "grass.png"
   }
 }

@@ -3,6 +3,7 @@ import { Engine } from '../../engine/Engine';
 import { ModuleUI } from '../../../modules/core/ModuleUI';
 import { HealthComponent } from '../../../components/game/HealthComponent';
 import { StaminaComponent } from '../../../components/game/StaminaComponent';
+import { BloodComponent } from '../../../components/game/BloodComponent';
 import { ArcaneKnightControllerComponent } from '../../../components/game/ArcaneKnightControllerComponent';
 import { GrappleTargetType } from '../../../types/GrappleTargetType.enum';
 import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
@@ -42,6 +43,7 @@ export class HUDController extends WidgetController {
   private playerEntity: Entity | null = null;
   private health: HealthComponent | null = null;
   private stamina: StaminaComponent | null = null;
+  private blood: BloodComponent | null = null;
   private grappleController: ArcaneKnightControllerComponent | null = null;
 
   constructor() {
@@ -60,8 +62,10 @@ export class HUDController extends WidgetController {
       );
     }
 
-    if (this.stamina && this.staminaBar) {
-      const ratio = this.stamina.getStaminaRatio();
+    if (this.staminaBar) {
+      const ratio = this.blood
+        ? this.blood.getBloodRatio()
+        : (this.stamina?.getStaminaRatio() ?? 1);
       const newW = Math.max(0, ratio * this.staminaBarMaxWidth);
       this.staminaBar.setSize(newW, this.staminaBar.getHeight());
     }
@@ -137,6 +141,9 @@ export class HUDController extends WidgetController {
     }
     if (!this.stamina) {
       this.stamina = this.playerEntity.getComponent('stamina') as StaminaComponent | null;
+    }
+    if (!this.blood) {
+      this.blood = this.playerEntity.getComponent('blood') as BloodComponent | null;
     }
     if (!this.grappleController) {
       this.grappleController = this.playerEntity.getComponent(

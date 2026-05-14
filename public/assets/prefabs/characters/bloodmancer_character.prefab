@@ -77,6 +77,9 @@
       "maxBlood": 100,
       "regenRate": 15,
       "regenDelay": 10
+    },
+    "health": {
+      "maxHp": 100
     }
   },
   "children": [

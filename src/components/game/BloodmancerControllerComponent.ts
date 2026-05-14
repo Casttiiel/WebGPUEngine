@@ -15,6 +15,8 @@ import { IMovementController } from './movement/IMovementController';
 import { IMantleController } from './movement/IMantleController';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import { DaggerBurstSystem } from './combat/DaggerBurstSystem';
+import { BloodComponent } from './BloodComponent';
+import { HealthComponent } from './HealthComponent';
 
 // ---------------------------------------------------------------------------
 // BloodmancerControllerComponent
@@ -87,7 +89,12 @@ export class BloodmancerControllerComponent
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
 
-    this.daggerBurstSystem = new DaggerBurstSystem({ poolName: 'DaggerManager' });
+    this.daggerBurstSystem = new DaggerBurstSystem({
+      poolName: 'DaggerManager',
+      bloodCostPerShot: 10,
+      getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
+      getHealth: () => this.getOwner().getComponent('health') as HealthComponent | null,
+    });
   }
 
   // ---------------------------------------------------------------------------
