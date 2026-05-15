@@ -33,6 +33,7 @@ import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
+import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
@@ -172,6 +173,7 @@ export class Engine {
     PaletteQuantizeComponent.registerMsgs();
     GodRaysComponent.registerMsgs();
     ContactShadowsComponent.registerMsgs();
+    BloodDrainSourceComponent.registerMsgs();
     LensFlareComponent.registerMsgs();
     HeightFogComponent.registerMsgs();
     AtmosphericFogComponent.registerMsgs();

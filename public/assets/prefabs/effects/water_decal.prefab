@@ -1,31 +1,31 @@
 {
-    "children": [],
-    "components": {
-      "name": "Water Decal",
-      "transform": {
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "rotation": [
-          0,
-          90,
-          0
-        ],
-        "scale": [
-          40,
-          1,
-          10
-        ]
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "unit_cube.obj",
-            "material": "water_decal.mat"
-          }
-        ]
-      }
+  "children": [],
+  "components": {
+    "name": "Water Decal",
+    "transform": {
+      "position": [
+        0,
+        -5,
+        0
+      ],
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "scale": [
+        40,
+        4,
+        10
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "water_decal.mat"
+        }
+      ]
     }
   }
+}

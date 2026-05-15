@@ -70,6 +70,7 @@ import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent
 import { HealthComponent } from '../../components/game/HealthComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
+import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { SkinnedMeshComponent } from '../../components/render/SkinnedMeshComponent';
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
 import { ViewModelMeshComponent } from '../../components/render/ViewModelMeshComponent';
@@ -412,6 +413,8 @@ export class Loader {
         return new StaminaComponent();
       case 'blood':
         return new BloodComponent();
+      case 'blood_drain_source':
+        return new BloodDrainSourceComponent();
       case 'view_model':
         return new ViewModelComponent();
       case 'view_model_mesh':

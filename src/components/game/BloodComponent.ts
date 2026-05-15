@@ -87,6 +87,18 @@ export class BloodComponent extends Component {
     this.spend(actual);
   }
 
+  /**
+   * Añade `amount` de sangre directamente, sin tocar el timer de regen.
+   * Útil para efectos externos (drenado de enemigos, pociones, etc.).
+   */
+  public restore(amount: number): void {
+    if (amount <= 0) return;
+    this.currentBlood = Math.min(this.maxBlood, this.currentBlood + amount);
+    if (this.currentBlood >= this.maxBlood) {
+      this.getOwner().sendMsg(Msg.bloodRestored());
+    }
+  }
+
   /** true si hay al menos `amount` de sangre disponible. */
   public has(amount: number): boolean {
     return this.currentBlood >= amount;

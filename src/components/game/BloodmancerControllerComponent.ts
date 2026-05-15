@@ -17,6 +17,7 @@ import { CharacterControllerComponentDataType } from '../../types/CharacterContr
 import { DaggerBurstSystem } from './combat/DaggerBurstSystem';
 import { BloodComponent } from './BloodComponent';
 import { HealthComponent } from './HealthComponent';
+import { BloodDrainSourceComponent } from './BloodDrainSourceComponent';
 
 // ---------------------------------------------------------------------------
 // BloodmancerControllerComponent
@@ -53,6 +54,7 @@ export class BloodmancerControllerComponent
   private groundNormal: vec3 = vec3.fromValues(0, 1, 0);
   private inputDisableTimer = -10.0;
   private impulsePadInputDisableTime = 0.5;
+  private isDraining = false;
 
   // ── Sub-sistemas ───────────────────────────────────────────────────────────
   private movementSystem!: MovementSystem;
@@ -110,6 +112,7 @@ export class BloodmancerControllerComponent
     this.updateGroundedState();
     this.mantleSystem.update();
     this.daggerBurstSystem.update(deltaTime, this.camera);
+    this.updateBloodDrain(deltaTime);
 
     if (this.inputDisableTimer > 0) {
       this.inputDisableTimer -= deltaTime;
@@ -417,6 +420,44 @@ export class BloodmancerControllerComponent
   public override renderDebug(): void {
     throw new Error('Method not implemented.');
   }
+
+  // ---------------------------------------------------------------------------
+  // Blood drain interaction
+  // ---------------------------------------------------------------------------
+
+  private updateBloodDrain(deltaTime: number): void {
+    const playerId = this.getOwner().id;
+    const source = BloodDrainSourceComponent.getInRange(playerId);
+    const bloodComp = this.getOwner().getComponent('blood') as BloodComponent | null;
+
+    // Pulsar E activa el drenaje (solo si hay fuente en rango y sangre incompleta)
+    if (Engine.getInput().isActionJustPressed(GameAction.INTERACT)) {
+      if (
+        source &&
+        !source.isDepleted() &&
+        bloodComp &&
+        bloodComp.getBlood() < bloodComp.getMaxBlood()
+      ) {
+        this.isDraining = true;
+      }
+    }
+
+    if (!this.isDraining) return;
+
+    // Parar automáticamente si ya no hay fuente, está agotada, o la sangre está llena
+    if (
+      !source ||
+      source.isDepleted() ||
+      !bloodComp ||
+      bloodComp.getBlood() >= bloodComp.getMaxBlood()
+    ) {
+      this.isDraining = false;
+      return;
+    }
+
+    source.drain(deltaTime, bloodComp);
+  }
+
   public getIsVaulting(): boolean {
     throw new Error('Method not implemented.');
   }

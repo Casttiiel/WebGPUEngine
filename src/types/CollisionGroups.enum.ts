@@ -25,6 +25,7 @@ export enum CollisionGroups {
   IMPULSE_TRIGGER = 0x00000040, // 0b01000000 - Plataformas de impulso
   CHECKPOINT = 0x00000080, // 0b10000000 - Checkpoints
   GRAPPLE_TRIGGER = 0x00000100, // 0b100000000 - Zonas de rango de grapple hook
+  BLOOD_DRAIN_TRIGGER = 0x00000200, // Zonas de drenado de sangre
 
   // Utilidades
   ALL = 0xffffffff, // Todos los grupos
@@ -44,7 +45,8 @@ export const CollisionMasks = {
     CollisionGroups.SWING_TRIGGER |
     CollisionGroups.IMPULSE_TRIGGER |
     CollisionGroups.CHECKPOINT |
-    CollisionGroups.GRAPPLE_TRIGGER,
+    CollisionGroups.GRAPPLE_TRIGGER |
+    CollisionGroups.BLOOD_DRAIN_TRIGGER,
 
   // Environment solo colisiona con player, enemigos y proyectiles
   ENVIRONMENT: CollisionGroups.PLAYER | CollisionGroups.ENEMY | CollisionGroups.PROJECTILE,

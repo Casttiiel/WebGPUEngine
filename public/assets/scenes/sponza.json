@@ -118,5 +118,13 @@
         "terrainName": "Terrain"
       }
     }
+  },
+  {
+    "prefab": "gameplay/blood_drain_source.prefab",
+    "components": {
+      "transform": {
+        "position": [0, -5.5, 3]
+      }
+    }
   }
 ]

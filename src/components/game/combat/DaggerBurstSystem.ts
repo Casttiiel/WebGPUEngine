@@ -98,11 +98,16 @@ export class DaggerBurstSystem {
   private fireOne(camera: CameraComponent | null): void {
     if (!camera) return;
 
-    // Spend blood; if insufficient, consume health instead
+    // Spend blood; if insufficient, drain the remainder and charge health for the deficit
     if (this.bloodCostPerShot > 0) {
       const blood = this.getBlood?.();
-      if (blood && !blood.spend(this.bloodCostPerShot)) {
-        this.getHealth?.()?.takeDamage(this.bloodCostPerShot);
+      if (blood) {
+        const available = blood.getBlood();
+        blood.spendClamped(this.bloodCostPerShot);
+        const deficit = this.bloodCostPerShot - available;
+        if (deficit > 0) {
+          this.getHealth?.()?.takeDamage(deficit);
+        }
       }
     }
 

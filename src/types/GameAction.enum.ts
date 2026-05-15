@@ -27,6 +27,9 @@ export enum GameAction {
   HEAVY_ATTACK = 'heavy_attack',
   SHIELD = 'shield',
 
+  // Interaction
+  INTERACT = 'interact',
+
   // Abilities
   ABILITY_Q = 'ability_q',
   ABILITY_E = 'ability_e',
