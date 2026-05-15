@@ -20,7 +20,9 @@ export interface TerrainMeshBuildParams {
   lodLevel: number;
   /**
    * How far (world units) the skirt vertices hang below the border edge.
-   * Set to 0 to disable skirts. Default: 4.
+   * Set to 0 to disable skirts. Default: 0 (chunks are geometrically seamless
+   * at the same LOD, so no skirt is needed and any positive value creates a
+   * visible step at chunk boundaries).
    */
   skirtDepth?: number;
 }
@@ -44,7 +46,7 @@ export class TerrainMeshBuilder {
    */
   static build(params: TerrainMeshBuildParams): RawMeshData {
     const { terrainData, chunkX, chunkZ, lodLevel } = params;
-    const skirtDepth = params.skirtDepth ?? 4;
+    const skirtDepth = params.skirtDepth ?? 0;
     const cfg = terrainData.config;
 
     // LOD reduces vertex count: step = 2^lodLevel

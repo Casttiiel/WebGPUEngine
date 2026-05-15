@@ -4,11 +4,15 @@
   "casts_shadows": false,
   "uvXScale": 8,
   "uvYScale": 8,
+  "roughnessFactor": 1,
+  "pomScale": 0.2,
   "textures": {
     "txLayer0Alb": "Asphalt01_Color.png",
     "txLayer0Nrm": "Asphalt01_Normal.png",
+    "txLayer0Rgh": "Asphalt01_Roughness.png",
     "txLayer1Alb": "Carbon01_Color.png",
     "txLayer1Nrm": "no-normal.jpg",
+    "txLayer1Rgh": "Carbon01_Roughness.png",
     "txLayer2Alb": "white.png",
     "txLayer2Nrm": "no-normal.jpg"
   }

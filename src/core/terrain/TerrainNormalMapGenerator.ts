@@ -45,9 +45,11 @@ export class TerrainNormalMapGenerator {
 
     for (let py = 0; py < resolution; py++) {
       for (let px = 0; px < resolution; px++) {
-        // UV within chunk [0, 1]
-        const u = (px + 0.5) / resolution;
-        const v = (py + 0.5) / resolution;
+        // UV within chunk [0, 1] — map pixel 0 → left boundary, pixel (res-1) → right boundary.
+        // This ensures the edge texels of adjacent chunks compute normals at the SAME world
+        // position, eliminating shading seams at chunk boundaries.
+        const u = resolution > 1 ? px / (resolution - 1) : 0.5;
+        const v = resolution > 1 ? py / (resolution - 1) : 0.5;
 
         // Absolute world position of this texel
         const wx = chunkX * chunkSize + u * chunkSize;

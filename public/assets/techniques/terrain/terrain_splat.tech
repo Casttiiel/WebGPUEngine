@@ -59,6 +59,24 @@
       "defaultValue": "no-normal.jpg"
     },
     {
+      "name": "txLayer0Rgh",
+      "binding": 10,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer1Rgh",
+      "binding": 11,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer2Rgh",
+      "binding": 12,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
       "name": "samplerState",
       "binding": 8,
       "type": "sampler",
