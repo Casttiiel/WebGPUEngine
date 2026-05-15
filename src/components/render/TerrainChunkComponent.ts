@@ -59,10 +59,27 @@ export class TerrainChunkComponent extends Component {
   private isRebuilding: boolean = false;
 
   /**
-   * Squared-distance thresholds for LOD transitions.
-   * LOD0 when dist² < [0], LOD1 when < [1], LOD2 when < [2], LOD3 otherwise.
+   * Hysteresis LOD thresholds (squared distances).
+   *
+   * INNER = upgrade threshold: switch to a BETTER (lower) LOD when dist² < inner[lod]
+   * OUTER = downgrade threshold: switch to a WORSE (higher) LOD when dist² > outer[lod]
+   *
+   * The dead zone between inner[i] and outer[i] prevents oscillation when the
+   * camera sits near a boundary (the previous bug with the 80m single threshold).
+   *
+   * Values chosen so that the entire 256-unit terrain stays at LOD0 while the
+   * camera is anywhere on or near it (~max dist to a chunk centre ≈ 200m).
    */
-  private static readonly LOD_DIST2: [number, number, number] = [80 * 80, 160 * 160, 320 * 320];
+  private static readonly LOD_INNER_DIST2: [number, number, number] = [
+    200 * 200, // < 200m  → upgrade to LOD0
+    320 * 320, // < 320m  → upgrade to LOD1
+    480 * 480, // < 480m  → upgrade to LOD2
+  ];
+  private static readonly LOD_OUTER_DIST2: [number, number, number] = [
+    225 * 225, // > 225m  → downgrade from LOD0
+    360 * 360, // > 360m  → downgrade from LOD1
+    540 * 540, // > 540m  → downgrade from LOD2
+  ];
 
   // ---------------------------------------------------------------------------
   // Component lifecycle
@@ -141,15 +158,28 @@ export class TerrainChunkComponent extends Component {
     const dz = (camPos[2] ?? 0) - centerZ;
     const dist2 = dx * dx + dz * dz;
 
-    let targetLod = 3;
-    for (let i = 0; i < TerrainChunkComponent.LOD_DIST2.length; i++) {
-      if (dist2 < TerrainChunkComponent.LOD_DIST2[i]!) {
-        targetLod = i;
-        break;
-      }
-    }
+    const INNER = TerrainChunkComponent.LOD_INNER_DIST2;
+    const OUTER = TerrainChunkComponent.LOD_OUTER_DIST2;
+    const current = this.currentLodLevel;
 
-    if (targetLod !== this.currentLodLevel) {
+    // Resolve the ideal LOD for a given threshold array (no hysteresis, pure distance).
+    const idealLod = (thresholds: [number, number, number]): number => {
+      for (let i = 0; i < thresholds.length; i++) {
+        if (dist2 < thresholds[i]!) return i;
+      }
+      return 3;
+    };
+
+    // Hysteresis: upgrade uses INNER thresholds, downgrade uses OUTER thresholds.
+    // In the dead zone (inner < dist < outer for current LOD) the level is kept.
+    let targetLod = current;
+    const byInner = idealLod(INNER);
+    const byOuter = idealLod(OUTER);
+
+    if (byInner < current) targetLod = byInner;       // closer than inner → upgrade
+    else if (byOuter > current) targetLod = byOuter;  // farther than outer → downgrade
+
+    if (targetLod !== current) {
       this.currentLodLevel = targetLod;
       this.buildRenderMesh(targetLod).catch((e) =>
         console.error('[TerrainChunk] LOD rebuild error', e),
@@ -161,40 +191,57 @@ export class TerrainChunkComponent extends Component {
   // Mesh build helpers
   // ---------------------------------------------------------------------------
 
-  /** Builds (or rebuilds) the render mesh at the given LOD. */
-  private async buildRenderMesh(lodLevel: number): Promise<void> {
+  /**
+   * Skirt depth for the render mesh (world units).
+   * Skirts hang the border edge vertices downward to hide T-junction cracks
+   * that appear when adjacent chunks are at different LOD levels.
+   * Keep at 0 for physics collider (always built at LOD0, no T-junctions).
+   */
+  private static readonly SKIRT_DEPTH = 2.0;
+
+  /**
+   * Builds (or rebuilds) the render mesh at the given LOD.
+   *
+   * @param lodLevel       Target LOD level (0 = full quality).
+   * @param rebuildTextures When true the normal map and splat map are
+   *   regenerated from the heightmap.  Pass true after brush deformation.
+   *   On LOD-only swaps the textures are identical so we skip the CPU work.
+   */
+  private async buildRenderMesh(lodLevel: number, rebuildTextures = false): Promise<void> {
+    const { chunkX, chunkZ } = this.chunkData;
+    const normalMapLabel = `terrain:normal:${chunkX}_${chunkZ}`;
+    const splatLabel = `terrain:splat:${chunkX}_${chunkZ}`;
+    const isFirstBuild = this.renderComp === null;
+
+    // ── Geometry ──────────────────────────────────────────────────────────────
     const rawMesh = TerrainMeshBuilder.build({
       terrainData: this.chunkData.terrainData,
-      chunkX: this.chunkData.chunkX,
-      chunkZ: this.chunkData.chunkZ,
+      chunkX,
+      chunkZ,
       lodLevel,
+      skirtDepth: TerrainChunkComponent.SKIRT_DEPTH,
     });
 
-    // ── Phase 4: per-chunk normal map ────────────────────────────────────────
-    // Generate a 256×256 tangent-space normal map from the full-res heightmap.
-    // The same GPU texture is reused across LOD rebuilds; only the pixel data
-    // changes on brush-deform rebuilds.
-    const normalMapLabel = `terrain:normal:${this.chunkData.chunkX}_${this.chunkData.chunkZ}`;
-    const normalPixels = TerrainNormalMapGenerator.generate(
-      this.chunkData.terrainData,
-      this.chunkData.chunkX,
-      this.chunkData.chunkZ,
-    );
-    this.normalMapTexture = Texture.createFromPixelData(normalMapLabel, 256, 256, normalPixels);
+    // ── Textures ──────────────────────────────────────────────────────────────
+    // Normal map and splat map are independent of LOD — skip the (synchronous
+    // but expensive) CPU regeneration on LOD-only swaps.
+    if (isFirstBuild || rebuildTextures) {
+      const normalPixels = TerrainNormalMapGenerator.generate(
+        this.chunkData.terrainData,
+        chunkX,
+        chunkZ,
+      );
+      this.normalMapTexture = Texture.createFromPixelData(normalMapLabel, 256, 256, normalPixels);
 
-    // ── Splat: per-chunk splat weight map ─────────────────────────────────────
-    // Generate a 256×256 RGBA8 weight texture from heightmap height + slope.
-    // R = ground/grass, G = rock, B = snow.
-    const splatLabel = `terrain:splat:${this.chunkData.chunkX}_${this.chunkData.chunkZ}`;
-    const splatPixels = TerrainSplatGenerator.generate(
-      this.chunkData.terrainData,
-      this.chunkData.chunkX,
-      this.chunkData.chunkZ,
-    );
-    this.splatMapTexture = Texture.createFromPixelData(splatLabel, 256, 256, splatPixels);
+      const splatPixels = TerrainSplatGenerator.generate(
+        this.chunkData.terrainData,
+        chunkX,
+        chunkZ,
+      );
+      this.splatMapTexture = Texture.createFromPixelData(splatLabel, 256, 256, splatPixels);
+    }
 
-    // Load base material data once (cached after first fetch) so we can
-    // create a unique inline material per chunk with the generated textures.
+    // ── Material (cached base + per-chunk texture overrides) ──────────────────
     let baseMat = TerrainChunkComponent.matDataCache.get(this.chunkData.materialPath);
     if (!baseMat) {
       baseMat = await ResourceManager.loadMaterialData(this.chunkData.materialPath);
@@ -205,31 +252,32 @@ export class TerrainChunkComponent extends Component {
       ...baseMat,
       textures: {
         ...baseMat.textures,
-        // Standard PBR fallback (terrain_test.mat uses txNormal)
         txNormal: normalMapLabel,
-        // Splat technique bindings
         txChunkNormal: normalMapLabel,
         txSplat: splatLabel,
       },
     };
 
+    // ── Flicker-free swap ─────────────────────────────────────────────────────
+    // 1. Set owner early so updateRenderManager() inside load() can resolve the
+    //    TransformComponent from the entity.
+    // 2. Load the new component fully (GPU buffers committed, render keys added).
+    //    The OLD component keeps rendering with zero gap during this await.
+    // 3. Atomically dispose old + update entity map once new is ready.
     const entity = this.getOwner();
+    const oldComp = this.renderComp;
 
-    if (this.renderComp) {
-      this.renderComp.dispose();
-    }
-    this.renderComp = new RenderComponent();
-    entity.addComponent('render', this.renderComp);
+    const newComp = new RenderComponent();
+    newComp.setOwner(entity);
 
-    await this.renderComp.load({
-      meshes: [
-        {
-          meshData: rawMesh,
-          materialData: perChunkMat,
-          visible: true,
-        },
-      ],
+    await newComp.load({
+      meshes: [{ meshData: rawMesh, materialData: perChunkMat, visible: true }],
     });
+
+    // Atomic swap — old removed from render manager, new already registered.
+    oldComp?.dispose();
+    entity.addComponent('render', newComp);
+    this.renderComp = newComp;
   }
 
   /**
@@ -277,7 +325,11 @@ export class TerrainChunkComponent extends Component {
   private async rebuildChunk(): Promise<void> {
     this.isRebuilding = true;
     try {
-      await Promise.all([this.buildRenderMesh(this.currentLodLevel), this.buildPhysicsCollider()]);
+      // rebuildTextures=true: heightmap changed via brush, so normal/splat maps must update.
+      await Promise.all([
+        this.buildRenderMesh(this.currentLodLevel, true),
+        this.buildPhysicsCollider(),
+      ]);
     } finally {
       this.isRebuilding = false;
     }
