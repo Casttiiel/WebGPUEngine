@@ -32,6 +32,7 @@ import { MotionBlurComponent } from '../../components/render/MotionBlurComponent
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
+import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
@@ -170,6 +171,7 @@ export class Engine {
     FSRComponent.registerMsgs();
     PaletteQuantizeComponent.registerMsgs();
     GodRaysComponent.registerMsgs();
+    ContactShadowsComponent.registerMsgs();
     LensFlareComponent.registerMsgs();
     HeightFogComponent.registerMsgs();
     AtmosphericFogComponent.registerMsgs();

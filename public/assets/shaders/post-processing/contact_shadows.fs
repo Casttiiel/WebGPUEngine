@@ -30,12 +30,17 @@ struct ContactShadowParams {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Project a world-space position to screen UV [0,1]
-fn worldToUV(worldPos: vec3<f32>) -> vec2<f32> {
+// Project a world-space position to screen UV [0,1].
+// Returns vec3: xy = UV, z = clip.w (≤ 0 means behind camera — treat as invalid).
+fn worldToUVW(worldPos: vec3<f32>) -> vec3<f32> {
     let clip = camera.projectionMatrix * (camera.viewMatrix * vec4<f32>(worldPos, 1.0));
-    let ndc  = clip.xy / clip.w;
+    // Guard: behind camera → return sentinel so caller can skip this step
+    if (clip.w <= 0.0) {
+        return vec3<f32>(0.0, 0.0, -1.0);
+    }
+    let ndc = clip.xy / clip.w;
     // WebGPU NDC: x∈[-1,1]→[0,1], y∈[-1,1] (Y-up)→[1,0] (Y-down in UV)
-    return vec2<f32>(ndc.x * 0.5 + 0.5, -ndc.y * 0.5 + 0.5);
+    return vec3<f32>(ndc.x * 0.5 + 0.5, -ndc.y * 0.5 + 0.5, clip.w);
 }
 
 // Compute the linearDepth convention used by the GBuffer for an arbitrary world pos.
@@ -63,38 +68,69 @@ fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
         return vec4<f32>(1.0);
     }
 
-    // Early-out: surface facing away from the light (backlit surfaces don't cast contact shadows)
+    // Early-out: surface facing away from the light (backlit → no contact shadow)
     let NdL = saturate(dot(g.normal, params.lightDir));
     if (NdL <= 0.0) {
         return vec4<f32>(1.0);
     }
 
-    // ── Screen-space ray march toward light ──────────────────────────────────
+    // ── Screen-space-aware step count ────────────────────────────────────────
+    // World-space steps produce banding near the camera because a fixed step
+    // covers very different numbers of pixels depending on depth.  Project the
+    // full ray extent to screen space and derive numSteps so each step covers
+    // roughly a constant number of pixels — dense near the camera, sparse far.
+    var numSteps: i32 = 16; // safe fallback
+    let startClip = camera.projectionMatrix * (camera.viewMatrix * vec4<f32>(g.worldPos, 1.0));
+    let endWorld  = g.worldPos + params.lightDir * params.maxDistance;
+    let endClip   = camera.projectionMatrix * (camera.viewMatrix * vec4<f32>(endWorld, 1.0));
+    if (startClip.w > 0.0 && endClip.w > 0.0) {
+        let startNDC  = startClip.xy / startClip.w;
+        let endNDC    = endClip.xy   / endClip.w;
+        // Convert NDC distance to pixels (account for UV-space scale)
+        let startUV   = vec2<f32>(startNDC.x * 0.5 + 0.5, -startNDC.y * 0.5 + 0.5);
+        let endUV     = vec2<f32>(endNDC.x   * 0.5 + 0.5, -endNDC.y   * 0.5 + 0.5);
+        let screenPx  = length((endUV - startUV) * camera.screenSize);
+        // ~1 step every 3 pixels, clamped to a sensible range
+        numSteps = clamp(i32(screenPx / 3.0), 4, 32);
+    }
+
+    // ── Self-shadowing bias ───────────────────────────────────────────────────
+    // Start the ray half a step ahead so the first sample doesn't land on the
+    // origin surface.  The depth-proportional term handles precision loss at
+    // large view depths (acne grows with distance without it).
+    let startBias = params.stepLength * 0.5 + g.zlinear * camera.cameraFar * 0.001;
+
+    // ── World-space ray march toward light ───────────────────────────────────
     var shadow: f32 = 0.0;
 
-    // Compute number of steps to cover maxDistance
-    let numSteps: i32 = clamp(i32(params.maxDistance / params.stepLength), 1, 24);
-
     for (var i: i32 = 1; i <= numSteps; i++) {
-        let t        = f32(i) * params.stepLength;
-        let rayPos   = g.worldPos + params.lightDir * t;
+        let t      = startBias + f32(i) * params.stepLength;
+        if (t > params.maxDistance) { break; }
 
-        let rayUV    = worldToUV(rayPos);
+        let rayPos = g.worldPos + params.lightDir * t;
+        let uvw    = worldToUVW(rayPos);
 
-        // Discard steps outside the screen
+        // Behind camera: skip this step, continue ray (don't abort entirely)
+        if (uvw.z <= 0.0) { continue; }
+
+        let rayUV = uvw.xy;
+
+        // Outside screen: continue — the ray may re-enter near screen edges
         if (rayUV.x < 0.0 || rayUV.x > 1.0 || rayUV.y < 0.0 || rayUV.y > 1.0) {
-            break;
+            continue;
         }
 
         let sceneZ = textureSampleLevel(gLinearDepth, samplerGBuffer, rayUV, 0.0).x;
         let rayZ   = worldToLinearDepth(rayPos);
 
-        // Ray is behind geometry (further from camera) and within the thickness band?
+        // Ray is behind geometry and within the thickness band → occluded
         let delta = rayZ - sceneZ;
         if (delta > 0.0 && delta < params.thickness) {
-            // Fade with distance; scale by NdL so shadow only affects where DL actually contributes
             let fade = 1.0 - t / params.maxDistance;
-            shadow   = params.intensity * max(0.0, fade) * NdL;
+            // Contact shadow is binary (occluder present or not) — do NOT scale by
+            // NdL here.  Grazing surfaces (low NdL) can still be fully occluded;
+            // surfaces facing away are already excluded by the early-out above.
+            shadow = params.intensity * max(0.0, fade);
             break;
         }
     }
@@ -103,3 +139,4 @@ fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
     let shadowFactor = 1.0 - shadow;
     return vec4<f32>(shadowFactor, shadowFactor, shadowFactor, 1.0);
 }
+

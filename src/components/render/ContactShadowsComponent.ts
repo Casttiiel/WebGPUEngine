@@ -9,6 +9,8 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { Render } from '../../renderer/core/pipeline/Render';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Engine } from '../../core/engine/Engine';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
 
 /**
  * ContactShadowsComponent
@@ -54,6 +56,15 @@ export class ContactShadowsComponent extends Component {
 
   // ─── Reusable Float32Array to avoid allocations on hot path ─────────────
   private readonly paramsData = new Float32Array(8);
+
+  // ─── Message registration ────────────────────────────────────────────────
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.RESIZE, 'contact_shadows', (comp) => {
+      const c = comp as ContactShadowsComponent;
+      if (c.hasLoaded()) c.resize();
+    });
+  }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
