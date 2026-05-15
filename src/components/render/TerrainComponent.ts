@@ -13,7 +13,9 @@ import { Engine } from '../../core/engine/Engine';
 import { TransformComponent } from '../core/TransformComponent';
 import { HeightmapGenerator, NoiseParams } from '../../core/terrain/HeightmapGenerator';
 import { TerrainConfig, TerrainData } from '../../core/terrain/TerrainData';
+import { TerrainMeshBuilder } from '../../core/terrain/TerrainMeshBuilder';
 import { TerrainChunkComponent } from './TerrainChunkComponent';
+import { NavMeshBuilder } from '../../ai/nav/NavMeshBuilder';
 
 // ---------------------------------------------------------------------------
 // JSON data shape (public/assets/scenes/*.json)
@@ -341,6 +343,70 @@ export class TerrainComponent extends Component {
       }
     }
     await Promise.all(chunkPromises);
+    // Build navmesh in the background — AI checks isBuilt() before querying,
+    // so this is safe to defer. Keeps it off the loading-screen critical path.
+    this.buildNavMesh().catch((e) => console.error('[Terrain] NavMesh build failed', e));
+  }
+
+  /**
+   * Generates a navmesh from the terrain geometry so AI agents can navigate it.
+   * Runs TerrainMeshBuilder at LOD 1 (half-resolution) for each chunk,
+   * transforms positions to world space, merges all chunks and feeds the
+   * combined geometry into NavMeshBuilder (Recast/Detour).
+   */
+  private async buildNavMesh(): Promise<void> {
+    // LOD 2 = quarter-resolution per chunk. Recast voxelises the mesh anyway
+    // so fine input geometry is wasted; LOD 2 still captures all slope features.
+    const NAV_LOD = 2;
+
+    const { chunkCountX, chunkCountZ, chunkSize } = this.terrainData.config;
+
+    // Terrain entity world-space origin (may be non-zero if the entity is moved)
+    const tc = this.getOwner().getComponent('transform') as TransformComponent | null;
+    const originX = tc ? (tc.getTransform().getWorldPosition()[0] ?? 0) : 0;
+    const originY = tc ? (tc.getTransform().getWorldPosition()[1] ?? 0) : 0;
+    const originZ = tc ? (tc.getTransform().getWorldPosition()[2] ?? 0) : 0;
+
+    const allPositions: number[] = [];
+    const allIndices: number[] = [];
+    let vertexOffset = 0;
+
+    for (let cz = 0; cz < chunkCountZ; cz++) {
+      for (let cx = 0; cx < chunkCountX; cx++) {
+        const raw = TerrainMeshBuilder.build({
+          terrainData: this.terrainData,
+          chunkX: cx,
+          chunkZ: cz,
+          lodLevel: NAV_LOD,
+          // No skirts — skirt geometry extends below the surface and
+          // would create spurious navmesh polygons underground.
+          skirtDepth: 0,
+        });
+
+        const pos = raw.attributes.POSITION;
+        const vertCount = pos.length / 3;
+        const chunkOffsetX = cx * chunkSize + originX;
+        const chunkOffsetZ = cz * chunkSize + originZ;
+
+        // Transform chunk-local positions → world space
+        for (let i = 0; i < vertCount; i++) {
+          allPositions.push((pos[i * 3] ?? 0) + chunkOffsetX);
+          allPositions.push((pos[i * 3 + 1] ?? 0) + originY);
+          allPositions.push((pos[i * 3 + 2] ?? 0) + chunkOffsetZ);
+        }
+
+        for (const idx of raw.indices) {
+          allIndices.push(idx + vertexOffset);
+        }
+        vertexOffset += vertCount;
+      }
+    }
+
+    await NavMeshBuilder.build(new Float32Array(allPositions), new Uint32Array(allIndices));
+    console.log(
+      `[TerrainComponent] NavMesh built from ${chunkCountX * chunkCountZ} terrain chunks ` +
+        `(${allIndices.length / 3} triangles).`,
+    );
   }
 
   private async createChunk(parent: Entity, cx: number, cz: number): Promise<void> {

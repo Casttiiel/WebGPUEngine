@@ -126,5 +126,13 @@
         "position": [0, -5.5, 3]
       }
     }
+  },
+  {
+    "prefab": "characters/enemy_basic.prefab",
+    "components": {
+      "transform": {
+        "position": [5, 0, 0]
+      }
+    }
   }
 ]

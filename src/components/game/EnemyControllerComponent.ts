@@ -11,6 +11,9 @@ import { BehaviorNode } from '../../ai/BehaviorNode';
 import { RequestPathAction } from '../../ai/nodes/RequestPathAction';
 import { SteerAction } from '../../ai/nodes/SteerAction';
 import { EnemyControllerComponentDataType } from '../../types/EnemyControllerComponentData.type';
+import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
+import { MsgType } from '../../types/MsgType.enum';
+import { BloodDrainSourceComponent } from './BloodDrainSourceComponent';
 
 /**
  * EnemyControllerComponent
@@ -84,6 +87,10 @@ export class EnemyControllerComponent extends Component {
   public currentState: string = 'IDLE';
   /** DOM element used to render the state label on screen. */
   private stateEl: HTMLElement | null = null;
+  /** True once ON_DEATH received — stops the AI update loop. */
+  private dead: boolean = false;
+  /** BloodDrainSourceComponent on the same entity, activated on death. */
+  private bloodDrainSource: BloodDrainSourceComponent | null = null;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -145,11 +152,14 @@ export class EnemyControllerComponent extends Component {
       document.body.appendChild(el);
     }
     this.stateEl = el;
+    this.bloodDrainSource =
+      this.getOwner().getComponent('blood_drain_source') as BloodDrainSourceComponent | null;
   }
 
   // ─── Main update ───────────────────────────────────────────────────────────
 
   public update(deltaTime: number): void {
+    if (this.dead) return;
     if (!this.capsuleCollider || !this.characterController) return;
 
     // 1. Sync world position + facing into blackboard
@@ -446,6 +456,22 @@ export class EnemyControllerComponent extends Component {
     if (vy > 0 && corrected.y < vy * dt * 0.5) {
       this.verticalVelocity = 0;
     }
+  }
+
+  // ─── Death handling ────────────────────────────────────────────────────────
+
+  public static registerMsgs(): void {
+    MsgDispatcher.register(MsgType.ON_DEATH, 'enemy_controller', (comp) => {
+      (comp as EnemyControllerComponent).onDeath();
+    });
+  }
+
+  private onDeath(): void {
+    this.dead = true;
+    // Zero out the rigid body velocity so physics doesn't keep sliding the corpse.
+    this.capsuleCollider?.getRigidBody().setLinvel({ x: 0, y: 0, z: 0 }, true);
+    if (this.stateEl) this.stateEl.textContent = 'AI: DEAD';
+    this.bloodDrainSource?.activate();
   }
 
   // ─── Component boilerplate ─────────────────────────────────────────────────

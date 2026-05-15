@@ -37,7 +37,9 @@
       "fovDegrees": 120,
       "eyeHeightOffset": 0.7,
       "checkInterval": 0.1
-    }
+    },
+    "health": { "maxHp": 100 },
+    "blood_drain_source": { "totalBlood": 100, "drainRate": 40, "startActive": false }
   },
   "children": [
     {

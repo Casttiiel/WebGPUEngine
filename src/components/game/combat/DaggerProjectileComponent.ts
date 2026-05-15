@@ -3,6 +3,7 @@ import { vec3 } from 'gl-matrix';
 import { ProjectileComponent } from '../ProjectileComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GrappleTargetComponent } from '../GrappleTargetComponent';
+import { Msg } from '../../../core/ecs/Msg';
 
 /**
  * DaggerProjectileComponent — Extiende ProjectileComponent para añadir
@@ -28,6 +29,12 @@ export class DaggerProjectileComponent extends ProjectileComponent {
 
     if (entityId !== undefined) {
       const entity = Engine.getEntities().getEntityById(entityId);
+
+      // Deal damage to whatever entity was hit (only entities with HealthComponent react)
+      if (entity) {
+        entity.sendMsg(Msg.damage({ amount: this.damage, instigator: null }));
+      }
+
       const isGrappleTarget = entity?.getComponent('grapple_target') != null;
 
       if (isGrappleTarget && this.onGrappleHit) {

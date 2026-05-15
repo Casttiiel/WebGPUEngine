@@ -34,6 +34,7 @@ import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantiz
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
+import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
@@ -182,9 +183,9 @@ export class Engine {
     SwingBarComponent.registerMsgs();
     ReflectionProbeComponent.registerMsgs();
     GrappleTargetComponent.registerMsgs();
+    EnemyControllerComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
-    // EnemyControllerComponent.registerMsgs();
   }
 
   public static renderInMenu(): void {

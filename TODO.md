@@ -11,12 +11,11 @@
 9. Editor Camera (Render Debug / Gizmo / Menu)
 10. Asset Spawn + Delete
 11. Enemy AI / NavMesh
-    (pensar en epipolar shadow map sampling)
 
 ## Gameplay
 
-1. Secondary attack
-2. Dash/Charge
+1. Execute/Dash/Charge
+2. Secondary attack
 
 ## Visuals and Sound
 

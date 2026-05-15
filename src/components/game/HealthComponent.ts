@@ -53,6 +53,7 @@ export class HealthComponent extends Component {
     const actual = Math.min(amount, this.currentHp);
     this.currentHp -= actual;
     this.invincibilityTimer = this.invincibilityTime;
+    console.log(`[Health] ${this.getOwner().getName()} HP: ${this.currentHp} / ${this.maxHp}`);
 
     this.getOwner().sendMsg(
       Msg.onDamaged({ amount: actual, currentHp: this.currentHp, instigator }),

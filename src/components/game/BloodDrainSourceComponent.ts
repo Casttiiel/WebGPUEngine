@@ -1,5 +1,7 @@
+import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { TransformComponent } from '../core/TransformComponent';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
 import { BloodComponent } from './BloodComponent';
@@ -28,22 +30,55 @@ export class BloodDrainSourceComponent extends Component {
   private remainingBlood: number = 100;
   /** Velocidad de drenado en unidades de sangre por segundo. */
   private drainRate: number = 40;
+  /** Si es false, los triggers y drain requests son ignorados. */
+  private active: boolean = true;
 
   /**
    * Registro estático: playerId → drain source actualmente en rango.
    * El controller consulta esto para saber si hay una fuente disponible.
    */
   private static readonly inRangeOf: Map<number, BloodDrainSourceComponent> = new Map();
+  /** Fuentes activas para detección por distancia (sin trigger físico). */
+  private static readonly activeSources = new Set<BloodDrainSourceComponent>();
 
   /** Devuelve la fuente de sangre en rango del jugador dado, o undefined. */
   public static getInRange(playerId: number): BloodDrainSourceComponent | undefined {
     return BloodDrainSourceComponent.inRangeOf.get(playerId);
   }
 
-  public load(data: { totalBlood?: number; drainRate?: number }): void {
+  /**
+   * Returns the nearest active drain source within maxRange of playerPos.
+   * Fallback for dead enemies that have no physics sensor.
+   */
+  public static getNearest(playerPos: vec3, maxRange: number): BloodDrainSourceComponent | undefined {
+    let closest: BloodDrainSourceComponent | undefined;
+    let closestDist = maxRange;
+    for (const src of BloodDrainSourceComponent.activeSources) {
+      if (src.isDepleted()) continue;
+      const tc = src.getOwner().getComponent('transform') as TransformComponent | null;
+      if (!tc) continue;
+      const dist = vec3.distance(playerPos, tc.getTransform().getWorldPosition() as vec3);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = src;
+      }
+    }
+    return closest;
+  }
+
+  public load(data: { totalBlood?: number; drainRate?: number; startActive?: boolean }): void {
     this.totalBlood = data?.totalBlood ?? this.totalBlood;
     this.drainRate = data?.drainRate ?? this.drainRate;
     this.remainingBlood = this.totalBlood;
+    this.active = data?.startActive ?? true;
+    if (this.active) BloodDrainSourceComponent.activeSources.add(this);
+  }
+
+  /** Activa esta fuente (llamado cuando el enemigo muere). */
+  public activate(): void {
+    if (this.active) return;
+    this.active = true;
+    BloodDrainSourceComponent.activeSources.add(this);
   }
 
   // ── Mensajes de trigger ───────────────────────────────────────────────────
@@ -60,6 +95,7 @@ export class BloodDrainSourceComponent extends Component {
   }
 
   private onEntityEnter(entityId: number): void {
+    if (!this.active) return;
     const entity = Engine.getPhysics().getEntityById(entityId);
     if (entity?.hasComponent('blood')) {
       BloodDrainSourceComponent.inRangeOf.set(entityId, this);
@@ -103,5 +139,7 @@ export class BloodDrainSourceComponent extends Component {
   public override update(_deltaTime: number): void {}
   public override renderInMenu(): void {}
   public override renderDebug(): void {}
-  public override dispose(): void {}
+  public override dispose(): void {
+    BloodDrainSourceComponent.activeSources.delete(this);
+  }
 }

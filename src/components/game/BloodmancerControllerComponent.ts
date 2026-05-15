@@ -93,7 +93,7 @@ export class BloodmancerControllerComponent
 
     this.daggerBurstSystem = new DaggerBurstSystem({
       poolName: 'DaggerManager',
-      bloodCostPerShot: 10,
+      bloodCostPerShot: 2,
       getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
       getHealth: () => this.getOwner().getComponent('health') as HealthComponent | null,
     });
@@ -427,7 +427,14 @@ export class BloodmancerControllerComponent
 
   private updateBloodDrain(deltaTime: number): void {
     const playerId = this.getOwner().id;
-    const source = BloodDrainSourceComponent.getInRange(playerId);
+    // Trigger-based (static world props) first; fall back to distance-based
+    // for active dead enemies that have no physics sensor.
+    let source: BloodDrainSourceComponent | undefined = BloodDrainSourceComponent.getInRange(playerId);
+    if (!source) {
+      const tc = this.getOwner().getComponent('transform') as TransformComponent | null;
+      const playerPos = tc?.getTransform().getWorldPosition();
+      if (playerPos) source = BloodDrainSourceComponent.getNearest(playerPos as vec3, 3.0);
+    }
     const bloodComp = this.getOwner().getComponent('blood') as BloodComponent | null;
 
     // Pulsar E activa el drenaje (solo si hay fuente en rango y sangre incompleta)

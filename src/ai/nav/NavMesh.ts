@@ -109,17 +109,18 @@ export class NavMesh {
     this._built = false;
 
     // Generate Detour navmesh using Recast voxelisation pipeline.
-    // cs/ch at 0.1 m gives good accuracy for human-scale scenes.
+    // cs=0.3m gives good path accuracy for human-scale scenes at a fraction of
+    // the voxel count vs cs=0.1 (a 256×256 terrain goes from ~6.5M to ~728K cells).
     const { success, navMesh } = generateSoloNavMesh(
       Array.from(finalPositions),
       Array.from(indices),
       {
-        cs: 0.1,
-        ch: 0.05,
+        cs: 0.3,
+        ch: 0.1,
         walkableSlopeAngle: 45,
         walkableHeight: 20, // voxels = 2.0 m / 0.1 ch
-        walkableClimb: 3, // voxels = 0.3 m / 0.1 ch
-        walkableRadius: 0, // no erosion — Rapier physics handles wall avoidance
+        walkableClimb: 3,   // voxels = 0.3 m / 0.1 ch
+        walkableRadius: 0,  // no erosion — Rapier physics handles wall avoidance
         maxEdgeLen: 120, // voxels
         maxSimplificationError: 1.3,
         minRegionArea: 2, // was 8 — tiny island regions now kept (avoids discarding thin areas)
