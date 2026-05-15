@@ -176,8 +176,9 @@ export class TerrainChunkComponent extends Component {
     const byInner = idealLod(INNER);
     const byOuter = idealLod(OUTER);
 
-    if (byInner < current) targetLod = byInner;       // closer than inner → upgrade
-    else if (byOuter > current) targetLod = byOuter;  // farther than outer → downgrade
+    if (byInner < current)
+      targetLod = byInner; // closer than inner → upgrade
+    else if (byOuter > current) targetLod = byOuter; // farther than outer → downgrade
 
     if (targetLod !== current) {
       this.currentLodLevel = targetLod;
