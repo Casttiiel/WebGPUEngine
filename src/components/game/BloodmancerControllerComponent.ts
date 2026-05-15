@@ -429,7 +429,8 @@ export class BloodmancerControllerComponent
     const playerId = this.getOwner().id;
     // Trigger-based (static world props) first; fall back to distance-based
     // for active dead enemies that have no physics sensor.
-    let source: BloodDrainSourceComponent | undefined = BloodDrainSourceComponent.getInRange(playerId);
+    let source: BloodDrainSourceComponent | undefined =
+      BloodDrainSourceComponent.getInRange(playerId);
     if (!source) {
       const tc = this.getOwner().getComponent('transform') as TransformComponent | null;
       const playerPos = tc?.getTransform().getWorldPosition();

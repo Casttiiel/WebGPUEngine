@@ -50,7 +50,10 @@ export class BloodDrainSourceComponent extends Component {
    * Returns the nearest active drain source within maxRange of playerPos.
    * Fallback for dead enemies that have no physics sensor.
    */
-  public static getNearest(playerPos: vec3, maxRange: number): BloodDrainSourceComponent | undefined {
+  public static getNearest(
+    playerPos: vec3,
+    maxRange: number,
+  ): BloodDrainSourceComponent | undefined {
     let closest: BloodDrainSourceComponent | undefined;
     let closestDist = maxRange;
     for (const src of BloodDrainSourceComponent.activeSources) {

@@ -152,8 +152,9 @@ export class EnemyControllerComponent extends Component {
       document.body.appendChild(el);
     }
     this.stateEl = el;
-    this.bloodDrainSource =
-      this.getOwner().getComponent('blood_drain_source') as BloodDrainSourceComponent | null;
+    this.bloodDrainSource = this.getOwner().getComponent(
+      'blood_drain_source',
+    ) as BloodDrainSourceComponent | null;
   }
 
   // ─── Main update ───────────────────────────────────────────────────────────

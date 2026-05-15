@@ -2,9 +2,21 @@
   "components": {
     "name": "Enemy",
     "transform": {
-      "position": [0, 0.9, 0],
-      "rotation": [0, 0, 0],
-      "scale": [0.6, 1.8, 0.6]
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.6,
+        1.8,
+        0.6
+      ]
     },
     "capsule_collider": {
       "height": 1.8,
@@ -13,8 +25,8 @@
       "lockRotationX": true,
       "lockRotationZ": true,
       "ignoreTransformScale": true,
-      "friction": 0.0,
-      "mass": 70.0,
+      "friction": 0,
+      "mass": 70,
       "collisionGroups": "ENEMY",
       "collisionMask": "ALL"
     },
@@ -38,16 +50,30 @@
       "eyeHeightOffset": 0.7,
       "checkInterval": 0.1
     },
-    "health": { "maxHp": 100 },
-    "blood_drain_source": { "totalBlood": 100, "drainRate": 40, "startActive": false }
+    "health": {
+      "maxHp": 100
+    },
+    "blood_drain_source": {
+      "totalBlood": 100,
+      "drainRate": 40,
+      "startActive": false
+    }
   },
   "children": [
     {
       "components": {
         "name": "ForwardIndicator",
         "transform": {
-          "position": [0, 0.167, 0.833],
-          "scale": [0.583, 0.067, 0.583]
+          "position": [
+            0,
+            0.167,
+            0.833
+          ],
+          "scale": [
+            0.583,
+            0.067,
+            0.583
+          ]
         },
         "render": {
           "meshes": [
