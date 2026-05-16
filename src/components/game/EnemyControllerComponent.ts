@@ -91,6 +91,10 @@ export class EnemyControllerComponent extends Component {
   private dead: boolean = false;
   /** BloodDrainSourceComponent on the same entity, activated on death. */
   private bloodDrainSource: BloodDrainSourceComponent | null = null;
+  /** Remaining seconds of slow effect. Counts down each frame. */
+  private slowTimer: number = 0;
+  /** Speed multiplier applied while slowTimer > 0 (set by BloodZoneComponent). */
+  private slowFactor: number = 1.0;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -186,6 +190,12 @@ export class EnemyControllerComponent extends Component {
     // 4. Step the behavior tree — Action nodes may call setDesiredHorizontal()
     this.tree.step();
 
+    // 4c. Apply slow effect (re-affirmed each frame by BloodZoneComponent)
+    if (this.slowTimer > 0) {
+      this.slowTimer -= deltaTime;
+      vec3.scale(this.desiredHorizontal, this.desiredHorizontal, this.slowFactor);
+    }
+
     // 4b. Derive current AI state from blackboard for the on-screen display
     const canSee = this.bb.get<boolean>('canSeePlayer', false);
     const hasLast = this.bb.get<boolean>('hasLastKnown', false);
@@ -235,6 +245,15 @@ export class EnemyControllerComponent extends Component {
   public setDesiredHorizontal(direction: vec3, speed?: number): void {
     const s = speed ?? this.moveSpeed;
     vec3.set(this.desiredHorizontal, direction[0] * s, 0, direction[2] * s);
+  }
+
+  /**
+   * Called by BloodZoneComponent each frame the enemy is inside the zone.
+   * Stacks duration additively so re-entering the zone refreshes the slow.
+   */
+  public applySlowEffect(factor: number, duration: number): void {
+    this.slowFactor = factor;
+    this.slowTimer = Math.max(this.slowTimer, duration);
   }
 
   /**

@@ -15,6 +15,7 @@ import { IMovementController } from './movement/IMovementController';
 import { IMantleController } from './movement/IMantleController';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import { DaggerBurstSystem } from './combat/DaggerBurstSystem';
+import { BloodZoneSystem } from './combat/BloodZoneSystem';
 import { BloodComponent } from './BloodComponent';
 import { HealthComponent } from './HealthComponent';
 import { BloodDrainSourceComponent } from './BloodDrainSourceComponent';
@@ -61,6 +62,7 @@ export class BloodmancerControllerComponent
   private jumpSystem!: JumpSystem;
   private mantleSystem!: MantleSystem;
   private daggerBurstSystem!: DaggerBurstSystem;
+  private bloodZoneSystem!: BloodZoneSystem;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -97,6 +99,11 @@ export class BloodmancerControllerComponent
       getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
       getHealth: () => this.getOwner().getComponent('health') as HealthComponent | null,
     });
+
+    this.bloodZoneSystem = new BloodZoneSystem({
+      bloodCost: 15,
+      getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -112,6 +119,7 @@ export class BloodmancerControllerComponent
     this.updateGroundedState();
     this.mantleSystem.update();
     this.daggerBurstSystem.update(deltaTime, this.camera);
+    this.bloodZoneSystem.update(deltaTime, this.camera);
     this.updateBloodDrain(deltaTime);
 
     if (this.inputDisableTimer > 0) {

@@ -12,6 +12,8 @@
     "health",
     "stamina",
     "blood",
+    "blood_zone",
+    "blood_ball_projectile",
     "depth_of_field",
     "camera_arm",
     "head_bob",

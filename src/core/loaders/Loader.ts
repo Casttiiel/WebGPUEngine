@@ -68,6 +68,8 @@ import { WeaponComponent } from '../../components/game/WeaponComponent';
 import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { HealthComponent } from '../../components/game/HealthComponent';
+import { BloodZoneComponent } from '../../components/game/combat/BloodZoneComponent';
+import { BloodBallProjectileComponent } from '../../components/game/combat/BloodBallProjectileComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
@@ -387,6 +389,8 @@ export class Loader {
         return new ProjectileComponent();
       case 'dagger_projectile':
         return new DaggerProjectileComponent();
+      case 'blood_ball_projectile':
+        return new BloodBallProjectileComponent();
       case 'grapple_target':
         return new GrappleTargetComponent();
       case 'bullet_pool':
@@ -409,6 +413,8 @@ export class Loader {
         return new PlayerSpawnComponent();
       case 'health':
         return new HealthComponent();
+      case 'blood_zone':
+        return new BloodZoneComponent();
       case 'stamina':
         return new StaminaComponent();
       case 'blood':
