@@ -1248,14 +1248,14 @@ export class ModuleEditorSelection extends Module {
 
       gvFolder
         .addColor(gvProxy, 'colorBottom')
-        .name('Color Bottom')
+        .name('Color Top')
         .onChange((v: string) => {
           const [r, g, b] = fromHex(v);
           gvMat.setFactors({ baseColorFactor: [r, g, b, 1] });
         });
       gvFolder
         .addColor(gvProxy, 'colorTop')
-        .name('Color Top')
+        .name('Color Bottom')
         .onChange((v: string) => {
           const [r, g, b] = fromHex(v);
           gvMat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });

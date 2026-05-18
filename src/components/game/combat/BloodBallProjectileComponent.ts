@@ -55,6 +55,17 @@ export class BloodBallProjectileComponent extends ProjectileComponent {
 
   // ── Hit handling ──────────────────────────────────────────────────────────
 
+  /**
+   * Called by BloodZoneSystem before fire() to override the zone parameters
+   * baked into the prefab (e.g. to use system-level configuration).
+   */
+  public setZoneParams(radius: number, duration: number, dps: number, slowFactor: number): void {
+    this.zoneRadius = radius;
+    this.zoneDuration = duration;
+    this.zoneDamagePerSecond = dps;
+    this.zoneSlowFactor = slowFactor;
+  }
+
   protected override onHit(hitPoint: vec3, _hit: RAPIER.RayColliderHit): void {
     this.spawnZone(hitPoint);
     // Release (destroys the dynamically spawned entity via the callback set in fire())

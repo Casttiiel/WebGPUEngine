@@ -215,7 +215,7 @@ export class GrassVolumeComponent extends Component {
     const bottomObj = { color: toHex(bcf[0] ?? 0, bcf[1] ?? 0, bcf[2] ?? 0) };
     folder
       .addColor(bottomObj, 'color')
-      .name('Color Bottom')
+      .name('Color Top')
       .onChange((v: string) => {
         const [r, g, b] = fromHex(v);
         mat.setFactors({ baseColorFactor: [r, g, b, 1] });
@@ -227,7 +227,7 @@ export class GrassVolumeComponent extends Component {
     };
     folder
       .addColor(topObj, 'color')
-      .name('Color Top')
+      .name('Color Bottom')
       .onChange((v: string) => {
         const [r, g, b] = fromHex(v);
         mat.setFactors({ roughnessFactor: r, metallicFactor: g, emissiveFactor: b });

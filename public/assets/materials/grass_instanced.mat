@@ -6,15 +6,15 @@
     "txAlbedo": "white.png"
   },
   "baseColorFactor": [
-    0.38,
-    0.62,
-    0.09,
+    0.11,
+    0.42,
+    0,
     1
   ],
-  "roughnessFactor": 0.2,
-  "metallicFactor": 0.64,
-  "emissiveFactor": 0.06,
-  "appearanceBlend": 0.25,
+  "roughnessFactor": 0.1,
+  "metallicFactor": 0.2,
+  "emissiveFactor": 0,
+  "appearanceBlend": 0,
   "surfaceBlend": 0.75,
   "uvXScale": 0.82,
   "uvYScale": 0.72,
