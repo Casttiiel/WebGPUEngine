@@ -50,6 +50,12 @@ fn worldToLinearDepth(pos: vec3<f32>) -> f32 {
     return dot(diff, camera.cameraFront.xyz) / camera.cameraFar;
 }
 
+// Interleaved Gradient Noise — low-discrepancy per-pixel noise in [0, 1).
+// Breaks up banding from fixed-step ray marching without repeating tile patterns.
+fn interleavedGradientNoise(coord: vec2<f32>) -> f32 {
+    return fract(52.9829189 * fract(dot(coord, vec2<f32>(0.06711056, 0.00583715))));
+}
+
 // ─── Fragment Entry ───────────────────────────────────────────────────────────
 @fragment
 fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
@@ -70,7 +76,7 @@ fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
 
     // Early-out: surface facing away from the light (backlit → no contact shadow)
     let NdL = saturate(dot(g.normal, params.lightDir));
-    if (NdL <= 0.0) {
+    if (NdL < 0.01) {
         return vec4<f32>(1.0);
     }
 
@@ -94,18 +100,32 @@ fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
         numSteps = clamp(i32(screenPx / 3.0), 4, 32);
     }
 
+    // ── Adaptive step size derived from maxDistance ──────────────────────────
+    // Using a fixed params.stepLength against a dynamic numSteps means the ray
+    // covers numSteps * stepLength which may be far less than maxDistance (deficit)
+    // or exceed it (handled by the old t > maxDistance guard, but the near-camera
+    // deficit case was silently under-sampling the shadow region).
+    // Deriving actualStep from maxDistance guarantees the ray always spans exactly
+    // [0, maxDistance] regardless of how many steps the screen-space heuristic chose.
+    let actualStep = params.maxDistance / f32(numSteps);
+
     // ── Self-shadowing bias ───────────────────────────────────────────────────
-    // Start the ray half a step ahead so the first sample doesn't land on the
-    // origin surface.  The depth-proportional term handles precision loss at
-    // large view depths (acne grows with distance without it).
-    let startBias = params.stepLength * 0.5 + g.zlinear * camera.cameraFar * 0.001;
+    // Per-pixel jitter (IGN + golden-ratio temporal shift) randomises the starting
+    // offset of each ray so adjacent pixels and adjacent frames never share the same
+    // discrete sample pattern.  Breaks banding stripes and lets TAA accumulate a
+    // clean result over multiple frames.
+    let jitter = fract(interleavedGradientNoise(fragCoord.xy) + camera.frameIndex * 0.6180339887);
+    // Offset the first sample into [0, actualStep) so the ray starts slightly ahead
+    // of the surface.  The depth-proportional term prevents acne at large view depths.
+    let startBias = actualStep * jitter + g.zlinear * camera.cameraFar * 0.001;
 
     // ── World-space ray march toward light ───────────────────────────────────
     var shadow: f32 = 0.0;
 
     for (var i: i32 = 1; i <= numSteps; i++) {
-        let t      = startBias + f32(i) * params.stepLength;
-        if (t > params.maxDistance) { break; }
+        let t = startBias + f32(i) * actualStep;
+        // t is bounded by startBias + numSteps * actualStep = jitter*actualStep + maxDistance
+        // which is at most maxDistance + actualStep — no break needed.
 
         let rayPos = g.worldPos + params.lightDir * t;
         let uvw    = worldToUVW(rayPos);

@@ -44,9 +44,9 @@ export class ContactShadowsComponent extends Component {
   // ─── Tuneable parameters (exposed for debug UI) ──────────────────────────
   public isEnabled: boolean = true;
   /** Opacity of the contact shadow [0, 1]. */
-  public intensity: number = 0.6;
+  public intensity: number = 0.7;
   /** World-space ray step length in metres. Smaller = more accurate, more expensive. */
-  public stepLength: number = 0.04;
+  public stepLength: number = 0.025;
   /** Maximum ray travel distance in metres. Larger = wider shadow coverage. */
   public maxDistance: number = 0.4;
   /** LinearDepth hit-detection tolerance. Tune to avoid false shadows on thin faces. */
@@ -198,7 +198,7 @@ export class ContactShadowsComponent extends Component {
 
     folder.add(this, 'isEnabled').name('Enable').listen();
     folder.add(this, 'intensity', 0.0, 1.0).name('Intensity').listen();
-    folder.add(this, 'stepLength', 0.005, 0.2).name('Step Length').listen();
+    folder.add(this, 'stepLength', 0.005, 0.1).name('Step Length').listen();
     folder.add(this, 'maxDistance', 0.05, 2.0).name('Max Distance').listen();
     folder.add(this, 'thickness', 0.001, 0.1).name('Thickness').listen();
 

@@ -51,6 +51,7 @@ export class Camera {
   // Time tracking for shader animations
   private time: number = 0;
   private deltaTime: number = 0;
+  private frameIndex: number = 0;
   private readonly TIME_RESET_INTERVAL = 3600.0; // Reset every hour to avoid float precision loss
 
   // Jitter patterns
@@ -383,6 +384,9 @@ export class Camera {
     // unjitteredProjectionMatrix (offset 98-113 = 392-455 bytes) mat4x4
     // Used by SSR viewToScreen() to project view-space hit positions without jitter.
     this.uniformData.set(this.unjitteredProjection, 98);
+    // frameIndex (offset 114 = byte 456): monotonically increasing frame counter.
+    // Stored as f32 — stays exact up to 2^24 (~16 million frames ≈ 77 hours @60fps).
+    this.uniformData[114] = this.frameIndex++;
 
     // Single GPU write instead of 7 separate writes
     GPUUtils.writeBuffer(this.uniformBuffer, 0, this.uniformData);

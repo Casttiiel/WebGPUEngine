@@ -29,6 +29,10 @@ struct CameraUniforms {
     // into stable screen UVs without relying on manual jitter-offset sign arithmetic.
     // Uploading the pre-built matrix avoids any sign convention confusion.
     unjitteredProjectionMatrix: mat4x4<f32>,
+    // Integer frame counter stored as f32 (offset 114 = byte 456).
+    // Incremented by 1 each frame. Used with golden-ratio increment for
+    // quasi-Monte Carlo temporal sample patterns (IGN, blue noise, etc.).
+    frameIndex: f32,
 }
 
 struct OldCameraUniforms {
