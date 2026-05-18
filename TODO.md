@@ -17,8 +17,6 @@
 
 ## Gameplay
 
-1. Bestiality
-
 ## Visuals and Sound
 
 1. Start Screen

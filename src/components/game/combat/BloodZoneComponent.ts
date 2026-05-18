@@ -4,6 +4,7 @@ import { Engine } from '../../../core/engine/Engine';
 import { TransformComponent } from '../../core/TransformComponent';
 import { EnemyControllerComponent } from '../EnemyControllerComponent';
 import { Msg } from '../../../core/ecs/Msg';
+import { BestialitySystem } from './BestialitySystem';
 
 export type BloodZoneData = {
   /** World-space center of the zone. */
@@ -93,6 +94,9 @@ export class BloodZoneComponent extends Component {
 
       // Continuous light damage
       entity.sendMsg(Msg.damage({ amount: damage, instigator: null }));
+
+      // Notify bestiality system — small proportional gain per enemy hit
+      BestialitySystem.notify(damage * 0.5);
 
       // Slow — re-affirm each frame so removal is instant when entity exits
       ec.applySlowEffect(this.slowFactor, dt * 2);

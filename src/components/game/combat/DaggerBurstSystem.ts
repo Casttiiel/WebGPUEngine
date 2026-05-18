@@ -26,6 +26,10 @@ export class DaggerBurstSystem {
   private readonly bloodCostPerShot: number;
   private readonly getBlood: (() => BloodComponent | null) | null;
   private readonly getHealth: (() => HealthComponent | null) | null;
+  /** Returns a multiplier [0.5, 1.0] applied to the burst cooldown. */
+  private readonly getCooldownMultiplier: (() => number) | null;
+  /** Called each time a single dagger is fired (for bestiality tracking). */
+  private readonly onShotFired: (() => void) | null;
 
   private cooldownTimer: number = 0;
   private pendingShots: number = 0;
@@ -42,6 +46,10 @@ export class DaggerBurstSystem {
     bloodCostPerShot?: number;
     getBlood?: () => BloodComponent | null;
     getHealth?: () => HealthComponent | null;
+    /** Optional callback returning a cooldown multiplier (e.g. from BestialitySystem). */
+    getCooldownMultiplier?: () => number;
+    /** Optional callback fired each time a single shot is launched. */
+    onShotFired?: () => void;
   }) {
     this.burstCount = data?.burstCount ?? 3;
     this.burstInterval = data?.burstInterval ?? 0.08;
@@ -50,6 +58,8 @@ export class DaggerBurstSystem {
     this.bloodCostPerShot = data?.bloodCostPerShot ?? 0;
     this.getBlood = data?.getBlood ?? null;
     this.getHealth = data?.getHealth ?? null;
+    this.getCooldownMultiplier = data?.getCooldownMultiplier ?? null;
+    this.onShotFired = data?.onShotFired ?? null;
   }
 
   // ──────────────────────────────────────────────────────────
@@ -74,7 +84,7 @@ export class DaggerBurstSystem {
 
       this.pendingShots = this.burstCount;
       this.burstTimer = 0; // fire first shot on the very next tick
-      this.cooldownTimer = this.cooldown;
+      this.cooldownTimer = this.cooldown * (this.getCooldownMultiplier?.() ?? 1.0);
     }
 
     // Drain the pending burst queue
@@ -130,5 +140,6 @@ export class DaggerBurstSystem {
     // Spawn dagger slightly in front of the camera so it starts outside the capsule
     const muzzle = vec3.scaleAndAdd(vec3.create(), origin, dir, 0.6);
     dagger.fire(muzzle, dir, this.pool.release.bind(this.pool));
+    this.onShotFired?.();
   }
 }

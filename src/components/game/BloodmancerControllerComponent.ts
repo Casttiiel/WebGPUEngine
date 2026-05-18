@@ -17,6 +17,7 @@ import { CharacterControllerComponentDataType } from '../../types/CharacterContr
 import { DaggerBurstSystem } from './combat/DaggerBurstSystem';
 import { BloodZoneSystem } from './combat/BloodZoneSystem';
 import { ChargeSystem } from './combat/ChargeSystem';
+import { BestialitySystem } from './combat/BestialitySystem';
 import { BloodComponent } from './BloodComponent';
 import { HealthComponent } from './HealthComponent';
 import { BloodDrainSourceComponent } from './BloodDrainSourceComponent';
@@ -65,6 +66,7 @@ export class BloodmancerControllerComponent
   private daggerBurstSystem!: DaggerBurstSystem;
   private bloodZoneSystem!: BloodZoneSystem;
   private chargeSystem!: ChargeSystem;
+  private bestialitySystem!: BestialitySystem;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -95,11 +97,16 @@ export class BloodmancerControllerComponent
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
 
+    this.bestialitySystem = new BestialitySystem();
+    BestialitySystem.activeInstance = this.bestialitySystem;
+
     this.daggerBurstSystem = new DaggerBurstSystem({
       poolName: 'DaggerManager',
       bloodCostPerShot: 2,
       getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
       getHealth: () => this.getOwner().getComponent('health') as HealthComponent | null,
+      getCooldownMultiplier: () => this.bestialitySystem.getCooldownMultiplier(),
+      onShotFired: () => this.bestialitySystem.onDamageDealt(),
     });
 
     this.bloodZoneSystem = new BloodZoneSystem({
@@ -130,6 +137,7 @@ export class BloodmancerControllerComponent
 
     this.updateGroundedState();
     this.mantleSystem.update();
+    this.bestialitySystem.update(deltaTime);
     this.daggerBurstSystem.update(deltaTime, this.camera);
     this.bloodZoneSystem.update(deltaTime, this.camera);
     this.updateBloodDrain(deltaTime);
