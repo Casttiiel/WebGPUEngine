@@ -17,9 +17,7 @@
 
 ## Gameplay
 
-1. Aim
-2. Charge (Recharge blood, heal 5%)
-3. Bestiality
+1. Bestiality
 
 ## Visuals and Sound
 

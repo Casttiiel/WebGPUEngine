@@ -38,6 +38,7 @@
     "bloodmancer_controller",
     "parkour_controller",
     "grapple_target",
+    "charge_target",
     "skinned_mesh",
     "view_model",
     "terrain",

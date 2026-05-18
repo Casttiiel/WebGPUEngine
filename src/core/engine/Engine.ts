@@ -42,6 +42,7 @@ import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { GrappleTargetComponent } from '../../components/game/GrappleTargetComponent';
+import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -183,6 +184,7 @@ export class Engine {
     SwingBarComponent.registerMsgs();
     ReflectionProbeComponent.registerMsgs();
     GrappleTargetComponent.registerMsgs();
+    ChargeTargetComponent.registerMsgs();
     EnemyControllerComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();

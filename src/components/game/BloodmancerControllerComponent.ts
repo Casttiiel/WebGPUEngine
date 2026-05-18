@@ -16,6 +16,7 @@ import { IMantleController } from './movement/IMantleController';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import { DaggerBurstSystem } from './combat/DaggerBurstSystem';
 import { BloodZoneSystem } from './combat/BloodZoneSystem';
+import { ChargeSystem } from './combat/ChargeSystem';
 import { BloodComponent } from './BloodComponent';
 import { HealthComponent } from './HealthComponent';
 import { BloodDrainSourceComponent } from './BloodDrainSourceComponent';
@@ -63,6 +64,7 @@ export class BloodmancerControllerComponent
   private mantleSystem!: MantleSystem;
   private daggerBurstSystem!: DaggerBurstSystem;
   private bloodZoneSystem!: BloodZoneSystem;
+  private chargeSystem!: ChargeSystem;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -104,6 +106,16 @@ export class BloodmancerControllerComponent
       bloodCost: 15,
       getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
     });
+
+    this.chargeSystem = new ChargeSystem(this, {
+      grappleMaxCharges: 99,
+      grappleMinDuration: 0.15,
+      grappleMaxDuration: 0.4,
+      grappleReachingDuration: 0.05,
+      grappleArcIntensity: 0.15,
+      getHealth: () => this.getOwner().getComponent('health') as HealthComponent | null,
+      getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -122,11 +134,28 @@ export class BloodmancerControllerComponent
     this.bloodZoneSystem.update(deltaTime, this.camera);
     this.updateBloodDrain(deltaTime);
 
+    this.chargeSystem.tickRecharge(deltaTime);
+    const cameraObj = this.camera.getCamera();
+    const camFront = cameraObj.getFront() as vec3;
+    const cameraForwardXZ = vec3.normalize(
+      vec3.create(),
+      vec3.fromValues(camFront[0], 0, camFront[2]),
+    );
+    this.chargeSystem.update(deltaTime, this.getOwner(), cameraForwardXZ);
+
     if (this.inputDisableTimer > 0) {
       this.inputDisableTimer -= deltaTime;
     }
 
     switch (this.movementState) {
+      case CharacterMovementState.GRAPPLING: {
+        const active = this.chargeSystem.updateMovement(deltaTime);
+        if (active) {
+          this.applyMovement(this.chargeSystem.getVelocity(), deltaTime);
+        }
+        break;
+      }
+
       case CharacterMovementState.MANTLING: {
         const mantleMovement = this.mantleSystem.updateMantleDirection();
         this.applyMovement(mantleMovement, deltaTime);
@@ -246,10 +275,12 @@ export class BloodmancerControllerComponent
   public setIsDashing(_value: boolean): void {}
 
   public getIsGrappling(): boolean {
-    return false;
+    return this.movementState === CharacterMovementState.GRAPPLING;
   }
 
-  public setIsGrappling(_value: boolean): void {}
+  public setIsGrappling(value: boolean): void {
+    this.movementState = value ? CharacterMovementState.GRAPPLING : CharacterMovementState.IDLE;
+  }
 
   public getIsSwinging(): boolean {
     return false;

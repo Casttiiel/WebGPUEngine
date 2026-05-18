@@ -62,6 +62,30 @@
   "children": [
     {
       "components": {
+        "name": "ChargeTarget",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "sphere_collider": {
+          "bodyType": "kinematic",
+          "radius": 8,
+          "mass": 0,
+          "friction": 0,
+          "restitution": 0,
+          "isSensor": true,
+          "collisionGroups": "CHARGE_TRIGGER",
+          "collisionMask": "TRIGGER_PLAYER",
+          "ignoreTransformScale": true
+        },
+        "charge_target": {}
+      }
+    },
+    {
+      "components": {
         "name": "ForwardIndicator",
         "transform": {
           "position": [

@@ -63,6 +63,7 @@ import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
 import { DaggerProjectileComponent } from '../../components/game/combat/DaggerProjectileComponent';
 import { GrappleTargetComponent } from '../../components/game/GrappleTargetComponent';
+import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
 import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
 import { WeaponComponent } from '../../components/game/WeaponComponent';
 import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
@@ -393,6 +394,8 @@ export class Loader {
         return new BloodBallProjectileComponent();
       case 'grapple_target':
         return new GrappleTargetComponent();
+      case 'charge_target':
+        return new ChargeTargetComponent();
       case 'bullet_pool':
         return new BulletPoolComponent();
       case 'weapon':

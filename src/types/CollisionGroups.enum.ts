@@ -26,6 +26,7 @@ export enum CollisionGroups {
   CHECKPOINT = 0x00000080, // 0b10000000 - Checkpoints
   GRAPPLE_TRIGGER = 0x00000100, // 0b100000000 - Zonas de rango de grapple hook
   BLOOD_DRAIN_TRIGGER = 0x00000200, // Zonas de drenado de sangre
+  CHARGE_TRIGGER = 0x00000400, // Zona de detección de enemigos para Charge
 
   // Utilidades
   ALL = 0xffffffff, // Todos los grupos
@@ -46,7 +47,8 @@ export const CollisionMasks = {
     CollisionGroups.IMPULSE_TRIGGER |
     CollisionGroups.CHECKPOINT |
     CollisionGroups.GRAPPLE_TRIGGER |
-    CollisionGroups.BLOOD_DRAIN_TRIGGER,
+    CollisionGroups.BLOOD_DRAIN_TRIGGER |
+    CollisionGroups.CHARGE_TRIGGER,
 
   // Environment solo colisiona con player, enemigos y proyectiles
   ENVIRONMENT: CollisionGroups.PLAYER | CollisionGroups.ENEMY | CollisionGroups.PROJECTILE,
