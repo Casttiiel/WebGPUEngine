@@ -538,12 +538,13 @@ export class BindGroupFactory {
     ]);
   }
 
-  /** Bind group layout for GrassUniforms (@group(3), binding 0: uniform buffer). */
+  /** Bind group layout for GrassUniforms (@group(3), binding 0: uniform buffer).
+   *  Visible to both VERTEX and FRAGMENT so the FS can read LOD fade distances. */
   public static getGrassUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('grass_uniforms', [
       {
         binding: 0,
-        visibility: GPUShaderStage.VERTEX,
+        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
         buffer: { type: 'uniform' },
       },
     ]);

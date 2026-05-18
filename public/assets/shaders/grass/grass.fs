@@ -1,6 +1,7 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/octahedral"
+#include "grass/grass_common"
 
 // ---------------------------------------------------------------------------
 // Grass blade fragment shader — UV-based two-colour gradient, GBuffer output.
@@ -20,6 +21,7 @@
 @group(1) @binding(0) var           txAlbedo:     texture_2d<f32>;
 @group(1) @binding(5) var           samplerState: sampler;
 @group(1) @binding(6) var<uniform>  factors:      MaterialFactors;
+@group(3) @binding(0) var<uniform>  grassUniforms: GrassUniforms;
 
 @fragment
 fn fs(input: VertexOutput) -> FragmentOutput {
@@ -60,5 +62,21 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   output.albedo = vec4<f32>(albedo, metallic);
   output.normal = vec4<f32>(encodedNorm.x, encodedNorm.y, roughness, emissive);
   output.depth  = linearDepth;
+
+  // ── Near LOD distance fade (Bayer 4×4 dithering) ————————————————————
+  // T.y carries the camera distance from the instance root (set in grass_instanced.vs).
+  let camDist = input.T.y;
+  if camDist >= grassUniforms.lodNearFadeEnd {
+    discard;
+  }
+  if camDist > grassUniforms.lodNearFadeStart {
+    // Fade ratio: 0 at fadeStart (fully visible) → 1 at fadeEnd (fully invisible)
+    let fadeRatio = (camDist - grassUniforms.lodNearFadeStart)
+                  / (grassUniforms.lodNearFadeEnd - grassUniforms.lodNearFadeStart);
+    if fadeRatio > bayer4x4(input.position.xy) {
+      discard;
+    }
+  }
+
   return output;
 }

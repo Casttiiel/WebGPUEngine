@@ -75,6 +75,14 @@ export interface GrassVolumeData {
    * + base gradient colour.  Omit to disable zone variation.
    */
   heightMap?: string;
+  /** Distance (m) at which the LOD crossfade begins. Near LOD starts fading out,
+   *  billboard starts fading in.  Default: 20. */
+  lodFadeStart?: number;
+  /** Distance (m) at which the near LOD is fully gone and billboard is fully visible.
+   *  Default: 28. */
+  lodNearFadeEnd?: number;
+  /** Distance (m) at which the billboard has completely faded out.  Default: 55. */
+  lodFarFadeEnd?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,12 +123,22 @@ export class GrassVolumeComponent extends Component {
   private gustSpeed = 2.5;
   private gustIntensity = 1.2;
 
+  // ── LOD params ─────────────────────────────────────────────────────────────
+  private lodFadeStart = 20;
+  private lodNearFadeEnd = 28;
+  private lodFarFadeEnd = 55;
+
   // ── GPU resources ──────────────────────────────────────────────────────────
   private instanceBuffer: GPUBuffer | null = null;
   private instanceBindGroup: GPUBindGroup | null = null;
   private indirectDrawBuffer: GPUBuffer | null = null;
   private grassUniformBuffer: GPUBuffer | null = null;
   private grassBindGroup: GPUBindGroup | null = null;
+
+  // ── Billboard LOD GPU resources ────────────────────────────────────────────
+  private billboardMesh: Mesh | null = null;
+  private billboardIndirectBuffer: GPUBuffer | null = null;
+  private billboardRenderComponent: RenderComponent | null = null;
 
   // ── Render resources ───────────────────────────────────────────────────────
   private grassMesh: Mesh | null = null;
@@ -149,6 +167,9 @@ export class GrassVolumeComponent extends Component {
     this.gustSpeed = d.gustSpeed ?? 2.5;
     this.gustIntensity = d.gustIntensity ?? 1.2;
     this.heightMap = d.heightMap ?? null;
+    this.lodFadeStart = d.lodFadeStart ?? 20;
+    this.lodNearFadeEnd = d.lodNearFadeEnd ?? 28;
+    this.lodFarFadeEnd = d.lodFarFadeEnd ?? 55;
   }
 
   /** Runs after all components on the entity are loaded — terrain is available. */
@@ -159,15 +180,18 @@ export class GrassVolumeComponent extends Component {
   update(_dt: number): void {
     if (!this.grassUniformBuffer) return;
     const device = GPUUtils.getDevice();
-    // GrassUniforms layout (40 bytes, buffer allocated as 48):
-    //   [0] windDir.x  [1] windDir.y  [2] windSpeed
-    //   [3] wiggleIntensity  [4] wiggleFrequency
-    //   [5] swayIntensity    [6] swayFrequency
-    //   [7] gustFrequency    [8] gustSpeed  [9] gustIntensity
-    const data = new Float32Array(12); // 48 bytes (10 fields + 2 padding)
+    // GrassUniforms layout (56 bytes of data, buffer allocated as 64):
+    //   [0]  windDir.x       [1]  windDir.y      [2]  windSpeed
+    //   [3]  wiggleIntensity [4]  wiggleFrequency
+    //   [5]  swayIntensity   [6]  swayFrequency
+    //   [7]  gustFrequency   [8]  gustSpeed       [9]  gustIntensity
+    //   [10] lodNearFadeStart [11] lodNearFadeEnd
+    //   [12] lodFarFadeStart  [13] lodFarFadeEnd
+    //   [14] [15] padding
+    const data = new Float32Array(16); // 64 bytes
     data[0] = Wind.getDirX();
     data[1] = Wind.getDirZ();
-    data[2] = Wind.speed * 12.0; // scale sky-UV speed to grass shader range
+    data[2] = Wind.speed * 12.0;
     data[3] = this.wiggleIntensity;
     data[4] = this.wiggleFrequency;
     data[5] = this.swayIntensity;
@@ -175,7 +199,11 @@ export class GrassVolumeComponent extends Component {
     data[7] = this.gustFrequency;
     data[8] = this.gustSpeed;
     data[9] = this.gustIntensity;
-    // data[10], data[11]: buffer padding (zero)
+    data[10] = this.lodFadeStart;
+    data[11] = this.lodNearFadeEnd;
+    data[12] = this.lodFadeStart; // lodFarFadeStart = same crossfade origin
+    data[13] = this.lodFarFadeEnd;
+    // data[14], data[15]: padding
     device.queue.writeBuffer(this.grassUniformBuffer, 0, data);
   }
   renderDebug(): void {}
@@ -273,10 +301,17 @@ export class GrassVolumeComponent extends Component {
     this.instanceBuffer = null;
     this.indirectDrawBuffer?.destroy();
     this.indirectDrawBuffer = null;
+    this.billboardIndirectBuffer?.destroy();
+    this.billboardIndirectBuffer = null;
     this.instanceBindGroup = null;
     this.grassUniformBuffer?.destroy();
     this.grassUniformBuffer = null;
     this.grassBindGroup = null;
+    // Billboard render key
+    if (this.billboardRenderComponent) {
+      RenderManagerV2.getInstance().delKeys(this.billboardRenderComponent);
+      this.billboardRenderComponent = null;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -371,59 +406,83 @@ export class GrassVolumeComponent extends Component {
       entries: [{ binding: 0, resource: { buffer: this.instanceBuffer } }],
     });
 
-    // ── Wind uniform buffer (GrassUniforms at @group(3)) ─────────────────────
+    // ── Wind + LOD uniform buffer (GrassUniforms at @group(3)) ─────────────────
     this.grassUniformBuffer = device.createBuffer({
       label: 'grass_uniforms_buffer',
-      size: 48, // GrassUniforms struct: 10 × f32 (40 bytes) + 8 bytes alignment padding
+      size: 64, // GrassUniforms struct: 14 × f32 (56 bytes) + 8 bytes padding → 64
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    const grassUniformLayout = BindGroupFactory.getLayout('grass_uniforms', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: 'uniform' as GPUBufferBindingType },
-      },
-    ]);
+    const grassUniformLayout = BindGroupFactory.getGrassUniformsLayout();
     this.grassBindGroup = device.createBindGroup({
       label: 'grass_uniforms_bindgroup',
       layout: grassUniformLayout,
       entries: [{ binding: 0, resource: { buffer: this.grassUniformBuffer } }],
     });
 
-    // ── Mesh (loaded first — index count feeds the indirect buffer) ───────────
-    this.grassMesh = await GLTFLoader.loadAsMesh('leaf_uv.gltf');
+    // ── Meshes ────────────────────────────────────────────────────────────────
+    [this.grassMesh, this.billboardMesh] = await Promise.all([
+      GLTFLoader.loadAsMesh('leaf_uv.gltf'),
+      GLTFLoader.loadAsMesh('grass_blade.gltf'),
+    ]);
 
-    // ── Indirect draw buffer ─────────────────────────────────────────────────
+    // ── Indirect draw buffers ─────────────────────────────────────────────────
     // Layout: [indexCount, instanceCount, firstIndex, baseVertex, firstInstance]
-    const indirectArgs = new Uint32Array([this.grassMesh.getIndexCount(), count, 0, 0, 0]);
+    const nearArgs = new Uint32Array([this.grassMesh.getIndexCount(), count, 0, 0, 0]);
+    const billboardArgs = new Uint32Array([this.billboardMesh.getIndexCount(), count, 0, 0, 0]);
+
     this.indirectDrawBuffer = device.createBuffer({
       label: 'grass_indirect_buffer',
-      size: indirectArgs.byteLength,
+      size: nearArgs.byteLength,
       usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(this.indirectDrawBuffer, 0, indirectArgs);
+    device.queue.writeBuffer(this.indirectDrawBuffer, 0, nearArgs);
 
-    // ── Material ──────────────────────────────────────────────────────────────
+    this.billboardIndirectBuffer = device.createBuffer({
+      label: 'grass_billboard_indirect_buffer',
+      size: billboardArgs.byteLength,
+      usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(this.billboardIndirectBuffer, 0, billboardArgs);
+
+    // ── Material (shared by both LODs) ────────────────────────────────────────
     this.grassMaterial = await Material.get(this.materialPath);
 
     // ── Register with render manager ──────────────────────────────────────────
-    // We need a RenderComponent owner for RenderManagerV2 key management.
     const transformComp = this.getOwner().getComponent('transform') as TransformComponent;
 
+    // Near LOD — detailed leaf mesh with full wind animation
     this.renderComponent = new RenderComponent();
     this.renderComponent.setOwner(this.getOwner());
-
     RenderManagerV2.getInstance().addKey(
       this.renderComponent,
       this.grassMesh,
       this.grassMaterial,
       transformComp,
-      true, // isInstanced — enables instance_index in VS
-      count, // instanceCount (informational; indirect buffer controls draw)
+      true, // isInstanced
+      count,
       this.instanceBindGroup, // @group(2): GrassInstance storage
-      this.grassBindGroup, // @group(3): GrassUniforms (wind params, updated per-frame)
-      this.indirectDrawBuffer, // GPU-driven indirect draw
-      true, // skipDepthPrepass — wind animation is incompatible with static prepass
+      this.grassBindGroup, // @group(3): GrassUniforms
+      this.indirectDrawBuffer,
+      true, // skipDepthPrepass
+    );
+
+    // Far LOD — cross-billboard mesh with Bayer fade-in/fade-out
+    // Shares the same instanceBindGroup and grassBindGroup (read-only, no conflict).
+    this.billboardRenderComponent = new RenderComponent();
+    this.billboardRenderComponent.setOwner(this.getOwner());
+    // Override the technique to grass_billboard.tech via a billboard-specific material.
+    const billboardMaterial = await Material.get('grass_billboard.mat');
+    RenderManagerV2.getInstance().addKey(
+      this.billboardRenderComponent,
+      this.billboardMesh,
+      billboardMaterial,
+      transformComp,
+      true, // isInstanced
+      count,
+      this.instanceBindGroup, // @group(2): same GrassInstance storage
+      this.grassBindGroup, // @group(3): same GrassUniforms
+      this.billboardIndirectBuffer,
+      true, // skipDepthPrepass
     );
   }
 

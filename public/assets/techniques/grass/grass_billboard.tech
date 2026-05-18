@@ -1,0 +1,14 @@
+{
+  "vs": "grass/grass_billboard.vs",
+  "fs": "grass/grass_billboard.fs",
+  "z": "less_equal_write",
+  "rs": "double_sided",
+  "writesOn": "gbuffer",
+  "skipDepthPrepass": true,
+  "uniforms": [
+    "CameraUniforms",
+    "MaterialTextures",
+    "InstanceStorage",
+    "GrassUniforms"
+  ]
+}

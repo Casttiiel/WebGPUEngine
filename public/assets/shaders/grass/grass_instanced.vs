@@ -28,19 +28,8 @@ struct GrassInstance {
   _pad:     f32,         // offset 28 — struct stride = 32 bytes = 8 floats
 }
 
-// Wind parameters uploaded every frame from Wind.ts via GrassVolumeComponent.update().
-struct GrassUniforms {
-  windDir:         vec2<f32>,  // offset  0 — normalised XZ wind direction
-  windSpeed:       f32,        // offset  8 — overall speed / amplitude scale
-  wiggleIntensity: f32,        // offset 12 — Phase 1: max chaotic XZ wiggle (m)
-  wiggleFrequency: f32,        // offset 16 — Phase 1: spatial frequency
-  swayIntensity:   f32,        // offset 20 — Phase 2: max directional sway (m)
-  swayFrequency:   f32,        // offset 24 — Phase 2: oscillation rate
-  gustFrequency:   f32,        // offset 28 — Phase 3: spatial stripe frequency
-  gustSpeed:       f32,        // offset 32 — Phase 3: stripe travel speed
-  gustIntensity:   f32,        // offset 36 — Phase 3: amplitude multiplier at gust peak
-  // struct size 40 bytes, AlignOf 8 → buffer allocated as 48 bytes
-}
+// GrassUniforms (wind + LOD distances) — shared with FS via grass_common.
+#include "grass/grass_common"
 
 @group(0) @binding(0) var<uniform> camera:       CameraUniforms;
 @group(2) @binding(0) var<storage, read> instances: array<GrassInstance>;
@@ -123,10 +112,13 @@ fn vs(
   );
 
   var output: VertexOutput;
+  // Camera distance from instance root (used by FS for LOD dithering).
+  let camDist = length(inst.pos - camera.cameraPosition.xyz);
+
   output.WorldPos = animatedPos;
   output.position = camera.projectionMatrix * camera.viewMatrix * vec4<f32>(animatedPos, 1.0);
   output.N  = normal;
-  output.T  = vec4<f32>(1.0, 0.0, inst.zone, inst.seed); // zone in T.z for FS colour tint, seed in T.w
+  output.T  = vec4<f32>(1.0, camDist, inst.zone, inst.seed); // T.y=camDist, T.z=zone, T.w=seed
   output.Uv = uv;
   return output;
 }
