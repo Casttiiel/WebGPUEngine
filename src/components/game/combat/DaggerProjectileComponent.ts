@@ -2,8 +2,6 @@ import RAPIER from '@dimforge/rapier3d';
 import { vec3 } from 'gl-matrix';
 import { ProjectileComponent } from '../ProjectileComponent';
 import { Engine } from '../../../core/engine/Engine';
-import { GrappleTargetComponent } from '../GrappleTargetComponent';
-import { Msg } from '../../../core/ecs/Msg';
 
 /**
  * DaggerProjectileComponent — Extiende ProjectileComponent para añadir
@@ -24,31 +22,17 @@ export class DaggerProjectileComponent extends ProjectileComponent {
   }
 
   protected override onHit(hitPoint: vec3, hit: RAPIER.RayColliderHit): void {
-    // Intentar resolver la entidad golpeada
+    // Check if the hit entity is a grapple target; if so, invoke the grapple callback
     const entityId = Engine.getPhysics().getEntityIdFromCollider(hit.collider.handle);
-
     if (entityId !== undefined) {
       const entity = Engine.getEntities().getEntityById(entityId);
-
-      // Deal damage to whatever entity was hit (only entities with HealthComponent react)
-      if (entity) {
-        entity.sendMsg(Msg.damage({ amount: this.damage, instigator: null }));
-      }
-
       const isGrappleTarget = entity?.getComponent('grapple_target') != null;
-
       if (isGrappleTarget && this.onGrappleHit) {
-        // La daga se "queda clavada" — sólo la liberamos del pool, no llamamos release
-        // (el pool la recuperará via el release normal cuando el grapple termine o
-        //  la daga salga de rango por el padre ProjectileComponent)
         this.onGrappleHit(hitPoint);
-        // Después de notificar, la daga vuelve al pool normalmente
-        super.onHit(hitPoint, hit);
-        return;
       }
     }
 
-    // Impacto normal (pared, suelo, enemigo, etc.)
+    // Base class handles damage + doRelease()
     super.onHit(hitPoint, hit);
   }
 }

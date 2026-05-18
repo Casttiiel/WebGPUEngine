@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+import { vec3, quat } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
@@ -10,10 +10,14 @@ import { Action, Condition, Selector, Sequence, Status } from '../../ai';
 import { BehaviorNode } from '../../ai/BehaviorNode';
 import { RequestPathAction } from '../../ai/nodes/RequestPathAction';
 import { SteerAction } from '../../ai/nodes/SteerAction';
+import { ShootAction } from '../../ai/nodes/ShootAction';
 import { EnemyControllerComponentDataType } from '../../types/EnemyControllerComponentData.type';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
 import { BloodDrainSourceComponent } from './BloodDrainSourceComponent';
+import { ChargeTargetComponent } from './ChargeTargetComponent';
+import { Material } from '../../renderer/resources/Material';
+import { RenderComponent } from '../render/RenderComponent';
 
 /**
  * EnemyControllerComponent
@@ -91,6 +95,12 @@ export class EnemyControllerComponent extends Component {
   private dead: boolean = false;
   /** BloodDrainSourceComponent on the same entity, activated on death. */
   private bloodDrainSource: BloodDrainSourceComponent | null = null;
+  /** Cloned material for per-enemy debug tinting (yellow=chargeable, red=dead). */
+  private clonedMaterial: Material | null = null;
+  /** ChargeTargetComponent on the first child, used to detect chargeable state. */
+  private chargeTarget: ChargeTargetComponent | null = null;
+  /** Cached player entity id for chargeable check (-1 = not yet found). */
+  private playerEntityId: number = -1;
   /** Remaining seconds of slow effect. Counts down each frame. */
   private slowTimer: number = 0;
   /** Speed multiplier applied while slowTimer > 0 (set by BloodZoneComponent). */
@@ -159,12 +169,38 @@ export class EnemyControllerComponent extends Component {
     this.bloodDrainSource = this.getOwner().getComponent(
       'blood_drain_source',
     ) as BloodDrainSourceComponent | null;
+
+    // Find the ChargeTarget child
+    for (const child of this.getOwner().getChildren()) {
+      const ct = child.getComponent('charge_target') as ChargeTargetComponent | null;
+      if (ct) {
+        this.chargeTarget = ct;
+        break;
+      }
+    }
+
+    // Clone the material so per-enemy tinting doesn't affect shared GPU data.
+    const renderComp = this.getOwner().getComponent('render') as RenderComponent | null;
+    const firstPart = renderComp?.getParts()[0];
+    if (firstPart) {
+      const clone = Material.cloneFrom(firstPart.material);
+      if (clone) {
+        this.clonedMaterial = clone;
+        renderComp!.setPartMaterial(0, clone);
+      }
+    }
   }
 
   // ─── Main update ───────────────────────────────────────────────────────────
 
   public update(deltaTime: number): void {
-    if (this.dead) return;
+    if (this.dead) {
+      // Post-death: destroy entity once blood is fully drained.
+      if (this.bloodDrainSource?.isDepleted()) {
+        Engine.getEntities().destroyEntity(this.getOwner());
+      }
+      return;
+    }
     if (!this.capsuleCollider || !this.characterController) return;
 
     // 1. Sync world position + facing into blackboard
@@ -204,7 +240,7 @@ export class EnemyControllerComponent extends Component {
     const atHome = !bbPosNow || !bbSpawn || vec3.distance(bbPosNow, bbSpawn) <= 1.5;
     let newState: string;
     if (canSee) {
-      newState = 'CHASE';
+      newState = 'SHOOT';
     } else if (hasLast) {
       newState = 'INVESTIGATE';
     } else if (!atHome) {
@@ -233,6 +269,14 @@ export class EnemyControllerComponent extends Component {
 
     // 7. Reset desired horizontal for next tick (BT must re-affirm each frame)
     vec3.set(this.desiredHorizontal, 0, 0, 0);
+
+    // Debug tinting: yellow when chargeable by player, white otherwise.
+    if (this.clonedMaterial) {
+      const chargeable = this.isChargeableByPlayer();
+      this.clonedMaterial.setFactors({
+        baseColorFactor: chargeable ? [1, 0.9, 0.1, 1] : [1, 1, 1, 1],
+      });
+    }
   }
 
   // ─── API for BT Action nodes ───────────────────────────────────────────────
@@ -333,8 +377,7 @@ export class EnemyControllerComponent extends Component {
   /**
    * State machine encoded as a prioritised reactive Selector:
    *
-   *   CHASE       (NavMesh)  — sees player  → A* path → Steer
-   *   CHASE       (direct)   — sees player  → direct move
+   *   SHOOT       — sees player → stop, face, fire at configurable rate
    *   INVESTIGATE (NavMesh)  — lost sight, hasLastKnown → A* to last known → Steer → clear
    *   INVESTIGATE (direct)   — lost sight, hasLastKnown → direct move to last known → clear
    *   RETURN      (NavMesh)  — not at home  → A* path to spawn → Steer
@@ -393,13 +436,8 @@ export class EnemyControllerComponent extends Component {
 
     return new Selector(
       [
-        // ── 1. CHASE (NavMesh) ───────────────────────────────────────────────
-        new Sequence([canSee(), new RequestPathAction('playerPosition'), new SteerAction()], {
-          reactive: true,
-        }),
-
-        // ── 2. CHASE (direct fallback) ───────────────────────────────────────
-        new Sequence([canSee(), moveDirectlyTo('ChaseDirectly', 'playerPosition')], {
+        // ── 1. SHOOT (player visible) ──────────────────────────────────────
+        new Sequence([canSee(), new ShootAction()], {
           reactive: true,
         }),
 
@@ -492,6 +530,39 @@ export class EnemyControllerComponent extends Component {
     this.capsuleCollider?.getRigidBody().setLinvel({ x: 0, y: 0, z: 0 }, true);
     if (this.stateEl) this.stateEl.textContent = 'AI: DEAD';
     this.bloodDrainSource?.activate();
+
+    // Red tint
+    this.clonedMaterial?.setFactors({ baseColorFactor: [0.9, 0.1, 0.1, 1] });
+
+    // Flip the mesh 180° around Z (compose current yaw with a half-turn).
+    const rb = this.capsuleCollider?.getRigidBody();
+    if (rb) {
+      const rot = rb.rotation();
+      const qCurr = quat.fromValues(rot.x, rot.y, rot.z, rot.w);
+      const q180Z = quat.fromValues(0, 0, 1, 0); // 180° around Z axis
+      const result = quat.multiply(quat.create(), qCurr, q180Z);
+      rb.setRotation({ x: result[0], y: result[1], z: result[2], w: result[3] }, true);
+    }
+  }
+
+  // ─── Debug helpers ─────────────────────────────────────────────────────────
+
+  private isChargeableByPlayer(): boolean {
+    if (!this.chargeTarget) return false;
+    const pid = this.resolvePlayerId();
+    if (pid < 0) return false;
+    return ChargeTargetComponent.getInRangeComponents(pid).has(this.chargeTarget);
+  }
+
+  private resolvePlayerId(): number {
+    if (this.playerEntityId >= 0) return this.playerEntityId;
+    for (const entity of Engine.getEntities().getAllEntities()) {
+      if (entity.hasComponent('player_controller')) {
+        this.playerEntityId = entity.id;
+        return this.playerEntityId;
+      }
+    }
+    return -1;
   }
 
   // ─── Component boilerplate ─────────────────────────────────────────────────
@@ -499,6 +570,8 @@ export class EnemyControllerComponent extends Component {
   public override dispose(): void {
     this.stateEl?.remove();
     this.stateEl = null;
+    this.clonedMaterial?.release();
+    this.clonedMaterial = null;
     if (this.characterController) {
       Engine.getPhysics().getWorld().removeCharacterController(this.characterController);
     }

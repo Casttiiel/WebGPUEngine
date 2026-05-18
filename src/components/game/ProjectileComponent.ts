@@ -4,6 +4,7 @@ import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { TransformComponent } from '../core/TransformComponent';
 import { TrailRendererComponent } from '../vfx/TrailRendererComponent';
+import { Msg } from '../../core/ecs/Msg';
 
 export type ProjectileComponentData = {
   speed?: number;
@@ -22,6 +23,8 @@ export class ProjectileComponent extends Component {
   private readonly prevPosition: vec3 = vec3.create();
   private traveledDistance: number = 0;
   private releaseCallback: ((proj: ProjectileComponent) => void) | null = null;
+  /** Rigid body of the entity that fired this projectile — excluded from ray casts. */
+  private shooterBody: RAPIER.RigidBody | null = null;
 
   public load(data: ProjectileComponentData): void {
     this.speed = data.speed ?? 80;
@@ -34,7 +37,13 @@ export class ProjectileComponent extends Component {
    * Activate this projectile from the pool.
    * Called by BulletPoolComponent.acquire() → WeaponComponent.
    */
-  public fire(origin: vec3, direction: vec3, onRelease: (proj: ProjectileComponent) => void): void {
+  public fire(
+    origin: vec3,
+    direction: vec3,
+    onRelease: (proj: ProjectileComponent) => void,
+    shooterBody?: RAPIER.RigidBody,
+  ): void {
+    this.shooterBody = shooterBody ?? null;
     const transform = (
       this.getOwner().getComponent('transform') as TransformComponent
     ).getTransform();
@@ -79,7 +88,15 @@ export class ProjectileComponent extends Component {
       { x: this.direction[0], y: this.direction[1], z: this.direction[2] },
     );
 
-    const hit = world.castRay(ray, stepDist, true, QueryFilterFlags.EXCLUDE_SENSORS);
+    const hit = world.castRay(
+      ray,
+      stepDist,
+      true,
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      undefined,
+      this.shooterBody ?? undefined,
+    );
     if (hit) {
       const hitPoint = vec3.scaleAndAdd(
         vec3.create(),
@@ -108,11 +125,20 @@ export class ProjectileComponent extends Component {
   }
 
   // Override to react to hits (damage, decals, sounds, etc.)
-  protected onHit(_hitPoint: vec3, _hit: RAPIER.RayColliderHit): void {
+  protected onHit(_hitPoint: vec3, hit: RAPIER.RayColliderHit): void {
+    // Send damage to whatever was hit (if the entity has a HealthComponent, it will react)
+    if (this.damage > 0) {
+      const entityId = Engine.getPhysics().getEntityIdFromCollider(hit.collider.handle);
+      if (entityId !== undefined) {
+        const entity = Engine.getEntities().getEntityById(entityId);
+        entity?.sendMsg(Msg.damage({ amount: this.damage, instigator: null }));
+      }
+    }
     this.doRelease();
   }
 
   private doRelease(): void {
+    this.shooterBody = null;
     this.releaseCallback?.(this);
   }
 

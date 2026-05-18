@@ -1,13 +1,13 @@
 {
-    "technique": "gbuffer/gbuffer.tech",
-    "textures":{
-        "txAlbedo": "white.png",
-        "txNormal": "no-normal.jpg",
-        "txMetallic": "white.png",
-        "txRoughness": "black.png",
-        "txEmissive": "black.png"
-    },
-    "casts_shadows": false,
-    "category": "solids",
-    "shadows": false
+  "technique": "gbuffer/gbuffer.tech",
+  "textures": {
+    "txAlbedo": "white.png",
+    "txNormal": "no-normal.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "black.png",
+    "txEmissive": "black.png"
+  },
+  "casts_shadows": false,
+  "category": "solids",
+  "shadows": false
 }

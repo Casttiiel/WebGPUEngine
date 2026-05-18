@@ -13,6 +13,7 @@ export { Condition } from './nodes/Condition';
 export { RequestPathAction } from './nodes/RequestPathAction';
 export { FollowPathAction } from './nodes/FollowPathAction';
 export { SteerAction } from './nodes/SteerAction';
+export { ShootAction } from './nodes/ShootAction';
 
 // Decorators
 export { Inverter, AlwaysSucceed, Repeat } from './nodes/Decorators';

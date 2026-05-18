@@ -2,9 +2,21 @@
   "components": {
     "name": "Bullet",
     "transform": {
-      "position": [0, 0, 0],
-      "rotation": [0, 0, 0],
-      "scale": [0.04, 0.04, 0.18]
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.04,
+        0.04,
+        0.18
+      ]
     },
     "render": {
       "meshes": [
@@ -15,7 +27,7 @@
       ]
     },
     "projectile": {
-      "speed": 1,
+      "speed": 50,
       "maxRange": 200,
       "damage": 25,
       "gravity": 0
@@ -26,8 +38,18 @@
       "minNodeDistance": 0.02,
       "width": 0.06,
       "lifetime": 0.25,
-      "startColor": [1.0, 0.95, 0.55, 1.0],
-      "endColor":   [1.0, 0.30, 0.05, 0.0]
+      "startColor": [
+        1,
+        0.95,
+        0.55,
+        1
+      ],
+      "endColor": [
+        1,
+        0.3,
+        0.05,
+        0
+      ]
     }
   }
 }
