@@ -139,14 +139,40 @@ export class HeadBobComponent extends Component {
     this._editorFolder.add(this, 'enabled').name('Enabled').listen();
 
     const p = {
-      get frequency() { return self.frequency; }, set frequency(v: number) { self.frequency = v; },
-      get verticalAmplitude() { return self.verticalAmplitude; }, set verticalAmplitude(v: number) { self.verticalAmplitude = v; },
-      get horizontalAmplitude() { return self.horizontalAmplitude; }, set horizontalAmplitude(v: number) { self.horizontalAmplitude = v; },
-      get speedThreshold() { return self.speedThreshold; }, set speedThreshold(v: number) { self.speedThreshold = v; },
+      get frequency() {
+        return self.frequency;
+      },
+      set frequency(v: number) {
+        self.frequency = v;
+      },
+      get verticalAmplitude() {
+        return self.verticalAmplitude;
+      },
+      set verticalAmplitude(v: number) {
+        self.verticalAmplitude = v;
+      },
+      get horizontalAmplitude() {
+        return self.horizontalAmplitude;
+      },
+      set horizontalAmplitude(v: number) {
+        self.horizontalAmplitude = v;
+      },
+      get speedThreshold() {
+        return self.speedThreshold;
+      },
+      set speedThreshold(v: number) {
+        self.speedThreshold = v;
+      },
     };
     this._editorFolder.add(p, 'frequency', 0.5, 5.0, 0.1).name('Frequency (Hz)').listen();
-    this._editorFolder.add(p, 'verticalAmplitude', 0.0, 0.2, 0.005).name('Vertical Amplitude').listen();
-    this._editorFolder.add(p, 'horizontalAmplitude', 0.0, 0.2, 0.005).name('Horizontal Amplitude').listen();
+    this._editorFolder
+      .add(p, 'verticalAmplitude', 0.0, 0.2, 0.005)
+      .name('Vertical Amplitude')
+      .listen();
+    this._editorFolder
+      .add(p, 'horizontalAmplitude', 0.0, 0.2, 0.005)
+      .name('Horizontal Amplitude')
+      .listen();
     this._editorFolder.add(p, 'speedThreshold', 0.0, 5.0, 0.1).name('Speed Threshold').listen();
   }
 

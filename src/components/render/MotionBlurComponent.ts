@@ -279,13 +279,40 @@ export class MotionBlurComponent extends Component {
     this._editorFolder = folder.addFolder('Motion Blur');
     this._editorFolder.close();
 
-    const blurStrWrapper = { get blurStrength() { return self._blurStrength; }, set blurStrength(v: number) { self._blurStrength = v; } };
-    const numSamplesWrapper = { get numSamples() { return self._numSamples; }, set numSamples(v: number) { self._numSamples = Math.floor(v); } };
-    const translWrapper = { get translationDampening() { return self.translationDampening; }, set translationDampening(v: number) { self.translationDampening = v; } };
+    const blurStrWrapper = {
+      get blurStrength() {
+        return self._blurStrength;
+      },
+      set blurStrength(v: number) {
+        self._blurStrength = v;
+      },
+    };
+    const numSamplesWrapper = {
+      get numSamples() {
+        return self._numSamples;
+      },
+      set numSamples(v: number) {
+        self._numSamples = Math.floor(v);
+      },
+    };
+    const translWrapper = {
+      get translationDampening() {
+        return self.translationDampening;
+      },
+      set translationDampening(v: number) {
+        self.translationDampening = v;
+      },
+    };
 
-    this._editorFolder.add(blurStrWrapper, 'blurStrength', 0.0, 2.0, 0.05).name('Strength').listen();
+    this._editorFolder
+      .add(blurStrWrapper, 'blurStrength', 0.0, 2.0, 0.05)
+      .name('Strength')
+      .listen();
     this._editorFolder.add(numSamplesWrapper, 'numSamples', 2, 16, 1).name('Sample Count').listen();
-    this._editorFolder.add(translWrapper, 'translationDampening', 0.0, 1.0, 0.05).name('Translation Dampening').listen();
+    this._editorFolder
+      .add(translWrapper, 'translationDampening', 0.0, 1.0, 0.05)
+      .name('Translation Dampening')
+      .listen();
   }
 
   public override renderDebug(): void {

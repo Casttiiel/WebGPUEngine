@@ -298,18 +298,81 @@ export class BloomGaussianComponent extends BlurGaussianComponent {
     this._editorFolder = folder.addFolder('Bloom');
     this._editorFolder.close();
 
-    const thresholdMinWrapper = { get thresholdMin() { return self.thresholdMin; }, set thresholdMin(v: number) { self.thresholdMin = v; self.updateBloomFilterParams(); self.bloomFilterParamsBindGroup = null; } };
-    const thresholdMaxWrapper = { get thresholdMax() { return self.thresholdMax; }, set thresholdMax(v: number) { self.thresholdMax = v; self.updateBloomFilterParams(); self.bloomFilterParamsBindGroup = null; } };
-    const emissiveWrapper = { get emissiveFactor() { return self.emissiveFactor; }, set emissiveFactor(v: number) { self.emissiveFactor = v; self.updateBloomFilterParams(); self.bloomFilterParamsBindGroup = null; } };
-    const blurStrWrapper = { get blurStrength() { return self.getBlurStrength(); }, set blurStrength(v: number) { self.setBlurStrength(v); } };
-    const maxStepsWrapper = { get maxBlurSteps() { return self.getMaxBlurSteps(); }, set maxBlurSteps(v: number) { self.setMaxBlurSteps(v); } };
-    const sizeWrapper = { get bloomSize() { return self.getBloomSize(); }, set bloomSize(v: number) { self.setBloomSize(v); } };
+    const thresholdMinWrapper = {
+      get thresholdMin() {
+        return self.thresholdMin;
+      },
+      set thresholdMin(v: number) {
+        self.thresholdMin = v;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null;
+      },
+    };
+    const thresholdMaxWrapper = {
+      get thresholdMax() {
+        return self.thresholdMax;
+      },
+      set thresholdMax(v: number) {
+        self.thresholdMax = v;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null;
+      },
+    };
+    const emissiveWrapper = {
+      get emissiveFactor() {
+        return self.emissiveFactor;
+      },
+      set emissiveFactor(v: number) {
+        self.emissiveFactor = v;
+        self.updateBloomFilterParams();
+        self.bloomFilterParamsBindGroup = null;
+      },
+    };
+    const blurStrWrapper = {
+      get blurStrength() {
+        return self.getBlurStrength();
+      },
+      set blurStrength(v: number) {
+        self.setBlurStrength(v);
+      },
+    };
+    const maxStepsWrapper = {
+      get maxBlurSteps() {
+        return self.getMaxBlurSteps();
+      },
+      set maxBlurSteps(v: number) {
+        self.setMaxBlurSteps(v);
+      },
+    };
+    const sizeWrapper = {
+      get bloomSize() {
+        return self.getBloomSize();
+      },
+      set bloomSize(v: number) {
+        self.setBloomSize(v);
+      },
+    };
 
-    this._editorFolder.add(thresholdMinWrapper, 'thresholdMin', 0.0, 50.0, 0.1).name('Filter Threshold Min').listen();
-    this._editorFolder.add(thresholdMaxWrapper, 'thresholdMax', 0.5, 100.0, 0.1).name('Filter Threshold Max').listen();
-    this._editorFolder.add(emissiveWrapper, 'emissiveFactor', 0.1, 10.0, 0.1).name('Emissive Factor').listen();
-    this._editorFolder.add(blurStrWrapper, 'blurStrength', 0.0, 10.0, 0.1).name('Blur Strength').listen();
-    this._editorFolder.add(maxStepsWrapper, 'maxBlurSteps', 1, 20, 1).name('Max Blur Steps').listen();
+    this._editorFolder
+      .add(thresholdMinWrapper, 'thresholdMin', 0.0, 50.0, 0.1)
+      .name('Filter Threshold Min')
+      .listen();
+    this._editorFolder
+      .add(thresholdMaxWrapper, 'thresholdMax', 0.5, 100.0, 0.1)
+      .name('Filter Threshold Max')
+      .listen();
+    this._editorFolder
+      .add(emissiveWrapper, 'emissiveFactor', 0.1, 10.0, 0.1)
+      .name('Emissive Factor')
+      .listen();
+    this._editorFolder
+      .add(blurStrWrapper, 'blurStrength', 0.0, 10.0, 0.1)
+      .name('Blur Strength')
+      .listen();
+    this._editorFolder
+      .add(maxStepsWrapper, 'maxBlurSteps', 1, 20, 1)
+      .name('Max Blur Steps')
+      .listen();
     this._editorFolder.add(sizeWrapper, 'bloomSize', 0.25, 4.0, 0.05).name('Size').listen();
   }
 

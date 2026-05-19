@@ -561,9 +561,18 @@ export class ParticleSystemComponent extends Component {
     if (this._editorFolder) return;
     this._editorFolder = folder.addFolder('Particle System');
     this._editorFolder.close();
-    this._editorFolder.add(this, 'spawnInterval', 0.1, 5.0, 0.1).name('Spawn Interval (s)').listen();
-    this._editorFolder.add(this, 'particlesPerSpawn', 1, 50, 1).name('Particles per Spawn').listen();
-    this._editorFolder.add({ maxParticles: this.maxParticles }, 'maxParticles').name('Max Particles').disable();
+    this._editorFolder
+      .add(this, 'spawnInterval', 0.1, 5.0, 0.1)
+      .name('Spawn Interval (s)')
+      .listen();
+    this._editorFolder
+      .add(this, 'particlesPerSpawn', 1, 50, 1)
+      .name('Particles per Spawn')
+      .listen();
+    this._editorFolder
+      .add({ maxParticles: this.maxParticles }, 'maxParticles')
+      .name('Max Particles')
+      .disable();
   }
 
   public override renderDebug(): void {

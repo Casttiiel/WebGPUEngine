@@ -455,11 +455,26 @@ export class SMAAComponent extends Component {
     this._editorFolder = folder.addFolder('SMAA');
     this._editorFolder.close();
     this._editorFolder.add(this.smaaParams, 'enabled').name('Enabled').listen();
-    this._editorFolder.add(this.smaaParams, 'edgeThreshold', 0.01, 1.5, 0.01).name('Edge Threshold').listen();
-    this._editorFolder.add(this.smaaParams, 'maxSearchSteps', 4, 64, 1).name('Max Search Steps').listen();
-    this._editorFolder.add(this.smaaParams, 'maxSearchStepsDiag', 4, 32, 1).name('Max Diagonal Steps').listen();
-    this._editorFolder.add(this.smaaParams, 'cornerRounding', 0.0, 100.0, 5.0).name('Corner Rounding').listen();
-    this._editorFolder.add(this.smaaParams, 'disableDiagDetection').name('Disable Diagonals').listen();
+    this._editorFolder
+      .add(this.smaaParams, 'edgeThreshold', 0.01, 1.5, 0.01)
+      .name('Edge Threshold')
+      .listen();
+    this._editorFolder
+      .add(this.smaaParams, 'maxSearchSteps', 4, 64, 1)
+      .name('Max Search Steps')
+      .listen();
+    this._editorFolder
+      .add(this.smaaParams, 'maxSearchStepsDiag', 4, 32, 1)
+      .name('Max Diagonal Steps')
+      .listen();
+    this._editorFolder
+      .add(this.smaaParams, 'cornerRounding', 0.0, 100.0, 5.0)
+      .name('Corner Rounding')
+      .listen();
+    this._editorFolder
+      .add(this.smaaParams, 'disableDiagDetection')
+      .name('Disable Diagonals')
+      .listen();
     this._editorFolder.add(this.smaaParams, 'useDirectWeights').name('Use Direct Weights').listen();
   }
 
