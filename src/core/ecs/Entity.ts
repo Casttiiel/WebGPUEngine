@@ -75,6 +75,8 @@ export class Entity {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _editorFolder: any = null;
+  /** Set by pool systems (e.g. BulletPoolComponent) to hide this entity from the editor. */
+  public isPoolEntity: boolean = false;
 
   /**
    * Adds this entity as a sub-folder of the provided raw lil-gui folder.

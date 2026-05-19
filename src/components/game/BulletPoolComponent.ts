@@ -58,6 +58,7 @@ export class BulletPoolComponent extends Component {
     }
 
     const entity = await Loader.loadEntityFromJSON(data, undefined, false);
+    entity.isPoolEntity = true;
     const projectile = entity.getComponent(this.projectileType) as ProjectileComponent | null;
 
     if (!projectile) {

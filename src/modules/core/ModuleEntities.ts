@@ -105,6 +105,7 @@ export class ModuleEntities extends Module {
     if (!sceneFolder) return;
 
     for (const entity of this.omEntities) {
+      if (entity.isPoolEntity) continue;
       entity.renderInMenu(sceneFolder);
     }
   }
