@@ -23,6 +23,7 @@
     "camera_fov_modifier",
     "box_collider",
     "capsule_collider",
+    "spider_controller",
     "transform",
     "fps_camera_controller",
     "camera",

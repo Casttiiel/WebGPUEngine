@@ -1,0 +1,445 @@
+{
+  "components": {
+    "name": "Spider",
+    "transform": {
+      "position": [
+        0,
+        0.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.4,
+        0.25,
+        0.7
+      ]
+    },
+    "capsule_collider": {
+      "height": 0.5,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 50,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_sphere.obj",
+          "material": "metal.mat"
+        }
+      ]
+    },
+    "spider_controller": {}
+  },
+  "children": [
+    {
+      "components": {
+        "name": "Leg0_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg0_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg1_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg1_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg2_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg2_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg3_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg3_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg4_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg4_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg5_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg5_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg6_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg6_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg7_Upper",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.55
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "components": {
+        "name": "Leg7_Lower",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.06,
+            0.06,
+            0.5
+          ]
+        },
+        "render": {
+          "meshes": [
+            {
+              "mesh": "unit_cube.obj",
+              "material": "metal.mat"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

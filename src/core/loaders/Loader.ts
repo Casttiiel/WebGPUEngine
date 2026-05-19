@@ -56,6 +56,7 @@ import { ContactShadowsComponent } from '../../components/render/ContactShadowsC
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
+import { SpiderControllerComponent } from '../../components/game/SpiderControllerComponent';
 import { ArcaneKnightControllerComponent } from '../../components/game/ArcaneKnightControllerComponent';
 import { BloodmancerControllerComponent } from '../../components/game/BloodmancerControllerComponent';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
@@ -384,6 +385,8 @@ export class Loader {
         return new SwingBarComponent();
       case 'enemy_controller':
         return new EnemyControllerComponent();
+      case 'spider_controller':
+        return new SpiderControllerComponent();
       case 'perception':
         return new PerceptionComponent();
       case 'projectile':
