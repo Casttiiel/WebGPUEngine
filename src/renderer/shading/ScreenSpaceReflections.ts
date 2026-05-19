@@ -373,8 +373,12 @@ export class ScreenSpaceReflections {
     this._editorFolder.add(p, 'metallicMin', 0.0, 1.0).name('Metallic Min').listen();
     this._editorFolder.add(p, 'roughnessMax', 0.0, 1.0).name('Roughness Max').listen();
     const enabledProxy = {
-      get enabled() { return p.enabled > 0.5; },
-      set enabled(v: boolean) { p.enabled = v ? 1.0 : 0.0; },
+      get enabled() {
+        return p.enabled > 0.5;
+      },
+      set enabled(v: boolean) {
+        p.enabled = v ? 1.0 : 0.0;
+      },
     };
     this._editorFolder.add(enabledProxy, 'enabled').name('Enabled').listen();
   }

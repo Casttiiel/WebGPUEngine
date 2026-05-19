@@ -1080,7 +1080,10 @@ export class FroxelVolumetricScattering {
     this._editorFolder.add(this, 'fogBaseHeight', -10.0, 10.0).name('Fog Base Height').listen();
     this._editorFolder.add(this, 'fogLayerHeight', 1.0, 50.0).name('Fog Layer Height').listen();
     this._editorFolder.add(this, 'fogFalloff', 0.0, 1.0).name('Fog Falloff').listen();
-    this._editorFolder.add(this, 'ambientVolumetricIntensity', 0.0, 0.2).name('Ambient Volumetric').listen();
+    this._editorFolder
+      .add(this, 'ambientVolumetricIntensity', 0.0, 0.2)
+      .name('Ambient Volumetric')
+      .listen();
     this._editorFolder.add(this, 'gLightFactor', 0.0, 1.0).name('G Light Factor').listen();
     this._editorFolder.add(this, 'nearPlane', 0.01, 1.0).name('Near Plane').listen();
     this._editorFolder.add(this, 'farPlane', 10.0, 200.0).name('Far Plane').listen();
