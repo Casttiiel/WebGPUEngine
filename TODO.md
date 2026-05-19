@@ -1,19 +1,17 @@
 ### Engine
 
-1. Scene entities tiene todas las entidades? Hacer skip de las "pools"
-
-2. Grass Influence Map / Chunks
-3. Trees Generator / https://www.youtube.com/watch?v=GOfttJQ-FGw
-4. Material Instances
-5. Fire https://www.youtube.com/watch?v=Y1ZBzIiP-v4
-6. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-7. Water Shader Reflections + Better Foam
-8. Virtual Textures / Texture Streaming. Sin streaming, escenas grandes explotan en VRAM.
-9. Procedural materials
-10. Mesh LOD
-11. Editor Camera (Render Debug / Gizmo / Menu)
-12. Asset Spawn + Delete
-13. Enemy AI / NavMesh
+1. Grass Influence Map / Chunks
+2. Trees Generator / https://www.youtube.com/watch?v=GOfttJQ-FGw
+3. Material Instances
+4. Fire https://www.youtube.com/watch?v=Y1ZBzIiP-v4
+5. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+6. Water Shader Reflections + Better Foam
+7. Virtual Textures / Texture Streaming. Sin streaming, escenas grandes explotan en VRAM.
+8. Procedural materials
+9. Mesh LOD
+10. Editor Camera (Render Debug / Gizmo / Menu)
+11. Asset Spawn + Delete
+12. Enemy AI / NavMesh
 
 ## Gameplay
 

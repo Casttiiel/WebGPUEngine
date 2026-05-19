@@ -1,83 +1,18 @@
 import { vec3, quat } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { Component } from '../../core/ecs/Component';
+import { Entity } from '../../core/ecs/Entity';
 import { Engine } from '../../core/engine/Engine';
 import { TransformComponent } from '../core/TransformComponent';
+import { TransformComponentDataType } from '../../types/TransformComponentData.type';
+import { NameComponent } from '../core/NameComponent';
+import { RenderComponent } from '../render/RenderComponent';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const NUM_LEGS = 8;
-
-/**
- * Alternating tetrapod gait (2 groups):
- *   Group 0 (Tetrapod A): FR(0), MFL(3), MBR(4), BL(7)  — odd-right + even-left
- *   Group 1 (Tetrapod B): FL(1), MFR(2), MBL(5), BR(6)  — odd-left  + even-right
- */
-//                         FR  FL  MFR MFL MBR MBL  BR  BL
-const STEP_GROUP: number[] = [0, 1, 1, 0, 0, 1, 1, 0];
-
-/**
- * Initial phase per leg: group 0 starts at phase 0, group 1 at phase 1
- * (half-cycle offset so the two tetrapods alternate from the first step).
- */
-//                           FR  FL  MFR MFL MBR MBL  BR  BL
-const STEP_INIT_TICK: number[] = [0, 1, 1, 0, 0, 1, 1, 0];
-
-/**
- * Intra-tetrapod phase offset (as a fraction of stepDuration).
- * Within each group the wave propagates back→front:
- *   BL/BR = 0.00, MBR/MBL = 0.25, MFL/MFR = 0.50, FR/FL = 0.75
- */
-//                                  FR    FL    MFR   MFL   MBR   MBL   BR    BL
-const STEP_PHASE_OFFSET: number[] = [0.75, 0.75, 0.5, 0.5, 0.25, 0.25, 0.0, 0.0];
-
-/**
- * The leg that must have started its swing (stepT >= 0.5) before this leg
- * is allowed to begin its own step.  -1 = no constraint (first in chain).
- * Chain per group:  BL(7)→MBR(4)→MFL(3)→FR(0)  and  BR(6)→MBL(5)→MFR(2)→FL(1)
- */
-//                                   FR  FL  MFR MFL MBR MBL  BR  BL
-const STEP_PREDECESSOR: number[] = [4, 5, 6, 7, 7, 6, -1, -1];
-
 /** Minimum pause (seconds) between two consecutive steps of the same leg. */
 const STEP_MIN_COOLDOWN = 0.05;
-
-/** Hip joint attachment points in body-local space. */
-const HIP_LOCAL: [number, number, number][] = [
-  [+0.42, -0.04, +0.48], // 0 front-right
-  [-0.42, -0.04, +0.48], // 1 front-left
-  [+0.42, -0.04, +0.14], // 2 midfront-right
-  [-0.42, -0.04, +0.14], // 3 midfront-left
-  [+0.42, -0.04, -0.14], // 4 midback-right
-  [-0.42, -0.04, -0.14], // 5 midback-left
-  [+0.42, -0.04, -0.48], // 6 back-right
-  [-0.42, -0.04, -0.48], // 7 back-left
-];
-
-/** Natural foot rest positions in body-local space (idle stance). */
-const FOOT_REST_LOCAL: [number, number, number][] = [
-  [+1.05, -0.55, +0.85], // 0
-  [-1.05, -0.55, +0.85], // 1
-  [+1.25, -0.55, +0.22], // 2
-  [-1.25, -0.55, +0.22], // 3
-  [+1.25, -0.55, -0.22], // 4
-  [-1.25, -0.55, -0.22], // 5
-  [+1.05, -0.55, -0.85], // 6
-  [-1.05, -0.55, -0.85], // 7
-];
-
-/** Lateral outward hint for the knee bend direction (+X = right leg, -X = left leg). */
-const KNEE_HINT: [number, number, number][] = [
-  [+1, 0.5, 0],
-  [-1, 0.5, 0],
-  [+1, 0.5, 0],
-  [-1, 0.5, 0],
-  [+1, 0.5, 0],
-  [-1, 0.5, 0],
-  [+1, 0.5, 0],
-  [-1, 0.5, 0],
-];
 
 const TURN_SPEED = 2.5; // rad/s
 const GRAVITY = 9.8;
@@ -164,10 +99,127 @@ export class SpiderControllerComponent extends Component {
   private bodyTiltAmount: number = 0.08; // max roll in radians
   private moveSpeed: number = 1.8;
   private chaseRange: number = 14.0;
+  /** Mesh path used for each leg segment (unit_cube.obj by default). */
+  private legMesh: string = 'unit_cube.obj';
+  /** Material path used for each leg segment. */
+  private legMaterial: string = 'metal.mat';
+
+  /** Leg child entities spawned by this component (tracked for dispose). */
+  private legEntities: Entity[] = [];
+
+  // ─── Per-leg geometry (configurable via JSON + editor) ───────────────────
+  /** How many legs. Must equal the number of Leg*_Upper/Lower child pairs. */
+  private numLegs: number = 8;
+  /** Hip joint attachment points in body-local space (one per leg). */
+  private hipLocal: [number, number, number][] = [
+    [+0.42, -0.04, +0.48], // 0 FR
+    [-0.42, -0.04, +0.48], // 1 FL
+    [+0.42, -0.04, +0.14], // 2 MFR
+    [-0.42, -0.04, +0.14], // 3 MFL
+    [+0.42, -0.04, -0.14], // 4 MBR
+    [-0.42, -0.04, -0.14], // 5 MBL
+    [+0.42, -0.04, -0.48], // 6 BR
+    [-0.42, -0.04, -0.48], // 7 BL
+  ];
+  /** Natural foot rest positions in body-local space (idle stance). */
+  private footRestLocal: [number, number, number][] = [
+    [+1.05, -0.55, +0.85], // 0
+    [-1.05, -0.55, +0.85], // 1
+    [+1.25, -0.55, +0.22], // 2
+    [-1.25, -0.55, +0.22], // 3
+    [+1.25, -0.55, -0.22], // 4
+    [-1.25, -0.55, -0.22], // 5
+    [+1.05, -0.55, -0.85], // 6
+    [-1.05, -0.55, -0.85], // 7
+  ];
+  /** Lateral outward knee-bend hint direction in body-local space. */
+  private kneeHint: [number, number, number][] = [
+    [+1, 0.5, 0],
+    [-1, 0.5, 0],
+    [+1, 0.5, 0],
+    [-1, 0.5, 0],
+    [+1, 0.5, 0],
+    [-1, 0.5, 0],
+    [+1, 0.5, 0],
+    [-1, 0.5, 0],
+  ];
+  // ─── Gait arrays (derived from numLegs; can be overridden in JSON) ────────
+  /** Tetrapod group (0 or 1) for each leg. */
+  private stepGroup: number[] = [0, 1, 1, 0, 0, 1, 1, 0];
+  /** Initial phase tick per leg (0=group fires first, 1=opposite group fires first). */
+  private stepInitTick: number[] = [0, 1, 1, 0, 0, 1, 1, 0];
+  /** Intra-tetrapod phase offset as a fraction of stepDuration (back→front stagger). */
+  private stepPhaseOffset: number[] = [0.75, 0.75, 0.5, 0.5, 0.25, 0.25, 0.0, 0.0];
+  /**
+   * Predecessor leg index: this leg waits until that leg is past 40 % of its swing.
+   * -1 = no constraint (first in back-to-front chain).
+   * Default chain: BL(7)→MBR(4)→MFL(3)→FR(0)  and  BR(6)→MBL(5)→MFR(2)→FL(1)
+   */
+  private stepPredecessor: number[] = [3, 2, 5, 4, 7, 6, -1, -1];
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
-  public load(_data: unknown): void {}
+  public load(data: unknown): void {
+    if (!data || typeof data !== 'object') return;
+    const d = data as Record<string, unknown>;
+
+    // Scalar parameters
+    const num = (key: string) => {
+      if (typeof d[key] === 'number') (this as any)[key] = d[key] as number;
+    };
+    num('legUpperLength');
+    num('legLowerLength');
+    num('legThickness');
+    num('stepThreshold');
+    num('stepDuration');
+    num('stepHeight');
+    num('stepAnticipation');
+    num('footSpread');
+    num('frontLegReach');
+    num('backLegReach');
+    num('bodyBobAmount');
+    num('bodyBobSpeed');
+    num('bodyTiltAmount');
+    num('moveSpeed');
+    num('chaseRange');
+    if (typeof d['legMesh'] === 'string') this.legMesh = d['legMesh'] as string;
+    if (typeof d['legMaterial'] === 'string') this.legMaterial = d['legMaterial'] as string;
+
+    // Leg count — if changed, regenerate geometry + gait defaults before applying overrides.
+    if (typeof d['numLegs'] === 'number' && d['numLegs'] !== this.numLegs) {
+      this.numLegs = d['numLegs'] as number;
+      this.generateDefaultGeometry(this.numLegs);
+      this.rebuildGaitArrays(this.numLegs);
+    }
+
+    // Per-leg geometry overrides (each entry is [x, y, z]).
+    const parseVec3Array = (key: string, target: [number, number, number][]) => {
+      const arr = d[key];
+      if (!Array.isArray(arr)) return;
+      for (let i = 0; i < arr.length && i < target.length; i++) {
+        const v = arr[i];
+        if (Array.isArray(v) && v.length >= 3) {
+          target[i] = [Number(v[0]) || 0, Number(v[1]) || 0, Number(v[2]) || 0];
+        }
+      }
+    };
+    parseVec3Array('hipLocal', this.hipLocal);
+    parseVec3Array('footRestLocal', this.footRestLocal);
+    parseVec3Array('kneeHint', this.kneeHint);
+
+    // Gait array overrides (number[]).
+    const parseNumArray = (key: string, target: number[]) => {
+      const arr = d[key];
+      if (!Array.isArray(arr)) return;
+      for (let i = 0; i < arr.length && i < target.length; i++) {
+        if (typeof arr[i] === 'number') target[i] = arr[i] as number;
+      }
+    };
+    parseNumArray('stepGroup', this.stepGroup);
+    parseNumArray('stepInitTick', this.stepInitTick);
+    parseNumArray('stepPhaseOffset', this.stepPhaseOffset);
+    parseNumArray('stepPredecessor', this.stepPredecessor);
+  }
 
   public override async onAttach(): Promise<void> {
     this.capsule = this.getOwner().getComponent(
@@ -183,8 +235,113 @@ export class SpiderControllerComponent extends Component {
     const t = this.capsule.getRigidBody().translation();
     vec3.set(this.spawnPos, t.x, t.y, t.z);
     this.pickPatrolTarget();
-    // Leg children are not yet loaded at onAttach time — they are initialized
-    // lazily on the first update() call (see initLegs).
+
+    // Spawn leg child entities now so initLegs() can find them on the first update().
+    await this.spawnLegEntities();
+  }
+
+  /**
+   * Procedurally creates the Leg{i}_Upper and Leg{i}_Lower child entities.
+   * Each is a thin box driven by IK — no need to define them in the prefab.
+   */
+  private async spawnLegEntities(): Promise<void> {
+    const owner = this.getOwner();
+    const em = Engine.getEntities();
+
+    for (let i = 0; i < this.numLegs; i++) {
+      for (const seg of ['Upper', 'Lower'] as const) {
+        const segLen = seg === 'Upper' ? this.legUpperLength : this.legLowerLength;
+
+        const child = new Entity();
+        owner.addChildren(child);
+        em.addEntity(child);
+        child.isPoolEntity = true; // hide from scene panel
+
+        const nameComp = new NameComponent();
+        nameComp.load(`Leg${i}_${seg}`);
+        child.addComponent('name', nameComp);
+
+        const tx = new TransformComponent();
+        child.addComponent('transform', tx);
+        tx.load({
+          position: [0, 0, 0],
+          scale: [this.legThickness, this.legThickness, segLen],
+        } as TransformComponentDataType);
+        em.addComponentToManager(tx, 'transform');
+
+        const rc = new RenderComponent();
+        rc.setOwner(child);
+        child.addComponent('render', rc);
+        await rc.load({ meshes: [{ mesh: this.legMesh, material: this.legMaterial }] });
+        em.addComponentToManager(rc, 'render');
+
+        this.legEntities.push(child);
+      }
+    }
+  }
+
+  /**
+   * Generates evenly-spaced default hip, foot-rest, and knee-hint arrays for `n` legs.
+   * Called automatically when `numLegs` changes via JSON; can also be called manually.
+   */
+  private generateDefaultGeometry(n: number): void {
+    const pairs = Math.max(1, Math.floor(n / 2));
+    const zFront = 0.48,
+      zBack = -0.48;
+    const fzFront = 0.85,
+      fzBack = -0.85;
+    const zStep = pairs > 1 ? (zFront - zBack) / (pairs - 1) : 0;
+    const fzStep = pairs > 1 ? (fzFront - fzBack) / (pairs - 1) : 0;
+    this.hipLocal = [];
+    this.footRestLocal = [];
+    this.kneeHint = [];
+    for (let i = 0; i < n; i++) {
+      const pairIdx = Math.floor(i / 2);
+      const sign = i % 2 === 0 ? 1 : -1;
+      const z = zFront - pairIdx * zStep;
+      const fz = fzFront - pairIdx * fzStep;
+      this.hipLocal.push([sign * 0.42, -0.04, z]);
+      this.footRestLocal.push([sign * 1.15, -0.55, fz]);
+      this.kneeHint.push([sign, 0.5, 0]);
+    }
+  }
+
+  /**
+   * Derives gait arrays (stepGroup, stepInitTick, stepPhaseOffset, stepPredecessor)
+   * from a given leg count using the alternating-tetrapod pattern.
+   * Pairs are indexed front-to-back; within each pair index 0 = right, 1 = left.
+   */
+  private rebuildGaitArrays(n: number): void {
+    const pairs = Math.max(1, Math.floor(n / 2));
+    this.stepGroup = new Array(n);
+    this.stepInitTick = new Array(n);
+    this.stepPhaseOffset = new Array(n);
+    this.stepPredecessor = new Array(n).fill(-1);
+
+    for (let i = 0; i < n; i++) {
+      const pairIdx = Math.floor(i / 2);
+      const isRight = i % 2 === 0;
+      const group = isRight ? pairIdx % 2 : (pairIdx + 1) % 2;
+      this.stepGroup[i] = group;
+      this.stepInitTick[i] = group;
+      // Phase: backmost pair fires first (0.0), frontmost fires last (0.75).
+      const pairFromBack = pairs - 1 - pairIdx;
+      this.stepPhaseOffset[i] =
+        pairs > 1 ? Math.round((pairFromBack / (pairs - 1)) * 0.75 * 100) / 100 : 0;
+    }
+
+    // Predecessor: within each group, front legs wait for the leg immediately behind them.
+    const groups: number[][] = [[], []];
+    for (let i = 0; i < n; i++) groups[this.stepGroup[i]!]!.push(i);
+    for (const g of groups) {
+      g.sort((a, b) => a - b); // ascending = front-to-back in index
+      // g[last] has the highest index = furthest back = no predecessor.
+      // Each leg g[k] waits for g[k+1] (the one behind it).
+      for (let k = 0; k < g.length - 1; k++) {
+        this.stepPredecessor[g[k]!] = g[k + 1]!;
+      }
+      this.stepPredecessor[g[g.length - 1]!] = -1;
+    }
   }
 
   /** Called once on the first update(), after all children are guaranteed loaded. */
@@ -202,7 +359,7 @@ export class SpiderControllerComponent extends Component {
     const bodyWorldPos = this.bodyTx.getTransform().getWorldPosition();
     const bodyWorldRot = this.bodyTx.getTransform().getWorldRotation();
 
-    for (let i = 0; i < NUM_LEGS; i++) {
+    for (let i = 0; i < this.numLegs; i++) {
       const upper = childByName.get(`Leg${i}_Upper`);
       const lower = childByName.get(`Leg${i}_Lower`);
       if (!upper || !lower) {
@@ -213,8 +370,8 @@ export class SpiderControllerComponent extends Component {
       // Initial planted foot = rest in body-local → world.
       // Use the TRS world-matrix formula: worldOff = rot * (scale ⊗ local)  (scale FIRST).
       // This must match the body mesh rendering (mat4.fromRotationTranslationScale).
-      const rawRest = FOOT_REST_LOCAL[i]!;
-      const zReach = i < 4 ? this.frontLegReach : this.backLegReach;
+      const rawRest = this.footRestLocal[i]!;
+      const zReach = i < Math.floor(this.numLegs / 2) ? this.frontLegReach : this.backLegReach;
       const restLocal = vec3.fromValues(
         rawRest[0] * this.footSpread,
         rawRest[1],
@@ -229,7 +386,7 @@ export class SpiderControllerComponent extends Component {
 
       // Group 1 legs get a half-cycle offset so the two tetrapods alternate.
       const initialCooldown =
-        STEP_INIT_TICK[i]! * this.stepDuration + STEP_PHASE_OFFSET[i]! * this.stepDuration;
+        this.stepInitTick[i]! * this.stepDuration + this.stepPhaseOffset[i]! * this.stepDuration;
 
       this.legs.push({
         planted,
@@ -375,8 +532,8 @@ export class SpiderControllerComponent extends Component {
 
       // Current body-relative rest position in world space.
       // TRS world-matrix formula: worldOff = rot * (scale ⊗ local)  (scale FIRST).
-      const rawRest = FOOT_REST_LOCAL[i]!;
-      const zReach = i < 4 ? this.frontLegReach : this.backLegReach;
+      const rawRest = this.footRestLocal[i]!;
+      const zReach = i < Math.floor(this.numLegs / 2) ? this.frontLegReach : this.backLegReach;
       const restLocal = vec3.fromValues(
         rawRest[0] * this.footSpread,
         rawRest[1],
@@ -389,23 +546,30 @@ export class SpiderControllerComponent extends Component {
         vec3.transformQuat(vec3.create(), restScaled, bodyRot),
       );
 
-      // Only run distance check (and potentially expensive raycast) when the
-      // foot is already close to the trigger radius — cheap early-out.
-      if (vec3.dist(leg.planted, restWorld) <= this.stepThreshold * 0.8) continue;
+      const dist = vec3.dist(leg.planted, restWorld);
 
-      // Trigger a step if within cooldown, opposite group is free, and foot is displaced.
-      if (leg.cooldown > 0) continue;
-      if (this.isOppositeGroupStepping(STEP_GROUP[i]!)) continue;
+      // Forced step: the leg has stretched far beyond its natural range (e.g. during
+      // a sharp turn). Bypass all gating so it snaps back immediately.
+      const isForced = dist > this.stepThreshold * 2.0;
 
-      // Intra-tetrapod ordering: stagger back→front within the group.
-      // Only block if the predecessor is currently in the first 40 % of its swing.
-      const pred = STEP_PREDECESSOR[i]!;
-      if (pred >= 0) {
-        const predLeg = this.legs[pred]!;
-        if (predLeg.stepping && predLeg.stepT < 0.4) continue;
+      if (!isForced) {
+        // Cheap early-out: foot is still close to its rest position.
+        if (dist <= this.stepThreshold * 0.8) continue;
+
+        // Normal gating: cooldown, opposite group, predecessor chain.
+        if (leg.cooldown > 0) continue;
+        if (this.isOppositeGroupStepping(this.stepGroup[i]!)) continue;
+
+        // Intra-tetrapod ordering: stagger back→front within the group.
+        // Only block if the predecessor is currently in the first 40 % of its swing.
+        const pred = this.stepPredecessor[i]!;
+        if (pred >= 0) {
+          const predLeg = this.legs[pred]!;
+          if (predLeg.stepping && predLeg.stepT < 0.4) continue;
+        }
+
+        if (dist <= this.stepThreshold) continue;
       }
-
-      if (vec3.dist(leg.planted, restWorld) <= this.stepThreshold) continue;
 
       // ── Step target: anticipate where the rest position will be once the
       //    step animation finishes (stepDuration * stepAnticipation seconds).
@@ -432,7 +596,7 @@ export class SpiderControllerComponent extends Component {
   private isOppositeGroupStepping(group: number): boolean {
     const opposite = group === 0 ? 1 : 0;
     for (let i = 0; i < this.legs.length; i++) {
-      if (STEP_GROUP[i] === opposite && this.legs[i]!.stepping) return true;
+      if (this.stepGroup[i] === opposite && this.legs[i]!.stepping) return true;
     }
     return false;
   }
@@ -453,7 +617,11 @@ export class SpiderControllerComponent extends Component {
       // Hip in world space.
       // TRS world-matrix formula: worldOff = rot * (scale ⊗ local)  (scale FIRST).
       // Matches the body mesh rendering so the attachment point aligns visually.
-      const hipScaled = vec3.multiply(vec3.create(), vec3.fromValues(...HIP_LOCAL[i]!), bodyScale);
+      const hipScaled = vec3.multiply(
+        vec3.create(),
+        vec3.fromValues(...this.hipLocal[i]!),
+        bodyScale,
+      );
       const hipWorld = vec3.add(
         vec3.create(),
         bodyPos,
@@ -461,7 +629,7 @@ export class SpiderControllerComponent extends Component {
       );
 
       // Rotate the body-local knee hint into world space.
-      const hintLocal = vec3.fromValues(...KNEE_HINT[i]!);
+      const hintLocal = vec3.fromValues(...this.kneeHint[i]!);
       const hintWorld = vec3.transformQuat(vec3.create(), hintLocal, bodyRot);
 
       const footWorld = leg.planted;
@@ -661,6 +829,11 @@ export class SpiderControllerComponent extends Component {
       Engine.getPhysics().getWorld().removeCharacterController(this.characterController);
       this.characterController = null;
     }
+    // Dispose leg child entities created by spawnLegEntities().
+    for (const child of this.legEntities) {
+      child.getComponent('render')?.dispose();
+    }
+    this.legEntities = [];
   }
 
   public renderDebug(): void {}
@@ -670,6 +843,112 @@ export class SpiderControllerComponent extends Component {
     if (this._editorFolder) return;
     this._editorFolder = folder.addFolder('Spider Controller');
     this._editorFolder.close();
+
+    // ── Per-leg geometry (at the top so it's always visible) ────────────────
+    {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      const self = this;
+      const ctx = { leg: 0 };
+
+      // Plain mirror objects — lil-gui reads/writes these directly.
+      // syncFromLeg() loads the selected leg's data into them.
+      const eHip = { x: 0, y: 0, z: 0 };
+      const eFoot = { x: 0, y: 0, z: 0 };
+      const eKnee = { x: 0, y: 0, z: 0 };
+
+      const syncFromLeg = (i: number): void => {
+        const h = self.hipLocal[i];
+        if (h) {
+          eHip.x = h[0];
+          eHip.y = h[1];
+          eHip.z = h[2];
+        }
+        const f = self.footRestLocal[i];
+        if (f) {
+          eFoot.x = f[0];
+          eFoot.y = f[1];
+          eFoot.z = f[2];
+        }
+        const k = self.kneeHint[i];
+        if (k) {
+          eKnee.x = k[0];
+          eKnee.y = k[1];
+          eKnee.z = k[2];
+        }
+      };
+      syncFromLeg(0);
+
+      const legsFolder = this._editorFolder.addFolder('Leg Geometry');
+      legsFolder.close();
+
+      legsFolder
+        .add(ctx, 'leg', 0, Math.max(0, this.numLegs - 1), 1)
+        .name('Leg Index')
+        .onChange((v: number) => {
+          syncFromLeg(v);
+          legsFolder.controllersRecursive().forEach((c: any) => c.updateDisplay());
+        });
+
+      const hipF = legsFolder.addFolder('Hip Anchor');
+      hipF
+        .add(eHip, 'x', -2, 2, 0.01)
+        .name('X')
+        .onChange((v: number) => {
+          if (self.hipLocal[ctx.leg]) self.hipLocal[ctx.leg]![0] = v;
+        });
+      hipF
+        .add(eHip, 'y', -1, 1, 0.01)
+        .name('Y')
+        .onChange((v: number) => {
+          if (self.hipLocal[ctx.leg]) self.hipLocal[ctx.leg]![1] = v;
+        });
+      hipF
+        .add(eHip, 'z', -2, 2, 0.01)
+        .name('Z')
+        .onChange((v: number) => {
+          if (self.hipLocal[ctx.leg]) self.hipLocal[ctx.leg]![2] = v;
+        });
+
+      const footF = legsFolder.addFolder('Foot Rest');
+      footF
+        .add(eFoot, 'x', -3, 3, 0.01)
+        .name('X')
+        .onChange((v: number) => {
+          if (self.footRestLocal[ctx.leg]) self.footRestLocal[ctx.leg]![0] = v;
+        });
+      footF
+        .add(eFoot, 'y', -2, 0, 0.01)
+        .name('Y')
+        .onChange((v: number) => {
+          if (self.footRestLocal[ctx.leg]) self.footRestLocal[ctx.leg]![1] = v;
+        });
+      footF
+        .add(eFoot, 'z', -2, 2, 0.01)
+        .name('Z')
+        .onChange((v: number) => {
+          if (self.footRestLocal[ctx.leg]) self.footRestLocal[ctx.leg]![2] = v;
+        });
+
+      const kneeF = legsFolder.addFolder('Knee Hint');
+      kneeF
+        .add(eKnee, 'x', -2, 2, 0.01)
+        .name('X')
+        .onChange((v: number) => {
+          if (self.kneeHint[ctx.leg]) self.kneeHint[ctx.leg]![0] = v;
+        });
+      kneeF
+        .add(eKnee, 'y', -1, 2, 0.01)
+        .name('Y')
+        .onChange((v: number) => {
+          if (self.kneeHint[ctx.leg]) self.kneeHint[ctx.leg]![1] = v;
+        });
+      kneeF
+        .add(eKnee, 'z', -2, 2, 0.01)
+        .name('Z')
+        .onChange((v: number) => {
+          if (self.kneeHint[ctx.leg]) self.kneeHint[ctx.leg]![2] = v;
+        });
+    }
 
     this._editorFolder.add(this, 'footSpread', 0.5, 3.0).step(0.05).name('Foot Spread').listen();
     this._editorFolder
@@ -730,5 +1009,10 @@ export class SpiderControllerComponent extends Component {
       .step(0.01)
       .name('Body Tilt Amount')
       .listen();
+
+    this._editorFolder
+      .add({ numLegs: this.numLegs }, 'numLegs')
+      .name('Num Legs (JSON only)')
+      .disable();
   }
 }
