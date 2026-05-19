@@ -644,13 +644,37 @@ export class SpiderControllerComponent extends Component {
     this._editorFolder.close();
 
     this._editorFolder.add(this, 'footSpread', 0.5, 3.0).step(0.05).name('Foot Spread').listen();
-    this._editorFolder.add(this, 'legUpperLength', 0.1, 2.0).step(0.01).name('Leg Upper Length').listen();
-    this._editorFolder.add(this, 'legLowerLength', 0.1, 2.0).step(0.01).name('Leg Lower Length').listen();
-    this._editorFolder.add(this, 'legThickness', 0.01, 0.3).step(0.005).name('Leg Thickness').listen();
-    this._editorFolder.add(this, 'stepThreshold', 0.1, 2.0).step(0.05).name('Step Threshold').listen();
+    this._editorFolder
+      .add(this, 'legUpperLength', 0.1, 2.0)
+      .step(0.01)
+      .name('Leg Upper Length')
+      .listen();
+    this._editorFolder
+      .add(this, 'legLowerLength', 0.1, 2.0)
+      .step(0.01)
+      .name('Leg Lower Length')
+      .listen();
+    this._editorFolder
+      .add(this, 'legThickness', 0.01, 0.3)
+      .step(0.005)
+      .name('Leg Thickness')
+      .listen();
+    this._editorFolder
+      .add(this, 'stepThreshold', 0.1, 2.0)
+      .step(0.05)
+      .name('Step Threshold')
+      .listen();
     this._editorFolder.add(this, 'stepHeight', 0.0, 1.0).step(0.02).name('Step Height').listen();
-    this._editorFolder.add(this, 'stepDuration', 0.05, 0.5).step(0.01).name('Step Duration').listen();
-    this._editorFolder.add(this, 'stepAnticipation', 0.0, 3.0).step(0.1).name('Step Anticipation').listen();
+    this._editorFolder
+      .add(this, 'stepDuration', 0.05, 0.5)
+      .step(0.01)
+      .name('Step Duration')
+      .listen();
+    this._editorFolder
+      .add(this, 'stepAnticipation', 0.0, 3.0)
+      .step(0.1)
+      .name('Step Anticipation')
+      .listen();
     this._editorFolder.add(this, 'moveSpeed', 0.0, 10.0).step(0.1).name('Move Speed').listen();
     this._editorFolder.add(this, 'chaseRange', 1.0, 50.0).step(0.5).name('Chase Range').listen();
   }

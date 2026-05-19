@@ -627,22 +627,31 @@ export class DirectionalLightComponent extends Component {
     this._editorFolder
       .add(this.lightDirection, '0', -1.0, 1.0)
       .name('Dir X')
-      .onChange(() => { vec3.normalize(this.lightDirection, this.lightDirection); })
+      .onChange(() => {
+        vec3.normalize(this.lightDirection, this.lightDirection);
+      })
       .listen();
     this._editorFolder
       .add(this.lightDirection, '1', -1.0, 1.0)
       .name('Dir Y')
-      .onChange(() => { vec3.normalize(this.lightDirection, this.lightDirection); })
+      .onChange(() => {
+        vec3.normalize(this.lightDirection, this.lightDirection);
+      })
       .listen();
     this._editorFolder
       .add(this.lightDirection, '2', -1.0, 1.0)
       .name('Dir Z')
-      .onChange(() => { vec3.normalize(this.lightDirection, this.lightDirection); })
+      .onChange(() => {
+        vec3.normalize(this.lightDirection, this.lightDirection);
+      })
       .listen();
 
     // Shadows
     this._editorFolder.add(this, 'hasShadows').name('Enable Shadows').listen();
-    this._editorFolder.add(this, 'maxShadowDistance', 10.0, 200.0).name('Max Shadow Distance').listen();
+    this._editorFolder
+      .add(this, 'maxShadowDistance', 10.0, 200.0)
+      .name('Max Shadow Distance')
+      .listen();
     if (this.cascadeCount > 1) {
       this._editorFolder.add(this, 'cascadeLambda', 0.0, 1.0).name('Cascade Lambda').listen();
     }
