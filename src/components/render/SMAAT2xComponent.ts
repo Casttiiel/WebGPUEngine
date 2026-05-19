@@ -542,9 +542,18 @@ export class SMAAT2xComponent extends Component {
     this._editorFolder = folder.addFolder('SMAA T2x');
     this._editorFolder.close();
     this._editorFolder.add(this.smaaParams, 'enabled').name('Enabled').listen();
-    this._editorFolder.add(this.smaaParams, 'edgeThreshold', 0.0, 0.5, 0.01).name('Edge Threshold').listen();
-    this._editorFolder.add(this.temporalParams, 'blendFactor', 0.0, 1.0, 0.05).name('Blend Factor').listen();
-    this._editorFolder.add(this.temporalParams, 'neighborhoodClampFactor', 0.0, 2.0, 0.1).name('Clamp Factor').listen();
+    this._editorFolder
+      .add(this.smaaParams, 'edgeThreshold', 0.0, 0.5, 0.01)
+      .name('Edge Threshold')
+      .listen();
+    this._editorFolder
+      .add(this.temporalParams, 'blendFactor', 0.0, 1.0, 0.05)
+      .name('Blend Factor')
+      .listen();
+    this._editorFolder
+      .add(this.temporalParams, 'neighborhoodClampFactor', 0.0, 2.0, 0.1)
+      .name('Clamp Factor')
+      .listen();
   }
 
   public renderDebug(): void {

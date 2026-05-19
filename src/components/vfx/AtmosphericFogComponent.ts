@@ -238,38 +238,76 @@ export class AtmosphericFogComponent extends Component {
 
   public override renderDebug(): void {}
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  private _editorFolder: any = null;
 
-    if (!gui.beginFolder('Atmospheric Fog')) return;
-
-    const guiManager = gui as any;
-    const folder = guiManager.folders?.get('Atmospheric Fog');
+  public override renderInMenu(folder?: any): void {
     if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Atmospheric Fog');
+    this._editorFolder.close();
 
     const dirty = () => {
       this.uniformsDirty = true;
     };
 
     // Distance
-    folder.add(this, 'distanceFogStart', 0, 2000).name('Fog Start').listen().onChange(dirty);
-    folder.add(this, 'distanceFogEnd', 0, 5000).name('Fog End').listen().onChange(dirty);
-    folder.add(this, 'fogDensity', 0, 1).name('Fog Density').listen().onChange(dirty);
-    folder.add(this, 'distanceExponent', 0.1, 4).name('Distance Exponent').listen().onChange(dirty);
+    this._editorFolder
+      .add(this, 'distanceFogStart', 0, 2000)
+      .name('Fog Start')
+      .listen()
+      .onChange(dirty);
+    this._editorFolder
+      .add(this, 'distanceFogEnd', 0, 5000)
+      .name('Fog End')
+      .listen()
+      .onChange(dirty);
+    this._editorFolder.add(this, 'fogDensity', 0, 1).name('Fog Density').listen().onChange(dirty);
+    this._editorFolder
+      .add(this, 'distanceExponent', 0.1, 4)
+      .name('Distance Exponent')
+      .listen()
+      .onChange(dirty);
 
     // Height
-    folder.add(this, 'fogHeightStart', -200, 200).name('Height Start').listen().onChange(dirty);
-    folder.add(this, 'fogHeightEnd', -200, 200).name('Height End').listen().onChange(dirty);
-    folder.add(this, 'fogFalloff', 0.1, 10).name('Height Falloff').listen().onChange(dirty);
+    this._editorFolder
+      .add(this, 'fogHeightStart', -200, 200)
+      .name('Height Start')
+      .listen()
+      .onChange(dirty);
+    this._editorFolder
+      .add(this, 'fogHeightEnd', -200, 200)
+      .name('Height End')
+      .listen()
+      .onChange(dirty);
+    this._editorFolder
+      .add(this, 'fogFalloff', 0.1, 10)
+      .name('Height Falloff')
+      .listen()
+      .onChange(dirty);
 
     // MIP fog
-    folder.add(this, 'mipFogStart', 0, 3000).name('MIP Fog Start').listen().onChange(dirty);
-    folder.add(this, 'mipFogEnd', 0, 5000).name('MIP Fog End').listen().onChange(dirty);
-    folder.add(this, 'mipFogMaxMip', 0, 8).name('MIP Max Level').listen().onChange(dirty);
-    folder.add(this, 'mipFogStrength', 0, 1).name('MIP Fog Strength').listen().onChange(dirty);
+    this._editorFolder
+      .add(this, 'mipFogStart', 0, 3000)
+      .name('MIP Fog Start')
+      .listen()
+      .onChange(dirty);
+    this._editorFolder.add(this, 'mipFogEnd', 0, 5000).name('MIP Fog End').listen().onChange(dirty);
+    this._editorFolder
+      .add(this, 'mipFogMaxMip', 0, 8)
+      .name('MIP Max Level')
+      .listen()
+      .onChange(dirty);
+    this._editorFolder
+      .add(this, 'mipFogStrength', 0, 1)
+      .name('MIP Fog Strength')
+      .listen()
+      .onChange(dirty);
 
     // Global boost
-    folder.add(this, 'globalAmbientBoost', 0, 4).name('Env Boost').listen().onChange(dirty);
+    this._editorFolder
+      .add(this, 'globalAmbientBoost', 0, 4)
+      .name('Env Boost')
+      .listen()
+      .onChange(dirty);
   }
 }

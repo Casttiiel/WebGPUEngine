@@ -13,6 +13,7 @@ import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 export class ScreenSpaceReflections {
   private isInitialized: boolean = false;
+  private _editorFolder: any = null;
 
   // ── SSR ray-march compute ────────────────────────────────────────────────
   private ssrComputePipeline: GPUComputePipeline | null = null;
@@ -358,35 +359,24 @@ export class ScreenSpaceReflections {
     ]);
   }
 
-  public renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  public renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('SSR');
+    this._editorFolder.close();
 
-    if (!gui.beginWindow('SSR')) return;
-
-    gui.addSlider('Step Size', this.debugParams.stepSize, 0.01, 2.0, (v) => {
-      this.debugParams.stepSize = v;
-    });
-    gui.addSliderInt('Max Steps', this.debugParams.maxSteps, 8, 128, (v) => {
-      this.debugParams.maxSteps = v;
-    });
-    gui.addSlider('Max Distance', this.debugParams.maxDistance, 5.0, 300.0, (v) => {
-      this.debugParams.maxDistance = v;
-    });
-    gui.addSlider('Thickness', this.debugParams.thickness, 0.001, 0.2, (v) => {
-      this.debugParams.thickness = v;
-    });
-    gui.addSlider('Metallic Min', this.debugParams.metallicMin, 0.0, 1.0, (v) => {
-      this.debugParams.metallicMin = v;
-    });
-    gui.addSlider('Roughness Max', this.debugParams.roughnessMax, 0.0, 1.0, (v) => {
-      this.debugParams.roughnessMax = v;
-    });
-    gui.addCheckbox('Enabled', this.debugParams.enabled > 0.5, (v) => {
-      this.debugParams.enabled = v ? 1.0 : 0.0;
-    });
-
-    gui.endWindow();
+    const p = this.debugParams;
+    this._editorFolder.add(p, 'stepSize', 0.01, 2.0).name('Step Size').listen();
+    this._editorFolder.add(p, 'maxSteps', 8, 128, 1).name('Max Steps').listen();
+    this._editorFolder.add(p, 'maxDistance', 5.0, 300.0).name('Max Distance').listen();
+    this._editorFolder.add(p, 'thickness', 0.001, 0.2).name('Thickness').listen();
+    this._editorFolder.add(p, 'metallicMin', 0.0, 1.0).name('Metallic Min').listen();
+    this._editorFolder.add(p, 'roughnessMax', 0.0, 1.0).name('Roughness Max').listen();
+    const enabledProxy = {
+      get enabled() { return p.enabled > 0.5; },
+      set enabled(v: boolean) { p.enabled = v ? 1.0 : 0.0; },
+    };
+    this._editorFolder.add(enabledProxy, 'enabled').name('Enabled').listen();
   }
 
   public update(dt: number): void {

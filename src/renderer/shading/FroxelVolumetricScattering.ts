@@ -24,6 +24,7 @@ import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 export class FroxelVolumetricScattering {
   private device: GPUDevice;
   private isEnabled: boolean = true;
+  private _editorFolder: any = null;
 
   // Maps sky UV speed (0.08/s) → ~1.2 world-units/s froxel noise (same as original hardcoded wind magnitude)
   private static readonly FROXEL_WORLD_SPEED_SCALE = 15.0;
@@ -1065,48 +1066,24 @@ export class FroxelVolumetricScattering {
     }
   }
 
-  public renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  public renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Volumetric Scattering');
+    this._editorFolder.close();
 
-    // Create/get the Volumetric Scattering folder
-    if (!gui.beginWindow('Volumetric Scattering', true)) return;
-
-    // Access the folder from GUIManager's internal map
-    const guiManager = gui as any;
-    const folder = guiManager.folders?.get('Volumetric Scattering');
-
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    // Volumetric parameters with automatic UI updates
-    folder.add(this, 'fogDensity', 0.0, 0.03).name('Fog Density').listen();
-
-    folder.add(this, 'scatteringCoeff', 0.0, 2.0).name('Scattering Coeff').listen();
-
-    folder.add(this, 'absorptionCoeff', 0.0, 5.0).name('Absorption Coeff').listen();
-
-    folder.add(this, 'multipleScatteringBoost', 1.0, 2.0).name('MS Boost').listen();
-
-    folder.add(this, 'anisotropy', 0.0, 0.99).name('Anisotropy (g)').listen();
-
-    folder.add(this, 'fogBaseHeight', -10.0, 10.0).name('Fog Base Height').listen();
-
-    folder.add(this, 'fogLayerHeight', 1.0, 50.0).name('Fog Layer Height').listen();
-
-    folder.add(this, 'fogFalloff', 0.0, 1.0).name('Fog Falloff').listen();
-
-    folder.add(this, 'ambientVolumetricIntensity', 0.0, 0.2).name('Ambient Volumetric').listen();
-
-    folder.add(this, 'gLightFactor', 0.0, 1.0).name('G Light Factor').listen();
-
-    folder.add(this, 'nearPlane', 0.01, 1.0).name('Near Plane').listen();
-
-    folder.add(this, 'farPlane', 10.0, 200.0).name('Far Plane').listen();
-
-    gui.endWindow();
+    this._editorFolder.add(this, 'fogDensity', 0.0, 0.03).name('Fog Density').listen();
+    this._editorFolder.add(this, 'scatteringCoeff', 0.0, 2.0).name('Scattering Coeff').listen();
+    this._editorFolder.add(this, 'absorptionCoeff', 0.0, 5.0).name('Absorption Coeff').listen();
+    this._editorFolder.add(this, 'multipleScatteringBoost', 1.0, 2.0).name('MS Boost').listen();
+    this._editorFolder.add(this, 'anisotropy', 0.0, 0.99).name('Anisotropy (g)').listen();
+    this._editorFolder.add(this, 'fogBaseHeight', -10.0, 10.0).name('Fog Base Height').listen();
+    this._editorFolder.add(this, 'fogLayerHeight', 1.0, 50.0).name('Fog Layer Height').listen();
+    this._editorFolder.add(this, 'fogFalloff', 0.0, 1.0).name('Fog Falloff').listen();
+    this._editorFolder.add(this, 'ambientVolumetricIntensity', 0.0, 0.2).name('Ambient Volumetric').listen();
+    this._editorFolder.add(this, 'gLightFactor', 0.0, 1.0).name('G Light Factor').listen();
+    this._editorFolder.add(this, 'nearPlane', 0.01, 1.0).name('Near Plane').listen();
+    this._editorFolder.add(this, 'farPlane', 10.0, 200.0).name('Far Plane').listen();
   }
 
   public dispose(): void {

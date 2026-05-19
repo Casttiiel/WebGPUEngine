@@ -322,26 +322,19 @@ export class GodRaysComponent extends Component {
 
   public override update(_dt: number): void {}
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  private _editorFolder: any = null;
 
-    if (!gui.beginWindow('God Rays', true)) return;
-
-    const folder = (gui as any).folders?.get('God Rays');
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    folder.add(this, 'isEnabled').name('Enable').listen();
-    folder.add(this, 'density', 0.0, 2.0, 0.01).name('Density (σs)').listen();
-    folder.add(this, 'extinction', 0.0, 2.0, 0.01).name('Extinction (σt)').listen();
-    folder.add(this, 'numSteps', 8, 64, 1).name('Steps').listen();
-    folder.add(this, 'intensity', 0.0, 5.0, 0.05).name('Intensity').listen();
-    folder.add(this, 'compositeScale', 0.0, 4.0, 0.05).name('Composite Scale').listen();
-
-    gui.endWindow();
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Volumetric Scattering');
+    this._editorFolder.close();
+    this._editorFolder.add(this, 'isEnabled').name('Enable').listen();
+    this._editorFolder.add(this, 'density', 0.0, 2.0, 0.01).name('Density (σs)').listen();
+    this._editorFolder.add(this, 'extinction', 0.0, 2.0, 0.01).name('Extinction (σt)').listen();
+    this._editorFolder.add(this, 'numSteps', 8, 64, 1).name('Steps').listen();
+    this._editorFolder.add(this, 'intensity', 0.0, 5.0, 0.05).name('Intensity').listen();
+    this._editorFolder.add(this, 'compositeScale', 0.0, 4.0, 0.05).name('Composite Scale').listen();
   }
 
   public override renderDebug(): void {}

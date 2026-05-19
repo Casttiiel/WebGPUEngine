@@ -39,6 +39,8 @@ import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
+import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
+import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { Profiler } from '../../core/debug/Profiler';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
@@ -762,27 +764,6 @@ export class ModuleRender extends Module {
 
     this.deferred.renderInMenu();
 
-    const mainCameraForMenu = Engine.getEntities().getEntityByName('MainCamera');
-    if (mainCameraForMenu?.hasComponent('auto_exposure')) {
-      const autoExposure = mainCameraForMenu.getComponent('auto_exposure') as AutoExposureComponent;
-      if (autoExposure.hasLoaded()) autoExposure.renderInMenu();
-    }
-
-    if (mainCameraForMenu?.hasComponent('god_rays')) {
-      const godRays = mainCameraForMenu.getComponent('god_rays') as GodRaysComponent;
-      if (godRays.hasLoaded()) godRays.renderInMenu();
-    }
-
-    if (mainCameraForMenu?.hasComponent('fsr')) {
-      const fsr = mainCameraForMenu.getComponent('fsr') as FSRComponent;
-      if (fsr.hasLoaded()) fsr.renderInMenu();
-    }
-
-    if (mainCameraForMenu?.hasComponent('taa')) {
-      const taa = mainCameraForMenu.getComponent('taa') as TAAComponent;
-      if (taa.hasLoaded()) taa.renderInMenu();
-    }
-
     // Create main window for render stats
     if (this.beginGUIWindow('Render Statistics')) {
       // Add dynamic text displays that auto-update
@@ -816,11 +797,21 @@ export class ModuleRender extends Module {
     // Get main camera for post-processing components
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
     if (mainCamera && this.beginGUIWindow('Post-Processing')) {
-      if (mainCamera.hasComponent('atmospheric_fog')) {
-        const atmosphericFog = mainCamera.getComponent(
-          'atmospheric_fog',
-        ) as AtmosphericFogComponent;
-        if (atmosphericFog.hasLoaded()) atmosphericFog.renderInMenu();
+      const ppFolder = (gui as any).folders?.get('Post-Processing');
+      if (ppFolder) {
+        this.deferred.renderPostProcessingMenu(ppFolder);
+        const tryRender = (key: string, cast: (c: any) => any) => {
+          if (!mainCamera.hasComponent(key)) return;
+          const c = cast(mainCamera.getComponent(key));
+          if (c?.hasLoaded?.() ?? true) c?.renderInMenu(ppFolder);
+        };
+        tryRender('auto_exposure', (c) => c as AutoExposureComponent);
+        tryRender('god_rays', (c) => c as GodRaysComponent);
+        tryRender('fsr', (c) => c as FSRComponent);
+        tryRender('taa', (c) => c as TAAComponent);
+        tryRender('ambient_occlusion', (c) => c as AmbientOcclusionComponent);
+        tryRender('contact_shadows', (c) => c as ContactShadowsComponent);
+        tryRender('atmospheric_fog', (c) => c as AtmosphericFogComponent);
       }
       this.endGUIWindow();
     }

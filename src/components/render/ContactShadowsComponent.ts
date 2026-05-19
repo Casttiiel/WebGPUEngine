@@ -182,27 +182,18 @@ export class ContactShadowsComponent extends Component {
 
   public override update(_dt: number): void {}
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  private _editorFolder: any = null;
 
-    if (!gui.beginWindow('Contact Shadows', true)) return;
-
-    const guiManager = gui as any;
-    const folder = guiManager.folders?.get('Contact Shadows');
-
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    folder.add(this, 'isEnabled').name('Enable').listen();
-    folder.add(this, 'intensity', 0.0, 1.0).name('Intensity').listen();
-    folder.add(this, 'stepLength', 0.005, 0.1).name('Step Length').listen();
-    folder.add(this, 'maxDistance', 0.05, 2.0).name('Max Distance').listen();
-    folder.add(this, 'thickness', 0.001, 0.1).name('Thickness').listen();
-
-    gui.endWindow();
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Contact Shadows');
+    this._editorFolder.close();
+    this._editorFolder.add(this, 'isEnabled').name('Enable').listen();
+    this._editorFolder.add(this, 'intensity', 0.0, 1.0).name('Intensity').listen();
+    this._editorFolder.add(this, 'stepLength', 0.005, 0.1).name('Step Length').listen();
+    this._editorFolder.add(this, 'maxDistance', 0.05, 2.0).name('Max Distance').listen();
+    this._editorFolder.add(this, 'thickness', 0.001, 0.1).name('Thickness').listen();
   }
 
   public renderDebug(): void {}

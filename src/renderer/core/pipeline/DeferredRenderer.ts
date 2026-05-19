@@ -769,23 +769,14 @@ export class DeferredRenderer {
   }
 
   public renderInMenu(): void {
-    this.froxelVolumetrics.renderInMenu();
-    this.ssr.renderInMenu();
+    // Intentionally empty — post-processing controls are rendered by ModuleRender
+    // inside its dedicated Post-Processing window via renderPostProcessingMenu().
+  }
 
-    const mainCameraEntity = Engine.getEntities().getEntityByName('MainCamera');
-    const ambientOcclusionComponent = mainCameraEntity?.getComponent(
-      'ambient_occlusion',
-    ) as AmbientOcclusionComponent;
-    if (ambientOcclusionComponent) {
-      ambientOcclusionComponent.renderInMenu();
-    }
-
-    const contactShadowsComponent = mainCameraEntity?.getComponent(
-      'contact_shadows',
-    ) as ContactShadowsComponent;
-    if (contactShadowsComponent) {
-      contactShadowsComponent.renderInMenu();
-    }
+  /** Called by ModuleRender from inside the Post-Processing lil-gui folder. */
+  public renderPostProcessingMenu(folder: any): void {
+    this.froxelVolumetrics.renderInMenu(folder);
+    this.ssr.renderInMenu(folder);
   }
 
   public resetSSRResources(): void {

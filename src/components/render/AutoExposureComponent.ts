@@ -8,7 +8,7 @@ import {
   ComputePipelineConfig,
 } from '../../renderer/core/factories/PipelineFactory';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
-import { Engine } from '../../core/engine/Engine';
+
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
 // ── Params layout (must match AdaptParams struct in adapt shader) ─────────────
@@ -320,31 +320,25 @@ export class AutoExposureComponent extends Component {
 
   public update(_dt: number): void {}
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  private _editorFolder: any = null;
 
-    // beginWindow returns true only on first call — controls are added once,
-    // .listen() keeps them reactive every frame.
-    if (!gui.beginWindow('Auto Exposure', true)) return;
-
-    const folder = (gui as any).folders?.get('Auto Exposure');
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    folder.add(this, 'enabled').name('Enable').listen();
-    folder.add(this, 'keyValue', 0.01, 1.0, 0.01).name('Key Value').listen();
-    folder.add(this, 'adaptSpeedUp', 0.0, 5.0, 0.05).name('Adapt Speed Up').listen();
-    folder.add(this, 'adaptSpeedDown', 0.0, 5.0, 0.05).name('Adapt Speed Down').listen();
-    folder.add(this, 'minExposure', 0.01, 5.0, 0.01).name('Min Exposure').listen();
-    folder.add(this, 'maxExposure', 1.0, 20.0, 0.1).name('Max Exposure').listen();
-    folder.add(this, 'compensation', -4.0, 4.0, 0.1).name('EV Compensation').listen();
-    folder.add(this, 'lowPercentile', 0.0, 0.5, 0.01).name('Low Percentile').listen();
-    folder.add(this, 'highPercentile', 0.5, 1.0, 0.01).name('High Percentile').listen();
-
-    gui.endWindow();
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Auto Exposure');
+    this._editorFolder.close();
+    this._editorFolder.add(this, 'enabled').name('Enable').listen();
+    this._editorFolder.add(this, 'keyValue', 0.01, 1.0, 0.01).name('Key Value').listen();
+    this._editorFolder.add(this, 'adaptSpeedUp', 0.0, 5.0, 0.05).name('Adapt Speed Up').listen();
+    this._editorFolder
+      .add(this, 'adaptSpeedDown', 0.0, 5.0, 0.05)
+      .name('Adapt Speed Down')
+      .listen();
+    this._editorFolder.add(this, 'minExposure', 0.01, 5.0, 0.01).name('Min Exposure').listen();
+    this._editorFolder.add(this, 'maxExposure', 1.0, 20.0, 0.1).name('Max Exposure').listen();
+    this._editorFolder.add(this, 'compensation', -4.0, 4.0, 0.1).name('EV Compensation').listen();
+    this._editorFolder.add(this, 'lowPercentile', 0.0, 0.5, 0.01).name('Low Percentile').listen();
+    this._editorFolder.add(this, 'highPercentile', 0.5, 1.0, 0.01).name('High Percentile').listen();
   }
 
   public debugInMenu(): void {}

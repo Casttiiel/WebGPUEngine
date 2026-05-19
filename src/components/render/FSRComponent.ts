@@ -11,7 +11,7 @@ import {
   ComputePipelineConfig,
 } from '../../renderer/core/factories/PipelineFactory';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { Engine } from '../../core/engine/Engine';
+
 import { FSRComponentData } from '../../types/FSRComponentData.type';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 
@@ -490,20 +490,12 @@ export class FSRComponent extends Component {
   // first entry into target mode.
   private readonly targetInput = { width: 0, height: 0 };
   private _targetSyncNeeded = true;
+  private _editorFolder: any = null;
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
 
-    if (!gui.beginWindow('FSR 1.0', true)) return;
-
-    const folder = (gui as any).folders?.get('FSR 1.0');
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    // Update live stats every frame
+    // Update live stats every frame so .listen() picks them up
     const canvas = Render.canvasSize;
     this.debugStats.input = `${Render.width} × ${Render.height}`;
     this.debugStats.output = `${canvas.width} × ${canvas.height}`;
@@ -511,17 +503,23 @@ export class FSRComponent extends Component {
     const scaleY = canvas.height / Math.max(Render.height, 1);
     this.debugStats.scale = `${scaleX.toFixed(2)}x (${scaleY.toFixed(2)}x)`;
 
-    folder.add(this.debugStats, 'input').name('Input  (render res)').listen().disable();
-    folder.add(this.debugStats, 'output').name('Output (canvas res)').listen().disable();
-    folder.add(this.debugStats, 'scale').name('Upscale factor').listen().disable();
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('FSR 1.0');
+    this._editorFolder.close();
 
-    folder.add(this, 'enabled').name('Enable FSR').listen();
-    folder.add(this, 'enableRCAS').name('Enable RCAS Sharpening').listen();
-    folder.add(this, 'rcasSharpness', 0.0, 2.0, 0.05).name('RCAS Sharpness').listen();
+    this._editorFolder.add(this.debugStats, 'input').name('Input  (render res)').listen().disable();
+    this._editorFolder
+      .add(this.debugStats, 'output')
+      .name('Output (canvas res)')
+      .listen()
+      .disable();
+    this._editorFolder.add(this.debugStats, 'scale').name('Upscale factor').listen().disable();
+    this._editorFolder.add(this, 'enabled').name('Enable FSR').listen();
+    this._editorFolder.add(this, 'enableRCAS').name('Enable RCAS Sharpening').listen();
+    this._editorFolder.add(this, 'rcasSharpness', 0.0, 2.0, 0.05).name('RCAS Sharpness').listen();
 
-    // Scale mode selector
     this.modeControl.scaleMode = this.scaleMode;
-    folder
+    this._editorFolder
       .add(this.modeControl, 'scaleMode', ['ratio', 'target'])
       .name('Scale Mode')
       .listen()
@@ -531,19 +529,17 @@ export class FSRComponent extends Component {
       });
 
     if (this.scaleMode === 'ratio') {
-      folder
+      this._editorFolder
         .add(this.renderResProxy, 'resolution', 0.25, 1.0, 0.05)
         .name('Render Resolution')
         .listen();
     } else {
-      // Initialise target inputs from actual render dimensions on first entry
       if (this._targetSyncNeeded) {
         this.targetInput.width = this._targetWidth > 0 ? this._targetWidth : Render.width;
         this.targetInput.height = this._targetHeight > 0 ? this._targetHeight : Render.height;
         this._targetSyncNeeded = false;
       }
-
-      folder
+      this._editorFolder
         .add(this.targetInput, 'width', 1, canvas.width, 1)
         .name('Target Width (px)')
         .listen()
@@ -557,8 +553,7 @@ export class FSRComponent extends Component {
           QualitySettings.getInstance().setRenderResolution(scale);
           Render.applyRenderResolution();
         });
-
-      folder
+      this._editorFolder
         .add(this.targetInput, 'height', 1, canvas.height, 1)
         .name('Target Height (px)')
         .listen()
@@ -573,17 +568,15 @@ export class FSRComponent extends Component {
           Render.applyRenderResolution();
         });
     }
-
-    gui.endWindow();
   }
 
   public debugInMenu(): void {}
-  public renderDebug(): void {}
-  public update(_dt: number): void {}
+  public override renderDebug(): void {}
+  public override update(_dt: number): void {}
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
 
-  public dispose(): void {
+  public override dispose(): void {
     this.easuParamsBuffer?.destroy();
     this.rcasParamsBuffer?.destroy();
     this.easuInputCache.clear();

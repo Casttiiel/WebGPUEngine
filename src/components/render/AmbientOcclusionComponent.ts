@@ -487,33 +487,24 @@ export class AmbientOcclusionComponent extends Component {
 
   // ── Debug UI ──────────────────────────────────────────────────────────────────
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  private _editorFolder: any = null;
 
-    if (!gui.beginWindow('Ambient Occlusion', true)) return;
-
-    const guiManager = gui as any;
-    const folder = guiManager.folders?.get('Ambient Occlusion');
-
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    folder.add(this, 'isEnabled').name('Enable AO').listen();
-    folder.add(this, 'sampleCount', 4.0, 8.0).name('Sample Count').listen();
-    folder.add(this, 'sliceCount', 3.0, 6.0).name('Slice Count').listen();
-    folder.add(this, 'radius', 0.1, 2.0).name('Radius').listen();
-    folder.add(this, 'strength', 0.0, 2.0).name('Strength').listen();
-    folder.add(this, 'angleOffset', 0.0, 3.0).name('Angle Offset').listen();
-    folder.add(this, 'spacialOffset', 0.0, 3.0).name('Spacial Offset').listen();
-    folder.add(this, 'falloff', 0.0, 15.0).name('Falloff').listen();
-    folder.add(this, 'thicknessMix', 0.001, 1.0).name('Thickness Mix').listen();
-    folder.add(this, 'maxStride', 1.0, 32.0).name('Max Stride').listen();
-    folder.add(this, 'limit', 0.0, 100.0).name('Limit').listen();
-
-    gui.endWindow();
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Ambient Occlusion');
+    this._editorFolder.close();
+    this._editorFolder.add(this, 'isEnabled').name('Enable AO').listen();
+    this._editorFolder.add(this, 'sampleCount', 4.0, 8.0).name('Sample Count').listen();
+    this._editorFolder.add(this, 'sliceCount', 3.0, 6.0).name('Slice Count').listen();
+    this._editorFolder.add(this, 'radius', 0.1, 2.0).name('Radius').listen();
+    this._editorFolder.add(this, 'strength', 0.0, 2.0).name('Strength').listen();
+    this._editorFolder.add(this, 'angleOffset', 0.0, 3.0).name('Angle Offset').listen();
+    this._editorFolder.add(this, 'spacialOffset', 0.0, 3.0).name('Spacial Offset').listen();
+    this._editorFolder.add(this, 'falloff', 0.0, 15.0).name('Falloff').listen();
+    this._editorFolder.add(this, 'thicknessMix', 0.001, 1.0).name('Thickness Mix').listen();
+    this._editorFolder.add(this, 'maxStride', 1.0, 32.0).name('Max Stride').listen();
+    this._editorFolder.add(this, 'limit', 0.0, 100.0).name('Limit').listen();
   }
 
   public update(_dt: number): void {}
