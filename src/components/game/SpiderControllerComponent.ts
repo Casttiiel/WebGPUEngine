@@ -10,39 +10,35 @@ import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 const NUM_LEGS = 8;
 
 /**
- * Step group per leg (0-3). A leg only steps if no leg in its group is mid-step.
- * Pairs are diagonal opposites so the two legs that share a group are maximally
- * separated on the body, keeping the spider balanced:
- *   group 0 → FR (0) + MBL (5)
- *   group 1 → FL (1) + MBR (4)
- *   group 2 → MFR(2) + BL  (7)
- *   group 3 → MFL(3) + BR  (6)
+ * Alternating tetrapod gait (2 groups):
+ *   Group 0 (Tetrapod A): FR(0), MFL(3), MBR(4), BL(7)  — odd-right + even-left
+ *   Group 1 (Tetrapod B): FL(1), MFR(2), MBL(5), BR(6)  — odd-left  + even-right
  */
-const STEP_GROUP: number[] = [0, 1, 2, 3, 1, 0, 3, 2];
+//                         FR  FL  MFR MFL MBR MBL  BR  BL
+const STEP_GROUP: number[] = [0, 1, 1, 0, 0, 1, 1, 0];
 
 /**
- * Metachronal wave: per-leg tick index (0-7) that controls the initial
- * stagger so the spider starts walking with a natural gait.
- *
- * Rule: right side steps back-to-front at EVEN ticks (0,2,4,6),
- *       left side steps back-to-front at ODD  ticks (1,3,5,7).
- * This perfectly interleaves the two sides so no two ipsilateral-adjacent
- * legs are ever in the air at the same time.
- *
- *   tick 0: BR  (6) — right back
- *   tick 1: BL  (7) — left  back
- *   tick 2: MBR (4) — right mid-back
- *   tick 3: MBL (5) — left  mid-back
- *   tick 4: MFR (2) — right mid-front
- *   tick 5: MFL (3) — left  mid-front
- *   tick 6: FR  (0) — right front
- *   tick 7: FL  (1) — left  front
+ * Initial phase per leg: group 0 starts at phase 0, group 1 at phase 1
+ * (half-cycle offset so the two tetrapods alternate from the first step).
  */
-const STEP_INIT_TICK: number[] = [6, 7, 4, 5, 2, 3, 0, 1];
+//                           FR  FL  MFR MFL MBR MBL  BR  BL
+const STEP_INIT_TICK: number[] = [0, 1, 1, 0, 0, 1, 1, 0];
 
-/** Time between consecutive ticks in the initial metachronal wave.
- *  Derived from the default stepDuration (0.16 * 1.1 ≈ 0.176 s). Computed inline as
- *  `this.stepDuration * 1.1` so it adapts when stepDuration is changed at runtime. */
+/**
+ * Intra-tetrapod phase offset (as a fraction of stepDuration).
+ * Within each group the wave propagates back→front:
+ *   BL/BR = 0.00, MBR/MBL = 0.25, MFL/MFR = 0.50, FR/FL = 0.75
+ */
+//                                  FR    FL    MFR   MFL   MBR   MBL   BR    BL
+const STEP_PHASE_OFFSET: number[] = [0.75, 0.75, 0.5, 0.5, 0.25, 0.25, 0.0, 0.0];
+
+/**
+ * The leg that must have started its swing (stepT >= 0.5) before this leg
+ * is allowed to begin its own step.  -1 = no constraint (first in chain).
+ * Chain per group:  BL(7)→MBR(4)→MFL(3)→FR(0)  and  BR(6)→MBL(5)→MFR(2)→FL(1)
+ */
+//                                   FR  FL  MFR MFL MBR MBL  BR  BL
+const STEP_PREDECESSOR: number[] = [4, 5, 6, 7, 7, 6, -1, -1];
 
 /** Minimum pause (seconds) between two consecutive steps of the same leg. */
 const STEP_MIN_COOLDOWN = 0.05;
@@ -156,6 +152,16 @@ export class SpiderControllerComponent extends Component {
   /** Multiplier applied to the XZ components of each foot rest position.
    *  Values > 1 spread the legs wider / farther from the body. */
   private footSpread: number = 1.0;
+  /** Z-reach multiplier for front legs (indices 0-3). > 1 pushes feet further forward. */
+  private frontLegReach: number = 1.0;
+  /** Z-reach multiplier for back legs (indices 4-7). > 1 pushes feet further rearward. */
+  private backLegReach: number = 1.0;
+  // Body bob
+  private bodyBobPhase: number = 0;
+  private bodyBobAmount: number = 0.04; // metres of vertical oscillation
+  private bodyBobSpeed: number = 8.0; // rad/s
+  // Body tilt on turn
+  private bodyTiltAmount: number = 0.08; // max roll in radians
   private moveSpeed: number = 1.8;
   private chaseRange: number = 14.0;
 
@@ -208,10 +214,11 @@ export class SpiderControllerComponent extends Component {
       // Use the TRS world-matrix formula: worldOff = rot * (scale ⊗ local)  (scale FIRST).
       // This must match the body mesh rendering (mat4.fromRotationTranslationScale).
       const rawRest = FOOT_REST_LOCAL[i]!;
+      const zReach = i < 4 ? this.frontLegReach : this.backLegReach;
       const restLocal = vec3.fromValues(
         rawRest[0] * this.footSpread,
         rawRest[1],
-        rawRest[2] * this.footSpread,
+        rawRest[2] * this.footSpread * zReach,
       );
       const restScaled = vec3.multiply(vec3.create(), restLocal, this.bodyScale);
       const planted = vec3.add(
@@ -220,10 +227,9 @@ export class SpiderControllerComponent extends Component {
         vec3.transformQuat(vec3.create(), restScaled, bodyWorldRot),
       );
 
-      // Stagger initial cooldowns using the metachronal wave tick index.
-      // This ensures the spider starts walking with alternating right/left,
-      // back-to-front leg waves rather than all stepping at once.
-      const initialCooldown = STEP_INIT_TICK[i]! * (this.stepDuration * 1.1);
+      // Group 1 legs get a half-cycle offset so the two tetrapods alternate.
+      const initialCooldown =
+        STEP_INIT_TICK[i]! * this.stepDuration + STEP_PHASE_OFFSET[i]! * this.stepDuration;
 
       this.legs.push({
         planted,
@@ -289,7 +295,15 @@ export class SpiderControllerComponent extends Component {
     while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
     this.currentYaw += Math.sign(dyaw) * Math.min(Math.abs(dyaw), TURN_SPEED * dt);
 
-    const bodyRot = quat.fromEuler(quat.create(), 0, this.currentYaw * (180 / Math.PI), 0);
+    // Body bob: oscillate vertically when moving.
+    this.bodyBobPhase += this.bodyBobSpeed * dt;
+    const bobOffset = Math.sin(this.bodyBobPhase) * this.bodyBobAmount * (speed > 0.1 ? 1 : 0);
+
+    // Body tilt: roll into the turn direction.
+    const tiltRoll =
+      -Math.sign(dyaw) * Math.min(Math.abs(dyaw) / Math.PI, 1.0) * this.bodyTiltAmount;
+    const DEG = 180 / Math.PI;
+    const bodyRot = quat.fromEuler(quat.create(), tiltRoll * DEG, this.currentYaw * DEG, 0);
     rb.setRotation({ x: bodyRot[0], y: bodyRot[1], z: bodyRot[2], w: bodyRot[3] }, true);
     // Sync bodyRot into the body's TransformComponent NOW, before transform.update()
     // cascades the hierarchy. capsule_collider.update() already ran this frame and wrote
@@ -318,7 +332,10 @@ export class SpiderControllerComponent extends Component {
       QueryFilterFlags.EXCLUDE_SENSORS,
     );
     const corrected = this.characterController.computedMovement();
-    rb.setLinvel({ x: corrected.x / dt, y: corrected.y / dt, z: corrected.z / dt }, true);
+    rb.setLinvel(
+      { x: corrected.x / dt, y: corrected.y / dt + bobOffset, z: corrected.z / dt },
+      true,
+    );
 
     // ── Procedural legs ─────────────────────────────────────────────────────
     // Pass the desired horizontal velocity so steps can anticipate movement.
@@ -359,10 +376,11 @@ export class SpiderControllerComponent extends Component {
       // Current body-relative rest position in world space.
       // TRS world-matrix formula: worldOff = rot * (scale ⊗ local)  (scale FIRST).
       const rawRest = FOOT_REST_LOCAL[i]!;
+      const zReach = i < 4 ? this.frontLegReach : this.backLegReach;
       const restLocal = vec3.fromValues(
         rawRest[0] * this.footSpread,
         rawRest[1],
-        rawRest[2] * this.footSpread,
+        rawRest[2] * this.footSpread * zReach,
       );
       const restScaled = vec3.multiply(vec3.create(), restLocal, bodyScale);
       const restWorld = vec3.add(
@@ -375,9 +393,18 @@ export class SpiderControllerComponent extends Component {
       // foot is already close to the trigger radius — cheap early-out.
       if (vec3.dist(leg.planted, restWorld) <= this.stepThreshold * 0.8) continue;
 
-      // Trigger a step if within cooldown, group is free, and foot is displaced.
+      // Trigger a step if within cooldown, opposite group is free, and foot is displaced.
       if (leg.cooldown > 0) continue;
-      if (this.isGroupStepping(STEP_GROUP[i]!)) continue;
+      if (this.isOppositeGroupStepping(STEP_GROUP[i]!)) continue;
+
+      // Intra-tetrapod ordering: stagger back→front within the group.
+      // Only block if the predecessor is currently in the first 40 % of its swing.
+      const pred = STEP_PREDECESSOR[i]!;
+      if (pred >= 0) {
+        const predLeg = this.legs[pred]!;
+        if (predLeg.stepping && predLeg.stepT < 0.4) continue;
+      }
+
       if (vec3.dist(leg.planted, restWorld) <= this.stepThreshold) continue;
 
       // ── Step target: anticipate where the rest position will be once the
@@ -401,10 +428,11 @@ export class SpiderControllerComponent extends Component {
     }
   }
 
-  /** Returns true if any leg in the given group is currently mid-step. */
-  private isGroupStepping(group: number): boolean {
+  /** Returns true if any leg in the OPPOSITE group is currently mid-step. */
+  private isOppositeGroupStepping(group: number): boolean {
+    const opposite = group === 0 ? 1 : 0;
     for (let i = 0; i < this.legs.length; i++) {
-      if (STEP_GROUP[i] === group && this.legs[i]!.stepping) return true;
+      if (STEP_GROUP[i] === opposite && this.legs[i]!.stepping) return true;
     }
     return false;
   }
@@ -645,6 +673,16 @@ export class SpiderControllerComponent extends Component {
 
     this._editorFolder.add(this, 'footSpread', 0.5, 3.0).step(0.05).name('Foot Spread').listen();
     this._editorFolder
+      .add(this, 'frontLegReach', 0.5, 2.0)
+      .step(0.05)
+      .name('Front Leg Reach')
+      .listen();
+    this._editorFolder
+      .add(this, 'backLegReach', 0.5, 2.0)
+      .step(0.05)
+      .name('Back Leg Reach')
+      .listen();
+    this._editorFolder
       .add(this, 'legUpperLength', 0.1, 2.0)
       .step(0.01)
       .name('Leg Upper Length')
@@ -677,5 +715,20 @@ export class SpiderControllerComponent extends Component {
       .listen();
     this._editorFolder.add(this, 'moveSpeed', 0.0, 10.0).step(0.1).name('Move Speed').listen();
     this._editorFolder.add(this, 'chaseRange', 1.0, 50.0).step(0.5).name('Chase Range').listen();
+    this._editorFolder
+      .add(this, 'bodyBobAmount', 0.0, 0.2)
+      .step(0.005)
+      .name('Body Bob Amount')
+      .listen();
+    this._editorFolder
+      .add(this, 'bodyBobSpeed', 1.0, 20.0)
+      .step(0.5)
+      .name('Body Bob Speed')
+      .listen();
+    this._editorFolder
+      .add(this, 'bodyTiltAmount', 0.0, 0.3)
+      .step(0.01)
+      .name('Body Tilt Amount')
+      .listen();
   }
 }
