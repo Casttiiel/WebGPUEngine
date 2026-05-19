@@ -40,6 +40,7 @@ export class DirectionalLightComponent extends Component {
   private lightDirection!: vec3; // Dirección de la luz (normalizada)
   private projectorTexture!: Texture;
   private projectorTextureView!: GPUTextureView;
+  private _editorFolder: any = null;
 
   // Contact shadows integration
   /** 1×1 white texture used as fallback when no ContactShadowsComponent is present. */
@@ -611,67 +612,40 @@ export class DirectionalLightComponent extends Component {
 
   public override renderDebug(): void {}
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder;
 
-    // Use raw lil-gui API for proper value tracking with .listen()
-    const folder = (gui as any).folders?.get('Directional Light') || gui;
+    // Color picker with .listen() for automatic updates
+    this._editorFolder.addColor(this, 'guiColorHex').name('Color').listen();
 
-    // Color picker with .listen() for automatic updates (works like intensity)
-    // The setter/getter automatically sync with this.color
-    folder.addColor(this, 'guiColorHex').name('Color').listen();
+    // Intensity slider
+    this._editorFolder.add(this, 'intensity', 0.0, 30.0).name('Intensity').listen();
 
-    // Intensity slider with .listen() for automatic updates
-    folder.add(this, 'intensity', 0.0, 30.0).name('Intensity').listen();
-
-    gui.addSeparator();
-
-    // Light Direction with .listen() for automatic updates when atmospheric system changes it
-    folder
+    // Light Direction
+    this._editorFolder
       .add(this.lightDirection, '0', -1.0, 1.0)
       .name('Dir X')
-      .onChange(() => {
-        vec3.normalize(this.lightDirection, this.lightDirection);
-      })
+      .onChange(() => { vec3.normalize(this.lightDirection, this.lightDirection); })
       .listen();
-
-    folder
+    this._editorFolder
       .add(this.lightDirection, '1', -1.0, 1.0)
       .name('Dir Y')
-      .onChange(() => {
-        vec3.normalize(this.lightDirection, this.lightDirection);
-      })
+      .onChange(() => { vec3.normalize(this.lightDirection, this.lightDirection); })
       .listen();
-
-    folder
+    this._editorFolder
       .add(this.lightDirection, '2', -1.0, 1.0)
       .name('Dir Z')
-      .onChange(() => {
-        vec3.normalize(this.lightDirection, this.lightDirection);
-      })
+      .onChange(() => { vec3.normalize(this.lightDirection, this.lightDirection); })
       .listen();
 
-    gui.addSeparator();
-
-    // Shadows toggle
-    folder.add(this, 'hasShadows').name('Enable Shadows').listen();
-
-    // Shadow parameters (only shown if shadows enabled)
-    if (this.hasShadows) {
-      folder.add(this, 'maxShadowDistance', 10.0, 200.0).name('Max Shadow Distance').listen();
-
-      // Cascade lambda (only if using multiple cascades)
-      if (this.cascadeCount > 1) {
-        folder.add(this, 'cascadeLambda', 0.0, 1.0).name('Cascade Lambda').listen();
-      }
+    // Shadows
+    this._editorFolder.add(this, 'hasShadows').name('Enable Shadows').listen();
+    this._editorFolder.add(this, 'maxShadowDistance', 10.0, 200.0).name('Max Shadow Distance').listen();
+    if (this.cascadeCount > 1) {
+      this._editorFolder.add(this, 'cascadeLambda', 0.0, 1.0).name('Cascade Lambda').listen();
     }
-
-    gui.addSeparator();
-
-    // Read-only information
-    const cascadeInfo = { value: this.cascadeCount };
-    gui.addDynamicText(cascadeInfo, 'value', 'Cascade Count');
   }
 
   // Getters for volumetric lighting integration

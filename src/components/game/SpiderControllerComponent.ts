@@ -145,6 +145,7 @@ export class SpiderControllerComponent extends Component {
   private playerEntityId: number = -1;
 
   // ─── Configurable parameters (exposed via renderInMenu) ──────────────────
+  private _editorFolder: any = null;
   private legUpperLength: number = 0.55;
   private legLowerLength: number = 0.5;
   private legThickness: number = 0.06;
@@ -636,29 +637,21 @@ export class SpiderControllerComponent extends Component {
 
   public renderDebug(): void {}
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
-    if (!gui.beginWindow('Spider Controller', true)) return;
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Spider Controller');
+    this._editorFolder.close();
 
-    const guiManager = gui as any;
-    const folder = guiManager.folders?.get('Spider Controller');
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    folder.add(this, 'footSpread', 0.5, 3.0).step(0.05).name('Foot Spread').listen();
-    folder.add(this, 'legUpperLength', 0.1, 2.0).step(0.01).name('Leg Upper Length').listen();
-    folder.add(this, 'legLowerLength', 0.1, 2.0).step(0.01).name('Leg Lower Length').listen();
-    folder.add(this, 'legThickness', 0.01, 0.3).step(0.005).name('Leg Thickness').listen();
-    folder.add(this, 'stepThreshold', 0.1, 2.0).step(0.05).name('Step Threshold').listen();
-    folder.add(this, 'stepHeight', 0.0, 1.0).step(0.02).name('Step Height').listen();
-    folder.add(this, 'stepDuration', 0.05, 0.5).step(0.01).name('Step Duration').listen();
-    folder.add(this, 'stepAnticipation', 0.0, 3.0).step(0.1).name('Step Anticipation').listen();
-    folder.add(this, 'moveSpeed', 0.0, 10.0).step(0.1).name('Move Speed').listen();
-    folder.add(this, 'chaseRange', 1.0, 50.0).step(0.5).name('Chase Range').listen();
-
-    gui.endWindow();
+    this._editorFolder.add(this, 'footSpread', 0.5, 3.0).step(0.05).name('Foot Spread').listen();
+    this._editorFolder.add(this, 'legUpperLength', 0.1, 2.0).step(0.01).name('Leg Upper Length').listen();
+    this._editorFolder.add(this, 'legLowerLength', 0.1, 2.0).step(0.01).name('Leg Lower Length').listen();
+    this._editorFolder.add(this, 'legThickness', 0.01, 0.3).step(0.005).name('Leg Thickness').listen();
+    this._editorFolder.add(this, 'stepThreshold', 0.1, 2.0).step(0.05).name('Step Threshold').listen();
+    this._editorFolder.add(this, 'stepHeight', 0.0, 1.0).step(0.02).name('Step Height').listen();
+    this._editorFolder.add(this, 'stepDuration', 0.05, 0.5).step(0.01).name('Step Duration').listen();
+    this._editorFolder.add(this, 'stepAnticipation', 0.0, 3.0).step(0.1).name('Step Anticipation').listen();
+    this._editorFolder.add(this, 'moveSpeed', 0.0, 10.0).step(0.1).name('Move Speed').listen();
+    this._editorFolder.add(this, 'chaseRange', 1.0, 50.0).step(0.5).name('Chase Range').listen();
   }
 }

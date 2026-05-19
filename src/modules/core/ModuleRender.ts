@@ -756,7 +756,8 @@ export class ModuleRender extends Module {
         const lightName = dirLight.getOwner().getName();
 
         if (this.beginGUIWindow(lightName)) {
-          dirLight.renderInMenu();
+          const lightFolder = (gui as any).folders?.get(lightName);
+          if (lightFolder) dirLight.renderInMenu(lightFolder);
           this.endGUIWindow();
         }
       }
