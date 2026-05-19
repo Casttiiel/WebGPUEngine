@@ -8,6 +8,9 @@ import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.e
 import { InstanceManager } from '../../renderer/core/managers/InstanceManager';
 import { RenderComponent } from '../render/RenderComponent';
 
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+
 export class TransformComponent extends Component {
   private transform: Transform;
   private uniformBuffer!: GPUBuffer;
@@ -21,6 +24,19 @@ export class TransformComponent extends Component {
   // True if the world matrix changed between the previous frame and this one.
   // Read by VelocityBufferManager to skip static objects in the per-object velocity pass.
   private matrixChangedThisFrame: boolean = false;
+
+  /** Proxy object bound to lil-gui sliders; kept in sync inside update(). */
+  private _editorProxy: {
+    posX: number;
+    posY: number;
+    posZ: number;
+    rotX: number;
+    rotY: number;
+    rotZ: number;
+    scaX: number;
+    scaY: number;
+    scaZ: number;
+  } | null = null;
 
   constructor() {
     super();
@@ -144,6 +160,22 @@ export class TransformComponent extends Component {
   }
 
   public update(): void {
+    // Sync editor proxy every frame so lil-gui .listen() reflects live changes (gizmo drags, etc.)
+    if (this._editorProxy) {
+      const pos = this.transform.getLocalPosition();
+      this._editorProxy.posX = pos[0]!;
+      this._editorProxy.posY = pos[1]!;
+      this._editorProxy.posZ = pos[2]!;
+      const angles = this.transform.getAngles();
+      this._editorProxy.rotX = angles.pitch * RAD2DEG;
+      this._editorProxy.rotY = angles.yaw * RAD2DEG;
+      this._editorProxy.rotZ = angles.roll * RAD2DEG;
+      const scale = this.transform.getLocalScale();
+      this._editorProxy.scaX = scale[0]!;
+      this._editorProxy.scaY = scale[1]!;
+      this._editorProxy.scaZ = scale[2]!;
+    }
+
     // Only do work when something actually changed
     if (!this.transform.getIsDirty()) return;
 
@@ -152,7 +184,97 @@ export class TransformComponent extends Component {
     this.updateChildrenTransforms();
   }
 
-  public override renderInMenu(): void {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorProxy) return; // already built
+
+    // Initialise proxy from current transform values
+    const pos = this.transform.getLocalPosition();
+    const angles = this.transform.getAngles();
+    const scale = this.transform.getLocalScale();
+    this._editorProxy = {
+      posX: pos[0]!,
+      posY: pos[1]!,
+      posZ: pos[2]!,
+      rotX: angles.pitch * RAD2DEG,
+      rotY: angles.yaw * RAD2DEG,
+      rotZ: angles.roll * RAD2DEG,
+      scaX: scale[0]!,
+      scaY: scale[1]!,
+      scaZ: scale[2]!,
+    };
+    const p = this._editorProxy;
+
+    // Helper: add a numeric input + step-decrement + step-increment buttons
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addAxisControls = (
+      parent: any,
+      obj: any,
+      key: string,
+      label: string,
+      stepRef: { v: number },
+      onChange: () => void,
+    ): void => {
+      parent.add(obj, key).step(0.001).name(label).listen().onChange(onChange);
+      parent
+        .add(
+          {
+            fn: () => {
+              obj[key] -= stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  −`);
+      parent
+        .add(
+          {
+            fn: () => {
+              obj[key] += stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  +`);
+    };
+
+    const tFolder = folder.addFolder('Transform');
+    tFolder.close();
+
+    // ── Position ──────────────────────────────────────────────────────────────
+    const posStep = { v: 0.1 };
+    const applyPos = () => this.transform.setLocalPosition(vec3.fromValues(p.posX, p.posY, p.posZ));
+    const posF = tFolder.addFolder('Position');
+    posF.close();
+    posF.add(posStep, 'v').step(0.001).name('± Step');
+    addAxisControls(posF, p, 'posX', 'X', posStep, applyPos);
+    addAxisControls(posF, p, 'posY', 'Y', posStep, applyPos);
+    addAxisControls(posF, p, 'posZ', 'Z', posStep, applyPos);
+
+    // ── Rotation (degrees) ───────────────────────────────────────────────────
+    const rotStep = { v: 5.0 };
+    const applyRot = () =>
+      this.transform.setAngles(p.rotY * DEG2RAD, p.rotX * DEG2RAD, p.rotZ * DEG2RAD);
+    const rotF = tFolder.addFolder('Rotation');
+    rotF.close();
+    rotF.add(rotStep, 'v').step(0.1).name('± Step °');
+    addAxisControls(rotF, p, 'rotX', 'Pitch', rotStep, applyRot);
+    addAxisControls(rotF, p, 'rotY', 'Yaw', rotStep, applyRot);
+    addAxisControls(rotF, p, 'rotZ', 'Roll', rotStep, applyRot);
+
+    // ── Scale ─────────────────────────────────────────────────────────────────
+    const scaStep = { v: 0.1 };
+    const applySca = () => this.transform.setLocalScale(vec3.fromValues(p.scaX, p.scaY, p.scaZ));
+    const scaF = tFolder.addFolder('Scale');
+    scaF.close();
+    scaF.add(scaStep, 'v').step(0.001).name('± Step');
+    addAxisControls(scaF, p, 'scaX', 'X', scaStep, applySca);
+    addAxisControls(scaF, p, 'scaY', 'Y', scaStep, applySca);
+    addAxisControls(scaF, p, 'scaZ', 'Z', scaStep, applySca);
+  }
 
   public renderDebug(): void {
     // Transform debug visualization could be implemented here

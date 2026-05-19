@@ -9,7 +9,6 @@ import {
 import { MeshPartType } from '../../types/MeshPart.type';
 import { MeshData } from '../../types/MeshData.type';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
-import { Engine } from '../../core/engine/Engine';
 
 export class RenderComponent extends Component {
   private _isVisible: boolean = true;
@@ -147,103 +146,70 @@ export class RenderComponent extends Component {
     // Implementation of update if needed
   }
 
-  public override renderInMenu(): void {
-    // Get the owner entity
-    const entity = this.getOwner();
-    const entityId = entity.id;
-    const entityKey = `entity_${entityId}`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (!this.parts.length) return;
 
-    // Get the parent folder from the entity hierarchy
-    let parentFolder = 'entities';
-    const parentEntity = entity.getParent();
-    if (parentEntity) {
-      const parentId = parentEntity.id;
-      const parentEntityKey = `entity_${parentId}`;
-      // If this entity has a parent, it's in a subfolder
-      parentFolder = `entities_${parentEntityKey}`;
-    }
+    const mat = this.parts[0]?.material ?? null;
+    if (!mat) return;
 
-    // Create helper method to add controls to the entity's folder
-    const addControl = (
-      object: unknown,
-      propertyKey: string,
-      label: string,
-      options?: { min?: number; max?: number; step?: number },
-    ) => {
-      const debugUI = Engine.getDebugUI();
-      debugUI.addControlToSubFolder(parentFolder, entityKey, object, propertyKey, label, options);
+    const mFolder = folder.addFolder('Material');
+    mFolder.close();
+
+    const mp = {
+      materialName: mat.getName().split('/').pop() ?? mat.getName(),
+      roughnessFactor: mat.getRoughnessFactor(),
+      metallicFactor: mat.getMetallicFactor(),
+      emissiveFactor: mat.getEmissiveFactor(),
+      uvXScale: mat.getUvXScale(),
+      uvYScale: mat.getUvYScale(),
+      appearanceBlend: mat.getAppearanceBlend(),
+      surfaceBlend: mat.getSurfaceBlend(),
+      pomScale: mat.getPomScale(),
     };
 
-    // Show visibility toggle
-    const visibilityControl = {
-      get visible() {
-        return this._visible;
-      },
-      set visible(value) {
-        this._visible = value;
-        this.component._isVisible = value;
-        this.component.updateRenderManager();
-      },
-      _visible: this._isVisible,
-      component: this,
-    };
-
-    addControl(visibilityControl, 'visible', 'Visible');
-
-    // Show mesh and material information for each part
-    for (let i = 0; i < this.parts.length; i++) {
-      const part = this.parts[i];
-      if (!part) continue;
-
-      const partIndex = i;
-
-      // Get the part path info from the resources
-      const meshPath = part.mesh.path || `Mesh_${i}`;
-      const materialPath = part.material.path || `Material_${i}`;
-      const techniquePath = part.material.getTechnique()?.path || 'None';
-
-      // Create info objects for display with just the names (no full paths)
-      const meshInfo = {
-        name: meshPath.split('/').pop() || meshPath,
-      };
-
-      const materialInfo = {
-        name: materialPath.split('/').pop() || materialPath,
-        category: part.material.getCategory(),
-        techniqueName: techniquePath.split('/').pop() || techniquePath,
-        castsShadows: part.material.getCastsShadows(),
-        receiveShadows: part.material.getShadows(),
-      };
-
-      // Add mesh control - just the name
-      addControl(meshInfo, 'name', `Mesh ${partIndex}`);
-
-      // Add material controls - just the essential info
-      addControl(materialInfo, 'name', `Material ${partIndex}`);
-      addControl(materialInfo, 'category', `Category`);
-      addControl(materialInfo, 'techniqueName', `Technique`);
-      addControl(materialInfo, 'castsShadows', `Casts Shadows`);
-      addControl(materialInfo, 'receiveShadows', `Receives Shadows`);
-
-      // Part visibility toggle
-      const partVisibility = {
-        get visible() {
-          return this._visible;
-        },
-        set visible(value) {
-          this._visible = value;
-          if (this.part) {
-            this.part.isVisible = value;
-            this.component.updateRenderManager();
-          }
-        },
-        _visible: part.isVisible,
-        part,
-        component: this,
-      };
-
-      addControl(partVisibility, 'visible', `Mesh ${partIndex} Visible`);
-    }
+    mFolder.add(mp, 'materialName').name('Material').disable().listen();
+    mFolder
+      .add(mp, 'roughnessFactor', 0, 2, 0.01)
+      .name('Roughness')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ roughnessFactor: v }));
+    mFolder
+      .add(mp, 'metallicFactor', 0, 1, 0.01)
+      .name('Metallic')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ metallicFactor: v }));
+    mFolder
+      .add(mp, 'emissiveFactor', 0, 5, 0.05)
+      .name('Emissive')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ emissiveFactor: v }));
+    mFolder
+      .add(mp, 'uvXScale', 0.1, 50, 0.1)
+      .name('UV Scale X')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ uvXScale: v }));
+    mFolder
+      .add(mp, 'uvYScale', 0.1, 50, 0.1)
+      .name('UV Scale Y')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ uvYScale: v }));
+    mFolder
+      .add(mp, 'appearanceBlend', 0, 1, 0.01)
+      .name('Appearance Blend')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ appearanceBlend: v }));
+    mFolder
+      .add(mp, 'surfaceBlend', 0, 1, 0.01)
+      .name('Surface Blend')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ surfaceBlend: v }));
+    mFolder
+      .add(mp, 'pomScale', 0, 0.2, 0.001)
+      .name('POM Scale')
+      .listen()
+      .onChange((v: number) => mat.setFactors({ pomScale: v }));
   }
 
   public override dispose(): void {

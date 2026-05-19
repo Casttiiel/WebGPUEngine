@@ -319,7 +319,84 @@ export class SpotLightComponent extends CameraComponent {
 
   public override update(dt: number): void {}
 
-  public override renderInMenu(): void {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+
+    const p = {
+      r: this.color[0]!,
+      g: this.color[1]!,
+      b: this.color[2]!,
+      intensity: this.intensity,
+      radius: this.radius,
+      startFalloff: this.startFallof,
+      fov: this.camera.getFov(),
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addAxisControls = (
+      parent: any,
+      obj: any,
+      key: string,
+      label: string,
+      stepRef: { v: number },
+      onChange: () => void,
+    ): void => {
+      parent.add(obj, key).step(0.001).name(label).listen().onChange(onChange);
+      parent
+        .add(
+          {
+            fn: () => {
+              obj[key] -= stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  −`);
+      parent
+        .add(
+          {
+            fn: () => {
+              obj[key] += stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  +`);
+    };
+
+    const slFolder = folder.addFolder('Spot Light');
+    slFolder.close();
+
+    const applyColor = () => this.setColor(p.r, p.g, p.b);
+    const colorStep = { v: 0.05 };
+    slFolder.add(colorStep, 'v').step(0.001).name('± Step (color)');
+    addAxisControls(slFolder, p, 'r', 'R', colorStep, applyColor);
+    addAxisControls(slFolder, p, 'g', 'G', colorStep, applyColor);
+    addAxisControls(slFolder, p, 'b', 'B', colorStep, applyColor);
+
+    const intStep = { v: 0.1 };
+    slFolder.add(intStep, 'v').step(0.001).name('± Step (intensity)');
+    addAxisControls(slFolder, p, 'intensity', 'Intensity', intStep, () =>
+      this.setIntensity(p.intensity),
+    );
+
+    const radStep = { v: 0.5 };
+    slFolder.add(radStep, 'v').step(0.001).name('± Step (radius)');
+    addAxisControls(slFolder, p, 'radius', 'Radius', radStep, () => this.setRadius(p.radius));
+
+    const fallStep = { v: 0.1 };
+    slFolder.add(fallStep, 'v').step(0.001).name('± Step (falloff)');
+    addAxisControls(slFolder, p, 'startFalloff', 'Start Falloff', fallStep, () =>
+      this.setStartFalloff(p.startFalloff),
+    );
+
+    const fovStep = { v: 5.0 };
+    slFolder.add(fovStep, 'v').step(0.1).name('± Step (fov°)');
+    addAxisControls(slFolder, p, 'fov', 'FOV °', fovStep, () => this.setFov(p.fov));
+  }
 
   public override renderDebug(): void {
     // Implement debug rendering if needed

@@ -1,4 +1,3 @@
-import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { BloomCombineRenderPass } from '../../renderer/core/passes/PostProcessingRenderPasses';
@@ -36,6 +35,7 @@ export class BloomGaussianComponent extends BlurGaussianComponent {
   private bloomTexturesBindGroup!: GPUBindGroup | null;
 
   private inputTextureCache: Map<GPUTextureView, GPUBindGroup> = new Map();
+  private _editorFolder: any = null;
 
   constructor() {
     super();
@@ -291,117 +291,26 @@ export class BloomGaussianComponent extends BlurGaussianComponent {
     // Implement debug menu for bloom parameters
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'render';
-    const subfolderKey = 'Camera Components';
-    const componentName = 'Bloom';
-
-    // Declare self at the beginning to avoid reference errors
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
     const self = this;
+    this._editorFolder = folder.addFolder('Bloom');
+    this._editorFolder.close();
 
-    // Add controls to the Camera Components subfolder
-    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
-      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
-        ...(options || {}),
-        readonly: false,
-      });
-    };
+    const thresholdMinWrapper = { get thresholdMin() { return self.thresholdMin; }, set thresholdMin(v: number) { self.thresholdMin = v; self.updateBloomFilterParams(); self.bloomFilterParamsBindGroup = null; } };
+    const thresholdMaxWrapper = { get thresholdMax() { return self.thresholdMax; }, set thresholdMax(v: number) { self.thresholdMax = v; self.updateBloomFilterParams(); self.bloomFilterParamsBindGroup = null; } };
+    const emissiveWrapper = { get emissiveFactor() { return self.emissiveFactor; }, set emissiveFactor(v: number) { self.emissiveFactor = v; self.updateBloomFilterParams(); self.bloomFilterParamsBindGroup = null; } };
+    const blurStrWrapper = { get blurStrength() { return self.getBlurStrength(); }, set blurStrength(v: number) { self.setBlurStrength(v); } };
+    const maxStepsWrapper = { get maxBlurSteps() { return self.getMaxBlurSteps(); }, set maxBlurSteps(v: number) { self.setMaxBlurSteps(v); } };
+    const sizeWrapper = { get bloomSize() { return self.getBloomSize(); }, set bloomSize(v: number) { self.setBloomSize(v); } };
 
-    // Add controls for bloom filter parameters
-    const thresholdMinWrapper = {
-      get thresholdMin() {
-        return self.thresholdMin;
-      },
-      set thresholdMin(value) {
-        self.thresholdMin = value;
-        self.updateBloomFilterParams();
-        self.bloomFilterParamsBindGroup = null; // Force recreation
-      },
-    };
-
-    const thresholdMaxWrapper = {
-      get thresholdMax() {
-        return self.thresholdMax;
-      },
-      set thresholdMax(value) {
-        self.thresholdMax = value;
-        self.updateBloomFilterParams();
-        self.bloomFilterParamsBindGroup = null; // Force recreation
-      },
-    };
-
-    const emissiveFactorWrapper = {
-      get emissiveFactor() {
-        return self.emissiveFactor;
-      },
-      set emissiveFactor(value) {
-        self.emissiveFactor = value;
-        self.updateBloomFilterParams();
-        self.bloomFilterParamsBindGroup = null; // Force recreation
-      },
-    };
-
-    addControl(thresholdMinWrapper, 'thresholdMin', `${componentName} Filter Threshold Min`, {
-      min: 0.0,
-      max: 50.0,
-      step: 0.1,
-    });
-    addControl(thresholdMaxWrapper, 'thresholdMax', `${componentName} Filter Threshold Max`, {
-      min: 0.5,
-      max: 100.0,
-      step: 0.1,
-    });
-    addControl(emissiveFactorWrapper, 'emissiveFactor', `${componentName} Emissive Factor`, {
-      min: 0.1,
-      max: 10.0,
-      step: 0.1,
-    });
-
-    const blurStrengthWrapper = {
-      get blurStrength() {
-        return self.getBlurStrength();
-      },
-      set blurStrength(value) {
-        self.setBlurStrength(value);
-      },
-    };
-
-    const maxBlurStepsWrapper = {
-      get maxBlurSteps() {
-        return self.getMaxBlurSteps();
-      },
-      set maxBlurSteps(value) {
-        self.setMaxBlurSteps(value);
-      },
-    };
-
-    addControl(blurStrengthWrapper, 'blurStrength', `${componentName} Blur Strength`, {
-      min: 0.0,
-      max: 10.0,
-      step: 0.1,
-    });
-    addControl(maxBlurStepsWrapper, 'maxBlurSteps', `${componentName} Max Blur Steps`, {
-      min: 1,
-      max: 20,
-      step: 1,
-    });
-
-    // ✅ Add bloom size control
-    const bloomSizeWrapper = {
-      get bloomSize() {
-        return self.getBloomSize();
-      },
-      set bloomSize(value) {
-        self.setBloomSize(value);
-      },
-    };
-
-    addControl(bloomSizeWrapper, 'bloomSize', `${componentName} Size`, {
-      min: 0.25,
-      max: 4.0,
-      step: 0.05,
-    });
+    this._editorFolder.add(thresholdMinWrapper, 'thresholdMin', 0.0, 50.0, 0.1).name('Filter Threshold Min').listen();
+    this._editorFolder.add(thresholdMaxWrapper, 'thresholdMax', 0.5, 100.0, 0.1).name('Filter Threshold Max').listen();
+    this._editorFolder.add(emissiveWrapper, 'emissiveFactor', 0.1, 10.0, 0.1).name('Emissive Factor').listen();
+    this._editorFolder.add(blurStrWrapper, 'blurStrength', 0.0, 10.0, 0.1).name('Blur Strength').listen();
+    this._editorFolder.add(maxStepsWrapper, 'maxBlurSteps', 1, 20, 1).name('Max Blur Steps').listen();
+    this._editorFolder.add(sizeWrapper, 'bloomSize', 0.25, 4.0, 0.05).name('Size').listen();
   }
 
   public override renderDebug(): void {

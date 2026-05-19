@@ -447,55 +447,20 @@ export class SMAAComponent extends Component {
     return this.blendParamsBindGroup;
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
+  private _editorFolder: any = null;
 
-    debugUI.addInteractiveControl('SMAA', this.smaaParams, 'enabled', 'Enabled');
-
-    debugUI.addInteractiveControl('SMAA', this.smaaParams, 'edgeThreshold', 'Edge Threshold', {
-      min: 0.01,
-      max: 1.5,
-      step: 0.01,
-    });
-
-    // Pass 2 parameters
-    debugUI.addInteractiveControl('SMAA', this.smaaParams, 'maxSearchSteps', 'Max Search Steps', {
-      min: 4,
-      max: 64,
-      step: 1,
-    });
-
-    debugUI.addInteractiveControl(
-      'SMAA',
-      this.smaaParams,
-      'maxSearchStepsDiag',
-      'Max Diagonal Steps',
-      {
-        min: 4,
-        max: 32,
-        step: 1,
-      },
-    );
-
-    debugUI.addInteractiveControl('SMAA', this.smaaParams, 'cornerRounding', 'Corner Rounding', {
-      min: 0.0,
-      max: 100.0,
-      step: 5.0,
-    });
-
-    debugUI.addInteractiveControl(
-      'SMAA',
-      this.smaaParams,
-      'disableDiagDetection',
-      'Disable Diagonals',
-    );
-
-    debugUI.addInteractiveControl(
-      'SMAA',
-      this.smaaParams,
-      'useDirectWeights',
-      'Use Direct Weights',
-    );
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('SMAA');
+    this._editorFolder.close();
+    this._editorFolder.add(this.smaaParams, 'enabled').name('Enabled').listen();
+    this._editorFolder.add(this.smaaParams, 'edgeThreshold', 0.01, 1.5, 0.01).name('Edge Threshold').listen();
+    this._editorFolder.add(this.smaaParams, 'maxSearchSteps', 4, 64, 1).name('Max Search Steps').listen();
+    this._editorFolder.add(this.smaaParams, 'maxSearchStepsDiag', 4, 32, 1).name('Max Diagonal Steps').listen();
+    this._editorFolder.add(this.smaaParams, 'cornerRounding', 0.0, 100.0, 5.0).name('Corner Rounding').listen();
+    this._editorFolder.add(this.smaaParams, 'disableDiagDetection').name('Disable Diagonals').listen();
+    this._editorFolder.add(this.smaaParams, 'useDirectWeights').name('Use Direct Weights').listen();
   }
 
   public renderDebug(): void {

@@ -223,117 +223,37 @@ export class CameraArmComponent extends Component {
     return desiredPos;
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'game';
-    const subfolderKey = 'Camera Arm';
+  private _editorFolder: any = null;
 
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
     const self = this;
+    this._editorFolder = folder.addFolder('Camera Arm');
+    this._editorFolder.close();
 
-    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
-      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
-        ...(options || {}),
-        readonly: false,
-      });
+    const offsetWrapper = {
+      get x() { return self.targetOffset[0] as number; }, set x(v: number) { self.targetOffset[0] = v; },
+      get y() { return self.targetOffset[1] as number; }, set y(v: number) { self.targetOffset[1] = v; },
+      get z() { return self.targetOffset[2] as number; }, set z(v: number) { self.targetOffset[2] = v; },
     };
+    this._editorFolder.add(offsetWrapper, 'x', -10, 10, 0.1).name('Target X').listen();
+    this._editorFolder.add(offsetWrapper, 'y', -10, 10, 0.1).name('Target Y').listen();
+    this._editorFolder.add(offsetWrapper, 'z', -10, 10, 0.1).name('Target Z').listen();
 
-    // Target Offset X, Y, Z
-    const targetOffsetWrapper = {
-      get x() {
-        return self.targetOffset[0];
-      },
-      set x(value) {
-        self.targetOffset[0] = value;
-      },
-      get y() {
-        return self.targetOffset[1];
-      },
-      set y(value) {
-        self.targetOffset[1] = value;
-      },
-      get z() {
-        return self.targetOffset[2];
-      },
-      set z(value) {
-        self.targetOffset[2] = value;
-      },
+    const distWrapper = { get distance() { return self.distance; }, set distance(v: number) { self.distance = v; } };
+    this._editorFolder.add(distWrapper, 'distance', 0.0, 20.0, 0.1).name('Distance').listen();
+
+    const smoothWrapper = { get smoothSpeed() { return self.smoothSpeed; }, set smoothSpeed(v: number) { self.smoothSpeed = v; },
+      // stub to satisfy remaining addControl calls (replaced below)
+      get rotationSmoothSpeed() { return self.rotationSmoothSpeed; }, set rotationSmoothSpeed(v: number) { self.rotationSmoothSpeed = v; },
+      get mouseSensitivity() { return self.mouseSensitivity; }, set mouseSensitivity(v: number) { self.mouseSensitivity = v; },
+      get enableCollision() { return self.enableCollision; }, set enableCollision(v: boolean) { self.enableCollision = v; },
     };
-
-    addControl(targetOffsetWrapper, 'x', 'Target X', { min: -10, max: 10, step: 0.1 });
-    addControl(targetOffsetWrapper, 'y', 'Target Y', { min: -10, max: 10, step: 0.1 });
-    addControl(targetOffsetWrapper, 'z', 'Target Z', { min: -10, max: 10, step: 0.1 });
-
-    // Distance
-    const distanceWrapper = {
-      get distance() {
-        return self.distance;
-      },
-      set distance(value) {
-        self.distance = value;
-      },
-    };
-
-    addControl(distanceWrapper, 'distance', 'Distance', { min: 0.0, max: 20.0, step: 0.1 });
-
-    // Smooth speed
-    const smoothSpeedWrapper = {
-      get smoothSpeed() {
-        return self.smoothSpeed;
-      },
-      set smoothSpeed(value) {
-        self.smoothSpeed = value;
-      },
-    };
-
-    addControl(smoothSpeedWrapper, 'smoothSpeed', 'Smooth Speed', {
-      min: 0.1,
-      max: 50.0,
-      step: 0.1,
-    });
-
-    // Rotation smooth speed
-    const rotationSmoothSpeedWrapper = {
-      get rotationSmoothSpeed() {
-        return self.rotationSmoothSpeed;
-      },
-      set rotationSmoothSpeed(value) {
-        self.rotationSmoothSpeed = value;
-      },
-    };
-
-    addControl(rotationSmoothSpeedWrapper, 'rotationSmoothSpeed', 'Rotation Smooth', {
-      min: 0.0,
-      max: 50.0,
-      step: 0.1,
-    });
-
-    // Mouse sensitivity
-    const mouseSensitivityWrapper = {
-      get mouseSensitivity() {
-        return self.mouseSensitivity;
-      },
-      set mouseSensitivity(value) {
-        self.mouseSensitivity = value;
-      },
-    };
-
-    addControl(mouseSensitivityWrapper, 'mouseSensitivity', 'Mouse Sensitivity', {
-      min: 0.01,
-      max: 1.0,
-      step: 0.01,
-    });
-
-    // Enable collision
-    const collisionWrapper = {
-      get enableCollision() {
-        return self.enableCollision;
-      },
-      set enableCollision(value) {
-        self.enableCollision = value;
-      },
-    };
-
-    addControl(collisionWrapper, 'enableCollision', 'Enable Collision');
+    this._editorFolder.add(smoothWrapper, 'smoothSpeed', 0.1, 50.0, 0.1).name('Smooth Speed').listen();
+    this._editorFolder.add(smoothWrapper, 'rotationSmoothSpeed', 0.0, 50.0, 0.1).name('Rotation Smooth').listen();
+    this._editorFolder.add(smoothWrapper, 'mouseSensitivity', 0.01, 1.0, 0.01).name('Mouse Sensitivity').listen();
+    this._editorFolder.add(smoothWrapper, 'enableCollision').name('Enable Collision').listen();
   }
 
   public renderDebug(): void {

@@ -221,6 +221,11 @@ export class TerrainComponent extends Component {
    * is detected on the entity.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (folder) this.addToEntityPanel(folder);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public addToEntityPanel(entityFolder: any): void {
     const terrainFolder = entityFolder.addFolder('Terrain');
     terrainFolder.close();

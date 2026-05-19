@@ -4,6 +4,7 @@ import { Entity } from '../../core/ecs/Entity';
 import { ComponentDataType } from '../../types/ComponentData.type';
 import { Module } from '../core/Module';
 import { Profiler } from '../../core/debug/Profiler';
+import { Engine } from '../../core/engine/Engine';
 
 class ObjectManager {
   private list: Component[] = [];
@@ -95,7 +96,17 @@ export class ModuleEntities extends Module {
   }
 
   public override renderInMenu(): void {
-    // No GUI implementation for this module
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    gui.beginWindow('Scene Entities'); // no-op on subsequent calls
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sceneFolder = (gui as any).folders?.get('Scene Entities');
+    if (!sceneFolder) return;
+
+    for (const entity of this.omEntities) {
+      entity.renderInMenu(sceneFolder);
+    }
   }
 
   public renderDebug(): void {
@@ -167,6 +178,14 @@ export class ModuleEntities extends Module {
   }
 
   public stop(): void {
+    // Clean up Scene Entities GUI folder
+    const gui = Engine.getGUI();
+    const sceneFolder = gui.getFolder('Scene Entities');
+    if (sceneFolder) {
+      (sceneFolder as any).destroy();
+      gui.unregisterFolder('Scene Entities');
+    }
+
     // Clear entities array (entities will be recreated on restart)
     this.omEntities = [];
     this.omToUpdate = new Map();

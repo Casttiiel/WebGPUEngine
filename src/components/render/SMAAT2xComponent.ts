@@ -534,28 +534,17 @@ export class SMAAT2xComponent extends Component {
     // (will be applied before rendering)
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const folder = 'SMAA T2x';
+  private _editorFolder: any = null;
 
-    debugUI.addInteractiveControl(folder, this.smaaParams, 'enabled', 'Enabled');
-    debugUI.addInteractiveControl(folder, this.smaaParams, 'edgeThreshold', 'Edge Threshold', {
-      min: 0.0,
-      max: 0.5,
-      step: 0.01,
-    });
-    debugUI.addInteractiveControl(folder, this.temporalParams, 'blendFactor', 'Blend Factor', {
-      min: 0.0,
-      max: 1.0,
-      step: 0.05,
-    });
-    debugUI.addInteractiveControl(
-      folder,
-      this.temporalParams,
-      'neighborhoodClampFactor',
-      'Clamp Factor',
-      { min: 0.0, max: 2.0, step: 0.1 },
-    );
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('SMAA T2x');
+    this._editorFolder.close();
+    this._editorFolder.add(this.smaaParams, 'enabled').name('Enabled').listen();
+    this._editorFolder.add(this.smaaParams, 'edgeThreshold', 0.0, 0.5, 0.01).name('Edge Threshold').listen();
+    this._editorFolder.add(this.temporalParams, 'blendFactor', 0.0, 1.0, 0.05).name('Blend Factor').listen();
+    this._editorFolder.add(this.temporalParams, 'neighborhoodClampFactor', 0.0, 2.0, 0.1).name('Clamp Factor').listen();
   }
 
   public renderDebug(): void {

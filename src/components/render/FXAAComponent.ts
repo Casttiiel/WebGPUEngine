@@ -9,7 +9,6 @@ import { Technique } from '../../renderer/resources/Technique';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
-import { Engine } from '../../core/engine/Engine';
 
 export class FXAAComponent extends Component {
   private loaded = false;
@@ -28,6 +27,8 @@ export class FXAAComponent extends Component {
     edgeThreshold: 0.063,
     edgeThresholdMin: 0.0312,
   };
+
+  private _editorFolder: any = null;
 
   constructor() {
     super();
@@ -117,37 +118,24 @@ export class FXAAComponent extends Component {
     throw new Error('Method not implemented.');
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'render';
-    const subfolderKey = 'Camera Components';
-    const componentName = 'Antialiasing';
-
-    // Add controls to the Camera Components subfolder
-    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
-      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
-        ...(options || {}),
-        readonly: false,
-      });
-    };
-
-    // Add controls for FXAA parameters
-    addControl(this.fxaaParams, 'enabled', `${componentName} Enabled`);
-    addControl(this.fxaaParams, 'subPixelShift', `${componentName} Sub-pixel Shift`, {
-      min: 0.0,
-      max: 1.0,
-      step: 0.01,
-    });
-    addControl(this.fxaaParams, 'edgeThreshold', `${componentName} Edge Threshold`, {
-      min: 0.0,
-      max: 0.5,
-      step: 0.001,
-    });
-    addControl(this.fxaaParams, 'edgeThresholdMin', `${componentName} Edge Threshold Min`, {
-      min: 0.0,
-      max: 0.1,
-      step: 0.001,
-    });
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('FXAA');
+    this._editorFolder.close();
+    this._editorFolder.add(this.fxaaParams, 'enabled').name('Enabled').listen();
+    this._editorFolder
+      .add(this.fxaaParams, 'subPixelShift', 0.0, 1.0, 0.01)
+      .name('Sub-pixel Shift')
+      .listen();
+    this._editorFolder
+      .add(this.fxaaParams, 'edgeThreshold', 0.0, 0.5, 0.001)
+      .name('Edge Threshold')
+      .listen();
+    this._editorFolder
+      .add(this.fxaaParams, 'edgeThresholdMin', 0.0, 0.1, 0.001)
+      .name('Edge Threshold Min')
+      .listen();
   }
 
   public debugInMenu(): void {

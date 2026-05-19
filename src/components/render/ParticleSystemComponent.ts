@@ -6,7 +6,6 @@ import { TransformComponent } from '../core/TransformComponent';
 import { RenderComponent } from './RenderComponent';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { ResourceManager } from '../../core/engine/ResourceManager';
-import { Engine } from '../../core/engine/Engine';
 import { ParticleSystemComponentData } from '../../types/ParticleSystemComponentData.type';
 
 /**
@@ -555,26 +554,16 @@ export class ParticleSystemComponent extends Component {
     device.queue.submit([encoder.finish()]);
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const folderName = `Particle System (${this.getOwner().getName()})`;
+  private _editorFolder: any = null;
 
-    // Spawn controls
-    debugUI.addInteractiveControl(folderName, this, 'spawnInterval', 'Spawn Interval (s)', {
-      min: 0.1,
-      max: 5.0,
-      step: 0.1,
-    });
-
-    debugUI.addInteractiveControl(folderName, this, 'particlesPerSpawn', 'Particles per Spawn', {
-      min: 1,
-      max: 50,
-      step: 1,
-    });
-
-    // Info (read-only)
-    const stats = { maxParticles: this.maxParticles };
-    debugUI.addDebugControl(folderName, stats, 'maxParticles', 'Max Particles');
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Particle System');
+    this._editorFolder.close();
+    this._editorFolder.add(this, 'spawnInterval', 0.1, 5.0, 0.1).name('Spawn Interval (s)').listen();
+    this._editorFolder.add(this, 'particlesPerSpawn', 1, 50, 1).name('Particles per Spawn').listen();
+    this._editorFolder.add({ maxParticles: this.maxParticles }, 'maxParticles').name('Max Particles').disable();
   }
 
   public override renderDebug(): void {

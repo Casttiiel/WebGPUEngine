@@ -1,6 +1,5 @@
 import { NameComponent } from '../../components/core/NameComponent';
 import { Component } from './Component';
-import { Engine } from '../../core/engine/Engine';
 import { MsgDispatcher } from './MsgDispatcher';
 import type { IMsg } from './Msg';
 
@@ -74,52 +73,26 @@ export class Entity {
     return `Entity(${this.getName()}, id=${this.id})`;
   }
 
-  public renderInMenu(parentFolder: string = 'entities'): void {
-    // Get Engine instance and ModuleManager
-    const moduleManager = Engine.getModules();
-    if (!moduleManager) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _editorFolder: any = null;
 
-    // Create a subfolder for this entity within the parent folder
-    // Use the entity's name as the display title and a unique key based on ID
-    const entityName = this.getName();
-    const entityKey = `entity_${this.id}`;
-    const folderKey = `${parentFolder}_${entityKey}`;
+  /**
+   * Adds this entity as a sub-folder of the provided raw lil-gui folder.
+   * Delegates to each component's renderInMenu(entitySubFolder) so each
+   * component can add its own controls. Idempotent – safe to call every frame.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public renderInMenu(parentFolder: any): void {
+    if (this._editorFolder) return; // already built
+    this._editorFolder = parentFolder.addFolder(`${this.getName()} [${this.id}]`);
+    this._editorFolder.close();
 
-    // Create an entity subfolder with its name (collapsed by default)
-    const debugUI = Engine.getDebugUI();
-    const entityFolder = debugUI.addSubFolder(
-      parentFolder, // Parent folder name
-      entityKey, // Subfolder key
-      entityName, // Display title
-      false, // Start collapsed
-    );
+    for (const component of this.components.values()) {
+      component.renderInMenu(this._editorFolder);
+    }
 
-    if (!entityFolder) return;
-
-    // Now add controls for each component
-    this.components.forEach((component, componentName) => {
-      // Add component type info to the entity folder
-      debugUI.addControlToSubFolder(
-        parentFolder,
-        entityKey,
-        { type: componentName },
-        'type',
-        `Component: ${componentName}`,
-      );
-
-      // Let the component add its own controls if it implements renderInMenu
-      if (typeof component.renderInMenu === 'function') {
-        component.renderInMenu();
-      }
-    });
-
-    // Render all child entities as direct subfolders of this entity
-    if (this.children.length > 0) {
-      // For each child entity, create its own subfolder under the current entity's folder
-      for (const child of this.children) {
-        // Pass the current entity's folder key as the parent folder for the child
-        child.renderInMenu(folderKey);
-      }
+    for (const child of this.children) {
+      child.renderInMenu(this._editorFolder);
     }
   }
 }

@@ -9,27 +9,43 @@ import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 
 const NUM_LEGS = 8;
 
-/** Upper leg length (hip → knee), world units. */
-const LEG_A = 0.55;
+/**
+ * Step group per leg (0-3). A leg only steps if no leg in its group is mid-step.
+ * Pairs are diagonal opposites so the two legs that share a group are maximally
+ * separated on the body, keeping the spider balanced:
+ *   group 0 → FR (0) + MBL (5)
+ *   group 1 → FL (1) + MBR (4)
+ *   group 2 → MFR(2) + BL  (7)
+ *   group 3 → MFL(3) + BR  (6)
+ */
+const STEP_GROUP: number[] = [0, 1, 2, 3, 1, 0, 3, 2];
 
-/** Lower leg length (knee → foot), world units. */
-const LEG_B = 0.5;
+/**
+ * Metachronal wave: per-leg tick index (0-7) that controls the initial
+ * stagger so the spider starts walking with a natural gait.
+ *
+ * Rule: right side steps back-to-front at EVEN ticks (0,2,4,6),
+ *       left side steps back-to-front at ODD  ticks (1,3,5,7).
+ * This perfectly interleaves the two sides so no two ipsilateral-adjacent
+ * legs are ever in the air at the same time.
+ *
+ *   tick 0: BR  (6) — right back
+ *   tick 1: BL  (7) — left  back
+ *   tick 2: MBR (4) — right mid-back
+ *   tick 3: MBL (5) — left  mid-back
+ *   tick 4: MFR (2) — right mid-front
+ *   tick 5: MFL (3) — left  mid-front
+ *   tick 6: FR  (0) — right front
+ *   tick 7: FL  (1) — left  front
+ */
+const STEP_INIT_TICK: number[] = [6, 7, 4, 5, 2, 3, 0, 1];
 
-/** Visual thickness of each leg segment (cube X/Y scale). */
-const LEG_THICKNESS = 0.06;
+/** Time between consecutive ticks in the initial metachronal wave.
+ *  Derived from the default stepDuration (0.16 * 1.1 ≈ 0.176 s). Computed inline as
+ *  `this.stepDuration * 1.1` so it adapts when stepDuration is changed at runtime. */
 
-/** Distance a planted foot can drift from its rest position before a step fires. */
-const STEP_THRESHOLD = 0.55;
-
-/** Duration of a single step animation (seconds). */
-const STEP_DURATION = 0.16;
-
-/** Upward arc height added to the foot mid-step. */
-const STEP_HEIGHT = 0.2;
-
-/** Step group per leg index (0 = group A, 1 = group B).
- *  A leg only steps if no leg in its own group is already stepping. */
-const STEP_GROUP: number[] = [0, 1, 1, 0, 0, 1, 1, 0];
+/** Minimum pause (seconds) between two consecutive steps of the same leg. */
+const STEP_MIN_COOLDOWN = 0.05;
 
 /** Hip joint attachment points in body-local space. */
 const HIP_LOCAL: [number, number, number][] = [
@@ -67,9 +83,7 @@ const KNEE_HINT: [number, number, number][] = [
   [-1, 0.5, 0],
 ];
 
-const MOVE_SPEED = 1.8;
 const TURN_SPEED = 2.5; // rad/s
-const CHASE_RANGE = 14.0;
 const GRAVITY = 9.8;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -85,6 +99,8 @@ interface LegState {
   stepTo: vec3;
   upperTx: TransformComponent;
   lowerTx: TransformComponent;
+  /** Seconds remaining before this leg may begin a new step. */
+  cooldown: number;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -127,6 +143,20 @@ export class SpiderControllerComponent extends Component {
   private spawnPos: vec3 = vec3.create();
   private patrolTarget: vec3 = vec3.create();
   private playerEntityId: number = -1;
+
+  // ─── Configurable parameters (exposed via renderInMenu) ──────────────────
+  private legUpperLength: number = 0.55;
+  private legLowerLength: number = 0.5;
+  private legThickness: number = 0.06;
+  private stepThreshold: number = 0.55;
+  private stepDuration: number = 0.16;
+  private stepHeight: number = 0.2;
+  private stepAnticipation: number = 1.1;
+  /** Multiplier applied to the XZ components of each foot rest position.
+   *  Values > 1 spread the legs wider / farther from the body. */
+  private footSpread: number = 1.0;
+  private moveSpeed: number = 1.8;
+  private chaseRange: number = 14.0;
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -176,13 +206,23 @@ export class SpiderControllerComponent extends Component {
       // Initial planted foot = rest in body-local → world.
       // Use the TRS world-matrix formula: worldOff = rot * (scale ⊗ local)  (scale FIRST).
       // This must match the body mesh rendering (mat4.fromRotationTranslationScale).
-      const restLocal = vec3.fromValues(...FOOT_REST_LOCAL[i]!);
+      const rawRest = FOOT_REST_LOCAL[i]!;
+      const restLocal = vec3.fromValues(
+        rawRest[0] * this.footSpread,
+        rawRest[1],
+        rawRest[2] * this.footSpread,
+      );
       const restScaled = vec3.multiply(vec3.create(), restLocal, this.bodyScale);
       const planted = vec3.add(
         vec3.create(),
         bodyWorldPos,
         vec3.transformQuat(vec3.create(), restScaled, bodyWorldRot),
       );
+
+      // Stagger initial cooldowns using the metachronal wave tick index.
+      // This ensures the spider starts walking with alternating right/left,
+      // back-to-front leg waves rather than all stepping at once.
+      const initialCooldown = STEP_INIT_TICK[i]! * (this.stepDuration * 1.1);
 
       this.legs.push({
         planted,
@@ -192,6 +232,7 @@ export class SpiderControllerComponent extends Component {
         stepTo: vec3.clone(planted),
         upperTx: upper,
         lowerTx: lower,
+        cooldown: initialCooldown,
       });
     }
 
@@ -216,10 +257,10 @@ export class SpiderControllerComponent extends Component {
 
     // ── AI: compute desired move direction ──────────────────────────────────
     const desiredDir = vec3.create();
-    let speed = MOVE_SPEED;
+    let speed = this.moveSpeed;
 
     const playerPos = this.resolvePlayerPos();
-    if (playerPos !== null && vec3.dist(bodyPos, playerPos) < CHASE_RANGE) {
+    if (playerPos !== null && vec3.dist(bodyPos, playerPos) < this.chaseRange) {
       const toPlayer = vec3.subtract(vec3.create(), playerPos, bodyPos);
       toPlayer[1] = 0;
       const d = vec3.len(toPlayer);
@@ -279,32 +320,49 @@ export class SpiderControllerComponent extends Component {
     rb.setLinvel({ x: corrected.x / dt, y: corrected.y / dt, z: corrected.z / dt }, true);
 
     // ── Procedural legs ─────────────────────────────────────────────────────
-    this.updateSteps(dt, bodyPos, bodyRot, this.bodyScale);
+    // Pass the desired horizontal velocity so steps can anticipate movement.
+    const bodyVelocity = vec3.fromValues(desiredDir[0] * speed, 0, desiredDir[2] * speed);
+    this.updateSteps(dt, bodyPos, bodyRot, this.bodyScale, bodyVelocity);
     this.updateLegSegments(bodyPos, bodyRot, this.bodyScale);
   }
 
   // ─── Step system ────────────────────────────────────────────────────────────
 
-  private updateSteps(dt: number, bodyPos: vec3, bodyRot: quat, bodyScale: vec3): void {
+  private updateSteps(
+    dt: number,
+    bodyPos: vec3,
+    bodyRot: quat,
+    bodyScale: vec3,
+    velocity: vec3,
+  ): void {
     for (let i = 0; i < this.legs.length; i++) {
       const leg = this.legs[i]!;
 
+      // Decrement per-leg cooldown every frame.
+      if (leg.cooldown > 0) leg.cooldown -= dt;
+
       if (leg.stepping) {
         // Advance step arc.
-        leg.stepT = Math.min(1, leg.stepT + dt / STEP_DURATION);
+        leg.stepT = Math.min(1, leg.stepT + dt / this.stepDuration);
         const t = this.easeInOut(leg.stepT);
         vec3.lerp(leg.planted, leg.stepFrom, leg.stepTo, t);
-        leg.planted[1] += Math.sin(t * Math.PI) * STEP_HEIGHT;
+        leg.planted[1] += Math.sin(t * Math.PI) * this.stepHeight;
         if (leg.stepT >= 1.0) {
           leg.stepping = false;
           vec3.copy(leg.planted, leg.stepTo);
+          leg.cooldown = STEP_MIN_COOLDOWN;
         }
         continue;
       }
 
-      // Rest position in world space.
+      // Current body-relative rest position in world space.
       // TRS world-matrix formula: worldOff = rot * (scale ⊗ local)  (scale FIRST).
-      const restLocal = vec3.fromValues(...FOOT_REST_LOCAL[i]!);
+      const rawRest = FOOT_REST_LOCAL[i]!;
+      const restLocal = vec3.fromValues(
+        rawRest[0] * this.footSpread,
+        rawRest[1],
+        rawRest[2] * this.footSpread,
+      );
       const restScaled = vec3.multiply(vec3.create(), restLocal, bodyScale);
       const restWorld = vec3.add(
         vec3.create(),
@@ -312,22 +370,33 @@ export class SpiderControllerComponent extends Component {
         vec3.transformQuat(vec3.create(), restScaled, bodyRot),
       );
 
-      // Only snap to ground and check threshold when the foot is approaching
-      // its step trigger distance — avoids 8 raycasts/frame when idle.
-      if (vec3.dist(leg.planted, restWorld) > STEP_THRESHOLD * 0.8) {
-        const groundY = this.getGroundY(restWorld);
-        if (groundY !== null) restWorld[1] = groundY;
+      // Only run distance check (and potentially expensive raycast) when the
+      // foot is already close to the trigger radius — cheap early-out.
+      if (vec3.dist(leg.planted, restWorld) <= this.stepThreshold * 0.8) continue;
 
-        // Trigger a step if the planted foot is too far from the rest position.
-        if (vec3.dist(leg.planted, restWorld) > STEP_THRESHOLD) {
-          if (!this.isGroupStepping(STEP_GROUP[i]!)) {
-            leg.stepping = true;
-            leg.stepT = 0;
-            vec3.copy(leg.stepFrom, leg.planted);
-            vec3.copy(leg.stepTo, restWorld);
-          }
-        }
-      }
+      // Trigger a step if within cooldown, group is free, and foot is displaced.
+      if (leg.cooldown > 0) continue;
+      if (this.isGroupStepping(STEP_GROUP[i]!)) continue;
+      if (vec3.dist(leg.planted, restWorld) <= this.stepThreshold) continue;
+
+      // ── Step target: anticipate where the rest position will be once the
+      //    step animation finishes (stepDuration * stepAnticipation seconds).
+      //    This makes the foot plant *ahead* of the body when walking.
+      const anticipation = vec3.scale(
+        vec3.create(),
+        velocity,
+        this.stepDuration * this.stepAnticipation,
+      );
+      const stepTo = vec3.add(vec3.create(), restWorld, anticipation);
+
+      // Snap the anticipated landing spot to the ground.
+      const groundY = this.getGroundY(stepTo);
+      if (groundY !== null) stepTo[1] = groundY;
+
+      leg.stepping = true;
+      leg.stepT = 0;
+      vec3.copy(leg.stepFrom, leg.planted);
+      vec3.copy(leg.stepTo, stepTo);
     }
   }
 
@@ -362,15 +431,24 @@ export class SpiderControllerComponent extends Component {
         vec3.transformQuat(vec3.create(), hipScaled, bodyRot),
       );
 
-      // TODO(IK): for now, hang straight down so anchoring can be confirmed.
-      const kneeWorld = vec3.fromValues(hipWorld[0], hipWorld[1] - LEG_A, hipWorld[2]);
-      const footWorld = vec3.fromValues(hipWorld[0], hipWorld[1] - LEG_A - LEG_B, hipWorld[2]);
+      // Rotate the body-local knee hint into world space.
+      const hintLocal = vec3.fromValues(...KNEE_HINT[i]!);
+      const hintWorld = vec3.transformQuat(vec3.create(), hintLocal, bodyRot);
+
+      const footWorld = leg.planted;
+      const kneeWorld = this.solveTwoBoneIK(
+        hipWorld,
+        footWorld,
+        this.legUpperLength,
+        this.legLowerLength,
+        hintWorld,
+      );
 
       this.placeSegment(
         leg.upperTx,
         hipWorld,
         kneeWorld,
-        LEG_THICKNESS,
+        this.legThickness,
         bodyPos,
         invBodyRot,
         invBodyScale,
@@ -379,7 +457,7 @@ export class SpiderControllerComponent extends Component {
         leg.lowerTx,
         kneeWorld,
         footWorld,
-        LEG_THICKNESS,
+        this.legThickness,
         bodyPos,
         invBodyRot,
         invBodyScale,
@@ -389,12 +467,14 @@ export class SpiderControllerComponent extends Component {
 
   /**
    * Analytical 2-bone IK using the law of cosines.
-   * The knee bends outward according to KNEE_HINT[legIndex].
+   * @param root      Hip joint position (world space).
+   * @param target    Foot target position (world space).
+   * @param a         Upper leg length.
+   * @param b         Lower leg length.
+   * @param hint      World-space direction that the knee should bend toward.
    * @returns World-space knee position.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // @ts-ignore – preserved for the IK re-implementation pass
-  private solveTwoBoneIK(root: vec3, target: vec3, a: number, b: number, legIndex: number): vec3 {
+  private solveTwoBoneIK(root: vec3, target: vec3, a: number, b: number, hint: vec3): vec3 {
     const diff = vec3.subtract(vec3.create(), target, root);
     const rawDist = vec3.len(diff);
     // Clamp to reachable range.
@@ -406,15 +486,17 @@ export class SpiderControllerComponent extends Component {
     const cosA = Math.max(-1, Math.min(1, (a * a + dist * dist - b * b) / (2 * a * dist)));
     const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
 
-    // Knee bend hint: outward + upward, perpendicular to dir.
-    const hint = vec3.fromValues(...KNEE_HINT[legIndex]!);
-    vec3.normalize(hint, hint);
-    const dotHint = vec3.dot(hint, dir);
-    const perp = vec3.subtract(vec3.create(), hint, vec3.scale(vec3.create(), dir, dotHint));
+    // Compute the knee bend plane: hint projected perpendicular to dir.
+    const hintN = vec3.normalize(vec3.create(), hint);
+    const dotHint = vec3.dot(hintN, dir);
+    const perp = vec3.subtract(vec3.create(), hintN, vec3.scale(vec3.create(), dir, dotHint));
     const perpLen = vec3.len(perp);
     if (perpLen < 0.001) {
-      // Degenerate (dir parallel to hint): fallback to outward X.
-      vec3.set(perp, KNEE_HINT[legIndex]![0] > 0 ? 1 : -1, 0, 0);
+      // Degenerate: dir parallel to hint — pick a safe fallback perpendicular.
+      const fallback = Math.abs(dir[0]) < 0.9 ? vec3.fromValues(1, 0, 0) : vec3.fromValues(0, 1, 0);
+      const dot2 = vec3.dot(fallback, dir);
+      vec3.subtract(perp, fallback, vec3.scale(vec3.create(), dir, dot2));
+      vec3.normalize(perp, perp);
     } else {
       vec3.scale(perp, perp, 1 / perpLen);
     }
@@ -553,4 +635,30 @@ export class SpiderControllerComponent extends Component {
   }
 
   public renderDebug(): void {}
+
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+    if (!gui.beginWindow('Spider Controller', true)) return;
+
+    const guiManager = gui as any;
+    const folder = guiManager.folders?.get('Spider Controller');
+    if (!folder) {
+      gui.endWindow();
+      return;
+    }
+
+    folder.add(this, 'footSpread', 0.5, 3.0).step(0.05).name('Foot Spread').listen();
+    folder.add(this, 'legUpperLength', 0.1, 2.0).step(0.01).name('Leg Upper Length').listen();
+    folder.add(this, 'legLowerLength', 0.1, 2.0).step(0.01).name('Leg Lower Length').listen();
+    folder.add(this, 'legThickness', 0.01, 0.3).step(0.005).name('Leg Thickness').listen();
+    folder.add(this, 'stepThreshold', 0.1, 2.0).step(0.05).name('Step Threshold').listen();
+    folder.add(this, 'stepHeight', 0.0, 1.0).step(0.02).name('Step Height').listen();
+    folder.add(this, 'stepDuration', 0.05, 0.5).step(0.01).name('Step Duration').listen();
+    folder.add(this, 'stepAnticipation', 0.0, 3.0).step(0.1).name('Step Anticipation').listen();
+    folder.add(this, 'moveSpeed', 0.0, 10.0).step(0.1).name('Move Speed').listen();
+    folder.add(this, 'chaseRange', 1.0, 50.0).step(0.5).name('Chase Range').listen();
+
+    gui.endWindow();
+  }
 }

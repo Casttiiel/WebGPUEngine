@@ -208,17 +208,9 @@ export class GrassVolumeComponent extends Component {
   }
   renderDebug(): void {}
 
-  public override renderInMenu(): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
     if (!this.grassMaterial) return;
-
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
-
-    if (!gui.beginWindow('Grass Colors', true)) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const folder = (gui as any).folders?.get('Grass Colors');
-    if (!folder) return;
 
     const mat = this.grassMaterial;
 
@@ -238,10 +230,25 @@ export class GrassVolumeComponent extends Component {
       parseInt(hex.slice(5, 7), 16) / 255,
     ];
 
+    // If a parent entity folder is provided, add a sub-folder inside it.
+    // Otherwise fall back to opening a standalone window (legacy/direct use).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let targetFolder: any;
+    if (folder) {
+      targetFolder = folder.addFolder('Grass Colors');
+      targetFolder.close();
+    } else {
+      const gui = Engine.getGUI();
+      if (!gui.getIsVisible()) return;
+      if (!gui.beginWindow('Grass Colors', true)) return;
+      targetFolder = (gui as any).folders?.get('Grass Colors');
+      if (!targetFolder) return;
+    }
+
     // Color Bottom — stored in baseColorFactor.rgb
     const bcf = mat.getBaseColorFactor();
     const bottomObj = { color: toHex(bcf[0] ?? 0, bcf[1] ?? 0, bcf[2] ?? 0) };
-    folder
+    targetFolder
       .addColor(bottomObj, 'color')
       .name('Color Top')
       .onChange((v: string) => {
@@ -253,7 +260,7 @@ export class GrassVolumeComponent extends Component {
     const topObj = {
       color: toHex(mat.getRoughnessFactor(), mat.getMetallicFactor(), mat.getEmissiveFactor()),
     };
-    folder
+    targetFolder
       .addColor(topObj, 'color')
       .name('Color Bottom')
       .onChange((v: string) => {
@@ -263,7 +270,7 @@ export class GrassVolumeComponent extends Component {
 
     // Color Tall Zones — repurposed uvXScale / uvYScale / pomScale
     const tallObj = { color: toHex(mat.getUvXScale(), mat.getUvYScale(), mat.getPomScale()) };
-    folder
+    targetFolder
       .addColor(tallObj, 'color')
       .name('Color Tall Zones')
       .onChange((v: string) => {
@@ -276,13 +283,13 @@ export class GrassVolumeComponent extends Component {
       blendStart: mat.getAppearanceBlend(),
       blendEnd: mat.getSurfaceBlend(),
     };
-    folder
+    targetFolder
       .add(blendObj, 'blendStart', 0, 1, 0.01)
       .name('Blend Start')
       .onChange((v: number) => {
         mat.setFactors({ appearanceBlend: v });
       });
-    folder
+    targetFolder
       .add(blendObj, 'blendEnd', 0, 1, 0.01)
       .name('Blend End')
       .onChange((v: number) => {

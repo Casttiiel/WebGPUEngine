@@ -270,73 +270,22 @@ export class MotionBlurComponent extends Component {
     // Camera matrices updated in apply() before rendering
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'render';
-    const subfolderKey = 'Camera Components';
-    const componentName = 'Motion Blur';
+  private _editorFolder: any = null;
 
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
     const self = this;
+    this._editorFolder = folder.addFolder('Motion Blur');
+    this._editorFolder.close();
 
-    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
-      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
-        ...(options || {}),
-        readonly: false,
-      });
-    };
+    const blurStrWrapper = { get blurStrength() { return self._blurStrength; }, set blurStrength(v: number) { self._blurStrength = v; } };
+    const numSamplesWrapper = { get numSamples() { return self._numSamples; }, set numSamples(v: number) { self._numSamples = Math.floor(v); } };
+    const translWrapper = { get translationDampening() { return self.translationDampening; }, set translationDampening(v: number) { self.translationDampening = v; } };
 
-    // Blur strength control
-    const blurStrengthWrapper = {
-      get blurStrength() {
-        return self._blurStrength;
-      },
-      set blurStrength(value) {
-        self._blurStrength = value;
-      },
-    };
-
-    addControl(blurStrengthWrapper, 'blurStrength', `${componentName} Strength`, {
-      min: 0.0,
-      max: 2.0,
-      step: 0.05,
-    });
-
-    // Sample count control
-    const numSamplesWrapper = {
-      get numSamples() {
-        return self._numSamples;
-      },
-      set numSamples(value) {
-        self._numSamples = Math.floor(value);
-      },
-    };
-
-    addControl(numSamplesWrapper, 'numSamples', `${componentName} Sample Count`, {
-      min: 2,
-      max: 16,
-      step: 1,
-    });
-
-    // Translation dampening control
-    const translationDampeningWrapper = {
-      get translationDampening() {
-        return self.translationDampening;
-      },
-      set translationDampening(value) {
-        self.translationDampening = value;
-      },
-    };
-
-    addControl(
-      translationDampeningWrapper,
-      'translationDampening',
-      `${componentName} Translation Dampening`,
-      {
-        min: 0.0,
-        max: 1.0,
-        step: 0.05,
-      },
-    );
+    this._editorFolder.add(blurStrWrapper, 'blurStrength', 0.0, 2.0, 0.05).name('Strength').listen();
+    this._editorFolder.add(numSamplesWrapper, 'numSamples', 2, 16, 1).name('Sample Count').listen();
+    this._editorFolder.add(translWrapper, 'translationDampening', 0.0, 1.0, 0.05).name('Translation Dampening').listen();
   }
 
   public override renderDebug(): void {

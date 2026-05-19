@@ -30,6 +30,7 @@
   {
     "prefab": "lighting/spot_light.prefab"
   },
+  { "prefab": "characters/spider_enemy.prefab" },
   {
     "prefab": "effects/cube_transparent.prefab",
     "components": {
@@ -88,40 +89,6 @@
           "scale": 0.005,
           "seed": 42
         }
-      }
-    }
-  },
-  {
-    "components": {
-      "name": "GrassVolume_01",
-      "transform": {
-        "position": [0, 0, 0]
-      },
-      "grass_volume": {
-        "width": 100,
-        "depth": 100,
-        "density": 10,
-        "maxInstances": 100000,
-        "minScale": 0.1,
-        "maxScale": 0.2,
-        "material": "grass_instanced.mat",
-        "terrainName": "Terrain"
-      }
-    }
-  },
-  {
-    "prefab": "gameplay/blood_drain_source.prefab",
-    "components": {
-      "transform": {
-        "position": [0, -5.5, 3]
-      }
-    }
-  },
-  {
-    "prefab": "characters/enemy_basic.prefab",
-    "components": {
-      "transform": {
-        "position": [5, 0, 0]
       }
     }
   }

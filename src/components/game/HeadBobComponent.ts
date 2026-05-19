@@ -1,6 +1,5 @@
 import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
-import { Engine } from '../../core/engine/Engine';
 import { BasePlayerController } from './BasePlayerController';
 import { CharacterControllerComponent } from './ParkourControllerComponent';
 
@@ -128,104 +127,27 @@ export class HeadBobComponent extends Component {
     return bobOffsetWorld;
   }
 
-  public override renderInMenu(): void {
-    const debugUI = Engine.getDebugUI();
-    const parentFolder = 'game';
-    const subfolderKey = 'Head Bob';
+  private _editorFolder: any = null;
 
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
     const self = this;
+    this._editorFolder = folder.addFolder('Head Bob');
+    this._editorFolder.close();
 
-    const addControl = (object: unknown, propertyKey: string, label: string, options?: any) => {
-      debugUI.addControlToSubFolder(parentFolder, subfolderKey, object, propertyKey, label, {
-        ...(options || {}),
-        readonly: false,
-      });
+    this._editorFolder.add(this, 'enabled').name('Enabled').listen();
+
+    const p = {
+      get frequency() { return self.frequency; }, set frequency(v: number) { self.frequency = v; },
+      get verticalAmplitude() { return self.verticalAmplitude; }, set verticalAmplitude(v: number) { self.verticalAmplitude = v; },
+      get horizontalAmplitude() { return self.horizontalAmplitude; }, set horizontalAmplitude(v: number) { self.horizontalAmplitude = v; },
+      get speedThreshold() { return self.speedThreshold; }, set speedThreshold(v: number) { self.speedThreshold = v; },
     };
-
-    // Enable head bob
-    const enabledWrapper = {
-      get enabled() {
-        return self.enabled;
-      },
-      set enabled(value) {
-        self.enabled = value;
-      },
-    };
-
-    addControl(enabledWrapper, 'enabled', 'Enabled');
-
-    // Frequency
-    const frequencyWrapper = {
-      get frequency() {
-        return self.frequency;
-      },
-      set frequency(value) {
-        self.frequency = value;
-      },
-    };
-
-    addControl(frequencyWrapper, 'frequency', 'Frequency (Hz)', {
-      min: 0.5,
-      max: 5.0,
-      step: 0.1,
-    });
-
-    // Vertical amplitude
-    const verticalWrapper = {
-      get verticalAmplitude() {
-        return self.verticalAmplitude;
-      },
-      set verticalAmplitude(value) {
-        self.verticalAmplitude = value;
-      },
-    };
-
-    addControl(verticalWrapper, 'verticalAmplitude', 'Vertical Amplitude', {
-      min: 0.0,
-      max: 0.2,
-      step: 0.005,
-    });
-
-    // Horizontal amplitude
-    const horizontalWrapper = {
-      get horizontalAmplitude() {
-        return self.horizontalAmplitude;
-      },
-      set horizontalAmplitude(value) {
-        self.horizontalAmplitude = value;
-      },
-    };
-
-    addControl(horizontalWrapper, 'horizontalAmplitude', 'Horizontal Amplitude', {
-      min: 0.0,
-      max: 0.2,
-      step: 0.005,
-    });
-
-    // Speed threshold
-    const thresholdWrapper = {
-      get speedThreshold() {
-        return self.speedThreshold;
-      },
-      set speedThreshold(value) {
-        self.speedThreshold = value;
-      },
-    };
-
-    addControl(thresholdWrapper, 'speedThreshold', 'Speed Threshold', {
-      min: 0.0,
-      max: 5.0,
-      step: 0.1,
-    });
-
-    // Current timer (read-only)
-    const timerWrapper = {
-      get timer() {
-        return self.headBobTimer.toFixed(2);
-      },
-    };
-
-    addControl(timerWrapper, 'timer', 'Timer (s)', { readonly: true });
+    this._editorFolder.add(p, 'frequency', 0.5, 5.0, 0.1).name('Frequency (Hz)').listen();
+    this._editorFolder.add(p, 'verticalAmplitude', 0.0, 0.2, 0.005).name('Vertical Amplitude').listen();
+    this._editorFolder.add(p, 'horizontalAmplitude', 0.0, 0.2, 0.005).name('Horizontal Amplitude').listen();
+    this._editorFolder.add(p, 'speedThreshold', 0.0, 5.0, 0.1).name('Speed Threshold').listen();
   }
 
   public renderDebug(): void {

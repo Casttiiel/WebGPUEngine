@@ -349,4 +349,78 @@ export class PointLightComponent extends Component {
 
   public debugInMenu(): void {}
   public renderDebug(): void {}
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+
+    const p = {
+      r: this.color[0]!,
+      g: this.color[1]!,
+      b: this.color[2]!,
+      intensity: this.intensity,
+      radius: this.radius,
+      startFalloff: this.startFallof,
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const addAxisControls = (
+      parent: any,
+      obj: any,
+      key: string,
+      label: string,
+      stepRef: { v: number },
+      onChange: () => void,
+    ): void => {
+      parent.add(obj, key).step(0.001).name(label).listen().onChange(onChange);
+      parent
+        .add(
+          {
+            fn: () => {
+              obj[key] -= stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  −`);
+      parent
+        .add(
+          {
+            fn: () => {
+              obj[key] += stepRef.v;
+              onChange();
+            },
+          },
+          'fn',
+        )
+        .name(`${label}  +`);
+    };
+
+    const plFolder = folder.addFolder('Point Light');
+    plFolder.close();
+
+    const applyColor = () => this.setColor(p.r, p.g, p.b);
+    const colorStep = { v: 0.05 };
+    plFolder.add(colorStep, 'v').step(0.001).name('± Step (color)');
+    addAxisControls(plFolder, p, 'r', 'R', colorStep, applyColor);
+    addAxisControls(plFolder, p, 'g', 'G', colorStep, applyColor);
+    addAxisControls(plFolder, p, 'b', 'B', colorStep, applyColor);
+
+    const intStep = { v: 0.1 };
+    plFolder.add(intStep, 'v').step(0.001).name('± Step (intensity)');
+    addAxisControls(plFolder, p, 'intensity', 'Intensity', intStep, () =>
+      this.setIntensity(p.intensity),
+    );
+
+    const radStep = { v: 0.5 };
+    plFolder.add(radStep, 'v').step(0.001).name('± Step (radius)');
+    addAxisControls(plFolder, p, 'radius', 'Radius', radStep, () => this.setRadius(p.radius));
+
+    const fallStep = { v: 0.1 };
+    plFolder.add(fallStep, 'v').step(0.001).name('± Step (falloff)');
+    addAxisControls(plFolder, p, 'startFalloff', 'Start Falloff', fallStep, () =>
+      this.setStartFalloff(p.startFalloff),
+    );
+  }
 }
