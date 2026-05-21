@@ -1,0 +1,36 @@
+{
+  "components": {
+    "name": "PassiveBlob",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.28,
+        0.28,
+        0.28
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "sphere.obj",
+          "material": "emissive.mat"
+        }
+      ]
+    },
+    "projectile": {
+      "speed": 7,
+      "maxRange": 20,
+      "damage": 8,
+      "gravity": 1.5
+    }
+  }
+}

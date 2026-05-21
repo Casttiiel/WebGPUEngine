@@ -387,6 +387,14 @@ export class EnemyControllerComponent extends Component {
    * NavMesh branches fail gracefully (RequestPathAction returns FAILURE) so the
    * direct-movement fallback always covers scenes without a navmesh.
    */
+  /**
+   * Override in subclasses to swap the default ShootAction with custom params
+   * while keeping the full base behavior tree intact.
+   */
+  protected createShootAction(): BehaviorNode {
+    return new ShootAction();
+  }
+
   protected buildTree(): BehaviorNode {
     // ── Shared condition factories (new instance per call — BT nodes are stateful) ──
     const canSee = () =>
@@ -437,7 +445,7 @@ export class EnemyControllerComponent extends Component {
     return new Selector(
       [
         // ── 1. SHOOT (player visible) ──────────────────────────────────────
-        new Sequence([canSee(), new ShootAction()], {
+        new Sequence([canSee(), this.createShootAction()], {
           reactive: true,
         }),
 
@@ -524,7 +532,7 @@ export class EnemyControllerComponent extends Component {
     });
   }
 
-  private onDeath(): void {
+  protected onDeath(): void {
     this.dead = true;
     // Zero out the rigid body velocity so physics doesn't keep sliding the corpse.
     this.capsuleCollider?.getRigidBody().setLinvel({ x: 0, y: 0, z: 0 }, true);

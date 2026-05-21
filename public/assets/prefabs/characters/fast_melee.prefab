@@ -1,0 +1,79 @@
+{
+  "components": {
+    "name": "FastMelee",
+    "transform": {
+      "position": [0, 0.9, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.45, 1.5, 0.45]
+    },
+    "capsule_collider": {
+      "height": 1.5,
+      "radius": 0.22,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 45,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "metal.mat"
+        }
+      ]
+    },
+    "fast_melee_controller": {
+      "moveSpeed": 10,
+      "gravity": 9,
+      "acceleration": 20,
+      "turnSpeed": 360
+    },
+    "melee_attack": {
+      "attackRange": 1.5,
+      "damage": 35,
+      "cooldown": 0.5,
+      "recoveryTime": 0.5
+    },
+    "perception": {
+      "sightRadius": 25,
+      "hearRadius": 8,
+      "fovDegrees": 200,
+      "eyeHeightOffset": 0.65,
+      "checkInterval": 0.1
+    },
+    "health": {
+      "maxHp": 40
+    },
+    "blood_drain_source": {
+      "totalBlood": 55,
+      "drainRate": 45,
+      "startActive": false
+    }
+  },
+  "children": [
+    {
+      "components": {
+        "name": "ChargeTarget",
+        "transform": {
+          "position": [0, 0, 0]
+        },
+        "sphere_collider": {
+          "bodyType": "kinematic",
+          "radius": 8,
+          "mass": 0,
+          "friction": 0,
+          "restitution": 0,
+          "isSensor": true,
+          "collisionGroups": "CHARGE_TRIGGER",
+          "collisionMask": "TRIGGER_PLAYER",
+          "ignoreTransformScale": true
+        },
+        "charge_target": {}
+      }
+    }
+  ]
+}

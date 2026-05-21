@@ -36,6 +36,11 @@ import { ContactShadowsComponent } from '../../components/render/ContactShadowsC
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { WeakPointComponent } from '../../components/game/combat/WeakPointComponent';
+import { PassiveRangerController } from '../../components/game/PassiveRangerController';
+import { AggressiveRangerController } from '../../components/game/AggressiveRangerController';
+import { FastMeleeController } from '../../components/game/FastMeleeController';
+import { TankMeleeController } from '../../components/game/TankMeleeController';
+import { HeavyMixedController } from '../../components/game/HeavyMixedController';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
@@ -188,6 +193,11 @@ export class Engine {
     ChargeTargetComponent.registerMsgs();
     EnemyControllerComponent.registerMsgs();
     WeakPointComponent.registerMsgs();
+    PassiveRangerController.registerMsgs();
+    AggressiveRangerController.registerMsgs();
+    FastMeleeController.registerMsgs();
+    TankMeleeController.registerMsgs();
+    HeavyMixedController.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
   }

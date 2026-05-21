@@ -81,7 +81,10 @@ export class PerceptionComponent extends Component {
   }
 
   public override async onAttach(): Promise<void> {
-    const enemy = this.getOwner().getComponent('enemy_controller') as EnemyControllerComponent;
+    // Accept any EnemyControllerComponent subclass regardless of its component key.
+    const enemy = this.getOwner()
+      .getAllComponents()
+      .find((c) => c instanceof EnemyControllerComponent) as EnemyControllerComponent | undefined;
     if (!enemy) {
       console.error('PerceptionComponent: requires EnemyControllerComponent on the same entity!');
       return;

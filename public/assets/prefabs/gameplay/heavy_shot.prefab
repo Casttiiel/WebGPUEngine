@@ -1,0 +1,24 @@
+{
+  "components": {
+    "name": "HeavyShot",
+    "transform": {
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.18, 0.18, 0.18]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "sphere.obj",
+          "material": "emissive.mat"
+        }
+      ]
+    },
+    "projectile": {
+      "speed": 22,
+      "maxRange": 35,
+      "damage": 20,
+      "gravity": 0
+    }
+  }
+}
