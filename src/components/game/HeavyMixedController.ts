@@ -15,21 +15,21 @@ import { MsgType } from '../../types/MsgType.enum';
 import { EnemyControllerComponentDataType } from '../../types/EnemyControllerComponentData.type';
 
 // ── Internal BB keys (prefixed _hm to avoid clashes with other actions) ──────
-const K_PHASE = '_hmPhase';         // HeavyPhase
-const K_SHOTS = '_hmShots';         // number — shots fired in current burst
-const K_NEXT_FIRE = '_hmNextFire';  // number — wall-clock time of next allowed shot
-const K_PAUSE_END = '_hmPauseEnd';  // number — wall-clock time vulnerability ends
+const K_PHASE = '_hmPhase'; // HeavyPhase
+const K_SHOTS = '_hmShots'; // number — shots fired in current burst
+const K_NEXT_FIRE = '_hmNextFire'; // number — wall-clock time of next allowed shot
+const K_PAUSE_END = '_hmPauseEnd'; // number — wall-clock time vulnerability ends
 const K_BACKSTEP_END = '_hmBackstepEnd'; // number — wall-clock time backstep ends
 
 // ── Combat constants ──────────────────────────────────────────────────────────
-const MUZZLE_HEIGHT = 0.3;   // metres above rigid-body centre
-const BURST_SIZE = 3;         // shots per burst
-const BURST_FIRE_RATE = 4;    // shots / second inside a burst
-const BURST_PAUSE = 2.0;      // seconds of vulnerability between bursts
-const BACKSTEP_SPEED = 5.0;   // m/s while backstepping away from player
+const MUZZLE_HEIGHT = 0.3; // metres above rigid-body centre
+const BURST_SIZE = 3; // shots per burst
+const BURST_FIRE_RATE = 4; // shots / second inside a burst
+const BURST_PAUSE = 2.0; // seconds of vulnerability between bursts
+const BACKSTEP_SPEED = 5.0; // m/s while backstepping away from player
 const BACKSTEP_DURATION = 0.5; // seconds of backstep after melee swing
-const MELEE_RANGE = 3.0;      // metres — triggers AoE melee interrupt
-const ADVANCE_RANGE = 20;     // metres — starts advancing when player is further
+const MELEE_RANGE = 3.0; // metres — triggers AoE melee interrupt
+const ADVANCE_RANGE = 20; // metres — starts advancing when player is further
 
 type HeavyPhase = 'IDLE' | 'BURST' | 'VULNERABLE';
 
@@ -240,10 +240,9 @@ export class HeavyMixedController extends EnemyControllerComponent {
         ),
 
         // 5. RETURN HOME (NavMesh)
-        new Sequence(
-          [notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()],
-          { reactive: true },
-        ),
+        new Sequence([notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()], {
+          reactive: true,
+        }),
 
         // 6. RETURN HOME (direct fallback)
         new Sequence([notAtHome(), moveDirectlyTo('ReturnDirectly', 'spawnPosition')], {

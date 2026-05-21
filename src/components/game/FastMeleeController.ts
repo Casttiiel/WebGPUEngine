@@ -116,10 +116,9 @@ export class FastMeleeController extends EnemyControllerComponent {
         ),
 
         // 4. RETURN HOME (NavMesh)
-        new Sequence(
-          [notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()],
-          { reactive: true },
-        ),
+        new Sequence([notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()], {
+          reactive: true,
+        }),
 
         // 5. RETURN HOME (direct fallback)
         new Sequence([notAtHome(), moveDirectlyTo('ReturnDirectly', 'spawnPosition')], {

@@ -2,9 +2,21 @@
   "components": {
     "name": "TankMelee",
     "transform": {
-      "position": [0, 1.1, 0],
-      "rotation": [0, 0, 0],
-      "scale": [0.9, 2.2, 0.9]
+      "position": [
+        0,
+        1.1,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.9,
+        2.2,
+        0.9
+      ]
     },
     "capsule_collider": {
       "height": 2.2,
@@ -27,7 +39,7 @@
       ]
     },
     "tank_melee_controller": {
-      "moveSpeed": 2.0,
+      "moveSpeed": 2,
       "gravity": 9,
       "acceleration": 5,
       "turnSpeed": 120
@@ -43,7 +55,7 @@
       "sightRadius": 20,
       "hearRadius": 12,
       "fovDegrees": 160,
-      "eyeHeightOffset": 1.0,
+      "eyeHeightOffset": 1,
       "checkInterval": 0.15
     },
     "health": {
@@ -61,7 +73,11 @@
       "components": {
         "name": "WeakPoint",
         "transform": {
-          "position": [0, 1.4, -0.5]
+          "position": [
+            0,
+            1.4,
+            -0.5
+          ]
         },
         "sphere_collider": {
           "bodyType": "kinematic",
@@ -75,7 +91,7 @@
           "ignoreTransformScale": true
         },
         "weak_point": {
-          "damageMultiplier": 5.0
+          "damageMultiplier": 5
         }
       }
     },
@@ -83,7 +99,11 @@
       "components": {
         "name": "ChargeTarget",
         "transform": {
-          "position": [0, 0, 0]
+          "position": [
+            0,
+            0,
+            0
+          ]
         },
         "sphere_collider": {
           "bodyType": "kinematic",

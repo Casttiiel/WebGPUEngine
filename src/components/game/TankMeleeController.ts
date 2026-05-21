@@ -110,10 +110,9 @@ export class TankMeleeController extends EnemyControllerComponent {
         new Sequence([canSee(), advanceAndSwing], { reactive: true }),
 
         // 2. RETURN HOME (NavMesh)
-        new Sequence(
-          [notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()],
-          { reactive: true },
-        ),
+        new Sequence([notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()], {
+          reactive: true,
+        }),
 
         // 3. RETURN HOME (direct fallback)
         new Sequence([notAtHome(), moveDirectlyTo('ReturnDirectly', 'spawnPosition')], {
