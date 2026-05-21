@@ -27,10 +27,13 @@ export class HealthComponent extends Component {
   private currentHp: number = 100;
   private invincibilityTime: number = 0;
   private invincibilityTimer: number = 0;
+  /** Fraction of incoming damage absorbed (0..1). Bypassed by 'bypass_resistance' sourceTag. */
+  private damageResistance: number = 0;
 
   public load(data: HealthComponentDataType): void {
     this.maxHp = data.maxHp ?? this.maxHp;
     this.invincibilityTime = data.invincibilityTime ?? this.invincibilityTime;
+    this.damageResistance = data.damageResistance ?? 0;
     this.currentHp = this.maxHp;
   }
 
@@ -45,12 +48,19 @@ export class HealthComponent extends Component {
   public takeDamage(
     amount: number,
     instigator: import('../../core/ecs/Entity').Entity | null = null,
+    sourceTag?: string,
   ): void {
     if (amount <= 0) return;
     if (this.isDead()) return;
     if (this.invincibilityTimer > 0) return;
 
-    const actual = Math.min(amount, this.currentHp);
+    // Apply resistance unless the source explicitly bypasses it
+    const effective =
+      this.damageResistance > 0 && sourceTag !== 'bypass_resistance'
+        ? amount * (1 - this.damageResistance)
+        : amount;
+
+    const actual = Math.min(effective, this.currentHp);
     this.currentHp -= actual;
     this.invincibilityTimer = this.invincibilityTime;
     console.log(`[Health] ${this.getOwner().getName()} HP: ${this.currentHp} / ${this.maxHp}`);
@@ -108,7 +118,7 @@ export class HealthComponent extends Component {
   public static registerMsgs(): void {
     MsgDispatcher.register(MsgType.DAMAGE, 'health', (comp, msg) => {
       const payload = (msg as IMsg<TMsgDamage>).payload;
-      (comp as HealthComponent).takeDamage(payload.amount, payload.instigator);
+      (comp as HealthComponent).takeDamage(payload.amount, payload.instigator, payload.sourceTag);
     });
   }
 }

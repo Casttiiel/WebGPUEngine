@@ -30,6 +30,7 @@
     "speed_lines_vfx",
     "projectile",
     "dagger_projectile",
+    "blood_explosive_projectile",
     "bullet_pool",
     "weapon",
     "trail_renderer",

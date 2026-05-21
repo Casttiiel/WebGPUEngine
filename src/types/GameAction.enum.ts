@@ -34,6 +34,7 @@ export enum GameAction {
   ABILITY_Q = 'ability_q',
   ABILITY_E = 'ability_e',
   ABILITY_R = 'ability_r',
+  BLOOD_EXPLOSIVE = 'blood_explosive',
 
   // UI
   PAUSE = 'pause',

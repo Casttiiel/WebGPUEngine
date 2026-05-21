@@ -35,6 +35,7 @@ import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
+import { WeakPointComponent } from '../../components/game/combat/WeakPointComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
@@ -186,6 +187,7 @@ export class Engine {
     GrappleTargetComponent.registerMsgs();
     ChargeTargetComponent.registerMsgs();
     EnemyControllerComponent.registerMsgs();
+    WeakPointComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
   }

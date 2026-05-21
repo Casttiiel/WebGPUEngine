@@ -72,6 +72,10 @@ import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent
 import { HealthComponent } from '../../components/game/HealthComponent';
 import { BloodZoneComponent } from '../../components/game/combat/BloodZoneComponent';
 import { BloodBallProjectileComponent } from '../../components/game/combat/BloodBallProjectileComponent';
+import { BloodExplosiveProjectileComponent } from '../../components/game/combat/BloodExplosiveProjectileComponent';
+import { MeleeAttackComponent } from '../../components/game/combat/MeleeAttackComponent';
+import { HomingProjectileComponent } from '../../components/game/combat/HomingProjectileComponent';
+import { WeakPointComponent } from '../../components/game/combat/WeakPointComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
@@ -395,6 +399,14 @@ export class Loader {
         return new DaggerProjectileComponent();
       case 'blood_ball_projectile':
         return new BloodBallProjectileComponent();
+      case 'blood_explosive_projectile':
+        return new BloodExplosiveProjectileComponent();
+      case 'melee_attack':
+        return new MeleeAttackComponent();
+      case 'homing_projectile':
+        return new HomingProjectileComponent();
+      case 'weak_point':
+        return new WeakPointComponent();
       case 'grapple_target':
         return new GrappleTargetComponent();
       case 'charge_target':

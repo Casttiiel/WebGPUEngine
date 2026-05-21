@@ -11,6 +11,8 @@ export type ProjectileComponentData = {
   maxRange?: number;
   damage?: number;
   gravity?: number;
+  /** Optional tag forwarded in damage messages (e.g. 'blood_explosive', 'bypass_resistance'). */
+  sourceTag?: string;
 };
 
 export class ProjectileComponent extends Component {
@@ -18,6 +20,8 @@ export class ProjectileComponent extends Component {
   private maxRange: number = 200;
   public damage: number = 25;
   private gravity: number = 0;
+  /** Forwarded into Msg.damage — lets WeakPointComponent / resistance logic identify the source. */
+  public sourceTag: string | undefined = undefined;
 
   private readonly direction: vec3 = vec3.create();
   private readonly prevPosition: vec3 = vec3.create();
@@ -26,11 +30,17 @@ export class ProjectileComponent extends Component {
   /** Rigid body of the entity that fired this projectile — excluded from ray casts. */
   private shooterBody: RAPIER.RigidBody | null = null;
 
+  /** Returns the live direction vector. Subclasses may mutate it to steer the projectile. */
+  protected getDirection(): vec3 {
+    return this.direction;
+  }
+
   public load(data: ProjectileComponentData): void {
     this.speed = data.speed ?? 80;
     this.maxRange = data.maxRange ?? 200;
     this.damage = data.damage ?? 25;
     this.gravity = data.gravity ?? 0;
+    this.sourceTag = data.sourceTag;
   }
 
   /**
@@ -131,7 +141,9 @@ export class ProjectileComponent extends Component {
       const entityId = Engine.getPhysics().getEntityIdFromCollider(hit.collider.handle);
       if (entityId !== undefined) {
         const entity = Engine.getEntities().getEntityById(entityId);
-        entity?.sendMsg(Msg.damage({ amount: this.damage, instigator: null }));
+        entity?.sendMsg(
+          Msg.damage({ amount: this.damage, instigator: null, sourceTag: this.sourceTag }),
+        );
       }
     }
     this.doRelease();

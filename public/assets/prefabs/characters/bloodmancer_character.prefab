@@ -119,6 +119,23 @@
           "projectileType": "blood_ball_projectile"
         }
       }
+    },
+    {
+      "components": {
+        "name": "BloodExplosiveManager",
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "bullet_pool": {
+          "prefab": "gameplay/blood_explosive.prefab",
+          "size": 2,
+          "projectileType": "blood_explosive_projectile"
+        }
+      }
     }
   ]
 }

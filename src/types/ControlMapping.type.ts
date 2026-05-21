@@ -55,6 +55,7 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
   // Interaction
   interact: { type: InputType.KEYBOARD, key: KeyCode.E },
   ability_e: { type: InputType.MOUSE_BUTTON, button: MouseButton.MIDDLE },
+  blood_explosive: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
   use: { type: InputType.KEYBOARD, key: KeyCode.NUM_3 }, // Temporal
 
   // Camera (mouse axes)

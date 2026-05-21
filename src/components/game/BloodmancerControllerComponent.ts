@@ -15,7 +15,7 @@ import { IMovementController } from './movement/IMovementController';
 import { IMantleController } from './movement/IMantleController';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import { DaggerBurstSystem } from './combat/DaggerBurstSystem';
-import { BloodZoneSystem } from './combat/BloodZoneSystem';
+import { BloodExplosiveSystem } from './combat/BloodExplosiveSystem';
 import { ChargeSystem } from './combat/ChargeSystem';
 import { BestialitySystem } from './combat/BestialitySystem';
 import { BloodComponent } from './BloodComponent';
@@ -64,7 +64,7 @@ export class BloodmancerControllerComponent
   private jumpSystem!: JumpSystem;
   private mantleSystem!: MantleSystem;
   private daggerBurstSystem!: DaggerBurstSystem;
-  private bloodZoneSystem!: BloodZoneSystem;
+  private bloodExplosiveSystem!: BloodExplosiveSystem;
   private chargeSystem!: ChargeSystem;
   private bestialitySystem!: BestialitySystem;
 
@@ -109,8 +109,8 @@ export class BloodmancerControllerComponent
       onShotFired: () => this.bestialitySystem.onDamageDealt(),
     });
 
-    this.bloodZoneSystem = new BloodZoneSystem({
-      bloodCost: 15,
+    this.bloodExplosiveSystem = new BloodExplosiveSystem({
+      bloodCost: 20,
       getBlood: () => this.getOwner().getComponent('blood') as BloodComponent | null,
     });
 
@@ -139,7 +139,7 @@ export class BloodmancerControllerComponent
     this.mantleSystem.update();
     this.bestialitySystem.update(deltaTime);
     this.daggerBurstSystem.update(deltaTime, this.camera);
-    this.bloodZoneSystem.update(deltaTime, this.camera);
+    this.bloodExplosiveSystem.update(deltaTime, this.camera);
     this.updateBloodDrain(deltaTime);
 
     this.chargeSystem.tickRecharge(deltaTime);

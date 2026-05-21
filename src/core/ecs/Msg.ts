@@ -7,6 +7,11 @@ export interface TMsgDamage {
   amount: number;
   /** Entidad que causó el daño (puede ser null para daño ambiental). */
   instigator: Entity | null;
+  /**
+   * Optional tag identifying the damage source (e.g. 'blood_explosive', 'bypass_resistance').
+   * Used by WeakPointComponent and damageResistance logic.
+   */
+  sourceTag?: string;
 }
 
 /** Emitido por HealthComponent tras procesar el daño. */
