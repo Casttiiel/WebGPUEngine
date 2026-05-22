@@ -363,9 +363,7 @@ export class Texture extends GPUResource {
       const smallBitmap = await createImageBitmap(offscreen);
       imageBitmap.close();
 
-      const initMipCount = this.genMipmaps
-        ? Math.floor(Math.log2(Math.max(initW, initH))) + 1
-        : 1;
+      const initMipCount = this.genMipmaps ? Math.floor(Math.log2(Math.max(initW, initH))) + 1 : 1;
 
       this.texture = GPUUtils.createTextureWithMipmaps(
         `${this.label}_texture`,
