@@ -27,6 +27,44 @@ export class Texture extends GPUResource {
   // Prevents returning a registered-but-not-yet-loaded texture to concurrent callers.
   private static readonly inflight = new Map<string, Promise<Texture>>();
 
+  /**
+   * Streaming state — non-null when the texture was initially loaded at a reduced resolution
+   * (coarsest mips only) and is waiting for a full-resolution upgrade.
+   */
+  public streamingState: { isFullyLoaded: boolean; fullWidth: number; fullHeight: number } | null =
+    null;
+
+  /** True while streamFullResolution() is executing; prevents duplicate calls. */
+  private upgradePending = false;
+
+  /** Subscribers notified after the GPU texture view is replaced (e.g., after streaming). */
+  private readonly viewListeners = new Set<() => void>();
+
+  /**
+   * GPU textures superseded by a streaming upgrade, queued for destruction at the start of the
+   * next frame. Destroyed by flushPendingDestroys(), which is called by
+   * TextureStreamingManager.update() before any command-buffer recording begins. Deferring
+   * ensures that all device.queue.submit() calls referencing the old texture (via old bind
+   * groups) have already happened before the resource is freed — eliminating the
+   * "Destroyed texture used in a submit" validation error.
+   */
+  private static readonly pendingDestroy: GPUTexture[] = [];
+
+  /** Enqueue an old GPU texture for deferred destruction (called from streamFullResolution). */
+  public static deferDestroy(texture: GPUTexture): void {
+    Texture.pendingDestroy.push(texture);
+  }
+
+  /**
+   * Destroy all queued old GPU textures.
+   * Must be called at the very beginning of each frame (before any render-pass recording)
+   * so that no in-flight command buffer can still reference the resources being freed.
+   */
+  public static flushPendingDestroys(): void {
+    for (const t of Texture.pendingDestroy) t.destroy();
+    Texture.pendingDestroy.length = 0;
+  }
+
   constructor(options: TextureOptions) {
     super({
       ...options,
@@ -47,6 +85,102 @@ export class Texture extends GPUResource {
         GPUTextureUsage.COPY_DST |
         GPUTextureUsage.RENDER_ATTACHMENT |
         GPUTextureUsage.STORAGE_BINDING;
+  }
+
+  /**
+   * Subscribe to texture view changes (fired after a streaming upgrade replaces the GPU view).
+   * Returns an unsubscribe function.
+   */
+  public addViewListener(cb: () => void): () => void {
+    this.viewListeners.add(cb);
+    return () => this.viewListeners.delete(cb);
+  }
+
+  /**
+   * Returns true while the texture is loaded at reduced resolution and has not yet been
+   * upgraded to full resolution.
+   */
+  public isStreamable(): boolean {
+    return this.streamingState !== null && !this.streamingState.isFullyLoaded;
+  }
+
+  /**
+   * Asynchronously re-fetches the original image at full resolution, allocates a new GPU
+   * texture with the complete mip chain, and swaps out the low-res placeholder.
+   * Fires all registered view listeners on completion so Materials can rebuild bind groups.
+   * Never blocks the calling frame — all heavy work is done in microtasks / GPU queue.
+   */
+  public async streamFullResolution(): Promise<void> {
+    if (!this.streamingState || this.streamingState.isFullyLoaded || this.upgradePending) return;
+    this.upgradePending = true;
+    try {
+      const { fullWidth, fullHeight } = this.streamingState;
+
+      const response = await ResourceManager.fetch(`assets/textures/${this.path}`);
+      const blob = await response.blob();
+      const imageBitmap = await createImageBitmap(blob);
+
+      const mipLevelCount = this.genMipmaps
+        ? Math.floor(Math.log2(Math.max(fullWidth, fullHeight))) + 1
+        : 1;
+
+      const newGPUTexture = GPUUtils.createTextureWithMipmaps(
+        `${this.label}_texture`,
+        fullWidth,
+        fullHeight,
+        this.format,
+        this.usage,
+        mipLevelCount,
+      );
+
+      this.device.queue.copyExternalImageToTexture(
+        { source: imageBitmap },
+        { texture: newGPUTexture },
+        { width: fullWidth, height: fullHeight },
+      );
+
+      imageBitmap.close();
+
+      // Swap this.texture so generateMipmaps() operates on the new full-res texture.
+      const oldGPUTexture = this.texture;
+      this.texture = newGPUTexture;
+
+      try {
+        if (this.genMipmaps && mipLevelCount > 1) {
+          await this.generateMipmaps();
+        }
+      } catch (err) {
+        // Revert on mipmap generation failure.
+        this.texture = oldGPUTexture;
+        newGPUTexture.destroy();
+        throw err;
+      }
+
+      // Install the new full-res view.
+      this.textureView = newGPUTexture.createView({
+        label: `${this.label}_textureView`,
+        baseMipLevel: 0,
+        mipLevelCount,
+      });
+
+      this.streamingState.isFullyLoaded = true;
+
+      // Notify Materials to rebuild their bind groups. From this point, all new render
+      // commands will use the new texture view.
+      this.viewListeners.forEach((cb) => cb());
+
+      // Defer the destruction of the old placeholder until the start of the next frame.
+      // TextureStreamingManager.update() calls Texture.flushPendingDestroys() before any
+      // command-buffer recording, guaranteeing that every device.queue.submit() that could
+      // reference the old texture (via old bind groups recorded in previous frames) has
+      // already happened before the resource is freed. This is more reliable than
+      // onSubmittedWorkDone(), which only captures work queued at the exact call-site and
+      // can resolve before the current frame's submit() if execution interleaves at the
+      // wrong microtask boundary.
+      if (oldGPUTexture) Texture.deferDestroy(oldGPUTexture);
+    } finally {
+      this.upgradePending = false;
+    }
   }
 
   public static get(path: string): Texture {
@@ -205,15 +339,81 @@ export class Texture extends GPUResource {
     const response = await ResourceManager.fetch(`assets/textures/${this.path}`);
     const blob = await response.blob();
     const imageBitmap = await createImageBitmap(blob);
+    const fullWidth = imageBitmap.width;
+    const fullHeight = imageBitmap.height;
+
+    // ── Streaming: placeholder upload at reduced resolution ──────────────────
+    // Textures ≥ 128 px that are not engine placeholders are streamed:
+    // an initial 64×64 thumbnail is uploaded immediately (cheap VRAM), then
+    // TextureStreamingManager replaces it with the full-res version when the
+    // owning entity comes within range.
+    const STREAM_SKIP = new Set(['white.png', 'black.png', 'no-normal.jpg']);
+    const useStreaming = !STREAM_SKIP.has(this.path) && Math.max(fullWidth, fullHeight) >= 128;
+
+    if (useStreaming) {
+      const INITIAL_MAX_DIM = 64;
+      const scale = INITIAL_MAX_DIM / Math.max(fullWidth, fullHeight);
+      const initW = Math.max(1, Math.round(fullWidth * scale));
+      const initH = Math.max(1, Math.round(fullHeight * scale));
+
+      // Downscale via OffscreenCanvas (works with any ImageBitmap).
+      const offscreen = new OffscreenCanvas(initW, initH);
+      const ctx = offscreen.getContext('2d')!;
+      ctx.drawImage(imageBitmap, 0, 0, initW, initH);
+      const smallBitmap = await createImageBitmap(offscreen);
+      imageBitmap.close();
+
+      const initMipCount = this.genMipmaps
+        ? Math.floor(Math.log2(Math.max(initW, initH))) + 1
+        : 1;
+
+      this.texture = GPUUtils.createTextureWithMipmaps(
+        `${this.label}_texture`,
+        initW,
+        initH,
+        this.format,
+        this.usage,
+        initMipCount,
+      );
+
+      this.device.queue.copyExternalImageToTexture(
+        { source: smallBitmap },
+        { texture: this.texture },
+        { width: initW, height: initH },
+      );
+
+      if (this.genMipmaps && initMipCount > 1) {
+        await this.generateMipmaps();
+      }
+
+      smallBitmap.close();
+
+      this.textureView = this.texture.createView({
+        label: `${this.label}_textureView`,
+        baseMipLevel: 0,
+        mipLevelCount: initMipCount,
+      });
+
+      const useNearest =
+        QualitySettings.getInstance().getSettings().meshTextureFilter === 'nearest';
+      this.sampler = useNearest ? SamplerLibrary.nearestRepeat : SamplerLibrary.anisotropic16x;
+
+      // Record the full dimensions so streamFullResolution() knows the target size.
+      this.streamingState = { isFullyLoaded: false, fullWidth, fullHeight };
+      this.setHasData();
+      return;
+    }
+
+    // ── Standard (non-streaming) path ────────────────────────────────────────
     const mipLevelCount = this.genMipmaps
-      ? Math.floor(Math.log2(Math.max(imageBitmap.width, imageBitmap.height))) + 1
+      ? Math.floor(Math.log2(Math.max(fullWidth, fullHeight))) + 1
       : 1;
 
     // Create GPU texture
     this.texture = GPUUtils.createTextureWithMipmaps(
       `${this.label}_texture`,
-      imageBitmap.width,
-      imageBitmap.height,
+      fullWidth,
+      fullHeight,
       this.format,
       this.usage,
       mipLevelCount,
@@ -223,13 +423,15 @@ export class Texture extends GPUResource {
     this.device.queue.copyExternalImageToTexture(
       { source: imageBitmap },
       { texture: this.texture },
-      { width: imageBitmap.width, height: imageBitmap.height },
+      { width: fullWidth, height: fullHeight },
     );
 
     // Generate mipmaps if needed
     if (this.genMipmaps) {
       await this.generateMipmaps();
     }
+
+    imageBitmap.close();
 
     // Create view and sampler
     this.textureView = this.texture.createView({

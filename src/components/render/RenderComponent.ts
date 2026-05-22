@@ -1,6 +1,7 @@
 import { Component } from '../../core/ecs/Component';
 import { Mesh } from '../../renderer/resources/Mesh';
 import { Material } from '../../renderer/resources/Material';
+import { Texture } from '../../renderer/resources/Texture';
 import { TransformComponent } from '../core/TransformComponent';
 import {
   RenderComponentDataType,
@@ -9,6 +10,7 @@ import {
 import { MeshPartType } from '../../types/MeshPart.type';
 import { MeshData } from '../../types/MeshData.type';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
+import { TextureStreamingManager } from '../../renderer/core/managers/TextureStreamingManager';
 
 export class RenderComponent extends Component {
   private _isVisible: boolean = true;
@@ -17,6 +19,11 @@ export class RenderComponent extends Component {
   // Instancing support
   private isInstanced: boolean = false;
   private instanceGroup: string = '';
+
+  /** Cached position getter shared across all textures loaded by this component. */
+  private streamingPosGetter: (() => import('gl-matrix').vec3) | null = null;
+  /** All streamable textures registered with TextureStreamingManager (for cleanup). */
+  private streamingTextures: Texture[] = [];
 
   constructor() {
     super();
@@ -80,6 +87,23 @@ export class RenderComponent extends Component {
       };
 
       this.parts.push(meshPart);
+
+      // Register streamable textures with the streaming manager so they are
+      // upgraded to full resolution when this entity comes within range.
+      const entity = this.getOwner();
+      const tc = entity?.getComponent('transform') as TransformComponent | undefined;
+      if (tc) {
+        if (!this.streamingPosGetter) {
+          this.streamingPosGetter = () => tc.getTransform().getWorldPosition();
+        }
+        const tsm = TextureStreamingManager.getInstance();
+        for (const tex of material.getAssetTextures()) {
+          tsm.register(tex, this.streamingPosGetter);
+          if (!this.streamingTextures.includes(tex)) {
+            this.streamingTextures.push(tex);
+          }
+        }
+      }
     } catch (error) {
       console.error('Error in readMesh:', error);
       throw error;
@@ -214,6 +238,17 @@ export class RenderComponent extends Component {
 
   public override dispose(): void {
     RenderManager.getInstance().delKeys(this);
+
+    // Unregister streaming textures so the manager stops tracking them.
+    if (this.streamingPosGetter) {
+      const tsm = TextureStreamingManager.getInstance();
+      for (const tex of this.streamingTextures) {
+        tsm.unregister(tex, this.streamingPosGetter);
+      }
+    }
+    this.streamingTextures = [];
+    this.streamingPosGetter = null;
+
     this.parts = [];
   }
 

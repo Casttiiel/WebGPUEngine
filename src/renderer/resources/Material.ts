@@ -81,6 +81,8 @@ export class Material extends GPUResource {
   private uniformBuffer: GPUBuffer | undefined;
   /** Unsubscribe functions from EngineTextureRegistry — called in release(). */
   private customUnsubscribes: Array<() => void> = [];
+  /** Unsubscribe functions from Texture view-change listeners (streaming upgrades). */
+  private readonly textureViewUnsubs: Array<() => void> = [];
 
   constructor(options: MaterialOptions) {
     super({
@@ -261,6 +263,15 @@ export class Material extends GPUResource {
     }
     await Promise.all(fileLoadPromises);
 
+    // Subscribe to streaming view-change notifications for file-based textures so that
+    // the custom bind group is rebuilt whenever a streaming upgrade replaces a low-res
+    // placeholder with the full-resolution GPU texture view.  Without this, custom-slot
+    // materials would keep the old (soon-to-be-destroyed) bind group forever, causing
+    // "Destroyed texture used in a submit" validation errors every frame.
+    for (const tex of this.customSlotTextures.values()) {
+      this.textureViewUnsubs.push(tex.addViewListener(() => this.tryBuildCustomBindGroup(slots)));
+    }
+
     // 2. Create the material-factors uniform buffer (used by 'uniform' slots).
     this.customUniformBuffer = GPUUtils.createBuffer(
       `${this.label}_custom_uniform`,
@@ -390,12 +401,15 @@ export class Material extends GPUResource {
 
     bindingIndex++;
 
-    this.uniformBuffer = GPUUtils.createBuffer(
-      'material uniform buffer',
-      48,
-      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    );
-    this.writeFactorsToGPU();
+    // Create the uniform buffer only once; on subsequent calls (streaming rebuild) reuse it.
+    if (!this.uniformBuffer) {
+      this.uniformBuffer = GPUUtils.createBuffer(
+        'material uniform buffer',
+        48,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+      this.writeFactorsToGPU();
+    }
 
     entries.push({
       binding: 6,
@@ -419,6 +433,8 @@ export class Material extends GPUResource {
     // shimmering at distance caused by box-filtering encoded normal vectors.
     return Texture.getAsync(path, type === 'normal').then((texture) => {
       this.textures.set(type, texture);
+      // Subscribe so the bind group is rebuilt after a streaming upgrade.
+      this.textureViewUnsubs.push(texture.addViewListener(() => void this.createBindGroup()));
     });
   }
 
@@ -645,10 +661,24 @@ export class Material extends GPUResource {
     return clone;
   }
 
+  /**
+   * Returns all asset-based textures loaded by this material (both standard PBR and
+   * custom-slot file textures).  Used by RenderComponent to register streamable textures
+   * with TextureStreamingManager.
+   */
+  public getAssetTextures(): Texture[] {
+    const result: Texture[] = [];
+    for (const tex of this.textures.values()) result.push(tex);
+    for (const tex of this.customSlotTextures.values()) result.push(tex);
+    return result;
+  }
+
   public override release(): void {
     // Unsubscribe from all engine texture change notifications.
     for (const unsub of this.customUnsubscribes) unsub();
     this.customUnsubscribes = [];
+    // Unsubscribe from texture view-change listeners (streaming upgrades).
+    for (const unsub of this.textureViewUnsubs) unsub();
     if (this.customUniformBuffer) {
       this.customUniformBuffer.destroy();
       this.customUniformBuffer = undefined;

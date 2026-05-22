@@ -194,12 +194,12 @@ export class PerceptionComponent extends Component {
     // No hit → nothing blocked the path → player is visible
     if (hit !== null) {
       const rb = hit.collider.parent();
-      console.log(
+      /*console.log(
         `[LOS] BLOCKED  toi=${hit.timeOfImpact.toFixed(2)}m` +
           `  colliderHandle=${hit.collider.handle}` +
           `  rigidBodyType=${rb ? rb.bodyType() : 'unknown'}` +
           `  isSensor=${hit.collider.isSensor()}`,
-      );
+      );*/
     }
     return hit === null;
   }

@@ -43,6 +43,7 @@ import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclus
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { Profiler } from '../../core/debug/Profiler';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { TextureStreamingManager } from '../../renderer/core/managers/TextureStreamingManager';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -304,6 +305,9 @@ export class ModuleRender extends Module {
 
       RenderManager.getInstance().performCulling(camera);
       RenderManager.getInstance().performLightCulling(camera);
+
+      // Evaluate camera–object distances and stream in full-res mips for nearby textures.
+      TextureStreamingManager.getInstance().update(camera.getPosition());
 
       Profiler.getInstance().cpu.begin('Shadows');
       this.deferred.generateShadowMaps();
