@@ -29,7 +29,7 @@ export class AStar {
     const t = performance.now();
     const { success, path } = query.computePath(
       { x: start[0], y: start[1], z: start[2] },
-      { x: goal[0],  y: goal[1],  z: goal[2]  },
+      { x: goal[0], y: goal[1], z: goal[2] },
     );
     const dt = performance.now() - t;
     if (dt > 2) console.warn(`[AStar] slow computePath: ${dt.toFixed(2)}ms`);

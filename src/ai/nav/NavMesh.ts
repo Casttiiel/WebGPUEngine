@@ -82,7 +82,7 @@ export class NavMesh {
       for (let i = 0; i < positions.length / 3; i++) {
         const v = vec3.fromValues(positions[i * 3]!, positions[i * 3 + 1]!, positions[i * 3 + 2]!);
         vec3.transformMat4(v, v, worldMatrix);
-        finalPositions[i * 3]     = v[0];
+        finalPositions[i * 3] = v[0];
         finalPositions[i * 3 + 1] = v[1];
         finalPositions[i * 3 + 2] = v[2];
       }
@@ -92,8 +92,7 @@ export class NavMesh {
     }
 
     // Normalise to Uint32Array so the worker always receives the same type.
-    const finalIndices =
-      indices instanceof Uint32Array ? indices : new Uint32Array(indices);
+    const finalIndices = indices instanceof Uint32Array ? indices : new Uint32Array(indices);
 
     // Tear down any previously built navmesh before replacing it.
     this._navMesh?.destroy();
@@ -128,7 +127,9 @@ export class NavMesh {
     this._query = new NavMeshQuery(this._navMesh);
     console.log(`[NavMesh] importNavMesh+Query: ${(performance.now() - tImport).toFixed(1)}ms`);
     this._built = true;
-    console.log(`[NavMesh] Built (Recast/Detour) — ${triCount} source triangles, total: ${(performance.now() - t0).toFixed(1)}ms`);
+    console.log(
+      `[NavMesh] Built (Recast/Detour) — ${triCount} source triangles, total: ${(performance.now() - t0).toFixed(1)}ms`,
+    );
   }
 
   /**
