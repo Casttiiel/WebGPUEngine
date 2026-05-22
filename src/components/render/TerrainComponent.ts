@@ -16,6 +16,7 @@ import { TerrainConfig, TerrainData } from '../../core/terrain/TerrainData';
 import { TerrainMeshBuilder } from '../../core/terrain/TerrainMeshBuilder';
 import { TerrainChunkComponent } from './TerrainChunkComponent';
 import { NavMeshBuilder } from '../../ai/nav/NavMeshBuilder';
+import { NavMesh } from '../../ai/nav/NavMesh';
 
 // ---------------------------------------------------------------------------
 // JSON data shape (public/assets/scenes/*.json)
@@ -85,6 +86,11 @@ export class TerrainComponent extends Component {
     }
 
     this.buildTerrainData();
+
+    // Pre-initialise the recast-navigation WASM module NOW (during loading)
+    // so that ensureInit() resolves before gameplay starts, avoiding a
+    // ~128ms main-thread block the first time buildNavMesh() is called.
+    NavMesh.preloadWasm();
   }
 
   public override async onAttach(): Promise<void> {
@@ -363,6 +369,7 @@ export class TerrainComponent extends Component {
     // LOD 2 = quarter-resolution per chunk. Recast voxelises the mesh anyway
     // so fine input geometry is wasted; LOD 2 still captures all slope features.
     const NAV_LOD = 2;
+    const t0 = performance.now();
 
     const { chunkCountX, chunkCountZ, chunkSize } = this.terrainData.config;
 
@@ -375,6 +382,11 @@ export class TerrainComponent extends Component {
     const allPositions: number[] = [];
     const allIndices: number[] = [];
     let vertexOffset = 0;
+
+    // Yield to the main thread every YIELD_EVERY chunks so the renderer is not
+    // blocked for the entire geometry-build loop on large terrain grids.
+    const YIELD_EVERY = 4;
+    let chunksDone = 0;
 
     for (let cz = 0; cz < chunkCountZ; cz++) {
       for (let cx = 0; cx < chunkCountX; cx++) {
@@ -404,13 +416,21 @@ export class TerrainComponent extends Component {
           allIndices.push(idx + vertexOffset);
         }
         vertexOffset += vertCount;
+
+        chunksDone++;
+        if (chunksDone % YIELD_EVERY === 0) {
+          // Release the main thread so pending frames and microtasks can run.
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
       }
     }
 
+    const tGeom = performance.now();
     await NavMeshBuilder.build(new Float32Array(allPositions), new Uint32Array(allIndices));
     console.log(
-      `[TerrainComponent] NavMesh built from ${chunkCountX * chunkCountZ} terrain chunks ` +
-        `(${allIndices.length / 3} triangles).`,
+      `[TerrainComponent] NavMesh built — ${chunkCountX * chunkCountZ} chunks, ` +
+        `${allIndices.length / 3} triangles | geom: ${(tGeom - t0).toFixed(1)}ms | ` +
+        `total: ${(performance.now() - t0).toFixed(1)}ms`,
     );
   }
 

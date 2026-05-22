@@ -56,6 +56,13 @@ import { RenderComponent } from '../render/RenderComponent';
  * }
  */
 export class EnemyControllerComponent extends Component {
+  // ─── Static registry — lets SteerAction find all enemies in O(n_enemies)
+  // instead of iterating every entity in the scene.
+  private static readonly _registry = new Set<EnemyControllerComponent>();
+  public static getAll(): ReadonlySet<EnemyControllerComponent> {
+    return EnemyControllerComponent._registry;
+  }
+
   // ─── Physics ───────────────────────────────────────────────────────────────
   protected capsuleCollider!: CapsuleColliderComponent;
   protected characterController!: RAPIER.KinematicCharacterController;
@@ -178,6 +185,8 @@ export class EnemyControllerComponent extends Component {
         break;
       }
     }
+
+    EnemyControllerComponent._registry.add(this);
 
     // Clone the material so per-enemy tinting doesn't affect shared GPU data.
     const renderComp = this.getOwner().getComponent('render') as RenderComponent | null;
@@ -576,6 +585,7 @@ export class EnemyControllerComponent extends Component {
   // ─── Component boilerplate ─────────────────────────────────────────────────
 
   public override dispose(): void {
+    EnemyControllerComponent._registry.delete(this);
     this.stateEl?.remove();
     this.stateEl = null;
     this.clonedMaterial?.release();

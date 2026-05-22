@@ -2,7 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { NavMesh } from './NavMesh';
 
 /**
- * AStar — pathfinding interface backed by Recast/Detour NavMeshQuery.
+ * AStar ï¿½ pathfinding interface backed by Recast/Detour NavMeshQuery.
  *
  * Replaces the previous custom A* + string-pull implementation.
  * NavMeshQuery.computePath() uses Detour's findPath (corridor) +
@@ -26,10 +26,13 @@ export class AStar {
     const query = mesh.getQuery();
     if (!query) return null;
 
+    const t = performance.now();
     const { success, path } = query.computePath(
       { x: start[0], y: start[1], z: start[2] },
       { x: goal[0],  y: goal[1],  z: goal[2]  },
     );
+    const dt = performance.now() - t;
+    if (dt > 2) console.warn(`[AStar] slow computePath: ${dt.toFixed(2)}ms`);
 
     if (!success || !path || path.length === 0) return null;
 

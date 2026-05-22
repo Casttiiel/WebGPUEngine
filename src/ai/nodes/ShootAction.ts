@@ -195,14 +195,12 @@ export class ShootAction extends BehaviorNode {
     }
     bb.set(K_SEP_TIME, now);
 
-    const myEntity = self.getOwner();
-    for (const e of Engine.getEntities().getAllEntities()) {
-      if (e === myEntity || !e.getComponent('enemy_controller')) continue;
-      const cap = e.getComponent('capsule_collider') as CapsuleColliderComponent | null;
-      if (!cap) continue;
-      const ot = cap.getRigidBody().translation();
-      const toOtherX = ot.x - pos[0];
-      const toOtherZ = ot.z - pos[2];
+    for (const ec of EnemyControllerComponent.getAll()) {
+      if (ec === self) continue;
+      const nbPos = ec.bb.get<vec3>('position');
+      if (!nbPos) continue;
+      const toOtherX = nbPos[0] - pos[0];
+      const toOtherZ = nbPos[2] - pos[2];
       const otherDist = Math.sqrt(toOtherX * toOtherX + toOtherZ * toOtherZ);
       if (otherDist < 0.001 || otherDist > 12) continue;
       const nx = toOtherX / otherDist;

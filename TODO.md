@@ -18,6 +18,7 @@ Integrar meshoptimizer (npm, WASM oficial) en el pipeline de carga de Mesh.ts. A
 11. World Partition / Scene Streaming
 12. Editor Camera (Render Debug / Gizmo / Menu)
 13. Asset Spawn + Delete
+14. Anamorphic lens flare
 
 ## Gameplay
 

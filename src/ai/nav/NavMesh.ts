@@ -1,6 +1,7 @@
 import { vec3, mat4 } from 'gl-matrix';
-import { init, NavMesh as RecastNavMesh, NavMeshQuery } from 'recast-navigation';
-import { generateSoloNavMesh } from 'recast-navigation/generators';
+import { init, NavMesh as RecastNavMesh, NavMeshQuery, importNavMesh } from 'recast-navigation';
+import NavMeshWorkerClass from './NavMeshWorker?worker';
+import type { NavMeshWorkerInput, NavMeshWorkerOutput } from './NavMeshWorker.types';
 
 /** Cached init promise — resolves immediately if already initialised. */
 let _initPromise: Promise<void> | null = null;
@@ -36,6 +37,12 @@ export class NavMesh {
     return NavMesh._instance;
   }
 
+  public static preloadWasm(): void {
+    // Start WASM init early (during loading phase) so ensureInit() is already
+    // resolved by the time buildNavMesh() is called during gameplay.
+    ensureInit().catch((e) => console.error('[NavMesh] WASM preload failed:', e));
+  }
+
   public isBuilt(): boolean {
     return this._built;
   }
@@ -63,85 +70,96 @@ export class NavMesh {
     indices: Uint32Array | Uint16Array,
     worldMatrix?: mat4,
   ): Promise<void> {
+    const t0 = performance.now();
+    // Ensure the WASM module is ready on the main thread — needed for importNavMesh().
     await ensureInit();
+    console.log(`[NavMesh] ensureInit: ${(performance.now() - t0).toFixed(1)}ms`);
 
-    // Apply world matrix to positions if needed
+    // Apply world matrix to positions if provided (fast O(n) loop on main thread).
     let finalPositions: Float32Array;
     if (worldMatrix) {
       finalPositions = new Float32Array(positions.length);
       for (let i = 0; i < positions.length / 3; i++) {
         const v = vec3.fromValues(positions[i * 3]!, positions[i * 3 + 1]!, positions[i * 3 + 2]!);
         vec3.transformMat4(v, v, worldMatrix);
-        finalPositions[i * 3] = v[0];
+        finalPositions[i * 3]     = v[0];
         finalPositions[i * 3 + 1] = v[1];
         finalPositions[i * 3 + 2] = v[2];
       }
     } else {
-      finalPositions = positions;
+      // Copy so the transfer to the worker does not detach the caller's buffer.
+      finalPositions = new Float32Array(positions);
     }
 
-    // Build centroid list for ProbeAutoPlacement
-    this._centroids = [];
-    const triCount = Math.floor(indices.length / 3);
-    for (let i = 0; i < triCount; i++) {
-      const i0 = indices[i * 3]!;
-      const i1 = indices[i * 3 + 1]!;
-      const i2 = indices[i * 3 + 2]!;
-      this._centroids.push(
-        vec3.fromValues(
-          (finalPositions[i0 * 3]! + finalPositions[i1 * 3]! + finalPositions[i2 * 3]!) / 3,
-          (finalPositions[i0 * 3 + 1]! +
-            finalPositions[i1 * 3 + 1]! +
-            finalPositions[i2 * 3 + 1]!) /
-            3,
-          (finalPositions[i0 * 3 + 2]! +
-            finalPositions[i1 * 3 + 2]! +
-            finalPositions[i2 * 3 + 2]!) /
-            3,
-        ),
-      );
-    }
+    // Normalise to Uint32Array so the worker always receives the same type.
+    const finalIndices =
+      indices instanceof Uint32Array ? indices : new Uint32Array(indices);
 
-    // Destroy previous navmesh if any
+    // Tear down any previously built navmesh before replacing it.
     this._navMesh?.destroy();
     this._navMesh = null;
     this._query = null;
     this._built = false;
 
-    // Generate Detour navmesh using Recast voxelisation pipeline.
-    // cs=0.3m gives good path accuracy for human-scale scenes at a fraction of
-    // the voxel count vs cs=0.1 (a 256×256 terrain goes from ~6.5M to ~728K cells).
-    const { success, navMesh } = generateSoloNavMesh(
-      Array.from(finalPositions),
-      Array.from(indices),
-      {
-        cs: 0.3,
-        ch: 0.1,
-        walkableSlopeAngle: 45,
-        walkableHeight: 20, // voxels = 2.0 m / 0.1 ch
-        walkableClimb: 3, // voxels = 0.3 m / 0.1 ch
-        walkableRadius: 0, // no erosion — Rapier physics handles wall avoidance
-        maxEdgeLen: 120, // voxels
-        maxSimplificationError: 1.3,
-        minRegionArea: 2, // was 8 — tiny island regions now kept (avoids discarding thin areas)
-        mergeRegionArea: 20,
-        maxVertsPerPoly: 6,
-        detailSampleDist: 6,
-        detailSampleMaxError: 1,
-      },
-    );
+    // Offload the heavy Recast voxelisation to a worker thread so it does not
+    // freeze the renderer.  transferring the ArrayBuffers avoids a memory copy.
+    const tWorker = performance.now();
+    const result = await this.buildInWorker(finalPositions, finalIndices);
+    console.log(`[NavMesh] worker: ${(performance.now() - tWorker).toFixed(1)}ms`);
 
-    if (!success || !navMesh) {
-      console.error(
-        '[NavMesh] Recast generateSoloNavMesh failed — falling back to no pathfinding.',
-      );
+    if (!result.navmeshBytes) {
+      console.error('[NavMesh] Worker reported failure — falling back to no pathfinding.');
       return;
     }
 
-    this._navMesh = navMesh;
-    this._query = new NavMeshQuery(navMesh);
+    // Reconstruct centroid list for ProbeAutoPlacement.
+    this._centroids = [];
+    const { centroids, triCount } = result;
+    for (let i = 0; i < triCount; i++) {
+      this._centroids.push(
+        vec3.fromValues(centroids[i * 3]!, centroids[i * 3 + 1]!, centroids[i * 3 + 2]!),
+      );
+    }
+
+    // importNavMesh re-creates the Detour navmesh on the main thread from the
+    // binary blob produced by the worker.  This call is fast (no voxelisation).
+    const tImport = performance.now();
+    this._navMesh = importNavMesh(result.navmeshBytes) as RecastNavMesh;
+    this._query = new NavMeshQuery(this._navMesh);
+    console.log(`[NavMesh] importNavMesh+Query: ${(performance.now() - tImport).toFixed(1)}ms`);
     this._built = true;
-    console.log(`[NavMesh] Built (Recast/Detour) — ${triCount} source triangles`);
+    console.log(`[NavMesh] Built (Recast/Detour) — ${triCount} source triangles, total: ${(performance.now() - t0).toFixed(1)}ms`);
+  }
+
+  /**
+   * Spawns a short-lived Web Worker to run Recast voxelisation off the main thread.
+   * Transfers the input ArrayBuffers to avoid copying; they are detached in the caller
+   * after this call returns so must not be used afterwards.
+   */
+  private buildInWorker(
+    positions: Float32Array,
+    indices: Uint32Array,
+  ): Promise<Extract<NavMeshWorkerOutput, { error?: undefined }>> {
+    return new Promise((resolve, reject) => {
+      const worker = new NavMeshWorkerClass();
+
+      worker.onmessage = (e: MessageEvent<NavMeshWorkerOutput>) => {
+        worker.terminate();
+        if (e.data.error) {
+          reject(new Error(`[NavMesh worker] ${e.data.error}`));
+        } else {
+          resolve(e.data as Extract<NavMeshWorkerOutput, { error?: undefined }>);
+        }
+      };
+
+      worker.onerror = (e: ErrorEvent) => {
+        worker.terminate();
+        reject(new Error(`[NavMesh worker] ${e.message}`));
+      };
+
+      const msg: NavMeshWorkerInput = { positions, indices };
+      worker.postMessage(msg, [positions.buffer, indices.buffer]);
+    });
   }
 
   public dispose(): void {

@@ -128,6 +128,11 @@ function no404FallbackPlugin(): Plugin {
 export default defineConfig({
   base: '/WebGPUEngine/', // Ajusta esto si cambias el nombre del repo
   plugins: [wgslIncludePlugin(), no404FallbackPlugin(), wasm(), topLevelAwait()],
+  worker: {
+    // Apply the same WASM and top-level-await plugins to worker bundles so that
+    // recast-navigation's WASM module loads correctly inside NavMeshWorker.
+    plugins: () => [wasm(), topLevelAwait()],
+  },
   optimizeDeps: {
     exclude: ['@dimforge/rapier3d', 'recast-navigation'], // Excluir Rapier de la optimización de deps
   },

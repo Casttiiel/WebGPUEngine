@@ -149,14 +149,14 @@ export class SteerAction extends BehaviorNode {
     range: number,
   ): vec3[] {
     const result: vec3[] = [];
-    for (const entity of Engine.getEntities().getAllEntities()) {
-      const ec = entity.getComponent('enemy_controller') as EnemyControllerComponent | null;
-      if (!ec || ec === self) continue;
+    const r2 = range * range;
+    for (const ec of EnemyControllerComponent.getAll()) {
+      if (ec === self) continue;
       const nbPos = ec.bb.get<vec3>('position');
       if (!nbPos) continue;
       const dx = nbPos[0] - pos[0];
       const dz = nbPos[2] - pos[2];
-      if (dx * dx + dz * dz < range * range) result.push(nbPos);
+      if (dx * dx + dz * dz < r2) result.push(nbPos);
     }
     return result;
   }
@@ -168,14 +168,14 @@ export class SteerAction extends BehaviorNode {
     range: number,
   ): RVONeighbor[] {
     const result: RVONeighbor[] = [];
-    for (const entity of Engine.getEntities().getAllEntities()) {
-      const ec = entity.getComponent('enemy_controller') as EnemyControllerComponent | null;
-      if (!ec || ec === self) continue;
+    const r2 = range * range;
+    for (const ec of EnemyControllerComponent.getAll()) {
+      if (ec === self) continue;
       const nbPos = ec.bb.get<vec3>('position');
       if (!nbPos) continue;
       const dx = nbPos[0] - pos[0];
       const dz = nbPos[2] - pos[2];
-      if (dx * dx + dz * dz < range * range) {
+      if (dx * dx + dz * dz < r2) {
         result.push({ pos: nbPos, vel: ec.getCurrentHorizontal() });
       }
     }

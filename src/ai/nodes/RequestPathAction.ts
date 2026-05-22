@@ -85,21 +85,11 @@ export class RequestPathAction extends BehaviorNode {
       //console.log(`[RPA:${this.targetKey}] STALE  goalΔ=${goalDist.toFixed(2)}m → recomputing`);
     }
 
-    const f = (v: vec3) => `(${v[0].toFixed(1)},${v[2].toFixed(1)})`;
     const path = AStar.findPath(from, to);
     if (!path || path.length === 0) {
-      /*console.warn(
-        `[RPA:${this.targetKey}] FAILURE — no path ${f(from)} → ${f(to)}` +
-          `\n  ⚠ If spamming, the target is likely OUTSIDE the navmesh geometry.`,
-      );*/
       bb.delete('currentPath');
       return Status.FAILURE;
     }
-
-    const wps = path.map(f).join(' → ');
-    console.log(
-      `[RPA:${this.targetKey}] NEW PATH  ${path.length}wp  ${f(from)} → ${f(to)}\n  ${wps}`,
-    );
 
     bb.set<vec3[]>('currentPath', path);
     bb.set<vec3[]>(
