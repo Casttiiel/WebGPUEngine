@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebGPU Engine</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="/WebGPUEngine/vite.svg"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #111;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        min-height: 100vh;
+        position: relative;
+      }
+
+      #loader-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+
+      #loader-container.hidden {
+        display: none;
+      }
+
+      #loader-gif {
+        width: 80px;
+        display: block;
+      }
+
+      #loader-text {
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        color: #00ff00;
+        text-align: center;
+        text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        min-height: 20px;
+        white-space: nowrap;
+      }
+
+      #progress-bar-container {
+        width: 300px;
+        height: 24px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #00ff00;
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+      }
+
+      #progress-bar-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #00ff00, #00cc00);
+        transition: width 0.3s ease-out;
+        box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+      }
+
+      #progress-bar-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        font-weight: bold;
+        color: #00ff00;
+        text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+        z-index: 1;
+      }
+
+      #error-message {
+        margin-top: 20px;
+        padding: 15px 20px;
+        background: rgba(139, 0, 0, 0.9);
+        border: 2px solid #ff0000;
+        border-radius: 8px;
+        color: #ff6b6b;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        max-width: 500px;
+        text-align: left;
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      #error-message.hidden {
+        display: none;
+      }
+
+      #error-message strong {
+        color: #ff0000;
+        text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+      }
+
+      canvas {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated; /* Evita suavizado del navegador */
+      }
+
+      #fps-display {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-family: monospace;
+        font-size: 14px;
+        line-height: 1.4;
+        color: #00ff00;
+        background-color: rgba(0, 0, 0, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        white-space: pre;
+        pointer-events: none;
+        z-index: 1000;
+        display: none; /* Hidden by default, shown in editor mode */
+      }
+
+      #profiler-overlay {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        color: #cdd6f4;
+        background-color: rgba(17, 17, 27, 0.88);
+        padding: 10px 14px;
+        border-radius: 6px;
+        border-left: 3px solid #cba6f7;
+        white-space: pre;
+        pointer-events: none;
+        z-index: 1001;
+        display: none; /* Toggle with F3 */
+      }
+    </style>
+    <script type="module" crossorigin src="/WebGPUEngine/assets/index-D0o1kjk8.js"></script>
+  </head>
+
+  <body>
+    <div id="fps-display">FPS: 0</div>
+    <div id="profiler-overlay"></div>
+    <canvas id="gfx-canvas"></canvas>
+    <div id="loader-container">
+      <img
+        id="loader-gif"
+        src="assets/loader.gif"
+        alt="Loading..."
+      />
+      <div id="loader-text">Initializing WebGPU Engine...</div>
+      <div id="progress-bar-container">
+        <div id="progress-bar-fill"></div>
+        <div id="progress-bar-text">0%</div>
+      </div>
+      <div
+        id="error-message"
+        class="hidden"
+      ></div>
+    </div>
+  </body>
+</html>

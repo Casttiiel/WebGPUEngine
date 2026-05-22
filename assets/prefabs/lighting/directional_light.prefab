@@ -1,0 +1,16 @@
+{
+    "children": [],
+    "components": {
+      "name": "Directional Light",
+      "directional_light": {
+        "color": [1.0, 0.956, 0.878],
+        "intensity": 8,
+        "hasShadows": true,
+        "position": [10, 15, 14],
+        "target": [0, 0, 0],
+        "cascadeCount": 3,
+        "cascadeLambda": 0.6,
+        "maxShadowDistance": 100
+      }
+    }
+  }

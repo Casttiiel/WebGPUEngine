@@ -1,0 +1,11 @@
+{
+    "vs": "utility/stone_instanced.vs",
+    "fs": "utility/stone.fs",
+    "z": "less_equal_no_write",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "InstanceStorage"
+    ],
+    "writesOn": "gbuffer"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "main_menu_background",
+  "alias": "main_menu_background_root",
+  "anchor": "center",
+  "x": -405.5,
+  "y": -540,
+  "children": [
+    {
+      "name": "background",
+      "type": "image",
+      "texture": "ui/backgrounds/menu_principal.jpg",
+      "x": 0,
+      "y": 0,
+      "width": 811,
+      "height": 1080
+    }
+  ]
+}

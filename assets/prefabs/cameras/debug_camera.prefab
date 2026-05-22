@@ -1,0 +1,17 @@
+{
+    "components": {
+      "name": "DebugCamera",
+      "camera": {
+        "controllable": false,
+        "fov": 60,
+        "position": [
+          -2,
+          5,
+          2
+        ],
+        "target":[
+          -2,5,3
+        ]
+      }
+    }
+  }

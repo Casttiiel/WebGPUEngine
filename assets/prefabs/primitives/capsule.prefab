@@ -1,0 +1,41 @@
+{
+    "children": [],
+    "components": {
+      "name": "Capsule",
+      "transform": {
+        "position": [
+          0,
+          1.0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.6,
+          1.8,
+          0.6
+        ]
+      },
+      "capsule_collider": {
+        "height": 1.8,
+        "radius": 0.3,
+        "bodyType": "dynamic",
+        "lockRotationX": true,
+        "lockRotationZ": true,
+        "ignoreTransformScale": true,
+        "friction": 0.0,
+        "mass": 70.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "textured.mat"
+          }
+        ]
+      }
+    }
+  }

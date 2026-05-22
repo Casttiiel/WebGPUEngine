@@ -1,0 +1,38 @@
+{
+    "children": [],
+    "components": {
+      "name": "Emissive Cube",
+      "box_collider": {
+        "bodyType": "static",
+        "size": [2, 2, 2],
+        "mass": 1,
+        "friction": 0.3,
+        "restitution": 0.3
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "emissive.mat"
+          }
+        ]
+      }
+    }
+  }

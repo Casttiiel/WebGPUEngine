@@ -1,0 +1,13 @@
+{
+    "vs": "gbuffer/gbuffer.vs",
+    "fs": "utility/oit_gather.fs",
+    "writesOn": "oit_gather",
+    "z": "test_but_no_write",
+    "rs": "double_sided",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms",
+        "OITGlassEnv"
+    ]
+}

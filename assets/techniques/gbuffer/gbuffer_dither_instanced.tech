@@ -1,0 +1,11 @@
+{
+    "vs": "gbuffer/gbuffer_instanced.vs",
+    "fs": "gbuffer/gbuffer_dither.fs",
+    "z": "less_equal_no_write",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "InstanceStorage"
+    ],
+    "writesOn": "gbuffer"
+}

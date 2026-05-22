@@ -1,0 +1,136 @@
+[
+  {
+    "components": {
+      "name": "Sponza",
+      "transform": {
+        "rotation": [0, 90, 0]
+      }
+    },
+    "gltf": "sponza.gltf"
+  },
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "characters/bloodmancer_character.prefab"
+  },
+  {
+    "prefab": "cameras/debug_camera.prefab"
+  },
+  {
+    "prefab": "effects/particles_worldspace.prefab"
+  },
+  {
+    "prefab": "effects/water_decal.prefab"
+  },
+
+  {
+    "prefab": "lighting/point_light.prefab"
+  },
+  {
+    "prefab": "lighting/spot_light.prefab"
+  },
+  { "prefab": "characters/spider_enemy.prefab" },
+
+  {
+    "prefab": "characters/passive_ranger.prefab",
+    "components": { "transform": { "position": [6, 0, 4] } }
+  },
+  {
+    "prefab": "characters/passive_ranger.prefab",
+    "components": { "transform": { "position": [-6, 0, -4] } }
+  },
+  {
+    "prefab": "characters/passive_ranger.prefab",
+    "components": { "transform": { "position": [0, 0, 8] } }
+  },
+  {
+    "prefab": "characters/aggressive_ranger.prefab",
+    "components": { "transform": { "position": [4, 0, -6] } }
+  },
+  {
+    "prefab": "characters/aggressive_ranger.prefab",
+    "components": { "transform": { "position": [-4, 0, 6] } }
+  },
+  {
+    "prefab": "characters/fast_melee.prefab",
+    "components": { "transform": { "position": [8, 0, 0] } }
+  },
+  {
+    "prefab": "characters/fast_melee.prefab",
+    "components": { "transform": { "position": [-8, 0, 2] } }
+  },
+  {
+    "prefab": "characters/fast_melee.prefab",
+    "components": { "transform": { "position": [0, 0, -8] } }
+  },
+  {
+    "prefab": "characters/tank_melee.prefab",
+    "components": { "transform": { "position": [10, 0, 5] } }
+  },
+  {
+    "prefab": "characters/heavy_mixed.prefab",
+    "components": { "transform": { "position": [0, 0, 12] } }
+  },
+  {
+    "prefab": "effects/cube_transparent.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 3, 7],
+        "scale": [1, 1, 1]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "transform": {
+        "position": [0, 1.5, 3]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "components": {
+      "name": "FogVolumeBox",
+      "transform": {
+        "position": [0, 7, 0],
+        "scale": [1, 1, 1]
+      },
+      "fog_volume": {
+        "shape": "box",
+        "size": [5, 5, 6],
+        "density": 0.11,
+        "scatteringCoeff": 1.0,
+        "absorptionCoeff": 0.2,
+        "falloff": 3.0,
+        "blendMode": "add"
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Terrain",
+      "transform": {
+        "position": [-128, -15, -128]
+      },
+      "terrain": {
+        "totalWidth": 256,
+        "totalDepth": 256,
+        "maxHeight": 20,
+        "chunkSize": 64,
+        "vertsPerSide": 33,
+        "material": "terrain_splat.mat",
+        "noise": {
+          "octaves": 6,
+          "persistence": 0.5,
+          "lacunarity": 2.0,
+          "scale": 0.005,
+          "seed": 42
+        }
+      }
+    }
+  }
+]

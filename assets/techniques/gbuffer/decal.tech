@@ -1,0 +1,13 @@
+{
+    "vs": "gbuffer/decal.vs",
+    "fs": "gbuffer/decal.fs",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms",
+        "GBufferUniforms"
+    ],
+    "rs": "reverse_culling",
+    "z": "inverse_test_no_write",
+    "writesOn": "partial_gbuffer"
+}

@@ -1,0 +1,1 @@
+{"vs":"utility/presentation.vs","fs":"lighting/tiled_lighting.fs","writesOn":"texture","blend":"additive","z":"disable_all","uniforms":["CameraUniforms","GBufferWithAOUniforms","TiledLightData"]}

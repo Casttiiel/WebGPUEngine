@@ -1,0 +1,9 @@
+{    
+    "vs": "depth_resolve.vs",
+    "fs": "depth_resolve.fs",
+    "writesOn": "depth_only",
+    "z": "always",
+    "uniforms": [
+        "DepthTexture"
+    ]
+}

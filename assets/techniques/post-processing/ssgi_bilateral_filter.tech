@@ -1,0 +1,7 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/ssgi_bilateral_filter.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms":["CameraUniforms", "GBufferUniforms", "SingleTexture"]
+}

@@ -1,0 +1,18 @@
+{
+  "update": [
+    "environment_manager",
+    "physics",
+    "entities",
+    "camera_mixer",
+    "boot",
+    "editor_selection",
+    "game_controller",
+    "game_paused",
+    "main_menu",
+    "input",
+    "ui",
+    "render",
+    "sound"
+  ],
+  "render_debug": ["editor_selection"]
+}

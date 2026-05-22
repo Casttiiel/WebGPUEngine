@@ -1,0 +1,16 @@
+{
+    "technique": "gbuffer/gbuffer_dither.tech",
+    "textures": {
+        "txAlbedo": "white.png",
+        "txNormal": "no-normal.jpg",
+        "txMetallic": "black.png",
+        "txRoughness": "black.png",
+        "txEmissive": "black.png"
+    },
+    "baseColorFactor": [1.0, 1.0, 1.0, 0.5],
+    "roughnessFactor": 0.8,
+    "metallicFactor": 0.0,
+    "category": "solids",
+    "casts_shadows": false,
+    "shadows": false
+}

@@ -1,0 +1,15 @@
+{
+    "vs": "lighting/pbr.vs",
+    "fs": "lighting/pbr_psx.fs",
+    "fsEntryPoint": "PS_dir_lights_shadow",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferWithAOUniforms",
+        "ObjectUniforms",
+        "DirectionalLightUniforms"
+    ],
+    "blend": "additive",
+    "rs": "reverse_culling",
+    "z": "inverse_test_no_write",
+    "writesOn": "texture"
+}

@@ -1,0 +1,18 @@
+{
+    "vs": "water/water.vs",
+    "fs": "water/water_gbuffer.fs",
+    "writesOn": "gbuffer",
+    "z": "test_but_no_write",
+    "rs": "double_sided",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms"
+    ],
+    "materialSlots": [
+        { "name": "txNoise1",     "binding": 0, "type": "texture2d" },
+        { "name": "txNoise2",     "binding": 1, "type": "texture2d" },
+        { "name": "samplerState", "binding": 5, "type": "sampler",  "defaultValue": "@sampler:simpleSampler" },
+        { "name": "factors",      "binding": 6, "type": "uniform" }
+    ]
+}

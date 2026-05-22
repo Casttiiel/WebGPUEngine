@@ -1,0 +1,45 @@
+{
+  "components": {
+    "name": "BloodDrainSource",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "sphere_collider": {
+      "bodyType": "static",
+      "radius": 3,
+      "mass": 0,
+      "friction": 0,
+      "restitution": 0,
+      "isSensor": true,
+      "collisionGroups": "BLOOD_DRAIN_TRIGGER",
+      "collisionMask": "TRIGGER_PLAYER",
+      "ignoreTransformScale": true
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_sphere.obj",
+          "material": "textured.mat"
+        }
+      ]
+    },
+    "blood_drain_source": {
+      "totalBlood": 100,
+      "drainRate": 40
+    }
+  }
+}

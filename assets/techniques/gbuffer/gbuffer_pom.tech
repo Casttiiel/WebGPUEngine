@@ -1,0 +1,61 @@
+{
+  "vs": "gbuffer/gbuffer_pom.vs",
+  "fs": "gbuffer/gbuffer_pom.fs",
+  "z": "less_equal_no_write",
+  "writesOn": "gbuffer",
+  "uniforms": [
+    "CameraUniforms",
+    "MaterialTextures",
+    "ObjectUniforms"
+  ],
+  "materialSlots": [
+    {
+      "binding": 0,
+      "name": "txAlbedo",
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "binding": 1,
+      "name": "txNormal",
+      "type": "texture2d",
+      "defaultValue": "no-normal.jpg"
+    },
+    {
+      "binding": 2,
+      "name": "txMetallic",
+      "type": "texture2d",
+      "defaultValue": "black.png"
+    },
+    {
+      "binding": 3,
+      "name": "txRoughness",
+      "type": "texture2d",
+      "defaultValue": "black.png"
+    },
+    {
+      "binding": 4,
+      "name": "txEmissive",
+      "type": "texture2d",
+      "defaultValue": "black.png"
+    },
+    {
+      "binding": 5,
+      "name": "txHeight",
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "binding": 6,
+      "name": "samplerState",
+      "type": "sampler",
+      "defaultValue": "@sampler:anisotropic16x"
+    },
+    {
+      "binding": 7,
+      "name": "factors",
+      "type": "uniform",
+      "defaultValue": null
+    }
+  ]
+}

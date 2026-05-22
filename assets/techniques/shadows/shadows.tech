@@ -1,0 +1,11 @@
+{
+    "vs": "shadows/shadows.vs",
+    "writesOn": "depth_only",
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms"
+    ],
+    "rs": "shadows",
+    "z": "shadows"
+}

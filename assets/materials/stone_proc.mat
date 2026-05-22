@@ -1,0 +1,15 @@
+{
+    "technique": "gbuffer/gbuffer_stone_proc.tech",
+    "textures": {
+        "txAlbedo":    "black.png",
+        "txNormal":    "black.png",
+        "txMetallic":  "black.png",
+        "txRoughness": "black.png",
+        "txEmissive":  "black.png"
+    },
+    "casts_shadows": true,
+    "uvXScale": 3.0,
+    "uvYScale": 3.0,
+    "category": "solids",
+    "shadows": false
+}

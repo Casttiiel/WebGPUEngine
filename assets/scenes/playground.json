@@ -1,0 +1,118 @@
+[
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "characters/knight_character.prefab"
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Idle",
+      "transform": {
+        "position": [0, 0, 50],
+        "rotation": [0, 0, 0],
+        "scale": [1, 1, 1]
+      },
+      "skinned_mesh": {
+        "gltf": "idle.gltf",
+        "animation": 0,
+        "loop": true,
+        "playbackSpeed": 1.0,
+        "extraAnimations": ["Kick.gltf"],
+        "autoPlayInterval": {
+          "clip": "Kick",
+          "intervalSeconds": 7,
+          "blendTime": 0.2
+        }
+      }
+    }
+  },
+  {
+    "prefab": "cameras/debug_camera.prefab"
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "prefab": "primitives/ground.prefab"
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Mantle Wall Sample",
+      "transform": {
+        "position": [0, 1.0, 7],
+        "rotation": [0, 0, 0],
+        "scale": [4, 2.5, 4.7]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Wall Height Sample",
+      "transform": {
+        "position": [-8, 2.0, 7],
+        "rotation": [0, 0, 0],
+        "scale": [4, 4.0, 0.7]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "children": [],
+    "components": {
+      "name": "Vault",
+      "transform": {
+        "position": [8, 0.5, 7],
+        "rotation": [0, 0, 0],
+        "scale": [4, 1.0, 0.7]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "mass": 1,
+        "friction": 1.3,
+        "restitution": 0.0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  }
+]

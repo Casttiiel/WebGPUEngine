@@ -1,0 +1,32 @@
+{
+  "children": [],
+  "components": {
+    "name": "GrassBlade",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "grass_blade.obj",
+          "material": "grass.mat",
+          "visible": true
+        }
+      ]
+    }
+  }
+}

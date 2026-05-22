@@ -1,0 +1,10 @@
+{    
+    "vs": "lighting/skybox.vs",
+    "fs": "lighting/skybox.fs",
+    "writesOn": "texture",
+    "z": "test_equal",
+    "uniforms": [
+        "CameraUniforms",
+        "SkyboxUniforms"
+    ]
+}

@@ -1,0 +1,18 @@
+{
+  "components": {
+    "name": "DashTrigger",
+    "transform": {
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [2, 2, 2]
+    },
+    "sphere_collider": {
+      "bodyType": "static",
+      "colliderType": "sphere",
+      "radius": 1,
+      "isSensor": true,
+      "collisionGroups": "DASH_TRIGGER",
+      "collisionMask": "PLAYER"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/tone_mapping.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms":["SingleTexture", "AutoExposureRead"]
+}

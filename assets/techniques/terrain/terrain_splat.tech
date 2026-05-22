@@ -1,0 +1,91 @@
+{
+  "vs": "gbuffer/terrain_splat.vs",
+  "fs": "gbuffer/terrain_splat.fs",
+  "z": "less_equal_no_write",
+  "rs": "double_sided",
+  "writesOn": "gbuffer",
+  "uniforms": [
+    "CameraUniforms",
+    "MaterialTextures",
+    "ObjectUniforms"
+  ],
+  "materialSlots": [
+    {
+      "name": "txSplat",
+      "binding": 0,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer0Alb",
+      "binding": 1,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer0Nrm",
+      "binding": 2,
+      "type": "texture2d",
+      "defaultValue": "no-normal.jpg"
+    },
+    {
+      "name": "txLayer1Alb",
+      "binding": 3,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer1Nrm",
+      "binding": 4,
+      "type": "texture2d",
+      "defaultValue": "no-normal.jpg"
+    },
+    {
+      "name": "txLayer2Alb",
+      "binding": 5,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer2Nrm",
+      "binding": 6,
+      "type": "texture2d",
+      "defaultValue": "no-normal.jpg"
+    },
+    {
+      "name": "txChunkNormal",
+      "binding": 7,
+      "type": "texture2d",
+      "defaultValue": "no-normal.jpg"
+    },
+    {
+      "name": "txLayer0Rgh",
+      "binding": 10,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer1Rgh",
+      "binding": 11,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "txLayer2Rgh",
+      "binding": 12,
+      "type": "texture2d",
+      "defaultValue": "white.png"
+    },
+    {
+      "name": "samplerState",
+      "binding": 8,
+      "type": "sampler",
+      "defaultValue": "@sampler:anisotropic16x"
+    },
+    {
+      "name": "factors",
+      "binding": 9,
+      "type": "uniform"
+    }
+  ]
+}

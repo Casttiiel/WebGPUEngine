@@ -1,0 +1,12 @@
+{
+  "vs": "utility/presentation.vs",
+  "fs": "post-processing/god_rays_volumetric.fs",
+  "writesOn": "mask",
+  "z": "disable_all",
+  "uniforms": [
+    "CameraUniforms",
+    "GBufferUniforms",
+    "GodRaysVolumetricCSM",
+    "GodRaysUniforms"
+  ]
+}

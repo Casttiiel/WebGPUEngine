@@ -1,0 +1,80 @@
+{
+  "name": "test_ui",
+  "widgets": [
+    {
+      "type": "image",
+      "name": "background",
+      "alias": "bg",
+      "position": [0.5, 0.5],
+      "size": [1.0, 1.0],
+      "imageParams": {
+        "texture": "textures/ui/backgrounds/panel.png",
+        "size": { "x": 512, "y": 512 },
+        "color": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 }
+      }
+    },
+    {
+      "type": "button",
+      "name": "play_button",
+      "alias": "btn_play",
+      "position": [0.5, 0.6],
+      "size": [0.2, 0.08],
+      "states": {
+        "normal": {
+          "imageParams": {
+            "texture": "textures/ui/buttons/button_normal.png",
+            "size": { "x": 256, "y": 64 },
+            "color": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 }
+          },
+          "textParams": {
+            "text": "PLAY",
+            "size": 32,
+            "color": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 }
+          }
+        },
+        "hover": {
+          "imageParams": {
+            "texture": "textures/ui/buttons/button_hover.png",
+            "size": { "x": 256, "y": 64 },
+            "color": { "r": 1.2, "g": 1.2, "b": 1.0, "a": 1.0 }
+          },
+          "textParams": {
+            "text": "PLAY",
+            "size": 32,
+            "color": { "r": 1.0, "g": 1.0, "b": 0.8, "a": 1.0 }
+          }
+        },
+        "pressed": {
+          "imageParams": {
+            "texture": "textures/ui/buttons/button_pressed.png",
+            "size": { "x": 256, "y": 64 },
+            "color": { "r": 0.8, "g": 0.8, "b": 0.8, "a": 1.0 }
+          },
+          "textParams": {
+            "text": "PLAY",
+            "size": 32,
+            "color": { "r": 0.9, "g": 0.9, "b": 0.9, "a": 1.0 }
+          }
+        }
+      },
+      "initialState": "normal"
+    },
+    {
+      "type": "progress",
+      "name": "health_bar",
+      "alias": "hp_bar",
+      "position": [0.1, 0.9],
+      "size": [0.3, 0.05],
+      "imageParams": {
+        "texture": "textures/ui/backgrounds/bar_background.png",
+        "size": { "x": 256, "y": 32 }
+      },
+      "progressParams": {
+        "barTexture": "textures/ui/backgrounds/bar_fill.png",
+        "min": 0.0,
+        "max": 100.0,
+        "value": 75.0
+      }
+    }
+  ]
+}

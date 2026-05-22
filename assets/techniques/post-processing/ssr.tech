@@ -1,0 +1,11 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "post-processing/ssr.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferUniforms",
+        "SSRUniforms"
+    ]
+}

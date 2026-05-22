@@ -1,0 +1,14 @@
+{
+    "technique": "gbuffer_triplanar_world.tech",
+    "textures":{
+        "txAlbedo": "Carbon01_Color.png",
+        "txNormal": "Carbon01_Normal.png",
+        "txMetallic": "Carbon01_Metallic.png",
+        "txRoughness": "Carbon01_Roughness.png",
+        "txEmissive": "black.png"
+    },
+    "casts_shadows": true,
+    "uvXScale": 1.0,
+    "category": "solids",
+    "shadows": false
+}

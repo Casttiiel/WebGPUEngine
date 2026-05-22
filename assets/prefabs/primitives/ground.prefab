@@ -1,0 +1,40 @@
+{
+  "children": [],
+  "components": {
+    "name": "Ground",
+    "transform": {
+      "position": [
+        0,
+        -0.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        100,
+        1,
+        100
+      ]
+    },
+    "box_collider": {
+      "bodyType": "static",
+      "size": [
+        1,
+        1,
+        1
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "stone.mat",
+          "visible": true
+        }
+      ]
+    }
+  }
+}

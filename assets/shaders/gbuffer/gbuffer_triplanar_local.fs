@@ -1,0 +1,342 @@
+struct CameraUniforms {
+    // All matrices first for better memory layout
+    viewMatrix: mat4x4<f32>,
+    projectionMatrix: mat4x4<f32>,
+    invViewProjection: mat4x4<f32>,
+    invProjection: mat4x4<f32>,
+    invView: mat4x4<f32>,
+    // Scalar data after matrices
+    cameraPosition: vec4<f32>,
+    screenSize: vec2<f32>,
+    time: f32,
+    timeDelta: f32,
+    cameraFront: vec3<f32>,
+    cameraFar: f32,
+    // Sub-pixel jitter offset in UV space: (pattern - 0.5) / screenSize
+    // Used by GBuffer shaders to unjitter texture UVs and prevent TAA-induced texture blur.
+    // Multiply by screenSize to get pixel-space offsets.
+    jitterOffset: vec2<f32>,
+    // Jitter offset from the previous frame (UV space). Used by TAA to remove
+    // the jitter contribution from static-geometry motion vectors.
+    prevJitterOffset: vec2<f32>,
+    // Negative mip bias applied to all GBuffer texture samples when camera jitter is
+    // active (TAA enabled).  Value = -0.5 → one half mip sharper per frame; the TAA
+    // accumulation then converges to a result that is net-sharper than no jitter.
+    // Reads 0.0 when jitter is disabled so non-TAA paths are unaffected.
+    mipBias: f32,
+    _pad_mip: f32,  // align to vec2 boundary
+    // Projection matrix WITHOUT jitter — used by SSR viewToScreen() to project 3D hits
+    // into stable screen UVs without relying on manual jitter-offset sign arithmetic.
+    // Uploading the pre-built matrix avoids any sign convention confusion.
+    unjitteredProjectionMatrix: mat4x4<f32>,
+    // Integer frame counter stored as f32 (offset 114 = byte 456).
+    // Incremented by 1 each frame. Used with golden-ratio increment for
+    // quasi-Monte Carlo temporal sample patterns (IGN, blue noise, etc.).
+    frameIndex: f32,
+}
+
+struct OldCameraUniforms {
+    viewMatrix: mat4x4<f32>,
+    projectionMatrix: mat4x4<f32>,
+}
+
+struct ObjectUniforms {
+    modelMatrix:         mat4x4<f32>, // current world matrix  (offset   0, 64 bytes)
+    previousModelMatrix: mat4x4<f32>, // previous-frame world  (offset  64, 64 bytes)
+}
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) @interpolate(perspective, centroid) N: vec3<f32>,
+    @location(1) @interpolate(perspective, centroid) Uv: vec2<f32>,
+    @location(2) @interpolate(perspective, centroid) WorldPos: vec3<f32>,
+    @location(3) @interpolate(perspective, centroid) T: vec4<f32>,
+}
+
+struct VertexOutputTriplanarLocal {
+    @builtin(position) position: vec4<f32>,
+
+    @location(0) @interpolate(perspective, centroid) localNormal: vec3<f32>,
+    @location(1) @interpolate(perspective, centroid) localPos: vec3<f32>,
+    @location(2) @interpolate(perspective, centroid) worldPos: vec3<f32>,
+
+    // Normal matrix como 3 columnas (col0, col1, col2)
+    @location(3) @interpolate(perspective, centroid) normalMatrix0: vec3<f32>,
+    @location(4) @interpolate(perspective, centroid) normalMatrix1: vec3<f32>,
+    @location(5) @interpolate(perspective, centroid) normalMatrix2: vec3<f32>,
+}
+
+struct ShadowsVertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) @interpolate(perspective, centroid) worldPos: vec3<f32>,
+}
+
+struct FragmentOutput {
+    @location(0) albedo: vec4<f32>,     // RGB: albedo, A: metallic
+    @location(1) normal: vec4<f32>,     // RG: octahedral normal, BA: roughness + emissive
+    @location(2) depth: f32,      // Linear depth (view space)
+}
+
+struct GBuffer {
+    worldPos: vec3<f32>,
+    normal: vec3<f32>,
+    albedo: vec3<f32>,
+    specularColor: vec3<f32>,
+    roughness: f32,
+    selfIllum: vec3<f32>,
+    emissive: f32,
+    reflectedDir: vec3<f32>,
+    viewDir: vec3<f32>,
+    metallic: f32,
+    zlinear: f32,
+}
+
+struct MaterialFactors {
+    baseColorFactor: vec4<f32>,
+    roughnessFactor: f32,
+    metallicFactor: f32,
+    emissiveFactor: f32,
+    appearanceBlend: f32,  // decal: blend weight for albedo+normal (1=full, 0=no change)
+    uvXScale: f32,
+    uvYScale: f32,
+    surfaceBlend: f32,     // decal: blend weight for roughness+metallic (1=full, 0=no change)
+    pomScale: f32          // POM height scale (0 = disabled, typical 0.01-0.1)
+}
+
+struct SSRUniforms {
+    globalAmbientBoost: f32,
+    stepSize: f32,
+    maxSteps: f32,
+    maxDistance: f32,
+    thickness: f32,
+    enabled: f32,
+    specularBoost: f32,
+    diffuseBoost: f32,
+    metallicMin: f32,
+    roughnessMax: f32,
+    temporalMode: f32,  // 1.0 = TAA active (halve march steps), 0.0 = standalone
+    frameIndex: f32,    // incremented each frame — drives blue-noise temporal animation
+}
+// Matrix utility functions
+// Level 1: No dependencies
+
+// Extract 3x3 rotation/scale from 4x4 transformation matrix
+fn get3x3From4x4(mat: mat4x4<f32>) -> mat3x3<f32> {
+    return mat3x3<f32>(
+        mat[0].xyz,
+        mat[1].xyz,
+        mat[2].xyz
+    );
+}
+
+// Compute TBN (Tangent-Bitangent-Normal) matrix for normal mapping
+fn computeTBN(inputN: vec3<f32>, inputT: vec4<f32>) -> mat3x3<f32> {
+    let N = inputN;
+    let T = inputT.xyz;
+    let B = cross(N, T) * inputT.w;
+    return mat3x3<f32>(T, B, N);
+}
+
+fn sign_nonzero_f(v: f32) -> f32 {
+    return select(-1.0, 1.0, v >= 0.0);
+}
+
+
+
+fn encodeOctahedral(n: vec3<f32>) -> vec2<f32> {
+    // Proyección octahedral: divide por la norma L1
+    var p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z));
+    // Wrap para hemisferio negativo Z
+    if (n.z < 0.0) {
+        p = (1.0 - abs(p.yx)) * sign_nonzero(p);
+    }
+    return p;  // rango [-1, 1]
+}
+
+fn decodeOctahedral(p: vec2<f32>) -> vec3<f32> {
+    var n = vec3<f32>(p.x, p.y, 1.0 - abs(p.x) - abs(p.y));
+    if (n.z < 0.0) {
+        let tmp = n.xy;
+        n.x = (1.0 - abs(tmp.y)) * sign_nonzero_f(tmp.x);
+        n.y = (1.0 - abs(tmp.x)) * sign_nonzero_f(tmp.y);
+    }
+    return normalize(n);
+}
+
+// sign que devuelve +1 cuando x=0 (necesario para el wrap)
+fn sign_nonzero(v: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(
+        select(-1.0, 1.0, v.x >= 0.0),
+        select(-1.0, 1.0, v.y >= 0.0)
+    );
+}
+
+fn normalToOctahedral01(n: vec3<f32>) -> vec2<f32> {
+    return encodeOctahedral(n) * 0.5 + 0.5;
+}
+
+fn octahedral01ToNormal(enc: vec2<f32>) -> vec3<f32> {
+    return decodeOctahedral(enc * 2.0 - 1.0);
+}
+
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+@group(1) @binding(0) var txAlbedo: texture_2d<f32>;
+@group(1) @binding(1) var txNormal: texture_2d<f32>;
+@group(1) @binding(2) var txMetallic: texture_2d<f32>;
+@group(1) @binding(3) var txRoughness: texture_2d<f32>;
+@group(1) @binding(4) var txEmissive: texture_2d<f32>;
+@group(1) @binding(5) var samplerState: sampler;
+@group(1) @binding(6) var<uniform> factors: MaterialFactors;
+
+
+fn triplanarSample(
+    tex: texture_2d<f32>,
+    smp: sampler,
+    localPos: vec3<f32>,
+    blend: vec3<f32>,
+    scale: f32
+) -> vec4<f32> {
+    let xProj = textureSampleBias(tex, smp, localPos.yz * scale, camera.mipBias);
+    let yProj = textureSampleBias(tex, smp, localPos.xz * scale, camera.mipBias);
+    let zProj = textureSampleBias(tex, smp, localPos.xy * scale, camera.mipBias);
+
+    return xProj * blend.x + yProj * blend.y + zProj * blend.z;
+}
+
+fn triplanarBlendWeights(n: vec3<f32>) -> vec3<f32> {
+    let an = abs(n);
+    let w = an / (an.x + an.y + an.z);
+    return w;
+}
+
+fn triplanarNormal(
+    tex: texture_2d<f32>,
+    smp: sampler,
+    localPos: vec3<f32>,
+    blend: vec3<f32>,
+    scale: f32
+) -> vec3<f32> {
+    // Leer los 3 normales proyectados
+    let nX = textureSampleBias(tex, smp, localPos.yz * scale, camera.mipBias).xyz * 2.0 - 1.0;
+    let nY = textureSampleBias(tex, smp, localPos.xz * scale, camera.mipBias).xyz * 2.0 - 1.0;
+    let nZ = textureSampleBias(tex, smp, localPos.xy * scale, camera.mipBias).xyz * 2.0 - 1.0;
+
+    // Asignar los ejes correctos (son "normales en espacio de proyección")
+    let nx = vec3<f32>(nX.z, nX.x, nX.y);
+    let ny = vec3<f32>(nY.x, nY.z, nY.y);
+    let nz = vec3<f32>(nZ.x, nZ.y, nZ.z);
+
+    // Combinar
+    let n = normalize(nx * blend.x + ny * blend.y + nz * blend.z);
+    return n;
+}
+
+@fragment
+fn fs(input: VertexOutput) -> FragmentOutput {
+    // === TRIPLANAR CON ROTACIÓN PERO SIN ESCALA ===
+    // Queremos que la textura rote con la mesh pero mantenga tamaño constante
+    // independientemente de la escala del objeto
+    
+    // Calcular la escala del objeto comparando world vs local
+    let localPos = input.Pos;
+    let worldPos = input.WorldPos;
+    
+    // Extraer solo la rotación eliminando la escala
+    // Esto se logra normalizando cada eje de la transformación
+    let scaleX = length(vec3<f32>(worldPos.x - localPos.x * 0.0, 0.0, 0.0));
+    let scaleY = length(vec3<f32>(0.0, worldPos.y - localPos.y * 0.0, 0.0));
+    let scaleZ = length(vec3<f32>(0.0, 0.0, worldPos.z - localPos.z * 0.0));
+    
+    // Método más robusto: calcular escala promedio desde las normales
+    // Las normales están normalizadas, así que al transformarlas perdemos info de escala
+    // Usamos la diferencia entre world y local dividida por local
+    let localLen = length(localPos);
+    let worldLen = length(worldPos);
+    let avgScale = select(1.0, worldLen / localLen, localLen > 0.001);
+    
+    // Posición rotada pero sin escala
+    let rotatedPos = worldPos / avgScale;
+    
+    let Nw = normalize(input.N);
+    let blend = triplanarBlendWeights(Nw);
+
+    // factors.uvXScale controla directamente el tiling de la textura
+    let scale = factors.uvXScale;
+
+    // Albedo (color)
+    let albedo_color = triplanarSample(
+        txAlbedo,
+        samplerState,
+        rotatedPos,
+        blend,
+        scale
+    );
+
+    // Metallic (solo canal B)
+    let metallic_value = triplanarSample(
+        txMetallic,
+        samplerState,
+        rotatedPos,
+        blend,
+        scale
+    ).b;
+
+    // Roughness (solo canal G)
+    let roughness_value = triplanarSample(
+        txRoughness,
+        samplerState,
+        rotatedPos,
+        blend,
+        scale
+    ).g;
+
+    // Emissive (canal R)
+    let emissive_value = triplanarSample(
+        txEmissive,
+        samplerState,
+        rotatedPos,
+        blend,
+        scale
+    ).r;
+
+    // Normal (en espacio rotado)
+    let N = triplanarNormal(
+        txNormal,
+        samplerState,
+        rotatedPos,
+        blend,
+        scale
+    );
+
+    // === Empaquetado de normal + roughness ===
+    let encodedNormal = normalToOctahedral01(N);
+
+    var output: FragmentOutput;
+
+    // Linearize sRGB albedo before applying factor (same as gbuffer.fs)
+    let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
+    output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
+    output.albedo.a = metallic_value * factors.metallicFactor;
+
+    // Specular Anti-Aliasing (same as gbuffer.fs)
+    let dndx          = dpdx(N);
+    let dndy          = dpdy(N);
+    let variance      = dot(dndx, dndx) + dot(dndy, dndy);
+    let kernelRough2  = min(2.0 * variance * 0.25, 0.18);
+    let roughness_raw = roughness_value * factors.roughnessFactor;
+    let rough2        = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
+    let roughness     = sqrt(rough2);
+
+    output.normal = vec4<f32>(
+        encodedNormal.x,
+        encodedNormal.y,
+        roughness,
+        emissive_value * factors.emissiveFactor
+    );
+
+    let camb2obj = input.WorldPos - camera.cameraPosition.xyz;
+    let linear_depth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
+    output.depth = linear_depth;
+
+    return output;
+}
