@@ -366,6 +366,16 @@ export class TerrainComponent extends Component {
    * combined geometry into NavMeshBuilder (Recast/Detour).
    */
   private async buildNavMesh(): Promise<void> {
+    // If the scene already loaded a GLTF navmesh (extras.type === "navmesh" node),
+    // skip the terrain build — the scene navmesh covers the actual walkable areas
+    // (e.g. sponza building at Y≈0) and the terrain is often underground / outside.
+    // Overwriting it would give enemies a navmesh whose polygons are far from them,
+    // making every findNearestPoly call dereference a null Detour ptr → freeze.
+    if (NavMesh.getInstance().isBuilt()) {
+      console.log('[Terrain] Scene navmesh already present — skipping terrain navmesh build.');
+      return;
+    }
+
     // LOD 2 = quarter-resolution per chunk. Recast voxelises the mesh anyway
     // so fine input geometry is wasted; LOD 2 still captures all slope features.
     const NAV_LOD = 2;

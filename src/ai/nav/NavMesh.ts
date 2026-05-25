@@ -123,8 +123,12 @@ export class NavMesh {
 
     // importNavMesh re-creates the Detour navmesh on the main thread from the
     // binary blob produced by the worker.  This call is fast (no voxelisation).
+    // NOTE: importNavMesh() returns { navMesh } — destructure to get the actual
+    // NavMesh instance; passing the wrapper object to NavMeshQuery gives it a
+    // null .raw pointer which corrupts every subsequent Detour query.
     const tImport = performance.now();
-    this._navMesh = importNavMesh(result.navmeshBytes) as RecastNavMesh;
+    const { navMesh: importedNavMesh } = importNavMesh(result.navmeshBytes);
+    this._navMesh = importedNavMesh;
     this._query = new NavMeshQuery(this._navMesh);
     console.log(`[NavMesh] importNavMesh+Query: ${(performance.now() - tImport).toFixed(1)}ms`);
     this._built = true;
