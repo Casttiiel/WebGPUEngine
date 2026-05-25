@@ -69,6 +69,7 @@ export class NavMesh {
     positions: Float32Array,
     indices: Uint32Array | Uint16Array,
     worldMatrix?: mat4,
+    recastOverrides?: { cs?: number; ch?: number },
   ): Promise<void> {
     const t0 = performance.now();
     // Ensure the WASM module is ready on the main thread — needed for importNavMesh().
@@ -103,7 +104,7 @@ export class NavMesh {
     // Offload the heavy Recast voxelisation to a worker thread so it does not
     // freeze the renderer.  transferring the ArrayBuffers avoids a memory copy.
     const tWorker = performance.now();
-    const result = await this.buildInWorker(finalPositions, finalIndices);
+    const result = await this.buildInWorker(finalPositions, finalIndices, recastOverrides);
     console.log(`[NavMesh] worker: ${(performance.now() - tWorker).toFixed(1)}ms`);
 
     if (!result.navmeshBytes) {
@@ -140,6 +141,7 @@ export class NavMesh {
   private buildInWorker(
     positions: Float32Array,
     indices: Uint32Array,
+    recastOverrides?: { cs?: number; ch?: number },
   ): Promise<Extract<NavMeshWorkerOutput, { error?: undefined }>> {
     return new Promise((resolve, reject) => {
       const worker = new NavMeshWorkerClass();
@@ -159,6 +161,7 @@ export class NavMesh {
       };
 
       const msg: NavMeshWorkerInput = { positions, indices };
+      if (recastOverrides) msg.recastOverrides = recastOverrides;
       worker.postMessage(msg, [positions.buffer, indices.buffer]);
     });
   }

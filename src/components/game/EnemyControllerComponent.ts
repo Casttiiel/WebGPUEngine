@@ -112,6 +112,12 @@ export class EnemyControllerComponent extends Component {
   private slowTimer: number = 0;
   /** Speed multiplier applied while slowTimer > 0 (set by BloodZoneComponent). */
   private slowFactor: number = 1.0;
+  /** Accumulates time to throttle ground-check raycasts to 20 Hz. */
+  private _groundTimer: number = 0;
+
+  // Pre-allocated colour arrays reused every frame — avoids per-frame GC pressure.
+  private static readonly _COLOR_NORMAL: [number, number, number, number] = [1, 1, 1, 1];
+  private static readonly _COLOR_CHARGEABLE: [number, number, number, number] = [1, 0.9, 0.1, 1];
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -221,8 +227,12 @@ export class EnemyControllerComponent extends Component {
     // 1b. Smooth rotation — advance currentYaw toward desiredYaw at turnSpeed.
     this.applyTurnStep(deltaTime);
 
-    // 2. Ground detection
-    this.updateGroundedState();
+    // 2. Ground detection — throttled to 20 Hz to save RAPIER raycasts.
+    this._groundTimer += deltaTime;
+    if (this._groundTimer >= 0.05) {
+      this._groundTimer = 0;
+      this.updateGroundedState();
+    }
     this.bb.set('isGrounded', this.isGrounded);
 
     // 3. Gravity
@@ -257,15 +267,15 @@ export class EnemyControllerComponent extends Component {
     } else {
       newState = 'IDLE';
     }
-    if (newState !== this.currentState) {
-      const pos = this.capsuleCollider.getRigidBody().translation();
-      const target = this.bb.get<vec3>('playerPosition');
-      console.log(
-        `[AI] ${this.currentState} → ${newState}` +
-          `  enemyPos=(${pos.x.toFixed(1)},${pos.z.toFixed(1)})` +
-          (target ? `  lastKnown=(${target[0].toFixed(1)},${target[2].toFixed(1)})` : ''),
-      );
-    }
+    // if (newState !== this.currentState) {
+    //   const pos = this.capsuleCollider.getRigidBody().translation();
+    //   const target = this.bb.get<vec3>('playerPosition');
+    //   console.log(
+    //     `[AI] ${this.currentState} → ${newState}` +
+    //       `  enemyPos=(${pos.x.toFixed(1)},${pos.z.toFixed(1)})` +
+    //       (target ? `  lastKnown=(${target[0].toFixed(1)},${target[2].toFixed(1)})` : ''),
+    //   );
+    // }
     this.currentState = newState;
     if (this.stateEl) this.stateEl.textContent = `AI: ${this.currentState}`;
 
@@ -283,7 +293,9 @@ export class EnemyControllerComponent extends Component {
     if (this.clonedMaterial) {
       const chargeable = this.isChargeableByPlayer();
       this.clonedMaterial.setFactors({
-        baseColorFactor: chargeable ? [1, 0.9, 0.1, 1] : [1, 1, 1, 1],
+        baseColorFactor: chargeable
+          ? EnemyControllerComponent._COLOR_CHARGEABLE
+          : EnemyControllerComponent._COLOR_NORMAL,
       });
     }
   }

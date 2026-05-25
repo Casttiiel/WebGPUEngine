@@ -11,6 +11,15 @@ import { NavMesh } from '../nav/NavMesh';
 const REUSE_DISTANCE = 0.5;
 
 /**
+ * Minimum milliseconds between path recomputations for the same node.
+ * Prevents multiple enemies from calling AStar.findPath() in the same frame
+ * when the player moves (cache-miss thundering herd → multi-ms spike).
+ * Each RequestPathAction instance also adds random jitter on construction to
+ * ensure different enemies stagger their recomputations across time.
+ */
+const RECOMPUTE_COOLDOWN_MS = 300;
+
+/**
  * Don't request a navmesh path when already within arrival range.
  * Returning FAILURE here lets the direct-movement fallback sequence handle
  * close-range pursuit cleanly, and prevents the 60x/sec Detour-call spam
@@ -42,11 +51,19 @@ export class RequestPathAction extends BehaviorNode {
   private readonly cacheKey: string;
   private readonly pathKey: string;
 
+  /**
+   * Earliest time (ms, performance.now()) at which this node is allowed to
+   * call AStar.findPath() again. Initialised with random jitter so that
+   * enemies that spawn together don't all recompute in the same frame.
+   */
+  private _nextComputeMs: number;
+
   constructor(targetKey = 'playerPosition', label?: string) {
     super(label ?? `RequestPath(${targetKey})`);
     this.targetKey = targetKey;
     this.cacheKey = `_lastPathGoal_${targetKey}`;
     this.pathKey = `_savedPath_${targetKey}`;
+    this._nextComputeMs = performance.now() + Math.random() * RECOMPUTE_COOLDOWN_MS;
   }
 
   public tick(bb: Blackboard): Status {
@@ -84,6 +101,27 @@ export class RequestPathAction extends BehaviorNode {
 
       //console.log(`[RPA:${this.targetKey}] STALE  goalΔ=${goalDist.toFixed(2)}m → recomputing`);
     }
+
+    // Throttle: if the cooldown hasn't expired yet, keep following the
+    // existing or saved path rather than calling into WASM this frame.
+    // This prevents multiple enemies from calling AStar.findPath() in the
+    // same frame when the player moves past the REUSE_DISTANCE threshold.
+    const nowMs = performance.now();
+    if (nowMs < this._nextComputeMs) {
+      const currentPath = bb.get<vec3[]>('currentPath');
+      if (currentPath && currentPath.length > 0) return Status.SUCCESS;
+      const saved = bb.get<vec3[]>(this.pathKey);
+      if (saved && saved.length > 0) {
+        bb.set(
+          'currentPath',
+          saved.map((v) => vec3.clone(v)),
+        );
+        bb.set('_pathIndex', 1);
+        return Status.SUCCESS;
+      }
+      return Status.FAILURE; // no path to reuse yet — let Selector fall through to direct movement
+    }
+    this._nextComputeMs = nowMs + RECOMPUTE_COOLDOWN_MS;
 
     const path = AStar.findPath(from, to);
     if (!path || path.length === 0) {

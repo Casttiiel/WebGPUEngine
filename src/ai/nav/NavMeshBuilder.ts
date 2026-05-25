@@ -17,7 +17,8 @@ export class NavMeshBuilder {
     positions: Float32Array,
     indices: Uint32Array | Uint16Array,
     worldMatrix?: mat4,
+    recastOverrides?: { cs?: number; ch?: number },
   ): Promise<void> {
-    await NavMesh.getInstance().build(positions, indices, worldMatrix);
+    await NavMesh.getInstance().build(positions, indices, worldMatrix, recastOverrides);
   }
 }

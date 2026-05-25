@@ -426,7 +426,18 @@ export class TerrainComponent extends Component {
     }
 
     const tGeom = performance.now();
-    await NavMeshBuilder.build(new Float32Array(allPositions), new Uint32Array(allIndices));
+    // Use coarser voxelisation for terrain (cs:1.5, ch:0.3) — the default cs:0.3 on a
+    // 256×256 terrain creates ~730 000 voxel cells which can freeze the worker for 30+ s.
+    // At cs:1.5 the grid is ~29 000 cells: still ample precision for outdoor AI navigation.
+    await NavMeshBuilder.build(
+      new Float32Array(allPositions),
+      new Uint32Array(allIndices),
+      undefined,
+      {
+        cs: 1.5,
+        ch: 0.3,
+      },
+    );
     console.log(
       `[TerrainComponent] NavMesh built — ${chunkCountX * chunkCountZ} chunks, ` +
         `${allIndices.length / 3} triangles | geom: ${(tGeom - t0).toFixed(1)}ms | ` +

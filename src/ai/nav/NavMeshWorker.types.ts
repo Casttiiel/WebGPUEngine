@@ -2,6 +2,11 @@
 export interface NavMeshWorkerInput {
   positions: Float32Array;
   indices: Uint32Array;
+  /** Override individual Recast config values (e.g. cs/ch for large terrains). */
+  recastOverrides?: {
+    cs?: number;
+    ch?: number;
+  };
 }
 
 /** Successful result from the NavMesh worker. */

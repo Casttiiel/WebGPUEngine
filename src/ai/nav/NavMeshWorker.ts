@@ -29,7 +29,11 @@ const RECAST_CONFIG = {
 };
 
 self.onmessage = async (e: MessageEvent<NavMeshWorkerInput>): Promise<void> => {
-  const { positions, indices } = e.data;
+  const { positions, indices, recastOverrides } = e.data;
+
+  // Merge caller overrides into the base config so each call-site can tune
+  // cs/ch without changing the shared default (e.g. terrain uses larger cells).
+  const config = recastOverrides ? { ...RECAST_CONFIG, ...recastOverrides } : RECAST_CONFIG;
 
   try {
     // Initialise Recast/Detour WASM inside the worker.
@@ -53,7 +57,7 @@ self.onmessage = async (e: MessageEvent<NavMeshWorkerInput>): Promise<void> => {
     // Heavy Recast voxelisation — runs in the worker so the main thread stays free.
     // TypedArrays implement ArrayLike<number> so no Array.from() conversion needed.
     const tRecast = performance.now();
-    const { success, navMesh } = generateSoloNavMesh(positions, indices, RECAST_CONFIG);
+    const { success, navMesh } = generateSoloNavMesh(positions, indices, config);
     console.log(
       `[NavMeshWorker] generateSoloNavMesh: ${(performance.now() - tRecast).toFixed(1)}ms`,
     );
