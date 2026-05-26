@@ -43,4 +43,6 @@ export type CharacterControllerComponentDataType = {
 
   wallKickDetectionDistance?: number; // Distance ahead to detect a kickable wall in units (default: 0.8)
   wallKickInputDisableTime?: number; // Time to disable input after wall kick in seconds (default: 0.15)
+
+  maxAirJumps?: number; // Extra jumps allowed while airborne (0 = no double jump, default: 0)
 };

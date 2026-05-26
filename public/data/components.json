@@ -46,6 +46,7 @@
     "arcane_knight_controller",
     "bloodmancer_controller",
     "parkour_controller",
+    "lynx_controller",
     "grapple_target",
     "charge_target",
     "skinned_mesh",

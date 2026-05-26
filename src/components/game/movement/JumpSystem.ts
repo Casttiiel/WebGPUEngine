@@ -23,6 +23,9 @@ export class JumpSystem {
   private timeSinceGrounded: number = 0.0;
   private wallRunGravity: number = -2.0;
 
+  private maxAirJumps: number = 0;
+  private airJumpsUsed: number = 0;
+
   constructor(
     private controller: IMovementController,
     private _modifiers: PlayerModifiersComponent | null,
@@ -36,6 +39,7 @@ export class JumpSystem {
     this.jumpCutVerticalVelocityLimit =
       data.jumpCutVerticalVelocityLimit ?? this.jumpCutVerticalVelocityLimit;
     this.wallRunGravity = data.wallRunGravity ?? this.wallRunGravity;
+    this.maxAirJumps = data.maxAirJumps ?? 0;
 
     this.calculatePhysicsConstants();
   }
@@ -90,16 +94,26 @@ export class JumpSystem {
       !this.controller.getIsJumping() &&
       (this.timeSinceGrounded <= this.coyoteTime || this.controller.getIsGrounded());
 
-    // Update coyote time
+    // Update coyote time and air-jump counter reset
     if (this.controller.getIsGrounded() && !this.controller.getIsJumping()) {
       this.timeSinceGrounded = 0.0;
+      this.airJumpsUsed = 0;
     } else {
       this.timeSinceGrounded += deltaTime;
     }
 
+    const canAirJump =
+      this.maxAirJumps > 0 &&
+      !this.controller.getIsGrounded() &&
+      this.airJumpsUsed < this.maxAirJumps;
+
     // Detectar inicio del salto
     if (input.isActionBuffered(GameAction.JUMP) && canGroundJump) {
       input.consumeBufferedAction(GameAction.JUMP);
+      this.applyJump(this.jumpVelocity);
+    } else if (input.isActionBuffered(GameAction.JUMP) && canAirJump) {
+      input.consumeBufferedAction(GameAction.JUMP);
+      this.airJumpsUsed++;
       this.applyJump(this.jumpVelocity);
     } else if (
       this.controller.getIsJumping() &&

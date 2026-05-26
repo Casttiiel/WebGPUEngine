@@ -12,7 +12,7 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/bloodmancer_character.prefab"
+    "prefab": "characters/lynx_character.prefab"
   },
   {
     "prefab": "cameras/debug_camera.prefab"
@@ -29,48 +29,6 @@
   },
   {
     "prefab": "lighting/spot_light.prefab"
-  },
-  { "prefab": "characters/spider_enemy.prefab" },
-
-  {
-    "prefab": "characters/passive_ranger.prefab",
-    "components": { "transform": { "position": [6, 0, 4] } }
-  },
-  {
-    "prefab": "characters/passive_ranger.prefab",
-    "components": { "transform": { "position": [-6, 0, -4] } }
-  },
-  {
-    "prefab": "characters/passive_ranger.prefab",
-    "components": { "transform": { "position": [0, 0, 8] } }
-  },
-  {
-    "prefab": "characters/aggressive_ranger.prefab",
-    "components": { "transform": { "position": [4, 0, -6] } }
-  },
-  {
-    "prefab": "characters/aggressive_ranger.prefab",
-    "components": { "transform": { "position": [-4, 0, 6] } }
-  },
-  {
-    "prefab": "characters/fast_melee.prefab",
-    "components": { "transform": { "position": [8, 0, 0] } }
-  },
-  {
-    "prefab": "characters/fast_melee.prefab",
-    "components": { "transform": { "position": [-8, 0, 2] } }
-  },
-  {
-    "prefab": "characters/fast_melee.prefab",
-    "components": { "transform": { "position": [0, 0, -8] } }
-  },
-  {
-    "prefab": "characters/tank_melee.prefab",
-    "components": { "transform": { "position": [10, 0, 5] } }
-  },
-  {
-    "prefab": "characters/heavy_mixed.prefab",
-    "components": { "transform": { "position": [0, 0, 12] } }
   },
   {
     "prefab": "effects/cube_transparent.prefab",
