@@ -1,29 +1,29 @@
 {
   "children": [],
   "components": {
-    "name": "Water Decal",
+    "name": "Blood Decal",
     "transform": {
       "position": [
         0,
-        -5,
+        0,
         0
       ],
       "rotation": [
         0,
-        90,
+        0,
         0
       ],
       "scale": [
-        40,
-        4,
-        10
+        1,
+        1,
+        1
       ]
     },
     "render": {
       "meshes": [
         {
           "mesh": "unit_cube.obj",
-          "material": "multiface_decal.mat"
+          "material": "simple_decal.mat"
         }
       ]
     }
