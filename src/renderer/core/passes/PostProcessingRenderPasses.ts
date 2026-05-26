@@ -590,3 +590,35 @@ export class LensFlareCompositeRenderPass extends PostProcessingRenderPass {
     pass.setBindGroup(2, this.paramsBindGroup);
   }
 }
+
+/**
+ * Radiance Cascades composite render pass.
+ * Additively blends the GI contribution (pre-computed by rc_apply.cs) onto rtAccLight.
+ * group(0) = CameraUniforms, group(1) = giResult + sampler (SingleTexture).
+ */
+export class RCCompositeRenderPass extends PostProcessingRenderPass {
+  private giBindGroup: GPUBindGroup;
+  private rcParamsBindGroup: GPUBindGroup;
+
+  constructor(
+    config: RenderPassConfig,
+    mesh: Mesh,
+    technique: Technique,
+    giBindGroup: GPUBindGroup,
+    rcParamsBindGroup: GPUBindGroup,
+  ) {
+    super(config, mesh, technique);
+    this.giBindGroup = giBindGroup;
+    this.rcParamsBindGroup = rcParamsBindGroup;
+  }
+
+  protected setBindGroups(pass: GPURenderPassEncoder): void {
+    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(1, this.giBindGroup);
+    pass.setBindGroup(2, this.rcParamsBindGroup);
+  }
+
+  public updateGIBindGroup(bindGroup: GPUBindGroup): void {
+    this.giBindGroup = bindGroup;
+  }
+}

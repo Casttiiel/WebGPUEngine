@@ -22,7 +22,7 @@ import { PointLightComponent } from '../../../components/render/PointLightCompon
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
-import { ScreenSpaceGlobalIllumination } from '../../shading/ScreenSpaceGlobalIllumination';
+import { RadianceCascades } from '../../shading/RadianceCascades';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { HZBBuilder } from '../culling/HZBBuilder';
@@ -38,8 +38,8 @@ export class DeferredRenderer {
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
 
+  private rc!: RadianceCascades;
   private froxelVolumetrics!: FroxelVolumetricScattering;
-  private ssgi!: ScreenSpaceGlobalIllumination;
   private depthPrepass!: DepthPrepass;
   private gBufferPass!: GBufferPass;
   private hzbBuilder!: HZBBuilder;
@@ -149,7 +149,7 @@ export class DeferredRenderer {
       width,
       height,
       QualitySettings.getInstance().getSettings().hdrTexture,
-      GPUTextureUsage.COPY_SRC,
+      GPUTextureUsage.COPY_SRC | GPUTextureUsage.STORAGE_BINDING,
     );
 
     // Create OIT render targets
@@ -365,7 +365,7 @@ export class DeferredRenderer {
     );
 
     this.ssr.dispose();
-    this.ssgi?.resize();
+    this.rc?.resize();
 
     // Create OIT compose bind group (accumulation + revealage → resolve over accLight)
     const oitLayout = BindGroupFactory.getLayoutFromEnum(
@@ -393,8 +393,8 @@ export class DeferredRenderer {
     this.ssr = new ScreenSpaceReflections();
     await this.ssr.load();
 
-    this.ssgi = new ScreenSpaceGlobalIllumination();
-    await this.ssgi.load();
+    this.rc = new RadianceCascades();
+    await this.rc.load();
 
     this.froxelVolumetrics = new FroxelVolumetricScattering();
     await this.froxelVolumetrics.load();
@@ -539,12 +539,9 @@ export class DeferredRenderer {
     this.csResult = this.renderContactShadows(camera);
     this.renderAccLight();
 
-    // 3b. Screen-Space Global Illumination — indirect diffuse, composited additively onto accLight
-    if (QualitySettings.getInstance().getSettings().enableSSGI) {
-      const ssgiView = this.ssgi?.render(this.gBufferBindGroup);
-      if (ssgiView) {
-        this.ssgi.composite(this.rtAccLight.getView(), this.gBufferBindGroup);
-      }
+    // 3b. Radiance Cascades — indirect diffuse GI, composited additively onto rtAccLight
+    if (QualitySettings.getInstance().getSettings().enableRC) {
+      this.rc?.render(this.gBufferComputeBindGroup, this.rtAccLight, this.renderPassManager);
     }
 
     // 4. Water hybrid pass ───────────────────────────────────────────────────
@@ -777,6 +774,7 @@ export class DeferredRenderer {
   public renderPostProcessingMenu(folder: any): void {
     this.froxelVolumetrics.renderInMenu(folder);
     this.ssr.renderInMenu(folder);
+    this.rc?.renderInMenu(folder);
   }
 
   public resetSSRResources(): void {
@@ -965,7 +963,7 @@ export class DeferredRenderer {
 
     this.hzbBuilder?.dispose();
 
-    this.ssgi?.dispose();
+    this.rc?.dispose();
     this.proceduralSkyCubemap?.dispose();
     this.proceduralSkyCubemap = null;
     this.gBufferBindGroup = null as any;

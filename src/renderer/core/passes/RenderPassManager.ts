@@ -29,6 +29,7 @@ import {
   GodRaysVolumetricRenderPass,
   LensFlareOcclusionRenderPass,
   LensFlareCompositeRenderPass,
+  RCCompositeRenderPass,
 } from './PostProcessingRenderPasses';
 import { FullScreenPass } from './BaseRenderPass';
 import { RenderPassFactory } from './RenderPassFactory';
@@ -393,58 +394,6 @@ export class RenderPassManager {
     this.executeDynamicPass(pass);
   }
 
-  public executeSSGIBilateralFilterPass(
-    mesh: Mesh,
-    technique: Technique,
-    gBufferBindGroup: GPUBindGroup,
-    aoBindGroup: GPUBindGroup,
-    result: RenderTarget,
-  ): void {
-    const scale = QualitySettings.getInstance().getSettings().ssgiScale;
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(
-      result,
-      {
-        width: Render.width * scale,
-        height: Render.height * scale,
-      },
-      'SSGI Bilateral Filter',
-    );
-    const pass = new AOBilateralFilterRenderPass(
-      passConfig,
-      mesh,
-      technique,
-      gBufferBindGroup,
-      aoBindGroup,
-    );
-    this.executeDynamicPass(pass);
-  }
-
-  /**
-   * Composites filtered SSGI irradiance × albedo additively onto accLight.
-   * Uses loadOp:'load' so the additive blend state on the technique adds on top of existing lighting.
-   */
-  public executeSSGICompositePass(
-    mesh: Mesh,
-    technique: Technique,
-    gBufferBindGroup: GPUBindGroup,
-    ssgiBindGroup: GPUBindGroup,
-    accLightView: GPUTextureView,
-  ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
-      accLightView,
-      undefined,
-      'SSGI Composite',
-    );
-    const pass = new AOBilateralFilterRenderPass(
-      passConfig,
-      mesh,
-      technique,
-      gBufferBindGroup,
-      ssgiBindGroup,
-    );
-    this.executeDynamicPass(pass);
-  }
-
   /**
    * Create and execute a motion blur pass dynamically
    */
@@ -692,6 +641,27 @@ export class RenderPassManager {
       occlusionBindGroup,
       paramsBindGroup,
     );
+    this.executeDynamicPass(pass);
+  }
+
+  /**
+   * Additively composites the Radiance Cascades GI result onto the HDR accumulation buffer.
+   * Executes the rc_composite technique with additive blend (loadOp: 'load', ONE+ONE).
+   * group(0) = CameraUniforms, group(1) = giResult + sampler.
+   */
+  public executeRCCompositePass(
+    mesh: Mesh,
+    technique: Technique,
+    hdrView: GPUTextureView,
+    giBindGroup: GPUBindGroup,
+    rcParamsBindGroup: GPUBindGroup,
+  ): void {
+    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
+      hdrView,
+      undefined,
+      'RC Composite',
+    );
+    const pass = new RCCompositeRenderPass(passConfig, mesh, technique, giBindGroup, rcParamsBindGroup);
     this.executeDynamicPass(pass);
   }
 

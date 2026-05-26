@@ -746,6 +746,72 @@ export class BindGroupFactory {
     ]);
   }
 
+  // ── Radiance Cascades layouts ─────────────────────────────────────────────
+
+  /**
+   * group(2) for rc_trace.cs:
+   *   b0 = RCParams uniform
+   *   b1 = rtAccLight (texture_2d, sampled)
+   *   b2 = irradianceCubemap (texture_cube)
+   *   b3 = envSampler
+   *   b4 = historyRT (texture_2d, sampled)
+   */
+  public static getRCTraceGroup2Layout(): GPUBindGroupLayout {
+    return this.getLayout('rc_trace_group2', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { viewDimension: 'cube', sampleType: 'float', multisampled: false },
+      },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+    ]);
+  }
+
+  /**
+   * group(1) for rc_merge.cs:
+   *   b0 = RCParams uniform
+   *   b1 = c_fine (texture_2d, sampled)
+   *   b2 = c_coarse (texture_2d, sampled)
+   *   b3 = samplerRC (filtering sampler)
+   */
+  public static getRCMergeGroup1Layout(): GPUBindGroupLayout {
+    return this.getLayout('rc_merge_group1', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+    ]);
+  }
+
+  /**
+   * group(2) for rc_apply.cs:
+   *   b0 = RCParams uniform
+   *   b1 = cascade0 merged result (texture_2d, sampled)
+   *   b2 = samplerRC (filtering sampler)
+   */
+  public static getRCApplyGroup2Layout(): GPUBindGroupLayout {
+    return this.getLayout('rc_apply_group2', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+    ]);
+  }
+
+  /**
+   * group(2) for rc_composite.fs:
+   *   b0 = RCParams uniform (only giIntensity slot is read)
+   */
+  public static getRCCompositeParamsLayout(): GPUBindGroupLayout {
+    return this.getLayout('rc_composite_params', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+    ]);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   /**
    * Create bind group layout for froxel parameters only (no camera)
    */

@@ -23,8 +23,9 @@ export interface GraphicsQualitySettings {
   ssrStepSize: number;
   ssrMaxSteps: number;
   directionalShadowMapResolution: number;
-  ssgiScale: number;
-  enableSSGI: boolean;
+  enableRC: boolean;
+  rcCascadeCount: 3 | 4;
+  rcBaseRange: number;
   useKTX2: boolean;
   meshTextureFilter: 'trilinear' | 'nearest';
   ditheringMode: 'off' | 'psx';
@@ -61,8 +62,9 @@ export class QualitySettings {
       ssrStepSize: 0.3,
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 256,
-      ssgiScale: 0.25,
-      enableSSGI: false,
+      enableRC: false,
+      rcCascadeCount: 3,
+      rcBaseRange: 0.5,
       enableMotionBlur: false,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -93,8 +95,9 @@ export class QualitySettings {
       ssrStepSize: 0.3,
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 512,
-      ssgiScale: 0.25,
-      enableSSGI: false,
+      enableRC: false,
+      rcCascadeCount: 3,
+      rcBaseRange: 0.5,
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -125,8 +128,9 @@ export class QualitySettings {
       ssrStepSize: 0.3,
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 1024,
-      ssgiScale: 0.25,
-      enableSSGI: false,
+      enableRC: true,
+      rcCascadeCount: 3,
+      rcBaseRange: 0.5,
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -157,8 +161,9 @@ export class QualitySettings {
       ssrStepSize: 0.3,
       ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 2048,
-      ssgiScale: 0.25,
-      enableSSGI: false,
+      enableRC: true,
+      rcCascadeCount: 4,
+      rcBaseRange: 0.5,
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',
@@ -193,8 +198,6 @@ export class QualitySettings {
       aoRadius: 0.1,
       aoStrength: 3.0,
       aoSliceCount: 0.01,
-      ssgiScale: 0.25,
-      enableSSGI: false,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
       linearDepthTexture: 'r16float',
@@ -205,6 +208,9 @@ export class QualitySettings {
       ssrStepSize: 0.05,
       ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
+      enableRC: true,
+      rcCascadeCount: 4,
+      rcBaseRange: 0.5,
       enableMotionBlur: true,
       useKTX2: false,
       meshTextureFilter: 'trilinear',

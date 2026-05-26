@@ -1,0 +1,12 @@
+{
+  "vs": "utility/presentation.vs",
+  "fs": "rc/rc_composite.fs",
+  "writesOn": "texture",
+  "blend": "additive",
+  "z": "disable_all",
+  "uniforms": [
+    "CameraUniforms",
+    "SingleTexture",
+    "BufferUniform"
+  ]
+}
