@@ -47,6 +47,7 @@
     "bloodmancer_controller",
     "parkour_controller",
     "lynx_controller",
+    "dummy_enemy_controller",
     "grapple_target",
     "charge_target",
     "skinned_mesh",

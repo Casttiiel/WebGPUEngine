@@ -1,0 +1,42 @@
+{
+  "components": {
+    "name": "DummyEnemy",
+    "transform": {
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "scale": [
+        0.6,
+        1.8,
+        0.6
+      ]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 70,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "stone.mat"
+        }
+      ]
+    },
+    "dummy_enemy_controller": {},
+    "health": {
+      "maxHp": 99999
+    }
+  }
+}

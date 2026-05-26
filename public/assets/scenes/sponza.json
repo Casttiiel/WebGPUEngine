@@ -51,6 +51,24 @@
     "prefab": "lighting/directional_light.prefab"
   },
   {
+    "prefab": "characters/dummy_enemy.prefab",
+    "components": {
+      "transform": { "position": [0, 0.9, -4] }
+    }
+  },
+  {
+    "prefab": "characters/dummy_enemy.prefab",
+    "components": {
+      "transform": { "position": [2, 0.9, -6] }
+    }
+  },
+  {
+    "prefab": "characters/dummy_enemy.prefab",
+    "components": {
+      "transform": { "position": [-2, 0.9, -6] }
+    }
+  },
+  {
     "components": {
       "name": "FogVolumeBox",
       "transform": {

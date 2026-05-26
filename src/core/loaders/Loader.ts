@@ -60,6 +60,7 @@ import { SpiderControllerComponent } from '../../components/game/SpiderControlle
 import { ArcaneKnightControllerComponent } from '../../components/game/ArcaneKnightControllerComponent';
 import { BloodmancerControllerComponent } from '../../components/game/BloodmancerControllerComponent';
 import { LynxControllerComponent } from '../../components/game/LynxControllerComponent';
+import { DummyEnemyController } from '../../components/game/DummyEnemyController';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
@@ -361,6 +362,8 @@ export class Loader {
         return new BloodmancerControllerComponent();
       case 'lynx_controller':
         return new LynxControllerComponent();
+      case 'dummy_enemy_controller':
+        return new DummyEnemyController();
       case 'camera_arm':
         return new CameraArmComponent();
       case 'fps_camera_controller':
