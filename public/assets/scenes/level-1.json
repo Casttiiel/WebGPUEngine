@@ -3,7 +3,13 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/knight_character.prefab"
+    "prefab": "characters/lynx_character.prefab"
+  },
+  {
+    "prefab": "characters/dummy_enemy.prefab",
+    "components": {
+      "transform": { "position": [0, 0.9, -4] }
+    }
   },
   {
     "children": [],

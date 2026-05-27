@@ -18,6 +18,8 @@ export interface KickSystemData {
   cooldown?: number;
   /** Input disable time applied to the player when wall-kicking (seconds). Default: 0.12. */
   selfInputDisableTime?: number;
+  /** Horizontal speed (units/s) applied to the player away from the wall on wall-kick. Default: 8. */
+  wallKickHorizForce?: number;
 }
 
 /**
@@ -39,6 +41,7 @@ export class KickSystem {
   private readonly enemyKnockbackDuration: number;
   private readonly cooldown: number;
   private readonly selfInputDisableTime: number;
+  private readonly wallKickHorizForce: number;
 
   private cooldownTimer: number = 0;
   /** One wall-kick per air period — reset by onGrounded(). */
@@ -53,7 +56,8 @@ export class KickSystem {
     this.enemyKnockbackUpForce = data?.enemyKnockbackUpForce ?? 6;
     this.enemyKnockbackDuration = data?.enemyKnockbackDuration ?? 0.8;
     this.cooldown = data?.cooldown ?? 0.6;
-    this.selfInputDisableTime = data?.selfInputDisableTime ?? 0.12;
+    this.selfInputDisableTime = data?.selfInputDisableTime ?? 0.5;
+    this.wallKickHorizForce = data?.wallKickHorizForce ?? 8;
   }
 
   // ── Per-frame update (call from IDLE state) ────────────────────────────────
@@ -71,7 +75,7 @@ export class KickSystem {
     if (result.type === 'kickable') {
       this.kickTarget(result.kickable!, result.direction);
     } else if (result.type === 'wall') {
-      this.wallKick();
+      this.wallKick(result.direction);
     }
     // If nothing kickable is in front, no effect and no cooldown consumed.
     else {
@@ -102,28 +106,28 @@ export class KickSystem {
 
   // ── Private ─────────────────────────────────────────────────────────────────
 
-  /**
-   * Component keys checked (in priority order) to find an IKickable on a hit entity.
-   * Extend this list when adding new kickable controller types.
-   */
-  private static readonly KICKABLE_KEYS = [
-    'enemy_controller', // EnemyControllerComponent (IKickable)
-    'dummy_enemy_controller', // DummyEnemyController (IKickable)
-    'kickable', // KickableComponent on dynamic props
-  ] as const;
-
   private kickTarget(kickable: IKickable, kickDir: vec3): void {
     const impulse = vec3.scale(vec3.create(), kickDir, this.enemyKnockbackForce);
     impulse[1] = this.enemyKnockbackUpForce;
     kickable.applyKnockback(impulse, this.enemyKnockbackDuration);
   }
 
-  private wallKick(): void {
+  private wallKick(wallFacing: vec3): void {
     if (!this.wallKickAvailable) return;
     if (this.controller.getIsGrounded()) return;
 
     this.wallKickAvailable = false;
-    this.controller.applyJumpFromSystem();
+
+    // Vertical: full jump arc via KCCMovement.
+    this.controller.setVerticalVelocity(10.0);
+
+    // Horizontal: push away from the wall (opposite of look direction, XZ only).
+    const away = vec3.negate(vec3.create(), wallFacing);
+    away[1] = 0;
+    vec3.normalize(away, away);
+    vec3.scale(away, away, this.wallKickHorizForce);
+    this.controller.setHorizontalVelocity(away);
+
     this.controller.setInputDisableTimer(this.selfInputDisableTime);
   }
 
@@ -169,7 +173,7 @@ export class KickSystem {
     if (entityId !== undefined) {
       const entity = Engine.getEntities().getEntityById(entityId);
       if (entity) {
-        const kickable = this.findKickable(entity);
+        const kickable = entity.getComponent('kickable') as IKickable | null;
         if (kickable) return { type: 'kickable', kickable, direction: facing };
       }
     }
@@ -180,14 +184,5 @@ export class KickSystem {
     }
 
     return { type: 'none', direction: facing };
-  }
-
-  /** Searches `KICKABLE_KEYS` on the entity and returns the first IKickable found. */
-  private findKickable(entity: import('../../../core/ecs/Entity').Entity): IKickable | null {
-    for (const key of KickSystem.KICKABLE_KEYS) {
-      const comp = entity.getComponent(key) as IKickable | null;
-      if (comp && typeof (comp as IKickable).applyKnockback === 'function') return comp;
-    }
-    return null;
   }
 }

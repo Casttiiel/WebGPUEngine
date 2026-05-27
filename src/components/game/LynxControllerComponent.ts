@@ -84,25 +84,6 @@ export class LynxControllerComponent
     this.impulsePadInputDisableTime =
       data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
 
-    this.movement = new KCCMovement({
-      maxSpeed: data.moveSpeed ?? 11,
-      groundAcceleration: data.groundAcceleration ?? 65,
-      groundDeceleration: data.groundDeceleration ?? 65,
-      airControl: data.airControl ?? 0.65,
-      airDrag: data.airDrag ?? 0.3,
-      ...(data.jumpHeight !== undefined ? { jumpHeight: data.jumpHeight } : {}),
-      ...(data.jumpTimeToPeak !== undefined ? { jumpTimeToPeak: data.jumpTimeToPeak } : {}),
-      ...(data.jumpTimeToDescent !== undefined
-        ? { jumpTimeToDescent: data.jumpTimeToDescent }
-        : {}),
-      ...(data.jumpCutFactor !== undefined ? { jumpCutFactor: data.jumpCutFactor } : {}),
-      ...(data.jumpCutVerticalVelocityLimit !== undefined
-        ? { jumpCutVelocityLimit: data.jumpCutVerticalVelocityLimit }
-        : {}),
-      ...(data.coyoteTime !== undefined ? { coyoteTime: data.coyoteTime } : {}),
-      maxAirJumps: data.maxAirJumps ?? 1,
-    });
-
     this.mantleSystem = new MantleSystem(this, data);
     this.vaultSystem = new VaultSystem(this);
 
@@ -141,6 +122,13 @@ export class LynxControllerComponent
     });
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
+  }
+
+  public override async onAttach(): Promise<void> {
+    this.movement = this.getOwner().getComponent('kcc_movement') as KCCMovement;
+    if (!this.movement) {
+      console.error('LynxControllerComponent: KCCMovement component not found.');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -233,26 +221,32 @@ export class LynxControllerComponent
       case CharacterMovementState.IDLE:
       default: {
         const input = Engine.getInput();
+        const inputDisabled = this.isInputDisabled();
 
-        // Jump input: request on buffered press, release on button release.
-        if (input.isActionBuffered(GameAction.JUMP)) {
-          if (this.movement.requestJump()) {
-            input.consumeBufferedAction(GameAction.JUMP);
+        if (!inputDisabled) {
+          // Jump input: request on buffered press, release on button release.
+          if (input.isActionBuffered(GameAction.JUMP)) {
+            if (this.movement.requestJump()) {
+              input.consumeBufferedAction(GameAction.JUMP);
+            }
           }
+          const jumpPressed = input.isActionPressed(GameAction.JUMP);
+          if (this.wasJumpPressed && !jumpPressed) {
+            this.movement.releaseJump();
+          }
+          this.wasJumpPressed = jumpPressed;
         }
-        const jumpPressed = input.isActionPressed(GameAction.JUMP);
-        if (this.wasJumpPressed && !jumpPressed) {
-          this.movement.releaseJump();
-        }
-        this.wasJumpPressed = jumpPressed;
 
-        // Horizontal movement.
-        const inputDir = this.getInputVector();
-        const targetDir = this.getTargetMovement(inputDir);
-        const maxSpeed = this.movement.getMaxSpeed();
-        const desiredVelocity = vec3.scale(vec3.create(), targetDir, maxSpeed);
+        // Horizontal movement — zero desired when input is disabled (gravity still applies).
+        const desiredVelocity = inputDisabled
+          ? vec3.create()
+          : vec3.scale(
+              vec3.create(),
+              this.getTargetMovement(this.getInputVector()),
+              this.movement.getMaxSpeed(),
+            );
 
-        this.movement.update(deltaTime, desiredVelocity);
+        this.movement.integrate(deltaTime, desiredVelocity);
         this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
         break;
       }

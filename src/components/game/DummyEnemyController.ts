@@ -23,7 +23,7 @@ export class DummyEnemyController extends Component implements IKickable {
   private characterController!: RAPIER.KinematicCharacterController;
 
   /** Velocity integration, gravity, air drag, and KCC application. */
-  private movement: KCCMovement = new KCCMovement();
+  private movement!: KCCMovement;
 
   // Throttle ground checks to ~20 Hz
   private groundTimer: number = 0;
@@ -41,7 +41,12 @@ export class DummyEnemyController extends Component implements IKickable {
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 
-  public override async onAttach(): Promise<void> {}
+  public override async onAttach(): Promise<void> {
+    this.movement = this.getOwner().getComponent('kcc_movement') as KCCMovement;
+    if (!this.movement) {
+      console.error('DummyEnemyController: KCCMovement component not found.');
+    }
+  }
 
   public applyKnockback(impulse: vec3): void {
     this.movement.applyImpulse(impulse);
@@ -60,7 +65,7 @@ export class DummyEnemyController extends Component implements IKickable {
     }
 
     // KCCMovement handles gravity + air drag; no desired horizontal (dummy doesn't walk).
-    this.movement.update(deltaTime, _ZERO_DESIRED);
+    this.movement.integrate(deltaTime, _ZERO_DESIRED);
     this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
   }
 

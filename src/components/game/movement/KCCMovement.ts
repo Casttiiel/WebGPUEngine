@@ -1,5 +1,6 @@
 import { vec3 } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import { Component } from '../../../core/ecs/Component';
 import type { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
 
 // ── Private helper ────────────────────────────────────────────────────────────
@@ -95,28 +96,28 @@ export interface KCCMovementParams {
  * this.movement.applyViaKCC(dt, capsule, kcc);
  * ```
  */
-export class KCCMovement {
+export class KCCMovement extends Component {
   // ── Mode flag ──────────────────────────────────────────────────────────────
   /** True when only gravity/acceleration were provided — preserves original exponential behaviour. */
-  private readonly isLegacyMode: boolean;
+  private isLegacyMode: boolean = false;
 
   // ── Physics constants ──────────────────────────────────────────────────────
-  private readonly jumpVelocity: number;
+  private jumpVelocity: number = 0;
   /** Applied while vy > 0 (ascending). Negative. */
-  private readonly ascendGravity: number;
+  private ascendGravity: number = -20;
   /** Applied while vy <= 0 (descending). Negative, stronger. */
-  private readonly descendGravity: number;
-  private readonly jumpCutFactor: number;
-  private readonly jumpCutVelocityLimit: number;
-  private readonly coyoteTime: number;
-  private readonly maxAirJumps: number;
+  private descendGravity: number = -20;
+  private jumpCutFactor: number = 0.7;
+  private jumpCutVelocityLimit: number = 1.0;
+  private coyoteTime: number = 0.12;
+  private maxAirJumps: number = 0;
 
   // ── Movement params ────────────────────────────────────────────────────────
-  private readonly _maxSpeed: number;
-  private readonly groundAcceleration: number;
-  private readonly groundDeceleration: number;
-  private readonly airControl: number;
-  private readonly airDrag: number;
+  private _maxSpeed: number = 11.0;
+  private groundAcceleration: number = 36;
+  private groundDeceleration: number = 18;
+  private airControl: number = 0.65;
+  private airDrag: number = 0.3;
 
   // ── Velocity state ─────────────────────────────────────────────────────────
   private vx = 0;
@@ -140,6 +141,23 @@ export class KCCMovement {
   private readonly _hVel: vec3 = vec3.create();
 
   constructor(params: KCCMovementParams = {}) {
+    super();
+    this.initialize(params);
+  }
+
+  /** Called by the Loader when used as an ECS component. */
+  public load(data: unknown): void {
+    this.initialize((data as KCCMovementParams) ?? {});
+  }
+
+  /** ECS tick — no-op. Integration is driven by the controller via `integrate()`. */
+  public update(_dt: number): void {}
+
+  public renderDebug(): void {}
+
+  // ── Initialization ───────────────────────────────────────────────────────────────
+
+  private initialize(params: KCCMovementParams): void {
     // Detect legacy mode: gravity provided, no jump kinematics.
     this.isLegacyMode = params.gravity !== undefined && params.jumpHeight === undefined;
 
@@ -344,7 +362,7 @@ export class KCCMovement {
    * @param desired Desired horizontal velocity vector (direction × target speed).
    *                Pass a zero vector for no input / knockback stun.
    */
-  public update(dt: number, desired: vec3): void {
+  public integrate(dt: number, desired: vec3): void {
     const isGrounded = this._isGrounded;
 
     // ── Coyote time ────────────────────────────────────────────────────────

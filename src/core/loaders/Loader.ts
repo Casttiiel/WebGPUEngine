@@ -58,6 +58,7 @@ import { EnemyControllerComponent } from '../../components/game/EnemyControllerC
 import { SpiderControllerComponent } from '../../components/game/SpiderControllerComponent';
 import { LynxControllerComponent } from '../../components/game/LynxControllerComponent';
 import { KickableComponent } from '../../components/game/KickableComponent';
+import { KCCMovement } from '../../components/game/movement/KCCMovement';
 import { DummyEnemyController } from '../../components/game/DummyEnemyController';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
@@ -357,6 +358,8 @@ export class Loader {
         return new LynxControllerComponent();
       case 'kickable':
         return new KickableComponent();
+      case 'kcc_movement':
+        return new KCCMovement();
       case 'dummy_enemy_controller':
         return new DummyEnemyController();
       case 'camera_arm':

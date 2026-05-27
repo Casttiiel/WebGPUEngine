@@ -277,7 +277,7 @@ export class EnemyControllerComponent extends Component implements IKickable {
     const effectiveDesired = this.knockbackTimer > 0 ? vec3.create() : this.desiredHorizontal;
 
     // 5+6. Integrate velocity (gravity + acceleration/drag) and apply via KCC.
-    this.movement.update(deltaTime, effectiveDesired);
+    this.movement.integrate(deltaTime, effectiveDesired);
     this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
 
     // 7. Reset desired horizontal for next tick (BT must re-affirm each frame)

@@ -2,26 +2,25 @@ import RAPIER from '@dimforge/rapier3d';
 import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import type { ColliderComponent } from '../physics/ColliderComponent';
-import type { IKickable } from './combat/IKickable';
+import { KCCMovement } from './movement/KCCMovement';
 
 /** Keys to search for a collider on the same entity (priority order). */
 const COLLIDER_KEYS = ['capsule_collider', 'box_collider', 'sphere_collider'] as const;
 
 /**
- * KickableComponent — Makes a **dynamic** rigid-body entity respond to player kicks.
+ * KickableComponent — Uniform IKickable entry point for the KickSystem.
  *
- * Implements IKickable by calling setLinvel() once; the physics engine then integrates
- * the resulting motion with gravity and friction, producing a natural arc automatically.
- *
- * For **kinematic** (KCC-driven) entities, implement IKickable directly in the
- * controller component using KCCMovement.applyImpulse() instead.
+ * - **Dynamic** rigid body: applies knockback via setLinvel(). Physics integrates
+ *   the resulting motion with gravity and friction automatically.
+ * - **Kinematic** (KCC-driven) rigid body: delegates to the entity’s movement
+ *   controller, which routes the impulse through KCCMovement.applyImpulse().
  *
  * JSON usage:
  * ```json
  * "kickable": {}
  * ```
  */
-export class KickableComponent extends Component implements IKickable {
+export class KickableComponent extends Component {
   private rigidBody: RAPIER.RigidBody | null = null;
 
   public async load(_data?: unknown): Promise<void> {}
@@ -37,9 +36,17 @@ export class KickableComponent extends Component implements IKickable {
     console.warn(`KickableComponent on '${this.getOwner().getName()}': no collider found.`);
   }
 
-  public applyKnockback(impulse: vec3): void {
+  public applyKnockback(impulse: vec3, _duration?: number): void {
     if (!this.rigidBody) return;
-    this.rigidBody.setLinvel({ x: impulse[0], y: impulse[1], z: impulse[2] }, true);
+
+    if (this.rigidBody.bodyType() === RAPIER.RigidBodyType.Dynamic) {
+      // Dynamic body: direct physics impulse — engine handles gravity and friction.
+      this.rigidBody.setLinvel({ x: impulse[0], y: impulse[1], z: impulse[2] }, true);
+    } else {
+      // Kinematic (KCC-driven): apply the impulse directly to the movement component.
+      const kcc = this.getOwner().getComponent('kcc_movement') as KCCMovement | null;
+      kcc?.applyImpulse(impulse);
+    }
   }
 
   public update(_dt: number): void {}

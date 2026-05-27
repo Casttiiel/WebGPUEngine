@@ -1,6 +1,4 @@
 import { vec3 } from 'gl-matrix';
-import type { CameraComponent } from '../../render/CameraComponent';
-import type { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
 import { IMantleController } from './IMantleController';
 
 /**
