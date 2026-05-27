@@ -1,5 +1,7 @@
-import { vec3 } from 'gl-matrix';
-import RAPIER from '@dimforge/rapier3d';
+import { vec3, quat } from 'gl-matrix';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import { Loader } from '../../core/loaders/Loader';
+import type { EntityDataType } from '../../types/SceneData.type';
 import { BasePlayerController } from './BasePlayerController';
 import { Engine } from '../../core/engine/Engine';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
@@ -235,6 +237,10 @@ export class LynxControllerComponent
             this.movement.releaseJump();
           }
           this.wasJumpPressed = jumpPressed;
+
+          if (input.isActionJustPressed(GameAction.INTERACT)) {
+            this.trySpawnImpulsePad();
+          }
         }
 
         // Horizontal movement — zero desired when input is disabled (gravity still applies).
@@ -491,4 +497,67 @@ export class LynxControllerComponent
   public override renderDebug(): void {}
 
   public override dispose(): void {}
+
+  // ---------------------------------------------------------------------------
+  // Impulse pad spawner
+  // ---------------------------------------------------------------------------
+
+  private trySpawnImpulsePad(): void {
+    if (!this.camera) return;
+
+    const cam = this.camera.getCamera();
+    const camPos = cam.getPosition();
+    const camFront = cam.getFront();
+
+    const ray = new RAPIER.Ray(
+      { x: camPos[0], y: camPos[1], z: camPos[2] },
+      { x: camFront[0], y: camFront[1], z: camFront[2] },
+    );
+
+    const hit = Engine.getPhysics()
+      .getWorld()
+      .castRayAndGetNormal(
+        ray,
+        10.0,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        this.capsuleCollider.getCollider(),
+      );
+
+    if (!hit) return;
+
+    const t = hit.timeOfImpact;
+    const normal = vec3.fromValues(hit.normal.x, hit.normal.y, hit.normal.z);
+    const hitPoint = vec3.fromValues(
+      camPos[0] + camFront[0] * t,
+      camPos[1] + camFront[1] * t,
+      camPos[2] + camFront[2] * t,
+    );
+    const spawnPos = vec3.scaleAndAdd(vec3.create(), hitPoint, normal, 0.02);
+
+    // Shortest rotation from Y-up to the surface normal → Euler degrees
+    // (combineTransforms only handles Euler, not quaternion)
+    const q = quat.rotationTo(quat.create(), vec3.fromValues(0, 1, 0), normal);
+    const toDeg = 180 / Math.PI;
+    const pitchX =
+      Math.atan2(2 * (q[3] * q[0] + q[1] * q[2]), 1 - 2 * (q[0] * q[0] + q[1] * q[1])) * toDeg;
+    const yawY = Math.asin(Math.max(-1, Math.min(1, 2 * (q[3] * q[1] - q[2] * q[0])))) * toDeg;
+    const rollZ =
+      Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2])) * toDeg;
+
+    const entityData = {
+      prefab: 'gameplay/impulse_pad_15.prefab',
+      components: {
+        transform: {
+          position: [spawnPos[0], spawnPos[1], spawnPos[2]] as [number, number, number],
+          rotation: [pitchX, yawY, rollZ] as [number, number, number],
+        },
+      },
+    } as unknown as EntityDataType;
+
+    Loader.parseEntityFromJSON(entityData)
+      .then((parsed) => Loader.loadEntityFromJSON(parsed, undefined, false))
+      .catch((e) => console.error('[LynxController] Failed to spawn impulse pad:', e));
+  }
 }
