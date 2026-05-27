@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+/*import { vec3 } from 'gl-matrix';
 import { BasePlayerController } from './BasePlayerController';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { CameraComponent } from '../render/CameraComponent';
@@ -41,7 +41,7 @@ import { PlayerModifiersComponent } from './PlayerModifiersComponent';
  * Requiere:
  * - CapsuleColliderComponent en la misma entidad
  * - CameraComponent como hijo de la entidad
- */
+ */ /*
 export class ParkourControllerComponent
   extends BasePlayerController
   implements IMantleController, IMovementController
@@ -116,7 +116,7 @@ export class ParkourControllerComponent
       'jumping',
       this.isJumping,
     );*/
-
+/*
     // Detectar paredes para wallrun
     this.wallRunSystem.detectWall(deltaTime);
 
@@ -594,3 +594,12 @@ export class ParkourControllerComponent
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 }
+*/
+
+// Stub — class is temporarily disabled.
+export class ParkourControllerComponent {
+  getCurrentSpeed(): number { return 0; }
+  getIsGrounded(): boolean { return false; }
+}
+// HeadBobComponent imports it under the old alias.
+export { ParkourControllerComponent as CharacterControllerComponent };

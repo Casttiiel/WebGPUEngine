@@ -1,0 +1,473 @@
+import { vec3 } from 'gl-matrix';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import type { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
+
+// ── Private helper ────────────────────────────────────────────────────────────
+/** Moves `current` toward `target` by at most `delta`, never overshooting. */
+function approach(current: number, target: number, delta: number): number {
+  if (current < target) return Math.min(current + delta, target);
+  if (current > target) return Math.max(current - delta, target);
+  return current;
+}
+
+// ── Params ────────────────────────────────────────────────────────────────────
+
+export interface KCCMovementParams {
+  // ── Horizontal movement ───────────────────────────────────────────────────
+  /** Normal max horizontal speed (m/s). Default (CMC): 11. */
+  maxSpeed?: number;
+  /** Ground acceleration (m/s²) in CMC mode. Also accepted as `acceleration`. Default (CMC): 36. */
+  groundAcceleration?: number;
+  /** Ground deceleration when no input (m/s²). Default (CMC): 18. */
+  groundDeceleration?: number;
+  /**
+   * Fraction of groundAcceleration available in the air.
+   * Default (CMC): 0.65. Default (legacy): 0.4.
+   */
+  airControl?: number;
+  /**
+   * Per-second air drag coefficient when airborne with no input.
+   * CMC mode: v *= (1 - airDrag)^dt.  Default (CMC): 0.3.
+   * Legacy mode: v *= exp(-airDrag * dt). Default (legacy): 1.5.
+   */
+  airDrag?: number;
+
+  // ── Jump (CMC mode only) ──────────────────────────────────────────────────
+  /** Max jump height (m). Default: 2.2. */
+  jumpHeight?: number;
+  /** Seconds from jump start to apex. Default: 0.5. */
+  jumpTimeToPeak?: number;
+  /** Seconds from apex to ground. Default: 0.4. */
+  jumpTimeToDescent?: number;
+  /**
+   * Gravity multiplier applied at the jump apex
+   * when `isJumping && vy > 0 && vy < jumpCutVelocityLimit`.
+   * < 1 creates a floaty peak. Clear with `releaseJump()` for variable height.
+   * Default: 0.7.
+   */
+  jumpCutFactor?: number;
+  /** vy threshold (m/s) below which jumpCutFactor is active at apex. Default: 1.0. */
+  jumpCutVelocityLimit?: number;
+  /** Seconds after leaving the ground where a jump can still trigger. Default: 0.12. */
+  coyoteTime?: number;
+  /** Extra mid-air jumps (0 = single, 1 = double jump). Default: 0. */
+  maxAirJumps?: number;
+
+  // ── Legacy / simple gravity (enemy style) ─────────────────────────────────
+  /**
+   * Constant gravity magnitude (m/s²). Overrides jump-derived gravity.
+   * Providing this (without jumpHeight) enables legacy exponential-acceleration mode.
+   */
+  gravity?: number;
+  /** Alias for groundAcceleration (legacy enemy usage). */
+  acceleration?: number;
+}
+
+/**
+ * KCCMovement — Kinematic Character Controller Movement.
+ *
+ * A self-contained velocity integration system analogous to Unreal Engine's
+ * UCharacterMovementComponent. Handles ground/air movement, gravity, jumping
+ * (coyote time, air jumps, variable-height apex), impulses, and KCC application.
+ *
+ * **CMC mode** (player): provide jump params (`jumpHeight`, etc.) or `maxSpeed`.
+ * Horizontal movement uses linear acceleration (`approach`), two-phase gravity.
+ * ```ts
+ * this.movement = new KCCMovement({
+ *   maxSpeed: 11, groundAcceleration: 65, groundDeceleration: 65,
+ *   airControl: 0.65, airDrag: 0.3,
+ *   jumpHeight: 1.3, jumpTimeToPeak: 0.38, jumpTimeToDescent: 0.32,
+ *   jumpCutFactor: 0.7, jumpCutVelocityLimit: 1.0, coyoteTime: 0.15,
+ *   maxAirJumps: 1,
+ * });
+ * // jump press: this.movement.requestJump()
+ * // jump release: this.movement.releaseJump()
+ * // each frame (IDLE): this.movement.update(dt, dir * maxSpeed, isGrounded)
+ * //                    this.movement.applyViaKCC(dt, capsule, kcc)
+ * // override states:  this.movement.setVelocity(v); this.movement.applyViaKCC(...)
+ * ```
+ *
+ * **Legacy mode** (enemies): provide `gravity` without `jumpHeight`.
+ * Horizontal uses exponential approach (original behaviour preserved).
+ * ```ts
+ * this.movement = new KCCMovement({ gravity: 9, acceleration: 8 });
+ * this.movement.update(dt, dir * moveSpeed, isGrounded);
+ * this.movement.applyViaKCC(dt, capsule, kcc);
+ * ```
+ */
+export class KCCMovement {
+  // ── Mode flag ──────────────────────────────────────────────────────────────
+  /** True when only gravity/acceleration were provided — preserves original exponential behaviour. */
+  private readonly isLegacyMode: boolean;
+
+  // ── Physics constants ──────────────────────────────────────────────────────
+  private readonly jumpVelocity: number;
+  /** Applied while vy > 0 (ascending). Negative. */
+  private readonly ascendGravity: number;
+  /** Applied while vy <= 0 (descending). Negative, stronger. */
+  private readonly descendGravity: number;
+  private readonly jumpCutFactor: number;
+  private readonly jumpCutVelocityLimit: number;
+  private readonly coyoteTime: number;
+  private readonly maxAirJumps: number;
+
+  // ── Movement params ────────────────────────────────────────────────────────
+  private readonly _maxSpeed: number;
+  private readonly groundAcceleration: number;
+  private readonly groundDeceleration: number;
+  private readonly airControl: number;
+  private readonly airDrag: number;
+
+  // ── Velocity state ─────────────────────────────────────────────────────────
+  private vx = 0;
+  private vy = 0;
+  private vz = 0;
+
+  // ── Jump state ─────────────────────────────────────────────────────────────
+  private isJumpingFlag = false;
+  private airJumpsUsed = 0;
+  /** Seconds since the character last had isGrounded = true. */
+  private timeSinceGrounded = 0;
+
+  // ── Gravity scale (e.g. wall-run) ──────────────────────────────────────────
+  private gravityScale = 1.0;
+
+  // ── Grounded state (updated via updateGroundedState) ──────────────────────
+  private _isGrounded = false;
+  private _groundNormal: vec3 = vec3.fromValues(0, 1, 0);
+
+  // ── Cache ──────────────────────────────────────────────────────────────────
+  private readonly _hVel: vec3 = vec3.create();
+
+  constructor(params: KCCMovementParams = {}) {
+    // Detect legacy mode: gravity provided, no jump kinematics.
+    this.isLegacyMode = params.gravity !== undefined && params.jumpHeight === undefined;
+
+    this._maxSpeed = params.maxSpeed ?? 11.0;
+
+    // Acceleration — accept `acceleration` as alias for groundAcceleration.
+    const accel = params.groundAcceleration ?? params.acceleration ?? (this.isLegacyMode ? 10 : 36);
+    this.groundAcceleration = accel;
+
+    // Deceleration: legacy uses same rate as accel; CMC has separate default.
+    this.groundDeceleration = params.groundDeceleration ?? (this.isLegacyMode ? accel : 18);
+
+    // Air params: different defaults per mode.
+    this.airControl = params.airControl ?? (this.isLegacyMode ? 0.4 : 0.65);
+    this.airDrag = params.airDrag ?? (this.isLegacyMode ? 1.5 : 0.3);
+
+    // Jump constants.
+    this.coyoteTime = params.coyoteTime ?? 0.12;
+    this.maxAirJumps = params.maxAirJumps ?? 0;
+    this.jumpCutFactor = params.jumpCutFactor ?? 0.7;
+    this.jumpCutVelocityLimit = params.jumpCutVelocityLimit ?? 1.0;
+
+    if (params.gravity !== undefined) {
+      // Simple constant gravity (legacy enemies or CMC with override).
+      this.ascendGravity = -params.gravity;
+      this.descendGravity = -params.gravity;
+      this.jumpVelocity = 0;
+    } else {
+      // Kinematic jump formulas.
+      const h = params.jumpHeight ?? 2.2;
+      const tp = params.jumpTimeToPeak ?? 0.5;
+      const td = params.jumpTimeToDescent ?? 0.4;
+      this.jumpVelocity = (2.0 * h) / tp;
+      this.ascendGravity = -(2.0 * h) / (tp * tp);
+      this.descendGravity = -(2.0 * h) / (td * td);
+    }
+  }
+
+  // ── Jump API ───────────────────────────────────────────────────────────────
+
+  /**
+   * Request a jump (call on button press / buffer hit).
+   * Handles ground jump, coyote-time window, and air jumps automatically.
+   * @returns `true` if a jump was initiated.
+   */
+  public requestJump(): boolean {
+    const canGroundJump = !this.isJumpingFlag && this.timeSinceGrounded < this.coyoteTime;
+    if (canGroundJump) {
+      this.vy = this.jumpVelocity;
+      this.isJumpingFlag = true;
+      // Burn coyote window so a second tap doesn't re-trigger.
+      this.timeSinceGrounded = this.coyoteTime + 1.0;
+      return true;
+    }
+    if (this.airJumpsUsed < this.maxAirJumps) {
+      this.vy = this.jumpVelocity;
+      this.airJumpsUsed++;
+      this.isJumpingFlag = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Notify that the jump button was released.
+   * Clears `isJumpingFlag`, which removes the floaty-apex gravity reduction
+   * and produces a lower peak when released early (variable-height jumping).
+   */
+  public releaseJump(): void {
+    this.isJumpingFlag = false;
+  }
+
+  /**
+   * Unconditionally apply the jump velocity impulse.
+   * Used by external systems (e.g. wall-kick, impulse pads) that bypass the
+   * normal jump-state checks.
+   */
+  public applyJump(): void {
+    this.vy = this.jumpVelocity;
+    this.isJumpingFlag = true;
+  }
+
+  // ── Velocity overrides ─────────────────────────────────────────────────────
+
+  /** Add an instantaneous velocity impulse (knockback, impulse pads). */
+  public applyImpulse(impulse: vec3): void {
+    this.vx += impulse[0];
+    this.vy += impulse[1];
+    this.vz += impulse[2];
+  }
+
+  /**
+   * Override the full velocity vector.
+   * Use for states that drive movement directly (dash, mantle, vault).
+   */
+  public setVelocity(v: vec3): void {
+    this.vx = v[0];
+    this.vy = v[1];
+    this.vz = v[2];
+  }
+
+  /** Override horizontal components only (X and Z). Preserves current vy. */
+  public setHorizontalVelocity(v: vec3): void {
+    this.vx = v[0];
+    this.vz = v[2];
+  }
+
+  public setVerticalVelocity(v: number): void {
+    this.vy = v;
+  }
+
+  public getVerticalVelocity(): number {
+    return this.vy;
+  }
+
+  /**
+   * Returns horizontal velocity as a cached vec3 (y = 0).
+   * Do **not** store this reference across frames.
+   */
+  public getHorizontalVelocity(): vec3 {
+    vec3.set(this._hVel, this.vx, 0, this.vz);
+    return this._hVel;
+  }
+
+  public getCurrentSpeed(): number {
+    return Math.sqrt(this.vx * this.vx + this.vz * this.vz);
+  }
+
+  /** Normal (non-boosted) max speed. */
+  public getMaxSpeed(): number {
+    return this._maxSpeed;
+  }
+
+  /** Scale applied to gravity each frame. 0 = zero-gravity (wall-run), < 1 = lighter. */
+  public setGravityScale(scale: number): void {
+    this.gravityScale = scale;
+  }
+
+  /** Whether a jump is currently in progress. */
+  public isJumping(): boolean {
+    return this.isJumpingFlag;
+  }
+
+  /**
+   * Force-set the internal jumping flag.
+   * Called by MantleSystem / VaultSystem to clear it on transition.
+   */
+  public setIsJumping(value: boolean): void {
+    this.isJumpingFlag = value;
+  }
+
+  // ── Grounded state API ────────────────────────────────────────────────────
+
+  /**
+   * Perform a downward raycast to update the grounded state and ground normal.
+   * Call once per frame (or at whatever frequency you need — enemies throttle to 20 Hz).
+   * Results are available via `isGrounded()` and `getGroundNormal()`.
+   */
+  public updateGroundedState(capsule: CapsuleColliderComponent, snapDistance = 0.2): void {
+    const hit = capsule.raycastGrounded(snapDistance);
+    this._isGrounded = hit !== null;
+    if (this._isGrounded && hit) {
+      if (hit.normal.y > 0.1) {
+        vec3.set(this._groundNormal, hit.normal.x, hit.normal.y, hit.normal.z);
+        vec3.normalize(this._groundNormal, this._groundNormal);
+      }
+      // If normal.y <= 0.1 (steep slope), keep previous normal.
+    } else {
+      vec3.set(this._groundNormal, 0, 1, 0);
+    }
+  }
+
+  /** Whether the character was grounded as of the last `updateGroundedState()` call. */
+  public isGrounded(): boolean {
+    return this._isGrounded;
+  }
+
+  /** Ground surface normal as of the last `updateGroundedState()` call. */
+  public getGroundNormal(): vec3 {
+    return this._groundNormal;
+  }
+
+  /**
+   * Project out any velocity component pointing into `wallNormal`.
+   * Call after detecting a wall collision via `numComputedCollisions()`.
+   */
+  public removeVelocityIntoWall(wallNormal: vec3): void {
+    const dot = this.vx * wallNormal[0] + this.vz * wallNormal[2];
+    if (dot < 0) {
+      this.vx -= wallNormal[0] * dot;
+      this.vz -= wallNormal[2] * dot;
+    }
+  }
+
+  // ── Per-frame ──────────────────────────────────────────────────────────────
+
+  /**
+   * Integrate velocity for one frame.
+   * Uses the grounded state from the most recent `updateGroundedState()` call.
+   *
+   * @param dt      Delta time (seconds).
+   * @param desired Desired horizontal velocity vector (direction × target speed).
+   *                Pass a zero vector for no input / knockback stun.
+   */
+  public update(dt: number, desired: vec3): void {
+    const isGrounded = this._isGrounded;
+
+    // ── Coyote time ────────────────────────────────────────────────────────
+    if (isGrounded) {
+      this.timeSinceGrounded = 0;
+      this.airJumpsUsed = 0;
+      this.isJumpingFlag = false;
+    } else {
+      this.timeSinceGrounded += dt;
+    }
+
+    // ── Vertical: gravity ──────────────────────────────────────────────────
+    if (isGrounded && this.vy < 0) {
+      this.vy = -0.5; // pressed against ground
+    } else if (!isGrounded) {
+      const grav = this.vy > 0 ? this.ascendGravity : this.descendGravity;
+      // Floaty apex: reduce gravity near the top of the jump arc when the
+      // jump button is still held (isJumpingFlag = true).
+      const atApex = this.isJumpingFlag && this.vy > 0 && this.vy < this.jumpCutVelocityLimit;
+      const gravFactor = atApex ? this.jumpCutFactor : 1.0;
+      this.vy += grav * gravFactor * this.gravityScale * dt;
+    }
+
+    // ── Horizontal ─────────────────────────────────────────────────────────
+    if (this.isLegacyMode) {
+      // Legacy exponential approach — preserves original enemy behaviour.
+      if (isGrounded) {
+        const t = 1.0 - Math.exp(-this.groundAcceleration * dt);
+        this.vx += (desired[0] - this.vx) * t;
+        this.vz += (desired[2] - this.vz) * t;
+      } else {
+        // Exponential drag first, then limited air control.
+        const drag = Math.exp(-this.airDrag * dt);
+        this.vx *= drag;
+        this.vz *= drag;
+        const t = 1.0 - Math.exp(-this.groundAcceleration * this.airControl * dt);
+        this.vx += (desired[0] - this.vx) * t;
+        this.vz += (desired[2] - this.vz) * t;
+      }
+    } else {
+      // CMC linear acceleration.
+      const dx = desired[0];
+      const dz = desired[2];
+      const desiredSpeed = Math.sqrt(dx * dx + dz * dz);
+      const hasInput = desiredSpeed > 0.01;
+
+      if (isGrounded) {
+        const currentSpeed = Math.sqrt(this.vx * this.vx + this.vz * this.vz);
+        if (hasInput) {
+          const newSpeed = approach(currentSpeed, desiredSpeed, this.groundAcceleration * dt);
+          const scale = newSpeed / desiredSpeed;
+          this.vx = dx * scale;
+          this.vz = dz * scale;
+        } else {
+          const newSpeed = approach(currentSpeed, 0, this.groundDeceleration * dt);
+          if (currentSpeed > 0.001) {
+            const scale = newSpeed / currentSpeed;
+            this.vx *= scale;
+            this.vz *= scale;
+          } else {
+            this.vx = 0;
+            this.vz = 0;
+          }
+        }
+      } else {
+        // Air: per-axis approach when steering, drag when not.
+        const airAccel = this.groundAcceleration * this.airControl;
+        if (hasInput) {
+          this.vx = approach(this.vx, dx, airAccel * dt);
+          this.vz = approach(this.vz, dz, airAccel * dt);
+        } else {
+          const drag = Math.pow(1.0 - this.airDrag, dt);
+          this.vx *= drag;
+          this.vz *= drag;
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply current velocity via the KCC and write the corrected result back
+   * to the rigid body's linear velocity. Automatically cancels upward velocity
+   * when hitting a ceiling.
+   */
+  public applyViaKCC(
+    dt: number,
+    capsule: CapsuleColliderComponent,
+    controller: RAPIER.KinematicCharacterController,
+  ): void {
+    const mx = this.vx * dt;
+    const my = this.vy * dt;
+    const mz = this.vz * dt;
+
+    controller.computeColliderMovement(
+      capsule.getCollider(),
+      new RAPIER.Vector3(mx, my, mz),
+      QueryFilterFlags.EXCLUDE_SENSORS,
+    );
+
+    const corrected = controller.computedMovement();
+    const invDt = 1.0 / dt;
+    capsule
+      .getRigidBody()
+      .setLinvel({ x: corrected.x * invDt, y: corrected.y * invDt, z: corrected.z * invDt }, true);
+
+    // Cancel upward velocity if the ceiling blocked the movement.
+    if (this.vy > 0 && corrected.y < my * 0.5) {
+      this.vy = 0;
+    }
+
+    // Wall collision response — project out velocity into fixed-geometry walls.
+    // Skips floor/ceiling normals (|n.y| >= 0.5).
+    for (let i = 0; i < controller.numComputedCollisions(); i++) {
+      const collision = controller.computedCollision(i);
+      if (!collision?.collider) continue;
+      const rb = collision.collider.parent();
+      if (!rb) continue;
+      if (rb.bodyType() === RAPIER.RigidBodyType.Fixed) {
+        const n = collision.normal1;
+        if (Math.abs(n.y) < 0.5) {
+          this.removeVelocityIntoWall(vec3.fromValues(n.x, n.y, n.z));
+        }
+      }
+    }
+  }
+}

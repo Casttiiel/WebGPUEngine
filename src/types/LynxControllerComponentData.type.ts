@@ -43,6 +43,18 @@ export type LynxControllerComponentDataType = {
   /** Cooldown in seconds. Default: 10. */
   dashPunchCooldown?: number;
 
+  // ── Kick ──────────────────────────────────────────────────────────────────
+  /** Forward detection range for kick (units). Default: 1.5. */
+  kickDetectionDistance?: number;
+  /** Horizontal impulse magnitude applied to kicked enemy (units/s). Default: 12. */
+  kickEnemyKnockbackForce?: number;
+  /** Duration the knockback overrides the enemy AI (seconds). Default: 0.35. */
+  kickEnemyKnockbackDuration?: number;
+  /** Cooldown between kicks (seconds). Default: 0.6. */
+  kickCooldown?: number;
+  /** Input-disable time applied to the player on wall-kick (seconds). Default: 0.12. */
+  kickSelfInputDisableTime?: number;
+
   // ── Misc ────────────────────────────────────────────────────────────────────
   impulsePadInputDisableTime?: number;
 };

@@ -1,7 +1,13 @@
-import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import RAPIER from '@dimforge/rapier3d';
+import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
+import { KCCMovement } from './movement/KCCMovement';
+import type { IKickable } from './combat/IKickable';
+
+/** Shared zero-vector passed to KCCMovement — dummy never desires horizontal movement. */
+const _ZERO_DESIRED: vec3 = vec3.create();
 
 /**
  * DummyEnemyController — Kinematic gravity-only controller with no AI.
@@ -12,13 +18,12 @@ import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
  *
  * Component key: 'dummy_enemy_controller'
  */
-export class DummyEnemyController extends Component {
+export class DummyEnemyController extends Component implements IKickable {
   private capsuleCollider!: CapsuleColliderComponent;
   private characterController!: RAPIER.KinematicCharacterController;
 
-  private verticalVelocity: number = 0;
-  private isGrounded: boolean = false;
-  private readonly gravity: number = 20;
+  /** Velocity integration, gravity, air drag, and KCC application. */
+  private movement: KCCMovement = new KCCMovement();
 
   // Throttle ground checks to ~20 Hz
   private groundTimer: number = 0;
@@ -36,6 +41,14 @@ export class DummyEnemyController extends Component {
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 
+  public override async onAttach(): Promise<void> {}
+
+  public applyKnockback(impulse: vec3): void {
+    this.movement.applyImpulse(impulse);
+  }
+
+  public renderDebug(): void {}
+
   public update(deltaTime: number): void {
     if (!this.capsuleCollider || !this.characterController) return;
 
@@ -43,32 +56,12 @@ export class DummyEnemyController extends Component {
     this.groundTimer += deltaTime;
     if (this.groundTimer >= 0.05) {
       this.groundTimer = 0;
-      this.isGrounded = this.capsuleCollider.raycastGrounded(0.2) !== null;
+      this.movement.updateGroundedState(this.capsuleCollider, 0.2);
     }
 
-    // Gravity
-    if (this.isGrounded && this.verticalVelocity < 0) {
-      this.verticalVelocity = -0.5;
-    } else {
-      this.verticalVelocity -= this.gravity * deltaTime;
-    }
-
-    // Apply through KCC (zero horizontal, only gravity)
-    const movement = new RAPIER.Vector3(0, this.verticalVelocity * deltaTime, 0);
-
-    this.characterController.computeColliderMovement(
-      this.capsuleCollider.getCollider(),
-      movement,
-      QueryFilterFlags.EXCLUDE_SENSORS,
-    );
-
-    const corrected = this.characterController.computedMovement();
-    this.capsuleCollider
-      .getRigidBody()
-      .setLinvel(
-        { x: corrected.x / deltaTime, y: corrected.y / deltaTime, z: corrected.z / deltaTime },
-        true,
-      );
+    // KCCMovement handles gravity + air drag; no desired horizontal (dummy doesn't walk).
+    this.movement.update(deltaTime, _ZERO_DESIRED);
+    this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
   }
 
   public override dispose(): void {}

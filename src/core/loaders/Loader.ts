@@ -24,7 +24,6 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { RenderComponent } from '../../components/render/RenderComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
 import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
-import { ParkourControllerComponent } from '../../components/game/ParkourControllerComponent';
 import { CameraArmComponent } from '../../components/game/CameraArmComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { HeadBobComponent } from '../../components/game/HeadBobComponent';
@@ -57,9 +56,8 @@ import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { SpiderControllerComponent } from '../../components/game/SpiderControllerComponent';
-import { ArcaneKnightControllerComponent } from '../../components/game/ArcaneKnightControllerComponent';
-import { BloodmancerControllerComponent } from '../../components/game/BloodmancerControllerComponent';
 import { LynxControllerComponent } from '../../components/game/LynxControllerComponent';
+import { KickableComponent } from '../../components/game/KickableComponent';
 import { DummyEnemyController } from '../../components/game/DummyEnemyController';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
@@ -355,14 +353,10 @@ export class Loader {
       case 'sphere_collider':
         return new SphereColliderComponent();
       case 'character_controller':
-      case 'parkour_controller':
-        return new ParkourControllerComponent();
-      case 'arcane_knight_controller':
-        return new ArcaneKnightControllerComponent();
-      case 'bloodmancer_controller':
-        return new BloodmancerControllerComponent();
       case 'lynx_controller':
         return new LynxControllerComponent();
+      case 'kickable':
+        return new KickableComponent();
       case 'dummy_enemy_controller':
         return new DummyEnemyController();
       case 'camera_arm':

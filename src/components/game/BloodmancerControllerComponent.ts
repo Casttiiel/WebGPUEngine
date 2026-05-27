@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+/*import { vec3 } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { BasePlayerController } from './BasePlayerController';
 import { Engine } from '../../core/engine/Engine';
@@ -520,3 +520,4 @@ export class BloodmancerControllerComponent
     throw new Error('Method not implemented.');
   }
 }
+*/

@@ -33,6 +33,7 @@ export enum GameAction {
   // Abilities
   ABILITY_Q = 'ability_q',
   ABILITY_E = 'ability_e',
+  KICK = 'kick',
   ABILITY_R = 'ability_r',
   BLOOD_EXPLOSIVE = 'blood_explosive',
 

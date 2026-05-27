@@ -49,6 +49,7 @@
     "parkour_controller",
     "lynx_controller",
     "dummy_enemy_controller",
+    "kickable",
     "grapple_target",
     "charge_target",
     "skinned_mesh",
