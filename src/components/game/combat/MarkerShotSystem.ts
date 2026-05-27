@@ -1,11 +1,11 @@
 import { vec3 } from 'gl-matrix';
-import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
-import { Engine } from '../../../core/engine/Engine';
+import RAPIER from '@dimforge/rapier3d';
 import { MouseButton } from '../../../types/MouseButton.enum';
-import { Msg } from '../../../core/ecs/Msg';
-import { HealthComponent } from '../HealthComponent';
+import { Engine } from '../../../core/engine/Engine';
+import type { BulletPoolComponent } from '../BulletPoolComponent';
 import type { CameraComponent } from '../../render/CameraComponent';
 import type { MarkSystem } from './MarkSystem';
+import type { MarkerProjectileComponent } from './MarkerProjectileComponent';
 
 export interface MarkerShotSystemData {
   /** Maximum number of stored charges. Default: 3. */
@@ -16,26 +16,22 @@ export interface MarkerShotSystemData {
   shotDamage?: number;
   /** How long a mark lasts in seconds. Default: 15. */
   markDuration?: number;
-  /** Maximum hitscan range in units. Default: 80. */
-  maxRange?: number;
 }
 
 /**
- * MarkerShotSystem — Hitscan shots that mark hit enemies.
+ * MarkerShotSystem — Physical projectile shots that mark hit enemies.
  *
  * Mechanics:
  *  - Up to `maxCharges` charges available at once.
  *  - Charges regenerate at 1 per `rechargeTime` seconds.
- *  - On LMB press (with charges available): fires an instant hitscan ray from
- *    the camera. Any enemy (entity with HealthComponent) takes `shotDamage` and
- *    is registered in MarkSystem for `markDuration` seconds.
+ *  - On LMB press (with charges available): acquires a MarkerProjectileComponent
+ *    from the bullet pool, injects the MarkSystem context, and fires it.
  */
 export class MarkerShotSystem {
   private readonly maxCharges: number;
   private readonly rechargeTime: number;
   private readonly shotDamage: number;
   private readonly markDuration: number;
-  private readonly maxRange: number;
 
   private charges: number;
   private rechargeTimer: number = 0;
@@ -45,21 +41,26 @@ export class MarkerShotSystem {
     this.rechargeTime = data?.rechargeTime ?? 2.5;
     this.shotDamage = data?.shotDamage ?? 5;
     this.markDuration = data?.markDuration ?? 15;
-    this.maxRange = data?.maxRange ?? 80;
     this.charges = this.maxCharges;
   }
 
   // ── Update ─────────────────────────────────────────────────────────────────
 
-  public update(dt: number, camera: CameraComponent | null, markSystem: MarkSystem): void {
+  public update(
+    dt: number,
+    camera: CameraComponent | null,
+    markSystem: MarkSystem,
+    pool: BulletPoolComponent | null,
+    shooterBody: RAPIER.RigidBody | null,
+  ): void {
     this.tickRecharge(dt);
 
-    if (!camera) return;
+    if (!camera || !pool) return;
 
     const input = Engine.getInput();
     if (input.isMouseButtonJustPressed(MouseButton.LEFT) && this.charges > 0) {
       this.charges--;
-      this.fireShot(camera, markSystem);
+      this.fireShot(camera, markSystem, pool, shooterBody);
     }
   }
 
@@ -92,38 +93,24 @@ export class MarkerShotSystem {
     }
   }
 
-  private fireShot(camera: CameraComponent, markSystem: MarkSystem): void {
+  private fireShot(
+    camera: CameraComponent,
+    markSystem: MarkSystem,
+    pool: BulletPoolComponent,
+    shooterBody: RAPIER.RigidBody | null,
+  ): void {
     const cam = camera.getCamera();
     const front = cam.getFront() as vec3;
     const eye = cam.getPosition() as vec3;
 
-    const physics = Engine.getPhysics();
-    const world = physics.getWorld();
+    // Offset muzzle forward so the bullet starts in front of the camera/player
+    const muzzle = vec3.scaleAndAdd(vec3.create(), eye, front, 0.5);
 
-    const ray = new RAPIER.Ray(
-      { x: eye[0], y: eye[1], z: eye[2] },
-      { x: front[0], y: front[1], z: front[2] },
-    );
+    const bullet = pool.acquire() as MarkerProjectileComponent | null;
+    if (!bullet) return; // pool exhausted
 
-    const hit = world.castRay(ray, this.maxRange, true, QueryFilterFlags.EXCLUDE_SENSORS);
-
-    if (!hit) return;
-
-    const entityId = physics.getEntityIdFromCollider(hit.collider.handle);
-    if (entityId === undefined) return;
-
-    const entity = Engine.getEntities().getEntityById(entityId);
-    if (!entity) return;
-
-    const health = entity.getComponent('health') as HealthComponent | null;
-    if (!health) return;
-
-    // Minimal damage
-    entity.sendMsg(
-      Msg.damage({ amount: this.shotDamage, instigator: null, sourceTag: 'lynx_mark_shot' }),
-    );
-
-    // Mark the enemy
-    markSystem.markEnemy(entityId, this.markDuration);
+    bullet.damage = this.shotDamage;
+    bullet.setMarkContext(markSystem, this.markDuration);
+    bullet.fire(muzzle, front, pool.release.bind(pool), shooterBody ?? undefined);
   }
 }

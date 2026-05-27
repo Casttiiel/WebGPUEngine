@@ -16,6 +16,8 @@ import { CharacterControllerComponentDataType } from '../../types/CharacterContr
 import { MarkSystem } from './combat/MarkSystem';
 import { MarkerShotSystem } from './combat/MarkerShotSystem';
 import { LynxDashPunchSystem } from './combat/LynxDashPunchSystem';
+import { BulletPoolComponent } from './BulletPoolComponent';
+import { MarkerBillboardSystem } from './combat/MarkerBillboardSystem';
 import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
 
 // ---------------------------------------------------------------------------
@@ -66,6 +68,8 @@ export class LynxControllerComponent
   private markSystem!: MarkSystem;
   private markerShotSystem!: MarkerShotSystem;
   private dashPunchSystem!: LynxDashPunchSystem;
+  private bulletPool: BulletPoolComponent | null = null;
+  private markerBillboard!: MarkerBillboardSystem;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -104,6 +108,8 @@ export class LynxControllerComponent
       markDuration: data.markerMarkDuration ?? 15,
     });
 
+    this.markerBillboard = new MarkerBillboardSystem();
+
     this.dashPunchSystem = new LynxDashPunchSystem({
       dashSpeed: data.dashPunchSpeed ?? 28,
       maxDashDistance: data.dashPunchMaxDistance ?? 12,
@@ -132,7 +138,15 @@ export class LynxControllerComponent
 
     // Tick systems that run every frame regardless of state.
     this.markSystem.update(deltaTime);
-    this.markerShotSystem.update(deltaTime, this.camera, this.markSystem);
+    this.markSystem.updateNDC(this.camera);
+    this.markerShotSystem.update(
+      deltaTime,
+      this.camera,
+      this.markSystem,
+      this.getBulletPool(),
+      this.capsuleCollider.getRigidBody(),
+    );
+    this.markerBillboard.update(deltaTime, this.markSystem);
     this.dashPunchSystem.tickCooldown(deltaTime);
 
     // Mantle / Vault detection runs during IDLE only.
@@ -371,6 +385,13 @@ export class LynxControllerComponent
         return;
       }
     }
+  }
+
+  private getBulletPool(): BulletPoolComponent | null {
+    if (!this.bulletPool) {
+      this.bulletPool = this.getOwner().getComponent('bullet_pool') as BulletPoolComponent | null;
+    }
+    return this.bulletPool;
   }
 
   private updateGroundedState(): void {

@@ -65,6 +65,7 @@ import { BasePlayerController } from '../../components/game/BasePlayerController
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
 import { DaggerProjectileComponent } from '../../components/game/combat/DaggerProjectileComponent';
+import { MarkerProjectileComponent } from '../../components/game/combat/MarkerProjectileComponent';
 import { GrappleTargetComponent } from '../../components/game/GrappleTargetComponent';
 import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
 import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
@@ -418,6 +419,8 @@ export class Loader {
         return new ProjectileComponent();
       case 'dagger_projectile':
         return new DaggerProjectileComponent();
+      case 'marker_projectile':
+        return new MarkerProjectileComponent();
       case 'blood_ball_projectile':
         return new BloodBallProjectileComponent();
       case 'blood_explosive_projectile':

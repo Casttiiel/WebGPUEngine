@@ -127,13 +127,13 @@ export class TextureStreamingManager {
       const texture = this.queue.shift()!;
       if (!texture.isStreamable()) continue;
       this.inFlight++;
-      console.log(
+      /*console.log(
         `[TextureStreaming] ▶ uploading: ${texture.getName()} (in-flight: ${this.inFlight})`,
-      );
+      );*/
       texture
         .streamFullResolution()
         .then(() => {
-          console.log(`[TextureStreaming] ✔ done: ${texture.getName()}`);
+          //console.log(`[TextureStreaming] ✔ done: ${texture.getName()}`);
         })
         .finally(() => {
           this.inFlight = Math.max(0, this.inFlight - 1);

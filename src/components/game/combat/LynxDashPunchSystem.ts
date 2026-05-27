@@ -30,10 +30,9 @@ export interface LynxDashPunchSystemData {
  * Mechanics:
  *  - Activated by GameAction.ABILITY_Q (while cooldown is zero).
  *  - Launches the character in the current camera look direction (full 3D, including Y).
- *  - While dashing, a forward raycast checks for enemy entities each frame.
- *    On collision → deals damage there, dash ends immediately.
- *  - If no collision during travel, a short forward cast at the endpoint deals
- *    damage to any enemy directly ahead.
+ *  - While dashing, a forward raycast stops the dash when an enemy is hit.
+ *  - On stop (collision or max distance reached), a short forward cast deals damage
+ *    to any enemy directly ahead (endHitRange).
  *  - 10 s cooldown (configurable).
  *  - If the hit target was marked by MarkerShotSystem → cooldown resets to 0.
  */
@@ -125,16 +124,16 @@ export class LynxDashPunchSystem {
     const remaining = this.maxDashDistance - this.distanceTraveled;
 
     if (remaining <= frameDistance) {
-      // Reached the end of the dash — deal endpoint damage then stop.
+      // Reached the end of the dash — deal damage to whatever is directly ahead.
       this.dealEndDamage(controller, markSystem);
       this.active = false;
       return vec3.create();
     }
 
-    // Check for enemy collisions ahead before moving.
+    // Stop the dash if an enemy is in the path — damage fires as endpoint cast.
     const hit = this.probeEnemyAhead(controller, this.probeDistance + frameDistance);
     if (hit) {
-      this.dealDamage(hit, markSystem);
+      this.dealEndDamage(controller, markSystem);
       this.active = false;
       return vec3.create();
     }
@@ -146,9 +145,8 @@ export class LynxDashPunchSystem {
   // ── Private helpers ─────────────────────────────────────────────────────────
 
   /**
-   * Casts a ray from the character's current position in the dash direction.
-   * Returns the first hit entity that has a HealthComponent (i.e. an enemy),
-   * or null if nothing is hit.
+   * Casts a short ray in the dash direction from the character's position.
+   * Returns the first entity with a HealthComponent in range, or null.
    */
   private probeEnemyAhead(controller: IMovementController, distance: number): Entity | null {
     const collider = controller.getCollider();
@@ -200,13 +198,22 @@ export class LynxDashPunchSystem {
   }
 
   /**
-   * At the natural end of the dash, cast a short ray forward to check for
-   * any enemy in melee range and damage it.
+   * At the end of the dash (collision or distance), damage any enemy directly
+   * ahead. If no enemy but a world mark is nearby, consume it and reset cooldown.
    */
   private dealEndDamage(controller: IMovementController, markSystem: MarkSystem): void {
     const enemy = this.probeEnemyAhead(controller, this.endHitRange);
     if (enemy) {
       this.dealDamage(enemy, markSystem);
+      return;
+    }
+
+    // Check for a world mark in range — dashing into one resets the cooldown
+    const rb = controller.getCollider().getRigidBody();
+    const t = rb.translation();
+    const pos = vec3.fromValues(t.x, t.y, t.z);
+    if (markSystem.clearWorldMarkNear(pos, this.endHitRange)) {
+      this.cooldownTimer = 0;
     }
   }
 }

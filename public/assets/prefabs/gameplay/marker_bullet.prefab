@@ -1,0 +1,56 @@
+{
+  "components": {
+    "name": "MarkerBullet",
+    "transform": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.04,
+        0.04,
+        0.22
+      ]
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "emissive.mat"
+        }
+      ]
+    },
+    "marker_projectile": {
+      "speed": 120,
+      "maxRange": 150,
+      "damage": 5,
+      "gravity": 0,
+      "sourceTag": "lynx_mark_shot"
+    },
+    "trail_renderer": {
+      "type": "ribbon",
+      "maxNodes": 300,
+      "minNodeDistance": 0.02,
+      "width": 0.05,
+      "lifetime": 0.18,
+      "startColor": [
+        0.1,
+        0.9,
+        1,
+        1
+      ],
+      "endColor": [
+        0,
+        0.3,
+        0.8,
+        0
+      ]
+    }
+  }
+}
