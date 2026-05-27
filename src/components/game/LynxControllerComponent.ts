@@ -282,7 +282,7 @@ export class LynxControllerComponent
   }
 
   public override applyImpulseFromPad(impulse: vec3): void {
-    this.movement.applyImpulse(impulse);
+    this.movement.setVelocity(impulse);
     this.inputDisableTimer = this.impulsePadInputDisableTime;
   }
 

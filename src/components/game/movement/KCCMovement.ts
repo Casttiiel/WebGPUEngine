@@ -242,7 +242,7 @@ export class KCCMovement extends Component {
 
   // ── Velocity overrides ─────────────────────────────────────────────────────
 
-  /** Add an instantaneous velocity impulse (knockback, impulse pads). */
+  /** Add an instantaneous velocity impulse (knockback, hits). Always additive. */
   public applyImpulse(impulse: vec3): void {
     this.vx += impulse[0];
     this.vy += impulse[1];

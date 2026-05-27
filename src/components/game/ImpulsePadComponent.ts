@@ -3,6 +3,7 @@ import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
 import { BasePlayerController } from './BasePlayerController';
+import { KCCMovement } from './movement/KCCMovement';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
 import type { IMsg } from '../../core/ecs/Msg';
@@ -34,19 +35,24 @@ export class ImpulsePadComponent extends Component {
 
   private onEntityEnter(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('player_controller')) {
-      this.entitiesInside.add(entityId);
-      (entity.getComponent('player_controller') as BasePlayerController)?.applyImpulseFromPad(
-        vec3.scale(vec3.create(), this.getUp(), this.force),
+    if (!entity) return;
+
+    const impulse = vec3.scale(vec3.create(), this.getUp(), this.force);
+    this.entitiesInside.add(entityId);
+
+    if (entity.hasComponent('player_controller')) {
+      // Player: applyImpulseFromPad handles both the launch and input-disable timer.
+      (entity.getComponent('player_controller') as BasePlayerController).applyImpulseFromPad(
+        impulse,
       );
+    } else {
+      const kcc = entity.getComponent('kcc_movement') as KCCMovement | null;
+      kcc?.setVelocity(impulse);
     }
   }
 
   private onEntityExit(entityId: number): void {
-    const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('player_controller')) {
-      this.entitiesInside.delete(entityId);
-    }
+    this.entitiesInside.delete(entityId);
   }
 
   public update(): void {}

@@ -18,6 +18,9 @@
 
 ## Gameplay
 
+1. Trampa
+2. Marcador
+
 ## Visuals and Sound
 
 1. Start Screen
