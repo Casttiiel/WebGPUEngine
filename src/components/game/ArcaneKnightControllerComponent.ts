@@ -536,7 +536,13 @@ export class ArcaneKnightControllerComponent
 
 // Stub — class is temporarily disabled.
 export class ArcaneKnightControllerComponent {
-  getGrappleSystem(): null { return null; }
-  getIsGrounded(): boolean { return false; }
-  getGrappleTarget(): null { return null; }
+  getGrappleSystem(): null {
+    return null;
+  }
+  getIsGrounded(): boolean {
+    return false;
+  }
+  getGrappleTarget(): null {
+    return null;
+  }
 }

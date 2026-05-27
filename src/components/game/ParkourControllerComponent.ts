@@ -598,8 +598,12 @@ export class ParkourControllerComponent
 
 // Stub — class is temporarily disabled.
 export class ParkourControllerComponent {
-  getCurrentSpeed(): number { return 0; }
-  getIsGrounded(): boolean { return false; }
+  getCurrentSpeed(): number {
+    return 0;
+  }
+  getIsGrounded(): boolean {
+    return false;
+  }
 }
 // HeadBobComponent imports it under the old alias.
 export { ParkourControllerComponent as CharacterControllerComponent };
