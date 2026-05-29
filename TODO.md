@@ -20,7 +20,7 @@
 ## Gameplay
 
 Movimiento mal en el aire
-Lanza unnatural movement and return
+Dash to spear
 
 ## Visuals and Sound
 

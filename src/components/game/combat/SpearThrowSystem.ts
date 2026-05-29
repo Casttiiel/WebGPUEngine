@@ -77,7 +77,7 @@ export class SpearThrowSystem {
         if (input.isActionJustPressed(GameAction.ABILITY_R)) {
           const spear = this.spear;
           this.state = SpearSystemState.RETURNING;
-          spear.startRecall(() => this.getRecallTarget(playerTransform));
+          spear.startRecall(() => this.getRecallTarget(camera, playerTransform));
           break;
         }
 
@@ -134,20 +134,26 @@ export class SpearThrowSystem {
     spear.fire(
       origin,
       direction,
-      null, // no rigid body exclusion needed (spear is not a physics body)
+      () => this.getRecallTarget(camera, playerTransform),
       (_hitPoint) => {
         // Spear embedded — transition to EMBEDDED state
         this.state = SpearSystemState.EMBEDDED;
       },
       () => {
-        // Spear returned to player (pickup or recall arrived)
+        // Spear returned to player (pickup, recall, or auto-recall arrived)
         this.state = SpearSystemState.READY;
       },
     );
   }
 
-  /** Target position for the recall: player chest (eye level - a bit). */
-  private getRecallTarget(playerTransform: TransformComponent): vec3 {
+  /** Target position for the recall: camera position (where the player is looking from). */
+  private getRecallTarget(
+    camera: CameraComponent | null,
+    playerTransform: TransformComponent,
+  ): vec3 {
+    if (camera) {
+      return vec3.clone(camera.getCamera().getPosition());
+    }
     const root = playerTransform.getTransform().getWorldPosition();
     return vec3.fromValues(root[0], root[1] + this.muzzleHeightOffset, root[2]);
   }

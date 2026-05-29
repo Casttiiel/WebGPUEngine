@@ -218,40 +218,12 @@ export class HUDController extends WidgetController {
 
   // ── Marker charge HUD (Lynx) ───────────────────────────────────────────────
 
-  private updateMarkerCharges(): void {
-    if (!this.lynxController) return;
-    const maxCharges = this.lynxController.getMarkerMaxCharges();
-    const charges = this.lynxController.getMarkerCharges();
-    const progress = this.lynxController.getMarkerRechargeProgress();
-
-    for (let i = 0; i < this.MAX_CHARGE_SLOTS; i++) {
-      const slot = this.chargeSlots[i];
-      const fill = this.chargeFills[i];
-
-      const active = i < maxCharges;
-      slot?.setVisible(active); // hiding slot also hides its fill child
-      if (!fill || !active) continue;
-
-      if (i < charges) {
-        // Full charge — cyan
-        fill.setColor(0.1, 0.9, 1.0, 1.0);
-        fill.setSize(this.chargeFillMaxWidth, fill.getHeight());
-      } else if (i === charges) {
-        // Recharging slot — dim cyan, width = progress
-        fill.setColor(0.1, 0.4, 0.5, 0.8);
-        fill.setSize(Math.max(2, progress * this.chargeFillMaxWidth), fill.getHeight());
-      } else {
-        // Empty slot beyond recharging one
-        fill.setColor(0.1, 0.4, 0.5, 0.8);
-        fill.setSize(2, fill.getHeight());
-      }
-    }
-  }
+  private updateMarkerCharges(): void {}
 
   // ── Crosshair tint ──────────────────────────────────────────────────
 
   private updateCrosshair(): void {
-    if (!this.crosshair) return;
+    /*if (!this.crosshair) return;
 
     const target = this.grappleController?.getPendingGrappleTarget() ?? null;
     if (!target) {
@@ -277,6 +249,6 @@ export class HUDController extends WidgetController {
       default:
         color = HUDController.COLOR_DEFAULT;
     }
-    this.crosshair.setColor(color[0], color[1], color[2], color[3]);
+    this.crosshair.setColor(color[0], color[1], color[2], color[3]);*/
   }
 }

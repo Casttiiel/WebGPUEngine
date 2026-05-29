@@ -27,7 +27,7 @@
       ]
     },
     "spear_projectile": {
-      "speed": 30,
+      "speed": 60,
       "returnSpeed": 38,
       "damage": 20,
       "maxRange": 50,
