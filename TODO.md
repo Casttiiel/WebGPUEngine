@@ -19,7 +19,7 @@
 
 ## Gameplay
 
-Movimiento mal en el aire
+Kick (Up) (Repeated)
 Dash to spear
 
 ## Visuals and Sound

@@ -428,11 +428,24 @@ export class KCCMovement extends Component {
           }
         }
       } else {
-        // Air: per-axis approach when steering, drag when not.
+        // Air: vector acceleration toward desired velocity.
+        // Per-axis approach causes the velocity to sweep through sideways directions
+        // when one axis reaches its target before the other. Using a single capped
+        // delta vector keeps the path straight in velocity space.
         const airAccel = this.groundAcceleration * this.airControl;
         if (hasInput) {
-          this.vx = approach(this.vx, dx, airAccel * dt);
-          this.vz = approach(this.vz, dz, airAccel * dt);
+          const maxDelta = airAccel * dt;
+          const ddx = dx - this.vx;
+          const ddz = dz - this.vz;
+          const dlen = Math.sqrt(ddx * ddx + ddz * ddz);
+          if (dlen <= maxDelta) {
+            this.vx = dx;
+            this.vz = dz;
+          } else {
+            const inv = maxDelta / dlen;
+            this.vx += ddx * inv;
+            this.vz += ddz * inv;
+          }
         } else {
           const drag = Math.pow(1.0 - this.airDrag, dt);
           this.vx *= drag;
