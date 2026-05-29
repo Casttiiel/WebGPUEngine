@@ -55,6 +55,10 @@ export type LynxControllerComponentDataType = {
   /** Input-disable time applied to the player on wall-kick (seconds). Default: 0.12. */
   kickSelfInputDisableTime?: number;
 
+  // ── Spear throw ─────────────────────────────────────────────────────────────
+  /** Scene entity name that holds the SpearProjectileComponent. Default: 'LynxSpear'. */
+  spearEntityName?: string;
+
   // ── Misc ────────────────────────────────────────────────────────────────────
   impulsePadInputDisableTime?: number;
 };

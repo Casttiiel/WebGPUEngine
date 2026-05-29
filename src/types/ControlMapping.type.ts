@@ -57,6 +57,7 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
   ability_e: { type: InputType.MOUSE_BUTTON, button: MouseButton.MIDDLE },
   ability_q: { type: InputType.MOUSE_BUTTON, button: MouseButton.MIDDLE },
   kick: { type: InputType.KEYBOARD, key: KeyCode.F },
+  ability_r: { type: InputType.KEYBOARD, key: KeyCode.R },
   blood_explosive: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
   use: { type: InputType.KEYBOARD, key: KeyCode.NUM_3 }, // Temporal
 

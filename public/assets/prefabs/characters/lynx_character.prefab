@@ -38,22 +38,10 @@
       "jumpCutFactor": 0.7,
       "jumpCutVelocityLimit": 1,
       "coyoteTime": 0.15,
-      "maxAirJumps": 1
+      "maxAirJumps": 0
     },
     "lynx_controller": {
       "moveSpeed": 11,
-      "maxSpeed": 17,
-      "airControl": 0.65,
-      "groundAcceleration": 65,
-      "groundDeceleration": 65,
-      "airDrag": 0.3,
-      "jumpHeight": 1.3,
-      "jumpTimeToPeak": 0.38,
-      "jumpTimeToDescent": 0.32,
-      "jumpCutFactor": 0.7,
-      "jumpCutVerticalVelocityLimit": 1,
-      "coyoteTime": 0.15,
-      "maxAirJumps": 1,
       "mantleDetectionDistance": 1.5,
       "mantleMaxHeight": -0.025,
       "mantlingMinVerticalVelocity": -9,

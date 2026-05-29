@@ -20,6 +20,7 @@ import { LynxDashPunchSystem } from './combat/LynxDashPunchSystem';
 import { KickSystem } from './combat/KickSystem';
 import { BulletPoolComponent } from './BulletPoolComponent';
 import { MarkerBillboardSystem } from './combat/MarkerBillboardSystem';
+import { SpearThrowSystem } from './combat/SpearThrowSystem';
 import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
 
 // ---------------------------------------------------------------------------
@@ -62,12 +63,9 @@ export class LynxControllerComponent
   private mantleSystem!: MantleSystem;
   private vaultSystem!: VaultSystem;
 
-  private markSystem!: MarkSystem;
-  private markerShotSystem!: MarkerShotSystem;
   private dashPunchSystem!: LynxDashPunchSystem;
   private kickSystem!: KickSystem;
-  private bulletPool: BulletPoolComponent | null = null;
-  private markerBillboard!: MarkerBillboardSystem;
+  private spearThrowSystem!: SpearThrowSystem;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -88,17 +86,6 @@ export class LynxControllerComponent
 
     this.mantleSystem = new MantleSystem(this, data);
     this.vaultSystem = new VaultSystem(this);
-
-    this.markSystem = new MarkSystem();
-
-    this.markerShotSystem = new MarkerShotSystem({
-      maxCharges: data.markerMaxCharges ?? 3,
-      rechargeTime: data.markerRechargeTime ?? 2.5,
-      shotDamage: data.markerShotDamage ?? 5,
-      markDuration: data.markerMarkDuration ?? 15,
-    });
-
-    this.markerBillboard = new MarkerBillboardSystem();
 
     this.dashPunchSystem = new LynxDashPunchSystem({
       dashSpeed: data.dashPunchSpeed ?? 28,
@@ -122,6 +109,10 @@ export class LynxControllerComponent
         ? { selfInputDisableTime: data.kickSelfInputDisableTime }
         : {}),
     });
+
+    this.spearThrowSystem = new SpearThrowSystem(
+      data.spearEntityName !== undefined ? { spearEntityName: data.spearEntityName } : undefined,
+    );
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
@@ -160,6 +151,7 @@ export class LynxControllerComponent
       /*this.mantleSystem.update();
       this.vaultSystem.update();*/
       this.kickSystem.update(deltaTime);
+      this.spearThrowSystem.update(deltaTime, this.camera, this.getTransform());
 
       // Try to start the dash punch.
       /*if (this.dashPunchSystem.tryStart(this.camera)) {
@@ -394,22 +386,6 @@ export class LynxControllerComponent
 
   public applyJumpFromSystem(): void {
     this.movement.applyJump();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Ability queries (for HUD / debug)
-  // ---------------------------------------------------------------------------
-
-  public getMarkerCharges(): number {
-    return this.markerShotSystem.getCharges();
-  }
-
-  public getMarkerMaxCharges(): number {
-    return this.markerShotSystem.getMaxCharges();
-  }
-
-  public getMarkerRechargeProgress(): number {
-    return this.markerShotSystem.getRechargeProgress();
   }
 
   public getDashCooldownTimer(): number {

@@ -36,6 +36,7 @@
     "projectile",
     "dagger_projectile",
     "marker_projectile",
+    "spear_projectile",
     "blood_explosive_projectile",
     "homing_projectile",
     "melee_attack",
