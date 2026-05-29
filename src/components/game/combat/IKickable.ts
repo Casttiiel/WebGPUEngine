@@ -9,4 +9,6 @@ import type { vec3 } from 'gl-matrix';
  */
 export interface IKickable {
   applyKnockback(impulse: vec3, duration?: number): void;
+  /** Returns true while the entity is in a stun / knockback state. */
+  isStunned(): boolean;
 }

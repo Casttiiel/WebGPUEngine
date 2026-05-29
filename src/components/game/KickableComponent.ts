@@ -49,6 +49,14 @@ export class KickableComponent extends Component {
     }
   }
 
+  public isStunned(): boolean {
+    // Delegate to EnemyControllerComponent if present.
+    const ctrl = this.getOwner().getComponent('enemy_controller') as {
+      isStunned(): boolean;
+    } | null;
+    return ctrl?.isStunned() ?? false;
+  }
+
   public update(_dt: number): void {}
   public renderDebug(): void {}
 

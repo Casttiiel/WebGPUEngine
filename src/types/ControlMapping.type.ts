@@ -54,6 +54,7 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
 
   // Interaction
   interact: { type: InputType.KEYBOARD, key: KeyCode.E },
+  parry: { type: InputType.KEYBOARD, key: KeyCode.E },
   ability_e: { type: InputType.MOUSE_BUTTON, button: MouseButton.MIDDLE },
   ability_q: { type: InputType.MOUSE_BUTTON, button: MouseButton.MIDDLE },
   kick: { type: InputType.KEYBOARD, key: KeyCode.F },

@@ -92,11 +92,6 @@
     },
     "health": {
       "maxHp": 100
-    },
-    "bullet_pool": {
-      "prefab": "gameplay/marker_bullet.prefab",
-      "size": 6,
-      "projectileType": "marker_projectile"
     }
   },
   "children": [

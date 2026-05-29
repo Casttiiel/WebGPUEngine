@@ -46,6 +46,7 @@ export class SpearThrowSystem {
 
   private state: SpearSystemState = SpearSystemState.READY;
   private spear: SpearProjectileComponent | null = null;
+  private justPickedUp = false;
 
   // Dash-to-spear state
   private dashDir: vec3 = vec3.create();
@@ -133,6 +134,21 @@ export class SpearThrowSystem {
     return this.state === SpearSystemState.EMBEDDED;
   }
 
+  /** True while the spear is flying back toward the player after a recall. */
+  public isReturning(): boolean {
+    return this.state === SpearSystemState.RETURNING;
+  }
+
+  /**
+   * Returns true (once) when the spear was just collected by the player.
+   * Consumes the flag — subsequent calls return false until the next pickup.
+   */
+  public consumeJustPickedUp(): boolean {
+    const v = this.justPickedUp;
+    this.justPickedUp = false;
+    return v;
+  }
+
   // ── Private ────────────────────────────────────────────────────────────────
 
   private throwSpear(camera: CameraComponent, playerTransform: TransformComponent): void {
@@ -166,6 +182,7 @@ export class SpearThrowSystem {
       },
       () => {
         // Spear returned to player (pickup, recall, or auto-recall arrived)
+        this.justPickedUp = true;
         this.state = SpearSystemState.READY;
       },
     );

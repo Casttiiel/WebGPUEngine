@@ -317,6 +317,11 @@ export class EnemyControllerComponent extends Component implements IKickable {
     this.knockbackTimer = duration;
   }
 
+  /** True while the enemy is in a stun/knockback state and AI movement is suppressed. */
+  public isStunned(): boolean {
+    return this.knockbackTimer > 0;
+  }
+
   /**
    * Called by BloodZoneComponent each frame the enemy is inside the zone.
    * Stacks duration additively so re-entering the zone refreshes the slow.

@@ -19,6 +19,9 @@
 
 ## Gameplay
 
+Dash to Spear as state on switch (set velocity to 0 on all axys)
+Gravity
+
 ## Visuals and Sound
 
 1. Start Screen

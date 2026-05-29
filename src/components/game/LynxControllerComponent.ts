@@ -1,7 +1,5 @@
-import { vec3, quat } from 'gl-matrix';
-import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
-import { Loader } from '../../core/loaders/Loader';
-import type { EntityDataType } from '../../types/SceneData.type';
+﻿import { vec3 } from 'gl-matrix';
+import RAPIER from '@dimforge/rapier3d';
 import { BasePlayerController } from './BasePlayerController';
 import { Engine } from '../../core/engine/Engine';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
@@ -14,14 +12,14 @@ import { VaultSystem } from './movement/VaultSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { GameAction } from '../../types/GameAction.enum';
-import { MarkSystem } from './combat/MarkSystem';
-import { MarkerShotSystem } from './combat/MarkerShotSystem';
 import { LynxDashPunchSystem } from './combat/LynxDashPunchSystem';
 import { KickSystem } from './combat/KickSystem';
-import { BulletPoolComponent } from './BulletPoolComponent';
-import { MarkerBillboardSystem } from './combat/MarkerBillboardSystem';
 import { SpearThrowSystem } from './combat/SpearThrowSystem';
+import { ParrySystem } from './combat/ParrySystem';
+import { HealthComponent } from './HealthComponent';
+import { CollisionGroups } from '../../types/CollisionGroups.enum';
 import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
+import { Entity } from '../../core/ecs/Entity';
 
 // ---------------------------------------------------------------------------
 // LynxControllerComponent
@@ -66,6 +64,7 @@ export class LynxControllerComponent
   private dashPunchSystem!: LynxDashPunchSystem;
   private kickSystem!: KickSystem;
   private spearThrowSystem!: SpearThrowSystem;
+  private parrySystem!: ParrySystem;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -114,6 +113,8 @@ export class LynxControllerComponent
       data.spearEntityName !== undefined ? { spearEntityName: data.spearEntityName } : undefined,
     );
 
+    this.parrySystem = new ParrySystem();
+
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 
@@ -121,6 +122,14 @@ export class LynxControllerComponent
     this.movement = this.getOwner().getComponent('kcc_movement') as KCCMovement;
     if (!this.movement) {
       console.error('LynxControllerComponent: KCCMovement component not found.');
+    }
+
+    // Wire parry interceptor into HealthComponent so hits during the window are blocked.
+    const health = this.getOwner().getComponent('health') as HealthComponent | null;
+    if (health) {
+      health.setDamageInterceptor((_amount: number, instigator: Entity | null) =>
+        this.parrySystem.tryConsume(instigator),
+      );
     }
   }
 
@@ -239,6 +248,21 @@ export class LynxControllerComponent
               this.getTargetMovement(this.getInputVector()),
               this.movement.getMaxSpeed(),
             );
+
+        // Parry.
+        this.parrySystem.update(deltaTime);
+
+        // AoE: if the window is active and the spear arrives, trigger the launch.
+        if (this.parrySystem.isWindowOpen() && this.spearThrowSystem.consumeJustPickedUp()) {
+          const parryPos = vec3.clone(this.getTransform().getTransform().getWorldPosition());
+          this.performSpearReturnParry(parryPos);
+        }
+
+        if (!inputDisabled && input.isActionBuffered(GameAction.PARRY)) {
+          if (this.parrySystem.tryOpenWindow()) {
+            input.consumeBufferedAction(GameAction.PARRY);
+          }
+        }
 
         // Spear dash — fly straight toward the embedded spear (overrides normal movement).
         if (this.spearThrowSystem.isDashingToSpear()) {
@@ -473,6 +497,45 @@ export class LynxControllerComponent
     const dot = vec3.dot(v, normal);
     const proj = vec3.scale(vec3.create(), normal, dot);
     return vec3.subtract(vec3.create(), v, proj);
+  }
+
+  /**
+   * AoE launch triggered by pressing parry while the spear is returning.
+   * Uses a Rapier sphere overlap query to find all enemies within radius.
+   */
+  private performSpearReturnParry(playerPos: vec3): void {
+    const radius = 8;
+    const upImpulse = vec3.fromValues(0, 18, 0);
+
+    const physics = Engine.getPhysics();
+    const world = physics.getWorld();
+    const ball = new RAPIER.Ball(radius);
+    const shapePos = { x: playerPos[0], y: playerPos[1], z: playerPos[2] };
+    const shapeRot = { x: 0, y: 0, z: 0, w: 1 };
+    // Membership: any; filter: only colliders in the ENEMY group.
+    const filterGroups = (0xffff << 16) | (CollisionGroups.ENEMY & 0xffff);
+    const seen = new Set<number>();
+
+    world.intersectionsWithShape(
+      shapePos,
+      shapeRot,
+      ball,
+      (collider) => {
+        const entityId = physics.getEntityIdFromCollider(collider.handle);
+        if (entityId === undefined || seen.has(entityId)) return true;
+        seen.add(entityId);
+
+        const entity = Engine.getEntities().getEntityById(entityId);
+        (
+          entity?.getComponent('kickable') as { applyKnockback(impulse: vec3): void } | null
+        )?.applyKnockback(upImpulse);
+        return true;
+      },
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+      filterGroups,
+    );
+
+    this.parrySystem.startCooldown();
   }
 
   public override renderDebug(): void {}

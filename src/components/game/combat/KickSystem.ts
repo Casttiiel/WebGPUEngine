@@ -107,9 +107,13 @@ export class KickSystem {
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private kickTarget(kickable: IKickable, kickDir: vec3): void {
-    const impulse = vec3.scale(vec3.create(), kickDir, this.enemyKnockbackForce);
-    impulse[1] = this.enemyKnockbackUpForce;
-    kickable.applyKnockback(impulse, this.enemyKnockbackDuration);
+    const stunned = kickable.isStunned();
+    // Powered kick on stunned enemies: 2.5× force, 2× duration.
+    const forceMult = stunned ? 2.5 : 1.0;
+    const durationMult = stunned ? 2.0 : 1.0;
+    const impulse = vec3.scale(vec3.create(), kickDir, this.enemyKnockbackForce * forceMult);
+    impulse[1] = this.enemyKnockbackUpForce * forceMult;
+    kickable.applyKnockback(impulse, this.enemyKnockbackDuration * durationMult);
   }
 
   private wallKick(wallFacing: vec3): void {
