@@ -1,5 +1,5 @@
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
-import { vec3, quat } from 'gl-matrix';
+import { vec3, quat, mat4 } from 'gl-matrix';
 import { Component } from '../../../core/ecs/Component';
 import { Engine } from '../../../core/engine/Engine';
 import { TransformComponent } from '../../core/TransformComponent';
@@ -87,6 +87,11 @@ export class SpearProjectileComponent extends Component {
   private traveledDistance: number = 0;
   private autoRecallTarget: (() => vec3) | null = null;
 
+  /** If the spear is embedded in an enemy, this tracks that enemy's transform. */
+  private attachedTransform: TransformComponent | null = null;
+  /** Hit point expressed in the attached entity's local space. */
+  private readonly attachedLocalOffset: vec3 = vec3.create();
+
   private returnCurrentSpeed: number = 0;
   private returnDelayTimer: number = 0;
   private returnArcAmplitude: number = 1.5;
@@ -107,7 +112,7 @@ export class SpearProjectileComponent extends Component {
     this.airFriction = data.airFriction ?? 0.1;
     this.maxRange = data.maxRange ?? 50;
     this.damage = data.damage ?? 20;
-    this.pickupRadius = data.pickupRadius ?? 1.8;
+    this.pickupRadius = data.pickupRadius ?? 1.0;
     this.returnDelay = data.returnDelay ?? 0.12;
     this.returnStartSpeed = data.returnStartSpeed ?? 5;
     this.returnAcceleration = data.returnAcceleration ?? 140;
@@ -131,6 +136,7 @@ export class SpearProjectileComponent extends Component {
     this.onHitCallback = onHit;
     this.onPickedUpCallback = onPickedUp;
     this.traveledDistance = 0;
+    this.attachedTransform = null;
 
     // Velocity = aim direction * initial speed
     const dir = vec3.normalize(vec3.create(), direction);
@@ -205,11 +211,19 @@ export class SpearProjectileComponent extends Component {
     return this.state === SpearState.EMBEDDED;
   }
 
+  /** World-space position of the spear when embedded; null otherwise. */
+  public getEmbeddedPosition(): vec3 | null {
+    if (this.state !== SpearState.EMBEDDED) return null;
+    return vec3.clone(this.getTransform().getWorldPosition());
+  }
+
   // ── ECS update ─────────────────────────────────────────────────────────────
 
   public update(dt: number): void {
     if (this.state === SpearState.FLYING) {
       this.updateFlying(dt);
+    } else if (this.state === SpearState.EMBEDDED) {
+      this.updateEmbedded();
     } else if (this.state === SpearState.RETURNING) {
       this.updateReturning(dt);
     }
@@ -275,6 +289,13 @@ export class SpearProjectileComponent extends Component {
       const entity = Engine.getEntities().getEntityById(entityId);
       if (entity?.getComponent('health') instanceof HealthComponent) {
         entity.sendMsg(Msg.damage({ amount: this.damage, instigator: null }));
+        // Attach spear to this enemy so it follows when kicked/moved.
+        const enemyT = entity.getComponent('transform') as TransformComponent | null;
+        if (enemyT) {
+          this.attachedTransform = enemyT;
+          const worldToLocal = mat4.invert(mat4.create(), enemyT.getTransform().getWorldMatrix());
+          vec3.transformMat4(this.attachedLocalOffset, hitPoint, worldToLocal);
+        }
       }
     }
     this.embed(hitPoint);
@@ -285,6 +306,18 @@ export class SpearProjectileComponent extends Component {
     const cb = this.onHitCallback;
     this.onHitCallback = null;
     cb?.(position);
+  }
+
+  // ── Private: EMBEDDED ──────────────────────────────────────────────────────
+
+  /** Follow an attached enemy (e.g. kicked while spear is stuck in them). */
+  private updateEmbedded(): void {
+    if (!this.attachedTransform) return;
+    const worldMatrix = this.attachedTransform.getTransform().getWorldMatrix();
+    const worldPos = vec3.transformMat4(vec3.create(), this.attachedLocalOffset, worldMatrix);
+    const t = this.getTransform();
+    t.setLocalPosition(worldPos);
+    t.markDirty();
   }
 
   // ── Private: RETURNING ────────────────────────────────────────────────────
@@ -354,6 +387,7 @@ export class SpearProjectileComponent extends Component {
     this.state = SpearState.PARKED;
     this.returnTarget = null;
     this.autoRecallTarget = null;
+    this.attachedTransform = null;
     const t = this.getTransform();
     t.setLocalPosition(SPEAR_PARK_POSITION);
     t.markDirty();

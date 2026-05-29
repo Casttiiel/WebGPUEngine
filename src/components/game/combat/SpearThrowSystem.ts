@@ -12,6 +12,10 @@ export interface SpearThrowSystemData {
   muzzleForwardOffset?: number;
   /** Vertical offset of the throw origin relative to player root (units). Default: 1.4. */
   muzzleHeightOffset?: number;
+  /** Speed of the dash-to-spear movement (m/s). Default: 22. */
+  spearDashSpeed?: number;
+  /** Max travel distance for a spear dash before it gives up (units). Default: 25. */
+  spearDashMaxDistance?: number;
 }
 
 const enum SpearSystemState {
@@ -19,6 +23,7 @@ const enum SpearSystemState {
   IN_FLIGHT = 1,
   EMBEDDED = 2,
   RETURNING = 3,
+  DASHING_TO_SPEAR = 4,
 }
 
 /**
@@ -36,14 +41,24 @@ export class SpearThrowSystem {
   private readonly spearEntityName: string;
   private readonly muzzleForwardOffset: number;
   private readonly muzzleHeightOffset: number;
+  private readonly spearDashSpeed: number;
+  private readonly spearDashMaxDistance: number;
 
   private state: SpearSystemState = SpearSystemState.READY;
   private spear: SpearProjectileComponent | null = null;
+
+  // Dash-to-spear state
+  private dashDir: vec3 = vec3.create();
+  private dashTraveled: number = 0;
+  /** Distance from player to spear at the moment the dash was started. Used for arc progress. */
+  private dashTotalDist: number = 0;
 
   constructor(data?: SpearThrowSystemData) {
     this.spearEntityName = data?.spearEntityName ?? 'LynxSpear';
     this.muzzleForwardOffset = data?.muzzleForwardOffset ?? 0.5;
     this.muzzleHeightOffset = data?.muzzleHeightOffset ?? 1.4;
+    this.spearDashSpeed = data?.spearDashSpeed ?? 22;
+    this.spearDashMaxDistance = data?.spearDashMaxDistance ?? 25;
   }
 
   // ── Update (call from LynxControllerComponent IDLE state) ─────────────────
@@ -81,6 +96,11 @@ export class SpearThrowSystem {
           break;
         }
 
+        // Dash to spear: press Shift while roughly facing it.
+        if (input.isActionJustPressed(GameAction.ROLL)) {
+          if (this.tryStartSpearDash(camera, playerTransform)) break;
+        }
+
         // Auto-pickup: walk close enough.
         const playerPos = playerTransform.getTransform().getWorldPosition();
         if (this.spear.tryAutoPickup(playerPos)) {
@@ -91,6 +111,11 @@ export class SpearThrowSystem {
 
       case SpearSystemState.RETURNING: {
         // Waiting for the onPickedUp callback — nothing to do.
+        break;
+      }
+
+      case SpearSystemState.DASHING_TO_SPEAR: {
+        // Movement handled by LynxControllerComponent via updateSpearDash().
         break;
       }
     }
@@ -156,6 +181,91 @@ export class SpearThrowSystem {
     }
     const root = playerTransform.getTransform().getWorldPosition();
     return vec3.fromValues(root[0], root[1] + this.muzzleHeightOffset, root[2]);
+  }
+
+  // ── Spear dash ─────────────────────────────────────────────────────────────
+
+  /** True while the player is dashing toward the embedded spear. */
+  public isDashingToSpear(): boolean {
+    return this.state === SpearSystemState.DASHING_TO_SPEAR;
+  }
+
+  /**
+   * Advances the spear dash by one frame.
+   * Returns the velocity to apply (world-space); returns a zero vector when done.
+   * Automatically transitions back to EMBEDDED so auto-pickup fires next frame.
+   *
+   * Feel:
+   *  - Dynamic steering: direction recomputed each frame toward current spear position.
+   *  - Speed burst: 1.4× at launch tapering to 1.0× at arrival.
+   *  - Straight line: no vertical arc.
+   */
+  public updateSpearDash(dt: number, playerPos: vec3): vec3 {
+    if (!this.spear) {
+      this.state = SpearSystemState.EMBEDDED;
+      return vec3.create();
+    }
+
+    const spearPos = this.spear.getEmbeddedPosition();
+    if (spearPos === null) {
+      this.state = SpearSystemState.EMBEDDED;
+      return vec3.create();
+    }
+
+    // Dynamic direction — always steer toward the actual spear position.
+    const toSpear = vec3.subtract(vec3.create(), spearPos, playerPos);
+    const dist = vec3.length(toSpear);
+
+    if (dist < 1.5) {
+      this.state = SpearSystemState.EMBEDDED;
+      return vec3.create();
+    }
+
+    const dirToSpear = vec3.scale(vec3.create(), toSpear, 1 / dist);
+
+    const progress =
+      this.dashTotalDist > 0 ? Math.min(this.dashTraveled / this.dashTotalDist, 1.0) : 0;
+
+    // Speed burst: 1.4× at launch, fades to 1.0× at arrival.
+    const speed = this.spearDashSpeed * (1.0 + 0.4 * (1.0 - progress));
+
+    this.dashTraveled += speed * dt;
+    if (this.dashTraveled >= this.spearDashMaxDistance) {
+      this.state = SpearSystemState.EMBEDDED;
+      return vec3.create();
+    }
+
+    return vec3.fromValues(dirToSpear[0] * speed, dirToSpear[1] * speed, dirToSpear[2] * speed);
+  }
+
+  /**
+   * Checks whether a spear dash can start (spear embedded, player roughly facing it)
+   * and initiates it.
+   */
+  private tryStartSpearDash(
+    camera: CameraComponent | null,
+    playerTransform: TransformComponent,
+  ): boolean {
+    if (!this.spear || !camera) return false;
+    const spearPos = this.spear.getEmbeddedPosition();
+    if (!spearPos) return false;
+
+    const playerPos = playerTransform.getTransform().getWorldPosition();
+    const toSpear = vec3.subtract(vec3.create(), spearPos, playerPos);
+    const dist = vec3.length(toSpear);
+    if (dist < 0.5) return false; // already on top of it
+
+    vec3.scale(toSpear, toSpear, 1 / dist); // normalize in-place
+
+    // Require the player to be roughly facing the spear (~65° cone).
+    const camFront = camera.getCamera().getFront() as vec3;
+    if (vec3.dot(toSpear, camFront) < 0.4) return false;
+
+    vec3.copy(this.dashDir, toSpear);
+    this.dashTraveled = 0;
+    this.dashTotalDist = dist;
+    this.state = SpearSystemState.DASHING_TO_SPEAR;
+    return true;
   }
 
   /** Lazy-resolve the spear entity by name. */

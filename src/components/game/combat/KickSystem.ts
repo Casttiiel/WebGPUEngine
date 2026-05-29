@@ -51,7 +51,7 @@ export class KickSystem {
     private readonly controller: IMovementController,
     data?: KickSystemData,
   ) {
-    this.detectionDistance = data?.detectionDistance ?? 1.5;
+    this.detectionDistance = data?.detectionDistance ?? 2.0;
     this.enemyKnockbackForce = data?.enemyKnockbackForce ?? 12;
     this.enemyKnockbackUpForce = data?.enemyKnockbackUpForce ?? 6;
     this.enemyKnockbackDuration = data?.enemyKnockbackDuration ?? 0.8;

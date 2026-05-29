@@ -19,9 +19,6 @@
 
 ## Gameplay
 
-Kick (Up) (Repeated)
-Dash to spear
-
 ## Visuals and Sound
 
 1. Start Screen
