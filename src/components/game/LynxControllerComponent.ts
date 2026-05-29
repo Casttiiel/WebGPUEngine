@@ -162,51 +162,14 @@ export class LynxControllerComponent
       this.kickSystem.update(deltaTime);
       this.spearThrowSystem.update(deltaTime, this.camera, this.getTransform());
 
-      // Try to start the dash punch.
-      /*if (this.dashPunchSystem.tryStart(this.camera)) {
-        // Freeze velocity while dashing.
-        this.movement.setVelocity(vec3.create());
+      // Spear dash just started — hand control to DASHING state.
+      if (this.spearThrowSystem.isDashingToSpear()) {
         this.movementState = CharacterMovementState.DASHING;
-      }*/
+      }
     }
 
     switch (this.movementState) {
-      /*case CharacterMovementState.DASHING: {
-        const dashVelocity = this.dashPunchSystem.updateDashMovement(
-          deltaTime,
-          this,
-          this.markSystem,
-        );
-        if (!this.dashPunchSystem.isActive()) {
-          // Dash ended — zero out velocity and return to IDLE.
-          this.movement.setVelocity(vec3.create());
-          this.movementState = CharacterMovementState.IDLE;
-        } else {
-          this.movement.setVelocity(dashVelocity);
-          this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
-          // Dash wall collision — end dash on fixed geometry wall.
-          for (let i = 0; i < this.characterController.numComputedCollisions(); i++) {
-            const collision = this.characterController.computedCollision(i);
-            if (!collision?.collider) continue;
-            const rb = collision.collider.parent();
-            if (!rb) continue;
-            if (rb.bodyType() === RAPIER.RigidBodyType.Fixed) {
-              const n = vec3.fromValues(
-                collision.normal1.x,
-                collision.normal1.y,
-                collision.normal1.z,
-              );
-              if (Math.abs(n[1]) < 0.5) {
-                this.movementState = CharacterMovementState.IDLE;
-                this.movement.setVelocity(vec3.create());
-                break;
-              }
-            }
-          }
-        }
-        break;
-      }
-
+      /*
       case CharacterMovementState.MANTLING: {
         const mantleMovement = this.mantleSystem.updateMantleDirection();
         this.movement.setVelocity(mantleMovement);
@@ -220,6 +183,19 @@ export class LynxControllerComponent
         this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
         break;
       }*/
+
+      case CharacterMovementState.DASHING: {
+        const playerPos = this.getTransform().getTransform().getWorldPosition();
+        const dashVel = this.spearThrowSystem.updateSpearDash(deltaTime, playerPos);
+        if (vec3.length(dashVel) < 0.01) {
+          this.movementState = CharacterMovementState.IDLE;
+          this.movement.setVelocity(vec3.create());
+          break;
+        }
+        this.movement.setVelocity(dashVel);
+        this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
+        break;
+      }
 
       case CharacterMovementState.IDLE:
       default: {
@@ -262,15 +238,6 @@ export class LynxControllerComponent
           if (this.parrySystem.tryOpenWindow()) {
             input.consumeBufferedAction(GameAction.PARRY);
           }
-        }
-
-        // Spear dash — fly straight toward the embedded spear (overrides normal movement).
-        if (this.spearThrowSystem.isDashingToSpear()) {
-          const playerPos = vec3.clone(this.getTransform().getTransform().getWorldPosition());
-          const dashVel = this.spearThrowSystem.updateSpearDash(deltaTime, playerPos);
-          this.movement.setVelocity(dashVel);
-          this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
-          break;
         }
 
         this.movement.integrate(deltaTime, desiredVelocity);
