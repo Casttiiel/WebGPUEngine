@@ -125,6 +125,10 @@ export class EnemyControllerComponent extends Component implements IKickable {
     this.movement = new KCCMovement({
       gravity: data.gravity ?? 20,
       acceleration: data.acceleration ?? 10,
+      apexThreshold: data.apexThreshold,
+      apexGravityScale: data.apexGravityScale,
+      fallGravityScale: data.fallGravityScale,
+      knockbackAscendScale: data.knockbackAscendScale,
     });
 
     // Physics

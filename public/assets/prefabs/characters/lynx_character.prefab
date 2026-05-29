@@ -38,7 +38,9 @@
       "jumpCutFactor": 0.7,
       "jumpCutVelocityLimit": 1,
       "coyoteTime": 0.15,
-      "maxAirJumps": 0
+      "maxAirJumps": 0,
+      "apexThreshold": 2,
+      "apexGravityScale": 0.35
     },
     "lynx_controller": {
       "moveSpeed": 11,
