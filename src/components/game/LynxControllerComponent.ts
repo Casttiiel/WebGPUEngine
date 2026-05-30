@@ -7,36 +7,11 @@ import { CameraComponent } from '../render/CameraComponent';
 import { TransformComponent } from '../core/TransformComponent';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
 import { KCCMovement } from './movement/KCCMovement';
-import { MantleSystem } from './movement/MantleSystem';
-import { VaultSystem } from './movement/VaultSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { GameAction } from '../../types/GameAction.enum';
-import { LynxDashPunchSystem } from './combat/LynxDashPunchSystem';
 import { KickSystem } from './combat/KickSystem';
-import { SpearThrowSystem } from './combat/SpearThrowSystem';
-import { ParrySystem } from './combat/ParrySystem';
-import { HealthComponent } from './HealthComponent';
-import { CollisionGroups } from '../../types/CollisionGroups.enum';
 import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
-import { Entity } from '../../core/ecs/Entity';
-
-// ---------------------------------------------------------------------------
-// LynxControllerComponent
-// ---------------------------------------------------------------------------
-// Player controller for the Lynx character.
-//
-// Movement:   WASD + mouse look, double jump, mantle, vault.
-// Ability 1:  Marker shots (LMB) — 3 charges, regen 1/2.5 s, mark enemies.
-// Ability 2:  Dash punch (ABILITY_Q) — lunge in look direction (full 3D),
-//             collision damage; hits marked enemies reset the 10 s cooldown.
-//
-// States (mutually exclusive):
-//   IDLE      — normal ground/air movement
-//   MANTLING  — climbing a ledge
-//   VAULTING  — clearing a low obstacle
-//   DASHING   — executing the dash punch
-// ---------------------------------------------------------------------------
 
 export class LynxControllerComponent
   extends BasePlayerController
@@ -56,19 +31,11 @@ export class LynxControllerComponent
   private impulsePadInputDisableTime = 0.5;
   private wasJumpPressed = false;
 
-  // ── Sub-systems ──────────────────────────────────────────────────────────────
   private movement!: KCCMovement;
-  private mantleSystem!: MantleSystem;
-  private vaultSystem!: VaultSystem;
+  /*private mantleSystem!: MantleSystem;
+  private vaultSystem!: VaultSystem;*/
 
-  private dashPunchSystem!: LynxDashPunchSystem;
   private kickSystem!: KickSystem;
-  private spearThrowSystem!: SpearThrowSystem;
-  private parrySystem!: ParrySystem;
-
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
 
   public async load(data: LynxControllerComponentDataType): Promise<void> {
     this.capsuleCollider = this.getOwner().getComponent(
@@ -83,15 +50,8 @@ export class LynxControllerComponent
     this.impulsePadInputDisableTime =
       data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
 
-    this.mantleSystem = new MantleSystem(this, data);
-    this.vaultSystem = new VaultSystem(this);
-
-    this.dashPunchSystem = new LynxDashPunchSystem({
-      dashSpeed: data.dashPunchSpeed ?? 28,
-      maxDashDistance: data.dashPunchMaxDistance ?? 12,
-      punchDamage: data.dashPunchDamage ?? 60,
-      cooldownDuration: data.dashPunchCooldown ?? 10,
-    });
+    /*this.mantleSystem = new MantleSystem(this, data);
+    this.vaultSystem = new VaultSystem(this);*/
 
     this.kickSystem = new KickSystem(this, {
       ...(data.kickDetectionDistance !== undefined
@@ -109,12 +69,6 @@ export class LynxControllerComponent
         : {}),
     });
 
-    this.spearThrowSystem = new SpearThrowSystem(
-      data.spearEntityName !== undefined ? { spearEntityName: data.spearEntityName } : undefined,
-    );
-
-    this.parrySystem = new ParrySystem();
-
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
 
@@ -122,14 +76,6 @@ export class LynxControllerComponent
     this.movement = this.getOwner().getComponent('kcc_movement') as KCCMovement;
     if (!this.movement) {
       console.error('LynxControllerComponent: KCCMovement component not found.');
-    }
-
-    // Wire parry interceptor into HealthComponent so hits during the window are blocked.
-    const health = this.getOwner().getComponent('health') as HealthComponent | null;
-    if (health) {
-      health.setDamageInterceptor((_amount: number, instigator: Entity | null) =>
-        this.parrySystem.tryConsume(instigator),
-      );
     }
   }
 
@@ -160,12 +106,6 @@ export class LynxControllerComponent
       /*this.mantleSystem.update();
       this.vaultSystem.update();*/
       this.kickSystem.update(deltaTime);
-      this.spearThrowSystem.update(deltaTime, this.camera, this.getTransform());
-
-      // Spear dash just started — hand control to DASHING state.
-      if (this.spearThrowSystem.isDashingToSpear()) {
-        this.movementState = CharacterMovementState.DASHING;
-      }
     }
 
     switch (this.movementState) {
@@ -184,26 +124,12 @@ export class LynxControllerComponent
         break;
       }*/
 
-      case CharacterMovementState.DASHING: {
-        const playerPos = this.getTransform().getTransform().getWorldPosition();
-        const dashVel = this.spearThrowSystem.updateSpearDash(deltaTime, playerPos);
-        if (vec3.length(dashVel) < 0.01) {
-          this.movementState = CharacterMovementState.IDLE;
-          this.movement.setVelocity(vec3.create());
-          break;
-        }
-        this.movement.setVelocity(dashVel);
-        this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
-        break;
-      }
-
       case CharacterMovementState.IDLE:
       default: {
         const input = Engine.getInput();
         const inputDisabled = this.isInputDisabled();
 
         if (!inputDisabled) {
-          // Jump input: request on buffered press, release on button release.
           if (input.isActionBuffered(GameAction.JUMP)) {
             if (this.movement.requestJump()) {
               input.consumeBufferedAction(GameAction.JUMP);
@@ -224,21 +150,6 @@ export class LynxControllerComponent
               this.getTargetMovement(this.getInputVector()),
               this.movement.getMaxSpeed(),
             );
-
-        // Parry.
-        this.parrySystem.update(deltaTime);
-
-        // AoE: if the window is active and the spear arrives, trigger the launch.
-        if (this.parrySystem.isWindowOpen() && this.spearThrowSystem.consumeJustPickedUp()) {
-          const parryPos = vec3.clone(this.getTransform().getTransform().getWorldPosition());
-          this.performSpearReturnParry(parryPos);
-        }
-
-        if (!inputDisabled && input.isActionBuffered(GameAction.PARRY)) {
-          if (this.parrySystem.tryOpenWindow()) {
-            input.consumeBufferedAction(GameAction.PARRY);
-          }
-        }
 
         this.movement.integrate(deltaTime, desiredVelocity);
         this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
@@ -384,14 +295,6 @@ export class LynxControllerComponent
     this.movement.applyJump();
   }
 
-  public getDashCooldownTimer(): number {
-    return this.dashPunchSystem.getCooldownTimer();
-  }
-
-  public getDashCooldownDuration(): number {
-    return this.dashPunchSystem.getCooldownDuration();
-  }
-
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
@@ -464,45 +367,6 @@ export class LynxControllerComponent
     const dot = vec3.dot(v, normal);
     const proj = vec3.scale(vec3.create(), normal, dot);
     return vec3.subtract(vec3.create(), v, proj);
-  }
-
-  /**
-   * AoE launch triggered by pressing parry while the spear is returning.
-   * Uses a Rapier sphere overlap query to find all enemies within radius.
-   */
-  private performSpearReturnParry(playerPos: vec3): void {
-    const radius = 8;
-    const upImpulse = vec3.fromValues(0, 18, 0);
-
-    const physics = Engine.getPhysics();
-    const world = physics.getWorld();
-    const ball = new RAPIER.Ball(radius);
-    const shapePos = { x: playerPos[0], y: playerPos[1], z: playerPos[2] };
-    const shapeRot = { x: 0, y: 0, z: 0, w: 1 };
-    // Membership: any; filter: only colliders in the ENEMY group.
-    const filterGroups = (0xffff << 16) | (CollisionGroups.ENEMY & 0xffff);
-    const seen = new Set<number>();
-
-    world.intersectionsWithShape(
-      shapePos,
-      shapeRot,
-      ball,
-      (collider) => {
-        const entityId = physics.getEntityIdFromCollider(collider.handle);
-        if (entityId === undefined || seen.has(entityId)) return true;
-        seen.add(entityId);
-
-        const entity = Engine.getEntities().getEntityById(entityId);
-        (
-          entity?.getComponent('kickable') as { applyKnockback(impulse: vec3): void } | null
-        )?.applyKnockback(upImpulse);
-        return true;
-      },
-      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
-      filterGroups,
-    );
-
-    this.parrySystem.startCooldown();
   }
 
   public override renderDebug(): void {}

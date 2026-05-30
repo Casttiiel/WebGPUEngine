@@ -62,23 +62,6 @@ export interface KCCMovementParams {
   gravity?: number;
   /** Alias for groundAcceleration (legacy enemy usage). */
   acceleration?: number;
-
-  // ── Variable gravity ──────────────────────────────────────────────────────
-  /**
-   * |vy| (m/s) below which apex gravity applies. 0 = disabled. Default: 0.
-   * ~2.0 for a subtle player hang; ~3.0 for cinematic knockback targets.
-   */
-  apexThreshold?: number;
-  /** Gravity multiplier inside the apex zone. < 1 = hang time. Default: 1.0. */
-  apexGravityScale?: number;
-  /** Gravity multiplier during descent (outside apex zone). > 1 = heavier fall. Default: 1.0. */
-  fallGravityScale?: number;
-  /**
-   * Gravity multiplier during the ascending phase after a knockback impulse.
-   * < 1 = floaty kick ascent (Dark Messiah style). Default: 1.0.
-   * Activated automatically by applyImpulse() when the resulting vy > 0.
-   */
-  knockbackAscendScale?: number;
 }
 
 /**
@@ -150,15 +133,6 @@ export class KCCMovement extends Component {
   // ── Gravity scale (e.g. wall-run) ──────────────────────────────────────────
   private gravityScale = 1.0;
 
-  // ── Variable gravity ────────────────────────────────────────────────────────
-  /** |vy| threshold below which apex gravity applies. 0 = disabled. */
-  private apexThreshold = 0;
-  private apexGravityScale = 1.0;
-  private fallGravityScale = 1.0;
-  private knockbackAscendScale = 1.0;
-  /** True after applyImpulse() launches the entity upward — enables floaty ascent. */
-  private isKnockedBack = false;
-
   // ── Grounded state (updated via updateGroundedState) ──────────────────────
   private _isGrounded = false;
   private _groundNormal: vec3 = vec3.fromValues(0, 1, 0);
@@ -205,12 +179,6 @@ export class KCCMovement extends Component {
     this.maxAirJumps = params.maxAirJumps ?? 0;
     this.jumpCutFactor = params.jumpCutFactor ?? 0.7;
     this.jumpCutVelocityLimit = params.jumpCutVelocityLimit ?? 1.0;
-
-    // Variable gravity.
-    this.apexThreshold = params.apexThreshold ?? 0;
-    this.apexGravityScale = params.apexGravityScale ?? 1.0;
-    this.fallGravityScale = params.fallGravityScale ?? 1.0;
-    this.knockbackAscendScale = params.knockbackAscendScale ?? 1.0;
 
     if (params.gravity !== undefined) {
       // Simple constant gravity (legacy enemies or CMC with override).
@@ -279,10 +247,6 @@ export class KCCMovement extends Component {
     this.vx += impulse[0];
     this.vy += impulse[1];
     this.vz += impulse[2];
-    // Activate floaty knockback ascent when the impulse launches the entity upward.
-    if (this.vy > 0) {
-      this.isKnockedBack = true;
-    }
   }
 
   /**
@@ -413,34 +377,12 @@ export class KCCMovement extends Component {
     // ── Vertical: gravity ──────────────────────────────────────────────────
     if (isGrounded && this.vy < 0) {
       this.vy = -0.5; // pressed against ground
-      this.isKnockedBack = false;
     } else if (!isGrounded) {
-      // Three-phase gravity:
-      //   apex zone  (|vy| < apexThreshold) — hang time, uses ascendGravity * apexGravityScale
-      //   ascending  (vy > 0, outside apex)  — normal, or floaty if knocked back
-      //   descending (vy < 0, outside apex)  — descendGravity * fallGravityScale (heavier)
-      const atApex = this.apexThreshold > 0 && Math.abs(this.vy) < this.apexThreshold;
-      let grav: number;
-      let gravFactor: number;
-
-      if (atApex) {
-        grav = this.ascendGravity;
-        gravFactor = this.apexGravityScale;
-      } else if (this.vy > 0) {
-        grav = this.ascendGravity;
-        gravFactor = this.isKnockedBack ? this.knockbackAscendScale : 1.0;
-      } else {
-        grav = this.descendGravity;
-        gravFactor = this.fallGravityScale;
-        this.isKnockedBack = false;
-      }
-
-      // Variable-height jump cut: extra apex reduction while the button is held
-      // near the peak. Composes multiplicatively with the phase factor above.
-      if (this.isJumpingFlag && this.vy > 0 && this.vy < this.jumpCutVelocityLimit) {
-        gravFactor *= this.jumpCutFactor;
-      }
-
+      const grav = this.vy > 0 ? this.ascendGravity : this.descendGravity;
+      // Floaty apex: reduce gravity near the top of the jump arc when the
+      // jump button is still held (isJumpingFlag = true).
+      const atApex = this.isJumpingFlag && this.vy > 0 && this.vy < this.jumpCutVelocityLimit;
+      const gravFactor = atApex ? this.jumpCutFactor : 1.0;
       this.vy += grav * gravFactor * this.gravityScale * dt;
     }
 

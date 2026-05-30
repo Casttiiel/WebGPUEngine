@@ -41,34 +41,11 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
 
   // Actions
   jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
-  roll: { type: InputType.KEYBOARD, key: KeyCode.SHIFT },
-  dive: { type: InputType.KEYBOARD, key: KeyCode.CTRL },
-  dash: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
-  throw: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },
-
-  // Combat
-  fire: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },
-  aim: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
-  reload: { type: InputType.KEYBOARD, key: KeyCode.NUM_1 }, // Temporal
-  melee: { type: InputType.KEYBOARD, key: KeyCode.NUM_2 }, // Temporal
-
-  // Interaction
-  interact: { type: InputType.KEYBOARD, key: KeyCode.E },
-  parry: { type: InputType.KEYBOARD, key: KeyCode.E },
-  ability_e: { type: InputType.MOUSE_BUTTON, button: MouseButton.MIDDLE },
-  ability_q: { type: InputType.MOUSE_BUTTON, button: MouseButton.MIDDLE },
+  dash: { type: InputType.MOUSE_BUTTON, key: KeyCode.SHIFT },
+  attack: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },
+  fire: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
   kick: { type: InputType.KEYBOARD, key: KeyCode.F },
-  ability_r: { type: InputType.KEYBOARD, key: KeyCode.R },
-  blood_explosive: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
-  use: { type: InputType.KEYBOARD, key: KeyCode.NUM_3 }, // Temporal
-
-  // Camera (mouse axes)
-  look_up: { type: InputType.MOUSE_AXIS, axis: 'y', scale: -1.0 },
-  look_down: { type: InputType.MOUSE_AXIS, axis: 'y', scale: 1.0 },
-  look_left: { type: InputType.MOUSE_AXIS, axis: 'x', scale: -1.0 },
-  look_right: { type: InputType.MOUSE_AXIS, axis: 'x', scale: 1.0 },
 
   // UI
   pause: { type: InputType.KEYBOARD, key: KeyCode.P },
-  inventory: { type: InputType.KEYBOARD, key: KeyCode.TAB },
 };

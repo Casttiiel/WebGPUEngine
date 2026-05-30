@@ -97,11 +97,6 @@ export class SpearThrowSystem {
           break;
         }
 
-        // Dash to spear: press Shift while roughly facing it.
-        if (input.isActionJustPressed(GameAction.ROLL)) {
-          if (this.tryStartSpearDash(camera, playerTransform)) break;
-        }
-
         // Auto-pickup: walk close enough.
         const playerPos = playerTransform.getTransform().getWorldPosition();
         if (this.spear.tryAutoPickup(playerPos)) {
@@ -257,9 +252,9 @@ export class SpearThrowSystem {
 
   /**
    * Checks whether a spear dash can start (spear embedded, player roughly facing it)
-   * and initiates it.
+   * and initiates it. Called externally by LynxControllerComponent on the unified E key.
    */
-  private tryStartSpearDash(
+  public tryStartSpearDash(
     camera: CameraComponent | null,
     playerTransform: TransformComponent,
   ): boolean {
