@@ -122,8 +122,7 @@ export class LynxControllerComponent
       }*/
 
       case CharacterMovementState.DASHING: {
-        const dashMovement = this.dashSystem.updateDashMovement();
-        this.movement.setVelocity(dashMovement);
+        this.dashSystem.updateDash(deltaTime);
         this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
         break;
       }
@@ -252,6 +251,10 @@ export class LynxControllerComponent
   }
 
   public setBoostedSpeed(_speed: number): void {}
+
+  public applyImpulse(impulse: vec3): void {
+    this.movement.applyImpulse(impulse);
+  }
 
   public override getIsWallRunning(): boolean {
     return false;

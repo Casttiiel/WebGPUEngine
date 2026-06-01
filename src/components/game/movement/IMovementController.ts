@@ -15,8 +15,10 @@ import { IMantleController } from './IMantleController';
 export interface IMovementController extends IMantleController {
   // ── Velocidades ──────────────────────────────────────────────────────────
   getBoostedSpeed(): number;
-  setBoostedSpeed(speed: number): void;
-
+  setBoostedSpeed(
+    speed: number,
+  ): void /** Impulso aditivo (knockback, dash). Suma al vx/vy/vz actual. */;
+  applyImpulse(impulse: vec3): void;
   // ── Flags de estado ──────────────────────────────────────────────────────
   /** Requerido (sobreescribe el opcional de IMantleController). */
   getIsWallRunning(): boolean;

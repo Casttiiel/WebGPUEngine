@@ -265,6 +265,12 @@ export class KCCMovement extends Component {
     this.vz = v[2];
   }
 
+  /** Suma a los componentes horizontales sin tocar vy. */
+  public addHorizontalVelocity(v: vec3): void {
+    this.vx += v[0];
+    this.vz += v[2];
+  }
+
   public setVerticalVelocity(v: number): void {
     this.vy = v;
   }
@@ -413,9 +419,17 @@ export class KCCMovement extends Component {
         const currentSpeed = Math.sqrt(this.vx * this.vx + this.vz * this.vz);
         if (hasInput) {
           const newSpeed = approach(currentSpeed, desiredSpeed, this.groundAcceleration * dt);
-          const scale = newSpeed / desiredSpeed;
-          this.vx = dx * scale;
-          this.vz = dz * scale;
+          if (currentSpeed > desiredSpeed) {
+            // Post-dash: venimos con más speed del deseado.
+            // Desacelerar manteniendo la dirección actual en lugar de redirigir bruscamente.
+            const scale = newSpeed / currentSpeed;
+            this.vx *= scale;
+            this.vz *= scale;
+          } else {
+            const scale = newSpeed / desiredSpeed;
+            this.vx = dx * scale;
+            this.vz = dz * scale;
+          }
         } else {
           const newSpeed = approach(currentSpeed, 0, this.groundDeceleration * dt);
           if (currentSpeed > 0.001) {

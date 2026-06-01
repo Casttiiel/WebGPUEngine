@@ -3,27 +3,40 @@ import type { IMovementController } from './IMovementController';
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
-import { CollisionGroups } from '../../../types/CollisionGroups.enum';
-import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import RAPIER from '@dimforge/rapier3d';
 
 /**
- * DashSystem - Gestiona el dash hacia puntos específicos
+ * DashSystem — Dash momentum-based hacia un punto detectado por raycast.
+ *
+ * Al iniciar: calcula la dirección al hit point y lanza el dash.
+ * Cada frame: aplica una fuerza horizontal que decae con easeOut durante dashDuration.
+ * Fin: por tiempo (timer >= dashDuration).
+ * Recarga: 1 airDashCharge, se restaura al aterrizar.
  */
 export class DashSystem {
-  // Parámetros de dash
-  private dashDetectionDistance: number = 28.0;
-  private dashSpeed: number = 50.0;
-  private dashStopDistance: number = 0.5;
+  // ── Detección ────────────────────────────────────────────────────────────
+  private readonly dashDetectionDistance: number = 28.0;
 
-  // Estado interno
-  private dashTargetPos: vec3 = vec3.create();
-  private canDash: boolean = true;
+  // ── Fuerza / curva ───────────────────────────────────────────────────────
+  /** Magnitud del impulso inicial (m/s). */
+  private readonly dashForce: number = 25.0;
+  /** Ventana mínima que el estado DASHING bloquea otras acciones (segundos). */
+  private readonly dashDuration: number = 0.2;
+
+  // ── Estado ───────────────────────────────────────────────────────────────
+  private dashTimer: number = 0;
+  private dashDirection: vec3 = vec3.create();
+
+  // ── Cargas en aire ───────────────────────────────────────────────────────
+  private airDashCharges: number = 1;
+  private readonly maxAirDashCharges: number = 1;
 
   constructor(
     private controller: IMovementController,
     private _modifiers: PlayerModifiersComponent | null,
   ) {}
 
+  /** Detecta input y arranca el dash. Llamar solo en estado IDLE. */
   public update(): void {
     const input = Engine.getInput();
 
@@ -31,7 +44,7 @@ export class DashSystem {
       this.controller.getIsDashing() ||
       this.controller.getIsMantling() ||
       this.controller.getIsSwinging() ||
-      !this.canDash
+      this.airDashCharges <= 0
     ) {
       return;
     }
@@ -44,20 +57,12 @@ export class DashSystem {
     }
   }
 
-  public updateDashMovement(): vec3 {
-    const collider = this.controller.getCollider();
-    const currentPos = collider.getRigidBody().translation();
-    const pos = vec3.fromValues(currentPos.x, currentPos.y, currentPos.z);
-
-    const direction = vec3.sub(vec3.create(), this.dashTargetPos, pos);
-    const distanceToTarget = vec3.length(direction);
-
-    if (distanceToTarget < this.dashStopDistance) {
-      this.endDash();
+  /** Gestiona el timer del dash y transiciona a IDLE al expirar. Llamar en el case DASHING del controller. */
+  public updateDash(dt: number): void {
+    this.dashTimer += dt;
+    if (this.dashTimer >= this.dashDuration) {
+      this.controller.setIsDashing(false);
     }
-
-    vec3.normalize(direction, direction);
-    return vec3.scale(vec3.create(), direction, this.dashSpeed);
   }
 
   private detectDashPoint(): vec3 | null {
@@ -69,49 +74,56 @@ export class DashSystem {
     const playerPos = collider.getRigidBody().translation();
     const forward = camera.getCamera().getFront();
 
+    // Offset el origen para evitar toi=0 cuando el ray arranca dentro de geometría sólida
+    const originOffset = 0.8;
     const ray = new RAPIER.Ray(
-      { x: playerPos.x, y: playerPos.y, z: playerPos.z },
+      {
+        x: playerPos.x + forward[0] * originOffset,
+        y: playerPos.y + forward[1] * originOffset,
+        z: playerPos.z + forward[2] * originOffset,
+      },
       { x: forward[0], y: forward[1], z: forward[2] },
     );
 
-    const interactionGroups =
-      ((CollisionGroups.PLAYER & 0xffff) << 16) | (CollisionGroups.DASH_TRIGGER & 0xffff);
-
-    const hit = physics.getWorld().castRay(
-      ray,
-      this.dashDetectionDistance,
-      true,
-      QueryFilterFlags.EXCLUDE_SENSORS,
-      undefined, //interactionGroups
-      collider.getCollider(),
-    );
+    const hit = physics
+      .getWorld()
+      .castRay(ray, this.dashDetectionDistance, true, undefined, undefined, collider.getCollider());
 
     if (!hit) return null;
 
-    // toi is measured from the offset origin, so add the offset back.
-    const origin = vec3.fromValues(playerPos.x, playerPos.y, playerPos.z);
+    // hit point = origen_offset + forward * toi
+    const origin = vec3.fromValues(
+      playerPos.x + forward[0] * originOffset,
+      playerPos.y + forward[1] * originOffset,
+      playerPos.z + forward[2] * originOffset,
+    );
     const dir = vec3.fromValues(forward[0], forward[1], forward[2]);
-    const hitPoint = vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
-    return hitPoint;
+    return vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
   }
 
   private startDash(targetPoint: vec3): void {
+    const collider = this.controller.getCollider();
+    const p = collider.getRigidBody().translation();
+    const playerPos = vec3.fromValues(p.x, p.y, p.z);
+
+    const dir = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), targetPoint, playerPos));
+    vec3.copy(this.dashDirection, dir);
+
+    // Impulso único aditivo en dirección 3D (incluye componente vertical para dashes en diagonal).
+    // integrate() se encarga de la desaceleración natural desde aquí.
+    this.controller.applyImpulse(vec3.scale(vec3.create(), dir, this.dashForce));
+
+    this.dashTimer = 0;
+    this.airDashCharges--;
     this.controller.setIsDashing(true);
-    this.canDash = false;
-    vec3.copy(this.dashTargetPos, targetPoint);
-
-    this.controller.setVerticalVelocity(0.0);
-  }
-
-  private endDash(): void {
-    this.controller.setIsDashing(false);
+    this.controller.setInputDisableTimer(this.dashDuration);
   }
 
   public onGrounded(): void {
-    this.canDash = true;
+    this.airDashCharges = this.maxAirDashCharges;
   }
 
-  public getCanDash(): boolean {
-    return this.canDash;
+  public getAirDashCharges(): number {
+    return this.airDashCharges;
   }
 }
