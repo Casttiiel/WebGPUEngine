@@ -34,8 +34,15 @@ export class CameraFOVModifierComponent extends Component {
 
   // Estado
   private currentFOV!: number; // FOV actual interpolado
-  private targetFOV!: number; // FOV objetivo
+  private targetFOV!: number; // FOV objetivo (speed-based)
   private initialized: boolean = false;
+
+  // Dash FOV
+  private dashFOVAlpha: number = 0; // 0 = sin efecto, 1 = efecto completo
+  private dashFOVDirection: number = 0; // +1 animando entrada, -1 salida, 0 idle
+  private hasAppliedFOV: boolean = false; // evita lanzar múltiples veces
+  private readonly dashFOVIncrease: number = 25.0; // grados extra durante el dash
+  private readonly dashFOVDuration: number = 0.2; // segundos de la animación
 
   // Referencias
   private cameraComponent: CameraComponent | null = null;
@@ -113,6 +120,24 @@ export class CameraFOVModifierComponent extends Component {
 
     const currentSpeed = (characterController as BasePlayerController).getCurrentSpeed() || 0.0;
 
+    // ── Dash FOV ────────────────────────────────────────────────────────────
+    const isDashing = characterController.getIsDashing();
+    if (isDashing && !this.hasAppliedFOV) {
+      this.hasAppliedFOV = true;
+      this.dashFOVDirection = 1;
+    } else if (!isDashing && this.hasAppliedFOV) {
+      this.hasAppliedFOV = false;
+      this.dashFOVDirection = -1;
+    }
+
+    if (this.dashFOVDirection !== 0) {
+      this.dashFOVAlpha += this.dashFOVDirection * (dt / this.dashFOVDuration);
+      this.dashFOVAlpha = Math.max(0, Math.min(1, this.dashFOVAlpha));
+      if (this.dashFOVAlpha === 0 || this.dashFOVAlpha === 1) {
+        this.dashFOVDirection = 0;
+      }
+    }
+
     // Calcular FOV objetivo basado en velocidad
     if (currentSpeed < this.speedThreshold) {
       // Velocidad baja: FOV base
@@ -134,9 +159,12 @@ export class CameraFOVModifierComponent extends Component {
     const fovDiff = this.targetFOV - this.currentFOV;
     this.currentFOV += fovDiff * Math.min(1.0, dt * this.lerpSpeed);
 
+    // Aplicar offset del dash (aditivo sobre el FOV de velocidad)
+    const dashOffset = this.dashFOVAlpha * this.dashFOVIncrease;
+
     // Aplicar FOV a la cámara
     const camera = this.cameraComponent.getCamera();
-    camera.setFov(this.currentFOV);
+    camera.setFov(this.currentFOV + dashOffset);
   }
 
   public override renderInMenu(): void {}

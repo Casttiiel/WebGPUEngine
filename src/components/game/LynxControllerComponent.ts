@@ -262,7 +262,7 @@ export class LynxControllerComponent
 
   public setIsWallRunning(_value: boolean): void {}
 
-  public getIsDashing(): boolean {
+  public override getIsDashing(): boolean {
     return this.movementState === CharacterMovementState.DASHING;
   }
 

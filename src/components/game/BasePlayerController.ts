@@ -62,6 +62,11 @@ export abstract class BasePlayerController extends Component {
     return false;
   }
 
+  /** true si el personaje está ejecutando un dash. */
+  public getIsDashing(): boolean {
+    return false;
+  }
+
   /** Normal de la pared en la que corre el personaje, o null si no aplica. */
   public getWallNormal(): import('gl-matrix').vec3 | null {
     return null;

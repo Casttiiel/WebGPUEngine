@@ -21,7 +21,7 @@ export class DashSystem {
   /** Magnitud del impulso inicial (m/s). */
   private readonly dashForce: number = 25.0;
   /** Ventana mínima que el estado DASHING bloquea otras acciones (segundos). */
-  private readonly dashDuration: number = 0.2;
+  private readonly dashDuration: number = 0.3;
 
   // ── Estado ───────────────────────────────────────────────────────────────
   private dashTimer: number = 0;

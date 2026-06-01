@@ -19,7 +19,6 @@
 
 ## Gameplay
 
-Dash effect
 Dash ground movement
 Dash Bounce off
 Dash Bounce off camera
