@@ -3,7 +3,8 @@ import type { IMovementController } from './IMovementController';
 import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
-import RAPIER from '@dimforge/rapier3d';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import { CollisionGroups } from '../../../types/CollisionGroups.enum';
 
 /**
  * DashSystem — Dash momentum-based hacia un punto detectado por raycast.
@@ -16,16 +17,21 @@ import RAPIER from '@dimforge/rapier3d';
 export class DashSystem {
   // ── Detección ────────────────────────────────────────────────────────────
   private readonly dashDetectionDistance: number = 28.0;
+  /** Distancia extra que se añade al hit point cuando el objetivo es un enemigo (atravesar). */
+  private readonly enemyPassThroughOffset: number = 0.3;
 
   // ── Fuerza / curva ───────────────────────────────────────────────────────
   /** Magnitud del impulso inicial (m/s). */
   private readonly dashForce: number = 25.0;
   /** Ventana mínima que el estado DASHING bloquea otras acciones (segundos). */
-  private readonly dashDuration: number = 0.3;
+  private readonly dashDuration: number = 1.0;
 
   // ── Estado ───────────────────────────────────────────────────────────────
   private dashTimer: number = 0;
   private dashDirection: vec3 = vec3.create();
+  private isDashingThroughEnemy: boolean = false;
+  /** Referencia al collider del enemigo objetivo durante un dash de atravesar. */
+  private dashTargetCollider: RAPIER.Collider | null = null;
 
   // ── Cargas en aire ───────────────────────────────────────────────────────
   private airDashCharges: number = 1;
@@ -61,6 +67,8 @@ export class DashSystem {
   public updateDash(dt: number): void {
     this.dashTimer += dt;
     if (this.dashTimer >= this.dashDuration) {
+      this.isDashingThroughEnemy = false;
+      this.dashTargetCollider = null;
       this.controller.setIsDashing(false);
     }
   }
@@ -75,30 +83,44 @@ export class DashSystem {
     const forward = camera.getCamera().getFront();
 
     // Offset el origen para evitar toi=0 cuando el ray arranca dentro de geometría sólida
-    const originOffset = 0.8;
     const ray = new RAPIER.Ray(
       {
-        x: playerPos.x + forward[0] * originOffset,
-        y: playerPos.y + forward[1] * originOffset,
-        z: playerPos.z + forward[2] * originOffset,
+        x: playerPos.x,
+        y: playerPos.y,
+        z: playerPos.z,
       },
       { x: forward[0], y: forward[1], z: forward[2] },
     );
 
     const hit = physics
       .getWorld()
-      .castRay(ray, this.dashDetectionDistance, true, undefined, undefined, collider.getCollider());
+      .castRay(
+        ray,
+        this.dashDetectionDistance,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        collider.getCollider(),
+      );
 
     if (!hit) return null;
 
     // hit point = origen_offset + forward * toi
-    const origin = vec3.fromValues(
-      playerPos.x + forward[0] * originOffset,
-      playerPos.y + forward[1] * originOffset,
-      playerPos.z + forward[2] * originOffset,
-    );
+    const origin = vec3.fromValues(playerPos.x, playerPos.y, playerPos.z);
     const dir = vec3.fromValues(forward[0], forward[1], forward[2]);
-    return vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
+    const hitPoint = vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
+
+    // Si el hit es un enemigo, extender el punto para atravesarlo
+    const hitMembership = hit.collider.collisionGroups() >>> 16;
+    this.isDashingThroughEnemy = (hitMembership & CollisionGroups.ENEMY) !== 0;
+    if (this.isDashingThroughEnemy) {
+      this.dashTargetCollider = hit.collider;
+      vec3.scaleAndAdd(hitPoint, hitPoint, dir, this.enemyPassThroughOffset);
+    } else {
+      this.dashTargetCollider = null;
+    }
+
+    return hitPoint;
   }
 
   private startDash(targetPoint: vec3): void {
@@ -108,6 +130,9 @@ export class DashSystem {
 
     const dir = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), targetPoint, playerPos));
     vec3.copy(this.dashDirection, dir);
+
+    // Suprimir colisión ANTES de aplicar velocidad — ahora via filterPredicate en KCC,
+    // no necesitamos modificar collision groups directamente.
 
     // Redirigir el momentum horizontal actual a la dirección del dash,
     // luego sumar el impulso del dash encima.
@@ -122,6 +147,14 @@ export class DashSystem {
     this.airDashCharges--;
     this.controller.setIsDashing(true);
     this.controller.setInputDisableTimer(this.dashDuration);
+  }
+
+  /**
+   * Devuelve el collider del enemigo objetivo si estamos haciendo dash a través de él,
+   * para que el KCC lo excluya vía filterPredicate.
+   */
+  public getDashTargetCollider(): RAPIER.Collider | null {
+    return this.isDashingThroughEnemy ? this.dashTargetCollider : null;
   }
 
   public onGrounded(): void {

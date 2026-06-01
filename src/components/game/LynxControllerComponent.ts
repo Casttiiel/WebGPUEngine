@@ -127,7 +127,12 @@ export class LynxControllerComponent
 
       case CharacterMovementState.DASHING: {
         this.dashSystem.updateDash(deltaTime);
-        this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
+        this.movement.applyViaKCC(
+          deltaTime,
+          this.capsuleCollider,
+          this.characterController,
+          this.dashSystem.getDashTargetCollider(),
+        );
         break;
       }
 

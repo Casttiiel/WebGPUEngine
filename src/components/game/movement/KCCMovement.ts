@@ -478,6 +478,7 @@ export class KCCMovement extends Component {
     dt: number,
     capsule: CapsuleColliderComponent,
     controller: RAPIER.KinematicCharacterController,
+    ignoredCollider?: RAPIER.Collider | null,
   ): void {
     const mx = this.vx * dt;
     const my = this.vy * dt;
@@ -487,6 +488,8 @@ export class KCCMovement extends Component {
       capsule.getCollider(),
       new RAPIER.Vector3(mx, my, mz),
       QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      ignoredCollider ? (c) => c.handle !== ignoredCollider.handle : undefined,
     );
 
     const corrected = controller.computedMovement();
