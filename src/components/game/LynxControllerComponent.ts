@@ -11,6 +11,8 @@ import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { GameAction } from '../../types/GameAction.enum';
 import { KickSystem } from './combat/KickSystem';
+import { ThrowingProjectileSystem } from './combat/ThrowingProjectileSystem';
+import { DashSystem } from './movement/DashSystem';
 import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
 
 export class LynxControllerComponent
@@ -36,6 +38,8 @@ export class LynxControllerComponent
   private vaultSystem!: VaultSystem;*/
 
   private kickSystem!: KickSystem;
+  private throwSystem!: ThrowingProjectileSystem;
+  private dashSystem!: DashSystem;
 
   public async load(data: LynxControllerComponentDataType): Promise<void> {
     this.capsuleCollider = this.getOwner().getComponent(
@@ -47,27 +51,16 @@ export class LynxControllerComponent
       return;
     }
 
-    this.impulsePadInputDisableTime =
-      data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
+    this.impulsePadInputDisableTime = this.impulsePadInputDisableTime;
 
     /*this.mantleSystem = new MantleSystem(this, data);
     this.vaultSystem = new VaultSystem(this);*/
 
-    this.kickSystem = new KickSystem(this, {
-      ...(data.kickDetectionDistance !== undefined
-        ? { detectionDistance: data.kickDetectionDistance }
-        : {}),
-      ...(data.kickEnemyKnockbackForce !== undefined
-        ? { enemyKnockbackForce: data.kickEnemyKnockbackForce }
-        : {}),
-      ...(data.kickEnemyKnockbackDuration !== undefined
-        ? { enemyKnockbackDuration: data.kickEnemyKnockbackDuration }
-        : {}),
-      ...(data.kickCooldown !== undefined ? { cooldown: data.kickCooldown } : {}),
-      ...(data.kickSelfInputDisableTime !== undefined
-        ? { selfInputDisableTime: data.kickSelfInputDisableTime }
-        : {}),
-    });
+    this.kickSystem = new KickSystem(this);
+
+    this.throwSystem = new ThrowingProjectileSystem();
+
+    this.dashSystem = new DashSystem(this, null);
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
@@ -92,8 +85,10 @@ export class LynxControllerComponent
     this.updateGroundedState();
 
     // Notify kick system when the player lands.
-    if (this.movement.isGrounded() && !this.wasGrounded) {
+    if (this.movement.isGrounded()) {
+      // && !this.wasGrounded
       this.kickSystem.onGrounded();
+      this.dashSystem.onGrounded();
     }
     this.wasGrounded = this.movement.isGrounded();
 
@@ -106,6 +101,8 @@ export class LynxControllerComponent
       /*this.mantleSystem.update();
       this.vaultSystem.update();*/
       this.kickSystem.update(deltaTime);
+      this.throwSystem.update(deltaTime, this.camera);
+      this.dashSystem.update();
     }
 
     switch (this.movementState) {
@@ -123,6 +120,13 @@ export class LynxControllerComponent
         this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
         break;
       }*/
+
+      case CharacterMovementState.DASHING: {
+        const dashMovement = this.dashSystem.updateDashMovement();
+        this.movement.setVelocity(dashMovement);
+        this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
+        break;
+      }
 
       case CharacterMovementState.IDLE:
       default: {
@@ -259,7 +263,9 @@ export class LynxControllerComponent
     return this.movementState === CharacterMovementState.DASHING;
   }
 
-  public setIsDashing(_value: boolean): void {}
+  public setIsDashing(value: boolean): void {
+    this.movementState = value ? CharacterMovementState.DASHING : CharacterMovementState.IDLE;
+  }
 
   public getIsGrappling(): boolean {
     return false;

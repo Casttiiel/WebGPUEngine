@@ -4,14 +4,14 @@ import type { PlayerModifiersComponent } from '../PlayerModifiersComponent';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
 import { CollisionGroups } from '../../../types/CollisionGroups.enum';
-import RAPIER from '@dimforge/rapier3d';
+import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 
 /**
  * DashSystem - Gestiona el dash hacia puntos específicos
  */
 export class DashSystem {
   // Parámetros de dash
-  private dashDetectionDistance: number = 8.0;
+  private dashDetectionDistance: number = 28.0;
   private dashSpeed: number = 50.0;
   private dashStopDistance: number = 0.5;
 
@@ -77,24 +77,22 @@ export class DashSystem {
     const interactionGroups =
       ((CollisionGroups.PLAYER & 0xffff) << 16) | (CollisionGroups.DASH_TRIGGER & 0xffff);
 
-    const hit = physics
-      .getWorld()
-      .castRay(
-        ray,
-        this.dashDetectionDistance,
-        true,
-        undefined,
-        interactionGroups,
-        collider.getCollider(),
-      );
+    const hit = physics.getWorld().castRay(
+      ray,
+      this.dashDetectionDistance,
+      true,
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined, //interactionGroups
+      collider.getCollider(),
+    );
 
     if (!hit) return null;
 
-    const rigidBody = hit.collider.parent();
-    if (!rigidBody) return null;
-
-    const centerPos = rigidBody.translation();
-    return vec3.fromValues(centerPos.x, centerPos.y, centerPos.z);
+    // toi is measured from the offset origin, so add the offset back.
+    const origin = vec3.fromValues(playerPos.x, playerPos.y, playerPos.z);
+    const dir = vec3.fromValues(forward[0], forward[1], forward[2]);
+    const hitPoint = vec3.scaleAndAdd(vec3.create(), origin, dir, hit.timeOfImpact);
+    return hitPoint;
   }
 
   private startDash(targetPoint: vec3): void {

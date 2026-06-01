@@ -19,7 +19,13 @@
 
 ## Gameplay
 
-Gravity
+Dash movement
+Dash effect
+Dash to enemies
+Dash Bounce off
+Dash Bounce off camera
+Daggers stay on scenario/enemies
+Dash to daggers
 
 ## Visuals and Sound
 
