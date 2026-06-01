@@ -31,8 +31,11 @@ export class DashSystem {
   private dashDirection: vec3 = vec3.create();
   private isDashingThroughEnemy: boolean = false;
   /** Referencia al collider del enemigo objetivo durante un dash de atravesar. */
-  private dashTargetCollider: RAPIER.Collider | null = null;
-
+  private dashTargetCollider: RAPIER.Collider | null =
+    null; /** Punto objetivo del dash (para detectar cuándo el jugador lo ha atravesado). */
+  private dashTargetPoint: vec3 | null = null;
+  /** Safety timer máximo para dash a enemigo (evita que se quede atascado). */
+  private readonly maxEnemyDashDuration: number = 1.6;
   // ── Cargas en aire ───────────────────────────────────────────────────────
   private airDashCharges: number = 1;
   private readonly maxAirDashCharges: number = 1;
@@ -63,14 +66,33 @@ export class DashSystem {
     }
   }
 
-  /** Gestiona el timer del dash y transiciona a IDLE al expirar. Llamar en el case DASHING del controller. */
+  /** Gestiona el fin del dash. Si es a enemigo, termina cuando el jugador lo atraviesa (por posición). */
   public updateDash(dt: number): void {
     this.dashTimer += dt;
-    if (this.dashTimer >= this.dashDuration) {
-      this.isDashingThroughEnemy = false;
-      this.dashTargetCollider = null;
-      this.controller.setIsDashing(false);
+
+    if (this.isDashingThroughEnemy && this.dashTargetPoint) {
+      // Fin por posición: el jugador ha pasado el punto objetivo
+      const p = this.controller.getCollider().getRigidBody().translation();
+      const playerPos = vec3.fromValues(p.x, p.y, p.z);
+      const toTarget = vec3.sub(vec3.create(), this.dashTargetPoint, playerPos);
+      const hasPassed = vec3.dot(toTarget, this.dashDirection) <= 0;
+
+      // Safety fallback por si el jugador no llega (colisión inesperada, etc.)
+      const safetyExpired = this.dashTimer >= this.maxEnemyDashDuration;
+
+      if (hasPassed || safetyExpired) {
+        this.endDash();
+      }
+    } else if (this.dashTimer >= this.dashDuration) {
+      this.endDash();
     }
+  }
+
+  private endDash(): void {
+    this.isDashingThroughEnemy = false;
+    this.dashTargetCollider = null;
+    this.dashTargetPoint = null;
+    this.controller.setIsDashing(false);
   }
 
   private detectDashPoint(): vec3 | null {
@@ -143,10 +165,16 @@ export class DashSystem {
     this.controller.setHorizontalVelocity(redirected);
     this.controller.applyImpulse(vec3.scale(vec3.create(), dir, this.dashForce));
 
+    console.log(`[DashSystem] startDash — isDashingThroughEnemy: ${this.isDashingThroughEnemy}`);
+
+    this.dashTargetPoint = vec3.clone(targetPoint);
     this.dashTimer = 0;
     this.airDashCharges--;
     this.controller.setIsDashing(true);
-    this.controller.setInputDisableTimer(this.dashDuration);
+    const disableDuration = this.isDashingThroughEnemy
+      ? this.maxEnemyDashDuration
+      : this.dashDuration;
+    this.controller.setInputDisableTimer(disableDuration);
   }
 
   /**

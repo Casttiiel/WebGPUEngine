@@ -70,4 +70,8 @@ export class DummyEnemyController extends Component implements IKickable {
   }
 
   public override dispose(): void {}
+
+  public isStunned(): boolean {
+    throw new Error('Method not implemented.');
+  }
 }

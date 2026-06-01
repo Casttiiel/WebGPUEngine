@@ -2,6 +2,7 @@ import { vec3 } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { Component } from '../../../core/ecs/Component';
 import type { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
+import { Engine } from '../../../core/engine/Engine';
 
 // ── Private helper ────────────────────────────────────────────────────────────
 /** Moves `current` toward `target` by at most `delta`, never overshooting. */
@@ -474,6 +475,11 @@ export class KCCMovement extends Component {
    * to the rigid body's linear velocity. Automatically cancels upward velocity
    * when hitting a ceiling.
    */
+  /** Velocidad interna actual (vx, vy, vz). Solo lectura. */
+  public getLinearVelocity(): { x: number; y: number; z: number } {
+    return { x: this.vx, y: this.vy, z: this.vz };
+  }
+
   public applyViaKCC(
     dt: number,
     capsule: CapsuleColliderComponent,
@@ -505,16 +511,45 @@ export class KCCMovement extends Component {
 
     // Wall collision response — project out velocity into fixed-geometry walls.
     // Skips floor/ceiling normals (|n.y| >= 0.5).
+    // Also pushes other kinematic bodies (KCC-driven) away from this body.
+    const physics = Engine.getPhysics();
     for (let i = 0; i < controller.numComputedCollisions(); i++) {
       const collision = controller.computedCollision(i);
       if (!collision?.collider) continue;
       const rb = collision.collider.parent();
       if (!rb) continue;
+
+      const n = collision.normal1;
+      if (Math.abs(n.y) >= 0.5) continue; // skip floor/ceiling
+
       if (rb.bodyType() === RAPIER.RigidBodyType.Fixed) {
-        const n = collision.normal1;
-        if (Math.abs(n.y) < 0.5) {
-          this.removeVelocityIntoWall(vec3.fromValues(n.x, n.y, n.z));
-        }
+        this.removeVelocityIntoWall(vec3.fromValues(n.x, n.y, n.z));
+        continue;
+      }
+
+      // Kinematic-kinematic: push the other body away.
+      // Rapier doesn't resolve kinematic vs kinematic automatically.
+      const speedIntoOther = -(this.vx * n.x + this.vz * n.z); // positive = this body moving toward other
+      if (speedIntoOther < 0.3) continue;
+
+      const entityId = physics.getEntityIdFromCollider(collision.collider.handle);
+      if (entityId === undefined) continue;
+      const entity = physics.getEntityById(entityId);
+      if (!entity) continue;
+      const otherMovement = entity.getComponent('kcc_movement') as KCCMovement | null;
+      if (!otherMovement) continue;
+
+      // Push direction = away from this body (-normal1)
+      const pushX = -n.x;
+      const pushZ = -n.z;
+
+      // Only push up to what's needed to reach the desired separation speed
+      const otherVel = otherMovement.getLinearVelocity();
+      const enemySpeedInPushDir = otherVel.x * pushX + otherVel.z * pushZ;
+      const desiredPushSpeed = Math.min(speedIntoOther, 5.0);
+      const pushNeeded = desiredPushSpeed - enemySpeedInPushDir;
+      if (pushNeeded > 0) {
+        otherMovement.applyImpulse(vec3.fromValues(pushX * pushNeeded, 0, pushZ * pushNeeded));
       }
     }
   }
