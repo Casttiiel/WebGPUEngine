@@ -19,9 +19,9 @@
 
 ## Gameplay
 
+Dash to enemies
 Dash Bounce off
 Dash Bounce off camera
-Dash to enemies
 Daggers stay on scenario/enemies
 Dash to daggers
 

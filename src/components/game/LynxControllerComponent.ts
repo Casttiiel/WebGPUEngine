@@ -13,6 +13,7 @@ import { GameAction } from '../../types/GameAction.enum';
 import { KickSystem } from './combat/KickSystem';
 import { ThrowingProjectileSystem } from './combat/ThrowingProjectileSystem';
 import { DashSystem } from './movement/DashSystem';
+import { WallJumpSystem } from './movement/WallJumpSystem';
 import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
 
 export class LynxControllerComponent
@@ -40,6 +41,7 @@ export class LynxControllerComponent
   private kickSystem!: KickSystem;
   private throwSystem!: ThrowingProjectileSystem;
   private dashSystem!: DashSystem;
+  private wallJumpSystem!: WallJumpSystem;
 
   public async load(data: LynxControllerComponentDataType): Promise<void> {
     this.capsuleCollider = this.getOwner().getComponent(
@@ -61,6 +63,7 @@ export class LynxControllerComponent
     this.throwSystem = new ThrowingProjectileSystem();
 
     this.dashSystem = new DashSystem(this, null);
+    this.wallJumpSystem = new WallJumpSystem(this);
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
@@ -103,6 +106,7 @@ export class LynxControllerComponent
       this.kickSystem.update(deltaTime);
       this.throwSystem.update(deltaTime, this.camera);
       this.dashSystem.update();
+      this.wallJumpSystem.update(deltaTime);
     }
 
     switch (this.movementState) {
@@ -133,7 +137,10 @@ export class LynxControllerComponent
         const inputDisabled = this.isInputDisabled();
 
         if (!inputDisabled) {
-          if (input.isActionBuffered(GameAction.JUMP)) {
+          // Wall jump tiene prioridad sobre el salto normal en el aire
+          if (!this.movement.isGrounded() && this.wallJumpSystem.tryWallJump()) {
+            // wall jump aplicado — el salto normal se omite este frame
+          } else if (input.isActionBuffered(GameAction.JUMP)) {
             if (this.movement.requestJump()) {
               input.consumeBufferedAction(GameAction.JUMP);
             }
