@@ -109,8 +109,13 @@ export class DashSystem {
     const dir = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), targetPoint, playerPos));
     vec3.copy(this.dashDirection, dir);
 
-    // Impulso único aditivo en dirección 3D (incluye componente vertical para dashes en diagonal).
-    // integrate() se encarga de la desaceleración natural desde aquí.
+    // Redirigir el momentum horizontal actual a la dirección del dash,
+    // luego sumar el impulso del dash encima.
+    const currentHVel = this.controller.getHorizontalVelocity();
+    const currentSpeed = vec3.length(currentHVel);
+    const redirected = vec3.scale(vec3.create(), dir, currentSpeed);
+    redirected[1] = 0;
+    this.controller.setHorizontalVelocity(redirected);
     this.controller.applyImpulse(vec3.scale(vec3.create(), dir, this.dashForce));
 
     this.dashTimer = 0;

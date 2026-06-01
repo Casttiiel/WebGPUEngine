@@ -19,7 +19,6 @@
 
 ## Gameplay
 
-Dash ground movement
 Dash Bounce off
 Dash Bounce off camera
 Dash to enemies
