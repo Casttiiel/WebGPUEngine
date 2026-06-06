@@ -57,6 +57,7 @@ import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { SpiderControllerComponent } from '../../components/game/SpiderControllerComponent';
 import { LynxControllerComponent } from '../../components/game/LynxControllerComponent';
+import { ParkourControllerComponent } from '../../components/game/ParkourControllerComponent';
 import { KickableComponent } from '../../components/game/KickableComponent';
 import { KCCMovement } from '../../components/game/movement/KCCMovement';
 import { DummyEnemyController } from '../../components/game/DummyEnemyController';
@@ -356,6 +357,8 @@ export class Loader {
       case 'character_controller':
       case 'lynx_controller':
         return new LynxControllerComponent();
+      case 'parkour_controller':
+        return new ParkourControllerComponent();
       case 'kickable':
         return new KickableComponent();
       case 'kcc_movement':

@@ -30,12 +30,14 @@ export class DashSystem {
   private dashTimer: number = 0;
   private dashDirection: vec3 = vec3.create();
   private isDashingThroughEnemy: boolean = false;
-  /** Referencia al collider del enemigo objetivo durante un dash de atravesar. */
-  private dashTargetCollider: RAPIER.Collider | null =
-    null; /** Punto objetivo del dash (para detectar cuándo el jugador lo ha atravesado). */
-  private dashTargetPoint: vec3 | null = null;
-  /** Safety timer máximo para dash a enemigo (evita que se quede atascado). */
-  private readonly maxEnemyDashDuration: number = 1.6;
+  /**
+   * Handle del collider del enemigo objetivo.
+   * Guardamos el handle (número estable) en lugar del objeto WASM temporal
+   * que devuelve castRay, que se libera en el siguiente step.
+   */
+  private dashTargetColliderHandle: number = -1;
+  /** Safety timer máximo para dash a enemigo. */
+  private readonly maxEnemyDashDuration: number = 0.6;
   // ── Cargas en aire ───────────────────────────────────────────────────────
   private airDashCharges: number = 1;
   private readonly maxAirDashCharges: number = 1;
@@ -66,32 +68,19 @@ export class DashSystem {
     }
   }
 
-  /** Gestiona el fin del dash. Si es a enemigo, termina cuando el jugador lo atraviesa (por posición). */
+  /** Gestiona el fin del dash. Si es a enemigo, termina por tiempo de seguridad. */
   public updateDash(dt: number): void {
     this.dashTimer += dt;
 
-    if (this.isDashingThroughEnemy && this.dashTargetPoint) {
-      // Fin por posición: el jugador ha pasado el punto objetivo
-      const p = this.controller.getCollider().getRigidBody().translation();
-      const playerPos = vec3.fromValues(p.x, p.y, p.z);
-      const toTarget = vec3.sub(vec3.create(), this.dashTargetPoint, playerPos);
-      const hasPassed = vec3.dot(toTarget, this.dashDirection) <= 0;
-
-      // Safety fallback por si el jugador no llega (colisión inesperada, etc.)
-      const safetyExpired = this.dashTimer >= this.maxEnemyDashDuration;
-
-      if (hasPassed || safetyExpired) {
-        this.endDash();
-      }
-    } else if (this.dashTimer >= this.dashDuration) {
+    const duration = this.isDashingThroughEnemy ? this.maxEnemyDashDuration : this.dashDuration;
+    if (this.dashTimer >= duration) {
       this.endDash();
     }
   }
 
   private endDash(): void {
     this.isDashingThroughEnemy = false;
-    this.dashTargetCollider = null;
-    this.dashTargetPoint = null;
+    this.dashTargetColliderHandle = -1;
     this.controller.setIsDashing(false);
   }
 
@@ -136,10 +125,11 @@ export class DashSystem {
     const hitMembership = hit.collider.collisionGroups() >>> 16;
     this.isDashingThroughEnemy = (hitMembership & CollisionGroups.ENEMY) !== 0;
     if (this.isDashingThroughEnemy) {
-      this.dashTargetCollider = hit.collider;
+      // Guardamos el handle (número estable), NO el objeto WASM que se libera
+      this.dashTargetColliderHandle = hit.collider.handle;
       vec3.scaleAndAdd(hitPoint, hitPoint, dir, this.enemyPassThroughOffset);
     } else {
-      this.dashTargetCollider = null;
+      this.dashTargetColliderHandle = -1;
     }
 
     return hitPoint;
@@ -153,8 +143,14 @@ export class DashSystem {
     const dir = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), targetPoint, playerPos));
     vec3.copy(this.dashDirection, dir);
 
-    // Suprimir colisión ANTES de aplicar velocidad — ahora via filterPredicate en KCC,
-    // no necesitamos modificar collision groups directamente.
+    // Recuperar el collider vivo del mundo usando el handle guardado
+    let liveCollider: RAPIER.Collider | null = null;
+    if (this.isDashingThroughEnemy && this.dashTargetColliderHandle !== -1) {
+      liveCollider = Engine.getPhysics().getWorld().getCollider(this.dashTargetColliderHandle);
+      console.log(
+        `[DashSystem] startDash — enemigo handle=${this.dashTargetColliderHandle}, collider vivo=${liveCollider ? 'OK' : 'NULL'}`,
+      );
+    }
 
     // Redirigir el momentum horizontal actual a la dirección del dash,
     // luego sumar el impulso del dash encima.
@@ -167,7 +163,6 @@ export class DashSystem {
 
     console.log(`[DashSystem] startDash — isDashingThroughEnemy: ${this.isDashingThroughEnemy}`);
 
-    this.dashTargetPoint = vec3.clone(targetPoint);
     this.dashTimer = 0;
     this.airDashCharges--;
     this.controller.setIsDashing(true);
@@ -178,11 +173,17 @@ export class DashSystem {
   }
 
   /**
-   * Devuelve el collider del enemigo objetivo si estamos haciendo dash a través de él,
-   * para que el KCC lo excluya vía filterPredicate.
+   * Predicate para excluir colisiones con ENEMY durante el dash-through.
+   * Usa collisionGroups() que lee de la memoria estable del mundo (no de structs WASM temporales).
    */
-  public getDashTargetCollider(): RAPIER.Collider | null {
-    return this.isDashingThroughEnemy ? this.dashTargetCollider : null;
+  public getDashPredicate(): ((c: RAPIER.Collider) => boolean) | null {
+    if (!this.isDashingThroughEnemy) return null;
+    return (c: RAPIER.Collider) => {
+      const membership = c.collisionGroups() >>> 16;
+      const isEnemy = (membership & CollisionGroups.ENEMY) !== 0;
+      if (isEnemy) console.log(`[DashSystem] predicate: excluyendo ENEMY (groups=0x${c.collisionGroups().toString(16)})`);
+      return !isEnemy;
+    };
   }
 
   public onGrounded(): void {

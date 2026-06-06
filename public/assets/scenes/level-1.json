@@ -3,7 +3,7 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/lynx_character.prefab"
+    "prefab": "characters/parkour_character_3p.prefab"
   },
   {
     "prefab": "characters/dummy_enemy.prefab",

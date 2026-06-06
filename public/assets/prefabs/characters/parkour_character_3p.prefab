@@ -1,0 +1,92 @@
+{
+  "children": [
+    {
+      "prefab": "cameras/player_camera.prefab",
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            1.6,
+            0
+          ]
+        }
+      }
+    }
+  ],
+  "gltf": "player.gltf",
+  "components": {
+    "name": "Player",
+    "transform": {
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "scale": [
+        0.6,
+        1.8,
+        0.6
+      ]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 70,
+      "collisionGroups": "PLAYER",
+      "collisionMask": "PLAYER_INTERACTIONS"
+    },
+    "kcc_movement": {
+      "maxSpeed": 11,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
+      "airControl": 0.7,
+      "airDrag": 0.3,
+      "jumpHeight": 1.2,
+      "jumpTimeToPeak": 0.35,
+      "jumpTimeToDescent": 0.3,
+      "jumpCutFactor": 0.7,
+      "jumpCutVelocityLimit": 1,
+      "coyoteTime": 0.15
+    },
+    "parkour_controller": {
+      "moveSpeed": 11,
+      "maxSpeed": 18,
+      "airControl": 0.7,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
+      "airDrag": 0.3,
+      "wallRunGravity": -2,
+      "startWallRunGravity": 2.5,
+      "wallRunAcceleration": 65,
+      "detectWallDistance": 0.5,
+      "wallJumpCoyoteTime": 0.15,
+      "disableInputAfterWallJumpTime": 0.3,
+      "mantleDetectionDistance": 1.5,
+      "mantleMaxHeight": -0.025,
+      "mantlingMinVerticalVelocity": -9,
+      "minMantleVelocity": 8,
+      "minSwingSpeed": 11,
+      "impulsePadInputDisableTime": 0.3
+    },
+    "camera_arm": {
+      "offset": [
+        0,
+        0,
+        5
+      ],
+      "targetOffset": [
+        0,
+        1.5,
+        0
+      ],
+      "smoothSpeed": 15,
+      "enableCollision": true,
+      "mouseSensitivity": 0.15
+    }
+  }
+}

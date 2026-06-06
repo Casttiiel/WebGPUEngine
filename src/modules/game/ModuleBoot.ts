@@ -7,6 +7,7 @@ import { Logger } from '../../core/debug/Logger';
 import { KeyCode } from '../../types/KeyCode.enum';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
+import { CameraArmComponent } from '../../components/game/CameraArmComponent';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
@@ -14,8 +15,11 @@ import { LinearInterpolator } from '../../core/math/Interpolators';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { GUIManager } from '../../core/debug/GUIManager';
 
+/** Component that controls the player camera — either FPS or TPS arm. */
+type PlayerCameraController = FPSCameraControllerComponent | CameraArmComponent;
+
 export class ModuleBoot extends Module {
-  private playerCameraControllerComponent!: FPSCameraControllerComponent;
+  private playerCameraControllerComponent!: PlayerCameraController;
   private debugCameraComponent!: CameraComponent;
   private playerCharacterControllerComponent!: BasePlayerController;
   private lastGamestate: string = '';
@@ -107,6 +111,10 @@ export class ModuleBoot extends Module {
         this.playerCameraControllerComponent = player.getComponent(
           'fps_camera_controller',
         ) as FPSCameraControllerComponent;
+      } else if (player.hasComponent('camera_arm')) {
+        this.playerCameraControllerComponent = player.getComponent(
+          'camera_arm',
+        ) as CameraArmComponent;
       }
     }
     if (!this.playerCharacterControllerComponent) {

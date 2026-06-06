@@ -131,7 +131,7 @@ export class LynxControllerComponent
           deltaTime,
           this.capsuleCollider,
           this.characterController,
-          this.dashSystem.getDashTargetCollider(),
+          this.dashSystem.getDashPredicate(),
         );
         break;
       }
