@@ -74,18 +74,23 @@
       "impulsePadInputDisableTime": 0.3
     },
     "camera_arm": {
-      "offset": [
-        0,
-        0,
-        5
-      ],
-      "targetOffset": [
+      "armLength": 5,
+      "pivotOffset": [
         0,
         1.5,
         0
       ],
-      "smoothSpeed": 120,
+      "socketOffset": [
+        0.5,
+        0,
+        0
+      ],
+      "cameraLag": true,
+      "cameraLagSpeed": 12,
+      "pitchMin": -70,
+      "pitchMax": 75,
       "enableCollision": true,
+      "collisionPullOutSpeed": 6,
       "mouseSensitivity": 0.15
     }
   }

@@ -6,106 +6,172 @@ import { Engine } from '../../core/engine/Engine';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 
 export interface CameraArmComponentData {
-  offset?: number[]; // [x, y, z] - Offset en espacio local
-  targetOffset?: number[]; // [x, y, z] - Punto al que mira la cámara (relativo al owner)
-  smoothSpeed?: number; // Velocidad de interpolación
-  enableCollision?: boolean; // Activar raycast de colisión
-  collisionRadius?: number; // Radio para el raycast
-  mouseSensitivity?: number; // Sensibilidad del mouse para rotación
+  // ── Arm ────────────────────────────────────────────────────────────────────
+  /** Natural length of the spring arm (metres). Replaces the old `offset` vector. */
+  armLength?: number;
+  /**
+   * Offset of the pivot point from the owner origin in world space.
+   * The arm rotates around this point and the camera looks at it.
+   * Equivalent to UE5 TargetOffset. (Legacy alias: `targetOffset`.)
+   */
+  pivotOffset?: number[];
+  /**
+   * Offset applied at the camera end of the arm in arm-local space [right, up, forward].
+   * Use this for over-the-shoulder framing without affecting arm length or look-at target.
+   * Equivalent to UE5 SocketOffset.
+   */
+  socketOffset?: number[];
+
+  // ── Lag ────────────────────────────────────────────────────────────────────
+  /** Smooth all three axes of camera position toward the desired position. */
+  cameraLag?: boolean;
+  /** How fast the camera reaches the desired position (higher = less lag). Default 10. */
+  cameraLagSpeed?: number;
+  /** Smooth the look-at target so the camera rotation lags slightly. */
+  cameraRotationLag?: boolean;
+  /** How fast the look-at target updates (higher = less lag). Default 15. */
+  cameraRotationLagSpeed?: number;
+  /**
+   * How fast the pivot's Y position follows the owner.
+   * 0 = instant (matches XZ behaviour). Default 0.
+   * (Legacy `smoothSpeed` is used here for backward compatibility.)
+   */
+  pivotLagSpeed?: number;
+
+  // ── Pitch limits ───────────────────────────────────────────────────────────
+  pitchMin?: number; // degrees, default -80
+  pitchMax?: number; // degrees, default  80
+
+  // ── Collision ──────────────────────────────────────────────────────────────
+  /** Raycast from pivot toward desired camera position and shorten arm on hit. */
+  enableCollision?: boolean;
+  /** Safety margin subtracted from the hit distance. Default 0.15. */
+  collisionRadius?: number;
+  /**
+   * Speed at which the arm returns to its full length after an obstruction clears.
+   * 0 = instant (legacy snap-out). Default 6.
+   */
+  collisionPullOutSpeed?: number;
+
+  // ── Input ──────────────────────────────────────────────────────────────────
+  mouseSensitivity?: number;
+
+  // ── Legacy (backward compat) ───────────────────────────────────────────────
+  /** Legacy: arm length is derived as vec3.length(offset). */
+  offset?: number[];
+  /** Legacy alias for pivotOffset. */
+  targetOffset?: number[];
+  /** Legacy: mapped to pivotLagSpeed. */
+  smoothSpeed?: number;
 }
 
 /**
- * CameraArmComponent - Spring Arm / Camera Boom
+ * CameraArmComponent — UE5-style spring arm for third-person cameras.
  *
- * Funcionalidades:
- * - Posiciona la cámara con offset relativo al owner (personaje)
- * - Control de rotación con mouse (mouse look) opcional
- * - Suavizado de movimiento (interpolación)
- * - Detección de colisión opcional (raycast para evitar atravesar paredes)
- * - Rotación del owner (personaje) en Y basado en mouse X
+ * Features:
+ *   - Configurable arm length + pivot offset + socket offset
+ *   - Camera position lag (all axes)
+ *   - Camera rotation lag (smooth look-at)
+ *   - Collision avoidance with configurable pull-out speed
+ *   - Mouse-driven pitch/yaw with clamping
+ *   - Rotates owner entity on Y so the character faces the camera direction
  *
- * Uso típico (tercera persona):
- * {
- *   "camera_arm": {
- *     "offset": [0, 2.5, -5.0],
- *     "targetOffset": [0, 1.0, 0],
- *     "smoothSpeed": 10.0,
- *     "enableCollision": true,
- *     "enableMouseLook": true,
- *     "mouseSensitivity": 0.2
- *   }
- * }
- *
- * Uso típico (primera persona):
- * {
- *   "camera_arm": {
- *     "offset": [0, 1.6, 0],
- *     "targetOffset": [0, 0, 1],
- *     "smoothSpeed": 15.0,
- *     "enableCollision": false,
- *     "enableMouseLook": true,
- *     "mouseSensitivity": 0.15
- *   }
- * }
+ * Entity setup (unchanged from before):
+ *   Player  [camera_arm, capsule_collider, ...]
+ *   └── PlayerCamera [camera]
  */
 export class CameraArmComponent extends Component {
-  // Configuración
-  private offset: vec3 = vec3.fromValues(0, 1.6, 0); // Primera persona por defecto
-  private targetOffset: vec3 = vec3.fromValues(0, 0, 1); // Mira hacia adelante
-  private smoothSpeed: number = 10.0; // Interpolación
-  private enableCollision: boolean = false; // Colisión con paredes
-  private collisionRadius: number = 0.3; // Radio para raycast
-  private mouseSensitivity: number = 0.15; // Sensibilidad del mouse
+  // ── Arm ────────────────────────────────────────────────────────────────────
+  private armLength: number = 5.0;
+  private pivotOffset: vec3 = vec3.fromValues(0, 1.5, 0);
+  private socketOffset: vec3 = vec3.fromValues(0, 0, 0);
+
+  // ── Lag ────────────────────────────────────────────────────────────────────
+  private cameraLag: boolean = false;
+  private cameraLagSpeed: number = 10.0;
+  private cameraRotationLag: boolean = false;
+  private cameraRotationLagSpeed: number = 15.0;
+  private pivotLagSpeed: number = 0;
+
+  // ── Pitch limits ───────────────────────────────────────────────────────────
+  private pitchMin: number = -80;
+  private pitchMax: number = 80;
+
+  // ── Collision ──────────────────────────────────────────────────────────────
+  private enableCollision: boolean = false;
+  private collisionRadius: number = 0.15;
+  private collisionPullOutSpeed: number = 6.0;
+
+  // ── Input ──────────────────────────────────────────────────────────────────
+  private mouseSensitivity: number = 0.15;
+
+  // ── Runtime state ──────────────────────────────────────────────────────────
+  private pitch: number = 0;
+  private yaw: number = 0;
+
   private currentPivot: vec3 = vec3.create();
   private isPivotInitialized: boolean = false;
 
-  // Estado interno
-  private currentPosition: vec3 = vec3.create();
-  private isFirstFrame: boolean = true;
-  private pitch: number = 0; // Rotación vertical (arriba/abajo)
-  private yaw: number = 0; // Rotación horizontal (izquierda/derecha)
+  private currentCamPos: vec3 = vec3.create();
+  private isCamPosInitialized: boolean = false;
 
-  // Referencias
+  private currentLookTarget: vec3 = vec3.create();
+  private isLookTargetInitialized: boolean = false;
+
+  // Current arm length after collision, driven toward armLength at pullOutSpeed.
+  private currentArmLength: number = 5.0;
+
   private cameraEntity: any = null;
 
-  constructor() {
-    super();
-  }
+  // ── Lifecycle ───────────────────────────────────────────────────────────────
 
   public async load(data: CameraArmComponentData): Promise<void> {
-    // Cargar configuración
-    if (data.offset && data.offset.length === 3) {
-      vec3.set(this.offset, data.offset[0]!, data.offset[1]!, data.offset[2]!);
+    // Arm length: explicit or derived from legacy offset vector length
+    if (data.armLength !== undefined) {
+      this.armLength = data.armLength;
+    } else if (data.offset && data.offset.length === 3) {
+      const len = Math.sqrt(data.offset[0]! ** 2 + data.offset[1]! ** 2 + data.offset[2]! ** 2);
+      this.armLength = len > 0.01 ? len : 5.0;
     }
-    if (data.targetOffset && data.targetOffset.length === 3) {
-      vec3.set(
-        this.targetOffset,
-        data.targetOffset[0]!,
-        data.targetOffset[1]!,
-        data.targetOffset[2]!,
-      );
-    }
-    if (data.smoothSpeed !== undefined) {
-      this.smoothSpeed = data.smoothSpeed;
-    }
-    if (data.enableCollision !== undefined) {
-      this.enableCollision = data.enableCollision;
-    }
-    if (data.collisionRadius !== undefined) {
-      this.collisionRadius = data.collisionRadius;
-    }
-    if (data.mouseSensitivity !== undefined) {
-      this.mouseSensitivity = data.mouseSensitivity;
+    this.currentArmLength = this.armLength;
+
+    // Pivot offset (new name preferred; legacy targetOffset also accepted)
+    const pivot = data.pivotOffset ?? data.targetOffset;
+    if (pivot && pivot.length === 3) {
+      vec3.set(this.pivotOffset, pivot[0]!, pivot[1]!, pivot[2]!);
     }
 
-    // Inicializar posición actual
-    vec3.copy(this.currentPosition, this.offset);
+    if (data.socketOffset && data.socketOffset.length === 3) {
+      vec3.set(this.socketOffset, data.socketOffset[0]!, data.socketOffset[1]!, data.socketOffset[2]!);
+    }
+
+    // Lag
+    this.cameraLag = data.cameraLag ?? false;
+    this.cameraLagSpeed = data.cameraLagSpeed ?? 10.0;
+    this.cameraRotationLag = data.cameraRotationLag ?? false;
+    this.cameraRotationLagSpeed = data.cameraRotationLagSpeed ?? 15.0;
+
+    // Pivot lag: explicit → legacy smoothSpeed → 0 (instant)
+    if (data.pivotLagSpeed !== undefined) {
+      this.pivotLagSpeed = data.pivotLagSpeed;
+    } else if (data.smoothSpeed !== undefined) {
+      this.pivotLagSpeed = data.smoothSpeed;
+    }
+
+    this.pitchMin = data.pitchMin ?? -80;
+    this.pitchMax = data.pitchMax ?? 80;
+
+    this.enableCollision = data.enableCollision ?? false;
+    this.collisionRadius = data.collisionRadius ?? 0.15;
+    this.collisionPullOutSpeed = data.collisionPullOutSpeed ?? 6.0;
+
+    this.mouseSensitivity = data.mouseSensitivity ?? 0.15;
   }
 
   public update(dt: number): void {
+    // ── Resolve camera child (cached after first find) ──────────────────────
     if (!this.cameraEntity) {
-      const children = this.getOwner().getChildren();
-      for (const child of children) {
+      for (const child of this.getOwner().getChildren()) {
         if (child.hasComponent('camera')) {
           this.cameraEntity = child;
           break;
@@ -116,100 +182,136 @@ export class CameraArmComponent extends Component {
 
     const ownerTransform = this.getOwner().getComponent('transform') as TransformComponent;
     if (!ownerTransform) return;
-
     const cameraTransform = this.cameraEntity.getComponent('transform') as TransformComponent;
     const cameraComponent = this.cameraEntity.getComponent('camera') as CameraComponent;
     if (!cameraTransform || !cameraComponent) return;
 
-    // --- Mouse look ---
-    const input = Engine.getInput();
-    const mouseDelta = input.getMouseDelta();
-
+    // ── Mouse input → pitch / yaw ───────────────────────────────────────────
+    const mouseDelta = Engine.getInput().getMouseDelta();
     this.yaw -= mouseDelta.x * this.mouseSensitivity;
     this.pitch += mouseDelta.y * this.mouseSensitivity;
-    this.pitch = Math.max(-89, Math.min(89, this.pitch));
+    this.pitch = Math.max(this.pitchMin, Math.min(this.pitchMax, this.pitch));
     this.yaw = ((this.yaw + 180) % 360) - 180;
 
-    // Rotar el owner en Y
+    // Rotate owner on Y so the character faces the camera's horizontal direction
     const ownerAngles = ownerTransform.getTransform().getAngles();
     ownerTransform.getTransform().setAngles(this.yaw, ownerAngles.pitch, ownerAngles.roll);
 
-    // --- Pivot suavizado ---
+    // ── Pivot (look-at target) ──────────────────────────────────────────────
     const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
-    const targetPivot = vec3.add(vec3.create(), ownerWorldPos, this.targetOffset);
+    const targetPivot = vec3.add(vec3.create(), ownerWorldPos, this.pivotOffset);
 
     if (!this.isPivotInitialized) {
       vec3.copy(this.currentPivot, targetPivot);
       this.isPivotInitialized = true;
     }
 
-    // XZ instantáneo, Y suavizado
-    this.currentPivot[0] = targetPivot[0];
-    this.currentPivot[2] = targetPivot[2];
-    const pivotAlpha = Math.min(1.0, dt * this.smoothSpeed);
-    this.currentPivot[1] += (targetPivot[1] - this.currentPivot[1]) * pivotAlpha;
-
-    // --- Posición de la cámara: siempre derivada del pivot, sin estado propio ---
-    const pitchRad = (this.pitch * Math.PI) / 180;
-    const yawRad = (this.yaw * Math.PI) / 180;
-    const armLength = vec3.length(this.offset);
-
-    const camOffset = vec3.fromValues(
-      -Math.cos(pitchRad) * Math.sin(yawRad) * armLength,
-      Math.sin(pitchRad) * armLength,
-      -Math.cos(pitchRad) * Math.cos(yawRad) * armLength,
-    );
-
-    const desiredPos = vec3.add(vec3.create(), this.currentPivot, camOffset);
-
-    // --- Colisión ---
-    let finalPos: vec3;
-    if (this.enableCollision) {
-      const collisionPos = this.applyCollision(this.currentPivot, desiredPos);
-      const currentDist = vec3.distance(this.currentPosition, this.currentPivot);
-      const collisionDist = vec3.distance(collisionPos, this.currentPivot);
-
-      if (collisionDist < currentDist) {
-        // Obstáculo detectado: snap inmediato
-        vec3.copy(this.currentPosition, collisionPos);
-      } else {
-        // Sin obstáculo: lerp suave de vuelta a la distancia completa
-        const alpha = Math.min(1.0, dt * this.smoothSpeed);
-        vec3.lerp(this.currentPosition, this.currentPosition, desiredPos, alpha);
-      }
-      finalPos = this.currentPosition;
+    if (this.pivotLagSpeed <= 0) {
+      vec3.copy(this.currentPivot, targetPivot);
     } else {
-      // Sin colisión: completamente determinista, cero estado
-      finalPos = desiredPos;
-      vec3.copy(this.currentPosition, finalPos);
+      const a = Math.min(1.0, dt * this.pivotLagSpeed);
+      vec3.lerp(this.currentPivot, this.currentPivot, targetPivot, a);
     }
 
-    // --- Posicionar y orientar cámara ---
-    cameraTransform.getTransform().setWorldPosition(finalPos);
+    // ── Arm direction (unit vector from pivot toward camera) ────────────────
+    const pitchRad = (this.pitch * Math.PI) / 180;
+    const yawRad   = (this.yaw   * Math.PI) / 180;
+    const armDir = vec3.fromValues(
+      -Math.cos(pitchRad) * Math.sin(yawRad),
+       Math.sin(pitchRad),
+      -Math.cos(pitchRad) * Math.cos(yawRad),
+    );
 
-    const camera = cameraComponent.getCamera();
-    camera.lookAt(
-      Array.from(finalPos) as [number, number, number],
-      Array.from(this.currentPivot) as [number, number, number],
+    // ── Collision: update current arm length ────────────────────────────────
+    if (this.enableCollision) {
+      const safeDist = this.castCollision(this.currentPivot, armDir, this.armLength);
+      if (safeDist < this.currentArmLength) {
+        // Obstacle detected → snap camera in immediately
+        this.currentArmLength = safeDist;
+      } else {
+        // No closer obstacle → pull back out at configured speed
+        if (this.collisionPullOutSpeed <= 0) {
+          this.currentArmLength = safeDist;
+        } else {
+          this.currentArmLength = Math.min(
+            safeDist,
+            this.currentArmLength + this.collisionPullOutSpeed * dt,
+          );
+        }
+      }
+    } else {
+      this.currentArmLength = this.armLength;
+    }
+
+    // ── Camera desired position = pivot + armDir * armLength ────────────────
+    let desiredPos = vec3.scaleAndAdd(vec3.create(), this.currentPivot, armDir, this.currentArmLength);
+
+    // ── Socket offset: shift camera in arm-local space [right, up, forward] ─
+    const soX = this.socketOffset[0]!, soY = this.socketOffset[1]!, soZ = this.socketOffset[2]!;
+    if (soX !== 0 || soY !== 0 || soZ !== 0) {
+      const worldUp  = vec3.fromValues(0, 1, 0);
+      // Right = cross(worldUp, armDir). Falls back to world X when arm is vertical.
+      let armRight = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), worldUp, armDir));
+      if (vec3.length(armRight) < 0.001) vec3.set(armRight, 1, 0, 0);
+      const armUp = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), armDir, armRight));
+
+      if (soX !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armRight, soX);
+      if (soY !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armUp,   soY);
+      if (soZ !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armDir,  soZ);
+    }
+
+    // ── Camera position lag ─────────────────────────────────────────────────
+    let finalCamPos: vec3;
+    if (this.cameraLag) {
+      if (!this.isCamPosInitialized) {
+        vec3.copy(this.currentCamPos, desiredPos);
+        this.isCamPosInitialized = true;
+      }
+      const a = Math.min(1.0, dt * this.cameraLagSpeed);
+      vec3.lerp(this.currentCamPos, this.currentCamPos, desiredPos, a);
+      finalCamPos = this.currentCamPos;
+    } else {
+      finalCamPos = desiredPos;
+      vec3.copy(this.currentCamPos, desiredPos);
+      this.isCamPosInitialized = true;
+    }
+
+    // ── Camera rotation lag (smooth look-at target) ─────────────────────────
+    let lookTarget: vec3;
+    if (this.cameraRotationLag) {
+      if (!this.isLookTargetInitialized) {
+        vec3.copy(this.currentLookTarget, this.currentPivot);
+        this.isLookTargetInitialized = true;
+      }
+      const a = Math.min(1.0, dt * this.cameraRotationLagSpeed);
+      vec3.lerp(this.currentLookTarget, this.currentLookTarget, this.currentPivot, a);
+      lookTarget = this.currentLookTarget;
+    } else {
+      lookTarget = this.currentPivot;
+    }
+
+    // ── Apply to camera ─────────────────────────────────────────────────────
+    cameraTransform.getTransform().setWorldPosition(finalCamPos);
+    cameraComponent.getCamera().lookAt(
+      Array.from(finalCamPos) as [number, number, number],
+      Array.from(lookTarget)  as [number, number, number],
       [0, 1, 0],
     );
   }
 
-  /**
-   * Aplica detección de colisión usando raycast
-   * Si hay obstáculos entre el owner y la posición deseada, acerca la cámara
-   */
-  private applyCollision(pivot: vec3, desiredPos: vec3): vec3 {
-    const physics = Engine.getPhysics();
-    if (!physics) return desiredPos;
+  // ── Private helpers ─────────────────────────────────────────────────────────
 
-    const direction = vec3.subtract(vec3.create(), desiredPos, pivot);
-    const distance = vec3.length(direction);
-    vec3.normalize(direction, direction);
+  /**
+   * Raycast from `pivot` along `dir` up to `maxDist`.
+   * Returns the safe camera distance (hit.toi - collisionRadius, clamped to collisionRadius).
+   */
+  private castCollision(pivot: vec3, dir: vec3, maxDist: number): number {
+    const physics = Engine.getPhysics();
+    if (!physics) return maxDist;
 
     const ray = new RAPIER.Ray(
-      { x: pivot[0], y: pivot[1], z: pivot[2] }, // ← origen en pivot, no en ownerPos
-      { x: direction[0], y: direction[1], z: direction[2] },
+      { x: pivot[0]!, y: pivot[1]!, z: pivot[2]! },
+      { x: dir[0]!,   y: dir[1]!,   z: dir[2]!   },
     );
 
     const capsule = this.getOwner().getComponent('capsule_collider') as any;
@@ -217,33 +319,22 @@ export class CameraArmComponent extends Component {
 
     const hit = physics
       .getWorld()
-      .castRay(ray, distance, true, QueryFilterFlags.EXCLUDE_SENSORS, undefined, playerRigidBody);
+      .castRay(ray, maxDist, true, QueryFilterFlags.EXCLUDE_SENSORS, undefined, playerRigidBody);
 
     if (hit) {
-      const safeDistance = Math.max(0.1, hit.timeOfImpact - this.collisionRadius);
-      return vec3.scaleAndAdd(vec3.create(), pivot, direction, safeDistance);
+      return Math.max(this.collisionRadius, hit.timeOfImpact - this.collisionRadius);
     }
-
-    return desiredPos;
-  }
-
-  public override renderInMenu(): void {}
-
-  public renderDebug(): void {
-    // TODO: Visualización debug
-    // - Línea desde owner hasta cámara
-    // - Punto de target
-    // - Raycast de colisión
+    return maxDist;
   }
 
   public setActive(isActive: boolean): void {
     this.enabled = isActive;
   }
 
-  /**
-   * Cleanup de recursos
-   */
-  public override dispose(): void {
-    // Limpieza si es necesario
-  }
+  public getPitch(): number { return this.pitch; }
+  public getYaw(): number   { return this.yaw;   }
+
+  public override renderInMenu(): void {}
+  public renderDebug(): void {}
+  public override dispose(): void {}
 }
