@@ -58,6 +58,7 @@
     "camera",
 
     "skeletal_mesh",
+    "foot_ik",
     "animator",
     "view_model",
     "trail_renderer",

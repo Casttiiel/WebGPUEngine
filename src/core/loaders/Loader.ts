@@ -89,6 +89,7 @@ import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { SkeletalMeshComponent } from '../../components/render/SkeletalMeshComponent';
 import { AnimatorComponent } from '../../components/render/AnimatorComponent';
+import { FootIKComponent } from '../../components/render/FootIKComponent';
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
 import { ViewModelMeshComponent } from '../../components/render/ViewModelMeshComponent';
 import { TerrainComponent } from '../../components/render/TerrainComponent';
@@ -317,6 +318,8 @@ export class Loader {
         return new SkeletalMeshComponent();
       case 'animator':
         return new AnimatorComponent();
+      case 'foot_ik':
+        return new FootIKComponent();
       case 'camera':
         return new CameraComponent();
       case 'tone_mapping':

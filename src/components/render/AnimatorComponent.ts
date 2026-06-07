@@ -555,6 +555,21 @@ export class AnimatorComponent extends Component {
     return this.clips.some((c) => c.name.toLowerCase() === name.toLowerCase());
   }
 
+  // ─── Joint access (for FootIKComponent and external IK systems) ─────────────
+
+  /** Returns the joint index for the given name, or -1 if not found / not yet loaded. */
+  public getJointIndex(name: string): number {
+    return this.skeleton?.names.indexOf(name) ?? -1;
+  }
+
+  /**
+   * Returns the joint's current model-space matrix (local to the mesh entity).
+   * Only valid AFTER the first evaluateAnimation() call (i.e. after onAttach).
+   */
+  public getJointModelMatrix(jointIndex: number): Readonly<mat4> | null {
+    return this.globalMats[jointIndex] ?? null;
+  }
+
   // ─── IK API ─────────────────────────────────────────────────────────────────
 
   public addIkConstraint<T extends IkConstraint>(constraint: T): T {
