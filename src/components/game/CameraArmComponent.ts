@@ -56,6 +56,8 @@ export class CameraArmComponent extends Component {
   private enableCollision: boolean = false; // Colisión con paredes
   private collisionRadius: number = 0.3; // Radio para raycast
   private mouseSensitivity: number = 0.15; // Sensibilidad del mouse
+  private currentPivot: vec3 = vec3.create();
+  private isPivotInitialized: boolean = false;
 
   // Estado interno
   private currentPosition: vec3 = vec3.create();
@@ -126,58 +128,69 @@ export class CameraArmComponent extends Component {
     this.yaw -= mouseDelta.x * this.mouseSensitivity;
     this.pitch += mouseDelta.y * this.mouseSensitivity;
     this.pitch = Math.max(-89, Math.min(89, this.pitch));
+    this.yaw = ((this.yaw + 180) % 360) - 180;
 
-    // Rotar el owner en Y (para que el personaje gire con la cámara)
+    // Rotar el owner en Y
     const ownerAngles = ownerTransform.getTransform().getAngles();
     ownerTransform.getTransform().setAngles(this.yaw, ownerAngles.pitch, ownerAngles.roll);
 
-    // --- Pivot: punto alrededor del cual orbita la cámara ---
+    // --- Pivot suavizado ---
     const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
-    const pivot = vec3.add(vec3.create(), ownerWorldPos, this.targetOffset);
-    //                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    // targetOffset es el punto de interés (ej. [0,1.5,0] = altura de la cabeza)
+    const targetPivot = vec3.add(vec3.create(), ownerWorldPos, this.targetOffset);
 
-    // --- Calcular posición de la cámara orbitando alrededor del pivot ---
+    if (!this.isPivotInitialized) {
+      vec3.copy(this.currentPivot, targetPivot);
+      this.isPivotInitialized = true;
+    }
+
+    // XZ instantáneo, Y suavizado
+    this.currentPivot[0] = targetPivot[0];
+    this.currentPivot[2] = targetPivot[2];
+    const pivotAlpha = Math.min(1.0, dt * this.smoothSpeed);
+    this.currentPivot[1] += (targetPivot[1] - this.currentPivot[1]) * pivotAlpha;
+
+    // --- Posición de la cámara: siempre derivada del pivot, sin estado propio ---
     const pitchRad = (this.pitch * Math.PI) / 180;
     const yawRad = (this.yaw * Math.PI) / 180;
+    const armLength = vec3.length(this.offset);
 
-    // El offset define la distancia del brazo. Usamos su longitud como radio
-    // y su dirección inicial como referencia, luego la rotamos con pitch+yaw.
-    const armLength = vec3.length(this.offset); // distancia cámara-pivot
-
-    // Posición de la cámara = pivot + dirección_rotada * armLength
-    // La dirección viene de rotar [0,0,-1] (detrás del pivot) con pitch+yaw
     const camOffset = vec3.fromValues(
       -Math.cos(pitchRad) * Math.sin(yawRad) * armLength,
       Math.sin(pitchRad) * armLength,
       -Math.cos(pitchRad) * Math.cos(yawRad) * armLength,
     );
 
-    const desiredPos = vec3.add(vec3.create(), pivot, camOffset);
+    const desiredPos = vec3.add(vec3.create(), this.currentPivot, camOffset);
 
-    // --- Colisión (opcional) ---
-    let finalPos = vec3.clone(desiredPos);
+    // --- Colisión ---
+    let finalPos: vec3;
     if (this.enableCollision) {
-      finalPos = this.applyCollision(pivot, desiredPos);
-    }
+      const collisionPos = this.applyCollision(this.currentPivot, desiredPos);
+      const currentDist = vec3.distance(this.currentPosition, this.currentPivot);
+      const collisionDist = vec3.distance(collisionPos, this.currentPivot);
 
-    // --- Suavizado ---
-    if (this.isFirstFrame) {
-      vec3.copy(this.currentPosition, finalPos);
-      this.isFirstFrame = false;
+      if (collisionDist < currentDist) {
+        // Obstáculo detectado: snap inmediato
+        vec3.copy(this.currentPosition, collisionPos);
+      } else {
+        // Sin obstáculo: lerp suave de vuelta a la distancia completa
+        const alpha = Math.min(1.0, dt * this.smoothSpeed);
+        vec3.lerp(this.currentPosition, this.currentPosition, desiredPos, alpha);
+      }
+      finalPos = this.currentPosition;
     } else {
-      const alpha = Math.min(1.0, dt * this.smoothSpeed);
-      vec3.lerp(this.currentPosition, this.currentPosition, finalPos, alpha);
+      // Sin colisión: completamente determinista, cero estado
+      finalPos = desiredPos;
+      vec3.copy(this.currentPosition, finalPos);
     }
 
-    // --- Posicionar cámara ---
-    cameraTransform.getTransform().setWorldPosition(this.currentPosition);
+    // --- Posicionar y orientar cámara ---
+    cameraTransform.getTransform().setWorldPosition(finalPos);
 
-    // --- Orientar cámara: siempre mirando al pivot ---
     const camera = cameraComponent.getCamera();
     camera.lookAt(
-      Array.from(this.currentPosition) as [number, number, number],
-      Array.from(pivot) as [number, number, number], // ← siempre mira al pivot
+      Array.from(finalPos) as [number, number, number],
+      Array.from(this.currentPivot) as [number, number, number],
       [0, 1, 0],
     );
   }

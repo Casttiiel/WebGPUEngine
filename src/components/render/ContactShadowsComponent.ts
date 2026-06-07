@@ -48,9 +48,9 @@ export class ContactShadowsComponent extends Component {
   /** World-space ray step length in metres. Smaller = more accurate, more expensive. */
   public stepLength: number = 0.025;
   /** Maximum ray travel distance in metres. Larger = wider shadow coverage. */
-  public maxDistance: number = 0.4;
+  public maxDistance: number = 0.1;
   /** LinearDepth hit-detection tolerance. Tune to avoid false shadows on thin faces. */
-  public thickness: number = 0.015;
+  public thickness: number = 0.0001;
 
   private loaded = false;
 
@@ -192,8 +192,8 @@ export class ContactShadowsComponent extends Component {
     this._editorFolder.add(this, 'isEnabled').name('Enable').listen();
     this._editorFolder.add(this, 'intensity', 0.0, 1.0).name('Intensity').listen();
     this._editorFolder.add(this, 'stepLength', 0.005, 0.1).name('Step Length').listen();
-    this._editorFolder.add(this, 'maxDistance', 0.05, 2.0).name('Max Distance').listen();
-    this._editorFolder.add(this, 'thickness', 0.001, 0.1).name('Thickness').listen();
+    this._editorFolder.add(this, 'maxDistance', 0.005, 0.5).name('Max Distance').listen();
+    this._editorFolder.add(this, 'thickness', 0.0001, 0.01).name('Thickness').listen();
   }
 
   public renderDebug(): void {}

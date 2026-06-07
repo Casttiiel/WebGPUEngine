@@ -84,7 +84,7 @@
         1.5,
         0
       ],
-      "smoothSpeed": 15,
+      "smoothSpeed": 120,
       "enableCollision": true,
       "mouseSensitivity": 0.15
     }
