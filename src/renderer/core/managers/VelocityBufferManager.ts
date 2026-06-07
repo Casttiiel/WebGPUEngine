@@ -8,7 +8,7 @@ import { mat4 } from 'gl-matrix';
 import { Engine } from '../../../core/engine/Engine';
 import { RenderKey } from './RenderKeyManager';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
-import { SkinnedMeshComponent } from '../../../components/render/SkinnedMeshComponent';
+import { SkeletalMeshComponent } from '../../../components/render/SkeletalMeshComponent';
 
 /**
  * VelocityBufferManager
@@ -380,12 +380,11 @@ export class VelocityBufferManager {
       if (!tech?.getIsSkinned()) continue;
       if (key.mesh.getIndexCount() === 0) continue;
 
-      // For skinned meshes, key.owner IS the SkinnedMeshComponent itself
-      // (it calls addKey(this as any, ...) in its load method).
-      // Use duck-typing: check for the method introduced specifically for this pass.
+      // key.owner is a SkeletalMeshComponent (or legacy SkinnedMeshComponent).
+      // Use duck-typing so the check works for both.
       const maybeComp = key.owner as unknown as Record<string, unknown>;
       if (typeof maybeComp['getVelocitySkinPairBindGroup'] !== 'function') continue;
-      const skinnedComp = key.owner as unknown as SkinnedMeshComponent;
+      const skinnedComp = key.owner as unknown as SkeletalMeshComponent;
 
       pass.setBindGroup(2, key.transform.getModelBindGroup()); // ObjectUniforms
       pass.setBindGroup(3, skinnedComp.getVelocitySkinPairBindGroup()); // current+previous joints

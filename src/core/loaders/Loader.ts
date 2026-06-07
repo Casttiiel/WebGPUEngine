@@ -87,7 +87,8 @@ import { HeavyMixedController } from '../../components/game/HeavyMixedController
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
-import { SkinnedMeshComponent } from '../../components/render/SkinnedMeshComponent';
+import { SkeletalMeshComponent } from '../../components/render/SkeletalMeshComponent';
+import { AnimatorComponent } from '../../components/render/AnimatorComponent';
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
 import { ViewModelMeshComponent } from '../../components/render/ViewModelMeshComponent';
 import { TerrainComponent } from '../../components/render/TerrainComponent';
@@ -312,8 +313,10 @@ export class Loader {
         return new TransformComponent();
       case 'render':
         return new RenderComponent();
-      case 'skinned_mesh':
-        return new SkinnedMeshComponent();
+      case 'skeletal_mesh':
+        return new SkeletalMeshComponent();
+      case 'animator':
+        return new AnimatorComponent();
       case 'camera':
         return new CameraComponent();
       case 'tone_mapping':

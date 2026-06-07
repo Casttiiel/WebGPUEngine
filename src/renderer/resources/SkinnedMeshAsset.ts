@@ -128,7 +128,7 @@ export class SkinnedMeshAsset extends BaseResource {
     this.material = await Material.get({
       technique: 'gbuffer/gbuffer_skinned.tech',
       category: RenderCategory.SOLIDS,
-      casts_shadows: false,
+      casts_shadows: true,
       textures: {
         txAlbedo: getTexName(albedoTex),
         txNormal: normalTex ? getTexName(normalTex) : 'no-normal.jpg',

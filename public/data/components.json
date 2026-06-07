@@ -57,7 +57,8 @@
 
     "camera",
 
-    "skinned_mesh",
+    "skeletal_mesh",
+    "animator",
     "view_model",
     "trail_renderer",
     "far_reach_tentacle",
