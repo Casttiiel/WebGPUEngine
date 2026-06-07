@@ -193,10 +193,6 @@ export class CameraArmComponent extends Component {
     this.pitch = Math.max(this.pitchMin, Math.min(this.pitchMax, this.pitch));
     this.yaw = ((this.yaw + 180) % 360) - 180;
 
-    // Rotate owner on Y so the character faces the camera's horizontal direction
-    const ownerAngles = ownerTransform.getTransform().getAngles();
-    ownerTransform.getTransform().setAngles(this.yaw, ownerAngles.pitch, ownerAngles.roll);
-
     // ── Pivot (look-at target) ──────────────────────────────────────────────
     const ownerWorldPos = ownerTransform.getTransform().getWorldPosition();
     const targetPivot = vec3.add(vec3.create(), ownerWorldPos, this.pivotOffset);

@@ -11,32 +11,7 @@
       "transform": { "position": [0, 0.9, -4] }
     }
   },
-  {
-    "children": [],
-    "components": {
-      "name": "Idle",
-      "transform": {
-        "position": [0, 0, 6],
-        "rotation": [0, 0, 0],
-        "scale": [1, 1, 1]
-      },
-      "skeletal_mesh": {
-        "gltf": "idle.gltf"
-      },
-      "animator": {
-        "extraAnimations": ["Kick.gltf"],
-        "states": [
-          { "name": "Idle", "clip": 0, "loop": true, "speed": 1.0 }
-        ],
-        "default": "Idle",
-        "autoPlayInterval": {
-          "clip": "Kick",
-          "intervalSeconds": 7,
-          "blendTime": 0.2
-        }
-      }
-    }
-  },
+
   {
     "prefab": "cameras/debug_camera.prefab"
   },

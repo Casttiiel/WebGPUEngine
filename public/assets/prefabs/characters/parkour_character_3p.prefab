@@ -4,29 +4,36 @@
       "prefab": "cameras/player_camera.prefab",
       "components": {
         "transform": {
-          "position": [
-            0,
-            1.6,
-            0
-          ]
+          "position": [0, 1.6, 0]
+        }
+      }
+    },
+    {
+      "children": [],
+      "components": {
+        "name": "PlayerMesh",
+        "transform": {
+          "position": [0, -0.9, 0],
+          "rotation": [0, 0, 0],
+          "scale": [1, 1, 1]
+        },
+        "skeletal_mesh": {
+          "gltf": "idle.gltf"
+        },
+        "animator": {
+          "states": [
+            { "name": "Idle", "clip": 0, "loop": true, "speed": 1.0 }
+          ],
+          "default": "Idle"
         }
       }
     }
   ],
-  "gltf": "player.gltf",
   "components": {
     "name": "Player",
     "transform": {
-      "position": [
-        0,
-        0.9,
-        0
-      ],
-      "scale": [
-        0.6,
-        1.8,
-        0.6
-      ]
+      "position": [0, 0.9, 0],
+      "scale": [1, 1, 1]
     },
     "capsule_collider": {
       "height": 1.8,
@@ -75,16 +82,8 @@
     },
     "camera_arm": {
       "armLength": 5,
-      "pivotOffset": [
-        0,
-        1.5,
-        0
-      ],
-      "socketOffset": [
-        0.5,
-        0,
-        0
-      ],
+      "pivotOffset": [0, 1.5, 0],
+      "socketOffset": [0.5, 0, 0],
       "cameraLag": true,
       "cameraLagSpeed": 12,
       "pitchMin": -70,

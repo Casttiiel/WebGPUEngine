@@ -2,6 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { BasePlayerController } from './BasePlayerController';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { CameraComponent } from '../render/CameraComponent';
+import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import RAPIER from '@dimforge/rapier3d';
@@ -48,6 +49,12 @@ export class ParkourControllerComponent
   private _boostedSpeed = 0.0;
   private wallRunGravity = -2.0;
 
+  // ── Visual rotation (mesh faces movement direction) ──────────────────────────
+  private visualYaw: number = 0;
+  private readonly turnSpeed: number = 600; // degrees/second — constant angular velocity
+  private animator: any = null;
+  private animatorFound: boolean = false;
+
   // ── Systems ──────────────────────────────────────────────────────────────────
   private wallRunSystem!: WallRunSystem;
   private dashSystem!: DashSystem;
@@ -82,12 +89,17 @@ export class ParkourControllerComponent
     if (!this.movement) {
       console.error('ParkourControllerComponent requires kcc_movement component!');
     }
+    const transform = this.getOwner().getComponent('transform') as TransformComponent;
+    if (transform) {
+      this.visualYaw = (transform.getTransform().getAngles() as any).yaw ?? 0;
+    }
   }
 
   // ── Update ───────────────────────────────────────────────────────────────────
   public update(dt: number): void {
     if (!this.isActive) return;
     this.findCamera();
+    this.findAnimator();
     if (!this.capsuleCollider || !this.camera || !this.movement) return;
 
     if (this.inputDisableTimer > 0) this.inputDisableTimer -= dt;
@@ -171,9 +183,65 @@ export class ParkourControllerComponent
         break;
       }
     }
+
+    this.updateVisualRotation(dt);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
+
+  private findAnimator(): void {
+    if (this.animatorFound) return;
+    for (const child of this.getOwner().getChildren()) {
+      const anim = child.getComponent('animator');
+      if (anim) {
+        this.animator = anim;
+        break;
+      }
+    }
+    this.animatorFound = true;
+  }
+
+  /** Constant-velocity angle rotation — avoids exponential-decay "never arrives" feel. */
+  private rotateToward(from: number, to: number, maxDelta: number): number {
+    let diff = to - from;
+    while (diff > 180) diff -= 360;
+    while (diff < -180) diff += 360;
+    if (Math.abs(diff) <= maxDelta) return to;
+    return from + Math.sign(diff) * maxDelta;
+  }
+
+  /**
+   * Rotates the entity (and its child mesh) toward the movement direction each frame.
+   * Uses horizontal velocity when moving, falls back to input direction when accelerating
+   * from rest. Also drives animator `isMoving` parameter.
+   */
+  private updateVisualRotation(dt: number): void {
+    const hVel = this.movement.getHorizontalVelocity();
+    const hSpeed = Math.sqrt(hVel[0] ** 2 + hVel[2] ** 2);
+
+    let facingDir: vec3 | null = null;
+    if (hSpeed > 0.3) {
+      // Rotate toward actual velocity direction — works for all states
+      facingDir = vec3.fromValues(hVel[0] / hSpeed, 0, hVel[2] / hSpeed);
+    } else {
+      // Use input direction while accelerating from rest so the character turns immediately
+      const movDir = this.getTargetMovement(this.getInputVector());
+      if (vec3.length(movDir) > 0.01) facingDir = movDir;
+    }
+
+    if (facingDir) {
+      const desiredYaw = Math.atan2(facingDir[0], facingDir[2]) * (180 / Math.PI);
+      this.visualYaw = this.rotateToward(this.visualYaw, desiredYaw, this.turnSpeed * dt);
+    }
+
+    const ownerTransform = this.getOwner().getComponent('transform') as TransformComponent;
+    if (ownerTransform) {
+      ownerTransform.getTransform().setAngles(this.visualYaw, 0, 0);
+    }
+
+    this.animator?.setParameter('isMoving', hSpeed > 0.5);
+  }
+
   private findCamera(): void {
     if (this.cameraFound) return;
     const children = this.getOwner().getChildren();

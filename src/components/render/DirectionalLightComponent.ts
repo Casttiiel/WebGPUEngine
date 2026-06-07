@@ -509,7 +509,6 @@ export class DirectionalLightComponent extends Component {
       RenderManager.getInstance().setCamera(this.shadowCameras[i]);
 
       // Renderizar objetos con sombras
-      debugger;
       RenderManager.getInstance().render(RenderCategory.SHADOWS, pass);
 
       pass.end();
