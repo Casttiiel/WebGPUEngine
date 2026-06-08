@@ -34,16 +34,27 @@
           ]
         },
         "skeletal_mesh": {
-          "gltf": "idle.gltf"
+          "gltf": "XBot.gltf"
         },
         "animator": {
+          "extraAnimations": ["Idle.gltf", "Run.gltf"],
           "states": [
             {
               "name": "Idle",
-              "clip": 0,
+              "clip": 1,
+              "loop": true,
+              "speed": 1
+            },
+            {
+              "name": "Run",
+              "clip": 2,
               "loop": true,
               "speed": 1
             }
+          ],
+          "transitions": [
+            { "from": "Idle", "to": "Run", "condition": "isMoving", "blendTime": 0.2 },
+            { "from": "Run", "to": "Idle", "conditionFalse": "isMoving", "blendTime": 0.3 }
           ],
           "default": "Idle"
         },

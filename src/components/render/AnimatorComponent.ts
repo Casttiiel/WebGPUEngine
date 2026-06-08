@@ -18,6 +18,8 @@ export interface AnimatorTransitionData {
   to: string;
   /** Bool parameter name that must be true to activate this transition. */
   condition?: string;
+  /** Bool parameter name that must be false to activate this transition. */
+  conditionFalse?: string;
   /** Trigger name that fires this transition (auto-reset after use). */
   trigger?: string;
   blendTime?: number;
@@ -106,6 +108,7 @@ interface RuntimeTransition {
   from: string;
   to: string;
   condition?: string;
+  conditionFalse?: string;
   trigger?: string;
   blendTime: number;
 }
@@ -296,6 +299,7 @@ export class AnimatorComponent extends Component {
         from: td.from,
         to: td.to,
         condition: td.condition,
+        conditionFalse: td.conditionFalse,
         trigger: td.trigger,
         blendTime: td.blendTime ?? 0.2,
       });
@@ -421,6 +425,8 @@ export class AnimatorComponent extends Component {
         conditionMet = true;
         this.activeTriggers.delete(t.trigger);
       } else if (t.condition && this.params.get(t.condition) === true) {
+        conditionMet = true;
+      } else if (t.conditionFalse && this.params.get(t.conditionFalse) !== true) {
         conditionMet = true;
       }
 
