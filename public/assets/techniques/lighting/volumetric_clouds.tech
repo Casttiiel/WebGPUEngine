@@ -1,0 +1,11 @@
+{
+    "vs": "lighting/skybox.vs",
+    "fs": "lighting/volumetric_clouds.fs",
+    "writesOn": "texture",
+    "z": "test_equal",
+    "blend": "combinative",
+    "uniforms": [
+        "CameraUniforms",
+        "BufferUniform"
+    ]
+}

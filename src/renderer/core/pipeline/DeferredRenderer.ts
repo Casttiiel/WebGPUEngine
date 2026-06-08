@@ -30,10 +30,12 @@ import { RenderManagerV2 } from '../managers/RenderManagerV2';
 import { TiledLightManager } from '../managers/TiledLightManager';
 import { EngineTextureRegistry, ENGINE_TEXTURES } from '../utils/EngineTextureRegistry';
 import { ViewModelPass } from '../passes/ViewModelPass';
+import { VolumetricClouds } from '../../shading/VolumetricClouds';
 
 export class DeferredRenderer {
   private isLoaded = false;
   private skybox!: Skybox;
+  private volumetricClouds!: VolumetricClouds;
   private proceduralSkyCubemap: ProceduralSkyCubemap | null = null;
   private ambientLight!: AmbientLight;
   private ssr!: ScreenSpaceReflections;
@@ -381,6 +383,9 @@ export class DeferredRenderer {
   public async load(): Promise<void> {
     this.skybox = new Skybox();
     await this.skybox.load();
+
+    this.volumetricClouds = new VolumetricClouds();
+    await this.volumetricClouds.load();
 
     if (Engine.getEnvironmentManager().getSkyboxType() === 'procedural') {
       this.proceduralSkyCubemap = new ProceduralSkyCubemap();
@@ -750,6 +755,7 @@ export class DeferredRenderer {
 
     const prepassDepthView = this.depthPrepass.getDepthTextureView();
     this.skybox.render(this.rtAccLight.getView(), prepassDepthView);
+    this.volumetricClouds.render(this.rtAccLight.getView(), prepassDepthView);
   }
 
   public update(_dt: number): void {
@@ -777,6 +783,7 @@ export class DeferredRenderer {
   public renderPostProcessingMenu(folder: any): void {
     this.froxelVolumetrics.renderInMenu(folder);
     this.ssr.renderInMenu(folder);
+    this.volumetricClouds.renderInMenu(folder);
   }
 
   public resetSSRResources(): void {
