@@ -1,11 +1,11 @@
 ### Engine
 
-1. Foot IK
-2. Character animator
+1. Character animator
    Run
    TurnLeft_90 + TurnRight_90 — pivotes en sitio cuando estás parado y giras > 45°
    TurnLeft_180 / TurnRight_180 — para inversión de dirección
    Para IK en giros pequeños: sí, es la técnica correcta. Un LookAt IK en la cabeza/spine cuando el ángulo entre facing y velocity es < 30°. AnimatorComponent.addIkConstraint() ya lo soporta, solo necesitas el nombre del joint en el esqueleto.
+2. Foot IK
 3. Clouds
 4. Anamorphic lens flare
 5. Editor Camera (Render Debug / Gizmo / Menu)
@@ -25,6 +25,8 @@
 4. Water Shader Reflections + Better Foam
 
 ## Gameplay
+
+Jump landing on two stages WRONG
 
 ## Visuals and Sound
 

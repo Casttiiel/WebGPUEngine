@@ -54,8 +54,8 @@
           "rightThigh": "mixamorig:RightUpLeg",
           "rightKnee": "mixamorig:RightLeg",
           "rightFoot": "mixamorig:RightFoot",
-          "raycastUpOffset": 0.5,
-          "raycastMaxDown": 1,
+          "raycastUpOffset": 0.05,
+          "raycastMaxDown": 0.15,
           "footLerpSpeed": 12
         }
       }

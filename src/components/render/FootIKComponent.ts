@@ -14,26 +14,22 @@ export interface FootIKData {
   rightKnee?: string;
   rightFoot?: string;
 
-  /** How far above the animated foot position the raycast starts (default 0.5 m). */
+  /**
+   * How far ABOVE the animated foot the raycast starts (default 0.05 m).
+   * Handles the case where the animation places the foot slightly inside the ground.
+   */
   raycastUpOffset?: number;
-  /** Max distance the ray travels downward from the start offset (default 1.0 m). */
+
+  /**
+   * How far BELOW the animated foot the raycast searches for ground (default 0.15 m).
+   * This is the primary control for swing-phase filtering: a foot 0.3 m in the air
+   * won't be hit by a 0.15 m ray, so IK is automatically skipped. No threshold
+   * parameter needed — the ray length IS the filter.
+   */
   raycastMaxDown?: number;
 
-  /**
-   * Exponential-decay speed for the per-foot Y offset (default 12).
-   * Higher = foot snaps to ground faster but may look rigid.
-   */
+  /** Exponential-decay speed for the per-foot Y offset (default 12). */
   footLerpSpeed?: number;
-
-  /**
-   * How high the foot must be above the mesh entity's world Y before it is
-   * considered "in swing phase" and IK is skipped (default 0.12 m).
-   * Prevents the IK from pinning the foot to the ground during the lift phase of a stride.
-   */
-  swingThreshold?: number;
-
-  /** Maximum Y correction the IK may apply in either direction (default 0.4 m). */
-  maxStepCorrection?: number;
 
   /** IK influence weight 0–1 (default 1). */
   ikWeight?: number;
@@ -42,25 +38,16 @@ export interface FootIKData {
 /**
  * FootIKComponent — places feet on the ground using Two-Bone IK.
  *
- * Key design decisions:
- *
- *   1. Runs BEFORE 'animator' in components.json so targets are ready for
- *      AnimatorComponent.evaluateAnimation().
- *
- *   2. Reads the PREVIOUS frame's globalMats (acceptable 1-frame lag for IK targets).
- *
- *   3. Tracks only a per-foot Y OFFSET (scalar, model space) rather than a full
- *      world-space target. This avoids the world-space drift bug: when the character
- *      moves, the XZ of the target must follow the animation exactly; only the Y
- *      needs smoothing for terrain height changes.
- *
- *   4. Swing-phase detection: if the animated foot is more than `swingThreshold`
- *      metres above the mesh entity's world Y (≈ ground level), the IK is skipped
- *      and the offset decays back to 0. This prevents the IK from pulling the foot
- *      to the ground during the airborne phase of a stride cycle.
- *
- *   5. IK constraints start with weight=0 and are enabled on the first frame that
- *      valid joint data is available, preventing the "feet snap to origin" glitch.
+ * Design:
+ *   - Raycasts are ALWAYS fired from the animated foot position.
+ *   - A short `raycastMaxDown` (~0.15 m) acts as the swing-phase filter naturally:
+ *     a foot high in the air during a stride or stair-climb won't hit ground within
+ *     that distance → no IK applied. No artificial height threshold needed.
+ *   - Tracks a scalar Y offset per foot (not a world-space position) so the IK
+ *     target is always: animatedModelPos + [0, smoothedYOffset, 0]. XZ stays
+ *     locked to the animation — only Y is corrected. This avoids the world-space
+ *     drift bug where moving characters' feet trail behind.
+ *   - Constraints start at weight=0 and activate on the first frame with valid data.
  *
  * Limitations / future work:
  *   - Pelvis adjustment: requires a pre-IK local-matrix pass in AnimatorComponent.
@@ -75,11 +62,9 @@ export class FootIKComponent extends Component {
   private rightKnee: string = 'mixamorig:RightLeg';
   private rightFoot: string = 'mixamorig:RightFoot';
 
-  private raycastUpOffset: number = 0.5;
-  private raycastMaxDown: number = 1.0;
+  private raycastUpOffset: number = 0.05;
+  private raycastMaxDown: number = 0.15;
   private footLerpSpeed: number = 12;
-  private swingThreshold: number = 0.12;
-  private maxStepCorrection: number = 0.4;
   private ikWeight: number = 1.0;
 
   // ── Runtime ──────────────────────────────────────────────────────────────────
@@ -87,11 +72,11 @@ export class FootIKComponent extends Component {
   private leftConstraint: TwoBoneIkConstraint | null = null;
   private rightConstraint: TwoBoneIkConstraint | null = null;
 
-  // Per-foot smoothed Y offsets (model space, positive = lift foot up).
+  // Per-foot smoothed Y correction (model space, positive = lift foot up).
   private leftYOffset: number = 0;
   private rightYOffset: number = 0;
 
-  // Prevents IK from activating until the first valid joint position is available.
+  // Prevents activating IK before the first valid joint position is available.
   private initialized: boolean = false;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -106,8 +91,6 @@ export class FootIKComponent extends Component {
     if (data.raycastUpOffset !== undefined) this.raycastUpOffset = data.raycastUpOffset;
     if (data.raycastMaxDown !== undefined) this.raycastMaxDown = data.raycastMaxDown;
     if (data.footLerpSpeed !== undefined) this.footLerpSpeed = data.footLerpSpeed;
-    if (data.swingThreshold !== undefined) this.swingThreshold = data.swingThreshold;
-    if (data.maxStepCorrection !== undefined) this.maxStepCorrection = data.maxStepCorrection;
     if (data.ikWeight !== undefined) this.ikWeight = data.ikWeight;
   }
 
@@ -127,7 +110,10 @@ export class FootIKComponent extends Component {
     const worldPos = transform.getTransform().getWorldPosition();
     const worldRot = transform.getTransform().getWorldRotation() as quat;
     const worldMat = mat4.fromRotationTranslationScale(
-      mat4.create(), worldRot, worldPos, vec3.fromValues(1, 1, 1),
+      mat4.create(),
+      worldRot,
+      worldPos,
+      vec3.fromValues(1, 1, 1),
     );
 
     // Exclude the character capsule from foot raycasts.
@@ -135,14 +121,10 @@ export class FootIKComponent extends Component {
     const capsuleBody: RAPIER.RigidBody | undefined =
       (parent?.getComponent('capsule_collider') as any)?.getRigidBody?.() ?? undefined;
 
-    // The mesh entity's world Y approximates the character's ground level
-    // (parent capsule center at +0.9, mesh child at -0.9 → world ≈ 0 when standing).
-    const meshWorldY = worldPos[1];
-
     const leftFootIdx = this.animator.getJointIndex(this.leftFoot);
     const rightFootIdx = this.animator.getJointIndex(this.rightFoot);
 
-    // Previous frame's animated foot positions.
+    // Use the previous frame's globalMats (FootIK runs before animator).
     const leftAnimWorld = this.getJointWorldPos(leftFootIdx, worldMat);
     const rightAnimWorld = this.getJointWorldPos(rightFootIdx, worldMat);
     const leftAnimModel = this.getJointModelPos(leftFootIdx);
@@ -150,48 +132,32 @@ export class FootIKComponent extends Component {
 
     if (!leftAnimWorld || !rightAnimWorld || !leftAnimModel || !rightAnimModel) return;
 
-    // Enable constraints on the first frame with valid data.
+    // Enable constraints on the first frame with valid joint data.
     if (!this.initialized) {
-      this.leftConstraint!.weight = this.ikWeight;
-      this.rightConstraint!.weight = this.ikWeight;
+      //this.leftConstraint!.weight = this.ikWeight;
+      //this.rightConstraint!.weight = this.ikWeight;
       this.initialized = true;
     }
 
     const alpha = Math.min(1.0, dt * this.footLerpSpeed);
 
     // ── Left foot ─────────────────────────────────────────────────────────────
-    // Skip IK when foot is lifted high enough to be in swing phase.
     {
-      const footAbove = leftAnimWorld[1] - meshWorldY;
-      let rawOffset = 0;
-      if (footAbove <= this.swingThreshold) {
-        const groundY = this.castGroundY(leftAnimWorld, capsuleBody);
-        if (groundY !== null) {
-          rawOffset = groundY - leftAnimWorld[1];
-          rawOffset = Math.max(-this.maxStepCorrection, Math.min(this.maxStepCorrection, rawOffset));
-        }
-      }
-      // Smooth toward raw offset. When swing phase (rawOffset=0), decays back to neutral.
+      const groundY = this.castGroundY(leftAnimWorld, capsuleBody);
+      const rawOffset = groundY !== null ? groundY - leftAnimWorld[1] : 0;
       this.leftYOffset += (rawOffset - this.leftYOffset) * alpha;
     }
 
     // ── Right foot ────────────────────────────────────────────────────────────
     {
-      const footAbove = rightAnimWorld[1] - meshWorldY;
-      let rawOffset = 0;
-      if (footAbove <= this.swingThreshold) {
-        const groundY = this.castGroundY(rightAnimWorld, capsuleBody);
-        if (groundY !== null) {
-          rawOffset = groundY - rightAnimWorld[1];
-          rawOffset = Math.max(-this.maxStepCorrection, Math.min(this.maxStepCorrection, rawOffset));
-        }
-      }
+      const groundY = this.castGroundY(rightAnimWorld, capsuleBody);
+      const rawOffset = groundY !== null ? groundY - rightAnimWorld[1] : 0;
       this.rightYOffset += (rawOffset - this.rightYOffset) * alpha;
     }
 
     // ── Write IK targets ──────────────────────────────────────────────────────
-    // Target = animated model-space position + Y correction only.
-    // X and Z always match the animation — no horizontal IK drift.
+    // Target = animated model-space position + Y-only correction.
+    // XZ is locked to the animation so feet never drift horizontally.
     vec3.set(
       this.leftConstraint!.target,
       leftAnimModel[0]!,
@@ -210,10 +176,9 @@ export class FootIKComponent extends Component {
 
   private tryCreateConstraints(): boolean {
     if (!this.animator) return false;
-    // Joint index < 0 means skeleton not yet loaded.
     if (this.animator.getJointIndex(this.leftThigh) < 0) return false;
 
-    // Start with weight=0 to avoid the "feet snap to origin" glitch on frame 0.
+    // weight=0 until the first valid frame to avoid feet snapping to origin.
     this.leftConstraint = this.animator.addIkConstraint<TwoBoneIkConstraint>({
       type: 'twobone',
       rootJointName: this.leftThigh,
@@ -235,7 +200,6 @@ export class FootIKComponent extends Component {
     return true;
   }
 
-  /** World-space position of a joint using the PREVIOUS frame's globalMats. */
   private getJointWorldPos(jointIdx: number, worldMat: mat4): vec3 | null {
     if (jointIdx < 0) return null;
     const M = this.animator!.getJointModelMatrix(jointIdx);
@@ -244,7 +208,6 @@ export class FootIKComponent extends Component {
     return vec3.fromValues(combined[12]!, combined[13]!, combined[14]!);
   }
 
-  /** Model-space position of a joint (column 3 of globalMats). */
   private getJointModelPos(jointIdx: number): vec3 | null {
     if (jointIdx < 0) return null;
     const M = this.animator!.getJointModelMatrix(jointIdx);
@@ -252,7 +215,12 @@ export class FootIKComponent extends Component {
     return vec3.fromValues(M[12]!, M[13]!, M[14]!);
   }
 
-  /** Raycasts downward from above the foot and returns the ground Y, or null if no hit. */
+  /**
+   * Raycasts downward from slightly above the animated foot position.
+   * Returns the ground Y in world space, or null if nothing is hit within range.
+   * The total ray length is raycastUpOffset + raycastMaxDown — typically ~0.2 m,
+   * which naturally excludes feet that are high in the air (swing/stair-climb phase).
+   */
   private castGroundY(footWorld: vec3, excludeBody?: RAPIER.RigidBody): number | null {
     const physics = Engine.getPhysics();
     if (!physics) return null;
@@ -262,15 +230,17 @@ export class FootIKComponent extends Component {
       { x: footWorld[0], y: originY, z: footWorld[2] },
       { x: 0, y: -1, z: 0 },
     );
-    const hit = physics.getWorld().castRay(
-      ray,
-      this.raycastUpOffset + this.raycastMaxDown,
-      true,
-      QueryFilterFlags.EXCLUDE_SENSORS,
-      undefined,
-      undefined,
-      excludeBody,
-    );
+    const hit = physics
+      .getWorld()
+      .castRay(
+        ray,
+        this.raycastUpOffset + this.raycastMaxDown,
+        true,
+        QueryFilterFlags.EXCLUDE_SENSORS,
+        undefined,
+        undefined,
+        excludeBody,
+      );
 
     return hit ? originY - hit.timeOfImpact : null;
   }
