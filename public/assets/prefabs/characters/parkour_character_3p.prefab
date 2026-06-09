@@ -37,7 +37,10 @@
           "gltf": "XBot.gltf"
         },
         "animator": {
-          "extraAnimations": ["Idle.gltf", "Run.gltf"],
+          "extraAnimations": [
+            "Idle.gltf",
+            "Run.gltf"
+          ],
           "states": [
             {
               "name": "Idle",
@@ -53,8 +56,18 @@
             }
           ],
           "transitions": [
-            { "from": "Idle", "to": "Run", "condition": "isMoving", "blendTime": 0.2 },
-            { "from": "Run", "to": "Idle", "conditionFalse": "isMoving", "blendTime": 0.3 }
+            {
+              "from": "Idle",
+              "to": "Run",
+              "condition": "isMoving",
+              "blendTime": 0.2
+            },
+            {
+              "from": "Run",
+              "to": "Idle",
+              "conditionFalse": "isMoving",
+              "blendTime": 0.2
+            }
           ],
           "default": "Idle"
         },

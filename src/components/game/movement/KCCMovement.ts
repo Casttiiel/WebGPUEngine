@@ -382,9 +382,7 @@ export class KCCMovement extends Component {
     }
 
     // ── Vertical: gravity ──────────────────────────────────────────────────
-    if (isGrounded && this.vy < 0) {
-      this.vy = -0.5; // pressed against ground
-    } else if (!isGrounded) {
+    if (!isGrounded) {
       const grav = this.vy > 0 ? this.ascendGravity : this.descendGravity;
       // Floaty apex: reduce gravity near the top of the jump arc when the
       // jump button is still held (isJumpingFlag = true).
@@ -507,6 +505,14 @@ export class KCCMovement extends Component {
     // Cancel upward velocity if the ceiling blocked the movement.
     if (this.vy > 0 && corrected.y < my * 0.5) {
       this.vy = 0;
+    }
+
+    // Ground contact: if descending and the floor stopped most of the movement,
+    // apply the stick-to-ground velocity. Doing this here (after KCC resolves the
+    // collision) prevents the two-phase landing bug where the snap-distance raycast
+    // sets isGrounded=true at 0.2m above ground and prematurely kills falling speed.
+    if (this.vy < 0 && corrected.y > my * 0.5) {
+      this.vy = -0.5;
     }
 
     // Wall collision response — project out velocity into fixed-geometry walls.

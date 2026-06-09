@@ -99,7 +99,7 @@ export class CameraArmComponent extends Component {
 
   // ── Collision ──────────────────────────────────────────────────────────────
   private enableCollision: boolean = false;
-  private collisionRadius: number = 0.15;
+  private collisionRadius: number = 0.5;
   private collisionPullOutSpeed: number = 6.0;
 
   // ── Input ──────────────────────────────────────────────────────────────────
@@ -142,7 +142,12 @@ export class CameraArmComponent extends Component {
     }
 
     if (data.socketOffset && data.socketOffset.length === 3) {
-      vec3.set(this.socketOffset, data.socketOffset[0]!, data.socketOffset[1]!, data.socketOffset[2]!);
+      vec3.set(
+        this.socketOffset,
+        data.socketOffset[0]!,
+        data.socketOffset[1]!,
+        data.socketOffset[2]!,
+      );
     }
 
     // Lag
@@ -211,10 +216,10 @@ export class CameraArmComponent extends Component {
 
     // ── Arm direction (unit vector from pivot toward camera) ────────────────
     const pitchRad = (this.pitch * Math.PI) / 180;
-    const yawRad   = (this.yaw   * Math.PI) / 180;
+    const yawRad = (this.yaw * Math.PI) / 180;
     const armDir = vec3.fromValues(
       -Math.cos(pitchRad) * Math.sin(yawRad),
-       Math.sin(pitchRad),
+      Math.sin(pitchRad),
       -Math.cos(pitchRad) * Math.cos(yawRad),
     );
 
@@ -240,20 +245,42 @@ export class CameraArmComponent extends Component {
     }
 
     // ── Camera desired position = pivot + armDir * armLength ────────────────
-    let desiredPos = vec3.scaleAndAdd(vec3.create(), this.currentPivot, armDir, this.currentArmLength);
+    let desiredPos = vec3.scaleAndAdd(
+      vec3.create(),
+      this.currentPivot,
+      armDir,
+      this.currentArmLength,
+    );
 
     // ── Socket offset: shift camera in arm-local space [right, up, forward] ─
-    const soX = this.socketOffset[0]!, soY = this.socketOffset[1]!, soZ = this.socketOffset[2]!;
+    const soX = this.socketOffset[0]!,
+      soY = this.socketOffset[1]!,
+      soZ = this.socketOffset[2]!;
     if (soX !== 0 || soY !== 0 || soZ !== 0) {
-      const worldUp  = vec3.fromValues(0, 1, 0);
+      const worldUp = vec3.fromValues(0, 1, 0);
       // Right = cross(worldUp, armDir). Falls back to world X when arm is vertical.
       let armRight = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), worldUp, armDir));
       if (vec3.length(armRight) < 0.001) vec3.set(armRight, 1, 0, 0);
       const armUp = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), armDir, armRight));
 
       if (soX !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armRight, soX);
-      if (soY !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armUp,   soY);
-      if (soZ !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armDir,  soZ);
+      if (soY !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armUp, soY);
+      if (soZ !== 0) vec3.scaleAndAdd(desiredPos, desiredPos, armDir, soZ);
+
+      // Secondary sweep: the primary sweep (along armDir) can't detect walls the socket
+      // offset pushes the camera into (e.g. right wall when soX > 0). Cast from pivot
+      // to the final socket-adjusted position and pull back if blocked.
+      if (this.enableCollision) {
+        const toCam = vec3.sub(vec3.create(), desiredPos, this.currentPivot);
+        const toCamDist = vec3.length(toCam);
+        if (toCamDist > 0.001) {
+          const toCamDir = vec3.scale(vec3.create(), toCam, 1.0 / toCamDist);
+          const safeFinal = this.castCollision(this.currentPivot, toCamDir, toCamDist);
+          if (safeFinal < toCamDist) {
+            vec3.scaleAndAdd(desiredPos, this.currentPivot, toCamDir, safeFinal);
+          }
+        }
+      }
     }
 
     // ── Camera position lag ─────────────────────────────────────────────────
@@ -288,37 +315,49 @@ export class CameraArmComponent extends Component {
 
     // ── Apply to camera ─────────────────────────────────────────────────────
     cameraTransform.getTransform().setWorldPosition(finalCamPos);
-    cameraComponent.getCamera().lookAt(
-      Array.from(finalCamPos) as [number, number, number],
-      Array.from(lookTarget)  as [number, number, number],
-      [0, 1, 0],
-    );
+    cameraComponent
+      .getCamera()
+      .lookAt(
+        Array.from(finalCamPos) as [number, number, number],
+        Array.from(lookTarget) as [number, number, number],
+        [0, 1, 0],
+      );
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
   /**
-   * Raycast from `pivot` along `dir` up to `maxDist`.
-   * Returns the safe camera distance (hit.toi - collisionRadius, clamped to collisionRadius).
+   * Sphere sweep from `pivot` along `dir` up to `maxDist`.
+   * Uses a Ball of radius `collisionRadius` so the camera is always that far from
+   * any surface — the margin is geometric, not a post-hoc subtraction.
+   * Handles fast movement and oblique angles better than a thin ray.
    */
   private castCollision(pivot: vec3, dir: vec3, maxDist: number): number {
     const physics = Engine.getPhysics();
     if (!physics) return maxDist;
 
-    const ray = new RAPIER.Ray(
-      { x: pivot[0]!, y: pivot[1]!, z: pivot[2]! },
-      { x: dir[0]!,   y: dir[1]!,   z: dir[2]!   },
-    );
-
     const capsule = this.getOwner().getComponent('capsule_collider') as any;
     const playerRigidBody = capsule?.getRigidBody?.() ?? undefined;
 
-    const hit = physics
-      .getWorld()
-      .castRay(ray, maxDist, true, QueryFilterFlags.EXCLUDE_SENSORS, undefined, playerRigidBody);
+    const sphere = new RAPIER.Ball(this.collisionRadius);
+    const hit = physics.getWorld().castShape(
+      { x: pivot[0]!, y: pivot[1]!, z: pivot[2]! },
+      { x: 0, y: 0, z: 0, w: 1 },
+      { x: dir[0]!, y: dir[1]!, z: dir[2]! },
+      sphere,
+      0, // targetDistance: 0 = report contact as soon as sphere touches anything
+      maxDist, // maxToi
+      true, // stopAtPenetration
+      QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      undefined,
+      playerRigidBody,
+    );
 
     if (hit) {
-      return Math.max(this.collisionRadius, hit.timeOfImpact - this.collisionRadius);
+      // time_of_impact = distance the sphere center travels before the surface touches the wall.
+      // Camera placed at that center → sphere surface is already collisionRadius from the wall.
+      return Math.max(this.collisionRadius, hit.time_of_impact);
     }
     return maxDist;
   }
@@ -327,8 +366,12 @@ export class CameraArmComponent extends Component {
     this.enabled = isActive;
   }
 
-  public getPitch(): number { return this.pitch; }
-  public getYaw(): number   { return this.yaw;   }
+  public getPitch(): number {
+    return this.pitch;
+  }
+  public getYaw(): number {
+    return this.yaw;
+  }
 
   public override renderInMenu(): void {}
   public renderDebug(): void {}
