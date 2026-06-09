@@ -1,7 +1,9 @@
 import { vec3, quat } from 'gl-matrix';
-import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
+import RAPIER from '@dimforge/rapier3d';
 import { Component } from '../../core/ecs/Component';
 import { Engine } from '../../core/engine/Engine';
+import { KCCMovement } from './movement/KCCMovement';
+import type { IKickable } from './combat/IKickable';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { TransformComponent } from '../core/TransformComponent';
 import { Blackboard } from '../../ai/Blackboard';
@@ -55,7 +57,7 @@ import { RenderComponent } from '../render/RenderComponent';
  *   }
  * }
  */
-export class EnemyControllerComponent extends Component {
+export class EnemyControllerComponent extends Component implements IKickable {
   // ─── Static registry — lets SteerAction find all enemies in O(n_enemies)
   // instead of iterating every entity in the scene.
   private static readonly _registry = new Set<EnemyControllerComponent>();
@@ -68,18 +70,15 @@ export class EnemyControllerComponent extends Component {
   protected characterController!: RAPIER.KinematicCharacterController;
 
   // ─── Movement state ────────────────────────────────────────────────────────
-  /** Horizontal velocity (XZ plane) set by BT Action nodes. */
+  /** Desired horizontal velocity written by BT Action nodes each tick. */
   protected desiredHorizontal: vec3 = vec3.create();
-  /** Current smoothed horizontal velocity after acceleration. */
-  protected currentHorizontal: vec3 = vec3.create();
-  /** Vertical velocity — managed internally (gravity + grounded clamping). */
-  private verticalVelocity: number = 0;
-  protected isGrounded: boolean = false;
+  /** Velocity integration, gravity, air drag, and KCC application. */
+  private movement!: KCCMovement;
+  /** Remaining seconds to suppress BT movement after a knockback impulse. */
+  private knockbackTimer: number = 0;
 
   // ─── Parameters ────────────────────────────────────────────────────────────
   protected moveSpeed: number = 3.5;
-  private gravity: number = 20;
-  private acceleration: number = 10;
   /** Maximum yaw rotation speed in radians/second. */
   private turnSpeed: number = 240 * (Math.PI / 180); // 240 deg/s default
 
@@ -114,7 +113,6 @@ export class EnemyControllerComponent extends Component {
   private slowFactor: number = 1.0;
   /** Accumulates time to throttle ground-check raycasts to 20 Hz. */
   private _groundTimer: number = 0;
-
   // Pre-allocated colour arrays reused every frame — avoids per-frame GC pressure.
   private static readonly _COLOR_NORMAL: [number, number, number, number] = [1, 1, 1, 1];
   private static readonly _COLOR_CHARGEABLE: [number, number, number, number] = [1, 0.9, 0.1, 1];
@@ -123,9 +121,15 @@ export class EnemyControllerComponent extends Component {
 
   public async load(data: EnemyControllerComponentDataType): Promise<void> {
     this.moveSpeed = data.moveSpeed ?? this.moveSpeed;
-    this.gravity = data.gravity ?? this.gravity;
-    this.acceleration = data.acceleration ?? this.acceleration;
     if (data.turnSpeed !== undefined) this.turnSpeed = data.turnSpeed * (Math.PI / 180);
+    this.movement = new KCCMovement({
+      gravity: data.gravity ?? 20,
+      acceleration: data.acceleration ?? 10,
+      apexThreshold: data.apexThreshold,
+      apexGravityScale: data.apexGravityScale,
+      fallGravityScale: data.fallGravityScale,
+      knockbackAscendScale: data.knockbackAscendScale,
+    });
 
     // Physics
     this.capsuleCollider = this.getOwner().getComponent(
@@ -233,14 +237,7 @@ export class EnemyControllerComponent extends Component {
       this._groundTimer = 0;
       this.updateGroundedState();
     }
-    this.bb.set('isGrounded', this.isGrounded);
-
-    // 3. Gravity
-    if (this.isGrounded && this.verticalVelocity < 0) {
-      this.verticalVelocity = -0.5; // small constant keeps snap-to-ground happy
-    } else {
-      this.verticalVelocity -= this.gravity * deltaTime;
-    }
+    this.bb.set('isGrounded', this.movement.isGrounded());
 
     // 4. Step the behavior tree — Action nodes may call setDesiredHorizontal()
     this.tree.step();
@@ -279,12 +276,13 @@ export class EnemyControllerComponent extends Component {
     this.currentState = newState;
     if (this.stateEl) this.stateEl.textContent = `AI: ${this.currentState}`;
 
-    // 5. Smooth horizontal velocity toward desired (exponential acceleration)
-    const t = 1 - Math.exp(-this.acceleration * deltaTime);
-    vec3.lerp(this.currentHorizontal, this.currentHorizontal, this.desiredHorizontal, t);
+    // 4d. Knockback stun — suppress BT desired movement while timer is active.
+    if (this.knockbackTimer > 0) this.knockbackTimer -= deltaTime;
+    const effectiveDesired = this.knockbackTimer > 0 ? vec3.create() : this.desiredHorizontal;
 
-    // 6. Apply movement through the KCC
-    this.applyMovement(deltaTime);
+    // 5+6. Integrate velocity (gravity + acceleration/drag) and apply via KCC.
+    this.movement.integrate(deltaTime, effectiveDesired);
+    this.movement.applyViaKCC(deltaTime, this.capsuleCollider, this.characterController);
 
     // 7. Reset desired horizontal for next tick (BT must re-affirm each frame)
     vec3.set(this.desiredHorizontal, 0, 0, 0);
@@ -310,6 +308,22 @@ export class EnemyControllerComponent extends Component {
   public setDesiredHorizontal(direction: vec3, speed?: number): void {
     const s = speed ?? this.moveSpeed;
     vec3.set(this.desiredHorizontal, direction[0] * s, 0, direction[2] * s);
+  }
+
+  /**
+   * Apply a physical knockback impulse (IKickable).
+   * The impulse is added directly to the velocity integrator — gravity and air drag
+   * produce a natural parabolic arc with no timer-based overrides.
+   * BT movement is suppressed for `duration` seconds while the entity is airborne.
+   */
+  public applyKnockback(impulse: vec3, duration: number = 0.5): void {
+    this.movement.applyImpulse(impulse);
+    this.knockbackTimer = duration;
+  }
+
+  /** True while the enemy is in a stun/knockback state and AI movement is suppressed. */
+  public isStunned(): boolean {
+    return this.knockbackTimer > 0;
   }
 
   /**
@@ -383,14 +397,14 @@ export class EnemyControllerComponent extends Component {
     return this.moveSpeed;
   }
   public getIsGrounded(): boolean {
-    return this.isGrounded;
+    return this.movement.isGrounded();
   }
   public getVerticalVelocity(): number {
-    return this.verticalVelocity;
+    return this.movement.getVerticalVelocity();
   }
   /** Returns the current smoothed horizontal velocity (XZ). Used by SteerAction for RVO. */
   public getCurrentHorizontal(): vec3 {
-    return this.currentHorizontal;
+    return this.movement.getHorizontalVelocity();
   }
 
   // ─── Override in subclasses ────────────────────────────────────────────────
@@ -516,33 +530,7 @@ export class EnemyControllerComponent extends Component {
   // ─── Physics internals ─────────────────────────────────────────────────────
 
   private updateGroundedState(): void {
-    const hit = this.capsuleCollider.raycastGrounded(0.2);
-    this.isGrounded = hit !== null;
-  }
-
-  private applyMovement(dt: number): void {
-    const vx = this.currentHorizontal[0];
-    const vz = this.currentHorizontal[2];
-    const vy = this.verticalVelocity;
-
-    const movement = new RAPIER.Vector3(vx * dt, vy * dt, vz * dt);
-
-    this.characterController.computeColliderMovement(
-      this.capsuleCollider.getCollider(),
-      movement,
-      QueryFilterFlags.EXCLUDE_SENSORS,
-    );
-
-    const corrected = this.characterController.computedMovement();
-
-    this.capsuleCollider
-      .getRigidBody()
-      .setLinvel({ x: corrected.x / dt, y: corrected.y / dt, z: corrected.z / dt }, true);
-
-    // Cancel vertical velocity if hitting ceiling (corrected.y is much less than requested)
-    if (vy > 0 && corrected.y < vy * dt * 0.5) {
-      this.verticalVelocity = 0;
-    }
+    this.movement.updateGroundedState(this.capsuleCollider, 0.2);
   }
 
   // ─── Death handling ────────────────────────────────────────────────────────

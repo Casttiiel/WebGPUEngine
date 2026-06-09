@@ -208,8 +208,18 @@ export class Material extends GPUResource {
         // then await all of them in parallel — shadow fetch no longer blocks textures.
         const shadowPromise = this.castsShadows
           ? (() => {
+              const isSkinnedTechnique = this.technique?.getIsSkinned();
               const isInstancedTechnique = this.technique?.path.includes('_instanced.tech');
-              if (isInstancedTechnique) {
+              if (isSkinnedTechnique) {
+                return Material.get({
+                  technique: 'shadows/shadows_skinned.tech',
+                  textures: {},
+                  category: 'shadows' as any,
+                  casts_shadows: false,
+                }).then((m) => {
+                  this.shadowsMaterial = m;
+                });
+              } else if (isInstancedTechnique) {
                 return Material.get({
                   technique: 'shadows/shadows_instanced.tech',
                   textures: {},

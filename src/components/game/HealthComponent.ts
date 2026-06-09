@@ -29,6 +29,13 @@ export class HealthComponent extends Component {
   private invincibilityTimer: number = 0;
   /** Fraction of incoming damage absorbed (0..1). Bypassed by 'bypass_resistance' sourceTag. */
   private damageResistance: number = 0;
+  /**
+   * Optional hook called before damage is applied.
+   * Return true to cancel the damage (e.g. parry).
+   */
+  private damageInterceptor:
+    | ((amount: number, instigator: import('../../core/ecs/Entity').Entity | null) => boolean)
+    | null = null;
 
   public load(data: HealthComponentDataType): void {
     this.maxHp = data.maxHp ?? this.maxHp;
@@ -53,6 +60,9 @@ export class HealthComponent extends Component {
     if (amount <= 0) return;
     if (this.isDead()) return;
     if (this.invincibilityTimer > 0) return;
+
+    // Parry / damage interceptor — runs before resistance and HP reduction.
+    if (this.damageInterceptor?.(amount, instigator)) return;
 
     // Apply resistance unless the source explicitly bypasses it
     const effective =
@@ -104,6 +114,19 @@ export class HealthComponent extends Component {
 
   public isInvincible(): boolean {
     return this.invincibilityTimer > 0;
+  }
+
+  /**
+   * Sets an optional damage interceptor.
+   * The callback receives the raw damage amount and instigator; return true to cancel the hit.
+   * Pass null to remove the interceptor.
+   */
+  public setDamageInterceptor(
+    fn:
+      | ((amount: number, instigator: import('../../core/ecs/Entity').Entity | null) => boolean)
+      | null,
+  ): void {
+    this.damageInterceptor = fn;
   }
 
   public override dispose(): void {}

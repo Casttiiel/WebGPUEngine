@@ -1,0 +1,155 @@
+{
+  "children": [
+    {
+      "prefab": "cameras/player_camera.prefab",
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            1.6,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "children": [],
+      "components": {
+        "name": "PlayerMesh",
+        "transform": {
+          "position": [
+            0,
+            -0.9,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "skeletal_mesh": {
+          "gltf": "XBot.gltf"
+        },
+        "animator": {
+          "extraAnimations": ["Idle.gltf", "Run.gltf"],
+          "states": [
+            {
+              "name": "Idle",
+              "clip": 1,
+              "loop": true,
+              "speed": 1
+            },
+            {
+              "name": "Run",
+              "clip": 2,
+              "loop": true,
+              "speed": 1
+            }
+          ],
+          "transitions": [
+            { "from": "Idle", "to": "Run", "condition": "isMoving", "blendTime": 0.2 },
+            { "from": "Run", "to": "Idle", "conditionFalse": "isMoving", "blendTime": 0.3 }
+          ],
+          "default": "Idle"
+        },
+        "foot_ik": {
+          "leftThigh": "mixamorig:LeftUpLeg",
+          "leftKnee": "mixamorig:LeftLeg",
+          "leftFoot": "mixamorig:LeftFoot",
+          "rightThigh": "mixamorig:RightUpLeg",
+          "rightKnee": "mixamorig:RightLeg",
+          "rightFoot": "mixamorig:RightFoot",
+          "raycastUpOffset": 0.05,
+          "raycastMaxDown": 0.15,
+          "footLerpSpeed": 12
+        }
+      }
+    }
+  ],
+  "components": {
+    "name": "Player",
+    "transform": {
+      "position": [
+        0,
+        0.9,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.3,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 70,
+      "collisionGroups": "PLAYER",
+      "collisionMask": "PLAYER_INTERACTIONS"
+    },
+    "kcc_movement": {
+      "maxSpeed": 11,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
+      "airControl": 0.7,
+      "airDrag": 0.3,
+      "jumpHeight": 1.2,
+      "jumpTimeToPeak": 0.35,
+      "jumpTimeToDescent": 0.3,
+      "jumpCutFactor": 0.7,
+      "jumpCutVelocityLimit": 1,
+      "coyoteTime": 0.15
+    },
+    "parkour_controller": {
+      "moveSpeed": 11,
+      "maxSpeed": 18,
+      "airControl": 0.7,
+      "groundAcceleration": 65,
+      "groundDeceleration": 65,
+      "airDrag": 0.3,
+      "wallRunGravity": -2,
+      "startWallRunGravity": 2.5,
+      "wallRunAcceleration": 65,
+      "detectWallDistance": 0.5,
+      "wallJumpCoyoteTime": 0.15,
+      "disableInputAfterWallJumpTime": 0.3,
+      "mantleDetectionDistance": 1.5,
+      "mantleMaxHeight": -0.025,
+      "mantlingMinVerticalVelocity": -9,
+      "minMantleVelocity": 8,
+      "minSwingSpeed": 11,
+      "impulsePadInputDisableTime": 0.3
+    },
+    "camera_arm": {
+      "armLength": 5,
+      "pivotOffset": [
+        0,
+        1.5,
+        0
+      ],
+      "socketOffset": [
+        0.5,
+        0,
+        0
+      ],
+      "cameraLag": true,
+      "cameraLagSpeed": 12,
+      "pitchMin": -70,
+      "pitchMax": 75,
+      "enableCollision": true,
+      "collisionPullOutSpeed": 6,
+      "mouseSensitivity": 0.15
+    }
+  }
+}

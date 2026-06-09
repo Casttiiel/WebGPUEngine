@@ -3,31 +3,15 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/knight_character.prefab"
+    "prefab": "characters/parkour_character_3p.prefab"
   },
   {
-    "children": [],
+    "prefab": "characters/dummy_enemy.prefab",
     "components": {
-      "name": "Idle",
-      "transform": {
-        "position": [0, 0, 6],
-        "rotation": [0, 0, 0],
-        "scale": [1, 1, 1]
-      },
-      "skinned_mesh": {
-        "gltf": "idle.gltf",
-        "animation": 0,
-        "loop": true,
-        "playbackSpeed": 1.0,
-        "extraAnimations": ["Kick.gltf"],
-        "autoPlayInterval": {
-          "clip": "Kick",
-          "intervalSeconds": 7,
-          "blendTime": 0.2
-        }
-      }
+      "transform": { "position": [0, 0.9, -4] }
     }
   },
+
   {
     "prefab": "cameras/debug_camera.prefab"
   },
@@ -386,5 +370,8 @@
         ]
       }
     }
+  },
+  {
+    "prefab": "gameplay/lynx_spear.prefab"
   }
 ]

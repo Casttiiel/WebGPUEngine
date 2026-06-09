@@ -26,20 +26,24 @@
       "collisionGroups": "PLAYER",
       "collisionMask": "PLAYER_INTERACTIONS"
     },
-    "lynx_controller": {
-      "moveSpeed": 11,
-      "maxSpeed": 17,
-      "airControl": 0.65,
+    "kcc_movement": {
+      "maxSpeed": 11,
       "groundAcceleration": 65,
       "groundDeceleration": 65,
+      "airControl": 0.65,
       "airDrag": 0.3,
       "jumpHeight": 1.3,
       "jumpTimeToPeak": 0.38,
       "jumpTimeToDescent": 0.32,
       "jumpCutFactor": 0.7,
-      "jumpCutVerticalVelocityLimit": 1,
+      "jumpCutVelocityLimit": 1,
       "coyoteTime": 0.15,
-      "maxAirJumps": 1,
+      "maxAirJumps": 0,
+      "apexThreshold": 2,
+      "apexGravityScale": 0.35
+    },
+    "lynx_controller": {
+      "moveSpeed": 11,
       "mantleDetectionDistance": 1.5,
       "mantleMaxHeight": -0.025,
       "mantlingMinVerticalVelocity": -9,
@@ -95,6 +99,16 @@
   "children": [
     {
       "prefab": "cameras/player_camera.prefab"
+    },
+    {
+      "components": {
+        "name": "DaggerManager",
+        "bullet_pool": {
+          "prefab": "gameplay/dagger.prefab",
+          "size": 15,
+          "projectileType": "dagger_projectile"
+        }
+      }
     }
   ]
 }

@@ -24,7 +24,6 @@ import { CameraComponent } from '../../components/render/CameraComponent';
 import { RenderComponent } from '../../components/render/RenderComponent';
 import { BoxColliderComponent } from '../../components/physics/BoxColliderComponent';
 import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
-import { ParkourControllerComponent } from '../../components/game/ParkourControllerComponent';
 import { CameraArmComponent } from '../../components/game/CameraArmComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { HeadBobComponent } from '../../components/game/HeadBobComponent';
@@ -57,14 +56,16 @@ import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { SpiderControllerComponent } from '../../components/game/SpiderControllerComponent';
-import { ArcaneKnightControllerComponent } from '../../components/game/ArcaneKnightControllerComponent';
-import { BloodmancerControllerComponent } from '../../components/game/BloodmancerControllerComponent';
 import { LynxControllerComponent } from '../../components/game/LynxControllerComponent';
+import { ParkourControllerComponent } from '../../components/game/ParkourControllerComponent';
+import { KickableComponent } from '../../components/game/KickableComponent';
+import { KCCMovement } from '../../components/game/movement/KCCMovement';
 import { DummyEnemyController } from '../../components/game/DummyEnemyController';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PerceptionComponent } from '../../components/game/PerceptionComponent';
 import { ProjectileComponent } from '../../components/game/ProjectileComponent';
 import { DaggerProjectileComponent } from '../../components/game/combat/DaggerProjectileComponent';
+import { SpearProjectileComponent } from '../../components/game/combat/SpearProjectileComponent';
 import { GrappleTargetComponent } from '../../components/game/GrappleTargetComponent';
 import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
 import { BulletPoolComponent } from '../../components/game/BulletPoolComponent';
@@ -86,7 +87,9 @@ import { HeavyMixedController } from '../../components/game/HeavyMixedController
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
-import { SkinnedMeshComponent } from '../../components/render/SkinnedMeshComponent';
+import { SkeletalMeshComponent } from '../../components/render/SkeletalMeshComponent';
+import { AnimatorComponent } from '../../components/render/AnimatorComponent';
+import { FootIKComponent } from '../../components/render/FootIKComponent';
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
 import { ViewModelMeshComponent } from '../../components/render/ViewModelMeshComponent';
 import { TerrainComponent } from '../../components/render/TerrainComponent';
@@ -311,8 +314,12 @@ export class Loader {
         return new TransformComponent();
       case 'render':
         return new RenderComponent();
-      case 'skinned_mesh':
-        return new SkinnedMeshComponent();
+      case 'skeletal_mesh':
+        return new SkeletalMeshComponent();
+      case 'animator':
+        return new AnimatorComponent();
+      case 'foot_ik':
+        return new FootIKComponent();
       case 'camera':
         return new CameraComponent();
       case 'tone_mapping':
@@ -354,14 +361,14 @@ export class Loader {
       case 'sphere_collider':
         return new SphereColliderComponent();
       case 'character_controller':
-      case 'parkour_controller':
-        return new ParkourControllerComponent();
-      case 'arcane_knight_controller':
-        return new ArcaneKnightControllerComponent();
-      case 'bloodmancer_controller':
-        return new BloodmancerControllerComponent();
       case 'lynx_controller':
         return new LynxControllerComponent();
+      case 'parkour_controller':
+        return new ParkourControllerComponent();
+      case 'kickable':
+        return new KickableComponent();
+      case 'kcc_movement':
+        return new KCCMovement();
       case 'dummy_enemy_controller':
         return new DummyEnemyController();
       case 'camera_arm':
@@ -418,6 +425,8 @@ export class Loader {
         return new ProjectileComponent();
       case 'dagger_projectile':
         return new DaggerProjectileComponent();
+      case 'spear_projectile':
+        return new SpearProjectileComponent();
       case 'blood_ball_projectile':
         return new BloodBallProjectileComponent();
       case 'blood_explosive_projectile':

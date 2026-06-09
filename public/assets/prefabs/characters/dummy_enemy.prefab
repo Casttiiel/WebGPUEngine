@@ -35,6 +35,8 @@
       ]
     },
     "dummy_enemy_controller": {},
+    "kcc_movement": {},
+    "kickable": {},
     "health": {
       "maxHp": 99999
     }

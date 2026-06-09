@@ -348,17 +348,14 @@ export class ColliderComponent extends Component {
         .getTransform()
         .setLocalRotation([rotation.x, rotation.y, rotation.z, rotation.w]);
     } else if (this.bodyType === RigidBodyType.KINEMATIC) {
-      // Si es cinemático, actualizar física desde transform
-      // (para mover plataformas desde código)
+      // Sync position only — the KCC moves the physics body each frame and we read it back.
+      // Rotation is NOT synced: kinematic bodies have no physics-driven rotation, so
+      // reading rigidBody.rotation() would always return identity and zero out any
+      // game-logic rotation (e.g. character facing direction set by the controller).
       const translation = this.rigidBody.translation();
-      const rotation = this.rigidBody.rotation();
-
       transformComponent
         .getTransform()
         .setLocalPosition(vec3.fromValues(translation.x, translation.y, translation.z));
-      transformComponent
-        .getTransform()
-        .setLocalRotation([rotation.x, rotation.y, rotation.z, rotation.w]);
     }
     // Si es estático, no necesita sincronización (no se mueve)
   }
@@ -367,7 +364,7 @@ export class ColliderComponent extends Component {
     // TODO: Implementar debug rendering del collider
   }
 
-  public dispose(): void {
+  public override dispose(): void {
     if (this.rigidBody) {
       Engine.getPhysics().removeBody(this.getOwner().id);
     }

@@ -5,6 +5,7 @@ import { HealthComponent } from '../../../components/game/HealthComponent';
 import { StaminaComponent } from '../../../components/game/StaminaComponent';
 import { BloodComponent } from '../../../components/game/BloodComponent';
 import { ArcaneKnightControllerComponent } from '../../../components/game/ArcaneKnightControllerComponent';
+import { LynxControllerComponent } from '../../../components/game/LynxControllerComponent';
 import { GrappleTargetType } from '../../../types/GrappleTargetType.enum';
 import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
 import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
@@ -25,8 +26,10 @@ export class HUDController extends WidgetController {
   // Grapple charge fills (up to 5)
   private readonly MAX_CHARGE_SLOTS = 5;
   private chargeFills: (ImageWidget | null)[] = new Array(5).fill(null);
+  private chargeSlots: (ImageWidget | null)[] = new Array(5).fill(null);
   private chargeFillMaxWidth: number = 36; // matches hud.json fill width
   private chargeWidgetsResolved = false;
+  private chargeSlotsResolved = false;
 
   // Grapple target indicator
   private targetIndicator: ImageWidget | null = null;
@@ -45,6 +48,7 @@ export class HUDController extends WidgetController {
   private stamina: StaminaComponent | null = null;
   private blood: BloodComponent | null = null;
   private grappleController: ArcaneKnightControllerComponent | null = null;
+  private lynxController: LynxControllerComponent | null = null;
 
   constructor() {
     super('hud_controller');
@@ -69,10 +73,18 @@ export class HUDController extends WidgetController {
       const newW = Math.max(0, ratio * this.staminaBarMaxWidth);
       this.staminaBar.setSize(newW, this.staminaBar.getHeight());
     }
+
+    if (this.grappleController) {
+      this.updateGrappleCharges();
+      this.updateCrosshair();
+    } else if (this.lynxController) {
+      this.updateMarkerCharges();
+    }
   }
 
   private resolveWidgets(): void {
-    if (this.healthBar && this.staminaBar) return;
+    if (this.healthBar && this.staminaBar && this.chargeWidgetsResolved && this.chargeSlotsResolved)
+      return;
 
     const ui = ModuleUI.getInstance();
     if (!ui) return;
@@ -107,6 +119,22 @@ export class HUDController extends WidgetController {
         }
       }
       this.chargeWidgetsResolved = allFound;
+    }
+
+    // Grapple charge slot backgrounds
+    if (!this.chargeSlotsResolved) {
+      let allFound = true;
+      for (let i = 0; i < this.MAX_CHARGE_SLOTS; i++) {
+        if (!this.chargeSlots[i]) {
+          const w = ui.getWidgetByAlias(`grapple_charge_slot_${i}`);
+          if (w instanceof ImageWidget) {
+            this.chargeSlots[i] = w;
+          } else {
+            allFound = false;
+          }
+        }
+      }
+      this.chargeSlotsResolved = allFound;
     }
 
     // Grapple target indicator
@@ -145,10 +173,13 @@ export class HUDController extends WidgetController {
     if (!this.blood) {
       this.blood = this.playerEntity.getComponent('blood') as BloodComponent | null;
     }
-    if (!this.grappleController) {
-      this.grappleController = this.playerEntity.getComponent(
-        'player_controller',
-      ) as ArcaneKnightControllerComponent | null;
+    if (!this.grappleController && !this.lynxController) {
+      const ctrl = this.playerEntity.getComponent('player_controller');
+      if (ctrl instanceof ArcaneKnightControllerComponent) {
+        this.grappleController = ctrl;
+      } else if (ctrl instanceof LynxControllerComponent) {
+        this.lynxController = ctrl;
+      }
     }
   }
 
@@ -185,10 +216,14 @@ export class HUDController extends WidgetController {
     }
   }
 
+  // ── Marker charge HUD (Lynx) ───────────────────────────────────────────────
+
+  private updateMarkerCharges(): void {}
+
   // ── Crosshair tint ──────────────────────────────────────────────────
 
   private updateCrosshair(): void {
-    if (!this.crosshair) return;
+    /*if (!this.crosshair) return;
 
     const target = this.grappleController?.getPendingGrappleTarget() ?? null;
     if (!target) {
@@ -214,6 +249,6 @@ export class HUDController extends WidgetController {
       default:
         color = HUDController.COLOR_DEFAULT;
     }
-    this.crosshair.setColor(color[0], color[1], color[2], color[3]);
+    this.crosshair.setColor(color[0], color[1], color[2], color[3]);*/
   }
 }

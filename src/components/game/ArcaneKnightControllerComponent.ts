@@ -1,4 +1,4 @@
-﻿import { vec3 } from 'gl-matrix';
+﻿/*import { vec3 } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { BasePlayerController } from './BasePlayerController';
 import { Engine } from '../../core/engine/Engine';
@@ -136,7 +136,7 @@ export class ArcaneKnightControllerComponent
             // Bleed off momentum so the character doesn't keep flying.
             vec3.zero(this.currentHorizontalVelocity);
             this.currentVerticalVelocity = 0;
-          }*/
+          }*/ /*
         }
         break;
       }
@@ -216,7 +216,6 @@ export class ArcaneKnightControllerComponent
     return this.currentHorizontalVelocity;
   }
 
-  // â”€â”€ IMovementController â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   public getIsJumping(): boolean {
     return this.isJumping;
   }
@@ -285,7 +284,7 @@ export class ArcaneKnightControllerComponent
     return this.combatSystem;
   }
 
-  /** Returns the current best-candidate grapple target (used by HUD). */
+  /** Returns the current best-candidate grapple target (used by HUD). */ /*
   public getPendingGrappleTarget(): {
     point: vec3;
     visualPoint: vec3;
@@ -322,7 +321,7 @@ export class ArcaneKnightControllerComponent
 
   /**
    * Fires the grapple toward pendingGrappleTarget when the input is pressed.
-   */
+   */ /*
   private tryActivateFarReach(): void {
     if (this.movementState !== CharacterMovementState.IDLE) return;
     const pendingTarget = this.grappleSystem.getPendingTarget();
@@ -519,7 +518,7 @@ export class ArcaneKnightControllerComponent
     }
   }
 
-  /** InterpolaciÃ³n lineal hacia target con paso mÃ¡ximo de step. */
+  /** InterpolaciÃ³n lineal hacia target con paso mÃ¡ximo de step. */ /*
   private projectOnPlane(v: vec3, normal: vec3): vec3 {
     const dot = vec3.dot(v, normal);
     const projected = vec3.create();
@@ -532,4 +531,18 @@ export class ArcaneKnightControllerComponent
   }
 
   public override dispose(): void {}
+}
+*/
+
+// Stub — class is temporarily disabled.
+export class ArcaneKnightControllerComponent {
+  getGrappleSystem(): null {
+    return null;
+  }
+  getIsGrounded(): boolean {
+    return false;
+  }
+  getGrappleTarget(): null {
+    return null;
+  }
 }

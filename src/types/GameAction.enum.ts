@@ -11,30 +11,10 @@ export enum GameAction {
 
   // Actions
   JUMP = 'jump',
-  ROLL = 'roll',
-  DIVE = 'dive',
   DASH = 'dash',
-  THROW = 'throw',
-
-  // Camera
-  LOOK_UP = 'look_up',
-  LOOK_DOWN = 'look_down',
-  LOOK_LEFT = 'look_left',
-  LOOK_RIGHT = 'look_right',
-
-  // Combat
   LIGHT_ATTACK = 'light_attack',
-  HEAVY_ATTACK = 'heavy_attack',
-  SHIELD = 'shield',
-
-  // Interaction
-  INTERACT = 'interact',
-
-  // Abilities
-  ABILITY_Q = 'ability_q',
-  ABILITY_E = 'ability_e',
-  ABILITY_R = 'ability_r',
-  BLOOD_EXPLOSIVE = 'blood_explosive',
+  FIRE = 'fire',
+  KICK = 'kick',
 
   // UI
   PAUSE = 'pause',

@@ -94,6 +94,7 @@
     "children": [
       {
         "name": "grapple_charge_slot_0",
+        "alias": "grapple_charge_slot_0",
         "type": "image",
         "x": 0,
         "y": 0,
@@ -123,6 +124,7 @@
       },
       {
         "name": "grapple_charge_slot_1",
+        "alias": "grapple_charge_slot_1",
         "type": "image",
         "x": 46,
         "y": 0,
@@ -152,6 +154,7 @@
       },
       {
         "name": "grapple_charge_slot_2",
+        "alias": "grapple_charge_slot_2",
         "type": "image",
         "x": 92,
         "y": 0,
@@ -181,6 +184,7 @@
       },
       {
         "name": "grapple_charge_slot_3",
+        "alias": "grapple_charge_slot_3",
         "type": "image",
         "x": 138,
         "y": 0,
@@ -210,6 +214,7 @@
       },
       {
         "name": "grapple_charge_slot_4",
+        "alias": "grapple_charge_slot_4",
         "type": "image",
         "x": 184,
         "y": 0,

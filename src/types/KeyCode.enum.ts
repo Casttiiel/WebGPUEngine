@@ -5,6 +5,8 @@ export enum KeyCode {
   S = 'keys',
   D = 'keyd',
   E = 'keye',
+  F = 'keyf',
+  R = 'keyr',
   SPACE = 'space',
   SHIFT = 'shiftleft',
   CTRL = 'controlleft',

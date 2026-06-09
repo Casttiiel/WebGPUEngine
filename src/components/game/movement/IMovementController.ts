@@ -1,6 +1,4 @@
 import { vec3 } from 'gl-matrix';
-import type { CameraComponent } from '../../render/CameraComponent';
-import type { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
 import { IMantleController } from './IMantleController';
 
 /**
@@ -17,8 +15,10 @@ import { IMantleController } from './IMantleController';
 export interface IMovementController extends IMantleController {
   // ── Velocidades ──────────────────────────────────────────────────────────
   getBoostedSpeed(): number;
-  setBoostedSpeed(speed: number): void;
-
+  setBoostedSpeed(
+    speed: number,
+  ): void /** Impulso aditivo (knockback, dash). Suma al vx/vy/vz actual. */;
+  applyImpulse(impulse: vec3): void;
   // ── Flags de estado ──────────────────────────────────────────────────────
   /** Requerido (sobreescribe el opcional de IMantleController). */
   getIsWallRunning(): boolean;

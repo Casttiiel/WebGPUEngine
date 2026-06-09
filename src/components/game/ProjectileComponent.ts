@@ -149,7 +149,7 @@ export class ProjectileComponent extends Component {
     this.doRelease();
   }
 
-  private doRelease(): void {
+  protected doRelease(): void {
     this.shooterBody = null;
     this.releaseCallback?.(this);
   }
