@@ -41,7 +41,6 @@ struct RCParams {
 // ---------------------------------------------------------------------------
 const DEPTH_SIGMA:  f32 = 10.0;
 const NORMAL_SIGMA: f32 = 4.0;
-const DEPTH_THOLD:  f32 = 0.0001;
 
 // ---------------------------------------------------------------------------
 // Main — 3×3 bilateral upsample from cascade0 (W/4) to full-res,
@@ -54,7 +53,7 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (p.x >= screen_sz.x || p.y >= screen_sz.y) { return; }
 
     let p_depth = textureLoad(gLinearDepth, p, 0).r;
-    if (p_depth <= DEPTH_THOLD) {
+    if (p_depth <= EPSILON) {
         // Sky pixel — write zero so the composite pass adds nothing
         textureStore(giResult, p, vec4<f32>(0.0));
         return;
@@ -71,14 +70,22 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     var weighted_sum  = vec3<f32>(0.0);
     var weight_total  = 0.0;
 
-    let inv_screen = 1.0 / rc.screenSize;
+    let inv_screen  = 1.0 / rc.screenSize;
+    let inv_cascade = 1.0 / rc.cascadeRes;
+    // Center UV for this full-res pixel (shared across all neighbour samples as base)
+    let center_uv   = (vec2<f32>(p) + 0.5) * inv_screen;
 
     for (var dy = -1; dy <= 1; dy++) {
         for (var dx = -1; dx <= 1; dx++) {
-            let sample_uv = (vec2<f32>(p) + 0.5 + vec2<f32>(f32(dx), f32(dy))) * inv_screen;
+            // Offset in cascade0-texel space so each sample hits a distinct cascade probe.
+            // Using full-res pixel offsets here would be sub-texel in cascade0 (W/4),
+            // giving 9 nearly-identical samples and defeating the bilateral filter.
+            let sample_uv = center_uv + vec2<f32>(f32(dx), f32(dy)) * inv_cascade;
 
             // GBuffer samples for bilateral weight (at the full-res neighbour)
             let smp_depth  = textureSampleLevel(gLinearDepth, samplerGBuffer, sample_uv, 0.0).r;
+            // Sky neighbours have no GI data — skip them so they don't dilute edge irradiance
+            if (smp_depth <= EPSILON) { continue; }
             let smp_normal = decodeOctahedral(
                 textureSampleLevel(gNormals, samplerGBuffer, sample_uv, 0.0).xy
             );
@@ -96,7 +103,9 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
 
-    let irradiance      = weighted_sum / max(weight_total, 0.0001);
+    // Divide by PI: trace uses uniform (not cosine-weighted) hemisphere sampling,
+    // so the Lambertian integral factor of 1/π is missing and must be applied here.
+    let irradiance      = (weighted_sum / max(weight_total, 0.0001)) / PI;
 
     // Lambertian diffuse indirect:
     //   L_indirect = irradiance × albedo × (1 − metallic) × (1 − roughness×0.5)

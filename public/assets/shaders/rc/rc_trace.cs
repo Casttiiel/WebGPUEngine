@@ -40,20 +40,24 @@ struct RCParams {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-const GOLDEN_RATIO: f32 = 1.6180339887;
-const NORMAL_BIAS:  f32 = 0.015;
-const DEPTH_THOLD:  f32 = 0.0001;
+const GOLDEN_RATIO:  f32 = 1.6180339887;
+const NORMAL_BIAS:   f32 = 0.015;
 const MAX_THICKNESS: f32 = 0.5; // maximum acceptable intersection depth (world units)
+const MAX_RADIANCE:  f32 = 10.0; // clamp to prevent bright hits inflating irradiance
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 fn reconstruct_world_pos(uv: vec2<f32>, linear_depth: f32) -> vec3<f32> {
-    let ndc      = vec4<f32>(uv * 2.0 - 1.0, 1.0, 1.0);
-    let world_h  = camera.invViewProjection * ndc;
+    let ndc       = vec4<f32>(uv * 2.0 - 1.0, 1.0, 1.0);
+    let world_h   = camera.invViewProjection * ndc;
     let world_dir = normalize(world_h.xyz / world_h.w - camera.cameraPosition.xyz);
-    return camera.cameraPosition.xyz + world_dir * (linear_depth * camera.cameraFar);
+    // linear_depth = dot(worldPos - camPos, cameraFront) / zFar  →  view-space Z, not ray distance.
+    // Divide by the front-projection to convert view-Z to actual ray distance.
+    let view_z   = linear_depth * camera.cameraFar;
+    let ray_dist = view_z / dot(world_dir, camera.cameraFront.xyz);
+    return camera.cameraPosition.xyz + world_dir * ray_dist;
 }
 
 fn build_tbn(n: vec3<f32>) -> mat3x3<f32> {
@@ -102,7 +106,7 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // Sample GBuffer at this probe's corresponding full-res pixel
     let depth_val = textureLoad(gLinearDepth, full_px, 0).r;
-    if (depth_val <= DEPTH_THOLD) {
+    if (depth_val <= EPSILON) {
         // Sky pixel — write black, fully "open" (alpha=0 → coarser cascade can fill)
         textureStore(outputCascade, probe_xy, vec4<f32>(0.0));
         return;
@@ -121,6 +125,7 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     let step_size = (rc.intervalEnd - rc.intervalStart) / rc.maxSteps;
 
     var accum_rgb = vec3<f32>(0.0);
+    var ibl_rgb   = vec3<f32>(0.0); // IBL fallback — contributes light but not coverage
     var hit_count = 0u;
 
     for (var ray_idx = 0u; ray_idx < num_rays; ray_idx++) {
@@ -139,12 +144,12 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
             let sample_px  = vec2<i32>(sample_uv * rc.screenSize);
             let smp_depth  = textureLoad(gLinearDepth, sample_px, 0).r;
 
-            if (smp_depth <= DEPTH_THOLD) { continue; } // no geometry
+            if (smp_depth <= EPSILON) { continue; } // no geometry
 
             // Reconstruct depth along ray direction to detect intersection
             let smp_world_pos  = reconstruct_world_pos(sample_uv, smp_depth);
-            let dist_ray       = dot(sample_world   - camera.cameraPosition.xyz, dir);
-            let dist_surface   = dot(smp_world_pos  - camera.cameraPosition.xyz, dir);
+            let dist_ray       = dot(sample_world  - origin, dir);
+            let dist_surface   = dot(smp_world_pos - origin, dir);
 
             // The ray point is slightly behind the surface → intersection
             let behind = dist_ray > dist_surface + 0.001;
@@ -159,23 +164,20 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
 
         if (hit_found) {
             let raw = textureSampleLevel(rtAccLight, samplerGBuffer, hit_uv, 0.0).rgb;
-            // Reinhard per-channel: keeps values in [0,1) so bright specular/sky hits
-            // don't inflate cascade irradiance and cause burn-out.
-            let lum = dot(raw, vec3<f32>(0.2126, 0.7152, 0.0722));
-            accum_rgb += raw / (1.0 + lum);
+            accum_rgb += min(raw, vec3<f32>(MAX_RADIANCE));
             hit_count++;
         } else if (u32(rc.cascadeIndex) == u32(rc.cascadeCount) - 1u) {
-            // IBL fallback: only on the coarsest cascade, for rays that escape the frustum
+            // IBL fallback: only on the coarsest cascade, for rays that escape the frustum.
+            // Accumulated separately so it contributes light without inflating coverage alpha —
+            // that would incorrectly suppress finer cascades during merge.
             let raw = textureSampleLevel(irradianceCubemap, envSampler, dir, 0.0).rgb;
-            let lum = dot(raw, vec3<f32>(0.2126, 0.7152, 0.0722));
-            accum_rgb += raw / (1.0 + lum);
-            hit_count++;
+            ibl_rgb += min(raw, vec3<f32>(MAX_RADIANCE));
         }
         // Finer cascades leave misses as "open" (alpha < 1) — coarser cascade fills via merge
     }
 
-    let out_rgb   = accum_rgb / f32(num_rays);
-    let out_alpha = f32(hit_count) / f32(num_rays); // coverage: 1.0 = all rays hit
+    let out_rgb   = (accum_rgb + ibl_rgb) / f32(num_rays);
+    let out_alpha = f32(hit_count) / f32(num_rays); // geometry coverage only — IBL excluded
 
     var result = vec4<f32>(out_rgb, out_alpha);
 

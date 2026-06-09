@@ -46,6 +46,8 @@ export class RadianceCascades {
   private mergeRT: RenderTarget[] = [];
   // historyRT: ping-pong buffers for cascades N-2 and N-1 (temporal accumulation).
   private historyRT: [RenderTarget, RenderTarget] | null = null;
+  // dummyHistoryRT: 1×1 black texture bound to cascades that don't use temporal blend.
+  private dummyHistoryRT: RenderTarget | null = null;
   // giResultRT: full-res GI contribution written by the apply pass.
   private giResultRT: RenderTarget | null = null;
 
@@ -153,7 +155,7 @@ export class RadianceCascades {
     if (!cameraGroup) return; // no camera yet
 
     const qs = QualitySettings.getInstance().getSettings();
-    const cascadeCount = qs.rcCascadeCount;
+    const cascadeCount = Math.max(3, Math.min(4, qs.rcCascadeCount));
     const baseRange = this.debugParams.baseRange;
     const encoder = Render.getInstance().getCommandEncoder();
 
@@ -399,7 +401,7 @@ export class RadianceCascades {
     this.destroyRenderTargets();
 
     const qs = QualitySettings.getInstance().getSettings();
-    const cascadeCount = qs.rcCascadeCount;
+    const cascadeCount = Math.max(3, Math.min(4, qs.rcCascadeCount));
 
     const storageCopyUsage =
       GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST;
@@ -423,6 +425,10 @@ export class RadianceCascades {
       rt.createRT(`rc_merge_${i}`, c.getWidth(), c.getHeight(), fmt, storageCopyUsage);
       this.mergeRT.push(rt);
     }
+
+    // 1×1 dummy — bound to cascades that don't use temporal blend (never sampled)
+    this.dummyHistoryRT = new RenderTarget();
+    this.dummyHistoryRT.createRT('rc_dummy_history', 1, 1, fmt, storageCopyUsage);
 
     // History for the two coarsest cascades (indices N-2 and N-1)
     const c2 = this.cascadeRT[cascadeCount - 2];
@@ -448,6 +454,8 @@ export class RadianceCascades {
       this.historyRT[1].destroy();
       this.historyRT = null;
     }
+    this.dummyHistoryRT?.destroy();
+    this.dummyHistoryRT = null;
     this.giResultRT?.destroy();
     this.giResultRT = null;
   }
@@ -455,7 +463,7 @@ export class RadianceCascades {
   // ─── Internal: bind group management ──────────────────────────────────────
 
   private rebuildBindGroups(rtAccLight: RenderTarget): void {
-    const cascadeCount = QualitySettings.getInstance().getSettings().rcCascadeCount;
+    const cascadeCount = Math.max(3, Math.min(4, QualitySettings.getInstance().getSettings().rcCascadeCount));
     const irradianceCubemap =
       Engine.getEnvironmentManager().getAmbientLightData().irradianceCubemap;
 
@@ -471,7 +479,7 @@ export class RadianceCascades {
       } else if (i === cascadeCount - 1) {
         historyView = this.historyRT![1].getView();
       } else {
-        historyView = this.historyRT![0].getView(); // dummy — never read when temporalBlend=0
+        historyView = this.dummyHistoryRT!.getView();
       }
 
       this.traceGroup2.push(
