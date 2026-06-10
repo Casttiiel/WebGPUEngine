@@ -35,19 +35,20 @@ export class VolumetricClouds {
   private lastHalfH = 0;
 
   // ── Parameters (tweakable via renderInMenu) ──────────────────────────────────
-  public cloudBase: number = 1200;         // world-Y of cloud bottom (metres)
-  public cloudTop: number = 2000;          // world-Y of cloud top  (800 m slab)
-  public coverage: number = 0.50;          // [0 = sparse … 1 = overcast]
-  public density: number = 3.0;            // density multiplier
-  public absorption: number = 0.12;        // light absorption per unit density
-  public scatterStrength: number = 25.0;   // overall brightness scale (calibrated for stepAbsorption formula)
+  public cloudBase: number = 500; // world-Y of cloud bottom (metres)
+  public cloudTop: number = 1300; // world-Y of cloud top  (800 m slab)
+  public coverage: number = 0.65; // [0 = sparse … 1 = overcast]
+  public density: number = 1.2; // density multiplier
+  public absorption: number = 0.01; // light absorption per unit density
+  public scatterStrength: number = 25.0; // overall brightness scale (calibrated for stepAbsorption formula)
   public cloudFrequency: number = 0.00022; // noise spatial frequency (lower = bigger clouds)
   // Quality / style
-  public stepCount: number = 32;           // primary ray-march steps (perf vs quality)
-  public lightSteps: number = 5;           // shadow ray steps per sample
-  public warpStrength: number = 0.35;      // domain-warp intensity (0 = no warp)
-  public worleyWeight: number = 0.35;      // Worley contribution in base shape (0 = pure value noise)
-  public fadeRadius: number = 25000;       // horizontal radius beyond which clouds fade out (metres)
+  public stepCount: number = 64; // primary ray-march steps (perf vs quality)
+  public lightSteps: number = 5; // shadow ray steps per sample
+  public warpStrength: number = 0.35; // domain-warp intensity (0 = no warp)
+  public worleyWeight: number = 0.35; // Worley contribution in base shape (0 = pure value noise)
+  public fadeRadius: number = 25000; // horizontal radius beyond which clouds fade out (metres)
+  public resolutionDivisor: number = 4; // render clouds at 1/N screen resolution (1=full, 2=half, 4=quarter…)
 
   // Wind state (accumulated per frame)
   private windOffset: number = 0;
@@ -82,14 +83,15 @@ export class VolumetricClouds {
   public render(rtAccLight: GPUTextureView, depthStencilView: GPUTextureView): void {
     this.uploadUniforms();
 
-    const halfW = Math.max(1, Math.floor(Render.width / 2));
-    const halfH = Math.max(1, Math.floor(Render.height / 2));
+    const div = Math.max(1, Math.round(this.resolutionDivisor));
+    const halfW = Math.max(1, Math.floor(Render.width / div));
+    const halfH = Math.max(1, Math.floor(Render.height / div));
 
-    // Recreate half-res texture whenever the render resolution changes
+    // Recreate texture whenever the render resolution or divisor changes
     if (halfW !== this.lastHalfW || halfH !== this.lastHalfH || !this.cloudHalfResTexture) {
       this.cloudHalfResTexture?.destroy();
       this.cloudHalfResTexture = GPUUtils.getDevice().createTexture({
-        label: 'cloud_halfres',
+        label: 'cloud_lowres',
         size: [halfW, halfH],
         format: 'rgba16float',
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -139,7 +141,11 @@ export class VolumetricClouds {
     // ── Pass 2: composite half-res cloud texture onto rtAccLight ──────────────
     // depth-equal test (z: test_equal in tech) ensures only sky pixels are touched
     const compositeColorAtt = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
-    const compositeDepthAtt = GPUUtils.createDepthStencilAttachment(depthStencilView, 'load', 'store');
+    const compositeDepthAtt = GPUUtils.createDepthStencilAttachment(
+      depthStencilView,
+      'load',
+      'store',
+    );
     const compositeDesc = GPUUtils.createRenderPassDescriptor(
       'cloud composite pass',
       [compositeColorAtt],
@@ -176,7 +182,7 @@ export class VolumetricClouds {
     const moonI = nightFactor * 0.05;
     const moonR = 0.75 * moonI;
     const moonG = 0.82 * moonI;
-    const moonB = 0.90 * moonI;
+    const moonB = 0.9 * moonI;
 
     // Ambient sky color for cloud underside, weakens at night
     const ambScale = 1.0 - nightFactor * 0.88;
@@ -246,14 +252,16 @@ export class VolumetricClouds {
     f.add(this, 'warpStrength', 0, 1, 0.01).name('Warp strength');
     f.add(this, 'worleyWeight', 0, 1, 0.01).name('Worley weight');
     // Lighting
-    f.add(this, 'density', 0.1, 20, 0.1).name('Density');
+    f.add(this, 'density', 0.1, 5, 0.1).name('Density');
     f.add(this, 'absorption', 0.01, 1, 0.01).name('Absorption');
-    f.add(this, 'scatterStrength', 0.1, 5, 0.1).name('Scatter');
+    f.add(this, 'scatterStrength', 0.1, 50, 0.1).name('Scatter');
     // Performance
     f.add(this, 'stepCount', 16, 128, 1).name('Steps (quality)');
     f.add(this, 'lightSteps', 2, 12, 1).name('Light steps');
     // Render distance
     f.add(this, 'fadeRadius', 1000, 80000, 500).name('Fade radius (m)');
+    // Resolution
+    f.add(this, 'resolutionDivisor', 1, 8, 1).name('Resolution (1/N)');
   }
 
   public dispose(): void {

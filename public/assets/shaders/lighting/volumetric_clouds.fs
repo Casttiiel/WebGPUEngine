@@ -175,11 +175,14 @@ fn sampleDensity(pos: vec3f, octaves: i32, doDetail: bool) -> f32 {
     var density = remap(baseShape, 1.0 - u_cloud.coverage, 1.0, 0.0, 1.0) * grad;
     if (density < 0.001) { return 0.0; }
 
-    // Erosión de bordes: solo en tier 0 (cercano) — 2 worley3D = 54 hash33 calls
+    // Erosión de bordes: solo en tier 0 (cercano) — 2 worley3D = 54 hash33 calls.
+    // detailScale normaliza la frecuencia respecto a cloudFrequency para que la erosión
+    // mantenga la misma relación espacial con la forma base sea cual sea la frecuencia.
     if (doDetail) {
-        let detail     = worleyDetail2(p * 2.5);
-        let edgeFactor = saturate(1.0 - density / 0.35);
-        density       -= edgeFactor * detail * 0.4;
+        let detailScale = 2.5 * (0.00022 / max(u_cloud.cloudFrequency, 0.00001));
+        let detail      = worleyDetail2(p * detailScale);
+        let edgeFactor  = saturate(1.0 - density / 0.35);
+        density        -= edgeFactor * detail * 0.4;
     }
 
     return max(0.0, density) * u_cloud.density;
@@ -201,7 +204,11 @@ fn sampleLightingN(pos: vec3f, nSteps: i32) -> f32 {
         accumulated += sampleDensityCheap(p) * stepSize;
         p += u_cloud.sunDirection * stepSize;
     }
-    return exp(-accumulated * u_cloud.absorption);
+    let od = accumulated * u_cloud.absorption;
+    // Multiple scattering approximation: primary Beer-Lambert term (direct) +
+    // a low-absorption term (simulates light bouncing back from deeper cloud layers).
+    // Prevents pitch-black interiors while preserving directionality from sun angle.
+    return exp(-od) * 0.7 + exp(-od * 0.25) * 0.3;
 }
 
 fn henyeyGreenstein(cosTheta: f32, g: f32) -> f32 {
@@ -234,9 +241,14 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
         tEnd   = max(0.0, max(tBase, tTop));
         if (tEnd < 0.001) { return vec4f(0.0); }
     } else {
-        if (tBase < 0.0 || tTop < 0.0) { return vec4f(0.0); }
-        tStart = min(tBase, tTop);
-        tEnd   = max(tBase, tTop);
+        // Cámara fuera del slab: solo usar los t positivos.
+        // Si la cámara está encima y mira hacia abajo, tTop < 0 (plano superior detrás),
+        // pero tBase > 0 es válido — el ray viaja de fuera hacia dentro por la base.
+        let tA = select(-1.0, tBase, tBase >= 0.0);
+        let tB = select(-1.0, tTop,  tTop  >= 0.0);
+        if (tA < 0.0 && tB < 0.0) { return vec4f(0.0); } // slab completamente detrás
+        tStart = select(tB, min(tA, tB), tA >= 0.0 && tB >= 0.0);
+        tEnd   = max(tA, tB);
     }
 
     if (tEnd <= tStart) { return vec4f(0.0); }
@@ -257,9 +269,8 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
     if (entryHorizDist > u_cloud.fadeRadius * 0.45) { qualityTier = 1; }
     if (entryHorizDist > u_cloud.fadeRadius * 0.70) { qualityTier = 2; }
 
-    // Smooth fade in the outer 25 % of the radius
-    let distFade = 1.0 - saturate((entryHorizDist - u_cloud.fadeRadius * 0.75)
-                                   / (u_cloud.fadeRadius * 0.25));
+    // distFade is now computed per-step so the cloud dissolves gradually
+    // rather than getting multiplied by a single entry-distance factor.
 
     let cosTheta = dot(rayDir, u_cloud.sunDirection);
     let phase    = dualLobe(cosTheta);
@@ -296,9 +307,15 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
         if (t >= tEnd || iters >= 256 || transmittance < 0.01) { break; }
         iters++;
 
-        // Per-step horizontal distance check — stop marching past the fade radius
+        // Per-step horizontal distance
         let stepHorizDist = t * horizLen;
-        if (stepHorizDist >= u_cloud.fadeRadius) { break; }
+
+        // Per-step fade: opacity reduces smoothly from 55 % to 100 % of fadeRadius.
+        // Using extinction scale rather than a result multiplier, so the cloud
+        // dissolves into transparency (no hard shape discontinuity when tweaking radius).
+        let stepFade = 1.0 - saturate((stepHorizDist - u_cloud.fadeRadius * 0.55)
+                                      / (u_cloud.fadeRadius * 0.45));
+        if (stepFade <= 0.001) { break; } // effectively beyond fade radius — stop marching
 
         let pos = rayOrigin + rayDir * t;
 
@@ -314,7 +331,9 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
         if (density > 0.001) {
             consecutiveEmpty = 0;
 
-            let extinction = density * u_cloud.absorption;
+            // Scale extinction by stepFade so distant steps contribute less opacity.
+            // Both Beer-Lambert and scatter use the same faded extinction — consistent.
+            let extinction = density * u_cloud.absorption * stepFade;
             let stepT     = exp(-extinction * baseStep);
             // Physically correct in-scatter: fraction of light absorbed by this step.
             // Always in [0,1] regardless of density or step size — prevents bloom.
@@ -329,15 +348,21 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
                 lightEnergy = sampleLightingN(pos, lightStepsTier);
             }
 
-            let powder = powderEffect(density, cosTheta);
+            // Powder solo tiene sentido con light march real; en tier 2 (aproximación constante)
+            // no hay dirección real de luz, así que se omite para evitar silver lining falso.
+            let powder = select(1.0, powderEffect(density, cosTheta), qualityTier < 2);
 
             scatteredLight += transmittance * lightEnergy * phase * powder
                             * u_cloud.sunColor * stepAbsorption * u_cloud.scatterStrength;
 
             let hFrac      = (pos.y - u_cloud.cloudBase) / cloudH;
             let skyAmbient = u_cloud.ambientColor * (0.3 + 0.7 * hFrac);
-            let gndAmbient = u_cloud.ambientColor * vec3f(0.8, 0.7, 0.5) * (1.0 - hFrac) * 0.15;
-            scatteredLight += transmittance * (skyAmbient + gndAmbient) * stepAbsorption * 0.3;
+            // Ground bounce: tinte terroso modulado por altura del sol para que sea
+            // coherente al atardecer/noche (no un naranja brillante a medianoche).
+            let sunHCl     = max(0.0, u_cloud.sunDirection.y);
+            let groundTint = vec3f(0.6 + sunHCl * 0.3, 0.5 + sunHCl * 0.2, 0.3 + sunHCl * 0.1);
+            let gndAmbient = u_cloud.ambientColor * groundTint * (1.0 - hFrac) * 0.15;
+            scatteredLight += transmittance * (skyAmbient + gndAmbient) * stepAbsorption * stepFade * 0.5;
 
             transmittance *= stepT;
             t += baseStep;
@@ -348,7 +373,7 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
         }
     }
 
-    return vec4f(scatteredLight * distFade, (1.0 - transmittance) * distFade);
+    return vec4f(scatteredLight, (1.0 - transmittance));
 }
 
 // ── Fragment entry ─────────────────────────────────────────────────────────────
