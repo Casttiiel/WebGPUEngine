@@ -2,7 +2,7 @@
     "vs": "lighting/skybox.vs",
     "fs": "lighting/volumetric_clouds.fs",
     "writesOn": "texture",
-    "z": "test_equal",
+    "z": "disable_all",
     "blend": "combinative",
     "uniforms": [
         "CameraUniforms",

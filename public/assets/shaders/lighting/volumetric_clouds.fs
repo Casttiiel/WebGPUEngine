@@ -16,6 +16,14 @@ struct CloudUniforms {
     scatterStrength: f32,    // offset  60 → 64
     ambientColor:    vec3f,  // offset  64
     cloudFrequency:  f32,    // offset  76 → 80
+    stepCount:       f32,    // offset  80
+    lightSteps:      f32,    // offset  84
+    warpStrength:    f32,    // offset  88
+    worleyWeight:    f32,    // offset  92
+    fadeRadius:      f32,    // offset  96
+    _pad0:           f32,    // offset 100
+    _pad1:           f32,    // offset 104
+    _pad2:           f32,    // offset 108 → 112
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -46,7 +54,6 @@ fn hash33(p3_in: vec3f) -> vec3f {
     return fract((p.xxy + p.yxx) * p.zyx);
 }
 
-// Smooth trilinear value noise — cheap base for FBM
 fn valueNoise3D(p: vec3f) -> f32 {
     let i = floor(p);
     let f = fract(p);
@@ -60,7 +67,23 @@ fn valueNoise3D(p: vec3f) -> f32 {
     );
 }
 
-// FBM con octave count variable — lejos usa menos octavas
+fn worley3D(p: vec3f) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    var minDist = 1e9;
+    for (var x = -1; x <= 1; x++) {
+        for (var y = -1; y <= 1; y++) {
+            for (var z = -1; z <= 1; z++) {
+                let n   = vec3f(f32(x), f32(y), f32(z));
+                let r   = hash33(i + n);
+                let d   = length(f - (n + r));
+                minDist = min(minDist, d);
+            }
+        }
+    }
+    return saturate(minDist);
+}
+
 fn fbm3D(p: vec3f, octaves: i32) -> f32 {
     var v = 0.0; var amp = 0.5; var q = p;
     for (var i = 0; i < octaves; i++) {
@@ -71,68 +94,111 @@ fn fbm3D(p: vec3f, octaves: i32) -> f32 {
     return v;
 }
 
-// 3D Worley (cellular) — vecindario 3x3x3 correcto para evitar artefactos de borde
-fn worley3D(p: vec3f) -> f32 {
-    let i = floor(p);
-    let f = fract(p);
-    var minDist = 1e9;
-    for (var x = -1; x <= 1; x++) {
-        for (var y = -1; y <= 1; y++) {
-            for (var z = -1; z <= 1; z++) {
-                let n   = vec3f(f32(x), f32(y), f32(z));
-                let r   = hash33(i + n);       // feature point dentro de la celda [0,1]³
-                let d   = length(f - (n + r)); // distancia al feature point
-                minDist = min(minDist, d);
-            }
-        }
+// ── Perlin-Worley y erosión de detalle ────────────────────────────────────────
+//
+// Perlin puro → bolas suaves y redondas.
+// Perlin-Worley → el Worley invertido (1 en centros de celda) erode los blobs
+// creando "puffs" con silueta de cúmulo en vez de esferas perfectas.
+
+fn perlinWorley(p: vec3f, worleyW: f32) -> f32 {
+    let perlin = valueNoise3D(p);
+    let wor    = 1.0 - worley3D(p * 0.85 + vec3f(13.7, 4.2, 7.1));
+    return perlin * (1.0 - worleyW) + wor * worleyW;
+}
+
+fn fbmShape(p: vec3f, octaves: i32, worleyW: f32) -> f32 {
+    var v = 0.0; var amp = 0.5; var q = p;
+    for (var i = 0; i < octaves; i++) {
+        v += amp * perlinWorley(q, worleyW);
+        amp *= 0.5;
+        q *= 2.02;
     }
-    return saturate(minDist);
+    return v;
+}
+
+// 2 octavas de Worley para erosión de bordes tipo cúmulo
+fn worleyDetail2(p: vec3f) -> f32 {
+    return worley3D(p) * 0.667 + worley3D(p * 2.0) * 0.333;
+}
+
+// ── Densidad rápida (solo para el light march) ─────────────────────────────────
+// Sin Worley, sin warp — puro FBM value noise de 2 octavas.
+// Las sombras propias no necesitan detalle fino.
+fn sampleDensityCheap(pos: vec3f) -> f32 {
+    let grad = heightGradient_fast(pos);
+    if (grad < 0.001) { return 0.0; }
+    let wind = vec3f(u_cloud.windDirection.x, 0.0, u_cloud.windDirection.z) * u_cloud.windOffset;
+    // Y-drift: lentamente avanza por una nueva "rodaja" del espacio de ruido 3D.
+    // El mismo evol que sampleDensity — consistencia de sombras.
+    let evol = u_cloud.windOffset * 0.0001;
+    let p    = (pos + wind) * u_cloud.cloudFrequency + vec3f(0.0, evol, 0.0);
+    let s    = fbm3D(p, 2);
+    return max(0.0, remap(s, 1.0 - u_cloud.coverage, 1.0, 0.0, 1.0)) * grad * u_cloud.density;
+}
+
+// ── Interleaved Gradient Noise (sin componente temporal para evitar flickering) ─
+fn ign(coord: vec2f) -> f32 {
+    return fract(52.9829189 * fract(0.06711056 * coord.x + 0.00583715 * coord.y));
 }
 
 // ── Cloud density ──────────────────────────────────────────────────────────────
 
-fn heightGradient(pos: vec3f) -> f32 {
+fn heightGradient_fast(pos: vec3f) -> f32 {
     let h = saturate((pos.y - u_cloud.cloudBase) / (u_cloud.cloudTop - u_cloud.cloudBase));
     return smoothstep(0.0, 0.12, h) * smoothstep(1.0, 0.65, h);
 }
 
-fn sampleDensity(pos: vec3f, octaves: i32) -> f32 {
-    let grad = heightGradient(pos);
+// doDetail=true: full quality (tier 0 only) — adds worleyDetail2 edge erosion (2×worley3D = 54 hash33)
+// doDetail=false: mid quality (tier 1) — skips the expensive detail erosion
+fn sampleDensity(pos: vec3f, octaves: i32, doDetail: bool) -> f32 {
+    let grad = heightGradient_fast(pos);
     if (grad < 0.001) { return 0.0; }
 
     let wind = vec3f(u_cloud.windDirection.x, 0.0, u_cloud.windDirection.z) * u_cloud.windOffset;
-    let p    = (pos + wind) * u_cloud.cloudFrequency;
+    // evol: parámetro de evolución lento — las formas mutan sin que el jugador lo perciba
+    // frame a frame, pero sí lo nota tras varios minutos de juego.
+    let evol = u_cloud.windOffset * 0.0001;
+    let p    = (pos + wind) * u_cloud.cloudFrequency + vec3f(0.0, evol, 0.0);
 
-    // Domain warp — 3 muestras FBM para x, y, z del desplazamiento
-    let warp = vec3f(fbm3D(p + vec3f(1.7, 9.2, 3.4), 2),
-                     fbm3D(p + vec3f(8.3, 2.8, 5.1), 2),
-                     fbm3D(p + vec3f(4.1, 6.7, 1.3), 2)) * 1.2;
-    let shape = fbm3D(p + warp, octaves);
+    // Domain warp con semillas que derivan a velocidades distintas (×0.71, ×1.0, ×1.37).
+    // Cada componente del warp evoluciona a distinto ritmo → las formas grandes y pequeñas
+    // se desfasan con el tiempo, dando aspecto de crecimiento y disipación natural.
+    let warp = vec3f(fbm3D(p + vec3f(1.7,              9.2 + evol * 0.71, 3.4             ), 2),
+                     fbm3D(p + vec3f(8.3 + evol,        2.8,               5.1             ), 2),
+                     fbm3D(p + vec3f(4.1,               6.7,               1.3 - evol * 1.37), 2))
+             * u_cloud.warpStrength;
 
-    var density = max(0.0, shape - (1.0 - u_cloud.coverage));
+    // Forma base: Perlin-Worley con peso de Worley tweakable
+    let baseShape = fbmShape(p + warp, octaves, u_cloud.worleyWeight);
+
+    // Coverage con remap suave
+    var density = remap(baseShape, 1.0 - u_cloud.coverage, 1.0, 0.0, 1.0) * grad;
     if (density < 0.001) { return 0.0; }
 
-    // Erosión Worley: "popcorn tops" en los cúmulos
-    let detail = worley3D(p * 3.5);
-    density = remap(density, detail * 0.25, 1.0, 0.0, 1.0);
+    // Erosión de bordes: solo en tier 0 (cercano) — 2 worley3D = 54 hash33 calls
+    if (doDetail) {
+        let detail     = worleyDetail2(p * 2.5);
+        let edgeFactor = saturate(1.0 - density / 0.35);
+        density       -= edgeFactor * detail * 0.4;
+    }
 
-    return max(0.0, density) * grad * u_cloud.density;
+    return max(0.0, density) * u_cloud.density;
 }
 
 // ── Iluminación ────────────────────────────────────────────────────────────────
 
-// 6 pasos Beer-Lambert hacia el sol (sombras propias)
-fn sampleLighting(pos: vec3f) -> f32 {
-    // Distancia hasta salir del slab en dirección al sol
+// nSteps: número de pasos del light march (permite reducir por LOD tier)
+fn sampleLightingN(pos: vec3f, nSteps: i32) -> f32 {
     let tExit     = rayPlaneIntersect(pos, u_cloud.sunDirection, u_cloud.cloudTop);
     let marchDist = clamp(tExit, 0.0, (u_cloud.cloudTop - u_cloud.cloudBase) * 2.0);
-    let stepSize  = marchDist / 6.0;
-    if (stepSize < 0.001) { return 1.0; } // sol rasante — sin sombra propia
+    let stepSize  = marchDist / f32(nSteps);
+    if (stepSize < 0.001) { return 1.0; }
 
     var accumulated = 0.0;
     var p = pos;
-    for (var i = 0; i < 6; i++) {
-        accumulated += sampleDensity(p, 2) * stepSize;
+    for (var i = 0; i < 12; i++) {
+        if (i >= nSteps) { break; }
+        accumulated += sampleDensityCheap(p) * stepSize;
         p += u_cloud.sunDirection * stepSize;
     }
     return exp(-accumulated * u_cloud.absorption);
@@ -143,13 +209,10 @@ fn henyeyGreenstein(cosTheta: f32, g: f32) -> f32 {
     return (1.0 - g2) / (pow(max(0.001, 1.0 + g2 - 2.0 * g * cosTheta), 1.5) * (4.0 * PI));
 }
 
-// Dos lóbulos: forward scatter (g=0.8) + back scatter (g=-0.3)
-// HG ya está normalizado — no multiplicar por 4π
 fn dualLobe(cosTheta: f32) -> f32 {
     return mix(henyeyGreenstein(cosTheta, 0.8), henyeyGreenstein(cosTheta, -0.3), 0.5);
 }
 
-// Silver lining: borde brillante cuando el sol está detrás de la nube
 fn powderEffect(density: f32, cosTheta: f32) -> f32 {
     let powder = 1.0 - exp(-density * 2.0);
     return mix(1.0, powder, saturate(-cosTheta * 0.5 + 0.5));
@@ -157,7 +220,7 @@ fn powderEffect(density: f32, cosTheta: f32) -> f32 {
 
 // ── Ray march principal ────────────────────────────────────────────────────────
 
-fn marchClouds(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
+fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
     let cameraInSlab = rayOrigin.y >= u_cloud.cloudBase && rayOrigin.y <= u_cloud.cloudTop;
 
     let tBase = rayPlaneIntersect(rayOrigin, rayDir, u_cloud.cloudBase);
@@ -168,7 +231,7 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
 
     if (cameraInSlab) {
         tStart = 0.0;
-        tEnd   = max(0.0, max(tBase, tTop)); // solo planos delante del ray
+        tEnd   = max(0.0, max(tBase, tTop));
         if (tEnd < 0.001) { return vec4f(0.0); }
     } else {
         if (tBase < 0.0 || tTop < 0.0) { return vec4f(0.0); }
@@ -178,67 +241,132 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f) -> vec4f {
 
     if (tEnd <= tStart) { return vec4f(0.0); }
 
+    // ── Distance LOD ──────────────────────────────────────────────────────────
+    // Horizontal distance from camera to the ray's entry into the cloud slab.
+    let horizLen       = length(rayDir.xz);
+    let entryHorizDist = tStart * horizLen;
+
+    // Early-out: completely beyond fade radius
+    if (entryHorizDist >= u_cloud.fadeRadius) { return vec4f(0.0); }
+
+    // Quality tier by horizontal entry distance
+    // 0 = full (Perlin-Worley + detail erosion)
+    // 1 = mid  (Perlin-Worley, fewer octaves, no erosion)
+    // 2 = cheap (pure value FBM, same as light march)
+    var qualityTier = 0;
+    if (entryHorizDist > u_cloud.fadeRadius * 0.45) { qualityTier = 1; }
+    if (entryHorizDist > u_cloud.fadeRadius * 0.70) { qualityTier = 2; }
+
+    // Smooth fade in the outer 25 % of the radius
+    let distFade = 1.0 - saturate((entryHorizDist - u_cloud.fadeRadius * 0.75)
+                                   / (u_cloud.fadeRadius * 0.25));
+
     let cosTheta = dot(rayDir, u_cloud.sunDirection);
     let phase    = dualLobe(cosTheta);
 
-    // Octavas según distancia — lejano usa menos detalle
-    let octaves  = select(2, 4, tStart < 8000.0);
-    let baseStep = (tEnd - tStart) / 32.0;
+    let nSteps   = i32(clamp(u_cloud.stepCount, 16.0, 128.0));
+    let cloudH   = u_cloud.cloudTop - u_cloud.cloudBase;
+
+    // Step size: el mínimo entre dividir el rayo por nSteps y cloudH/16 por componente vertical.
+    // Esto evita pasos enormes en rayos casi horizontales que saltan nubes enteras.
+    let vertComp = max(abs(rayDir.y), 0.08);
+    let maxStep  = cloudH / (16.0 * vertComp);
+    let baseStep = min((tEnd - tStart) / f32(nSteps), maxStep);
+
+    // Octave count: fewer for mid tier or distant rays
+    var octaves = select(2, 4, tStart < 8000.0);
+    if (qualityTier >= 1) { octaves = 2; }
+
+    // Light step count per tier:
+    //   Tier 0 (close):  full user-set value
+    //   Tier 1 (mid):    capped at 3
+    //   Tier 2 (far):    0 — skip light march, use constant approximation
+    let nLightSteps    = i32(clamp(u_cloud.lightSteps, 3.0, 12.0));
+    let lightStepsTier = select(nLightSteps, 3, qualityTier == 1);
 
     var transmittance    = 1.0;
     var scatteredLight   = vec3f(0.0);
     var consecutiveEmpty = 0;
-    var t     = tStart + baseStep * 0.5;
+    // IGN estático full-range: cada píxel muestrea en una posición diferente dentro del primer
+    // paso, rompiendo la correlación entre píxeles adyacentes que causaba los "planos" visibles.
+    var t     = tStart + baseStep * dither;
     var iters = 0;
 
-    // Loop controlado por t (no por iteraciones fijas) para que el adaptive step
-    // no consuma iteraciones sin avanzar la distancia correctamente
     loop {
-        if (t >= tEnd || iters >= 128 || transmittance < 0.01) { break; }
+        if (t >= tEnd || iters >= 256 || transmittance < 0.01) { break; }
         iters++;
 
-        let pos     = rayOrigin + rayDir * t;
-        let density = sampleDensity(pos, octaves);
+        // Per-step horizontal distance check — stop marching past the fade radius
+        let stepHorizDist = t * horizLen;
+        if (stepHorizDist >= u_cloud.fadeRadius) { break; }
+
+        let pos = rayOrigin + rayDir * t;
+
+        // Select density function by LOD tier
+        // doDetail=true only for tier 0 (skips 2 worley3D = 54 hash33 for mid/far)
+        var density = 0.0;
+        if (qualityTier >= 2) {
+            density = sampleDensityCheap(pos);
+        } else {
+            density = sampleDensity(pos, octaves, qualityTier == 0);
+        }
 
         if (density > 0.001) {
             consecutiveEmpty = 0;
 
-            let extinction  = density * u_cloud.absorption;
-            let lightEnergy = sampleLighting(pos);
-            let powder      = powderEffect(density, cosTheta);
-            let stepT       = exp(-extinction * baseStep);
+            let extinction = density * u_cloud.absorption;
+            let stepT     = exp(-extinction * baseStep);
+            // Physically correct in-scatter: fraction of light absorbed by this step.
+            // Always in [0,1] regardless of density or step size — prevents bloom.
+            let stepAbsorption = 1.0 - stepT;
 
-            // Luz directa del sol
+            // Tier 2: skip light march entirely — constant ambient sun approximation.
+            // Saves 5 sampleDensityCheap calls per step (83 % of the per-step cost).
+            var lightEnergy: f32;
+            if (qualityTier >= 2) {
+                lightEnergy = 0.40;
+            } else {
+                lightEnergy = sampleLightingN(pos, lightStepsTier);
+            }
+
+            let powder = powderEffect(density, cosTheta);
+
             scatteredLight += transmittance * lightEnergy * phase * powder
-                            * u_cloud.sunColor * density * baseStep * u_cloud.scatterStrength;
+                            * u_cloud.sunColor * stepAbsorption * u_cloud.scatterStrength;
 
-            // Ambient: cielo (frío, arriba) + rebote de suelo (cálido, abajo)
-            let hFrac      = (pos.y - u_cloud.cloudBase) / (u_cloud.cloudTop - u_cloud.cloudBase);
+            let hFrac      = (pos.y - u_cloud.cloudBase) / cloudH;
             let skyAmbient = u_cloud.ambientColor * (0.3 + 0.7 * hFrac);
             let gndAmbient = u_cloud.ambientColor * vec3f(0.8, 0.7, 0.5) * (1.0 - hFrac) * 0.15;
-            let ambient    = (skyAmbient + gndAmbient) * density * baseStep * 0.3;
-            scatteredLight += transmittance * ambient;
+            scatteredLight += transmittance * (skyAmbient + gndAmbient) * stepAbsorption * 0.3;
 
             transmittance *= stepT;
             t += baseStep;
         } else {
-            // Adaptive: hasta 4× el paso base en zonas vacías
+            // Skip máximo 2× en vacío (era 4×, provocaba saltar nubes enteras)
             consecutiveEmpty++;
-            t += baseStep * f32(min(consecutiveEmpty, 4));
+            t += baseStep * f32(min(consecutiveEmpty, 2));
         }
     }
 
-    return vec4f(scatteredLight, 1.0 - transmittance);
+    return vec4f(scatteredLight * distFade, (1.0 - transmittance) * distFade);
 }
 
 // ── Fragment entry ─────────────────────────────────────────────────────────────
 
+struct FsIn {
+    @location(0) position_clip: vec3f,
+    @builtin(position) fragCoord: vec4f,
+}
+
 @fragment
-fn fs(@location(0) position_clip: vec3f) -> @location(0) vec4f {
-    let viewDir   = get_view_dir(position_clip, camera);
+fn fs(in: FsIn) -> @location(0) vec4f {
+    let viewDir   = get_view_dir(in.position_clip, camera);
     let worldDir  = normalize(get_world_dir(viewDir, camera));
     let rayOrigin = camera.cameraPosition.xyz;
 
-    let result = marchClouds(rayOrigin, worldDir);
+    // IGN estático — sin componente temporal para evitar flickering sin TAA
+    let dither = ign(in.fragCoord.xy);
+
+    let result = marchClouds(rayOrigin, worldDir, dither);
     return result;
 }

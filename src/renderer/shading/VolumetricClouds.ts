@@ -8,41 +8,57 @@ import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { Wind } from '../../core/engine/Wind';
 
 /**
- * VolumetricClouds — ray-marched cloud layer rendered as a post-skybox fullscreen pass.
+ * VolumetricClouds — ray-marched cloud layer rendered as a post-skybox pass.
  *
- * Renders into rtAccLight with alpha blending (blend: combinative) and depth-equal
- * test so clouds only appear on sky pixels (depth == 1.0), behind all geometry.
+ * Two-pass approach for performance:
+ *   Pass 1 (half-res): ray-march clouds into a private RGBA16F texture at 50 % resolution.
+ *            No depth attachment — the cloud shader returns transparent on non-sky rays.
+ *   Pass 2 (full-res composite): bilinearly upscale the half-res cloud texture onto rtAccLight.
+ *            Uses depth-equal test so the composite only runs on sky pixels (depth == 1.0),
+ *            preventing clouds from bleeding over foreground geometry.
  *
- * Algorithm:
- *   - Flat slab cloud volume bounded by two horizontal planes (cloudBase / cloudTop)
- *   - Per-step: 3D procedural density (FBM + Worley), Beer-Lambert transmittance,
- *     6-step light march toward sun, Henyey-Greenstein dual-lobe phase, powder effect
- *   - 32 primary steps, early exit at transmittance < 0.01
+ * Net effect: 4× fewer cloud fragments → ~4× GPU speedup from resolution reduction alone.
  */
 export class VolumetricClouds {
   private technique!: Technique;
+  private compositeTechnique!: Technique;
   private quad!: Mesh;
   private uniformBuffer!: GPUBuffer;
   private bindGroup!: GPUBindGroup;
+  private compositeSampler!: GPUSampler;
+
+  // Half-res render target (recreated on resize)
+  private cloudHalfResTexture: GPUTexture | null = null;
+  private cloudHalfResView: GPUTextureView | null = null;
+  private compositeBindGroup: GPUBindGroup | null = null;
+  private lastHalfW = 0;
+  private lastHalfH = 0;
 
   // ── Parameters (tweakable via renderInMenu) ──────────────────────────────────
-  public cloudBase: number = 800; // world-Y of cloud bottom (metres)
-  public cloudTop: number = 2400; // world-Y of cloud top
-  public coverage: number = 0.55; // [0 = sparse … 1 = overcast]
-  public density: number = 4.0; // density multiplier
-  public absorption: number = 0.12; // light absorption per unit density
-  public scatterStrength: number = 1.5; // overall brightness scale
-  public cloudFrequency: number = 0.00018; // noise spatial frequency (lower = bigger clouds)
+  public cloudBase: number = 1200;         // world-Y of cloud bottom (metres)
+  public cloudTop: number = 2000;          // world-Y of cloud top  (800 m slab)
+  public coverage: number = 0.50;          // [0 = sparse … 1 = overcast]
+  public density: number = 3.0;            // density multiplier
+  public absorption: number = 0.12;        // light absorption per unit density
+  public scatterStrength: number = 25.0;   // overall brightness scale (calibrated for stepAbsorption formula)
+  public cloudFrequency: number = 0.00022; // noise spatial frequency (lower = bigger clouds)
+  // Quality / style
+  public stepCount: number = 32;           // primary ray-march steps (perf vs quality)
+  public lightSteps: number = 5;           // shadow ray steps per sample
+  public warpStrength: number = 0.35;      // domain-warp intensity (0 = no warp)
+  public worleyWeight: number = 0.35;      // Worley contribution in base shape (0 = pure value noise)
+  public fadeRadius: number = 25000;       // horizontal radius beyond which clouds fade out (metres)
 
   // Wind state (accumulated per frame)
   private windOffset: number = 0;
   private lastTime: number = 0;
 
-  private static readonly UNIFORM_SIZE = 80; // 20 × f32
+  private static readonly UNIFORM_SIZE = 112; // 28 × f32  (must be multiple of 16)
 
   public async load(): Promise<void> {
     this.quad = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.getAsync('lighting/volumetric_clouds.tech');
+    this.compositeTechnique = await Technique.getAsync('lighting/volumetric_clouds_composite.tech');
 
     this.uniformBuffer = GPUUtils.createBuffer(
       'volumetric_clouds_uniforms',
@@ -55,54 +71,127 @@ export class VolumetricClouds {
       this.technique.getPipeline().getBindGroupLayout(1)!,
       [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
     );
+
+    this.compositeSampler = GPUUtils.getDevice().createSampler({
+      label: 'cloud_composite_sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
   }
 
   public render(rtAccLight: GPUTextureView, depthStencilView: GPUTextureView): void {
     this.uploadUniforms();
 
+    const halfW = Math.max(1, Math.floor(Render.width / 2));
+    const halfH = Math.max(1, Math.floor(Render.height / 2));
+
+    // Recreate half-res texture whenever the render resolution changes
+    if (halfW !== this.lastHalfW || halfH !== this.lastHalfH || !this.cloudHalfResTexture) {
+      this.cloudHalfResTexture?.destroy();
+      this.cloudHalfResTexture = GPUUtils.getDevice().createTexture({
+        label: 'cloud_halfres',
+        size: [halfW, halfH],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.cloudHalfResView = this.cloudHalfResTexture.createView({ label: 'cloud_halfres_view' });
+      this.lastHalfW = halfW;
+      this.lastHalfH = halfH;
+      this.compositeBindGroup = null; // force rebuild below
+    }
+
+    if (!this.compositeBindGroup) {
+      this.compositeBindGroup = BindGroupFactory.createBindGroup(
+        'cloud_composite_bindgroup',
+        this.compositeTechnique.getPipeline().getBindGroupLayout(1)!,
+        [
+          { binding: 0, resource: this.cloudHalfResView! },
+          { binding: 1, resource: this.compositeSampler },
+        ],
+      );
+    }
+
     const render = Render.getInstance();
-    const colorAtt = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
-    const depthAtt = GPUUtils.createDepthStencilAttachment(depthStencilView, 'load', 'store');
 
-    const desc = GPUUtils.createRenderPassDescriptor(
-      'volumetric clouds pass',
-      [colorAtt],
-      depthAtt,
-    );
+    // ── Pass 1: ray-march clouds at half resolution (no depth attachment) ─────
+    const cloudColorAtt: GPURenderPassColorAttachment = {
+      view: this.cloudHalfResView!,
+      loadOp: 'clear',
+      storeOp: 'store',
+      clearValue: { r: 0, g: 0, b: 0, a: 0 },
+    };
+    const cloudDesc: GPURenderPassDescriptor = {
+      label: 'volumetric clouds half-res',
+      colorAttachments: [cloudColorAtt],
+    };
     const ts = GPUProfiler.getInstance().getTimestampWrites('VolumetricClouds');
-    if (ts) desc.timestampWrites = ts;
+    if (ts) cloudDesc.timestampWrites = ts;
 
-    const pass = render.getCommandEncoder().beginRenderPass(desc);
-    GPUUtils.configureViewportAndScissor(pass);
+    const cloudPass = render.getCommandEncoder().beginRenderPass(cloudDesc);
+    GPUUtils.configureViewportAndScissor(cloudPass, halfW, halfH);
+    this.technique.activatePipeline(cloudPass);
+    this.quad.activate(cloudPass);
+    cloudPass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    cloudPass.setBindGroup(1, this.bindGroup);
+    this.quad.renderGroup(cloudPass);
+    cloudPass.end();
 
-    this.technique.activatePipeline(pass);
-    this.quad.activate(pass);
-    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
-    pass.setBindGroup(1, this.bindGroup);
-    this.quad.renderGroup(pass);
-    pass.end();
+    // ── Pass 2: composite half-res cloud texture onto rtAccLight ──────────────
+    // depth-equal test (z: test_equal in tech) ensures only sky pixels are touched
+    const compositeColorAtt = GPUUtils.createColorAttachment(rtAccLight, 'load', 'store');
+    const compositeDepthAtt = GPUUtils.createDepthStencilAttachment(depthStencilView, 'load', 'store');
+    const compositeDesc = GPUUtils.createRenderPassDescriptor(
+      'cloud composite pass',
+      [compositeColorAtt],
+      compositeDepthAtt,
+    );
+
+    const compositePass = render.getCommandEncoder().beginRenderPass(compositeDesc);
+    GPUUtils.configureViewportAndScissor(compositePass);
+    this.compositeTechnique.activatePipeline(compositePass);
+    this.quad.activate(compositePass);
+    compositePass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    compositePass.setBindGroup(1, this.compositeBindGroup);
+    this.quad.renderGroup(compositePass);
+    compositePass.end();
   }
 
   private uploadUniforms(): void {
     const env = Engine.getEnvironmentManager();
     const sunDir = env.getSunDirection();
-    const sunH = Math.max(0, sunDir[1]);
+    const sunH = sunDir[1]; // real value, may be negative at night
+    const sunHAbove = Math.max(0, sunH); // used only for above-horizon color gradient
 
-    // Sun color: warm orange at horizon → white at zenith
-    const sunR = 1.0;
-    const sunG = 0.5 + sunH * 0.5;
-    const sunB = 0.3 + sunH * 0.68;
-    const sunIntensity = 1.0 + sunH * 1.0;
+    // night_factor: mirrors skybox_scattering.fs smoothstep(0.1, -0.2, sun_height)
+    // 0 = full day, 1 = full night
+    const nightFactor = Math.max(0, Math.min(1, (0.1 - sunH) / 0.3));
 
-    // Ambient sky color for cloud underside
-    const ambR = 0.15 + sunH * 0.25;
-    const ambG = 0.2 + sunH * 0.3;
-    const ambB = 0.35 + sunH * 0.4;
+    // Sunlight: warm orange at horizon → warm white at zenith, fades to zero at night
+    const dayIntensity = (1.0 + sunHAbove) * (1.0 - nightFactor);
+    const sunR = dayIntensity;
+    const sunG = (0.5 + sunHAbove * 0.5) * dayIntensity;
+    const sunB = (0.3 + sunHAbove * 0.68) * dayIntensity;
 
-    // Wind accumulation
+    // Moonlight: cool dim blue only at night (matches skybox moon color)
+    const moonI = nightFactor * 0.05;
+    const moonR = 0.75 * moonI;
+    const moonG = 0.82 * moonI;
+    const moonB = 0.90 * moonI;
+
+    // Ambient sky color for cloud underside, weakens at night
+    const ambScale = 1.0 - nightFactor * 0.88;
+    const ambR = (0.15 + sunHAbove * 0.25) * ambScale;
+    const ambG = (0.2 + sunHAbove * 0.3) * ambScale;
+    const ambB = (0.35 + sunHAbove * 0.4) * ambScale;
+
+    // Wind accumulation.
+    // Wind.speed está calibrado en unidades UV/s para el skybox 2D.
+    // Para nubes 3D en espacio mundo (cloudFrequency ≈ 0.00022), necesitamos metros/s reales.
+    // El factor 200 convierte: Wind.speed=0.08 → ~16 m/s, Wind.speed=0.5 → ~100 m/s.
+    const CLOUD_WIND_SCALE = 200.0;
     const now = performance.now() * 0.001;
     if (this.lastTime > 0) {
-      this.windOffset += Wind.speed * (now - this.lastTime);
+      this.windOffset += Wind.speed * CLOUD_WIND_SCALE * (now - this.lastTime);
     }
     this.lastTime = now;
 
@@ -113,14 +202,17 @@ export class VolumetricClouds {
     //   [12]    coverage,      [13]    density
     //   [14]    absorption,    [15]    scatterStrength
     //   [16..18] ambientColor, [19]    cloudFrequency
-    const d = new Float32Array(20);
+    //   [20]    stepCount,     [21]    lightSteps
+    //   [22]    warpStrength,  [23]    worleyWeight
+    //   [24]    fadeRadius,    [25..27] (padding)
+    const d = new Float32Array(28);
     d[0] = sunDir[0];
     d[1] = sunDir[1];
     d[2] = sunDir[2];
     d[3] = this.cloudBase;
-    d[4] = sunR * sunIntensity;
-    d[5] = sunG * sunIntensity;
-    d[6] = sunB * sunIntensity;
+    d[4] = sunR + moonR;
+    d[5] = sunG + moonG;
+    d[6] = sunB + moonB;
     d[7] = this.cloudTop;
     d[8] = Wind.getDirX();
     d[9] = 0;
@@ -134,22 +226,38 @@ export class VolumetricClouds {
     d[17] = ambG;
     d[18] = ambB;
     d[19] = this.cloudFrequency;
+    d[20] = this.stepCount;
+    d[21] = this.lightSteps;
+    d[22] = this.warpStrength;
+    d[23] = this.worleyWeight;
+    d[24] = this.fadeRadius;
+    // d[25..27] padding = 0 (Float32Array default)
 
     GPUUtils.getDevice().queue.writeBuffer(this.uniformBuffer, 0, d);
   }
 
   public renderInMenu(folder: any): void {
     const f = folder.addFolder('Volumetric Clouds');
+    // Shape
     f.add(this, 'cloudBase', 0, 5000, 10).name('Base (m)');
     f.add(this, 'cloudTop', 100, 8000, 10).name('Top (m)');
     f.add(this, 'coverage', 0, 1, 0.01).name('Coverage');
+    f.add(this, 'cloudFrequency', 0.00001, 0.001, 0.00001).name('Frequency');
+    f.add(this, 'warpStrength', 0, 1, 0.01).name('Warp strength');
+    f.add(this, 'worleyWeight', 0, 1, 0.01).name('Worley weight');
+    // Lighting
     f.add(this, 'density', 0.1, 20, 0.1).name('Density');
     f.add(this, 'absorption', 0.01, 1, 0.01).name('Absorption');
     f.add(this, 'scatterStrength', 0.1, 5, 0.1).name('Scatter');
-    f.add(this, 'cloudFrequency', 0.00001, 0.001, 0.00001).name('Frequency');
+    // Performance
+    f.add(this, 'stepCount', 16, 128, 1).name('Steps (quality)');
+    f.add(this, 'lightSteps', 2, 12, 1).name('Light steps');
+    // Render distance
+    f.add(this, 'fadeRadius', 1000, 80000, 500).name('Fade radius (m)');
   }
 
   public dispose(): void {
     this.uniformBuffer?.destroy();
+    this.cloudHalfResTexture?.destroy();
   }
 }

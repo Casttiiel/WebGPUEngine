@@ -56,7 +56,7 @@ export class ModuleEnvironmentManager extends Module {
   public cloudCoverage: number = 0.0; // 0=sparse (default), 1=overcast
   public cloudScale: number = 1.0; // >1 = bigger clouds
   public cloudLayers: number = 4; // FBM octave count [1..8]
-  public cloudOpacity: number = 1.0; // max cloud opacity
+  public cloudOpacity: number = 0.0; // max cloud opacity (0 = hidden)
   public cloudColor: [number, number, number] = [1, 1, 1]; // normalized 0-1 (white = no tint)
 
   // Generador de irradiance
