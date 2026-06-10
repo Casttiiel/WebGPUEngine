@@ -35,9 +35,6 @@ export class AmbientLight {
   private pccSpecularUniformBuffer!: GPUBuffer;
   private pccSpecularUniformArray = new Float32Array(28);
 
-  /** Cached views for bind-group invalidation on resize or SSGI toggle.
-   * lastAoView removed — bind group is now keyed by aoResult in ambientDiffuseBindGroupCache. */
-
   /** Cached probe views for bind-group invalidation when the player moves between probes. */
   private lastProbeAView: GPUTextureView | null = null;
   private lastProbeBView: GPUTextureView | null = null;

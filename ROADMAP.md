@@ -103,7 +103,7 @@ Ruinas, entrada al interior. Prueba el sistema de mixed interior/exterior y frox
 `diseño`
 
 **Interior completo**  
-Pasillos, habitaciones, verticalidad. Prueba iluminación dinámica con Radiance Cascades GI.  
+Pasillos, habitaciones, verticalidad.  
 `diseño`
 
 **NavMesh del nivel completo**  
@@ -129,10 +129,6 @@ Tipo 2: arquero/ranged. Tipo 3: tanque lento. Reutiliza BT base, ejercita varied
 `diseño`
 
 ### Bloque 6 · rendering — features del motor
-
-**Radiance Cascades GI**  
-Implementar los 4 cascades confirmados. Interiores con antorchas. Este es el showcase visual del proyecto.  
-`motor`
 
 **Decals de impacto**  
 Marcas de bala, sangre en paredes. Decal renderer en deferred. Limpieza por tiempo/count.  

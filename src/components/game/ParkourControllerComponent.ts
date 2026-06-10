@@ -51,9 +51,16 @@ export class ParkourControllerComponent
 
   // ── Visual rotation (mesh faces movement direction) ──────────────────────────
   private visualYaw: number = 0;
-  private readonly turnSpeed: number = 600; // degrees/second — constant angular velocity
+  private smoothedDesiredYaw: number | null = null;
+  private readonly targetSmoothSpeed: number = 15; // smooths noisy desiredYaw from camera front
+  private readonly turnSpeed: number = 20;          // character follows smoothed target
   private animator: any = null;
   private animatorFound: boolean = false;
+
+  // ── Head look-at IK ──────────────────────────────────────────────────────────
+  private headLookConstraint: any = null;
+  private headLookConstraintCreated: boolean = false;
+  private headLookWeight: number = 0;
 
   // ── Systems ──────────────────────────────────────────────────────────────────
   private wallRunSystem!: WallRunSystem;
@@ -202,12 +209,11 @@ export class ParkourControllerComponent
   }
 
   /** Constant-velocity angle rotation — avoids exponential-decay "never arrives" feel. */
-  private rotateToward(from: number, to: number, maxDelta: number): number {
+  private lerpAngle(from: number, to: number, t: number): number {
     let diff = to - from;
     while (diff > 180) diff -= 360;
     while (diff < -180) diff += 360;
-    if (Math.abs(diff) <= maxDelta) return to;
-    return from + Math.sign(diff) * maxDelta;
+    return from + diff * t;
   }
 
   /**
@@ -220,18 +226,28 @@ export class ParkourControllerComponent
     const hSpeed = Math.sqrt(hVel[0] ** 2 + hVel[2] ** 2);
 
     let facingDir: vec3 | null = null;
-    if (hSpeed > 0.3) {
-      // Rotate toward actual velocity direction — works for all states
+    // Input direction always takes priority — avoids threshold flicker when decelerating
+    // while rotating the camera (speed bouncing around the threshold causes jerky jumps
+    // between velocity-based and input-based heading).
+    const movDir = this.getTargetMovement(this.getInputVector());
+    if (vec3.length(movDir) > 0.01) {
+      facingDir = movDir;
+    } else if (hSpeed > 0.3) {
+      // No input — keep facing the momentum direction while coasting to a stop
       facingDir = vec3.fromValues(hVel[0] / hSpeed, 0, hVel[2] / hSpeed);
-    } else {
-      // Use input direction while accelerating from rest so the character turns immediately
-      const movDir = this.getTargetMovement(this.getInputVector());
-      if (vec3.length(movDir) > 0.01) facingDir = movDir;
     }
 
     if (facingDir) {
-      const desiredYaw = Math.atan2(facingDir[0], facingDir[2]) * (180 / Math.PI);
-      this.visualYaw = this.rotateToward(this.visualYaw, desiredYaw, this.turnSpeed * dt);
+      const rawYaw = Math.atan2(facingDir[0], facingDir[2]) * (180 / Math.PI);
+      // Stage 1: smooth the noisy raw target (mouse jitter, camera front micro-changes)
+      if (this.smoothedDesiredYaw === null) this.smoothedDesiredYaw = rawYaw;
+      const t1 = 1 - Math.exp(-this.targetSmoothSpeed * dt);
+      this.smoothedDesiredYaw = this.lerpAngle(this.smoothedDesiredYaw, rawYaw, t1);
+      // Stage 2: character follows the already-smooth target
+      const t2 = 1 - Math.exp(-this.turnSpeed * dt);
+      this.visualYaw = this.lerpAngle(this.visualYaw, this.smoothedDesiredYaw, t2);
+    } else {
+      this.smoothedDesiredYaw = null;
     }
 
     const ownerTransform = this.getOwner().getComponent('transform') as TransformComponent;
@@ -240,6 +256,55 @@ export class ParkourControllerComponent
     }
 
     this.animator?.setParameter('isMoving', hSpeed > 0.5);
+    this.updateHeadLookAt(dt, hVel, hSpeed);
+  }
+
+  private updateHeadLookAt(dt: number, hVel: ArrayLike<number>, hSpeed: number): void {
+    if (!this.animator) return;
+
+    if (!this.headLookConstraintCreated) {
+      this.headLookConstraint = this.animator.addIkConstraint({
+        type: 'lookat',
+        jointName: 'mixamorig:Head',
+        target: vec3.create(),
+        limitAngleDeg: 40,
+        weight: 0,
+      });
+      this.headLookConstraintCreated = true;
+    }
+    if (!this.headLookConstraint) return;
+
+    let targetWeight = 0;
+
+    if (hSpeed > 0.3) {
+      // Angle between body facing direction and velocity direction
+      const yawRad = this.visualYaw * (Math.PI / 180);
+      const facingVec = vec3.fromValues(Math.sin(yawRad), 0, Math.cos(yawRad));
+      const velDir = vec3.normalize(vec3.create(), vec3.fromValues(hVel[0]!, 0, hVel[2]!));
+      const angleDeg = Math.acos(Math.max(-1, Math.min(1, vec3.dot(facingVec, velDir)))) * (180 / Math.PI);
+
+      if (angleDeg < 30) {
+        targetWeight = 1.0;
+
+        // Rotate velocity from world space to model space by undoing the visualYaw rotation.
+        // model_dir = rotate_Y(-yaw) * world_dir
+        const cosY = Math.cos(yawRad);
+        const sinY = Math.sin(yawRad);
+        const vxM = velDir[0]! * cosY - velDir[2]! * sinY;
+        const vzM = velDir[0]! * sinY + velDir[2]! * cosY;
+
+        // Sample head Y from current pose so the look stays horizontal (toTarget.y = 0).
+        const headIdx = this.animator.getJointIndex('mixamorig:Head');
+        const headM = this.animator.getJointModelMatrix(headIdx);
+        const headY: number = headM ? (headM as Float32Array)[13]! : 1.5;
+
+        vec3.set(this.headLookConstraint.target, vxM * 3.0, headY, vzM * 3.0);
+      }
+    }
+
+    const wAlpha = 1 - Math.exp(-8 * dt);
+    this.headLookWeight += (targetWeight - this.headLookWeight) * wAlpha;
+    this.headLookConstraint.weight = this.headLookWeight;
   }
 
   private findCamera(): void {

@@ -393,58 +393,6 @@ export class RenderPassManager {
     this.executeDynamicPass(pass);
   }
 
-  public executeSSGIBilateralFilterPass(
-    mesh: Mesh,
-    technique: Technique,
-    gBufferBindGroup: GPUBindGroup,
-    aoBindGroup: GPUBindGroup,
-    result: RenderTarget,
-  ): void {
-    const scale = QualitySettings.getInstance().getSettings().ssgiScale;
-    const passConfig = RenderPassFactory.createPostProcessPassConfig(
-      result,
-      {
-        width: Render.width * scale,
-        height: Render.height * scale,
-      },
-      'SSGI Bilateral Filter',
-    );
-    const pass = new AOBilateralFilterRenderPass(
-      passConfig,
-      mesh,
-      technique,
-      gBufferBindGroup,
-      aoBindGroup,
-    );
-    this.executeDynamicPass(pass);
-  }
-
-  /**
-   * Composites filtered SSGI irradiance × albedo additively onto accLight.
-   * Uses loadOp:'load' so the additive blend state on the technique adds on top of existing lighting.
-   */
-  public executeSSGICompositePass(
-    mesh: Mesh,
-    technique: Technique,
-    gBufferBindGroup: GPUBindGroup,
-    ssgiBindGroup: GPUBindGroup,
-    accLightView: GPUTextureView,
-  ): void {
-    const passConfig = RenderPassFactory.createPostProcessPassConfigBlended(
-      accLightView,
-      undefined,
-      'SSGI Composite',
-    );
-    const pass = new AOBilateralFilterRenderPass(
-      passConfig,
-      mesh,
-      technique,
-      gBufferBindGroup,
-      ssgiBindGroup,
-    );
-    this.executeDynamicPass(pass);
-  }
-
   /**
    * Create and execute a motion blur pass dynamically
    */

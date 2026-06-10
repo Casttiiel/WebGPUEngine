@@ -18,6 +18,8 @@ export interface AnimatorTransitionData {
   to: string;
   /** Bool parameter name that must be true to activate this transition. */
   condition?: string;
+  /** Bool parameter name that must be false to activate this transition. */
+  conditionFalse?: string;
   /** Trigger name that fires this transition (auto-reset after use). */
   trigger?: string;
   blendTime?: number;
@@ -106,6 +108,7 @@ interface RuntimeTransition {
   from: string;
   to: string;
   condition?: string;
+  conditionFalse?: string;
   trigger?: string;
   blendTime: number;
 }
@@ -198,6 +201,8 @@ export class AnimatorComponent extends Component {
   // IK constraints
   private ikConstraints: IkConstraint[] = [];
   private _ikFrozenJoints: Set<number> = new Set();
+  // Pre-IK bone offsets applied and propagated before the constraint loop (e.g. pelvis).
+  private readonly preIkOffsets = new Map<number, vec3>();
 
   // State machine
   private states: Map<string, RuntimeState> = new Map();
@@ -296,6 +301,7 @@ export class AnimatorComponent extends Component {
         from: td.from,
         to: td.to,
         condition: td.condition,
+        conditionFalse: td.conditionFalse,
         trigger: td.trigger,
         blendTime: td.blendTime ?? 0.2,
       });
@@ -421,6 +427,8 @@ export class AnimatorComponent extends Component {
         conditionMet = true;
         this.activeTriggers.delete(t.trigger);
       } else if (t.condition && this.params.get(t.condition) === true) {
+        conditionMet = true;
+      } else if (t.conditionFalse && this.params.get(t.conditionFalse) !== true) {
         conditionMet = true;
       }
 
@@ -586,6 +594,13 @@ export class AnimatorComponent extends Component {
     this.ikConstraints.length = 0;
   }
 
+  /** Set a translation offset (model space) applied and propagated BEFORE the IK constraint pass. */
+  public setPreIkBoneOffset(boneName: string, offset: vec3): void {
+    if (!this.skeleton) return;
+    const idx = this.skeleton.names.indexOf(boneName);
+    if (idx >= 0) this.preIkOffsets.set(idx, offset);
+  }
+
   // ─── Animation evaluation ────────────────────────────────────────────────────
 
   private evaluateClip(
@@ -737,6 +752,22 @@ export class AnimatorComponent extends Component {
 
   private applyIkConstraints(): void {
     this._ikFrozenJoints.clear();
+
+    // Pre-IK pass: apply bone offsets (e.g. pelvis) and propagate to children so
+    // TwoBoneIK sees the updated leg root positions.
+    if (this.preIkOffsets.size > 0) {
+      for (const [idx, offset] of this.preIkOffsets) {
+        const M = this.globalMats[idx]!;
+        (M as Float32Array)[12] += offset[0];
+        (M as Float32Array)[13] += offset[1];
+        (M as Float32Array)[14] += offset[2];
+        this._ikFrozenJoints.add(idx);
+      }
+      this.repropagateMats();
+      this._ikFrozenJoints.clear();
+      this.preIkOffsets.clear();
+    }
+
     for (const c of this.ikConstraints) {
       if (c.weight <= 0) continue;
       if (c.type === 'lookat') this.applyLookAt(c);

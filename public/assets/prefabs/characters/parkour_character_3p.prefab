@@ -34,15 +34,39 @@
           ]
         },
         "skeletal_mesh": {
-          "gltf": "idle.gltf"
+          "gltf": "XBot.gltf"
         },
         "animator": {
+          "extraAnimations": [
+            "Idle.gltf",
+            "Run.gltf"
+          ],
           "states": [
             {
               "name": "Idle",
-              "clip": 0,
+              "clip": 1,
               "loop": true,
               "speed": 1
+            },
+            {
+              "name": "Run",
+              "clip": 2,
+              "loop": true,
+              "speed": 1
+            }
+          ],
+          "transitions": [
+            {
+              "from": "Idle",
+              "to": "Run",
+              "condition": "isMoving",
+              "blendTime": 0.2
+            },
+            {
+              "from": "Run",
+              "to": "Idle",
+              "conditionFalse": "isMoving",
+              "blendTime": 0.2
             }
           ],
           "default": "Idle"
@@ -54,9 +78,11 @@
           "rightThigh": "mixamorig:RightUpLeg",
           "rightKnee": "mixamorig:RightLeg",
           "rightFoot": "mixamorig:RightFoot",
+          "pelvis": "mixamorig:Hips",
           "raycastUpOffset": 0.05,
           "raycastMaxDown": 0.15,
-          "footLerpSpeed": 12
+          "footLerpSpeed": 12,
+          "pelvisLerpSpeed": 8
         }
       }
     }
@@ -134,6 +160,7 @@
       ],
       "cameraLag": true,
       "cameraLagSpeed": 12,
+      "pivotLagSpeed": 18,
       "pitchMin": -70,
       "pitchMax": 75,
       "enableCollision": true,
