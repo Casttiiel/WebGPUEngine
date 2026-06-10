@@ -115,7 +115,6 @@ export class ModuleRender extends Module {
     'AO Bilateral Vertical': { value: '-' },
     'SSR Compute': { value: '-' },
     'SSR Blur': { value: '-' },
-    SSGI: { value: '-' },
     hzb_build_copy: { value: '-' },
     // Auto Exposure
     'AE Luminance': { value: '-' },

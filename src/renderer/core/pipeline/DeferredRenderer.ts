@@ -22,7 +22,6 @@ import { PointLightComponent } from '../../../components/render/PointLightCompon
 import { Engine } from '../../../core/engine/Engine';
 import { SpotLightComponent } from '../../../components/render/SpotLightComponent';
 import { ScreenSpaceReflections } from '../../shading/ScreenSpaceReflections';
-import { ScreenSpaceGlobalIllumination } from '../../shading/ScreenSpaceGlobalIllumination';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { HZBBuilder } from '../culling/HZBBuilder';
@@ -39,7 +38,6 @@ export class DeferredRenderer {
   private ssr!: ScreenSpaceReflections;
 
   private froxelVolumetrics!: FroxelVolumetricScattering;
-  private ssgi!: ScreenSpaceGlobalIllumination;
   private depthPrepass!: DepthPrepass;
   private gBufferPass!: GBufferPass;
   private hzbBuilder!: HZBBuilder;
@@ -93,7 +91,7 @@ export class DeferredRenderer {
   private rtCopyNormals!: RenderTarget;
 
   private gBufferBindGroup!: GPUBindGroup;
-  private gBufferComputeBindGroup!: GPUBindGroup; // COMPUTE-visibility version for AO/SSGI compute passes
+  private gBufferComputeBindGroup!: GPUBindGroup; // COMPUTE-visibility version for AO/SSR compute passes
   private gBufferLayout!: GPUBindGroupLayout;
   private whiteTexture!: Texture;
 
@@ -320,7 +318,7 @@ export class DeferredRenderer {
       ],
     );
 
-    // Compute-visibility G-Buffer bind group — same textures, COMPUTE visibility for AO/SSGI dispatches.
+    // Compute-visibility G-Buffer bind group — same textures, COMPUTE visibility for AO/SSR dispatches.
     this.gBufferComputeBindGroup = BindGroupFactory.createBindGroup(
       `gbuffer_compute_bindgroup`,
       BindGroupFactory.getGBufferComputeLayout(),
@@ -365,7 +363,6 @@ export class DeferredRenderer {
     );
 
     this.ssr.dispose();
-    this.ssgi?.resize();
 
     // Create OIT compose bind group (accumulation + revealage → resolve over accLight)
     const oitLayout = BindGroupFactory.getLayoutFromEnum(
@@ -392,9 +389,6 @@ export class DeferredRenderer {
 
     this.ssr = new ScreenSpaceReflections();
     await this.ssr.load();
-
-    this.ssgi = new ScreenSpaceGlobalIllumination();
-    await this.ssgi.load();
 
     this.froxelVolumetrics = new FroxelVolumetricScattering();
     await this.froxelVolumetrics.load();
@@ -538,14 +532,6 @@ export class DeferredRenderer {
     this.aoResult = this.renderAO(camera);
     this.csResult = this.renderContactShadows(camera);
     this.renderAccLight();
-
-    // 3b. Screen-Space Global Illumination — indirect diffuse, composited additively onto accLight
-    if (QualitySettings.getInstance().getSettings().enableSSGI) {
-      const ssgiView = this.ssgi?.render(this.gBufferBindGroup);
-      if (ssgiView) {
-        this.ssgi.composite(this.rtAccLight.getView(), this.gBufferBindGroup);
-      }
-    }
 
     // 4. Water hybrid pass ───────────────────────────────────────────────────
     // Snapshot lit scene (solids only) before water pixels are composited.
@@ -965,7 +951,6 @@ export class DeferredRenderer {
 
     this.hzbBuilder?.dispose();
 
-    this.ssgi?.dispose();
     this.proceduralSkyCubemap?.dispose();
     this.proceduralSkyCubemap = null;
     this.gBufferBindGroup = null as any;

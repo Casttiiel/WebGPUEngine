@@ -174,7 +174,7 @@ export class BindGroupFactory {
     ]);
   }
 
-  /** Same structure as getGBufferLayout() but with COMPUTE visibility — for AO/SSGI compute passes. */
+  /** Same structure as getGBufferLayout() but with COMPUTE visibility — for AO/SSR compute passes. */
   public static getGBufferComputeLayout(): GPUBindGroupLayout {
     return this.getLayout('gbuffer_compute', [
       { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },

@@ -1,8 +1,0 @@
-{
-    "vs": "utility/presentation.vs",
-    "fs": "post-processing/ssgi_composite.fs",
-    "writesOn": "texture",
-    "blend": "additive",
-    "z": "disable_all",
-    "uniforms": ["CameraUniforms", "GBufferUniforms", "SingleTexture"]
-}

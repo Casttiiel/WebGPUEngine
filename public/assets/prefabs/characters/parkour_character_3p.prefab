@@ -78,9 +78,11 @@
           "rightThigh": "mixamorig:RightUpLeg",
           "rightKnee": "mixamorig:RightLeg",
           "rightFoot": "mixamorig:RightFoot",
+          "pelvis": "mixamorig:Hips",
           "raycastUpOffset": 0.05,
           "raycastMaxDown": 0.15,
-          "footLerpSpeed": 12
+          "footLerpSpeed": 12,
+          "pelvisLerpSpeed": 8
         }
       }
     }
@@ -158,6 +160,7 @@
       ],
       "cameraLag": true,
       "cameraLagSpeed": 12,
+      "pivotLagSpeed": 18,
       "pitchMin": -70,
       "pitchMax": 75,
       "enableCollision": true,
