@@ -5,8 +5,7 @@
    TurnLeft_180 / TurnRight_180 — para inversión de dirección
 2. Para IK en giros pequeños: Un LookAt IK en la cabeza/spine cuando el ángulo entre facing y velocity es < 30°. AnimatorComponent.addIkConstraint() ya lo soporta, solo necesitas el nombre del joint en el esqueleto.
 3. Foot IK
-4. Clouds (textures for spawning)
-   Bicubic upscaling Es la única técnica relevante que él menciona y tú no tienes. Renderizar a half/quarter res y hacer bicubic filtering al reconstruir es un win de rendimiento significativo. El IGN que ya tienes es el paso previo correcto — si añades temporal accumulation después, el bicubic upscale es el complemento natural.
+4. Clouds (textures for spawning)(Mejor forma tridimensional/sombras) (Sombras not good)
 5. Anamorphic lens flare
 6. Editor Camera (Render Debug / Gizmo / Menu)
 7. Material Instances
