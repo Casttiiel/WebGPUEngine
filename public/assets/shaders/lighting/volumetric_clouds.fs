@@ -132,10 +132,13 @@ fn sampleDensityCheap(pos: vec3f) -> f32 {
     // El mismo evol que sampleDensity — consistencia de sombras.
     let evol = u_cloud.windOffset * 0.0001;
     let p    = (pos + wind) * u_cloud.cloudFrequency + vec3f(0.0, evol, 0.0);
-    let s    = fbm3D(p, 2);
-    // FBM value noise peaks at ~0.75.  Scale the threshold so coverage=0 → clear sky,
-    // coverage=1 → full overcast, instead of coverage<0.25 always yielding nothing.
-    return max(0.0, remap(s, (1.0 - u_cloud.coverage) * 0.75, 1.0, 0.0, 1.0)) * grad * u_cloud.density;
+    let s        = fbm3D(p, 2);
+    let rawShape = remap(s, (1.0 - u_cloud.coverage) * 0.75, 1.0, 0.0, 1.0);
+    // cloudMap scales density (not threshold): storm zones are thicker, clear zones thinner.
+    // This guarantees clouds exist at every XZ position; only their thickness varies.
+    let map      = cloudMap(pos);
+    let mapScale = 0.55 + saturate(map * 1.33) * 0.9;  // [0.55, 1.45]
+    return max(0.0, rawShape) * grad * u_cloud.density * mapScale;
 }
 
 // ── Interleaved Gradient Noise (sin componente temporal para evitar flickering) ─
@@ -147,13 +150,36 @@ fn ign(coord: vec2f) -> f32 {
 
 fn heightGradient_fast(pos: vec3f) -> f32 {
     let cloudH = u_cloud.cloudTop - u_cloud.cloudBase;
-    // h is NOT clamped at the bottom: negative h = below cloudBase = tendril zone.
-    // The march also starts 12 % below cloudBase so these tendrils actually render.
     let h = (pos.y - u_cloud.cloudBase) / cloudH;
-    // Bottom: fade in from -0.12 (120 % of 1 step below base) to 0.25 (100 m above base).
-    // This breaks the perfectly-flat-shelf appearance that a hard cloudBase cutoff creates.
-    // Top: fade out from 0.65 to 1.0 (unchanged).
-    return smoothstep(-0.12, 0.25, h) * smoothstep(1.0, 0.65, h);
+
+    // Per-column cloud top: single valueNoise3D at XZ (moves with wind, 1.5× the
+    // detail frequency).  topFrac ∈ [0.28, 0.80] → at default 800 m slab some clouds
+    // are flat cumulus humilis (~220 m tall) and others tall cumulus mediocris (~640 m).
+    let wind     = vec3f(u_cloud.windDirection.x, 0.0, u_cloud.windDirection.z) * u_cloud.windOffset;
+    let colP     = (vec3f(pos.x, 0.0, pos.z) + wind) * (u_cloud.cloudFrequency * 1.5);
+    let topNoise = valueNoise3D(colP);       // [0, 1]
+    let topFrac  = 0.28 + topNoise * 0.52;  // [0.28, 0.80]
+
+    // Bottom: tendril zone from -0.12 to 0.20 above cloudBase.
+    let bottomFade = smoothstep(-0.12, 0.20, h);
+    // Top: variable per column — fade from topFrac to topFrac+0.18.
+    let topFade    = smoothstep(topFrac + 0.18, topFrac, h);
+    return bottomFade * topFade;
+}
+
+// ── Cloud Map (regional weather variation) ────────────────────────────────────
+// Very low-frequency 2D FBM: same wind as the detail layer but at 0.06× the
+// frequency → weather regions ~16× larger than individual clouds (~75 km wide
+// at the default cloudFrequency of 0.00022).  Returns ≈ [0, 0.75].
+// Low values = clear sky gap.  High values = dense-cloud zone.
+fn cloudMap(pos: vec3f) -> f32 {
+    let wind = vec3f(u_cloud.windDirection.x, 0.0, u_cloud.windDirection.z) * u_cloud.windOffset;
+    // 0.5× detail frequency → weather regions ~2× larger than individual clouds.
+    // At default cloudFrequency=0.00022 that is ≈ 9 km — 2-3 regions visible
+    // inside the 25 km fadeRadius.  0.06 was too small (75 km regions → one zone
+    // covered the entire sky and returned a near-constant value).
+    let p = (vec3f(pos.x, 0.0, pos.z) + wind) * (u_cloud.cloudFrequency * 0.5);
+    return fbm3D(p, 2);  // range ≈ [0, 0.75]
 }
 
 // doDetail=true: full quality (tier 0 only) — adds worleyDetail2 edge erosion (2×worley3D = 54 hash33)
@@ -179,8 +205,13 @@ fn sampleDensity(pos: vec3f, octaves: i32, doDetail: bool) -> f32 {
     // Forma base: Perlin-Worley con peso de Worley tweakable
     let baseShape = fbmShape(p + warp, octaves, u_cloud.worleyWeight);
 
-    // Coverage con remap suave
-    var density = remap(baseShape, (1.0 - u_cloud.coverage) * 0.75, 1.0, 0.0, 1.0) * grad;
+    // Coverage threshold is uniform — clouds exist everywhere, only thickness varies.
+    let rawShape = remap(baseShape, (1.0 - u_cloud.coverage) * 0.75, 1.0, 0.0, 1.0);
+    let sharpShape = pow(max(rawShape, 0.0), 1.3);
+    // cloudMap scales density: clear-sky gaps are thin, storm zones are thick.
+    let map      = cloudMap(pos);
+    let mapScale = 0.55 + saturate(map * 1.33) * 0.9;  // [0.55, 1.45]
+    var density  = sharpShape * grad * mapScale;
     if (density < 0.001) { return 0.0; }
 
     // Erosión de bordes: solo en tier 0 (cercano) — 2 worley3D = 54 hash33 calls.

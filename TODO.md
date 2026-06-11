@@ -5,7 +5,7 @@
    TurnLeft_180 / TurnRight_180 — para inversión de dirección
 2. Para IK en giros pequeños: Un LookAt IK en la cabeza/spine cuando el ángulo entre facing y velocity es < 30°. AnimatorComponent.addIkConstraint() ya lo soporta, solo necesitas el nombre del joint en el esqueleto.
 3. Foot IK
-4. Clouds (textures for spawning)(Mejor forma tridimensional/sombras)
+4. Clouds (textures for spawning)
 5. Anamorphic lens flare
 6. Editor Camera (Render Debug / Gizmo / Menu)
 7. Material Instances

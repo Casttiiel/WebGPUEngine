@@ -184,6 +184,15 @@ export class BindGroupFactory {
     ]);
   }
 
+  public static getCloudTemporalLayout(): GPUBindGroupLayout {
+    return this.getLayout('cloud_temporal', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+    ]);
+  }
+
   public static getSingleTextureLayout(): GPUBindGroupLayout {
     return this.getLayout('single_texture', [
       {
@@ -1997,6 +2006,8 @@ export class BindGroupFactory {
         return this.getSkinMatricesPairLayout();
       case PipelineBindGroupLayouts.GRASS_UNIFORMS:
         return this.getGrassUniformsLayout();
+      case PipelineBindGroupLayouts.CLOUD_TEMPORAL_UNIFORMS:
+        return this.getCloudTemporalLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }
