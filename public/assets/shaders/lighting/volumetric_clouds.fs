@@ -133,7 +133,9 @@ fn sampleDensityCheap(pos: vec3f) -> f32 {
     let evol = u_cloud.windOffset * 0.0001;
     let p    = (pos + wind) * u_cloud.cloudFrequency + vec3f(0.0, evol, 0.0);
     let s    = fbm3D(p, 2);
-    return max(0.0, remap(s, 1.0 - u_cloud.coverage, 1.0, 0.0, 1.0)) * grad * u_cloud.density;
+    // FBM value noise peaks at ~0.75.  Scale the threshold so coverage=0 → clear sky,
+    // coverage=1 → full overcast, instead of coverage<0.25 always yielding nothing.
+    return max(0.0, remap(s, (1.0 - u_cloud.coverage) * 0.75, 1.0, 0.0, 1.0)) * grad * u_cloud.density;
 }
 
 // ── Interleaved Gradient Noise (sin componente temporal para evitar flickering) ─
@@ -144,8 +146,14 @@ fn ign(coord: vec2f) -> f32 {
 // ── Cloud density ──────────────────────────────────────────────────────────────
 
 fn heightGradient_fast(pos: vec3f) -> f32 {
-    let h = saturate((pos.y - u_cloud.cloudBase) / (u_cloud.cloudTop - u_cloud.cloudBase));
-    return smoothstep(0.0, 0.12, h) * smoothstep(1.0, 0.65, h);
+    let cloudH = u_cloud.cloudTop - u_cloud.cloudBase;
+    // h is NOT clamped at the bottom: negative h = below cloudBase = tendril zone.
+    // The march also starts 12 % below cloudBase so these tendrils actually render.
+    let h = (pos.y - u_cloud.cloudBase) / cloudH;
+    // Bottom: fade in from -0.12 (120 % of 1 step below base) to 0.25 (100 m above base).
+    // This breaks the perfectly-flat-shelf appearance that a hard cloudBase cutoff creates.
+    // Top: fade out from 0.65 to 1.0 (unchanged).
+    return smoothstep(-0.12, 0.25, h) * smoothstep(1.0, 0.65, h);
 }
 
 // doDetail=true: full quality (tier 0 only) — adds worleyDetail2 edge erosion (2×worley3D = 54 hash33)
@@ -172,7 +180,7 @@ fn sampleDensity(pos: vec3f, octaves: i32, doDetail: bool) -> f32 {
     let baseShape = fbmShape(p + warp, octaves, u_cloud.worleyWeight);
 
     // Coverage con remap suave
-    var density = remap(baseShape, 1.0 - u_cloud.coverage, 1.0, 0.0, 1.0) * grad;
+    var density = remap(baseShape, (1.0 - u_cloud.coverage) * 0.75, 1.0, 0.0, 1.0) * grad;
     if (density < 0.001) { return 0.0; }
 
     // Erosión de bordes: solo en tier 0 (cercano) — 2 worley3D = 54 hash33 calls.
@@ -228,9 +236,16 @@ fn powderEffect(density: f32, cosTheta: f32) -> f32 {
 // ── Ray march principal ────────────────────────────────────────────────────────
 
 fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
-    let cameraInSlab = rayOrigin.y >= u_cloud.cloudBase && rayOrigin.y <= u_cloud.cloudTop;
+    // Extend the effective slab bottom 12 % below cloudBase so the march enters
+    // the tendril zone defined in heightGradient_fast (smoothstep -0.12 → 0.25).
+    // Without this the march starts at the perfectly-flat cloudBase plane, producing
+    // a visible horizontal shelf at the cloud base regardless of the gradient.
+    let cloudH  = u_cloud.cloudTop - u_cloud.cloudBase;
+    let extBase = u_cloud.cloudBase - cloudH * 0.12;
 
-    let tBase = rayPlaneIntersect(rayOrigin, rayDir, u_cloud.cloudBase);
+    let cameraInSlab = rayOrigin.y >= extBase && rayOrigin.y <= u_cloud.cloudTop;
+
+    let tBase = rayPlaneIntersect(rayOrigin, rayDir, extBase);
     let tTop  = rayPlaneIntersect(rayOrigin, rayDir, u_cloud.cloudTop);
 
     var tStart = 0.0;
@@ -276,7 +291,6 @@ fn marchClouds(rayOrigin: vec3f, rayDir: vec3f, dither: f32) -> vec4f {
     let phase    = dualLobe(cosTheta);
 
     let nSteps   = i32(clamp(u_cloud.stepCount, 16.0, 128.0));
-    let cloudH   = u_cloud.cloudTop - u_cloud.cloudBase;
 
     // Step size: el mínimo entre dividir el rayo por nSteps y cloudH/16 por componente vertical.
     // Esto evita pasos enormes en rayos casi horizontales que saltan nubes enteras.

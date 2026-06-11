@@ -37,10 +37,10 @@ export class VolumetricClouds {
   // ── Parameters (tweakable via renderInMenu) ──────────────────────────────────
   public cloudBase: number = 500; // world-Y of cloud bottom (metres)
   public cloudTop: number = 1300; // world-Y of cloud top  (800 m slab)
-  public coverage: number = 0.65; // [0 = sparse … 1 = overcast]
+  public coverage: number = 0.55; // [0 = sparse … 1 = overcast]
   public density: number = 1.2; // density multiplier
-  public absorption: number = 0.01; // light absorption per unit density
-  public scatterStrength: number = 25.0; // overall brightness scale (calibrated for stepAbsorption formula)
+  public absorption: number = 0.04; // light absorption per unit density
+  public scatterStrength: number = 4.0; // overall brightness scale
   public cloudFrequency: number = 0.00022; // noise spatial frequency (lower = bigger clouds)
   // Quality / style
   public stepCount: number = 64; // primary ray-march steps (perf vs quality)
