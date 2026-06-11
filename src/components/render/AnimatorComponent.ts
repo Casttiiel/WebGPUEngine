@@ -166,6 +166,8 @@ export class AnimatorComponent extends Component {
   private tempR: Float32Array[] = [];
   private tempS: Float32Array[] = [];
   private globalMats: mat4[] = [];
+  /** Snapshot of globalMats taken after animation eval but before IK — used by foot IK. */
+  private baseAnimGlobalMats: mat4[] = [];
   private jointPalette: Float32Array = new Float32Array(MAX_JOINTS * 16);
 
   // Base clip playback
@@ -578,6 +580,12 @@ export class AnimatorComponent extends Component {
     return this.globalMats[jointIndex] ?? null;
   }
 
+  /** Returns the joint matrix from the BASE animation pose (before any IK constraints).
+   *  Use this for raycasts / offset computation in foot IK to avoid feedback loops. */
+  public getJointBaseAnimModelMatrix(jointIndex: number): Readonly<mat4> | null {
+    return this.baseAnimGlobalMats[jointIndex] ?? null;
+  }
+
   // ─── IK API ─────────────────────────────────────────────────────────────────
 
   public addIkConstraint<T extends IkConstraint>(constraint: T): T {
@@ -729,6 +737,13 @@ export class AnimatorComponent extends Component {
       }
     }
 
+    // Snapshot base-anim pose before IK so foot IK (and other systems) can read
+    // the pure animation position without the previous frame's IK baked in.
+    for (let i = 0; i < this.jointCount; i++) {
+      if (!this.baseAnimGlobalMats[i]) this.baseAnimGlobalMats[i] = mat4.create();
+      mat4.copy(this.baseAnimGlobalMats[i]!, this.globalMats[i]!);
+    }
+
     // Step 6: IK constraints
     if (this.ikConstraints.length > 0) this.applyIkConstraints();
 
@@ -764,7 +779,12 @@ export class AnimatorComponent extends Component {
         this._ikFrozenJoints.add(idx);
       }
       this.repropagateMats();
+      // Keep only the directly-offset joints frozen so the final repropagateMats
+      // preserves them (torso follows pelvis down) while letting TwoBoneIK work
+      // on the children and the final pass propagates feet from IK knees.
+      const preIkRoots = new Set<number>(this.preIkOffsets.keys());
       this._ikFrozenJoints.clear();
+      for (const idx of preIkRoots) this._ikFrozenJoints.add(idx);
       this.preIkOffsets.clear();
     }
 

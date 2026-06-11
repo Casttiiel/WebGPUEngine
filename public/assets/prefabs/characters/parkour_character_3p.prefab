@@ -79,8 +79,8 @@
           "rightKnee": "mixamorig:RightLeg",
           "rightFoot": "mixamorig:RightFoot",
           "pelvis": "mixamorig:Hips",
-          "raycastUpOffset": 0.05,
-          "raycastMaxDown": 0.15,
+          "raycastUpOffset": 0.3,
+          "raycastMaxDown": 0.3,
           "footLerpSpeed": 12,
           "pelvisLerpSpeed": 8
         }
@@ -124,7 +124,8 @@
       "jumpTimeToDescent": 0.3,
       "jumpCutFactor": 0.7,
       "jumpCutVelocityLimit": 1,
-      "coyoteTime": 0.15
+      "coyoteTime": 0.15,
+      "maxAirJumps": 1
     },
     "parkour_controller": {
       "moveSpeed": 11,

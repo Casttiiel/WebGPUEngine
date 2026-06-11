@@ -8,11 +8,11 @@
 4. Clouds
 5. Anamorphic lens flare
 6. Editor Camera (Render Debug / Gizmo / Menu)
-8. Material Instances
-9. [Blender] GLTF Exporter unifies metaltlic and roughness? In right channel?
-10. Procedural materials
-11. World Partition / Scene Streaming
-12. LOD automático para meshes
+7. Material Instances
+8. [Blender] GLTF Exporter unifies metaltlic and roughness? In right channel?
+9. Procedural materials
+10. World Partition / Scene Streaming
+11. LOD automático para meshes
     Integrar meshoptimizer (npm, WASM oficial) en el pipeline de carga de Mesh.ts. Al cargar un .glb/mesh, generar 3 niveles de LOD en CPU con meshopt_simplify (error cuadrático). El GPUCullingManager ya tiene distancia a cámara por objeto — seleccionar el LOD activo en el buffer de culling según umbral de distancia configurable. Incluye LOD crossfade con dithering para transiciones invisibles (el campo lodFadeStart ya existe en GrassVolumeComponent, el patrón está definido).
 
 ## VFX
@@ -24,7 +24,14 @@
 
 ## Gameplay
 
-Jump landing on two stages WRONG
+Jump / Double Jump
+Mantle
+Maintain Gravity
+Dash
+Light Attack
+Push Attack
+Lift Attack
+(Batman Arkham style)
 
 ## Visuals and Sound
 
