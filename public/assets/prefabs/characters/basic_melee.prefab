@@ -1,32 +1,20 @@
 {
   "components": {
-    "name": "PassiveRanger",
+    "name": "BasicMelee",
     "transform": {
-      "position": [
-        0,
-        0.9,
-        0
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        0.5,
-        1.6,
-        0.5
-      ]
+      "position": [0, 0.9, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.55, 1.8, 0.55]
     },
     "capsule_collider": {
-      "height": 1.6,
-      "radius": 0.25,
+      "height": 1.8,
+      "radius": 0.28,
       "bodyType": "kinematic",
       "lockRotationX": true,
       "lockRotationZ": true,
       "ignoreTransformScale": true,
       "friction": 0,
-      "mass": 55,
+      "mass": 70,
       "collisionGroups": "ENEMY",
       "collisionMask": "ALL"
     },
@@ -38,42 +26,40 @@
         }
       ]
     },
-    "passive_ranger_controller": {
-      "moveSpeed": 2.5,
+    "tank_melee_controller": {
+      "moveSpeed": 3.5,
       "gravity": 9,
-      "acceleration": 8
+      "acceleration": 8,
+      "turnSpeed": 200
+    },
+    "melee_attack": {
+      "attackRange": 1.8,
+      "damage": 20,
+      "cooldown": 1.2,
+      "recoveryTime": 0.35
     },
     "perception": {
       "sightRadius": 20,
-      "hearRadius": 6,
-      "fovDegrees": 120,
+      "hearRadius": 8,
+      "fovDegrees": 150,
       "eyeHeightOffset": 0.7,
       "checkInterval": 0.1
     },
     "health": {
-      "maxHp": 30
+      "maxHp": 80,
+      "faction": "enemy"
     },
     "blood_drain_source": {
-      "totalBlood": 60,
-      "drainRate": 30,
+      "totalBlood": 80,
+      "drainRate": 40,
       "startActive": false
-    },
-    "bullet_pool": {
-      "prefab": "gameplay/passive_blob.prefab",
-      "size": 4
     }
   },
   "children": [
     {
       "components": {
         "name": "ChargeTarget",
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ]
-        },
+        "transform": { "position": [0, 0, 0] },
         "sphere_collider": {
           "bodyType": "kinematic",
           "radius": 8,

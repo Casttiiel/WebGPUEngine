@@ -380,33 +380,21 @@
   },
 
   {
-    "prefab": "characters/fast_melee.prefab",
+    "prefab": "characters/basic_melee.prefab",
     "components": {
-      "transform": { "position": [4, 0.9, 6] }
+      "transform": { "position": [3, 0.9, 5] }
     }
   },
   {
-    "prefab": "characters/fast_melee.prefab",
+    "prefab": "characters/basic_melee.prefab",
     "components": {
-      "transform": { "position": [-4, 0.9, 7] }
+      "transform": { "position": [-3, 0.9, 5] }
     }
   },
   {
-    "prefab": "characters/fast_melee.prefab",
+    "prefab": "characters/basic_melee.prefab",
     "components": {
-      "transform": { "position": [0, 0.9, 9] }
-    }
-  },
-  {
-    "prefab": "characters/tank_melee.prefab",
-    "components": {
-      "transform": { "position": [7, 0.9, 2] }
-    }
-  },
-  {
-    "prefab": "characters/tank_melee.prefab",
-    "components": {
-      "transform": { "position": [-7, 0.9, 2] }
+      "transform": { "position": [0, 0.9, 7] }
     }
   }
 ]

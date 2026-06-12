@@ -30,6 +30,11 @@ export class HealthComponent extends Component {
   /** Fraction of incoming damage absorbed (0..1). Bypassed by 'bypass_resistance' sourceTag. */
   private damageResistance: number = 0;
   /**
+   * Faction tag set via prefab. Damage from an instigator with the same faction is rejected.
+   * Null = no faction = receives damage from everyone (training dummy, neutral objects).
+   */
+  private faction: string | null = null;
+  /**
    * Optional hook called before damage is applied.
    * Return true to cancel the damage (e.g. parry).
    */
@@ -41,6 +46,7 @@ export class HealthComponent extends Component {
     this.maxHp = data.maxHp ?? this.maxHp;
     this.invincibilityTime = data.invincibilityTime ?? this.invincibilityTime;
     this.damageResistance = data.damageResistance ?? 0;
+    this.faction = data.faction ?? null;
     this.currentHp = this.maxHp;
   }
 
@@ -60,6 +66,12 @@ export class HealthComponent extends Component {
     if (amount <= 0) return;
     if (this.isDead()) return;
     if (this.invincibilityTimer > 0) return;
+
+    // Friendly-fire prevention: reject damage from instigators with the same faction.
+    if (this.faction !== null && instigator !== null) {
+      const instigatorHealth = instigator.getComponent('health') as HealthComponent | null;
+      if (instigatorHealth?.faction === this.faction) return;
+    }
 
     // Parry / damage interceptor — runs before resistance and HP reduction.
     if (this.damageInterceptor?.(amount, instigator)) return;

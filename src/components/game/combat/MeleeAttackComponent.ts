@@ -101,7 +101,6 @@ export class MeleeAttackComponent extends Component {
   private applyAoE(center: vec3): void {
     for (const entity of Engine.getEntities().getAllEntities()) {
       if (!entity.getComponent('health')) continue;
-      // Skip self
       if (entity === this.getOwner()) continue;
 
       const tc = entity.getComponent('transform') as TransformComponent | null;

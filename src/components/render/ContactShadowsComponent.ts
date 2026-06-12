@@ -44,7 +44,7 @@ export class ContactShadowsComponent extends Component {
   // ─── Tuneable parameters (exposed for debug UI) ──────────────────────────
   public isEnabled: boolean = true;
   /** Opacity of the contact shadow [0, 1]. */
-  public intensity: number = 0.7;
+  public intensity: number = 1.0;
   /** World-space ray step length in metres. Smaller = more accurate, more expensive. */
   public stepLength: number = 0.025;
   /** Maximum ray travel distance in metres. Larger = wider shadow coverage. */

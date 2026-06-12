@@ -14,7 +14,7 @@
     "lens_flare": {},
     "atmospheric_fog": {},
     "vignette": {
-      "intensity": 0.2,
+      "intensity": 0.3,
       "smoothness": 0.2
     },
     "chromatic_aberration": {

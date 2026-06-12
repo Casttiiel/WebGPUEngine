@@ -82,11 +82,7 @@ import { BloodExplosiveProjectileComponent } from '../../components/game/combat/
 import { MeleeAttackComponent } from '../../components/game/combat/MeleeAttackComponent';
 import { HomingProjectileComponent } from '../../components/game/combat/HomingProjectileComponent';
 import { WeakPointComponent } from '../../components/game/combat/WeakPointComponent';
-import { PassiveRangerController } from '../../components/game/PassiveRangerController';
-import { AggressiveRangerController } from '../../components/game/AggressiveRangerController';
-import { FastMeleeController } from '../../components/game/FastMeleeController';
 import { TankMeleeController } from '../../components/game/TankMeleeController';
-import { HeavyMixedController } from '../../components/game/HeavyMixedController';
 import { CombatDirectorComponent } from '../../components/game/CombatDirectorComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
@@ -419,16 +415,8 @@ export class Loader {
         return new EnemyControllerComponent();
       case 'spider_controller':
         return new SpiderControllerComponent();
-      case 'passive_ranger_controller':
-        return new PassiveRangerController();
-      case 'aggressive_ranger_controller':
-        return new AggressiveRangerController();
-      case 'fast_melee_controller':
-        return new FastMeleeController();
       case 'tank_melee_controller':
         return new TankMeleeController();
-      case 'heavy_mixed_controller':
-        return new HeavyMixedController();
       case 'combat_director':
         return new CombatDirectorComponent();
       case 'perception':

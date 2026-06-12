@@ -132,7 +132,7 @@ export class PerceptionComponent extends Component {
 
     // ── Player state — Bloque 4 contextual modifiers ──────────────────────────
     if (this.playerController) {
-      // playerInAir: jugador en el aire y cayendo (útil para FastMelee que puede esquivarlo)
+      // playerInAir: jugador en el aire y cayendo
       const inAir = !this.playerController.getIsGrounded() &&
                     this.playerController.getVerticalVelocity() < -0.5;
       this.bb.set<boolean>('playerInAir', inAir);

@@ -67,17 +67,25 @@ export class TankMeleeController extends EnemyControllerComponent {
 
       self.faceToward(target);
 
-      if (dist > 0.3) {
-        vec3.normalize(dir, dir);
-        self.setDesiredHorizontal(dir);
-      }
-
-      // Attempt AoE swing — MeleeAttackComponent handles range check + cooldown
       const melee = self.getOwner().getComponent('melee_attack') as MeleeAttackComponent | null;
-      if (melee && melee.canAttack(target, pos)) {
-        const tc = self.getOwner().getComponent('transform') as TransformComponent | null;
-        const center = (tc?.getTransform().getWorldPosition() ?? pos) as vec3;
-        melee.attack(center);
+
+      if (melee?.isInRecovery()) {
+        // Back away from player during post-swing recovery
+        if (dist > 0.1) {
+          const awayDir = vec3.normalize(vec3.create(), vec3.negate(vec3.create(), dir));
+          self.setDesiredHorizontal(awayDir);
+        }
+      } else {
+        if (dist > 0.3) {
+          vec3.normalize(dir, dir);
+          self.setDesiredHorizontal(dir);
+        }
+        // Attempt swing — MeleeAttackComponent handles range check + cooldown
+        if (melee && melee.canAttack(target, pos)) {
+          const tc = self.getOwner().getComponent('transform') as TransformComponent | null;
+          const center = (tc?.getTransform().getWorldPosition() ?? pos) as vec3;
+          melee.attack(center);
+        }
       }
 
       return Status.RUNNING;

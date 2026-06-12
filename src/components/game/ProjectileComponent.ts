@@ -1,6 +1,7 @@
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { vec3, quat } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
+import { Entity } from '../../core/ecs/Entity';
 import { Engine } from '../../core/engine/Engine';
 import { TransformComponent } from '../core/TransformComponent';
 import { TrailRendererComponent } from '../vfx/TrailRendererComponent';
@@ -29,6 +30,8 @@ export class ProjectileComponent extends Component {
   private releaseCallback: ((proj: ProjectileComponent) => void) | null = null;
   /** Rigid body of the entity that fired this projectile — excluded from ray casts. */
   private shooterBody: RAPIER.RigidBody | null = null;
+  /** Entity that fired this projectile — forwarded as instigator in damage messages. */
+  private _instigatorEntity: Entity | null = null;
 
   /** Returns the live direction vector. Subclasses may mutate it to steer the projectile. */
   protected getDirection(): vec3 {
@@ -52,8 +55,10 @@ export class ProjectileComponent extends Component {
     direction: vec3,
     onRelease: (proj: ProjectileComponent) => void,
     shooterBody?: RAPIER.RigidBody,
+    instigator?: Entity,
   ): void {
     this.shooterBody = shooterBody ?? null;
+    this._instigatorEntity = instigator ?? null;
     const transform = (
       this.getOwner().getComponent('transform') as TransformComponent
     ).getTransform();
@@ -136,13 +141,12 @@ export class ProjectileComponent extends Component {
 
   // Override to react to hits (damage, decals, sounds, etc.)
   protected onHit(_hitPoint: vec3, hit: RAPIER.RayColliderHit): void {
-    // Send damage to whatever was hit (if the entity has a HealthComponent, it will react)
     if (this.damage > 0) {
       const entityId = Engine.getPhysics().getEntityIdFromCollider(hit.collider.handle);
       if (entityId !== undefined) {
         const entity = Engine.getEntities().getEntityById(entityId);
         entity?.sendMsg(
-          Msg.damage({ amount: this.damage, instigator: null, sourceTag: this.sourceTag }),
+          Msg.damage({ amount: this.damage, instigator: this._instigatorEntity, sourceTag: this.sourceTag }),
         );
       }
     }

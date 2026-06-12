@@ -147,6 +147,10 @@
       "minSwingSpeed": 11,
       "impulsePadInputDisableTime": 0.3
     },
+    "health": {
+      "maxHp": 100,
+      "faction": "player"
+    },
     "camera_arm": {
       "armLength": 5,
       "pivotOffset": [
