@@ -3,26 +3,31 @@ import { BehaviorNode, Status } from '../BehaviorNode';
 import { Blackboard } from '../Blackboard';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 
-const K_STRAFE_DIR = '_csa_dir';     // +1 or -1
-const K_STRAFE_FLIP = '_csa_flip';   // wall-clock seconds for next direction flip
-const K_POS_SIDE = '_csa_side';      // last computed positioning push (-1, 0, +1)
-const K_POS_TIME = '_csa_posTime';   // wall-clock seconds of last positioning check
+const K_STRAFE_DIR = '_csa_dir';        // +1 or -1 — current orbit direction
+const K_STRAFE_FLIP = '_csa_flip';      // wall-clock seconds for next direction flip (idle oscillation)
+const K_POS_TIME = '_csa_posTime';      // wall-clock seconds of last sector computation
+const K_TARGET_ANGLE = '_csa_tAngle';   // target sector angle (radians, world space)
 
 /**
- * CircleStrafeAction
+ * CircleStrafeAction — Bloque 3 + 5.
  *
- * BT leaf that orbits the player at `preferredRange` while the enemy waits for
- * an attack token.  Behavior by distance:
+ * BT leaf que orbita al jugador a `preferredRange` mientras el enemigo espera
+ * un token de ataque.
  *
- *  - Too close (< range × 0.7)  → back off diagonally while strafing
- *  - In range   (0.7 – 1.4 × r) → pure lateral orbit at ¾ speed
- *  - Too far    (> range × 1.4) → approach diagonally while strafing
+ * Comportamiento por zona de distancia:
+ *  - Demasiado cerca  (< rango × 0.7)  → retrocede lateralmente en strafe
+ *  - En rango         (0.7 – 1.4 × r)  → órbita lateral pura a ¾ velocidad
+ *  - Demasiado lejos  (> rango × 1.4)  → avanza diagonalmente en strafe
  *
- * Positioning intent: every 0.6 s checks nearby enemies and biases the strafe
- * direction toward the less-populated side, naturally spacing the group out.
+ * Encirclement por sectores (Bloque 5):
+ *  Cada 0.6 s calcula el ángulo del "mayor hueco" entre las posiciones angulares
+ *  del resto de enemigos alrededor del jugador. El enemigo orbita hacia ese
+ *  sector, espaciándose naturalmente sin coordinación explícita.
+ *  Si ya está en el sector destino (|delta| < 0.15 rad), mantiene una pequeña
+ *  oscilación natural para evitar que todos estén perfectamente alineados.
  *
- * Always returns RUNNING — the outer reactive Sequence interrupts it the moment
- * the enemy either loses sight of the player or acquires its attack token.
+ * Siempre devuelve RUNNING — la Sequence reactiva exterior lo interrumpe cuando
+ * el enemigo pierde al jugador de vista o adquiere su token de ataque.
  */
 export class CircleStrafeAction extends BehaviorNode {
   private readonly preferredRange: number;
@@ -44,40 +49,47 @@ export class CircleStrafeAction extends BehaviorNode {
     const dz = target[2] - pos[2];
     const dist = Math.sqrt(dx * dx + dz * dz);
 
-    // Always face the player
     self.faceToward(target);
 
     const invDist = dist > 0.001 ? 1.0 / dist : 0;
     // Forward vector (self → player)
     const fwdX = dx * invDist;
     const fwdZ = dz * invDist;
-    // Right vector (90° CW): right = (fwdZ, 0, -fwdX)
+    // Right vector (90° CW of forward in XZ): rightX = fwdZ, rightZ = -fwdX
     const rightX = fwdZ;
     const rightZ = -fwdX;
 
-    // ── Strafe direction with periodic flips ─────────────────────────────────
-    let dir = bb.get<number>(K_STRAFE_DIR, 1);
-    const flipTime = bb.get<number>(K_STRAFE_FLIP, -9999);
-    if (now >= flipTime) {
-      dir = -dir;
-      bb.set(K_STRAFE_DIR, dir);
-      bb.set(K_STRAFE_FLIP, now + 1.5 + Math.random() * 1.0); // 1.5–2.5 s
-    }
-
-    // ── Positioning intent: bias toward less-populated side ───────────────────
-    let posSide = bb.get<number>(K_POS_SIDE, 0);
+    // ── Sector targeting — recomputed every 0.6 s ─────────────────────────────
     const posTime = bb.get<number>(K_POS_TIME, -9999);
-    if (now - posTime >= 0.6) {
+    let targetAngle = bb.get<number>(K_TARGET_ANGLE, Infinity);
+    if (targetAngle === Infinity || now - posTime >= 0.6) {
       bb.set(K_POS_TIME, now);
-      posSide = this.computePositioningSide(self, pos, rightX, rightZ);
-      bb.set(K_POS_SIDE, posSide);
+      targetAngle = this.computeTargetSectorAngle(self, target, pos);
+      bb.set(K_TARGET_ANGLE, targetAngle);
     }
 
-    // If positioning pushes opposite our current strafing direction, flip
-    if (posSide !== 0 && posSide !== dir) {
-      dir = posSide;
+    // ── Determine orbital direction from angular delta ────────────────────────
+    const currentAngle = Math.atan2(pos[0] - target[0], pos[2] - target[2]);
+    let angleDelta = targetAngle - currentAngle;
+    while (angleDelta > Math.PI) angleDelta -= 2 * Math.PI;
+    while (angleDelta < -Math.PI) angleDelta += 2 * Math.PI;
+
+    let dir: number;
+    if (Math.abs(angleDelta) < 0.15) {
+      // In target sector — small natural oscillation to avoid static positions
+      dir = bb.get<number>(K_STRAFE_DIR, 1);
+      const flipTime = bb.get<number>(K_STRAFE_FLIP, -9999);
+      if (now >= flipTime) {
+        dir = -dir;
+        bb.set(K_STRAFE_DIR, dir);
+        bb.set(K_STRAFE_FLIP, now + 1.5 + Math.random() * 1.0);
+      }
+    } else {
+      // Orbit toward target sector:
+      // angleDelta > 0 → target is CCW → move left (-right)  → dir = -1
+      // angleDelta < 0 → target is CW  → move right (+right) → dir = +1
+      dir = angleDelta > 0 ? -1 : 1;
       bb.set(K_STRAFE_DIR, dir);
-      bb.set(K_STRAFE_FLIP, now + 1.0 + Math.random() * 0.5);
     }
 
     // ── Build movement vector based on distance zone ──────────────────────────
@@ -107,9 +119,7 @@ export class CircleStrafeAction extends BehaviorNode {
 
     const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
     if (len > 0.001) {
-      const normX = moveX / len;
-      const normZ = moveZ / len;
-      const dir3 = vec3.fromValues(normX, 0, normZ);
+      const dir3 = vec3.fromValues(moveX / len, 0, moveZ / len);
       self.setDesiredHorizontal(dir3, self.getMoveSpeed() * speedFactor);
     }
 
@@ -117,38 +127,54 @@ export class CircleStrafeAction extends BehaviorNode {
   }
 
   /**
-   * Returns the less-populated side (+1 right / -1 left / 0 balanced) by
-   * comparing how many nearby enemies are on each side relative to self→player axis.
-   * Checked every 0.6 s to avoid per-frame registry scans.
+   * Computes the angle (radians) of the largest angular gap between the other
+   * enemies' positions around the player.  Returns the center of that gap so
+   * this enemy orbits toward the emptiest sector, creating emergent encirclement.
+   *
+   * If alone, returns the current self angle (no repositioning needed).
+   * Recomputed every 0.6 s to avoid per-frame registry scans.
    */
-  private computePositioningSide(
+  private computeTargetSectorAngle(
     self: EnemyControllerComponent,
-    pos: vec3,
-    rightX: number,
-    rightZ: number,
+    playerPos: vec3,
+    selfPos: vec3,
   ): number {
-    let rightCount = 0;
-    let leftCount = 0;
+    const others: number[] = [];
 
     for (const ec of EnemyControllerComponent.getAll()) {
       if (ec === self) continue;
       const nbPos = ec.bb.get<vec3>('position');
       if (!nbPos) continue;
-
-      const toOtherX = nbPos[0] - pos[0];
-      const toOtherZ = nbPos[2] - pos[2];
-      const d = Math.sqrt(toOtherX * toOtherX + toOtherZ * toOtherZ);
-      if (d < 0.01 || d > 10) continue;
-
-      // Dot with right axis: positive = enemy is on our right side
-      const dot = (toOtherX / d) * rightX + (toOtherZ / d) * rightZ;
-      if (dot > 0.3) rightCount++;
-      else if (dot < -0.3) leftCount++;
+      const ddx = nbPos[0] - playerPos[0];
+      const ddz = nbPos[2] - playerPos[2];
+      if (ddx * ddx + ddz * ddz < 0.25) continue; // ignore enemies stacked on player
+      others.push(Math.atan2(ddx, ddz));
     }
 
-    if (rightCount > leftCount) return -1; // push left
-    if (leftCount > rightCount) return 1;  // push right
-    return 0;
+    const selfAngle = Math.atan2(selfPos[0] - playerPos[0], selfPos[2] - playerPos[2]);
+
+    if (others.length === 0) return selfAngle;
+
+    // Sort angles and find the largest gap
+    const sorted = [...others].sort((a, b) => a - b);
+    let bestGapSize = 0;
+    let bestGapCenter = selfAngle;
+
+    for (let i = 0; i < sorted.length; i++) {
+      const a = sorted[i]!;
+      const b = i < sorted.length - 1 ? sorted[i + 1]! : sorted[0]! + 2 * Math.PI;
+      const gap = b - a;
+      if (gap > bestGapSize) {
+        bestGapSize = gap;
+        bestGapCenter = a + gap / 2;
+      }
+    }
+
+    // Normalize to [-π, π]
+    while (bestGapCenter > Math.PI) bestGapCenter -= 2 * Math.PI;
+    while (bestGapCenter < -Math.PI) bestGapCenter += 2 * Math.PI;
+
+    return bestGapCenter;
   }
 
   public reset(): void {

@@ -143,5 +143,6 @@ export class TankMeleeController extends EnemyControllerComponent {
       (comp as TankMeleeController).onDeath();
     });
     EnemyControllerComponent.registerDamagedHandler('tank_melee_controller');
+    EnemyControllerComponent.registerParryHitHandler('tank_melee_controller');
   }
 }

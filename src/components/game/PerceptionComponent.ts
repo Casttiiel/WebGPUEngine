@@ -8,6 +8,7 @@ import { EnemyControllerComponent } from './EnemyControllerComponent';
 import { Blackboard } from '../../ai/Blackboard';
 import { PerceptionComponentDataType } from '../../types/PerceptionComponentData.type';
 import { NoiseEventDispatcher } from '../../ai/NoiseEventDispatcher';
+import { BasePlayerController } from './BasePlayerController';
 
 /**
  * PerceptionComponent
@@ -67,6 +68,10 @@ export class PerceptionComponent extends Component {
   private playerCollider: CapsuleColliderComponent | null = null;
   private timer: number = 0;
   private prevCanSee: boolean = false;
+  /** Cached player controller for state queries (playerInAir, playerIsRetreating). */
+  private playerController: BasePlayerController | null = null;
+  /** Distance to player in the previous perception check — for retreating detection. */
+  private _prevDist: number = 0;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -124,6 +129,19 @@ export class PerceptionComponent extends Component {
     const dist = vec3.length(toPlayer);
 
     this.bb.set<number>('distToPlayer', dist);
+
+    // ── Player state — Bloque 4 contextual modifiers ──────────────────────────
+    if (this.playerController) {
+      // playerInAir: jugador en el aire y cayendo (útil para FastMelee que puede esquivarlo)
+      const inAir = !this.playerController.getIsGrounded() &&
+                    this.playerController.getVerticalVelocity() < -0.5;
+      this.bb.set<boolean>('playerInAir', inAir);
+
+      // playerIsRetreating: la distancia aumenta > 1.5 m/s entre checks (10 Hz → > 0.15 m/check)
+      const retreating = (dist - this._prevDist) / this.checkInterval > 1.5;
+      this.bb.set<boolean>('playerIsRetreating', retreating);
+    }
+    this._prevDist = dist;
 
     // ── Hearing — direct distance check ──────────────────────────────────────
     const canHear = dist <= this.hearRadius;
@@ -249,6 +267,7 @@ export class PerceptionComponent extends Component {
       if (entity.hasComponent(this.playerComponentKey)) {
         this.playerEntity = entity;
         this.playerCollider = entity.getComponent('capsule_collider') as CapsuleColliderComponent;
+        this.playerController = entity.getComponent('player_controller') as BasePlayerController | null;
         if (!this.playerCollider) {
           console.warn(
             'PerceptionComponent: player entity found but has no CapsuleColliderComponent.',

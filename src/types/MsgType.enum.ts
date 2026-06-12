@@ -13,6 +13,7 @@ export enum MsgType {
   ON_DAMAGED = 'on_damaged', // La entidad recibió daño (emitido por HealthComponent)
   ON_DEATH = 'on_death', // La entidad murió   (emitido por HealthComponent)
   ON_HEALED = 'on_healed', // La entidad fue curada (emitido por HealthComponent)
+  PARRY_HIT = 'parry_hit', // El jugador ha parado un ataque enemigo (emitido por combate del jugador)
 
   // ── Física / Colisiones ────────────────────────────────────────────────
   ON_CONTACT = 'on_contact', // Contacto físico (balas, trampas, etc.)

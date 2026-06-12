@@ -294,5 +294,6 @@ export class HeavyMixedController extends EnemyControllerComponent {
       (comp as HeavyMixedController).onDeath();
     });
     EnemyControllerComponent.registerDamagedHandler('heavy_mixed_controller');
+    EnemyControllerComponent.registerParryHitHandler('heavy_mixed_controller');
   }
 }

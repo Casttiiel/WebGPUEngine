@@ -52,6 +52,7 @@ import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
 import { GrappleTargetComponent } from '../../components/game/GrappleTargetComponent';
 import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
+import { CombatDirectorComponent } from '../../components/game/CombatDirectorComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -204,6 +205,7 @@ export class Engine {
     FastMeleeController.registerMsgs();
     TankMeleeController.registerMsgs();
     HeavyMixedController.registerMsgs();
+    CombatDirectorComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
   }

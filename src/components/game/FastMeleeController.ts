@@ -145,5 +145,6 @@ export class FastMeleeController extends EnemyControllerComponent {
       (comp as FastMeleeController).onDeath();
     });
     EnemyControllerComponent.registerDamagedHandler('fast_melee_controller');
+    EnemyControllerComponent.registerParryHitHandler('fast_melee_controller');
   }
 }

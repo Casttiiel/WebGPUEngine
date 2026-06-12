@@ -113,5 +113,6 @@ export class PassiveRangerController extends EnemyControllerComponent {
       (comp as PassiveRangerController).onDeath();
     });
     EnemyControllerComponent.registerDamagedHandler('passive_ranger_controller');
+    EnemyControllerComponent.registerParryHitHandler('passive_ranger_controller');
   }
 }

@@ -1,5 +1,9 @@
 ### Engine
 
+Quitar daño entre enemigos
+Enemigo se acerca al jugador y no vuelve hacia atras? es lo esperado?
+Enemigos pesados meh, elimina todos los enemigos y deja solo el dummy y otro que crees que sera el que usaremos como enemigo basico en el hack and slash game
+
 6. Partículas: ribbons, meshes, beams
 
 Qué falta: El sistema actual solo hace billboards. UE5's Niagara tiene ribbons (fuego, humo), mesh emitters (fragmentos), beams (rayos)

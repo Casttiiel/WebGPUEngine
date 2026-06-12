@@ -22,6 +22,8 @@ import { ChargeTargetComponent } from './ChargeTargetComponent';
 import { Material } from '../../renderer/resources/Material';
 import { RenderComponent } from '../render/RenderComponent';
 import { CombatDirectorComponent } from './CombatDirectorComponent';
+import { CombatEventBus } from '../../ai/CombatEventBus';
+import { EnemyRole } from '../../types/EnemyRole.enum';
 
 /**
  * EnemyControllerComponent
@@ -103,6 +105,10 @@ export class EnemyControllerComponent extends Component implements IKickable {
   private dead: boolean = false;
   /** True while this enemy holds a combat token (may enter attack behavior). */
   private _hasAttackToken: boolean = false;
+  /** Previous canSeePlayer value — used to detect first-sight for player_spotted event. */
+  private _prevCanSeePlayer: boolean = false;
+  /** CombatEventBus unsubscribe functions — cleaned up in dispose(). */
+  private _eventUnsubs: Array<() => void> = [];
   /** BloodDrainSourceComponent on the same entity, activated on death. */
   private bloodDrainSource: BloodDrainSourceComponent | null = null;
   /** Cloned material for per-enemy debug tinting (yellow=chargeable, red=dead). */
@@ -202,6 +208,28 @@ export class EnemyControllerComponent extends Component implements IKickable {
 
     EnemyControllerComponent._registry.add(this);
 
+    // ── Bloque 5: suscribirse a eventos de grupo ──────────────────────────────
+    this._eventUnsubs.push(
+      // Otro enemigo ha visto al jugador → investigar esa posición si no tenemos pista
+      CombatEventBus.on('player_spotted', (payload) => {
+        if (this.dead || this.bb.get<boolean>('canSeePlayer') || this.bb.get<boolean>('hasLastKnown')) return;
+        if (!payload.position) return;
+        this.bb.set<boolean>('hasLastKnown', true);
+        const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
+        vec3.set(stored, payload.position[0], payload.position[1], payload.position[2]);
+        this.bb.set('playerPosition', stored);
+      }),
+      // Un aliado ha muerto → si estamos sin pista, investigar en su última posición
+      CombatEventBus.on('ally_dead', (payload) => {
+        if (this.dead || this.bb.get<boolean>('canSeePlayer') || this.bb.get<boolean>('hasLastKnown')) return;
+        if (!payload.position) return;
+        this.bb.set<boolean>('hasLastKnown', true);
+        const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
+        vec3.set(stored, payload.position[0], payload.position[1], payload.position[2]);
+        this.bb.set('playerPosition', stored);
+      }),
+    );
+
     // Clone the material so per-enemy tinting doesn't affect shared GPU data.
     const renderComp = this.getOwner().getComponent('render') as RenderComponent | null;
     const firstPart = renderComp?.getParts()[0];
@@ -254,6 +282,14 @@ export class EnemyControllerComponent extends Component implements IKickable {
 
     // 4b. Derive current AI state from blackboard for the on-screen display
     const canSee = this.bb.get<boolean>('canSeePlayer', false);
+    // First-sight: broadcast to group so idle allies get alerted
+    if (canSee && !this._prevCanSeePlayer) {
+      const playerPos = this.bb.get<vec3>('playerPosition');
+      if (playerPos) {
+        CombatEventBus.emit('player_spotted', { position: [playerPos[0], playerPos[1], playerPos[2]] });
+      }
+    }
+    this._prevCanSeePlayer = canSee;
     // Release attack token the moment we stop seeing the player
     if (!canSee) this.releaseAttackToken();
     const hasLast = this.bb.get<boolean>('hasLastKnown', false);
@@ -554,6 +590,7 @@ export class EnemyControllerComponent extends Component implements IKickable {
       (comp as EnemyControllerComponent).onDeath();
     });
     EnemyControllerComponent.registerDamagedHandler('enemy_controller');
+    EnemyControllerComponent.registerParryHitHandler('enemy_controller');
   }
 
   /**
@@ -563,6 +600,16 @@ export class EnemyControllerComponent extends Component implements IKickable {
   protected static registerDamagedHandler(key: string): void {
     MsgDispatcher.register(MsgType.ON_DAMAGED, key, (comp) => {
       (comp as EnemyControllerComponent).onDamaged();
+    });
+  }
+
+  /**
+   * Registers a PARRY_HIT handler for the given component key.
+   * Call from each subclass's registerMsgs() so parry stagger fires regardless of enemy type.
+   */
+  protected static registerParryHitHandler(key: string): void {
+    MsgDispatcher.register(MsgType.PARRY_HIT, key, (comp) => {
+      (comp as EnemyControllerComponent).onParryHit();
     });
   }
 
@@ -582,9 +629,21 @@ export class EnemyControllerComponent extends Component implements IKickable {
     this.applyKnockback(impulse, 0.3);
   }
 
+  protected onParryHit(): void {
+    if (this.dead || this.isStunned()) return;
+    // Upward stagger — longer suppression than a normal step-back
+    const impulse = vec3.fromValues(0, 3.0, 0);
+    this.applyKnockback(impulse, 0.7);
+  }
+
   protected onDeath(): void {
     this.dead = true;
     this.releaseAttackToken();
+    // Broadcast death to allies so idle enemies investigate the combat area
+    const pos = this.bb.get<vec3>('position');
+    if (pos) {
+      CombatEventBus.emit('ally_dead', { position: [pos[0], pos[1], pos[2]] });
+    }
     // Zero out the rigid body velocity so physics doesn't keep sliding the corpse.
     this.capsuleCollider?.getRigidBody().setLinvel({ x: 0, y: 0, z: 0 }, true);
     if (this.stateEl) this.stateEl.textContent = 'AI: DEAD';
@@ -615,7 +674,12 @@ export class EnemyControllerComponent extends Component implements IKickable {
     const dir = CombatDirectorComponent.instance;
     if (!dir) { this._hasAttackToken = true; return true; }
     if (this._hasAttackToken) return true;
-    if (dir.acquireToken(this)) { this._hasAttackToken = true; return true; }
+    if (dir.acquireToken(this)) {
+      this._hasAttackToken = true;
+      const pos = this.bb.get<vec3>('position');
+      if (pos) CombatEventBus.emit('ally_attacking', { position: [pos[0], pos[1], pos[2]] });
+      return true;
+    }
     return false;
   }
 
@@ -649,9 +713,12 @@ export class EnemyControllerComponent extends Component implements IKickable {
 
   /**
    * Orbit radius used by CircleStrafeAction while waiting for an attack token.
-   * Override in subclasses: ranged enemies prefer larger values, melee prefer smaller.
+   * HARASSER role (set by CombatDirectorComponent) orbits farther to stay safe.
+   * Override in subclasses to tune per-enemy type.
    */
   protected getPreferredStrafeRange(): number {
+    const dir = CombatDirectorComponent.instance;
+    if (dir?.getRole(this) === EnemyRole.HARASSER) return 18;
     return 12;
   }
 
@@ -679,6 +746,8 @@ export class EnemyControllerComponent extends Component implements IKickable {
 
   public override dispose(): void {
     EnemyControllerComponent._registry.delete(this);
+    for (const unsub of this._eventUnsubs) unsub();
+    this._eventUnsubs.length = 0;
     this.stateEl?.remove();
     this.stateEl = null;
     this.clonedMaterial?.release();
