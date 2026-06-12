@@ -812,6 +812,7 @@ export class ModuleRender extends Module {
         tryRender('auto_exposure', (c) => c as AutoExposureComponent);
         tryRender('god_rays', (c) => c as GodRaysComponent);
         tryRender('fsr', (c) => c as FSRComponent);
+        tryRender('tsr', (c) => c as TSRComponent);
         tryRender('taa', (c) => c as TAAComponent);
         tryRender('ambient_occlusion', (c) => c as AmbientOcclusionComponent);
         tryRender('contact_shadows', (c) => c as ContactShadowsComponent);

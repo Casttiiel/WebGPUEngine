@@ -365,6 +365,7 @@ export class VolumetricClouds {
 
   public renderInMenu(folder: any): void {
     const f = folder.addFolder('Volumetric Clouds');
+    f.close();
     f.add(this, 'cloudBase', 0, 5000, 10).name('Base (m)');
     f.add(this, 'cloudTop', 100, 8000, 10).name('Top (m)');
     f.add(this, 'coverage', 0, 1, 0.01).name('Coverage');

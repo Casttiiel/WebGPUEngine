@@ -1,7 +1,6 @@
 import { Component } from '../../core/ecs/Component';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
-import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
@@ -340,24 +339,13 @@ export class TSRComponent extends Component {
 
   public update(_dt: number): void {}
 
-  public override renderInMenu(): void {
-    const gui = Engine.getGUI();
-    if (!gui.getIsVisible()) return;
-
-    if (!gui.beginWindow('TSR', true)) return;
-
-    const folder = (gui as any).folders?.get('TSR');
-    if (!folder) {
-      gui.endWindow();
-      return;
-    }
-
-    folder.add(this.tsrParams, 'enabled').name('Enabled').listen();
-    folder.add(this.tsrParams, 'blendFactor', 0.01, 0.5, 0.01).name('Blend Factor').listen();
-    folder.add(this.tsrParams, 'gamma', 0.5, 2.0, 0.05).name('Clamp Gamma').listen();
-    folder.add(this.tsrParams, 'sharpenStrength', 0.0, 1.0, 0.05).name('Sharpen Strength').listen();
-
-    gui.endWindow();
+  public override renderInMenu(parentFolder?: any): void {
+    if (!parentFolder) return;
+    const f = parentFolder.addFolder('TSR');
+    f.add(this.tsrParams, 'enabled').name('Enabled').listen();
+    f.add(this.tsrParams, 'blendFactor', 0.01, 0.5, 0.01).name('Blend Factor').listen();
+    f.add(this.tsrParams, 'gamma', 0.5, 2.0, 0.05).name('Clamp Gamma').listen();
+    f.add(this.tsrParams, 'sharpenStrength', 0.0, 1.0, 0.05).name('Sharpen Strength').listen();
   }
 
   public debugInMenu(): void {}

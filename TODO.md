@@ -1,10 +1,57 @@
 ### Engine
 
-1. Character animator
+1. Chromatic Aberration + Film Grain + Vignette
+
+Qué falta: Tres micro-efectos de cámara que UE5 tiene por defecto en su stack cinematic
+Impacto visual: Transforma el aspecto de "render WebGL" en "render cinematográfico". Sin ellos todo parece CG puro.
+Esfuerzo: MUY BAJO. Cada uno es 10-30 líneas de shader en el pass de tone mapping
+Estado actual: Solo tienes lens flare y DOF. Cero aberración, grano ni viñeta
+
+2. PCSS — Percentage-Closer Soft Shadows
+
+Qué falta: Sombras con penumbra variable según distancia al caster. UE5 usa Virtual Shadow Maps que dan penumbras físicamente correctas
+Impacto visual: Es quizás la diferencia visual más grande entre indie y AAA. Tus sombras actuales tienen Poisson PCF fijo — misma softness a 1m y a 100m del objeto
+Esfuerzo: MEDIO. Añadir PCSS sobre el CSM existente: busca el blocker distance en el shadow map, ajusta el kernel radius proporcionalmente
+Estado actual: Poisson disk 8 taps de radio fijo
+
+6. Partículas: ribbons, meshes, beams
+
+Qué falta: El sistema actual solo hace billboards. UE5's Niagara tiene ribbons (fuego, humo), mesh emitters (fragmentos), beams (rayos)
+Impacto visual: Alto para efectos de juego. Explosiones, magia, sangre — todo se ve básico sin ribbons
+Esfuerzo: MEDIO-ALTO por cada tipo. Ya tienes compute particles, añadir ribbon requiere strip geometry generado en compute
+Estado actual: Solo billboards GPU. Ya tienes el componente trail separado que podría integrarse
+
+8. Reflejos planares (Planar Reflections)
+
+Qué falta: Renderizar la escena desde una cámara reflejada y proyectarla en superficies planas. Esencial para suelos brillantes, espejos, agua estática
+Impacto visual: ALTO para escenas con agua o suelos reflectantes. SSR falla en ángulos grazing — planar reflections los cubre
+Esfuerzo: MEDIO-ALTO. Render pass adicional con cámara invertida + clip plane
+Estado actual: Solo SSR (falla en ángulos grazing y cuando el reflejo sale de pantalla)
+
+10. Contact shadows para point/spot lights
+
+Qué falta: Tus contact shadows solo aplican a la luz direccional. Las luces puntuales no tienen contact shadows — objetos cerca de una lámpara no proyectan su sombra de contacto
+Impacto visual: Medio. Muy visible en interiores iluminados con point lights
+Esfuerzo: MEDIO. Extensión del sistema actual para otras luces
+Estado actual: Solo directional light contact shadows
+
+11. Hi-Z SSR (mejor calidad de reflecciones)
+
+Qué falta: Tu SSR usa ray marching lineal. UE5 usa Hi-Z (Hierarchical Z) que permite pasos exponenciales — llega mucho más lejos con menos samples, menos banda de ruido
+Esfuerzo: MEDIO. Usa el HZB que ya tienes construido
+Estado actual: Ray march lineal con blue noise
+
+13. Temporal upscaling mejorado (TSR con optical flow)
+
+Qué falta: El TSR actual usa velocity buffer. UE5's TSR usa optical flow para objetos sin velocity (vegetación, partículas)
+Esfuerzo: ALTO
+Estado actual: TSR con velocity buffer estándar
+
+1. Better foot IK (distance) + foot angle
+2. Character animator
    TurnLeft_90 + TurnRight_90 — pivotes en sitio cuando estás parado y giras > 45°
    TurnLeft_180 / TurnRight_180 — para inversión de dirección
-2. Para IK en giros pequeños: Un LookAt IK en la cabeza/spine cuando el ángulo entre facing y velocity es < 30°. AnimatorComponent.addIkConstraint() ya lo soporta, solo necesitas el nombre del joint en el esqueleto.
-3. Anamorphic lens flare
+3. Para IK en giros pequeños: Un LookAt IK en la cabeza/spine cuando el ángulo entre facing y velocity es < 30°. AnimatorComponent.addIkConstraint() ya lo soporta, solo necesitas el nombre del joint en el esqueleto.
 4. Editor Camera (Render Debug / Gizmo / Menu)
 5. Material Instances
 6. [Blender] GLTF Exporter unifies metaltlic and roughness? In right channel?
