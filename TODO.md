@@ -1,30 +1,16 @@
 ### Engine
 
-1. Contact shadows para point/spot lights
-
-2. Hi-Z SSR (mejor calidad de reflecciones)
-
-Qué falta: Tu SSR usa ray marching lineal. UE5 usa Hi-Z (Hierarchical Z) que permite pasos exponenciales — llega mucho más lejos con menos samples, menos banda de ruido
-Esfuerzo: MEDIO. Usa el HZB que ya tienes construido
-Estado actual: Ray march lineal con blue noise
-
-3. Temporal upscaling mejorado (TSR con optical flow)
-
-Qué falta: El TSR actual usa velocity buffer. UE5's TSR usa optical flow para objetos sin velocity (vegetación, partículas)
-Esfuerzo: ALTO
-Estado actual: TSR con velocity buffer estándar
-
-4. Better foot IK foot angle + walking
+1. IA
+2. Better foot IK foot angle + walking
+3. Hi-Z SSR (mejor calidad de reflecciones)
+4. Temporal upscaling mejorado (TSR con optical flow para objetos sin velocity) (Y con velocity?)
 5. Character animator
-   TurnLeft_90 + TurnRight_90 — pivotes en sitio cuando estás parado y giras > 45°
-   TurnLeft_180 / TurnRight_180 — para inversión de dirección
-6. Para IK en giros pequeños: Un LookAt IK en la cabeza/spine cuando el ángulo entre facing y velocity es < 30°. AnimatorComponent.addIkConstraint() ya lo soporta, solo necesitas el nombre del joint en el esqueleto.
-7. Editor Camera (Render Debug / Gizmo / Menu)
-8. Material Instances
-9. [Blender] GLTF Exporter unifies metaltlic and roughness? In right channel?
-10. Procedural materials
-11. World Partition / Scene Streaming
-12. LOD automático para meshes
+6. Editor Camera (Render Debug / Gizmo / Menu)
+7. Material Instances
+8. [Blender] GLTF Exporter unifies metaltlic and roughness? In right channel?
+9. Procedural materials
+10. World Partition / Scene Streaming
+11. LOD automático para meshes
     Integrar meshoptimizer (npm, WASM oficial) en el pipeline de carga de Mesh.ts. Al cargar un .glb/mesh, generar 3 niveles de LOD en CPU con meshopt_simplify (error cuadrático). El GPUCullingManager ya tiene distancia a cámara por objeto — seleccionar el LOD activo en el buffer de culling según umbral de distancia configurable. Incluye LOD crossfade con dithering para transiciones invisibles (el campo lodFadeStart ya existe en GrassVolumeComponent, el patrón está definido).
 
 ## VFX
@@ -37,12 +23,12 @@ Estado actual: TSR con velocity buffer estándar
 ## Gameplay
 
 Jump / Double Jump
-Mantle
 Maintain Gravity
 Dash
 Light Attack
 Push Attack
 Lift Attack
+Mantle
 (Batman Arkham style)
 
 ## Visuals and Sound

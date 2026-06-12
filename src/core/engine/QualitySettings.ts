@@ -141,7 +141,7 @@ export class QualitySettings {
       aoSampleCount: 8.0,
       aoRadius: 1.5,
       aoStrength: 1.0,
-      aoSliceCount: 6.0,
+      aoSliceCount: 4.0,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',

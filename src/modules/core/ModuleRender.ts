@@ -827,9 +827,19 @@ export class ModuleRender extends Module {
     // Get main camera for post-processing components
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
     if (mainCamera && this.beginGUIWindow('Post-Processing')) {
+      // First-time creation: populate renderer-owned items (deferred pipeline controls).
+      const ppFolderInit = (gui as any).folders?.get('Post-Processing');
+      if (ppFolderInit) this.deferred.renderPostProcessingMenu(ppFolderInit);
+      this.endGUIWindow();
+    }
+
+    // Register component controls every frame — each renderInMenu is idempotent via
+    // _editorFolder, so this is safe even though beginGUIWindow only returns true once.
+    // Running it every frame allows late-loading components (e.g. GTAO) to appear in
+    // the panel as soon as hasLoaded() becomes true.
+    if (mainCamera) {
       const ppFolder = (gui as any).folders?.get('Post-Processing');
       if (ppFolder) {
-        this.deferred.renderPostProcessingMenu(ppFolder);
         const tryRender = (key: string, cast: (c: any) => any) => {
           if (!mainCamera.hasComponent(key)) return;
           const c = cast(mainCamera.getComponent(key));
@@ -847,7 +857,6 @@ export class ModuleRender extends Module {
         tryRender('chromatic_aberration', (c) => c as ChromaticAberrationComponent);
         tryRender('film_grain', (c) => c as FilmGrainComponent);
       }
-      this.endGUIWindow();
     }
 
     // Profiler window

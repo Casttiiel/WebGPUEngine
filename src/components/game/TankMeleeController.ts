@@ -19,16 +19,26 @@ import { EnemyControllerComponentDataType } from '../../types/EnemyControllerCom
  * Advances relentlessly toward the player and swings an AoE melee attack
  * whenever in range — MeleeAttackComponent handles the cooldown internally.
  *
- * Counter-play: the WeakPoint child entity (sphere collider + WeakPointComponent)
- * amplifies 5× any direct hit. Players should aim precisely at it to bypass
- * the base damage resistance.
- *
- * `damageResistance` is configured on the HealthComponent in the prefab
- * (not on this class), using the standard HealthComponent scaling.
+ * Attack flow (with token system):
+ *   1. Acquire attack token via makeTryTokenNode (subject to per-attack cooldown).
+ *   2. Advance toward player and attack (advanceAndSwing).
+ *   3. During recovery window: back away from player.
+ *   4. Recovery ends → advanceAndSwing returns SUCCESS.
+ *   5. releaseAndCooldown releases the token and sets a 2 s cooldown.
+ *   6. During cooldown the enemy orbits (CircleStrafeAction).
  *
  * Component key: 'tank_melee_controller'
  */
 export class TankMeleeController extends EnemyControllerComponent {
+  // ── Per-attack state ──────────────────────────────────────────────────────
+  /** True while the enemy is in the post-swing recovery backing-up phase. */
+  private _wasInRecovery = false;
+  /**
+   * Timestamp (ms) before which the enemy must not attempt to acquire the
+   * attack token again. Reset to 0 on load / respawn.
+   */
+  private _attackCooldownUntil = 0;
+
   // ── Default stats ─────────────────────────────────────────────────────────
 
   public override async load(data: EnemyControllerComponentDataType): Promise<void> {
@@ -44,6 +54,8 @@ export class TankMeleeController extends EnemyControllerComponent {
   // ── Behavior Tree ─────────────────────────────────────────────────────────
 
   protected override buildTree(): BehaviorNode {
+    const tank = this; // captured reference to TankMeleeController for closures
+
     const canSee = () =>
       new Condition('CanSeePlayer', (bb) => bb.get<boolean>('canSeePlayer', false));
     const notAtHome = () =>
@@ -53,8 +65,17 @@ export class TankMeleeController extends EnemyControllerComponent {
         return !!pos && !!spawn && vec3.distance(pos, spawn) > 1.5;
       });
 
-    // Advance toward the player and swing AoE melee when in range.
-    // The tank never stops — MeleeAttackComponent manages its own cooldown.
+    // Wraps the base tryToken check with a per-attack cooldown guard.
+    // While cooldown is active the Sequence fails and the Selector falls
+    // through to CircleStrafeAction, letting the enemy orbit instead.
+    const tryTokenWithCooldown = new Condition('TryTokenCooldown', (_bb) => {
+      if (Date.now() < tank._attackCooldownUntil) return false;
+      return tank.tryAcquireAttackToken();
+    });
+
+    // Advance + swing.  Returns RUNNING while closing in and while in recovery.
+    // Returns SUCCESS the frame recovery ends — this drives the Sequence forward
+    // to releaseAndCooldown so the attack token is properly freed.
     const advanceAndSwing = new Action('TankAdvanceAndSwing', (bb) => {
       const self = bb.get<EnemyControllerComponent>('self')!;
       const pos = bb.get<vec3>('position')!;
@@ -70,25 +91,42 @@ export class TankMeleeController extends EnemyControllerComponent {
       const melee = self.getOwner().getComponent('melee_attack') as MeleeAttackComponent | null;
 
       if (melee?.isInRecovery()) {
-        // Back away from player during post-swing recovery
+        // Post-swing recovery: back away so the player has room to react
+        tank._wasInRecovery = true;
         if (dist > 0.1) {
           const awayDir = vec3.normalize(vec3.create(), vec3.negate(vec3.create(), dir));
           self.setDesiredHorizontal(awayDir);
         }
-      } else {
-        if (dist > 0.3) {
-          vec3.normalize(dir, dir);
-          self.setDesiredHorizontal(dir);
-        }
-        // Attempt swing — MeleeAttackComponent handles range check + cooldown
-        if (melee && melee.canAttack(target, pos)) {
-          const tc = self.getOwner().getComponent('transform') as TransformComponent | null;
-          const center = (tc?.getTransform().getWorldPosition() ?? pos) as vec3;
-          melee.attack(center);
-        }
+        return Status.RUNNING;
+      }
+
+      if (tank._wasInRecovery) {
+        // Recovery just ended this frame — signal attack complete
+        tank._wasInRecovery = false;
+        return Status.SUCCESS;
+      }
+
+      // Advance toward player and attempt swing
+      if (dist > 0.3) {
+        vec3.normalize(dir, dir);
+        self.setDesiredHorizontal(dir);
+      }
+      if (melee && melee.canAttack(target, pos)) {
+        const tc = self.getOwner().getComponent('transform') as TransformComponent | null;
+        const center = (tc?.getTransform().getWorldPosition() ?? pos) as vec3;
+        melee.attack(center);
       }
 
       return Status.RUNNING;
+    });
+
+    // Runs after advanceAndSwing succeeds.  Releases the attack token and
+    // starts a cooldown so other enemies get a turn before this one attacks again.
+    const releaseAndCooldown = new Action('ReleaseToken', (_bb) => {
+      tank.releaseAttackToken();
+      tank._wasInRecovery = false;
+      tank._attackCooldownUntil = Date.now() + 2000; // 2 s orbit cooldown
+      return Status.SUCCESS;
     });
 
     const moveDirectlyTo = (
@@ -115,12 +153,14 @@ export class TankMeleeController extends EnemyControllerComponent {
 
     return new Selector(
       [
-        // 1. COMBAT — token granted → advance; no token → slow orbit at mid range
+        // 1. COMBAT
+        //    token + cooldown OK → advance, swing, release token, orbit cooldown
+        //    no token or cooldown active → orbit at mid range
         new Sequence(
           [
             canSee(),
             new Selector([
-              new Sequence([this.makeTryTokenNode(), advanceAndSwing]),
+              new Sequence([tryTokenWithCooldown, advanceAndSwing, releaseAndCooldown]),
               new CircleStrafeAction({ preferredRange: 5 }),
             ]),
           ],

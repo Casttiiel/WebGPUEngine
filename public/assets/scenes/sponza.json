@@ -12,7 +12,7 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/lynx_character.prefab"
+    "prefab": "characters/parkour_character_3p.prefab"
   },
   {
     "prefab": "cameras/debug_camera.prefab"
@@ -23,7 +23,9 @@
   {
     "prefab": "effects/water_decal.prefab"
   },
-
+  {
+    "prefab": "primitives/ground.prefab"
+  },
   {
     "prefab": "lighting/point_light.prefab"
   },
