@@ -42,6 +42,9 @@ import { FastMeleeController } from '../../components/game/FastMeleeController';
 import { TankMeleeController } from '../../components/game/TankMeleeController';
 import { HeavyMixedController } from '../../components/game/HeavyMixedController';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
+import { ChromaticAberrationComponent } from '../../components/render/ChromaticAberrationComponent';
+import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
+import { VignetteComponent } from '../../components/render/VignetteComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
@@ -183,6 +186,9 @@ export class Engine {
     ContactShadowsComponent.registerMsgs();
     BloodDrainSourceComponent.registerMsgs();
     LensFlareComponent.registerMsgs();
+    ChromaticAberrationComponent.registerMsgs();
+    FilmGrainComponent.registerMsgs();
+    VignetteComponent.registerMsgs();
     HeightFogComponent.registerMsgs();
     AtmosphericFogComponent.registerMsgs();
     // Triggers / Física — TRIGGER_ENTER / TRIGGER_EXIT

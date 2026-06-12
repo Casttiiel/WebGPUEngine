@@ -12,6 +12,14 @@
     "bloom": {},
     "auto_exposure": {},
     "lens_flare": {},
-    "atmospheric_fog": {}
+    "atmospheric_fog": {},
+    "vignette": {
+      "intensity": 0.2,
+      "smoothness": 0.2
+    },
+    "chromatic_aberration": {
+      "intensity": 0.5,
+      "startOffset": 0
+    }
   }
 }

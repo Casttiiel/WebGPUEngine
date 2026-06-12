@@ -37,6 +37,9 @@ import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
+import { ChromaticAberrationComponent } from '../../components/render/ChromaticAberrationComponent';
+import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
+import { VignetteComponent } from '../../components/render/VignetteComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
@@ -531,6 +534,29 @@ export class ModuleRender extends Module {
         }
       }
 
+      if (mainCameraEntity?.hasComponent('vignette')) {
+        const vignette = mainCameraEntity.getComponent('vignette') as VignetteComponent;
+        if (vignette.hasLoaded()) {
+          result = vignette.apply(result);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('chromatic_aberration')) {
+        const ca = mainCameraEntity.getComponent(
+          'chromatic_aberration',
+        ) as ChromaticAberrationComponent;
+        if (ca.hasLoaded()) {
+          result = ca.apply(result);
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('film_grain')) {
+        const filmGrain = mainCameraEntity.getComponent('film_grain') as FilmGrainComponent;
+        if (filmGrain.hasLoaded()) {
+          result = filmGrain.apply(result, this.lastDt);
+        }
+      }
+
       if (mainCameraEntity?.hasComponent('speed_lines_vfx')) {
         const speedLines = mainCameraEntity.getComponent(
           'speed_lines_vfx',
@@ -817,6 +843,9 @@ export class ModuleRender extends Module {
         tryRender('ambient_occlusion', (c) => c as AmbientOcclusionComponent);
         tryRender('contact_shadows', (c) => c as ContactShadowsComponent);
         tryRender('atmospheric_fog', (c) => c as AtmosphericFogComponent);
+        tryRender('vignette', (c) => c as VignetteComponent);
+        tryRender('chromatic_aberration', (c) => c as ChromaticAberrationComponent);
+        tryRender('film_grain', (c) => c as FilmGrainComponent);
       }
       this.endGUIWindow();
     }

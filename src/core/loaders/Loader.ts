@@ -54,6 +54,9 @@ import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
+import { ChromaticAberrationComponent } from '../../components/render/ChromaticAberrationComponent';
+import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
+import { VignetteComponent } from '../../components/render/VignetteComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { SpiderControllerComponent } from '../../components/game/SpiderControllerComponent';
 import { LynxControllerComponent } from '../../components/game/LynxControllerComponent';
@@ -340,6 +343,12 @@ export class Loader {
         return new TAAComponent();
       case 'tsr':
         return new TSRComponent();
+      case 'chromatic_aberration':
+        return new ChromaticAberrationComponent();
+      case 'film_grain':
+        return new FilmGrainComponent();
+      case 'vignette':
+        return new VignetteComponent();
       case 'reflection_probe':
         return new ReflectionProbeComponent();
       case 'ambient_occlusion':
