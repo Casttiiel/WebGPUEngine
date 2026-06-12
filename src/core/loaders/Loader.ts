@@ -87,6 +87,7 @@ import { AggressiveRangerController } from '../../components/game/AggressiveRang
 import { FastMeleeController } from '../../components/game/FastMeleeController';
 import { TankMeleeController } from '../../components/game/TankMeleeController';
 import { HeavyMixedController } from '../../components/game/HeavyMixedController';
+import { CombatDirectorComponent } from '../../components/game/CombatDirectorComponent';
 import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
@@ -428,6 +429,8 @@ export class Loader {
         return new TankMeleeController();
       case 'heavy_mixed_controller':
         return new HeavyMixedController();
+      case 'combat_director':
+        return new CombatDirectorComponent();
       case 'perception':
         return new PerceptionComponent();
       case 'projectile':

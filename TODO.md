@@ -1,12 +1,5 @@
 ### Engine
 
-2. PCSS — Percentage-Closer Soft Shadows
-
-Qué falta: Sombras con penumbra variable según distancia al caster. UE5 usa Virtual Shadow Maps que dan penumbras físicamente correctas
-Impacto visual: Es quizás la diferencia visual más grande entre indie y AAA. Tus sombras actuales tienen Poisson PCF fijo — misma softness a 1m y a 100m del objeto
-Esfuerzo: MEDIO. Añadir PCSS sobre el CSM existente: busca el blocker distance en el shadow map, ajusta el kernel radius proporcionalmente
-Estado actual: Poisson disk 8 taps de radio fijo
-
 6. Partículas: ribbons, meshes, beams
 
 Qué falta: El sistema actual solo hace billboards. UE5's Niagara tiene ribbons (fuego, humo), mesh emitters (fragmentos), beams (rayos)
@@ -40,7 +33,7 @@ Qué falta: El TSR actual usa velocity buffer. UE5's TSR usa optical flow para o
 Esfuerzo: ALTO
 Estado actual: TSR con velocity buffer estándar
 
-1. Better foot IK foot angle
+1. Better foot IK foot angle + walking
 2. Character animator
    TurnLeft_90 + TurnRight_90 — pivotes en sitio cuando estás parado y giras > 45°
    TurnLeft_180 / TurnRight_180 — para inversión de dirección

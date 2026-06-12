@@ -13,6 +13,7 @@ import { BehaviorNode } from '../../ai/BehaviorNode';
 import { RequestPathAction } from '../../ai/nodes/RequestPathAction';
 import { SteerAction } from '../../ai/nodes/SteerAction';
 import { ShootAction } from '../../ai/nodes/ShootAction';
+import { CircleStrafeAction } from '../../ai/nodes/CircleStrafeAction';
 import { EnemyControllerComponentDataType } from '../../types/EnemyControllerComponentData.type';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
@@ -20,6 +21,7 @@ import { BloodDrainSourceComponent } from './BloodDrainSourceComponent';
 import { ChargeTargetComponent } from './ChargeTargetComponent';
 import { Material } from '../../renderer/resources/Material';
 import { RenderComponent } from '../render/RenderComponent';
+import { CombatDirectorComponent } from './CombatDirectorComponent';
 
 /**
  * EnemyControllerComponent
@@ -99,6 +101,8 @@ export class EnemyControllerComponent extends Component implements IKickable {
   private stateEl: HTMLElement | null = null;
   /** True once ON_DEATH received — stops the AI update loop. */
   private dead: boolean = false;
+  /** True while this enemy holds a combat token (may enter attack behavior). */
+  private _hasAttackToken: boolean = false;
   /** BloodDrainSourceComponent on the same entity, activated on death. */
   private bloodDrainSource: BloodDrainSourceComponent | null = null;
   /** Cloned material for per-enemy debug tinting (yellow=chargeable, red=dead). */
@@ -250,6 +254,8 @@ export class EnemyControllerComponent extends Component implements IKickable {
 
     // 4b. Derive current AI state from blackboard for the on-screen display
     const canSee = this.bb.get<boolean>('canSeePlayer', false);
+    // Release attack token the moment we stop seeing the player
+    if (!canSee) this.releaseAttackToken();
     const hasLast = this.bb.get<boolean>('hasLastKnown', false);
     const bbSpawn = this.bb.get<vec3>('spawnPosition');
     const bbPosNow = this.bb.get<vec3>('position');
@@ -479,10 +485,18 @@ export class EnemyControllerComponent extends Component implements IKickable {
 
     return new Selector(
       [
-        // ── 1. SHOOT (player visible) ──────────────────────────────────────
-        new Sequence([canSee(), this.createShootAction()], {
-          reactive: true,
-        }),
+        // ── 1. COMBAT (player visible) ────────────────────────────────────
+        // Has token → attack. No token → circle strafe while waiting.
+        new Sequence(
+          [
+            canSee(),
+            new Selector([
+              new Sequence([this.makeTryTokenNode(), this.createShootAction()]),
+              new CircleStrafeAction({ preferredRange: this.getPreferredStrafeRange() }),
+            ]),
+          ],
+          { reactive: true },
+        ),
 
         // ── 3. INVESTIGATE (NavMesh) ─────────────────────────────────────────
         // Goes to last known player position. clearInvestigation fires once
@@ -539,10 +553,38 @@ export class EnemyControllerComponent extends Component implements IKickable {
     MsgDispatcher.register(MsgType.ON_DEATH, 'enemy_controller', (comp) => {
       (comp as EnemyControllerComponent).onDeath();
     });
+    EnemyControllerComponent.registerDamagedHandler('enemy_controller');
+  }
+
+  /**
+   * Registers an ON_DAMAGED handler for the given component key.
+   * Call from each subclass's registerMsgs() so step-back fires regardless of enemy type.
+   */
+  protected static registerDamagedHandler(key: string): void {
+    MsgDispatcher.register(MsgType.ON_DAMAGED, key, (comp) => {
+      (comp as EnemyControllerComponent).onDamaged();
+    });
+  }
+
+  protected onDamaged(): void {
+    if (this.dead || this.isStunned()) return;
+    const pos = this.bb.get<vec3>('position');
+    const playerPos = this.bb.get<vec3>('playerPosition');
+    if (!pos || !playerPos) return;
+
+    const awayX = pos[0] - playerPos[0];
+    const awayZ = pos[2] - playerPos[2];
+    const len = Math.sqrt(awayX * awayX + awayZ * awayZ);
+    if (len < 0.01) return;
+
+    // Short hop-back: weak horizontal push + slight upward lift
+    const impulse = vec3.fromValues((awayX / len) * 3.5, 1.5, (awayZ / len) * 3.5);
+    this.applyKnockback(impulse, 0.3);
   }
 
   protected onDeath(): void {
     this.dead = true;
+    this.releaseAttackToken();
     // Zero out the rigid body velocity so physics doesn't keep sliding the corpse.
     this.capsuleCollider?.getRigidBody().setLinvel({ x: 0, y: 0, z: 0 }, true);
     if (this.stateEl) this.stateEl.textContent = 'AI: DEAD';
@@ -560,6 +602,57 @@ export class EnemyControllerComponent extends Component implements IKickable {
       const result = quat.multiply(quat.create(), qCurr, q180Z);
       rb.setRotation({ x: result[0], y: result[1], z: result[2], w: result[3] }, true);
     }
+  }
+
+  // ─── Combat token API ──────────────────────────────────────────────────────
+
+  /**
+   * Try to acquire an attack token from the CombatDirectorComponent.
+   * Returns true if the token was granted (or already held).
+   * Returns true unconditionally when no Director is in the scene (graceful fallback).
+   */
+  public tryAcquireAttackToken(): boolean {
+    const dir = CombatDirectorComponent.instance;
+    if (!dir) { this._hasAttackToken = true; return true; }
+    if (this._hasAttackToken) return true;
+    if (dir.acquireToken(this)) { this._hasAttackToken = true; return true; }
+    return false;
+  }
+
+  /** Release the token. Safe to call when not holding one. */
+  public releaseAttackToken(): void {
+    if (!this._hasAttackToken) return;
+    this._hasAttackToken = false;
+    CombatDirectorComponent.instance?.releaseToken(this);
+  }
+
+  public hasAttackToken(): boolean {
+    return this._hasAttackToken;
+  }
+
+  /**
+   * BT Condition node: returns SUCCESS if a token was acquired, FAILURE otherwise.
+   * Use inside a Selector so the fallback branch (CircleStrafeAction) runs when
+   * no token is available:
+   *
+   *   new Selector([
+   *     new Sequence([this.makeTryTokenNode(), attackNode]),
+   *     new CircleStrafeAction({ preferredRange: this.getPreferredStrafeRange() }),
+   *   ])
+   */
+  protected makeTryTokenNode(): BehaviorNode {
+    return new Action('TryToken', (bb) => {
+      const self = bb.get<EnemyControllerComponent>('self')!;
+      return self.tryAcquireAttackToken() ? Status.SUCCESS : Status.FAILURE;
+    });
+  }
+
+  /**
+   * Orbit radius used by CircleStrafeAction while waiting for an attack token.
+   * Override in subclasses: ranged enemies prefer larger values, melee prefer smaller.
+   */
+  protected getPreferredStrafeRange(): number {
+    return 12;
   }
 
   // ─── Debug helpers ─────────────────────────────────────────────────────────

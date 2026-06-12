@@ -373,5 +373,40 @@
   },
   {
     "prefab": "gameplay/lynx_spear.prefab"
+  },
+
+  {
+    "prefab": "gameplay/game_manager.prefab"
+  },
+
+  {
+    "prefab": "characters/fast_melee.prefab",
+    "components": {
+      "transform": { "position": [4, 0.9, 6] }
+    }
+  },
+  {
+    "prefab": "characters/fast_melee.prefab",
+    "components": {
+      "transform": { "position": [-4, 0.9, 7] }
+    }
+  },
+  {
+    "prefab": "characters/fast_melee.prefab",
+    "components": {
+      "transform": { "position": [0, 0.9, 9] }
+    }
+  },
+  {
+    "prefab": "characters/tank_melee.prefab",
+    "components": {
+      "transform": { "position": [7, 0.9, 2] }
+    }
+  },
+  {
+    "prefab": "characters/tank_melee.prefab",
+    "components": {
+      "transform": { "position": [-7, 0.9, 2] }
+    }
   }
 ]

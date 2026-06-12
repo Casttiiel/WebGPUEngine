@@ -4,6 +4,7 @@ import { BehaviorNode, Status } from '../../ai/BehaviorNode';
 import { Action, Condition, Selector, Sequence } from '../../ai';
 import { Blackboard } from '../../ai/Blackboard';
 import { ChargeAction } from '../../ai/nodes/ChargeAction';
+import { CircleStrafeAction } from '../../ai/nodes/CircleStrafeAction';
 import { RequestPathAction } from '../../ai/nodes/RequestPathAction';
 import { SteerAction } from '../../ai/nodes/SteerAction';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
@@ -74,17 +75,22 @@ export class FastMeleeController extends EnemyControllerComponent {
 
     return new Selector(
       [
-        // 1. CHARGE — dash toward player at full speed with limited steering.
-        //    Overshooting triggers ChargeAction's internal RECOVERY phase.
+        // 1. COMBAT — token granted → charge; no token → circle strafe at close range
         new Sequence(
           [
             canSee(),
-            new ChargeAction('Charge', {
-              chargeSpeed: 10,
-              maxTurnRate: 1.8,
-              recoveryTime: 1.0,
-              meleeRange: 1.5,
-            }),
+            new Selector([
+              new Sequence([
+                this.makeTryTokenNode(),
+                new ChargeAction('Charge', {
+                  chargeSpeed: 10,
+                  maxTurnRate: 1.8,
+                  recoveryTime: 1.0,
+                  meleeRange: 1.5,
+                }),
+              ]),
+              new CircleStrafeAction({ preferredRange: 4 }),
+            ]),
           ],
           { reactive: true },
         ),
@@ -138,5 +144,6 @@ export class FastMeleeController extends EnemyControllerComponent {
     MsgDispatcher.register(MsgType.ON_DEATH, 'fast_melee_controller', (comp) => {
       (comp as FastMeleeController).onDeath();
     });
+    EnemyControllerComponent.registerDamagedHandler('fast_melee_controller');
   }
 }

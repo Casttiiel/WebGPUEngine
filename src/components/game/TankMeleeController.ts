@@ -5,6 +5,7 @@ import { Action, Condition, Selector, Sequence } from '../../ai';
 import { Blackboard } from '../../ai/Blackboard';
 import { MeleeAttackComponent } from './combat/MeleeAttackComponent';
 import { TransformComponent } from '../core/TransformComponent';
+import { CircleStrafeAction } from '../../ai/nodes/CircleStrafeAction';
 import { RequestPathAction } from '../../ai/nodes/RequestPathAction';
 import { SteerAction } from '../../ai/nodes/SteerAction';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
@@ -106,8 +107,17 @@ export class TankMeleeController extends EnemyControllerComponent {
 
     return new Selector(
       [
-        // 1. COMBAT — advance relentlessly, AoE swing when close enough
-        new Sequence([canSee(), advanceAndSwing], { reactive: true }),
+        // 1. COMBAT — token granted → advance; no token → slow orbit at mid range
+        new Sequence(
+          [
+            canSee(),
+            new Selector([
+              new Sequence([this.makeTryTokenNode(), advanceAndSwing]),
+              new CircleStrafeAction({ preferredRange: 5 }),
+            ]),
+          ],
+          { reactive: true },
+        ),
 
         // 2. RETURN HOME (NavMesh)
         new Sequence([notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()], {
@@ -132,5 +142,6 @@ export class TankMeleeController extends EnemyControllerComponent {
     MsgDispatcher.register(MsgType.ON_DEATH, 'tank_melee_controller', (comp) => {
       (comp as TankMeleeController).onDeath();
     });
+    EnemyControllerComponent.registerDamagedHandler('tank_melee_controller');
   }
 }

@@ -49,5 +49,6 @@ export class AggressiveRangerController extends EnemyControllerComponent {
     MsgDispatcher.register(MsgType.ON_DEATH, 'aggressive_ranger_controller', (comp) => {
       (comp as AggressiveRangerController).onDeath();
     });
+    EnemyControllerComponent.registerDamagedHandler('aggressive_ranger_controller');
   }
 }

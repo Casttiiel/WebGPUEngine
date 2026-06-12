@@ -7,6 +7,7 @@ import { MeleeAttackComponent } from './combat/MeleeAttackComponent';
 import { BulletPoolComponent } from './BulletPoolComponent';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { TransformComponent } from '../core/TransformComponent';
+import { CircleStrafeAction } from '../../ai/nodes/CircleStrafeAction';
 import { RequestPathAction } from '../../ai/nodes/RequestPathAction';
 import { SteerAction } from '../../ai/nodes/SteerAction';
 import { Engine } from '../../core/engine/Engine';
@@ -207,11 +208,20 @@ export class HeavyMixedController extends EnemyControllerComponent {
 
     return new Selector(
       [
-        // 1. MELEE INTERRUPT — punish player for closing in
+        // 1. MELEE INTERRUPT — punish player for closing in (no token needed: defensive)
         new Sequence([playerInMeleeRange(), meleeAndBackstep], { reactive: true }),
 
-        // 2. RANGED COMBAT CYCLE — burst fire → vulnerability → repeat
-        new Sequence([canSee(), heavyCombat], { reactive: true }),
+        // 2. RANGED COMBAT CYCLE — token granted → burst; no token → orbit at preferred range
+        new Sequence(
+          [
+            canSee(),
+            new Selector([
+              new Sequence([this.makeTryTokenNode(), heavyCombat]),
+              new CircleStrafeAction({ preferredRange: 10 }),
+            ]),
+          ],
+          { reactive: true },
+        ),
 
         // 3. INVESTIGATE (NavMesh)
         new Sequence(
@@ -283,5 +293,6 @@ export class HeavyMixedController extends EnemyControllerComponent {
     MsgDispatcher.register(MsgType.ON_DEATH, 'heavy_mixed_controller', (comp) => {
       (comp as HeavyMixedController).onDeath();
     });
+    EnemyControllerComponent.registerDamagedHandler('heavy_mixed_controller');
   }
 }

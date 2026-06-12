@@ -112,5 +112,6 @@ export class PassiveRangerController extends EnemyControllerComponent {
     MsgDispatcher.register(MsgType.ON_DEATH, 'passive_ranger_controller', (comp) => {
       (comp as PassiveRangerController).onDeath();
     });
+    EnemyControllerComponent.registerDamagedHandler('passive_ranger_controller');
   }
 }

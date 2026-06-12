@@ -1,261 +1,130 @@
-# Roadmap de producción — Immersive Sim en primera persona
+# Roadmap — Sistema de IA de combate
 
-**Motor:** WebGPU + TypeScript  
-**Género:** Immersive Sim FPS (dark fantasy)  
-**Scope:** 1 nivel completo, jugable de punta a punta
+**Ya implementado:** Behavior Trees · NavMesh / pathfinding · KCC con Rapier
 
----
-
-## Fase 0 — Pre-producción (~2 semanas)
-
-### Diseño y planificación
-
-**GDD mínimo**  
-Core loop, objetivo del nivel, 3 verbos del jugador (moverse, interactuar, atacar). No más de 2 páginas.  
-`diseño`
-
-**Mood board visual**  
-Referencias de atmósfera: iluminación, paleta de colores, tipo de entorno. Orienta todas las decisiones artísticas.  
-`arte`
-
-**Feature list del motor**  
-Listar qué sistemas necesita el juego vs qué tiene ya el motor. Priorizar el delta.  
-`motor`
-
-**Arquitectura de nivel**  
-Sketch en papel: 3 zonas (exterior → transición → interior), flujo del jugador, puntos de interés.  
-`diseño`
-
-> 🏁 **Milestone:** GDD firmado + feature list del motor acordado
+El orden de implementación no es capa por capa — es por impacto y dependencias.  
+El token system va primero aunque sea Capa 3: sin él el resto del sistema no tiene sentido.
 
 ---
 
-## Fase 1 — Alpha: mecánicas core (~6-8 semanas)
+## Bloque 1 — Token System
+*Capa 3 · Director — el más crítico, implementar antes que todo lo demás*
 
-### Bloque 1 · movimiento y física del jugador
+El token system es la columna vertebral de todo el combate. Controla quién ataca y cuándo. Sin él, todos los enemigos atacan simultáneamente y el combate es injusto desde el primer encuentro.
 
-**Character controller FPS**  
-Rapier KCC, movimiento + salto + crouch. Resolver el bug del dash-through-collider con sensor workaround.  
-`motor`
+**CombatDirectorComponent**  
+Componente en la entidad de escena. Gestiona un pool de N tokens (`maxActiveAttackers: 2` por defecto). API pública:
+- `acquireToken(enemy) → bool` — el enemigo pide permiso para atacar
+- `releaseToken(enemy)` — devuelve el token al terminar el ataque
+- Expiración automática: si el poseedor no ataca en X segundos, el token se libera solo  
 
-**Cámara FPS**  
-Pitch/yaw, FOV configurable, mouse sensitivity, interpolación suave. Head bobbing opcional.  
-`motor`
-
-**Sistema de interacción**  
-Raycast en crosshair, interfaz IInteractable, highlight de objetos, prompt de UI diegético.  
-`motor`
-
-**Objetos físicos interactivos**  
-Pick up, throw, use. Cajas, palancas, puertas. Ejercita Rapier rigid bodies + constraints.  
-`diseño`
-
-### Bloque 2 · combate básico
-
-**Arma melee**  
-Hitbox sweep en arco, damage + knockback. Primero porque no necesita sistema de proyectiles.  
-`motor`
-
-**Arma de fuego (hitscan)**  
-Raycast, decals de impacto, tracer VFX como cosmético. Fuerza el sistema de partículas/trails.  
-`motor`
-
-**Sistema de salud + muerte**  
-HP del jugador y enemigos, daño, muerte, respawn o game over. HealthComponent reutilizable.  
-`diseño`
-
-**Feedback de impacto**  
-Screen shake, hit flash en material, partículas de sangre/chispas. Esencial para game feel.  
-`motor`
-
-### Bloque 3 · IA enemiga básica
-
-**Behavior tree base**  
-Idle → patrulla → alerta → combate → muerto. Sin animaciones: enemigos como cápsulas con billboard.  
-`motor`
-
-**NavMesh + pathfinding**  
-recast-navigation-js en runtime. Agentes navegando el blockout, obstacle avoidance básico.  
-`motor`
-
-**Sistema de percepción**  
-Line of sight con raycast, rango de audición. Fuerza queries de física útiles para el motor.  
-`motor`
-
-**Tipo enemigo 1: patrullero**  
-Patrulla waypoints, detecta al jugador, ataca cuerpo a cuerpo, alerta a vecinos.  
-`diseño`
-
-> 🏁 **Alpha milestone:** loop jugable — puedes entrar, luchar con 1 tipo de enemigo y salir
+Sin token = el enemigo orbita al jugador pero **no ataca**.
 
 ---
 
-## Fase 2 — Alpha: mundo y sistemas (~5-6 semanas)
+## Bloque 2 — Percepción
+*Capa 1 · IA individual*
 
-### Bloque 4 · blockout del nivel
+Sin percepción el enemigo es omnisciente. Se siente barato y elimina cualquier posibilidad de sigilo o de "escapar" de un encuentro.
 
-**Blockout exterior**  
-Geometría gris, escala correcta, iluminación direccional. Solo primitivas, sin assets finales.  
-`diseño`
+**Sight cone — FOV + raycast**  
+Ángulo de visión configurable + distancia máxima. Raycast desde los ojos del enemigo al jugador — si impacta un obstáculo antes de llegar, no ve al jugador. Update a 10 Hz (no cada frame).
 
-**Zona de transición**  
-Ruinas, entrada al interior. Prueba el sistema de mixed interior/exterior y froxel fog.  
-`diseño`
+**Hearing radius — radio de sonido por evento**  
+El jugador emite `NoiseEvent(position, radius, type)` al correr, atacar, aterrizar, abrir puertas. Cada enemigo comprueba si el evento ocurrió dentro de su radio de escucha. Sin raycast, solo distancia. El tipo de evento determina el nivel de alerta resultante (caminar → susurro, atacar → alerta total).
 
-**Interior completo**  
-Pasillos, habitaciones, verticalidad.  
-`diseño`
-
-**NavMesh del nivel completo**  
-Generar navmesh de las 3 zonas. Verificar que los agentes navegan correctamente inter-zonas.  
-`motor`
-
-### Bloque 5 · sistemas de juego
-
-**Estado del mundo**  
-Puertas abiertas, switches activados, enemigos muertos. Serialización para que el nivel recuerde cambios.  
-`motor`
-
-**Inventario mínimo**  
-Armas + consumibles (poción, llave). UI funcional no diegética primero, refinable más tarde.  
-`diseño`
-
-**Sistema de sigilo**  
-Luz dinámica afecta visibilidad. Apagar antorchas. Agachar reduce ruido. Indicador de alerta.  
-`diseño`
-
-**2 enemigos adicionales**  
-Tipo 2: arquero/ranged. Tipo 3: tanque lento. Reutiliza BT base, ejercita variedad de IA.  
-`diseño`
-
-### Bloque 6 · rendering — features del motor
-
-**Decals de impacto**  
-Marcas de bala, sangre en paredes. Decal renderer en deferred. Limpieza por tiempo/count.  
-`motor`
-
-**Partículas y trails**  
-Tracers de bala, chispas, humo. GPU instancing. Ejercita el particle system del motor.  
-`motor`
-
-**Audio espacial 3D**  
-Web Audio API, HRTF panning, reverb por zona. Pasos, disparos, alertas. Feature nueva del motor.  
-`audio`
-
-> 🏁 **Alpha completa:** nivel jugable de punta a punta, 3 tipos de enemigos, sigilo funcional
+**Memory — última posición conocida del jugador**  
+Cuando el enemigo pierde visión, almacena `lastKnownPos` y navega a ese punto antes de volver a IDLE. Nodos nuevos en el BT: `IsPlayerVisible`, `GoToLastKnownPos`, `ClearMemory` al llegar sin encontrar al jugador. Crea tensión — el jugador que escapa no está seguro todavía.
 
 ---
 
-## Fase 3 — Beta: contenido y polish (~4-5 semanas)
+## Bloque 3 — Combat movement
+*Capa 1 · IA individual*
 
-### Bloque 7 · arte y assets
+Es lo más ignorado y lo que más diferencia hace en game feel. Un enemigo que se mueve bien parece inteligente aunque tome decisiones simples.
 
-**Meshes del entorno**  
-Reemplazar blockout con assets finales. Piedra, madera, metal. Gaea heightmaps para exterior.  
-`arte`
+**Circle strafing**  
+Mientras espera token, el enemigo orbita al jugador a su distancia de combate preferida. Samplea posiciones en arco sobre el NavMesh y navega a la más cercana que esté libre. Elimina los enemigos estáticos mirando al jugador en fila.
 
-**Iluminación de producción**  
-Antorchas, candelabros, grietas con luz exterior. Afinar RC GI con geometría final.  
-`arte`
+**Step back al recibir daño**  
+Al recibir un hit: impulso KCC en dirección opuesta a la fuente de daño + estado stagger de 0.3s (sin atacar, sin moverse, libera token si lo tiene). El combate se vuelve bidireccional — el jugador tiene agencia sobre la posición del enemigo.
 
-**Meshes de enemigos**  
-Modelos low-poly dark fantasy. Sin animaciones de esqueleto — locomotion por procedural animation.  
-`arte`
-
-**Armas y props**  
-Viewmodel de arma en primera persona, props interactivos (cajas, llaves, pociones) con materiales PBR.  
-`arte`
-
-### Bloque 8 · animación procedural y VFX
-
-**Procedural animation**  
-Locomotion con IK para enemigos. Breathing idle en viewmodel. Sine/cosine bone transforms.  
-`motor`
-
-**Weapon sway + recoil**  
-Sway por movimiento de cámara, recoil pattern, muzzle flash. Feedback visual de disparo.  
-`motor`
-
-**Death ragdoll**  
-Ragdoll físico al morir. Ejercita Rapier joints + rigid bodies encadenados.  
-`motor`
-
-**Post-process stack**  
-LUT color grading dark fantasy, vignette, chromatic aberration al recibir daño.  
-`motor`
-
-### Bloque 9 · UI y UX
-
-**HUD final**  
-HP, inventario, indicador de sigilo (sombra/luz). JSON-driven UI system. Mínimo, dark fantasy.  
-`diseño`
-
-**Menú principal + pausa**  
-Menú de inicio, pausa con opciones (audio, gráficos, sensibilidad). Guardado/carga de estado.  
-`diseño`
-
-> 🏁 **Beta milestone:** juego con assets finales, sin placeholders, todos los sistemas integrados
+**Positioning intent — buscar flanco y distancia óptima**  
+Si hay aliados en el mismo ángulo, detectar saturación de sector y buscar el arco opuesto. Usa los sectores del encirclement (Bloque 5) como input. Hace que los enemigos busquen ángulos sin necesidad de scripting explícito.
 
 ---
 
-## Fase 4 — Gold: polish y release (~3 semanas)
+## Bloque 4 — Toma de decisiones
+*Capa 1 · IA individual*
 
-### Bloque 10 · optimización y QA
+**Attack selection — qué ataque usar y cuándo**  
+Cada tipo de ataque tiene: `minRange`, `maxRange`, `baseWeight`, `cooldown` individual (no cooldown global). Al entrar en fase de ataque: filtrar por rango actual, aplicar pesos, seleccionar con random ponderado. Los cooldowns son por tipo de ataque — permite variedad sin parecer caótico.
 
-**Performance pass**  
-GPU profiling en WebGPU. Occlusion culling, LODs si necesario. Target 60fps en hardware mid-range.  
-`motor`
+**Cooldown management — timing entre ataques**  
+Cooldowns independientes por tipo de ataque. El enemigo siempre puede atacar con *algo* si está en rango — solo los ataques costosos tienen cooldown largo.
 
-**FSR upscaling**  
-EASU + RCAS passes ya evaluados. Activar como opción de calidad para hardware más débil.  
-`motor`
+**Condiciones contextuales — modificadores de peso**  
+- Jugador en el aire → sweep bajo gana peso
+- Jugador agachado → overhead gana peso  
+- Jugador de espaldas → ataque rápido de bajo coste gana peso  
 
-**Bug fixing**  
-Playtest completo del nivel. Lista de bugs críticos/mayores/menores. Solo fix de críticos y mayores para gold.  
-`diseño`
+Se implementa como tabla de modificadores en el data asset del enemigo. Fácil de tunear por diseño sin tocar código.
 
-**Audio final y música**  
-SFX finales (no placeholders), música ambiental, stingers de combate y sigilo.  
-`audio`
+**Threat assessment — evalúa distancia, HP, contexto del grupo**  
+Factor que combina: distancia al jugador, HP propio, número de aliados en combate, tokens disponibles. Alimenta las decisiones de huir vs perseguir y el nivel de agresividad individual.
 
-### Bloque 11 · game feel final
-
-**Juiciness pass**  
-Revisar cada acción: ¿tiene sonido, VFX y feedback visual? Impacto de melee, muerte de enemigo, recoger ítem.  
-`diseño`
-
-**Difficulty tuning**  
-HP, daño, rangos de percepción de enemigos. Una sesión de playtest externo si es posible.  
-`diseño`
-
-**Pantalla de victoria/derrota**  
-Objetivo completado → créditos. Muerte → menú con opción de reintentar. Cierre del loop.  
-`diseño`
-
-**Build de release**  
-Bundle optimizado, asset compression, deploy en hosting estático (GitHub Pages, Netlify, itch.io).  
-`motor`
-
-> 🏁 **Gold:** nivel completo, jugable de punta a punta, publicable
+**Reaction to player — dodge, guard, counter**  
+- Parry del jugador → stagger prolongado (0.8s), libera token automáticamente, ventana de contraataque visible
+- Jugador en el aire más de 0.3s → preparar ataque al nivel del suelo para castigar el aterrizaje
+- Jugador huyendo → perseguir activamente o llamar refuerzos vía broadcast
 
 ---
 
-## Resumen de fases
+## Bloque 5 — Coordinación de grupo
+*Capa 2 — todo por implementar*
 
-| Fase                | Duración estimada  | Hito                        |
-| ------------------- | ------------------ | --------------------------- |
-| 0 — Pre-producción  | ~2 semanas         | GDD + feature list firmados |
-| 1 — Alpha mecánicas | ~6-8 semanas       | Loop básico jugable         |
-| 2 — Alpha mundo     | ~5-6 semanas       | Nivel completo con sistemas |
-| 3 — Beta            | ~4-5 semanas       | Assets finales integrados   |
-| 4 — Gold            | ~3 semanas         | Release                     |
-| **Total**           | **~20-24 semanas** |                             |
+Aquí está la diferencia entre un hack and slash mediocre y uno bueno. Sin coordinación los enemigos son islas que no interactúan entre sí.
 
-## Features del motor que ejercita este proyecto
+**Broadcast de eventos — ally attacking, alerted...**  
+Bus de eventos compartido por `CombatGroup`. Eventos clave: `AllyAttacking`, `AllyDead`, `PlayerSpotted`, `PlayerRetreat`. Cada enemigo escucha y ajusta su BT en consecuencia. Sin esto, que muera un aliado no afecta a nadie.
 
-| Fase    | Features nuevas forzadas                                           |
-| ------- | ------------------------------------------------------------------ |
-| Alpha 1 | Física de personaje, decals, trails/partículas, perception queries |
-| Alpha 2 | RC GI (4 cascades), serialización de estado, audio espacial 3D     |
-| Beta    | Procedural animation + IK, ragdoll físico, post-process LUT        |
-| Gold    | FSR upscaling (EASU + RCAS), asset pipeline, GPU profiling         |
+**Steering con separation**  
+Fuerza de repulsión entre enemigos dentro de radio de separación (~1.5m). Se aplica como offset al destino del NavMesh agent — no como fuerza física directa, para no luchar contra Rapier. Elimina el pile-up visual que delata IA barata.
+
+**Formación dinámica — encirclement y surround**  
+Dividir el círculo alrededor del jugador en N sectores (uno por enemigo activo). Cada enemigo reclama el sector válido más cercano a su posición. Navegar hacia el centroide del sector reclamado. Sin scripting — el encirclement emerge de la asignación de sectores. Si un sector queda libre (aliado muerto), otro enemigo lo reclama.
+
+---
+
+## Bloque 6 — Director completo
+*Capa 3 — todo por implementar*
+
+**Role assignment — Aggressor, Flanker, Support, Harasser**  
+El Director asigna un rol al inicio del encuentro y lo reasigna si el contexto cambia (aliado muerto, token liberado, distancia drástica):
+- `Aggressor` — tiene token activo, ataca ahora
+- `Flanker` — sin token, busca ángulo lateral o trasero
+- `Harasser` — ataques rápidos de bajo daño desde distancia, mantiene presión sin arriesgar
+- `Support` — si un aliado está en stagger prolongado, distrae al jugador para que el aliado se reposicione
+
+**Pressure escalation — agresividad dinámica**  
+El Director trackea `timeSincePlayerDamaged`. Umbrales de escalada:
+- +8s sin recibir daño → `maxActiveAttackers` sube en 1, cooldown entre rondas baja 20%
+- +15s → Harassers pasan a Aggressors, los enemigos empiezan a hacer fakes/feints más frecuentes
+- HP del jugador < 30% → todos los Harassers se convierten en Aggressors  
+
+Se resetea cuando el jugador recibe daño. Previene el stalemate donde el jugador circlestrafea sin consecuencias. Hace que quedarse quieto sea peligroso.
+
+---
+
+## Orden de implementación resumido
+
+| Bloque | Contenido                           | Capa | Impacto  |
+| ------ | ----------------------------------- | ---- | -------- |
+| 1      | Token system                        | 3    | Crítico  |
+| 2      | Percepción (sight, hearing, memory) | 1    | Alto     |
+| 3      | Combat movement (strafe, step back) | 1    | Alto     |
+| 4      | Toma de decisiones y reacciones     | 1    | Alto     |
+| 5      | Coordinación de grupo               | 2    | Medio    |
+| 6      | Roles + pressure escalation         | 3    | Medio    |
+
+> 🏁 **Milestone final:** combate tácticamente coherente con hasta 6 enemigos simultáneos sin sentirse injusto

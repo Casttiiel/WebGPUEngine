@@ -7,6 +7,7 @@ import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { EnemyControllerComponent } from './EnemyControllerComponent';
 import { Blackboard } from '../../ai/Blackboard';
 import { PerceptionComponentDataType } from '../../types/PerceptionComponentData.type';
+import { NoiseEventDispatcher } from '../../ai/NoiseEventDispatcher';
 
 /**
  * PerceptionComponent
@@ -124,41 +125,58 @@ export class PerceptionComponent extends Component {
 
     this.bb.set<number>('distToPlayer', dist);
 
-    // ── Hearing ──────────────────────────────────────────────────────────────
-    this.bb.set<boolean>('canHearPlayer', dist <= this.hearRadius);
+    // ── Hearing — direct distance check ──────────────────────────────────────
+    const canHear = dist <= this.hearRadius;
+    this.bb.set<boolean>('canHearPlayer', canHear);
 
-    // ── Sight: distance gate ─────────────────────────────────────────────────
-    if (dist > this.sightRadius) {
-      if (this.prevCanSee) this.prevCanSee = false;
-      this.bb.set<boolean>('canSeePlayer', false);
-      return;
+    // ── Sight — three-stage check ─────────────────────────────────────────────
+    let canSee = false;
+    if (dist <= this.sightRadius) {
+      const facing = this.bb.get<vec3>('facing', vec3.fromValues(0, 0, 1));
+      const dirToPlayer = vec3.normalize(vec3.create(), toPlayer);
+      if (vec3.dot(facing, dirToPlayer) >= this.fovCosHalf) {
+        canSee = this.castLOS(ownPos, dirToPlayer, dist);
+      }
     }
-
-    // ── Sight: FOV cone gate ─────────────────────────────────────────────────
-    const facing = this.bb.get<vec3>('facing', vec3.fromValues(0, 0, 1));
-    const dirToPlayer = vec3.normalize(vec3.create(), toPlayer);
-    const dot = vec3.dot(facing, dirToPlayer);
-
-    if (dot < this.fovCosHalf) {
-      if (this.prevCanSee) this.prevCanSee = false;
-      this.bb.set<boolean>('canSeePlayer', false);
-      return;
-    }
-
-    // ── Sight: Line-of-sight raycast ─────────────────────────────────────────
-    const canSee = this.castLOS(ownPos, dirToPlayer, dist);
-    this.bb.set<boolean>('canSeePlayer', canSee);
 
     if (canSee && !this.prevCanSee) {
-      // First detection — mark that we have a last-known position to investigate
       this.bb.set<boolean>('hasLastKnown', true);
     }
     this.prevCanSee = canSee;
+    this.bb.set<boolean>('canSeePlayer', canSee);
 
+    // ── Position updates — sight > hearing > noise events ────────────────────
     if (canSee) {
+      // Sight: exact position, highest priority
       const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
       vec3.copy(stored, this.getPlayerBodyPos());
       this.bb.set('playerPosition', stored);
+    } else if (canHear) {
+      // Hearing: within hearRadius, enemy knows you're here (no LOS needed)
+      this.bb.set<boolean>('hasLastKnown', true);
+      const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
+      vec3.copy(stored, this.getPlayerBodyPos());
+      this.bb.set('playerPosition', stored);
+    } else {
+      // Noise events: player or world emitted a sound — investigate the origin
+      const noise = NoiseEventDispatcher.getEventsInRange(ownPos, this.hearRadius);
+      if (noise.length > 0) {
+        let closestDist = Infinity;
+        let closestPos: vec3 | null = null;
+        for (const ev of noise) {
+          const d = vec3.distance(ownPos, ev.position);
+          if (d < closestDist) {
+            closestDist = d;
+            closestPos = ev.position;
+          }
+        }
+        if (closestPos) {
+          this.bb.set<boolean>('hasLastKnown', true);
+          const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
+          vec3.copy(stored, closestPos);
+          this.bb.set('playerPosition', stored);
+        }
+      }
     }
   }
 
