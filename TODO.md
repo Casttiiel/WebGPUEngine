@@ -1,12 +1,5 @@
 ### Engine
 
-1. Chromatic Aberration + Film Grain + Vignette
-
-Qué falta: Tres micro-efectos de cámara que UE5 tiene por defecto en su stack cinematic
-Impacto visual: Transforma el aspecto de "render WebGL" en "render cinematográfico". Sin ellos todo parece CG puro.
-Esfuerzo: MUY BAJO. Cada uno es 10-30 líneas de shader en el pass de tone mapping
-Estado actual: Solo tienes lens flare y DOF. Cero aberración, grano ni viñeta
-
 2. PCSS — Percentage-Closer Soft Shadows
 
 Qué falta: Sombras con penumbra variable según distancia al caster. UE5 usa Virtual Shadow Maps que dan penumbras físicamente correctas
@@ -47,7 +40,7 @@ Qué falta: El TSR actual usa velocity buffer. UE5's TSR usa optical flow para o
 Esfuerzo: ALTO
 Estado actual: TSR con velocity buffer estándar
 
-1. Better foot IK (distance) + foot angle
+1. Better foot IK foot angle
 2. Character animator
    TurnLeft_90 + TurnRight_90 — pivotes en sitio cuando estás parado y giras > 45°
    TurnLeft_180 / TurnRight_180 — para inversión de dirección

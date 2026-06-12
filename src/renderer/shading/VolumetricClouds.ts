@@ -73,8 +73,8 @@ export class VolumetricClouds {
   public lightSteps: number = 5;
   public warpStrength: number = 0.35;
   public worleyWeight: number = 0.35;
-  public fadeRadius: number = 25000;
-  public resolutionDivisor: number = 4;
+  public fadeRadius: number = 11000;
+  public resolutionDivisor: number = 6;
   // Temporal
   public blendFactor: number = 0.07;
 

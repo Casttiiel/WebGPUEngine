@@ -157,9 +157,9 @@ export class FootIKComponent extends Component {
     // Base animation foot positions (pre-IK snapshot from this frame's animation eval).
     // These are used for raycasts and delta computation — never post-IK positions,
     // which would create a feedback loop where the corrected foot looks "already correct".
-    const leftBaseWorld  = this.getJointBaseAnimWorldPos(leftFootIdx,  worldMat);
+    const leftBaseWorld = this.getJointBaseAnimWorldPos(leftFootIdx, worldMat);
     const rightBaseWorld = this.getJointBaseAnimWorldPos(rightFootIdx, worldMat);
-    const leftAnimModel  = this.getJointBaseAnimModelPos(leftFootIdx);
+    const leftAnimModel = this.getJointBaseAnimModelPos(leftFootIdx);
     const rightAnimModel = this.getJointBaseAnimModelPos(rightFootIdx);
     if (!leftBaseWorld || !rightBaseWorld || !leftAnimModel || !rightAnimModel) return;
 
@@ -169,19 +169,21 @@ export class FootIKComponent extends Component {
       this.initialized = true;
     }
 
-    const footAlpha   = Math.min(1.0, dt * this.footLerpSpeed);
+    const footAlpha = Math.min(1.0, dt * this.footLerpSpeed);
     const pelvisAlpha = Math.min(1.0, dt * this.pelvisLerpSpeed);
 
     // ── 1. Raycast each foot from BASE animation position → target world Y ────
     // No hit = swing phase → target = base anim Y → offset decays to 0 naturally.
-    const leftGroundY  = this.castGroundY(leftBaseWorld,  capsuleBody);
+    const leftGroundY = this.castGroundY(leftBaseWorld, capsuleBody);
     const rightGroundY = this.castGroundY(rightBaseWorld, capsuleBody);
 
-    const leftTargetWorldY  = leftGroundY  !== null ? leftGroundY  + this.ankleHeight : leftBaseWorld[1];
-    const rightTargetWorldY = rightGroundY !== null ? rightGroundY + this.ankleHeight : rightBaseWorld[1];
+    const leftTargetWorldY =
+      leftGroundY !== null ? leftGroundY + this.ankleHeight : leftBaseWorld[1];
+    const rightTargetWorldY =
+      rightGroundY !== null ? rightGroundY + this.ankleHeight : rightBaseWorld[1];
 
     // ── 2. Delta from base animation position to target ───────────────────────
-    const leftRaw  = leftTargetWorldY  - leftBaseWorld[1];
+    const leftRaw = leftTargetWorldY - leftBaseWorld[1];
     const rightRaw = rightTargetWorldY - rightBaseWorld[1];
 
     // Smooth the corrections over time (avoids snapping on uneven terrain)
