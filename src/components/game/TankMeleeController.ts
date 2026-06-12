@@ -1,6 +1,6 @@
 import { vec3 } from 'gl-matrix';
 import { EnemyControllerComponent } from './EnemyControllerComponent';
-import { BehaviorNode, Status } from '../../ai/BehaviorNode';
+import { BehaviorNode, BehaviorTree, Status } from '../../ai';
 import { Action, Condition, Selector, Sequence } from '../../ai';
 import { Blackboard } from '../../ai/Blackboard';
 import { MeleeAttackComponent } from './combat/MeleeAttackComponent';
@@ -15,29 +15,41 @@ import { EnemyControllerComponentDataType } from '../../types/EnemyControllerCom
 /**
  * TankMeleeController — Enemigo D: Melee Tanque
  *
- * A slow, heavily armoured enemy with very high HP and damage resistance.
- * Advances relentlessly toward the player and swings an AoE melee attack
- * whenever in range — MeleeAttackComponent handles the cooldown internally.
+ * Attack rhythm is fully controlled by CombatDirectorComponent (attackPaceMs,
+ * aggressiveness). This controller only decides HOW to execute an attack once
+ * the director grants the token — not WHEN.
  *
- * Attack flow (with token system):
- *   1. Acquire attack token via makeTryTokenNode (subject to per-attack cooldown).
- *   2. Advance toward player and attack (advanceAndSwing).
- *   3. During recovery window: back away from player.
- *   4. Recovery ends → advanceAndSwing returns SUCCESS.
- *   5. releaseAndCooldown releases the token and sets a 2 s cooldown.
- *   6. During cooldown the enemy orbits (CircleStrafeAction).
- *
- * Component key: 'tank_melee_controller'
+ * Flow:
+ *   Director grants token → advance → attack → back off during recovery →
+ *   release token → orbit until director grants next wave.
  */
 export class TankMeleeController extends EnemyControllerComponent {
-  // ── Per-attack state ──────────────────────────────────────────────────────
-  /** True while the enemy is in the post-swing recovery backing-up phase. */
-  private _wasInRecovery = false;
+  // ── Per-attack transient state ─────────────────────────────────────────────
+  /** True between attack() being called and recovery completing. */
+  private _attackLaunched = false;
+
   /**
-   * Timestamp (ms) before which the enemy must not attempt to acquire the
-   * attack token again. Reset to 0 on load / respawn.
+   * Per-tank cooldown after each attack, in milliseconds.
+   * After releasing the token, this enemy won't be eligible for another
+   * token (from the director or self) until this time has elapsed.
+   * Director's global attackPaceMs applies ON TOP of this.
    */
-  private _attackCooldownUntil = 0;
+  public individualCooldownMs = 3000;
+
+  protected override getIndividualCooldownMs(): number {
+    return this.individualCooldownMs;
+  }
+
+  // ── Orbit range (rebuilds BT on change via setter) ────────────────────────
+  public get orbitRange(): number { return this._orbitRange; }
+  public set orbitRange(v: number) {
+    this._orbitRange = v;
+    if (this.tree) this.tree = new BehaviorTree(this.buildTree(), this.bb);
+  }
+  private _orbitRange = 5;
+
+  // ── Editor ────────────────────────────────────────────────────────────────
+  private _editorFolder: any = null;
 
   // ── Default stats ─────────────────────────────────────────────────────────
 
@@ -54,7 +66,7 @@ export class TankMeleeController extends EnemyControllerComponent {
   // ── Behavior Tree ─────────────────────────────────────────────────────────
 
   protected override buildTree(): BehaviorNode {
-    const tank = this; // captured reference to TankMeleeController for closures
+    const tank = this;
 
     const canSee = () =>
       new Condition('CanSeePlayer', (bb) => bb.get<boolean>('canSeePlayer', false));
@@ -65,17 +77,12 @@ export class TankMeleeController extends EnemyControllerComponent {
         return !!pos && !!spawn && vec3.distance(pos, spawn) > 1.5;
       });
 
-    // Wraps the base tryToken check with a per-attack cooldown guard.
-    // While cooldown is active the Sequence fails and the Selector falls
-    // through to CircleStrafeAction, letting the enemy orbit instead.
-    const tryTokenWithCooldown = new Condition('TryTokenCooldown', (_bb) => {
-      if (Date.now() < tank._attackCooldownUntil) return false;
-      return tank.tryAcquireAttackToken();
-    });
+    // Token gate: director controls WHEN the next wave is allowed.
+    // Enemy just says "I'm ready" — the director decides if now is the time.
+    const tryToken = new Condition('TryToken', (_bb) => tank.tryAcquireAttackToken());
 
-    // Advance + swing.  Returns RUNNING while closing in and while in recovery.
-    // Returns SUCCESS the frame recovery ends — this drives the Sequence forward
-    // to releaseAndCooldown so the attack token is properly freed.
+    // Advance, attack, back off through recovery, then signal done.
+    // The director's pace timer starts when this resolves (via releaseToken below).
     const advanceAndSwing = new Action('TankAdvanceAndSwing', (bb) => {
       const self = bb.get<EnemyControllerComponent>('self')!;
       const pos = bb.get<vec3>('position')!;
@@ -90,23 +97,21 @@ export class TankMeleeController extends EnemyControllerComponent {
 
       const melee = self.getOwner().getComponent('melee_attack') as MeleeAttackComponent | null;
 
-      if (melee?.isInRecovery()) {
-        // Post-swing recovery: back away so the player has room to react
-        tank._wasInRecovery = true;
-        if (dist > 0.1) {
-          const awayDir = vec3.normalize(vec3.create(), vec3.negate(vec3.create(), dir));
-          self.setDesiredHorizontal(awayDir);
+      if (tank._attackLaunched) {
+        if (melee?.isInRecovery()) {
+          // Back away during the post-swing window
+          if (dist > 0.1) {
+            const away = vec3.normalize(vec3.create(), vec3.negate(vec3.create(), dir));
+            self.setDesiredHorizontal(away);
+          }
+          return Status.RUNNING;
         }
-        return Status.RUNNING;
-      }
-
-      if (tank._wasInRecovery) {
-        // Recovery just ended this frame — signal attack complete
-        tank._wasInRecovery = false;
+        // Recovery done (or was instant — recoveryTime=0): signal complete
+        tank._attackLaunched = false;
         return Status.SUCCESS;
       }
 
-      // Advance toward player and attempt swing
+      // Close in and swing
       if (dist > 0.3) {
         vec3.normalize(dir, dir);
         self.setDesiredHorizontal(dir);
@@ -115,38 +120,30 @@ export class TankMeleeController extends EnemyControllerComponent {
         const tc = self.getOwner().getComponent('transform') as TransformComponent | null;
         const center = (tc?.getTransform().getWorldPosition() ?? pos) as vec3;
         melee.attack(center);
+        tank._attackLaunched = true; // recovery check starts next tick
       }
 
       return Status.RUNNING;
     });
 
-    // Runs after advanceAndSwing succeeds.  Releases the attack token and
-    // starts a cooldown so other enemies get a turn before this one attacks again.
-    const releaseAndCooldown = new Action('ReleaseToken', (_bb) => {
+    // Release token → director starts the inter-wave pace timer.
+    // No per-enemy cooldown here — rhythm is global.
+    const releaseToken = new Action('ReleaseToken', (_bb) => {
+      tank._attackLaunched = false;
       tank.releaseAttackToken();
-      tank._wasInRecovery = false;
-      tank._attackCooldownUntil = Date.now() + 2000; // 2 s orbit cooldown
       return Status.SUCCESS;
     });
 
-    const moveDirectlyTo = (
-      label: string,
-      targetKey: string,
-      onArrival?: (bb: Blackboard) => void,
-    ) =>
+    const moveDirectlyTo = (label: string, targetKey: string, onArrival?: (bb: Blackboard) => void) =>
       new Action(label, (bb) => {
         const self = bb.get<EnemyControllerComponent>('self')!;
         const pos = bb.get<vec3>('position')!;
         const target = bb.get<vec3>(targetKey)!;
-        const dir = vec3.subtract(vec3.create(), target, pos);
-        dir[1] = 0;
-        const dist = vec3.length(dir);
-        if (dist < 1.5) {
-          onArrival?.(bb);
-          return Status.SUCCESS;
-        }
-        vec3.normalize(dir, dir);
-        self.setDesiredHorizontal(dir);
+        const d = vec3.subtract(vec3.create(), target, pos);
+        d[1] = 0;
+        if (vec3.length(d) < 1.5) { onArrival?.(bb); return Status.SUCCESS; }
+        vec3.normalize(d, d);
+        self.setDesiredHorizontal(d);
         self.faceToward(target);
         return Status.RUNNING;
       });
@@ -154,15 +151,20 @@ export class TankMeleeController extends EnemyControllerComponent {
     return new Selector(
       [
         // 1. COMBAT
-        //    token + cooldown OK → advance, swing, release token, orbit cooldown
-        //    no token or cooldown active → orbit at mid range
+        // Outer Sequence reactive: canSee() re-checked every tick.
+        // Inner Selector reactive: re-checks token availability every tick,
+        //   so the enemy transitions to attacking the moment the director
+        //   opens the next wave (pace timer expired).
         new Sequence(
           [
             canSee(),
-            new Selector([
-              new Sequence([tryTokenWithCooldown, advanceAndSwing, releaseAndCooldown]),
-              new CircleStrafeAction({ preferredRange: 5 }),
-            ]),
+            new Selector(
+              [
+                new Sequence([tryToken, advanceAndSwing, releaseToken]),
+                new CircleStrafeAction({ preferredRange: tank._orbitRange }),
+              ],
+              { reactive: true },
+            ),
           ],
           { reactive: true },
         ),
@@ -182,6 +184,25 @@ export class TankMeleeController extends EnemyControllerComponent {
       ],
       { label: 'TankMeleeRoot', reactive: true },
     );
+  }
+
+  // ── Editor GUI ────────────────────────────────────────────────────────────
+
+  public override renderInMenu(folder?: any): void {
+    if (this._editorFolder || !folder) return;
+    this._editorFolder = folder.addFolder('Tank Melee AI');
+    this._editorFolder.open();
+
+    this._editorFolder
+      .add(this, 'individualCooldownMs', 0, 8000, 100)
+      .name('Individual cooldown (ms)')
+      .listen();
+
+    // Orbit range uses a setter that rebuilds the BT so CircleStrafeAction picks it up.
+    this._editorFolder
+      .add(this, 'orbitRange', 1, 15, 0.5)
+      .name('Orbit range (m)')
+      .listen();
   }
 
   // ── Message registration ──────────────────────────────────────────────────

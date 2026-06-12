@@ -60,6 +60,12 @@ export class PerceptionComponent extends Component {
   private eyeHeightOffset: number = 0.7;
   private checkInterval: number = 0.1;
   private playerComponentKey: string = 'player_controller';
+  /**
+   * H&S deaggro distance: once the player is spotted, the enemy keeps tracking
+   * without FOV or LOS until the player moves farther than this value.
+   * Prevents enemies from "losing" the player during normal melee combat.
+   */
+  private deaggroRadius: number = 25;
 
   // ─── Internal ──────────────────────────────────────────────────────────────
   private bb!: Blackboard;
@@ -72,6 +78,12 @@ export class PerceptionComponent extends Component {
   private playerController: BasePlayerController | null = null;
   /** Distance to player in the previous perception check — for retreating detection. */
   private _prevDist: number = 0;
+  /**
+   * H&S combat state: true once player is first spotted (FOV+LOS).
+   * While true, sight check is a simple distance gate (deaggroRadius) — no FOV/LOS.
+   * Cleared when player moves beyond deaggroRadius.
+   */
+  private _inCombat: boolean = false;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +93,7 @@ export class PerceptionComponent extends Component {
     if (data.eyeHeightOffset !== undefined) this.eyeHeightOffset = data.eyeHeightOffset;
     if (data.checkInterval !== undefined) this.checkInterval = data.checkInterval;
     if (data.playerComponentKey !== undefined) this.playerComponentKey = data.playerComponentKey;
+    if (data.deaggroRadius !== undefined) this.deaggroRadius = data.deaggroRadius;
 
     const fov = data.fovDegrees ?? 120;
     this.fovCosHalf = Math.cos((fov / 2) * (Math.PI / 180));
@@ -147,13 +160,21 @@ export class PerceptionComponent extends Component {
     const canHear = dist <= this.hearRadius;
     this.bb.set<boolean>('canHearPlayer', canHear);
 
-    // ── Sight — three-stage check ─────────────────────────────────────────────
+    // ── Sight — H&S two-mode check ────────────────────────────────────────────
+    // In combat (already spotted): simple deaggro distance check, no FOV/LOS.
+    // Not in combat: full 3-stage check. Entering combat stays until deaggro.
     let canSee = false;
-    if (dist <= this.sightRadius) {
-      const facing = this.bb.get<vec3>('facing', vec3.fromValues(0, 0, 1));
-      const dirToPlayer = vec3.normalize(vec3.create(), toPlayer);
-      if (vec3.dot(facing, dirToPlayer) >= this.fovCosHalf) {
-        canSee = this.castLOS(ownPos, dirToPlayer, dist);
+    if (this._inCombat) {
+      canSee = dist <= this.deaggroRadius;
+      if (!canSee) this._inCombat = false; // player escaped → back to patrol
+    } else {
+      if (dist <= this.sightRadius) {
+        const facing = this.bb.get<vec3>('facing', vec3.fromValues(0, 0, 1));
+        const dirToPlayer = vec3.normalize(vec3.create(), toPlayer);
+        if (vec3.dot(facing, dirToPlayer) >= this.fovCosHalf) {
+          canSee = this.castLOS(ownPos, dirToPlayer, dist);
+          if (canSee) this._inCombat = true; // first contact → enter combat state
+        }
       }
     }
 
@@ -229,8 +250,8 @@ export class PerceptionComponent extends Component {
 
     // No hit → nothing blocked the path → player is visible
     if (hit !== null) {
-      const rb = hit.collider.parent();
-      /*console.log(
+      /*const rb = hit.collider.parent();
+      console.log(
         `[LOS] BLOCKED  toi=${hit.timeOfImpact.toFixed(2)}m` +
           `  colliderHandle=${hit.collider.handle}` +
           `  rigidBodyType=${rb ? rb.bodyType() : 'unknown'}` +

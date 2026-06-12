@@ -21,4 +21,11 @@ export interface PerceptionComponentDataType {
    * Default: 'player_controller'
    */
   playerComponentKey?: string;
+  /**
+   * Once the player is spotted (full FOV+LOS check), the enemy enters "combat state"
+   * and keeps tracking the player with no FOV or LOS requirement until the player
+   * moves farther than this distance. H&S style — enemies don't lose you mid-fight.
+   * Default: 25 (metres)
+   */
+  deaggroRadius?: number;
 }

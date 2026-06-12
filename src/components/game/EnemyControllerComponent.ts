@@ -105,6 +105,15 @@ export class EnemyControllerComponent extends Component implements IKickable {
   private dead: boolean = false;
   /** True while this enemy holds a combat token (may enter attack behavior). */
   private _hasAttackToken: boolean = false;
+  /**
+   * Timestamp (ms, Date.now()) before which this enemy cannot request or receive
+   * a new attack token. Set by releaseAttackToken() using getIndividualCooldownMs().
+   * Subclasses control the duration by overriding getIndividualCooldownMs().
+   */
+  protected _individualCooldownUntil: number = 0;
+  /** Timestamp of the most recent releaseAttackToken() call. Used by the director
+   *  for score-based priority: longer wait → higher priority. */
+  private _lastAttackReleasedAt: number = 0;
   /** Previous canSeePlayer value — used to detect first-sight for player_spotted event. */
   private _prevCanSeePlayer: boolean = false;
   /** CombatEventBus unsubscribe functions — cleaned up in dispose(). */
@@ -683,15 +692,43 @@ export class EnemyControllerComponent extends Component implements IKickable {
     return false;
   }
 
-  /** Release the token. Safe to call when not holding one. */
+  /** Release the token. Starts this enemy's individual cooldown. Safe when not holding. */
   public releaseAttackToken(): void {
     if (!this._hasAttackToken) return;
     this._hasAttackToken = false;
+    this._lastAttackReleasedAt = Date.now();
+    this._individualCooldownUntil = Date.now() + this.getIndividualCooldownMs();
     CombatDirectorComponent.instance?.releaseToken(this);
   }
 
   public hasAttackToken(): boolean {
     return this._hasAttackToken;
+  }
+
+  /**
+   * Returns true while this enemy's individual post-attack cooldown is active.
+   * The director and the enemy's BT both respect this before granting/requesting tokens.
+   */
+  public isOnIndividualCooldown(): boolean {
+    return Date.now() < this._individualCooldownUntil;
+  }
+
+  /**
+   * Seconds elapsed since this enemy last released an attack token.
+   * Used by the director's priority score: enemies that waited longer rank higher.
+   */
+  public getTimeSinceLastAttack(): number {
+    if (this._lastAttackReleasedAt === 0) return 9999; // never attacked → highest priority
+    return (Date.now() - this._lastAttackReleasedAt) / 1000;
+  }
+
+  /**
+   * Per-enemy-type individual cooldown after each attack, in milliseconds.
+   * Returns 0 by default (no individual cooldown). Override in subclasses to tune.
+   * The director also respects this via isOnIndividualCooldown() in its scoring.
+   */
+  protected getIndividualCooldownMs(): number {
+    return 0;
   }
 
   /**

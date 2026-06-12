@@ -1,130 +1,190 @@
-# Roadmap — Sistema de IA de combate
+# Combat AI — Roadmap de mejoras
 
-**Ya implementado:** Behavior Trees · NavMesh / pathfinding · KCC con Rapier
-
-El orden de implementación no es capa por capa — es por impacto y dependencias.  
-El token system va primero aunque sea Capa 3: sin él el resto del sistema no tiene sentido.
+Síntesis de principios de diseño de combate H&S (God of War, DMC, Batman Arkham, Bayonetta, Sekiro)
+aplicados a este motor. Ordenado de más fácil a más complejo de implementar.
 
 ---
 
-## Bloque 1 — Token System
-*Capa 3 · Director — el más crítico, implementar antes que todo lo demás*
+## Estado actual (implementado)
 
-El token system es la columna vertebral de todo el combate. Controla quién ataca y cuándo. Sin él, todos los enemigos atacan simultáneamente y el combate es injusto desde el primer encuentro.
-
-**CombatDirectorComponent**  
-Componente en la entidad de escena. Gestiona un pool de N tokens (`maxActiveAttackers: 2` por defecto). API pública:
-- `acquireToken(enemy) → bool` — el enemigo pide permiso para atacar
-- `releaseToken(enemy)` — devuelve el token al terminar el ataque
-- Expiración automática: si el poseedor no ataca en X segundos, el token se libera solo  
-
-Sin token = el enemigo orbita al jugador pero **no ataca**.
+- **Token system** — solo N enemigos atacan simultáneamente (CombatDirectorComponent)
+- **Global pace timer** — pausa entre olas de ataque (attackPaceMs)
+- **Cooldown individual** — cada enemigo espera X segundos tras su propio ataque
+- **Selección por puntuación** — director elige al mejor candidato (distancia + espera + penalización por repetición)
+- **Percepción H&S** — primera detección con FOV+LOS, luego solo radio de deaggro (25 m)
+- **CircleStrafe** — enemigos orbitan al jugador con sector encirclement mientras esperan
+- **Roles** — AGGRESSOR / FLANKER / HARASSER / SUPPORT (asignación automática en token)
+- **Presión escalada** — agresividad sube cuando el jugador lleva tiempo sin recibir daño
 
 ---
 
-## Bloque 2 — Percepción
-*Capa 1 · IA individual*
+## Tier 1 — Muy fácil (parámetros o < 20 líneas de código)
 
-Sin percepción el enemigo es omnisciente. Se siente barato y elimina cualquier posibilidad de sigilo o de "escapar" de un encuentro.
+### 1. Valores por defecto afinados por tipo de enemigo
 
-**Sight cone — FOV + raycast**  
-Ángulo de visión configurable + distancia máxima. Raycast desde los ojos del enemigo al jugador — si impacta un obstáculo antes de llegar, no ve al jugador. Update a 10 Hz (no cada frame).
+> Melee básico: cooldown 4-6 s | Berserker: 2-3 s | Tanque: 7-10 s | Arquero: 3-5 s
 
-**Hearing radius — radio de sonido por evento**  
-El jugador emite `NoiseEvent(position, radius, type)` al correr, atacar, aterrizar, abrir puertas. Cada enemigo comprueba si el evento ocurrió dentro de su radio de escucha. Sin raycast, solo distancia. El tipo de evento determina el nivel de alerta resultante (caminar → susurro, atacar → alerta total).
-
-**Memory — última posición conocida del jugador**  
-Cuando el enemigo pierde visión, almacena `lastKnownPos` y navega a ese punto antes de volver a IDLE. Nodos nuevos en el BT: `IsPlayerVisible`, `GoToLastKnownPos`, `ClearMemory` al llegar sin encontrar al jugador. Crea tensión — el jugador que escapa no está seguro todavía.
+Cambiar `individualCooldownMs` y `attackPaceMs` por tipo. Cero arquitectura nueva.
 
 ---
 
-## Bloque 3 — Combat movement
-*Capa 1 · IA individual*
+### 2. Presets de dificultad en el director
 
-Es lo más ignorado y lo que más diferencia hace en game feel. Un enemigo que se mueve bien parece inteligente aunque tome decisiones simples.
+```
+Fácil:       maxAttackers=1, attackPaceMs=8000, aggressiveness=0.2
+Normal:      maxAttackers=1, attackPaceMs=5000, aggressiveness=0.5
+Difícil:     maxAttackers=2, attackPaceMs=300,  aggressiveness=0.75
+Muy difícil: maxAttackers=3, attackPaceMs=1500,  aggressiveness=1.0
+```
 
-**Circle strafing**  
-Mientras espera token, el enemigo orbita al jugador a su distancia de combate preferida. Samplea posiciones en arco sobre el NavMesh y navega a la más cercana que esté libre. Elimina los enemigos estáticos mirando al jugador en fila.
-
-**Step back al recibir daño**  
-Al recibir un hit: impulso KCC en dirección opuesta a la fuente de daño + estado stagger de 0.3s (sin atacar, sin moverse, libera token si lo tiene). El combate se vuelve bidireccional — el jugador tiene agencia sobre la posición del enemigo.
-
-**Positioning intent — buscar flanco y distancia óptima**  
-Si hay aliados en el mismo ángulo, detectar saturación de sector y buscar el arco opuesto. Usa los sectores del encirclement (Bloque 5) como input. Hace que los enemigos busquen ángulos sin necesidad de scripting explícito.
+El director ya tiene todos estos parámetros. Solo hace falta un método `setDifficulty(level)`.
 
 ---
 
-## Bloque 4 — Toma de decisiones
-*Capa 1 · IA individual*
+### 3. Offsets aleatorios en posición deseada
 
-**Attack selection — qué ataque usar y cuándo**  
-Cada tipo de ataque tiene: `minRange`, `maxRange`, `baseWeight`, `cooldown` individual (no cooldown global). Al entrar en fase de ataque: filtrar por rango actual, aplicar pesos, seleccionar con random ponderado. Los cooldowns son por tipo de ataque — permite variedad sin parecer caótico.
+> _"desiredPosition += RandomOffset()"_ — Naughty Dog / Santa Monica
 
-**Cooldown management — timing entre ataques**  
-Cooldowns independientes por tipo de ataque. El enemigo siempre puede atacar con *algo* si está en rango — solo los ataques costosos tienen cooldown largo.
-
-**Condiciones contextuales — modificadores de peso**  
-- Jugador en el aire → sweep bajo gana peso
-- Jugador agachado → overhead gana peso  
-- Jugador de espaldas → ataque rápido de bajo coste gana peso  
-
-Se implementa como tabla de modificadores en el data asset del enemigo. Fácil de tunear por diseño sin tocar código.
-
-**Threat assessment — evalúa distancia, HP, contexto del grupo**  
-Factor que combina: distancia al jugador, HP propio, número de aliados en combate, tokens disponibles. Alimenta las decisiones de huir vs perseguir y el nivel de agresividad individual.
-
-**Reaction to player — dodge, guard, counter**  
-- Parry del jugador → stagger prolongado (0.8s), libera token automáticamente, ventana de contraataque visible
-- Jugador en el aire más de 0.3s → preparar ataque al nivel del suelo para castigar el aterrizaje
-- Jugador huyendo → perseguir activamente o llamar refuerzos vía broadcast
+Añadir un pequeño ruido (0.2–0.8 m) a la posición objetivo de cada enemigo al calcularse.
+Resultado: la formación deja de parecer militar. Se implementa en un sitio: `CircleStrafeAction`.
 
 ---
 
-## Bloque 5 — Coordinación de grupo
-*Capa 2 — todo por implementar*
+### 4. Distancia preferida variable por enemigo
 
-Aquí está la diferencia entre un hack and slash mediocre y uno bueno. Sin coordinación los enemigos son islas que no interactúan entre sí.
+```
+distancePreference = Random(1.8m, 3.2m)
+```
 
-**Broadcast de eventos — ally attacking, alerted...**  
-Bus de eventos compartido por `CombatGroup`. Eventos clave: `AllyAttacking`, `AllyDead`, `PlayerSpotted`, `PlayerRetreat`. Cada enemigo escucha y ajusta su BT en consecuencia. Sin esto, que muera un aliado no afecta a nadie.
-
-**Steering con separation**  
-Fuerza de repulsión entre enemigos dentro de radio de separación (~1.5m). Se aplica como offset al destino del NavMesh agent — no como fuerza física directa, para no luchar contra Rapier. Elimina el pile-up visual que delata IA barata.
-
-**Formación dinámica — encirclement y surround**  
-Dividir el círculo alrededor del jugador en N sectores (uno por enemigo activo). Cada enemigo reclama el sector válido más cercano a su posición. Navegar hacia el centroide del sector reclamado. Sin scripting — el encirclement emerge de la asignación de sectores. Si un sector queda libre (aliado muerto), otro enemigo lo reclama.
+Cada instancia de `CircleStrafeAction` elige su `preferredRange` dentro de un rango en lugar de un valor fijo.
+Unos se acercan demasiado, otros se quedan atrás. Orgánico sin código extra.
 
 ---
 
-## Bloque 6 — Director completo
-*Capa 3 — todo por implementar*
+### 5. Tiempo de compromiso en decisiones de dirección
 
-**Role assignment — Aggressor, Flanker, Support, Harasser**  
-El Director asigna un rol al inicio del encuentro y lo reasigna si el contexto cambia (aliado muerto, token liberado, distancia drástica):
-- `Aggressor` — tiene token activo, ataca ahora
-- `Flanker` — sin token, busca ángulo lateral o trasero
-- `Harasser` — ataques rápidos de bajo daño desde distancia, mantiene presión sin arriesgar
-- `Support` — si un aliado está en stagger prolongado, distrae al jugador para que el aliado se reposicione
+> _"commitmentTime = Random(1s, 3s)"_ — evita el efecto zigzag frame a frame
 
-**Pressure escalation — agresividad dinámica**  
-El Director trackea `timeSincePlayerDamaged`. Umbrales de escalada:
-- +8s sin recibir daño → `maxActiveAttackers` sube en 1, cooldown entre rondas baja 20%
-- +15s → Harassers pasan a Aggressors, los enemigos empiezan a hacer fakes/feints más frecuentes
-- HP del jugador < 30% → todos los Harassers se convierten en Aggressors  
-
-Se resetea cuando el jugador recibe daño. Previene el stalemate donde el jugador circlestrafea sin consecuencias. Hace que quedarse quieto sea peligroso.
+Una vez que `CircleStrafeAction` elige una dirección de órbita, mantenerla durante `commitmentTime`
+antes de recalcular. Ya hay `K_STRAFE_DIR` y `K_STRAFE_FLIP` en el Blackboard — solo ajustar el intervalo.
 
 ---
 
-## Orden de implementación resumido
+## Tier 2 — Fácil (campo nuevo o método pequeño)
 
-| Bloque | Contenido                           | Capa | Impacto  |
-| ------ | ----------------------------------- | ---- | -------- |
-| 1      | Token system                        | 3    | Crítico  |
-| 2      | Percepción (sight, hearing, memory) | 1    | Alto     |
-| 3      | Combat movement (strafe, step back) | 1    | Alto     |
-| 4      | Toma de decisiones y reacciones     | 1    | Alto     |
-| 5      | Coordinación de grupo               | 2    | Medio    |
-| 6      | Roles + pressure escalation         | 3    | Medio    |
+### 6. Decisiones asíncronas (relojes mentales independientes)
 
-> 🏁 **Milestone final:** combate tácticamente coherente con hasta 6 enemigos simultáneos sin sentirse injusto
+> _"EnemyA piensa cada 0.3 s, EnemyB cada 0.7 s, EnemyC cada 0.5 s"_
+
+El BT ya corre cada frame. Añadir un `thinkInterval = Random(0.1s, 0.4s)` en `EnemyControllerComponent`
+que regule cada cuánto se evalúa el árbol completo. Elimina el efecto "todos deciden a la vez"
+que produce sincronización artificial.
+
+**Archivo:** `EnemyControllerComponent.update()` — throttle de `tree.step()`.
+
+---
+
+### 7. Reserva de slot durante varios segundos
+
+> _"slotReservationDuration = 2-5 s"_ — el enemigo mantiene su ángulo aunque ya no sea ideal
+
+`CircleStrafeAction` recalcula el sector óptimo cada 0.6 s. Ampliar a 2-4 s aleatorios.
+Cuando el jugador se mueve bruscamente, los enemigos **no se reorganizan inmediatamente** —
+quedan mal colocados brevemente y se reajustan poco a poco. Mucho más natural. Y ademas puede intercambiar slots para que sea mas natural.
+
+**Archivo:** `CircleStrafeAction.ts` — cambiar `K_POS_TIME` interval.
+
+---
+
+### 8. Latencia de reacción ante cambios bruscos del jugador
+
+> _"reactionDelay = Random(0.2f, 1.2f)"_ — la naturaleza tiene latencia
+
+Cuando el jugador teletransporta, hace dash o cambia de posición más de N metros en un tick,
+los enemigos no actualizan `playerPosition` en su Blackboard inmediatamente — introducir
+un delay aleatorio antes de escribir la nueva posición.
+
+**Archivo:** `PerceptionComponent.runChecks()` — delay en la escritura de `playerPosition` tras cambios grandes.
+
+---
+
+### 9. Presupuesto de amenaza (Threat Budget)
+
+> _"Threat Budget = 100 | Golpe = 25, Carga = 40, Proyectil = 20, Especial = 60"_
+
+El director mantiene un pool de "amenaza activa". Cada tipo de ataque tiene un coste.
+Antes de conceder un token, el director comprueba si el coste cabe en el presupuesto restante.
+Cuando el ataque termina, el coste se devuelve al pool.
+
+Esto limita automáticamente las combinaciones peligrosas sin reglas hardcoded:
+`60 + 60 = 120 > 100` → bloqueado. `25 + 25 + 20 = 70 ≤ 100` → permitido.
+
+**Archivos:** `CombatDirectorComponent.ts` (campo `threatBudget`, coste por tipo),
+`EnemyControllerComponent.ts` (`getAttackThreatCost(): number` override en subclases).
+
+---
+
+## Tier 3 — Medio (sistema nuevo, ~100-200 líneas)
+
+### 13. "1 atacante + 1 preparándose" como estado explícito
+
+> _"A golpeando, B acercándose, C D E F rodeando"_
+
+El director puede conceder dos tokens distintos: `ATTACK` y `PREPARE`.
+El token `PREPARE` permite al enemigo acercarse al jugador (rango corto) pero no atacar todavía.
+Cuando el `ATTACK` termina, el `PREPARE` se convierte automáticamente en el nuevo `ATTACK`.
+Crea flujo continuo: siempre hay alguien que llega justo cuando el anterior termina.
+
+---
+
+### 14. Imperfección deliberada
+
+> _"La IA perfecta parece falsa"_
+
+Introducir errores controlados
+
+Nada de esto requiere lógica compleja — son rolls aleatorios en puntos clave del BT.
+
+---
+
+## Tier 4 — Complejo (arquitectura nueva, > 200 líneas)
+
+### 15. Sistema de slots posicionales
+
+> _"Posición A = 78 | Posición B = 81 | Posición C = 75 → elige B"_
+
+En lugar de orbitar libremente, el director mantiene N slots numerados alrededor del jugador
+(por ejemplo, 8 posiciones a 45° de separación). Cada enemigo **reserva** un slot y navega
+hacia él. Los slots se recalculan cada 2-5 s.
+
+Beneficios: los enemigos no se solapan, el flanqueo es predecible y legible para el jugador,
+el director controla la geometría del combate.
+
+**Archivos nuevos:** `CombatSlotManager.ts`, integración en `CombatDirectorComponent`.
+
+---
+
+---
+
+### 17. Presupuesto de presión continuo (Pressure Budget dinámico)
+
+> _"Cada segundo el director decide: ¿puedo gastar más presión?"_
+
+Evolución del Threat Budget (Tier 2): el presupuesto se regenera con el tiempo a una tasa
+función de la dificultad. Los ataques no devuelven su coste al terminar — se amortiza
+durante 2-3 s, produciendo rachas de alta presión seguidas de respiros naturales sin
+que el diseñador tenga que hardcodear la cadencia.
+
+---
+
+## Principios generales (guían el diseño, no son código)
+
+| Regla                              | Valor orientativo                                                           |
+| ---------------------------------- | --------------------------------------------------------------------------- |
+| Máx. atacantes simultáneos         | 1-2 (normal), 3 (difícil)                                                   |
+| Cooldown global entre olas         | 1.5–3 s                                                                     |
+| Cooldown individual por enemigo    | 3–6 s (varía por tipo)                                                      |
+| Proporción presión activa / órbita | 30% atacando, 70% rodeando/esperando                                        |
+| Tiempo entre amenazas relevantes   | 1.5–3 s (ataque, carga, proyectil…)                                         |
+| Latencia de reacción de enemigos   | 1.0–2.5 s ante cambios grandes del jugador                                  |
+| Objetivo de diseño                 | El jugador nunca está seguro, pero casi siempre tiene una respuesta posible |

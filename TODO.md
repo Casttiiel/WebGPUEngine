@@ -1,6 +1,8 @@
 ### Engine
 
 1. IA
+   reposicionarse y cambiar slots si el jugador se mueve y tiene sentido
+   diferentes distancias de orbitar
 2. Better foot IK foot angle + walking
 3. Hi-Z SSR (mejor calidad de reflecciones)
 4. Temporal upscaling mejorado (TSR con optical flow para objetos sin velocity) (Y con velocity?)
