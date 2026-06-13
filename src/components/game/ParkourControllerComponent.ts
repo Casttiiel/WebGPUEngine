@@ -53,7 +53,7 @@ export class ParkourControllerComponent
   private visualYaw: number = 0;
   private smoothedDesiredYaw: number | null = null;
   private readonly targetSmoothSpeed: number = 15; // smooths noisy desiredYaw from camera front
-  private readonly turnSpeed: number = 20;          // character follows smoothed target
+  private readonly turnSpeed: number = 20; // character follows smoothed target
   private animator: any = null;
   private animatorFound: boolean = false;
 
@@ -61,6 +61,13 @@ export class ParkourControllerComponent
   private headLookConstraint: any = null;
   private headLookConstraintCreated: boolean = false;
   private headLookWeight: number = 0;
+
+  // ── Jump animation ────────────────────────────────────────────────────────────
+  private _wasGrounded: boolean = true;
+  private _landLayerId: number = -1;
+  private _landLayerElapsed: number = 0;
+  private _jumpStartLayerId: number = -1;
+  private _airTimer: number = 0;
 
   // ── Systems ──────────────────────────────────────────────────────────────────
   private wallRunSystem!: WallRunSystem;
@@ -166,6 +173,11 @@ export class ParkourControllerComponent
           if (input.isActionBuffered(GameAction.JUMP)) {
             if (this.movement.requestJump()) {
               input.consumeBufferedAction(GameAction.JUMP);
+              this._jumpStartLayerId = this.animator?.addLayer('Jump_Start', {
+                loop: false,
+                weight: 1.0,
+                blendInTime: 0.08,
+              }) ?? -1;
             }
           }
           const jumpPressed = input.isActionPressed(GameAction.JUMP);
@@ -256,55 +268,33 @@ export class ParkourControllerComponent
     }
 
     this.animator?.setParameter('isMoving', hSpeed > 0.5);
-    this.updateHeadLookAt(dt, hVel, hSpeed);
-  }
 
-  private updateHeadLookAt(dt: number, hVel: ArrayLike<number>, hSpeed: number): void {
-    if (!this.animator) return;
+    const isGrounded = this.movement.isGrounded();
+    // Debounce: only switch to InAir after 0.15s airborne to prevent flicker on uneven terrain
+    this._airTimer = isGrounded ? 0 : this._airTimer + dt;
+    this.animator?.setParameter('isInAir', this._airTimer > 0.15);
 
-    if (!this.headLookConstraintCreated) {
-      this.headLookConstraint = this.animator.addIkConstraint({
-        type: 'lookat',
-        jointName: 'mixamorig:Head',
-        target: vec3.create(),
-        limitAngleDeg: 40,
-        weight: 0,
-      });
-      this.headLookConstraintCreated = true;
+    if (!this._wasGrounded && isGrounded) {
+      if (this._jumpStartLayerId >= 0) {
+        this.animator?.removeLayer(this._jumpStartLayerId, 0.1);
+        this._jumpStartLayerId = -1;
+      }
+      // Speed scales with landing velocity: 1.0x at rest → 3.5x at full speed
+      const landSpeed = 1.0 + Math.min(hSpeed * 0.25, 2.5);
+      this._landLayerId = this.animator?.addLayer('Jump_Land', { loop: false, weight: 1.0, blendInTime: 0.08, speed: landSpeed }) ?? -1;
+      this._landLayerElapsed = 0;
     }
-    if (!this.headLookConstraint) return;
 
-    let targetWeight = 0;
-
-    if (hSpeed > 0.3) {
-      // Angle between body facing direction and velocity direction
-      const yawRad = this.visualYaw * (Math.PI / 180);
-      const facingVec = vec3.fromValues(Math.sin(yawRad), 0, Math.cos(yawRad));
-      const velDir = vec3.normalize(vec3.create(), vec3.fromValues(hVel[0]!, 0, hVel[2]!));
-      const angleDeg = Math.acos(Math.max(-1, Math.min(1, vec3.dot(facingVec, velDir)))) * (180 / Math.PI);
-
-      if (angleDeg < 30) {
-        targetWeight = 1.0;
-
-        // Rotate velocity from world space to model space by undoing the visualYaw rotation.
-        // model_dir = rotate_Y(-yaw) * world_dir
-        const cosY = Math.cos(yawRad);
-        const sinY = Math.sin(yawRad);
-        const vxM = velDir[0]! * cosY - velDir[2]! * sinY;
-        const vzM = velDir[0]! * sinY + velDir[2]! * cosY;
-
-        // Sample head Y from current pose so the look stays horizontal (toTarget.y = 0).
-        const headIdx = this.animator.getJointIndex('mixamorig:Head');
-        const headM = this.animator.getJointModelMatrix(headIdx);
-        const headY: number = headM ? (headM as Float32Array)[13]! : 1.5;
-
-        vec3.set(this.headLookConstraint.target, vxM * 3.0, headY, vzM * 3.0);
+    if (this._landLayerId >= 0) {
+      this._landLayerElapsed += dt;
+      // Minimum 0.2s before the layer can be cancelled by running
+      if (this._landLayerElapsed > 0.2 && hSpeed > 2.0) {
+        this.animator?.removeLayer(this._landLayerId, 0.15);
+        this._landLayerId = -1;
       }
     }
 
-    const wAlpha = 1 - Math.exp(-8 * dt);
-    this.headLookWeight += (targetWeight - this.headLookWeight) * wAlpha;
-    this.headLookConstraint.weight = this.headLookWeight;
+    this._wasGrounded = isGrounded;
   }
 
   private findCamera(): void {

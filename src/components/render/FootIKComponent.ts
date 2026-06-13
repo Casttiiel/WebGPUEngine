@@ -113,6 +113,7 @@ export class FootIKComponent extends Component {
   }
 
   public update(dt: number): void {
+    return;
     if (!this.animator) return;
     if (!this.leftConstraint && !this.tryCreateConstraints()) return;
 

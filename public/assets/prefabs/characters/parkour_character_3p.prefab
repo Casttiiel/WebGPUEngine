@@ -38,38 +38,21 @@
         },
         "animator": {
           "extraAnimations": [
-            "Idle.gltf",
-            "Run.gltf"
+            "universal_animations.gltf"
           ],
           "states": [
-            {
-              "name": "Idle",
-              "clip": 1,
-              "loop": true,
-              "speed": 1
-            },
-            {
-              "name": "Run",
-              "clip": 2,
-              "loop": true,
-              "speed": 1
-            }
+            { "name": "Idle",  "clip": "Idle_Loop",     "loop": true  },
+            { "name": "Run",   "clip": "Jog_Fwd_Loop",  "loop": true  },
+            { "name": "InAir", "clip": "Jump_Loop",      "loop": true  }
           ],
+          "default": "Idle",
           "transitions": [
-            {
-              "from": "Idle",
-              "to": "Run",
-              "condition": "isMoving",
-              "blendTime": 0.2
-            },
-            {
-              "from": "Run",
-              "to": "Idle",
-              "conditionFalse": "isMoving",
-              "blendTime": 0.2
-            }
-          ],
-          "default": "Idle"
+            { "from": "Idle",  "to": "Run",   "condition":      "isMoving", "blendTime": 0.2  },
+            { "from": "Run",   "to": "Idle",  "conditionFalse": "isMoving", "blendTime": 0.3  },
+            { "from": "Idle",  "to": "InAir", "condition":      "isInAir",  "blendTime": 0.15 },
+            { "from": "Run",   "to": "InAir", "condition":      "isInAir",  "blendTime": 0.15 },
+            { "from": "InAir", "to": "Idle",  "conditionFalse": "isInAir",  "blendTime": 0.2  }
+          ]
         },
         "foot_ik": {
           "leftThigh": "thigh_l",
