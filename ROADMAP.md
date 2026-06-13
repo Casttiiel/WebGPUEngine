@@ -20,12 +20,6 @@ aplicados a este motor. Ordenado de más fácil a más complejo de implementar.
 
 ## Tier 1 — Muy fácil (parámetros o < 20 líneas de código)
 
-### 1. Valores por defecto afinados por tipo de enemigo
-
-> Melee básico: cooldown 4-6 s | Berserker: 2-3 s | Tanque: 7-10 s | Arquero: 3-5 s
-
-Cambiar `individualCooldownMs` y `attackPaceMs` por tipo. Cero arquitectura nueva.
-
 ---
 
 ### 2. Presets de dificultad en el director
@@ -125,15 +119,6 @@ Esto limita automáticamente las combinaciones peligrosas sin reglas hardcoded:
 ---
 
 ## Tier 3 — Medio (sistema nuevo, ~100-200 líneas)
-
-### 13. "1 atacante + 1 preparándose" como estado explícito
-
-> _"A golpeando, B acercándose, C D E F rodeando"_
-
-El director puede conceder dos tokens distintos: `ATTACK` y `PREPARE`.
-El token `PREPARE` permite al enemigo acercarse al jugador (rango corto) pero no atacar todavía.
-Cuando el `ATTACK` termina, el `PREPARE` se convierte automáticamente en el nuevo `ATTACK`.
-Crea flujo continuo: siempre hay alguien que llega justo cuando el anterior termina.
 
 ---
 

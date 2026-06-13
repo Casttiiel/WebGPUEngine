@@ -132,6 +132,14 @@ export class EnemyControllerComponent extends Component implements IKickable {
   private slowFactor: number = 1.0;
   /** Accumulates time to throttle ground-check raycasts to 20 Hz. */
   private _groundTimer: number = 0;
+  // ── Tier 2.6 — Async BT think interval ───────────────────────────────────
+  // Each enemy evaluates its BT at a different rate (80–200 ms). This breaks
+  // the "all enemies decide simultaneously" sync artifact that makes the group
+  // feel artificial. Random initial phase prevents burst-alignment at spawn.
+  private readonly _thinkInterval: number = 0.08 + Math.random() * 0.12;
+  private _thinkTimer: number = Math.random() * 0.2; // random phase offset
+  /** Cached movement desired from the last BT think step, re-applied between steps. */
+  private _cachedDesired: vec3 = vec3.create();
   // Pre-allocated colour arrays reused every frame — avoids per-frame GC pressure.
   private static readonly _COLOR_NORMAL: [number, number, number, number] = [1, 1, 1, 1];
   private static readonly _COLOR_CHARGEABLE: [number, number, number, number] = [1, 0.9, 0.1, 1];
@@ -280,8 +288,15 @@ export class EnemyControllerComponent extends Component implements IKickable {
     }
     this.bb.set('isGrounded', this.movement.isGrounded());
 
-    // 4. Step the behavior tree — Action nodes may call setDesiredHorizontal()
-    this.tree.step();
+    // 4. Step the behavior tree — throttled per-enemy (Tier 2.6 async decisions)
+    this._thinkTimer += deltaTime;
+    if (this._thinkTimer >= this._thinkInterval) {
+      this._thinkTimer -= this._thinkInterval;
+      this.tree.step();
+      vec3.copy(this._cachedDesired, this.desiredHorizontal);
+    } else {
+      vec3.copy(this.desiredHorizontal, this._cachedDesired);
+    }
 
     // 4c. Apply slow effect (re-affirmed each frame by BloodZoneComponent)
     if (this.slowTimer > 0) {
@@ -729,6 +744,16 @@ export class EnemyControllerComponent extends Component implements IKickable {
    */
   protected getIndividualCooldownMs(): number {
     return 0;
+  }
+
+  /**
+   * Threat cost charged to the director's Threat Budget when this enemy holds an
+   * attack token. The budget (default 100) limits dangerous attack combinations.
+   * Override per enemy type: tanks cost 40, basic enemies 25, ranged 20.
+   * Tier 2.9 — Threat Budget.
+   */
+  public getAttackThreatCost(): number {
+    return 25;
   }
 
   /**

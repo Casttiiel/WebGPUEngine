@@ -68,6 +68,11 @@ export class PerceptionComponent extends Component {
   private deaggroRadius: number = 25;
 
   // ─── Internal ──────────────────────────────────────────────────────────────
+  /** Tier 2.8 — Reaction delay: pending player position after a large jump. */
+  private _pendingPos: vec3 | null = null;
+  /** Seconds remaining until _pendingPos is written to the blackboard. */
+  private _pendingTimer: number = 0;
+
   private bb!: Blackboard;
   private ownCollider!: CapsuleColliderComponent;
   private playerEntity: Entity | null = null;
@@ -120,6 +125,17 @@ export class PerceptionComponent extends Component {
 
   public update(deltaTime: number): void {
     if (!this.bb || !this.ownCollider) return;
+
+    // Tier 2.8 — flush pending position when reaction delay expires (runs every frame)
+    if (this._pendingPos !== null) {
+      this._pendingTimer -= deltaTime;
+      if (this._pendingTimer <= 0) {
+        const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
+        vec3.copy(stored, this._pendingPos);
+        this.bb.set('playerPosition', stored);
+        this._pendingPos = null;
+      }
+    }
 
     this.timer += deltaTime;
     if (this.timer < this.checkInterval) return;
@@ -186,10 +202,21 @@ export class PerceptionComponent extends Component {
 
     // ── Position updates — sight > hearing > noise events ────────────────────
     if (canSee) {
-      // Sight: exact position, highest priority
+      // Tier 2.8 — sight update with reaction delay for large position jumps.
+      // If the player dashed/rolled > 3 m, defer the BB update by 0.2–0.8 s
+      // so enemies briefly keep chasing the old position (natural reaction lag).
+      const newPos = this.getPlayerBodyPos();
       const stored = this.bb.get<vec3>('playerPosition') ?? vec3.create();
-      vec3.copy(stored, this.getPlayerBodyPos());
-      this.bb.set('playerPosition', stored);
+      const jump = vec3.distance(stored, newPos);
+      if (jump > 3.0 && this._pendingPos === null) {
+        this._pendingPos = newPos;
+        this._pendingTimer = 0.2 + Math.random() * 0.6; // 0.2–0.8 s delay
+      } else if (this._pendingPos === null) {
+        // Small move — update immediately as before
+        vec3.copy(stored, newPos);
+        this.bb.set('playerPosition', stored);
+      }
+      // While pending: keep old position until _pendingTimer fires
     } else if (canHear) {
       // Hearing: within hearRadius, enemy knows you're here (no LOS needed)
       this.bb.set<boolean>('hasLastKnown', true);

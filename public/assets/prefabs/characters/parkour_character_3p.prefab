@@ -34,7 +34,7 @@
           ]
         },
         "skeletal_mesh": {
-          "gltf": "XBot.gltf"
+          "gltf": "character.gltf"
         },
         "animator": {
           "extraAnimations": [
@@ -72,15 +72,16 @@
           "default": "Idle"
         },
         "foot_ik": {
-          "leftThigh": "mixamorig:LeftUpLeg",
-          "leftKnee": "mixamorig:LeftLeg",
-          "leftFoot": "mixamorig:LeftFoot",
-          "rightThigh": "mixamorig:RightUpLeg",
-          "rightKnee": "mixamorig:RightLeg",
-          "rightFoot": "mixamorig:RightFoot",
-          "pelvis": "mixamorig:Hips",
+          "leftThigh": "thigh_l",
+          "leftKnee": "calf_l",
+          "leftFoot": "foot_l",
+          "rightThigh": "thigh_r",
+          "rightKnee": "calf_r",
+          "rightFoot": "foot_r",
+          "pelvis": "pelvis",
+          "ankleHeight": 0.09,
           "raycastUpOffset": 0.3,
-          "raycastMaxDown": 0.3,
+          "raycastMaxDown": 0.5,
           "footLerpSpeed": 12,
           "pelvisLerpSpeed": 8
         }

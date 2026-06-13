@@ -12,32 +12,23 @@ import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
 import { EnemyControllerComponentDataType } from '../../types/EnemyControllerComponentData.type';
 
-/**
- * TankMeleeController — Enemigo D: Melee Tanque
- *
- * Attack rhythm is fully controlled by CombatDirectorComponent (attackPaceMs,
- * aggressiveness). This controller only decides HOW to execute an attack once
- * the director grants the token — not WHEN.
- *
- * Flow:
- *   Director grants token → advance → attack → back off during recovery →
- *   release token → orbit until director grants next wave.
- */
 export class TankMeleeController extends EnemyControllerComponent {
   // ── Per-attack transient state ─────────────────────────────────────────────
-  /** True between attack() being called and recovery completing. */
   private _attackLaunched = false;
 
-  /**
-   * Per-tank cooldown after each attack, in milliseconds.
-   * After releasing the token, this enemy won't be eligible for another
-   * token (from the director or self) until this time has elapsed.
-   * Director's global attackPaceMs applies ON TOP of this.
-   */
+  // ── Tier 3.14 — deliberate imperfection ──────────────────────────────────
+  // 15% chance per attack cycle of a 0.3–0.7 s hesitation before advancing.
+  private _hesitateRolled = false;
+  private _hesitateUntil = 0;
+
   public individualCooldownMs = 3000;
 
   protected override getIndividualCooldownMs(): number {
     return this.individualCooldownMs;
+  }
+
+  public override getAttackThreatCost(): number {
+    return 40;
   }
 
   // ── Orbit range (rebuilds BT on change via setter) ────────────────────────
@@ -48,10 +39,7 @@ export class TankMeleeController extends EnemyControllerComponent {
   }
   private _orbitRange = 5;
 
-  // ── Editor ────────────────────────────────────────────────────────────────
   private _editorFolder: any = null;
-
-  // ── Default stats ─────────────────────────────────────────────────────────
 
   public override async load(data: EnemyControllerComponentDataType): Promise<void> {
     await super.load({
@@ -62,8 +50,6 @@ export class TankMeleeController extends EnemyControllerComponent {
       ...data,
     });
   }
-
-  // ── Behavior Tree ─────────────────────────────────────────────────────────
 
   protected override buildTree(): BehaviorNode {
     const tank = this;
@@ -77,12 +63,8 @@ export class TankMeleeController extends EnemyControllerComponent {
         return !!pos && !!spawn && vec3.distance(pos, spawn) > 1.5;
       });
 
-    // Token gate: director controls WHEN the next wave is allowed.
-    // Enemy just says "I'm ready" — the director decides if now is the time.
     const tryToken = new Condition('TryToken', (_bb) => tank.tryAcquireAttackToken());
 
-    // Advance, attack, back off through recovery, then signal done.
-    // The director's pace timer starts when this resolves (via releaseToken below).
     const advanceAndSwing = new Action('TankAdvanceAndSwing', (bb) => {
       const self = bb.get<EnemyControllerComponent>('self')!;
       const pos = bb.get<vec3>('position')!;
@@ -99,19 +81,27 @@ export class TankMeleeController extends EnemyControllerComponent {
 
       if (tank._attackLaunched) {
         if (melee?.isInRecovery()) {
-          // Back away during the post-swing window
           if (dist > 0.1) {
             const away = vec3.normalize(vec3.create(), vec3.negate(vec3.create(), dir));
             self.setDesiredHorizontal(away);
           }
           return Status.RUNNING;
         }
-        // Recovery done (or was instant — recoveryTime=0): signal complete
         tank._attackLaunched = false;
         return Status.SUCCESS;
       }
 
-      // Close in and swing
+      // Tier 3.14 — roll for hesitation once at the start of each attack cycle
+      if (!tank._hesitateRolled) {
+        tank._hesitateRolled = true;
+        if (Math.random() < 0.15) {
+          tank._hesitateUntil = Date.now() + 300 + Math.random() * 400;
+        }
+      }
+      if (Date.now() < tank._hesitateUntil) {
+        return Status.RUNNING; // face player but don't advance yet
+      }
+
       if (dist > 0.3) {
         vec3.normalize(dir, dir);
         self.setDesiredHorizontal(dir);
@@ -120,16 +110,16 @@ export class TankMeleeController extends EnemyControllerComponent {
         const tc = self.getOwner().getComponent('transform') as TransformComponent | null;
         const center = (tc?.getTransform().getWorldPosition() ?? pos) as vec3;
         melee.attack(center);
-        tank._attackLaunched = true; // recovery check starts next tick
+        tank._attackLaunched = true;
       }
 
       return Status.RUNNING;
     });
 
-    // Release token → director starts the inter-wave pace timer.
-    // No per-enemy cooldown here — rhythm is global.
     const releaseToken = new Action('ReleaseToken', (_bb) => {
       tank._attackLaunched = false;
+      tank._hesitateRolled = false;
+      tank._hesitateUntil = 0;
       tank.releaseAttackToken();
       return Status.SUCCESS;
     });
@@ -150,18 +140,16 @@ export class TankMeleeController extends EnemyControllerComponent {
 
     return new Selector(
       [
-        // 1. COMBAT
-        // Outer Sequence reactive: canSee() re-checked every tick.
-        // Inner Selector reactive: re-checks token availability every tick,
-        //   so the enemy transitions to attacking the moment the director
-        //   opens the next wave (pace timer expired).
         new Sequence(
           [
             canSee(),
             new Selector(
               [
                 new Sequence([tryToken, advanceAndSwing, releaseToken]),
-                new CircleStrafeAction({ preferredRange: tank._orbitRange }),
+                new CircleStrafeAction({
+                  preferredRangeMin: tank._orbitRange * 0.8,
+                  preferredRangeMax: tank._orbitRange * 1.2,
+                }),
               ],
               { reactive: true },
             ),
@@ -169,24 +157,19 @@ export class TankMeleeController extends EnemyControllerComponent {
           { reactive: true },
         ),
 
-        // 2. RETURN HOME (NavMesh)
         new Sequence([notAtHome(), new RequestPathAction('spawnPosition'), new SteerAction()], {
           reactive: true,
         }),
 
-        // 3. RETURN HOME (direct fallback)
         new Sequence([notAtHome(), moveDirectlyTo('ReturnDirectly', 'spawnPosition')], {
           reactive: true,
         }),
 
-        // 4. IDLE
         new Action('Idle', (_bb) => Status.RUNNING),
       ],
       { label: 'TankMeleeRoot', reactive: true },
     );
   }
-
-  // ── Editor GUI ────────────────────────────────────────────────────────────
 
   public override renderInMenu(folder?: any): void {
     if (this._editorFolder || !folder) return;
@@ -198,14 +181,11 @@ export class TankMeleeController extends EnemyControllerComponent {
       .name('Individual cooldown (ms)')
       .listen();
 
-    // Orbit range uses a setter that rebuilds the BT so CircleStrafeAction picks it up.
     this._editorFolder
       .add(this, 'orbitRange', 1, 15, 0.5)
       .name('Orbit range (m)')
       .listen();
   }
-
-  // ── Message registration ──────────────────────────────────────────────────
 
   public static override registerMsgs(): void {
     MsgDispatcher.register(MsgType.ON_DEATH, 'tank_melee_controller', (comp) => {

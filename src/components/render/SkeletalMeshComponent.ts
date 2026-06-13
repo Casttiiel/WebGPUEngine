@@ -78,6 +78,19 @@ export class SkeletalMeshComponent extends Component {
       ],
     });
 
+    // Upload identity matrices as the default (bind) pose so the mesh is visible
+    // even without an AnimatorComponent. Clamped to MAX_JOINTS.
+    const defaultPalette = new Float32Array(MAX_JOINTS * 16);
+    const defaultJointCount = Math.min(this.asset.skeleton.joints.length, MAX_JOINTS);
+    for (let i = 0; i < defaultJointCount; i++) {
+      const o = i * 16;
+      defaultPalette[o] = 1; defaultPalette[o + 5] = 1;
+      defaultPalette[o + 10] = 1; defaultPalette[o + 15] = 1;
+    }
+    device.queue.writeBuffer(this.jointMatrixBuffer, 0, defaultPalette);
+    device.queue.writeBuffer(this.previousJointMatrixBuffer, 0, defaultPalette);
+    this.previousJointPalette.set(defaultPalette);
+
     // Register render keys — shadow key is auto-created by RenderManagerV2
     // because the material now has casts_shadows: true.
     const renderManager = RenderManagerV2.getInstance();
@@ -104,7 +117,7 @@ export class SkeletalMeshComponent extends Component {
    */
   public uploadPose(palette: Float32Array): void {
     const device = GPUUtils.getDevice();
-    const jointCount = this.asset.skeleton.joints.length;
+    const jointCount = Math.min(this.asset.skeleton.joints.length, MAX_JOINTS);
     const floatCount = jointCount * 16;
 
     // On the first frame, prime the previous palette with the current pose so
