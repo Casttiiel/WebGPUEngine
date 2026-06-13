@@ -1,17 +1,34 @@
 {
+  "children": [
+    {
+      "children": [],
+      "components": {
+        "name": "EnemyMesh",
+        "transform": {
+          "position": [0, -0.9, 0],
+          "rotation": [0, 0, 0],
+          "scale": [1, 1, 1]
+        },
+        "skeletal_mesh": {
+          "gltf": "character.gltf",
+          "baseColorFactor": [0.9, 0.2, 0.15, 1.0]
+        },
+        "animator": {
+          "extraAnimations": ["universal_animations.gltf"],
+          "states": [
+            { "name": "Idle", "clip": "Idle_Loop", "loop": true }
+          ],
+          "default": "Idle",
+          "transitions": []
+        }
+      }
+    }
+  ],
   "components": {
     "name": "DummyEnemy",
     "transform": {
-      "position": [
-        0,
-        0.9,
-        0
-      ],
-      "scale": [
-        0.6,
-        1.8,
-        0.6
-      ]
+      "position": [0, 0.9, 0],
+      "scale": [1, 1, 1]
     },
     "capsule_collider": {
       "height": 1.8,
@@ -26,19 +43,13 @@
       "collisionGroups": "ENEMY",
       "collisionMask": "ALL"
     },
-    "render": {
-      "meshes": [
-        {
-          "mesh": "unit_cube.obj",
-          "material": "stone.mat"
-        }
-      ]
-    },
     "dummy_enemy_controller": {},
     "kcc_movement": {},
     "kickable": {},
     "health": {
-      "maxHp": 99999
-    }
+      "maxHp": 99999,
+      "faction": "enemy"
+    },
+    "hit_reaction": {}
   }
 }

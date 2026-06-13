@@ -307,6 +307,24 @@ export class ModulePhysics extends Module {
   }
 
   /**
+   * Returns the entity IDs of all colliders overlapping a sphere at `center` with `radius`.
+   * Excludes sensors. Callback receives each entity ID; return false to stop early.
+   */
+  public overlapSphere(center: vec3, radius: number, callback: (entityId: number) => boolean): void {
+    const shape = new RAPIER.Ball(radius);
+    const shapePos = { x: center[0], y: center[1], z: center[2] };
+    const shapeRot = { w: 1, x: 0, y: 0, z: 0 };
+
+    this.world.intersectionsWithShape(shapePos, shapeRot, shape, (collider) => {
+      const entityId = this.colliderHandleToEntityId.get(collider.handle);
+      if (entityId !== undefined) {
+        return callback(entityId);
+      }
+      return true;
+    }, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS);
+  }
+
+  /**
    * Removes a collider from Rapier world and cleans up internal tracking maps.
    * Used when resizing a collider at runtime.
    */

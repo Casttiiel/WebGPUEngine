@@ -69,6 +69,7 @@ export class ParkourControllerComponent
   private _jumpStartLayerId: number = -1;
   private _airTimer: number = 0;
 
+
   // ── Systems ──────────────────────────────────────────────────────────────────
   private wallRunSystem!: WallRunSystem;
   private dashSystem!: DashSystem;

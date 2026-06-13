@@ -41,7 +41,7 @@
             "universal_animations.gltf"
           ],
           "states": [
-            { "name": "Idle",  "clip": "Idle_Loop",     "loop": true  },
+            { "name": "Idle",  "clip": "Sword_Idle",    "loop": true  },
             { "name": "Run",   "clip": "Jog_Fwd_Loop",  "loop": true  },
             { "name": "InAir", "clip": "Jump_Loop",      "loop": true  }
           ],
@@ -135,6 +135,14 @@
       "maxHp": 100,
       "faction": "player"
     },
+    "player_attack": {
+      "damage": 20,
+      "range": 2.0,
+      "halfAngleDeg": 60,
+      "cooldown": 0.5,
+      "attackClip": "Sword_Attack_Standing"
+    },
+    "hit_reaction": {},
     "camera_arm": {
       "armLength": 5,
       "pivotOffset": [

@@ -50,20 +50,37 @@ export class SkinnedMeshAsset extends BaseResource {
 
   // ── Factory ──────────────────────────────────────────────────────────────
 
+  // In-flight parse promises — prevents returning a partially-initialised asset
+  // when multiple entities request the same GLTF simultaneously via Promise.all.
+  private static readonly pending = new Map<string, Promise<SkinnedMeshAsset>>();
+
   /**
    * Returns a cached SkinnedMeshAsset for `gltfName`, parsing it on first access.
-   * Subsequent calls for the same file return immediately from ResourceManager.
+   * Concurrent calls for the same file await the same parse promise so no caller
+   * ever receives an asset whose material/skeleton fields are still undefined.
    */
   public static async get(gltfName: string): Promise<SkinnedMeshAsset> {
     const key = `skinned_asset:${gltfName}`;
+
+    // 1. In-flight: another caller is already parsing this file — share the promise.
+    const inFlight = SkinnedMeshAsset.pending.get(key);
+    if (inFlight) return inFlight;
+
+    // 2. Already fully parsed and registered.
     try {
       return ResourceManager.getResource<SkinnedMeshAsset>(key);
-    } catch {
+    } catch { /* not cached yet */ }
+
+    // 3. First caller: parse, then register.
+    const promise = (async () => {
       const asset = new SkinnedMeshAsset({ path: key, type: ResourceType.SKINNED_MESH_ASSET });
-      ResourceManager.registerResource(asset);
       await asset.parse(gltfName);
+      ResourceManager.registerResource(asset); // register only after fully parsed
+      SkinnedMeshAsset.pending.delete(key);
       return asset;
-    }
+    })();
+    SkinnedMeshAsset.pending.set(key, promise);
+    return promise;
   }
 
   // BaseResource requires a sync load() — we use the async parse() path instead.

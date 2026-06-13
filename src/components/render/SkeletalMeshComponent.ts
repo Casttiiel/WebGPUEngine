@@ -5,10 +5,12 @@ import { RenderManagerV2 } from '../../renderer/core/managers/RenderManagerV2';
 import { TextureStreamingManager } from '../../renderer/core/managers/TextureStreamingManager';
 import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory';
 import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
+import { Material } from '../../renderer/resources/Material';
 import { vec3 } from 'gl-matrix';
 
 export interface SkeletalMeshComponentData {
   gltf: string;
+  baseColorFactor?: [number, number, number, number];
 }
 
 const MAX_JOINTS = 128;
@@ -39,10 +41,20 @@ export class SkeletalMeshComponent extends Component {
   private previousJointPalette: Float32Array = new Float32Array(MAX_JOINTS * 16);
 
   private streamingPosGetter: (() => vec3) | null = null;
+  // Per-instance material clone when baseColorFactor override is requested.
+  private materialOverride: Material | null = null;
 
   public async load(data: SkeletalMeshComponentData): Promise<void> {
     const { gltf } = data;
     this.asset = await SkinnedMeshAsset.get(gltf);
+
+    if (data.baseColorFactor) {
+      const clone = Material.cloneFrom(this.asset.material);
+      if (clone) {
+        clone.setFactors({ baseColorFactor: data.baseColorFactor });
+        this.materialOverride = clone;
+      }
+    }
 
     const device = GPUUtils.getDevice();
     const bgl = BindGroupFactory.getSkinMatricesLayout();
@@ -95,8 +107,9 @@ export class SkeletalMeshComponent extends Component {
     // because the material now has casts_shadows: true.
     const renderManager = RenderManagerV2.getInstance();
     const transform = this.getOwner().getComponent('transform') as TransformComponent;
+    const material = this.materialOverride ?? this.asset.material;
     for (const sm of this.asset.skinnedMeshes) {
-      renderManager.addKey(this as any, sm as any, this.asset.material, transform, false, 1, undefined, this.skinBindGroup);
+      renderManager.addKey(this as any, sm as any, material, transform, false, 1, undefined, this.skinBindGroup);
     }
 
     // Register textures with TextureStreamingManager so MIP levels are upgraded
@@ -137,7 +150,6 @@ export class SkeletalMeshComponent extends Component {
     RenderManagerV2.getInstance().delKeys(this as any);
     this.jointMatrixBuffer?.destroy();
     this.previousJointMatrixBuffer?.destroy();
-
     if (this.streamingPosGetter) {
       const tsm = TextureStreamingManager.getInstance();
       for (const tex of this.asset.material.getAssetTextures()) {

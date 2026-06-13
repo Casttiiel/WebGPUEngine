@@ -1,12 +1,12 @@
 ### Engine
 
-1. IA
+1. Character animator
+2. IA
    reposicionarse y cambiar slots si el jugador se mueve y tiene sentido
    diferentes distancias de orbitar
-2. Better foot IK foot angle + walking
-3. Hi-Z SSR (mejor calidad de reflecciones)
-4. Temporal upscaling mejorado (TSR con optical flow para objetos sin velocity) (Y con velocity?)
-5. Character animator
+3. Better foot IK foot angle + walking
+4. Hi-Z SSR (mejor calidad de reflecciones)
+5. Temporal upscaling mejorado (TSR con optical flow para objetos sin velocity) (Y con velocity?)
 6. Editor Camera (Render Debug / Gizmo / Menu)
 7. Material Instances
 8. [Blender] GLTF Exporter unifies metaltlic and roughness? In right channel?

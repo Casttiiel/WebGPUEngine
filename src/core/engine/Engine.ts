@@ -49,6 +49,7 @@ import { ReflectionProbeComponent } from '../../components/render/ReflectionProb
 import { GrappleTargetComponent } from '../../components/game/GrappleTargetComponent';
 import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
 import { CombatDirectorComponent } from '../../components/game/CombatDirectorComponent';
+import { HitReactionComponent } from '../../components/game/HitReactionComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -198,6 +199,7 @@ export class Engine {
     WeakPointComponent.registerMsgs();
     TankMeleeController.registerMsgs();
     CombatDirectorComponent.registerMsgs();
+    HitReactionComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
   }

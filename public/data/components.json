@@ -22,6 +22,7 @@
 
     "player_controller",
     "parkour_controller",
+    "player_attack",
 
     "melee_attack",
     "weapon",
@@ -34,6 +35,7 @@
     "blood_ball_projectile",
 
     "health",
+    "hit_reaction",
     "stamina",
     "blood",
     "blood_zone",

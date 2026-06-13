@@ -373,28 +373,5 @@
   },
   {
     "prefab": "gameplay/lynx_spear.prefab"
-  },
-
-  {
-    "prefab": "gameplay/game_manager.prefab"
-  },
-
-  {
-    "prefab": "characters/basic_melee.prefab",
-    "components": {
-      "transform": { "position": [3, 0.9, 5] }
-    }
-  },
-  {
-    "prefab": "characters/basic_melee.prefab",
-    "components": {
-      "transform": { "position": [-3, 0.9, 5] }
-    }
-  },
-  {
-    "prefab": "characters/basic_melee.prefab",
-    "components": {
-      "transform": { "position": [0, 0.9, 7] }
-    }
   }
 ]

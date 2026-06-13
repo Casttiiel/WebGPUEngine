@@ -43,6 +43,7 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
   jump: { type: InputType.KEYBOARD, key: KeyCode.SPACE },
   dash: { type: InputType.KEYBOARD, key: KeyCode.SHIFT },
   attack: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },
+  light_attack: { type: InputType.MOUSE_BUTTON, button: MouseButton.LEFT },
   fire: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
   kick: { type: InputType.KEYBOARD, key: KeyCode.F },
 
