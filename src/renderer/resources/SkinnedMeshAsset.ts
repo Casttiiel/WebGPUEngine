@@ -18,6 +18,7 @@ import {
   WebIO,
   Node as GltfNode,
   Mesh as GltfMesh,
+  Primitive as GltfPrimitive,
   Skin as GltfSkin,
   Animation as GltfAnimation,
 } from '@gltf-transform/core';
@@ -125,8 +126,16 @@ export class SkinnedMeshAsset extends BaseResource {
       throw new Error(`SkinnedMeshAsset: no skinned primitive in ${gltfName}`);
 
     // ── Build shared GPU meshes ──────────────────────────────────────────
+    // Collect ALL skinned primitives across all mesh nodes (a single Blender
+    // mesh with multiple materials exports as multiple primitives on one node).
+    const primitivesToBuild: GltfPrimitive[] = [];
+    for (const { mesh } of meshNodes) {
+      for (const prim of mesh.listPrimitives()) {
+        if (prim.getAttribute('JOINTS_0')) primitivesToBuild.push(prim);
+      }
+    }
     this.skinnedMeshes = await Promise.all(
-      meshNodes.map(({ mesh }) => this.buildMesh(mesh, folderName)),
+      primitivesToBuild.map((prim) => this.buildPrimitive(prim)),
     );
 
     // ── Build shared material ────────────────────────────────────────────
@@ -182,10 +191,9 @@ export class SkinnedMeshAsset extends BaseResource {
     this.clips = this.extractAnimations(root.listAnimations(), root.listNodes());
   }
 
-  // ── Build a single GPU SkinnedMesh from a GLTF mesh ──────────────────────
+  // ── Build a single GPU SkinnedMesh from a GLTF primitive ─────────────────
 
-  private async buildMesh(mesh: GltfMesh, folderName: string): Promise<SkinnedMesh> {
-    const prim = mesh.listPrimitives()[0]!;
+  private async buildPrimitive(prim: GltfPrimitive): Promise<SkinnedMesh> {
     const positions = prim.getAttribute('POSITION')!.getArray()! as Float32Array;
     const normals = prim.getAttribute('NORMAL')!.getArray()! as Float32Array;
     const uvs = prim.getAttribute('TEXCOORD_0')?.getArray() as Float32Array | undefined;

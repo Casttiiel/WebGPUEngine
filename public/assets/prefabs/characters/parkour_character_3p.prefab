@@ -13,7 +13,12 @@
       }
     },
     {
-      "children": [],
+      "children": [
+        {
+          "prefab": "weapons/sword.prefab",
+          "components": {}
+        }
+      ],
       "components": {
         "name": "PlayerMesh",
         "transform": {

@@ -47,6 +47,7 @@
     "box_collider",
     "capsule_collider",
 
+    "bone_attachment",
     "transform",
 
     "camera_arm",

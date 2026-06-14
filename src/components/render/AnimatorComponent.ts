@@ -572,6 +572,10 @@ export class AnimatorComponent extends Component {
     return this.skeleton?.names.indexOf(name) ?? -1;
   }
 
+  public getAllJointNames(): string[] {
+    return this.skeleton?.names ?? [];
+  }
+
   /**
    * Returns the joint's current model-space matrix (local to the mesh entity).
    * Only valid AFTER the first evaluateAnimation() call (i.e. after onAttach).

@@ -82,6 +82,7 @@ import { BloodExplosiveProjectileComponent } from '../../components/game/combat/
 import { MeleeAttackComponent } from '../../components/game/combat/MeleeAttackComponent';
 import { PlayerAttackComponent } from '../../components/game/combat/PlayerAttackComponent';
 import { HitReactionComponent } from '../../components/game/HitReactionComponent';
+import { BoneAttachmentComponent } from '../../components/game/BoneAttachmentComponent';
 import { HomingProjectileComponent } from '../../components/game/combat/HomingProjectileComponent';
 import { WeakPointComponent } from '../../components/game/combat/WeakPointComponent';
 import { TankMeleeController } from '../../components/game/TankMeleeController';
@@ -439,6 +440,8 @@ export class Loader {
         return new PlayerAttackComponent();
       case 'hit_reaction':
         return new HitReactionComponent();
+      case 'bone_attachment':
+        return new BoneAttachmentComponent();
       case 'homing_projectile':
         return new HomingProjectileComponent();
       case 'weak_point':
