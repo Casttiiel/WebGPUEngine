@@ -4,13 +4,12 @@ Slash effect
 
 A) KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima de los enemigos, que se separan entre ellos con fuerzas suaves. El combate mueve enemigos, no el contacto físico. Más fluido para el jugador.
 
-1. Mantle
-2. Dash
-3. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
-4. Light Attack
-5. Push Attack
-6. Lift Attack
-7. Maintain Gravity (aerial combo juggle)
+1. Dash
+2. Maintain Gravity
+3. Push Attack
+4. Lift Attack
+5. Mantle
+6. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
 
 ## Character & Animation
 
@@ -67,7 +66,6 @@ A) KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima d
 - 10 Ways to Make Combat Feel Better https://www.youtube.com/watch?v=xkSDw6Z4PKk&list=WL&index=21&t=5s
 - The SECRET To Better COMBAT https://www.youtube.com/watch?v=wM6DzywtTMI&list=WL&index=20&t=58s
 - Recreating Batman Arkham's Freeflow Combat https://www.youtube.com/watch?v=GFOpKcpKGKQ&list=WL&index=17
-- Batman Arkham feel https://www.instagram.com/p/DYSKBz1vHtf/
 - Control resonant Inspiration https://www.youtube.com/watch?v=Xc62H7K3RYo&list=WL&index=19
 - Making a Game About Weak Points Inspiration https://www.youtube.com/watch?v=-HFs-ZwfDos&list=WL&index=22&t=206s
 - Fix your bland game with these… https://www.youtube.com/watch?v=ibbwutlkWp4&list=WL&index=12&t=9s

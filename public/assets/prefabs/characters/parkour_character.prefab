@@ -26,7 +26,7 @@
       "collisionGroups": "PLAYER",
       "collisionMask": "PLAYER_INTERACTIONS"
     },
-    "parkour_controller": {
+    "hack_and_slash_controller": {
       "moveSpeed": 11,
       "maxSpeed": 18,
       "airControl": 0.7,

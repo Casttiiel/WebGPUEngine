@@ -116,7 +116,7 @@
       "coyoteTime": 0.15,
       "maxAirJumps": 1
     },
-    "parkour_controller": {
+    "hack_and_slash_controller": {
       "moveSpeed": 11,
       "maxSpeed": 18,
       "airControl": 0.7,

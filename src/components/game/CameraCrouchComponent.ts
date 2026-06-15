@@ -1,5 +1,5 @@
 import { Component } from '../../core/ecs/Component';
-import { CharacterControllerComponent } from './ParkourControllerComponent';
+import { CharacterControllerComponent } from './HackAndSlashControllerComponent';
 import { FPSCameraControllerComponent } from './FPSCameraControllerComponent';
 
 export interface CameraCrouchComponentData {
@@ -77,7 +77,7 @@ export class CameraCrouchComponent extends Component {
 
     // Obtener estado del character controller
     const charCtrl = this.getOwner().getComponent(
-      'parkour_controller',
+      'hack_and_slash_controller',
     ) as CharacterControllerComponent | null;
     if (!charCtrl) return;
 

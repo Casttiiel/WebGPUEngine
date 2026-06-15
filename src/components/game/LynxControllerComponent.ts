@@ -12,7 +12,7 @@ import { IMovementController } from './movement/IMovementController';
 import { GameAction } from '../../types/GameAction.enum';
 import { KickSystem } from './combat/KickSystem';
 import { ThrowingProjectileSystem } from './combat/ThrowingProjectileSystem';
-import { DashSystem } from './movement/DashSystem';
+import { BlinkSystem } from './movement/BlinkSystem';
 import { WallJumpSystem } from './movement/WallJumpSystem';
 import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
 
@@ -40,7 +40,7 @@ export class LynxControllerComponent
 
   private kickSystem!: KickSystem;
   private throwSystem!: ThrowingProjectileSystem;
-  private dashSystem!: DashSystem;
+  private dashSystem!: BlinkSystem;
   private wallJumpSystem!: WallJumpSystem;
 
   public async load(data: LynxControllerComponentDataType): Promise<void> {
@@ -62,7 +62,7 @@ export class LynxControllerComponent
 
     this.throwSystem = new ThrowingProjectileSystem();
 
-    this.dashSystem = new DashSystem(this, null);
+    this.dashSystem = new BlinkSystem(this, null);
     this.wallJumpSystem = new WallJumpSystem(this);
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
@@ -126,12 +126,12 @@ export class LynxControllerComponent
       }*/
 
       case CharacterMovementState.DASHING: {
-        this.dashSystem.updateDash(deltaTime);
+        this.dashSystem.updateBlink(deltaTime);
         this.movement.applyViaKCC(
           deltaTime,
           this.capsuleCollider,
           this.characterController,
-          this.dashSystem.getDashPredicate(),
+          this.dashSystem.getBlinkPredicate(),
         );
         break;
       }
@@ -310,6 +310,9 @@ export class LynxControllerComponent
 
   public getGroundNormal(): vec3 {
     return this.movement.getGroundNormal();
+  }
+  public setGravityScale(scale: number): void {
+    this.movement.setGravityScale(scale);
   }
 
   public applyJumpFromSystem(): void {

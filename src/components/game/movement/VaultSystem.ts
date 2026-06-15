@@ -64,7 +64,7 @@ export class VaultSystem {
   // ── API pública ──────────────────────────────────────────────────────────────
 
   /**
-   * Llamar cada frame desde el estado IDLE del ParkourController.
+   * Llamar cada frame desde el estado IDLE del HackAndSlashControllerComponent.
    * Si detecta una oportunidad de vault, inicia automáticamente.
    */
   public update(): void {

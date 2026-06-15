@@ -32,20 +32,18 @@ export class RollSystem {
     private modifiers: PlayerModifiersComponent | null,
   ) {}
 
-  public update(deltaTime: number): void {
-    // Actualizar cooldown
+  /** @param inputDir Dirección WASD en espacio mundo (opcional). Si se provee, el roll va en esa dirección. */
+  public update(deltaTime: number, inputDir?: vec3): void {
     if (this.rollCooldownTimer > 0.0) {
       this.rollCooldownTimer -= deltaTime;
     }
 
-    // Actualizar cacheo de caída
     this.updateFallCaching(deltaTime);
 
-    // Intentar iniciar roll
     const input = Engine.getInput();
     if (this.canStartRoll() && input.isActionBuffered(GameAction.ROLL)) {
       input.consumeBufferedAction(GameAction.ROLL);
-      this.startRoll();
+      this.startRoll(inputDir);
     }
   }
 
@@ -75,7 +73,7 @@ export class RollSystem {
     );
   }
 
-  private startRoll(): void {
+  private startRoll(inputDir?: vec3): void {
     this.controller.setIsRolling(true);
     this.rollTimer = 0.0;
 
@@ -94,8 +92,15 @@ export class RollSystem {
     this.initialRollSpeed = Math.min(this.initialRollSpeed, 14.0);
     this.rollSpeed = this.initialRollSpeed * this.rollSpeedMultiplier;
 
-    // Fijar dirección
-    if (currentSpeed <= 0.01) {
+    // Fijar dirección: WASD tiene prioridad, luego velocidad, luego cámara
+    if (inputDir && vec3.length(inputDir) > 0.01) {
+      this.rollDirection[0] = inputDir[0];
+      this.rollDirection[1] = 0;
+      this.rollDirection[2] = inputDir[2];
+      vec3.normalize(this.rollDirection, this.rollDirection);
+    } else if (currentSpeed > 0.01) {
+      vec3.normalize(this.rollDirection, currentHorizontalVel);
+    } else {
       const camera = this.controller.getCamera();
       if (camera) {
         const forward = camera.getCamera().getFront();
@@ -104,8 +109,6 @@ export class RollSystem {
         this.rollDirection[2] = forward[2];
         vec3.normalize(this.rollDirection, this.rollDirection);
       }
-    } else {
-      vec3.normalize(this.rollDirection, currentHorizontalVel);
     }
   }
 

@@ -23,7 +23,7 @@
     "lynx_controller",
 
     "player_controller",
-    "parkour_controller",
+    "hack_and_slash_controller",
     "player_attack",
 
     "melee_attack",

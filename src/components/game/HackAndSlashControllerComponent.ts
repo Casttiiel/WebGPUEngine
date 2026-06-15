@@ -6,31 +6,29 @@ import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
 import { CharacterControllerComponentDataType } from '../../types/CharacterControllerComponentData.type';
 import RAPIER from '@dimforge/rapier3d';
-import type { SwingEntryData } from '../../types/SwingEntryData.type';
 import { GameAction } from '../../types/GameAction.enum';
 import { CharacterMovementState } from '../../types/CharacterMovementState.enum';
 import { KCCMovement } from './movement/KCCMovement';
-import { WallRunSystem } from './movement/WallRunSystem';
-import { DashSystem } from './movement/DashSystem';
 import { MantleSystem } from './movement/MantleSystem';
+import { RollSystem } from './movement/RollSystem';
+import { HoverSystem } from './movement/HoverSystem';
 import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
-import { SwingSystem } from './movement/SwingSystem';
 import { PlayerModifiersComponent } from './PlayerModifiersComponent';
 import type { HitStopComponent } from './HitStopComponent';
 
 /**
- * ParkourControllerComponent — Parkour Character Controller
+ * HackAndSlashControllerComponent — Hack & Slash Character Controller
  *
- * Parkour movement system supporting wall-run, mantle, dash, and swing.
- * Works in both FPS and TPS configurations depending on the camera component used.
+ * Sistema de movimiento para combate hack & slash.
+ * Soporta mantle, roll/esquiva y levitar (hover).
  *
  * Requires on the same entity:
  * - CapsuleColliderComponent
  * - KCCMovement (kcc_movement)
  * - A child entity with CameraComponent
  */
-export class ParkourControllerComponent
+export class HackAndSlashControllerComponent
   extends BasePlayerController
   implements IMantleController, IMovementController
 {
@@ -48,20 +46,14 @@ export class ParkourControllerComponent
   private impulsePadInputDisableTime = 0.5;
   private wasJumpPressed = false;
   private _boostedSpeed = 0.0;
-  private wallRunGravity = -2.0;
 
   // ── Visual rotation (mesh faces movement direction) ──────────────────────────
   private visualYaw: number = 0;
   private smoothedDesiredYaw: number | null = null;
-  private readonly targetSmoothSpeed: number = 15; // smooths noisy desiredYaw from camera front
-  private readonly turnSpeed: number = 20; // character follows smoothed target
+  private readonly targetSmoothSpeed: number = 15;
+  private readonly turnSpeed: number = 20;
   private animator: any = null;
   private animatorFound: boolean = false;
-
-  // ── Head look-at IK ──────────────────────────────────────────────────────────
-  private headLookConstraint: any = null;
-  private headLookConstraintCreated: boolean = false;
-  private headLookWeight: number = 0;
 
   // ── Jump animation ────────────────────────────────────────────────────────────
   private _wasGrounded: boolean = true;
@@ -70,12 +62,10 @@ export class ParkourControllerComponent
   private _jumpStartLayerId: number = -1;
   private _airTimer: number = 0;
 
-
   // ── Systems ──────────────────────────────────────────────────────────────────
-  private wallRunSystem!: WallRunSystem;
-  private dashSystem!: DashSystem;
   private mantleSystem!: MantleSystem;
-  private swingSystem!: SwingSystem;
+  private rollSystem!: RollSystem;
+  private hoverSystem!: HoverSystem;
   private modifiers: PlayerModifiersComponent | null = null;
 
   // ── Load ─────────────────────────────────────────────────────────────────────
@@ -84,18 +74,16 @@ export class ParkourControllerComponent
       'capsule_collider',
     ) as CapsuleColliderComponent;
     if (!this.capsuleCollider) {
-      console.error('ParkourControllerComponent requires CapsuleColliderComponent!');
+      console.error('HackAndSlashControllerComponent requires CapsuleColliderComponent!');
       return;
     }
     this.modifiers = this.getOwner().getComponent('player_modifiers') as PlayerModifiersComponent;
     this.impulsePadInputDisableTime =
       data.impulsePadInputDisableTime ?? this.impulsePadInputDisableTime;
-    this.wallRunGravity = data.wallRunGravity ?? this.wallRunGravity;
 
-    this.wallRunSystem = new WallRunSystem(this, this.modifiers, data);
-    this.dashSystem = new DashSystem(this, this.modifiers);
     this.mantleSystem = new MantleSystem(this, data);
-    this.swingSystem = new SwingSystem(this, this.modifiers, data);
+    this.rollSystem = new RollSystem(this, this.modifiers);
+    this.hoverSystem = new HoverSystem(this);
 
     this.characterController = Engine.getPhysics().createCharacterControllerPhysicsForCollider();
   }
@@ -103,7 +91,7 @@ export class ParkourControllerComponent
   public override async onAttach(): Promise<void> {
     this.movement = this.getOwner().getComponent('kcc_movement') as KCCMovement;
     if (!this.movement) {
-      console.error('ParkourControllerComponent requires kcc_movement component!');
+      console.error('HackAndSlashControllerComponent requires kcc_movement component!');
     }
     const transform = this.getOwner().getComponent('transform') as TransformComponent;
     if (transform) {
@@ -122,22 +110,8 @@ export class ParkourControllerComponent
     if (this.inputDisableTimer > 0) this.inputDisableTimer -= dt;
 
     this.movement.updateGroundedState(this.capsuleCollider);
-    if (this.movement.isGrounded()) this.dashSystem.onGrounded();
-
-    this.wallRunSystem.detectWall(dt);
 
     switch (this.movementState) {
-      case CharacterMovementState.DASHING: {
-        this.dashSystem.updateDash(dt);
-        this.movement.applyViaKCC(
-          dt,
-          this.capsuleCollider,
-          this.characterController,
-          this.dashSystem.getDashPredicate(),
-        );
-        break;
-      }
-
       case CharacterMovementState.MANTLING: {
         const mantleDir = this.mantleSystem.updateMantleDirection();
         this.movement.setVelocity(mantleDir);
@@ -145,21 +119,9 @@ export class ParkourControllerComponent
         break;
       }
 
-      case CharacterMovementState.WALL_RUNNING: {
-        const wallInput = this.getTargetMovement(this.getInputVector());
-        this.wallRunSystem.update(dt, wallInput);
-        // Apply reduced gravity during wall-run without calling integrate()
-        const wallVy = Math.max(
-          this.movement.getVerticalVelocity() + this.wallRunGravity * dt,
-          -2.0,
-        );
-        this.movement.setVerticalVelocity(wallVy);
-        this.movement.applyViaKCC(dt, this.capsuleCollider, this.characterController);
-        break;
-      }
-
-      case CharacterMovementState.SWINGING: {
-        this.swingSystem.updateSwingMovement(dt);
+      case CharacterMovementState.ROLLING: {
+        const rollVelocity = this.rollSystem.updateRollMovement(dt);
+        this.movement.setHorizontalVelocity(rollVelocity);
         this.movement.applyViaKCC(dt, this.capsuleCollider, this.characterController);
         break;
       }
@@ -171,16 +133,17 @@ export class ParkourControllerComponent
 
         if (!inputDisabled) {
           this.mantleSystem.update();
-          this.dashSystem.update();
+          this.rollSystem.update(dt, this.getTargetMovement(this.getInputVector()));
 
           if (input.isActionBuffered(GameAction.JUMP)) {
             if (this.movement.requestJump()) {
               input.consumeBufferedAction(GameAction.JUMP);
-              this._jumpStartLayerId = this.animator?.addLayer('Jump_Start', {
-                loop: false,
-                weight: 1.0,
-                blendInTime: 0.08,
-              }) ?? -1;
+              this._jumpStartLayerId =
+                this.animator?.addLayer('Jump_Start', {
+                  loop: false,
+                  weight: 1.0,
+                  blendInTime: 0.08,
+                }) ?? -1;
             }
           }
           const jumpPressed = input.isActionPressed(GameAction.JUMP);
@@ -188,9 +151,7 @@ export class ParkourControllerComponent
           this.wasJumpPressed = jumpPressed;
         }
 
-        if (!this.movement.isGrounded()) {
-          this.wallRunSystem.checkCoyoteWallJump(dt);
-        }
+        this.hoverSystem.update(dt);
 
         const desired = inputDisabled
           ? vec3.create()
@@ -223,7 +184,6 @@ export class ParkourControllerComponent
     this.animatorFound = true;
   }
 
-  /** Constant-velocity angle rotation — avoids exponential-decay "never arrives" feel. */
   private lerpAngle(from: number, to: number, t: number): number {
     let diff = to - from;
     while (diff > 180) diff -= 360;
@@ -231,34 +191,23 @@ export class ParkourControllerComponent
     return from + diff * t;
   }
 
-  /**
-   * Rotates the entity (and its child mesh) toward the movement direction each frame.
-   * Uses horizontal velocity when moving, falls back to input direction when accelerating
-   * from rest. Also drives animator `isMoving` parameter.
-   */
   private updateVisualRotation(dt: number): void {
     const hVel = this.movement.getHorizontalVelocity();
     const hSpeed = Math.sqrt(hVel[0] ** 2 + hVel[2] ** 2);
 
     let facingDir: vec3 | null = null;
-    // Input direction always takes priority — avoids threshold flicker when decelerating
-    // while rotating the camera (speed bouncing around the threshold causes jerky jumps
-    // between velocity-based and input-based heading).
     const movDir = this.getTargetMovement(this.getInputVector());
     if (vec3.length(movDir) > 0.01) {
       facingDir = movDir;
     } else if (hSpeed > 0.3) {
-      // No input — keep facing the momentum direction while coasting to a stop
       facingDir = vec3.fromValues(hVel[0] / hSpeed, 0, hVel[2] / hSpeed);
     }
 
     if (facingDir) {
       const rawYaw = Math.atan2(facingDir[0], facingDir[2]) * (180 / Math.PI);
-      // Stage 1: smooth the noisy raw target (mouse jitter, camera front micro-changes)
       if (this.smoothedDesiredYaw === null) this.smoothedDesiredYaw = rawYaw;
       const t1 = 1 - Math.exp(-this.targetSmoothSpeed * dt);
       this.smoothedDesiredYaw = this.lerpAngle(this.smoothedDesiredYaw, rawYaw, t1);
-      // Stage 2: character follows the already-smooth target
       const t2 = 1 - Math.exp(-this.turnSpeed * dt);
       this.visualYaw = this.lerpAngle(this.visualYaw, this.smoothedDesiredYaw, t2);
     } else {
@@ -273,7 +222,6 @@ export class ParkourControllerComponent
     this.animator?.setParameter('isMoving', hSpeed > 0.5);
 
     const isGrounded = this.movement.isGrounded();
-    // Debounce: only switch to InAir after 0.15s airborne to prevent flicker on uneven terrain
     this._airTimer = isGrounded ? 0 : this._airTimer + dt;
     this.animator?.setParameter('isInAir', this._airTimer > 0.15);
 
@@ -282,15 +230,19 @@ export class ParkourControllerComponent
         this.animator?.removeLayer(this._jumpStartLayerId, 0.1);
         this._jumpStartLayerId = -1;
       }
-      // Speed scales with landing velocity: 1.0x at rest → 3.5x at full speed
       const landSpeed = 1.0 + Math.min(hSpeed * 0.25, 2.5);
-      this._landLayerId = this.animator?.addLayer('Jump_Land', { loop: false, weight: 1.0, blendInTime: 0.08, speed: landSpeed }) ?? -1;
+      this._landLayerId =
+        this.animator?.addLayer('Jump_Land', {
+          loop: false,
+          weight: 1.0,
+          blendInTime: 0.08,
+          speed: landSpeed,
+        }) ?? -1;
       this._landLayerElapsed = 0;
     }
 
     if (this._landLayerId >= 0) {
       this._landLayerElapsed += dt;
-      // Minimum 0.2s before the layer can be cancelled by running
       if (this._landLayerElapsed > 0.2 && hSpeed > 2.0) {
         this.animator?.removeLayer(this._landLayerId, 0.15);
         this._landLayerId = -1;
@@ -311,7 +263,7 @@ export class ParkourControllerComponent
         return;
       }
     }
-    console.warn('ParkourControllerComponent: No camera found in children.');
+    console.warn('HackAndSlashControllerComponent: No camera found in children.');
   }
 
   private getInputVector(): vec3 {
@@ -378,13 +330,13 @@ export class ParkourControllerComponent
     return this.movementState === CharacterMovementState.MANTLING;
   }
   public override getIsWallRunning(): boolean {
-    return this.movementState === CharacterMovementState.WALL_RUNNING;
+    return false;
   }
   public override getIsDashing(): boolean {
-    return this.movementState === CharacterMovementState.DASHING;
+    return false;
   }
   public override getWallNormal(): vec3 | null {
-    return this.wallRunSystem?.getWallNormal() ?? null;
+    return null;
   }
   public override applyImpulseFromPad(impulse: vec3): void {
     this.movement.setVelocity(impulse);
@@ -430,25 +382,19 @@ export class ParkourControllerComponent
   public applyImpulse(impulse: vec3): void {
     this.movement.applyImpulse(impulse);
   }
-  public setIsWallRunning(value: boolean): void {
-    this.movementState = value ? CharacterMovementState.WALL_RUNNING : CharacterMovementState.IDLE;
-  }
+  public setIsWallRunning(_value: boolean): void {}
   public getIsJumping(): boolean {
     return this.movement?.isJumping() ?? false;
   }
-  public setIsDashing(value: boolean): void {
-    this.movementState = value ? CharacterMovementState.DASHING : CharacterMovementState.IDLE;
-  }
+  public setIsDashing(_value: boolean): void {}
   public getIsGrappling(): boolean {
     return false;
   }
   public setIsGrappling(_value: boolean): void {}
   public getIsSwinging(): boolean {
-    return this.movementState === CharacterMovementState.SWINGING;
+    return false;
   }
-  public setIsSwinging(value: boolean): void {
-    this.movementState = value ? CharacterMovementState.SWINGING : CharacterMovementState.IDLE;
-  }
+  public setIsSwinging(_value: boolean): void {}
   public setIsRolling(value: boolean): void {
     this.movementState = value ? CharacterMovementState.ROLLING : CharacterMovementState.IDLE;
   }
@@ -461,26 +407,21 @@ export class ParkourControllerComponent
   public getGroundNormal(): vec3 {
     return this.movement?.getGroundNormal() ?? vec3.fromValues(0, 1, 0);
   }
+  public setGravityScale(scale: number): void {
+    this.movement?.setGravityScale(scale);
+  }
   public applyJumpFromSystem(): void {
     this.movement.applyJump();
   }
 
   // ── Public API ───────────────────────────────────────────────────────────────
-  public startSwing(data: SwingEntryData): void {
-    this.swingSystem.startSwing(data);
-  }
-
-  // Stubs for roll — RollSystem not active; kept for API compatibility.
   public getRollTimer(): number {
-    return 0;
+    return this.rollSystem?.getRollTimer() ?? 0;
   }
   public getRollDuration(): number {
-    return 1;
+    return this.rollSystem?.getRollDuration() ?? 1;
   }
 
   public override renderDebug(): void {}
   public override dispose(): void {}
 }
-
-// HeadBobComponent imports it under the old alias.
-export { ParkourControllerComponent as CharacterControllerComponent };

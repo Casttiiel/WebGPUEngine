@@ -1,7 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { BasePlayerController } from './BasePlayerController';
-import { CharacterControllerComponent } from './ParkourControllerComponent';
+import { CharacterControllerComponent } from './HackAndSlashControllerComponent';
 
 export interface HeadBobComponentData {
   frequency?: number; // Frecuencia del bobbing (Hz)
@@ -69,9 +69,8 @@ export class HeadBobComponent extends Component {
       vec3.set(this.headBobOffset, 0, 0, 0);
       return;
     }
-    // Extras opcionales solo disponibles con parkour controller
     const parkour = this.getOwner().getComponent(
-      'parkour_controller',
+      'hack_and_slash_controller',
     ) as CharacterControllerComponent | null;
 
     const currentSpeed = base.getCurrentSpeed() || 0.0;

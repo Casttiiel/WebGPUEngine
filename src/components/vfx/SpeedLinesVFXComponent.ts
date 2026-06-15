@@ -6,7 +6,7 @@ import { BindGroupFactory } from '../../renderer/core/factories/BindGroupFactory
 import { RenderPassManager } from '../../renderer/core/passes/RenderPassManager';
 import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Texture } from '../../renderer/resources/Texture';
-import { ParkourControllerComponent } from '../game/ParkourControllerComponent';
+import { HackAndSlashControllerComponent } from '../game/HackAndSlashControllerComponent';
 import { Engine } from '../../core/engine/Engine';
 
 export class SpeedLinesVFXComponent extends Component {
@@ -109,7 +109,7 @@ export class SpeedLinesVFXComponent extends Component {
       .getEntityByName('Player')
       ?.getComponent('character_controller');
     if (!characterController) return;
-    let speed = (characterController as ParkourControllerComponent).getCurrentSpeed() ?? 0.0;
+    let speed = (characterController as HackAndSlashControllerComponent).getCurrentSpeed() ?? 0.0;
     speed = Math.max(1 + ((speed - 8) * 9.0) / 6.0, 0.0);
     this.time += dt;
     Render.getInstance()

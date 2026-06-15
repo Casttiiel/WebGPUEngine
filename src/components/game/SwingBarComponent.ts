@@ -160,7 +160,7 @@ export class SwingBarComponent extends Component {
 
   private onEntityExit(entityId: number): void {
     const entity = Engine.getPhysics().getEntityById(entityId);
-    if (entity && entity.hasComponent('parkour_controller')) {
+    if (entity && entity.hasComponent('player_controller')) {
       this.entitiesInside.delete(entityId);
     }
   }

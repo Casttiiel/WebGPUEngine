@@ -10,7 +10,7 @@ import { IMantleController } from './IMantleController';
  * necesarios para el resto de sistemas.
  *
  * Implementado por cualquier controller que quiera usar estos subsistemas,
- * p. ej. ParkourControllerComponent.
+ * p. ej. HackAndSlashControllerComponent.
  */
 export interface IMovementController extends IMantleController {
   // ── Velocidades ──────────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ export interface IMovementController extends IMantleController {
 
   // ── Física ───────────────────────────────────────────────────────────────
   getGroundNormal(): vec3;
+  setGravityScale(scale: number): void;
 
   // ── Delegación de salto ───────────────────────────────────────────────────
   /** Aplica el impulso de salto calculado por JumpSystem. */

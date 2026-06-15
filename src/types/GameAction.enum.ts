@@ -12,6 +12,7 @@ export enum GameAction {
   // Actions
   JUMP = 'jump',
   DASH = 'dash',
+  ROLL = 'roll',
   LIGHT_ATTACK = 'light_attack',
   FIRE = 'fire',
   KICK = 'kick',
