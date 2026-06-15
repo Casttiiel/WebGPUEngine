@@ -52,6 +52,7 @@
     "bone_attachment",
     "transform",
 
+    "camera_shake",
     "camera_arm",
     "head_bob",
     "head_tilt",

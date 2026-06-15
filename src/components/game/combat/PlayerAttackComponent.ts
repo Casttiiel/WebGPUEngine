@@ -6,6 +6,7 @@ import { TransformComponent } from '../../core/TransformComponent';
 import { AnimatorComponent } from '../../render/AnimatorComponent';
 import { Msg } from '../../../core/ecs/Msg';
 import type { HitStopComponent } from '../HitStopComponent';
+import type { CameraShakeComponent } from '../CameraShakeComponent';
 
 export interface PlayerAttackData {
   damage?: number;
@@ -166,6 +167,7 @@ export class PlayerAttackComponent extends Component {
           entity.sendMsg(Msg.damage({ amount: this.damage, instigator: ownerEntity }));
           (entity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(10 / 60);
           (ownerEntity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(6 / 60);
+          (ownerEntity.getComponent('camera_shake') as CameraShakeComponent | null)?.shake(0.2);
         }
         return true;
       });

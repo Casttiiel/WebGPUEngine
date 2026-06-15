@@ -1,13 +1,16 @@
-## Gameplay — Movement
+## Gameplay
+
+Autoaim: cono de 60° y 4 m.
+Rotación automática: hasta 15°.
+Slash effect
 
 1. Mantle
 2. Dash
-3. Jump / Double Jump
-4. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
-5. Light Attack
-6. Push Attack
-7. Lift Attack
-8. Maintain Gravity (aerial combo juggle)
+3. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
+4. Light Attack
+5. Push Attack
+6. Lift Attack
+7. Maintain Gravity (aerial combo juggle)
 
 ## Character & Animation
 

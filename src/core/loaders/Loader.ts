@@ -84,6 +84,7 @@ import { PlayerAttackComponent } from '../../components/game/combat/PlayerAttack
 import { HitReactionComponent } from '../../components/game/HitReactionComponent';
 import { BoneAttachmentComponent } from '../../components/game/BoneAttachmentComponent';
 import { HitStopComponent } from '../../components/game/HitStopComponent';
+import { CameraShakeComponent } from '../../components/game/CameraShakeComponent';
 import { HomingProjectileComponent } from '../../components/game/combat/HomingProjectileComponent';
 import { WeakPointComponent } from '../../components/game/combat/WeakPointComponent';
 import { TankMeleeController } from '../../components/game/TankMeleeController';
@@ -445,6 +446,8 @@ export class Loader {
         return new BoneAttachmentComponent();
       case 'hit_stop':
         return new HitStopComponent();
+      case 'camera_shake':
+        return new CameraShakeComponent();
       case 'homing_projectile':
         return new HomingProjectileComponent();
       case 'weak_point':

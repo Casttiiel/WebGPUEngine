@@ -151,6 +151,12 @@
     },
     "hit_stop": {},
     "hit_reaction": {},
+    "camera_shake": {
+      "positionAmplitude": 0.05,
+      "frequency": 8,
+      "blendInRatio": 0.1,
+      "blendOutRatio": 0.5
+    },
     "camera_arm": {
       "armLength": 5,
       "pivotOffset": [
