@@ -17,6 +17,7 @@ import { IMantleController } from './movement/IMantleController';
 import { IMovementController } from './movement/IMovementController';
 import { SwingSystem } from './movement/SwingSystem';
 import { PlayerModifiersComponent } from './PlayerModifiersComponent';
+import type { HitStopComponent } from './HitStopComponent';
 
 /**
  * ParkourControllerComponent — Parkour Character Controller
@@ -113,6 +114,7 @@ export class ParkourControllerComponent
   // ── Update ───────────────────────────────────────────────────────────────────
   public update(dt: number): void {
     if (!this.isActive) return;
+    if ((this.getOwner().getComponent('hit_stop') as HitStopComponent | null)?.isFrozen()) return;
     this.findCamera();
     this.findAnimator();
     if (!this.capsuleCollider || !this.camera || !this.movement) return;

@@ -50,6 +50,7 @@
       "maxHp": 99999,
       "faction": "enemy"
     },
+    "hit_stop": {},
     "hit_reaction": {}
   }
 }

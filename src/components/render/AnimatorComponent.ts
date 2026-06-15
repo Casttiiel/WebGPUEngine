@@ -330,7 +330,13 @@ export class AnimatorComponent extends Component {
 
   // ─── Update ─────────────────────────────────────────────────────────────────
 
+  private paused: boolean = false;
+
+  public setPaused(v: boolean): void { this.paused = v; }
+  public isPaused(): boolean { return this.paused; }
+
   public update(dt: number): void {
+    if (this.paused) return; // hit stop: GPU keeps last uploaded pose, time frozen
     if (!this.playing || this.clips.length === 0) return;
 
     // State machine: check transitions

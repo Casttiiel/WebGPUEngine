@@ -142,11 +142,14 @@
     },
     "player_attack": {
       "damage": 20,
-      "range": 2.0,
-      "halfAngleDeg": 60,
-      "cooldown": 0.5,
-      "attackClip": "Sword_Attack_Standing"
+      "cooldown": 0.8,
+      "attackClip": "Sword_Attack_Standing",
+      "bladeLength": 0.65,
+      "activeWindowStart": 0.2,
+      "activeWindowEnd": 0.6,
+      "sweepRadius": 0.15
     },
+    "hit_stop": {},
     "hit_reaction": {},
     "camera_arm": {
       "armLength": 5,

@@ -5,6 +5,7 @@ import { Engine } from '../../core/engine/Engine';
 import { CapsuleColliderComponent } from '../physics/CapsuleColliderComponent';
 import { KCCMovement } from './movement/KCCMovement';
 import type { IKickable } from './combat/IKickable';
+import type { HitStopComponent } from './HitStopComponent';
 
 /** Shared zero-vector passed to KCCMovement — dummy never desires horizontal movement. */
 const _ZERO_DESIRED: vec3 = vec3.create();
@@ -56,6 +57,7 @@ export class DummyEnemyController extends Component implements IKickable {
 
   public update(deltaTime: number): void {
     if (!this.capsuleCollider || !this.characterController) return;
+    if ((this.getOwner().getComponent('hit_stop') as HitStopComponent | null)?.isFrozen()) return;
 
     // Ground detection throttled to 20 Hz
     this.groundTimer += deltaTime;

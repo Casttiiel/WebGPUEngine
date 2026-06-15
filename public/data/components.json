@@ -5,6 +5,8 @@
     "area_light",
     "particle_system",
 
+    "hit_stop",
+
     "perception",
     "flow",
 
