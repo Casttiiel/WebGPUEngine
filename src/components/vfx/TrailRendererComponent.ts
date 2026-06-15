@@ -30,6 +30,8 @@ export interface TrailRendererComponentData {
   splineSubdivisions?: number;
   /** Material path. Default 'trail.mat'. */
   material?: string;
+  /** Whether to start emitting immediately on load. Default true. */
+  emitting?: boolean;
 }
 
 // Interleaved vertex stride mirrors the engine mesh format (12 floats = 48 bytes)
@@ -92,6 +94,7 @@ export class TrailRendererComponent extends Component {
     this.endColor = (data.endColor as [number, number, number, number]) ?? [1, 0.2, 0, 0];
     this.splineSubdivisions = Math.max(1, data.splineSubdivisions ?? 4);
     this.materialPath = data.material ?? 'trail.mat';
+    this.emitting = data.emitting !== false;
 
     // Pre-allocate ring buffer nodes (reuse objects every frame)
     this.nodes = Array.from({ length: this.maxNodes }, () => ({
@@ -185,11 +188,22 @@ export class TrailRendererComponent extends Component {
     this.activeCount = 0;
     this.hasLastPos = false;
     this.emitting = true;
+    this.enabled = true;
     if (this.indirectBuffer) {
       Render.getInstance()
         .getDevice()
         .queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([0, 1, 0, 0, 0]));
     }
+  }
+
+  /**
+   * Start recording nodes. Call after stopEmitting() to resume (e.g. next attack).
+   * Does NOT clear existing nodes — call reset() first if you want a clean start.
+   */
+  public startEmitting(): void {
+    this.emitting = true;
+    this.enabled = true;
+    this.hasLastPos = false;
   }
 
   /**
@@ -240,8 +254,10 @@ export class TrailRendererComponent extends Component {
       Render.getInstance()
         .getDevice()
         .queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([0, 1, 0, 0, 0]));
-      // Auto-disable once all nodes have faded out after stopEmitting()
-      if (!this.emitting) this.enabled = false;
+      // Auto-disable once all nodes have faded out after stopEmitting().
+      // Guard with hasLastPos so a component that starts with emitting:false
+      // doesn't disable itself on the very first frame before recording anything.
+      if (!this.emitting && this.hasLastPos) this.enabled = false;
       return;
     }
 

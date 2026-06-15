@@ -13,6 +13,8 @@ import { AnimatorComponent } from '../render/AnimatorComponent';
  */
 export class HitStopComponent extends Component {
   private timer: number = 0;
+  private delayTimer: number = 0;
+  private pendingFreeze: number = 0;
   private animator: AnimatorComponent | null = null;
   private animResolved: boolean = false;
 
@@ -20,13 +22,15 @@ export class HitStopComponent extends Component {
 
   /**
    * Freeze this entity for `seconds` real-world seconds.
-   * If already frozen, extends to whichever is longer.
+   * `delay` lets the hit-reaction animation start blending in before the pause.
+   * Default delay is 2 frames (2/60 ≈ 33 ms).
    */
-  public freeze(seconds: number): void {
-    const wasAlreadyFrozen = this.timer > 0;
-    this.timer = Math.max(this.timer, seconds);
-    if (!wasAlreadyFrozen) {
-      this.findAnimator()?.setPaused(true);
+  public freeze(seconds: number, delay: number = 2 / 60): void {
+    if (delay > 0) {
+      this.pendingFreeze = Math.max(this.pendingFreeze, seconds);
+      this.delayTimer = Math.max(this.delayTimer, delay);
+    } else {
+      this.applyFreeze(seconds);
     }
   }
 
@@ -35,11 +39,30 @@ export class HitStopComponent extends Component {
   }
 
   public update(dt: number): void {
+    // Countdown before applying the freeze so hit-reaction has time to register
+    if (this.delayTimer > 0) {
+      this.delayTimer -= dt;
+      if (this.delayTimer <= 0) {
+        this.delayTimer = 0;
+        const pending = this.pendingFreeze;
+        this.pendingFreeze = 0;
+        if (pending > 0) this.applyFreeze(pending);
+      }
+    }
+
     if (this.timer <= 0) return;
     this.timer -= dt;
     if (this.timer <= 0) {
       this.timer = 0;
       this.findAnimator()?.setPaused(false);
+    }
+  }
+
+  private applyFreeze(seconds: number): void {
+    const wasAlreadyFrozen = this.timer > 0;
+    this.timer = Math.max(this.timer, seconds);
+    if (!wasAlreadyFrozen) {
+      this.findAnimator()?.setPaused(true);
     }
   }
 

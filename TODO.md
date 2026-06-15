@@ -1,8 +1,8 @@
 ## Gameplay
 
-Autoaim: cono de 60° y 4 m.
-Rotación automática: hasta 15°.
 Slash effect
+
+A) KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima de los enemigos, que se separan entre ellos con fuerzas suaves. El combate mueve enemigos, no el contacto físico. Más fluido para el jugador.
 
 1. Mantle
 2. Dash

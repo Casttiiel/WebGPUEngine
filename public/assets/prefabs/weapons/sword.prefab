@@ -1,23 +1,32 @@
 {
-  "children": [],
+  "children": [
+    {
+      "children": [],
+      "components": {
+        "name": "SwordTip",
+        "transform": {
+          "position": [0, 0, 0.5]
+        },
+        "trail_renderer": {
+          "type": "spline",
+          "maxNodes": 24,
+          "minNodeDistance": 0.02,
+          "width": 0.22,
+          "lifetime": 0.15,
+          "startColor": [1.0, 1.0, 1.0, 0.85],
+          "endColor": [0.6, 0.85, 1.0, 0.0],
+          "splineSubdivisions": 3,
+          "emitting": false
+        }
+      }
+    }
+  ],
   "components": {
     "name": "Sword",
     "transform": {
-      "position": [
-        0,
-        0,
-        0
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        0.03,
-        0.03,
-        0.7
-      ]
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.03, 0.03, 0.7]
     },
     "render": {
       "meshes": [
@@ -29,16 +38,8 @@
     },
     "bone_attachment": {
       "boneName": "hand_r",
-      "positionOffset": [
-        -0.05,
-        0.11,
-        0.35
-      ],
-      "rotationOffset": [
-        0,
-        0,
-        0
-      ]
+      "positionOffset": [-0.05, 0.11, 0.35],
+      "rotationOffset": [0, 0, 0]
     }
   }
 }

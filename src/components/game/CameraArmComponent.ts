@@ -386,6 +386,12 @@ export class CameraArmComponent extends Component {
     this.enabled = isActive;
   }
 
+  /** Rotate the camera arm yaw by `degrees` (positive = clockwise from above). */
+  public addYaw(degrees: number): void {
+    this.yaw += degrees;
+    this.yaw = ((this.yaw + 180) % 360) - 180;
+  }
+
   public getPitch(): number {
     return this.pitch;
   }
