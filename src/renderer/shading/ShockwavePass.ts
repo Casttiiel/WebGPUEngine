@@ -103,6 +103,7 @@ export class ShockwavePass {
 
   public hasLoaded(): boolean { return this._loaded; }
   public hasActiveWaves(): boolean { return this.waves.length > 0; }
+  public getActiveWaveCount(): number { return this.waves.length; }
 
   public addWave(
     origin: [number, number, number],

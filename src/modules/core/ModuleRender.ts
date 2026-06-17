@@ -864,6 +864,7 @@ export class ModuleRender extends Module {
         tryRender('vignette', (c) => c as VignetteComponent);
         tryRender('chromatic_aberration', (c) => c as ChromaticAberrationComponent);
         tryRender('film_grain', (c) => c as FilmGrainComponent);
+        tryRender('shockwave',  (c) => c as ShockwavePostProcessComponent);
       }
     }
 

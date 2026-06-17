@@ -16,6 +16,17 @@ import { ShockwavePass, ShockwaveConfig } from '../../renderer/shading/Shockwave
 export class ShockwavePostProcessComponent extends Component {
   private pass: ShockwavePass = new ShockwavePass();
   private _loaded = false;
+  private _editorFolder: any = null;
+
+  // Default config exposed in the debug menu — sliders modify these,
+  // and they become the defaults for the next spawn() call.
+  private debugConfig = {
+    speed:     14.0,
+    maxRadius: 20.0,
+    thickness:  2.0,
+    intensity:  0.04,
+    falloff:    0.6,
+  };
 
   // ── Message subscriptions ────────────────────────────────────────────────
 
@@ -43,6 +54,34 @@ export class ShockwavePostProcessComponent extends Component {
   }
 
   public renderDebug(): void {}
+
+  public override renderInMenu(parentFolder?: any): void {
+    if (!parentFolder || this._editorFolder) return;
+
+    const f = parentFolder.addFolder('Shockwave');
+    f.close();   // start collapsed
+
+    // Live counters
+    const stats = { activeWaves: 0 };
+    f.add(stats, 'activeWaves').name('Active Waves').listen();
+    // Refresh counter each frame via the folder's onChange — lil-gui listen() handles it
+    // by reading the property each animation frame. We proxy it through a getter object.
+    Object.defineProperty(stats, 'activeWaves', {
+      get: () => this.pass.getActiveWaveCount(),
+      enumerable: true,
+    });
+
+    f.add(this.debugConfig, 'speed',      1.0, 40.0, 0.5 ).name('Speed (m/s)');
+    f.add(this.debugConfig, 'maxRadius',  1.0, 60.0, 1.0 ).name('Max Radius (m)');
+    f.add(this.debugConfig, 'thickness',  0.1, 10.0, 0.1 ).name('Thickness (m)');
+    f.add(this.debugConfig, 'intensity',  0.005, 0.2, 0.005).name('Intensity');
+    f.add(this.debugConfig, 'falloff',    0.0,  2.0, 0.05).name('Falloff');
+
+    f.add({ spawnTest: () => this.pass.addWave([0, 1, 0], { ...this.debugConfig }) }, 'spawnTest')
+     .name('Spawn at Origin');
+
+    this._editorFolder = f;
+  }
 
   public override dispose(): void {
     this.pass.dispose();

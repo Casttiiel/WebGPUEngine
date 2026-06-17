@@ -25,11 +25,11 @@
 
 // ── Wave data UBO ─────────────────────────────────────────────────────────────
 struct ShockwaveSource {
-    origin:    vec3<f32>,   // world-space centre of the wave
-    radius:    f32,         // current radius (metres), updated each frame from CPU
-    thickness: f32,         // ring width in metres  (e.g. 2.5)
-    intensity: f32,         // UV warp amplitude     (e.g. 0.04)
-    falloff:   f32,         // depth-attenuation factor exp(-depth * falloff)
+    origin:    vec3<f32>,
+    radius:    f32,
+    thickness: f32,
+    intensity: f32,
+    falloff:   f32,
     _pad:      f32,
 }
 struct ShockwavesUBO {
@@ -39,11 +39,32 @@ struct ShockwavesUBO {
 }
 @group(3) @binding(0) var<uniform> shockwaves: ShockwavesUBO;
 
-// ── Hash noise ────────────────────────────────────────────────────────────────
-fn hash22(p: vec2<f32>) -> vec2<f32> {
-    var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
-    p3 += dot(p3, p3.yzx + 19.19);
-    return fract((p3.xx + p3.yz) * p3.zy);
+// ── FBM Noise (replaces hash22 — much more organic than white noise) ──────────
+fn hash21(p: vec2<f32>) -> f32 {
+    var p2 = fract(p * vec2<f32>(127.1, 311.7));
+    p2 += dot(p2, p2.yx + 19.19);
+    return fract((p2.x + p2.y) * p2.x);
+}
+
+fn valueNoise(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash21(i + vec2<f32>(0.0, 0.0)), hash21(i + vec2<f32>(1.0, 0.0)), u.x),
+        mix(hash21(i + vec2<f32>(0.0, 1.0)), hash21(i + vec2<f32>(1.0, 1.0)), u.x),
+        u.y,
+    );
+}
+
+// 2-octave FBM — returns [-0.5, 0.5]
+fn fbm(p: vec2<f32>) -> f32 {
+    return valueNoise(p) * 0.667 + valueNoise(p * 2.0 + vec2<f32>(1.7, 9.2)) * 0.333 - 0.5;
+}
+
+// Vector FBM with decorrelated axes for curl-like tangential offsets
+fn fbmVec(p: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(fbm(p), fbm(p + vec2<f32>(5.2, 1.3)));
 }
 
 // ── Ray-sphere intersection (nearest positive t) ──────────────────────────────
@@ -66,7 +87,6 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let uv = (vec2<f32>(coord) + 0.5) / vec2<f32>(dims);
 
-    // Fast path: skip entirely when no active waves
     if (shockwaves.count == 0u) {
         textureStore(outputTex, coord, textureSampleLevel(accLight, samplerScene, uv, 0.0));
         return;
@@ -75,7 +95,7 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     // ── Depth + world position ────────────────────────────────────────────────
     let depthCoord = clamp(
         vec2<i32>(uv * vec2<f32>(textureDimensions(gLinearDepth))),
-        vec2<i32>(0), vec2<i32>(textureDimensions(gLinearDepth)) - vec2<i32>(1)
+        vec2<i32>(0), vec2<i32>(textureDimensions(gLinearDepth)) - vec2<i32>(1),
     );
     let depth  = textureLoad(gLinearDepth, depthCoord, 0).r;
     let isSky  = depth < 0.0001;
@@ -86,7 +106,6 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (!isSky) {
         worldPos = getWorldCoords(uv, depth, camera);
     } else {
-        // Reconstruct view-space ray direction for sphere intersection
         let ndcXY = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
         let vx    = ndcXY.x / camera.projectionMatrix[0][0];
         let vy    = ndcXY.y / camera.projectionMatrix[1][1];
@@ -94,75 +113,101 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // ── Accumulate UV offset from all active waves ────────────────────────────
-    var totalOffset = vec2<f32>(0.0);
-    var totalMask   = 0.0;
+    var totalOffset   = vec2<f32>(0.0);
+    var totalMask     = 0.0;
+    // Weighted world distance used later for the pulse spatial term
+    var pulseDist     = 0.0;
+    var pulseWeight   = 0.0;
 
     for (var i = 0u; i < shockwaves.count; i++) {
         let w = shockwaves.waves[i];
         if (w.radius <= 0.0) { continue; }
 
         var mask:  f32;
-        var wPos:  vec3<f32>;  // world position used for noise / direction
+        var wPos:  vec3<f32>;
 
         if (!isSky) {
-            // ── Geometry pixel: exact world-space ring mask ───────────────────
             let dist = length(worldPos - w.origin);
             let wave = abs(dist - w.radius);
             mask = pow(1.0 - smoothstep(0.0, w.thickness, wave), 2.0);
             wPos = worldPos;
         } else {
-            // ── Sky pixel: perpendicular-distance ring mask ───────────────────
-            // Use the perpendicular distance from the camera ray to the sphere
-            // centre. The ring is visible where perpDist ≈ w.radius (tangent
-            // rays at the sphere silhouette).
-            let oc  = camera.cameraPosition.xyz - w.origin;
-            let tCA = max(-dot(oc, rayDir), 0.0);    // closest-approach parameter
-            if (tCA <= 0.0) { continue; }            // sphere behind camera
-            let closest = camera.cameraPosition.xyz + rayDir * tCA;
+            let oc       = camera.cameraPosition.xyz - w.origin;
+            let tCA      = max(-dot(oc, rayDir), 0.0);
+            if (tCA <= 0.0) { continue; }
+            let closest  = camera.cameraPosition.xyz + rayDir * tCA;
             let perpDist = length(closest - w.origin);
-            let wave = abs(perpDist - w.radius);
+            let wave     = abs(perpDist - w.radius);
             mask = pow(1.0 - smoothstep(0.0, w.thickness * 0.5, wave), 2.0);
             wPos = closest;
         }
 
         if (mask < 0.001) { continue; }
 
-        // ── Outward screen-space direction ────────────────────────────────────
-        let radial3d = normalize(wPos - w.origin);
-        let radialSS = normalize(
-            (camera.projectionMatrix * camera.viewMatrix * vec4<f32>(radial3d, 0.0)).xy
+        // ── Outward screen-space directions ───────────────────────────────────
+        let radial3d  = normalize(wPos - w.origin);
+        let radialSS  = normalize(
+            (camera.projectionMatrix * camera.viewMatrix * vec4<f32>(radial3d, 0.0)).xy,
         );
+        let tangentSS = vec2<f32>(-radialSS.y, radialSS.x);  // 90° CCW — curl axis
 
-        // ── Depth attenuation (closer pixels = stronger effect) ───────────────
-        let depthAtten = select(1.0, exp(-depth * w.falloff), !isSky);
+        // ── Depth attenuation using real camera distance (stable, linear) ─────
+        let distCam    = select(1.0, length(wPos - camera.cameraPosition.xyz), !isSky);
+        let depthAtten = select(1.0, exp(-distCam * w.falloff * 0.08), !isSky);
+
+        // ── FBM noise — organic flow turbulence ───────────────────────────────
+        let nCoord = wPos.xz * 0.5 + vec2<f32>(camera.time * 0.06);
+        let nVec   = fbmVec(nCoord);       // each component in [-0.5, 0.5]
 
         // ── Temporal micro-ripples ────────────────────────────────────────────
         let dist2     = length(wPos - w.origin);
         let secondary = sin(dist2 * 8.0 - camera.time * 25.0) * mask * 0.35;
         let flicker   = sin(camera.time * 18.0 + dist2 * 4.0) * 0.0015;
 
-        // ── Noise turbulence ──────────────────────────────────────────────────
-        let n       = hash22(wPos.xz * 0.8 + vec2<f32>(camera.time * 0.08));
-        let noiseOff = (n * 2.0 - vec2<f32>(1.0)) * 0.006 * mask * depthAtten;
+        // ── Fresnel — energy spike at silhouette angles ───────────────────────
+        // Grazing view angles relative to the wave's radial direction get boosted.
+        // Sky pixels: closest-approach geometry → naturally fresnel≈1 at silhouette.
+        let toCamera = normalize(camera.cameraPosition.xyz - wPos);
+        let fresnel  = pow(1.0 - abs(dot(toCamera, radial3d)), 3.0);
 
-        // ── Compose offset for this wave ──────────────────────────────────────
-        let waveOff = radialSS * (
+        // ── Primary radial offset (outward push) ──────────────────────────────
+        var waveOff = radialSS * (
               mask * w.intensity
             + secondary * w.intensity * 0.3
-            + flicker   * mask
+            + flicker * mask
         ) * depthAtten;
 
-        totalOffset += waveOff + noiseOff;
+        waveOff *= (0.5 + fresnel);
+
+        // ── Double refraction: tangential (curl-like) offset ──────────────────
+        // The wave doesn't only push outward — it also shears space tangentially.
+        // nVec.x drives the curl amplitude independently from the radial noise.
+        let tangentOff = tangentSS * nVec.x * mask * depthAtten * w.intensity * 0.5;
+
+        // ── Radial noise turbulence (FBM replaces white-noise hash22) ─────────
+        let noiseOff = radialSS * nVec.y * 0.008 * mask * depthAtten;
+
+        totalOffset += waveOff + tangentOff + noiseOff;
         totalMask    = max(totalMask, mask * depthAtten);
+
+        // Accumulate weighted distance for pulse spatial frequency
+        pulseDist   += dist2 * mask;
+        pulseWeight += mask;
     }
 
-    // Pass-through: no wave covering this pixel
     if (totalMask < 0.001) {
         textureStore(outputTex, coord, textureSampleLevel(accLight, samplerScene, uv, 0.0));
         return;
     }
 
-    // ── Chromatic aberration: split R/G/B with slightly different UV offsets ──
+    // ── Pulse: temporal anomaly oscillation ───────────────────────────────────
+    // Modulates total offset so the shockwave pulses like a quantum distortion.
+    // pulseDist ≈ w.radius per wave, so frequency naturally rises as wave expands.
+    let avgDist = select(0.0, pulseDist / pulseWeight, pulseWeight > 0.001);
+    let pulse   = 1.0 + 0.2 * sin(camera.time * 15.0 + avgDist * 3.0);
+    totalOffset *= pulse;
+
+    // ── Chromatic aberration: R/G/B at slightly different UV offsets ──────────
     let ca = 0.08;
     let r  = textureSampleLevel(accLight, samplerScene, uv + totalOffset * (1.0 + ca), 0.0).r;
     let g  = textureSampleLevel(accLight, samplerScene, uv + totalOffset,              0.0).g;
