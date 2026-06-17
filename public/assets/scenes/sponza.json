@@ -12,7 +12,7 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/parkour_character_3p.prefab"
+    "prefab": "characters/slash_character_3p.prefab"
   },
   {
     "prefab": "cameras/debug_camera.prefab"

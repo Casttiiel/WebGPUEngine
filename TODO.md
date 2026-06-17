@@ -30,11 +30,9 @@ Air combos
 ## Renderer
 
 1. Material Instances https://www.instagram.com/p/DWCZ7GGjC5D/
-2. Hi-Z SSR (mejor calidad de reflecciones)
-3. Parallax Mapping https://www.reddit.com/r/godot/comments/1twtuqd/iterative_parallax_mapping_cheaper_alternative_to/
-4. Temporal upscaling mejorado (TSR con optical flow para objetos sin velocity) (Y con velocity?)
-5. Procedural materials
-6. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+2. Parallax Mapping https://www.reddit.com/r/godot/comments/1twtuqd/iterative_parallax_mapping_cheaper_alternative_to/
+3. Procedural materials
+4. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
 
 ## Engine
 

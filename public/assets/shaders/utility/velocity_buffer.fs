@@ -33,12 +33,29 @@ struct VertexOutput {
 fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // 1. Sample depth del frame actual
     let linearDepth = textureSample(gLinearDepth, samplerGBuffer, input.Uv).x;
-    
-    // Early exit si es skybox (depth = 1.0)
+
+    // Sky pixels have linearDepth = 0 (G-Buffer cleared to 0, no geometry written).
+    // The normal reconstruction divides by viewZ = 0, producing NaN velocity → TSR ghosts.
+    // Instead, compute velocity from a far-away point in the view direction so that
+    // camera ROTATION is captured correctly (translation effect is negligible at 10 km).
+    if (linearDepth < 0.0001) {
+        let ndcX = input.Uv.x * 2.0 - 1.0;
+        let ndcY = (1.0 - input.Uv.y) * 2.0 - 1.0;
+        var farWorld = currentUnjitteredInvVP * vec4<f32>(ndcX, ndcY, 1.0, 1.0);
+        farWorld /= farWorld.w;
+        let skyDir   = normalize(farWorld.xyz - camera.cameraPosition.xyz);
+        let skyPt    = vec4<f32>(camera.cameraPosition.xyz + skyDir * 10000.0, 1.0);
+        let prevClip = previousUnjitteredVP * skyPt;
+        let prevNDC  = prevClip.xy / prevClip.w;
+        let prevUV   = vec2<f32>(prevNDC.x * 0.5 + 0.5, 1.0 - (prevNDC.y * 0.5 + 0.5));
+        return vec4<f32>(input.Uv - prevUV, 0.0, 0.0);
+    }
+
+    // Early exit si hay geometría justo en el far plane (depth = 1.0)
     if (linearDepth >= 0.9999) {
         return vec4<f32>(0.0, 0.0, 0.0, 0.0);
     }
-    
+
     // 2. Reconstruir posición world del frame actual usando unjittered inv VP.
     // IMPORTANTE: NO usar camera.invViewProjection aquí — ese tiene el jitter del frame actual
     // incorporado. El jitter alterna signo cada frame, por lo que worldPos oscilaría

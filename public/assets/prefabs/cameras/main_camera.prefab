@@ -3,10 +3,9 @@
     "name": "MainCamera",
     "camera": {},
     "tone_mapping": {},
-    "fsr": {
-      "renderScale": 0.77
+    "tsr": {
+      "renderScale": 0.67
     },
-    "fxaa": {},
     "contact_shadows": {},
     "ambient_occlusion": {},
     "bloom": {},

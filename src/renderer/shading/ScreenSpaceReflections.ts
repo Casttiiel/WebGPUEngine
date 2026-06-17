@@ -20,6 +20,20 @@ export class ScreenSpaceReflections {
   private ssrParamsLayout: GPUBindGroupLayout | null = null;
   private ssrOutputLayout: GPUBindGroupLayout | null = null;
 
+  // ── Hi-Z depth pyramid ────────────────────────────────────────────────────
+  // hizTex has HIZ_LEVELS mip levels at half-render-resolution base size.
+  // Level 0 of the pyramid = gLinearDepth (read directly in the shader).
+  // hizTex mip k = full-pyramid level (k+1), built by min-pooling each frame.
+  private static readonly HIZ_LEVELS = 4;
+  private hizTexture: GPUTexture | null = null;
+  private hizReadView: GPUTextureView | null = null;   // all mip levels — bound in SSR
+  private hizMipViews: GPUTextureView[] = [];           // one per mip level — build passes
+  private hizBuildPipelineL0: GPUComputePipeline | null = null; // src: filterable (gLinearDepth)
+  private hizBuildPipelineL1: GPUComputePipeline | null = null; // src: unfilterable (hizTex)
+  private hizBuildL0BG: GPUBindGroup | null = null;    // gLinearDepth → hizTex mip 0
+  private hizBuildL1BGs: GPUBindGroup[] = [];           // hizTex mip k → mip k+1 (3 groups)
+  private lastHiZDepthView: GPUTextureView | null = null; // cache key for L0 bind group
+
   // ── Blur compute ─────────────────────────────────────────────────────────
   private blurPipeline: GPUComputePipeline | null = null;
   private blurInputLayout: GPUBindGroupLayout | null = null;
@@ -89,6 +103,7 @@ export class ScreenSpaceReflections {
 
       await this.createComputePipeline();
       await this.createBlurPipeline();
+      await this.createHiZBuildPipelines();
 
       Logger.info('RENDER', 'SSR ready');
     } catch (error) {
@@ -115,6 +130,89 @@ export class ScreenSpaceReflections {
     this.ssrOutputBindGroup = null;
     this.blurInputBindGroup = null;
     this.blurOutputBindGroup = null;
+
+    // Hi-Z pyramid is built from gLinearDepth (render resolution, not SSR scale).
+    // Base size = half render resolution; HIZ_LEVELS mip levels give 1/2 → 1/16 res pyramid.
+    this.createHiZTexture(Render.width, Render.height);
+  }
+
+  private createHiZTexture(renderW: number, renderH: number): void {
+    if (this.hizTexture) {
+      this.hizTexture.destroy();
+      this.hizTexture = null;
+    }
+
+    const device = GPUUtils.getDevice();
+    const baseW = Math.max(1, Math.ceil(renderW / 2));
+    const baseH = Math.max(1, Math.ceil(renderH / 2));
+
+    this.hizTexture = device.createTexture({
+      label: 'hiz_texture',
+      size: [baseW, baseH, 1],
+      mipLevelCount: ScreenSpaceReflections.HIZ_LEVELS,
+      format: 'r32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+    });
+
+    // Full read view (all mip levels) — bound as hizTex in the SSR march shader
+    this.hizReadView = this.hizTexture.createView({ label: 'hiz_read_all' });
+
+    // Per-mip views (single level each) — used as src/dst in the build passes.
+    // Each view exposes only one mip so WebGPU sees no read/write overlap in a single pass.
+    this.hizMipViews = [];
+    for (let k = 0; k < ScreenSpaceReflections.HIZ_LEVELS; k++) {
+      this.hizMipViews.push(
+        this.hizTexture.createView({
+          label: `hiz_mip_${k}`,
+          baseMipLevel: k,
+          mipLevelCount: 1,
+        }),
+      );
+    }
+
+    // Pre-build the inter-level bind groups (mip k → mip k+1).
+    // These don't depend on gLinearDepth so they can be created immediately.
+    this.hizBuildL1BGs = [];
+    const unfilterLayout = BindGroupFactory.getHiZBuildFromUnfilterableLayout();
+    for (let k = 0; k < ScreenSpaceReflections.HIZ_LEVELS - 1; k++) {
+      this.hizBuildL1BGs.push(
+        BindGroupFactory.createBindGroup(`hiz_build_l${k + 1}_bg`, unfilterLayout, [
+          { binding: 0, resource: this.hizMipViews[k]! },     // src: mip k (read)
+          { binding: 1, resource: this.hizMipViews[k + 1]! }, // dst: mip k+1 (write)
+        ]),
+      );
+    }
+
+    // Level-0 bind group depends on gLinearDepth — lazily created in executeHiZBuildPasses
+    this.hizBuildL0BG = null;
+    this.lastHiZDepthView = null;
+
+    // SSR main bind group must be rebuilt (hizReadView changed)
+    this.ssrBindGroup = null;
+    this.lastAccLightsView = null;
+  }
+
+  private async createHiZBuildPipelines(): Promise<void> {
+    const device = GPUUtils.getDevice();
+    const shaderCode = await ResourceManager.loadShader('post-processing/hiz_build.cs');
+    const module = device.createShaderModule({ label: 'hiz_build_cs', code: shaderCode });
+
+    const l0Layout = BindGroupFactory.getHiZBuildFromFilterableLayout();
+    const l1Layout = BindGroupFactory.getHiZBuildFromUnfilterableLayout();
+
+    const l0Config: ComputePipelineConfig = {
+      label: 'Hi-Z Build L0 Pipeline',
+      layout: PipelineFactory.createPipelineLayout('hiz_build_l0_layout', [l0Layout]),
+      compute: { module, entryPoint: 'cs' },
+    };
+    this.hizBuildPipelineL0 = PipelineFactory.createComputePipeline(l0Config);
+
+    const l1Config: ComputePipelineConfig = {
+      label: 'Hi-Z Build L1+ Pipeline',
+      layout: PipelineFactory.createPipelineLayout('hiz_build_l1_layout', [l1Layout]),
+      compute: { module, entryPoint: 'cs' },
+    };
+    this.hizBuildPipelineL1 = PipelineFactory.createComputePipeline(l1Config);
   }
 
   // ─── Compute pipeline setup ────────────────────────────────────────────────
@@ -205,7 +303,7 @@ export class ScreenSpaceReflections {
       this.createSSRBindGroup(accLights, ao);
     }
 
-    this.executeSSRPass(gBufferBindGroup);
+    this.executeSSRPass(gBufferBindGroup, gDepthView);
     this.executeBlurPass(gNormalsView, gDepthView);
 
     return this.ssrBlurred.getView();
@@ -277,8 +375,11 @@ export class ScreenSpaceReflections {
     pass.end();
   }
 
-  public executeSSRPass(gBufferBindGroup: GPUBindGroup): void {
+  public executeSSRPass(gBufferBindGroup: GPUBindGroup, gDepthView: GPUTextureView): void {
     if (!this.isInitialized || !this.ssrComputePipeline) return;
+
+    // ── Hi-Z pyramid build (4 passes, cheap ~0.1 ms) ─────────────────────────
+    this.executeHiZBuildPasses(gDepthView);
 
     const qs = QualitySettings.getInstance().getSettings();
     const ssrW = Math.floor(Render.width * qs.ssrScale);
@@ -323,6 +424,49 @@ export class ScreenSpaceReflections {
     pass.end();
   }
 
+  private executeHiZBuildPasses(gDepthView: GPUTextureView): void {
+    if (!this.hizBuildPipelineL0 || !this.hizBuildPipelineL1 || !this.hizTexture) return;
+
+    // Lazily create the level-0 bind group (depends on gLinearDepth view pointer)
+    if (!this.hizBuildL0BG || this.lastHiZDepthView !== gDepthView) {
+      this.lastHiZDepthView = gDepthView;
+      this.hizBuildL0BG = BindGroupFactory.createBindGroup(
+        'hiz_build_l0_bg',
+        BindGroupFactory.getHiZBuildFromFilterableLayout(),
+        [
+          { binding: 0, resource: gDepthView },            // src: gLinearDepth (full res)
+          { binding: 1, resource: this.hizMipViews[0]! },   // dst: hizTex mip 0 (half res)
+        ],
+      );
+    }
+
+    const encoder = Render.getInstance().getCommandEncoder();
+    const baseW = this.hizTexture.width;
+    const baseH = this.hizTexture.height;
+
+    // Pass 0: gLinearDepth (render res) → hizTex mip 0 (half res)
+    {
+      const pass = encoder.beginComputePass({ label: 'Hi-Z Build L0' });
+      pass.setPipeline(this.hizBuildPipelineL0);
+      pass.setBindGroup(0, this.hizBuildL0BG);
+      pass.dispatchWorkgroups(Math.ceil(baseW / 8), Math.ceil(baseH / 8), 1);
+      pass.end();
+    }
+
+    // Passes 1-3: hizTex mip k → mip k+1
+    for (let k = 0; k < ScreenSpaceReflections.HIZ_LEVELS - 1; k++) {
+      const mipW = Math.max(1, baseW >> k);
+      const mipH = Math.max(1, baseH >> k);
+      const dstW = Math.max(1, Math.ceil(mipW / 2));
+      const dstH = Math.max(1, Math.ceil(mipH / 2));
+      const pass = encoder.beginComputePass({ label: `Hi-Z Build L${k + 1}` });
+      pass.setPipeline(this.hizBuildPipelineL1);
+      pass.setBindGroup(0, this.hizBuildL1BGs[k]);
+      pass.dispatchWorkgroups(Math.ceil(dstW / 8), Math.ceil(dstH / 8), 1);
+      pass.end();
+    }
+  }
+
   public composeSSR(): void {
     if (!this.isInitialized) return;
   }
@@ -342,20 +486,13 @@ export class ScreenSpaceReflections {
     return this.brdfLUT;
   }
 
-  private createSSRBindGroup(accLights: GPUTextureView, ao: GPUTextureView) {
+  private createSSRBindGroup(accLights: GPUTextureView, _ao: GPUTextureView) {
     this.ssrBindGroup = BindGroupFactory.createBindGroup('ssr_bindgroup', this.ssrParamsLayout!, [
-      {
-        binding: 0,
-        resource: accLights,
-      },
-      {
-        binding: 1,
-        resource: { buffer: this.ssrUniformBuffer },
-      },
-      {
-        binding: 2,
-        resource: this.blueNoiseTexture.getTextureView(),
-      },
+      { binding: 0, resource: accLights },
+      { binding: 1, resource: { buffer: this.ssrUniformBuffer } },
+      { binding: 2, resource: this.blueNoiseTexture.getTextureView()! },
+      // Hi-Z min-depth pyramid — always valid (created in createHiZTexture)
+      { binding: 3, resource: this.hizReadView! },
     ]);
   }
 
@@ -383,7 +520,7 @@ export class ScreenSpaceReflections {
     this._editorFolder.add(enabledProxy, 'enabled').name('Enabled').listen();
   }
 
-  public update(dt: number): void {
+  public update(_dt: number): void {
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
 
     GPUUtils.writeBuffer(
@@ -422,6 +559,15 @@ export class ScreenSpaceReflections {
     this.blurOutputBindGroup = null;
     this.lastBlurNormalsView = null;
     this.lastBlurDepthView = null;
+    this.hizBuildL0BG = null;
+    this.hizBuildL1BGs = [];
+    this.hizMipViews = [];
+    this.hizReadView = null;
+    this.lastHiZDepthView = null;
+    if (this.hizTexture) {
+      this.hizTexture.destroy();
+      this.hizTexture = null;
+    }
     this.ssrResult = null as any;
     this.ssrBlurred = null as any;
     this.createRenderTarget();

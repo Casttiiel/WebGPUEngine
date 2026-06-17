@@ -309,6 +309,38 @@ export class BindGroupFactory {
       { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
       // binding 2: blue-noise 64×64 tiling texture for step dithering + ray jitter
       { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      // binding 3: Hi-Z min-depth pyramid (r32float = unfilterable-float, 4 mip levels)
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
+    ]);
+  }
+
+  /**
+   * Hi-Z build pass — level 0: src = gLinearDepth (r16float, filterable).
+   * Both bindings are @group(0): binding 0 = srcTex, binding 1 = dstTex (r32float storage).
+   */
+  public static getHiZBuildFromFilterableLayout(): GPUBindGroupLayout {
+    return this.getLayout('hiz_build_filterable', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '2d' },
+      },
+    ]);
+  }
+
+  /**
+   * Hi-Z build pass — levels 1-3: src = hizTex mip k (r32float, unfilterable).
+   * Both bindings are @group(0): binding 0 = srcTex, binding 1 = dstTex (r32float storage).
+   */
+  public static getHiZBuildFromUnfilterableLayout(): GPUBindGroupLayout {
+    return this.getLayout('hiz_build_unfilterable', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '2d' },
+      },
     ]);
   }
 
