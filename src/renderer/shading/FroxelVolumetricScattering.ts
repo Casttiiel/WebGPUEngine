@@ -29,11 +29,13 @@ export class FroxelVolumetricScattering {
   // Maps sky UV speed (0.08/s) → ~1.2 world-units/s froxel noise (same as original hardcoded wind magnitude)
   private static readonly FROXEL_WORLD_SPEED_SCALE = 15.0;
 
-  // Froxel grid dimensions
+  // Froxel grid dimensions — half-res relative to the previous 240×135×128.
+  // Smaller grid + temporal blue-noise dithering (already in raymarch shader)
+  // lets TAA reconstruct detail without the cost of the full-res grid.
   private froxelDimensions = {
-    x: 240, // Width slices 160
-    y: 135, // Height slices 90
-    z: 128, // Depth slices (logarithmic distribution)
+    x: 160,
+    y: 90,
+    z: 64,
   };
 
   private densityComputeShader!: GPUShaderModule;
@@ -126,6 +128,7 @@ export class FroxelVolumetricScattering {
   private spotLightTexturesBindGroups: Map<SpotLightComponent, GPUBindGroup[]> = new Map();
   private spotLightDataBindGroups: Map<SpotLightComponent, GPUBindGroup> = new Map();
   private integrationBindGroups: GPUBindGroup[] = [];
+  private integrationDepthBindGroup!: GPUBindGroup;
 
   constructor() {
     this.device = GPUUtils.getDevice();
@@ -232,6 +235,7 @@ export class FroxelVolumetricScattering {
       [
         BindGroupFactory.getFroxelParametersLayout(),
         BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
+        BindGroupFactory.getIntegrationDepthLayout(),
       ],
     );
 
@@ -463,10 +467,11 @@ export class FroxelVolumetricScattering {
    * Call when the screen is resized so stale screen-size-dependent bind groups are rebuilt.
    */
   public resize(): void {
-    // noiseTextureBindGroup holds a reference to the linearDepth RenderTarget view.
-    // After a resize GBufferPass destroys that texture, so we must drop the bind group
-    // so it gets recreated with the new view on the next updateFroxelData call.
+    // Both bind groups hold references to the linearDepth RenderTarget view.
+    // After a resize GBufferPass destroys that texture, so we must drop them
+    // so they get recreated with the new view on the next updateFroxelData call.
     this.noiseTextureBindGroup = null as any;
+    this.integrationDepthBindGroup = null as any;
   }
 
   public updateFroxelData(linearDepth: RenderTarget): void {
@@ -497,7 +502,7 @@ export class FroxelVolumetricScattering {
 
     this.executeSpotLightInjectionPass(commandEncoder);
 
-    this.executeVolumetricIntegrationPass(commandEncoder);
+    this.executeVolumetricIntegrationPass(commandEncoder, linearDepth);
     // No submit here — endFrame() submits everything together.
   }
 
@@ -615,7 +620,10 @@ export class FroxelVolumetricScattering {
     computePass.end();
   }
 
-  private executeVolumetricIntegrationPass(commandEncoder: GPUCommandEncoder): void {
+  private executeVolumetricIntegrationPass(
+    commandEncoder: GPUCommandEncoder,
+    linearDepth: RenderTarget,
+  ): void {
     const integrationTs = GPUProfiler.getInstance().getTimestampWrites(
       'froxel_volumetrict_integration_compute',
     );
@@ -626,9 +634,18 @@ export class FroxelVolumetricScattering {
 
     const pingPongIdx = this.froxelLightTextureView === this.froxelLightTextureViewA ? 0 : 1;
 
+    if (!this.integrationDepthBindGroup) {
+      this.integrationDepthBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_integration_depth_bind_group',
+        BindGroupFactory.getIntegrationDepthLayout(),
+        [{ binding: 0, resource: linearDepth.getView() }],
+      );
+    }
+
     computePass.setPipeline(this.volumetricIntegrationComputePipeline);
-    computePass.setBindGroup(0, this.parametersBindGroup); // Froxel + volumetric uniforms
+    computePass.setBindGroup(0, this.parametersBindGroup);
     computePass.setBindGroup(1, this.integrationBindGroups[pingPongIdx]);
+    computePass.setBindGroup(2, this.integrationDepthBindGroup);
 
     // Dispatch compute workgroups
     const { x, y, z } = this.froxelDimensions;

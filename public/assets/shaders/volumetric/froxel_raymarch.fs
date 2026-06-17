@@ -57,19 +57,13 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   // ±0.5 froxel dither — spans exactly one slice at any depth
   let fzScene = z01 * dimsF.z;
 
-  // Cap the Z lookup to floor(fzScene): the last froxel slice whose texel
-  // centre sits strictly in front of the GBuffer surface.
-  //
-  // Why floor and not fzScene directly?
-  //   textureSampleLevel maps fz → uvw.z = (fz + 0.5) / numSlices.
-  //   Trilinear then blends between floor(uvw.z * N - 0.5) and ceil() texels.
-  //   When fz = K (integer), uvw.z lands exactly on texel K's centre → zero
-  //   blending with texel K+1 (the wall slice).
-  //   When fz = K + ε, the GPU starts pulling in texel K+1 → leak.
-  //   Capping at floor(fzScene) ensures fz ≤ K so the ceil texel is always
-  //   K or less — never the slice that straddles the geometry boundary.
-  let fzMax = floor(fzScene);
-  let fz    = clamp(fzScene + dither, 0.0, fzMax);  // never reach the wall slice
+  // Depth injection in froxel_density.compute.wgsl zeroes density behind geometry,
+  // so stored[K+1..N] = stored[K] for all slices past the wall.
+  // That means trilinear can safely go above fzScene without leaking fog —
+  // sampling at K+ε and K+1 both return stored[K].
+  // Symmetric ±0.5-froxel dither around fzScene smooths slice boundaries;
+  // the clamp only guards the far-plane edge of the texture.
+  let fz = clamp(fzScene + dither, 0.0, dimsF.z - 1.0);
 
   // Dither XY
   let ditherX = dither * 0.5;

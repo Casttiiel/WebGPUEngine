@@ -125,11 +125,6 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
   let froxelWS = tempFroxelWS.xyz / tempFroxelWS.w;
 
-  // Depth rejection has been removed: the integration pass stores one result
-  // per slice and the raymarch pass already clamps its Z lookup to scene
-  // depth, so froxels behind geometry are simply never sampled.  Rejecting
-  // them in the density pass created a ~half-froxel dark halo around every
-  // object edge.
 
   // 2) Height fog (parameters from uniform)
   let fogBaseHeight = volumetricParams.fogBaseHeight;
@@ -173,7 +168,9 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
 
   // Apply world-space density volumes (SDF blend)
   let finalParams = applyFogVolumes(froxelWS, sigmaS, sigmaT);
-  
-  // Store density in 3D texture (R32F format)
+
+  // Store density in 3D texture (rg32float: R=sigmaS, G=sigmaT)
+  // Depth-awareness is handled in the integration pass, which stops accumulation
+  // per-column when the froxel depth exceeds the scene geometry depth.
   textureStore(froxelDensityTexture, froxelCoord, vec4<f32>(finalParams.x, finalParams.y, 0.0, 0.0));
 }

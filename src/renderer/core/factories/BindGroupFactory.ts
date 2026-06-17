@@ -891,6 +891,17 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Layout for the G-Buffer linear depth texture used by the integration pass (group 2). */
+  public static getIntegrationDepthLayout(): GPUBindGroupLayout {
+    return this.getLayout('integration_depth_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float', viewDimension: '2d' },
+      },
+    ]);
+  }
+
   /**
    * Create bind group layout for ambient light injection textures
    */
