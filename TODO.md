@@ -33,6 +33,7 @@ Air combos
 2. Parallax Mapping https://www.reddit.com/r/godot/comments/1twtuqd/iterative_parallax_mapping_cheaper_alternative_to/
 3. Procedural materials
 4. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+5. Review SSR
 
 ## Engine
 

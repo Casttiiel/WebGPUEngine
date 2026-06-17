@@ -2056,6 +2056,32 @@ export class BindGroupFactory {
     }
   }
 
+  // ── Shockwave post-process compute pass ─────────────────────────────────────
+
+  public static getShockwaveInputLayout(): GPUBindGroupLayout {
+    return this.getLayout('shockwave_input', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
+    ]);
+  }
+
+  public static getShockwaveOutputLayout(): GPUBindGroupLayout {
+    return this.getLayout('shockwave_output', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '2d' },
+      },
+    ]);
+  }
+
+  public static getShockwaveWavesLayout(): GPUBindGroupLayout {
+    return this.getLayout('shockwave_waves', [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+    ]);
+  }
+
   /**
    * Clears all cached layouts
    */

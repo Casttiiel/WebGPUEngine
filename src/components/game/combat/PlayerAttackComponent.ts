@@ -13,6 +13,7 @@ import type { HitStopComponent } from '../HitStopComponent';
 import type { CameraShakeComponent } from '../CameraShakeComponent';
 import type { CameraArmComponent } from '../CameraArmComponent';
 import type { KCCMovement } from '../movement/KCCMovement';
+import type { ShockwavePostProcessComponent } from '../../render/ShockwavePostProcessComponent';
 
 export interface PlayerAttackData {
   damage?: number;
@@ -327,6 +328,11 @@ export class PlayerAttackComponent extends Component {
 
           // Hit sparks at impact point
           this.hitSparks?.burst(24, pt);
+
+          // Shockwave distortion at impact point
+          const camEntity = Engine.getEntities().getEntityByName('MainCamera');
+          const sw = camEntity?.getComponent('shockwave') as ShockwavePostProcessComponent | null;
+          sw?.spawn([pt[0], pt[1], pt[2]], { speed: 14, maxRadius: 20, intensity: 0.04, thickness: 2.0 });
         }
         return true;
       });

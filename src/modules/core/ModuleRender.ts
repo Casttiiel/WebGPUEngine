@@ -44,6 +44,7 @@ import { PointLightComponent } from '../../components/render/PointLightComponent
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
 import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
+import { ShockwavePostProcessComponent } from '../../components/render/ShockwavePostProcessComponent';
 import { Profiler } from '../../core/debug/Profiler';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { TextureStreamingManager } from '../../renderer/core/managers/TextureStreamingManager';
@@ -392,6 +393,13 @@ export class ModuleRender extends Module {
       }
 
       this.distorsions.render(result, this.deferred.getDepthStencilView()!);
+
+      if (mainCameraEntity?.hasComponent('shockwave')) {
+        const shockwave = mainCameraEntity.getComponent('shockwave') as ShockwavePostProcessComponent;
+        if (shockwave.hasLoaded()) {
+          result = shockwave.apply(result, this.deferred.getLinearDepthView());
+        }
+      }
 
       if (mainCameraEntity?.hasComponent('depth_of_field')) {
         const depthOfField = mainCameraEntity.getComponent(

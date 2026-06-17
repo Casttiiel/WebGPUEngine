@@ -43,6 +43,7 @@ import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
 import { VignetteComponent } from '../../components/render/VignetteComponent';
 import { HeightFogComponent } from '../../components/vfx/HeightFogComponent';
 import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComponent';
+import { ShockwavePostProcessComponent } from '../../components/render/ShockwavePostProcessComponent';
 import { ImpulsePadComponent } from '../../components/game/ImpulsePadComponent';
 import { SwingBarComponent } from '../../components/game/SwingBarComponent';
 import { ReflectionProbeComponent } from '../../components/render/ReflectionProbeComponent';
@@ -189,6 +190,7 @@ export class Engine {
     VignetteComponent.registerMsgs();
     HeightFogComponent.registerMsgs();
     AtmosphericFogComponent.registerMsgs();
+    ShockwavePostProcessComponent.registerMsgs();
     // Triggers / Física — TRIGGER_ENTER / TRIGGER_EXIT
     ImpulsePadComponent.registerMsgs();
     SwingBarComponent.registerMsgs();
