@@ -15,4 +15,10 @@ export interface ParticleSystemComponentData {
   worldSpace?: boolean; // Si true, las partículas se emiten en world space y no siguen al emisor
   material?: string; // Material a usar (opcional, por defecto según worldSpace)
   mesh?: string; // Mesh a usar (opcional, por defecto quad.obj)
+  /** Si true, emite `burstCount` partículas en el primer update y detiene la emisión continua. */
+  oneShot?: boolean;
+  /** Partículas a emitir en modo oneShot (por defecto: maxParticles). */
+  burstCount?: number;
+  /** Si false, el emisor no emite continuamente al inicio — usar burst() para activar. Por defecto true. */
+  emitting?: boolean;
 }

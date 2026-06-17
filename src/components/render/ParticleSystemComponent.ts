@@ -1,3 +1,4 @@
+import { vec3 } from 'gl-matrix';
 import { Component } from '../../core/ecs/Component';
 import { Material } from '../../renderer/resources/Material';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -47,6 +48,13 @@ export class ParticleSystemComponent extends Component {
   private spawnTimer: number = 0;
   private spawnInterval: number = 0.05; // Spawn 20 veces/segundo
   private particlesPerSpawn: number = 5;
+
+  // ── Burst / oneShot ───────────────────────────────────────────────────────────
+  private pendingBurst: number = 0;
+  private emitting: boolean = true;
+  private oneShot: boolean = false;
+  private oneShotBurstCount: number = 0;
+  private oneShotFired: boolean = false;
 
   // ── Parámetros de partícula (leídos del prefab) ────────────────────────────────
   private worldSpace: boolean = false;
@@ -149,6 +157,12 @@ export class ParticleSystemComponent extends Component {
       this.particleLife = data?.particleLife ?? 3.0;
       this.particleLifeVarMin = data?.particleLifeVarianceMin ?? 0.0;
       this.particleLifeVarMax = data?.particleLifeVarianceMax ?? 0.0;
+
+      // Burst / oneShot
+      this.emitting = data?.emitting !== false; // default true
+      this.oneShot = data?.oneShot ?? false;
+      this.oneShotBurstCount = data?.burstCount ?? this.maxParticles;
+      if (this.oneShot) this.emitting = false; // oneShot overrides continuous emission
 
       // 1. Cargar mesh y material con la técnica apropiada según worldSpace
       const meshPath = data?.mesh ?? 'quad.obj';
@@ -452,24 +466,55 @@ export class ParticleSystemComponent extends Component {
     });
   }
 
+  /**
+   * Emite `count` partículas inmediatamente en la siguiente GPU frame.
+   * Si se proporciona `worldPos`, el emitter se teletransporta a esa posición antes
+   * de emitir — ideal para efectos de impacto en world-space.
+   */
+  public burst(count: number, worldPos?: vec3): void {
+    if (worldPos && this.transform) {
+      this.transform.getTransform().setLocalPosition(worldPos);
+    }
+    this.pendingBurst += count;
+  }
+
+  public startEmitting(): void {
+    this.emitting = true;
+  }
+
+  public stopEmitting(): void {
+    this.emitting = false;
+  }
+
   public override update(deltaTime: number): void {
     const device = GPUUtils.getDevice();
 
+    // OneShot: dispara una sola vez en el primer update
+    if (this.oneShot && !this.oneShotFired) {
+      this.oneShotFired = true;
+      this.pendingBurst += this.oneShotBurstCount;
+    }
+
     // 1. Actualizar timer de spawn
-    this.spawnTimer += deltaTime;
+    if (this.emitting) this.spawnTimer += deltaTime;
 
     // 2. Actualizar deltaTime en el buffer de simulación (gravity se escribe una sola vez en load)
     this.simParamsArray[0] = deltaTime;
     device.queue.writeBuffer(this.simulationParamsBuffer, 0, this.simParamsArray, 0, 1);
 
-    // Verificar si es momento de spawn
-    const shouldSpawn = this.spawnTimer >= this.spawnInterval;
+    // Determinar cuántas partículas spawnar este frame
+    const regularSpawn = this.emitting && this.spawnTimer >= this.spawnInterval;
+    const regularCount = regularSpawn ? this.particlesPerSpawn : 0;
+    const totalSpawnCount = regularCount + this.pendingBurst;
 
-    if (shouldSpawn) {
-      this.spawnTimer = 0;
+    if (regularSpawn) this.spawnTimer = 0;
+    this.pendingBurst = 0;
 
+    const shouldRunSpawnPass = totalSpawnCount > 0;
+
+    if (shouldRunSpawnPass) {
       // Preparar parámetros de spawn según SpawnParams en particle_spawn_compact.cs (80 bytes)
-      this.spawnParamsUint32View[0] = this.particlesPerSpawn; // [0]  spawnCount
+      this.spawnParamsUint32View[0] = totalSpawnCount; // [0]  spawnCount
       this.spawnParamsFloat32View[1] = Math.random() * 10000.0; // [1]  randomSeed
       this.spawnParamsUint32View[2] = this.worldSpace ? 1 : 0; // [2]  worldSpace
       this.spawnParamsFloat32View[3] = 0; // [3]  padding1
@@ -502,10 +547,7 @@ export class ParticleSystemComponent extends Component {
 
       device.queue.writeBuffer(this.spawnParamsBuffer, 0, this.spawnParamsArray);
 
-      // OPTIMIZACIÓN: Resetear contador atómico reutilizando buffer CPU
-      // ANTES: new Uint32Array([...]) cada spawn → GC pressure
-      // AHORA: reutilizar counterDataArray → 0 allocations
-      this.counterDataArray[0] = this.particlesPerSpawn;
+      this.counterDataArray[0] = totalSpawnCount;
       device.queue.writeBuffer(this.spawnCounterBuffer, 0, this.counterDataArray);
 
       // Actualizar render params si cambiaron (p.ej. debug UI)
@@ -538,7 +580,7 @@ export class ParticleSystemComponent extends Component {
     updatePass.end();
 
     // Pass 2: SPAWN (solo si toca) - crea nuevas partículas
-    if (shouldSpawn) {
+    if (shouldRunSpawnPass) {
       const spawnPass = encoder.beginComputePass({ label: 'Spawn Pass' });
       spawnPass.setPipeline(this.spawnPipeline);
       spawnPass.setBindGroup(0, this.spawnCompactBindGroup);

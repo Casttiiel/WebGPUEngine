@@ -18,7 +18,7 @@ export interface TrailRendererComponentData {
   maxNodes?: number;
   /** Minimum world-space distance between recorded nodes. Default 0.05. */
   minNodeDistance?: number;
-  /** Width of the ribbon in world units. Default 0.1. */
+  /** Width of the ribbon in world units. Used only in single-emitter mode. Default 0.1. */
   width?: number;
   /** How long each node lives before fading out (seconds). Default 0.3. */
   lifetime?: number;
@@ -32,13 +32,28 @@ export interface TrailRendererComponentData {
   material?: string;
   /** Whether to start emitting immediately on load. Default true. */
   emitting?: boolean;
+  /**
+   * Dual-emitter mode: name of a scene entity to use as the second ribbon edge.
+   * When set, the ribbon spans between this entity and the owner entity each frame,
+   * exactly covering the distance between the two points (e.g. sword hilt → tip).
+   * The `width` parameter is ignored in dual-emitter mode.
+   */
+  secondaryEmitterName?: string;
+  /**
+   * Blade mode (recommended for weapons): automatically computes tip and hilt from the
+   * owner entity's world matrix Z column, which includes scale. This avoids any child
+   * entity world-position issues and correctly spans the full visible blade length.
+   * When true, `secondaryEmitterName` is ignored.
+   */
+  bladeMode?: boolean;
 }
 
 // Interleaved vertex stride mirrors the engine mesh format (12 floats = 48 bytes)
 const VERTEX_STRIDE = 12;
 
 interface TrailNode {
-  pos: vec3;
+  pos: vec3; // primary emitter world position
+  posB: vec3; // secondary emitter world position (dual mode only; pre-allocated)
   age: number;
 }
 
@@ -53,12 +68,18 @@ export class TrailRendererComponent extends Component {
   private splineSubdivisions: number = 4;
   private materialPath: string = 'trail.mat';
 
-  // Ring buffer state
+  // ── Dual-emitter mode ────────────────────────────────────────────────────────
+  private secondaryEntityName: string | null = null;
+  private secondaryTransform: TransformComponent | null = null;
+  private secondaryResolved: boolean = false;
+  private bladeMode: boolean = false;
+
+  // ── Ring buffer ──────────────────────────────────────────────────────────────
   private nodes: TrailNode[] = [];
   private head: number = 0;
   private activeCount: number = 0;
 
-  // GPU resources
+  // ── GPU resources ────────────────────────────────────────────────────────────
   private trailMesh!: Mesh;
   private trailMaterial!: Material;
   private renderComp!: RenderComponent;
@@ -66,22 +87,19 @@ export class TrailRendererComponent extends Component {
   private indirectBuffer!: GPUBuffer;
   private dummyBindGroup!: GPUBindGroup;
 
-  // CPU geometry scratch buffer (reused every frame, no alloc)
+  // ── CPU geometry scratch buffer (reused every frame, no alloc) ───────────────
   private vertexCPU!: Float32Array;
 
-  // Reusable vec3 temporaries (avoid per-frame alloc)
+  // ── Reusable vec3 temporaries ────────────────────────────────────────────────
   private readonly tempForward = vec3.create();
   private readonly tempCamDir = vec3.create();
   private readonly tempRight = vec3.create();
 
-  // Position tracking for node distance check
+  // ── Position tracking ────────────────────────────────────────────────────────
   private readonly lastPos = vec3.create();
   private hasLastPos = false;
 
-  // When false, no new nodes are pushed but existing ones continue to age out
   private emitting: boolean = true;
-
-  // Max render vertices (may exceed maxNodes for spline)
   private maxRenderVerts: number = 0;
 
   public async load(data: TrailRendererComponentData): Promise<void> {
@@ -95,27 +113,24 @@ export class TrailRendererComponent extends Component {
     this.splineSubdivisions = Math.max(1, data.splineSubdivisions ?? 4);
     this.materialPath = data.material ?? 'trail.mat';
     this.emitting = data.emitting !== false;
+    this.bladeMode = data.bladeMode ?? false;
+    this.secondaryEntityName = data.bladeMode ? null : (data.secondaryEmitterName ?? null);
 
-    // Pre-allocate ring buffer nodes (reuse objects every frame)
+    // Pre-allocate ring buffer — posB is always allocated to avoid branching
     this.nodes = Array.from({ length: this.maxNodes }, () => ({
       pos: vec3.create(),
+      posB: vec3.create(),
       age: 0,
     }));
 
-    // Maximum number of vertices the ribbon can produce
-    // For spline: each gap between control nodes is subdivided
     const maxSplineNodes =
       this.trailType === 'spline'
         ? (this.maxNodes - 1) * this.splineSubdivisions + 1
         : this.maxNodes;
     this.maxRenderVerts = maxSplineNodes * 2;
 
-    // CPU vertex scratch buffer (world-space ribbon, uploaded to GPU each frame)
     this.vertexCPU = new Float32Array(this.maxRenderVerts * VERTEX_STRIDE);
 
-    // Pre-bake a fixed index buffer for the maximum ribbon size.
-    // Triangle strip pattern for N nodes → N-1 quad segments:
-    //   seg k → verts [2k, 2k+1, 2k+2, 2k+3] → 2 triangles
     const maxSegments = maxSplineNodes - 1;
     const indexData = new Uint16Array(maxSegments * 6);
     for (let k = 0; k < maxSegments; k++) {
@@ -128,8 +143,6 @@ export class TrailRendererComponent extends Component {
       indexData[b + 5] = k * 2 + 2;
     }
 
-    // Create a dynamic mesh pre-allocated to max capacity.
-    // The raw-array shape matches what Mesh.setData() actually consumes at runtime.
     this.trailMesh = await Mesh.getAsync({
       attributes: {
         POSITION: new Float32Array(this.maxRenderVerts * 3) as any,
@@ -140,25 +153,19 @@ export class TrailRendererComponent extends Component {
       indices: indexData as any,
     } as any);
 
-    // Start with zero-index draw (invisible until data arrives)
     this.trailMesh.setActiveIndexCount(0);
 
     this.trailMaterial = await Material.get(this.materialPath);
     this.transformComp = this.getOwner().getComponent('transform') as TransformComponent;
 
-    // Create a self-managed indirect draw buffer (5 × uint32 = 20 bytes).
-    // Owning this buffer prevents the GPUCullingManager from hijacking the key.
     const device = Render.getInstance().getDevice();
     this.indirectBuffer = device.createBuffer({
       label: 'trail-indirect',
       size: 20,
       usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
     });
-    // Start invisible: indexCount = 0
     device.queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([0, 1, 0, 0, 0]));
 
-    // A non-null renderBindGroup at group 3 excludes this key from GPUCullingManager.
-    // The trail shader doesn't use group 3, so an empty layout is safe.
     const emptyLayout = device.createBindGroupLayout({ label: 'trail-dummy-bgl', entries: [] });
     this.dummyBindGroup = device.createBindGroup({
       label: 'trail-dummy-bg',
@@ -166,7 +173,6 @@ export class TrailRendererComponent extends Component {
       entries: [],
     });
 
-    // Register once with the transparent render pipeline
     this.renderComp = new RenderComponent();
     this.renderComp.setOwner(this.getOwner());
     RenderManagerV2.getInstance().addKey(
@@ -174,15 +180,14 @@ export class TrailRendererComponent extends Component {
       this.trailMesh,
       this.trailMaterial,
       this.transformComp,
-      false, // isInstanced
-      1, // instanceCount
-      undefined, // instanceBindGroup
-      this.dummyBindGroup, // renderBindGroup — non-null escapes GPU culler filter
-      this.indirectBuffer, // indirectDrawBuffer — trail owns and writes this
+      false,
+      1,
+      undefined,
+      this.dummyBindGroup,
+      this.indirectBuffer,
     );
   }
 
-  /** Clear all trail nodes and hide the ribbon immediately. Restores emitting. */
   public reset(): void {
     this.head = 0;
     this.activeCount = 0;
@@ -196,21 +201,12 @@ export class TrailRendererComponent extends Component {
     }
   }
 
-  /**
-   * Start recording nodes. Call after stopEmitting() to resume (e.g. next attack).
-   * Does NOT clear existing nodes — call reset() first if you want a clean start.
-   */
   public startEmitting(): void {
     this.emitting = true;
     this.enabled = true;
     this.hasLastPos = false;
   }
 
-  /**
-   * Stop recording new nodes. Existing nodes continue to age out and fade
-   * naturally over their lifetime. The component auto-disables itself once
-   * the last node expires.
-   */
   public stopEmitting(): void {
     this.emitting = false;
   }
@@ -218,19 +214,38 @@ export class TrailRendererComponent extends Component {
   public override update(dt: number): void {
     if (!this.trailMesh) return;
 
-    if (this.emitting) {
-      const ownerPos = this.transformComp.getTransform().getWorldPosition();
+    // Lazy-resolve secondary transform on first update tick (entity-name mode only)
+    if (!this.secondaryResolved && !this.bladeMode) this.resolveSecondary();
 
-      // Record a new control node when the emitter has moved far enough
+    const isDual = this.bladeMode || this.secondaryTransform !== null;
+
+    if (this.emitting) {
+      let posA: vec3;
+      let posB: vec3 | null = null;
+
+      if (this.bladeMode) {
+        // Read Z column of world matrix — its length = scale_z = half-blade * 2.
+        // This correctly computes tip (posA) and hilt (posB) regardless of child-transform scaling.
+        const worldMat = this.transformComp.getTransform().getWorldMatrix();
+        const zCol = vec3.fromValues(worldMat[8]!, worldMat[9]!, worldMat[10]!);
+        const halfLen = vec3.length(zCol) * 0.5;
+        const dir = vec3.scale(zCol, zCol, 1 / (halfLen * 2));
+        const center = this.transformComp.getTransform().getWorldPosition();
+        posA = vec3.scaleAndAdd(vec3.create(), center, dir, halfLen);   // tip
+        posB = vec3.scaleAndAdd(vec3.create(), center, dir, -halfLen);  // hilt
+      } else {
+        posA = this.transformComp.getTransform().getWorldPosition();
+        posB = this.secondaryTransform
+          ? this.secondaryTransform.getTransform().getWorldPosition()
+          : null;
+      }
+
       if (!this.hasLastPos) {
-        // Record the initial position without pushing a node — the transform may not yet
-        // have its final world matrix on the very first update tick.  The first real node
-        // is pushed only once the entity has actually moved >= minNodeDistance from here.
-        vec3.copy(this.lastPos, ownerPos);
+        vec3.copy(this.lastPos, posA);
         this.hasLastPos = true;
-      } else if (vec3.distance(ownerPos, this.lastPos) >= this.minNodeDistance) {
-        this.pushNode(ownerPos);
-        vec3.copy(this.lastPos, ownerPos);
+      } else if (vec3.distance(posA, this.lastPos) >= this.minNodeDistance) {
+        this.pushNode(posA, posB);
+        vec3.copy(this.lastPos, posA);
       }
     }
 
@@ -240,7 +255,7 @@ export class TrailRendererComponent extends Component {
       this.nodes[idx]!.age += dt;
     }
 
-    // Prune expired nodes from the tail (oldest first)
+    // Prune expired nodes from the tail
     while (this.activeCount > 0) {
       const tailIdx = (this.head - this.activeCount + this.maxNodes) % this.maxNodes;
       if (this.nodes[tailIdx]!.age >= this.nodeLifetime) {
@@ -254,31 +269,39 @@ export class TrailRendererComponent extends Component {
       Render.getInstance()
         .getDevice()
         .queue.writeBuffer(this.indirectBuffer, 0, new Uint32Array([0, 1, 0, 0, 0]));
-      // Auto-disable once all nodes have faded out after stopEmitting().
-      // Guard with hasLastPos so a component that starts with emitting:false
-      // doesn't disable itself on the very first frame before recording anything.
       if (!this.emitting && this.hasLastPos) this.enabled = false;
       return;
     }
 
     // Collect ordered positions [newest=0 … oldest=N-1]
     const count = this.activeCount;
-    const controlPositions: vec3[] = new Array(count);
+    const posA: vec3[] = new Array(count);
+    const posB: vec3[] = isDual ? new Array(count) : [];
+
     for (let i = 0; i < count; i++) {
       const idx = (this.head - 1 - i + this.maxNodes) % this.maxNodes;
-      controlPositions[i] = this.nodes[idx]!.pos;
+      posA[i] = this.nodes[idx]!.pos;
+      if (isDual) posB[i] = this.nodes[idx]!.posB;
     }
 
-    // Apply Catmull-Rom subdivision for spline trails
-    const finalPositions: vec3[] =
-      this.trailType === 'spline' && count >= 3
-        ? this.catmullRomSubdivide(controlPositions)
-        : controlPositions;
+    // Catmull-Rom subdivision applied independently to both edge arrays
+    let finalA: vec3[];
+    let finalB: vec3[];
+    if (this.trailType === 'spline' && count >= 3) {
+      finalA = this.catmullRomSubdivide(posA);
+      finalB = isDual ? this.catmullRomSubdivide(posB) : [];
+    } else {
+      finalA = posA;
+      finalB = posB;
+    }
 
-    const cameraPos = this.getCameraWorldPos();
-    const N = finalPositions.length;
+    const N = finalA.length;
 
-    this.buildRibbonGeometry(finalPositions, cameraPos, N);
+    if (isDual) {
+      this.buildDualRibbonGeometry(finalA, finalB, N);
+    } else {
+      this.buildRibbonGeometry(finalA, this.getCameraWorldPos(), N);
+    }
 
     this.trailMesh.writeVertexData(this.vertexCPU.subarray(0, N * 2 * VERTEX_STRIDE));
     const activeIndexCount = (N - 1) * 6;
@@ -289,74 +312,74 @@ export class TrailRendererComponent extends Component {
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
-  private pushNode(pos: vec3): void {
+  private resolveSecondary(): void {
+    this.secondaryResolved = true;
+    if (!this.secondaryEntityName) return;
+    try {
+      const entity = Engine.getEntities().getEntityByName(this.secondaryEntityName);
+      if (entity) {
+        this.secondaryTransform = entity.getComponent('transform') as TransformComponent | null;
+      }
+    } catch {}
+  }
+
+  private pushNode(pos: vec3, posB: vec3 | null): void {
     const node = this.nodes[this.head]!;
     vec3.copy(node.pos, pos);
+    if (posB) vec3.copy(node.posB, posB);
     node.age = 0;
     this.head = (this.head + 1) % this.maxNodes;
     this.activeCount = Math.min(this.activeCount + 1, this.maxNodes);
   }
 
+  /**
+   * Single-emitter mode: camera-facing ribbon of constant `width` centered on the emitter path.
+   */
   private buildRibbonGeometry(positions: vec3[], cameraPos: vec3, N: number): void {
     const halfWidth = this.width * 0.5;
 
     for (let i = 0; i < N; i++) {
       const pos = positions[i]!;
-      // t: 0 = newest (head), 1 = oldest (tail)
       const t = N > 1 ? i / (N - 1) : 0;
 
-      // Forward direction along the trail (pointing from current to next node)
       if (i < N - 1) {
         vec3.subtract(this.tempForward, positions[i]!, positions[i + 1]!);
       } else {
         vec3.subtract(this.tempForward, positions[N - 2]!, positions[N - 1]!);
       }
       const fwdLen = vec3.length(this.tempForward);
-      if (fwdLen > 0.0001) {
-        vec3.scale(this.tempForward, this.tempForward, 1 / fwdLen);
-      } else {
-        vec3.set(this.tempForward, 0, 0, 1);
-      }
+      if (fwdLen > 0.0001) vec3.scale(this.tempForward, this.tempForward, 1 / fwdLen);
+      else vec3.set(this.tempForward, 0, 0, 1);
 
-      // Camera-perpendicular right vector — makes the ribbon face the camera
       vec3.subtract(this.tempCamDir, cameraPos, pos);
       const camLen = vec3.length(this.tempCamDir);
-      if (camLen > 0.0001) {
-        vec3.scale(this.tempCamDir, this.tempCamDir, 1 / camLen);
-      } else {
-        vec3.set(this.tempCamDir, 0, 1, 0);
-      }
+      if (camLen > 0.0001) vec3.scale(this.tempCamDir, this.tempCamDir, 1 / camLen);
+      else vec3.set(this.tempCamDir, 0, 1, 0);
 
       vec3.cross(this.tempRight, this.tempCamDir, this.tempForward);
       const rightLen = vec3.length(this.tempRight);
-      if (rightLen > 0.0001) {
-        vec3.scale(this.tempRight, this.tempRight, 1 / rightLen);
-      } else {
-        vec3.set(this.tempRight, 1, 0, 0);
-      }
+      if (rightLen > 0.0001) vec3.scale(this.tempRight, this.tempRight, 1 / rightLen);
+      else vec3.set(this.tempRight, 1, 0, 0);
 
-      // Interpolate color (startColor → endColor as t goes 0 → 1)
       const r = this.startColor[0] + (this.endColor[0] - this.startColor[0]) * t;
       const g = this.startColor[1] + (this.endColor[1] - this.startColor[1]) * t;
       const b = this.startColor[2] + (this.endColor[2] - this.startColor[2]) * t;
       const a = this.startColor[3] + (this.endColor[3] - this.startColor[3]) * t;
 
-      // Left vertex: pos - right * halfWidth  (uv.x = 0)
       const li = i * 2 * VERTEX_STRIDE;
       this.vertexCPU[li + 0] = pos[0] - this.tempRight[0] * halfWidth;
       this.vertexCPU[li + 1] = pos[1] - this.tempRight[1] * halfWidth;
       this.vertexCPU[li + 2] = pos[2] - this.tempRight[2] * halfWidth;
-      this.vertexCPU[li + 3] = 0; // normal.x
-      this.vertexCPU[li + 4] = 1; // normal.y
-      this.vertexCPU[li + 5] = 0; // normal.z
-      this.vertexCPU[li + 6] = 0; // uv.x = left edge
-      this.vertexCPU[li + 7] = t; // uv.y = position along trail
+      this.vertexCPU[li + 3] = 0;
+      this.vertexCPU[li + 4] = 1;
+      this.vertexCPU[li + 5] = 0;
+      this.vertexCPU[li + 6] = 0;
+      this.vertexCPU[li + 7] = t;
       this.vertexCPU[li + 8] = r;
       this.vertexCPU[li + 9] = g;
       this.vertexCPU[li + 10] = b;
       this.vertexCPU[li + 11] = a;
 
-      // Right vertex: pos + right * halfWidth  (uv.x = 1)
       const ri = (i * 2 + 1) * VERTEX_STRIDE;
       this.vertexCPU[ri + 0] = pos[0] + this.tempRight[0] * halfWidth;
       this.vertexCPU[ri + 1] = pos[1] + this.tempRight[1] * halfWidth;
@@ -364,7 +387,7 @@ export class TrailRendererComponent extends Component {
       this.vertexCPU[ri + 3] = 0;
       this.vertexCPU[ri + 4] = 1;
       this.vertexCPU[ri + 5] = 0;
-      this.vertexCPU[ri + 6] = 1; // uv.x = right edge
+      this.vertexCPU[ri + 6] = 1;
       this.vertexCPU[ri + 7] = t;
       this.vertexCPU[ri + 8] = r;
       this.vertexCPU[ri + 9] = g;
@@ -374,9 +397,74 @@ export class TrailRendererComponent extends Component {
   }
 
   /**
-   * Catmull-Rom spline subdivision.
-   * Produces (N-1)*subdivisions + 1 smooth points from N control points.
+   * Dual-emitter mode: each ribbon quad spans exactly from posA[i] to posB[i].
+   * The ribbon covers the full distance between the two emitters (e.g. sword tip → hilt).
+   * `width` is not used — the visual width is determined by the world-space gap between emitters.
    */
+  private buildDualRibbonGeometry(positionsA: vec3[], positionsB: vec3[], N: number): void {
+    for (let i = 0; i < N; i++) {
+      const pA = positionsA[i]!;
+      const pB = positionsB[i]!;
+      const t = N > 1 ? i / (N - 1) : 0;
+
+      // Normal: perpendicular to both blade direction and trail forward
+      const bladeDir = vec3.sub(this.tempRight, pB, pA);
+      const bladeDirLen = vec3.length(bladeDir);
+      if (bladeDirLen > 0.0001) vec3.scale(bladeDir, bladeDir, 1 / bladeDirLen);
+      else vec3.set(bladeDir, 1, 0, 0);
+
+      const nextA = positionsA[Math.min(i + 1, N - 1)]!;
+      vec3.sub(this.tempForward, pA, nextA);
+      const fwdLen = vec3.length(this.tempForward);
+      if (fwdLen > 0.0001) vec3.scale(this.tempForward, this.tempForward, 1 / fwdLen);
+      else vec3.set(this.tempForward, 0, 0, 1);
+
+      vec3.cross(this.tempCamDir, bladeDir, this.tempForward); // reuse tempCamDir as normal
+      const nLen = vec3.length(this.tempCamDir);
+      if (nLen > 0.0001) vec3.scale(this.tempCamDir, this.tempCamDir, 1 / nLen);
+      else vec3.set(this.tempCamDir, 0, 1, 0);
+
+      const nx = this.tempCamDir[0],
+        ny = this.tempCamDir[1],
+        nz = this.tempCamDir[2];
+
+      const r = this.startColor[0] + (this.endColor[0] - this.startColor[0]) * t;
+      const g = this.startColor[1] + (this.endColor[1] - this.startColor[1]) * t;
+      const b = this.startColor[2] + (this.endColor[2] - this.startColor[2]) * t;
+      const a = this.startColor[3] + (this.endColor[3] - this.startColor[3]) * t;
+
+      // Edge A (primary emitter, uv.x = 0)
+      const li = i * 2 * VERTEX_STRIDE;
+      this.vertexCPU[li + 0] = pA[0];
+      this.vertexCPU[li + 1] = pA[1];
+      this.vertexCPU[li + 2] = pA[2];
+      this.vertexCPU[li + 3] = nx;
+      this.vertexCPU[li + 4] = ny;
+      this.vertexCPU[li + 5] = nz;
+      this.vertexCPU[li + 6] = 0;
+      this.vertexCPU[li + 7] = t;
+      this.vertexCPU[li + 8] = r;
+      this.vertexCPU[li + 9] = g;
+      this.vertexCPU[li + 10] = b;
+      this.vertexCPU[li + 11] = a;
+
+      // Edge B (secondary emitter, uv.x = 1)
+      const ri = (i * 2 + 1) * VERTEX_STRIDE;
+      this.vertexCPU[ri + 0] = pB[0];
+      this.vertexCPU[ri + 1] = pB[1];
+      this.vertexCPU[ri + 2] = pB[2];
+      this.vertexCPU[ri + 3] = nx;
+      this.vertexCPU[ri + 4] = ny;
+      this.vertexCPU[ri + 5] = nz;
+      this.vertexCPU[ri + 6] = 1;
+      this.vertexCPU[ri + 7] = t;
+      this.vertexCPU[ri + 8] = r;
+      this.vertexCPU[ri + 9] = g;
+      this.vertexCPU[ri + 10] = b;
+      this.vertexCPU[ri + 11] = a;
+    }
+  }
+
   private catmullRomSubdivide(pts: vec3[]): vec3[] {
     const sub = this.splineSubdivisions;
     const result: vec3[] = [];

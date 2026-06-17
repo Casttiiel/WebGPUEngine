@@ -6,6 +6,8 @@ import { GameAction } from '../../../types/GameAction.enum';
 import { TransformComponent } from '../../core/TransformComponent';
 import { AnimatorComponent } from '../../render/AnimatorComponent';
 import { TrailRendererComponent } from '../../vfx/TrailRendererComponent';
+import { ParticleSystemComponent } from '../../render/ParticleSystemComponent';
+import { Loader } from '../../../core/loaders/Loader';
 import { Msg } from '../../../core/ecs/Msg';
 import type { HitStopComponent } from '../HitStopComponent';
 import type { CameraShakeComponent } from '../CameraShakeComponent';
@@ -47,7 +49,7 @@ export class PlayerAttackComponent extends Component {
   private minLungeDistance: number = 1.5;
   private autoAimRange: number = 4.0;
   private autoAimConeAngle: number = 60;
-  private autoRotateMax: number = 15;
+  private autoRotateMax: number = 30;
   private knockbackSpeed: number = 2;
 
   // ── Runtime state ──────────────────────────────────────────────────────────
@@ -63,25 +65,36 @@ export class PlayerAttackComponent extends Component {
   private ownerTransform: TransformComponent | null = null;
   private movement: KCCMovement | null = null;
   private trail: TrailRendererComponent | null = null;
+  private hitSparks: ParticleSystemComponent | null = null;
   private handJointIndex: number = -1;
   private resolved: boolean = false;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   public load(data: PlayerAttackData): void {
-    this.damage             = data.damage             ?? this.damage;
-    this.cooldown           = data.cooldown           ?? this.cooldown;
-    this.attackClip         = data.attackClip         ?? this.attackClip;
-    this.bladeLength        = data.bladeLength        ?? this.bladeLength;
-    this.activeWindowStart  = data.activeWindowStart  ?? this.activeWindowStart;
-    this.activeWindowEnd    = data.activeWindowEnd    ?? this.activeWindowEnd;
-    this.sweepRadius        = data.sweepRadius        ?? this.sweepRadius;
-    this.lungeSpeed         = data.lungeSpeed         ?? this.lungeSpeed;
-    this.minLungeDistance   = data.minLungeDistance   ?? this.minLungeDistance;
-    this.autoAimRange       = data.autoAimRange       ?? this.autoAimRange;
-    this.autoAimConeAngle   = data.autoAimConeAngle   ?? this.autoAimConeAngle;
-    this.autoRotateMax      = data.autoRotateMax      ?? this.autoRotateMax;
-    this.knockbackSpeed     = data.knockbackSpeed     ?? this.knockbackSpeed;
+    this.damage = data.damage ?? this.damage;
+    this.cooldown = data.cooldown ?? this.cooldown;
+    this.attackClip = data.attackClip ?? this.attackClip;
+    this.bladeLength = data.bladeLength ?? this.bladeLength;
+    this.activeWindowStart = data.activeWindowStart ?? this.activeWindowStart;
+    this.activeWindowEnd = data.activeWindowEnd ?? this.activeWindowEnd;
+    this.sweepRadius = data.sweepRadius ?? this.sweepRadius;
+    this.lungeSpeed = data.lungeSpeed ?? this.lungeSpeed;
+    this.minLungeDistance = data.minLungeDistance ?? this.minLungeDistance;
+    this.autoAimRange = data.autoAimRange ?? this.autoAimRange;
+    this.autoAimConeAngle = data.autoAimConeAngle ?? this.autoAimConeAngle;
+    this.autoRotateMax = data.autoRotateMax ?? this.autoRotateMax;
+    this.knockbackSpeed = data.knockbackSpeed ?? this.knockbackSpeed;
+    this.loadHitSparks();
+  }
+
+  private loadHitSparks(): void {
+    Loader.parseEntityFromJSON({ prefab: 'effects/hit_sparks.prefab' } as any)
+      .then((parsed) => Loader.loadEntityFromJSON(parsed, undefined, false))
+      .then((entity) => {
+        this.hitSparks = entity.getComponent('particle_system') as ParticleSystemComponent | null;
+      })
+      .catch(() => {});
   }
 
   public update(dt: number): void {
@@ -176,9 +189,12 @@ export class PlayerAttackComponent extends Component {
    * Finds the closest entity with a health component inside the attack cone.
    * Returns both the entity and its horizontal distance from the player.
    */
-  private findAutoAimTarget(ownerPos: vec3, forward: vec3): { entity: Entity; dist: number } | null {
+  private findAutoAimTarget(
+    ownerPos: vec3,
+    forward: vec3,
+  ): { entity: Entity; dist: number } | null {
     const ownerEntity = this.getOwner();
-    const halfAngleCos = Math.cos(((this.autoAimConeAngle * 0.5) * Math.PI) / 180);
+    const halfAngleCos = Math.cos((this.autoAimConeAngle * 0.5 * Math.PI) / 180);
 
     let bestTarget: Entity | null = null;
     let bestDist = Infinity;
@@ -298,14 +314,19 @@ export class PlayerAttackComponent extends Component {
               const d = Math.sqrt(dx * dx + dz * dz);
               if (d > 0.01) {
                 const kcc = entity.getComponent('kcc_movement') as KCCMovement | null;
-                kcc?.applyImpulse(vec3.fromValues(
-                  (dx / d) * this.knockbackSpeed,
-                  0,
-                  (dz / d) * this.knockbackSpeed,
-                ));
+                kcc?.applyImpulse(
+                  vec3.fromValues(
+                    (dx / d) * this.knockbackSpeed,
+                    0,
+                    (dz / d) * this.knockbackSpeed,
+                  ),
+                );
               }
             }
           }
+
+          // Hit sparks at impact point
+          this.hitSparks?.burst(24, pt);
         }
         return true;
       });

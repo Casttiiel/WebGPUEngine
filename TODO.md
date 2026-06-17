@@ -1,20 +1,24 @@
-## Gameplay
+## Pending
 
 Slash effect
+KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima de los enemigos, que se separan entre ellos con fuerzas suaves. El combate mueve enemigos, no el contacto físico. Más fluido para el jugador.
+Ground Combos (Light and Heavy) + input buffer
+Block Movement during combos
+Air combos
 
-A) KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima de los enemigos, que se separan entre ellos con fuerzas suaves. El combate mueve enemigos, no el contacto físico. Más fluido para el jugador.
+## Gameplay
 
-1. Dash
-2. Maintain Gravity
-3. Push Attack
-4. Lift Attack
-5. Mantle
-6. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
+1. Push Attack
+2. Lift Attack
+3. Mantle
+4. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
 
 ## Character & Animation
 
 1. Character animator
 2. Better foot IK foot angle + walking
+3. Motion Warping
+4. Motion Matching
 
 ## AI
 
