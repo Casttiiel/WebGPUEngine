@@ -38,6 +38,7 @@
 
     "health",
     "hit_reaction",
+    "motion_match_recovery",
     "stamina",
     "blood",
     "blood_zone",

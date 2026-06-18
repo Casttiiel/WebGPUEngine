@@ -8,7 +8,7 @@
   {
     "prefab": "characters/dummy_enemy.prefab",
     "components": {
-      "transform": { "position": [0, 0.9, -4] }
+      "transform": { "position": [0, 0.9, 0] }
     }
   },
 

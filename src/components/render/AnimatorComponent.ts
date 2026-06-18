@@ -200,6 +200,11 @@ export class AnimatorComponent extends Component {
   private _rootMotionFirstFrame: boolean = true;
   private _rootMotionDidLoop: boolean = false;
 
+  // Additive bone rotations — applied to localR BEFORE global matrix computation,
+  // completely separate from IK. Used by hit-warp, procedural animation, etc.
+  // Values are Float32Array[4] quaternions (x,y,z,w).
+  private readonly additiveRotations = new Map<number, Float32Array>();
+
   // IK constraints
   private ikConstraints: IkConstraint[] = [];
   private _ikFrozenJoints: Set<number> = new Set();
@@ -596,6 +601,32 @@ export class AnimatorComponent extends Component {
     return this.baseAnimGlobalMats[jointIndex] ?? null;
   }
 
+  // ─── Additive rotation API ───────────────────────────────────────────────────
+
+  /**
+   * Sets an additive rotation on a joint (applied in joint-local space, post-multiply).
+   * pitchDeg = X rotation (forward/back lean), rollDeg = Z rotation (left/right lean).
+   * Replaces any existing additive rotation for this joint.
+   */
+  public setAdditiveRotation(jointName: string, pitchDeg: number, rollDeg: number): void {
+    const idx = this.getJointIndex(jointName);
+    if (idx < 0) return;
+    let arr = this.additiveRotations.get(idx);
+    if (!arr) { arr = new Float32Array(4); this.additiveRotations.set(idx, arr); }
+    const q = quat.create();
+    (quat as any).fromEuler(q, pitchDeg, 0, rollDeg);
+    arr.set(q as unknown as Float32Array);
+  }
+
+  /** Removes the additive rotation for a joint, returning it to its animated pose. */
+  public clearAdditiveRotation(jointName: string): void {
+    const idx = this.getJointIndex(jointName);
+    if (idx >= 0) this.additiveRotations.delete(idx);
+  }
+
+  /** Removes all additive rotations at once. */
+  public clearAllAdditiveRotations(): void { this.additiveRotations.clear(); }
+
   // ─── IK API ─────────────────────────────────────────────────────────────────
 
   public addIkConstraint<T extends IkConstraint>(constraint: T): T {
@@ -685,6 +716,19 @@ export class AnimatorComponent extends Component {
         lS[1] = lS1 + (tS[1]! - lS1) * w;
         lS[2] = lS2 + (tS[2]! - lS2) * w;
         quat.slerp(this.localR[i] as any, this.localR[i] as any, this.tempR[i] as any, w);
+      }
+    }
+
+    // Step 3.5: additive bone rotations (hit warp, procedural overlay)
+    // Post-multiply into localR so the additive rotation is in joint-local space,
+    // cleanly separate from both override layers and IK constraints.
+    if (this.additiveRotations.size > 0) {
+      for (const [idx, addQ] of this.additiveRotations) {
+        if (idx >= this.jointCount) continue;
+        const lr = this.localR[idx]!;
+        const result = quat.mul(quat.create() as any, lr as any, addQ as any) as unknown as Float32Array;
+        quat.normalize(result as any, result as any);
+        lr.set(result);
       }
     }
 

@@ -46,17 +46,54 @@
             "universal_animations.gltf"
           ],
           "states": [
-            { "name": "Idle",  "clip": "Sword_Idle",    "loop": true  },
-            { "name": "Run",   "clip": "Jog_Fwd_Loop",  "loop": true  },
-            { "name": "InAir", "clip": "Jump_Loop",      "loop": true  }
+            {
+              "name": "Idle",
+              "clip": "Sword_Idle",
+              "loop": true
+            },
+            {
+              "name": "Run",
+              "clip": "Jog_Fwd_Loop",
+              "loop": true
+            },
+            {
+              "name": "InAir",
+              "clip": "Jump_Loop",
+              "loop": true
+            }
           ],
           "default": "Idle",
           "transitions": [
-            { "from": "Idle",  "to": "Run",   "condition":      "isMoving", "blendTime": 0.2  },
-            { "from": "Run",   "to": "Idle",  "conditionFalse": "isMoving", "blendTime": 0.3  },
-            { "from": "Idle",  "to": "InAir", "condition":      "isInAir",  "blendTime": 0.15 },
-            { "from": "Run",   "to": "InAir", "condition":      "isInAir",  "blendTime": 0.15 },
-            { "from": "InAir", "to": "Idle",  "conditionFalse": "isInAir",  "blendTime": 0.2  }
+            {
+              "from": "Idle",
+              "to": "Run",
+              "condition": "isMoving",
+              "blendTime": 0.2
+            },
+            {
+              "from": "Run",
+              "to": "Idle",
+              "conditionFalse": "isMoving",
+              "blendTime": 0.3
+            },
+            {
+              "from": "Idle",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Run",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "InAir",
+              "to": "Idle",
+              "conditionFalse": "isInAir",
+              "blendTime": 0.2
+            }
           ]
         },
         "foot_ik": {
@@ -82,7 +119,7 @@
       "position": [
         0,
         0.9,
-        0
+        -4
       ],
       "scale": [
         1,
@@ -152,7 +189,7 @@
     "hit_stop": {},
     "hit_reaction": {},
     "camera_shake": {
-      "positionAmplitude": 0.05,
+      "positionAmplitude": 0.02,
       "frequency": 8,
       "blendInRatio": 0.1,
       "blendOutRatio": 0.5

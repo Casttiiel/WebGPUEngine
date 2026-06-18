@@ -13,7 +13,6 @@ import type { HitStopComponent } from '../HitStopComponent';
 import type { CameraShakeComponent } from '../CameraShakeComponent';
 import type { CameraArmComponent } from '../CameraArmComponent';
 import type { KCCMovement } from '../movement/KCCMovement';
-import type { ShockwavePostProcessComponent } from '../../render/ShockwavePostProcessComponent';
 
 export interface PlayerAttackData {
   damage?: number;
@@ -302,7 +301,7 @@ export class PlayerAttackComponent extends Component {
           // Delay the freeze so the hit-reaction animation can start blending first
           (entity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(10 / 60, 2 / 60);
           (ownerEntity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(6 / 60, 1 / 60);
-          (ownerEntity.getComponent('camera_shake') as CameraShakeComponent | null)?.shake(0.2);
+          //(ownerEntity.getComponent('camera_shake') as CameraShakeComponent | null)?.shake(0.2);
 
           // Knockback: push enemy away from player
           if (this.knockbackSpeed > 0 && this.ownerTransform) {
@@ -328,11 +327,6 @@ export class PlayerAttackComponent extends Component {
 
           // Hit sparks at impact point
           this.hitSparks?.burst(24, pt);
-
-          // Shockwave distortion at impact point
-          const camEntity = Engine.getEntities().getEntityByName('MainCamera');
-          const sw = camEntity?.getComponent('shockwave') as ShockwavePostProcessComponent | null;
-          sw?.spawn([pt[0], pt[1], pt[2]], { speed: 14, maxRadius: 20, intensity: 0.04, thickness: 2.0 });
         }
         return true;
       });

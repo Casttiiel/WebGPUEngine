@@ -51,6 +51,7 @@ import { GrappleTargetComponent } from '../../components/game/GrappleTargetCompo
 import { ChargeTargetComponent } from '../../components/game/ChargeTargetComponent';
 import { CombatDirectorComponent } from '../../components/game/CombatDirectorComponent';
 import { HitReactionComponent } from '../../components/game/HitReactionComponent';
+import { MotionMatchRecoveryComponent } from '../../components/game/MotionMatchRecoveryComponent';
 
 export class Engine {
   private static initialized: boolean = false;
@@ -202,6 +203,7 @@ export class Engine {
     TankMeleeController.registerMsgs();
     CombatDirectorComponent.registerMsgs();
     HitReactionComponent.registerMsgs();
+    MotionMatchRecoveryComponent.registerMsgs();
     // Nuevos componentes con mensajes se añaden aquí:
     // StaminaComponent.registerMsgs();
   }

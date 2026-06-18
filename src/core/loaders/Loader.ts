@@ -83,6 +83,7 @@ import { BloodExplosiveProjectileComponent } from '../../components/game/combat/
 import { MeleeAttackComponent } from '../../components/game/combat/MeleeAttackComponent';
 import { PlayerAttackComponent } from '../../components/game/combat/PlayerAttackComponent';
 import { HitReactionComponent } from '../../components/game/HitReactionComponent';
+import { MotionMatchRecoveryComponent } from '../../components/game/MotionMatchRecoveryComponent';
 import { BoneAttachmentComponent } from '../../components/game/BoneAttachmentComponent';
 import { HitStopComponent } from '../../components/game/HitStopComponent';
 import { CameraShakeComponent } from '../../components/game/CameraShakeComponent';
@@ -446,6 +447,8 @@ export class Loader {
         return new PlayerAttackComponent();
       case 'hit_reaction':
         return new HitReactionComponent();
+      case 'motion_match_recovery':
+        return new MotionMatchRecoveryComponent();
       case 'bone_attachment':
         return new BoneAttachmentComponent();
       case 'hit_stop':
