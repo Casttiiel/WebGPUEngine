@@ -121,6 +121,11 @@ export class HackAndSlashControllerComponent
 
       case CharacterMovementState.ROLLING: {
         const rollVelocity = this.rollSystem.updateRollMovement(dt);
+        // Air roll: freeze vertical so the character holds height during the roll.
+        // Ground roll: preserve vy (-0.5 stick) so slopes are handled correctly.
+        if (!this.movement.isGrounded()) {
+          this.movement.setVerticalVelocity(0);
+        }
         this.movement.setHorizontalVelocity(rollVelocity);
         this.movement.applyViaKCC(dt, this.capsuleCollider, this.characterController);
         break;
@@ -196,10 +201,15 @@ export class HackAndSlashControllerComponent
     const hSpeed = Math.sqrt(hVel[0] ** 2 + hVel[2] ** 2);
 
     let facingDir: vec3 | null = null;
-    const movDir = this.getTargetMovement(this.getInputVector());
-    if (vec3.length(movDir) > 0.01) {
-      facingDir = movDir;
-    } else if (hSpeed > 0.3) {
+    // Facing and movement are locked during the entire roll; only resume when
+    // the roll ends and velocity is back to zero.
+    if (!this.getIsRolling()) {
+      const movDir = this.getTargetMovement(this.getInputVector());
+      if (vec3.length(movDir) > 0.01) {
+        facingDir = movDir;
+      }
+    }
+    if (!facingDir && hSpeed > 0.3) {
       facingDir = vec3.fromValues(hVel[0] / hSpeed, 0, hVel[2] / hSpeed);
     }
 

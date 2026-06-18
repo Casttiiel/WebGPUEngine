@@ -9,7 +9,7 @@ import { GameAction } from '../../../types/GameAction.enum';
  */
 export class RollSystem {
   // Parámetros del roll
-  private rollDuration: number = 0.4;
+  private rollDuration: number = 1.28;
   private rollSpeedMultiplier: number = 1.9;
   private rollCooldown: number = 0.5;
   private rollFallSpeedConversionFactor: number = 0.7;
@@ -57,8 +57,7 @@ export class RollSystem {
 
     const result = vec3.scale(vec3.create(), this.rollDirection, this.rollSpeed);
 
-    // Terminar roll si se acabó la duración o perdimos suelo
-    if (this.rollTimer >= this.rollDuration || !this.controller.getIsGrounded()) {
+    if (this.rollTimer >= this.rollDuration) {
       this.endRoll();
     }
 
@@ -66,11 +65,7 @@ export class RollSystem {
   }
 
   private canStartRoll(): boolean {
-    return (
-      !this.controller.getIsRolling() &&
-      this.controller.getIsGrounded() &&
-      this.rollCooldownTimer <= 0.0
-    );
+    return !this.controller.getIsRolling() && this.rollCooldownTimer <= 0.0;
   }
 
   private startRoll(inputDir?: vec3): void {
@@ -119,15 +114,9 @@ export class RollSystem {
     this.rollTimer = 0.0;
     this.rollCooldownTimer = this.rollCooldown;
 
-    // Transferir velocidad al controller
-    const dir = vec3.normalize(vec3.create(), this.rollDirection);
-    const newVelocity = vec3.scale(vec3.create(), dir, this.initialRollSpeed);
-    this.controller.setHorizontalVelocity(newVelocity);
+    this.controller.setHorizontalVelocity(vec3.create());
+    this.controller.setBoostedSpeed(0.0);
 
-    // Setear boosted speed
-    this.controller.setBoostedSpeed(this.initialRollSpeed);
-
-    // Notificar modifiers
     this.modifiers?.notifyPerfectAction?.();
   }
 

@@ -21,24 +21,13 @@ try {
       ProfilerOverlay.initialize();
 
       let then = 0;
-      let isFirstFrame = false;
       const MAX_DELTA_TIME = 0.1; // Limitar a 100ms (10 FPS mínimo)
 
       // Iniciar el bucle de renderizado
       function frame(now: number) {
         now *= 0.001;
-        let deltaTime = now - then;
+        const deltaTime = Math.min(now - then, MAX_DELTA_TIME);
         then = now;
-
-        // Saltar el primer frame para evitar big deltaTime
-        if (isFirstFrame) {
-          isFirstFrame = false;
-          requestAnimationFrame(frame);
-          return;
-        }
-
-        // Clamp deltaTime para evitar saltos grandes
-        deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
         // Aplicar timeScale (para pausas, slow-motion, etc.)
         const scaledDeltaTime = deltaTime * Time.getTimeScale();
