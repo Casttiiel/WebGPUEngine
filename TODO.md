@@ -1,5 +1,6 @@
 ## Pending
 
+Hit stop again
 Ground Combos (Light and Heavy) + input buffer
 Block Movement during combos
 Roll animation + movement

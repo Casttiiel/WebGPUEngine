@@ -199,6 +199,13 @@ export class AnimatorComponent extends Component {
   private prevRootLocalT: Float32Array = new Float32Array(3);
   private _rootMotionFirstFrame: boolean = true;
   private _rootMotionDidLoop: boolean = false;
+  // 'apply' mode — drives parent entity's KCC directly
+  private _rmKCC: any = null;
+  private _rmKCCSearched: boolean = false;
+  private _rmVelocity: vec3 = vec3.create();
+  // Keeps root joint zeroed during layer fade-out even after mode='none',
+  // preventing the accumulated root translation from snapping back into the mesh.
+  private _rootZeroLingerTime: number = 0;
 
   // Additive bone rotations — applied to localR BEFORE global matrix computation,
   // completely separate from IK. Used by hit-warp, procedural animation, etc.
@@ -323,9 +330,10 @@ export class AnimatorComponent extends Component {
     const state = this.states.get(name);
     if (!state) return;
 
-    const blendTime = instant ? 0 : (this.transitions.find(
-      (t) => t.from === this.currentStateName && t.to === name,
-    )?.blendTime ?? 0.2);
+    const blendTime = instant
+      ? 0
+      : (this.transitions.find((t) => t.from === this.currentStateName && t.to === name)
+          ?.blendTime ?? 0.2);
 
     this.play(state.clipIndex, blendTime);
     this.loop = state.loop;
@@ -337,8 +345,12 @@ export class AnimatorComponent extends Component {
 
   private paused: boolean = false;
 
-  public setPaused(v: boolean): void { this.paused = v; }
-  public isPaused(): boolean { return this.paused; }
+  public setPaused(v: boolean): void {
+    this.paused = v;
+  }
+  public isPaused(): boolean {
+    return this.paused;
+  }
 
   public update(dt: number): void {
     if (this.paused) return; // hit stop: GPU keeps last uploaded pose, time frozen
@@ -410,14 +422,16 @@ export class AnimatorComponent extends Component {
       }
 
       if (!layer.fadingOut) {
-        layer.currentWeight = layer.blendInTime > 0
-          ? Math.min(layer.currentWeight + dt / layer.blendInTime, layer.weight)
-          : layer.weight;
+        layer.currentWeight =
+          layer.blendInTime > 0
+            ? Math.min(layer.currentWeight + dt / layer.blendInTime, layer.weight)
+            : layer.weight;
       } else {
         layer.fadeOutElapsed += dt;
-        layer.currentWeight = layer.fadeOutDuration > 0
-          ? layer.weight * Math.max(1 - layer.fadeOutElapsed / layer.fadeOutDuration, 0)
-          : 0;
+        layer.currentWeight =
+          layer.fadeOutDuration > 0
+            ? layer.weight * Math.max(1 - layer.fadeOutElapsed / layer.fadeOutDuration, 0)
+            : 0;
         if (layer.currentWeight <= 0) {
           this.animLayers.splice(i, 1);
           continue;
@@ -425,7 +439,7 @@ export class AnimatorComponent extends Component {
       }
     }
 
-    this.evaluateAnimation(this.playbackTime);
+    this.evaluateAnimation(this.playbackTime, dt);
     this.skeletalMesh.uploadPose(this.jointPalette);
   }
 
@@ -489,8 +503,10 @@ export class AnimatorComponent extends Component {
       const lower = clipIndexOrName.toLowerCase();
       const idx = this.clips.findIndex((c) => c.name.toLowerCase() === lower);
       if (idx < 0) {
-        console.warn(`[Animator] addLayer: clip "${clipIndexOrName}" not found. Available:`,
-          this.clips.map((c) => `"${c.name}"`).join(', '));
+        console.warn(
+          `[Animator] addLayer: clip "${clipIndexOrName}" not found. Available:`,
+          this.clips.map((c) => `"${c.name}"`).join(', '),
+        );
         return -1;
       }
       clipIndex = idx;
@@ -552,10 +568,26 @@ export class AnimatorComponent extends Component {
     this.rootMotionIncludeY = includeY;
     this._rootMotionFirstFrame = true;
     vec3.set(this.rootMotionDelta, 0, 0, 0);
+    vec3.set(this._rmVelocity, 0, 0, 0);
+    this._rmKCCSearched = false;
+  }
+
+  /**
+   * Keeps the root joint zeroed for `duration` seconds even after setRootMotion('none').
+   * Call this alongside removeLayer() so the accumulated root translation does not
+   * snap back into the mesh while the layer is still blending out.
+   */
+  public keepRootZeroed(duration: number): void {
+    this._rootZeroLingerTime = duration;
   }
 
   public getRootMotionDelta(): Readonly<vec3> {
     return this.rootMotionDelta;
+  }
+
+  /** True while rootMotionMode === 'apply' — lets the controller skip normal deceleration. */
+  public isRootMotionActive(): boolean {
+    return this.rootMotionMode === 'apply';
   }
 
   /** Set a bool parameter used by transitions. */
@@ -568,10 +600,18 @@ export class AnimatorComponent extends Component {
     this.activeTriggers.add(name);
   }
 
-  public pause(): void { this.playing = false; }
-  public resume(): void { this.playing = true; }
-  public setSpeed(s: number): void { this.playbackSpeed = s; }
-  public getClips(): string[] { return this.clips.map((c) => c.name); }
+  public pause(): void {
+    this.playing = false;
+  }
+  public resume(): void {
+    this.playing = true;
+  }
+  public setSpeed(s: number): void {
+    this.playbackSpeed = s;
+  }
+  public getClips(): string[] {
+    return this.clips.map((c) => c.name);
+  }
   public hasClip(name: string): boolean {
     return this.clips.some((c) => c.name.toLowerCase() === name.toLowerCase());
   }
@@ -612,7 +652,10 @@ export class AnimatorComponent extends Component {
     const idx = this.getJointIndex(jointName);
     if (idx < 0) return;
     let arr = this.additiveRotations.get(idx);
-    if (!arr) { arr = new Float32Array(4); this.additiveRotations.set(idx, arr); }
+    if (!arr) {
+      arr = new Float32Array(4);
+      this.additiveRotations.set(idx, arr);
+    }
     const q = quat.create();
     (quat as any).fromEuler(q, pitchDeg, 0, rollDeg);
     arr.set(q as unknown as Float32Array);
@@ -625,7 +668,9 @@ export class AnimatorComponent extends Component {
   }
 
   /** Removes all additive rotations at once. */
-  public clearAllAdditiveRotations(): void { this.additiveRotations.clear(); }
+  public clearAllAdditiveRotations(): void {
+    this.additiveRotations.clear();
+  }
 
   // ─── IK API ─────────────────────────────────────────────────────────────────
 
@@ -672,25 +717,34 @@ export class AnimatorComponent extends Component {
       const { jointIndex, path, times, values, interpolation } = channel;
       if (jointIndex >= this.jointCount) continue;
       if (path === 'translation') sampleVec3(times, values, time, interpolation, outT[jointIndex]!);
-      else if (path === 'rotation') sampleQuat(times, values, time, interpolation, outR[jointIndex]!);
+      else if (path === 'rotation')
+        sampleQuat(times, values, time, interpolation, outR[jointIndex]!);
       else if (path === 'scale') sampleVec3(times, values, time, interpolation, outS[jointIndex]!);
     }
   }
 
-  private evaluateAnimation(time: number): void {
+  private evaluateAnimation(time: number, dt: number = 0): void {
     // Step 1: active clip
     this.evaluateClip(this.activeClipIndex, time, this.localT, this.localR, this.localS);
 
     // Step 2: crossfade blend
     if (this.crossfadeFrom) {
       const alpha = Math.min(this.crossfadeElapsed / this.crossfadeDuration, 1.0);
-      this.evaluateClip(this.crossfadeFrom.clipIndex, this.crossfadeFrom.time, this.tempT, this.tempR, this.tempS);
+      this.evaluateClip(
+        this.crossfadeFrom.clipIndex,
+        this.crossfadeFrom.time,
+        this.tempT,
+        this.tempR,
+        this.tempS,
+      );
       for (let i = 0; i < this.jointCount; i++) {
-        const lT = this.localT[i]!, tT = this.tempT[i]!;
+        const lT = this.localT[i]!,
+          tT = this.tempT[i]!;
         lT[0] = tT[0]! + (lT[0]! - tT[0]!) * alpha;
         lT[1] = tT[1]! + (lT[1]! - tT[1]!) * alpha;
         lT[2] = tT[2]! + (lT[2]! - tT[2]!) * alpha;
-        const lS = this.localS[i]!, tS = this.tempS[i]!;
+        const lS = this.localS[i]!,
+          tS = this.tempS[i]!;
         lS[0] = tS[0]! + (lS[0]! - tS[0]!) * alpha;
         lS[1] = tS[1]! + (lS[1]! - tS[1]!) * alpha;
         lS[2] = tS[2]! + (lS[2]! - tS[2]!) * alpha;
@@ -705,13 +759,19 @@ export class AnimatorComponent extends Component {
       const w = layer.currentWeight;
       for (let i = 0; i < this.jointCount; i++) {
         if (layer.jointMask && !layer.jointMask[i]) continue;
-        const lT = this.localT[i]!, tT = this.tempT[i]!;
-        const lT0 = lT[0]!, lT1 = lT[1]!, lT2 = lT[2]!;
+        const lT = this.localT[i]!,
+          tT = this.tempT[i]!;
+        const lT0 = lT[0]!,
+          lT1 = lT[1]!,
+          lT2 = lT[2]!;
         lT[0] = lT0 + (tT[0]! - lT0) * w;
         lT[1] = lT1 + (tT[1]! - lT1) * w;
         lT[2] = lT2 + (tT[2]! - lT2) * w;
-        const lS = this.localS[i]!, tS = this.tempS[i]!;
-        const lS0 = lS[0]!, lS1 = lS[1]!, lS2 = lS[2]!;
+        const lS = this.localS[i]!,
+          tS = this.tempS[i]!;
+        const lS0 = lS[0]!,
+          lS1 = lS[1]!,
+          lS2 = lS[2]!;
         lS[0] = lS0 + (tS[0]! - lS0) * w;
         lS[1] = lS1 + (tS[1]! - lS1) * w;
         lS[2] = lS2 + (tS[2]! - lS2) * w;
@@ -726,48 +786,74 @@ export class AnimatorComponent extends Component {
       for (const [idx, addQ] of this.additiveRotations) {
         if (idx >= this.jointCount) continue;
         const lr = this.localR[idx]!;
-        const result = quat.mul(quat.create() as any, lr as any, addQ as any) as unknown as Float32Array;
+        const result = quat.mul(
+          quat.create() as any,
+          lr as any,
+          addQ as any,
+        ) as unknown as Float32Array;
         quat.normalize(result as any, result as any);
         lr.set(result);
       }
     }
 
     // Step 4: root motion extraction
-    if (this.rootMotionMode !== 'none' && this.rootJointIndex >= 0) {
-      const rootT = this.localT[this.rootJointIndex]!;
-
-      if (this._rootMotionFirstFrame || this._rootMotionDidLoop) {
-        this.prevRootLocalT.set(rootT);
-        vec3.set(this.rootMotionDelta, 0, 0, 0);
-        this._rootMotionFirstFrame = false;
-        this._rootMotionDidLoop = false;
-      } else {
-        const dx = rootT[0]! - this.prevRootLocalT[0]!;
-        const dy = this.rootMotionIncludeY ? rootT[1]! - this.prevRootLocalT[1]! : 0;
-        const dz = rootT[2]! - this.prevRootLocalT[2]!;
-        const delta = vec3.fromValues(dx, dy, dz);
-        vec3.transformQuat(delta, delta, this.rootPreRotation as unknown as quat);
-        const ownerTransform = (
-          this.getOwner().getComponent('transform') as TransformComponent | null
-        )?.getTransform();
-        if (ownerTransform) {
-          vec3.transformQuat(delta, delta, ownerTransform.getWorldRotation());
+    // Also runs during _rootZeroLingerTime to keep the root joint zeroed
+    // while a layer is blending out, preventing the accumulated translation
+    // from snapping back into the mesh pose.
+    const isExtracting = this.rootMotionMode !== 'none';
+    if (this._rootZeroLingerTime > 0) {
+      this._rootZeroLingerTime = Math.max(0, this._rootZeroLingerTime - dt);
+    }
+    if ((isExtracting || this._rootZeroLingerTime > 0) && this.rootJointIndex >= 0) {
+      if (isExtracting) {
+        const rootT = this.localT[this.rootJointIndex]!;
+        if (this._rootMotionFirstFrame || this._rootMotionDidLoop) {
+          this.prevRootLocalT.set(rootT);
+          vec3.set(this.rootMotionDelta, 0, 0, 0);
+          this._rootMotionFirstFrame = false;
+          this._rootMotionDidLoop = false;
+        } else {
+          const dx = rootT[0]! - this.prevRootLocalT[0]!;
+          const dy = this.rootMotionIncludeY ? rootT[1]! - this.prevRootLocalT[1]! : 0;
+          const dz = rootT[2]! - this.prevRootLocalT[2]!;
+          const delta = vec3.fromValues(dx, dy, dz);
+          vec3.transformQuat(delta, delta, this.rootPreRotation as unknown as quat);
+          const ownerTransform = (
+            this.getOwner().getComponent('transform') as TransformComponent | null
+          )?.getTransform();
+          if (ownerTransform) {
+            vec3.transformQuat(delta, delta, ownerTransform.getWorldRotation());
+          }
+          vec3.copy(this.rootMotionDelta, delta);
+          this.prevRootLocalT.set(rootT);
         }
-        vec3.copy(this.rootMotionDelta, delta);
-        this.prevRootLocalT.set(rootT);
       }
 
+      // Always zero the root joint (extraction or linger) to prevent the
+      // accumulated translation from appearing in the rendered mesh.
       const bp = this.skeleton.bindPoseLocal;
       const bpOff = this.rootJointIndex * 10;
       this.localT[this.rootJointIndex]!.set([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
 
-      if (this.rootMotionMode === 'apply') {
-        const ownerTransform = (
-          this.getOwner().getComponent('transform') as TransformComponent | null
-        )?.getTransform();
-        if (ownerTransform) {
-          const pos = ownerTransform.getLocalPosition();
-          ownerTransform.setLocalPosition(vec3.add(vec3.create(), pos, this.rootMotionDelta));
+      if (this.rootMotionMode === 'apply' && dt > 0) {
+        // Find parent entity's KCC once.
+        if (!this._rmKCCSearched) {
+          const parent = this.getOwner().getParent();
+          this._rmKCC = parent?.getComponent('kcc_movement') ?? null;
+          this._rmKCCSearched = true;
+        }
+
+        if (this._rmKCC) {
+          const hasDelta = this.rootMotionDelta[0] ** 2 + this.rootMotionDelta[2] ** 2 > 1e-8;
+          if (hasDelta) {
+            // New keyframe — update velocity from displacement.
+            this._rmVelocity[0] = this.rootMotionDelta[0] / dt;
+            this._rmVelocity[1] = 0;
+            this._rmVelocity[2] = this.rootMotionDelta[2] / dt;
+          }
+          // Always write (even on zero-delta frames) so the controller's
+          // integrate() sees it as the desired speed and does not decelerate.
+          this._rmKCC.setHorizontalVelocity(this._rmVelocity);
         }
       }
     }
@@ -858,7 +944,12 @@ export class AnimatorComponent extends Component {
       if (this._ikFrozenJoints.has(i)) continue;
       const parentIdx = parents[i]!;
       if (parentIdx >= 0 && !this._ikFrozenJoints.has(parentIdx)) continue;
-      const local = mat4.fromRotationTranslationScale(mat4.create(), this.localR[i] as any, this.localT[i] as any, this.localS[i] as any);
+      const local = mat4.fromRotationTranslationScale(
+        mat4.create(),
+        this.localR[i] as any,
+        this.localT[i] as any,
+        this.localS[i] as any,
+      );
       if (parentIdx < 0) {
         this.globalMats[i] = mat4.mul(mat4.create(), rootPre, local);
       } else {
@@ -881,7 +972,11 @@ export class AnimatorComponent extends Component {
     mat4.getRotation(currentRot as unknown as quat, M as unknown as mat4);
     quat.normalize(currentRot as unknown as quat, currentRot as unknown as quat);
     const fwdLocal = c.forwardAxis ?? [0, 0, 1];
-    const worldFwd = vec3.transformQuat(vec3.create(), fwdLocal as vec3, currentRot as unknown as quat);
+    const worldFwd = vec3.transformQuat(
+      vec3.create(),
+      fwdLocal as vec3,
+      currentRot as unknown as quat,
+    );
     const q = quat.create();
     quat.rotationTo(q as unknown as quat, worldFwd, toTarget);
     if (c.limitAngleDeg !== undefined) {
@@ -889,11 +984,25 @@ export class AnimatorComponent extends Component {
       const w = Math.min(1, Math.abs((q as unknown as Float32Array)[3]!));
       const angle = 2 * Math.acos(w);
       if (angle > limitRad && angle > 0.0001) {
-        quat.slerp(q as unknown as quat, quat.create() as unknown as quat, q as unknown as quat, limitRad / angle);
+        quat.slerp(
+          q as unknown as quat,
+          quat.create() as unknown as quat,
+          q as unknown as quat,
+          limitRad / angle,
+        );
       }
     }
-    quat.slerp(q as unknown as quat, quat.create() as unknown as quat, q as unknown as quat, c.weight);
-    const newRot = quat.mul(quat.create() as unknown as quat, q as unknown as quat, currentRot as unknown as quat);
+    quat.slerp(
+      q as unknown as quat,
+      quat.create() as unknown as quat,
+      q as unknown as quat,
+      c.weight,
+    );
+    const newRot = quat.mul(
+      quat.create() as unknown as quat,
+      q as unknown as quat,
+      currentRot as unknown as quat,
+    );
     quat.normalize(newRot as unknown as quat, newRot as unknown as quat);
     const scale = vec3.create();
     mat4.getScaling(scale, M as unknown as mat4);
@@ -929,25 +1038,48 @@ export class AnimatorComponent extends Component {
     const poleLen = vec3.length(polePerp);
     if (poleLen < 0.0001) vec3.set(polePerp, 0, 1, 0);
     else vec3.scale(polePerp, polePerp, 1 / poleLen);
-    const cosA = Math.max(-1, Math.min(1, (d1 * d1 + clampedDist * clampedDist - d2 * d2) / (2 * d1 * clampedDist)));
+    const cosA = Math.max(
+      -1,
+      Math.min(1, (d1 * d1 + clampedDist * clampedDist - d2 * d2) / (2 * d1 * clampedDist)),
+    );
     const angleA = Math.acos(cosA);
-    const pB_new = vec3.add(vec3.create(), pA, vec3.add(vec3.create(),
-      vec3.scale(vec3.create(), dir, Math.cos(angleA) * d1),
-      vec3.scale(vec3.create(), polePerp, Math.sin(angleA) * d1)));
+    const pB_new = vec3.add(
+      vec3.create(),
+      pA,
+      vec3.add(
+        vec3.create(),
+        vec3.scale(vec3.create(), dir, Math.cos(angleA) * d1),
+        vec3.scale(vec3.create(), polePerp, Math.sin(angleA) * d1),
+      ),
+    );
     const pT_adj = vec3.add(vec3.create(), pA, vec3.scale(vec3.create(), dir, clampedDist));
     const origAB = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pB, pA));
     const newAB = vec3.normalize(vec3.create(), vec3.sub(vec3.create(), pB_new, pA));
     const qRoot = quat.create();
     quat.rotationTo(qRoot as unknown as quat, origAB, newAB);
-    quat.slerp(qRoot as unknown as quat, quat.create() as unknown as quat, qRoot as unknown as quat, c.weight);
+    quat.slerp(
+      qRoot as unknown as quat,
+      quat.create() as unknown as quat,
+      qRoot as unknown as quat,
+      c.weight,
+    );
     const rootRot = quat.create();
     mat4.getRotation(rootRot as unknown as quat, MR as unknown as mat4);
     quat.normalize(rootRot as unknown as quat, rootRot as unknown as quat);
-    const newRootRot = quat.mul(quat.create() as unknown as quat, qRoot as unknown as quat, rootRot as unknown as quat);
+    const newRootRot = quat.mul(
+      quat.create() as unknown as quat,
+      qRoot as unknown as quat,
+      rootRot as unknown as quat,
+    );
     quat.normalize(newRootRot as unknown as quat, newRootRot as unknown as quat);
     const rootScale = vec3.create();
     mat4.getScaling(rootScale, MR as unknown as mat4);
-    mat4.fromRotationTranslationScale(MR as unknown as mat4, newRootRot as unknown as quat, pA, rootScale);
+    mat4.fromRotationTranslationScale(
+      MR as unknown as mat4,
+      newRootRot as unknown as quat,
+      pA,
+      rootScale,
+    );
     this._ikFrozenJoints.add(rootIdx);
     const pB_final = c.weight < 1 ? vec3.lerp(vec3.create(), pB, pB_new, c.weight) : pB_new;
     const pT_final = c.weight < 1 ? vec3.lerp(vec3.create(), pC, pT_adj, c.weight) : pT_adj;
@@ -958,11 +1090,20 @@ export class AnimatorComponent extends Component {
     const midRot = quat.create();
     mat4.getRotation(midRot as unknown as quat, MM as unknown as mat4);
     quat.normalize(midRot as unknown as quat, midRot as unknown as quat);
-    const newMidRot = quat.mul(quat.create() as unknown as quat, qMid as unknown as quat, midRot as unknown as quat);
+    const newMidRot = quat.mul(
+      quat.create() as unknown as quat,
+      qMid as unknown as quat,
+      midRot as unknown as quat,
+    );
     quat.normalize(newMidRot as unknown as quat, newMidRot as unknown as quat);
     const midScale = vec3.create();
     mat4.getScaling(midScale, MM as unknown as mat4);
-    mat4.fromRotationTranslationScale(MM as unknown as mat4, newMidRot as unknown as quat, pB_final, midScale);
+    mat4.fromRotationTranslationScale(
+      MM as unknown as mat4,
+      newMidRot as unknown as quat,
+      pB_final,
+      midScale,
+    );
     this._ikFrozenJoints.add(midIdx);
     void tipIdx;
   }
@@ -978,7 +1119,12 @@ export class AnimatorComponent extends Component {
     mat4.getRotation(rot as unknown as quat, M as unknown as mat4);
     quat.normalize(rot as unknown as quat, rot as unknown as quat);
     if (c.rotationOffset) {
-      const blendedRot = quat.slerp(quat.create() as unknown as quat, quat.create() as unknown as quat, c.rotationOffset as unknown as quat, c.weight);
+      const blendedRot = quat.slerp(
+        quat.create() as unknown as quat,
+        quat.create() as unknown as quat,
+        c.rotationOffset as unknown as quat,
+        c.weight,
+      );
       quat.mul(rot as unknown as quat, rot as unknown as quat, blendedRot as unknown as quat);
       quat.normalize(rot as unknown as quat, rot as unknown as quat);
     }
@@ -1041,7 +1187,18 @@ export class AnimatorComponent extends Component {
         if (!bv) return null;
         const buffer = bufferData[bv.buffer];
         if (!buffer) return null;
-        const componentCount = acc.type === 'SCALAR' ? 1 : acc.type === 'VEC2' ? 2 : acc.type === 'VEC3' ? 3 : acc.type === 'VEC4' ? 4 : acc.type === 'MAT4' ? 16 : 1;
+        const componentCount =
+          acc.type === 'SCALAR'
+            ? 1
+            : acc.type === 'VEC2'
+              ? 2
+              : acc.type === 'VEC3'
+                ? 3
+                : acc.type === 'VEC4'
+                  ? 4
+                  : acc.type === 'MAT4'
+                    ? 16
+                    : 1;
         const byteOffset = (bv.byteOffset ?? 0) + (acc.byteOffset ?? 0);
         const elementBytes = acc.componentType === 5126 ? 4 : 1;
         const totalBytes = acc.count * componentCount * elementBytes;
@@ -1049,7 +1206,8 @@ export class AnimatorComponent extends Component {
           console.warn(`[Animator] accessor ${accIdx} out of bounds, skipping`);
           return null;
         }
-        if (acc.componentType === 5126) return new Float32Array(buffer, byteOffset, acc.count * componentCount);
+        if (acc.componentType === 5126)
+          return new Float32Array(buffer, byteOffset, acc.count * componentCount);
         const out = new Float32Array(acc.count * componentCount);
         const dv = new DataView(buffer, byteOffset);
         for (let i = 0; i < out.length; i++) out[i] = dv.getUint8(i);
@@ -1074,7 +1232,13 @@ export class AnimatorComponent extends Component {
           const animPath = ch.target.path as 'translation' | 'rotation' | 'scale';
           const interp = (sampler.interpolation ?? 'LINEAR') as AnimationChannel['interpolation'];
           if (times.length > 0) duration = Math.max(duration, times[times.length - 1]!);
-          channels.push({ jointIndex, path: animPath, times: new Float32Array(times), values: new Float32Array(values), interpolation: interp });
+          channels.push({
+            jointIndex,
+            path: animPath,
+            times: new Float32Array(times),
+            values: new Float32Array(values),
+            interpolation: interp,
+          });
         }
         const filenameBase = path.replace(/\.[^.]+$/, '');
         const clipName = !anim.name || anim.name === 'mixamo.com' ? filenameBase : anim.name;
@@ -1090,7 +1254,8 @@ export class AnimatorComponent extends Component {
 // ─── Animation sampling helpers ───────────────────────────────────────────────
 
 function findKeyframe(times: Float32Array, t: number): number {
-  let lo = 0, hi = times.length - 2;
+  let lo = 0,
+    hi = times.length - 2;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
     if (times[mid]! <= t) lo = mid;
@@ -1108,10 +1273,17 @@ function sampleVec3(
 ): void {
   const n = times.length;
   if (n === 0) return;
-  if (t <= times[0]!) { out.set(values.subarray(0, 3)); return; }
-  if (t >= times[n - 1]!) { out.set(values.subarray((n - 1) * 3, n * 3)); return; }
+  if (t <= times[0]!) {
+    out.set(values.subarray(0, 3));
+    return;
+  }
+  if (t >= times[n - 1]!) {
+    out.set(values.subarray((n - 1) * 3, n * 3));
+    return;
+  }
   const i = findKeyframe(times, t);
-  const t0 = times[i]!, t1 = times[i + 1]!;
+  const t0 = times[i]!,
+    t1 = times[i + 1]!;
   const alpha = (t - t0) / (t1 - t0);
   if (interp === 'STEP') {
     out.set(values.subarray(i * 3, i * 3 + 3));
@@ -1135,10 +1307,17 @@ function sampleQuat(
 ): void {
   const n = times.length;
   if (n === 0) return;
-  if (t <= times[0]!) { out.set(values.subarray(0, 4)); return; }
-  if (t >= times[n - 1]!) { out.set(values.subarray((n - 1) * 4, n * 4)); return; }
+  if (t <= times[0]!) {
+    out.set(values.subarray(0, 4));
+    return;
+  }
+  if (t >= times[n - 1]!) {
+    out.set(values.subarray((n - 1) * 4, n * 4));
+    return;
+  }
   const i = findKeyframe(times, t);
-  const t0 = times[i]!, t1 = times[i + 1]!;
+  const t0 = times[i]!,
+    t1 = times[i + 1]!;
   const alpha = (t - t0) / (t1 - t0);
   if (interp === 'STEP') {
     out.set(values.subarray(i * 4, i * 4 + 4));

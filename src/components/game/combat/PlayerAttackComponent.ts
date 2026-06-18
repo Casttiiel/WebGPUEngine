@@ -21,16 +21,6 @@ export interface PlayerAttackData {
   activeWindowStart?: number;
   activeWindowEnd?: number;
   sweepRadius?: number;
-  /** Forward speed (m/s) applied at attack start. Skipped when already within minLungeDistance. Default 12. */
-  lungeSpeed?: number;
-  /** Min distance to target required to trigger lunge (metres). Default 1.5. */
-  minLungeDistance?: number;
-  /** Max range of the auto-aim sphere overlap (metres). Default 4. */
-  autoAimRange?: number;
-  /** Full cone angle for auto-aim (degrees). Default 60. */
-  autoAimConeAngle?: number;
-  /** Maximum camera-arm yaw rotation toward the auto-aim target (degrees). Default 15. */
-  autoRotateMax?: number;
   /** Horizontal impulse speed (m/s) applied to the enemy on hit. Default 5. */
   knockbackSpeed?: number;
 }
@@ -39,16 +29,11 @@ export class PlayerAttackComponent extends Component {
   // ── Config ─────────────────────────────────────────────────────────────────
   private damage: number = 20;
   private cooldown: number = 0.8;
-  private attackClip: string = 'Sword_Attack_Standing';
+  private attackClip: string = 'Sword_Attack_RM';
   private bladeLength: number = 0.65;
   private activeWindowStart: number = 0.2;
   private activeWindowEnd: number = 0.6;
   private sweepRadius: number = 0.15;
-  private lungeSpeed: number = 12;
-  private minLungeDistance: number = 1.5;
-  private autoAimRange: number = 4.0;
-  private autoAimConeAngle: number = 60;
-  private autoRotateMax: number = 30;
   private knockbackSpeed: number = 2;
 
   // ── Runtime state ──────────────────────────────────────────────────────────
@@ -62,7 +47,6 @@ export class PlayerAttackComponent extends Component {
   private animator: AnimatorComponent | null = null;
   private meshTransform: TransformComponent | null = null;
   private ownerTransform: TransformComponent | null = null;
-  private movement: KCCMovement | null = null;
   private trail: TrailRendererComponent | null = null;
   private hitSparks: ParticleSystemComponent | null = null;
   private handJointIndex: number = -1;
@@ -78,11 +62,6 @@ export class PlayerAttackComponent extends Component {
     this.activeWindowStart = data.activeWindowStart ?? this.activeWindowStart;
     this.activeWindowEnd = data.activeWindowEnd ?? this.activeWindowEnd;
     this.sweepRadius = data.sweepRadius ?? this.sweepRadius;
-    this.lungeSpeed = data.lungeSpeed ?? this.lungeSpeed;
-    this.minLungeDistance = data.minLungeDistance ?? this.minLungeDistance;
-    this.autoAimRange = data.autoAimRange ?? this.autoAimRange;
-    this.autoAimConeAngle = data.autoAimConeAngle ?? this.autoAimConeAngle;
-    this.autoRotateMax = data.autoRotateMax ?? this.autoRotateMax;
     this.knockbackSpeed = data.knockbackSpeed ?? this.knockbackSpeed;
     this.loadHitSparks();
   }
@@ -111,6 +90,10 @@ export class PlayerAttackComponent extends Component {
     }
   }
 
+  public isAttacking(): boolean {
+    return this.attackTimer >= 0;
+  }
+
   // ── Attack lifecycle ───────────────────────────────────────────────────────
 
   private startAttack(): void {
@@ -129,34 +112,7 @@ export class PlayerAttackComponent extends Component {
     this.cooldownTimer = this.cooldown;
     this.trail?.reset();
 
-    // ── Auto-aim + conditional lunge ──────────────────────────────────────────
-    const ownerPos = this.ownerTransform.getTransform().getWorldPosition();
-    const worldMat = this.ownerTransform.getTransform().getWorldMatrix();
-    const forward = vec3.normalize(vec3.create(), [worldMat[8]!, 0, worldMat[10]!]);
-
-    let lungeDir = vec3.clone(forward);
-    let shouldLunge = true;
-
-    if (this.autoAimRange > 0) {
-      const aimResult = this.findAutoAimTarget(ownerPos, forward);
-      if (aimResult) {
-        const delta = this.computeYawDelta(ownerPos, forward, aimResult.entity);
-        if (delta !== 0) {
-          // Rotate the lunge direction toward the target without rotating the camera.
-          const rad = (delta * Math.PI) / 180;
-          const c = Math.cos(rad);
-          const s = Math.sin(rad);
-          lungeDir[0] = forward[0] * c + forward[2] * s;
-          lungeDir[2] = -forward[0] * s + forward[2] * c;
-        }
-        // Skip lunge when already within melee range — lunging through the enemy looks wrong.
-        if (aimResult.dist < this.minLungeDistance) shouldLunge = false;
-      }
-    }
-
-    if (shouldLunge && this.lungeSpeed > 0 && this.movement) {
-      this.movement.setHorizontalVelocity(vec3.scale(vec3.create(), lungeDir, this.lungeSpeed));
-    }
+    this.animator.setRootMotion('apply');
   }
 
   private tickSwing(): void {
@@ -174,82 +130,18 @@ export class PlayerAttackComponent extends Component {
     }
 
     if (this.attackTimer > this.activeWindowEnd + 0.3) {
-      if (this.attackLayerId >= 0) this.animator?.removeLayer(this.attackLayerId, 0.15);
+      const fadeDuration = 0.15;
+      if (this.attackLayerId >= 0) this.animator?.removeLayer(this.attackLayerId, fadeDuration);
+      this.animator?.setRootMotion('none');
+      // Keep root joint zeroed for the layer fade duration so the accumulated
+      // root translation doesn't snap back into the mesh while it blends out.
+      this.animator?.keepRootZeroed(fadeDuration);
       this.attackTimer = -1;
       this.attackLayerId = -1;
     }
   }
 
   // ── Auto-aim helpers ───────────────────────────────────────────────────────
-
-  /**
-   * Finds the closest entity with a health component inside the attack cone.
-   * Returns both the entity and its horizontal distance from the player.
-   */
-  private findAutoAimTarget(
-    ownerPos: vec3,
-    forward: vec3,
-  ): { entity: Entity; dist: number } | null {
-    const ownerEntity = this.getOwner();
-    const halfAngleCos = Math.cos((this.autoAimConeAngle * 0.5 * Math.PI) / 180);
-
-    let bestTarget: Entity | null = null;
-    let bestDist = Infinity;
-
-    Engine.getPhysics().overlapSphere(ownerPos, this.autoAimRange, (entityId) => {
-      const entity = Engine.getEntities().getEntityById(entityId);
-      if (!entity || entity === ownerEntity) return true;
-      if (!entity.getComponent('health')) return true;
-
-      const tc = entity.getComponent('transform') as TransformComponent | null;
-      if (!tc) return true;
-
-      const targetPos = tc.getTransform().getWorldPosition();
-      const dx = targetPos[0] - ownerPos[0];
-      const dz = targetPos[2] - ownerPos[2];
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < 0.01) return true;
-
-      const dot = forward[0] * (dx / dist) + forward[2] * (dz / dist);
-      if (dot < halfAngleCos) return true;
-
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestTarget = entity;
-      }
-      return true;
-    });
-
-    return bestTarget ? { entity: bestTarget, dist: bestDist } : null;
-  }
-
-  /**
-   * Returns the signed yaw delta (degrees) needed to rotate the player toward
-   * `target`, clamped to ±autoRotateMax.
-   * Positive = clockwise from above (rightward).
-   */
-  private computeYawDelta(ownerPos: vec3, forward: vec3, target: Entity): number {
-    const tc = target.getComponent('transform') as TransformComponent | null;
-    if (!tc) return 0;
-
-    const targetPos = tc.getTransform().getWorldPosition();
-    const dx = targetPos[0] - ownerPos[0];
-    const dz = targetPos[2] - ownerPos[2];
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    if (dist < 0.01) return 0;
-
-    const dirX = dx / dist;
-    const dirZ = dz / dist;
-
-    // Cross product Y component: positive → target is CCW from forward (left)
-    //                             negative → target is CW from forward (right)
-    // Negate so that positive delta = clockwise = rightward addYaw
-    const crossY = forward[0] * dirZ - forward[2] * dirX;
-    const dot = forward[0] * dirX + forward[2] * dirZ;
-    const angleDeg = Math.atan2(-crossY, dot) * (180 / Math.PI);
-
-    return Math.max(-this.autoRotateMax, Math.min(this.autoRotateMax, angleDeg));
-  }
 
   // ── Blade position ─────────────────────────────────────────────────────────
 
@@ -338,7 +230,6 @@ export class PlayerAttackComponent extends Component {
 
     const owner = this.getOwner();
     this.ownerTransform = owner.getComponent('transform') as TransformComponent | null;
-    this.movement = owner.getComponent('kcc_movement') as KCCMovement | null;
 
     for (const child of owner.getChildren()) {
       const anim = child.getComponent('animator') as AnimatorComponent | null;

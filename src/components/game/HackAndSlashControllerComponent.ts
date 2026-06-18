@@ -158,13 +158,20 @@ export class HackAndSlashControllerComponent
 
         this.hoverSystem.update(dt);
 
-        const desired = inputDisabled
-          ? vec3.create()
-          : vec3.scale(
-              vec3.create(),
-              this.getTargetMovement(this.getInputVector()),
-              this.movement.getMaxSpeed(),
-            );
+        let desired: vec3;
+        if (this.animator?.isRootMotionActive?.()) {
+          // AnimatorComponent already called setHorizontalVelocity on the KCC.
+          // Pass current velocity as desired so integrate() does not decelerate it.
+          desired = this.movement.getHorizontalVelocity();
+        } else if (inputDisabled) {
+          desired = vec3.create();
+        } else {
+          desired = vec3.scale(
+            vec3.create(),
+            this.getTargetMovement(this.getInputVector()),
+            this.movement.getMaxSpeed(),
+          );
+        }
 
         this.movement.integrate(dt, desired);
         this.movement.applyViaKCC(dt, this.capsuleCollider, this.characterController);
