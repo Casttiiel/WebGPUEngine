@@ -17,8 +17,17 @@ export interface FootIKData {
 
   /** How far above the animated foot the raycast starts (default 0.3 m). */
   raycastUpOffset?: number;
-  /** How far below the animated foot the raycast searches (default 0.5 m). */
+  /** How far below the animated foot the raycast searches (default 0.8 m). */
   raycastMaxDown?: number;
+  /**
+   * How far above the capsule bottom the foot must be (in addition to ankleHeight)
+   * before the foot is treated as "in swing" and IK is skipped (default 0.22 m).
+   * Using capsule-relative height keeps the filter calibrated on slopes — on a
+   * downward ramp the capsule descends with the character so the threshold adjusts
+   * automatically. Falls back to a fixed ground-contact threshold when no capsule
+   * is found.
+   */
+  swingLiftThreshold?: number;
 
   /**
    * Height of the ankle joint above the foot sole in the bind pose (metres).
@@ -62,7 +71,8 @@ export class FootIKComponent extends Component {
 
   private ankleHeight: number = 0.08;
   private raycastUpOffset: number = 0.3;
-  private raycastMaxDown: number = 0.5;
+  private raycastMaxDown: number = 0.8;
+  private swingLiftThreshold: number = 0.22;
   private footLerpSpeed: number = 12;
   private pelvisLerpSpeed: number = 8;
   private ikWeight: number = 1.0;
@@ -75,7 +85,7 @@ export class FootIKComponent extends Component {
   private leftYOffset: number = 0;
   private rightYOffset: number = 0;
   private pelvisYOffset: number = 0;
-  private initialized: boolean = false;
+  private currentIkWeight: number = 0;
 
   // ── Debug (read-only, exposed to renderInMenu via .listen()) ──────────────────
   public dbgLeftRaw: number = 0;
@@ -103,6 +113,7 @@ export class FootIKComponent extends Component {
     if (data.ankleHeight !== undefined) this.ankleHeight = data.ankleHeight;
     if (data.raycastUpOffset !== undefined) this.raycastUpOffset = data.raycastUpOffset;
     if (data.raycastMaxDown !== undefined) this.raycastMaxDown = data.raycastMaxDown;
+    if (data.swingLiftThreshold !== undefined) this.swingLiftThreshold = data.swingLiftThreshold;
     if (data.footLerpSpeed !== undefined) this.footLerpSpeed = data.footLerpSpeed;
     if (data.pelvisLerpSpeed !== undefined) this.pelvisLerpSpeed = data.pelvisLerpSpeed;
     if (data.ikWeight !== undefined) this.ikWeight = data.ikWeight;
@@ -113,83 +124,115 @@ export class FootIKComponent extends Component {
   }
 
   public update(dt: number): void {
-    return;
     if (!this.animator) return;
     if (!this.leftConstraint && !this.tryCreateConstraints()) return;
 
     const transform = this.getOwner().getComponent('transform') as TransformComponent | null;
     if (!transform) return;
 
-    // Is In Air check: skip IK and fade offsets toward 0 when not grounded.
-    // The controller lives on the parent entity; try owner first as fallback.
+    // ── Grounded state ────────────────────────────────────────────────────────
     const controllerEntity = this.getOwner().getParent() ?? this.getOwner();
     const controller =
       (controllerEntity.getComponent('player_controller') as any) ??
       (this.getOwner().getComponent('player_controller') as any);
-    if (controller && controller.getIsGrounded?.() === false) {
-      const worldScaleY0 = (transform.getTransform().getWorldScale() as vec3)[1];
-      const invScaleY0 = worldScaleY0 > 0 ? 1.0 / worldScaleY0 : 1.0;
-      const fadeK = Math.max(0, 1 - dt * this.footLerpSpeed);
-      this.leftYOffset *= fadeK;
-      this.rightYOffset *= fadeK;
-      this.pelvisYOffset *= Math.max(0, 1 - dt * this.pelvisLerpSpeed);
-      this.animator.setPreIkBoneOffset(
-        this.pelvis,
-        vec3.fromValues(0, this.pelvisYOffset * invScaleY0, 0),
-      );
-      const lm = this.getJointModelPos(this.animator.getJointIndex(this.leftFoot));
-      const rm = this.getJointModelPos(this.animator.getJointIndex(this.rightFoot));
-      if (lm) vec3.copy(this.leftConstraint!.target, lm);
-      if (rm) vec3.copy(this.rightConstraint!.target, rm);
-      return;
-    }
+    const isGrounded = !controller || controller.getIsGrounded?.() !== false;
 
-    // Use the full world matrix (includes scale) so foot world positions are correct
-    // even when the character is imported at a non-unit scale (e.g. Mixamo at 0.01).
+    // ── IK weight: fade to 0 in the air so animation drives legs fully ────────
+    // Fade out fast (15/s) to avoid stretched legs on jump; fade in medium (8/s).
+    const targetWeight = isGrounded ? this.ikWeight : 0;
+    this.currentIkWeight +=
+      (targetWeight - this.currentIkWeight) * Math.min(1, dt * (isGrounded ? 8 : 15));
+    this.leftConstraint!.weight = this.currentIkWeight;
+    this.rightConstraint!.weight = this.currentIkWeight;
+
     const worldMat = transform.getTransform().getWorldMatrix() as mat4;
-
     const parent = this.getOwner().getParent();
     const capsuleBody: RAPIER.RigidBody | undefined =
       (parent?.getComponent('capsule_collider') as any)?.getRigidBody?.() ?? undefined;
 
     const leftFootIdx = this.animator.getJointIndex(this.leftFoot);
     const rightFootIdx = this.animator.getJointIndex(this.rightFoot);
-
-    // Base animation foot positions (pre-IK snapshot from this frame's animation eval).
-    // These are used for raycasts and delta computation — never post-IK positions,
-    // which would create a feedback loop where the corrected foot looks "already correct".
     const leftBaseWorld = this.getJointBaseAnimWorldPos(leftFootIdx, worldMat);
     const rightBaseWorld = this.getJointBaseAnimWorldPos(rightFootIdx, worldMat);
     const leftAnimModel = this.getJointBaseAnimModelPos(leftFootIdx);
     const rightAnimModel = this.getJointBaseAnimModelPos(rightFootIdx);
     if (!leftBaseWorld || !rightBaseWorld || !leftAnimModel || !rightAnimModel) return;
 
-    if (!this.initialized) {
-      this.leftConstraint!.weight = this.ikWeight;
-      this.rightConstraint!.weight = this.ikWeight;
-      this.initialized = true;
-    }
-
     const footAlpha = Math.min(1.0, dt * this.footLerpSpeed);
     const pelvisAlpha = Math.min(1.0, dt * this.pelvisLerpSpeed);
 
-    // ── 1. Raycast each foot from BASE animation position → target world Y ────
-    // No hit = swing phase → target = base anim Y → offset decays to 0 naturally.
-    const leftGroundY = this.castGroundY(leftBaseWorld, capsuleBody);
-    const rightGroundY = this.castGroundY(rightBaseWorld, capsuleBody);
+    // Skip raycasts when airborne — offsets will lerp toward 0 on their own.
+    const leftGroundY = isGrounded ? this.castGroundY(leftBaseWorld, capsuleBody) : null;
+    const rightGroundY = isGrounded ? this.castGroundY(rightBaseWorld, capsuleBody) : null;
 
-    const leftTargetWorldY =
-      leftGroundY !== null ? leftGroundY + this.ankleHeight : leftBaseWorld[1];
-    const rightTargetWorldY =
-      rightGroundY !== null ? rightGroundY + this.ankleHeight : rightBaseWorld[1];
+    // ── Swing-phase filter ────────────────────────────────────────────────────
+    // Determine whether each foot is planted or in swing so we don't pull it
+    // down while the animation lifts it.
+    //
+    // Capsule-relative mode (preferred): the foot is in swing when it is more
+    // than (swingLiftThreshold + ankleHeight) above the capsule bottom.  Because
+    // the capsule follows the character down a slope, this threshold self-adjusts
+    // on ramps — a foot resting on a steep downward slope is still only ~ankleHeight
+    // above the capsule bottom and will correctly receive IK.
+    //
+    // Fallback (no capsule): fixed threshold above the raycast hit point.
+    const capsuleComp = parent?.getComponent('capsule_collider') as any;
+    const capsuleBottomY: number | null =
+      capsuleBody && capsuleComp?.getCapsuleHeight
+        ? (capsuleBody.translation().y as number) - (capsuleComp.getCapsuleHeight() as number) / 2
+        : null;
 
-    // ── 2. Delta from base animation position to target ───────────────────────
-    const leftRaw = leftTargetWorldY - leftBaseWorld[1];
-    const rightRaw = rightTargetWorldY - rightBaseWorld[1];
+    const swingCutoff = this.swingLiftThreshold + this.ankleHeight;
 
-    // Smooth the corrections over time (avoids snapping on uneven terrain)
+    const isLeftSwing =
+      leftGroundY === null ||
+      (capsuleBottomY !== null
+        ? leftBaseWorld[1] - capsuleBottomY > swingCutoff
+        : leftBaseWorld[1] - (leftGroundY + this.ankleHeight) > this.swingLiftThreshold);
+
+    const isRightSwing =
+      rightGroundY === null ||
+      (capsuleBottomY !== null
+        ? rightBaseWorld[1] - capsuleBottomY > swingCutoff
+        : rightBaseWorld[1] - (rightGroundY + this.ankleHeight) > this.swingLiftThreshold);
+
+    const leftRaw = isLeftSwing ? 0 : leftGroundY! + this.ankleHeight - leftBaseWorld[1];
+    const rightRaw = isRightSwing ? 0 : rightGroundY! + this.ankleHeight - rightBaseWorld[1];
+
     this.leftYOffset += (leftRaw - this.leftYOffset) * footAlpha;
     this.rightYOffset += (rightRaw - this.rightYOffset) * footAlpha;
+
+    // ── Pelvis adjustment ─────────────────────────────────────────────────────
+    const worldScaleY = (transform.getTransform().getWorldScale() as vec3)[1];
+    const invScaleY = worldScaleY > 0 ? 1.0 / worldScaleY : 1.0;
+
+    const pelvisTarget = Math.min(this.leftYOffset, this.rightYOffset, 0);
+    // Rise at 25 % of drop speed — prevents the pelvis from bobbing each stride
+    // cycle as feet alternate between planted and swing.
+    const pelvisAlphaEffective =
+      pelvisTarget > this.pelvisYOffset
+        ? Math.min(1.0, dt * this.pelvisLerpSpeed * 0.25)
+        : pelvisAlpha;
+    this.pelvisYOffset += (pelvisTarget - this.pelvisYOffset) * pelvisAlphaEffective;
+
+    this.animator.setPreIkBoneOffset(
+      this.pelvis,
+      vec3.fromValues(0, this.pelvisYOffset * invScaleY, 0),
+    );
+
+    // ── IK targets in model space ─────────────────────────────────────────────
+    vec3.set(
+      this.leftConstraint!.target,
+      leftAnimModel[0]!,
+      leftAnimModel[1]! + this.leftYOffset * invScaleY,
+      leftAnimModel[2]!,
+    );
+    vec3.set(
+      this.rightConstraint!.target,
+      rightAnimModel[0]!,
+      rightAnimModel[1]! + this.rightYOffset * invScaleY,
+      rightAnimModel[2]!,
+    );
 
     // ── Debug ─────────────────────────────────────────────────────────────────
     this.dbgLeftGroundY = leftGroundY ?? -999;
@@ -205,41 +248,9 @@ export class FootIKComponent extends Component {
       console.log(
         `[FootIK] L ground=${(leftGroundY ?? -999).toFixed(3)} baseY=${leftBaseWorld[1].toFixed(3)} raw=${leftRaw.toFixed(3)} off=${this.leftYOffset.toFixed(3)}` +
           ` | R ground=${(rightGroundY ?? -999).toFixed(3)} baseY=${rightBaseWorld[1].toFixed(3)} raw=${rightRaw.toFixed(3)} off=${this.rightYOffset.toFixed(3)}` +
-          ` | pelvis=${this.pelvisYOffset.toFixed(3)}`,
+          ` | pelvis=${this.pelvisYOffset.toFixed(3)} weight=${this.currentIkWeight.toFixed(3)}`,
       );
     }
-
-    // ── 3. Lower the pelvis so the downward leg can reach ─────────────────────
-    // World-space offsets must be converted to model space before being applied
-    // to bone matrices. The character may be imported at a non-unit scale (e.g.
-    // Mixamo at 0.01: model units are cm, world units are m). Without dividing
-    // by worldScale a -0.2 m correction becomes -0.2 cm — the mesh never moves.
-    const worldScaleY = (transform.getTransform().getWorldScale() as vec3)[1];
-    const invScaleY = worldScaleY > 0 ? 1.0 / worldScaleY : 1.0;
-
-    const pelvisTarget = Math.min(this.leftYOffset, this.rightYOffset, 0);
-    this.pelvisYOffset += (pelvisTarget - this.pelvisYOffset) * pelvisAlpha;
-    // pelvisYOffset is in world metres → convert to model space before applying
-    this.animator.setPreIkBoneOffset(
-      this.pelvis,
-      vec3.fromValues(0, this.pelvisYOffset * invScaleY, 0),
-    );
-
-    // ── 4. IK targets in model space ──────────────────────────────────────────
-    // Same scale conversion: leftYOffset/rightYOffset are world-space deltas,
-    // the IK constraint target is read in model space.
-    vec3.set(
-      this.leftConstraint!.target,
-      leftAnimModel[0]!,
-      leftAnimModel[1]! + this.leftYOffset * invScaleY,
-      leftAnimModel[2]!,
-    );
-    vec3.set(
-      this.rightConstraint!.target,
-      rightAnimModel[0]!,
-      rightAnimModel[1]! + this.rightYOffset * invScaleY,
-      rightAnimModel[2]!,
-    );
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
@@ -286,13 +297,6 @@ export class FootIKComponent extends Component {
     return vec3.fromValues(M[12]!, M[13]!, M[14]!);
   }
 
-  private getJointModelPos(jointIdx: number): vec3 | null {
-    if (jointIdx < 0) return null;
-    const M = this.animator!.getJointModelMatrix(jointIdx);
-    if (!M) return null;
-    return vec3.fromValues(M[12]!, M[13]!, M[14]!);
-  }
-
   private castGroundY(footWorld: vec3, excludeBody?: RAPIER.RigidBody): number | null {
     const physics = Engine.getPhysics();
     if (!physics) return null;
@@ -330,9 +334,10 @@ export class FootIKComponent extends Component {
     // Tweakable params
     f.add(this, 'ankleHeight', 0, 0.3, 0.001).name('Ankle height (m)');
     f.add(this, 'ikWeight', 0, 1, 0.01).name('IK weight');
+    f.add(this, 'swingLiftThreshold', 0.05, 0.6, 0.01).name('Swing lift (m)');
     f.add(this, 'footLerpSpeed', 1, 30, 1).name('Foot smooth');
     f.add(this, 'pelvisLerpSpeed', 1, 20, 1).name('Pelvis smooth');
-    f.add(this, 'raycastMaxDown', 0.05, 1.5, 0.01).name('Ray max down (m)');
+    f.add(this, 'raycastMaxDown', 0.05, 2.0, 0.01).name('Ray max down (m)');
     f.add(this, 'logToConsole').name('Log to console');
 
     // Live read-only debug values (auto-refresh via .listen())

@@ -3,9 +3,9 @@
 Ground Combos (Light and Heavy) + input buffer
 Block Movement during combos
 Roll animation + movement
+KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima de los enemigos, que se separan entre ellos con fuerzas suaves. El combate mueve enemigos, no el contacto físico.
 Air combos
 Slash effect
-KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima de los enemigos, que se separan entre ellos con fuerzas suaves. El combate mueve enemigos, no el contacto físico. Más fluido para el jugador.
 
 ## Gameplay
 
