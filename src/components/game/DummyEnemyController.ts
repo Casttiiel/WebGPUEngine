@@ -26,8 +26,8 @@ export class DummyEnemyController extends Component implements IKickable {
   /** Velocity integration, gravity, air drag, and KCC application. */
   private movement!: KCCMovement;
 
-  // Throttle ground checks to ~20 Hz
-  private groundTimer: number = 0;
+  // Throttle ground checks to ~20 Hz; initialize at threshold to fire on frame 1.
+  private groundTimer: number = 0.05;
 
   public async load(): Promise<void> {
     this.capsuleCollider = this.getOwner().getComponent(

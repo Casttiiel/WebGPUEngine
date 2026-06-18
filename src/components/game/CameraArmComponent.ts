@@ -316,19 +316,26 @@ export class CameraArmComponent extends Component {
 
     // ── Camera shake offset (arm-local right/up space) ─────────────────────
     const shakeComp = this.getOwner().getComponent('camera_shake') as CameraShakeComponent | null;
-    if (shakeComp?.isShaking()) {
+    if (shakeComp?.isActive()) {
+      const worldUp = vec3.fromValues(0, 1, 0);
+      let shakeRight = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), worldUp, armDir));
+      if (vec3.length(shakeRight) < 0.001) vec3.set(shakeRight, 1, 0, 0);
+      const shakeUp = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), armDir, shakeRight));
+
+      // Burst shake — screen-space X/Y from getOffset()
       const off = shakeComp.getOffset();
-      if (off[0] !== 0 || off[1] !== 0) {
-        const worldUp = vec3.fromValues(0, 1, 0);
-        let shakeRight = vec3.normalize(vec3.create(), vec3.cross(vec3.create(), worldUp, armDir));
-        if (vec3.length(shakeRight) < 0.001) vec3.set(shakeRight, 1, 0, 0);
-        const shakeUp = vec3.normalize(
-          vec3.create(),
-          vec3.cross(vec3.create(), armDir, shakeRight),
-        );
+      let dx = off[0];
+      let dy = off[1];
+
+      // Directional punch — projected onto camera axes at apply time
+      const [px, py] = shakeComp.getPunchContribution(shakeRight, shakeUp);
+      dx += px;
+      dy += py;
+
+      if (dx !== 0 || dy !== 0) {
         const shaken = vec3.clone(finalCamPos);
-        vec3.scaleAndAdd(shaken, shaken, shakeRight, off[0]);
-        vec3.scaleAndAdd(shaken, shaken, shakeUp, off[1]);
+        vec3.scaleAndAdd(shaken, shaken, shakeRight, dx);
+        vec3.scaleAndAdd(shaken, shaken, shakeUp, dy);
         finalCamPos = shaken;
       }
     }

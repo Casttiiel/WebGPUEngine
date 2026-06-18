@@ -5,6 +5,7 @@ import { MsgType } from '../../types/MsgType.enum';
 import { IMsg, TMsgOnDamaged } from '../../core/ecs/Msg';
 import { AnimatorComponent } from '../render/AnimatorComponent';
 import { TransformComponent } from '../core/TransformComponent';
+import { HitStopComponent } from './HitStopComponent';
 
 // ── Bone warp configuration ───────────────────────────────────────────────────
 
@@ -91,6 +92,8 @@ export class HitReactionComponent extends Component {
   private bones: WarpBoneState[] = [];
   private animator: AnimatorComponent | null = null;
   private animatorFound: boolean = false;
+  private hitStop: HitStopComponent | null = null;
+  private hitStopFound: boolean = false;
   private _editorFolder: any = null;
 
   // ── Registration ─────────────────────────────────────────────────────────────
@@ -120,8 +123,10 @@ export class HitReactionComponent extends Component {
 
   public update(dt: number): void {
     if (this.cooldownTimer > 0) this.cooldownTimer -= dt;
-    this.time += dt;
     this.findAnimator();
+    this.findHitStop();
+    if (this.hitStop?.isFrozen()) return;
+    this.time += dt;
     this.tickWarp(dt);
   }
 
@@ -236,6 +241,12 @@ export class HitReactionComponent extends Component {
       rightDot: vec3.dot(toAttacker, myTc.getTransform().getRight()),
       forwardDot: vec3.dot(toAttacker, myTc.getTransform().getFront()),
     };
+  }
+
+  private findHitStop(): void {
+    if (this.hitStopFound) return;
+    this.hitStopFound = true;
+    this.hitStop = this.getOwner().getComponent('hit_stop') as HitStopComponent | null;
   }
 
   private findAnimator(): void {

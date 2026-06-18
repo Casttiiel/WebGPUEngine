@@ -189,7 +189,7 @@
     "hit_stop": {},
     "hit_reaction": {},
     "camera_shake": {
-      "positionAmplitude": 0.02,
+      "positionAmplitude": 0.06,
       "frequency": 8,
       "blendInRatio": 0.1,
       "blendOutRatio": 0.5

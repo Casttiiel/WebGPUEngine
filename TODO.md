@@ -1,6 +1,6 @@
 ## Pending
 
-Motion Wrapping hit reactions
+Enemigo traspasa el suelo al inicio del juego
 Motion Matching Hit rec
 Ground Combos (Light and Heavy) + input buffer
 Block Movement during combos

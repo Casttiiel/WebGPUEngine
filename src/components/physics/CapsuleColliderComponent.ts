@@ -103,16 +103,20 @@ export class CapsuleColliderComponent extends ColliderComponent {
 
     const pos = this.rigidBody.translation();
 
-    // Raycast desde el suelo de la cápsula hacia abajo
+    // Start the ray 5 cm above the capsule bottom (inside the capsule) so RAPIER
+    // reliably detects a floor at exactly the capsule's resting position.
+    // Casting from the exact boundary (pos.y - height/2) can return null when the
+    // ray origin coincides with the top face of a static box at distance=0.
+    const skinOffset = 0.05;
     const ray = new RAPIER.Ray(
-      { x: pos.x, y: pos.y - this.capsuleHeight / 2.0, z: pos.z },
+      { x: pos.x, y: pos.y - this.capsuleHeight / 2.0 + skinOffset, z: pos.z },
       { x: 0, y: -1, z: 0 },
     );
 
     // Excluir el propio collider del raycast
     const hit = physics.getWorld().castRayAndGetNormal(
       ray,
-      castDistance,
+      castDistance + skinOffset,
       true, // solid
       QueryFilterFlags.EXCLUDE_SENSORS,
       undefined, // sin filtro de grupos

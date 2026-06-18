@@ -11,7 +11,6 @@ import { Loader } from '../../../core/loaders/Loader';
 import { Msg } from '../../../core/ecs/Msg';
 import type { HitStopComponent } from '../HitStopComponent';
 import type { CameraShakeComponent } from '../CameraShakeComponent';
-import type { CameraArmComponent } from '../CameraArmComponent';
 import type { KCCMovement } from '../movement/KCCMovement';
 
 export interface PlayerAttackData {
@@ -143,9 +142,7 @@ export class PlayerAttackComponent extends Component {
       if (aimResult) {
         const delta = this.computeYawDelta(ownerPos, forward, aimResult.entity);
         if (delta !== 0) {
-          const arm = this.getOwner().getComponent('camera_arm') as CameraArmComponent | null;
-          arm?.addYaw(delta);
-          // Rotate forward for immediate lunge alignment (arm yaw takes effect next frame).
+          // Rotate the lunge direction toward the target without rotating the camera.
           const rad = (delta * Math.PI) / 180;
           const c = Math.cos(rad);
           const s = Math.sin(rad);
@@ -299,9 +296,9 @@ export class PlayerAttackComponent extends Component {
           this.hitSet.add(entityId);
           entity.sendMsg(Msg.damage({ amount: this.damage, instigator: ownerEntity }));
           // Delay the freeze so the hit-reaction animation can start blending first
-          (entity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(10 / 60, 2 / 60);
-          (ownerEntity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(6 / 60, 1 / 60);
-          //(ownerEntity.getComponent('camera_shake') as CameraShakeComponent | null)?.shake(0.2);
+          //(entity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(10 / 60, 2 / 60);
+          //(ownerEntity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(6 / 60, 1 / 60);
+          (ownerEntity.getComponent('camera_shake') as CameraShakeComponent | null)?.punch(0.12);
 
           // Knockback: push enemy away from player
           if (this.knockbackSpeed > 0 && this.ownerTransform) {

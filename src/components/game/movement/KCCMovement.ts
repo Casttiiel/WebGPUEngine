@@ -389,6 +389,9 @@ export class KCCMovement extends Component {
       const atApex = this.isJumpingFlag && this.vy > 0 && this.vy < this.jumpCutVelocityLimit;
       const gravFactor = atApex ? this.jumpCutFactor : 1.0;
       this.vy += grav * gravFactor * this.gravityScale * dt;
+      // Terminal velocity — prevents tunnelling through geometry if grounding
+      // detection is delayed (e.g. first frame, throttled ground checks).
+      if (this.vy < -20) this.vy = -20;
     }
 
     // ── Horizontal ─────────────────────────────────────────────────────────
