@@ -9,7 +9,6 @@ import { TrailRendererComponent } from '../../vfx/TrailRendererComponent';
 import { ParticleSystemComponent } from '../../render/ParticleSystemComponent';
 import { Loader } from '../../../core/loaders/Loader';
 import { Msg } from '../../../core/ecs/Msg';
-import type { HitStopComponent } from '../HitStopComponent';
 import type { CameraShakeComponent } from '../CameraShakeComponent';
 import type { KCCMovement } from '../movement/KCCMovement';
 
@@ -40,6 +39,7 @@ export class PlayerAttackComponent extends Component {
   private cooldownTimer: number = 0;
   private attackTimer: number = -1;
   private attackLayerId: number = -1;
+  private attackClipDuration: number = 0;
   private trailStopped: boolean = false;
   private readonly hitSet: Set<number> = new Set();
 
@@ -112,6 +112,7 @@ export class PlayerAttackComponent extends Component {
     this.cooldownTimer = this.cooldown;
     this.trail?.reset();
 
+    this.attackClipDuration = this.animator.getClipDuration(this.attackClip);
     this.animator.setRootMotion('apply');
   }
 
@@ -129,12 +130,11 @@ export class PlayerAttackComponent extends Component {
       this.trailStopped = true;
     }
 
-    if (this.attackTimer > this.activeWindowEnd + 0.3) {
+    const endTime = this.attackClipDuration > 0 ? this.attackClipDuration : this.activeWindowEnd + 0.3;
+    if (this.attackTimer > endTime) {
       const fadeDuration = 0.15;
       if (this.attackLayerId >= 0) this.animator?.removeLayer(this.attackLayerId, fadeDuration);
       this.animator?.setRootMotion('none');
-      // Keep root joint zeroed for the layer fade duration so the accumulated
-      // root translation doesn't snap back into the mesh while it blends out.
       this.animator?.keepRootZeroed(fadeDuration);
       this.attackTimer = -1;
       this.attackLayerId = -1;

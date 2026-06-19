@@ -206,17 +206,20 @@ export class HackAndSlashControllerComponent
   private updateVisualRotation(dt: number): void {
     const hVel = this.movement.getHorizontalVelocity();
     const hSpeed = Math.sqrt(hVel[0] ** 2 + hVel[2] ** 2);
+    const isRootMotion = this.animator?.isRootMotionActive?.() === true;
 
     let facingDir: vec3 | null = null;
-    // Facing and movement are locked during the entire roll; only resume when
-    // the roll ends and velocity is back to zero.
-    if (!this.getIsRolling()) {
+    // Facing locked during roll. Also locked during root motion: the root motion
+    // delta is rotated by ownerWorldRotation, so letting velocity change the yaw
+    // creates a feedback loop (lateral component → rotation change → larger lateral
+    // component next frame → spiral). Commit to the facing at attack start instead.
+    if (!this.getIsRolling() && !isRootMotion) {
       const movDir = this.getTargetMovement(this.getInputVector());
       if (vec3.length(movDir) > 0.01) {
         facingDir = movDir;
       }
     }
-    if (!facingDir && hSpeed > 0.3) {
+    if (!facingDir && hSpeed > 0.3 && !isRootMotion) {
       facingDir = vec3.fromValues(hVel[0] / hSpeed, 0, hVel[2] / hSpeed);
     }
 

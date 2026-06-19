@@ -203,6 +203,7 @@ export class AnimatorComponent extends Component {
   private _rmKCC: any = null;
   private _rmKCCSearched: boolean = false;
   private _rmVelocity: vec3 = vec3.create();
+  private _rmPrevLayerTime: number = 0;
   // Keeps root joint zeroed during layer fade-out even after mode='none',
   // preventing the accumulated root translation from snapping back into the mesh.
   private _rootZeroLingerTime: number = 0;
@@ -563,13 +564,25 @@ export class AnimatorComponent extends Component {
     if (layer) layer.weight = Math.max(0, Math.min(1, weight));
   }
 
+  /** Returns the duration in seconds of the named clip, or 0 if not found. */
+  public getClipDuration(name: string): number {
+    const lower = name.toLowerCase();
+    return this.clips.find((c) => c.name.toLowerCase() === lower)?.duration ?? 0;
+  }
+
   public setRootMotion(mode: RootMotionMode, includeY: boolean = false): void {
     this.rootMotionMode = mode;
     this.rootMotionIncludeY = includeY;
     this._rootMotionFirstFrame = true;
     vec3.set(this.rootMotionDelta, 0, 0, 0);
     vec3.set(this._rmVelocity, 0, 0, 0);
-    this._rmKCCSearched = false;
+    this._rmPrevLayerTime = 0;
+    if (this._rmKCC) {
+      this._rmKCC.setHorizontalVelocity(this._rmVelocity);
+    }
+    if (mode === 'apply') {
+      this._rmKCCSearched = false;
+    }
   }
 
   /**
@@ -805,7 +818,8 @@ export class AnimatorComponent extends Component {
       this._rootZeroLingerTime = Math.max(0, this._rootZeroLingerTime - dt);
     }
     if ((isExtracting || this._rootZeroLingerTime > 0) && this.rootJointIndex >= 0) {
-      if (isExtracting) {
+      // 'extract' mode: delta from blended pose (used by external consumers via getRootMotionDelta).
+      if (this.rootMotionMode === 'extract') {
         const rootT = this.localT[this.rootJointIndex]!;
         if (this._rootMotionFirstFrame || this._rootMotionDidLoop) {
           this.prevRootLocalT.set(rootT);
@@ -829,14 +843,17 @@ export class AnimatorComponent extends Component {
         }
       }
 
-      // Always zero the root joint (extraction or linger) to prevent the
-      // accumulated translation from appearing in the rendered mesh.
+      // Zero root joint in all cases (extraction or linger).
       const bp = this.skeleton.bindPoseLocal;
       const bpOff = this.rootJointIndex * 10;
       this.localT[this.rootJointIndex]!.set([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
 
+      // 'apply' mode: sample the root channel DIRECTLY from the clip with LINEAR
+      // interpolation, bypassing whatever interpolation the animation exported with.
+      // STEP-interpolated channels produce zero deltas between keyframes, causing
+      // inconsistent total displacement that varies with frame timing. LINEAR
+      // sampling gives a smooth, consistent velocity curve every time.
       if (this.rootMotionMode === 'apply' && dt > 0) {
-        // Find parent entity's KCC once.
         if (!this._rmKCCSearched) {
           const parent = this.getOwner().getParent();
           this._rmKCC = parent?.getComponent('kcc_movement') ?? null;
@@ -844,15 +861,40 @@ export class AnimatorComponent extends Component {
         }
 
         if (this._rmKCC) {
-          const hasDelta = this.rootMotionDelta[0] ** 2 + this.rootMotionDelta[2] ** 2 > 1e-8;
-          if (hasDelta) {
-            // New keyframe — update velocity from displacement.
-            this._rmVelocity[0] = this.rootMotionDelta[0] / dt;
+          const layer = this.animLayers.length > 0
+            ? this.animLayers[this.animLayers.length - 1]!
+            : null;
+          const clip = layer ? this.clips[layer.clipIndex] : null;
+          const rootCh = clip?.channels.find(
+            (ch) => ch.jointIndex === this.rootJointIndex && ch.path === 'translation',
+          );
+
+          if (rootCh) {
+            const curT = new Float32Array([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
+            const prevT = new Float32Array([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
+            sampleVec3(rootCh.times, rootCh.values, layer!.time, 'LINEAR', curT);
+            sampleVec3(rootCh.times, rootCh.values, this._rmPrevLayerTime, 'LINEAR', prevT);
+            this._rmPrevLayerTime = layer!.time;
+
+            const dx = curT[0]! - prevT[0]!;
+            const dy = this.rootMotionIncludeY ? curT[1]! - prevT[1]! : 0;
+            const dz = curT[2]! - prevT[2]!;
+            const delta = vec3.fromValues(dx, dy, dz);
+            vec3.transformQuat(delta, delta, this.rootPreRotation as unknown as quat);
+            const ownerTransform = (
+              this.getOwner().getComponent('transform') as TransformComponent | null
+            )?.getTransform();
+            if (ownerTransform) {
+              vec3.transformQuat(delta, delta, ownerTransform.getWorldRotation());
+            }
+
+            this._rmVelocity[0] = delta[0] / dt;
             this._rmVelocity[1] = 0;
-            this._rmVelocity[2] = this.rootMotionDelta[2] / dt;
+            this._rmVelocity[2] = delta[2] / dt;
+          } else {
+            // No root channel found — zero velocity so the character stops cleanly.
+            vec3.set(this._rmVelocity, 0, 0, 0);
           }
-          // Always write (even on zero-delta frames) so the controller's
-          // integrate() sees it as the desired speed and does not decelerate.
           this._rmKCC.setHorizontalVelocity(this._rmVelocity);
         }
       }
