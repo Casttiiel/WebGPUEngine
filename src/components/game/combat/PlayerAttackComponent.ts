@@ -4,13 +4,14 @@ import { Entity } from '../../../core/ecs/Entity';
 import { Engine } from '../../../core/engine/Engine';
 import { GameAction } from '../../../types/GameAction.enum';
 import { TransformComponent } from '../../core/TransformComponent';
-import { AnimatorComponent } from '../../render/AnimatorComponent';
+import { AnimatorComponent, type TwoBoneIkConstraint } from '../../render/AnimatorComponent';
 import { TrailRendererComponent } from '../../vfx/TrailRendererComponent';
 import { ParticleSystemComponent } from '../../render/ParticleSystemComponent';
 import { Loader } from '../../../core/loaders/Loader';
 import { Msg } from '../../../core/ecs/Msg';
 import type { CameraShakeComponent } from '../CameraShakeComponent';
 import type { KCCMovement } from '../movement/KCCMovement';
+import { HitStopComponent } from '../HitStopComponent';
 
 export interface PlayerAttackData {
   damage?: number;
@@ -43,6 +44,13 @@ export class PlayerAttackComponent extends Component {
   private trailStopped: boolean = false;
   private readonly hitSet: Set<number> = new Set();
 
+  // ── Hit-freeze IK ─────────────────────────────────────────────────────────
+  private static readonly HIT_FREEZE_IK_DURATION = 0.2;
+  private static readonly HIT_FREEZE_IK_FADEOUT = 0.1;
+  private hitFreezeIk: TwoBoneIkConstraint | null = null;
+  private hitFreezeTimer: number = 0;
+  private readonly hitFreezeWorldPos: vec3 = vec3.create();
+
   // ── Cached references ──────────────────────────────────────────────────────
   private animator: AnimatorComponent | null = null;
   private meshTransform: TransformComponent | null = null;
@@ -50,6 +58,8 @@ export class PlayerAttackComponent extends Component {
   private trail: TrailRendererComponent | null = null;
   private hitSparks: ParticleSystemComponent | null = null;
   private handJointIndex: number = -1;
+  private upperArmJointIndex: number = -1;
+  private foreArmJointIndex: number = -1;
   private resolved: boolean = false;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -84,6 +94,8 @@ export class PlayerAttackComponent extends Component {
       this.tickSwing();
     }
 
+    this.tickHitFreezeIK(dt);
+
     const canAttack = this.cooldownTimer <= 0 && this.attackTimer < 0;
     if (canAttack && Engine.getInput().isActionJustPressed(GameAction.LIGHT_ATTACK)) {
       this.startAttack();
@@ -98,6 +110,8 @@ export class PlayerAttackComponent extends Component {
 
   private startAttack(): void {
     if (!this.animator || !this.ownerTransform) return;
+
+    this.clearHitFreezeIK();
 
     this.attackLayerId =
       this.animator.addLayer(this.attackClip, {
@@ -116,6 +130,65 @@ export class PlayerAttackComponent extends Component {
     this.animator.setRootMotion('apply');
   }
 
+  // ── Hit-freeze IK ──────────────────────────────────────────────────────────
+
+  private activateHitFreezeIK(): void {
+    if (!this.animator || !this.meshTransform || this.handJointIndex < 0) return;
+    if (this.upperArmJointIndex < 0 || this.foreArmJointIndex < 0) return;
+    if (this.hitFreezeIk) return; // already active
+
+    // Capture hand position in world space at the moment of contact.
+    const handM = this.animator.getJointModelMatrix(this.handJointIndex) as mat4 | null;
+    if (!handM) return;
+    const handModelPos = vec3.fromValues(handM[12]!, handM[13]!, handM[14]!);
+    const meshWorld = this.meshTransform.getTransform().getWorldMatrix() as unknown as mat4;
+    vec3.transformMat4(this.hitFreezeWorldPos, handModelPos, meshWorld);
+
+    // IK target starts at current model-space position (will be updated each frame).
+    const initialTarget = vec3.clone(handModelPos);
+    this.hitFreezeIk = this.animator.addIkConstraint({
+      type: 'twobone',
+      rootJointName: 'upperarm_r',
+      midJointName: 'lowerarm_r',
+      tipJointName: 'hand_r',
+      target: initialTarget,
+      weight: 1.0,
+    });
+    this.hitFreezeTimer = PlayerAttackComponent.HIT_FREEZE_IK_DURATION;
+  }
+
+  private tickHitFreezeIK(dt: number): void {
+    if (!this.hitFreezeIk || !this.animator || !this.meshTransform) return;
+
+    this.hitFreezeTimer -= dt;
+
+    if (this.hitFreezeTimer <= 0) {
+      this.clearHitFreezeIK();
+      return;
+    }
+
+    // Re-project the frozen world position into the current mesh-local space
+    // so the constraint tracks the same world point as the character moves.
+    const meshWorld = this.meshTransform.getTransform().getWorldMatrix() as unknown as mat4;
+    const invMeshWorld = mat4.invert(mat4.create(), meshWorld);
+    if (invMeshWorld) {
+      vec3.transformMat4(this.hitFreezeIk.target as vec3, this.hitFreezeWorldPos, invMeshWorld);
+    }
+
+    // Fade out weight during the last HIT_FREEZE_IK_FADEOUT seconds.
+    if (this.hitFreezeTimer < PlayerAttackComponent.HIT_FREEZE_IK_FADEOUT) {
+      this.hitFreezeIk.weight = this.hitFreezeTimer / PlayerAttackComponent.HIT_FREEZE_IK_FADEOUT;
+    }
+  }
+
+  private clearHitFreezeIK(): void {
+    if (this.hitFreezeIk && this.animator) {
+      this.animator.removeIkConstraint(this.hitFreezeIk);
+    }
+    this.hitFreezeIk = null;
+    this.hitFreezeTimer = 0;
+  }
+
   private tickSwing(): void {
     const inWindow =
       this.attackTimer >= this.activeWindowStart && this.attackTimer <= this.activeWindowEnd;
@@ -130,7 +203,8 @@ export class PlayerAttackComponent extends Component {
       this.trailStopped = true;
     }
 
-    const endTime = this.attackClipDuration > 0 ? this.attackClipDuration : this.activeWindowEnd + 0.3;
+    const endTime =
+      this.attackClipDuration > 0 ? this.attackClipDuration : this.activeWindowEnd + 0.3;
     if (this.attackTimer > endTime) {
       const fadeDuration = 0.15;
       if (this.attackLayerId >= 0) this.animator?.removeLayer(this.attackLayerId, fadeDuration);
@@ -188,9 +262,9 @@ export class PlayerAttackComponent extends Component {
           this.hitSet.add(entityId);
           entity.sendMsg(Msg.damage({ amount: this.damage, instigator: ownerEntity }));
           // Delay the freeze so the hit-reaction animation can start blending first
-          //(entity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(10 / 60, 2 / 60);
-          //(ownerEntity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(6 / 60, 1 / 60);
+          (entity.getComponent('hit_stop') as HitStopComponent | null)?.freeze(0.2, 0.05);
           (ownerEntity.getComponent('camera_shake') as CameraShakeComponent | null)?.punch(0.12);
+          this.activateHitFreezeIK();
 
           // Knockback: push enemy away from player
           if (this.knockbackSpeed > 0 && this.ownerTransform) {
@@ -237,6 +311,8 @@ export class PlayerAttackComponent extends Component {
         this.animator = anim;
         this.meshTransform = child.getComponent('transform') as TransformComponent | null;
         this.handJointIndex = anim.getJointIndex('hand_r');
+        this.upperArmJointIndex = anim.getJointIndex('upperarm_r');
+        this.foreArmJointIndex = anim.getJointIndex('lowerarm_r');
         break;
       }
     }

@@ -342,6 +342,7 @@ export class TSRComponent extends Component {
   public override renderInMenu(parentFolder?: any): void {
     if (!parentFolder) return;
     const f = parentFolder.addFolder('TSR');
+    f.close();
     f.add(this.tsrParams, 'enabled').name('Enabled').listen();
     f.add(this.tsrParams, 'blendFactor', 0.01, 0.5, 0.01).name('Blend Factor').listen();
     f.add(this.tsrParams, 'gamma', 0.5, 2.0, 0.05).name('Clamp Gamma').listen();

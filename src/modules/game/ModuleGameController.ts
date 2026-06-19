@@ -39,7 +39,5 @@ export class ModuleGameController extends Module {
     }
   }
 
-  public renderDebug(): void {
-    // No hay debug info específico
-  }
+  public renderDebug(): void {}
 }

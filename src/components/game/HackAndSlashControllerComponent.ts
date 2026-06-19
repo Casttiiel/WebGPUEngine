@@ -97,6 +97,7 @@ export class HackAndSlashControllerComponent
     if (transform) {
       this.visualYaw = (transform.getTransform().getAngles() as any).yaw ?? 0;
     }
+
   }
 
   // ── Update ───────────────────────────────────────────────────────────────────

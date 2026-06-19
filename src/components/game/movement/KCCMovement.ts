@@ -1,8 +1,9 @@
 import { vec3 } from 'gl-matrix';
 import RAPIER, { QueryFilterFlags } from '@dimforge/rapier3d';
 import { Component } from '../../../core/ecs/Component';
-import type { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
 import { Engine } from '../../../core/engine/Engine';
+import { CollisionGroups } from '../../../types/CollisionGroups.enum';
+import type { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
 
 // ── Private helper ────────────────────────────────────────────────────────────
 /** Moves `current` toward `target` by at most `delta`, never overshooting. */
@@ -481,22 +482,32 @@ export class KCCMovement extends Component {
     return { x: this.vx, y: this.vy, z: this.vz };
   }
 
+  // Contact distance between two character capsules (2 × capsule radius 0.3 + small slack).
+  private static readonly CHAR_CONTACT_DIST = 0.65;
+
   public applyViaKCC(
     dt: number,
     capsule: CapsuleColliderComponent,
     controller: RAPIER.KinematicCharacterController,
-    filterPredicate?: ((c: RAPIER.Collider) => boolean) | null,
   ): void {
+    // Block movement into other kinematic characters BEFORE KCC runs, so no
+    // depenetration push can occur: each mover stops at the contact surface.
+    this.blockAgainstCharacters(capsule);
+
     const mx = this.vx * dt;
     const my = this.vy * dt;
     const mz = this.vz * dt;
+
+    // KCC only queries ENVIRONMENT geometry — never other character capsules.
+    // This prevents Rapier's KCC from generating any push between kinematics.
+    const membership = capsule.getCollider().collisionGroups() >>> 16;
+    const kccGroups = (membership << 16) | CollisionGroups.ENVIRONMENT;
 
     controller.computeColliderMovement(
       capsule.getCollider(),
       new RAPIER.Vector3(mx, my, mz),
       QueryFilterFlags.EXCLUDE_SENSORS,
-      undefined,
-      filterPredicate ?? undefined,
+      kccGroups,
     );
 
     const corrected = controller.computedMovement();
@@ -505,57 +516,57 @@ export class KCCMovement extends Component {
       .getRigidBody()
       .setLinvel({ x: corrected.x * invDt, y: corrected.y * invDt, z: corrected.z * invDt }, true);
 
-    // Cancel upward velocity if the ceiling blocked the movement.
-    if (this.vy > 0 && corrected.y < my * 0.5) {
-      this.vy = 0;
-    }
+    if (this.vy > 0 && corrected.y < my * 0.5) this.vy = 0;
+    if (this.vy < 0 && corrected.y > my * 0.5) this.vy = -0.5;
 
-    // Ground contact: if descending and the floor stopped most of the movement,
-    // apply the stick-to-ground velocity. Doing this here (after KCC resolves the
-    // collision) prevents the two-phase landing bug where the snap-distance raycast
-    // sets isGrounded=true at 0.2m above ground and prematurely kills falling speed.
-    if (this.vy < 0 && corrected.y > my * 0.5) {
-      this.vy = -0.5;
-    }
-
-    // Wall collision response — project out velocity into fixed-geometry walls.
-    // Also pushes other kinematic bodies away.
-    const physics = Engine.getPhysics();
+    // Wall response — environment geometry only (KCC only sees that now).
     const numCollisions = controller.numComputedCollisions();
     for (let i = 0; i < numCollisions; i++) {
       const collision = controller.computedCollision(i);
       if (!collision?.collider) continue;
       const rb = collision.collider.parent();
       if (!rb) continue;
-
       const n = collision.normal1;
       if (Math.abs(n.y) >= 0.5) continue;
-
-      if (rb.bodyType() === RAPIER.RigidBodyType.Fixed) {
-        this.removeVelocityIntoWall(vec3.fromValues(n.x, n.y, n.z));
-        continue;
-      }
-
-      // Kinematic-kinematic: push the other body away.
-      const speedIntoOther = -(this.vx * n.x + this.vz * n.z);
-      if (speedIntoOther < 0.3) continue;
-
-      const entityId = physics.getEntityIdFromCollider(collision.collider.handle);
-      if (entityId === undefined) continue;
-      const entity = physics.getEntityById(entityId);
-      if (!entity) continue;
-      const otherMovement = entity.getComponent('kcc_movement') as KCCMovement | null;
-      if (!otherMovement) continue;
-
-      const pushX = -n.x;
-      const pushZ = -n.z;
-      const otherVel = otherMovement.getLinearVelocity();
-      const enemySpeedInPushDir = otherVel.x * pushX + otherVel.z * pushZ;
-      const desiredPushSpeed = Math.min(speedIntoOther, 5.0);
-      const pushNeeded = desiredPushSpeed - enemySpeedInPushDir;
-      if (pushNeeded > 0) {
-        otherMovement.applyImpulse(vec3.fromValues(pushX * pushNeeded, 0, pushZ * pushNeeded));
-      }
+      this.removeVelocityIntoWall(vec3.fromValues(n.x, n.y, n.z));
     }
+  }
+
+  private blockAgainstCharacters(capsule: CapsuleColliderComponent): void {
+    const physics = Engine.getPhysics();
+    const myRb = capsule.getRigidBody();
+    const myPos = myRb.translation();
+    const myHandle = myRb.handle;
+
+    physics.overlapSphere(
+      vec3.fromValues(myPos.x, myPos.y, myPos.z),
+      KCCMovement.CHAR_CONTACT_DIST,
+      (entityId) => {
+        const other = physics.getEntityById(entityId);
+        if (!other) return true;
+        const otherCapsule = (other as any).getComponent('capsule_collider') as CapsuleColliderComponent | null;
+        if (!otherCapsule) return true;
+        const otherRb = otherCapsule.getRigidBody();
+        if (!otherRb.isKinematic() || otherRb.handle === myHandle) return true;
+
+        const op = otherRb.translation();
+        const dx = op.x - myPos.x;
+        const dz = op.z - myPos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < 0.0001) return true;
+
+        const dist = Math.sqrt(distSq);
+        const nx = dx / dist;
+        const nz = dz / dist;
+
+        // Remove the velocity component directed toward the other character.
+        const dot = this.vx * nx + this.vz * nz;
+        if (dot > 0) {
+          this.vx -= dot * nx;
+          this.vz -= dot * nz;
+        }
+        return true;
+      },
+    );
   }
 }

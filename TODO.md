@@ -1,10 +1,8 @@
 ## Pending
 
-Hit stop again
 Ground Combos (Light and Heavy) + input buffer
 Block Movement during combos
 Roll animation + movement
-KCC Movement: Pass-through (God of War, DMC) — El jugador pasa por encima de los enemigos, que se separan entre ellos con fuerzas suaves. El combate mueve enemigos, no el contacto físico.
 Air combos
 Slash effect
 
@@ -18,10 +16,9 @@ Slash effect
 ## Character & Animation
 
 1. Character animator
-2. Better foot IK foot angle + walking
-3. Motion Warping
+2. Motion Warping
    Root motion warping al objetivo — el ataque actual usa lunge con velocidad fija. Con warping, la animación se estira/comprime para que la espada llegue exactamente al enemigo en su posición real, sin importar si está 1.2m o 2.8m. Elimina el floating que se ve cuando el lunge se queda corto o se pasa.
-4. Motion Matching
+3. Motion Matching
    Concatenación de ataques — ahora el combo es un clip único. Con MM podrías tener 30 variantes de ataque y el sistema elige cuál encadena mejor desde la posición de los pies y momentum actuales. Lo que hace DMC para que ningún combo se vea igual.
 
 ## AI

@@ -14,6 +14,8 @@ import { CapsuleColliderComponent } from '../../components/physics/CapsuleCollid
 import { LinearInterpolator } from '../../core/math/Interpolators';
 import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { GUIManager } from '../../core/debug/GUIManager';
+import GUI from 'lil-gui';
+import { Time } from '../../core/engine/Time';
 
 /** Component that controls the player camera — either FPS or TPS arm. */
 type PlayerCameraController = FPSCameraControllerComponent | CameraArmComponent;
@@ -198,13 +200,34 @@ export class ModuleBoot extends Module {
     }
   }
 
-  public renderDebug(): void {
-    // ModuleBoot doesn't have debug info to render
+  public override renderInMenu(): void {
+    const gui = Engine.getGUI();
+    if (!gui.getIsVisible()) return;
+
+    if (this.beginGUIWindow('Time Control')) {
+      const folder = (gui as any).folders?.get('Time Control') as GUI | undefined;
+      if (folder) {
+        const proxy = {} as { timeScale: number };
+        Object.defineProperty(proxy, 'timeScale', {
+          get: () => Time.getTimeScale(),
+          set: (v: number) => Time.setTimeScale(v),
+          enumerable: true,
+          configurable: true,
+        });
+        folder.add(proxy, 'timeScale', 0, 3, 0.01).name('Time Scale').listen();
+        folder.add({ fn: () => Time.setTimeScale(0) }, 'fn').name('Pause');
+        folder.add({ fn: () => Time.setTimeScale(0.1) }, 'fn').name('0.1x  Bullet Time');
+        folder.add({ fn: () => Time.setTimeScale(0.25) }, 'fn').name('0.25x');
+        folder.add({ fn: () => Time.setTimeScale(0.5) }, 'fn').name('0.5x');
+        folder.add({ fn: () => Time.setTimeScale(1.0) }, 'fn').name('1x  Normal');
+        folder.add({ fn: () => Time.setTimeScale(2.0) }, 'fn').name('2x  Fast');
+      }
+      this.endGUIWindow();
+    }
   }
 
-  /**
-   * Toggle entre gs_gameplay y gs_editor
-   */
+  public renderDebug(): void {}
+
   private toggleEditorMode(): void {
     const currentGamestate = Engine.getModules().getCurrentGamestate();
 
