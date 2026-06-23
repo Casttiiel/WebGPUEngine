@@ -2053,10 +2053,10 @@ export class BindGroupFactory {
         return this.getCloudTemporalLayout();
       case PipelineBindGroupLayouts.FOG_SCATTER_RAYMARCH_UNIFORMS:
         return this.getFogScatterRaymarchUniformsLayout();
-      case PipelineBindGroupLayouts.FOG_MULTISCATTER_SCENE_TEXTURES:
-        return this.getFogMultiScatterSceneTexturesLayout();
-      case PipelineBindGroupLayouts.FOG_MULTISCATTER_FOG_TEXTURES:
-        return this.getFogMultiScatterFogTexturesLayout();
+      case PipelineBindGroupLayouts.FOG_SCATTER_SCENE_TEXTURES:
+        return this.getFogScatterSceneTexturesLayout();
+      case PipelineBindGroupLayouts.FOG_SCATTER_FOG_TEXTURES:
+        return this.getFogScatterFogTexturesLayout();
       default:
         throw new Error(`Unknown bind group layout: ${layout}`);
     }
@@ -2064,12 +2064,6 @@ export class BindGroupFactory {
 
   // ── Shockwave post-process compute pass ─────────────────────────────────────
 
-  /**
-   * Fog scatter raymarch params layout (group 3 of fog_scatter_raymarch.fs).
-   * binding 0: FogScatterParams uniform (48 bytes)
-   * binding 1: blue-noise texture_2d<f32> (64×64 tiling)
-   * binding 2: sampler (filtering)
-   */
   public static getFogScatterRaymarchUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('fog_scatter_raymarch_uniforms', [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
@@ -2078,28 +2072,16 @@ export class BindGroupFactory {
     ]);
   }
 
-  /**
-   * Compose pass group(0): original scene + blurred scene + shared sampler.
-   * binding 0: txScene         (texture_2d<f32>)
-   * binding 1: txSceneBlurred  (texture_2d<f32>)
-   * binding 2: sampler         (filtering)
-   */
-  public static getFogMultiScatterSceneTexturesLayout(): GPUBindGroupLayout {
-    return this.getLayout('fog_multiscatter_scene_textures', [
+  public static getFogScatterSceneTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('fog_scatter_scene_textures', [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
     ]);
   }
 
-  /**
-   * Compose pass group(1): raymarch output + blurred raymarch output + sampler.
-   * binding 0: txFogHalf        (texture_2d<f32> — scatter RGB + transmittance A)
-   * binding 1: txFogHalfBlurred (texture_2d<f32>)
-   * binding 2: sampler          (filtering)
-   */
-  public static getFogMultiScatterFogTexturesLayout(): GPUBindGroupLayout {
-    return this.getLayout('fog_multiscatter_fog_textures', [
+  public static getFogScatterFogTexturesLayout(): GPUBindGroupLayout {
+    return this.getLayout('fog_scatter_fog_textures', [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },

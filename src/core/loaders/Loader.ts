@@ -54,7 +54,7 @@ import { AtmosphericFogComponent } from '../../components/vfx/AtmosphericFogComp
 import { BloomComponent } from '../../components/render/BloomComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
-import { FogMultiScatterComponent } from '../../components/render/FogMultiScatterComponent';
+import { FogScatterComponent } from '../../components/render/FogScatterComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { ChromaticAberrationComponent } from '../../components/render/ChromaticAberrationComponent';
 import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
@@ -476,8 +476,8 @@ export class Loader {
         return new ContactShadowsComponent();
       case 'god_rays':
         return new GodRaysComponent();
-      case 'fog_multi_scatter':
-        return new FogMultiScatterComponent();
+      case 'fog_scatter':
+        return new FogScatterComponent();
       case 'lens_flare':
         return new LensFlareComponent();
       case 'fog_volume':

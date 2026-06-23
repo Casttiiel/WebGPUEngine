@@ -36,15 +36,13 @@ import { AutoExposureComponent } from '../../components/render/AutoExposureCompo
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
-import { FogMultiScatterComponent } from '../../components/render/FogMultiScatterComponent';
+import { FogScatterComponent } from '../../components/render/FogScatterComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { ChromaticAberrationComponent } from '../../components/render/ChromaticAberrationComponent';
 import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
 import { VignetteComponent } from '../../components/render/VignetteComponent';
 import { PointLightComponent } from '../../components/render/PointLightComponent';
 import { SpotLightComponent } from '../../components/render/SpotLightComponent';
-import { AmbientOcclusionComponent } from '../../components/render/AmbientOcclusionComponent';
-import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { ShockwavePostProcessComponent } from '../../components/render/ShockwavePostProcessComponent';
 import { Profiler } from '../../core/debug/Profiler';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
@@ -441,10 +439,10 @@ export class ModuleRender extends Module {
         }
       }
 
-      if (mainCameraEntity?.hasComponent('fog_multi_scatter')) {
+      if (mainCameraEntity?.hasComponent('fog_scatter')) {
         const fogMultiScatter = mainCameraEntity.getComponent(
-          'fog_multi_scatter',
-        ) as FogMultiScatterComponent;
+          'fog_scatter',
+        ) as FogScatterComponent;
         if (fogMultiScatter.hasLoaded() && fogMultiScatter.isEnabled()) {
           const dirLights =
             Engine.getEntities().getObjectManagerByName('directional_light')?.getList() ?? [];
@@ -800,107 +798,101 @@ export class ModuleRender extends Module {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
-    // Directional Lights section - each light gets its own window
-    const directionalLights = Engine.getEntities()
-      .getObjectManagerByName('directional_light')
-      ?.getList();
+    this.renderDirectionalLightsMenu(gui);
+    this.renderStatsMenu(gui);
+    this.renderPostProcessingMenu(gui);
+    this.renderProfilerMenu(gui);
+  }
 
-    if (directionalLights && directionalLights.length > 0) {
-      for (const light of directionalLights) {
-        const dirLight = light as DirectionalLightComponent;
-        const lightName = dirLight.getOwner().getName();
+  private renderDirectionalLightsMenu(gui: any): void {
+    const lights = Engine.getEntities().getObjectManagerByName('directional_light')?.getList();
+    if (!lights?.length) return;
 
-        if (this.beginGUIWindow(lightName)) {
-          const lightFolder = (gui as any).folders?.get(lightName);
-          if (lightFolder) dirLight.renderInMenu(lightFolder);
-          this.endGUIWindow();
-        }
+    for (const light of lights) {
+      const dirLight = light as DirectionalLightComponent;
+      const name = dirLight.getOwner().getName();
+      if (this.beginGUIWindow(name)) {
+        const folder = gui.folders?.get(name);
+        if (folder) dirLight.renderInMenu(folder);
+        this.endGUIWindow();
       }
     }
+  }
 
-    this.deferred.renderInMenu();
+  private renderStatsMenu(gui: any): void {
+    if (!this.beginGUIWindow('Render Statistics')) return;
 
-    // Create main window for render stats
-    if (this.beginGUIWindow('Render Statistics')) {
-      // Add dynamic text displays that auto-update
-      gui.addDynamicText(this.debugValues.drawCallsSolids, 'value', 'Draw Calls (Solids)');
-      gui.addDynamicText(
-        this.debugValues.drawCallsTransparent,
-        'value',
-        'Draw Calls (Transparent)',
-      );
-      gui.addDynamicText(this.debugValues.drawCallsGlass, 'value', 'Draw Calls (Glass)');
-      gui.addDynamicText(
-        this.debugValues.drawCallsDistorsions,
-        'value',
-        'Draw Calls (Distortions)',
-      );
-      gui.addDynamicText(this.debugValues.drawCallsDecals, 'value', 'Draw Calls (Decals)');
-      this.addGUISeparator();
-      gui.addDynamicText(this.debugValues.totalDrawCalls, 'value', 'Total Draw Cmds');
-      this.addGUISeparator();
-      gui.addDynamicText(this.debugValues.gpuCullingKeys, 'value', 'GPU Managed Keys');
-      gui.addDynamicText(this.debugValues.gpuEstimatedVisible, 'value', 'Est. Visible (CPU)');
-      gui.addDynamicText(this.debugValues.hzbCulled, 'value', 'HZB Culled');
-      gui.addDynamicText(this.debugValues.visiblePointLights, 'value', 'Point Lights (visible)');
-      gui.addDynamicText(this.debugValues.visibleSpotLights, 'value', 'Spot Lights (visible)');
-      this.addGUISeparator();
-      gui.addDynamicText(this.debugValues.resolution, 'value', 'Render Resolution');
-      gui.addDynamicText(this.debugValues.canvasResolution, 'value', 'Canvas Resolution');
-      this.endGUIWindow();
-    }
+    gui.addDynamicText(this.debugValues.drawCallsSolids, 'value', 'Draw Calls (Solids)');
+    gui.addDynamicText(this.debugValues.drawCallsTransparent, 'value', 'Draw Calls (Transparent)');
+    gui.addDynamicText(this.debugValues.drawCallsGlass, 'value', 'Draw Calls (Glass)');
+    gui.addDynamicText(this.debugValues.drawCallsDistorsions, 'value', 'Draw Calls (Distortions)');
+    gui.addDynamicText(this.debugValues.drawCallsDecals, 'value', 'Draw Calls (Decals)');
+    this.addGUISeparator();
+    gui.addDynamicText(this.debugValues.totalDrawCalls, 'value', 'Total Draw Cmds');
+    this.addGUISeparator();
+    gui.addDynamicText(this.debugValues.gpuCullingKeys, 'value', 'GPU Managed Keys');
+    gui.addDynamicText(this.debugValues.gpuEstimatedVisible, 'value', 'Est. Visible (CPU)');
+    gui.addDynamicText(this.debugValues.hzbCulled, 'value', 'HZB Culled');
+    gui.addDynamicText(this.debugValues.visiblePointLights, 'value', 'Point Lights (visible)');
+    gui.addDynamicText(this.debugValues.visibleSpotLights, 'value', 'Spot Lights (visible)');
+    this.addGUISeparator();
+    gui.addDynamicText(this.debugValues.resolution, 'value', 'Render Resolution');
+    gui.addDynamicText(this.debugValues.canvasResolution, 'value', 'Canvas Resolution');
+    this.endGUIWindow();
+  }
 
-    // Get main camera for post-processing components
+  private renderPostProcessingMenu(gui: any): void {
     const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    if (mainCamera && this.beginGUIWindow('Post-Processing')) {
-      // First-time creation: populate renderer-owned items (deferred pipeline controls).
-      const ppFolderInit = (gui as any).folders?.get('Post-Processing');
-      if (ppFolderInit) this.deferred.renderPostProcessingMenu(ppFolderInit);
+    if (!mainCamera) return;
+
+    // beginGUIWindow creates the folder on the first call and returns true; no-op after.
+    if (this.beginGUIWindow('Post-Processing')) {
       this.endGUIWindow();
     }
 
-    // Register component controls every frame — each renderInMenu is idempotent via
-    // _editorFolder, so this is safe even though beginGUIWindow only returns true once.
-    // Running it every frame allows late-loading components (e.g. GTAO) to appear in
-    // the panel as soon as hasLoaded() becomes true.
-    if (mainCamera) {
-      const ppFolder = (gui as any).folders?.get('Post-Processing');
-      if (ppFolder) {
-        const tryRender = (key: string, cast: (c: any) => any) => {
-          if (!mainCamera.hasComponent(key)) return;
-          const c = cast(mainCamera.getComponent(key));
-          if (c?.hasLoaded?.() ?? true) c?.renderInMenu(ppFolder);
-        };
-        tryRender('auto_exposure', (c) => c as AutoExposureComponent);
-        tryRender('god_rays', (c) => c as GodRaysComponent);
-        tryRender('fsr', (c) => c as FSRComponent);
-        tryRender('tsr', (c) => c as TSRComponent);
-        tryRender('taa', (c) => c as TAAComponent);
-        tryRender('ambient_occlusion', (c) => c as AmbientOcclusionComponent);
-        tryRender('contact_shadows', (c) => c as ContactShadowsComponent);
-        tryRender('atmospheric_fog', (c) => c as AtmosphericFogComponent);
-        tryRender('vignette', (c) => c as VignetteComponent);
-        tryRender('chromatic_aberration', (c) => c as ChromaticAberrationComponent);
-        tryRender('film_grain', (c) => c as FilmGrainComponent);
-        tryRender('shockwave', (c) => c as ShockwavePostProcessComponent);
-        tryRender('fog_multi_scatter', (c) => c as FogMultiScatterComponent);
-      }
-    }
+    const ppFolder = gui.folders?.get('Post-Processing');
+    if (!ppFolder) return;
 
-    // Profiler window
-    if (this.beginGUIWindow('Profiler')) {
-      gui.addDynamicText(this.profilerMeta.gpuSupported, 'value', 'GPU Timestamps');
-      this.addGUISeparator();
-      gui.addDynamicText(this.profilerCPU.Entities, 'value', 'CPU  Entities');
-      gui.addDynamicText(this.profilerCPU.Shadows, 'value', 'CPU  Shadows');
-      gui.addDynamicText(this.profilerCPU.Deferred, 'value', 'CPU  Deferred');
-      gui.addDynamicText(this.profilerCPU['Post-Process'], 'value', 'CPU  Post-Process');
-      this.addGUISeparator();
-      for (const [name, obj] of Object.entries(this.profilerGPU)) {
-        gui.addDynamicText(obj, 'value', `GPU  ${name}`);
-      }
-      this.endGUIWindow();
+    // Renderer-owned controls (froxels, SSR, clouds) — each guards itself internally.
+    this.deferred.renderInMenu(ppFolder);
+
+    // Camera component controls — run every frame so late-loading components appear
+    // as soon as hasLoaded() becomes true. Each component guards via _editorFolder.
+    const tryRender = (key: string) => {
+      if (!mainCamera.hasComponent(key)) return;
+      const c = mainCamera.getComponent(key) as any;
+      if (c?.hasLoaded?.() ?? true) c?.renderInMenu(ppFolder);
+    };
+
+    tryRender('auto_exposure');
+    tryRender('god_rays');
+    tryRender('fsr');
+    tryRender('tsr');
+    tryRender('taa');
+    tryRender('ambient_occlusion');
+    tryRender('contact_shadows');
+    tryRender('atmospheric_fog');
+    tryRender('fog_scatter');
+    tryRender('vignette');
+    tryRender('chromatic_aberration');
+    tryRender('film_grain');
+    tryRender('shockwave');
+  }
+
+  private renderProfilerMenu(gui: any): void {
+    if (!this.beginGUIWindow('Profiler')) return;
+
+    gui.addDynamicText(this.profilerMeta.gpuSupported, 'value', 'GPU Timestamps');
+    this.addGUISeparator();
+    gui.addDynamicText(this.profilerCPU.Entities, 'value', 'CPU  Entities');
+    gui.addDynamicText(this.profilerCPU.Shadows, 'value', 'CPU  Shadows');
+    gui.addDynamicText(this.profilerCPU.Deferred, 'value', 'CPU  Deferred');
+    gui.addDynamicText(this.profilerCPU['Post-Process'], 'value', 'CPU  Post-Process');
+    this.addGUISeparator();
+    for (const [name, obj] of Object.entries(this.profilerGPU)) {
+      gui.addDynamicText(obj, 'value', `GPU  ${name}`);
     }
+    this.endGUIWindow();
   }
 
   public renderDebug(): void {

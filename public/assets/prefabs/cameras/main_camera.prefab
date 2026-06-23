@@ -11,7 +11,7 @@
     "bloom": {},
     "auto_exposure": {},
     "lens_flare": {},
-    "fog_multi_scatter": {
+    "fog_scatter": {
       "density": 0.012,
       "heightBase": 0,
       "heightFalloff": 0.08,
@@ -21,8 +21,14 @@
         1
       ],
       "numSteps": 16,
+      "ambientColor": [
+        0.4,
+        0.6,
+        1
+      ],
+      "ambientStrength": 0,
       "lateralScatterStrength": 0.45,
-      "multiScatterStrength": 0.6
+      "scatterStrength": 0.6
     },
     "vignette": {
       "intensity": 0.3,

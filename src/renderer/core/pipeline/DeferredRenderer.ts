@@ -760,13 +760,7 @@ export class DeferredRenderer {
     this.ssr.update(_dt);
   }
 
-  public renderInMenu(): void {
-    // Intentionally empty — post-processing controls are rendered by ModuleRender
-    // inside its dedicated Post-Processing window via renderPostProcessingMenu().
-  }
-
-  /** Called by ModuleRender from inside the Post-Processing lil-gui folder. */
-  public renderPostProcessingMenu(folder: any): void {
+  public renderInMenu(folder: any): void {
     this.froxelVolumetrics.renderInMenu(folder);
     this.ssr.renderInMenu(folder);
     this.volumetricClouds.renderInMenu(folder);

@@ -30,7 +30,7 @@ Slash effect
 
 ## Renderer
 
-1. Screen space multiple scattering
+1. Screen space multiple scattering (Granulado) (Blur) (Ruido 3d) (Lights)
 2. Irradiance Volumes
 3. Material Instances https://www.instagram.com/p/DWCZ7GGjC5D/
 4. Procedural materials

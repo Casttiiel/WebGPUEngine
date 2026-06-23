@@ -32,7 +32,7 @@ import { MotionBlurComponent } from '../../components/render/MotionBlurComponent
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
-import { FogMultiScatterComponent } from '../../components/render/FogMultiScatterComponent';
+import { FogScatterComponent } from '../../components/render/FogScatterComponent';
 import { ContactShadowsComponent } from '../../components/render/ContactShadowsComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
@@ -184,7 +184,7 @@ export class Engine {
     FSRComponent.registerMsgs();
     PaletteQuantizeComponent.registerMsgs();
     GodRaysComponent.registerMsgs();
-    FogMultiScatterComponent.registerMsgs();
+    FogScatterComponent.registerMsgs();
     ContactShadowsComponent.registerMsgs();
     BloodDrainSourceComponent.registerMsgs();
     LensFlareComponent.registerMsgs();

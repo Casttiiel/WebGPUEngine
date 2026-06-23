@@ -1,4 +1,4 @@
-export type FogMultiScatterComponentData = Readonly<{
+export type FogScatterComponentData = Readonly<{
   enabled?: boolean;
   density?: number;
   heightBase?: number;
@@ -8,6 +8,8 @@ export type FogMultiScatterComponentData = Readonly<{
   numSteps?: number;
   fogNear?: number;
   fogFar?: number;
+  ambientColor?: [number, number, number];
+  ambientStrength?: number;
   lateralScatterStrength?: number;
-  multiScatterStrength?: number;
+  scatterStrength?: number;
 }>;

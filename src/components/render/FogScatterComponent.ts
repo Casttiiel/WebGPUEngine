@@ -1,7 +1,7 @@
 import { Component } from '../../core/ecs/Component';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
-import { FogMultiScatterComponentData } from '../../types/FogMultiScatterComponentData.type';
+import { FogScatterComponentData } from '../../types/FogScatterComponentData.type';
 import { DirectionalLightComponent } from './DirectionalLightComponent';
 import { RenderTarget } from '../../renderer/resources/RenderTarget';
 import { Mesh } from '../../renderer/resources/Mesh';
@@ -14,13 +14,13 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { Engine } from '../../core/engine/Engine';
 
 /**
- * FogMultiScatterComponent — Screen-space physically-motivated fog.
+ * FogScatterComponent — Screen-space single-scatter fog.
  *
- * Two effects without froxel dependency:
- *   Effect 1 (scene blur):    objects inside dense fog lose sharpness in proportion
- *                              to actual transmittance — not to distance.
- *   Effect 2 (lateral scatter): light bleeds laterally across shadow boundaries inside
- *                              the fog volume.
+ * Two artistic effects:
+ *   Effect 1 (scene blur):    objects inside dense fog lose sharpness in
+ *                              proportion to actual transmittance.
+ *   Effect 2 (lateral scatter): light bleeds laterally across shadow
+ *                              boundaries inside the fog volume.
  *
  * Pipeline (6 passes):
  *   Pass 1 — fog_scatter_raymarch  → fogHalfRT (half-res scatter + transmittance)
@@ -28,20 +28,18 @@ import { Engine } from '../../core/engine/Engine';
  *   Pass 3 — bilateral blur V      → fogHalfBlurred  (lateral scatter ready)
  *   Pass 4 — bilateral blur H      → sceneBlurH      (scene blur, quarter-res)
  *   Pass 5 — bilateral blur V      → sceneBlurred
- *   Pass 6 — fog_multiscatter_compose → resultRT     (final frame)
+ *   Pass 6 — fog_scatter_compose   → resultRT        (final frame)
  *
- * FogScatterParams layout (48 bytes = 12 × f32):
+ * FogScatterParams layout (64 bytes = 16 × f32):
  *   [0]  density          [1]  heightBase      [2]  heightFalloff   [3]  extinctionCoeff
  *   [4]  scatterColor.r   [5]  scatterColor.g  [6]  scatterColor.b  [7]  numSteps
  *   [8]  fogNear          [9]  fogFar          [10] enabled         [11] _pad
+ *   [12] ambientColor.r   [13] ambientColor.g  [14] ambientColor.b  [15] _pad2
  *
- * FogMultiScatterParams layout (16 bytes = 4 × f32):
- *   [0]  lateralScatterStrength  [1]  multiScatterStrength  [2]  enabled  [3]  _pad
- *
- * FogBilateralBlurParams layout (16 bytes = 4 × f32):
- *   [0]  direction.x  [1]  direction.y  [2]  depthSigma  [3]  radius
+ * FogScatterComposeParams layout (16 bytes = 4 × f32):
+ *   [0]  lateralScatterStrength  [1]  scatterStrength  [2]  enabled  [3]  _pad
  */
-export class FogMultiScatterComponent extends Component {
+export class FogScatterComponent extends Component {
   // ─── Techniques + mesh ───────────────────────────────────────────────────────
   private raymarchTech!: Technique;
   private bilateralBlurTech!: Technique;
@@ -49,17 +47,16 @@ export class FogMultiScatterComponent extends Component {
   private mesh!: Mesh;
 
   // ─── Render targets ───────────────────────────────────────────────────────────
-  private fogHalfRT!: RenderTarget; // half-res, rgba16float — raymarch output
-  private fogHalfBlurH!: RenderTarget; // half-res — horizontal bilateral pass
-  private fogHalfBlurred!: RenderTarget; // half-res — full bilateral (lateral scatter)
-  private sceneBlurH!: RenderTarget; // quarter-res — horizontal scene blur
-  private sceneBlurred!: RenderTarget; // quarter-res — full scene blur
-  private resultRT!: RenderTarget; // full-res — final composed output
+  private fogHalfRT!: RenderTarget;
+  private fogHalfBlurH!: RenderTarget;
+  private fogHalfBlurred!: RenderTarget;
+  private sceneBlurH!: RenderTarget;
+  private sceneBlurred!: RenderTarget;
+  private resultRT!: RenderTarget;
 
   // ─── Uniform buffers ──────────────────────────────────────────────────────────
-  private fogParamsBuffer!: GPUBuffer; // FogScatterParams (48 bytes)
-  private composeParamsBuffer!: GPUBuffer; // FogMultiScatterParams (16 bytes)
-  // One buffer per blur direction/sigma pair — written once at load, never change.
+  private fogParamsBuffer!: GPUBuffer; // FogScatterParams (64 bytes)
+  private composeParamsBuffer!: GPUBuffer; // FogScatterComposeParams (16 bytes)
   private fogBlurHBuffer!: GPUBuffer;
   private fogBlurVBuffer!: GPUBuffer;
   private sceneBlurHBuffer!: GPUBuffer;
@@ -69,18 +66,14 @@ export class FogMultiScatterComponent extends Component {
   private fogParamsBindGroup: GPUBindGroup | null = null;
   private composeParamsBindGroup: GPUBindGroup | null = null;
   private fogComposeBG: GPUBindGroup | null = null;
-  // Bilateral blur group(1) — depth texture (rebuilt when depth view changes).
   private blurDepthBG: GPUBindGroup | null = null;
   private cachedDepthView: GPUTextureView | null = null;
-  // Blur group(2) — params buffer, one per pass direction.
   private fogBlurHBG!: GPUBindGroup;
   private fogBlurVBG!: GPUBindGroup;
   private sceneBlurHBG!: GPUBindGroup;
   private sceneBlurVBG!: GPUBindGroup;
-  // CSM bind group for raymarch pass (group 2).
   private csmBindGroup: GPUBindGroup | null = null;
   private cachedShadowView: GPUTextureView | null = null;
-  // Per-texture-view caches.
   private blurInputBGCache: Map<GPUTextureView, GPUBindGroup> = new Map();
   private composeSceneBGCache: Map<GPUTextureView, GPUBindGroup> = new Map();
 
@@ -97,18 +90,20 @@ export class FogMultiScatterComponent extends Component {
   public numSteps: number = 16;
   public fogNear: number = 0.0;
   public fogFar: number = 500.0;
+  public ambientColor: [number, number, number] = [0.4, 0.6, 1.0];
+  public ambientStrength: number = 0.15;
   public lateralScatterStrength: number = 0.45;
-  public multiScatterStrength: number = 0.6;
+  public scatterStrength: number = 0.6;
 
   private loaded = false;
-  private readonly fogParamsData = new Float32Array(12);
+  private readonly fogParamsData = new Float32Array(16);
   private readonly composeParamsData = new Float32Array(4);
 
   private _editorFolder: any = null;
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
-  public async load(data?: FogMultiScatterComponentData): Promise<void> {
+  public async load(data?: FogScatterComponentData): Promise<void> {
     if (data) {
       if (data.enabled !== undefined) this._enabled = data.enabled;
       if (data.density !== undefined) this.density = data.density;
@@ -119,16 +114,17 @@ export class FogMultiScatterComponent extends Component {
       if (data.numSteps !== undefined) this.numSteps = data.numSteps;
       if (data.fogNear !== undefined) this.fogNear = data.fogNear;
       if (data.fogFar !== undefined) this.fogFar = data.fogFar;
+      if (data.ambientColor !== undefined) this.ambientColor = data.ambientColor;
+      if (data.ambientStrength !== undefined) this.ambientStrength = data.ambientStrength;
       if (data.lateralScatterStrength !== undefined)
         this.lateralScatterStrength = data.lateralScatterStrength;
-      if (data.multiScatterStrength !== undefined)
-        this.multiScatterStrength = data.multiScatterStrength;
+      if (data.scatterStrength !== undefined) this.scatterStrength = data.scatterStrength;
     }
 
     this.mesh = await Mesh.getAsync('fullscreenquad.obj');
     this.raymarchTech = await Technique.getAsync('post-processing/fog_scatter_raymarch.tech');
     this.bilateralBlurTech = await Technique.getAsync('post-processing/fog_bilateral_blur.tech');
-    this.composeTech = await Technique.getAsync('post-processing/fog_multiscatter_compose.tech');
+    this.composeTech = await Technique.getAsync('post-processing/fog_scatter_compose.tech');
     this.blueNoiseTexture = await Texture.getAsync('bluenoise64.png');
 
     this.createRenderTargets();
@@ -139,8 +135,8 @@ export class FogMultiScatterComponent extends Component {
   }
 
   public static registerMsgs(): void {
-    MsgDispatcher.register(MsgType.RESIZE, 'fog_multi_scatter', (comp) => {
-      const c = comp as FogMultiScatterComponent;
+    MsgDispatcher.register(MsgType.RESIZE, 'fog_scatter', (comp) => {
+      const c = comp as FogScatterComponent;
       if (c.hasLoaded()) c.resize();
     });
   }
@@ -149,7 +145,6 @@ export class FogMultiScatterComponent extends Component {
     if (!this.loaded) return;
     this.destroyRenderTargets();
     this.createRenderTargets();
-    // Invalidate all view-dependent caches.
     this.csmBindGroup = null;
     this.cachedShadowView = null;
     this.blurDepthBG = null;
@@ -157,16 +152,11 @@ export class FogMultiScatterComponent extends Component {
     this.fogComposeBG = null;
     this.blurInputBGCache.clear();
     this.composeSceneBGCache.clear();
-    // Rebuild static bind groups that hold RT views.
     this.createStaticBindGroups();
   }
 
   // ─── Per-frame render ─────────────────────────────────────────────────────────
 
-  /**
-   * Run the 6-pass fog pipeline and return the final composed texture view.
-   * Returns sceneView unmodified when no directional light with shadows is found.
-   */
   public render(
     sceneView: GPUTextureView,
     gBufferBindGroup: GPUBindGroup,
@@ -183,7 +173,6 @@ export class FogMultiScatterComponent extends Component {
     const cameraBG = Engine.getRender().getMainCameraBindGroup();
     const depthBG = this.getOrRebuildBlurDepthBG();
 
-    // ── Pass 1: raymarch scatter + transmittance ──────────────────────────────
     this.executePass('Fog Scatter Raymarch', this.raymarchTech, this.fogHalfRT, 1.0, [
       cameraBG,
       gBufferBindGroup,
@@ -191,35 +180,30 @@ export class FogMultiScatterComponent extends Component {
       this.fogParamsBindGroup!,
     ]);
 
-    // ── Pass 2: fog bilateral blur H ──────────────────────────────────────────
     this.executePass('Fog Bilateral H', this.bilateralBlurTech, this.fogHalfBlurH, 1.0, [
       this.getOrCreateBlurInputBG(this.fogHalfRT.getView()),
       depthBG,
       this.fogBlurHBG,
     ]);
 
-    // ── Pass 3: fog bilateral blur V ──────────────────────────────────────────
     this.executePass('Fog Bilateral V', this.bilateralBlurTech, this.fogHalfBlurred, 1.0, [
       this.getOrCreateBlurInputBG(this.fogHalfBlurH.getView()),
       depthBG,
       this.fogBlurVBG,
     ]);
 
-    // ── Pass 4: scene bilateral blur H (quarter-res) ──────────────────────────
     this.executePass('Scene Bilateral H', this.bilateralBlurTech, this.sceneBlurH, 1.0, [
       this.getOrCreateBlurInputBG(sceneView),
       depthBG,
       this.sceneBlurHBG,
     ]);
 
-    // ── Pass 5: scene bilateral blur V ────────────────────────────────────────
     this.executePass('Scene Bilateral V', this.bilateralBlurTech, this.sceneBlurred, 1.0, [
       this.getOrCreateBlurInputBG(this.sceneBlurH.getView()),
       depthBG,
       this.sceneBlurVBG,
     ]);
 
-    // ── Pass 6: compose ───────────────────────────────────────────────────────
     this.executePass('Fog Compose', this.composeTech, this.resultRT, 1.0, [
       this.getOrCreateComposeBG(sceneView),
       this.fogComposeBG!,
@@ -232,19 +216,15 @@ export class FogMultiScatterComponent extends Component {
   public isEnabled(): boolean {
     return this._enabled;
   }
-
   public hasLoaded(): boolean {
     return this.loaded;
   }
-
   public override update(_dt: number): void {}
-
   public override renderDebug(): void {}
 
   public override renderInMenu(folder?: any): void {
-    if (!folder) return;
-    if (this._editorFolder) return;
-    this._editorFolder = folder.addFolder('Fog Multi-Scatter');
+    if (!folder || this._editorFolder) return;
+    this._editorFolder = folder.addFolder('Fog Scatter');
     this._editorFolder.close();
     this._editorFolder.add(this, '_enabled').name('Enable').listen();
     this._editorFolder.add(this, 'density', 0.0, 0.1, 0.001).name('Density').listen();
@@ -254,12 +234,16 @@ export class FogMultiScatterComponent extends Component {
     this._editorFolder.add(this, 'numSteps', [8, 16, 32]).name('Steps').listen();
     this._editorFolder.add(this, 'fogFar', 50, 2000, 10).name('Fog Far').listen();
     this._editorFolder
+      .add(this, 'ambientStrength', 0.0, 1.0, 0.01)
+      .name('Ambient Strength')
+      .listen();
+    this._editorFolder
       .add(this, 'lateralScatterStrength', 0.0, 1.0, 0.01)
       .name('Lateral Scatter')
       .listen();
     this._editorFolder
-      .add(this, 'multiScatterStrength', 0.0, 1.0, 0.01)
-      .name('Multi Scatter')
+      .add(this, 'scatterStrength', 0.0, 1.0, 0.01)
+      .name('Scatter Strength')
       .listen();
   }
 
@@ -279,7 +263,6 @@ export class FogMultiScatterComponent extends Component {
     const w = Render.width;
     const h = Render.height;
     const fmt: GPUTextureFormat = 'rgba16float';
-
     const halfW = Math.max(1, w >> 1);
     const halfH = Math.max(1, h >> 1);
     const qW = Math.max(1, w >> 2);
@@ -287,19 +270,14 @@ export class FogMultiScatterComponent extends Component {
 
     this.fogHalfRT = new RenderTarget();
     this.fogHalfRT.createRT('fog_half_rt', halfW, halfH, fmt);
-
     this.fogHalfBlurH = new RenderTarget();
     this.fogHalfBlurH.createRT('fog_half_blur_h', halfW, halfH, fmt);
-
     this.fogHalfBlurred = new RenderTarget();
     this.fogHalfBlurred.createRT('fog_half_blurred', halfW, halfH, fmt);
-
     this.sceneBlurH = new RenderTarget();
     this.sceneBlurH.createRT('fog_scene_blur_h', qW, qH, fmt);
-
     this.sceneBlurred = new RenderTarget();
     this.sceneBlurred.createRT('fog_scene_blurred', qW, qH, fmt);
-
     this.resultRT = new RenderTarget();
     this.resultRT.createRT('fog_result_rt', w, h, fmt);
   }
@@ -316,7 +294,7 @@ export class FogMultiScatterComponent extends Component {
   private createUniformBuffers(): void {
     this.fogParamsBuffer = GPUUtils.createBuffer(
       'fog_scatter_params',
-      48,
+      64,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.composeParamsBuffer = GPUUtils.createBuffer(
@@ -324,8 +302,6 @@ export class FogMultiScatterComponent extends Component {
       16,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-
-    // Bilateral blur param buffers: direction, depthSigma, radius — fixed per role.
     this.fogBlurHBuffer = GPUUtils.createBuffer(
       'fog_blur_h_params',
       16,
@@ -346,8 +322,6 @@ export class FogMultiScatterComponent extends Component {
       16,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-
-    // direction is (1,0)/(0,1); shader computes texelSize from txInput dimensions.
     GPUUtils.writeBuffer(this.fogBlurHBuffer, 0, new Float32Array([1, 0, 5.0, 2.0]));
     GPUUtils.writeBuffer(this.fogBlurVBuffer, 0, new Float32Array([0, 1, 5.0, 2.0]));
     GPUUtils.writeBuffer(this.sceneBlurHBuffer, 0, new Float32Array([1, 0, 1.0, 5.0]));
@@ -355,7 +329,6 @@ export class FogMultiScatterComponent extends Component {
   }
 
   private createStaticBindGroups(): void {
-    // Group(3) of raymarch: fogParams + blueNoise + sampler.
     this.fogParamsBindGroup = BindGroupFactory.createBindGroup(
       'fog_scatter_params_bg',
       this.raymarchTech.getPipeline().getBindGroupLayout(3),
@@ -366,14 +339,12 @@ export class FogMultiScatterComponent extends Component {
       ],
     );
 
-    // Group(2) for compose: FogMultiScatterParams.
     this.composeParamsBindGroup = BindGroupFactory.createBindGroup(
       'fog_compose_params_bg',
       this.composeTech.getPipeline().getBindGroupLayout(2),
       [{ binding: 0, resource: { buffer: this.composeParamsBuffer } }],
     );
 
-    // Group(1) of compose: fogHalfRT + fogHalfBlurred + sampler.
     this.fogComposeBG = BindGroupFactory.createBindGroup(
       'fog_compose_fog_bg',
       this.composeTech.getPipeline().getBindGroupLayout(1),
@@ -384,7 +355,6 @@ export class FogMultiScatterComponent extends Component {
       ],
     );
 
-    // Group(2) of bilateral blur — one bind group per blur params buffer.
     const blurParamsLayout = this.bilateralBlurTech.getPipeline().getBindGroupLayout(2);
     this.fogBlurHBG = BindGroupFactory.createBindGroup('fog_blur_h_bg', blurParamsLayout, [
       { binding: 0, resource: { buffer: this.fogBlurHBuffer } },
@@ -414,13 +384,20 @@ export class FogMultiScatterComponent extends Component {
     d[9] = this.fogFar;
     d[10] = this._enabled ? 1.0 : 0.0;
     d[11] = 0;
+    // ambientColor pre-scaled by globalFactor so the shader doesn't need to read it
+    const globalFactor = Engine.getEnvironmentManager().getAmbientLightData().globalFactor;
+    const ambientScale = this.ambientStrength * globalFactor;
+    d[12] = this.ambientColor[0] * ambientScale;
+    d[13] = this.ambientColor[1] * ambientScale;
+    d[14] = this.ambientColor[2] * ambientScale;
+    d[15] = 0;
     GPUUtils.writeBuffer(this.fogParamsBuffer, 0, d);
   }
 
   private updateComposeParamsBuffer(): void {
     const d = this.composeParamsData;
     d[0] = this.lateralScatterStrength;
-    d[1] = this.multiScatterStrength;
+    d[1] = this.scatterStrength;
     d[2] = this._enabled ? 1.0 : 0.0;
     d[3] = 0;
     GPUUtils.writeBuffer(this.composeParamsBuffer, 0, d);
