@@ -329,6 +329,11 @@ export class HackAndSlashControllerComponent
   }
 
   // ── BasePlayerController ─────────────────────────────────────────────────────
+  public setVisualYaw(yaw: number): void {
+    this.visualYaw = yaw;
+    this.smoothedDesiredYaw = yaw;
+  }
+
   public override setActive(active: boolean): void {
     this.isActive = active;
   }

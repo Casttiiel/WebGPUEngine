@@ -112,6 +112,7 @@ export class PlayerAttackComponent extends Component {
     if (!this.animator || !this.ownerTransform) return;
 
     this.clearHitFreezeIK();
+    this.snapToNearestEnemy();
 
     this.attackLayerId =
       this.animator.addLayer(this.attackClip, {
@@ -216,6 +217,43 @@ export class PlayerAttackComponent extends Component {
   }
 
   // ── Auto-aim helpers ───────────────────────────────────────────────────────
+
+  private static readonly AUTO_AIM_RADIUS = 5.0;
+
+  private snapToNearestEnemy(): void {
+    if (!this.ownerTransform) return;
+    const myPos = this.ownerTransform.getTransform().getWorldPosition();
+    const physics = Engine.getPhysics();
+
+    let bestDistSq = PlayerAttackComponent.AUTO_AIM_RADIUS ** 2;
+    let bestDir: vec3 | null = null;
+
+    physics.overlapSphere(myPos, PlayerAttackComponent.AUTO_AIM_RADIUS, (entityId) => {
+      const entity = Engine.getEntities().getEntityById(entityId);
+      if (!entity || entity === this.getOwner()) return true;
+      if (!entity.getComponent('health')) return true;
+
+      const tc = entity.getComponent('transform') as TransformComponent | null;
+      const ePos = tc?.getTransform().getWorldPosition();
+      if (!ePos) return true;
+
+      const dx = ePos[0] - myPos[0];
+      const dz = ePos[2] - myPos[2];
+      const distSq = dx * dx + dz * dz;
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        bestDir = vec3.normalize(vec3.create(), vec3.fromValues(dx, 0, dz));
+      }
+      return true;
+    });
+
+    if (!bestDir) return;
+
+    const yaw = Math.atan2((bestDir as vec3)[0], (bestDir as vec3)[2]) * (180 / Math.PI);
+    const controller = this.getOwner().getComponent('hack_and_slash_controller') as any;
+    controller?.setVisualYaw?.(yaw);
+    this.ownerTransform.getTransform().setAngles(yaw, 0, 0);
+  }
 
   // ── Blade position ─────────────────────────────────────────────────────────
 
