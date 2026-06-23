@@ -49,4 +49,7 @@ export enum PipelineBindGroupLayouts {
   SKIN_MATRICES_PAIR = 'SkinMatricesPair',
   GRASS_UNIFORMS = 'GrassUniforms',
   CLOUD_TEMPORAL_UNIFORMS = 'CloudTemporalUniforms',
+  FOG_SCATTER_RAYMARCH_UNIFORMS = 'FogScatterRaymarchUniforms',
+  FOG_MULTISCATTER_SCENE_TEXTURES = 'FogMultiScatterSceneTextures',
+  FOG_MULTISCATTER_FOG_TEXTURES = 'FogMultiScatterFogTextures',
 }

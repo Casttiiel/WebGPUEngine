@@ -36,6 +36,7 @@ import { AutoExposureComponent } from '../../components/render/AutoExposureCompo
 import { FSRComponent } from '../../components/render/FSRComponent';
 import { PaletteQuantizeComponent } from '../../components/render/PaletteQuantizeComponent';
 import { GodRaysComponent } from '../../components/render/GodRaysComponent';
+import { FogMultiScatterComponent } from '../../components/render/FogMultiScatterComponent';
 import { LensFlareComponent } from '../../components/render/LensFlareComponent';
 import { ChromaticAberrationComponent } from '../../components/render/ChromaticAberrationComponent';
 import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
@@ -395,7 +396,9 @@ export class ModuleRender extends Module {
       this.distorsions.render(result, this.deferred.getDepthStencilView()!);
 
       if (mainCameraEntity?.hasComponent('shockwave')) {
-        const shockwave = mainCameraEntity.getComponent('shockwave') as ShockwavePostProcessComponent;
+        const shockwave = mainCameraEntity.getComponent(
+          'shockwave',
+        ) as ShockwavePostProcessComponent;
         if (shockwave.hasLoaded()) {
           result = shockwave.apply(result, this.deferred.getLinearDepthView());
         }
@@ -435,6 +438,21 @@ export class ModuleRender extends Module {
             }
           }
           result = godRays.apply(result, this.deferred.getGBufferBindGroup());
+        }
+      }
+
+      if (mainCameraEntity?.hasComponent('fog_multi_scatter')) {
+        const fogMultiScatter = mainCameraEntity.getComponent(
+          'fog_multi_scatter',
+        ) as FogMultiScatterComponent;
+        if (fogMultiScatter.hasLoaded() && fogMultiScatter.isEnabled()) {
+          const dirLights =
+            Engine.getEntities().getObjectManagerByName('directional_light')?.getList() ?? [];
+          const dirLight =
+            dirLights.length > 0 ? (dirLights[0] as DirectionalLightComponent) : null;
+          if (dirLight) {
+            result = fogMultiScatter.render(result, this.deferred.getGBufferBindGroup(), dirLight);
+          }
         }
       }
 
@@ -864,7 +882,8 @@ export class ModuleRender extends Module {
         tryRender('vignette', (c) => c as VignetteComponent);
         tryRender('chromatic_aberration', (c) => c as ChromaticAberrationComponent);
         tryRender('film_grain', (c) => c as FilmGrainComponent);
-        tryRender('shockwave',  (c) => c as ShockwavePostProcessComponent);
+        tryRender('shockwave', (c) => c as ShockwavePostProcessComponent);
+        tryRender('fog_multi_scatter', (c) => c as FogMultiScatterComponent);
       }
     }
 
