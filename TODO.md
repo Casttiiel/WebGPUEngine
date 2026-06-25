@@ -30,7 +30,6 @@ Slash effect
 
 ## Renderer
 
-1. Screen space multiple scattering (Ruido 3d)
 2. TSR Flickering
 3. Material Instances https://www.instagram.com/p/DWCZ7GGjC5D/
 4. Procedural materials

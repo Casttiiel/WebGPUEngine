@@ -115,15 +115,40 @@ fn evalHeightFog(worldPos: vec3<f32>) -> f32 {
     return fogParams.density * exp(-h * fogParams.heightFalloff);
 }
 
-// Returns a density modulator in [0..~1].
-// RGB channels of the blue noise are independent patterns → richer variation.
-// noiseThreshold clips below-threshold values to 0 → creates distinct fog banks.
+// ── Procedural 3D value noise ─────────────────────────────────────────────────
+// Works on any world coordinate (including negatives). No texture needed.
+
+fn hash31(p: vec3<f32>) -> f32 {
+    var h = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
+    h += dot(h, h.yzx + 33.33);
+    return fract((h.x + h.y) * h.z);
+}
+
+fn valueNoise3D(p: vec3<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(mix(hash31(i),                              hash31(i + vec3<f32>(1,0,0)), u.x),
+            mix(hash31(i + vec3<f32>(0,1,0)),          hash31(i + vec3<f32>(1,1,0)), u.x), u.y),
+        mix(mix(hash31(i + vec3<f32>(0,0,1)),          hash31(i + vec3<f32>(1,0,1)), u.x),
+            mix(hash31(i + vec3<f32>(0,1,1)),          hash31(i + vec3<f32>(1,1,1)), u.x), u.y),
+        u.z,
+    );
+}
+
+// Returns density modulator in [0..1].
+// XZ scaled by noiseScale; Y scaled 8× slower → banks are wide/horizontal, not columnar.
+// 2-octave FBM: coarse banks (oct 0) + fine tendrils (oct 1).
 fn noiseFactor(worldPos: vec3<f32>) -> f32 {
-    let uv  = worldPos.xz * fogParams.noiseScale
-            + vec2<f32>(fogParams.windOffsetX, fogParams.windOffsetZ);
-    let n   = textureSampleLevel(txBlueNoise, samplerNoise, uv, 0.0);
-    let raw = n.r * 0.5 + n.g * 0.35 + n.b * 0.15;  // weighted mean ≈ 0.5
-    // Threshold: below it → 0; above it → remap to [0..1]
+    let p    = vec3<f32>(
+                   worldPos.x * fogParams.noiseScale + fogParams.windOffsetX,
+                   worldPos.y * fogParams.noiseScale * 0.12,
+                   worldPos.z * fogParams.noiseScale + fogParams.windOffsetZ,
+               );
+    let n0   = valueNoise3D(p);
+    let n1   = valueNoise3D(p * 2.17 + vec3<f32>(1.7, 9.2, 3.4)) * 0.5;
+    let raw  = n0 * 0.667 + n1 * 0.333;
     let above = max(raw - fogParams.noiseThreshold, 0.0)
               / max(1.0 - fogParams.noiseThreshold, 0.001);
     return mix(1.0, above, fogParams.noiseStrength);
