@@ -685,18 +685,7 @@ export class ModuleEnvironmentManager extends Module {
     // Time of Day slider with .listen() for automatic updates
     folder.add(this, 'timeOfDay', 0.0, 1.0).name('Time of Day').listen();
 
-    // ── Cloud controls (procedural skybox only) ──
-    if (this.skyboxType === 'procedural') {
-      folder.add(this, 'cloudCoverage', 0.0, 1.0).name('Cloud Coverage').listen();
-      folder.add(this, 'cloudThickness', 0.0, 8.0).name('Cloud Thickness').listen();
-      folder.add(this, 'cloudScale', 0.1, 5.0).name('Cloud Size').listen();
-      folder.add(this, 'cloudLayers', 1, 8).step(1).name('Cloud Layers').listen();
-      folder.add(this, 'cloudOpacity', 0.0, 1.0).name('Cloud Opacity').listen();
-      folder.add(this, 'cloudDistanceFade', 0.01, 0.5).name('Cloud Horizon Fade').listen();
-      folder.addColor(this, 'cloudColor').name('Cloud Color').listen();
-    }
-
-    // ── Wind (affects clouds + volumetric fog) ──
+    // ── Wind ──
     folder.add(Wind, 'speed', 0.0, 0.5).name('Wind Speed').listen();
     folder.add(Wind, 'dirAngle', 0.0, 360.0).name('Wind Direction (°)').listen();
 

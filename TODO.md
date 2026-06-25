@@ -30,12 +30,13 @@ Slash effect
 
 ## Renderer
 
-1. Screen space multiple scattering (Granulado) (Blur) (Ruido 3d) (Lights)
-2. Irradiance Volumes
+1. Screen space multiple scattering (Ruido 3d)
+2. TSR Flickering
 3. Material Instances https://www.instagram.com/p/DWCZ7GGjC5D/
 4. Procedural materials
-5. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-6. Review SSR
+5. Irradiance Volumes
+6. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+7. Review SSR
 
 ## Engine
 

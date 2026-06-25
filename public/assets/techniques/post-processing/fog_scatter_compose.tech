@@ -3,5 +3,5 @@
   "fs": "post-processing/fog_scatter_compose.fs",
   "writesOn": "texture",
   "z": "disable_all",
-  "uniforms": ["FogScatterSceneTextures", "FogScatterFogTextures", "BufferUniform"]
+  "uniforms": ["SingleTexture", "FogScatterFogTextures", "SingleTexture", "BufferUniform"]
 }

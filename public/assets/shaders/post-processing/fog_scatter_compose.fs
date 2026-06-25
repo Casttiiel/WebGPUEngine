@@ -1,42 +1,41 @@
-// ─── Screen-Space Fog — Compose Pass ─────────────────────────────────────────
+// ─── Fog Scatter — Compose Pass ───────────────────────────────────────────────
 //
-// Combines the raymarch scatter buffer and bilateral-blurred variants into a
-// final frame with two fog effects:
+// Final composite of the full fog pipeline onto the scene:
 //
-//   Effect 1 (scene blur):     objects inside dense fog lose sharpness in
-//                               proportion to real transmittance, not distance.
+//   1. Apply raymarch fog:       base = scene * T + fogScatter
+//   2. Energy loss:              base *= 1 - energyLoss * fogFac
+//   3. SSMS scatter blend:       mix(base, scatter / radius, fogFac * intensity)
 //
-//   Effect 2 (lateral scatter): illuminated fog regions bleed laterally into
-//                               shadowed areas, softening shadow edges.
+// The scatter texture is the output of the SSMS pyramid (fog-masked bloom glow).
+// maxDensity clamps transmittance so no fragment is fully opaque fog.
 //
-// Bind-group layout:
-//   group(0)  FogScatterSceneTextures — txScene + txSceneBlurred + sampler
-//   group(1)  FogScatterFogTextures   — txFogHalf + txFogHalfBlurred + sampler
-//   group(2)  BufferUniform           — FogScatterComposeParams
+// Bind groups:
+//   group(0)  SingleTexture          — txScene + sampler
+//   group(1)  FogScatterFogTextures  — txFogHalfBlurred (scatter.rgb + transmittance.a) + sampler
+//   group(2)  SingleTexture          — txScatter (SSMS pyramid result) + sampler
+//   group(3)  BufferUniform          — FogScatterComposeParams
 
-// ─── Uniform ──────────────────────────────────────────────────────────────────
-
-// 16 bytes — matches FogScatterComposeParams in FogScatterComponent.
 struct FogScatterComposeParams {
-    lateralScatterStrength: f32,  // 0=no lateral blur, 1=fully blurred scatter
-    scatterStrength:        f32,  // 0=no scene blur,   1=full transmittance blur
-    enabled:                f32,  // 0 = passthrough
-    _pad:                   f32,
+    maxDensity:       f32,   // max fog opacity; clamps T to max(T, 1 - maxDensity)
+    energyLoss:       f32,   // scene darkening inside fog (0 = none, 1 = full)
+    scatterIntensity: f32,   // final blend strength toward scatter
+    scatterRadius:    f32,   // pyramid brightness normalisation divisor
+    enabled:          f32,
+    _p0:              f32,
+    _p1:              f32,
+    _p2:              f32,
 }
 
-// ─── Bindings ─────────────────────────────────────────────────────────────────
-
 @group(0) @binding(0) var txScene:        texture_2d<f32>;
-@group(0) @binding(1) var txSceneBlurred: texture_2d<f32>;
-@group(0) @binding(2) var samplerScene:   sampler;
+@group(0) @binding(1) var samplerScene:   sampler;
 
-@group(1) @binding(0) var txFogHalf:        texture_2d<f32>;
-@group(1) @binding(1) var txFogHalfBlurred: texture_2d<f32>;
-@group(1) @binding(2) var samplerFog:       sampler;
+@group(1) @binding(0) var txFog:          texture_2d<f32>;
+@group(1) @binding(1) var samplerFog:     sampler;
 
-@group(2) @binding(0) var<uniform> params: FogScatterComposeParams;
+@group(2) @binding(0) var txScatter:      texture_2d<f32>;
+@group(2) @binding(1) var samplerScatter: sampler;
 
-// ─── Fragment entry ───────────────────────────────────────────────────────────
+@group(3) @binding(0) var<uniform> params: FogScatterComposeParams;
 
 @fragment
 fn fs(
@@ -48,18 +47,28 @@ fn fs(
         return vec4<f32>(sceneColor, 1.0);
     }
 
-    let sceneBlurred = textureSample(txSceneBlurred, samplerScene, uv).rgb;
-    let fogHalf      = textureSample(txFogHalf,        samplerFog, uv);
-    let fogBlurred   = textureSample(txFogHalfBlurred, samplerFog, uv);
+    let fogSample     = textureSample(txFog, samplerFog, uv);
+    let transmittance = fogSample.a;
+    let fogScatter    = fogSample.rgb;
 
-    let transmittance = fogHalf.a;
+    // Clamp transmittance: maxDensity=0.95 means objects can't vanish fully into fog
+    let T      = max(transmittance, 1.0 - params.maxDensity);
+    let rawFog = 1.0 - T;
 
-    // Effect 2 — lateral scatter: blend sharp vs blurred scatter.
-    let fogScatter = mix(fogHalf.rgb, fogBlurred.rgb, params.lateralScatterStrength);
+    // Amplify fog factor ×50 so a 2% T-drop (typical low density) maps to ~0.5 rather than ~0.
+    // Keeps scatter/energy-loss visible at working density values (0.0005–0.003).
+    let fogFac = saturate(rawFog * 50.0);
 
-    // Effect 1 — scene blur proportional to transmittance.
-    let blurWeight = saturate((1.0 - transmittance) * params.scatterStrength);
-    let baseColor  = mix(sceneColor, sceneBlurred, blurWeight);
+    // Scene with raymarch single-scatter applied
+    var base = sceneColor * T + fogScatter;
 
-    return vec4<f32>(baseColor * transmittance + fogScatter, 1.0);
+    // Energy loss: fog absorbs scene energy (non-physical, artistic)
+    base *= 1.0 - params.energyLoss * fogFac;
+
+    // SSMS scatter: lerp toward blurred pyramid glow in foggy areas
+    let scatter     = textureSample(txScatter, samplerScatter, uv).rgb;
+    let scatterNorm = scatter / max(params.scatterRadius, 0.001);
+    let blendFac    = clamp(fogFac * params.scatterIntensity, 0.0, 1.0);
+
+    return vec4<f32>(mix(base, scatterNorm, blendFac), 1.0);
 }

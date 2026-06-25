@@ -140,6 +140,9 @@ export class FroxelVolumetricScattering {
   }
 
   public async load(): Promise<void> {
+    if (!this.isEnabled) {
+      return;
+    }
     this.noiseTexture = await Texture.getAsync('noiseRGBTileable.jpg');
     this.blueNoiseTexture = await Texture.getAsync('bluenoise64.png');
     await this.initializeComputeShaders();
@@ -1084,6 +1087,9 @@ export class FroxelVolumetricScattering {
   }
 
   public renderInMenu(folder?: any): void {
+    if (!this.isEnabled) {
+      return;
+    }
     if (!folder) return;
     if (this._editorFolder) return;
     this._editorFolder = folder.addFolder('Volumetric Scattering');
