@@ -74,7 +74,8 @@ fn reinhardTonemap(c: vec3<f32>) -> vec3<f32> {
 
 fn reinhardInverse(c: vec3<f32>) -> vec3<f32> {
     let luma = dot(c, vec3<f32>(0.299, 0.587, 0.114));
-    return c / max(1.0 - luma, 0.0001);
+    // Adaptive epsilon prevents blow-up for very bright clamped specular history.
+    return c / max(1.0 - luma, 0.001 + luma * 0.002);
 }
 
 // ── Variance clipping (center→history ray clip) ───────────────────────────────
@@ -115,7 +116,8 @@ fn depthEdgeFactor(uv: vec2<f32>, inputTexelSize: vec2<f32>) -> f32 {
     let depthW = textureSampleLevel(txLinearDepth, txSampler, uv + vec2<f32>(-inputTexelSize.x,  0.0             ), 0.0).r;
     let maxDiff = max(max(abs(depthC - depthN), abs(depthC - depthS)),
                      max(abs(depthC - depthE), abs(depthC - depthW)));
-    return saturate(maxDiff / max(depthC * 0.05, 0.001));
+    // Clamp minimum threshold to 0.02 so close-range geometry isn't hypersensitive.
+    return saturate(maxDiff / max(depthC * 0.05, 0.02));
 }
 
 // ── Catmull-Rom upsampling of current frame (render res → canvas res) ─────────
@@ -239,8 +241,12 @@ fn fs(in: VertexOutput) -> @location(0) vec4<f32> {
     // Adaptive expansion at contrast edges
     let colorRange   = length(rawColorMax - rawColorMin);
     let contrastEdge = saturate(colorRange * 2.0);
-    let colorMin     = rawColorMin - contrastEdge * stddev * params.gamma;
-    let colorMax     = rawColorMax + contrastEdge * stddev * params.gamma;
+    // thinFeatureProtect pre-computed so AABB expands at sub-pixel high-contrast features.
+    // Prevents aggressive clamping from forcing history to track the jitter-alternating current.
+    let thinFeatureProtect = saturate(length(stddev) * 5.0 - 0.2);
+    let thinExpand   = thinFeatureProtect * 0.4;
+    let colorMin     = rawColorMin - contrastEdge * stddev * params.gamma - thinExpand;
+    let colorMax     = rawColorMax + contrastEdge * stddev * params.gamma + thinExpand;
 
     let histYCoCg      = rgbToYCoCg(reinhardTonemap(historyColor.rgb));
     let clampedYCoCg   = varianceClip(histYCoCg, colorMin, colorMax);
@@ -254,17 +260,14 @@ fn fs(in: VertexOutput) -> @location(0) vec4<f32> {
     // gating by disoccMotion eliminates the artifact without harming real events.
     let motionLen     = length(velocity);
     let edgeFactor    = depthEdgeFactor(uv, inputTexelSize);
-    let blendMotion   = mix(params.blendFactor, 0.3, saturate(motionLen * 20.0));
     let clampDelta    = length(clampedHistory.rgb - historyColor.rgb);
     let clampBoost    = saturate(clampDelta * 8.0);
     let disoccMotion  = saturate(motionLen * 30.0);
-    // Thin-feature protection: high neighbourhood stddev signals a complex or sub-pixel
-    // feature (1px crack, thin wire, geometry edge) that jitter alternates every frame.
-    // Reducing the current-frame blend weight at these pixels bounds the per-frame
-    // oscillation amplitude — with blend=0.04 the steady-state shimmer is only ~2% of
-    // the colour difference, which is imperceptible.  Ghost convergence slows at these
-    // pixels but they are typically too thin to ghost visibly anyway.
-    let thinFeatureProtect = saturate(length(stddev) * 5.0 - 0.2);
+    // thinFeatureProtect already computed above (shared with AABB expansion).
+    // Apply it to the BASE blend so high-variance sub-pixel features accumulate more history
+    // and less of the frame-to-frame jitter-alternating current → damps dark/bright oscillation.
+    let baseBlend     = params.blendFactor * (1.0 - thinFeatureProtect * 0.7);
+    let blendMotion   = mix(baseBlend, 0.3, saturate(motionLen * 20.0));
     let clampBoostTerm = clampBoost * 0.6 * edgeFactor * disoccMotion
                          * (1.0 - thinFeatureProtect * 0.6);
     let adaptiveBlend  = max(blendMotion, clampBoostTerm);

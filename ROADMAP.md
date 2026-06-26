@@ -178,225 +178,301 @@ que el diseñador tenga que hardcodear la cadencia.
 
 ---
 
-# Screen Space Fog Multi-Scatter — Roadmap de implementación
+# Weather System — Roadmap de implementación
 
-Sistema completamente independiente del froxel volumetric. No depende de ningún sistema de niebla existente.
+Sistema de clima dinámico que orquesta en tiempo real los sistemas existentes del motor
+(niebla, nubes volumétricas, viento, iluminación direccional, partículas) bajo una capa
+unificada de estados y transiciones suaves.
 
-Dos efectos físicamente motivados:
-- **Efecto 1 (scene blur):** objetos dentro de la niebla pierden nitidez en proporción a la transmittance real (no a la distancia). Un objeto a 30 m detrás de niebla densa se ve borroso; uno a 30 m con cielo despejado, no.
-- **Efecto 2 (lateral scatter):** la luz inside el volumen sangra lateralmente — el paso de zona iluminada a zona en sombra dentro de la niebla es un gradiente suave, no un corte duro.
-
-El sistema genera su propio `fogHalfRT` (media resolución, RGBA: RGB=scatter acumulado, A=transmittance) mediante un raymarch screen-space propio. Todo el pipeline vive en un único componente de cámara.
-
----
-
-## Step 0 — Leer los componentes de referencia
-
-**Archivos a leer (sin modificar):**
-- `src/components/render/GodRaysComponent.ts` — patrón de raymarch screen-space con shadow maps + kawase blur + composite
-- `src/components/vfx/AtmosphericFogComponent.ts` — patrón de fog analítico con RenderPassManager, uniforms, bind group cache
-- `src/components/render/BlurGaussianComponent.ts` — patrón de blur gaussiano separable reutilizable
-- `public/assets/shaders/post-processing/gaussian_blur.fs` — shader de blur existente como base
-
-Objetivo: entender exactamente cómo se crean los RenderTargets, cómo se gestiona el RenderPassManager, cómo se cachean los bind groups, y cómo se registran los componentes en `Loader.ts`. Aplicar estos mismos patrones al nuevo componente.
+No introduce un nuevo renderer ni un nuevo lenguaje de shaders. Su valor es la **coordinación**
+de sistemas ya funcionando y la adición de los efectos visuales que faltan (lluvia, nieve,
+rayos, superficies mojadas).
 
 ---
 
-## Step 1 — Shader de raymarch screen-space
-
-**Archivo nuevo:** `public/assets/shaders/post-processing/fog_scatter_raymarch.fs`
-
-Raymarch a media resolución que reconstruye rayos de cámara desde el depth buffer del GBuffer.
+## Arquitectura general
 
 ```
-Inputs (bindings):
-  - txLinearDepth   — depth lineal del GBuffer (para reconstruir posición de mundo y saber dónde parar)
-  - txShadowMap     — shadow map del directional light (para saber si cada step está iluminado)
-  - uCamera         — uniforms de cámara (proyección inversa, posición, far plane)
-  - uDirLight       — dirección + color del sol
-  - uFogParams      — density, height falloff, scatter color, step count, near/far
-  - uBlueNoise      — textura de ruido para dithering del raymarch (evita banding)
+WeatherSystem (singleton)
+├── Estado actual: WeatherState  { clear | cloudy | overcast | rain | heavyRain | storm | fog | snow }
+├── Estado objetivo: WeatherState
+├── Progreso de transición: t ∈ [0,1]
+├── Duración de transición: transitionDuration (seg)
+└── Tick(dt): interpolación de todos los parámetros hacia el estado objetivo
 
-Output: vec4<f32>
-  RGB = scatter acumulado (luz in-scattered × niebla × visibilidad de sombra)
-  A   = transmittance (1 = sin niebla, 0 = completamente opaco)
+WeatherComponent (camera component, prefab "main_camera.prefab")
+├── load(data)         — conecta WeatherSystem con los sistemas de render
+├── update(dt)         — tick del sistema, aplica valores interpolados a cada subsistema
+└── renderInMenu()     — controles en editor: estado actual, intensidad, transición manual
+
+Sistemas controlados:
+├── FogScatterComponent       — density, heightFalloff
+├── ModuleEnvironmentManager  — cloudCoverage, windSpeed, windAngle
+├── DirectionalLightComponent — intensity, color (tinte nublado)
+├── RainSystem                — intensidad de partículas, velocidad, dirección
+├── SnowSystem                — ídem
+├── ThunderSystem             — frecuencia, flash de luz, audio
+└── WetSurfaceManager         — factor de humedad global → roughness/reflectivity en materiales
 ```
 
-El raymarch avanza desde la posición de cámara hasta `min(hitDepth, fogFarPlane)` en N steps:
-```wgsl
-for step in 0..numSteps:
-  worldPos = cameraPos + rayDir * (stepT + blueNoiseDither)
-  fogDensity = evalHeightFog(worldPos)   // densidad = e^(-height * falloff)
-  shadowVis = sampleShadowMap(worldPos)  // 0 o 1 (PCF suave)
-  scatter += fogDensity * scatterColor * dirLightColor * shadowVis * stepSize
-  transmittance *= exp(-fogDensity * extinctionCoeff * stepSize)
-```
-
-Parámetros del raymarch: `numSteps` (16-32), `fogDensity`, `fogHeightBase`, `fogHeightFalloff`, `scatterColor`, `extinctionCoeff`, `nearPlane`, `farPlane`.
-
-**Nota de coste:** a 1/2 resolución con 16-24 steps y shadow map PCF, es comparable al GodRaysComponent. El blue noise + TSR hacen el trabajo de alisado temporal.
+Cada `WeatherState` es un objeto que define los valores **objetivo** de todos los parámetros.
+`WeatherSystem.tick()` interpola linealmente (o con curvas configurables) desde el estado actual
+hacia el objetivo. Todos los subsistemas reciben el valor interpolado, no el target directo.
 
 ---
 
-## Step 2 — Shader de blur bilateral con depth
+## Phase 1 — Estado y transiciones (núcleo del sistema)
 
-**Archivo nuevo:** `public/assets/shaders/post-processing/fog_bilateral_blur.fs`
+**Archivos nuevos:**
+- `src/systems/weather/WeatherSystem.ts`
+- `src/systems/weather/WeatherState.ts`
+- `src/components/game/WeatherComponent.ts`
+- `src/types/WeatherComponentData.type.ts`
 
-Gaussian separable con weight por similitud de profundidad. Basado en `gaussian_blur.fs` con un binding extra para el depth.
-
-```wgsl
-// Por cada sample vecino en la dirección del blur:
-let depthDiff   = abs(sampleLinearDepth - centerLinearDepth);
-let depthWeight = exp(-depthDiff * params.depthSigma);
-totalWeight    += gaussianWeight * depthWeight;
-accum          += textureSample(...) * gaussianWeight * depthWeight;
-output          = accum / totalWeight;
-```
-
-Uniforme: `direction (vec2)`, `radius (f32)`, `depthSigma (f32)`.
-
-Sirve para dos usos sin cambios:
-- **Blur de fogHalf** (RGBA, radio pequeño 1-2 px en media res) — lateral scatter
-- **Blur de sceneColor** (RGB, radio mayor 4-6 px en cuarto de res) — scene blur por transmittance
-
-El `depthSigma` controla si el blur cruza bordes geométricos o no. Valores útiles: `~5.0` para fog (bordes suaves), `~1.0` para scene blur (no mezclar fondo lejano con objetos cercanos).
-
----
-
-## Step 3 — Shader de composición final
-
-**Archivo nuevo:** `public/assets/shaders/post-processing/fog_multiscatter_compose.fs`
-
-```wgsl
-// Bindings:
-// txScene          — sceneColor original (HDR antes de fog)
-// txSceneBlurred   — sceneColor con blur bilateral a cuarto de res
-// txFogHalf        — output del raymarch (RGB=scatter, A=transmittance)
-// txFogHalfBlurred — fogHalf con blur bilateral
-// uParams          — lateralScatterStrength, multiScatterStrength
-
-let fogHalf        = textureSample(txFogHalf, ..., uv);
-let fogHalfBlurred = textureSample(txFogHalfBlurred, ..., uv);
-let sceneColor     = textureSample(txScene, ..., uv).rgb;
-let sceneBlurred   = textureSample(txSceneBlurred, ..., uv).rgb;
-
-let transmittance = fogHalf.a;
-
-// Efecto 2: lateral scatter
-let fogScatter = mix(fogHalf.rgb, fogHalfBlurred.rgb, params.lateralScatterStrength);
-
-// Efecto 1: scene blur proporcional a niebla real
-let blurWeight = saturate((1.0 - transmittance) * params.multiScatterStrength);
-let baseColor  = mix(sceneColor, sceneBlurred, blurWeight);
-
-// Composición estándar
-output = vec4<f32>(baseColor * transmittance + fogScatter, 1.0);
-```
-
-Uniforme `FogMultiScatterParams` (16 bytes): `lateralScatterStrength`, `multiScatterStrength`, `enabled (f32)`, `pad`.
-
----
-
-## Step 4 — Crear los archivos `.tech`
-
-**Archivos nuevos:** basarse en `gaussian_blur.tech` como referencia de estructura.
-
-- `public/assets/techniques/post-processing/fog_scatter_raymarch.tech`
-  - Sin depth stencil, sin blend (escribe scatter+transmittance directo a fogHalfRT)
-- `public/assets/techniques/post-processing/fog_bilateral_blur.tech`
-  - Sin blend, sin depth
-- `public/assets/techniques/post-processing/fog_multiscatter_compose.tech`
-  - Sin blend, escribe el resultado final directo
-
----
-
-## Step 5 — Crear `FogMultiScatterComponent`
-
-**Archivo nuevo:** `src/components/render/FogMultiScatterComponent.ts`
-
-Combina el raymarch + blurs + compose en un único componente de cámara, igual que `GodRaysComponent` combina su raymarch + kawase + composite.
-
-```
-FogMultiScatterComponent extends Component
-│
-├── RenderTargets
-│     ├── fogHalfRT          (Render.width/2 × Render.height/2, rgba16float)  ← output del raymarch
-│     ├── fogHalfBlurH       (misma res, rgba16float)  ← horizontal bilateral
-│     ├── fogHalfBlurred     (misma res, rgba16float)  ← vertical bilateral
-│     ├── sceneBlurH         (Render.width/4 × Render.height/4, rgba16float)
-│     ├── sceneBlurred       (misma res, rgba16float)
-│     └── resultRT           (Render.width × Render.height, rgba16float)  ← output final
-│
-├── load(data)
-│     ├── Cargar fog_scatter_raymarch.tech
-│     ├── Cargar fog_bilateral_blur.tech
-│     ├── Cargar fog_multiscatter_compose.tech
-│     ├── Crear RenderTargets
-│     ├── Crear uniform buffers (fogParams + multiScatterParams)
-│     └── Crear bind group cache (igual que AtmosphericFogComponent)
-│
-├── render(sceneView, gBufferBindGroup, dirLightComponent): GPUTextureView
-│     ├── Pass 1: fog_scatter_raymarch  → fogHalfRT          (genera scatter+transmittance)
-│     ├── Pass 2: bilateral blur H      → fogHalfBlurH        (lateral scatter H)
-│     ├── Pass 3: bilateral blur V      → fogHalfBlurred      (lateral scatter V)
-│     ├── Pass 4: bilateral blur H      → sceneBlurH          (scene blur H, usa sceneView)
-│     ├── Pass 5: bilateral blur V      → sceneBlurred        (scene blur V)
-│     └── Pass 6: compose               → resultRT            (efecto 1 + efecto 2 + fog)
-│
-├── resize()    — destruye y recrea todos los RenderTargets + invalida bind group cache
-│
-└── renderInMenu()
-      ├── enabled
-      ├── fog density, height base, height falloff, scatter color
-      ├── num raymarch steps (8 / 16 / 32)
-      ├── lateralScatterStrength (0.0 → 1.0, default 0.45)
-      └── multiScatterStrength   (0.0 → 1.0, default 0.6)
-```
-
----
-
-## Step 6 — Wiring en DeferredRenderer
-
-**Archivo:** `src/renderer/core/pipeline/DeferredRenderer.ts`
-
-El componente se invoca al final del pipeline de iluminación, antes de que `rtAccLight` salga al pipeline de post-process (TSR, bloom, tone mapping).
+### WeatherState
 
 ```typescript
-// Al final de renderScene(), después de SSR + ambient specular:
-const fogMultiScatter = camera.getComponent('fog_multi_scatter') as FogMultiScatterComponent | null;
-if (fogMultiScatter?.isEnabled()) {
-  const dirLight = Engine.getEntities()
-    .getObjectManagerByName('directional_light')?.getList()[0] as DirectionalLightComponent;
-  return fogMultiScatter.render(
-    this.rtAccLight.getView(),
-    this.gBufferBindGroup,        // contiene linearDepth para el raymarch
-    dirLight,
-  );
+interface WeatherStateParams {
+  // Niebla
+  fogDensity:      number;   // 0.0 – 0.003
+  fogHeightFalloff: number;  // 0.02 – 0.15
+
+  // Nubes
+  cloudCoverage:   number;   // 0.0 – 1.0
+  cloudThickness:  number;   // 0.0 – 1.0
+
+  // Viento
+  windSpeed:       number;   // 0.0 – 0.15 (m/s normalizado)
+  windAngle:       number;   // 0 – 360 grados
+
+  // Sol
+  sunIntensityScale: number; // 0.1 (tormenta) – 1.0 (despejado)
+  sunColorTint:    [number, number, number]; // RGB multiplicativo
+
+  // Precipitación
+  rainIntensity:   number;   // 0.0 – 1.0
+  snowIntensity:   number;   // 0.0 – 1.0
+
+  // Tormenta
+  thunderFrequency: number;  // relámpagos por minuto (0 = ninguno)
+
+  // Humedad superficial
+  wetness:         number;   // 0.0 – 1.0
 }
-return this.rtAccLight.getView();
 ```
 
-El resultado de `fogMultiScatter.render()` reemplaza `rtAccLight.getView()` como input del resto del pipeline (TSR, bloom, tone mapping). Si el componente no existe o está desactivado, el pipeline no cambia.
+**Presets de estado** (valores de referencia iniciales, ajustables en prefab):
+
+| Estado      | fog   | clouds | wind  | sun   | rain | snow | thunder | wet  |
+|-------------|-------|--------|-------|-------|------|------|---------|------|
+| Clear       | 0.0003| 0.1    | 0.02  | 1.0   | 0.0  | 0.0  | 0       | 0.0  |
+| Cloudy      | 0.0005| 0.45   | 0.04  | 0.75  | 0.0  | 0.0  | 0       | 0.0  |
+| Overcast    | 0.001 | 0.75   | 0.05  | 0.45  | 0.0  | 0.0  | 0       | 0.05 |
+| Rain        | 0.0015| 0.85   | 0.07  | 0.30  | 0.5  | 0.0  | 0       | 0.5  |
+| HeavyRain   | 0.002 | 0.95   | 0.10  | 0.20  | 1.0  | 0.0  | 0       | 1.0  |
+| Storm       | 0.002 | 1.0    | 0.15  | 0.15  | 1.0  | 0.0  | 8       | 1.0  |
+| Snow        | 0.0008| 0.70   | 0.03  | 0.55  | 0.0  | 1.0  | 0       | 0.0  |
+| Fog         | 0.003 | 0.20   | 0.01  | 0.60  | 0.0  | 0.0  | 0       | 0.2  |
+
+### WeatherSystem
+
+```typescript
+class WeatherSystem {
+  static getInstance(): WeatherSystem
+
+  // Cambio de estado con transición suave
+  transitionTo(state: WeatherStateKey, durationSecs: number): void
+  setImmediate(state: WeatherStateKey): void
+
+  // Estado interpolado actual (lo que reciben los subsistemas)
+  getCurrentParams(): WeatherStateParams
+
+  tick(dt: number): void  // interpolación frame a frame
+  isTransitioning(): boolean
+  getTransitionProgress(): number  // 0–1
+}
+```
+
+La interpolación usa `lerp` simple por defecto. El `windAngle` usa interpolación angular
+(camino más corto entre ángulos). El `thunderFrequency` se interpola también y se trata
+como probabilidad en el sistema de rayos.
+
+### WeatherComponent
+
+Componente de cámara que:
+1. Obtiene `WeatherSystem.getCurrentParams()` cada frame
+2. Aplica los valores a cada subsistema (niebla, nubes, sol, viento)
+3. Activa/desactiva RainSystem y SnowSystem según intensidad > umbral
+4. Expone en `renderInMenu()` los controles del weather
+
+**Conexión con sistemas existentes:**
+- `FogScatterComponent` — `comp.density = params.fogDensity`, `comp.heightFalloff = params.fogHeightFalloff`
+- `ModuleEnvironmentManager` — `env.setCloudCoverage(params.cloudCoverage)`, `env.setWindSpeed(params.windSpeed)`
+- `DirectionalLightComponent` — `light.setIntensityScale(params.sunIntensityScale)`, `light.setColorTint(params.sunColorTint)`
+
+**Archivos a modificar:**
+- `src/core/loaders/Loader.ts` — registrar `"weather" → WeatherComponent`
+- `public/assets/prefabs/cameras/main_camera.prefab` — añadir bloque `"weather": { "initialState": "clear", ... }`
+- `src/modules/core/ModuleEnvironmentManager.ts` — exponer setters públicos `setCloudCoverage()`, `setWindSpeed()` si no existen
 
 ---
 
-## Step 7 — Registro y prefab
+## Phase 2 — Sistema de lluvia
 
-**Archivos:** `src/core/loaders/Loader.ts`, `public/assets/prefabs/cameras/main_camera.prefab`
+**Archivos nuevos:**
+- `src/systems/weather/RainSystem.ts`
+- `public/assets/shaders/particles/rain_particle.vs` / `.fs`
+- `public/assets/prefabs/vfx/rain_emitter.prefab`
 
-En `Loader.ts`, añadir `"fog_multi_scatter" → FogMultiScatterComponent` donde están el resto de componentes de render de cámara.
+### Partículas de lluvia
 
-En `main_camera.prefab`:
-```json
-"fog_multi_scatter": {
-  "density": 0.012,
-  "heightBase": 0.0,
-  "heightFalloff": 0.08,
-  "scatterColor": [0.85, 0.92, 1.0],
-  "numSteps": 16,
-  "lateralScatterStrength": 0.45,
-  "multiScatterStrength": 0.6
+La lluvia se implementa como un **volumen de partículas billboard centrado en la cámara**
+(no en el mundo), de forma que siempre cubre el área visible sin gestión de streaming.
+
+```
+RainSystem
+├── Emitter en world space pero reposicionado a cameraPos + (0, roofOffset, 0) cada frame
+├── Pool fijo de N partículas (N = 2000 lluvia ligera, 8000 lluvia intensa)
+├── Cada partícula: posición aleatoria en caja [-halfExtent, +halfExtent] × [0, height]
+├── Velocidad = windDir × windSpeed + vec3(0, -fallSpeed, 0)
+├── Cuando y < cameraPos.y - groundOffset → reciclar (nueva posición arriba)
+├── Forma: línea elongada en dirección de velocidad (billboard orientado a velocidad)
+└── Alpha = intensidad × depthFade (desvanece en superficies cercanas)
+```
+
+**Shader de partícula:**
+- VS: transforma posición + estira el quad en dirección de velocidad (longitud = speed × stretchFactor)
+- FS: gradiente alfa a lo largo del eje largo (más opaco en centro, transparente en extremos)
+- Sin sombras, sin iluminación — solo tinting por `scatterColor` de niebla para integración visual
+
+### Splash / impacto en superficies
+
+Efecto secundario simple: cuando una gota llega a `y = groundLevel`, se emite un splash
+procedural (billboard circular que se expande en 0.1 s y desaparece). No requiere ray cast;
+el `groundLevel` se pasa como uniform (configurable, default 0).
+
+El splash usa la misma textura que las ondas de agua de lluvia (circle ripple). Se puede
+reutilizar un atlas de partículas existente.
+
+---
+
+## Phase 3 — Sistema de nieve
+
+**Archivos nuevos:**
+- `src/systems/weather/SnowSystem.ts`
+
+Arquitectura idéntica a `RainSystem` con diferencias:
+
+- Partículas más lentas (`fallSpeed` = 1-3 m/s vs 8-15 m/s de lluvia)
+- Forma: copo esférico (billboard circular con textura de copo) o quad giratorio
+- Movimiento añadido: oscilación senoidal en XZ (flutter) con fase aleatoria por partícula
+- Sin splash; en su lugar, ligero "ground accumulation" (ver Phase 5)
+- El `windAngle` tiene más influencia visual en nieve que en lluvia (copos lentos)
+
+---
+
+## Phase 4 — Sistema de relámpagos
+
+**Archivos nuevos:**
+- `src/systems/weather/ThunderSystem.ts`
+
+Un relámpago es un evento en tres capas:
+
+**Capa 1 — Flash de luz (inmediato)**
+Al dispararse el evento, `ThunderSystem` aumenta temporalmente la intensidad del
+`DirectionalLightComponent` en un factor grande (×8-15) durante 2-3 frames (≈50 ms),
+luego vuelve al valor base. El color vira a azul-blanco (tinte `[0.9, 0.95, 1.0]`).
+
+**Capa 2 — Flash de pantalla (post-process)**
+Simultáneamente se activa un fullscreen flash: un quad blanco-semitransparente con
+alpha 0.3-0.5 que decae en 3-5 frames. Se renderiza como pass adicional en el pipeline
+de post-process, antes del tone mapping.
+
+```typescript
+// ThunderFlashComponent (simple, en el mismo fichero ThunderSystem.ts)
+// Se activa con triggerFlash(intensity, decaySecs)
+// Su pass escribe en el RT de accLight antes de TSR
+```
+
+**Capa 3 — Audio (diferido)**
+El trueno (sonido) se dispara con un delay = `distancia / 340` ms después del flash.
+`distancia` es aleatoria en un rango [200, 2000] m según el estado (tormenta cerca/lejos).
+Se integra con el sistema de audio existente si hay uno, o se deja como hook vacío.
+
+**Lógica de frecuencia:**
+```typescript
+// En ThunderSystem.tick(dt):
+this.timer += dt;
+const interval = 60.0 / params.thunderFrequency;  // segundos entre rayos
+if (this.timer >= interval + Random(-interval*0.4, interval*0.4)) {
+  this.triggerLightning();
+  this.timer = 0;
 }
+```
+
+---
+
+## Phase 5 — Superficies mojadas (WetSurfaceManager)
+
+**Archivos nuevos:**
+- `src/systems/weather/WetSurfaceManager.ts`
+
+**Archivos a modificar:**
+- Shader PBR de materiales (`public/assets/shaders/lighting/`) — añadir uniform `wetness`
+
+### Efecto visual
+
+Las superficies mojadas tienen:
+- **Roughness reducida** → más reflectividad especular (suelo brilla como espejo bajo lluvia)
+- **Reflectividad base aumentada** → el layer de agua tiene F0 de agua (~0.02)
+- **Micro-ondulaciones (ripple normals)** → normal map animado que simula lluvia cayendo en charcos
+
+```wgsl
+// En el shader PBR, tras leer las propiedades del material:
+let wet = wetness;  // uniform global 0-1
+let waterRoughness  = mix(material.roughness, 0.05, wet * saturate(1.0 - material.roughness));
+let waterReflective = mix(material.reflectivity, 0.02, wet * 0.6);
+// Solo en superficies horizontales (normal.y > umbral):
+let rippleNormal = sampleRippleNormal(worldPos.xz, time);
+let finalNormal  = normalize(mix(material.normal, rippleNormal, wet * horizontalFactor));
+```
+
+`WetSurfaceManager` simplemente mantiene el valor `wetness` global interpolado por
+`WeatherSystem` y lo sube a un uniform buffer pequeño (16 bytes) que el shader PBR lee.
+
+### Charcos procedurales
+
+Charcos visibles en zonas planas: se pueden implementar con una máscara basada en la
+normal del mundo (`worldNormal.y > 0.85`) y el factor `wetness`. No requiere geometría nueva —
+es un blending en el shader PBR entre el material base y un material de agua.
+
+---
+
+## Phase 6 — API de scripting y cinemáticas
+
+**Archivos a modificar:**
+- `WeatherSystem.ts` — añadir `onTransitionComplete` callback
+- `WeatherComponent.ts` — exponer `triggerWeatherSequence(steps: WeatherSequenceStep[])`
+
+### WeatherSequence
+
+Permite que el código de juego o el sistema de cinemáticas programe secuencias de clima:
+
+```typescript
+interface WeatherSequenceStep {
+  state:         WeatherStateKey;
+  holdSecs:      number;   // cuánto tiempo mantener este estado
+  transitionSecs: number;  // duración de la transición HACIA este estado
+}
+
+// Ejemplo de secuencia de tormenta cinemática:
+WeatherSystem.getInstance().playSequence([
+  { state: 'cloudy',    transitionSecs: 30, holdSecs: 60 },
+  { state: 'overcast',  transitionSecs: 20, holdSecs: 30 },
+  { state: 'storm',     transitionSecs: 15, holdSecs: 120 },
+  { state: 'rain',      transitionSecs: 60, holdSecs: 0  },
+  { state: 'clear',     transitionSecs: 90, holdSecs: 0  },
+]);
 ```
 
 ---
@@ -405,17 +481,56 @@ En `main_camera.prefab`:
 
 | Acción    | Archivo |
 |-----------|---------|
-| Crear     | `src/components/render/FogMultiScatterComponent.ts` |
-| Crear     | `public/assets/shaders/post-processing/fog_scatter_raymarch.fs` |
-| Crear     | `public/assets/shaders/post-processing/fog_bilateral_blur.fs` |
-| Crear     | `public/assets/shaders/post-processing/fog_multiscatter_compose.fs` |
-| Crear     | `public/assets/techniques/post-processing/fog_scatter_raymarch.tech` |
-| Crear     | `public/assets/techniques/post-processing/fog_bilateral_blur.tech` |
-| Crear     | `public/assets/techniques/post-processing/fog_multiscatter_compose.tech` |
-| Modificar | `src/renderer/core/pipeline/DeferredRenderer.ts` — wiring al final de renderScene() |
-| Modificar | `src/core/loaders/Loader.ts` — registro del componente |
-| Modificar | `public/assets/prefabs/cameras/main_camera.prefab` — añadir fog_multi_scatter |
+| Crear     | `src/systems/weather/WeatherSystem.ts` |
+| Crear     | `src/systems/weather/WeatherState.ts` |
+| Crear     | `src/components/game/WeatherComponent.ts` |
+| Crear     | `src/types/WeatherComponentData.type.ts` |
+| Crear     | `src/systems/weather/RainSystem.ts` |
+| Crear     | `src/systems/weather/SnowSystem.ts` |
+| Crear     | `src/systems/weather/ThunderSystem.ts` |
+| Crear     | `src/systems/weather/WetSurfaceManager.ts` |
+| Crear     | `public/assets/shaders/particles/rain_particle.vs` |
+| Crear     | `public/assets/shaders/particles/rain_particle.fs` |
+| Modificar | `src/core/loaders/Loader.ts` — registrar WeatherComponent |
+| Modificar | `public/assets/prefabs/cameras/main_camera.prefab` — bloque weather |
+| Modificar | `src/modules/core/ModuleEnvironmentManager.ts` — setters públicos cloud/wind |
+| Modificar | `public/assets/shaders/lighting/tiled_lighting.fs` (o PBR base) — uniform wetness |
 
-**Cero dependencias del sistema froxel.** Toda la información de niebla (scatter, transmittance) la genera el raymarch propio.
+---
 
-**Orden recomendado:** Steps 0-1 (shader del raymarch + test visual de fogHalfRT) → Steps 2-3 (blur + compose) → Step 4 (.tech) → Step 5 (componente) → Steps 6-7 (wiring). El test visual del fogHalfRT es el checkpoint más importante: si el raymarch genera scatter y transmittance correctamente, el resto del sistema sigue de forma directa.
+## Orden de implementación recomendado
+
+```
+Phase 1 (núcleo)
+  → WeatherState + WeatherSystem (tick + interpolación)
+  → WeatherComponent (conexión con fog + nubes + sol + viento existentes)
+  → renderInMenu con selector de estado y slider de transición
+  → Verificar que los 8 estados transicionan visualmente de forma correcta
+
+Phase 2 (lluvia)
+  → RainSystem con pool de partículas centrado en cámara
+  → Shader mínimo (línea elongada, alpha fade)
+  → Splash de impacto (opcional, segunda iteración)
+
+Phase 4 (relámpagos)
+  → ThunderSystem con flash de luz direccional
+  → Flash de pantalla (fullscreen quad)
+  → Audio hook (dejar preparado aunque no haya audio aún)
+
+Phase 5 (superficies mojadas)
+  → WetSurfaceManager → uniform buffer
+  → Roughness/reflectivity en shader PBR
+  → Ripple normals (segunda iteración)
+
+Phase 3 (nieve)
+  → SnowSystem basado en RainSystem con ajustes de velocidad/flutter
+
+Phase 6 (scripting)
+  → WeatherSequence API
+  → Integración con sistema de cinemáticas si existe
+```
+
+**El checkpoint más importante es al final de Phase 1**: si los 8 estados transicionan
+correctamente y los sistemas existentes (niebla, nubes, viento) responden, el núcleo del
+weather system está completo. Las phases siguientes añaden efectos pero no bloquean el uso
+del sistema para scripting y diseño de niveles.

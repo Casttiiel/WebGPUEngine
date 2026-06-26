@@ -373,5 +373,8 @@
   },
   {
     "prefab": "gameplay/lynx_spear.prefab"
+  },
+  {
+    "prefab": "effects/rain_emitter.prefab"
   }
 ]

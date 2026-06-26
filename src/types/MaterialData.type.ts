@@ -2,6 +2,9 @@ import { RenderCategory } from './RenderCategory.enum';
 import { TechniqueDataType } from './TechniqueData.type';
 
 export type MaterialDataType = Readonly<{
+  /** Path to a parent material. When set, this material becomes an instance that inherits
+   *  the parent's technique and textures, overriding only the specified factors/textures. */
+  parent?: string;
   technique?: string;
   techniqueData?: TechniqueDataType;
   baseColorFactor?: number[];

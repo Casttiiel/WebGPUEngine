@@ -52,37 +52,37 @@ export class Material extends GPUResource {
   // Prevents duplicate registration for string-path materials under parallel load.
   private static readonly inflight = new Map<string, Promise<Material>>();
 
-  private technique?: Technique;
-  private textures: Map<string, Texture> = new Map();
-  private baseColorFactor!: number[];
-  private roughnessFactor!: number;
-  private metallicFactor!: number;
-  private emissiveFactor!: number;
-  private uvXScale!: number;
-  private uvYScale!: number;
-  private appearanceBlend!: number;
-  private surfaceBlend!: number;
-  private pomScale!: number;
-  private category: RenderCategory;
-  private castsShadows: boolean;
-  private shadows: boolean;
-  private textureBindGroup?: GPUBindGroup;
-  private textureFiles: MaterialTexturesOptions | undefined;
-  private shadowsMaterial?: Material;
+  protected technique?: Technique;
+  protected textures: Map<string, Texture> = new Map();
+  protected baseColorFactor!: number[];
+  protected roughnessFactor!: number;
+  protected metallicFactor!: number;
+  protected emissiveFactor!: number;
+  protected uvXScale!: number;
+  protected uvYScale!: number;
+  protected appearanceBlend!: number;
+  protected surfaceBlend!: number;
+  protected pomScale!: number;
+  protected category: RenderCategory;
+  protected castsShadows: boolean;
+  protected shadows: boolean;
+  protected textureBindGroup?: GPUBindGroup;
+  protected textureFiles: MaterialTexturesOptions | undefined;
+  protected shadowsMaterial?: Material;
 
   // --- Custom material slot state ---
   /** Raw texture map from the .mat file, used by the custom-slot path. */
-  private rawTextures: Record<string, string> = {};
+  protected rawTextures: Record<string, string> = {};
   /** Pre-loaded file-based textures for custom slots (async-loaded at Material.load() time). */
-  private customSlotTextures: Map<string, Texture> = new Map();
+  protected customSlotTextures: Map<string, Texture> = new Map();
   /** GPUBuffer for the material-factors uniform in custom-slot materials. */
-  private customUniformBuffer: GPUBuffer | undefined;
+  protected customUniformBuffer: GPUBuffer | undefined;
   /** GPUBuffer for the material-factors uniform in the standard PBR path. */
-  private uniformBuffer: GPUBuffer | undefined;
+  protected uniformBuffer: GPUBuffer | undefined;
   /** Unsubscribe functions from EngineTextureRegistry — called in release(). */
-  private customUnsubscribes: Array<() => void> = [];
+  protected customUnsubscribes: Array<() => void> = [];
   /** Unsubscribe functions from Texture view-change listeners (streaming upgrades). */
-  private readonly textureViewUnsubs: Array<() => void> = [];
+  protected readonly textureViewUnsubs: Array<() => void> = [];
 
   constructor(options: MaterialOptions) {
     super({
@@ -143,6 +143,30 @@ export class Material extends GPUResource {
     path: string,
     materialData: MaterialDataType,
   ): Promise<Material> {
+    // Instance path: delegate to MaterialInstance when a parent is specified.
+    if (materialData.parent) {
+      const parent = await Material.get(materialData.parent);
+      const { MaterialInstance } = await import('./MaterialInstance');
+      const instance = await MaterialInstance.from(
+        parent,
+        {
+          baseColorFactor: materialData.baseColorFactor,
+          roughnessFactor: materialData.roughnessFactor,
+          metallicFactor: materialData.metallicFactor,
+          emissiveFactor: materialData.emissiveFactor,
+          uvXScale: materialData.uvXScale,
+          uvYScale: materialData.uvYScale,
+          appearanceBlend: materialData.appearanceBlend,
+          surfaceBlend: materialData.surfaceBlend,
+          pomScale: materialData.pomScale,
+          textures: materialData.textures as Record<string, string> | undefined,
+        } as any,
+        path,
+      );
+      ResourceManager.registerResource(instance);
+      return instance;
+    }
+
     const techniqueSource =
       materialData.technique !== undefined
         ? materialData.technique
@@ -255,7 +279,7 @@ export class Material extends GPUResource {
    * Custom-slot path: loads all file-based textures, subscribes to engine textures,
    * and builds the bind group once all resources are available.
    */
-  private async createCustomBindGroup(slots: ReadonlyArray<TechniqueMaterialSlot>): Promise<void> {
+  protected async createCustomBindGroup(slots: ReadonlyArray<TechniqueMaterialSlot>): Promise<void> {
     // 1. Collect all file-based texture paths and load them in parallel.
     const fileLoadPromises: Promise<void>[] = [];
     for (const slot of slots) {
@@ -312,7 +336,7 @@ export class Material extends GPUResource {
    * Silently returns if any engine texture is not yet available — it will be
    * called again when that texture gets registered.
    */
-  private tryBuildCustomBindGroup(slots: ReadonlyArray<TechniqueMaterialSlot>): void {
+  protected tryBuildCustomBindGroup(slots: ReadonlyArray<TechniqueMaterialSlot>): void {
     const layout = this.technique?.getCustomMaterialLayout();
     if (!layout) return;
 
@@ -368,7 +392,7 @@ export class Material extends GPUResource {
     return sampler ?? null;
   }
 
-  private async createBindGroup(): Promise<void> {
+  protected async createBindGroup(): Promise<void> {
     if (!this.technique) {
       throw new Error('Technique not loaded');
     }
@@ -438,7 +462,7 @@ export class Material extends GPUResource {
     );
   }
 
-  private loadTexture(type: string, path: string): Promise<void> {
+  protected loadTexture(type: string, path: string): Promise<void> {
     // Normal maps must use the normalise-after-average mipmap generator to avoid
     // shimmering at distance caused by box-filtering encoded normal vectors.
     return Texture.getAsync(path, type === 'normal').then((texture) => {
@@ -446,6 +470,19 @@ export class Material extends GPUResource {
       // Subscribe so the bind group is rebuilt after a streaming upgrade.
       this.textureViewUnsubs.push(texture.addViewListener(() => void this.createBindGroup()));
     });
+  }
+
+  /**
+   * Exposes internal resource maps to MaterialInstance without going through the public API.
+   * Protected so only subclasses can call it; avoids leaking internals as public getters.
+   */
+  protected static extractMaterialState(mat: Material) {
+    return {
+      textures: mat.textures,
+      customSlotTextures: mat.customSlotTextures,
+      rawTextures: mat.rawTextures,
+      textureFiles: mat.textureFiles,
+    };
   }
 
   public getCategory(): RenderCategory {
@@ -544,7 +581,7 @@ export class Material extends GPUResource {
   }
 
   /** Writes all in-memory factor values to the active GPU uniform buffer. */
-  private writeFactorsToGPU(): void {
+  protected writeFactorsToGPU(): void {
     const buf = this.customUniformBuffer ?? this.uniformBuffer;
     if (!buf) return;
     GPUUtils.writeBuffer(buf, 0, new Float32Array(this.baseColorFactor));

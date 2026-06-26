@@ -30,12 +30,10 @@ Slash effect
 
 ## Renderer
 
-2. TSR Flickering
-3. Material Instances https://www.instagram.com/p/DWCZ7GGjC5D/
-4. Procedural materials
-5. Irradiance Volumes
-6. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-7. Review SSR
+1. Irradiance Volumes
+2. Procedural materials
+3. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
+4. Review SSR
 
 ## Engine
 
