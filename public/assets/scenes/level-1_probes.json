@@ -1,0 +1,3060 @@
+[
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_0",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_1",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_2",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_3",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_4",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_5",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_6",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_7",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_8",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_9",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_10",
+      "transform": {
+        "position": [
+          -40.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_11",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_12",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_13",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_14",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_15",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_16",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_17",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_18",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_19",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_20",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_21",
+      "transform": {
+        "position": [
+          -35.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_22",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_23",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_24",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_25",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_26",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_27",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_28",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_29",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_30",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_31",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_32",
+      "transform": {
+        "position": [
+          -30.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_33",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_34",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_35",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_36",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_37",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_38",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_39",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_40",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_41",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_42",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_43",
+      "transform": {
+        "position": [
+          -25.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_44",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_45",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_46",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_47",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_48",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_49",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_50",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_51",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_52",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_53",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_54",
+      "transform": {
+        "position": [
+          -20.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_55",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_56",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_57",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_58",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_59",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_60",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_61",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_62",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_63",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_64",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_65",
+      "transform": {
+        "position": [
+          -15.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_66",
+      "transform": {
+        "position": [
+          -10.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_67",
+      "transform": {
+        "position": [
+          -10.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_68",
+      "transform": {
+        "position": [
+          -10.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_69",
+      "transform": {
+        "position": [
+          -10.5,
+          13.44974136352539,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_70",
+      "transform": {
+        "position": [
+          -10.5,
+          18.221111297607422,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_71",
+      "transform": {
+        "position": [
+          -10.5,
+          19.20046615600586,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_72",
+      "transform": {
+        "position": [
+          -10.5,
+          17.692386627197266,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_73",
+      "transform": {
+        "position": [
+          -10.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_74",
+      "transform": {
+        "position": [
+          -10.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_75",
+      "transform": {
+        "position": [
+          -10.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_76",
+      "transform": {
+        "position": [
+          -5.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_77",
+      "transform": {
+        "position": [
+          -5.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_78",
+      "transform": {
+        "position": [
+          -5.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_79",
+      "transform": {
+        "position": [
+          -5.5,
+          18.72252082824707,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_80",
+      "transform": {
+        "position": [
+          -5.5,
+          21.7098445892334,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_81",
+      "transform": {
+        "position": [
+          -5.5,
+          22.446325302124023,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_82",
+      "transform": {
+        "position": [
+          -5.5,
+          21.325754165649414,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_83",
+      "transform": {
+        "position": [
+          -5.5,
+          17.692386627197266,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_84",
+      "transform": {
+        "position": [
+          -5.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_85",
+      "transform": {
+        "position": [
+          -5.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_86",
+      "transform": {
+        "position": [
+          -5.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_87",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_88",
+      "transform": {
+        "position": [
+          -0.5,
+          20.097412109375,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_89",
+      "transform": {
+        "position": [
+          -0.5,
+          22.446325302124023,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_90",
+      "transform": {
+        "position": [
+          -0.5,
+          19.20046615600586,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_91",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_92",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_93",
+      "transform": {
+        "position": [
+          -0.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_94",
+      "transform": {
+        "position": [
+          4.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_95",
+      "transform": {
+        "position": [
+          4.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_96",
+      "transform": {
+        "position": [
+          4.5,
+          19.200464248657227,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_97",
+      "transform": {
+        "position": [
+          4.5,
+          22.08307647705078,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_98",
+      "transform": {
+        "position": [
+          4.5,
+          21.7098445892334,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_99",
+      "transform": {
+        "position": [
+          4.5,
+          18.22110939025879,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_100",
+      "transform": {
+        "position": [
+          4.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_101",
+      "transform": {
+        "position": [
+          4.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_102",
+      "transform": {
+        "position": [
+          4.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_103",
+      "transform": {
+        "position": [
+          9.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_104",
+      "transform": {
+        "position": [
+          9.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_105",
+      "transform": {
+        "position": [
+          9.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_106",
+      "transform": {
+        "position": [
+          9.5,
+          20.72252082824707,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_107",
+      "transform": {
+        "position": [
+          9.5,
+          19.692386627197266,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_108",
+      "transform": {
+        "position": [
+          9.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_109",
+      "transform": {
+        "position": [
+          9.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_110",
+      "transform": {
+        "position": [
+          9.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_111",
+      "transform": {
+        "position": [
+          14.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_112",
+      "transform": {
+        "position": [
+          14.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_113",
+      "transform": {
+        "position": [
+          14.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "indoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_114",
+      "transform": {
+        "position": [
+          14.5,
+          22.097412109375,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_115",
+      "transform": {
+        "position": [
+          14.5,
+          21.20046615600586,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_116",
+      "transform": {
+        "position": [
+          14.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_117",
+      "transform": {
+        "position": [
+          14.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_118",
+      "transform": {
+        "position": [
+          14.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_119",
+      "transform": {
+        "position": [
+          19.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_120",
+      "transform": {
+        "position": [
+          19.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_121",
+      "transform": {
+        "position": [
+          19.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_122",
+      "transform": {
+        "position": [
+          19.5,
+          21.20046615600586,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_123",
+      "transform": {
+        "position": [
+          19.5,
+          20.22110939025879,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_124",
+      "transform": {
+        "position": [
+          19.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_125",
+      "transform": {
+        "position": [
+          19.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_126",
+      "transform": {
+        "position": [
+          19.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_127",
+      "transform": {
+        "position": [
+          24.5,
+          1.5,
+          -16.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_128",
+      "transform": {
+        "position": [
+          24.5,
+          1.5,
+          -11.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_129",
+      "transform": {
+        "position": [
+          24.5,
+          1.5,
+          -6.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_130",
+      "transform": {
+        "position": [
+          24.5,
+          17.170825958251953,
+          -1.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_131",
+      "transform": {
+        "position": [
+          24.5,
+          21.20046615600586,
+          3.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_132",
+      "transform": {
+        "position": [
+          24.5,
+          22.097412109375,
+          8.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_133",
+      "transform": {
+        "position": [
+          24.5,
+          20.72252082824707,
+          13.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_134",
+      "transform": {
+        "position": [
+          24.5,
+          15.449735641479492,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_135",
+      "transform": {
+        "position": [
+          24.5,
+          1.5,
+          18.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "indoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_136",
+      "transform": {
+        "position": [
+          24.5,
+          1.5,
+          23.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_137",
+      "transform": {
+        "position": [
+          24.5,
+          1.5,
+          28.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/reflection_probe.prefab",
+    "components": {
+      "name": "level-1_Probe_138",
+      "transform": {
+        "position": [
+          24.5,
+          1.5,
+          33.5
+        ]
+      },
+      "reflection_probe": {
+        "resolution": 512,
+        "type": "outdoor",
+        "extents": [
+          2.5,
+          2.5,
+          2.5
+        ]
+      }
+    }
+  }
+]

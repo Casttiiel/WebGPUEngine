@@ -17,7 +17,7 @@ import { SHProjector } from '../../renderer/core/SHProjector';
 import { MipmapGenerator } from '../../renderer/core/processing/MipmapGenerator';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { Render } from '../../renderer/core/pipeline/Render';
-import { ProbeAutoPlacement } from '../../renderer/shading/ProbeAutoPlacement';
+import { ProbeAutoPlacement, ProbeCandidate } from '../../renderer/shading/ProbeAutoPlacement';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { Wind } from '../../core/engine/Wind';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
@@ -48,6 +48,9 @@ export class ModuleEnvironmentManager extends Module {
 
   private blendState: EnvironmentBlendState | null = null;
 
+  /** Base name of the first scene in boot.json (e.g. "level-1"). Used to prefix probe names. */
+  private sceneName: string = 'scene';
+
   // Cloud parameters (sky-only, exposed via renderInMenu)
   public cloudThickness: number = 3.2;
   public cloudDistanceFade: number = 0.15;
@@ -74,7 +77,17 @@ export class ModuleEnvironmentManager extends Module {
     const jsonData = await response.json();
 
     this.skyboxType = jsonData.skyboxType || 'cubemap';
-    this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
+    this.timeOfDay = jsonData.timeOfDay ?? 0.5;
+
+    // Derive scene name from the first entry in boot.json for probe naming/file scoping
+    try {
+      const bootResp = await ResourceManager.fetch('data/boot.json');
+      const bootData = await bootResp.json() as { scenes_to_load?: string[] };
+      const first = bootData.scenes_to_load?.[0] ?? 'scene.json';
+      this.sceneName = first.replace(/\.json$/i, '');
+    } catch {
+      this.sceneName = 'scene';
+    }
 
     const [skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
       HDRTexture.getAsync(jsonData.skybox),
@@ -123,23 +136,35 @@ export class ModuleEnvironmentManager extends Module {
       }
     }
 
+    // F7 — auto-place probes from scene geometry and download placement JSON.
+    // Add the downloaded file to assets/scenes/ and reference it in boot.json
+    // so probes persist across sessions.
     if (Engine.getInput().isKeyJustPressed(KeyCode.F7)) {
-      ProbeAutoPlacement.generate();
+      const candidates = await ProbeAutoPlacement.generate(this.sceneName);
+      if (candidates.length > 0) {
+        this.downloadProbesJSON(candidates);
+      }
     }
 
+    // F8 — bake all existing reflection probes (SH + cubemap) and re-export
+    // the placement JSON so the file stays in sync with the current scene state.
     if (Engine.getInput().isKeyJustPressed(KeyCode.F8)) {
-      // ⏸️ Pausar el render loop principal para facilitar debugging
       const moduleRender = Engine.getRender();
       moduleRender.pauseRendering = true;
 
-      for (const comp of Engine.getEntities()
+      const probeComponents = Engine.getEntities()
         .getObjectManagerByName('reflection_probe')
-        ?.getList() ?? []) {
-        const probe = comp as ReflectionProbeComponent;
-        await this.captureAndDownloadProbe(probe);
+        ?.getList() ?? [];
+
+      for (const comp of probeComponents) {
+        await this.captureAndDownloadProbe(comp as ReflectionProbeComponent);
       }
 
-      // ▶️ Reanudar el render loop principal
+      // Re-export placement JSON with the actual probes in the scene
+      this.downloadProbesJSONFromComponents(
+        probeComponents.map((c) => c as ReflectionProbeComponent),
+      );
+
       moduleRender.pauseRendering = false;
     }
   }
@@ -569,6 +594,53 @@ export class ModuleEnvironmentManager extends Module {
       blendedWeight: 0.0,
       interpolator,
     };
+  }
+
+  // ── Probe placement JSON helpers ────────────────────────────────────────────
+
+  /** Downloads a scene-compatible JSON from auto-placement candidates (F7). */
+  private downloadProbesJSON(candidates: ProbeCandidate[]): void {
+    this.downloadJSON(
+      ProbeAutoPlacement.buildSceneJSON(candidates),
+      `${this.sceneName}_probes.json`,
+    );
+    console.log(
+      `[Probes] Downloaded ${this.sceneName}_probes.json` +
+      ` — add it to assets/scenes/ and reference it in data/boot.json.`,
+    );
+  }
+
+  /** Downloads a scene-compatible JSON from the live ReflectionProbeComponents (F8). */
+  private downloadProbesJSONFromComponents(probes: ReflectionProbeComponent[]): void {
+    const entities = probes.map((probe) => {
+      const pos = probe.getPosition();
+      const ext = probe.getExtents();
+      return {
+        prefab: 'lighting/reflection_probe.prefab',
+        components: {
+          name: probe.getOwner().getName(),
+          transform: { position: [pos[0], pos[1], pos[2]] },
+          reflection_probe: {
+            resolution: probe.getResolution(),
+            type: probe.getProbeType(),
+            extents: [ext[0], ext[1], ext[2]],
+          },
+        },
+      };
+    });
+    this.downloadJSON(entities, `${this.sceneName}_probes.json`);
+  }
+
+  private downloadJSON(data: unknown, filename: string): void {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 
   public changeSSREnvironmentTexture(newTexture: string): void {

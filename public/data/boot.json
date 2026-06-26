@@ -1,3 +1,3 @@
 {
-  "scenes_to_load": ["level-1.json"]
+  "scenes_to_load": ["level-1.json", "level-1_probes.json"]
 }

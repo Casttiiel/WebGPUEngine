@@ -185,8 +185,8 @@ export class Loader {
       }
 
       if (json.components) {
-        if (json.components.name && prefabJson.components.name !== undefined) {
-          json.components.name += prefabJson.components.name;
+        if (json.components.name !== undefined) {
+          // Entity-level name overrides the prefab name — never concatenate.
           delete prefabJson.components.name;
         }
         if (json.components.transform && prefabJson.components.transform) {

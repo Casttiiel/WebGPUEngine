@@ -4,144 +4,206 @@ import { NavMesh } from '../../ai/nav/NavMesh';
 import { Loader } from '../../core/loaders/Loader';
 
 export interface ProbeCandidate {
+  name: string;
   position: [number, number, number];
   estimatedExtents: [number, number, number];
+  type: 'indoor' | 'outdoor';
 }
 
-const CELL_SIZE = 5.0; // metres — one probe per cell
-const FLOOR_OFFSET = 1.5; // metres above navmesh floor
-const EXTERIOR_RAY = 20.0; // metres — sky ray length for interior classification
-const MIN_CLEARANCE = 0.6; // metres — minimum horizontal clearance from walls/objects
+const CELL_SIZE     = 5.0;  // metres — one probe per XZ cell
+const FLOOR_OFFSET  = 1.5;  // metres above detected floor
+const FLOOR_HEIGHT  = 3.5;  // metres — vertical scan step for multi-storey buildings
+const CEIL_MAX      = 20.0; // metres — upward ray to detect ceiling (interior classification)
+const MIN_CLEARANCE = 0.6;  // metres — minimum horizontal clearance from walls
+
+const DIR_DOWN = vec3.fromValues(0, -1, 0);
+const DIR_UP   = vec3.fromValues(0,  1, 0);
+const CARDINALS = [
+  vec3.fromValues( 1, 0,  0),
+  vec3.fromValues(-1, 0,  0),
+  vec3.fromValues( 0, 0,  1),
+  vec3.fromValues( 0, 0, -1),
+];
 
 /**
- * ProbeAutoPlacement — offline debug tool (FASE 3).
+ * ProbeAutoPlacement — places ReflectionProbe entities from scene geometry.
  *
- * Activated by setting "debugProbeAutoPlace": true in environment.json.
- * Never runs in release builds.
+ * Strategies (tried in order):
+ *   1. NavMesh-seeded  — uses walkable triangle centroids as XZ candidates.
+ *   2. Grid fallback   — XZ grid over the physics AABB, multi-Y sweep per cell.
  *
- * Algorithm:
- *  1. Sample the NavMesh centroids + a 3-metre grid around each centroid.
- *  2. Cast a ray straight up from each candidate. If the ray hits geometry
- *     within EXTERIOR_RAY metres the point is INTERIOR (under a roof).
- *  3. Cluster interior candidates into 5×5×5 m³ cells — one probe per cell
- *     at the cluster centroid.
- *  4. Print the resulting JSON to the console. The artist places bake
- *     cameras at these positions in Blender and exports the cubemaps.
+ * Call generate(sceneName) to spawn probes in the current session AND download
+ * a `{sceneName}_probes.json` file ready to drop into assets/scenes/.
  */
 export class ProbeAutoPlacement {
-  public static generate(): ProbeCandidate[] {
+
+  /**
+   * Places probes, awaits their entity registration, downloads placement JSON.
+   * Returns the generated candidates so the caller can chain baking.
+   */
+  public static async generate(sceneName: string): Promise<ProbeCandidate[]> {
     const navMesh = NavMesh.getInstance();
-    if (!navMesh.isBuilt()) {
-      console.warn('[ProbeAutoPlacement] NavMesh not built — no probes generated.');
+    const seeds = navMesh.isBuilt()
+      ? ProbeAutoPlacement.seedsFromNavMesh(navMesh)
+      : ProbeAutoPlacement.seedsFromGrid();
+
+    if (seeds.length === 0) {
+      console.warn('[ProbeAutoPlacement] No candidate seeds — check physics/navmesh.');
       return [];
     }
 
-    // ── Step 1: Seed candidates from NavMesh centroids only ──────────────────
-    // Centroids are guaranteed to lie on walkable geometry.
-    // We do NOT expand a blind XZ grid around them — grid-expanded points can
-    // fall inside columns, pillars, furniture, etc.
+    const validated = ProbeAutoPlacement.validate(seeds);
+    const candidates = ProbeAutoPlacement.cluster(validated, sceneName);
+
+    await ProbeAutoPlacement.spawn(candidates);
+
+    console.log(
+      `[ProbeAutoPlacement] Placed ${candidates.length} probes` +
+      ` (${navMesh.isBuilt() ? 'NavMesh' : 'grid'} strategy).`,
+    );
+    return candidates;
+  }
+
+  // ── Strategy 1: NavMesh centroids ──────────────────────────────────────────
+
+  private static seedsFromNavMesh(navMesh: NavMesh): vec3[] {
     const seen = new Set<string>();
-    const candidates: vec3[] = [];
-
-    const add = (x: number, y: number, z: number): void => {
-      // Deduplicate on a coarse grid (CELL_SIZE resolution)
-      const key = `${Math.round(x / CELL_SIZE)},${Math.round(z / CELL_SIZE)}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      candidates.push(vec3.fromValues(x, y + FLOOR_OFFSET, z));
-    };
-
+    const out: vec3[] = [];
     for (const c of navMesh.getCentroids()) {
-      add(c[0], c[1], c[2]);
+      const key = `${Math.round(c[0] / CELL_SIZE)},${Math.round(c[2] / CELL_SIZE)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(vec3.fromValues(c[0], c[1] + FLOOR_OFFSET, c[2]));
     }
+    return out;
+  }
 
-    // ── Step 2: Filter candidates ─────────────────────────────────────────────
-    // Three checks must all pass:
-    //  a) Downward ray (solid=true): toi≈0 → inside a solid → reject.
-    //     No hit or toi too large → not near any walkable floor → reject.
-    //  b) Upward ray (solid=false): must find a ceiling → interior point.
-    //     solid=false avoids false toi=0 when origin is inside geometry.
-    //  c) Horizontal clearance: 4 cardinal rays at head height.
-    //     Any hit within MIN_CLEARANCE → too close to a wall/object → reject.
+  // ── Strategy 2: Physics AABB grid ──────────────────────────────────────────
+
+  private static seedsFromGrid(): vec3[] {
     const physics = Engine.getPhysics();
-    const up = vec3.fromValues(0, 1, 0);
-    const down = vec3.fromValues(0, -1, 0);
-    const cardinals = [
-      vec3.fromValues(1, 0, 0),
-      vec3.fromValues(-1, 0, 0),
-      vec3.fromValues(0, 0, 1),
-      vec3.fromValues(0, 0, -1),
-    ];
+    const { min, max } = physics.getSceneAABB();
 
-    const interior: vec3[] = candidates.filter((pos) => {
-      // ── a) Vertical: valid floor below, not inside solid ──────────────────
-      const downHit = physics.raycast(pos, down, FLOOR_OFFSET * 3, true);
-      if (!downHit) return false; // no floor found
-      if (downHit.timeOfImpact < 0.05) return false; // inside solid geometry
-      if (downHit.timeOfImpact > FLOOR_OFFSET * 2) return false; // floor too far
+    const seen = new Set<string>();
+    const out: vec3[] = [];
 
-      // ── b) Ceiling above → interior ───────────────────────────────────────
-      const ceilHit = physics.raycast(pos, up, EXTERIOR_RAY, false);
-      if (!ceilHit) return false;
+    for (let x = min[0] + CELL_SIZE / 2; x < max[0]; x += CELL_SIZE) {
+      for (let z = min[2] + CELL_SIZE / 2; z < max[2]; z += CELL_SIZE) {
+        // Sweep Y top-to-bottom to catch every floor in multi-storey buildings
+        for (let y = max[1] + 1; y >= min[1]; y -= FLOOR_HEIGHT) {
+          const origin = vec3.fromValues(x, y, z);
+          const hit = physics.raycast(origin, DIR_DOWN, FLOOR_HEIGHT + 0.5, true);
+          if (!hit) continue;
+          if (hit.timeOfImpact < 0.05) continue; // origin inside solid
 
-      // ── c) Horizontal clearance — no wall/object within MIN_CLEARANCE ─────
-      for (const dir of cardinals) {
-        const wallHit = physics.raycast(pos, dir, MIN_CLEARANCE, false);
-        if (wallHit !== null) return false;
+          const floorY = y - hit.timeOfImpact;
+          const candidate = vec3.fromValues(x, floorY + FLOOR_OFFSET, z);
+
+          const yBand = Math.round(floorY / FLOOR_HEIGHT);
+          const key = `${Math.round(x / CELL_SIZE)},${yBand},${Math.round(z / CELL_SIZE)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          out.push(candidate);
+        }
       }
-
-      return true;
-    });
-
-    // ── Step 3: Cluster into CELL_SIZE³ cells ────────────────────────────────
-    const cellMap = new Map<string, vec3[]>();
-
-    for (const pos of interior) {
-      const cx = Math.floor(pos[0] / CELL_SIZE);
-      const cy = Math.floor(pos[1] / CELL_SIZE);
-      const cz = Math.floor(pos[2] / CELL_SIZE);
-      const key = `${cx},${cy},${cz}`;
-      if (!cellMap.has(key)) cellMap.set(key, []);
-      cellMap.get(key)!.push(pos);
     }
 
-    // ── Step 4: One probe per cell at the cluster centroid ────────────────────
-    const probes: ProbeCandidate[] = [];
+    return out;
+  }
 
-    for (const [, group] of cellMap) {
-      const pos = vec3.create();
-      for (const p of group) vec3.add(pos, pos, p);
-      vec3.scale(pos, pos, 1 / group.length);
+  // ── Validation ─────────────────────────────────────────────────────────────
 
-      probes.push({
-        position: [pos[0], pos[1], pos[2]],
+  private static validate(seeds: vec3[]): Array<{ pos: vec3; type: 'indoor' | 'outdoor' }> {
+    const physics = Engine.getPhysics();
+    const out: Array<{ pos: vec3; type: 'indoor' | 'outdoor' }> = [];
+
+    for (const pos of seeds) {
+      let tooClose = false;
+      for (const dir of CARDINALS) {
+        if (physics.raycast(pos, dir, MIN_CLEARANCE, false) !== null) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (tooClose) continue;
+
+      const ceilHit = physics.raycast(pos, DIR_UP, CEIL_MAX, false);
+      out.push({ pos, type: ceilHit ? 'indoor' : 'outdoor' });
+    }
+
+    return out;
+  }
+
+  // ── Cluster into CELL_SIZE³ cells — one probe per cell at the centroid ─────
+
+  private static cluster(
+    validated: Array<{ pos: vec3; type: 'indoor' | 'outdoor' }>,
+    sceneName: string,
+  ): ProbeCandidate[] {
+    const cells = new Map<string, { positions: vec3[]; type: 'indoor' | 'outdoor' }>();
+
+    for (const { pos, type } of validated) {
+      const key = `${Math.floor(pos[0] / CELL_SIZE)},${Math.floor(pos[1] / CELL_SIZE)},${Math.floor(pos[2] / CELL_SIZE)}`;
+      if (!cells.has(key)) cells.set(key, { positions: [], type });
+      cells.get(key)!.positions.push(pos);
+    }
+
+    const out: ProbeCandidate[] = [];
+    let idx = 0;
+    for (const { positions, type } of cells.values()) {
+      const centre = vec3.create();
+      for (const p of positions) vec3.add(centre, centre, p);
+      vec3.scale(centre, centre, 1 / positions.length);
+
+      out.push({
+        name: `${sceneName}_Probe_${idx++}`,
+        position: [centre[0], centre[1], centre[2]],
         estimatedExtents: [CELL_SIZE / 2, CELL_SIZE / 2, CELL_SIZE / 2],
+        type,
       });
     }
 
-    console.log(`[ProbeAutoPlacement] Spawning ${probes.length} reflection probes...`);
+    return out;
+  }
 
-    for (let i = 0; i < probes.length; i++) {
-      const p = probes[i]!;
-      const entityJson = {
-        prefab: 'lighting/reflection_probe.prefab',
-        components: {
-          name: `ReflectionProbe_Auto_${i}`,
-          transform: {
-            position: p.position,
+  // ── Spawn — awaits full entity registration before returning ───────────────
+
+  private static async spawn(probes: ProbeCandidate[]): Promise<void> {
+    await Promise.all(
+      probes.map(async (p) => {
+        const entityJson = {
+          prefab: 'lighting/reflection_probe.prefab',
+          components: {
+            name: p.name,
+            transform: { position: p.position },
+            reflection_probe: {
+              resolution: 512,
+              type: p.type,
+              extents: p.estimatedExtents,
+            },
           },
-          reflection_probe: {
-            resolution: 512,
-            extents: p.estimatedExtents,
-          },
+        };
+        const parsed = await Loader.parseEntityFromJSON(entityJson as any);
+        await Loader.loadEntityFromJSON(parsed);
+      }),
+    );
+  }
+
+  // ── Serialise placed probes to a scene-compatible JSON array ───────────────
+
+  public static buildSceneJSON(probes: ProbeCandidate[]): object[] {
+    return probes.map((p) => ({
+      prefab: 'lighting/reflection_probe.prefab',
+      components: {
+        name: p.name,
+        transform: { position: p.position },
+        reflection_probe: {
+          resolution: 512,
+          type: p.type,
+          extents: p.estimatedExtents,
         },
-      };
-
-      Loader.parseEntityFromJSON(entityJson as any).then((parsed) =>
-        Loader.loadEntityFromJSON(parsed),
-      );
-    }
-
-    return probes;
+      },
+    }));
   }
 }

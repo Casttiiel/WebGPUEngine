@@ -14,18 +14,22 @@ export interface CubemapOptions extends IGPUResourceOptions {
   addressModeV?: GPUAddressMode;
   addressModeW?: GPUAddressMode;
   maxAnisotropy?: number;
+  /** Base fetch directory. Defaults to 'assets/textures'. */
+  baseFolder?: string;
 }
 
 export class Cubemap extends GPUResource {
   private gpuTexture?: GPUTexture;
   private gpuTextureView?: GPUTextureView;
   private gpuSampler?: GPUSampler;
+  private readonly baseFolder: string;
 
   constructor(options: CubemapOptions) {
     super({
       ...options,
       type: ResourceType.CUBEMAP,
     });
+    this.baseFolder = options.baseFolder ?? 'assets/textures';
   }
 
   public static get(path: string, options: Partial<CubemapOptions> = {}): Cubemap {
@@ -78,43 +82,26 @@ export class Cubemap extends GPUResource {
   public async loadAsync(): Promise<void> {
     try {
       const image = await createImageBitmap(
-        await ResourceManager.fetch(`assets/textures/${this.path}`).then((r) => r.blob()),
+        await ResourceManager.fetch(`${this.baseFolder}/${this.path}`).then((r) => r.blob()),
       );
 
       const faceSize = image.width / 4; // Asumimos imagen 4x3 caras
-      const faceCoords: Record<number, [number, number]> = {
-        0: [2, 1], // +X
-        1: [0, 1], // -X
-        2: [1, 0], // +Y
-        3: [1, 2], // -Y
-        4: [1, 1], // +Z
-        5: [3, 1], // -Z
-      };
+      // T-layout face positions: col, row in a 4×3 grid.
+      const faceCoords: [number, number][] = [
+        [2, 1], // +X
+        [0, 1], // -X
+        [1, 0], // +Y
+        [1, 2], // -Y
+        [1, 1], // +Z
+        [3, 1], // -Z
+      ];
 
-      // Extract all 6 faces in parallel — each gets its own OffscreenCanvas so
-      // drawImage + createImageBitmap run concurrently without shared state.
+      // Crop each face using createImageBitmap's built-in crop — runs off-thread,
+      // no synchronous drawImage/canvas work on the main thread.
       const faces = await Promise.all(
-        Array.from({ length: 6 }, (_, i) => {
-          const coords = faceCoords[i];
-          if (!coords) throw new Error(`Invalid face index: ${i}`);
-          const [col, row] = coords;
-
-          const faceCanvas = new OffscreenCanvas(faceSize, faceSize);
-          const ctx = faceCanvas.getContext('2d');
-          if (!ctx) throw new Error('Could not get 2D context from OffscreenCanvas');
-          ctx.drawImage(
-            image,
-            col * faceSize,
-            row * faceSize,
-            faceSize,
-            faceSize,
-            0,
-            0,
-            faceSize,
-            faceSize,
-          );
-          return createImageBitmap(faceCanvas);
-        }),
+        faceCoords.map(([col, row]) =>
+          createImageBitmap(image, col * faceSize, row * faceSize, faceSize, faceSize),
+        ),
       );
 
       // Calcular niveles de mipmap

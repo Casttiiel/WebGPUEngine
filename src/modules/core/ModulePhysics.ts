@@ -258,6 +258,31 @@ export class ModulePhysics extends Module {
   }
 
   /**
+   * Returns an approximate AABB enclosing the whole physics scene.
+   * Uses each collider's translation + a generous margin because Rapier's JS
+   * bindings don't expose per-collider extents directly.
+   * Precision doesn't matter here — the result is only used to bound the
+   * probe auto-placement grid scan.
+   */
+  public getSceneAABB(): { min: vec3; max: vec3 } {
+    const min = vec3.fromValues(Infinity, Infinity, Infinity);
+    const max = vec3.fromValues(-Infinity, -Infinity, -Infinity);
+    // 10 m margin per collider centre covers typical mesh extents
+    const M = 10;
+    this.world.forEachCollider((col) => {
+      const t = col.translation();
+      if (t.x - M < min[0]) min[0] = t.x - M;
+      if (t.y - M < min[1]) min[1] = t.y - M;
+      if (t.z - M < min[2]) min[2] = t.z - M;
+      if (t.x + M > max[0]) max[0] = t.x + M;
+      if (t.y + M > max[1]) max[1] = t.y + M;
+      if (t.z + M > max[2]) max[2] = t.z + M;
+    });
+    if (!isFinite(min[0])) { vec3.set(min, -50, 0, -50); vec3.set(max, 50, 8, 50); }
+    return { min, max };
+  }
+
+  /**
    * Realiza un raycast en el mundo físico
    * Útil para detección de disparos, line of sight, etc.
    */

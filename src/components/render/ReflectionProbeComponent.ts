@@ -61,12 +61,11 @@ export class ReflectionProbeComponent extends Component {
   public override async onAttach(): Promise<void> {
     const baseName = this.getOwner().getName();
 
-    // Non-blocking: SHData.get() fires the fetch and returns immediately.
-    // getSHCoefficients() returns null until the JSON is parsed.
+    // SH is small (~1 KB) and contributes to ambient even from a distance — load eagerly.
     this.shData = SHData.get(`${baseName}_sh.json`);
 
-    // Load prefiltered specular env cubemap for PCC specular
-    this.envCubemap = await Cubemap.getAsync(baseName + '_env_cubemap_T.png').catch(() => null);
+    // Specular cubemap is large and only needed when the player is inside this probe.
+    // Loaded lazily on first onEntityEnter — see below.
 
     ProbeManager.getInstance().register(this);
   }
@@ -86,7 +85,14 @@ export class ReflectionProbeComponent extends Component {
     const entity = Engine.getPhysics().getEntityById(entityId);
     if (entity && entity.hasComponent('player_controller')) {
       this.entitiesInside.add(entityId);
+      this.ensureEnvCubemapLoaded();
     }
+  }
+
+  private ensureEnvCubemapLoaded(): void {
+    if (this.envCubemap) return;
+    const baseName = this.getOwner().getName();
+    this.envCubemap = Cubemap.get(`${baseName}_cubemap_T.png`, { baseFolder: 'assets/probes' });
   }
 
   private onEntityExit(entityId: number): void {
@@ -150,6 +156,10 @@ export class ReflectionProbeComponent extends Component {
    *   1.0 = outdoor — use probe env, no PCC correction
    *   2.0 = indoor  — use probe env + PCC AABB correction
    */
+  public getProbeType(): 'indoor' | 'outdoor' {
+    return this.probeType;
+  }
+
   public getProbeTypeFlag(): number {
     return this.probeType === 'indoor' ? 2.0 : 1.0;
   }
