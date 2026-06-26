@@ -11,7 +11,9 @@
       "transform": { "position": [0, 0.9, 0] }
     }
   },
-
+  {
+    "prefab": "lighting/reflection_probe.prefab"
+  },
   {
     "prefab": "cameras/debug_camera.prefab"
   },

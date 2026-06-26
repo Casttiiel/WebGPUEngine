@@ -9,5 +9,6 @@ export enum ResourceType {
   SCENE = 'scene',
   SOUND = 'sound',
   CUBEMAP = 'cubemap',
+  SH_DATA = 'sh_data',
   SKINNED_MESH_ASSET = 'skinned_mesh_asset',
 }

@@ -7,48 +7,68 @@
 struct AmbientUniforms {
     globalAmbientBoost: f32,
     diffuseBoost:       f32,
-    isBaking:       f32,  // 1.0 during probe bake — skips irradiance sampling to avoid feedback
-    probeBlendWeight: f32,
+    isBaking:           f32,  // 1.0 during probe bake — uses white irradiance to avoid feedback
+    probeBlendWeight:   f32,
+    hasProbeA:          f32,  // 1.0 = SH coefficients are ready; 0.0 = no diffuse IBL
+}
+
+struct SHProbeUniforms {
+    coefA: array<vec4<f32>, 9>,  // probe A: 9 × (R, G, B, pad) = 144 bytes
+    coefB: array<vec4<f32>, 9>,  // probe B: 9 × (R, G, B, pad) = 144 bytes
 }
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
-@group(1) @binding(0) var gAlbedo: texture_2d<f32>;
-@group(1) @binding(1) var gNormals: texture_2d<f32>;
+@group(1) @binding(0) var gAlbedo:      texture_2d<f32>;
+@group(1) @binding(1) var gNormals:     texture_2d<f32>;
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
 @group(1) @binding(3) var samplerGBuffer: sampler;
 
-@group(2) @binding(0) var gAO:            texture_2d<f32>;
-@group(2) @binding(1) var samplerAO:       sampler;
+@group(2) @binding(0) var gAO:              texture_2d<f32>;
+@group(2) @binding(1) var samplerAO:        sampler;
 @group(2) @binding(2) var<uniform> ambient: AmbientUniforms;
-@group(2) @binding(3) var irradianceMap:    texture_cube<f32>;
-@group(2) @binding(4) var samplerIrradiance: sampler;
-@group(2) @binding(5) var brdfLUT:         texture_2d<f32>;
-@group(2) @binding(6) var irradianceMapB:   texture_cube<f32>;
+@group(2) @binding(3) var brdfLUT:          texture_2d<f32>;
+@group(2) @binding(4) var<uniform> sh:      SHProbeUniforms;
 
+// Evaluates SH L2 irradiance at direction N.
+// Coefficients are stored with the cosine-lobe convolution factors pre-baked:
+//   E(N) = Σ_k coef_k · Y_k(N)
+fn evalSH(c: array<vec4<f32>, 9>, N: vec3<f32>) -> vec3<f32> {
+    let x = N.x; let y = N.y; let z = N.z;
+    var r = c[0].rgb * 0.282095;
+    r += c[1].rgb * (0.488603 * y);
+    r += c[2].rgb * (0.488603 * z);
+    r += c[3].rgb * (0.488603 * x);
+    r += c[4].rgb * (1.092548 * x * y);
+    r += c[5].rgb * (1.092548 * y * z);
+    r += c[6].rgb * (0.315392 * (3.0 * z * z - 1.0));
+    r += c[7].rgb * (1.092548 * x * z);
+    r += c[8].rgb * (0.546274 * (x * x - y * y));
+    return max(r, vec3<f32>(0.0));
+}
 
 fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let N   = normalize(g.normal);
     let V   = normalize(g.viewDir);
     let NdV = clamp(dot(N, V), 0.001, 1.0);
 
-    let irradianceDir = N;
-    let irradianceA = textureSample(irradianceMap, samplerIrradiance, irradianceDir).rgb;
-    let irradianceB = textureSample(irradianceMapB, samplerIrradiance, irradianceDir).rgb;
-    let sampledIrradiance = mix(irradianceA, irradianceB, ambient.probeBlendWeight);
-    // During probe baking use white irradiance to avoid feedback darkening
-    let irradiance = select(sampledIrradiance, vec3<f32>(1.0), ambient.isBaking > 0.5);
+    var irradiance: vec3<f32>;
+    if (ambient.isBaking > 0.5) {
+        irradiance = vec3<f32>(1.0);
+    } else if (ambient.hasProbeA > 0.5) {
+        let irrA = evalSH(sh.coefA, N);
+        let irrB = evalSH(sh.coefB, N);
+        irradiance = mix(irrA, irrB, ambient.probeBlendWeight);
+    } else {
+        irradiance = vec3<f32>(0.0);
+    }
 
-    // Use LUT-integrated directional albedo E = brdf.x + brdf.y for kD so that
-    // energy conservation is consistent with the Kulla-Conty splitSum in the specular pass.
-    // Point-Fresnel F would under-subtract from kD compared to the hemisphere-integrated F.
+    // Use LUT-integrated directional albedo for kD — keeps energy conservation
+    // consistent with the Kulla-Conty split-sum in the specular pass.
     let brdfCoords = vec2<f32>(clamp(NdV, 0.0, 1.0), 1.0 - clamp(g.roughness, 0.0, 1.0));
     let brdf = textureSampleLevel(brdfLUT, samplerAO, brdfCoords, 0.0).rg;
-    // Per-channel energy conservation: E = F0 * brdf.x + brdf.y (vec3).
-    // Using F0=1 (scalar) overestimates E at normal incidence on smooth surfaces,
-    // collapsing kD to ~0 at screen-center and creating a visible bright halo ring.
     let E    = g.specularColor * brdf.x + brdf.y;
-    let Ems  = 1.0 - (brdf.x + brdf.y);  // scalar Ems
+    let Ems  = 1.0 - (brdf.x + brdf.y);
     let Favg = g.specularColor + (1.0 - g.specularColor) / 21.0;
     let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
     let kD   = (1.0 - E - Fms) * (1.0 - g.metallic);

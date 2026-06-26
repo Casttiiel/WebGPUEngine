@@ -627,32 +627,16 @@ export class BindGroupFactory {
         buffer: { type: 'uniform' },
       },
       {
+        // brdfLUT
         binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          viewDimension: 'cube',
-          sampleType: 'float',
-          multisampled: false,
-        },
-      },
-      {
-        binding: 4,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
-      },
-      {
-        binding: 5,
         visibility: GPUShaderStage.FRAGMENT,
         texture: { sampleType: 'float' },
       },
       {
-        binding: 6,
+        // SH L2 irradiance coefficients: probeA(9×vec4) + probeB(9×vec4) = 288 bytes
+        binding: 4,
         visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          viewDimension: 'cube',
-          sampleType: 'float',
-          multisampled: false,
-        },
+        buffer: { type: 'uniform' },
       },
     ]);
   }

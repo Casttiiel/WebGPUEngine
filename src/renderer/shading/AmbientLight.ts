@@ -21,12 +21,16 @@ export class AmbientLight {
   private ambientSpecularBindGroup!: GPUBindGroup;
   private ambientSpecularUniformBuffer!: GPUBuffer;
 
-  // Diffuse uniform: 4 scalars + 6 × vec4 for PCC probe A/B data = 28 floats / 112 bytes.
-  // Layout: [0..3] = globalBoost,diffuseBoost,isBaking,blendWeight
-  //         [4..15] = probeAPos(xyz,w) + probeAMin(xyz,_) + probeAMax(xyz,_)
-  //         [16..27] = probeBPos(xyz,w) + probeBMin(xyz,_) + probeBMax(xyz,_)
-  private ambientDiffuseUniformArray = new Float32Array(28);
+  // Diffuse uniform: 5 scalars (+ padding to 8) = 32 bytes.
+  // Layout: [0] globalBoost  [1] diffuseBoost  [2] isBaking
+  //         [3] probeBlendWeight  [4] hasProbeA  [5..7] padding
+  private ambientDiffuseUniformArray = new Float32Array(8);
   private ambientSpecularUniformArray = new Float32Array(12);
+
+  // SH L2 irradiance: probeA(9×vec4) + probeB(9×vec4) = 72 floats / 288 bytes.
+  // Each vec4 = (R, G, B, 0_padding). Layout: coefA[0..8] then coefB[0..8].
+  private shUniformBuffer!: GPUBuffer;
+  private shUniformArray = new Float32Array(72);
 
   // PCC specular uniform: 7 × vec4 = 28 floats / 112 bytes.
   // Layout: probeAPos(xyz,hasA) + probeAMin(xyz,_) + probeAMax(xyz,_)
@@ -35,9 +39,7 @@ export class AmbientLight {
   private pccSpecularUniformBuffer!: GPUBuffer;
   private pccSpecularUniformArray = new Float32Array(28);
 
-  /** Cached probe views for bind-group invalidation when the player moves between probes. */
-  private lastProbeAView: GPUTextureView | null = null;
-  private lastProbeBView: GPUTextureView | null = null;
+  /** Cached probe env views for specular bind-group invalidation. */
   private lastProbeEnvAView: GPUTextureView | null = null;
   private lastProbeEnvBView: GPUTextureView | null = null;
 
@@ -59,7 +61,13 @@ export class AmbientLight {
 
       this.ambientDiffuseUniformBuffer = GPUUtils.createBuffer(
         'ambient diffuse uniform buffer',
-        112, // 28 floats: 4 scalars + 6 vec4s for PCC probe A/B
+        32, // 8 floats: globalBoost, diffuseBoost, isBaking, blendWeight, hasProbeA + 3 pad
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+
+      this.shUniformBuffer = GPUUtils.createBuffer(
+        'ambient SH uniform buffer',
+        288, // 72 floats: probeA(9×vec4) + probeB(9×vec4)
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
 
@@ -87,20 +95,10 @@ export class AmbientLight {
     gBufferBindGroup: GPUBindGroup,
     aoResult: GPUTextureView,
   ): void {
-    const probeViews = this._getProbeViews();
-    const probeAChanged = probeViews.viewA !== this.lastProbeAView;
-    const probeBChanged = probeViews.viewB !== this.lastProbeBView;
-
-    if (probeAChanged || probeBChanged) {
-      // Probe changed — all cached bind groups are stale (they embed the irradiance views).
-      this.ambientDiffuseBindGroupCache.clear();
-      this.lastProbeAView = probeViews.viewA;
-      this.lastProbeBView = probeViews.viewB;
-    }
-
+    // SH data is in a uniform buffer written every frame — bind group is stable per aoResult.
     let diffuseBG = this.ambientDiffuseBindGroupCache.get(aoResult);
     if (!diffuseBG) {
-      diffuseBG = this.createAmbientDiffuseBindGroup(aoResult, probeViews.viewA, probeViews.viewB);
+      diffuseBG = this.createAmbientDiffuseBindGroup(aoResult);
       this.ambientDiffuseBindGroupCache.set(aoResult, diffuseBG);
     }
     const render = Render.getInstance();
@@ -183,45 +181,16 @@ export class AmbientLight {
     pass.end();
   }
 
-  private createAmbientDiffuseBindGroup(
-    aoResult: GPUTextureView,
-    irradianceViewA: GPUTextureView,
-    irradianceViewB: GPUTextureView,
-  ): GPUBindGroup {
+  private createAmbientDiffuseBindGroup(aoResult: GPUTextureView): GPUBindGroup {
     return BindGroupFactory.createBindGroup(
       'ambient_bindgroup',
       this.ambientDiffuseTechnique.getPipeline().getBindGroupLayout(2),
       [
-        {
-          binding: 0,
-          resource: aoResult,
-        },
-        {
-          binding: 1,
-          resource: SamplerLibrary.simpleSampler!,
-        },
-        {
-          binding: 2,
-          resource: { buffer: this.ambientDiffuseUniformBuffer },
-        },
-        {
-          binding: 3,
-          resource: irradianceViewA,
-        },
-        {
-          binding: 4,
-          resource: Engine.getEnvironmentManager()
-            .getAmbientLightData()
-            .irradianceCubemap.getSampler()!,
-        },
-        {
-          binding: 5,
-          resource: this.brdfLUT.getTextureView()!,
-        },
-        {
-          binding: 6,
-          resource: irradianceViewB,
-        },
+        { binding: 0, resource: aoResult },
+        { binding: 1, resource: SamplerLibrary.simpleSampler! },
+        { binding: 2, resource: { buffer: this.ambientDiffuseUniformBuffer } },
+        { binding: 3, resource: this.brdfLUT.getTextureView()! },
+        { binding: 4, resource: { buffer: this.shUniformBuffer } },
       ],
     );
   }
@@ -285,23 +254,22 @@ export class AmbientLight {
   }
 
   public update(_dt: number): void {
-    // Guard: load() is async and may not have finished yet on the very first frame.
-    if (
-      !this.pccSpecularUniformBuffer ||
-      !this.ambientDiffuseUniformBuffer ||
-      !this.ambientSpecularUniformBuffer
-    ) {
-      return;
-    }
+    if (!this.pccSpecularUniformBuffer || !this.ambientDiffuseUniformBuffer || !this.ambientSpecularUniformBuffer || !this.shUniformBuffer) return;
 
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
+    const blend = ProbeManager.getInstance().getBlendedProbes();
+    // hasProbeA is 1 only when SH coefficients are actually loaded — otherwise fall back to
+    // the global irradiance cubemap so there's no black frame during async JSON load.
+    const shCoefA = blend.probeA?.getSHCoefficients() ?? null;
+    const hasProbeA = shCoefA !== null ? 1.0 : 0.0;
+
     this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
     this.ambientDiffuseUniformArray[1] = ambientData.diffuseFactor;
-    this.ambientDiffuseUniformArray[2] = AmbientLight._bakingMode ? 1.0 : 0.0; // isBaking flag
-    // [3] = probeBlendWeight — updated by _getProbeViews() side-effect via renderDiffuse
-    const blend = ProbeManager.getInstance().getBlendedProbes();
+    this.ambientDiffuseUniformArray[2] = AmbientLight._bakingMode ? 1.0 : 0.0;
     this.ambientDiffuseUniformArray[3] = blend.probeB !== null ? blend.blendWeight : 0.0;
-    // Buffer is written by _writePCCDiffuseUniforms() below (avoids a redundant write)
+    this.ambientDiffuseUniformArray[4] = hasProbeA;
+    // [5..7] = padding
+    GPUUtils.writeBuffer(this.ambientDiffuseUniformBuffer, 0, this.ambientDiffuseUniformArray);
 
     this.ambientSpecularUniformArray[0] = ambientData.globalFactor;
     this.ambientSpecularUniformArray[1] = 0.0;
@@ -311,18 +279,14 @@ export class AmbientLight {
     this.ambientSpecularUniformArray[5] = 0.0;
     this.ambientSpecularUniformArray[6] = ambientData.reflectionFactor;
     this.ambientSpecularUniformArray[7] = ambientData.diffuseFactor;
-    // indices 8–11 are metallicMin, roughnessMax, _pad0, _pad1 — unused in this pass, keep as 0
     this.ambientSpecularUniformArray[8] = 0.0;
     this.ambientSpecularUniformArray[9] = 0.0;
     this.ambientSpecularUniformArray[10] = 0.0;
     this.ambientSpecularUniformArray[11] = 0.0;
     GPUUtils.writeBuffer(this.ambientSpecularUniformBuffer, 0, this.ambientSpecularUniformArray);
 
-    // ── PCC specular data ─────────────────────────────────────────────────────
     this._writePCCSpecularUniforms();
-
-    // ── PCC diffuse data (packed into ambient diffuse uniform) ────────────────
-    this._writePCCDiffuseUniforms();
+    this._writeSHUniforms(blend);
   }
 
   /**
@@ -361,43 +325,33 @@ export class AmbientLight {
   }
 
   /**
-   * Writes probe A and B AABB data into the ambient diffuse uniform buffer
-   * at the PCC region (offsets 4–27 of the Float32Array).
+   * Packs SH L2 coefficients for probe A and probe B into the SH uniform buffer.
+   * Each coefficient is stored as vec4(R, G, B, 0). Layout: coefA[0..8] coefB[0..8].
+   * When no probe is active, writes zeros so hasProbeA=0 causes the shader to fall back
+   * to the global irradiance cubemap.
    */
-  private _writePCCDiffuseUniforms(): void {
-    const blend = ProbeManager.getInstance().getBlendedProbes();
+  private _writeSHUniforms(blend: ReturnType<typeof ProbeManager.prototype.getBlendedProbes>): void {
+    const shA = blend.probeA?.getSHCoefficients() ?? null;
+    const shB = blend.probeB?.getSHCoefficients() ?? shA; // fall back to A when no B
 
-    const writeProbe = (probe: typeof blend.probeA, offset: number): void => {
-      if (probe) {
-        const pos = probe.getPosition();
-        const ext = probe.getExtents();
-        this.ambientDiffuseUniformArray[offset + 0] = pos[0];
-        this.ambientDiffuseUniformArray[offset + 1] = pos[1];
-        this.ambientDiffuseUniformArray[offset + 2] = pos[2];
-        this.ambientDiffuseUniformArray[offset + 3] = probe.getProbeTypeFlag(); // 1=outdoor, 2=indoor+PCC
-        this.ambientDiffuseUniformArray[offset + 4] = pos[0] - ext[0];
-        this.ambientDiffuseUniformArray[offset + 5] = pos[1] - ext[1];
-        this.ambientDiffuseUniformArray[offset + 6] = pos[2] - ext[2];
-        this.ambientDiffuseUniformArray[offset + 7] = 0.0;
-        this.ambientDiffuseUniformArray[offset + 8] = pos[0] + ext[0];
-        this.ambientDiffuseUniformArray[offset + 9] = pos[1] + ext[1];
-        this.ambientDiffuseUniformArray[offset + 10] = pos[2] + ext[2];
-        this.ambientDiffuseUniformArray[offset + 11] = 0.0;
-      } else {
-        this.ambientDiffuseUniformArray[offset + 3] = 0.0; // clear hasProbe
+    const writeSH = (coefs: Float32Array | null, base: number): void => {
+      for (let k = 0; k < 9; k++) {
+        const o = base + k * 4;
+        this.shUniformArray[o]     = coefs ? coefs[k * 3]!     : 0;
+        this.shUniformArray[o + 1] = coefs ? coefs[k * 3 + 1]! : 0;
+        this.shUniformArray[o + 2] = coefs ? coefs[k * 3 + 2]! : 0;
+        this.shUniformArray[o + 3] = 0; // padding
       }
     };
 
-    writeProbe(blend.probeA, 4); // probeAPos at index 4
-    writeProbe(blend.probeB, 16); // probeBPos at index 16
-    GPUUtils.writeBuffer(this.ambientDiffuseUniformBuffer, 0, this.ambientDiffuseUniformArray);
+    writeSH(shA, 0);   // probeA at floats 0–35
+    writeSH(shB, 36);  // probeB at floats 36–71
+    GPUUtils.writeBuffer(this.shUniformBuffer, 0, this.shUniformArray);
   }
 
   public destroy(): void {
     this.ambientDiffuseBindGroupCache.clear();
     this.ambientSpecularBindGroup = null!;
-    this.lastProbeAView = null;
-    this.lastProbeBView = null;
     this.lastProbeEnvAView = null;
     this.lastProbeEnvBView = null;
   }
@@ -416,18 +370,4 @@ export class AmbientLight {
     return { envA, envB };
   }
 
-  /**
-   * Returns the irradiance cubemap views to bind for the two dominant probes.
-   * Falls back to the global/environment irradiance when no probe covers the player.
-   */
-  private _getProbeViews(): { viewA: GPUTextureView; viewB: GPUTextureView } {
-    const globalView = Engine.getEnvironmentManager()
-      .getAmbientLightData()
-      .irradianceCubemap.getTextureView()!;
-
-    const blend = ProbeManager.getInstance().getBlendedProbes();
-    const viewA = blend.probeA?.getIrradianceView() ?? globalView;
-    const viewB = blend.probeB?.getIrradianceView() ?? viewA;
-    return { viewA, viewB };
-  }
 }

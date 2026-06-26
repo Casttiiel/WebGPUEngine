@@ -13,13 +13,11 @@ import { GPUUtils } from '../../renderer/core/utils/GPUUtils';
 import { DeferredRenderer } from '../../renderer/core/pipeline/DeferredRenderer';
 import { Entity } from '../../core/ecs/Entity';
 import { CameraComponent } from '../../components/render/CameraComponent';
-import { IrradianceGenerator } from '../../renderer/core/IrradianceGenerator';
+import { SHProjector } from '../../renderer/core/SHProjector';
 import { MipmapGenerator } from '../../renderer/core/processing/MipmapGenerator';
 import { QualitySettings } from '../../core/engine/QualitySettings';
-import { ResourceType } from '../../types/ResourceType.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { ProbeAutoPlacement } from '../../renderer/shading/ProbeAutoPlacement';
-import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { DirectionalLightComponent } from '../../components/render/DirectionalLightComponent';
 import { Wind } from '../../core/engine/Wind';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
@@ -59,9 +57,6 @@ export class ModuleEnvironmentManager extends Module {
   public cloudOpacity: number = 0.0; // max cloud opacity (0 = hidden)
   public cloudColor: [number, number, number] = [1, 1, 1]; // normalized 0-1 (white = no tint)
 
-  // Generador de irradiance
-  private irradianceGenerator: IrradianceGenerator | null = null;
-
   constructor(name: string) {
     super(name);
   }
@@ -80,25 +75,16 @@ export class ModuleEnvironmentManager extends Module {
 
     this.skyboxType = jsonData.skyboxType || 'cubemap';
     this.timeOfDay = jsonData.timeOfDay ?? 0.5; // Default to noon
-    this.irradianceGenerator = new IrradianceGenerator();
 
-    const [irradianceCubemap, skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
-      Cubemap.getAsync(jsonData.ambient.irradianceCubemap).then((r) => {
-        return r;
-      }),
-      HDRTexture.getAsync(jsonData.skybox).then((r) => {
-        return r;
-      }),
-      Cubemap.getAsync(jsonData.ssrEnvironment).then((r) => {
-        return r;
-      }),
+    const [skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
+      HDRTexture.getAsync(jsonData.skybox),
+      Cubemap.getAsync(jsonData.ssrEnvironment),
     ]);
 
     this.ambientLightData = {
       globalFactor: jsonData.ambient.globalFactor,
       diffuseFactor: jsonData.ambient.diffuseFactor,
       reflectionFactor: jsonData.ambient.reflectionFactor,
-      irradianceCubemap,
     };
     this.skyboxTexture = skyboxTexture;
     this.ssrEnvironmentTexture = ssrEnvironmentTexture;
@@ -130,7 +116,6 @@ export class ModuleEnvironmentManager extends Module {
         reflectionFactor:
           this.blendState.startData.reflectionFactor * (1.0 - ratio) +
           this.blendState.targetData.reflectionFactor * ratio,
-        irradianceCubemap: this.blendState.startData.irradianceCubemap,
       };
 
       if (this.blendState.blendedWeight >= 1.0) {
@@ -379,10 +364,10 @@ export class ModuleEnvironmentManager extends Module {
     // ✅ Restaurar dimensiones originales del render
     Render.restoreRenderSize();
 
-    // ✅ Generar irradiance cubemap a partir del reflection cubemap
-    await this.generateAndDownloadIrradiance(cubemapTexture, probeName, resolution);
+    // Project SH L2 irradiance coefficients and download as JSON
+    await this.computeAndDownloadSH(cubemapTexture, probeName, resolution);
 
-    // Descargar cubemap de reflection generado
+    // Download the raw reflection cubemap (kept for specular PCC)
     await this.downloadCubemap(cubemapTexture, probeName, resolution);
 
     // Limpiar
@@ -390,59 +375,26 @@ export class ModuleEnvironmentManager extends Module {
   }
 
   /**
-   * Genera un irradiance cubemap a partir del reflection cubemap y lo descarga
+   * Projects the captured cubemap to SH L2 irradiance coefficients and downloads as JSON.
+   * Replaces the old irradiance cubemap bake — produces 27 floats instead of a 128×128 image.
    */
-  private async generateAndDownloadIrradiance(
-    reflectionTexture: GPUTexture,
+  private async computeAndDownloadSH(
+    cubemapTexture: GPUTexture,
     probeName: string,
     resolution: number,
   ): Promise<void> {
-    if (!this.irradianceGenerator) {
-      console.error('❌ IrradianceGenerator no está inicializado');
-      return;
-    }
-
-    console.log(`🔶 Generando irradiance para ${probeName}...`);
-
-    // Crear un Cubemap temporal a partir de la textura de reflection
-    const tempReflectionCubemap = this.createCubemapFromTexture(
-      reflectionTexture,
-      `${probeName}_reflection_temp`,
-    );
-
-    // Generar irradiance
-    const irradianceCubemap =
-      await this.irradianceGenerator.generateIrradiance(tempReflectionCubemap);
-
-    // Descargar el irradiance cubemap (128x128)
-    const irradianceTexture = (irradianceCubemap as any).gpuTexture as GPUTexture;
-    await this.downloadCubemap(irradianceTexture, `${probeName}_irradiance`, 128);
-
-    console.log(`✅ Irradiance generado y descargado para ${probeName}`);
-  }
-
-  /**
-   * Crea un objeto Cubemap temporal a partir de una GPUTexture
-   */
-  private createCubemapFromTexture(texture: GPUTexture, name: string): Cubemap {
-    const device = GPUUtils.getDevice();
-
-    const cubemap = new Cubemap({
-      path: name,
-      type: ResourceType.CUBEMAP,
-      label: name,
-    });
-
-    // Inyectar la textura directamente
-    (cubemap as any).gpuTexture = texture;
-    (cubemap as any).gpuTextureView = texture.createView({
-      dimension: 'cube',
-    });
-    (cubemap as any).gpuSampler = SamplerLibrary.environmentCubemap;
-
-    (cubemap as any)._hasData = true;
-
-    return cubemap;
+    const sh = await SHProjector.projectFromGPUTexture(cubemapTexture, resolution);
+    const json = JSON.stringify({ sh: Array.from(sh) });
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    // Save as {probeName}_sh.json — place in public/assets/probes/ after download
+    link.download = `${probeName}_sh.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 
   /**
@@ -617,17 +569,6 @@ export class ModuleEnvironmentManager extends Module {
       blendedWeight: 0.0,
       interpolator,
     };
-  }
-
-  public changeIrradianceTexture(newTexture: string): void {
-    Cubemap.getAsync(newTexture)
-      .then((cubemap) => {
-        this.ambientLightData.irradianceCubemap = cubemap;
-        Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
-      })
-      .catch(() => {
-        // Texture not found (not yet baked) — keep current irradiance cubemap
-      });
   }
 
   public changeSSREnvironmentTexture(newTexture: string): void {

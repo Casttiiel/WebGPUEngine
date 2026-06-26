@@ -4,6 +4,7 @@ import { vec3 } from 'gl-matrix';
 import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
 import { Cubemap } from '../../renderer/resources/Cubemap';
+import { SHData } from '../../renderer/resources/SHData';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
 import { ReflectionProbeComponentData } from '../../types/ReflectionProbeComponentData.type';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
@@ -25,8 +26,8 @@ export class ReflectionProbeComponent extends Component {
    */
   private probeType: 'indoor' | 'outdoor' = 'indoor';
 
-  /** Own pre-baked irradiance cubemap for multi-probe blending. */
-  private irradianceCubemap: Cubemap | null = null;
+  /** SH L2 irradiance data loaded from assets/probes/{name}_sh.json. */
+  private shData: SHData | null = null;
 
   /** Own pre-baked prefiltered env cubemap for per-probe specular PCC. */
   private envCubemap: Cubemap | null = null;
@@ -58,16 +59,15 @@ export class ReflectionProbeComponent extends Component {
   }
 
   public override async onAttach(): Promise<void> {
-    // Load own irradiance and env cubemaps for per-probe PCC blending
     const baseName = this.getOwner().getName();
-    const [irr, env] = await Promise.all([
-      Cubemap.getAsync(baseName + '_irradiance_cubemap_T.png').catch(() => null),
-      Cubemap.getAsync(baseName + '_env_cubemap_T.png').catch(() => null),
-    ]);
-    this.irradianceCubemap = irr;
-    this.envCubemap = env;
 
-    // Register with ProbeManager so AmbientLight can drive per-probe PCC
+    // Non-blocking: SHData.get() fires the fetch and returns immediately.
+    // getSHCoefficients() returns null until the JSON is parsed.
+    this.shData = SHData.get(`${baseName}_sh.json`);
+
+    // Load prefiltered specular env cubemap for PCC specular
+    this.envCubemap = await Cubemap.getAsync(baseName + '_env_cubemap_T.png').catch(() => null);
+
     ProbeManager.getInstance().register(this);
   }
 
@@ -134,9 +134,9 @@ export class ReflectionProbeComponent extends Component {
     return this.entitiesInside;
   }
 
-  /** Returns the GPU view for this probe's pre-baked irradiance cubemap, or null if not loaded. */
-  public getIrradianceView(): GPUTextureView | null {
-    return this.irradianceCubemap?.getTextureView() ?? null;
+  /** Returns the 27-float SH L2 irradiance coefficients, or null if not yet loaded. */
+  public getSHCoefficients(): Float32Array | null {
+    return this.shData?.getCoefficients() ?? null;
   }
 
   /** Returns the GPU view for this probe's prefiltered env cubemap (specular PCC), or null if not loaded. */

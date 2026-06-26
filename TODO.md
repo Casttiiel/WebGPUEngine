@@ -30,7 +30,7 @@ Slash effect
 
 ## Renderer
 
-1. Irradiance Volumes
+1. Irradiance Volumes (Cambio de iluminacion?)(Generador de probes)(Nombres de ficheros)
 2. Procedural materials
 3. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
 4. Review SSR
