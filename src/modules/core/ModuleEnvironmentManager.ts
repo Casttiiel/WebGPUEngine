@@ -23,6 +23,13 @@ import { Wind } from '../../core/engine/Wind';
 import { ProbeManager } from '../../renderer/core/managers/ProbeManager';
 import { AmbientLight } from '../../renderer/shading/AmbientLight';
 
+// ── Probe auto-placement config ────────────────────────────────────────────────
+// Distance in metres between probe centres. Collider size and PCC AABB are
+// derived automatically so adjacent probes tile without gaps.
+//   Small value  → more probes, finer coverage, heavier bake
+//   Large value  → fewer probes, coarser coverage, faster bake
+const PROBE_SPACING = 16.0;
+
 // Math utilities for atmospheric lighting
 const lerp = (a: number, b: number, alpha: number): number => a + alpha * (b - a);
 const smoothstep = (edge0: number, edge1: number, x: number): number => {
@@ -82,7 +89,7 @@ export class ModuleEnvironmentManager extends Module {
     // Derive scene name from the first entry in boot.json for probe naming/file scoping
     try {
       const bootResp = await ResourceManager.fetch('data/boot.json');
-      const bootData = await bootResp.json() as { scenes_to_load?: string[] };
+      const bootData = (await bootResp.json()) as { scenes_to_load?: string[] };
       const first = bootData.scenes_to_load?.[0] ?? 'scene.json';
       this.sceneName = first.replace(/\.json$/i, '');
     } catch {
@@ -140,7 +147,7 @@ export class ModuleEnvironmentManager extends Module {
     // Add the downloaded file to assets/scenes/ and reference it in boot.json
     // so probes persist across sessions.
     if (Engine.getInput().isKeyJustPressed(KeyCode.F7)) {
-      const candidates = await ProbeAutoPlacement.generate(this.sceneName);
+      const candidates = await ProbeAutoPlacement.generate(this.sceneName, PROBE_SPACING);
       if (candidates.length > 0) {
         this.downloadProbesJSON(candidates);
       }
@@ -152,9 +159,8 @@ export class ModuleEnvironmentManager extends Module {
       const moduleRender = Engine.getRender();
       moduleRender.pauseRendering = true;
 
-      const probeComponents = Engine.getEntities()
-        .getObjectManagerByName('reflection_probe')
-        ?.getList() ?? [];
+      const probeComponents =
+        Engine.getEntities().getObjectManagerByName('reflection_probe')?.getList() ?? [];
 
       for (const comp of probeComponents) {
         await this.captureAndDownloadProbe(comp as ReflectionProbeComponent);
@@ -606,7 +612,7 @@ export class ModuleEnvironmentManager extends Module {
     );
     console.log(
       `[Probes] Downloaded ${this.sceneName}_probes.json` +
-      ` — add it to assets/scenes/ and reference it in data/boot.json.`,
+        ` — add it to assets/scenes/ and reference it in data/boot.json.`,
     );
   }
 

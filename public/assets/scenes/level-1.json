@@ -12,9 +12,6 @@
     }
   },
   {
-    "prefab": "lighting/reflection_probe.prefab"
-  },
-  {
     "prefab": "cameras/debug_camera.prefab"
   },
   {
