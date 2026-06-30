@@ -25,8 +25,9 @@
       "maxNodes": 24,
       "minNodeDistance": 0.02,
       "lifetime": 0.15,
-      "startColor": [1.0, 1.0, 1.0, 0.85],
-      "endColor": [0.6, 0.85, 1.0, 0.0],
+      "material": "slash.mat",
+      "startColor": [1.0, 0.92, 0.6, 1.0],
+      "endColor": [0.3, 0.6,  1.0, 0.0],
       "splineSubdivisions": 3,
       "emitting": false,
       "bladeMode": true

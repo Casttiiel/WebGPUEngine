@@ -60,7 +60,13 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
         let irrB = evalSH(sh.coefB, N);
         irradiance = mix(irrA, irrB, ambient.probeBlendWeight);
     } else {
-        irradiance = vec3<f32>(0.0);
+        // Hemisphere ambient fallback when no probe is active.
+        // Sky colour overhead, darker ground colour below — gives soft directional
+        // ambient without needing any baked data.
+        let hemi = dot(N, vec3<f32>(0.0, 1.0, 0.0)) * 0.5 + 0.5; // 0=ground, 1=sky
+        let skyColour    = vec3<f32>(0.38, 0.50, 0.65);
+        let groundColour = vec3<f32>(0.10, 0.07, 0.04);
+        irradiance = mix(groundColour, skyColour, hemi);
     }
 
     // Use LUT-integrated directional albedo for kD — keeps energy conservation

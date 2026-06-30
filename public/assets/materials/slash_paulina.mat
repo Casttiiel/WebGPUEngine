@@ -1,0 +1,12 @@
+{
+    "technique": "trail/slash_paulina.tech",
+    "textures": {
+        "txAlbedo":    "white.png",
+        "txNormal":    "white.png",
+        "txMetallic":  "white.png",
+        "txRoughness": "white.png"
+    },
+    "casts_shadows": false,
+    "category": "transparent",
+    "shadows": false
+}
