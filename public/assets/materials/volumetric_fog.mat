@@ -1,0 +1,17 @@
+{
+    "technique": "vfx/volumetric_box_fog.tech",
+    "textures": {},
+    "casts_shadows": false,
+    "category": "transparent",
+    "shadows": false,
+
+    "baseColorFactor":  [1.0, 0.88, 0.65, 0.05],
+    "roughnessFactor":   0.438,
+    "metallicFactor":    0.657,
+    "emissiveFactor":    0.613,
+    "appearanceBlend":   0.82,
+    "uvXScale":          0.22,
+    "uvYScale":          0.80,
+    "surfaceBlend":      0.05,
+    "pomScale":          1.0
+}

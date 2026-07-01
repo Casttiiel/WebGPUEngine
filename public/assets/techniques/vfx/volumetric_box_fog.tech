@@ -1,0 +1,16 @@
+{
+    "vs": "vfx/volumetric_box_fog.vs",
+    "fs": "vfx/volumetric_box_fog.fs",
+    "writesOn": "texture",
+    "z": "test_but_no_write",
+    "blend": "volumetric",
+    "rs": "double_sided",
+    "uniforms": ["CameraUniforms", "MaterialTextures", "ObjectUniforms"],
+    "materialSlots": [
+        { "name": "txBlueNoise",   "binding": 0, "type": "texture2d", "defaultValue": "bluenoise64.png" },
+        { "name": "txLinearDepth", "binding": 1, "type": "texture2d", "defaultValue": "@engine:linear_depth" },
+        { "name": "fogSampler",    "binding": 2, "type": "sampler",   "defaultValue": "@sampler:nearestRepeat" },
+        { "name": "fogParams",     "binding": 3, "type": "uniform" }
+    ],
+    "instanced": false
+}
