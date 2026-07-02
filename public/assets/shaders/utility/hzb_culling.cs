@@ -88,10 +88,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let obj = objects[idx];
 
   // --- Project all 8 AABB corners through viewProj -------------------------
-  // Track NDC extents and the minimum (front-face) NDC Z.
+  // Reverse Z convention: near=1, far=0.
+  // Track NDC extents and the maximum (front-face) NDC Z — in reverse Z the
+  // closest corner has the LARGEST depth value.
   var ndcMinXY = vec2<f32>( 1e20,  1e20);
   var ndcMaxXY = vec2<f32>(-1e20, -1e20);
-  var ndcMinZ  = f32(1e20);   // smallest Z = closest corner to camera
+  var ndcMaxZ  = f32(0.0);   // largest Z = closest corner to camera (reverse Z)
 
   var anyVisible = false;
 
@@ -103,12 +105,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let worldPos = obj.modelMatrix * vec4<f32>(lx, ly, lz, 1.0);
     let clipPos  = camera.viewProj * worldPos;
 
-    // Any corner behind the near plane means the object straddles it (camera inside
-    // or very close). The HZB cannot represent this case — keep visible immediately.
-    // Returning here (instead of continue + anyClipped flag) prevents accumulating
-    // ndcMinZ only from far corners, which would produce a falsely large ndcMinZ
-    // and incorrectly cull objects that are partially visible from up close.
-    if (clipPos.w <= 0.0 || clipPos.z < 0.0) {
+    // Any corner that straddles the near or far plane means the object is
+    // partially unrepresentable in the HZB — keep it visible immediately.
+    // In reverse Z: beyond-near → clipZ > clipW, beyond-far → clipZ < 0.
+    if (clipPos.w <= 0.0 || clipPos.z < 0.0 || clipPos.z > clipPos.w) {
       return;
     }
 
@@ -118,11 +118,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     ndcMinXY = min(ndcMinXY, ndcXY);
     ndcMaxXY = max(ndcMaxXY, ndcXY);
-    ndcMinZ  = min(ndcMinZ,  ndcZ );
+    ndcMaxZ  = max(ndcMaxZ,  ndcZ );  // closest corner = highest Z in reverse Z
     anyVisible = true;
   }
 
-  // All corners behind near plane — frustum should have caught this, but skip.
+  // All corners clipped — frustum should have caught this, but skip.
   if (!anyVisible) {
     return;
   }
@@ -130,7 +130,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   // Clamp NDC extents to the visible frustum volume [-1, 1]
   ndcMinXY = clamp(ndcMinXY, vec2<f32>(-1.0), vec2<f32>(1.0));
   ndcMaxXY = clamp(ndcMaxXY, vec2<f32>(-1.0), vec2<f32>(1.0));
-  ndcMinZ  = clamp(ndcMinZ,  0.0, 1.0);
+  ndcMaxZ  = clamp(ndcMaxZ,  0.0, 1.0);
 
   // --- Convert NDC → UV ([0,1] texture coordinates) -----------------------
   // WebGPU NDC: X = -1..+1 (left→right), Y = -1..+1 (bottom→top)
@@ -182,30 +182,30 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let tx1 = clamp(i32(uvMaxX * mipDims.x) + 1, 0, mipDimsI.x - 1);
   let ty1 = clamp(i32(uvMaxY * mipDims.y) + 1, 0, mipDimsI.y - 1);
 
-  var hzbMaxDepth = 0.0;
+  // In reverse Z the HZB stores MAX depth per region via max-pool downsampling.
+  // MAX = closest occluder in region (highest value = nearest to camera).
+  // We take the MIN across query cells to get the most permissive (least
+  // occluding) cell in the footprint — a single transparent cell would allow
+  // the object through, so we must be conservative here.
+  var hzbMinDepth = 1.0;
   for (var ty = ty0; ty <= ty1; ty++) {
     for (var tx = tx0; tx <= tx1; tx++) {
       let d = textureLoad(hzbTexture, vec2<i32>(tx, ty), mipFine).r;
-      hzbMaxDepth = max(hzbMaxDepth, d);
+      hzbMinDepth = min(hzbMinDepth, d);
     }
   }
 
   // --- Occlusion test -------------------------------------------------------
-  // Depth convention: 0 = near, 1 = far (standard non-reversed-Z).
-  // ndcMinZ is the closest (smallest Z) corner of the AABB.
-  // If even the closest corner is farther than the max occluder depth in the
-  // HZB region, the whole AABB is behind occluders → cull it.
+  // Depth convention: reverse Z — near=1, far=0.
+  // ndcMaxZ is the closest (largest Z) corner of the AABB.
+  // If even the closest corner has a depth below the minimum HZB occluder
+  // depth in the region, the whole AABB is behind occluders → cull it.
   //
-  // Bias: at large distances both wall and object NDC-Z values are compressed
-  // close to 1.0, so the absolute difference shrinks.  A fixed 0.002 bias
-  // swamps that difference and prevents culling.  Use a depth-proportional
-  // bias instead: it's negligible at close range (handled by anyClipped) and
-  // stays below the actual NDC precision loss at far range.
-  // Proportional bias keeps false culls rare at all distances; the absolute
-  // minimum of 0.0001 prevents the bias from disappearing at very small ndcMinZ
-  // values where non-reversed Z precision is already low.
-  let DEPTH_BIAS = max(ndcMinZ * 0.001, 0.0001);
-  if (ndcMinZ > hzbMaxDepth + DEPTH_BIAS) {
+  // Bias: reverse Z gives better precision at large distances (small Z values).
+  // Near-distance precision near Z=1 is still fine. Use a bias proportional to
+  // (1 - ndcMaxZ) so it scales with "distance from the near plane".
+  let DEPTH_BIAS = max((1.0 - ndcMaxZ) * 0.001, 0.0001);
+  if (ndcMaxZ < hzbMinDepth - DEPTH_BIAS) {
     indirectArgs[idx].instanceCount = 0u;
     atomicAdd(&culledCount, 1u);
 
@@ -214,8 +214,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (debugSlot < 32u) {
       let base = 1u + debugSlot * 12u;
       atomicStore(&hzbDebug[base +  0u], idx);
-      atomicStore(&hzbDebug[base +  1u], bitcast<u32>(ndcMinZ));
-      atomicStore(&hzbDebug[base +  2u], bitcast<u32>(hzbMaxDepth));
+      atomicStore(&hzbDebug[base +  1u], bitcast<u32>(ndcMaxZ));
+      atomicStore(&hzbDebug[base +  2u], bitcast<u32>(hzbMinDepth));
       atomicStore(&hzbDebug[base +  3u], u32(mipFine));
       atomicStore(&hzbDebug[base +  4u], u32(tx0));
       atomicStore(&hzbDebug[base +  5u], u32(ty0));

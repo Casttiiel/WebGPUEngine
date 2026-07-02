@@ -103,7 +103,7 @@ export class ViewModelPass {
         view: this.depthView,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
-        depthClearValue: 1.0,
+        depthClearValue: 0.0,
       },
     });
 

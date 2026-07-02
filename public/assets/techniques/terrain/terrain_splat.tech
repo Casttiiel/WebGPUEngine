@@ -1,7 +1,7 @@
-{
+﻿{
   "vs": "gbuffer/terrain_splat.vs",
   "fs": "gbuffer/terrain_splat.fs",
-  "z": "less_equal_no_write",
+  "z": "greater_equal_no_write",
   "rs": "double_sided",
   "writesOn": "gbuffer",
   "uniforms": [

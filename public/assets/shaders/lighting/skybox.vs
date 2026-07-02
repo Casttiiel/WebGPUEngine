@@ -12,7 +12,7 @@ fn vs(@location(0) position: vec3<f32>,) -> VertexOutput {
     var output: VertexOutput;
     
     // Mantenemos las posiciones del quad en clip space
-    output.position = vec4<f32>(position.xy, 1.0, 1.0);
+    output.position = vec4<f32>(position.xy, 0.0, 1.0);
     
     // Guardamos la posición en clip space para reconstruir la dirección en el fragment shader
     output.position_clip = position;

@@ -1,8 +1,8 @@
-{
+﻿{
     "vs": "viewmodel/viewmodel.vs",
     "fs": "viewmodel/viewmodel.fs",
     "writesOn": "texture",
-    "z": "less_equal_write",
+    "z": "greater_equal_write",
     "uniforms": [
         "CameraUniforms",
         "MaterialTextures",

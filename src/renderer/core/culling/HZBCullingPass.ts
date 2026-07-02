@@ -71,7 +71,7 @@ export class HZBCullingPass {
   // Buffer layout (all atomic<u32>):
   //   [0]           = count of recorded culls (max 32)
   //   [1 + i*12 .. 1 + i*12 + 11] for each cull i:
-  //     [0] objectIdx  [1] ndcMinZ_bits  [2] hzbMaxDepth_bits  [3] mip
+  //     [0] objectIdx  [1] ndcMaxZ_bits  [2] hzbMinDepth_bits  [3] mip
   //     [4] tx0  [5] ty0  [6] tx1  [7] ty1
   //     [8] uvMinX_bits  [9] uvMaxX_bits  [10] uvMinY_bits  [11] uvMaxY_bits
   // Total: (1 + 32*12) * 4 = 1540 bytes
@@ -402,8 +402,8 @@ export class HZBCullingPass {
     for (let i = 0; i < count; i++) {
       const b = 1 + i * 12;
       const objIdx = u32[b + 0]!;
-      const ndcMinZ = f32[b + 1]!;
-      const hzbMaxDepth = f32[b + 2]!;
+      const ndcMaxZ     = f32[b + 1]!;
+      const hzbMinDepth = f32[b + 2]!;
       const mip = u32[b + 3]!;
       const tx0 = u32[b + 4]!,
         ty0 = u32[b + 5]!;
@@ -413,9 +413,9 @@ export class HZBCullingPass {
         uvMaxX = f32[b + 9]!;
       const uvMinY = f32[b + 10]!,
         uvMaxY = f32[b + 11]!;
-      const diff = ndcMinZ - hzbMaxDepth;
+      const diff = hzbMinDepth - ndcMaxZ;
       lines.push(
-        `  [${i}] obj=${objIdx}  ndcMinZ=${ndcMinZ.toFixed(5)}  hzb=${hzbMaxDepth.toFixed(5)}` +
+        `  [${i}] obj=${objIdx}  ndcMaxZ=${ndcMaxZ.toFixed(5)}  hzb=${hzbMinDepth.toFixed(5)}` +
           `  DIFF=${diff > 0 ? '+' : ''}${diff.toFixed(5)}  mip=${mip}` +
           `  tx=[${tx0},${tx1}]  ty=[${ty0},${ty1}]` +
           `  uvX=[${uvMinX.toFixed(4)},${uvMaxX.toFixed(4)}]  uvY=[${uvMinY.toFixed(4)},${uvMaxY.toFixed(4)}]`,

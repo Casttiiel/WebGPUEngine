@@ -409,7 +409,7 @@ export class GLTFLoader {
         ] as const,
         writesOn: FragmentShaderTargets.PARTIAL_GBUFFER,
         rs: RasterizationMode.DOUBLE_SIDED,
-        z: DepthModes.LESS_EQUAL_NO_WRITE,
+        z: DepthModes.GREATER_EQUAL_NO_WRITE,
         blend: BlendModes.DEFAULT,
       };
       return material;
@@ -439,7 +439,7 @@ export class GLTFLoader {
             ? FragmentShaderTargets.TEXTURE
             : FragmentShaderTargets.GBUFFER,
         rs: RasterizationMode.DOUBLE_SIDED,
-        z: isGlass || isBlend ? DepthModes.TEST_BUT_NO_WRITE : DepthModes.LESS_EQUAL_WRITE,
+        z: isGlass || isBlend ? DepthModes.GREATER_NO_WRITE : DepthModes.GREATER_EQUAL_WRITE,
         blend: isBlend ? BlendModes.ADDITIVE_BY_SRC_ALPHA : BlendModes.DEFAULT,
       };
     } else {

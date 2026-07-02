@@ -439,47 +439,11 @@ export class Technique extends GPUResource {
           format: 'depth32float',
         };
       }
-      case DepthModes.TEST_EQUAL: {
-        return {
-          depthWriteEnabled: false,
-          depthCompare: 'equal',
-          format: 'depth32float',
-        };
-      }
       case DepthModes.INVERSE_TEST_NO_WRITE: {
         return {
           depthWriteEnabled: false,
           depthCompare: 'greater',
           format: 'depth32float',
-        };
-      }
-      case DepthModes.DEFAULT: {
-        return {
-          format: 'depth32float',
-          depthWriteEnabled: true,
-          depthCompare: 'less',
-          depthBias: 0, // Sin bias para rendering normal
-          depthBiasSlopeScale: 0,
-          depthBiasClamp: 0,
-        };
-      }
-      case DepthModes.SHADOWS: {
-        return {
-          format: 'depth32float',
-          depthWriteEnabled: true,
-          depthCompare: 'less',
-          // Front-face culling renders back faces into the shadow map, eliminating
-          // acne on solid meshes without hardware bias (no peter panning either).
-          depthBias: 0,
-          depthBiasSlopeScale: 0,
-          depthBiasClamp: 0,
-        };
-      }
-      case DepthModes.ALWAYS: {
-        return {
-          format: 'depth32float',
-          depthWriteEnabled: true,
-          depthCompare: 'always',
         };
       }
       case DepthModes.LESS_EQUAL_NO_WRITE: {
@@ -496,11 +460,66 @@ export class Technique extends GPUResource {
           depthCompare: 'less-equal',
         };
       }
+      case DepthModes.GREATER_NO_WRITE: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: false,
+          depthCompare: 'greater',
+        };
+      }
+      case DepthModes.GREATER_EQUAL_NO_WRITE: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: false,
+          depthCompare: 'greater-equal',
+        };
+      }
+      case DepthModes.GREATER_EQUAL_WRITE: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: true,
+          depthCompare: 'greater-equal',
+        };
+      }
+      case DepthModes.TEST_EQUAL: {
+        return {
+          depthWriteEnabled: false,
+          depthCompare: 'equal',
+          format: 'depth32float',
+        };
+      }
       case DepthModes.TEST_EQUAL_NO_WRITE: {
         return {
           format: 'depth32float',
           depthWriteEnabled: false,
           depthCompare: 'equal',
+        };
+      }
+      case DepthModes.DEFAULT: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: true,
+          depthCompare: 'greater',
+          depthBias: 0,
+          depthBiasSlopeScale: 0,
+          depthBiasClamp: 0,
+        };
+      }
+      case DepthModes.SHADOWS: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: true,
+          depthCompare: 'less', // shadow maps stay standard Z (near=0, far=1)
+          depthBias: 0,
+          depthBiasSlopeScale: 0,
+          depthBiasClamp: 0,
+        };
+      }
+      case DepthModes.ALWAYS: {
+        return {
+          format: 'depth32float',
+          depthWriteEnabled: true,
+          depthCompare: 'always',
         };
       }
       default: {

@@ -149,7 +149,7 @@ export class Camera {
       // Ortho cameras never use jitter — unjitteredProjection == projection.
       mat4.copy(this.unjitteredProjection, this.projection);
     } else {
-      mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
+      mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zFar, this.zNear);
 
       // Snapshot the clean (unjittered) projection — updateViewProjection() will use
       // this to keep unjitteredViewProjection always current regardless of view changes.

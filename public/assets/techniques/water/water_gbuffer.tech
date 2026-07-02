@@ -1,8 +1,8 @@
-{
+﻿{
     "vs": "water/water.vs",
     "fs": "water/water_gbuffer.fs",
     "writesOn": "gbuffer",
-    "z": "test_but_no_write",
+    "z": "greater_no_write",
     "rs": "double_sided",
     "uniforms": [
         "CameraUniforms",

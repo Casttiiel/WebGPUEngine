@@ -15,7 +15,11 @@
       "density": 0.001,
       "heightBase": 0,
       "heightFalloff": 0.08,
-      "scatterColor": [0.85, 0.92, 1],
+      "scatterColor": [
+        0.85,
+        0.92,
+        1
+      ],
       "numSteps": 16,
       "fogFar": 500,
       "fogBlurRadius": 3,
@@ -24,16 +28,24 @@
       "noiseStrength": 0.5,
       "windSpeed": 0.02,
       "windAngle": 45,
-      "fogBaseColor": [1, 1, 1],
+      "fogBaseColor": [
+        1,
+        1,
+        1
+      ],
       "noiseThreshold": 0.3,
       "maxDensity": 0.95,
-      "energyLoss": 0.0,
-      "blurTint": [1, 1, 1],
-      "blurWeight": 1.0,
+      "energyLoss": 0,
+      "blurTint": [
+        1,
+        1,
+        1
+      ],
+      "blurWeight": 1,
       "scatterIntensity": 0.8,
-      "scatterRadius": 4.0,
+      "scatterRadius": 4,
       "fadeCurve": 0.3,
-      "threshold": 0.0,
+      "threshold": 0,
       "softKnee": 0.5
     },
     "vignette": {

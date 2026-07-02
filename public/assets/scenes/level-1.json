@@ -378,24 +378,6 @@
   },
   {
     "components": {
-      "name": "FogVolume",
-      "transform": {
-        "position": [0, 2, 5],
-        "scale": [14, 14, 14]
-      },
-      "render": {
-        "meshes": [
-          {
-            "mesh": "unit_cube.obj",
-            "material": "volumetric_fog.mat"
-          }
-        ]
-      }
-    }
-  },
-
-  {
-    "components": {
       "name": "SlashPreviewCube",
       "transform": {
         "position": [3, 1.5, 0],

@@ -1,8 +1,8 @@
-{
+﻿{
     "vs": "vfx/volumetric_box_fog.vs",
     "fs": "vfx/volumetric_box_fog.fs",
     "writesOn": "texture",
-    "z": "test_but_no_write",
+    "z": "greater_no_write",
     "blend": "volumetric",
     "rs": "double_sided",
     "uniforms": ["CameraUniforms", "MaterialTextures", "ObjectUniforms"],

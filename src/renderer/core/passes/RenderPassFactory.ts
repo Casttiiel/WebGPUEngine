@@ -20,7 +20,7 @@ export class RenderPassFactory {
       colorAttachments,
       depthStencilAttachment: {
         view: depthView,
-        depthClearValue: 1.0,
+        depthClearValue: 0.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
       },

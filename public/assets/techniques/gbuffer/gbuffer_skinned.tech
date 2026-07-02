@@ -1,7 +1,7 @@
-{
+﻿{
   "vs": "gbuffer/gbuffer_skinned.vs",
   "fs": "gbuffer/gbuffer.fs",
-  "z": "less_equal_no_write",
+  "z": "greater_equal_no_write",
   "skinned": true,
   "uniforms": [
     "CameraUniforms",

@@ -61,17 +61,23 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     // incorporado. El jitter alterna signo cada frame, por lo que worldPos oscilaría
     // ligeramente cada frame → velocity oscila → vibración de cámara.
     //
-    // gLinearDepth almacena depth lineal = dot(worldPos-camPos, camFront) / cameraFar [0..1].
-    // La matriz invVP espera NDC Z (no lineal, perspectiveZO de gl-matrix [0..1]).
-    // Conversión: near = P[14]/P[10], ndcZ = far*(viewZ-near) / (viewZ*(far-near))
-    // donde viewZ = linearDepth * far.
-    let P10  = camera.projectionMatrix[2][2]; // far / (near - far)  — siempre negativo
-    let P14  = camera.projectionMatrix[3][2]; // near * far / (near - far)
-    let near = P14 / P10;                     // = near (positivo)
-    let far  = camera.cameraFar;
-    let viewZ = linearDepth * far;            // view-space depth (positivo, distancia a cámara)
-    // perspectiveZO NDC Z ∈ [0,1]: 0 en near, 1 en far
-    let ndcZ = far * (viewZ - near) / (viewZ * (far - near));
+    // gLinearDepth almacena depth lineal = length(worldPos-camPos) / cameraFar [0..1].
+    // La matriz invVP espera NDC Z (perspectiveZO de gl-matrix).
+    //
+    // Derivación universal (funciona para standard Z y reverse Z):
+    //   clip.z = P10 * (-viewZ) + P14   (viewZ = distancia positiva a cámara)
+    //   clip.w = viewZ
+    //   ndcZ   = clip.z / clip.w = P14/viewZ - P10
+    //
+    // En standard Z P10 < 0, P14 < 0  → ndcZ ∈ [0,1] con 0=near, 1=far
+    // En reverse Z  P10 > 0, P14 > 0  → ndcZ ∈ [0,1] con 1=near, 0=far
+    // La fórmula anterior (far*(viewZ-near)/(viewZ*(far-near))) falla en reverse Z porque
+    // P14/P10 devuelve la distancia al far plane en vez de near, haciendo (far-near) ≈ 0.
+    let P10   = camera.projectionMatrix[2][2];
+    let P14   = camera.projectionMatrix[3][2];
+    let far   = camera.cameraFar;
+    let viewZ = linearDepth * far;  // distancia world-space a la cámara
+    let ndcZ  = P14 / viewZ - P10; // válido para standard Z y reverse Z
 
     let ndcX = input.Uv.x * 2.0 - 1.0;
     let ndcY = (1.0 - input.Uv.y) * 2.0 - 1.0; // Invertir Y (texture UV vs NDC)

@@ -1,7 +1,7 @@
-{
+﻿{
   "vs": "gbuffer/gbuffer.vs",
   "fs": "gbuffer/gbuffer.fs",
-  "z": "less_equal_no_write",
+  "z": "greater_equal_no_write",
   "rs": "double_sided",
   "uniforms": [
     "CameraUniforms",

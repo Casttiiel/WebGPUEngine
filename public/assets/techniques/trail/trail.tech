@@ -1,8 +1,8 @@
-{
+﻿{
     "vs": "trail/trail.vs",
     "fs": "trail/trail.fs",
     "writesOn": "texture",
-    "z": "test_but_no_write",
+    "z": "greater_no_write",
     "blend": "additive_by_src_alpha",
     "rs": "double_sided",
     "uniforms": [

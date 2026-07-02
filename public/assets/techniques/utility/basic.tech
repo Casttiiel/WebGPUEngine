@@ -1,7 +1,7 @@
-{
+﻿{
     "vs": "basic.vs",
     "fs": "basic.fs",
     "blend": "combinative_gbuffer",
     "rs": "reverse_culling",
-    "z": "inverse_test_no_write"
+    "z": "test_but_no_write"
 }

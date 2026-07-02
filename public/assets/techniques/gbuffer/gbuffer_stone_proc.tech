@@ -1,7 +1,7 @@
-{
+﻿{
     "vs": "gbuffer/gbuffer.vs",
     "fs": "gbuffer/gbuffer_stone_proc.fs",
-    "z": "less_equal_no_write",
+    "z": "greater_equal_no_write",
     "uniforms": ["CameraUniforms", "MaterialTextures", "ObjectUniforms"],
     "writesOn": "gbuffer"
 }
