@@ -47,6 +47,7 @@ import { ShockwavePostProcessComponent } from '../../components/render/Shockwave
 import { Profiler } from '../../core/debug/Profiler';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { TextureStreamingManager } from '../../renderer/core/managers/TextureStreamingManager';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 export class ModuleRender extends Module {
   private deferred: DeferredRenderer;
@@ -151,6 +152,8 @@ export class ModuleRender extends Module {
     await this.deferred.load();
 
     this.onResolutionUpdated();
+
+    await PhysicsDebugDrawer.getInstance().initialize();
 
     // 2. Everything independent of each other → parallel
     LoadingStatus.updateStatus('Loading render resources...', 50);
@@ -458,6 +461,21 @@ export class ModuleRender extends Module {
         const lensFlare = mainCameraEntity.getComponent('lens_flare') as LensFlareComponent;
         if (lensFlare.hasLoaded()) {
           result = lensFlare.apply(result, this.deferred.getGBufferBindGroup());
+        }
+      }
+
+      // Physics debug wireframe — injected before TSR so both color and depth are at
+      // render resolution (TSR upscales color to canvas resolution, making sizes diverge).
+      const physicsDebug = PhysicsDebugDrawer.getInstance();
+      if (physicsDebug.isActive()) {
+        const depthView = this.deferred.getDepthStencilView();
+        if (depthView) {
+          physicsDebug.draw(
+            Render.getInstance().getCommandEncoder(),
+            result,
+            depthView,
+            this.mainCamera.getBindGroup(),
+          );
         }
       }
 
@@ -801,7 +819,6 @@ export class ModuleRender extends Module {
     this.renderDirectionalLightsMenu(gui);
     this.renderStatsMenu(gui);
     this.renderPostProcessingMenu(gui);
-    this.renderProfilerMenu(gui);
   }
 
   private renderDirectionalLightsMenu(gui: any): void {
@@ -877,22 +894,6 @@ export class ModuleRender extends Module {
     tryRender('chromatic_aberration');
     tryRender('film_grain');
     tryRender('shockwave');
-  }
-
-  private renderProfilerMenu(gui: any): void {
-    if (!this.beginGUIWindow('Profiler')) return;
-
-    gui.addDynamicText(this.profilerMeta.gpuSupported, 'value', 'GPU Timestamps');
-    this.addGUISeparator();
-    gui.addDynamicText(this.profilerCPU.Entities, 'value', 'CPU  Entities');
-    gui.addDynamicText(this.profilerCPU.Shadows, 'value', 'CPU  Shadows');
-    gui.addDynamicText(this.profilerCPU.Deferred, 'value', 'CPU  Deferred');
-    gui.addDynamicText(this.profilerCPU['Post-Process'], 'value', 'CPU  Post-Process');
-    this.addGUISeparator();
-    for (const [name, obj] of Object.entries(this.profilerGPU)) {
-      gui.addDynamicText(obj, 'value', `GPU  ${name}`);
-    }
-    this.endGUIWindow();
   }
 
   public renderDebug(): void {

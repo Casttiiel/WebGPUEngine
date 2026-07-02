@@ -16,6 +16,7 @@ import { LoadingStatus } from '../../core/engine/LoadingStatus';
 import { GUIManager } from '../../core/debug/GUIManager';
 import GUI from 'lil-gui';
 import { Time } from '../../core/engine/Time';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 /** Component that controls the player camera — either FPS or TPS arm. */
 type PlayerCameraController = FPSCameraControllerComponent | CameraArmComponent;
@@ -134,17 +135,6 @@ export class ModuleBoot extends Module {
       }
     }
 
-    if (Engine.getInput().isKeyJustPressed(KeyCode.F1)) {
-      this.debugCameraComponent.setActive(false);
-      this.playerCameraControllerComponent.setActive(true);
-      this.playerCharacterControllerComponent.setActive(true);
-      Engine.getCameraMixer().blendCamera(
-        Engine.getEntities().getEntityByName('PlayerCamera')!,
-        1.0,
-        new LinearInterpolator(),
-      );
-    }
-
     if (Engine.getInput().isKeyJustPressed(KeyCode.F2)) {
       this.debugCameraComponent.setActive(true);
       this.playerCameraControllerComponent.setActive(false);
@@ -154,6 +144,14 @@ export class ModuleBoot extends Module {
         1.0,
         new LinearInterpolator(),
       );
+    }
+
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F4)) {
+      PhysicsDebugDrawer.getInstance().toggleColliders();
+    }
+
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F5)) {
+      PhysicsDebugDrawer.getInstance().toggleSensors();
     }
 
     // Detectar gamestate y ajustar cámaras automáticamente
