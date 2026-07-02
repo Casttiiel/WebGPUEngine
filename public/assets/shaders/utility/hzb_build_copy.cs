@@ -24,6 +24,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   // textureLoad on texture_depth_2d returns f32 (depth value in [0, 1])
   let depth = textureLoad(depthTexture, vec2<i32>(id.xy), 0);
 
-  // Store into HZB mip 0 — HZB stores max depth (farthest occluder per region)
+  // Store into HZB mip 0 — raw depth value (reverse Z: 0=far, 1=near)
   textureStore(hzbMip0, id.xy, vec4<f32>(depth, 0.0, 0.0, 1.0));
 }

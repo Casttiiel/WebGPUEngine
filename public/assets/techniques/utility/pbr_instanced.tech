@@ -1,9 +1,7 @@
 {
   "vs": "gbuffer/gbuffer_instanced.vs",
   "fs": "lighting/pbr.fs",
-  "blend": "OPAQUE",
-  "z": "LESS_EQUAL",
-  "rs": "FILL",
-  "writesOn": "GBUFFER",
-  "uniforms": ["CAMERA_UNIFORMS", "MATERIAL_TEXTURES", "INSTANCE_STORAGE"]
+  "z": "greater_equal_no_write",
+  "writesOn": "gbuffer",
+  "uniforms": ["CameraUniforms", "MaterialTextures", "InstanceStorage"]
 }

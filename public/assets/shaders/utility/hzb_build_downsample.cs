@@ -2,9 +2,11 @@
 // HZB Build — Mip Downsample Pass
 //
 // Reduces a source mip of the HZB pyramid (r32float) into the next mip by
-// taking the MAX of the 2×2 texel block.  Storing the max means a single
-// HZB sample at mip M conservatively represents the farthest (largest)
-// depth across the entire 2^M × 2^M region at full resolution.
+// taking the MIN of the 2×2 texel block (Reverse Z, depth cleared to 0.0).
+// MIN-pool means empty/sky pixels (depth=0) always dominate occluders,
+// so a single HZB sample conservatively represents the farthest visible
+// occluder across the entire 2^M × 2^M region — never falsely culling
+// objects visible through gaps between solid geometry.
 //
 // One dispatch per mip transition: mip N → mip N+1.
 //
@@ -43,7 +45,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let d01 = textureLoad(srcMip, vec2<u32>(x0, y1), 0).r;
   let d11 = textureLoad(srcMip, vec2<u32>(x1, y1), 0).r;
 
-  // Conservative: take the maximum depth so no occluder is missed
-  let maxDepth = max(max(d00, d10), max(d01, d11));
-  textureStore(dstMip, id.xy, vec4<f32>(maxDepth, 0.0, 0.0, 1.0));
+  // Reverse Z (near=1, far=0, depth cleared to 0):
+  // MIN-pool so that empty/sky pixels (depth=0) dominate over occluders.
+  // Any cell touching open sky keeps value 0 → prevents false culls on
+  // visible objects whose HZB footprint includes a gap between occluders.
+  // Standard Z would use MAX here, but revZ inverts the safe direction.
+  let minDepth = min(min(d00, d10), min(d01, d11));
+  textureStore(dstMip, id.xy, vec4<f32>(minDepth, 0.0, 0.0, 1.0));
 }
