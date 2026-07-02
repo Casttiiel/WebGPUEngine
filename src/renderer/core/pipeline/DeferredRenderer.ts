@@ -760,10 +760,13 @@ export class DeferredRenderer {
     this.ssr.update(_dt);
   }
 
-  public renderInMenu(folder: any): void {
+  public renderAtmosphereInMenu(folder: any): void {
     this.froxelVolumetrics.renderInMenu(folder);
-    this.ssr.renderInMenu(folder);
     this.volumetricClouds.renderInMenu(folder);
+  }
+
+  public renderSSRInMenu(folder: any): void {
+    this.ssr.renderInMenu(folder);
   }
 
   public resetSSRResources(): void {

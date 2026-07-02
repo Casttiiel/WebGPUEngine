@@ -665,11 +665,11 @@ export class ModuleEnvironmentManager extends Module {
     if (!gui.getIsVisible()) return;
 
     // Use beginWindow to create/get the folder
-    if (!gui.beginWindow('Environment', true)) return;
+    if (!gui.beginWindow('Lighting', true)) return;
 
     // Get the folder from GUIManager's internal map
     const guiManager = gui as any;
-    const folder = guiManager.folders?.get('Environment');
+    const folder = guiManager.folders?.get('Lighting');
 
     if (!folder) {
       gui.endWindow();

@@ -222,7 +222,7 @@ export class TerrainComponent extends Component {
   }
 
   /**
-   * Adds terrain controls into an entity folder in the Scene Entities panel.
+   * Adds terrain controls into an entity folder in the Scene panel.
    * Called by ModuleEditorSelection.addEntityToPanel() when a 'terrain' component
    * is detected on the entity.
    */

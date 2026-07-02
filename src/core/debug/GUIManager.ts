@@ -1,11 +1,136 @@
 import GUI from 'lil-gui';
 
-/**
- * Manages Lil-GUI integration for editor UI
- * Shows UI only in editor mode (gs_editor), hidden in gameplay mode
- *
- * Lil-GUI provides a lightweight, flexible GUI system for debug/editor controls
- */
+const FOLDER_CONFIG: Record<string, { open: boolean; cssClass?: string }> = {
+  'Scene':           { open: false, cssClass: 'gui-cat-scene' },
+  'Lighting':        { open: false, cssClass: 'gui-cat-lighting' },
+  'Atmosphere':      { open: false, cssClass: 'gui-cat-atmosphere' },
+  'Post Processing': { open: false, cssClass: 'gui-cat-postprocessing' },
+  'Time Control':    { open: false, cssClass: 'gui-cat-time' },
+  'Statistics':      { open: false, cssClass: 'gui-cat-statistics' },
+};
+
+// lil-gui v0.21 uses "lil-" prefix on ALL class names.
+// Actual classes: .lil-root  .lil-children  .lil-title  .lil-controller  .lil-name  .lil-widget  .lil-closed  .lil-disabled
+const EDITOR_CSS = `
+/* ── Theme variables ─────────────────────────────────────── */
+.lil-gui.lil-root {
+  --background-color:       #161616;
+  --text-color:             #c4c4c4;
+  --title-background-color: #0e0e0e;
+  --title-text-color:       #e0e0e0;
+  --widget-color:           #252525;
+  --hover-color:            #2d2d2d;
+  --focus-color:            #353535;
+  --number-color:           #79b8ff;
+  --string-color:           #98c379;
+  --font-size:              11px;
+  --input-font-size:        11px;
+  --font-family:            system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-family-mono:       'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --folder-indent:          0px;
+  --spacing:                2px;
+  --widget-height:          20px;
+  --name-width:             44%;
+  max-height: calc(100vh - 20px);
+  overflow: hidden;
+  box-shadow: 2px 0 16px rgba(0,0,0,0.6);
+}
+.lil-gui.lil-root > .lil-children {
+  max-height: calc(100vh - 46px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+.lil-gui.lil-root > .lil-children::-webkit-scrollbar       { width: 3px; background: transparent; }
+.lil-gui.lil-root > .lil-children::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+.lil-gui.lil-root > .lil-children::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+
+/* ── Panel title "Editor" ─────────────────────────────────── */
+.lil-gui.lil-root > .lil-title {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #555 !important;
+  height: auto !important;
+  padding: 7px 10px !important;
+}
+
+/* ── Top-level folder headers ─────────────────────────────── */
+.lil-gui.lil-root > .lil-children > .lil-gui > .lil-title {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em;
+  height: auto !important;
+  padding: 6px 10px !important;
+  border-top: 1px solid rgba(255,255,255,0.03) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+}
+
+/* ── Category title colors ────────────────────────────────── */
+.lil-gui.gui-cat-scene          > .lil-title { color: #d0d0d0 !important; }
+.lil-gui.gui-cat-lighting       > .lil-title { color: #f5c842 !important; }
+.lil-gui.gui-cat-atmosphere     > .lil-title { color: #5bc4e8 !important; }
+.lil-gui.gui-cat-postprocessing > .lil-title { color: #a57af0 !important; }
+.lil-gui.gui-cat-time           > .lil-title { color: #6fce84 !important; }
+.lil-gui.gui-cat-statistics     > .lil-title { color: #606060 !important; font-style: italic; }
+
+/* ── Category colored border on content area ──────────────── */
+.lil-gui.gui-cat-scene          > .lil-children { border-left: 2px solid rgba(208,208,208,0.18) !important; }
+.lil-gui.gui-cat-lighting       > .lil-children { border-left: 2px solid rgba(245,200,66,0.30)  !important; }
+.lil-gui.gui-cat-atmosphere     > .lil-children { border-left: 2px solid rgba(91,196,232,0.30)  !important; }
+.lil-gui.gui-cat-postprocessing > .lil-children { border-left: 2px solid rgba(165,122,240,0.30) !important; }
+.lil-gui.gui-cat-time           > .lil-children { border-left: 2px solid rgba(111,206,132,0.30) !important; }
+.lil-gui.gui-cat-statistics     > .lil-children { border-left: 2px solid rgba(96,96,96,0.18)    !important; }
+
+/* ── Level 1: indent inside category folders ──────────────── */
+.lil-gui.lil-root > .lil-children > .lil-gui > .lil-children {
+  margin-left: 6px !important;
+  padding-left: 8px !important;
+}
+
+/* ── Level 2: sub-folder title ────────────────────────────── */
+.lil-gui.lil-root > .lil-children > .lil-gui > .lil-children > .lil-gui > .lil-title {
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  color: #888 !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  background: #181818 !important;
+}
+/* Level 2: sub-folder content */
+.lil-gui.lil-root > .lil-children > .lil-gui > .lil-children > .lil-gui > .lil-children {
+  border-left: 1px solid rgba(255,255,255,0.06) !important;
+  margin-left: 6px !important;
+  padding-left: 7px !important;
+}
+
+/* ── Level 3: sub-sub-folder title ───────────────────────── */
+.lil-gui.lil-root > .lil-children > .lil-gui > .lil-children > .lil-gui > .lil-children > .lil-gui > .lil-title {
+  font-size: 10px !important;
+  color: #666 !important;
+  height: auto !important;
+  padding: 3px 6px !important;
+  background: #171717 !important;
+}
+/* Level 3: sub-sub-folder content */
+.lil-gui.lil-root > .lil-children > .lil-gui > .lil-children > .lil-gui > .lil-children > .lil-gui > .lil-children {
+  border-left: 1px solid rgba(255,255,255,0.04) !important;
+  margin-left: 4px !important;
+  padding-left: 5px !important;
+}
+
+/* ── Controller rows ──────────────────────────────────────── */
+.lil-gui .lil-controller { border-top: none; }
+.lil-gui .lil-controller > .lil-name { color: #888; }
+.lil-gui .lil-controller.lil-disabled { opacity: 1; }
+.lil-gui .lil-controller.lil-disabled > .lil-name { color: #555; font-size: 10.5px; }
+
+/* ── Separators ───────────────────────────────────────────── */
+.gui-separator { pointer-events: none !important; }
+.gui-separator .lil-widget { display: none !important; }
+.gui-separator .lil-name { width: 100% !important; min-width: 100% !important; color: #2e2e2e !important; letter-spacing: -0.02em; }
+`;
+
 export class GUIManager {
   private static instance: GUIManager;
   private initialized: boolean = false;
@@ -42,7 +167,7 @@ export class GUIManager {
       // Create main GUI instance
       this.gui = new GUI({
         title: 'Editor',
-        width: 300,
+        width: 380,
         closeFolders: false,
       });
 
@@ -57,6 +182,7 @@ export class GUIManager {
       this.gui.hide();
       this.isVisible = false;
 
+      this.injectEditorStyles();
       this.initialized = true;
     } catch (error) {
       console.error('GUIManager: Failed to initialize', error);
@@ -93,16 +219,16 @@ export class GUIManager {
   public beginWindow(name: string, _defaultOpen: boolean = true): boolean {
     if (!this.initialized || !this.isVisible || !this.gui) return false;
 
-    // Create or get folder — only populate content on first creation
     const existing = this.folders.get(name);
-    if (existing) {
-      return false; // Already populated, skip re-adding controls
-    }
+    if (existing) return false;
 
     const folder = this.gui.addFolder(name);
-    folder.close(); // Start collapsed by default
-    this.folders.set(name, folder);
+    const config = FOLDER_CONFIG[name];
 
+    if (config?.cssClass) folder.domElement.classList.add(config.cssClass);
+    if (config ? config.open : _defaultOpen) folder.open(); else folder.close();
+
+    this.folders.set(name, folder);
     return true;
   }
 
@@ -188,9 +314,9 @@ export class GUIManager {
     const parent = this.getCurrentContext();
     if (!parent) return;
 
-    // Add a disabled empty controller as separator
     const obj = { _: '' };
-    parent.add(obj, '_').name('───────────────').disable();
+    const ctrl = parent.add(obj, '_').name('───────────────').disable();
+    ctrl.domElement.classList.add('gui-separator');
   }
 
   /**
@@ -419,6 +545,14 @@ export class GUIManager {
     else folder.close();
     this.folders.set(childName, folder);
     return folder;
+  }
+
+  private injectEditorStyles(): void {
+    if (document.getElementById('lil-gui-custom')) return;
+    const style = document.createElement('style');
+    style.id = 'lil-gui-custom';
+    style.textContent = EDITOR_CSS;
+    document.head.appendChild(style);
   }
 
   /**

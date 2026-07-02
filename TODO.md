@@ -1,10 +1,12 @@
 ## Pending
 
-Ground Combos (Light and Heavy) + input buffer
-Block Movement during combos
-Roll animation + movement
-Air combos
-Slash effect
+1. Camera Render Debug
+2. Scene entities Material -> Render + more info
+3. Main Camera on scene entities does not have all renderinmenu
+4. Directional light render in menu
+5. Scene entities should render wireframe when hovered on gui
+6. POM on distance?
+7. Quality settings selection
 
 ## Gameplay
 
@@ -12,6 +14,11 @@ Slash effect
 2. Lift Attack
 3. Mantle
 4. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
+   Ground Combos (Light and Heavy) + input buffer
+   Block Movement during combos
+   Roll animation + movement
+   Air combos
+   Slash effect
 
 ## Character & Animation
 
@@ -31,14 +38,13 @@ Slash effect
 ## Renderer
 
 1. Irradiance Volumes (Generador de probes)(Async)(Cambio de iluminacion)
-2. Procedural materials
+2. Review SSR
 3. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-4. Review SSR
+4. Procedural materials
 
 ## Engine
 
-1. Editor Camera (Render Debug / Gizmo / Menu)
-2. World Partition / Scene Streaming
+1. World Partition / Scene Streaming
 
 ## VFX
 
@@ -59,7 +65,6 @@ Slash effect
 
 1. Start Screen
 2. Game Loading Screen
-3. Quality settings selection
 
 ## References & Inspiration
 
@@ -86,5 +91,3 @@ Slash effect
 - How to Generate 3D Elements from Image in Blender! https://www.youtube.com/watch?v=Jdz1I223oFw&list=WL&index=14
 - How to make First Person Weapon Animations https://www.youtube.com/watch?v=ad6ZQPrfcec&list=WL&index=6&t=760s
 - The Easiest Way to Make 2D Sprites for Your Retro FPS Game! https://www.youtube.com/watch?v=VVxK3_UTymA&list=WL&index=5
-
-Morbid Metal

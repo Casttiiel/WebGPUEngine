@@ -816,28 +816,87 @@ export class ModuleRender extends Module {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
-    this.renderDirectionalLightsMenu(gui);
-    this.renderStatsMenu(gui);
+    this.renderLightingMenu(gui);
+    this.renderAtmosphereMenu(gui);
     this.renderPostProcessingMenu(gui);
+    this.renderStatsMenu(gui);
   }
 
-  private renderDirectionalLightsMenu(gui: any): void {
+  // Adds directional lights as sub-folders inside the "Lighting" folder created by ModuleEnvironmentManager.
+  private renderLightingMenu(gui: any): void {
     const lights = Engine.getEntities().getObjectManagerByName('directional_light')?.getList();
     if (!lights?.length) return;
 
     for (const light of lights) {
       const dirLight = light as DirectionalLightComponent;
       const name = dirLight.getOwner().getName();
-      if (this.beginGUIWindow(name)) {
-        const folder = gui.folders?.get(name);
+      const guiManager = gui as any;
+      if (!guiManager.folders?.get(name)) {
+        const folder = gui.createChildFolder('Lighting', name, false);
         if (folder) dirLight.renderInMenu(folder);
-        this.endGUIWindow();
       }
     }
   }
 
+  private renderAtmosphereMenu(gui: any): void {
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    if (!mainCamera) return;
+
+    if (this.beginGUIWindow('Atmosphere')) {
+      this.endGUIWindow();
+    }
+
+    const atmoFolder = (gui as any).folders?.get('Atmosphere');
+    if (!atmoFolder) return;
+
+    // Volumetrics and clouds — each guards itself via _editorFolder.
+    this.deferred.renderAtmosphereInMenu(atmoFolder);
+
+    const tryRender = (key: string) => {
+      if (!mainCamera.hasComponent(key)) return;
+      const c = mainCamera.getComponent(key) as any;
+      if (c?.hasLoaded?.() ?? true) c?.renderInMenu(atmoFolder);
+    };
+
+    tryRender('god_rays');
+    tryRender('atmospheric_fog');
+    tryRender('fog_scatter');
+  }
+
+  private renderPostProcessingMenu(gui: any): void {
+    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
+    if (!mainCamera) return;
+
+    if (this.beginGUIWindow('Post Processing')) {
+      this.endGUIWindow();
+    }
+
+    const ppFolder = (gui as any).folders?.get('Post Processing');
+    if (!ppFolder) return;
+
+    // Camera component controls — each guards itself via _editorFolder.
+    this.deferred.renderSSRInMenu(ppFolder);
+
+    const tryRender = (key: string) => {
+      if (!mainCamera.hasComponent(key)) return;
+      const c = mainCamera.getComponent(key) as any;
+      if (c?.hasLoaded?.() ?? true) c?.renderInMenu(ppFolder);
+    };
+
+    tryRender('auto_exposure');
+    tryRender('fsr');
+    tryRender('tsr');
+    tryRender('taa');
+    tryRender('ambient_occlusion');
+    tryRender('contact_shadows');
+    tryRender('vignette');
+    tryRender('chromatic_aberration');
+    tryRender('film_grain');
+    tryRender('shockwave');
+  }
+
   private renderStatsMenu(gui: any): void {
-    if (!this.beginGUIWindow('Render Statistics')) return;
+    if (!this.beginGUIWindow('Statistics')) return;
 
     gui.addDynamicText(this.debugValues.drawCallsSolids, 'value', 'Draw Calls (Solids)');
     gui.addDynamicText(this.debugValues.drawCallsTransparent, 'value', 'Draw Calls (Transparent)');
@@ -856,44 +915,6 @@ export class ModuleRender extends Module {
     gui.addDynamicText(this.debugValues.resolution, 'value', 'Render Resolution');
     gui.addDynamicText(this.debugValues.canvasResolution, 'value', 'Canvas Resolution');
     this.endGUIWindow();
-  }
-
-  private renderPostProcessingMenu(gui: any): void {
-    const mainCamera = Engine.getEntities().getEntityByName('MainCamera');
-    if (!mainCamera) return;
-
-    // beginGUIWindow creates the folder on the first call and returns true; no-op after.
-    if (this.beginGUIWindow('Post-Processing')) {
-      this.endGUIWindow();
-    }
-
-    const ppFolder = gui.folders?.get('Post-Processing');
-    if (!ppFolder) return;
-
-    // Renderer-owned controls (froxels, SSR, clouds) — each guards itself internally.
-    this.deferred.renderInMenu(ppFolder);
-
-    // Camera component controls — run every frame so late-loading components appear
-    // as soon as hasLoaded() becomes true. Each component guards via _editorFolder.
-    const tryRender = (key: string) => {
-      if (!mainCamera.hasComponent(key)) return;
-      const c = mainCamera.getComponent(key) as any;
-      if (c?.hasLoaded?.() ?? true) c?.renderInMenu(ppFolder);
-    };
-
-    tryRender('auto_exposure');
-    tryRender('god_rays');
-    tryRender('fsr');
-    tryRender('tsr');
-    tryRender('taa');
-    tryRender('ambient_occlusion');
-    tryRender('contact_shadows');
-    tryRender('atmospheric_fog');
-    tryRender('fog_scatter');
-    tryRender('vignette');
-    tryRender('chromatic_aberration');
-    tryRender('film_grain');
-    tryRender('shockwave');
   }
 
   public renderDebug(): void {

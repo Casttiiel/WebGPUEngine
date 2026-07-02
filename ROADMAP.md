@@ -1,3 +1,68 @@
+- **Hierarchy / Outliner panel** — lista scrollable de todas las entidades de la escena. Click selecciona, doble-click renombra, icono por tipo de entidad. Sin esto no puedes navegar una escena con más de 20 objetos.
+- **Property Inspector** — muestra los componentes de la entidad seleccionada con sus propiedades editables. Los colliders tienen `// TODO` en `renderInMenu()`. Los componentes de post-process ya implementan `renderInMenu(folder)` pero no están conectados al flujo del editor.
+- **Rediseño visual del panel** — lil-gui por defecto (300px, top-left, gris). Necesita más anchura, colores por categoría de componente y mejor tipografía.
+
+Editor
+├── Scene ← renombrar "Scene Entities", moverlo arriba
+│ └── [lista de entidades]
+│ └── [propiedades de la seleccionada]
+├── Lighting ← fusionar "Directional Light" + ambient de "Environment"
+│ ├── Directional Light
+│ └── Ambient / Sky
+├── Atmosphere ← extraer del bloque Post Processing
+│ ├── Volumetric Fog
+│ ├── God Rays
+│ └── Volumetric Clouds
+├── Post Processing ← solo los filtros de cámara
+│ ├── Screen Space (SSAO, SSR, Contact Shadows)
+│ ├── Color (Exposure, Vignette, Chromatic Aberration, Film Grain)
+│ └── Upscaling (FSR, TSR, TAA)
+├── Time Control
+└── Statistics ← al final, colapsado por defecto
+
+## Editor de Escena
+
+El mayor gap de productividad. Tiene la base (picking, gizmos, wireframe) pero le falta lo esencial para iterar rápido.
+
+### Prioritario
+
+- **Gizmo Rotate** — el modo existe en el ciclo de SPACE pero `renderGizmo()` no tiene el caso implementado. Necesita 3 arcos en los planos XY/XZ/YZ y drag con proyección sobre el plano de rotación.
+- **Guardar escena desde el editor** — ahora todo es `boot.json` a mano. Un botón Save que serialice la escena actual.
+
+### Mejoras visuales / UX
+
+- **Multi-selección** — Shift/Ctrl+click para seleccionar varias entidades y transformarlas juntas.
+- **Foco en selección** — tecla F para hacer zoom a la entidad seleccionada con la debug camera.
+- **Duplicar entidad** — Ctrl+D para clonar la seleccionada con todos sus componentes.
+
+### A largo plazo
+
+- Asset browser integrado (texturas, meshes, prefabs arrastrables a la escena)
+- Gizmo de orientación en esquina (cubo estilo Blender)
+
+## Rendering
+
+- **LOD de sombras** — el shadow map siempre usa la geometría completa. Saltarse entidades lejanas por cascada daría bastante ganancia.
+
+## Serialización de Escena
+
+- Formato más robusto que el `boot.json` actual — soporte para referencias entre entidades, arrays de componentes, versioning.
+- Carga incremental de zonas (level streaming) para mundos grandes sin pantalla de carga.
+
+## LOD de Meshes
+
+El terreno tiene LOD completo con histeresis. Las entidades normales no tienen nada.
+
+### Prioritario
+
+- **LODComponent** — define N niveles, cada uno con una mesh diferente y una distancia de transición. El sistema mide `length(entityPos - cameraPos)` cada frame y activa la mesh correspondiente. El HZB culling ya descarta lo no visible; el LOD reduce el coste de lo visible lejano.
+- **Integración con RenderManager** — que el LOD activo determine qué mesh se envía al draw indirect.
+
+### Después
+
+- Generación automática de LODs desde la mesh original (simplificación en CPU al importar)
+- Cross-fade entre niveles para evitar el pop visual
+
 # Combat AI — Roadmap de mejoras
 
 Síntesis de principios de diseño de combate H&S (God of War, DMC, Batman Arkham, Bayonetta, Sekiro)
@@ -224,6 +289,7 @@ hacia el objetivo. Todos los subsistemas reciben el valor interpolado, no el tar
 ## Phase 1 — Estado y transiciones (núcleo del sistema)
 
 **Archivos nuevos:**
+
 - `src/systems/weather/WeatherSystem.ts`
 - `src/systems/weather/WeatherState.ts`
 - `src/components/game/WeatherComponent.ts`
@@ -234,62 +300,62 @@ hacia el objetivo. Todos los subsistemas reciben el valor interpolado, no el tar
 ```typescript
 interface WeatherStateParams {
   // Niebla
-  fogDensity:      number;   // 0.0 – 0.003
-  fogHeightFalloff: number;  // 0.02 – 0.15
+  fogDensity: number; // 0.0 – 0.003
+  fogHeightFalloff: number; // 0.02 – 0.15
 
   // Nubes
-  cloudCoverage:   number;   // 0.0 – 1.0
-  cloudThickness:  number;   // 0.0 – 1.0
+  cloudCoverage: number; // 0.0 – 1.0
+  cloudThickness: number; // 0.0 – 1.0
 
   // Viento
-  windSpeed:       number;   // 0.0 – 0.15 (m/s normalizado)
-  windAngle:       number;   // 0 – 360 grados
+  windSpeed: number; // 0.0 – 0.15 (m/s normalizado)
+  windAngle: number; // 0 – 360 grados
 
   // Sol
   sunIntensityScale: number; // 0.1 (tormenta) – 1.0 (despejado)
-  sunColorTint:    [number, number, number]; // RGB multiplicativo
+  sunColorTint: [number, number, number]; // RGB multiplicativo
 
   // Precipitación
-  rainIntensity:   number;   // 0.0 – 1.0
-  snowIntensity:   number;   // 0.0 – 1.0
+  rainIntensity: number; // 0.0 – 1.0
+  snowIntensity: number; // 0.0 – 1.0
 
   // Tormenta
-  thunderFrequency: number;  // relámpagos por minuto (0 = ninguno)
+  thunderFrequency: number; // relámpagos por minuto (0 = ninguno)
 
   // Humedad superficial
-  wetness:         number;   // 0.0 – 1.0
+  wetness: number; // 0.0 – 1.0
 }
 ```
 
 **Presets de estado** (valores de referencia iniciales, ajustables en prefab):
 
-| Estado      | fog   | clouds | wind  | sun   | rain | snow | thunder | wet  |
-|-------------|-------|--------|-------|-------|------|------|---------|------|
-| Clear       | 0.0003| 0.1    | 0.02  | 1.0   | 0.0  | 0.0  | 0       | 0.0  |
-| Cloudy      | 0.0005| 0.45   | 0.04  | 0.75  | 0.0  | 0.0  | 0       | 0.0  |
-| Overcast    | 0.001 | 0.75   | 0.05  | 0.45  | 0.0  | 0.0  | 0       | 0.05 |
-| Rain        | 0.0015| 0.85   | 0.07  | 0.30  | 0.5  | 0.0  | 0       | 0.5  |
-| HeavyRain   | 0.002 | 0.95   | 0.10  | 0.20  | 1.0  | 0.0  | 0       | 1.0  |
-| Storm       | 0.002 | 1.0    | 0.15  | 0.15  | 1.0  | 0.0  | 8       | 1.0  |
-| Snow        | 0.0008| 0.70   | 0.03  | 0.55  | 0.0  | 1.0  | 0       | 0.0  |
-| Fog         | 0.003 | 0.20   | 0.01  | 0.60  | 0.0  | 0.0  | 0       | 0.2  |
+| Estado    | fog    | clouds | wind | sun  | rain | snow | thunder | wet  |
+| --------- | ------ | ------ | ---- | ---- | ---- | ---- | ------- | ---- |
+| Clear     | 0.0003 | 0.1    | 0.02 | 1.0  | 0.0  | 0.0  | 0       | 0.0  |
+| Cloudy    | 0.0005 | 0.45   | 0.04 | 0.75 | 0.0  | 0.0  | 0       | 0.0  |
+| Overcast  | 0.001  | 0.75   | 0.05 | 0.45 | 0.0  | 0.0  | 0       | 0.05 |
+| Rain      | 0.0015 | 0.85   | 0.07 | 0.30 | 0.5  | 0.0  | 0       | 0.5  |
+| HeavyRain | 0.002  | 0.95   | 0.10 | 0.20 | 1.0  | 0.0  | 0       | 1.0  |
+| Storm     | 0.002  | 1.0    | 0.15 | 0.15 | 1.0  | 0.0  | 8       | 1.0  |
+| Snow      | 0.0008 | 0.70   | 0.03 | 0.55 | 0.0  | 1.0  | 0       | 0.0  |
+| Fog       | 0.003  | 0.20   | 0.01 | 0.60 | 0.0  | 0.0  | 0       | 0.2  |
 
 ### WeatherSystem
 
 ```typescript
 class WeatherSystem {
-  static getInstance(): WeatherSystem
+  static getInstance(): WeatherSystem;
 
   // Cambio de estado con transición suave
-  transitionTo(state: WeatherStateKey, durationSecs: number): void
-  setImmediate(state: WeatherStateKey): void
+  transitionTo(state: WeatherStateKey, durationSecs: number): void;
+  setImmediate(state: WeatherStateKey): void;
 
   // Estado interpolado actual (lo que reciben los subsistemas)
-  getCurrentParams(): WeatherStateParams
+  getCurrentParams(): WeatherStateParams;
 
-  tick(dt: number): void  // interpolación frame a frame
-  isTransitioning(): boolean
-  getTransitionProgress(): number  // 0–1
+  tick(dt: number): void; // interpolación frame a frame
+  isTransitioning(): boolean;
+  getTransitionProgress(): number; // 0–1
 }
 ```
 
@@ -300,17 +366,20 @@ como probabilidad en el sistema de rayos.
 ### WeatherComponent
 
 Componente de cámara que:
+
 1. Obtiene `WeatherSystem.getCurrentParams()` cada frame
 2. Aplica los valores a cada subsistema (niebla, nubes, sol, viento)
 3. Activa/desactiva RainSystem y SnowSystem según intensidad > umbral
 4. Expone en `renderInMenu()` los controles del weather
 
 **Conexión con sistemas existentes:**
+
 - `FogScatterComponent` — `comp.density = params.fogDensity`, `comp.heightFalloff = params.fogHeightFalloff`
 - `ModuleEnvironmentManager` — `env.setCloudCoverage(params.cloudCoverage)`, `env.setWindSpeed(params.windSpeed)`
 - `DirectionalLightComponent` — `light.setIntensityScale(params.sunIntensityScale)`, `light.setColorTint(params.sunColorTint)`
 
 **Archivos a modificar:**
+
 - `src/core/loaders/Loader.ts` — registrar `"weather" → WeatherComponent`
 - `public/assets/prefabs/cameras/main_camera.prefab` — añadir bloque `"weather": { "initialState": "clear", ... }`
 - `src/modules/core/ModuleEnvironmentManager.ts` — exponer setters públicos `setCloudCoverage()`, `setWindSpeed()` si no existen
@@ -320,6 +389,7 @@ Componente de cámara que:
 ## Phase 2 — Sistema de lluvia
 
 **Archivos nuevos:**
+
 - `src/systems/weather/RainSystem.ts`
 - `public/assets/shaders/particles/rain_particle.vs` / `.fs`
 - `public/assets/prefabs/vfx/rain_emitter.prefab`
@@ -341,6 +411,7 @@ RainSystem
 ```
 
 **Shader de partícula:**
+
 - VS: transforma posición + estira el quad en dirección de velocidad (longitud = speed × stretchFactor)
 - FS: gradiente alfa a lo largo del eje largo (más opaco en centro, transparente en extremos)
 - Sin sombras, sin iluminación — solo tinting por `scatterColor` de niebla para integración visual
@@ -359,6 +430,7 @@ reutilizar un atlas de partículas existente.
 ## Phase 3 — Sistema de nieve
 
 **Archivos nuevos:**
+
 - `src/systems/weather/SnowSystem.ts`
 
 Arquitectura idéntica a `RainSystem` con diferencias:
@@ -374,6 +446,7 @@ Arquitectura idéntica a `RainSystem` con diferencias:
 ## Phase 4 — Sistema de relámpagos
 
 **Archivos nuevos:**
+
 - `src/systems/weather/ThunderSystem.ts`
 
 Un relámpago es un evento en tres capas:
@@ -400,11 +473,12 @@ El trueno (sonido) se dispara con un delay = `distancia / 340` ms después del f
 Se integra con el sistema de audio existente si hay uno, o se deja como hook vacío.
 
 **Lógica de frecuencia:**
+
 ```typescript
 // En ThunderSystem.tick(dt):
 this.timer += dt;
-const interval = 60.0 / params.thunderFrequency;  // segundos entre rayos
-if (this.timer >= interval + Random(-interval*0.4, interval*0.4)) {
+const interval = 60.0 / params.thunderFrequency; // segundos entre rayos
+if (this.timer >= interval + Random(-interval * 0.4, interval * 0.4)) {
   this.triggerLightning();
   this.timer = 0;
 }
@@ -415,14 +489,17 @@ if (this.timer >= interval + Random(-interval*0.4, interval*0.4)) {
 ## Phase 5 — Superficies mojadas (WetSurfaceManager)
 
 **Archivos nuevos:**
+
 - `src/systems/weather/WetSurfaceManager.ts`
 
 **Archivos a modificar:**
+
 - Shader PBR de materiales (`public/assets/shaders/lighting/`) — añadir uniform `wetness`
 
 ### Efecto visual
 
 Las superficies mojadas tienen:
+
 - **Roughness reducida** → más reflectividad especular (suelo brilla como espejo bajo lluvia)
 - **Reflectividad base aumentada** → el layer de agua tiene F0 de agua (~0.02)
 - **Micro-ondulaciones (ripple normals)** → normal map animado que simula lluvia cayendo en charcos
@@ -451,6 +528,7 @@ es un blending en el shader PBR entre el material base y un material de agua.
 ## Phase 6 — API de scripting y cinemáticas
 
 **Archivos a modificar:**
+
 - `WeatherSystem.ts` — añadir `onTransitionComplete` callback
 - `WeatherComponent.ts` — exponer `triggerWeatherSequence(steps: WeatherSequenceStep[])`
 
@@ -460,18 +538,18 @@ Permite que el código de juego o el sistema de cinemáticas programe secuencias
 
 ```typescript
 interface WeatherSequenceStep {
-  state:         WeatherStateKey;
-  holdSecs:      number;   // cuánto tiempo mantener este estado
-  transitionSecs: number;  // duración de la transición HACIA este estado
+  state: WeatherStateKey;
+  holdSecs: number; // cuánto tiempo mantener este estado
+  transitionSecs: number; // duración de la transición HACIA este estado
 }
 
 // Ejemplo de secuencia de tormenta cinemática:
 WeatherSystem.getInstance().playSequence([
-  { state: 'cloudy',    transitionSecs: 30, holdSecs: 60 },
-  { state: 'overcast',  transitionSecs: 20, holdSecs: 30 },
-  { state: 'storm',     transitionSecs: 15, holdSecs: 120 },
-  { state: 'rain',      transitionSecs: 60, holdSecs: 0  },
-  { state: 'clear',     transitionSecs: 90, holdSecs: 0  },
+  { state: 'cloudy', transitionSecs: 30, holdSecs: 60 },
+  { state: 'overcast', transitionSecs: 20, holdSecs: 30 },
+  { state: 'storm', transitionSecs: 15, holdSecs: 120 },
+  { state: 'rain', transitionSecs: 60, holdSecs: 0 },
+  { state: 'clear', transitionSecs: 90, holdSecs: 0 },
 ]);
 ```
 
@@ -479,21 +557,21 @@ WeatherSystem.getInstance().playSequence([
 
 ## Resumen de archivos
 
-| Acción    | Archivo |
-|-----------|---------|
-| Crear     | `src/systems/weather/WeatherSystem.ts` |
-| Crear     | `src/systems/weather/WeatherState.ts` |
-| Crear     | `src/components/game/WeatherComponent.ts` |
-| Crear     | `src/types/WeatherComponentData.type.ts` |
-| Crear     | `src/systems/weather/RainSystem.ts` |
-| Crear     | `src/systems/weather/SnowSystem.ts` |
-| Crear     | `src/systems/weather/ThunderSystem.ts` |
-| Crear     | `src/systems/weather/WetSurfaceManager.ts` |
-| Crear     | `public/assets/shaders/particles/rain_particle.vs` |
-| Crear     | `public/assets/shaders/particles/rain_particle.fs` |
-| Modificar | `src/core/loaders/Loader.ts` — registrar WeatherComponent |
-| Modificar | `public/assets/prefabs/cameras/main_camera.prefab` — bloque weather |
-| Modificar | `src/modules/core/ModuleEnvironmentManager.ts` — setters públicos cloud/wind |
+| Acción    | Archivo                                                                           |
+| --------- | --------------------------------------------------------------------------------- |
+| Crear     | `src/systems/weather/WeatherSystem.ts`                                            |
+| Crear     | `src/systems/weather/WeatherState.ts`                                             |
+| Crear     | `src/components/game/WeatherComponent.ts`                                         |
+| Crear     | `src/types/WeatherComponentData.type.ts`                                          |
+| Crear     | `src/systems/weather/RainSystem.ts`                                               |
+| Crear     | `src/systems/weather/SnowSystem.ts`                                               |
+| Crear     | `src/systems/weather/ThunderSystem.ts`                                            |
+| Crear     | `src/systems/weather/WetSurfaceManager.ts`                                        |
+| Crear     | `public/assets/shaders/particles/rain_particle.vs`                                |
+| Crear     | `public/assets/shaders/particles/rain_particle.fs`                                |
+| Modificar | `src/core/loaders/Loader.ts` — registrar WeatherComponent                         |
+| Modificar | `public/assets/prefabs/cameras/main_camera.prefab` — bloque weather               |
+| Modificar | `src/modules/core/ModuleEnvironmentManager.ts` — setters públicos cloud/wind      |
 | Modificar | `public/assets/shaders/lighting/tiled_lighting.fs` (o PBR base) — uniform wetness |
 
 ---

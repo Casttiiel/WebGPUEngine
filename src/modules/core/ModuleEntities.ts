@@ -99,9 +99,9 @@ export class ModuleEntities extends Module {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
 
-    gui.beginWindow('Scene Entities'); // no-op on subsequent calls
+    gui.beginWindow('Scene'); // no-op on subsequent calls
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sceneFolder = (gui as any).folders?.get('Scene Entities');
+    const sceneFolder = (gui as any).folders?.get('Scene');
     if (!sceneFolder) return;
 
     for (const entity of this.omEntities) {
@@ -179,12 +179,12 @@ export class ModuleEntities extends Module {
   }
 
   public stop(): void {
-    // Clean up Scene Entities GUI folder
+    // Clean up Scene GUI folder
     const gui = Engine.getGUI();
-    const sceneFolder = gui.getFolder('Scene Entities');
+    const sceneFolder = gui.getFolder('Scene');
     if (sceneFolder) {
       (sceneFolder as any).destroy();
-      gui.unregisterFolder('Scene Entities');
+      gui.unregisterFolder('Scene');
     }
 
     // Clear entities array (entities will be recreated on restart)
