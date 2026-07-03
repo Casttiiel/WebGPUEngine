@@ -306,7 +306,7 @@ export class RenderComponent extends Component {
   }
 
   public override renderDebug(filter?: string): void {
-    if (filter && filter !== 'render' && filter !== 'all') return;
+    if (filter !== 'all') return;
     if (!this.parts.length) return;
     PhysicsDebugDrawer.getInstance().addMeshWireframe(this.getOwner(), [0.0, 0.5, 1.0, 1.0]);
   }

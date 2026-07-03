@@ -14,9 +14,6 @@ const CIRCLE_SEGS    = 16;
 export class PhysicsDebugDrawer {
   private static _instance: PhysicsDebugDrawer | null = null;
 
-  public showColliders = false;
-  public showSensors   = false;
-
   private pipeline          : GPURenderPipeline | null = null;
   private vertexBuf         : GPUBuffer | null = null;
   private depthTextureLayout: GPUBindGroupLayout | null = null;

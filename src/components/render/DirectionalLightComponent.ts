@@ -623,7 +623,7 @@ export class DirectionalLightComponent extends Component {
   ];
 
   public override renderDebug(filter?: string): void {
-    if (filter && filter !== 'render' && filter !== 'all') return;
+    if (!filter || (filter !== 'all' && !filter.includes('lights'))) return;
     if (!this.shadowCameras?.length) return;
     const physicsDebug = PhysicsDebugDrawer.getInstance();
     for (let i = 0; i < this.shadowCameras.length; i++) {

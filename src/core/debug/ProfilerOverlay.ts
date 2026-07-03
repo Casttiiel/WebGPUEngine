@@ -103,7 +103,7 @@ const GPU_PASSES = GPU_GROUPS.flatMap((g) => g.passes) as readonly string[];
 /**
  * Lightweight HTML overlay for real-time CPU + GPU profiling data.
  *
- * Toggle with F3 (always available, independent of editor mode).
+ * Toggle with F1 (always available, independent of editor mode).
  * Updates every ~200 ms to keep the display readable.
  */
 export class ProfilerOverlay {
@@ -122,9 +122,9 @@ export class ProfilerOverlay {
     ProfilerOverlay.el = document.getElementById(OVERLAY_ID);
     if (!ProfilerOverlay.el) return;
 
-    // Wire F3 toggle
+    // Wire F1 toggle
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'F3') {
+      if (e.key === 'F1') {
         e.preventDefault();
         ProfilerOverlay.toggle();
       }
@@ -180,7 +180,7 @@ export class ProfilerOverlay {
     const cpuTotal = CPU_SCOPES.reduce((s, k) => s + (ProfilerOverlay.cpuMs[k] ?? 0), 0);
     const gpuTotal = GPU_PASSES.reduce((s, k) => s + (ProfilerOverlay.gpuMs[k] ?? 0), 0);
 
-    let html = `<b style="color:#cba6f7">PROFILER</b>  <span style="color:#6c7086;font-size:10px">[F3 to hide]</span>\n`;
+    let html = `<b style="color:#cba6f7">PROFILER</b>  <span style="color:#6c7086;font-size:10px">[F1 to hide]</span>\n`;
     html += SEP;
 
     // Summary row

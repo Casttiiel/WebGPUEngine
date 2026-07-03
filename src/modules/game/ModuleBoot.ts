@@ -103,11 +103,6 @@ export class ModuleBoot extends Module {
   }
 
   public update(dt: number): void {
-    // Check F1 para toggle entre gs_gameplay y gs_editor
-    if (Engine.getInput().isKeyJustPressed(KeyCode.F1)) {
-      this.toggleEditorMode();
-    }
-
     if (!this.playerCameraControllerComponent) {
       const player = Engine.getEntities().getEntityByName('Player')!;
       if (player.hasComponent('fps_camera_controller')) {
@@ -135,23 +130,29 @@ export class ModuleBoot extends Module {
       }
     }
 
+    // F2: toggle between debug/game mode
     if (Engine.getInput().isKeyJustPressed(KeyCode.F2)) {
-      this.debugCameraComponent.setActive(true);
-      this.playerCameraControllerComponent.setActive(false);
-      this.playerCharacterControllerComponent.setActive(false);
-      Engine.getCameraMixer().blendCamera(
-        Engine.getEntities().getEntityByName('DebugCamera')!,
-        1.0,
-        new LinearInterpolator(),
-      );
+      this.toggleEditorMode();
     }
 
-    if (Engine.getInput().isKeyJustPressed(KeyCode.F4)) {
-      DebugRenderState.showRender = !DebugRenderState.showRender;
-    }
-
-    if (Engine.getInput().isKeyJustPressed(KeyCode.F5)) {
+    // F3: toggle collider (non-sensor) wireframes
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F3)) {
       DebugRenderState.showColliders = !DebugRenderState.showColliders;
+    }
+
+    // F4: toggle sensor wireframes
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F4)) {
+      DebugRenderState.showSensors = !DebugRenderState.showSensors;
+    }
+
+    // F5: toggle light debug
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F5)) {
+      DebugRenderState.showLights = !DebugRenderState.showLights;
+    }
+
+    // F6: toggle camera debug
+    if (Engine.getInput().isKeyJustPressed(KeyCode.F6)) {
+      DebugRenderState.showCameras = !DebugRenderState.showCameras;
     }
 
     // Detectar gamestate y ajustar cámaras automáticamente

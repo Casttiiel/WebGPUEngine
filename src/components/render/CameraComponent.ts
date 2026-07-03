@@ -123,7 +123,7 @@ export class CameraComponent extends Component {
   public override renderInMenu(): void {}
 
   public override renderDebug(filter?: string): void {
-    if (filter && filter !== 'render' && filter !== 'all') return;
+    if (!filter || (filter !== 'all' && !filter.includes('cameras'))) return;
     const invVP = this.camera.getInvViewProjectionMatrix();
     PhysicsDebugDrawer.getInstance().addFrustumSlices(invVP, [1.0, 1.0, 0.0, 1.0]);
   }

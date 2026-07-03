@@ -1,11 +1,21 @@
 export class DebugRenderState {
-  public static showRender: boolean = false;
   public static showColliders: boolean = false;
+  public static showSensors:   boolean = false;
+  public static showLights:    boolean = false;
+  public static showCameras:   boolean = false;
 
   public static getFilter(): string | undefined {
-    if (this.showRender && this.showColliders) return 'all';
-    if (this.showRender)    return 'render';
-    if (this.showColliders) return 'collider';
-    return undefined;
+    const parts: string[] = [];
+    if (this.showColliders) parts.push('collider');
+    if (this.showSensors)   parts.push('sensor');
+    if (this.showLights)    parts.push('lights');
+    if (this.showCameras)   parts.push('cameras');
+    return parts.length ? parts.join('|') : undefined;
+  }
+
+  public static has(filter: string | undefined, category: string): boolean {
+    if (!filter) return false;
+    if (filter === 'all') return true;
+    return filter.includes(category);
   }
 }

@@ -362,7 +362,8 @@ export class ColliderComponent extends Component {
   }
 
   public override renderDebug(filter?: string): void {
-    if (filter && filter !== 'collider' && filter !== 'all') return;
+    const needed = this.isSensor ? 'sensor' : 'collider';
+    if (!filter || (filter !== 'all' && !filter.includes(needed))) return;
     if (!this.collider) return;
 
     const col: [number, number, number, number] = this.isSensor

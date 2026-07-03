@@ -352,7 +352,7 @@ export class PointLightComponent extends Component {
   public debugInMenu(): void {}
 
   public override renderDebug(filter?: string): void {
-    if (filter && filter !== 'render' && filter !== 'all') return;
+    if (!filter || (filter !== 'all' && !filter.includes('lights'))) return;
     const pos = this.getWorldPosition();
     PhysicsDebugDrawer.getInstance().addSphere(pos[0]!, pos[1]!, pos[2]!, this.getRadius(), [1.0, 0.6, 0.0, 1.0]);
   }
