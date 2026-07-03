@@ -146,7 +146,21 @@ export class ToneMappingComponent extends Component {
     throw new Error('Method not implemented.');
   }
 
-  public override renderInMenu(): void {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+
+    this._editorFolder = folder.addFolder('Tone Mapping');
+    this._editorFolder.close();
+
+    const proxy = {
+      technique: 'tone_mapping.tech',
+      loaded: this.isLoaded,
+    };
+    this._editorFolder.add(proxy, 'loaded').name('Loaded').disable();
+    this._editorFolder.add(proxy, 'technique').name('Technique').disable();
+  }
 
   public debugInMenu(): void {
     // Implement debug menu if needed

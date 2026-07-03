@@ -245,10 +245,12 @@ export class ModuleEnvironmentManager extends Module {
 
     const lightIntensity = lerp(moonMaxIntensity, sunIntensity, k);
 
-    // Aplicar a la luz principal
-    mainLight.setLightDirection(lightDir);
-    mainLight.setColor([lightColor[0], lightColor[1], lightColor[2]]);
-    mainLight.setIntensity(lightIntensity);
+    // Aplicar a la luz principal (solo si está vinculada al tiempo del día)
+    if (mainLight.linkedToTimeOfDay) {
+      mainLight.setLightDirection(lightDir);
+      mainLight.setColor([lightColor[0], lightColor[1], lightColor[2]]);
+      mainLight.setIntensity(lightIntensity);
+    }
 
     // FASE 4.1 — Ambient ligado al cielo
     this.ambientLightData.globalFactor = lerp(0.08, 5.0, sunAbove);

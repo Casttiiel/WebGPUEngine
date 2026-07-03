@@ -38,6 +38,7 @@ export class DirectionalLightComponent extends Component {
   private color!: number[];
   private intensity!: number;
   private lightDirection!: vec3; // Dirección de la luz (normalizada)
+  public linkedToTimeOfDay: boolean = true;
   private projectorTexture!: Texture;
   private projectorTextureView!: GPUTextureView;
 
@@ -614,43 +615,31 @@ export class DirectionalLightComponent extends Component {
   public override renderInMenu(folder?: any): void {
     if (!folder) return;
     if (this._editorFolder) return;
-    this._editorFolder = folder;
 
-    // Color picker with .listen() for automatic updates
+    const entityName = this.getOwner()?.getName() ?? 'Directional Light';
+    this._editorFolder = folder.addFolder(entityName);
+    this._editorFolder.close();
+
+    this._editorFolder.add(this, 'linkedToTimeOfDay').name('Link Time of Day').listen();
     this._editorFolder.addColor(this, 'guiColorHex').name('Color').listen();
-
-    // Intensity slider
     this._editorFolder.add(this, 'intensity', 0.0, 30.0).name('Intensity').listen();
-
-    // Light Direction
     this._editorFolder
       .add(this.lightDirection, '0', -1.0, 1.0)
       .name('Dir X')
-      .onChange(() => {
-        vec3.normalize(this.lightDirection, this.lightDirection);
-      })
+      .onChange(() => vec3.normalize(this.lightDirection, this.lightDirection))
       .listen();
     this._editorFolder
       .add(this.lightDirection, '1', -1.0, 1.0)
       .name('Dir Y')
-      .onChange(() => {
-        vec3.normalize(this.lightDirection, this.lightDirection);
-      })
+      .onChange(() => vec3.normalize(this.lightDirection, this.lightDirection))
       .listen();
     this._editorFolder
       .add(this.lightDirection, '2', -1.0, 1.0)
       .name('Dir Z')
-      .onChange(() => {
-        vec3.normalize(this.lightDirection, this.lightDirection);
-      })
+      .onChange(() => vec3.normalize(this.lightDirection, this.lightDirection))
       .listen();
-
-    // Shadows
     this._editorFolder.add(this, 'hasShadows').name('Enable Shadows').listen();
-    this._editorFolder
-      .add(this, 'maxShadowDistance', 10.0, 200.0)
-      .name('Max Shadow Distance')
-      .listen();
+    this._editorFolder.add(this, 'maxShadowDistance', 10.0, 200.0).name('Max Shadow Distance').listen();
     if (this.cascadeCount > 1) {
       this._editorFolder.add(this, 'cascadeLambda', 0.0, 1.0).name('Cascade Lambda').listen();
     }

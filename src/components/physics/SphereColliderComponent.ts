@@ -31,10 +31,6 @@ export class SphereColliderComponent extends ColliderComponent {
     await this.loadSphere(data as SphereColliderData);
   }
 
-  public override renderInMenu(): void {
-    // TODO: Implementar debug UI
-  }
-
   public override renderDebug(): void {
     // TODO: Implementar debug rendering (wireframe del box)
   }

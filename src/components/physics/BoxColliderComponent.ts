@@ -32,10 +32,6 @@ export class BoxColliderComponent extends ColliderComponent {
     await this.loadBox(data as BoxColliderData);
   }
 
-  public override renderInMenu(): void {
-    // TODO: Implementar debug UI
-  }
-
   public override renderDebug(): void {
     // TODO: Implementar debug rendering (wireframe del box)
   }

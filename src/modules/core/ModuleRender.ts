@@ -827,14 +827,12 @@ export class ModuleRender extends Module {
     const lights = Engine.getEntities().getObjectManagerByName('directional_light')?.getList();
     if (!lights?.length) return;
 
+    const lightingFolder = (gui as any).folders?.get('Lighting');
+    if (!lightingFolder) return;
+
     for (const light of lights) {
       const dirLight = light as DirectionalLightComponent;
-      const name = dirLight.getOwner().getName();
-      const guiManager = gui as any;
-      if (!guiManager.folders?.get(name)) {
-        const folder = gui.createChildFolder('Lighting', name, false);
-        if (folder) dirLight.renderInMenu(folder);
-      }
+      dirLight.renderInMenu(lightingFolder);
     }
   }
 
@@ -884,6 +882,9 @@ export class ModuleRender extends Module {
     };
 
     tryRender('auto_exposure');
+    tryRender('bloom');
+    tryRender('tone_mapping');
+    tryRender('lens_flare');
     tryRender('fsr');
     tryRender('tsr');
     tryRender('taa');

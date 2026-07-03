@@ -119,7 +119,4 @@ export class InfinitePlaneColliderComponent extends Component {
     // TODO: Implementar debug rendering (visualización del plano)
   }
 
-  public override renderInMenu(): void {
-    // TODO: Implementar debug UI
-  }
 }

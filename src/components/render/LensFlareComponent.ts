@@ -180,6 +180,19 @@ export class LensFlareComponent extends Component {
   public override update(_dt: number): void {}
   public override renderDebug(): void {}
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+
+    this._editorFolder = folder.addFolder('Lens Flare');
+    this._editorFolder.close();
+
+    this._editorFolder.add(this, 'isEnabled').name('Enabled').listen();
+    this._editorFolder.add(this, 'intensity', 0, 5, 0.05).name('Intensity').listen();
+    this._editorFolder.add(this, 'ghostScale', 0.3, 3.0, 0.05).name('Ghost Scale').listen();
+  }
+
   public override dispose(): void {
     this.paramsBuffer?.destroy();
     this.occlusionMask?.destroy();

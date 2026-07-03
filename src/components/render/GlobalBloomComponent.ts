@@ -35,6 +35,8 @@ export class GlobalBloomComponent extends Component {
   private finalCombinedResult: RenderTarget | null = null; // Final combined result (original + bloom)
   private numMips = 0;
 
+  public enabled: boolean = true;
+
   // Uniform buffers
   private downsampleParamsBuffer!: GPUBuffer;
 
@@ -71,7 +73,7 @@ export class GlobalBloomComponent extends Component {
   }
 
   public apply(sourceTexture: GPUTextureView): GPUTextureView {
-    if (!this.isLoaded || this.mipChain.length === 0) {
+    if (!this.isLoaded || this.mipChain.length === 0 || !this.enabled) {
       return sourceTexture;
     }
 
@@ -612,6 +614,18 @@ export class GlobalBloomComponent extends Component {
 
   public override renderDebug(): void {
     // Debug implementation if needed
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+
+    this._editorFolder = folder.addFolder('Global Bloom');
+    this._editorFolder.close();
+
+    this._editorFolder.add(this, 'enabled').name('Enabled').listen();
+    this._editorFolder.add({ mips: this.numMips }, 'mips').name('Mip Levels').disable();
   }
 
   private destroyMipChain(): void {

@@ -364,6 +364,52 @@ export class ColliderComponent extends Component {
     // TODO: Implementar debug rendering del collider
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+
+    this._editorFolder = folder.addFolder('Collider');
+    this._editorFolder.close();
+
+    const proxy = {
+      bodyType: this.bodyType,
+      colliderType: this.colliderType,
+      isSensor: this.isSensor,
+      enableCCD: this.enableCCD,
+    };
+    this._editorFolder.add(proxy, 'bodyType').name('Body Type').disable();
+    this._editorFolder.add(proxy, 'colliderType').name('Shape').disable();
+    this._editorFolder.add(proxy, 'isSensor').name('Is Sensor').disable();
+    this._editorFolder.add(proxy, 'enableCCD').name('CCD').disable();
+
+    if (this.collider) {
+      const physProxy = {
+        friction: this.collider.friction(),
+        restitution: this.collider.restitution(),
+      };
+      this._editorFolder.add(physProxy, 'friction', 0, 2, 0.01).name('Friction')
+        .onChange((v: number) => this.collider.setFriction(v));
+      this._editorFolder.add(physProxy, 'restitution', 0, 1, 0.01).name('Restitution')
+        .onChange((v: number) => this.collider.setRestitution(v));
+
+      const shape = this.collider.shape as any;
+      if (this.colliderType === ColliderType.CUBOID && shape.halfExtents) {
+        const hf = shape.halfExtents;
+        const dimFolder = this._editorFolder.addFolder('Half Extents');
+        dimFolder.close();
+        dimFolder.add({ x: hf.x }, 'x').name('X').disable();
+        dimFolder.add({ y: hf.y }, 'y').name('Y').disable();
+        dimFolder.add({ z: hf.z }, 'z').name('Z').disable();
+      } else if (this.colliderType === ColliderType.SPHERE && shape.radius !== undefined) {
+        this._editorFolder.add({ radius: shape.radius }, 'radius').name('Radius').disable();
+      } else if (this.colliderType === ColliderType.CAPSULE && shape.halfHeight !== undefined) {
+        this._editorFolder.add({ halfHeight: shape.halfHeight }, 'halfHeight').name('Half Height').disable();
+        this._editorFolder.add({ radius: shape.radius }, 'radius').name('Radius').disable();
+      }
+    }
+  }
+
   public override dispose(): void {
     if (this.rigidBody) {
       Engine.getPhysics().removeBody(this.getOwner().id);

@@ -262,8 +262,26 @@ export class BloomComponent extends BlurKawaseComponent {
     // Implement debug menu for bloom parameters
   }
 
-  public override renderInMenu(): void {
-    // Implement render menu for bloom parameters
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public override renderInMenu(folder?: any): void {
+    if (!folder) return;
+    if (this._editorFolder) return;
+
+    this._editorFolder = folder.addFolder('Bloom');
+    this._editorFolder.close();
+
+    const proxy = {
+      thresholdMin: this.thresholdMin,
+      thresholdMax: this.thresholdMax,
+      emissiveFactor: this.emissiveFactor,
+    };
+
+    this._editorFolder.add(proxy, 'thresholdMin', 0, 30, 0.1).name('Threshold Min')
+      .onChange((v: number) => { this.thresholdMin = v; this.updateBloomFilterParams(); });
+    this._editorFolder.add(proxy, 'thresholdMax', 0, 5, 0.05).name('Threshold Max')
+      .onChange((v: number) => { this.thresholdMax = v; this.updateBloomFilterParams(); });
+    this._editorFolder.add(proxy, 'emissiveFactor', 0, 10, 0.1).name('Emissive Factor')
+      .onChange((v: number) => { this.emissiveFactor = v; this.updateBloomFilterParams(); });
   }
 
   public override renderDebug(): void {
