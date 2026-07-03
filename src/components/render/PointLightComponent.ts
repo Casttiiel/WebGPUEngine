@@ -158,6 +158,7 @@ export class PointLightComponent extends Component {
     this.shadowCameras = [];
     for (let face = 0; face < 6; face++) {
       const cam = new Camera();
+      cam.setUseReverseZ(false);
       cam.setFov(90);
       cam.setNearPlane(this.shadowNear);
       cam.setFarPlane(this.radius);

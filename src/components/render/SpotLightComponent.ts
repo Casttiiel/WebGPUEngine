@@ -61,6 +61,7 @@ export class SpotLightComponent extends CameraComponent {
 
   constructor() {
     super();
+    this.camera.setUseReverseZ(false);
   }
 
   public override async load(data: SpotLightComponentData): Promise<void> {

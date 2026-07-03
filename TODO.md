@@ -1,9 +1,10 @@
 ## Pending
 
-1. Frustum slices shold be more split
-2. creo que tras los cambios del reverse z o algo las spot y point lights no se ven en la geometria
-3. POM on distance?
-4. Quality settings selection
+1. las spot y point lights no se ven en la geometria
+2. F2 (Toggle between the debug/game mode, isntead of F1 y F2), F1 Render statistics (que ahora esta en F3), F3 Toggle render Colliders (nonsensor) , F4 Toggle render sensor, F5 Toggle render lights, F6 Toggle render Cameras
+3. Cameras not rendering on hover
+4. POM on distance?
+5. Quality settings selection
 
 ## Gameplay
 

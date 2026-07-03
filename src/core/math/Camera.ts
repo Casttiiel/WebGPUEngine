@@ -35,6 +35,7 @@ export class Camera {
   private orthoHeight: number = 1.0;
   private orthoCentered: boolean = false;
 
+  private useReverseZ: boolean = true;
   private isDirty: boolean = true;
   private culledKeys: RenderKey[] = [];
 
@@ -149,7 +150,11 @@ export class Camera {
       // Ortho cameras never use jitter — unjitteredProjection == projection.
       mat4.copy(this.unjitteredProjection, this.projection);
     } else {
-      mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zFar, this.zNear);
+      if (this.useReverseZ) {
+        mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zFar, this.zNear);
+      } else {
+        mat4.perspectiveZO(this.projection, this.fovRadians, this.aspectRatio, this.zNear, this.zFar);
+      }
 
       // Snapshot the clean (unjittered) projection — updateViewProjection() will use
       // this to keep unjitteredViewProjection always current regardless of view changes.
@@ -172,6 +177,11 @@ export class Camera {
     mat4.invert(invProjection, this.projection);
 
     this.invProjection = invProjection;
+  }
+
+  public setUseReverseZ(value: boolean): void {
+    this.useReverseZ = value;
+    this.updateProjection();
   }
 
   public setProjectionParams(fov: number, zNear: number, zFar: number): void {

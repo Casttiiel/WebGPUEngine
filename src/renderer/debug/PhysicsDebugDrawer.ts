@@ -299,9 +299,9 @@ export class PhysicsDebugDrawer {
     this.line(ax, ay, az, bx, by, bz, col);
   }
 
-  // Unprojects the 8 NDC corners of a frustum slice through invVP and draws
-  // `slices` cross-section rectangles plus connecting edges between them.
-  // zValues go from 0 (near) to 1 (far) in WebGPU NDC depth convention.
+  // Unprojects frustum corners through invVP and draws `slices` cross-section
+  // rectangles plus connecting edges. Slices are log-distributed in view-space depth
+  // and always run near->far regardless of z-buffer convention (standard or reverse-z).
   public addFrustumSlices(
     invVP: mat4,
     col: [number, number, number, number],
@@ -314,26 +314,52 @@ export class PhysicsDebugDrawer {
       return [v[0]! / w, v[1]! / w, v[2]! / w];
     };
 
-    // NDC corners at a given z: TL, TR, BL, BR
     const cornersAt = (nz: number): [[number,number,number],[number,number,number],[number,number,number],[number,number,number]] => [
-      unproject(-1,  1, nz), // TL
-      unproject( 1,  1, nz), // TR
-      unproject(-1, -1, nz), // BL
-      unproject( 1, -1, nz), // BR
+      unproject(-1,  1, nz),
+      unproject( 1,  1, nz),
+      unproject(-1, -1, nz),
+      unproject( 1, -1, nz),
     ];
 
-    let prev = cornersAt(0);
+    // invVP * [0,0,nz,1] has w = 1/z_view (linear in nz). Larger w = closer.
+    // Compare w at nz=0 and nz=1 to detect which end is the near plane:
+    //   standard-z: near is nz=0 (wAtZ0 > wAtZ1)
+    //   reverse-z:  near is nz=1 (wAtZ1 > wAtZ0)
+    const hZ0 = vec4.fromValues(0, 0, 0, 1);
+    const hZ1 = vec4.fromValues(0, 0, 1, 1);
+    vec4.transformMat4(hZ0, hZ0, invVP);
+    vec4.transformMat4(hZ1, hZ1, invVP);
+    const wAtZ0 = hZ0[3]!;
+    const wAtZ1 = hZ1[3]!;
+
+    const ndcNear = wAtZ0 >= wAtZ1 ? 0.0 : 1.0; // NDC z of the near plane
+    const wNear   = wAtZ0 >= wAtZ1 ? wAtZ0 : wAtZ1;
+    const wFar    = wAtZ0 >= wAtZ1 ? wAtZ1 : wAtZ0;
+
+    const toNdcZ = (i: number): number => {
+      const isPerspective = wNear > 1e-5 && wFar > 0 && Math.abs(wNear - wFar) > 1e-5;
+      if (!isPerspective) {
+        // Ortho: linear from ndcNear toward ndcFar
+        return ndcNear + (1.0 - 2.0 * ndcNear) * (i / slices);
+      }
+      // Log-distribute from zNear to zFar: zView = zNear * (zFar/zNear)^t
+      const zNear = 1 / wNear;
+      const zFar  = 1 / wFar;
+      const zView = zNear * Math.pow(zFar / zNear, i / slices);
+      // w is linear in ndc_z, invert to recover ndc_z
+      return Math.max(0, Math.min(1, (1 / zView - wAtZ0) / (wAtZ1 - wAtZ0)));
+    };
+
+    // Start from the near plane so slices grow near->far (small->large cross-section).
+    let prev = cornersAt(ndcNear);
     for (let i = 1; i <= slices; i++) {
-      const nz = i / slices;
-      const curr = cornersAt(nz);
+      const curr = cornersAt(toNdcZ(i));
 
-      // Rectangle at curr z
-      this.line(...curr[0], ...curr[1], col); // TL-TR
-      this.line(...curr[1], ...curr[3], col); // TR-BR
-      this.line(...curr[3], ...curr[2], col); // BR-BL
-      this.line(...curr[2], ...curr[0], col); // BL-TL
+      this.line(...curr[0], ...curr[1], col);
+      this.line(...curr[1], ...curr[3], col);
+      this.line(...curr[3], ...curr[2], col);
+      this.line(...curr[2], ...curr[0], col);
 
-      // Connecting edges from prev slice to curr
       this.line(...prev[0], ...curr[0], col);
       this.line(...prev[1], ...curr[1], col);
       this.line(...prev[2], ...curr[2], col);
