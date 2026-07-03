@@ -565,4 +565,10 @@ export class Technique extends GPUResource {
   public getSkipDepthPrepass(): boolean {
     return this._skipDepthPrepass;
   }
+
+  public getVsFile(): string { return this.vsFile; }
+  public getFsFile(): string | undefined { return this.fsFile; }
+  public getBlendMode(): BlendModes { return this.blendMode; }
+  public getDepthTest(): DepthModes { return this.depthTest; }
+  public getRasterizationMode(): RasterizationMode { return this.rasterizationMode; }
 }

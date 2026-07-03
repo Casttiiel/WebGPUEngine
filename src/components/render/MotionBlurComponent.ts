@@ -270,7 +270,6 @@ export class MotionBlurComponent extends Component {
     // Camera matrices updated in apply() before rendering
   }
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

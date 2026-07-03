@@ -40,7 +40,6 @@ export class DirectionalLightComponent extends Component {
   private lightDirection!: vec3; // Dirección de la luz (normalizada)
   private projectorTexture!: Texture;
   private projectorTextureView!: GPUTextureView;
-  private _editorFolder: any = null;
 
   // Contact shadows integration
   /** 1×1 white texture used as fallback when no ContactShadowsComponent is present. */

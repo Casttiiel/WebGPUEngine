@@ -90,7 +90,7 @@ export class Entity {
     this._editorFolder.close();
 
     for (const component of this.components.values()) {
-      component.renderInMenu(this._editorFolder);
+      component.renderInEntityPanel(this._editorFolder);
     }
 
     for (const child of this.children) {

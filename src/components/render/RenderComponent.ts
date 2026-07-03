@@ -172,68 +172,120 @@ export class RenderComponent extends Component {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public override renderInMenu(folder?: any): void {
-    if (!folder) return;
-    if (!this.parts.length) return;
+    if (!folder || !this.parts.length) return;
 
-    const mat = this.parts[0]?.material ?? null;
-    if (!mat) return;
+    const rFolder = folder.addFolder('Render');
+    rFolder.close();
 
-    const mFolder = folder.addFolder('Material');
-    mFolder.close();
+    // ── Component-level ──────────────────────────────────────────────────────
+    const compState = { visible: this._isVisible };
+    rFolder
+      .add(compState, 'visible')
+      .name('Visible')
+      .onChange((v: boolean) => {
+        this._isVisible = v;
+        compState.visible = v;
+        this.updateRenderManager();
+      });
 
-    const mp = {
-      materialName: mat.getName().split('/').pop() ?? mat.getName(),
-      roughnessFactor: mat.getRoughnessFactor(),
-      metallicFactor: mat.getMetallicFactor(),
-      emissiveFactor: mat.getEmissiveFactor(),
-      uvXScale: mat.getUvXScale(),
-      uvYScale: mat.getUvYScale(),
-      appearanceBlend: mat.getAppearanceBlend(),
-      surfaceBlend: mat.getSurfaceBlend(),
-      pomScale: mat.getPomScale(),
-    };
+    const instanceState = { instanced: this.isInstanced, group: this.instanceGroup || '—' };
+    rFolder.add(instanceState, 'instanced').name('Instanced').disable();
+    if (this.isInstanced) {
+      rFolder.add(instanceState, 'group').name('Instance Group').disable();
+    }
 
-    mFolder.add(mp, 'materialName').name('Material').disable().listen();
-    mFolder
-      .add(mp, 'roughnessFactor', 0, 2, 0.01)
-      .name('Roughness')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ roughnessFactor: v }));
-    mFolder
-      .add(mp, 'metallicFactor', 0, 1, 0.01)
-      .name('Metallic')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ metallicFactor: v }));
-    mFolder
-      .add(mp, 'emissiveFactor', 0, 5, 0.05)
-      .name('Emissive')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ emissiveFactor: v }));
-    mFolder
-      .add(mp, 'uvXScale', 0.1, 50, 0.1)
-      .name('UV Scale X')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ uvXScale: v }));
-    mFolder
-      .add(mp, 'uvYScale', 0.1, 50, 0.1)
-      .name('UV Scale Y')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ uvYScale: v }));
-    mFolder
-      .add(mp, 'appearanceBlend', 0, 1, 0.01)
-      .name('Appearance Blend')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ appearanceBlend: v }));
-    mFolder
-      .add(mp, 'surfaceBlend', 0, 1, 0.01)
-      .name('Surface Blend')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ surfaceBlend: v }));
-    mFolder
-      .add(mp, 'pomScale', 0, 0.2, 0.001)
-      .name('POM Scale')
-      .listen()
-      .onChange((v: number) => mat.setFactors({ pomScale: v }));
+    // ── One sub-folder per mesh part ─────────────────────────────────────────
+    this.parts.forEach((part, i) => {
+      const meshShortName = part.mesh.getName().split('/').pop() ?? `part${i}`;
+      const pFolder = rFolder.addFolder(`Part ${i}  ·  ${meshShortName}`);
+      pFolder.close();
+
+      // Per-part visibility — lil-gui writes directly to part.isVisible via .add()
+      pFolder
+        .add(part, 'isVisible')
+        .name('Visible')
+        .listen()
+        .onChange(() => { if (!this.isInstanced) this.updateRenderManager(); });
+
+      // ── Mesh ───────────────────────────────────────────────────────────────
+      const meshFolder = pFolder.addFolder('Mesh');
+      meshFolder.close();
+      const meshProxy = {
+        name:     part.mesh.getName().split('/').pop() ?? part.mesh.getName(),
+        vertices: part.mesh.getVertexCount(),
+        indices:  part.mesh.getIndexCount(),
+      };
+      meshFolder.add(meshProxy, 'name').name('Name').disable();
+      meshFolder.add(meshProxy, 'vertices').name('Vertices').disable();
+      meshFolder.add(meshProxy, 'indices').name('Indices').disable();
+
+      // ── Material ───────────────────────────────────────────────────────────
+      const mat = part.material;
+      const matFolder = pFolder.addFolder('Material');
+      matFolder.close();
+      const matProxy = {
+        name:            mat.getName().split('/').pop() ?? mat.getName(),
+        category:        mat.getCategory(),
+        castsShadows:    mat.getCastsShadows(),
+        receivesShadows: mat.getShadows(),
+        roughness:       mat.getRoughnessFactor(),
+        metallic:        mat.getMetallicFactor(),
+        emissive:        mat.getEmissiveFactor(),
+        uvX:             mat.getUvXScale(),
+        uvY:             mat.getUvYScale(),
+        appearanceBlend: mat.getAppearanceBlend(),
+        surfaceBlend:    mat.getSurfaceBlend(),
+        pomScale:        mat.getPomScale(),
+      };
+      matFolder.add(matProxy, 'name').name('Name').disable();
+      matFolder.add(matProxy, 'category').name('Category').disable();
+      matFolder.add(matProxy, 'castsShadows').name('Casts Shadows').disable();
+      matFolder.add(matProxy, 'receivesShadows').name('Receives Shadows').disable();
+      matFolder.add(matProxy, 'roughness', 0, 2, 0.01).name('Roughness').listen()
+        .onChange((v: number) => mat.setFactors({ roughnessFactor: v }));
+      matFolder.add(matProxy, 'metallic', 0, 1, 0.01).name('Metallic').listen()
+        .onChange((v: number) => mat.setFactors({ metallicFactor: v }));
+      matFolder.add(matProxy, 'emissive', 0, 5, 0.05).name('Emissive').listen()
+        .onChange((v: number) => mat.setFactors({ emissiveFactor: v }));
+      matFolder.add(matProxy, 'uvX', 0.1, 50, 0.1).name('UV Scale X').listen()
+        .onChange((v: number) => mat.setFactors({ uvXScale: v }));
+      matFolder.add(matProxy, 'uvY', 0.1, 50, 0.1).name('UV Scale Y').listen()
+        .onChange((v: number) => mat.setFactors({ uvYScale: v }));
+      matFolder.add(matProxy, 'appearanceBlend', 0, 1, 0.01).name('Appearance Blend').listen()
+        .onChange((v: number) => mat.setFactors({ appearanceBlend: v }));
+      matFolder.add(matProxy, 'surfaceBlend', 0, 1, 0.01).name('Surface Blend').listen()
+        .onChange((v: number) => mat.setFactors({ surfaceBlend: v }));
+      matFolder.add(matProxy, 'pomScale', 0, 0.2, 0.001).name('POM Scale').listen()
+        .onChange((v: number) => mat.setFactors({ pomScale: v }));
+
+      // ── Technique ──────────────────────────────────────────────────────────
+      const tech = mat.getTechnique();
+      if (tech) {
+        const techFolder = pFolder.addFolder('Technique');
+        techFolder.close();
+        const vsShort = tech.getVsFile().split('/').pop() ?? tech.getVsFile();
+        const fsRaw   = tech.getFsFile();
+        const fsShort = fsRaw ? (fsRaw.split('/').pop() ?? fsRaw) : '—';
+        const techProxy = {
+          name:        tech.getName().split('/').pop() ?? tech.getName(),
+          vs:          vsShort,
+          fs:          fsShort,
+          blend:       tech.getBlendMode(),
+          depth:       tech.getDepthTest(),
+          raster:      tech.getRasterizationMode(),
+          skipPrepass: tech.getSkipDepthPrepass(),
+          skinned:     tech.getIsSkinned(),
+        };
+        techFolder.add(techProxy, 'name').name('Name').disable();
+        techFolder.add(techProxy, 'vs').name('Vertex Shader').disable();
+        techFolder.add(techProxy, 'fs').name('Fragment Shader').disable();
+        techFolder.add(techProxy, 'blend').name('Blend').disable();
+        techFolder.add(techProxy, 'depth').name('Depth').disable();
+        techFolder.add(techProxy, 'raster').name('Rasterization').disable();
+        techFolder.add(techProxy, 'skipPrepass').name('Skip Prepass').disable();
+        techFolder.add(techProxy, 'skinned').name('Skinned').disable();
+      }
+    });
   }
 
   public override dispose(): void {

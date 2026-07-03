@@ -134,7 +134,6 @@ export class FogScatterComponent extends Component {
   private readonly kawaseData = new Float32Array(4); // 16 bytes
   private readonly upsampleParamsData = new Float32Array(4); // 16 bytes
 
-  private _editorFolder: any = null;
 
   private static readonly NUM_PYRAMID = 5;
 

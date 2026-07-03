@@ -340,8 +340,10 @@ export class TSRComponent extends Component {
   public update(_dt: number): void {}
 
   public override renderInMenu(parentFolder?: any): void {
+    if (this._editorFolder) return;
     if (!parentFolder) return;
     const f = parentFolder.addFolder('TSR');
+    this._editorFolder = f;
     f.close();
     f.add(this.tsrParams, 'enabled').name('Enabled').listen();
     f.add(this.tsrParams, 'blendFactor', 0.01, 0.5, 0.01).name('Blend Factor').listen();

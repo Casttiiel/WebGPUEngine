@@ -534,7 +534,6 @@ export class SMAAT2xComponent extends Component {
     // (will be applied before rendering)
   }
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

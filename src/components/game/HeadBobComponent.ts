@@ -126,7 +126,6 @@ export class HeadBobComponent extends Component {
     return bobOffsetWorld;
   }
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

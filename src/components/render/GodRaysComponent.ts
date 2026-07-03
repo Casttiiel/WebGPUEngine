@@ -322,7 +322,6 @@ export class GodRaysComponent extends Component {
 
   public override update(_dt: number): void {}
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

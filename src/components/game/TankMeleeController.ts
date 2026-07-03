@@ -39,7 +39,6 @@ export class TankMeleeController extends EnemyControllerComponent {
   }
   private _orbitRange = 5;
 
-  private _editorFolder: any = null;
 
   public override async load(data: EnemyControllerComponentDataType): Promise<void> {
     await super.load({

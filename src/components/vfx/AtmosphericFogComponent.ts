@@ -238,7 +238,6 @@ export class AtmosphericFogComponent extends Component {
 
   public override renderDebug(): void {}
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

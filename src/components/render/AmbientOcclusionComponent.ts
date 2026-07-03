@@ -487,7 +487,6 @@ export class AmbientOcclusionComponent extends Component {
 
   // ── Debug UI ──────────────────────────────────────────────────────────────────
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

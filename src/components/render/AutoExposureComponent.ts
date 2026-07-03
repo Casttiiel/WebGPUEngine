@@ -320,7 +320,6 @@ export class AutoExposureComponent extends Component {
 
   public update(_dt: number): void {}
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

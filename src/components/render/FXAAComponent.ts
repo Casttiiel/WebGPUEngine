@@ -28,7 +28,6 @@ export class FXAAComponent extends Component {
     edgeThresholdMin: 0.0312,
   };
 
-  private _editorFolder: any = null;
 
   constructor() {
     super();

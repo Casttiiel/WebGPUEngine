@@ -16,7 +16,6 @@ import { ShockwavePass, ShockwaveConfig } from '../../renderer/shading/Shockwave
 export class ShockwavePostProcessComponent extends Component {
   private pass: ShockwavePass = new ShockwavePass();
   private _loaded = false;
-  private _editorFolder: any = null;
 
   // Default config exposed in the debug menu — sliders modify these,
   // and they become the defaults for the next spawn() call.

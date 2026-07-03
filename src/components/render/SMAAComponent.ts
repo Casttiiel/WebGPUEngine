@@ -447,7 +447,6 @@ export class SMAAComponent extends Component {
     return this.blendParamsBindGroup;
   }
 
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

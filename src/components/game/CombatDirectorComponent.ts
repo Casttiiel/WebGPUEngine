@@ -55,7 +55,6 @@ export class CombatDirectorComponent extends Component {
   public _difficulty: string = 'normal';
 
   // ── Editor ────────────────────────────────────────────────────────────────
-  private _editorFolder: any = null;
   // Live status updated each game frame so dat.GUI .listen() always reads current values.
   private _statusDisplay: { attackers: number; waveCooldown: number; threat: number } | null = null;
 

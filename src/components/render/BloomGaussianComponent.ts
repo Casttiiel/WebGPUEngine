@@ -35,7 +35,6 @@ export class BloomGaussianComponent extends BlurGaussianComponent {
   private bloomTexturesBindGroup!: GPUBindGroup | null;
 
   private inputTextureCache: Map<GPUTextureView, GPUBindGroup> = new Map();
-  private _editorFolder: any = null;
 
   constructor() {
     super();

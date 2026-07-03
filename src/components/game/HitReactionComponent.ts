@@ -94,7 +94,6 @@ export class HitReactionComponent extends Component {
   private animatorFound: boolean = false;
   private hitStop: HitStopComponent | null = null;
   private hitStopFound: boolean = false;
-  private _editorFolder: any = null;
 
   // ── Registration ─────────────────────────────────────────────────────────────
 

@@ -1,9 +1,9 @@
 ## Pending
 
-1. Camera Render Debug
-2. Scene entities Material -> Render + more info
-3. Main Camera on scene entities does not have all renderinmenu
-4. Directional light render in menu
+1. Directional light render in menu (Unlink from time checkbox)
+2. Collider Render In Menu
+3. Camera Render Debug
+4. Bloom + Tone Mapping + Lens Flare
 5. Scene entities should render wireframe when hovered on gui
 6. POM on distance?
 7. Quality settings selection

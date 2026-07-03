@@ -490,7 +490,6 @@ export class FSRComponent extends Component {
   // first entry into target mode.
   private readonly targetInput = { width: 0, height: 0 };
   private _targetSyncNeeded = true;
-  private _editorFolder: any = null;
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

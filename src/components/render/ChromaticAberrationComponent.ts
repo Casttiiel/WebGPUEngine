@@ -25,7 +25,6 @@ export class ChromaticAberrationComponent extends Component {
   private lastInputView: GPUTextureView | null = null;
   private paramsBindGroupCached: GPUBindGroup | null = null;
 
-  private _editorFolder: any = null;
 
   private params = {
     enabled:     true,

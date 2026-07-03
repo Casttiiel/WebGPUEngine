@@ -76,7 +76,6 @@ export class SpiderControllerComponent extends Component {
   private playerEntityId: number = -1;
 
   // ─── Configurable parameters (exposed via renderInMenu) ──────────────────
-  private _editorFolder: any = null;
   private legUpperLength: number = 0.55;
   private legLowerLength: number = 0.5;
   private legThickness: number = 0.06;
