@@ -464,18 +464,20 @@ export class ModuleRender extends Module {
         }
       }
 
-      // Physics debug wireframe — injected before TSR so both color and depth are at
-      // render resolution (TSR upscales color to canvas resolution, making sizes diverge).
-      const physicsDebug = PhysicsDebugDrawer.getInstance();
-      if (physicsDebug.isActive()) {
-        const depthView = this.deferred.getDepthStencilView();
-        if (depthView) {
-          physicsDebug.draw(
-            Render.getInstance().getCommandEncoder(),
-            result,
-            depthView,
-            this.mainCamera.getBindGroup(),
-          );
+      // Physics debug wireframe — draw before TSR so colour and depth are both at
+      // render resolution (TSR upscales colour to canvas size, making sizes diverge).
+      {
+        const physicsDebug = PhysicsDebugDrawer.getInstance();
+        if (physicsDebug.hasLinesToDraw()) {
+          const depthView = this.deferred.getDepthStencilView();
+          if (depthView) {
+            physicsDebug.draw(
+              Render.getInstance().getCommandEncoder(),
+              result,
+              depthView,
+              this.mainCamera.getBindGroup(),
+            );
+          }
         }
       }
 
@@ -918,9 +920,7 @@ export class ModuleRender extends Module {
     this.endGUIWindow();
   }
 
-  public renderDebug(): void {
-    throw new Error('Method not implemented.');
-  }
+  public override renderDebug(_filter?: string): void {}
 
   public getMainCameraBindGroup(): GPUBindGroup {
     return this.mainCamera.getBindGroup();

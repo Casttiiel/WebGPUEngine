@@ -14,5 +14,5 @@
     "render",
     "sound"
   ],
-  "render_debug": ["editor_selection"]
+  "render_debug": ["entities", "editor_selection"]
 }

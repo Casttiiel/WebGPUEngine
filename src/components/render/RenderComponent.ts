@@ -11,6 +11,7 @@ import { MeshPartType } from '../../types/MeshPart.type';
 import { MeshData } from '../../types/MeshData.type';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { TextureStreamingManager } from '../../renderer/core/managers/TextureStreamingManager';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 export class RenderComponent extends Component {
   private _isVisible: boolean = true;
@@ -304,7 +305,9 @@ export class RenderComponent extends Component {
     this.parts = [];
   }
 
-  public renderDebug(): void {
-    throw new Error('Method not implemented.');
+  public override renderDebug(filter?: string): void {
+    if (filter && filter !== 'render' && filter !== 'all') return;
+    if (!this.parts.length) return;
+    PhysicsDebugDrawer.getInstance().addMeshWireframe(this.getOwner(), [0.0, 0.5, 1.0, 1.0]);
   }
 }

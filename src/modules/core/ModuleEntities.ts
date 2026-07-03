@@ -110,15 +110,14 @@ export class ModuleEntities extends Module {
     }
   }
 
-  public renderDebug(): void {
-    this.renderDebugOfComponents();
-  }
-
-  private renderDebugOfComponents(): void {
-    for (const [, om] of this.omToRenderDebug) {
-      om.renderDebugAll();
+  public override pushDebugLines(filter?: string): void {
+    if (!filter) return;
+    for (const entity of this.omEntities) {
+      entity.renderDebug(filter);
     }
   }
+
+  public override renderDebug(_filter?: string): void {}
 
   public addEntity(entity: Entity): void {
     this.omEntities.push(entity);

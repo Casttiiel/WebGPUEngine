@@ -10,7 +10,8 @@ export abstract class Component {
 
   public abstract load(data: unknown): void;
   public abstract update(dt: number): void;
-  public abstract renderDebug(): void;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public renderDebug(_filter?: string): void {}
 
   // Base method for debug UI that components can override.
   // If a raw lil-gui folder is passed, the component should add its controls there.

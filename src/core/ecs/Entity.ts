@@ -78,6 +78,18 @@ export class Entity {
   /** Set by pool systems (e.g. BulletPoolComponent) to hide this entity from the editor. */
   public isPoolEntity: boolean = false;
 
+  public renderDebug(filter?: string): void {
+    for (const component of this.components.values()) {
+      component.renderDebug(filter);
+    }
+  }
+
+  /** Registered by ModuleEditorSelection to avoid a circular Engine→Entity import. */
+  private static _onGuiHover: ((entity: Entity | null) => void) | null = null;
+  public static registerGuiHoverCallback(cb: (entity: Entity | null) => void): void {
+    Entity._onGuiHover = cb;
+  }
+
   /**
    * Adds this entity as a sub-folder of the provided raw lil-gui folder.
    * Delegates to each component's renderInMenu(entitySubFolder) so each
@@ -88,6 +100,14 @@ export class Entity {
     if (this._editorFolder) return; // already built
     this._editorFolder = parentFolder.addFolder(`${this.getName()} [${this.id}]`);
     this._editorFolder.close();
+
+    // Wireframe on GUI hover — attach to the folder title bar DOM element.
+    const titleEl: HTMLElement | undefined = this._editorFolder.$title;
+    if (titleEl && Entity._onGuiHover) {
+      const self = this;
+      titleEl.addEventListener('mouseenter', () => Entity._onGuiHover?.(self));
+      titleEl.addEventListener('mouseleave', () => Entity._onGuiHover?.(null));
+    }
 
     for (const component of this.components.values()) {
       component.renderInEntityPanel(this._editorFolder);

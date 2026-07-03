@@ -18,6 +18,7 @@ import { ResourceManager } from './ResourceManager';
 import { ModuleUI } from '../../modules/core/ModuleUI';
 import { GUIManager } from '../debug/GUIManager';
 import { Logger } from '../debug/Logger';
+import { DebugRenderState } from '../debug/DebugRenderState';
 import { HealthComponent } from '../../components/game/HealthComponent';
 import { ToneMappingComponent } from '../../components/render/ToneMappingComponent';
 import { FXAAComponent } from '../../components/render/FXAAComponent';
@@ -159,6 +160,8 @@ export class Engine {
       return;
     }
     this._modules.update(dt * this._timeScale);
+    // Push CPU debug lines so they are ready when generateFrame() calls physicsDebug.draw()
+    this._modules.pushDebugLines(DebugRenderState.getFilter());
 
     // Update GUI (no-op for lil-gui, kept for compatibility)
     this._guiManager.update(dt * this._timeScale);
@@ -220,7 +223,7 @@ export class Engine {
       return;
     }
     this._render.generateFrame();
-    this._modules.renderDebug();
+    this._modules.renderDebug(DebugRenderState.getFilter());
 
     // End GUI frame and render UI
     this._guiManager.endFrame();

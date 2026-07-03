@@ -645,6 +645,10 @@ export class Mesh extends GPUResource {
     return this.vertices ? this.vertices.length / 3 : 0;
   }
 
+  public getVertexPositions(): Float32Array {
+    return this.vertices;
+  }
+
   public getIndices(): Uint16Array | Uint32Array {
     return this.indices;
   }

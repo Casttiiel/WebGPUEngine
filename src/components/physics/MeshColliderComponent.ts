@@ -31,7 +31,4 @@ export class MeshColliderComponent extends ColliderComponent {
     await this.loadMesh(data as MeshColliderData);
   }
 
-  public override renderDebug(): void {
-    // TODO: Implementar debug rendering (wireframe del mesh)
-  }
 }

@@ -167,7 +167,4 @@ export class CapsuleColliderComponent extends ColliderComponent {
     return this.capsuleRadius;
   }
 
-  public override renderDebug(): void {
-    // TODO: Wireframe capsule, raycast visualization
-  }
 }

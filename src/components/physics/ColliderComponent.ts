@@ -5,6 +5,7 @@ import { TransformComponent } from '../core/TransformComponent';
 import { Engine } from '../../core/engine/Engine';
 import { CollisionGroups, CollisionMasks } from '../../types/CollisionGroups.enum';
 import { Msg } from '../../core/ecs/Msg';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 /**
  * Convierte un string del enum CollisionGroups a su valor numérico
@@ -360,8 +361,38 @@ export class ColliderComponent extends Component {
     // Si es estático, no necesita sincronización (no se mueve)
   }
 
-  public renderDebug(): void {
-    // TODO: Implementar debug rendering del collider
+  public override renderDebug(filter?: string): void {
+    if (filter && filter !== 'collider' && filter !== 'all') return;
+    if (!this.collider) return;
+
+    const col: [number, number, number, number] = this.isSensor
+      ? [1.0, 0.8, 0.0, 1.0]
+      : [0.0, 1.0, 0.2, 1.0];
+
+    const physicsDebug = PhysicsDebugDrawer.getInstance();
+    const t = this.collider.translation();
+    const r = this.collider.rotation();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const shape = this.collider.shape as any;
+
+    switch (this.colliderType) {
+      case ColliderType.CUBOID: {
+        const hf = shape.halfExtents;
+        if (hf) physicsDebug.addBox(t.x, t.y, t.z, hf.x, hf.y, hf.z, r.x, r.y, r.z, r.w, col);
+        break;
+      }
+      case ColliderType.SPHERE: {
+        if (shape.radius !== undefined) physicsDebug.addSphere(t.x, t.y, t.z, shape.radius, col);
+        break;
+      }
+      case ColliderType.CAPSULE: {
+        if (shape.halfHeight !== undefined) {
+          physicsDebug.addCapsule(t.x, t.y, t.z, shape.halfHeight, shape.radius, r.x, r.y, r.z, r.w, col);
+        }
+        break;
+      }
+      // TRIMESH: skip (too many triangles to draw as wireframe)
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

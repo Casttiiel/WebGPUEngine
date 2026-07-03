@@ -54,10 +54,17 @@ export class ModuleManager {
     }
   }
 
-  public renderDebug(): void {
+  public pushDebugLines(filter?: string): void {
     for (const module of this.renderDebugModules) {
       if (!module.isActive()) continue;
-      module.renderDebug();
+      module.pushDebugLines(filter);
+    }
+  }
+
+  public renderDebug(filter?: string): void {
+    for (const module of this.renderDebugModules) {
+      if (!module.isActive()) continue;
+      module.renderDebug(filter);
     }
   }
 

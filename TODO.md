@@ -1,9 +1,8 @@
 ## Pending
 
-1. Scene entities should render wireframe when hovered on gui
-2. Camera + Directional light + spot light + point light Render Debug
-3. POM on distance?
-4. Quality settings selection
+1. Camera + Directional light + spot light + point light Render Debug
+2. POM on distance?
+3. Quality settings selection
 
 ## Gameplay
 

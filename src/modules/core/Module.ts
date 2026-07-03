@@ -11,7 +11,10 @@ export abstract class Module {
   public abstract start(): Promise<boolean>;
   public abstract stop(): void;
   public abstract update(dt: number): void;
-  public abstract renderDebug(): void;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public renderDebug(_filter?: string): void {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public pushDebugLines(_filter?: string): void {}
 
   // Método para renderizar en el menú de debug (Tweakpane + ImGui)
   public renderInMenu(): void {

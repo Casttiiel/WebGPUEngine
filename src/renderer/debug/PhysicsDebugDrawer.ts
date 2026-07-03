@@ -1,19 +1,14 @@
-import { Engine } from '../../core/engine/Engine';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { Render } from '../core/pipeline/Render';
 import { PipelineBindGroupLayouts } from '../../types/PipelineBindGroupLayouts.enum';
+import type { Entity } from '../../core/ecs/Entity';
 
 const MAX_VERTICES   = 65536;
 const FLOATS_PER_VTX = 7; // xyz(3) + rgba(4)
 const BYTES_PER_VTX  = FLOATS_PER_VTX * 4;
 const CIRCLE_SEGS    = 16;
-
-// Non-sensor collider color (green)
-const COLOR_SOLID  : [number, number, number, number] = [0.0, 1.0, 0.2, 1.0];
-// Sensor collider color (amber/yellow)
-const COLOR_SENSOR : [number, number, number, number] = [1.0, 0.8, 0.0, 1.0];
 
 export class PhysicsDebugDrawer {
   private static _instance: PhysicsDebugDrawer | null = null;
@@ -35,9 +30,48 @@ export class PhysicsDebugDrawer {
     return this._instance;
   }
 
-  public isActive(): boolean { return this.showColliders || this.showSensors; }
-  public toggleColliders(): void { this.showColliders = !this.showColliders; }
-  public toggleSensors():   void { this.showSensors   = !this.showSensors;   }
+  public hasLinesToDraw(): boolean { return this.vCount > 0; }
+
+  public addMeshWireframe(entity: Entity, col: [number, number, number, number]): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const renderComp    = entity.getComponent('render')    as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transformComp = entity.getComponent('transform') as any;
+    if (!renderComp || !transformComp) return;
+
+    const parts = renderComp.getParts();
+    if (!parts.length) return;
+
+    const m = transformComp.getTransform().getWorldMatrix() as Float32Array;
+
+    for (const part of parts) {
+      if (!part.isVisible) continue;
+      const positions = part.mesh.getVertexPositions();
+      const indices   = part.mesh.getIndices();
+      if (!positions?.length || !indices?.length) continue;
+
+      const xf = (idx: number): [number, number, number] => {
+        const x = positions[idx * 3]!;
+        const y = positions[idx * 3 + 1]!;
+        const z = positions[idx * 3 + 2]!;
+        return [
+          m[0]! * x + m[4]! * y + m[8]!  * z + m[12]!,
+          m[1]! * x + m[5]! * y + m[9]!  * z + m[13]!,
+          m[2]! * x + m[6]! * y + m[10]! * z + m[14]!,
+        ];
+      };
+
+      for (let i = 0; i < indices.length; i += 3) {
+        const [ax, ay, az] = xf(indices[i]!);
+        const [bx, by, bz] = xf(indices[i + 1]!);
+        const [cx, cy, cz] = xf(indices[i + 2]!);
+        this.line(ax, ay, az, bx, by, bz, col);
+        this.line(bx, by, bz, cx, cy, cz, col);
+        this.line(cx, cy, cz, ax, ay, az, col);
+        if (this.vCount >= MAX_VERTICES) return;
+      }
+    }
+  }
 
   public async initialize(): Promise<void> {
     const device    = Render.getInstance().getDevice();
@@ -135,7 +169,7 @@ export class PhysicsDebugDrawer {
 
   // ── Shape generators ────────────────────────────────────────────────────────
 
-  private addBox(
+  public addBox(
     tx: number, ty: number, tz: number,
     hx: number, hy: number, hz: number,
     qx: number, qy: number, qz: number, qw: number,
@@ -208,7 +242,7 @@ export class PhysicsDebugDrawer {
     }
   }
 
-  private addSphere(
+  public addSphere(
     tx: number, ty: number, tz: number,
     radius: number,
     col: [number, number, number, number],
@@ -218,7 +252,7 @@ export class PhysicsDebugDrawer {
     this.addCircle(tx, ty, tz, radius, 0,1,0, 0,0,1, col); // YZ
   }
 
-  private addCapsule(
+  public addCapsule(
     tx: number, ty: number, tz: number,
     halfHeight: number,
     radius: number,
@@ -262,33 +296,7 @@ export class PhysicsDebugDrawer {
     depthView    : GPUTextureView,
     cameraGroup  : GPUBindGroup,
   ): void {
-    if (!this.ready || !this.pipeline || !this.vertexBuf || !this.isActive()) return;
-
-    this.vCount = 0;
-
-    Engine.getPhysics().getWorld().forEachCollider((col) => {
-      const sensor = col.isSensor();
-      if (sensor  && !this.showSensors)   return;
-      if (!sensor && !this.showColliders) return;
-
-      const col_ = col as any;
-      const color = sensor ? COLOR_SENSOR : COLOR_SOLID;
-      const t  = col.translation();
-      const q  = col.rotation();
-      const sh = col_.shape as any;
-
-      if (sh?.halfExtents) {
-        const he = sh.halfExtents;
-        this.addBox(t.x, t.y, t.z, he.x, he.y, he.z, q.x, q.y, q.z, q.w, color);
-      } else if (sh?.halfHeight !== undefined && sh?.radius !== undefined) {
-        this.addCapsule(t.x, t.y, t.z, sh.halfHeight, sh.radius, q.x, q.y, q.z, q.w, color);
-      } else if (sh?.radius !== undefined) {
-        this.addSphere(t.x, t.y, t.z, sh.radius, color);
-      }
-      // Trimesh: skip (too many triangles to outline usefully)
-    });
-
-    if (this.vCount === 0) return;
+    if (!this.ready || !this.pipeline || !this.vertexBuf || this.vCount === 0) return;
 
     const device = Render.getInstance().getDevice();
 
@@ -323,5 +331,7 @@ export class PhysicsDebugDrawer {
     pass.setVertexBuffer(0, this.vertexBuf);
     pass.draw(this.vCount);
     pass.end();
+
+    this.vCount = 0; // reset after draw so the next frame starts clean
   }
 }
