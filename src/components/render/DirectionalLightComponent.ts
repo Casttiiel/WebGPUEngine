@@ -15,6 +15,7 @@ import { DirectionalLightComponentData } from '../../types/DirectionalLightCompo
 import { Texture } from '../../renderer/resources/Texture';
 import { CameraComponent } from './CameraComponent';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 interface AABB {
   minX: number;
@@ -610,7 +611,26 @@ export class DirectionalLightComponent extends Component {
     this.updateLightUniforms();
   }
 
-  public override renderDebug(): void {}
+  public getCascadeCameras(): Camera[] {
+    return this.shadowCameras;
+  }
+
+  private static readonly CASCADE_COLORS: [number, number, number, number][] = [
+    [0.0, 1.0, 1.0, 1.0],
+    [1.0, 0.5, 0.0, 1.0],
+    [1.0, 0.0, 1.0, 1.0],
+    [0.0, 1.0, 0.0, 1.0],
+  ];
+
+  public override renderDebug(filter?: string): void {
+    if (filter && filter !== 'render' && filter !== 'all') return;
+    if (!this.shadowCameras?.length) return;
+    const physicsDebug = PhysicsDebugDrawer.getInstance();
+    for (let i = 0; i < this.shadowCameras.length; i++) {
+      const col = DirectionalLightComponent.CASCADE_COLORS[i % DirectionalLightComponent.CASCADE_COLORS.length]!;
+      physicsDebug.addFrustumSlices(this.shadowCameras[i]!.getInvViewProjectionMatrix(), col);
+    }
+  }
 
   public override renderInMenu(folder?: any): void {
     if (!folder) return;

@@ -1,3 +1,4 @@
+import { vec4, mat4 } from 'gl-matrix';
 import { ResourceManager } from '../../core/engine/ResourceManager';
 import { QualitySettings } from '../../core/engine/QualitySettings';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
@@ -286,6 +287,60 @@ export class PhysicsDebugDrawer {
     this.addArc(topX, topY, topZ, radius, lzx, lzy, lzz, lyx, lyy, lyz, col, false);
     this.addArc(botX, botY, botZ, radius, lxx, lxy, lxz, lyx, lyy, lyz, col, true);
     this.addArc(botX, botY, botZ, radius, lzx, lzy, lzz, lyx, lyy, lyz, col, true);
+  }
+
+  // ── Public line helper and frustum visualizer ───────────────────────────────
+
+  public addLine(
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    col: [number, number, number, number],
+  ): void {
+    this.line(ax, ay, az, bx, by, bz, col);
+  }
+
+  // Unprojects the 8 NDC corners of a frustum slice through invVP and draws
+  // `slices` cross-section rectangles plus connecting edges between them.
+  // zValues go from 0 (near) to 1 (far) in WebGPU NDC depth convention.
+  public addFrustumSlices(
+    invVP: mat4,
+    col: [number, number, number, number],
+    slices: number = 10,
+  ): void {
+    const unproject = (nx: number, ny: number, nz: number): [number, number, number] => {
+      const v = vec4.fromValues(nx, ny, nz, 1.0);
+      vec4.transformMat4(v, v, invVP);
+      const w = v[3]!;
+      return [v[0]! / w, v[1]! / w, v[2]! / w];
+    };
+
+    // NDC corners at a given z: TL, TR, BL, BR
+    const cornersAt = (nz: number): [[number,number,number],[number,number,number],[number,number,number],[number,number,number]] => [
+      unproject(-1,  1, nz), // TL
+      unproject( 1,  1, nz), // TR
+      unproject(-1, -1, nz), // BL
+      unproject( 1, -1, nz), // BR
+    ];
+
+    let prev = cornersAt(0);
+    for (let i = 1; i <= slices; i++) {
+      const nz = i / slices;
+      const curr = cornersAt(nz);
+
+      // Rectangle at curr z
+      this.line(...curr[0], ...curr[1], col); // TL-TR
+      this.line(...curr[1], ...curr[3], col); // TR-BR
+      this.line(...curr[3], ...curr[2], col); // BR-BL
+      this.line(...curr[2], ...curr[0], col); // BL-TL
+
+      // Connecting edges from prev slice to curr
+      this.line(...prev[0], ...curr[0], col);
+      this.line(...prev[1], ...curr[1], col);
+      this.line(...prev[2], ...curr[2], col);
+      this.line(...prev[3], ...curr[3], col);
+
+      prev = curr;
+    }
   }
 
   // ── Main draw call (injected into ModuleRender.generateFrame) ───────────────

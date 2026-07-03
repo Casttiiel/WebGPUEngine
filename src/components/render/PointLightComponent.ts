@@ -13,6 +13,7 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { RenderManagerV2 as RenderManager } from '../../renderer/core/managers/RenderManagerV2';
 import { RenderCategory } from '../../types/RenderCategory.enum';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 // WebGPU cube face order: +X, -X, +Y, -Y, +Z, -Z
 // Up vectors match the WebGPU/Vulkan cubemap sampling convention (v=0 at top).
@@ -348,7 +349,12 @@ export class PointLightComponent extends Component {
   }
 
   public debugInMenu(): void {}
-  public renderDebug(): void {}
+
+  public override renderDebug(filter?: string): void {
+    if (filter && filter !== 'render' && filter !== 'all') return;
+    const pos = this.getWorldPosition();
+    PhysicsDebugDrawer.getInstance().addSphere(pos[0]!, pos[1]!, pos[2]!, this.getRadius(), [1.0, 0.6, 0.0, 1.0]);
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public override renderInMenu(folder?: any): void {

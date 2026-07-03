@@ -6,6 +6,7 @@ import { KeyCode } from '../../types/KeyCode.enum';
 import { MouseButton } from '../../types/MouseButton.enum';
 import { Render } from '../../renderer/core/pipeline/Render';
 import { vec3 } from 'gl-matrix';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 export class CameraComponent extends Component {
   protected camera: Camera;
@@ -121,8 +122,10 @@ export class CameraComponent extends Component {
 
   public override renderInMenu(): void {}
 
-  public renderDebug(): void {
-    // Implementar visualización de debug de la cámara si es necesario
+  public override renderDebug(filter?: string): void {
+    if (filter && filter !== 'render' && filter !== 'all') return;
+    const invVP = this.camera.getInvViewProjectionMatrix();
+    PhysicsDebugDrawer.getInstance().addFrustumSlices(invVP, [1.0, 1.0, 0.0, 1.0]);
   }
 
   public getCamera(): Camera {

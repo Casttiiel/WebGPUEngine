@@ -11,6 +11,7 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { Texture } from '../../renderer/resources/Texture';
 import { AABB } from '../../core/math/AABB';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 
 const ndcCorners = [
   [-1, -1, -1, 1],
@@ -398,8 +399,10 @@ export class SpotLightComponent extends CameraComponent {
     addAxisControls(slFolder, p, 'fov', 'FOV °', fovStep, () => this.setFov(p.fov));
   }
 
-  public override renderDebug(): void {
-    // Implement debug rendering if needed
+  public override renderDebug(filter?: string): void {
+    if (filter && filter !== 'render' && filter !== 'all') return;
+    const invVP = this.camera.getInvViewProjectionMatrix();
+    PhysicsDebugDrawer.getInstance().addFrustumSlices(invVP, [1.0, 0.5, 0.0, 1.0]);
   }
 
   public getUniformBuffer(): GPUBuffer {

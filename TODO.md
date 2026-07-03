@@ -1,8 +1,9 @@
 ## Pending
 
-1. Camera + Directional light + spot light + point light Render Debug
-2. POM on distance?
-3. Quality settings selection
+1. Frustum slices shold be more split
+2. creo que tras los cambios del reverse z o algo las spot y point lights no se ven en la geometria
+3. POM on distance?
+4. Quality settings selection
 
 ## Gameplay
 
