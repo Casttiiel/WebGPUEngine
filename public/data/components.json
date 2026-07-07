@@ -20,7 +20,7 @@
     "arcane_knight_controller",
     "bloodmancer_controller",
     "dummy_enemy_controller",
-    "lynx_controller",
+    "alchemist_controller",
 
     "player_controller",
     "hack_and_slash_controller",

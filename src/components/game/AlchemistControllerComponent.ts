@@ -14,9 +14,9 @@ import { KickSystem } from './combat/KickSystem';
 import { ThrowingProjectileSystem } from './combat/ThrowingProjectileSystem';
 import { BlinkSystem } from './movement/BlinkSystem';
 import { WallJumpSystem } from './movement/WallJumpSystem';
-import type { LynxControllerComponentDataType } from '../../types/LynxControllerComponentData.type';
+import type { AlchemistControllerComponentDataType } from '../../types/AlchemistControllerComponentData.type';
 
-export class LynxControllerComponent
+export class AlchemistControllerComponent
   extends BasePlayerController
   implements IMovementController, IMantleController
 {
@@ -43,13 +43,13 @@ export class LynxControllerComponent
   private dashSystem!: BlinkSystem;
   private wallJumpSystem!: WallJumpSystem;
 
-  public async load(data: LynxControllerComponentDataType): Promise<void> {
+  public async load(data: AlchemistControllerComponentDataType): Promise<void> {
     this.capsuleCollider = this.getOwner().getComponent(
       'capsule_collider',
     ) as CapsuleColliderComponent;
 
     if (!this.capsuleCollider) {
-      console.error('LynxControllerComponent: CapsuleColliderComponent not found.');
+      console.error('AlchemistControllerComponent: CapsuleColliderComponent not found.');
       return;
     }
 
@@ -71,7 +71,7 @@ export class LynxControllerComponent
   public override async onAttach(): Promise<void> {
     this.movement = this.getOwner().getComponent('kcc_movement') as KCCMovement;
     if (!this.movement) {
-      console.error('LynxControllerComponent: KCCMovement component not found.');
+      console.error('AlchemistControllerComponent: KCCMovement component not found.');
     }
   }
 

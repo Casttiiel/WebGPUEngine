@@ -5,7 +5,7 @@ import { HealthComponent } from '../../../components/game/HealthComponent';
 import { StaminaComponent } from '../../../components/game/StaminaComponent';
 import { BloodComponent } from '../../../components/game/BloodComponent';
 import { ArcaneKnightControllerComponent } from '../../../components/game/ArcaneKnightControllerComponent';
-import { LynxControllerComponent } from '../../../components/game/LynxControllerComponent';
+import { AlchemistControllerComponent } from '../../../components/game/AlchemistControllerComponent';
 import { GrappleTargetType } from '../../../types/GrappleTargetType.enum';
 import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
 import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
@@ -48,7 +48,7 @@ export class HUDController extends WidgetController {
   private stamina: StaminaComponent | null = null;
   private blood: BloodComponent | null = null;
   private grappleController: ArcaneKnightControllerComponent | null = null;
-  private lynxController: LynxControllerComponent | null = null;
+  private alchemistController: AlchemistControllerComponent | null = null;
 
   constructor() {
     super('hud_controller');
@@ -77,7 +77,7 @@ export class HUDController extends WidgetController {
     if (this.grappleController) {
       this.updateGrappleCharges();
       this.updateCrosshair();
-    } else if (this.lynxController) {
+    } else if (this.alchemistController) {
       this.updateMarkerCharges();
     }
   }
@@ -173,12 +173,12 @@ export class HUDController extends WidgetController {
     if (!this.blood) {
       this.blood = this.playerEntity.getComponent('blood') as BloodComponent | null;
     }
-    if (!this.grappleController && !this.lynxController) {
+    if (!this.grappleController && !this.alchemistController) {
       const ctrl = this.playerEntity.getComponent('player_controller');
       if (ctrl instanceof ArcaneKnightControllerComponent) {
         this.grappleController = ctrl;
-      } else if (ctrl instanceof LynxControllerComponent) {
-        this.lynxController = ctrl;
+      } else if (ctrl instanceof AlchemistControllerComponent) {
+        this.alchemistController = ctrl;
       }
     }
   }
@@ -216,7 +216,7 @@ export class HUDController extends WidgetController {
     }
   }
 
-  // ── Marker charge HUD (Lynx) ───────────────────────────────────────────────
+  // ── Marker charge HUD (Alchemist) ──────────────────────────────────────────
 
   private updateMarkerCharges(): void {}
 

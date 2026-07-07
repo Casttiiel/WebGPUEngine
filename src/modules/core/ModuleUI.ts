@@ -62,6 +62,9 @@ export class ModuleUI extends Module {
     // Gameplay HUD
     await this.registerWidgetClass('HUD', 'hud.json', parser, new HUDController());
 
+    // Pause menu
+    await this.registerWidgetClass('PAUSE_MENU', 'pause_menu.json', parser);
+
     // TODO: Create MenuController for main menu buttons
     // const menuController = new MenuController();
     // await this.registerWidgetClass('MAIN_MENU_BUTTONS', 'assets/ui/main_menu_buttons.json', parser, menuController);
@@ -314,7 +317,7 @@ export class ModuleUI extends Module {
       for (const wname of widgetClass.names) {
         const w = this.getWidgetByName(wname);
         if (w) {
-          w.onActivate();
+          w.start();
           if (!this.activeWidgets.includes(w)) this.activeWidgets.push(w);
           if (!firstWidget) firstWidget = w;
         }
@@ -328,7 +331,7 @@ export class ModuleUI extends Module {
     // Single root widget
     const widget = this.getWidgetByName(widgetClass.name);
     if (widget) {
-      widget.onActivate();
+      widget.start();
       widgetClass.enabled = true;
       this.widgetStructureMap.set(name, widgetClass);
       if (!this.activeWidgets.includes(widget)) {

@@ -1,5 +1,4 @@
 {
-  "gltf": "player.gltf",
   "components": {
     "name": "Player",
     "transform": {
@@ -9,9 +8,9 @@
         0
       ],
       "scale": [
-        0.6,
-        1.8,
-        0.6
+        1,
+        1,
+        1
       ]
     },
     "capsule_collider": {
@@ -42,7 +41,7 @@
       "apexThreshold": 2,
       "apexGravityScale": 0.35
     },
-    "lynx_controller": {
+    "alchemist_controller": {
       "moveSpeed": 11,
       "mantleDetectionDistance": 1.5,
       "mantleMaxHeight": -0.025,
@@ -61,8 +60,8 @@
     "fps_camera_controller": {
       "eyeOffset": [
         0,
-        0.8,
-        0
+        0.6,
+        0.1
       ],
       "mouseSensitivity": 0.1,
       "invertY": true
@@ -107,6 +106,106 @@
           "prefab": "gameplay/dagger.prefab",
           "size": 15,
           "projectileType": "dagger_projectile"
+        }
+      }
+    },
+    {
+      "children": [
+        {
+          "prefab": "weapons/sword.prefab",
+          "components": {}
+        }
+      ],
+      "components": {
+        "name": "PlayerMesh",
+        "transform": {
+          "position": [
+            0,
+            -0.9,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "skeletal_mesh": {
+          "gltf": "character.gltf"
+        },
+        "animator": {
+          "extraAnimations": [
+            "universal_animations.gltf"
+          ],
+          "states": [
+            {
+              "name": "Idle",
+              "clip": "Sword_Idle",
+              "loop": true
+            },
+            {
+              "name": "Run",
+              "clip": "Jog_Fwd_Loop",
+              "loop": true
+            },
+            {
+              "name": "InAir",
+              "clip": "Jump_Loop",
+              "loop": true
+            }
+          ],
+          "default": "Idle",
+          "transitions": [
+            {
+              "from": "Idle",
+              "to": "Run",
+              "condition": "isMoving",
+              "blendTime": 0.2
+            },
+            {
+              "from": "Run",
+              "to": "Idle",
+              "conditionFalse": "isMoving",
+              "blendTime": 0.3
+            },
+            {
+              "from": "Idle",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Run",
+              "to": "InAir",
+              "condition": "isInAir",
+              "blendTime": 0.15
+            },
+            {
+              "from": "InAir",
+              "to": "Idle",
+              "conditionFalse": "isInAir",
+              "blendTime": 0.2
+            }
+          ]
+        },
+        "foot_ik": {
+          "leftThigh": "thigh_l",
+          "leftKnee": "calf_l",
+          "leftFoot": "foot_l",
+          "rightThigh": "thigh_r",
+          "rightKnee": "calf_r",
+          "rightFoot": "foot_r",
+          "pelvis": "pelvis",
+          "ankleHeight": 0.09,
+          "raycastUpOffset": 0.3,
+          "raycastMaxDown": 0.5,
+          "footLerpSpeed": 12,
+          "pelvisLerpSpeed": 8
         }
       }
     }

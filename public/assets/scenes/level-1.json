@@ -3,7 +3,7 @@
     "prefab": "cameras/main_camera.prefab"
   },
   {
-    "prefab": "characters/slash_character_3p.prefab"
+    "prefab": "characters/alchemist_character.prefab"
   },
   {
     "prefab": "characters/dummy_enemy.prefab",
@@ -371,7 +371,7 @@
     }
   },
   {
-    "prefab": "gameplay/lynx_spear.prefab"
+    "prefab": "gameplay/alchemist_spear.prefab"
   },
   {
     "prefab": "effects/rain_emitter.prefab"

@@ -117,12 +117,11 @@ export class MenuController extends WidgetController {
     // KEYBOARD NAVIGATION
     // ============================================================================
 
-    // Check for navigation keys (using KeyCode enum)
-    if (input.isKeyPressed(KeyCode.ARROW_DOWN) || input.isKeyPressed(KeyCode.S)) {
+    if (input.isKeyJustPressed(KeyCode.ARROW_DOWN) || input.isKeyJustPressed(KeyCode.S)) {
       this.setCurrentOption(this.currentOption + 1);
     }
 
-    if (input.isKeyPressed(KeyCode.ARROW_UP) || input.isKeyPressed(KeyCode.W)) {
+    if (input.isKeyJustPressed(KeyCode.ARROW_UP) || input.isKeyJustPressed(KeyCode.W)) {
       this.setCurrentOption(this.currentOption - 1);
     }
 
@@ -130,7 +129,7 @@ export class MenuController extends WidgetController {
     // CONFIRMATION (Keyboard or Mouse)
     // ============================================================================
 
-    const confirmPressed = input.isKeyPressed(KeyCode.ENTER) || input.isKeyPressed(KeyCode.SPACE);
+    const confirmPressed = input.isKeyJustPressed(KeyCode.ENTER) || input.isKeyJustPressed(KeyCode.SPACE);
 
     if (confirmPressed) {
       if (this.currentOption >= 0 && this.currentOption < this.options.length) {

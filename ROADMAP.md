@@ -1,25 +1,3 @@
-- **Hierarchy / Outliner panel** — lista scrollable de todas las entidades de la escena. Click selecciona, doble-click renombra, icono por tipo de entidad. Sin esto no puedes navegar una escena con más de 20 objetos.
-- **Property Inspector** — muestra los componentes de la entidad seleccionada con sus propiedades editables. Los colliders tienen `// TODO` en `renderInMenu()`. Los componentes de post-process ya implementan `renderInMenu(folder)` pero no están conectados al flujo del editor.
-- **Rediseño visual del panel** — lil-gui por defecto (300px, top-left, gris). Necesita más anchura, colores por categoría de componente y mejor tipografía.
-
-Editor
-├── Scene ← renombrar "Scene Entities", moverlo arriba
-│ └── [lista de entidades]
-│ └── [propiedades de la seleccionada]
-├── Lighting ← fusionar "Directional Light" + ambient de "Environment"
-│ ├── Directional Light
-│ └── Ambient / Sky
-├── Atmosphere ← extraer del bloque Post Processing
-│ ├── Volumetric Fog
-│ ├── God Rays
-│ └── Volumetric Clouds
-├── Post Processing ← solo los filtros de cámara
-│ ├── Screen Space (SSAO, SSR, Contact Shadows)
-│ ├── Color (Exposure, Vignette, Chromatic Aberration, Film Grain)
-│ └── Upscaling (FSR, TSR, TAA)
-├── Time Control
-└── Statistics ← al final, colapsado por defecto
-
 ## Editor de Escena
 
 El mayor gap de productividad. Tiene la base (picking, gizmos, wireframe) pero le falta lo esencial para iterar rápido.

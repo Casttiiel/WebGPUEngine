@@ -3,46 +3,62 @@ import { Time } from '../../core/engine/Time';
 import { InputManager } from '../../core/input/InputManager';
 import { GameAction } from '../../types/GameAction.enum';
 import { Engine } from '../../core/engine/Engine';
+import { MenuController } from '../../core/ui/controllers/MenuController';
+import { ButtonWidget } from '../../components/ui/widgets/ButtonWidget';
 
-/**
- * Módulo para gestionar el estado de pausa del juego
- * Muestra el menú de pausa y detecta P para reanudar
- */
 export class ModuleGamePaused extends Module {
-  private isInitialized: boolean = false;
+  private menuController: MenuController | null = null;
 
   constructor(name: string) {
     super(name);
   }
 
   public async start(): Promise<boolean> {
-    if (!this.isInitialized) {
-      this.isInitialized = true;
-    }
+    const moduleUI = Engine.getUI();
+    if (!moduleUI) return false;
 
-    // Mostrar el menú de pausa (el juego ya está pausado desde GameController)
-    console.log('GamePaused started - Pause menu shown');
+    moduleUI.activateWidgetClass('PAUSE_MENU');
+
+    const btnContinue = moduleUI.getWidgetByAlias('btn_continue') as ButtonWidget | undefined;
+    const btnOptions  = moduleUI.getWidgetByAlias('btn_options')  as ButtonWidget | undefined;
+
+    if (btnContinue && btnOptions) {
+      this.menuController = new MenuController();
+      this.menuController.registerOption(btnContinue, () => this.onContinue());
+      this.menuController.registerOption(btnOptions,  () => this.onOptions());
+      moduleUI.registerController(this.menuController);
+    }
 
     return true;
   }
 
   public stop(): void {
-    // Ocultar el menú de pausa (el juego se reanudará en GameController)
-    console.log('GamePaused stopped - Pause menu hidden');
+    const moduleUI = Engine.getUI();
+    if (moduleUI) {
+      moduleUI.deactivateWidgetClass('PAUSE_MENU');
+      if (this.menuController) {
+        moduleUI.unregisterController(this.menuController);
+      }
+    }
+    this.menuController = null;
   }
 
   public update(_dt: number): void {
-    const inputManager = InputManager.getInstance();
-
-    // Presionar P para salir del menú de pausa
-    if (inputManager.isActionJustPressed(GameAction.PAUSE)) {
-      console.log('P pressed - Resuming game');
-      Time.resume();
-      Engine.getModules().changeToGamestate('gs_gameplay');
+    // P also resumes (same key that triggered pause)
+    if (InputManager.getInstance().isActionJustPressed(GameAction.PAUSE)) {
+      this.onContinue();
     }
   }
 
-  public renderDebug(): void {
-    // No hay debug info específico para el menú de pausa
+  public renderDebug(): void {}
+
+  private onContinue(): void {
+    Time.resume();
+    Engine.getModules().changeToGamestate('gs_gameplay');
+  }
+
+  private onOptions(): void {
+    // Placeholder — options sub-menu to be implemented
+    console.log('Options selected');
   }
 }

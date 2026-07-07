@@ -6,7 +6,7 @@ import type { TransformComponent } from '../../core/TransformComponent';
 import type { SpearProjectileComponent } from './SpearProjectileComponent';
 
 export interface SpearThrowSystemData {
-  /** Name of the scene entity that holds the SpearProjectileComponent. Default: 'LynxSpear'. */
+  /** Name of the scene entity that holds the SpearProjectileComponent. Default: 'AlchemistSpear'. */
   spearEntityName?: string;
   /** Offset from player origin along camera forward when throwing (units). Default: 0.5. */
   muzzleForwardOffset?: number;
@@ -35,7 +35,7 @@ const enum SpearSystemState {
  *   - ABILITY_R:     Recalls the embedded spear back to the player (Thor's hammer).
  *
  * There is no pool — exactly one spear entity lives in the scene.
- * The entity name is configurable via `spearEntityName` (default: 'LynxSpear').
+ * The entity name is configurable via `spearEntityName` (default: 'AlchemistSpear').
  */
 export class SpearThrowSystem {
   private readonly spearEntityName: string;
@@ -55,7 +55,7 @@ export class SpearThrowSystem {
   private dashTotalDist: number = 0;
 
   constructor(data?: SpearThrowSystemData) {
-    this.spearEntityName = data?.spearEntityName ?? 'LynxSpear';
+    this.spearEntityName = data?.spearEntityName ?? 'AlchemistSpear';
     this.muzzleForwardOffset = data?.muzzleForwardOffset ?? 0.5;
     this.muzzleHeightOffset = data?.muzzleHeightOffset ?? 1.4;
     this.spearDashSpeed = data?.spearDashSpeed ?? 22;

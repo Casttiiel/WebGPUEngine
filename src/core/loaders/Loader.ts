@@ -61,7 +61,7 @@ import { FilmGrainComponent } from '../../components/render/FilmGrainComponent';
 import { VignetteComponent } from '../../components/render/VignetteComponent';
 import { EnemyControllerComponent } from '../../components/game/EnemyControllerComponent';
 import { SpiderControllerComponent } from '../../components/game/SpiderControllerComponent';
-import { LynxControllerComponent } from '../../components/game/LynxControllerComponent';
+import { AlchemistControllerComponent } from '../../components/game/AlchemistControllerComponent';
 import { HackAndSlashControllerComponent } from '../../components/game/HackAndSlashControllerComponent';
 import { KickableComponent } from '../../components/game/KickableComponent';
 import { KCCMovement } from '../../components/game/movement/KCCMovement';
@@ -375,8 +375,8 @@ export class Loader {
       case 'sphere_collider':
         return new SphereColliderComponent();
       case 'character_controller':
-      case 'lynx_controller':
-        return new LynxControllerComponent();
+      case 'alchemist_controller':
+        return new AlchemistControllerComponent();
       case 'hack_and_slash_controller':
       case 'parkour_controller':
         return new HackAndSlashControllerComponent();

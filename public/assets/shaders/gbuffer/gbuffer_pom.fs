@@ -128,11 +128,15 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     let heightMip     = max(computeMipLevel(baseUv, heightTexSize) + camera.mipBias, 0.0);
 
     // Fade POM to zero at very grazing angles (viewDirTS.z → 0) to prevent UV explosions.
-    // Range is tighter than before: at z=0.1 we already have full POM, so more of the
-    // surface gets displacement.  The mip level rising with distance/angle naturally
-    // blurs the heightmap at extreme angles, bounding the effect without a hard cutoff.
     let grazingFade = smoothstep(0.02, 0.1, viewDirNorm.z);
-    let finalFade   = grazingFade;
+
+    // Distance LOD: fade POM out beyond ~8 m so the transition to normal-map-only
+    // is smooth and controlled instead of abruptly flat from mip blurring.
+    // At full distance (>20 m) normal maps still provide lighting variation.
+    let pixelDist  = length(camera.cameraPosition.xyz - input.WorldPos);
+    let distFade   = 1.0 - smoothstep(20.0, 100.0, pixelDist);
+
+    let finalFade  = distFade;
 
     if (pomScale > 0.0 && finalFade > 0.001) {
         let pomUv = parallaxOcclusionMapping(

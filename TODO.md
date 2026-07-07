@@ -1,8 +1,6 @@
 ## Pending
 
-1. Cameras not rendering on hover
-2. POM on distance?
-3. Quality settings selection
+1. Quality settings selection
 
 ## Gameplay
 

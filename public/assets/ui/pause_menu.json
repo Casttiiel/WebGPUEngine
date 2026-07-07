@@ -8,174 +8,73 @@
   "width": 1920,
   "height": 1080,
   "imageParams": {
-    "texture": "ui/backgrounds/pause_overlay.png",
+    "texture": "white.png",
     "size": [1920, 1080],
     "color": [0, 0, 0, 0.7]
   },
-  "effects": [
-    {
-      "name": "fx_fade_in",
-      "type": "fade",
-      "alpha": 1.0,
-      "duration": 0.3,
-      "mode": "Single",
-      "interpolator": "linear"
-    }
-  ],
   "children": [
     {
       "name": "pause_panel",
       "type": "image",
       "x": 704,
-      "y": 348,
+      "y": 390,
       "width": 512,
-      "height": 384,
+      "height": 300,
       "imageParams": {
-        "texture": "ui/panels/panel_dark.png",
-        "size": [512, 384],
-        "color": [1, 1, 1, 1]
+        "texture": "white.png",
+        "size": [512, 300],
+        "color": [0.15, 0.15, 0.2, 0.95]
       },
-      "effects": [
-        {
-          "name": "fx_scale_in",
-          "type": "scale",
-          "scale": [1, 1],
-          "duration": 0.3,
-          "mode": "Single",
-          "interpolator": "backOut"
-        }
-      ],
       "children": [
         {
-          "name": "pause_title",
-          "type": "text",
+          "name": "btn_continue",
+          "alias": "btn_continue",
+          "type": "button",
           "x": 156,
-          "y": 72,
+          "y": 100,
           "width": 200,
-          "height": 40,
-          "textParams": {
-            "text": "PAUSED",
-            "texture": "fonts/arial_bitmap.png",
-            "size": [24, 24],
-            "color": [1, 1, 1, 1]
+          "height": 60,
+          "states": {
+            "NORMAL": {
+              "imageParams": {
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.3, 0.3, 0.4, 1]
+              }
+            },
+            "HOVER": {
+              "imageParams": {
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.6, 0.6, 1.0, 1]
+              }
+            }
           }
         },
         {
-          "name": "btn_resume",
-          "alias": "btn_resume",
+          "name": "btn_options",
+          "alias": "btn_options",
           "type": "button",
           "x": 156,
-          "y": 162,
+          "y": 200,
           "width": 200,
-          "height": 50,
+          "height": 60,
           "states": {
             "NORMAL": {
               "imageParams": {
-                "texture": "ui/buttons/button_normal.png",
-                "size": [200, 50],
-                "color": [1, 1, 1, 1]
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.3, 0.3, 0.4, 1]
               }
             },
             "HOVER": {
               "imageParams": {
-                "texture": "ui/buttons/button_hover.png",
-                "size": [200, 50],
-                "color": [1.2, 1.2, 1.2, 1]
+                "texture": "white.png",
+                "size": [200, 60],
+                "color": [0.6, 0.6, 1.0, 1]
               }
             }
-          },
-          "children": [
-            {
-              "name": "btn_resume_text",
-              "type": "text",
-              "x": 0,
-              "y": 0,
-              "textParams": {
-                "text": "RESUME",
-                "texture": "fonts/arial_bitmap.png",
-                "size": [14, 14],
-                "color": [1, 1, 1, 1]
-              }
-            }
-          ]
-        },
-        {
-          "name": "btn_restart",
-          "alias": "btn_restart",
-          "type": "button",
-          "x": 156,
-          "y": 232,
-          "width": 200,
-          "height": 50,
-          "states": {
-            "NORMAL": {
-              "imageParams": {
-                "texture": "ui/buttons/button_normal.png",
-                "size": [200, 50],
-                "color": [1, 1, 1, 1]
-              }
-            },
-            "HOVER": {
-              "imageParams": {
-                "texture": "ui/buttons/button_hover.png",
-                "size": [200, 50],
-                "color": [1.2, 1.2, 1.2, 1]
-              }
-            }
-          },
-          "children": [
-            {
-              "name": "btn_restart_text",
-              "type": "text",
-              "x": 0,
-              "y": 0,
-              "textParams": {
-                "text": "RESTART",
-                "texture": "fonts/arial_bitmap.png",
-                "size": [14, 14],
-                "color": [1, 1, 1, 1]
-              }
-            }
-          ]
-        },
-        {
-          "name": "btn_main_menu",
-          "alias": "btn_main_menu",
-          "type": "button",
-          "x": 156,
-          "y": 302,
-          "width": 200,
-          "height": 50,
-          "states": {
-            "NORMAL": {
-              "imageParams": {
-                "texture": "ui/buttons/button_normal.png",
-                "size": [200, 50],
-                "color": [1, 1, 1, 1]
-              }
-            },
-            "HOVER": {
-              "imageParams": {
-                "texture": "ui/buttons/button_hover.png",
-                "size": [200, 50],
-                "color": [1.2, 1.2, 1.2, 1]
-              }
-            }
-          },
-          "children": [
-            {
-              "name": "btn_main_menu_text",
-              "type": "text",
-              "x": 0,
-              "y": 0,
-              "textParams": {
-                "text": "MAIN MENU",
-                "texture": "fonts/arial_bitmap.png",
-                "size": [14, 14],
-                "color": [1, 1, 1, 1]
-              }
-            }
-          ]
+          }
         }
       ]
     }
