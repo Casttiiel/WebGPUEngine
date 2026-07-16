@@ -17,6 +17,11 @@ export enum GameAction {
   FIRE = 'fire',
   KICK = 'kick',
 
+  // Alchemist powers
+  ABILITY_PRIMARY   = 'ability_primary',
+  ABILITY_SECONDARY = 'ability_secondary',
+  POWER_NEXT        = 'power_next',
+
   // UI
   PAUSE = 'pause',
 }

@@ -48,6 +48,11 @@ export const DEFAULT_CONTROL_MAPPING: ControlMappingConfig = {
   fire: { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
   kick: { type: InputType.KEYBOARD, key: KeyCode.F },
 
+  // Alchemist powers
+  ability_primary:   { type: InputType.MOUSE_BUTTON, button: MouseButton.RIGHT },
+  ability_secondary: { type: InputType.KEYBOARD,     key: KeyCode.Q },
+  power_next:        { type: InputType.KEYBOARD,     key: KeyCode.TAB },
+
   // UI
   pause: { type: InputType.KEYBOARD, key: KeyCode.P },
 };
