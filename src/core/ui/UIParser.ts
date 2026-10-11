@@ -441,6 +441,11 @@ export class UIParser {
     if (jData.size && Array.isArray(jData.size)) {
       params.size = { x: jData.size[0], y: jData.size[1] };
     }
+    if (jData.align === "center" || jData.align === "left") params.align = jData.align;
+    if (Array.isArray(jData.color)) {
+      const [r = 1, g = 1, b = 1, a = 1] = jData.color;
+      params.color = { r, g, b, a };
+    }
 
     return params;
   }

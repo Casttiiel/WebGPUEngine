@@ -33,6 +33,9 @@ export class ModuleInput extends Module {
   // (o con el juego en pausa) no se pierde en isKeyJustPressed / isMouseButtonJustPressed.
   private keysPressedThisFrame: Set<KeyCode> = new Set();
   private mouseButtonsPressedThisFrame: Set<MouseButton> = new Set();
+  // Contador monótono de pulsaciones por botón: para módulos que se actualizan después
+  // de ModuleInput (p.ej. la UI) y no pueden usar isMouseButtonJustPressed.
+  private mouseButtonPressCount: Map<MouseButton, number> = new Map();
 
   // Valores observables para Tweakpane
   private debugValues = {
@@ -126,6 +129,8 @@ export class ModuleInput extends Module {
     // Evita el autoscroll del navegador con el botón central (se usa para la cámara)
     if (event.button === MouseButton.MIDDLE) event.preventDefault();
     this.mouseButtonsPressedThisFrame.add(event.button as MouseButton);
+    const button = event.button as MouseButton;
+    this.mouseButtonPressCount.set(button, (this.mouseButtonPressCount.get(button) ?? 0) + 1);
     this.mouseButtons.set(event.button as MouseButton, true);
   }
 
@@ -290,6 +295,10 @@ export class ModuleInput extends Module {
       this.mouseButtonsPressedThisFrame.has(button) ||
       ((this.mouseButtons.get(button) || false) && !(this.mouseButtonsLastFrame.get(button) || false))
     );
+  }
+
+  public getMouseButtonPressCount(button: MouseButton): number {
+    return this.mouseButtonPressCount.get(button) ?? 0;
   }
 
   public isMouseButtonJustReleased(button: MouseButton): boolean {

@@ -43,6 +43,26 @@ export class SkeletalMeshComponent extends Component {
   private streamingPosGetter: (() => vec3) | null = null;
   // Per-instance material clone when baseColorFactor override is requested.
   private materialOverride: Material | null = null;
+  private baseColorFactor: number[] | null = null;
+  private highlight = 0;
+
+  /**
+   * Aclara el color base hacia blanco (0 = color original, 1 = blanco). Usado para el
+   * resaltado al pasar el ratón. Requiere `baseColorFactor` en el JSON (material propio).
+   */
+  public setHighlight(amount: number): void {
+    if (!this.materialOverride || !this.baseColorFactor || amount === this.highlight) return;
+    this.highlight = amount;
+    const c = this.baseColorFactor;
+    this.materialOverride.setFactors({
+      baseColorFactor: [
+        c[0]! + (1 - c[0]!) * amount,
+        c[1]! + (1 - c[1]!) * amount,
+        c[2]! + (1 - c[2]!) * amount,
+        c[3] ?? 1,
+      ],
+    });
+  }
 
   public async load(data: SkeletalMeshComponentData): Promise<void> {
     const { gltf } = data;
@@ -53,6 +73,7 @@ export class SkeletalMeshComponent extends Component {
       if (clone) {
         clone.setFactors({ baseColorFactor: data.baseColorFactor });
         this.materialOverride = clone;
+        this.baseColorFactor = [...data.baseColorFactor];
       }
     }
 

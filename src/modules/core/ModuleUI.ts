@@ -7,6 +7,7 @@ import { MouseButton } from '../../types/MouseButton.enum';
 import { UIParser } from '../../core/ui/UIParser';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 import { HUDController } from '../../core/ui/controllers/HUDController';
+import { PartyHUDController } from '../../core/ui/controllers/PartyHUDController';
 import { Render } from '../../renderer/core/pipeline/Render';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
@@ -25,7 +26,8 @@ export class ModuleUI extends Module {
 
   // Input system
   private inputManager: UIInputManager = new UIInputManager();
-  private lastMouseClicked: boolean = false;
+  // Nº de pulsaciones del botón izquierdo ya procesadas (independiente del orden de update).
+  private lastMousePressCount: number = 0;
 
   // Legacy variables kept for future implementation
   // private sizeUI = 0;
@@ -61,6 +63,9 @@ export class ModuleUI extends Module {
 
     // Gameplay HUD
     await this.registerWidgetClass('HUD', 'hud.json', parser, new HUDController());
+
+    // HUD táctico: retratos de la party
+    await this.registerWidgetClass('PARTY_HUD', 'party_hud.json', parser, new PartyHUDController());
 
     // Pause menu
     await this.registerWidgetClass('PAUSE_MENU', 'pause_menu.json', parser);
@@ -158,10 +163,11 @@ export class ModuleUI extends Module {
     const dpr = window.devicePixelRatio || 1;
     const mousePhysPos = vec2.fromValues(mousePos.x * dpr, mousePos.y * dpr);
 
-    // Detect click (transition from not pressed to pressed)
-    const isMousePressed = input.isMouseButtonPressed(MouseButton.LEFT);
-    const isMouseClicked = isMousePressed && !this.lastMouseClicked;
-    this.lastMouseClicked = isMousePressed;
+    // Click = ha habido una pulsación nueva desde el último update (no se pierden clicks
+    // más cortos que un frame).
+    const pressCount = input.getMouseButtonPressCount(MouseButton.LEFT);
+    const isMouseClicked = pressCount !== this.lastMousePressCount;
+    this.lastMousePressCount = pressCount;
 
     // Process input for all active widgets (physical-px coordinates)
     this.inputManager.processInput(this.activeWidgets, mousePhysPos, isMouseClicked);
@@ -223,7 +229,7 @@ export class ModuleUI extends Module {
 
     // Reset input manager
     this.inputManager.reset();
-    this.lastMouseClicked = false;
+    this.lastMousePressCount = Engine.getInput()?.getMouseButtonPressCount(MouseButton.LEFT) ?? 0;
   }
 
   public override renderDebug(): void {

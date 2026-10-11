@@ -10,6 +10,9 @@ import { ModuleUI } from '../core/ModuleUI';
  * Detecta cuando el jugador presiona P para pausar el juego
  */
 export class ModuleGameController extends Module {
+  /** Clase de widgets de HUD del gameplay. La escena puede cambiarla (p.ej. PartyComponent → PARTY_HUD). */
+  public static gameplayHud = 'HUD';
+
   constructor(name: string) {
     super(name);
   }
@@ -19,13 +22,13 @@ export class ModuleGameController extends Module {
     Time.resume();
 
     const moduleUI = ModuleUI.getInstance();
-    if (moduleUI) moduleUI.activateWidgetClass('HUD');
+    if (moduleUI) moduleUI.activateWidgetClass(ModuleGameController.gameplayHud);
     return true;
   }
 
   public stop(): void {
     const moduleUI = ModuleUI.getInstance();
-    if (moduleUI) moduleUI.deactivateWidgetClass('HUD');
+    if (moduleUI) moduleUI.deactivateWidgetClass(ModuleGameController.gameplayHud);
   }
 
   public update(_dt: number): void {

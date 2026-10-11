@@ -1,0 +1,246 @@
+[
+  {
+    "name": "portrait_1",
+    "alias": "portrait_1",
+    "type": "image",
+    "anchor": "top-left",
+    "visible": true,
+    "x": 24,
+    "y": 24,
+    "width": 96,
+    "height": 96,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [96, 96],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "children": [
+      {
+        "name": "portrait_1_face",
+        "alias": "portrait_1_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 88,
+        "height": 88,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [88, 88],
+          "color": [0.13, 0.27, 0.6, 1]
+        }
+      },
+      {
+        "name": "portrait_1_key",
+        "alias": "portrait_1_key",
+        "type": "text",
+        "x": 6,
+        "y": 6,
+        "width": 26,
+        "height": 26,
+        "textParams": {
+          "text": "1",
+          "size": [24, 24],
+          "color": [1, 1, 1, 0.9]
+        }
+      },
+      {
+        "name": "portrait_1_name",
+        "alias": "portrait_1_name",
+        "type": "text",
+        "x": 4,
+        "y": 62,
+        "width": 88,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [19, 19],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        }
+      }
+    ]
+  },
+  {
+    "name": "portrait_2",
+    "alias": "portrait_2",
+    "type": "image",
+    "anchor": "top-left",
+    "visible": true,
+    "x": 24,
+    "y": 136,
+    "width": 96,
+    "height": 96,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [96, 96],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "children": [
+      {
+        "name": "portrait_2_face",
+        "alias": "portrait_2_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 88,
+        "height": 88,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [88, 88],
+          "color": [0.13, 0.27, 0.6, 1]
+        }
+      },
+      {
+        "name": "portrait_2_key",
+        "alias": "portrait_2_key",
+        "type": "text",
+        "x": 6,
+        "y": 6,
+        "width": 26,
+        "height": 26,
+        "textParams": {
+          "text": "2",
+          "size": [24, 24],
+          "color": [1, 1, 1, 0.9]
+        }
+      },
+      {
+        "name": "portrait_2_name",
+        "alias": "portrait_2_name",
+        "type": "text",
+        "x": 4,
+        "y": 62,
+        "width": 88,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [19, 19],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        }
+      }
+    ]
+  },
+  {
+    "name": "portrait_3",
+    "alias": "portrait_3",
+    "type": "image",
+    "anchor": "top-left",
+    "visible": true,
+    "x": 24,
+    "y": 248,
+    "width": 96,
+    "height": 96,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [96, 96],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "children": [
+      {
+        "name": "portrait_3_face",
+        "alias": "portrait_3_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 88,
+        "height": 88,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [88, 88],
+          "color": [0.13, 0.27, 0.6, 1]
+        }
+      },
+      {
+        "name": "portrait_3_key",
+        "alias": "portrait_3_key",
+        "type": "text",
+        "x": 6,
+        "y": 6,
+        "width": 26,
+        "height": 26,
+        "textParams": {
+          "text": "3",
+          "size": [24, 24],
+          "color": [1, 1, 1, 0.9]
+        }
+      },
+      {
+        "name": "portrait_3_name",
+        "alias": "portrait_3_name",
+        "type": "text",
+        "x": 4,
+        "y": 62,
+        "width": 88,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [19, 19],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        }
+      }
+    ]
+  },
+  {
+    "name": "portrait_4",
+    "alias": "portrait_4",
+    "type": "image",
+    "anchor": "top-left",
+    "visible": true,
+    "x": 24,
+    "y": 360,
+    "width": 96,
+    "height": 96,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [96, 96],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "children": [
+      {
+        "name": "portrait_4_face",
+        "alias": "portrait_4_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 88,
+        "height": 88,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [88, 88],
+          "color": [0.13, 0.27, 0.6, 1]
+        }
+      },
+      {
+        "name": "portrait_4_key",
+        "alias": "portrait_4_key",
+        "type": "text",
+        "x": 6,
+        "y": 6,
+        "width": 26,
+        "height": 26,
+        "textParams": {
+          "text": "4",
+          "size": [24, 24],
+          "color": [1, 1, 1, 0.9]
+        }
+      },
+      {
+        "name": "portrait_4_name",
+        "alias": "portrait_4_name",
+        "type": "text",
+        "x": 4,
+        "y": 62,
+        "width": 88,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [19, 19],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        }
+      }
+    ]
+  }
+]

@@ -70,7 +70,7 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 > - **Navmesh:** se genera a partir de los colliders estáticos con el componente `scene_navmesh`.
 > - **Cámara:** `TacticalCameraRig [tactical_camera_controller]` mueve su hija `PlayerCamera [camera]`, con el mismo patrón que `camera_arm` y `fps_camera_controller`. Seguir una unidad es una referencia que se activa y desactiva (F / Home / pan).
 > - **`unit`:** componente marcador de bando (party / enemigo / neutral), que será la base de la Fase 2.
-> - **Pendiente:** "doble click en retrato" llegará con la UI (Fase 4). Hasta que exista la party, Tab / Shift+Tab cambia la unidad activa.
+> - La unidad activa de la cámara la fija la party al seleccionar (Fase 2).
 
 ### 1. Escenario simple
 - Escena de prueba: suelo plano, unas paredes, cajas/columnas como obstáculos, algún desnivel (rampa/plataforma) para más adelante.
@@ -91,7 +91,14 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ---
 
-## Fase 2 — Party y exploración
+## Fase 2 — Party y exploración ✅
+
+> **Estado: implementada.** Test: `run_scenario phase2_party`.
+> - **`party`** (entidad `Party` de la escena): miembros, seleccionado, teclas 1-4 y Tab / Shift+Tab. La cámara sigue siempre al personaje seleccionado.
+> - **`tactical_pointer`:** picking desde el ratón, resaltado del personaje bajo el cursor, anillos de hover (azul aliado, rojo enemigo) y cursor contextual: seleccionar / atacar / mover / no válido. "Mover" solo aparece si el seleccionado puede llegar andando. Click en un aliado lo selecciona.
+> - **Anillos:** decals creados en runtime (`GroundMarker`) para que `InstanceManager` no los agrupe.
+> - **HUD:** retratos en `assets/ui/party_hud.json` + `PartyHUDController` (nombre, tecla, seleccionado y hover; click selecciona). Sustituye al HUD FPS.
+> - **Motor:** se ha implementado el render de texto bitmap (`TextWidget` / `UIRenderUtils.renderText`), que estaba sin hacer. Ya no se pierden los clicks de UI más cortos que un frame.
 
 ### 4. Party (4 personajes)
 - `PartyComponent` / `PartyManager`: lista de 4 miembros, miembro seleccionado.

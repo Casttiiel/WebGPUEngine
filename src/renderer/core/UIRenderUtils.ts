@@ -396,49 +396,58 @@ export class UIRenderUtils {
     });
   }
 
+  /** Atlas de la fuente bitmap (ui/fonts/font.png): 8x8 celdas, ASCII 32 (' ') a 95 ('_'). */
+  private static readonly FONT_GRID = 8;
+  private static readonly FONT_FIRST_CHAR = 32;
+  private static readonly FONT_LAST_CHAR = 95;
+
+  /** Ancho que ocupa un texto con renderText (px físicos). */
+  public static measureText(text: string, charWidth: number, spacing = 0.8): number {
+    return text.length > 0 ? (text.length - 1) * charWidth * spacing + charWidth : 0;
+  }
+
   /**
-   * Render text using a font texture atlas
-   * @param pass - The render pass encoder
-   * @param text - The text string to render
-   * @param fontTexture - The font atlas texture
-   * @param position - Position in UI space
-   * @param scale - Text scale factor
-   * @param tint - Text color
+   * Dibuja texto con la fuente bitmap. Solo mayúsculas: las minúsculas se convierten y los
+   * caracteres fuera del atlas se dejan como espacio.
+   * @param origin  Esquina superior izquierda del texto en px físicos
+   * @param charSize Tamaño de cada carácter en px físicos [ancho, alto]
+   * @param spacing Avance entre caracteres como fracción del ancho (los glifos tienen margen)
    */
   public static renderText(
-    _pass: GPURenderPassEncoder,
-    _text: string,
-    _fontTexture: Texture,
-    _position: vec2,
-    _scale: number = 1.0,
-    _tint: vec4 = vec4.fromValues(1, 1, 1, 1),
+    pass: GPURenderPassEncoder,
+    text: string,
+    fontTexture: Texture,
+    origin: vec2,
+    charSize: vec2,
+    tint: vec4 = vec4.fromValues(1, 1, 1, 1),
+    spacing = 0.8,
   ): void {
     if (!this.initialized) {
       console.error('UIRenderUtils: Not initialized, call initialize() first');
       return;
     }
 
-    // Basic text rendering implementation
-    // For each character:
-    // 1. Calculate UV coords in font atlas
-    // 2. Calculate transform (position + offset + scale)
-    // 3. Call renderBitmap with character UVs
+    const grid = this.FONT_GRID;
+    const cell = 1 / grid;
+    const [w, h] = [charSize[0]!, charSize[1]!];
+    const transform = mat4.create();
+    const uvMin = vec2.create();
+    const uvMax = vec2.create();
+    const upper = text.toUpperCase();
 
-    // This is a simplified placeholder implementation
-    // Full implementation would require font metrics and atlas mapping
-    console.warn('UIRenderUtils: renderText is not fully implemented yet');
+    for (let i = 0; i < upper.length; i++) {
+      const code = upper.charCodeAt(i);
+      if (code <= this.FONT_FIRST_CHAR || code > this.FONT_LAST_CHAR) continue; // espacio / fuera del atlas
+      const index = code - this.FONT_FIRST_CHAR;
+      const col = index % grid;
+      const row = Math.floor(index / grid);
+      vec2.set(uvMin, col * cell, row * cell);
+      vec2.set(uvMax, (col + 1) * cell, (row + 1) * cell);
 
-    // Example for single character rendering:
-    // const charWidth = 0.1 * scale;
-    // const charHeight = 0.1 * scale;
-    // for (let i = 0; i < text.length; i++) {
-    //   const char = text[i];
-    //   const uvMin = calculateCharUV(char); // Implement based on font atlas
-    //   const uvMax = vec2.add(vec2.create(), uvMin, vec2.fromValues(1/16, 1/16));
-    //   const transform = mat4.create();
-    //   mat4.translate(transform, transform, [position[0] + i * charWidth, position[1], 0]);
-    //   mat4.scale(transform, transform, [charWidth, charHeight, 1]);
-    //   this.renderBitmap(pass, fontTexture, transform, tint, uvMin, uvMax);
-    // }
+      // El quad unitario está centrado en el origen: trasladar al centro de la celda.
+      mat4.fromTranslation(transform, [origin[0]! + i * w * spacing + w / 2, origin[1]! + h / 2, 0]);
+      mat4.scale(transform, transform, [w, h, 1]);
+      this.renderBitmap(pass, fontTexture, transform, tint, uvMin, uvMax);
+    }
   }
 }

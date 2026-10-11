@@ -3,7 +3,7 @@ import { Engine } from '../../core/engine/Engine';
 import { Entity } from '../../core/ecs/Entity';
 import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 import { CameraComponent } from '../../components/render/CameraComponent';
-import { vec3, mat4, vec4 } from 'gl-matrix';
+import { screenPointToRay } from '../../core/math/ScreenRay';
 import { MouseButton } from '../../types/MouseButton.enum';
 
 export class ModuleEditorSelection extends Module {
@@ -62,7 +62,7 @@ export class ModuleEditorSelection extends Module {
     if (!camera) return;
 
     const mousePos = Engine.getInput().getMousePosition();
-    const ray = this.screenToWorldRay(mousePos, camera);
+    const ray = screenPointToRay(mousePos.x, mousePos.y, camera.getCamera());
 
     const result = Engine.getPhysics().raycastClosestNonSensor(ray.origin, ray.direction, 10000.0);
 
@@ -79,41 +79,5 @@ export class ModuleEditorSelection extends Module {
     const debugCamera = Engine.getEntities().getEntityByName('DebugCamera');
     if (!debugCamera) return null;
     return debugCamera.getComponent('camera') as CameraComponent;
-  }
-
-  private screenToWorldRay(
-    mousePos: { x: number; y: number },
-    cameraComponent: CameraComponent,
-  ): { origin: vec3; direction: vec3 } {
-    const camera = cameraComponent.getCamera();
-    const canvas = document.getElementById('gfx-canvas') as HTMLCanvasElement;
-    const rect = canvas.getBoundingClientRect();
-
-    const x = ((mousePos.x - rect.left) / rect.width) * 2 - 1;
-    const y = 1 - ((mousePos.y - rect.top) / rect.height) * 2;
-
-    const rayClip = vec4.fromValues(x, y, 1, 1);
-
-    const invProj = mat4.create();
-    mat4.invert(invProj, camera.getProjection());
-    const rayView = vec4.create();
-    vec4.transformMat4(rayView, rayClip, invProj);
-    rayView[0] /= rayView[3];
-    rayView[1] /= rayView[3];
-    rayView[2] /= rayView[3];
-    rayView[3] = 0;
-
-    const invView = mat4.create();
-    mat4.invert(invView, camera.getView());
-    const rayWorld4 = vec4.create();
-    vec4.transformMat4(rayWorld4, rayView, invView);
-
-    const worldDirection = vec3.fromValues(rayWorld4[0], rayWorld4[1], rayWorld4[2]);
-    vec3.normalize(worldDirection, worldDirection);
-
-    const worldOrigin = vec3.create();
-    mat4.getTranslation(worldOrigin, invView);
-
-    return { origin: worldOrigin, direction: worldDirection };
   }
 }

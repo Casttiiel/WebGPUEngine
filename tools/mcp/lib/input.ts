@@ -10,9 +10,10 @@ export const TargetSchema = z
     y: z.number().optional(),
     world: vec3.optional().describe('World position, projected through the main camera'),
     entity: z.string().optional().describe('Entity name or id; uses its world position'),
+    widget: z.string().optional().describe('UI widget alias; uses its centre'),
   })
   .describe(
-    'Canvas-relative {x,y} in CSS px (canvas is 1280x720), or {world:[x,y,z]}, or {entity:"Name"}',
+    'Canvas-relative {x,y} in CSS px (canvas is 1280x720), {world:[x,y,z]}, {entity:"Name"} or {widget:"alias"}',
   );
 
 const button = z.enum(['left', 'right', 'middle']).optional();
@@ -63,6 +64,13 @@ async function resolveTarget(
   required: boolean,
 ): Promise<{ x: number; y: number } | null> {
   const origin = await session.canvasOrigin();
+  if (t.widget) {
+    const r = await session.call<{ x: number; y: number; width: number; height: number }>(
+      'getWidgetRect',
+      t.widget,
+    );
+    return { x: origin.x + r.x + r.width / 2, y: origin.y + r.y + r.height / 2 };
+  }
   if (t.world || t.entity !== undefined) {
     const ref = t.world ?? t.entity;
     const p = await session.call<{ x: number; y: number; visible: boolean }>('worldToScreen', ref);
@@ -73,7 +81,7 @@ async function resolveTarget(
     return { x: origin.x + p.x, y: origin.y + p.y };
   }
   if (t.x !== undefined && t.y !== undefined) return { x: origin.x + t.x, y: origin.y + t.y };
-  if (required) throw new Error('Input target needs {x,y}, {world} or {entity}');
+  if (required) throw new Error('Input target needs {x,y}, {world}, {entity} or {widget}');
   return null;
 }
 

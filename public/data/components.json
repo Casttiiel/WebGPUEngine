@@ -55,6 +55,8 @@
 
     "camera_shake",
     "camera_arm",
+    "party",
+    "tactical_pointer",
     "tactical_camera_controller",
     "scene_navmesh",
     "head_bob",

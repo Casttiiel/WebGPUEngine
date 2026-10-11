@@ -10,6 +10,7 @@ import { AStar } from '../../ai/nav/AStar';
 import { NavMesh } from '../../ai/nav/NavMesh';
 import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 import { TransformComponent } from '../../components/core/TransformComponent';
+import { ModuleUI } from '../../modules/core/ModuleUI';
 
 /**
  * DevBridge — API de depuración expuesta como `window.__engine` (solo en `npm run dev`).
@@ -230,6 +231,7 @@ export class DevBridge {
       },
 
       worldToScreen: (pos: PointRef) => this.worldToScreen(this.resolvePoint(pos)),
+      getWidgetRect: (alias: string) => this.getWidgetRect(alias),
       queryPath: (from: PointRef, to: PointRef) => this.queryPath(from, to),
       queryLos: (from: PointRef, to: PointRef, eyeHeight?: number) =>
         this.queryLos(from, to, eyeHeight ?? 1.5),
@@ -522,6 +524,23 @@ export class DevBridge {
     const y = (1 - (ny * 0.5 + 0.5)) * size.height;
     const visible = nx >= -1 && nx <= 1 && ny >= -1 && ny <= 1;
     return { x: round(x), y: round(y), visible };
+  }
+
+  /** Rectángulo de un widget de UI (por alias o nombre) en px CSS relativos al canvas. */
+  private static getWidgetRect(alias: string): Record<string, unknown> {
+    const ui = ModuleUI.getInstance();
+    const widget = ui?.getWidgetByAlias(alias) ?? ui?.getWidgetByName(alias);
+    if (!widget) throw new Error(`Widget not found: ${alias}`);
+    const dpr = window.devicePixelRatio || 1;
+    const [ox, oy] = widget.getOrigin();
+    const size = widget.getSize();
+    return {
+      x: round(ox / dpr),
+      y: round(oy / dpr),
+      width: round(size[0]! / dpr),
+      height: round(size[1]! / dpr),
+      visible: widget.isVisible(),
+    };
   }
 
   private static queryPath(fromRef: PointRef, toRef: PointRef): Record<string, unknown> {

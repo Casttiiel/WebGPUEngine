@@ -81,6 +81,8 @@ import { HealthComponent } from '../../components/game/HealthComponent';
 import { UnitComponent } from '../../components/game/tactical/UnitComponent';
 import { TacticalCameraControllerComponent } from '../../components/game/tactical/TacticalCameraControllerComponent';
 import { SceneNavMeshComponent } from '../../components/game/tactical/SceneNavMeshComponent';
+import { PartyComponent } from '../../components/game/tactical/PartyComponent';
+import { TacticalPointerComponent } from '../../components/game/tactical/TacticalPointerComponent';
 import { BloodZoneComponent } from '../../components/game/combat/BloodZoneComponent';
 import { BloodBallProjectileComponent } from '../../components/game/combat/BloodBallProjectileComponent';
 import { BloodExplosiveProjectileComponent } from '../../components/game/combat/BloodExplosiveProjectileComponent';
@@ -238,6 +240,15 @@ export class Loader {
     json.children = parsedEntities;
 
     return json;
+  }
+
+  /**
+   * Crea una entidad en runtime (prefab + overrides). No pasa por InstanceManager: las
+   * entidades creadas así nunca se instancian.
+   */
+  public static async spawnFromJSON(json: EntityDataType, parent?: Entity): Promise<Entity> {
+    const parsed = await this.parseEntityFromJSON(structuredClone(json));
+    return this.loadEntityFromJSON(parsed, parent, false);
   }
 
   public static async loadEntityFromJSON(
@@ -506,6 +517,10 @@ export class Loader {
         return new TacticalCameraControllerComponent();
       case 'scene_navmesh':
         return new SceneNavMeshComponent();
+      case 'party':
+        return new PartyComponent();
+      case 'tactical_pointer':
+        return new TacticalPointerComponent();
       case 'blood_zone':
         return new BloodZoneComponent();
       case 'stamina':

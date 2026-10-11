@@ -73,6 +73,8 @@ export interface TextParams {
   text: string; // Text content
   texture: string | null; // Bitmap font texture path
   size: { x: number; y: number }; // Text size in UI coordinates
+  color?: { r: number; g: number; b: number; a: number }; // Tint (default white)
+  align?: "left" | "center"; // Horizontal alignment inside the widget (default left)
 }
 
 /**

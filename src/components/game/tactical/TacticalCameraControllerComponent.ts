@@ -1,5 +1,4 @@
 import { vec3 } from 'gl-matrix';
-import RAPIER from '@dimforge/rapier3d';
 import { Component } from '../../../core/ecs/Component';
 import { Entity } from '../../../core/ecs/Entity';
 import { Engine } from '../../../core/engine/Engine';
@@ -10,6 +9,7 @@ import { Render } from '../../../renderer/core/pipeline/Render';
 import { PhysicsDebugDrawer } from '../../../renderer/debug/PhysicsDebugDrawer';
 import { DevBridge } from '../../../core/debug/DevBridge';
 import { UnitComponent } from './UnitComponent';
+import { groundHeightAt } from './TacticalQueries';
 
 export type TacticalCameraControllerData = Readonly<{
   /** Pivot inicial (punto del suelo al que mira la cámara). Default [0,0,0]. */
@@ -69,7 +69,6 @@ const UP = vec3.fromValues(0, 1, 0);
  *   Rueda                                zoom (más cenital cuanto más lejos)
  *   F                                    activar/desactivar seguir a la unidad activa
  *   Inicio (Home)                        centrar y seguir la unidad activa
- *   Tab / Shift+Tab                      cambiar de unidad activa (hasta que exista la party)
  */
 export class TacticalCameraControllerComponent extends Component {
   // ── Config ──────────────────────────────────────────────────────────────────
@@ -172,7 +171,7 @@ export class TacticalCameraControllerComponent extends Component {
     }
     this.clampToBounds(this.targetPivot);
     this.targetPivot[1] =
-      this.groundHeightAt(this.targetPivot[0]!, this.targetPivot[2]!) ?? this.targetPivot[1]!;
+      groundHeightAt(this.targetPivot[0]!, this.targetPivot[2]!) ?? this.targetPivot[1]!;
 
     // Suavizado exponencial (independiente del framerate).
     const k = 1 - Math.exp(-this.smoothing * dt);
@@ -230,7 +229,7 @@ export class TacticalCameraControllerComponent extends Component {
     return this.followEnabled && this.followTarget !== null;
   }
 
-  /** Unidad "activa" (la que enfoca Home / F). La party y los turnos la irán cambiando. */
+  /** Unidad "activa" (la que enfoca Home / F). La fija la party al seleccionar. */
   public setActiveUnit(entity: Entity | null, follow = true): void {
     this.activeUnit = entity;
     if (entity && follow) this.focusOn(entity, true);
@@ -270,7 +269,7 @@ export class TacticalCameraControllerComponent extends Component {
     if (first && this.followOnStart !== false) {
       this.focusOn(first, true);
       // Primera colocación sin transición.
-      this.targetPivot[1] = this.groundHeightAt(this.targetPivot[0]!, this.targetPivot[2]!) ?? 0;
+      this.targetPivot[1] = groundHeightAt(this.targetPivot[0]!, this.targetPivot[2]!) ?? 0;
       vec3.copy(this.pivot, this.targetPivot);
     }
   }
@@ -360,18 +359,9 @@ export class TacticalCameraControllerComponent extends Component {
     }
 
     // ── Seguimiento / unidad activa ────────────────────────────────────────
-    if (input.isKeyJustPressed(KeyCode.TAB)) this.cycleActiveUnit(shift ? -1 : 1);
     if (input.isKeyJustPressed(KeyCode.HOME) && this.activeUnit)
       this.focusOn(this.activeUnit, true);
     if (input.isKeyJustPressed(KeyCode.F)) this.setFollowEnabled(!this.isFollowing());
-  }
-
-  private cycleActiveUnit(direction: 1 | -1): void {
-    const units = UnitComponent.getAll().map((u) => u.getOwner());
-    if (!units.length) return;
-    const index = this.activeUnit ? units.indexOf(this.activeUnit) : -1;
-    const next = units[(index + direction + units.length) % units.length]!;
-    this.setActiveUnit(next, true);
   }
 
   private pitchForDistance(distance: number): number {
@@ -393,33 +383,13 @@ export class TacticalCameraControllerComponent extends Component {
     );
 
     // Nunca por debajo del suelo (u obstáculo) que tenga debajo el ojo.
-    const groundUnderEye = this.groundHeightAt(this.tmpEye[0]!, this.tmpEye[2]!);
+    const groundUnderEye = groundHeightAt(this.tmpEye[0]!, this.tmpEye[2]!);
     if (groundUnderEye !== null && this.tmpEye[1]! < groundUnderEye + this.minEyeClearance) {
       this.tmpEye[1] = groundUnderEye + this.minEyeClearance;
     }
 
     const camera = (this.cameraEntity!.getComponent('camera') as CameraComponent).getCamera();
     camera.lookAt(this.tmpEye, this.tmpLook, UP);
-  }
-
-  /** Altura del suelo estático en (x,z): raycast hacia abajo ignorando unidades y sensores. */
-  private groundHeightAt(x: number, z: number): number | null {
-    const physics = Engine.getPhysics();
-    const world = physics?.getWorld();
-    if (!world) return null;
-    const top = 200;
-    const ray = new RAPIER.Ray({ x, y: top, z }, { x: 0, y: -1, z: 0 });
-    const hit = world.castRay(
-      ray,
-      400,
-      true,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      (collider) => !collider.isSensor() && (collider.parent()?.isFixed() ?? true),
-    );
-    return hit ? top - hit.timeOfImpact : null;
   }
 
   private clampToBounds(p: vec3): void {

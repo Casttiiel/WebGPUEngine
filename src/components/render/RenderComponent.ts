@@ -166,6 +166,13 @@ export class RenderComponent extends Component {
     return this._isVisible;
   }
 
+  /** Muestra/oculta todas las partes (p.ej. marcadores de selección creados en runtime). */
+  public setVisible(visible: boolean): void {
+    if (this._isVisible === visible) return;
+    this._isVisible = visible;
+    this.updateRenderManager();
+  }
+
   public update(_dt: number): void {
     // Unused dt parameter is prefixed with underscore
     // Implementation of update if needed
