@@ -1,0 +1,554 @@
+[
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "prefab": "cameras/debug_camera.prefab"
+  },
+  {
+    "prefab": "tactical/tactical_camera.prefab",
+    "components": {
+      "tactical_camera_controller": {
+        "bounds": {
+          "min": [-15.5, -15.5],
+          "max": [15.5, 15.5]
+        }
+      }
+    }
+  },
+  {
+    "prefab": "lighting/directional_light.prefab"
+  },
+  {
+    "components": {
+      "name": "NavMesh",
+      "scene_navmesh": {
+        "cellSize": 0.15,
+        "cellHeight": 0.1,
+        "agentRadius": 0.4,
+        "agentHeight": 1.8,
+        "agentMaxClimb": 0.35,
+        "agentMaxSlope": 40
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Ground",
+      "transform": {
+        "position": [0, -0.5, 0],
+        "rotation": [0, 0, 0],
+        "scale": [40, 1, 40]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "pom_example.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "WallNorth",
+      "transform": {
+        "position": [0, 1.5, 18.5],
+        "rotation": [0, 0, 0],
+        "scale": [38, 3, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "WallSouth",
+      "transform": {
+        "position": [0, 1.5, -18.5],
+        "rotation": [0, 0, 0],
+        "scale": [38, 3, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "WallEast",
+      "transform": {
+        "position": [18.5, 1.5, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 3, 36]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "WallWest",
+      "transform": {
+        "position": [-18.5, 1.5, 0],
+        "rotation": [0, 0, 0],
+        "scale": [1, 3, 36]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CoverWall1",
+      "transform": {
+        "position": [-6, 0.6, 2],
+        "rotation": [0, 0, 0],
+        "scale": [6, 1.2, 0.6]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CoverWall2",
+      "transform": {
+        "position": [5, 0.6, -2],
+        "rotation": [0, 0, 0],
+        "scale": [0.6, 1.2, 6]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "CoverWall3",
+      "transform": {
+        "position": [-11, 0.6, 10],
+        "rotation": [0, 0, 0],
+        "scale": [0.6, 1.2, 5]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "carbon.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Column1",
+      "transform": {
+        "position": [-10, 2, -8],
+        "rotation": [0, 0, 0],
+        "scale": [1, 4, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "stone.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Column2",
+      "transform": {
+        "position": [10, 2, 8],
+        "rotation": [0, 0, 0],
+        "scale": [1, 4, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "stone.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Column3",
+      "transform": {
+        "position": [0, 2, 9],
+        "rotation": [0, 0, 0],
+        "scale": [1, 4, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "stone.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Column4",
+      "transform": {
+        "position": [-2, 2, -12],
+        "rotation": [0, 0, 0],
+        "scale": [1, 4, 1]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "stone.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Crate1",
+      "transform": {
+        "position": [2, 0.6, 3],
+        "rotation": [0, 0, 0],
+        "scale": [1.2, 1.2, 1.2]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "metal.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Crate2",
+      "transform": {
+        "position": [3.3, 0.6, 3.4],
+        "rotation": [0, 25, 0],
+        "scale": [1.2, 1.2, 1.2]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "metal.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Crate3",
+      "transform": {
+        "position": [-8, 0.6, -2],
+        "rotation": [0, 0, 0],
+        "scale": [1.2, 1.2, 1.2]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "metal.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Crate4",
+      "transform": {
+        "position": [8, 0.6, 13],
+        "rotation": [0, 15, 0],
+        "scale": [1.2, 1.2, 1.2]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "metal.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Crate5",
+      "transform": {
+        "position": [-14, 0.6, -13],
+        "rotation": [0, 0, 0],
+        "scale": [1.2, 1.2, 1.2]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "metal.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Platform",
+      "transform": {
+        "position": [11, 0.75, -11],
+        "rotation": [0, 0, 0],
+        "scale": [8, 1.5, 8]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "stone.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "Ramp",
+      "transform": {
+        "position": [4.5, 0.6, -11],
+        "rotation": [0, 0, 16.7],
+        "scale": [5.4, 0.3, 3]
+      },
+      "box_collider": {
+        "bodyType": "static",
+        "size": [1, 1, 1],
+        "friction": 1,
+        "restitution": 0
+      },
+      "render": {
+        "meshes": [
+          {
+            "mesh": "unit_cube.obj",
+            "material": "stone.mat"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/hero.prefab",
+    "components": {
+      "name": "Hero1",
+      "transform": {
+        "position": [-4, 0, -6]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/hero.prefab",
+    "components": {
+      "name": "Hero2",
+      "transform": {
+        "position": [-2.5, 0, -7.2]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/hero.prefab",
+    "components": {
+      "name": "Hero3",
+      "transform": {
+        "position": [-5.5, 0, -7.6]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/hero.prefab",
+    "components": {
+      "name": "Hero4",
+      "transform": {
+        "position": [-3.5, 0, -8.8]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/enemy.prefab",
+    "components": {
+      "name": "Enemy1",
+      "transform": {
+        "position": [5, 0, 6]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/enemy.prefab",
+    "components": {
+      "name": "Enemy2",
+      "transform": {
+        "position": [7.5, 0, 4]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/enemy.prefab",
+    "components": {
+      "name": "Enemy3",
+      "transform": {
+        "position": [12, 0, -11]
+      }
+    }
+  }
+]

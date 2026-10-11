@@ -73,6 +73,7 @@ export class DevBridge {
 
   // ── Datos de overlays integrados ───────────────────────────────────────────
   private static navMeshEdges: Float32Array | null = null;
+  private static navMeshEdgesSource: unknown = null;
   private static debugPaths: { points: Vec3Like[]; until: number; color: Color }[] = [];
   private static debugRays: { from: Vec3Like; to: Vec3Like; until: number; color: Color }[] = [];
 
@@ -673,6 +674,11 @@ export class DevBridge {
   private static drawNavMesh(): void {
     const recast = NavMesh.getInstance().getRecastNavMesh();
     if (!recast) return;
+    // Si el navmesh se ha reconstruido, recalcular las aristas.
+    if (this.navMeshEdgesSource !== recast) {
+      this.navMeshEdges = null;
+      this.navMeshEdgesSource = recast;
+    }
     if (!this.navMeshEdges) {
       const [positions, indices] = getNavMeshPositionsAndIndices(recast);
       const edges: number[] = [];

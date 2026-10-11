@@ -321,8 +321,14 @@ async function runStep(
 export async function evalInPage(session: BrowserSession, code: string): Promise<unknown> {
   return session.getPage().evaluate(async (src) => {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    const body = /(^|[;{}\s])return\s|;\s*\S/.test(src.trim()) ? src : `return (${src});`;
-    const value = await new AsyncFunction(body)();
+    // Primero como expresión (incluye IIFEs con `return` dentro); si no compila, como sentencias.
+    let fn: () => Promise<unknown>;
+    try {
+      fn = new AsyncFunction(`return (${src.trim().replace(/;+$/, '')});`);
+    } catch {
+      fn = new AsyncFunction(src);
+    }
+    const value = await fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const engine = (window as any).__engine;
     return engine?.serialize ? engine.serialize(value) : JSON.parse(JSON.stringify(value ?? null));

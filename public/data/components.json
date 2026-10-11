@@ -55,6 +55,8 @@
 
     "camera_shake",
     "camera_arm",
+    "tactical_camera_controller",
+    "scene_navmesh",
     "head_bob",
     "head_tilt",
     "landing_camera",

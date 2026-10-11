@@ -1,0 +1,28 @@
+{
+  "children": [
+    {
+      "children": [],
+      "components": {
+        "name": "PlayerCamera",
+        "camera": {
+          "fov": 45,
+          "near": 0.3,
+          "far": 300,
+          "position": [0, 12, -14],
+          "target": [0, 0, 0]
+        }
+      }
+    }
+  ],
+  "components": {
+    "name": "TacticalCameraRig",
+    "tactical_camera_controller": {
+      "yaw": 0,
+      "distance": 16,
+      "minDistance": 6,
+      "maxDistance": 32,
+      "pitchNear": 40,
+      "pitchFar": 62
+    }
+  }
+}

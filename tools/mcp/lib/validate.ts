@@ -97,6 +97,7 @@ export function validateData(only?: string[]): { issues: Issue[]; filesChecked: 
       continue;
     }
     json.forEach((e, i) => validateEntity(e, `[${i}]`, ctx));
+    checkInstancedTechniques(json, ctx);
   }
 
   for (const file of prefabs.filter(include)) {
@@ -321,6 +322,7 @@ function validateComponent(key: string, data: unknown, p: string, ctx: Ctx): voi
       });
     return;
   }
+  if (key === 'render') checkRenderAssets(data, p, ctx);
   const schema = ctx.schemas.get(key);
   if (!schema) {
     const suggestion = closest(key, [...ctx.schemas.keys()]);
@@ -398,4 +400,97 @@ function levenshtein(a: string, b: string): number {
     }
   }
   return dp[b.length]!;
+}
+
+/** Un material que no existe, o cuya técnica no existe, falla al cargar (sin romper la escena). */
+function checkRenderAssets(data: unknown, p: string, ctx: Ctx): void {
+  if (!isObject(data) || !Array.isArray(data.meshes)) return;
+  data.meshes.forEach((m, i) => {
+    if (!isObject(m)) return;
+    const at = `${p}.meshes[${i}]`;
+    if (typeof m.mesh === 'string' && !fs.existsSync(path.join(ASSETS, 'meshes', m.mesh))) {
+      ctx.issues.push({
+        severity: 'error',
+        file: ctx.file,
+        path: `${at}.mesh`,
+        message: `Mesh not found: assets/meshes/${m.mesh}`,
+      });
+    }
+    if (typeof m.material !== 'string') return;
+    const matFile = path.join(ASSETS, 'materials', m.material);
+    if (!fs.existsSync(matFile)) {
+      ctx.issues.push({
+        severity: 'error',
+        file: ctx.file,
+        path: `${at}.material`,
+        message: `Material not found: assets/materials/${m.material}`,
+      });
+      return;
+    }
+    try {
+      const technique = JSON.parse(fs.readFileSync(matFile, 'utf-8')).technique;
+      if (
+        typeof technique === 'string' &&
+        !fs.existsSync(path.join(ASSETS, 'techniques', technique))
+      ) {
+        ctx.issues.push({
+          severity: 'error',
+          file: ctx.file,
+          path: `${at}.material`,
+          message: `Material '${m.material}' uses missing technique assets/techniques/${technique}`,
+        });
+      }
+    } catch {
+      ctx.issues.push({
+        severity: 'error',
+        file: ctx.file,
+        path: `${at}.material`,
+        message: `Material '${m.material}' is not valid JSON`,
+      });
+    }
+  });
+}
+
+/**
+ * InstanceManager agrupa entidades con el mismo mesh+material y usa la técnica
+ * `<tecnica>_instanced.tech`. Si esa variante no existe, el grupo falla al cargar.
+ */
+function checkInstancedTechniques(scene: unknown[], ctx: Ctx): void {
+  const counts = new Map<string, number>();
+  const walk = (node: unknown) => {
+    if (!isObject(node)) return;
+    const render = isObject(node.components) ? node.components.render : undefined;
+    if (isObject(render) && Array.isArray(render.meshes)) {
+      for (const m of render.meshes) {
+        if (isObject(m) && typeof m.mesh === 'string' && typeof m.material === 'string') {
+          const key = `${m.mesh}|${m.material}`;
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+      }
+    }
+    if (Array.isArray(node.children)) node.children.forEach(walk);
+  };
+  scene.forEach(walk);
+
+  for (const [key, n] of counts) {
+    if (n < 2) continue;
+    const material = key.split('|')[1]!;
+    const matFile = path.join(ASSETS, 'materials', material);
+    if (!fs.existsSync(matFile)) continue;
+    try {
+      const technique: unknown = JSON.parse(fs.readFileSync(matFile, 'utf-8')).technique;
+      if (typeof technique !== 'string') continue;
+      const instanced = technique.replace(/\.tech$/, '_instanced.tech');
+      if (!fs.existsSync(path.join(ASSETS, 'techniques', instanced))) {
+        ctx.issues.push({
+          severity: 'error',
+          file: ctx.file,
+          path: '',
+          message: `${n} entities share mesh+material '${key.replace('|', ' + ')}' (instanced), but assets/techniques/${instanced} does not exist`,
+        });
+      }
+    } catch {
+      // JSON inválido: ya lo reporta checkRenderAssets
+    }
+  }
 }

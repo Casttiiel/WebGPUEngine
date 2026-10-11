@@ -63,7 +63,14 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ---
 
-## Fase 1 — Escenario y cámara
+## Fase 1 — Escenario y cámara ✅
+
+> **Estado: implementada.** Test: `run_scenario phase1_camera`.
+> - **Escena:** `assets/scenes/tactical.json`, cargada desde `boot.json` en ~1 s. Los prefabs están en `prefabs/tactical/`.
+> - **Navmesh:** se genera a partir de los colliders estáticos con el componente `scene_navmesh`.
+> - **Cámara:** `TacticalCameraRig [tactical_camera_controller]` mueve su hija `PlayerCamera [camera]`, con el mismo patrón que `camera_arm` y `fps_camera_controller`. Seguir una unidad es una referencia que se activa y desactiva (F / Home / pan).
+> - **`unit`:** componente marcador de bando (party / enemigo / neutral), que será la base de la Fase 2.
+> - **Pendiente:** "doble click en retrato" llegará con la UI (Fase 4). Hasta que exista la party, Tab / Shift+Tab cambia la unidad activa.
 
 ### 1. Escenario simple
 - Escena de prueba: suelo plano, unas paredes, cajas/columnas como obstáculos, algún desnivel (rampa/plataforma) para más adelante.
@@ -96,11 +103,6 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 - Raycast desde el ratón contra suelo y entidades: hover con highlight/outline.
 - El cursor cambia según lo que hay debajo: mover / atacar / no válido.
 - **Hecho cuando:** pasar el ratón sobre un enemigo, un aliado o el suelo da feedback distinto.
-
-### 6. Movimiento en exploración (tiempo real) *(añadido)*
-- Click en el suelo → el seleccionado va por el navmesh. Los demás le siguen en formación (encadenados como en BG3).
-- Desencadenar/encadenar miembros del grupo (opcional, simple).
-- **Hecho cuando:** la party se mueve junta sin atascarse entre ellos.
 
 ---
 
@@ -198,6 +200,7 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 - **Saltar**: acción que salta obstáculos/huecos consumiendo movimiento.
 - **Animaciones básicas**: idle, andar, atacar, recibir golpe, morir (usar el sistema de animación existente).
 - **Feedback**: cámara que encuadra al atacante y objetivo, hit-stop, partículas de impacto (ya existen piezas).
+- **Muros que tapan la cámara**: hacer transparentes o recortar los muros entre la cámara y el pivot, como en BG3. Hoy se evita limitando el pivot (`bounds`) al interior del mapa.
 - **Encuentros definidos en datos**: un JSON por encuentro (enemigos, posiciones, trigger).
 - **Guardar/cargar** el estado de la party y el combate.
 

@@ -1,12 +1,21 @@
+/**
+ * Override individual Recast config values (e.g. cs/ch for large terrains, agent size
+ * for tactical scenes). walkable* values are in voxels (cs horizontally, ch vertically).
+ */
+export interface RecastOverrides {
+  cs?: number;
+  ch?: number;
+  walkableSlopeAngle?: number;
+  walkableHeight?: number;
+  walkableClimb?: number;
+  walkableRadius?: number;
+}
+
 /** Input sent from the main thread to the NavMesh worker. */
 export interface NavMeshWorkerInput {
   positions: Float32Array;
   indices: Uint32Array;
-  /** Override individual Recast config values (e.g. cs/ch for large terrains). */
-  recastOverrides?: {
-    cs?: number;
-    ch?: number;
-  };
+  recastOverrides?: RecastOverrides;
 }
 
 /** Successful result from the NavMesh worker. */

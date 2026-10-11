@@ -78,6 +78,9 @@ import { WeaponComponent } from '../../components/game/WeaponComponent';
 import { FogVolumeComponent } from '../../components/vfx/FogVolumeComponent';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { HealthComponent } from '../../components/game/HealthComponent';
+import { UnitComponent } from '../../components/game/tactical/UnitComponent';
+import { TacticalCameraControllerComponent } from '../../components/game/tactical/TacticalCameraControllerComponent';
+import { SceneNavMeshComponent } from '../../components/game/tactical/SceneNavMeshComponent';
 import { BloodZoneComponent } from '../../components/game/combat/BloodZoneComponent';
 import { BloodBallProjectileComponent } from '../../components/game/combat/BloodBallProjectileComponent';
 import { BloodExplosiveProjectileComponent } from '../../components/game/combat/BloodExplosiveProjectileComponent';
@@ -179,7 +182,9 @@ export class Loader {
     let entityChildrens = json.children ?? [];
 
     if (json.prefab) {
-      const prefabJson = await ResourceManager.loadPrefab(json.prefab);
+      // Copia: el prefab está cacheado y aquí se modifica (delete de name/transform, hijos
+      // que se parsean in-place). Sin copiar, la 2ª instancia heredaba un prefab ya mutilado.
+      const prefabJson = structuredClone(await ResourceManager.loadPrefab(json.prefab));
       if (prefabJson.children) {
         entityChildrens = entityChildrens.concat(prefabJson.children);
       }
@@ -198,13 +203,22 @@ export class Loader {
         }
       }
 
-      const mergedComponents = {
+      // El orden de claves importa (los componentes se añaden en ese orden y algunos, como los
+      // colliders, leen el transform al cargar): primero las de la escena, luego las del prefab.
+      const mergedComponents: Record<string, unknown> = {
         ...json.components,
         ...prefabJson.components,
       };
+      // Lo definido en la escena sobreescribe al prefab, campo a campo dentro de cada componente.
+      const prefabComponents = prefabJson.components as Record<string, unknown>;
+      for (const [key, value] of Object.entries(json.components ?? {})) {
+        const base = prefabComponents[key];
+        mergedComponents[key] =
+          isPlainObject(base) && isPlainObject(value) ? { ...base, ...value } : value;
+      }
       json.gltf = prefabJson.gltf;
 
-      json.components = mergedComponents;
+      json.components = mergedComponents as EntityDataType['components'];
     }
 
     if (json.gltf) {
@@ -486,6 +500,12 @@ export class Loader {
         return new PlayerSpawnComponent();
       case 'health':
         return new HealthComponent();
+      case 'unit':
+        return new UnitComponent();
+      case 'tactical_camera_controller':
+        return new TacticalCameraControllerComponent();
+      case 'scene_navmesh':
+        return new SceneNavMeshComponent();
       case 'blood_zone':
         return new BloodZoneComponent();
       case 'stamina':
@@ -537,4 +557,8 @@ export class Loader {
       operation === 'add' ? val5 + val6 : val5 * val6,
     );
   }
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }

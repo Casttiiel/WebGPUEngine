@@ -8,6 +8,7 @@ import { KeyCode } from '../../types/KeyCode.enum';
 import { CameraComponent } from '../../components/render/CameraComponent';
 import { FPSCameraControllerComponent } from '../../components/game/FPSCameraControllerComponent';
 import { CameraArmComponent } from '../../components/game/CameraArmComponent';
+import { TacticalCameraControllerComponent } from '../../components/game/tactical/TacticalCameraControllerComponent';
 import { BasePlayerController } from '../../components/game/BasePlayerController';
 import { PlayerSpawnComponent } from '../../components/game/PlayerSpawnComponent';
 import { CapsuleColliderComponent } from '../../components/physics/CapsuleColliderComponent';
@@ -18,13 +19,18 @@ import GUI from 'lil-gui';
 import { Time } from '../../core/engine/Time';
 import { DebugRenderState } from '../../core/debug/DebugRenderState';
 
-/** Component that controls the player camera — either FPS or TPS arm. */
-type PlayerCameraController = FPSCameraControllerComponent | CameraArmComponent;
+/** Component that controls the player camera — FPS, TPS arm or tactical rig. */
+type PlayerCameraController =
+  | FPSCameraControllerComponent
+  | CameraArmComponent
+  | TacticalCameraControllerComponent;
 
 export class ModuleBoot extends Module {
-  private playerCameraControllerComponent!: PlayerCameraController;
-  private debugCameraComponent!: CameraComponent;
-  private playerCharacterControllerComponent!: BasePlayerController;
+  // Opcionales: una escena táctica no tiene Player (su cámara la mueve un rig táctico).
+  private playerCameraControllerComponent: PlayerCameraController | null = null;
+  private debugCameraComponent: CameraComponent | null = null;
+  private playerCharacterControllerComponent: BasePlayerController | null = null;
+  private sceneRefsResolved = false;
   private lastGamestate: string = '';
 
   constructor(name: string) {
@@ -33,7 +39,7 @@ export class ModuleBoot extends Module {
 
   public async start(): Promise<boolean> {
     LoadingStatus.updateStatus('Loading scene files...');
-    let tStep = performance.now();
+    const tStart = performance.now();
     const response = await ResourceManager.fetch(`data/boot.json`);
     const jsonData = await response.json();
     const finalScene = [];
@@ -67,15 +73,12 @@ export class ModuleBoot extends Module {
     }
 
     LoadingStatus.updateStatus('Parsing scene data...');
-    tStep = performance.now();
     const parsedJson = await Loader.parseSceneJSON(finalScene);
 
     LoadingStatus.updateStatus('Processing instances...');
-    tStep = performance.now();
     const flaggedJson = InstanceManager.flagInstanceableEntities(parsedJson);
 
     LoadingStatus.updateStatus('Loading entities...');
-    tStep = performance.now();
     await Loader.loadSceneFromJSON(flaggedJson);
 
     // Teleport player to spawn point if a player_spawn marker was found in the scene's GLTF
@@ -107,10 +110,13 @@ export class ModuleBoot extends Module {
     }
 
     LoadingStatus.updateStatus('Creating instance groups...');
-    tStep = performance.now();
     const allEntities = Engine.getEntities().getAllEntities();
     await InstanceManager.createInstanceGroups(allEntities);
 
+    Logger.info(
+      'ENGINE',
+      `Scene loaded (${scenesToLoad.join(', ')}): ${allEntities.length} entities in ${(performance.now() - tStart).toFixed(0)}ms`,
+    );
     return true;
   }
 
@@ -119,33 +125,37 @@ export class ModuleBoot extends Module {
     Logger.info('ENGINE', 'Stopped');
   }
 
-  public update(dt: number): void {
-    if (!this.playerCameraControllerComponent) {
-      const player = Engine.getEntities().getEntityByName('Player')!;
-      if (player.hasComponent('fps_camera_controller')) {
-        this.playerCameraControllerComponent = player.getComponent(
-          'fps_camera_controller',
-        ) as FPSCameraControllerComponent;
-      } else if (player.hasComponent('camera_arm')) {
-        this.playerCameraControllerComponent = player.getComponent(
-          'camera_arm',
-        ) as CameraArmComponent;
-      }
+  /** Busca una vez los controllers de cámara/personaje de la escena (todos opcionales). */
+  private resolveSceneRefs(): void {
+    this.sceneRefsResolved = true;
+    const entities = Engine.getEntities();
+
+    const player = entities.getEntityByName('Player');
+    if (player?.hasComponent('fps_camera_controller')) {
+      this.playerCameraControllerComponent = player.getComponent(
+        'fps_camera_controller',
+      ) as FPSCameraControllerComponent;
+    } else if (player?.hasComponent('camera_arm')) {
+      this.playerCameraControllerComponent = player.getComponent('camera_arm') as CameraArmComponent;
+    } else {
+      const tactical = entities.getObjectManagerByName('tactical_camera_controller')?.getList()[0];
+      if (tactical) this.playerCameraControllerComponent = tactical as TacticalCameraControllerComponent;
     }
-    if (!this.playerCharacterControllerComponent) {
-      const player = Engine.getEntities().getEntityByName('Player')!;
-      if (player.hasComponent('player_controller')) {
-        this.playerCharacterControllerComponent = player.getComponent(
-          'player_controller',
-        ) as BasePlayerController;
-      }
+
+    if (player?.hasComponent('player_controller')) {
+      this.playerCharacterControllerComponent = player.getComponent(
+        'player_controller',
+      ) as BasePlayerController;
     }
-    if (!this.debugCameraComponent) {
-      const camera = Engine.getEntities().getEntityByName('DebugCamera')!;
-      if (camera.hasComponent('camera')) {
-        this.debugCameraComponent = camera.getComponent('camera') as CameraComponent;
-      }
+
+    const debugCamera = entities.getEntityByName('DebugCamera');
+    if (debugCamera?.hasComponent('camera')) {
+      this.debugCameraComponent = debugCamera.getComponent('camera') as CameraComponent;
     }
+  }
+
+  public update(_dt: number): void {
+    if (!this.sceneRefsResolved) this.resolveSceneRefs();
 
     // F2: toggle between debug/game mode
     if (Engine.getInput().isKeyJustPressed(KeyCode.F2)) {
@@ -181,14 +191,13 @@ export class ModuleBoot extends Module {
 
       if (currentGamestate === 'gs_editor') {
         // Modo editor: activar DebugCamera, desactivar PlayerController, mostrar ImGui
-        this.debugCameraComponent.setActive(true);
-        this.playerCameraControllerComponent.setActive(false);
-        this.playerCharacterControllerComponent.setActive(false);
-        Engine.getCameraMixer().blendCamera(
-          Engine.getEntities().getEntityByName('DebugCamera')!,
-          1.0,
-          new LinearInterpolator(),
-        );
+        this.debugCameraComponent?.setActive(true);
+        this.playerCameraControllerComponent?.setActive(false);
+        this.playerCharacterControllerComponent?.setActive(false);
+        const debugCamera = Engine.getEntities().getEntityByName('DebugCamera');
+        if (debugCamera) {
+          Engine.getCameraMixer().blendCamera(debugCamera, 1.0, new LinearInterpolator());
+        }
 
         // Mostrar GUI UI
         GUIManager.getInstance().show();
@@ -199,9 +208,9 @@ export class ModuleBoot extends Module {
         Logger.info('ENGINE', '📷 Debug camera');
       } else if (currentGamestate === 'gs_gameplay') {
         // Modo gameplay: activar PlayerCamera, activar PlayerController, ocultar ImGui
-        this.debugCameraComponent.setActive(false);
-        this.playerCameraControllerComponent.setActive(true);
-        this.playerCharacterControllerComponent.setActive(true);
+        this.debugCameraComponent?.setActive(false);
+        this.playerCameraControllerComponent?.setActive(true);
+        this.playerCharacterControllerComponent?.setActive(true);
         Engine.getCameraMixer().blendCamera(
           Engine.getEntities().getEntityByName('PlayerCamera')!,
           1.0,

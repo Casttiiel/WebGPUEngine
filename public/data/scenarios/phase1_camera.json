@@ -1,0 +1,231 @@
+{
+  "description": "Fase 1: escena táctica + controles de cámara (follow, pan, zoom, rotación, Home/Tab/F, límites, suelo).",
+  "seed": 1,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    {
+      "assert": {
+        "expr": "__engine.queryPath('Hero1', [11, 1.5, -11]).reachable",
+        "value": true,
+        "message": "la plataforma es accesible por la rampa"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.queryPath('Hero1', [2, 1.2, 3]).reachable",
+        "value": false,
+        "message": "encima de una caja no se puede llegar"
+      }
+    },
+
+    { "log": "Arranca siguiendo a la primera unidad de la party" },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.isFollowing",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot",
+        "op": "approx",
+        "value": [-4, 0, -6],
+        "tolerance": 0.05
+      }
+    },
+    { "screenshot": "01-start" },
+
+    { "log": "Zoom out con la rueda: más distancia y más cenital" },
+    {
+      "input": [
+        { "type": "move", "x": 640, "y": 360 },
+        { "type": "wheel", "deltaY": 600 }
+      ]
+    },
+    { "wait_frames": 60 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.getDistance",
+        "op": ">",
+        "value": 25
+      }
+    },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.getPitch",
+        "op": ">",
+        "value": 55
+      }
+    },
+    { "screenshot": "02-zoom-out" },
+
+    { "log": "Pan con W: se mueve hacia delante y deja de seguir" },
+    { "input": { "type": "key", "key": "KeyW", "action": "down" } },
+    { "wait_frames": 30 },
+    { "input": { "type": "key", "key": "KeyW", "action": "up" } },
+    { "wait_frames": 30 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.isFollowing",
+        "value": false
+      }
+    },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot.2",
+        "op": ">",
+        "value": 2
+      }
+    },
+
+    { "log": "Rotación con Q" },
+    { "input": { "type": "key", "key": "KeyQ", "action": "down" } },
+    { "wait_frames": 30 },
+    { "input": { "type": "key", "key": "KeyQ", "action": "up" } },
+    { "wait_frames": 40 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.getYaw",
+        "op": "approx",
+        "value": 55,
+        "tolerance": 3
+      }
+    },
+    { "screenshot": "03-rotated" },
+
+    { "log": "Home: vuelve a centrar y seguir a la unidad activa" },
+    { "input": { "type": "key", "key": "Home" } },
+    { "wait_frames": 90 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.isFollowing",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot",
+        "op": "approx",
+        "value": [-4, 0, -6],
+        "tolerance": 0.1
+      }
+    },
+
+    { "log": "Tab: siguiente unidad (transición suave)" },
+    { "input": { "type": "key", "key": "Tab" } },
+    { "wait_frames": 5 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot.0",
+        "op": ">",
+        "value": -3.99,
+        "message": "ya se está moviendo"
+      }
+    },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot.0",
+        "op": "<",
+        "value": -2.6,
+        "message": "pero aún no ha llegado: es una transición, no un salto"
+      }
+    },
+    { "wait_frames": 90 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot",
+        "op": "approx",
+        "value": [-2.5, 0, -7.2],
+        "tolerance": 0.1
+      }
+    },
+
+    { "log": "F: desactivar seguimiento" },
+    { "input": { "type": "key", "key": "KeyF" } },
+    { "wait_frames": 2 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.isFollowing",
+        "value": false
+      }
+    },
+
+    { "log": "Arrastre con botón central: pan" },
+    {
+      "input": [
+        { "type": "move", "x": 640, "y": 360 },
+        { "type": "down", "button": "middle" }
+      ]
+    },
+    { "wait_frames": 1 },
+    { "input": { "type": "move", "x": 840, "y": 360, "steps": 5 } },
+    { "wait_frames": 1 },
+    { "input": { "type": "up", "button": "middle" } },
+    { "wait_frames": 30 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot.0",
+        "op": ">",
+        "value": 0,
+        "message": "arrastrar a la derecha mueve el suelo con el cursor"
+      }
+    },
+
+    { "log": "Edge pan hacia la izquierda hasta el límite del mapa" },
+    { "input": { "type": "move", "x": 2, "y": 360 } },
+    { "wait_frames": 400 },
+    { "input": { "type": "move", "x": 640, "y": 360 } },
+    { "wait_frames": 60 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot.0",
+        "op": "approx",
+        "value": 15.5,
+        "tolerance": 0.2,
+        "message": "clamp en bounds.max.x"
+      }
+    },
+
+    {
+      "log": "Zoom in al máximo junto a la plataforma: el ojo nunca queda bajo el suelo/obstáculo"
+    },
+    { "input": [{ "type": "wheel", "deltaY": -3000 }] },
+    { "wait_frames": 90 },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.getDistance",
+        "op": "approx",
+        "value": 6,
+        "tolerance": 0.1
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const p = Engine.getRender().getMainCamera().getPosition(); return p[1] > 0.7; })()",
+        "value": true
+      }
+    },
+    { "screenshot": "04-edge-zoom-in" },
+
+    { "assert": { "no_errors": true } }
+  ]
+}

@@ -1,5 +1,6 @@
 import { mat4 } from 'gl-matrix';
 import { NavMesh } from './NavMesh';
+import type { RecastOverrides } from './NavMeshWorker.types';
 
 /**
  * NavMeshBuilder — thin wrapper that extracts raw GLTF geometry
@@ -17,7 +18,7 @@ export class NavMeshBuilder {
     positions: Float32Array,
     indices: Uint32Array | Uint16Array,
     worldMatrix?: mat4,
-    recastOverrides?: { cs?: number; ch?: number },
+    recastOverrides?: RecastOverrides,
   ): Promise<void> {
     await NavMesh.getInstance().build(positions, indices, worldMatrix, recastOverrides);
   }

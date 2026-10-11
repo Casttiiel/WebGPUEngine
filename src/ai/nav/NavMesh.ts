@@ -1,7 +1,11 @@
 import { vec3, mat4 } from 'gl-matrix';
 import { init, NavMesh as RecastNavMesh, NavMeshQuery, importNavMesh } from 'recast-navigation';
 import NavMeshWorkerClass from './NavMeshWorker?worker';
-import type { NavMeshWorkerInput, NavMeshWorkerOutput } from './NavMeshWorker.types';
+import type {
+  NavMeshWorkerInput,
+  NavMeshWorkerOutput,
+  RecastOverrides,
+} from './NavMeshWorker.types';
 
 /** Cached init promise — resolves immediately if already initialised. */
 let _initPromise: Promise<void> | null = null;
@@ -74,7 +78,7 @@ export class NavMesh {
     positions: Float32Array,
     indices: Uint32Array | Uint16Array,
     worldMatrix?: mat4,
-    recastOverrides?: { cs?: number; ch?: number },
+    recastOverrides?: RecastOverrides,
   ): Promise<void> {
     const t0 = performance.now();
     // Ensure the WASM module is ready on the main thread — needed for importNavMesh().
@@ -150,7 +154,7 @@ export class NavMesh {
   private buildInWorker(
     positions: Float32Array,
     indices: Uint32Array,
-    recastOverrides?: { cs?: number; ch?: number },
+    recastOverrides?: RecastOverrides,
   ): Promise<Extract<NavMeshWorkerOutput, { error?: undefined }>> {
     return new Promise((resolve, reject) => {
       const worker = new NavMeshWorkerClass();
