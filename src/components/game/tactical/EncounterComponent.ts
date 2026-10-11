@@ -5,7 +5,7 @@ import { Engine } from '../../../core/engine/Engine';
 import { KeyCode } from '../../../types/KeyCode.enum';
 import { DevBridge } from '../../../core/debug/DevBridge';
 import { ModuleGameController } from '../../../modules/game/ModuleGameController';
-import { UnitComponent, type UnitAttack } from './UnitComponent';
+import { UnitComponent, type UnitAttack, type UnitStatusId } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import { UnitObstacles } from './UnitObstacles';
@@ -66,6 +66,8 @@ export interface EncounterEventData {
   hit?: boolean;
   /** Origen del daño (texto flotante). */
   cause?: DamageCause;
+  /** Estado aplicado o expirado (eventos status / status-end). */
+  status?: UnitStatusId;
 }
 
 export type DamageCause = 'attack' | 'skill' | 'fire' | 'explosion' | 'debug';
@@ -494,6 +496,7 @@ export class EncounterComponent extends Component {
       return fail('cannot attack an ally');
     }
     if (!target.isAlive()) return fail('target is down');
+    if (unit.hasStatus('fear')) return fail('frightened');
 
     result.distance = unitDistance(unit, target);
     result.inRange = result.distance <= attack.range + EPS;
@@ -726,6 +729,7 @@ export class EncounterComponent extends Component {
 
     if (!result.inRange) return fail('target out of range');
     if (!result.lineOfSight) return fail('no line of sight');
+    if (unit.hasStatus('fear') && isHostile(skill)) return fail('frightened');
     const permission = this.canAct(unit, skill.cost);
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
@@ -813,6 +817,18 @@ export class EncounterComponent extends Component {
         case 'surface':
           this.surfaces.add(effect.surface, origin, effect.radius);
           break;
+        case 'status':
+          for (const u of affected()) {
+            if (!u.isAlive()) continue;
+            u.addStatus(effect.status, effect.turns, caster.getOwner());
+            u.stop();
+            this.emit('status', {
+              unit: u.getOwner(),
+              source: caster.getOwner(),
+              status: effect.status,
+            });
+          }
+          break;
         case 'teleport':
           break; // se resuelve al lanzar
       }
@@ -887,6 +903,9 @@ export class EncounterComponent extends Component {
     if (this.state !== 'combat') return false;
     const active = this.combatants[this.turnIndex];
     if (active?.unit.isBusy() || this.pendingAttack || this.pendingHits.length) return false;
+    for (const status of active?.unit.tickStatuses() ?? []) {
+      this.emit('status-end', { unit: active!.unit.getOwner(), status });
+    }
     this.nextIndex();
     this.beginTurn();
     return true;
@@ -906,7 +925,10 @@ export class EncounterComponent extends Component {
     this.pendingAttack = null;
     this.round = 0;
     this.turnIndex = 0;
-    for (const u of UnitComponent.getAll()) u.clearCooldowns();
+    for (const u of UnitComponent.getAll()) {
+      u.clearCooldowns();
+      u.clearStatuses();
+    }
     if (result === 'victory') {
       // Como en BG3: los caídos se levantan al terminar el combate.
       for (const m of PartyComponent.find()?.getMembers() ?? []) {
@@ -1382,6 +1404,11 @@ export class EncounterComponent extends Component {
           hp: u.getHp(),
           maxHp: u.getMaxHp(),
           alive: u.isAlive(),
+          statuses: u.getStatuses().map((st) => ({
+            id: st.id,
+            turns: st.turns,
+            source: st.source?.getName() ?? null,
+          })),
           cooldowns: Object.fromEntries(
             u
               .getSkillIds()

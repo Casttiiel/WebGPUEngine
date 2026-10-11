@@ -2,6 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { UnitComponent } from './UnitComponent';
 import type { SurfaceType } from './Surfaces';
+import type { UnitStatusId } from './UnitComponent';
 
 /**
  * Habilidades: modelo de datos genérico (public/data/skills.json) y geometría de sus áreas.
@@ -25,7 +26,9 @@ export type SkillEffect =
   /** El lanzador va en línea recta, muy rápido, hasta el punto (no gasta movimiento). */
   | { type: 'teleport' }
   /** Deja una superficie en el punto (fuego…). */
-  | { type: 'surface'; surface: SurfaceType; radius: number };
+  | { type: 'surface'; surface: SurfaceType; radius: number }
+  /** Aplica un estado alterado a los afectados durante `turns` turnos suyos. */
+  | { type: 'status'; status: UnitStatusId; turns: number };
 
 export interface SkillDef {
   id: string;
@@ -104,7 +107,7 @@ export const hasEffect = (skill: SkillDef, type: SkillEffect['type']): boolean =
 
 /** ¿Es hostil? (daña o empuja: el cursor es de ataque y empieza combates). */
 export const isHostile = (skill: SkillDef): boolean =>
-  hasEffect(skill, 'damage') || hasEffect(skill, 'push');
+  hasEffect(skill, 'damage') || hasEffect(skill, 'push') || hasEffect(skill, 'status');
 
 /** ¿`unit` cuenta para el filtro del área (relativo al bando del lanzador)? */
 function passesAffects(skill: SkillDef, caster: UnitComponent, unit: UnitComponent): boolean {

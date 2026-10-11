@@ -1537,6 +1537,71 @@
     ]
   },
   {
+    "name": "hotbar_7",
+    "alias": "hotbar_7",
+    "type": "image",
+    "x": 0,
+    "y": -130,
+    "width": 150,
+    "height": 104,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [150, 104],
+      "color": [0.08, 0.08, 0.1, 0.9]
+    },
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_7_icon",
+        "alias": "hotbar_7_icon",
+        "type": "image",
+        "x": 6,
+        "y": 6,
+        "width": 138,
+        "height": 92,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [138, 92],
+          "color": [0.5, 0.15, 0.1, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_7_key",
+        "alias": "hotbar_7_key",
+        "type": "text",
+        "x": 10,
+        "y": 6,
+        "width": 30,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_7_name",
+        "alias": "hotbar_7_name",
+        "type": "text",
+        "x": 2,
+        "y": 62,
+        "width": 146,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [24, 24],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
     "name": "hotbar_tooltip",
     "alias": "hotbar_tooltip",
     "type": "text",
@@ -1603,6 +1668,134 @@
         "blocksInput": false
       }
     ]
+  },
+  {
+    "name": "status_1",
+    "alias": "status_1",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_2",
+    "alias": "status_2",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_3",
+    "alias": "status_3",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_4",
+    "alias": "status_4",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_5",
+    "alias": "status_5",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_6",
+    "alias": "status_6",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_7",
+    "alias": "status_7",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_8",
+    "alias": "status_8",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [64, 64],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
   },
   {
     "name": "float_1",

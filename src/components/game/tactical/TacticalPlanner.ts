@@ -41,6 +41,8 @@ const RETREAT_BASE = 8;
 const RETREAT_DISTANCE = 1.2; // por metro de separación del enemigo más cercano
 const RETREAT_HIDDEN = 5; // ningún enemigo le ve
 const ADVANCE_BASE = -20;
+const FLEE_DISTANCE = 1.5; // por metro de separación de quien le asustó
+const FLEE_HIDDEN = 4; // y si no le ve
 const MELEE_REACH = 2; // de borde a borde: "le pueden pegar" si está más cerca
 
 const RING_STEP = 1.5;
@@ -84,6 +86,10 @@ export function planTurn(
     reason: 'nothing to do',
   };
   if (foes.length === 0) return wait;
+
+  // Asustado: no puede atacar; huye de quien le asustó.
+  const fear = me.getStatus('fear');
+  if (fear) return planFlee(encounter, me, fear.source, foes, wait);
 
   const low =
     profile.retreatHp > 0 && me.getMaxHp() > 0 && me.getHp() / me.getMaxHp() < profile.retreatHp;
@@ -193,6 +199,46 @@ export function planTurn(
   }
 
   return candidates.reduce((a, b) => (b.score > a.score ? b : a));
+}
+
+/**
+ * Huida (miedo): el punto alcanzable más lejos de quien lo asustó, mejor si no le ve.
+ * Sin movimiento o sin sitio, se queda quieto (no puede atacar).
+ */
+function planFlee(
+  encounter: EncounterComponent,
+  me: UnitComponent,
+  sourceEntity: Entity | null,
+  foes: UnitComponent[],
+  wait: TurnPlan,
+): TurnPlan {
+  const source =
+    (sourceEntity?.getComponent('unit') as UnitComponent | null) ??
+    foes.reduce((a, b) =>
+      unitDistanceFrom(me, me.getFeetPosition(vec3.create()), a) <=
+      unitDistanceFrom(me, me.getFeetPosition(vec3.create()), b)
+        ? a
+        : b,
+    );
+  const here = me.getFeetPosition(vec3.create());
+  const budget = encounter.getResources().movement;
+  let best: TurnPlan = { ...wait, reason: 'asustado: no tiene a dónde huir' };
+  if (budget <= 0.5) return best;
+  for (const sample of sampleReachable(encounter, me.getOwner(), here, budget)) {
+    const distance = unitDistanceFrom(me, sample.feet, source);
+    const hidden = !unitLineOfSightFrom(me, sample.feet, source);
+    const score = distance * FLEE_DISTANCE + (hidden ? FLEE_HIDDEN : 0) - sample.length * MOVE_COST;
+    if (score > best.score) {
+      best = {
+        kind: 'retreat',
+        move: sample.feet,
+        attack: null,
+        score,
+        reason: `huye de ${source.getDisplayName()} (miedo)`,
+      };
+    }
+  }
+  return best;
 }
 
 /** Puntos a los que puede llegar andando este turno (anillos alrededor de la unidad). */

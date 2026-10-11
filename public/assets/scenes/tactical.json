@@ -518,7 +518,7 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero1",
-      "unit": { "skills": ["shove", "second_wind"] },
+      "unit": { "skills": ["shove", "second_wind", "fear"] },
       "transform": {
         "position": [-4, 0, -6]
       }

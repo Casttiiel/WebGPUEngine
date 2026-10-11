@@ -44,6 +44,16 @@
     "target": "self",
     "effects": [{ "type": "heal", "amount": 8 }]
   },
+  "fear": {
+    "name": "Miedo",
+    "cost": "action",
+    "cooldown": 1,
+    "target": "unit",
+    "range": 9,
+    "targets": "enemy",
+    "effects": [{ "type": "status", "status": "fear", "turns": 1 }],
+    "clip": "Spell_Simple_Shoot"
+  },
   "shove": {
     "name": "Empellón",
     "cost": "bonusAction",

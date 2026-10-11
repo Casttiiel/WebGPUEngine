@@ -86,6 +86,8 @@ function skillEffects(skill: SkillDef): string {
         return 'se lanza en línea recta';
       case 'surface':
         return e.surface === 'fire' ? 'deja fuego' : 'deja aceite';
+      case 'status':
+        return `asusta ${e.turns} turno${e.turns > 1 ? 's' : ''}: huye y no puede atacar`;
     }
   });
   const area =

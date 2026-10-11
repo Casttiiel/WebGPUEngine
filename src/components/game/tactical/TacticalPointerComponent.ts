@@ -96,6 +96,7 @@ const REASON_TEXT: Record<string, string> = {
   'target is down': 'caído',
   'path blocked': 'camino bloqueado',
   'no target': 'elige un objetivo',
+  frightened: 'asustado',
 };
 
 const reasonText = (reason: string | undefined): string =>
@@ -108,6 +109,8 @@ const HOTBAR_KEYS = [
   KeyCode.NUM_4,
   KeyCode.NUM_5,
   KeyCode.NUM_6,
+  KeyCode.NUM_7,
+  KeyCode.NUM_8,
 ];
 
 /**
@@ -121,7 +124,7 @@ const HOTBAR_KEYS = [
  *    → atacar con el ataque armado (si es cuerpo a cuerpo y no llega, se acerca y ataca);
  *    en un objeto (barril, caja) → empujarlo (acción adicional) o, con un ataque armado,
  *    atacarlo (un barril explosivo explota).
- * Acción armada (hotbar, teclas 1-6 en combate): otro ataque, Saltar (click en el suelo:
+ * Acción armada (hotbar, teclas 1-8 en combate): otro ataque, Saltar (click en el suelo:
  * salta allí, gasta movimiento), Empujar o una habilidad. Con una habilidad armada se ve su
  * área y se resaltan los afectados antes de confirmar con click; las de "self" se lanzan al
  * pulsarlas. Esc o click derecho vuelven a lo de por defecto.
@@ -588,6 +591,8 @@ export class TacticalPointerComponent extends Component {
   private unitTooltip(unit: UnitComponent): string {
     const parts = [unit.getDisplayName()];
     if (unit.getMaxHp() > 0) parts.push(`${Math.ceil(unit.getHp())}/${unit.getMaxHp()} PV`);
+    const fear = unit.getStatus('fear');
+    if (fear) parts.push(`asustado (${fear.turns} turno${fear.turns > 1 ? 's' : ''})`);
     const plan = this.attackPlan;
     if (this.hoverKind === 'enemy' && plan?.attack) {
       if (plan.canAttack || plan.allowed) {

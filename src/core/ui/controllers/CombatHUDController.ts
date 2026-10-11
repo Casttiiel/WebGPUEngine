@@ -13,7 +13,10 @@ import {
   type EncounterEventData,
   type EncounterState,
 } from '../../../components/game/tactical/EncounterComponent';
-import type { UnitComponent } from '../../../components/game/tactical/UnitComponent';
+import {
+  UnitComponent as UnitComponentRef,
+  type UnitComponent,
+} from '../../../components/game/tactical/UnitComponent';
 import {
   hotbarEntries,
   hotbarTooltip,
@@ -43,7 +46,7 @@ const FACE_DOWN: RGBA = [0.22, 0.22, 0.22, 1];
 const HP_PARTY: RGBA = [0.25, 0.8, 0.3, 1];
 const HP_ENEMY: RGBA = [0.9, 0.25, 0.2, 1];
 
-const HOTBAR_SLOTS = 6;
+const HOTBAR_SLOTS = 7;
 const HOTBAR_WIDTH = 150;
 const HOTBAR_GAP = 10;
 const ICON: Record<HotbarKind, RGBA> = {
@@ -77,6 +80,12 @@ const FLOAT_MISS: RGBA = [0.85, 0.85, 0.85, 1];
 const FLOAT_HEAL: RGBA = [0.4, 1, 0.45, 1];
 const FLOAT_DOWN: RGBA = [0.7, 0.7, 0.75, 1];
 const FLOAT_FIRE: RGBA = [1, 0.6, 0.15, 1];
+const FLOAT_FEAR: RGBA = [0.8, 0.6, 1, 1];
+
+const STATUS_ICONS = 8;
+const STATUS_SIZE = 64;
+/** Altura del icono de estado sobre el centro de la unidad (m): encima de la cabeza. */
+const STATUS_HEIGHT = 1.2;
 
 interface InitiativeSlot {
   frame: ImageWidget;
@@ -134,6 +143,8 @@ export class CombatHUDController extends WidgetController {
   private hotbar: HotbarSlot[] = [];
   private floats: FloatingText[] = [];
   private freeFloats: TextWidget[] = [];
+  /** Iconos de estado (miedo) sobre la cabeza de las unidades afectadas. */
+  private statusIcons: ImageWidget[] = [];
   private resolved = false;
 
   private subscribed: EncounterComponent | null = null;
@@ -169,6 +180,7 @@ export class CombatHUDController extends WidgetController {
     if (this.turnBannerTimer <= 0) this.turnBanner?.setVisible(false);
     this.updateRestartHint(encounter);
     this.updateFloats(dt);
+    this.updateStatusIcons();
 
     const inCombat = state === 'combat';
     const playerTurn = inCombat && encounter.isPlayerTurn();
@@ -214,6 +226,9 @@ export class CombatHUDController extends WidgetController {
         else this.spawnFloat(unit, amount, FLOAT_DAMAGE);
         break;
       }
+      case 'status':
+        if (data.status === 'fear') this.spawnFloat(unit, '¡Miedo!', FLOAT_FEAR, 1.5);
+        break;
       case 'explosion':
         this.spawnFloat(unit, '¡BUM!', FLOAT_FIRE);
         break;
@@ -380,7 +395,8 @@ export class CombatHUDController extends WidgetController {
 
   // ── Texto flotante ───────────────────────────────────────────────────────
 
-  private spawnFloat(unit: Entity | null, text: string, color: RGBA): void {
+  /** `lift`: escalones extra hacia arriba (p.ej. para no tapar el icono de estado). */
+  private spawnFloat(unit: Entity | null, text: string, color: RGBA, lift = 0): void {
     if (!unit) return;
     let widget = this.freeFloats.pop();
     if (!widget) {
@@ -389,7 +405,7 @@ export class CombatHUDController extends WidgetController {
       if (!oldest) return;
       widget = oldest.widget;
     }
-    const stack = this.floats.filter((f) => f.unit === unit && f.age < 0.4).length;
+    const stack = this.floats.filter((f) => f.unit === unit && f.age < 0.4).length + lift;
     widget.setText(text);
     widget.setColor(...color);
     this.floats.push({ widget, unit, age: 0, color, stack });
@@ -428,6 +444,25 @@ export class CombatHUDController extends WidgetController {
     f.widget.setVisible(true);
   }
 
+  /** Un icono sobre la cabeza de cada unidad viva con miedo, mientras dure. */
+  private updateStatusIcons(): void {
+    const feared = this.subscribed
+      ? UnitComponentRef.getAll().filter((u) => u.isAlive() && u.hasStatus('fear'))
+      : [];
+    this.statusIcons.forEach((icon, i) => {
+      const unit = feared[i];
+      if (!unit) {
+        icon.setVisible(false);
+        return;
+      }
+      const p = unit.getPosition(this.tmpPos);
+      p[1] = p[1]! + STATUS_HEIGHT;
+      const screen = this.worldToUI(p);
+      icon.setVisible(screen !== null);
+      if (screen) icon.setPosition(screen[0] - STATUS_SIZE / 2, screen[1] - STATUS_SIZE / 2);
+    });
+  }
+
   private clearFloats(): void {
     for (const f of this.floats) {
       f.widget.setVisible(false);
@@ -464,6 +499,7 @@ export class CombatHUDController extends WidgetController {
       this.endTurn,
       ...this.initiative.map((s) => s.frame),
       ...this.hotbar.map((s) => s.frame),
+      ...this.statusIcons,
     ];
     for (const w of all) w?.setVisible(false);
     this.clearFloats();
@@ -537,6 +573,10 @@ export class CombatHUDController extends WidgetController {
     for (let i = 1; i <= 8; i++) {
       const w = get<TextWidget>(`float_${i}`);
       if (w) this.freeFloats.push(w);
+    }
+    for (let i = 1; i <= STATUS_ICONS; i++) {
+      const w = get<ImageWidget>(`status_${i}`);
+      if (w) this.statusIcons.push(w);
     }
   }
 }

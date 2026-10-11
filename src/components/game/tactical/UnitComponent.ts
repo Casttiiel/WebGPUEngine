@@ -60,6 +60,17 @@ export type UnitComponentDataType = Readonly<{
   skills?: string[];
 }>;
 
+/** Estado alterado (miedo…). Dura `turns` turnos de la unidad afectada. */
+export type UnitStatusId = 'fear';
+
+export interface UnitStatus {
+  id: UnitStatusId;
+  /** Turnos de la unidad que le quedan (se descuenta al acabar cada uno de sus turnos). */
+  turns: number;
+  /** Quién lo causó (p.ej. de quién huye una unidad asustada). */
+  source: Entity | null;
+}
+
 /** Acciones que no son ataques: saltar (gasta movimiento) y empujar un objeto (acción adicional). */
 export type UnitAbility = 'jump' | 'push';
 
@@ -95,6 +106,7 @@ export class UnitComponent extends Component {
   private skills: string[] = [];
   /** Turnos que le quedan a cada habilidad para volver a estar disponible. */
   private cooldowns = new Map<string, number>();
+  private statuses = new Map<UnitStatusId, UnitStatus>();
   private pathSpeed = 4;
   private pathTurns = true;
   /** Segundos que le quedan a la acción en curso (animación de ataque). */
@@ -203,6 +215,45 @@ export class UnitComponent extends Component {
     this.cooldowns.clear();
   }
 
+  // ── Estados ──────────────────────────────────────────────────────────────
+
+  public getStatus(id: UnitStatusId): UnitStatus | null {
+    return this.statuses.get(id) ?? null;
+  }
+
+  public hasStatus(id: UnitStatusId): boolean {
+    return this.statuses.has(id);
+  }
+
+  public getStatuses(): UnitStatus[] {
+    return [...this.statuses.values()];
+  }
+
+  /** Aplica (o renueva, quedándose con la duración mayor) un estado. */
+  public addStatus(id: UnitStatusId, turns: number, source: Entity | null = null): void {
+    const current = this.statuses.get(id);
+    this.statuses.set(id, { id, turns: Math.max(turns, current?.turns ?? 0), source });
+  }
+
+  public removeStatus(id: UnitStatusId): void {
+    this.statuses.delete(id);
+  }
+
+  /** Acaba un turno de la unidad: los estados se consumen. Devuelve los que han expirado. */
+  public tickStatuses(): UnitStatusId[] {
+    const expired: UnitStatusId[] = [];
+    for (const status of this.statuses.values()) {
+      status.turns--;
+      if (status.turns <= 0) expired.push(status.id);
+    }
+    for (const id of expired) this.statuses.delete(id);
+    return expired;
+  }
+
+  public clearStatuses(): void {
+    this.statuses.clear();
+  }
+
   public getAttacks(): readonly UnitAttack[] {
     return this.attacks;
   }
@@ -309,6 +360,7 @@ export class UnitComponent extends Component {
     if (down === this.down) return;
     this.down = down;
     this.stop();
+    if (down) this.clearStatuses();
     this.actionTimer = 0;
     const capsule = this.getOwner().getComponent(
       'capsule_collider',
@@ -327,6 +379,7 @@ export class UnitComponent extends Component {
   public resetToSpawn(): void {
     this.stop();
     this.clearCooldowns();
+    this.clearStatuses();
     this.setDown(false);
     this.getHealth()?.restore();
     this.actionTimer = 0;
