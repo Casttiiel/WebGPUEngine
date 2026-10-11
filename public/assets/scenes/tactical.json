@@ -43,6 +43,15 @@
   },
   {
     "components": {
+      "name": "Encounter",
+      "encounter": {
+        "joinRadius": 15,
+        "enemyTurnDelay": 0.8
+      }
+    }
+  },
+  {
+    "components": {
       "name": "Ground",
       "transform": {
         "position": [0, -0.5, 0],

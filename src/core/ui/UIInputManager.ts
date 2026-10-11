@@ -96,6 +96,8 @@ export class UIInputManager {
 
     // Find first widget under cursor (respects Z-order if sorted)
     for (const widget of activeWidgets) {
+      // Un widget oculto o informativo (blocksInput: false) no captura el ratón.
+      if (!widget.isVisible() || !widget.blocksInput()) continue;
       if (this.checkHover(widget, mouseUIPos)) {
         hoveredWidget = widget;
         break; // First widget wins (topmost in Z-order)

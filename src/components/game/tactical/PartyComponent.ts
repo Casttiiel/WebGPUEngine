@@ -40,7 +40,11 @@ export class PartyComponent extends Component {
   public load(data: PartyComponentDataType): void {
     this.memberNames = data.members ?? null;
     // El HUD táctico sustituye al HUD FPS por defecto (lo activa ModuleGameController).
-    ModuleGameController.gameplayHud = data.hud ?? 'PARTY_HUD';
+    const hud = data.hud ?? 'PARTY_HUD';
+    ModuleGameController.gameplayHuds = [
+      hud,
+      ...ModuleGameController.gameplayHuds.filter((h) => h !== 'HUD' && h !== hud),
+    ];
   }
 
   public update(_dt: number): void {

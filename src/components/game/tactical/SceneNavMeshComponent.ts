@@ -3,7 +3,7 @@ import { ShapeType } from '@dimforge/rapier3d';
 import type { Collider, Cuboid, TriMesh } from '@dimforge/rapier3d';
 import { Component } from '../../../core/ecs/Component';
 import { Engine } from '../../../core/engine/Engine';
-import { NavMeshBuilder } from '../../../ai/nav/NavMeshBuilder';
+import { NavMesh } from '../../../ai/nav/NavMesh';
 import { Logger } from '../../../core/debug/Logger';
 
 export type SceneNavMeshComponentDataType = Readonly<{
@@ -28,8 +28,9 @@ export type SceneNavMeshComponentDataType = Readonly<{
  * escena (cajas y trimeshes de cuerpos fijos). Así una escena montada con primitivas en
  * JSON tiene pathfinding sin necesidad de un nodo "navmesh" en un GLTF.
  *
- * Las unidades (cuerpos kinematic/dinámicos) y los sensores no cuentan como obstáculos:
- * el navmesh es el mapa estático; los obstáculos dinámicos se resuelven más adelante.
+ * Las unidades (cuerpos kinematic/dinámicos) y los sensores no forman parte de la geometría:
+ * se construye como TileCache y las unidades se añaden como obstáculos dinámicos
+ * (UnitObstacles), que se pueden quitar/mover sin reconstruir el mapa.
  */
 export class SceneNavMeshComponent extends Component {
   private cellSize = 0.15;
@@ -65,14 +66,19 @@ export class SceneNavMeshComponent extends Component {
       Logger.warn('ENGINE', '[SceneNavMesh] No static colliders found — navmesh not built');
       return;
     }
-    await NavMeshBuilder.build(new Float32Array(positions), new Uint32Array(indices), undefined, {
-      cs: this.cellSize,
-      ch: this.cellHeight,
-      walkableRadius: Math.ceil(this.agentRadius / this.cellSize),
-      walkableHeight: Math.ceil(this.agentHeight / this.cellHeight),
-      walkableClimb: Math.floor(this.agentMaxClimb / this.cellHeight),
-      walkableSlopeAngle: this.agentMaxSlope,
-    });
+    // TileCache: permite que las unidades corten el navmesh como obstáculos dinámicos.
+    await NavMesh.getInstance().buildWithObstacles(
+      new Float32Array(positions),
+      new Uint32Array(indices),
+      {
+        cs: this.cellSize,
+        ch: this.cellHeight,
+        walkableRadius: Math.ceil(this.agentRadius / this.cellSize),
+        walkableHeight: Math.ceil(this.agentHeight / this.cellHeight),
+        walkableClimb: Math.floor(this.agentMaxClimb / this.cellHeight),
+        walkableSlopeAngle: this.agentMaxSlope,
+      },
+    );
     Logger.info(
       'ENGINE',
       `[SceneNavMesh] Built from ${colliders} static colliders (${indices.length / 3} tris) in ${(performance.now() - t0).toFixed(0)}ms`,

@@ -8,6 +8,7 @@ import { UIParser } from '../../core/ui/UIParser';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 import { HUDController } from '../../core/ui/controllers/HUDController';
 import { PartyHUDController } from '../../core/ui/controllers/PartyHUDController';
+import { CombatHUDController } from '../../core/ui/controllers/CombatHUDController';
 import { Render } from '../../renderer/core/pipeline/Render';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
@@ -66,6 +67,7 @@ export class ModuleUI extends Module {
 
     // HUD táctico: retratos de la party
     await this.registerWidgetClass('PARTY_HUD', 'party_hud.json', parser, new PartyHUDController());
+    await this.registerWidgetClass('COMBAT_HUD', 'combat_hud.json', parser, new CombatHUDController());
 
     // Pause menu
     await this.registerWidgetClass('PAUSE_MENU', 'pause_menu.json', parser);

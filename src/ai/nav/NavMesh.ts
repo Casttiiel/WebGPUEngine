@@ -1,5 +1,13 @@
 import { vec3, mat4 } from 'gl-matrix';
-import { init, NavMesh as RecastNavMesh, NavMeshQuery, importNavMesh } from 'recast-navigation';
+import {
+  init,
+  NavMesh as RecastNavMesh,
+  NavMeshQuery,
+  importNavMesh,
+  TileCache,
+  type CylinderObstacle,
+} from 'recast-navigation';
+import { generateTileCache } from 'recast-navigation/generators';
 import NavMeshWorkerClass from './NavMeshWorker?worker';
 import type {
   NavMeshWorkerInput,
@@ -33,6 +41,12 @@ export class NavMesh {
   private _navMesh: RecastNavMesh | null = null;
   /** Query interface wrapping _navMesh. */
   private _query: NavMeshQuery | null = null;
+  /** Solo en navmeshes construidos con buildWithObstacles(): permite obstáculos dinámicos. */
+  private _tileCache: TileCache | null = null;
+  /** Se incrementa cada vez que la geometría navegable cambia (rebuild u obstáculos). */
+  private _version = 0;
+  /** Radio del agente con el que se erosionó el navmesh (m). */
+  private _agentRadius = 0;
 
   private constructor() {}
 
@@ -141,6 +155,7 @@ export class NavMesh {
     this._query = new NavMeshQuery(this._navMesh);
     console.log(`[NavMesh] importNavMesh+Query: ${(performance.now() - tImport).toFixed(1)}ms`);
     this._built = true;
+    this._version++;
     console.log(
       `[NavMesh] Built (Recast/Detour) — ${triCount} source triangles, total: ${(performance.now() - t0).toFixed(1)}ms`,
     );
@@ -179,7 +194,88 @@ export class NavMesh {
     });
   }
 
+  // ── Obstáculos dinámicos (TileCache) ──────────────────────────────────────
+
+  /**
+   * Construye el navmesh como TileCache (en el hilo principal: la escena es pequeña) para
+   * poder añadir/quitar obstáculos dinámicos, p.ej. unidades que bloquean el paso.
+   */
+  public async buildWithObstacles(
+    positions: Float32Array,
+    indices: Uint32Array,
+    overrides: RecastOverrides & { tileSize?: number; maxObstacles?: number } = {},
+  ): Promise<boolean> {
+    const t0 = performance.now();
+    await ensureInit();
+    this.dispose();
+
+    const { success, navMesh, tileCache } = generateTileCache(positions, indices, {
+      tileSize: 32,
+      expectedLayersPerTile: 4,
+      maxObstacles: 128,
+      ...overrides,
+    });
+    if (!success || !navMesh || !tileCache) {
+      console.error('[NavMesh] generateTileCache failed');
+      return false;
+    }
+    this._navMesh = navMesh;
+    this._tileCache = tileCache;
+    this._query = new NavMeshQuery(navMesh);
+    this._agentRadius = (overrides.walkableRadius ?? 0) * (overrides.cs ?? 0.3);
+    this._built = true;
+    this._version++;
+    console.log(
+      `[NavMesh] Built TileCache (dynamic obstacles) in ${(performance.now() - t0).toFixed(1)}ms`,
+    );
+    return true;
+  }
+
+  /**
+   * Radio del agente (m) usado al construir. Los obstáculos del TileCache se rasterizan
+   * después de la erosión, así que deben sumarlo para mantener esa separación.
+   */
+  public getAgentRadius(): number {
+    return this._agentRadius;
+  }
+
+  public supportsObstacles(): boolean {
+    return this._tileCache !== null;
+  }
+
+  /** Versión de la geometría navegable: cambia con cada rebuild o cambio de obstáculos. */
+  public getVersion(): number {
+    return this._version;
+  }
+
+  /** Añade un obstáculo cilíndrico (base en position). Aplicar con flushObstacles(). */
+  public addCylinderObstacle(position: vec3, radius: number, height: number): CylinderObstacle | null {
+    if (!this._tileCache) return null;
+    const result = this._tileCache.addCylinderObstacle(
+      { x: position[0]!, y: position[1]!, z: position[2]! },
+      radius,
+      height,
+    );
+    return result.success ? result.obstacle : null;
+  }
+
+  public removeObstacle(obstacle: CylinderObstacle): void {
+    this._tileCache?.removeObstacle(obstacle);
+  }
+
+  /** Reconstruye los tiles afectados por obstáculos añadidos/quitados (síncrono). */
+  public flushObstacles(): void {
+    if (!this._tileCache || !this._navMesh) return;
+    for (let i = 0; i < 64; i++) {
+      const { upToDate } = this._tileCache.update(this._navMesh);
+      if (upToDate) break;
+    }
+    this._version++;
+  }
+
   public dispose(): void {
+    this._tileCache?.destroy();
+    this._tileCache = null;
     this._navMesh?.destroy();
     this._navMesh = null;
     this._query = null;

@@ -2,6 +2,7 @@
  * Llama herramientas del MCP desde la terminal (útil para probar el servidor sin Claude).
  *
  *   npm run mcp:call -- '[["launch",{}],["screenshot",{}],["close",{}]]'
+ *   npm run mcp:call -- @llamadas.json
  *
  * Las imágenes se guardan en .mcp-out/call/.
  */
@@ -11,7 +12,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { OUT, ROOT, rel } from './lib/paths.ts';
 
-const calls = JSON.parse(process.argv[2] ?? '[]') as [string, Record<string, unknown>][];
+// Argumento: JSON con las llamadas, o @ruta.json para leerlas de un fichero.
+const arg = process.argv[2] ?? '[]';
+const calls = JSON.parse(arg.startsWith('@') ? fs.readFileSync(arg.slice(1), 'utf-8') : arg) as [
+  string,
+  Record<string, unknown>,
+][];
 const client = new Client({ name: 'mcp-call', version: '1.0.0' });
 await client.connect(
   new StdioClientTransport({

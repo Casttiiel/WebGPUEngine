@@ -10,7 +10,9 @@ import { SkeletalMeshComponent } from '../../render/SkeletalMeshComponent';
 import { UnitComponent } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { GroundMarker } from './GroundMarker';
-import { isReachable } from './TacticalQueries';
+import { EncounterComponent, type MovePlan } from './EncounterComponent';
+import { NavMesh } from '../../../ai/nav/NavMesh';
+import { PathPreview } from './PathPreview';
 
 /** Qué hay bajo el cursor. */
 export type HoverKind = 'none' | 'ui' | 'ally' | 'enemy' | 'neutral' | 'ground' | 'invalid';
@@ -63,8 +65,9 @@ const CURSOR_FOR_HOVER: Record<HoverKind, CursorKind> = {
  *  - picking (rayo desde el cursor contra la física) para saber qué hay debajo,
  *  - cursor contextual (seleccionar aliado / atacar enemigo / mover / no válido),
  *  - resaltado del personaje bajo el cursor + anillo de hover (azul aliado, rojo enemigo),
- *  - click en un miembro de la party → seleccionarlo.
- * Mover y atacar con click llegan en la Fase 3; aquí solo se muestra la intención.
+ *  - vista previa del camino al suelo bajo el cursor (y metros en combate),
+ *  - click en un miembro de la party → seleccionarlo; click en el suelo → moverse.
+ * Las reglas (quién se mueve, cuánto) son de EncounterComponent. Atacar: punto 12.
  */
 export class TacticalPointerComponent extends Component {
   private hoverHighlight = 0.35;
@@ -76,6 +79,8 @@ export class TacticalPointerComponent extends Component {
 
   private allyRing = new GroundMarker('tactical/ring_hover_ally.prefab');
   private enemyRing = new GroundMarker('tactical/ring_hover_enemy.prefab');
+  private preview: PathPreview | null = null;
+  private movePlan: MovePlan | null = null;
   private initialized = false;
   private readonly tmpPos = vec3.create();
 
@@ -88,6 +93,7 @@ export class TacticalPointerComponent extends Component {
       this.initialized = true;
       void this.allyRing.spawn();
       void this.enemyRing.spawn();
+      this.preview = new PathPreview();
     }
 
     const inGameplay = Engine.getModules().getCurrentGamestate() === 'gs_gameplay';
@@ -126,6 +132,7 @@ export class TacticalPointerComponent extends Component {
 
   private pick(inGameplay: boolean): void {
     this.hoveredUnit = null;
+    this.movePlan = null;
     const input = Engine.getInput();
     if (!inGameplay || !input.isMouseInWindow()) {
       this.hoverKind = 'none';
@@ -158,27 +165,31 @@ export class TacticalPointerComponent extends Component {
     }
 
     vec3.scaleAndAdd(this.hoverPoint, ray.origin, ray.direction, result.hit.timeOfImpact);
-    this.hoverKind = this.isReachableFromSelected(this.hoverPoint) ? 'ground' : 'invalid';
+    this.movePlan = this.planMoveTo(this.hoverPoint);
+    const m = this.movePlan;
+    this.hoverKind = m && m.allowed && m.plan.reachable && m.affordable ? 'ground' : 'invalid';
   }
 
-  // Caché de alcanzabilidad: el camino solo se recalcula si el punto o el seleccionado cambian.
-  private reachCache = {
+  // Caché del plan: el camino solo se recalcula si cambia el punto, quién actúa, el
+  // estado del encuentro, el presupuesto o el navmesh (p.ej. una unidad se ha movido).
+  private planCache = {
     point: vec3.fromValues(Infinity, 0, 0),
-    from: null as Entity | null,
-    value: false,
+    key: '',
+    plan: null as MovePlan | null,
   };
 
-  /** Un punto es destino válido si el personaje seleccionado puede llegar andando. */
-  private isReachableFromSelected(point: vec3): boolean {
+  /** Plan de movimiento del seleccionado hasta `point` (null si no hay encuentro/selección). */
+  private planMoveTo(point: vec3): MovePlan | null {
+    const encounter = EncounterComponent.find();
     const selected = PartyComponent.find()?.getSelected() ?? null;
-    const unit = selected?.getComponent('unit') as UnitComponent | null;
-    if (!unit) return false;
-    const c = this.reachCache;
-    if (c.from === selected && vec3.squaredDistance(c.point, point) < 0.15 * 0.15) return c.value;
+    if (!encounter || !selected) return null;
+    const key = `${selected.id}|${encounter.getState()}|${encounter.getActiveUnitName()}|${encounter.getResources().movement.toFixed(2)}|${NavMesh.getInstance().getVersion()}`;
+    const c = this.planCache;
+    if (c.key === key && vec3.squaredDistance(c.point, point) < 0.1 * 0.1) return c.plan;
     vec3.copy(c.point, point);
-    c.from = selected;
-    c.value = isReachable(unit.getPosition(this.tmpPos), point);
-    return c.value;
+    c.key = key;
+    c.plan = encounter.planMove(selected, point);
+    return c.plan;
   }
 
   private lastHighlighted: Entity | null = null;
@@ -212,18 +223,42 @@ export class TacticalPointerComponent extends Component {
       this.allyRing.hide();
       this.enemyRing.hide();
     }
+
+    // Vista previa del camino: solo si la unidad puede moverse y hay camino (aunque no llegue
+    // el presupuesto: el tramo que sobra se pinta en rojo).
+    const m = this.movePlan;
+    const showPath =
+      (this.hoverKind === 'ground' || this.hoverKind === 'invalid') &&
+      m &&
+      m.allowed &&
+      m.plan.reachable;
+    if (showPath) {
+      const inCombat = EncounterComponent.find()?.isInCombat() ?? false;
+      this.preview?.show(
+        m.plan.points,
+        m.budget,
+        inCombat ? `${m.plan.length.toFixed(1)} M` : null,
+      );
+    } else {
+      this.preview?.hide();
+    }
   }
 
   private handleClick(): void {
     if (this.hoverKind === 'ally' && this.hoveredUnit) {
       PartyComponent.find()?.select(this.hoveredUnit, 'world');
+    } else if (this.hoverKind === 'ground') {
+      const selected = PartyComponent.find()?.getSelected();
+      if (selected) EncounterComponent.find()?.requestMove(selected, this.hoverPoint);
+      this.planCache.key = ''; // el presupuesto ha cambiado
     }
-    // 'ground' → mover y 'enemy' → atacar: Fase 3.
+    // 'enemy' → atacar: punto 12.
   }
 
   public override dispose(): void {
     this.allyRing.destroy();
     this.enemyRing.destroy();
+    this.preview?.destroy();
     if (this.lastHighlighted) setUnitHighlight(this.lastHighlighted, 0);
     Render.getInstance().getCanvas().style.cursor = 'default';
   }

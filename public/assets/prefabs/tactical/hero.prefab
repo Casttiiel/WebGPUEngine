@@ -11,13 +11,37 @@
         },
         "skeletal_mesh": {
           "gltf": "character.gltf",
-          "baseColorFactor": [0.2, 0.45, 0.95, 1.0]
+          "baseColorFactor": [0.2, 0.45, 0.95, 1]
         },
         "animator": {
           "extraAnimations": ["universal_animations.gltf"],
-          "states": [{ "name": "Idle", "clip": "Idle_Loop", "loop": true }],
+          "states": [
+            {
+              "name": "Idle",
+              "clip": "Idle_Loop",
+              "loop": true
+            },
+            {
+              "name": "Walk",
+              "clip": "Jog_Fwd_Loop",
+              "loop": true
+            }
+          ],
           "default": "Idle",
-          "transitions": []
+          "transitions": [
+            {
+              "from": "Idle",
+              "to": "Walk",
+              "condition": "moving",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Walk",
+              "to": "Idle",
+              "conditionFalse": "moving",
+              "blendTime": 0.2
+            }
+          ]
         }
       }
     }
@@ -42,7 +66,9 @@
       "collisionMask": "ALL"
     },
     "unit": {
-      "faction": "party"
+      "faction": "party",
+      "moveSpeed": 4,
+      "movement": 9
     }
   }
 }

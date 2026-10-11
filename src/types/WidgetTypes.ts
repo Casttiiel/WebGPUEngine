@@ -46,6 +46,8 @@ export interface WidgetParams {
   scaleWithScreen: boolean;
   anchor?: string;
   visible: boolean;
+  /** false: el widget no captura el ratón (textos informativos, rótulos). Default true. */
+  blocksInput?: boolean;
   // widget name / alias
   name?: string;
   alias?: string;

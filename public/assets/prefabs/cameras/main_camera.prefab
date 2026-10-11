@@ -58,3 +58,8 @@
     }
   }
 }
+
+TSR hace que todo se vea blurry, creo que es porque va a 30 fps, pero a 60 se ve mucho mejor, como se arregla eso?
+los numeros y letras de la UI se ven muy pixeladas, porque es eso? 
+Los cubos blancos y los enemigos y aliados no castean sombras, lo arreglas?
+Quiero que si clicas en un punto al que no puedes llegar por cantidad de movimiento necesaria, aun asi lo haga, hasta el punto mas lejano que puede llegar.

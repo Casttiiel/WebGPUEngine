@@ -49,16 +49,63 @@ export function isOnNavMesh(x: number, y: number, z: number, tolerance = 0.25): 
   return dx * dx + dz * dz <= tolerance * tolerance && Math.abs(result.point.y - y) < 0.5;
 }
 
+export interface PathPlan {
+  /** Puntos del camino sobre el suelo (incluye inicio y fin). Vacío si no hay camino. */
+  points: vec3[];
+  /** Longitud del camino en metros. */
+  length: number;
+  /** El camino llega al destino pedido (no se queda en el punto alcanzable más cercano). */
+  reachable: boolean;
+}
+
 /**
- * ¿Se puede ir andando de `from` a `to`? El punto debe estar en el navmesh y conectado:
- * zonas aisladas (p.ej. encima de una caja) están en el navmesh pero no son alcanzables.
+ * Camino andando de `from` a `to` por el navmesh (con los obstáculos dinámicos actuales).
+ * Zonas aisladas (p.ej. encima de una caja) o tapadas por otras unidades no son alcanzables.
  */
-export function isReachable(from: vec3, to: vec3, tolerance = 0.3): boolean {
-  if (!isOnNavMesh(to[0]!, to[1]!, to[2]!, tolerance)) return false;
-  const path = AStar.findPath(from, to);
-  if (!path || path.length === 0) return false;
-  const end = path[path.length - 1]!;
+export function planPath(from: vec3, to: vec3, tolerance = 0.3): PathPlan {
+  const empty: PathPlan = { points: [], length: 0, reachable: false };
+  if (!isOnNavMesh(to[0]!, to[1]!, to[2]!, tolerance)) return empty;
+  const points = AStar.findPath(from, to);
+  if (!points || points.length === 0) return empty;
+  let length = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!;
+    const b = points[i]!;
+    length += Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!);
+  }
+  const end = points[points.length - 1]!;
   const dx = end[0]! - to[0]!;
   const dz = end[2]! - to[2]!;
-  return dx * dx + dz * dz <= tolerance * tolerance && Math.abs(end[1]! - to[1]!) < 0.6;
+  const reachable = dx * dx + dz * dz <= tolerance * tolerance && Math.abs(end[1]! - to[1]!) < 0.6;
+  return { points, length, reachable };
+}
+
+export function isReachable(from: vec3, to: vec3, tolerance = 0.3): boolean {
+  return planPath(from, to, tolerance).reachable;
+}
+
+/** ¿Hay línea de visión entre dos puntos? Solo bloquea la geometría estática. */
+export function hasLineOfSight(a: vec3, b: vec3): boolean {
+  const world = Engine.getPhysics()?.getWorld();
+  if (!world) return false;
+  const dx = b[0]! - a[0]!;
+  const dy = b[1]! - a[1]!;
+  const dz = b[2]! - a[2]!;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist < 1e-4) return true;
+  const ray = new RAPIER.Ray(
+    { x: a[0]!, y: a[1]!, z: a[2]! },
+    { x: dx / dist, y: dy / dist, z: dz / dist },
+  );
+  const hit = world.castRay(
+    ray,
+    dist,
+    true,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    isStaticSolid,
+  );
+  return hit === null;
 }

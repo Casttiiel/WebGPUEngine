@@ -55,6 +55,8 @@
 
     "camera_shake",
     "camera_arm",
+    "unit",
+    "encounter",
     "party",
     "tactical_pointer",
     "tactical_camera_controller",

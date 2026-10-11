@@ -309,6 +309,7 @@ export class UIParser {
     if (jData.name) params.name = jData.name;
     if (jData.alias) params.alias = jData.alias;
     if (jData.visible !== undefined) params.visible = jData.visible;
+    if (jData.blocksInput !== undefined) params.blocksInput = jData.blocksInput;
 
     // ── Anchor ────────────────────────────────────────────────────────────
     if (jData.anchor && typeof jData.anchor === 'string') {

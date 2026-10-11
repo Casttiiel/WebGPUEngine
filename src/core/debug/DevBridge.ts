@@ -694,9 +694,10 @@ export class DevBridge {
     const recast = NavMesh.getInstance().getRecastNavMesh();
     if (!recast) return;
     // Si el navmesh se ha reconstruido, recalcular las aristas.
-    if (this.navMeshEdgesSource !== recast) {
+    const version = NavMesh.getInstance().getVersion();
+    if (this.navMeshEdgesSource !== version) {
       this.navMeshEdges = null;
-      this.navMeshEdgesSource = recast;
+      this.navMeshEdgesSource = version;
     }
     if (!this.navMeshEdges) {
       const [positions, indices] = getNavMeshPositionsAndIndices(recast);

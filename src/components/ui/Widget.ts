@@ -253,6 +253,11 @@ export class Widget {
     return this.params.visible;
   }
 
+  /** ¿Captura el ratón? (los rótulos informativos no deberían tapar el mundo). */
+  public blocksInput(): boolean {
+    return this.params.blocksInput !== false;
+  }
+
   /** Alias of setVisible â€” used by CarouselController and similar. */
   public setActive(active: boolean): void {
     this.setVisible(active);
