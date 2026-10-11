@@ -1,5 +1,6 @@
 {
   "description": "Fase 3 (puntos 7-10): acercarse inicia el combate, iniciativa y rondas, recursos de turno, movimiento limitado con preview, unidades como obstáculos y enemigos que se unen tarde.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
   "seed": 7,
   "entities": [
     {

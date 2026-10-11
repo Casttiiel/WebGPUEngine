@@ -84,6 +84,7 @@ import { SceneNavMeshComponent } from '../../components/game/tactical/SceneNavMe
 import { PartyComponent } from '../../components/game/tactical/PartyComponent';
 import { TacticalPointerComponent } from '../../components/game/tactical/TacticalPointerComponent';
 import { EncounterComponent } from '../../components/game/tactical/EncounterComponent';
+import { TacticalAIComponent } from '../../components/game/tactical/TacticalAIComponent';
 import { BloodZoneComponent } from '../../components/game/combat/BloodZoneComponent';
 import { BloodBallProjectileComponent } from '../../components/game/combat/BloodBallProjectileComponent';
 import { BloodExplosiveProjectileComponent } from '../../components/game/combat/BloodExplosiveProjectileComponent';
@@ -522,6 +523,8 @@ export class Loader {
         return new PartyComponent();
       case 'tactical_pointer':
         return new TacticalPointerComponent();
+      case 'tactical_ai':
+        return new TacticalAIComponent();
       case 'encounter':
         return new EncounterComponent();
       case 'blood_zone':

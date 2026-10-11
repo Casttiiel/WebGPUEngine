@@ -56,6 +56,7 @@
     "camera_shake",
     "camera_arm",
     "unit",
+    "tactical_ai",
     "encounter",
     "party",
     "tactical_pointer",

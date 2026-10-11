@@ -9,6 +9,7 @@ import { UnitComponent, type UnitAttack } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import { UnitObstacles } from './UnitObstacles';
+import type { TacticalAIComponent } from './TacticalAIComponent';
 import { hasLineOfSight, planPath, truncatePath, type PathPlan } from './TacticalQueries';
 import {
   EYE_HEIGHT,
@@ -23,7 +24,7 @@ export type EncounterState = 'exploration' | 'combat' | 'victory' | 'defeat';
 export type EncounterComponentDataType = Readonly<{
   /** Al empezar un combate entran los enemigos a esta distancia de la party (m). Default 15. */
   joinRadius?: number;
-  /** Segundos que tarda en pasar turno un enemigo (hasta que exista la IA). Default 0.8. */
+  /** Segundos que tarda en pasar turno un enemigo sin IA (tactical_ai). Default 0.8. */
   enemyTurnDelay?: number;
   /** Segundos que se muestra "VICTORIA" antes de volver a exploración. Default 2. */
   victoryTime?: number;
@@ -104,6 +105,8 @@ const EPS = 0.05;
 const ATTACK_TIME = 0.9;
 const HIT_DELAY = 0.4;
 const HIT_CLIP = 'Hit_Chest';
+/** Un turno de la IA que dure más que esto (s simulados) se da por terminado. */
+const AI_TURN_TIMEOUT = 20;
 /** Al acercarse para atacar cuerpo a cuerpo se queda a esta fracción del alcance. */
 const APPROACH_FRACTION = 0.6;
 const APPROACH_CANDIDATES = 16;
@@ -116,7 +119,8 @@ const APPROACH_CANDIDATES = 16;
  *
  * Combate: iniciativa d20 (RNG del juego, reproducible con ?seed), rondas, recursos por
  * turno (acción, acción adicional, metros), fin de turno manual (Espacio / botón) o
- * automático sin recursos útiles, y enemigos que se unen a mitad de combate.
+ * automático sin recursos útiles, y enemigos que se unen a mitad de combate. En el turno
+ * de un enemigo con tactical_ai decide su IA (Behavior Tree); sin ella, pasa turno.
  *
  * Ataques: cuerpo a cuerpo (si no llega, se acerca y ataca) y a distancia (alcance y línea
  * de visión). A 0 PV un enemigo muere (sale de la iniciativa) y un aliado queda caído
@@ -137,6 +141,10 @@ export class EncounterComponent extends Component {
   private round = 0;
   private resources: TurnResources = { action: 0, bonusAction: 0, movement: 0 };
   private turnTimer = 0;
+  /** Segundos que lleva el turno de la IA (vigilante). */
+  private aiTurnTime = 0;
+  /** Turnos de la IA cortados por el vigilante (debería ser siempre 0). */
+  private aiTimeouts = 0;
   private stateTimer = 0;
   private detectionTimer = 0;
   private listeners: ((event: string, data: EncounterEventData) => void)[] = [];
@@ -257,6 +265,11 @@ export class EncounterComponent extends Component {
   }
 
   /** ¿Se puede reiniciar el encuentro con R? En derrota, o con todos los enemigos muertos. */
+  /** Hay un ataque en marcha (acercándose para atacar o un golpe por resolver). */
+  public isResolving(): boolean {
+    return this.pendingAttack !== null || this.pendingHits.length > 0;
+  }
+
   public canRestart(): boolean {
     if (this.state === 'defeat') return true;
     return (
@@ -700,7 +713,24 @@ export class EncounterComponent extends Component {
     }
 
     const active = this.combatants[this.turnIndex];
-    if (!active || active.unit.isBusy() || this.pendingAttack || this.pendingHits.length) return;
+    if (!active) return;
+
+    // Vigilante: un turno de la IA nunca se queda colgado (camino imposible, bug…).
+    const ai = this.getAI(active.unit);
+    if (ai) {
+      this.aiTurnTime += dt;
+      if (this.aiTurnTime > AI_TURN_TIMEOUT) {
+        console.warn(`[Encounter] AI turn of ${active.unit.getOwner().getName()} timed out`);
+        this.aiTimeouts++;
+        active.unit.stop();
+        this.pendingAttack = null;
+        this.pendingHits = [];
+        this.endTurn();
+        return;
+      }
+    }
+
+    if (active.unit.isBusy() || this.isResolving()) return;
 
     if (this.isPlayerTurn()) {
       if (Engine.getInput().isKeyJustPressed(KeyCode.SPACE)) {
@@ -708,11 +738,18 @@ export class EncounterComponent extends Component {
       } else if (!this.hasUsableResources(active.unit)) {
         this.endTurn(); // sin recursos
       }
+    } else if (ai) {
+      if (ai.updateTurn(dt)) this.endTurn();
     } else {
-      // Hasta que haya IA (Fase 4): el enemigo pasa turno.
+      // Sin IA (enemigo dummy): pasa turno.
       this.turnTimer -= dt;
       if (this.turnTimer <= 0) this.endTurn();
     }
+  }
+
+  private getAI(unit: UnitComponent): TacticalAIComponent | null {
+    if (PartyComponent.find()?.isMember(unit.getOwner())) return null;
+    return unit.getOwner().getComponent('tactical_ai') as TacticalAIComponent | null;
   }
 
   /** ¿Le queda algo que hacer? Metros, o una acción / acción adicional que algún ataque use. */
@@ -741,6 +778,8 @@ export class EncounterComponent extends Component {
     if (!active) return;
     this.resources = { action: 1, bonusAction: 1, movement: active.unit.getMovement() };
     this.turnTimer = this.enemyTurnDelay;
+    this.aiTurnTime = 0;
+    this.getAI(active.unit)?.beginTurn(this);
 
     const entity = active.unit.getOwner();
     const party = PartyComponent.find();
@@ -825,7 +864,17 @@ export class EncounterComponent extends Component {
         resources: this.getResources(),
         turnOrder: this.getCombatants(),
         selected: PartyComponent.find()?.getSelectedName() ?? null,
-        busy: this.pendingAttack !== null || this.pendingHits.length > 0,
+        busy: this.isResolving(),
+        aiTimeouts: this.aiTimeouts,
+        aiPlans: UnitComponent.getAll()
+          .map((u) => ({ unit: u, plan: this.getAI(u)?.getLastPlan() ?? null }))
+          .filter((p) => p.plan)
+          .map((p) => ({
+            unit: p.unit.getOwner().getName(),
+            kind: p.plan!.kind,
+            reason: p.plan!.reason,
+            score: Math.round(p.plan!.score * 10) / 10,
+          })),
         units: UnitComponent.getAll().map((u) => ({
           name: u.getOwner().getName(),
           faction: u.getFaction(),

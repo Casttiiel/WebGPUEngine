@@ -1,5 +1,6 @@
 {
   "description": "Fase 2: party de 4 (selección por tecla, Tab, retrato y click), anillo de selección, hover y cursor contextual.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
   "seed": 1,
   "steps": [
     {
@@ -117,8 +118,8 @@
       }
     },
 
-    { "log": "Click en un enemigo no cambia la selección (atacar llega en la Fase 3)" },
-    { "input": { "type": "click", "entity": "Enemy1" } },
+    { "log": "Un enemigo bajo el cursor no cambia la selección (click = atacar: ver phase3_combat)" },
+    { "input": { "type": "move", "entity": "Enemy1" } },
     { "wait_frames": 2 },
     { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero1" } },
 

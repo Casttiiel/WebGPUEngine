@@ -191,7 +191,12 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ## Fase 5 — Habilidades
 
-### 17. Skills
+### 17. Improvements
+- **Saltar**: acción que salta obstáculos/huecos consumiendo movimiento.
+- **Muros que tapan la cámara**: hacer transparentes o recortar los muros entre la cámara y el pivot, como en BG3. Hoy se evita limitando el pivot (`bounds`) al interior del mapa.
+- **Interacción con el entorno**: objetos empujables/explosivos (barriles), superficies (fuego/charco) que aplican efectos al entrar.
+
+### 18. Skills
 - Modelo de datos genérico (JSON/prefab): coste (Acción / Acción adicional), rango, tipo de targeting, efecto.
 - Tipos de targeting: **unidad**, **punto en el suelo**, **área (círculo/cono)**, **self**.
 - Efectos esqueleto: daño, curación, empujón (aprovecha `PushAbility`), teletransporte.
@@ -199,7 +204,7 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 - Cooldowns por turno (en lugar de spell slots).
 - **Hecho cuando:** hay 3–4 skills distintas funcionando (bola de fuego en área, curación, empujón, dash).
 
-### 18. Reacciones *(añadido)*
+### 19. Reacciones *(añadido)*
 - Ataque de oportunidad al salir del alcance cuerpo a cuerpo de un enemigo.
 - Es lo que hace que el posicionamiento importe; con una sola reacción ya se nota.
 - **Hecho cuando:** alejarse de un enemigo adyacente dispara su ataque.
@@ -208,12 +213,9 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ## Fase 6 — Pulido del esqueleto (si sobra tiempo)
 
-- **Saltar**: acción que salta obstáculos/huecos consumiendo movimiento.
-- **Muros que tapan la cámara**: hacer transparentes o recortar los muros entre la cámara y el pivot, como en BG3. Hoy se evita limitando el pivot (`bounds`) al interior del mapa.
 - **Feedback**: cámara que encuadra al atacante y objetivo, hit-stop, partículas de impacto (ya existen piezas).
 - **Animaciones básicas**: idle, andar, atacar, recibir golpe, morir (usar el sistema de animación existente).
 - **Guardar/cargar** el estado de la party y el combate.
-- **Interacción con el entorno**: objetos empujables/explosivos (barriles), superficies (fuego/charco) que aplican efectos al entrar.
 - **Ventaja por altura**: bonus de impacto desde arriba; daño por caída al ser empujado.
 - **Encuentros definidos en datos**: un JSON por encuentro (enemigos, posiciones, trigger).
 

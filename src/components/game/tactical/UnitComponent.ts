@@ -173,6 +173,11 @@ export class UnitComponent extends Component {
     return capsule?.getCapsuleRadius() ?? 0.35;
   }
 
+  /** Distancia vertical de los pies al pivote (centro de la cápsula). */
+  public getFeetOffset(): number {
+    return this.feetOffset ?? 0.9;
+  }
+
   /** Posición de mundo del pivote de la unidad (centro de la cápsula). */
   public getPosition(out: vec3 = vec3.create()): vec3 {
     const transform = this.getOwner().getComponent('transform') as TransformComponent | null;

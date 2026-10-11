@@ -1,5 +1,6 @@
 {
   "description": "Fase 3 (puntos 11-15): 4 héroes contra 2 enemigos dummy de principio a fin. Línea de visión (columna), ataque a distancia por sorpresa, moverse y atacar con click, muerte y salida de la iniciativa, victoria, aliados caídos que pierden el turno, derrota y reinicio con R. Todo con el HUD de combate.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
   "seed": 7,
   "steps": [
     {

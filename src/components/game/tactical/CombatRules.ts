@@ -35,6 +35,27 @@ export function unitLineOfSight(from: UnitComponent, to: UnitComponent): boolean
   return hasLineOfSight(eye, target);
 }
 
+/**
+ * Como unitDistance, pero con `unit` colocada con los pies en `feet` (posición hipotética:
+ * la IA evalúa sitios a los que moverse).
+ */
+export function unitDistanceFrom(unit: UnitComponent, feet: vec3, target: UnitComponent): number {
+  const pb = target.getPosition(tmpB);
+  const center = Math.hypot(pb[0]! - feet[0]!, pb[2]! - feet[2]!);
+  return Math.max(0, center - unit.getCapsuleRadius() - target.getCapsuleRadius());
+}
+
+/** Como unitLineOfSight, pero con `unit` colocada con los pies en `feet`. */
+export function unitLineOfSightFrom(unit: UnitComponent, feet: vec3, target: UnitComponent): boolean {
+  const eye = vec3.copy(tmpA, feet);
+  eye[1] = eye[1]! + unit.getFeetOffset() + EYE_HEIGHT;
+  const aim = target.getPosition(tmpB);
+  aim[1] = aim[1]! + EYE_HEIGHT;
+  if (hasLineOfSight(eye, aim)) return true;
+  aim[1] = aim[1]! - EYE_HEIGHT;
+  return hasLineOfSight(eye, aim);
+}
+
 export interface AttackRoll {
   /** Probabilidad de impacto (0-1). */
   hitChance: number;

@@ -10,6 +10,7 @@ export { Selector } from './nodes/Selector';
 // Leaf nodes
 export { Action } from './nodes/Action';
 export { Condition } from './nodes/Condition';
+export { Wait } from './nodes/Wait';
 export { RequestPathAction } from './nodes/RequestPathAction';
 export { FollowPathAction } from './nodes/FollowPathAction';
 export { SteerAction } from './nodes/SteerAction';
