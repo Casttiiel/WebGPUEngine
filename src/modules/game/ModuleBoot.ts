@@ -38,9 +38,26 @@ export class ModuleBoot extends Module {
     const jsonData = await response.json();
     const finalScene = [];
 
+    // Dev: `?scene=a.json,b.json` sustituye las escenas de boot.json y `?scenario=nombre`
+    // carga data/scenarios/nombre.json (escenas + entidades extra). Los usa el MCP.
+    let scenesToLoad: string[] = jsonData.scenes_to_load;
+    if (import.meta.env.DEV) {
+      const params = new URLSearchParams(window.location.search);
+      const scenarioName = params.get('scenario');
+      if (scenarioName) {
+        const scenarioResponse = await ResourceManager.fetch(`data/scenarios/${scenarioName}.json`);
+        const scenario = await scenarioResponse.json();
+        if (Array.isArray(scenario.scenes)) scenesToLoad = scenario.scenes;
+        if (Array.isArray(scenario.entities)) finalScene.push(...scenario.entities);
+        Logger.info('ENGINE', `Scenario '${scenarioName}'`);
+      }
+      const sceneParam = params.get('scene');
+      if (sceneParam) scenesToLoad = sceneParam.split(',');
+    }
+
     // Fetch all scene files in parallel, then merge in original order
     const sceneArrays = await Promise.all(
-      jsonData.scenes_to_load.map(async (sceneName: string) => {
+      scenesToLoad.map(async (sceneName: string) => {
         const sceneResponse = await ResourceManager.fetch(`assets/scenes/${sceneName}`);
         return sceneResponse.json();
       }),

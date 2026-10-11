@@ -52,6 +52,10 @@ export class Entity {
     return Array.from(this.components.values());
   }
 
+  public getComponentEntries(): [string, Component][] {
+    return Array.from(this.components.entries());
+  }
+
   public getName(): string {
     const nameComponent = this.getComponent('name') as NameComponent;
     return nameComponent?.getName() || `Entity_${this.id}`;

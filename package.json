@@ -17,20 +17,27 @@
     "check": "npm run type-check && npm run format:check && npm run lint",
     "fix": "npm run format && npm run lint:fix",
     "dev:unsafe": "vite",
-    "dev:check": "npm run check && vite"
+    "dev:check": "npm run check && vite",
+    "mcp": "tsx tools/mcp/server.ts",
+    "mcp:call": "tsx tools/mcp/call.ts",
+    "mcp:check": "tsc -p tools/mcp/tsconfig.json"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@types/node": "^24.19.2",
     "@typescript-eslint/eslint-plugin": "^8.40.0",
     "@typescript-eslint/parser": "^8.40.0",
     "@webgpu/types": "^0.1.60",
     "eslint": "^9.28.0",
+    "playwright-core": "^1.64.0",
     "prettier": "^3.5.3",
     "sharp": "^0.34.5",
     "tsx": "^4.21.0",
     "typescript": "~5.7.2",
     "vite": "^6.2.0",
     "vite-plugin-top-level-await": "^1.6.0",
-    "vite-plugin-wasm": "^3.5.0"
+    "vite-plugin-wasm": "^3.5.0",
+    "zod": "^4.6.5"
   },
   "dependencies": {
     "@derschmale/io-rgbe": "^0.1.1",

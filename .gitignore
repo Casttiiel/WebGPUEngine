@@ -42,3 +42,5 @@ old/
 bin/
 proceduralSkyShader-main/
 UnrealRetroShaders-master/
+# MCP outputs (screenshots, scenario captures)
+.mcp-out/

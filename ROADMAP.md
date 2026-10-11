@@ -1,592 +1,223 @@
-## Editor de Escena
+# Roadmap — Prototipo táctico estilo Baldur's Gate 3
 
-El mayor gap de productividad. Tiene la base (picking, gizmos, wireframe) pero le falta lo esencial para iterar rápido.
+Objetivo: el **esqueleto jugable** de un RPG táctico por turnos con party de 4. Sin stats, clases, inventario ni diálogos: solo el bucle *explorar → entrar en combate → turnos → victoria/derrota*.
 
-### Prioritario
+Cada hito tiene un criterio **"Hecho cuando"** verificable (idealmente vía MCP, ver Fase 0).
 
-- **Gizmo Rotate** — el modo existe en el ciclo de SPACE pero `renderGizmo()` no tiene el caso implementado. Necesita 3 arcos en los planos XY/XZ/YZ y drag con proyección sobre el plano de rotación.
-- **Guardar escena desde el editor** — ahora todo es `boot.json` a mano. Un botón Save que serialice la escena actual.
-
-### Mejoras visuales / UX
-
-- **Multi-selección** — Shift/Ctrl+click para seleccionar varias entidades y transformarlas juntas.
-- **Foco en selección** — tecla F para hacer zoom a la entidad seleccionada con la debug camera.
-- **Duplicar entidad** — Ctrl+D para clonar la seleccionada con todos sus componentes.
-
-### A largo plazo
-
-- Asset browser integrado (texturas, meshes, prefabs arrastrables a la escena)
-- Gizmo de orientación en esquina (cubo estilo Blender)
-
-## Rendering
-
-- **LOD de sombras** — el shadow map siempre usa la geometría completa. Saltarse entidades lejanas por cascada daría bastante ganancia.
-
-## Serialización de Escena
-
-- Formato más robusto que el `boot.json` actual — soporte para referencias entre entidades, arrays de componentes, versioning.
-- Carga incremental de zonas (level streaming) para mundos grandes sin pantalla de carga.
-
-## LOD de Meshes
-
-El terreno tiene LOD completo con histeresis. Las entidades normales no tienen nada.
-
-### Prioritario
-
-- **LODComponent** — define N niveles, cada uno con una mesh diferente y una distancia de transición. El sistema mide `length(entityPos - cameraPos)` cada frame y activa la mesh correspondiente. El HZB culling ya descarta lo no visible; el LOD reduce el coste de lo visible lejano.
-- **Integración con RenderManager** — que el LOD activo determine qué mesh se envía al draw indirect.
-
-### Después
-
-- Generación automática de LODs desde la mesh original (simplificación en CPU al importar)
-- Cross-fade entre niveles para evitar el pop visual
-
-# Combat AI — Roadmap de mejoras
-
-Síntesis de principios de diseño de combate H&S (God of War, DMC, Batman Arkham, Bayonetta, Sekiro)
-aplicados a este motor. Ordenado de más fácil a más complejo de implementar.
+Piezas del motor que se reutilizan: ECS + prefabs, `src/ai/nav` (NavMesh + A*), `src/ai` (Behavior Trees, Blackboard), Rapier (raycasts/colisiones), `HealthComponent`, `AbilitySystem`, `DummyEnemyController`, `src/core/ui`, `gamestates.json`.
 
 ---
 
-## Estado actual (implementado)
+## Fase 0 — MCP del motor (para que Claude pueda iterar solo) ✅
 
-- **Token system** — solo N enemigos atacan simultáneamente (CombatDirectorComponent)
-- **Global pace timer** — pausa entre olas de ataque (attackPaceMs)
-- **Cooldown individual** — cada enemigo espera X segundos tras su propio ataque
-- **Selección por puntuación** — director elige al mejor candidato (distancia + espera + penalización por repetición)
-- **Percepción H&S** — primera detección con FOV+LOS, luego solo radio de deaggro (25 m)
-- **CircleStrafe** — enemigos orbitan al jugador con sector encirclement mientras esperan
-- **Roles** — AGGRESSOR / FLANKER / HARASSER / SUPPORT (asignación automática en token)
-- **Presión escalada** — agresividad sube cuando el jugador lleva tiempo sin recibir daño
+Va primero porque acelera todo lo demás: sin esto, cada cambio necesita que tú mires la pantalla y me cuentes qué pasa.
 
----
+> **Estado: implementada.** Documentación y formato de escenarios en [tools/mcp/README.md](tools/mcp/README.md).
+> - Usa Edge del sistema vía Playwright, porque no hay Chrome instalado.
+> - `get_combat_state` y `game_command` ya están cableados, pero devuelven "no provider" hasta que la Fase 3 llame a `DevBridge.registerCombatProvider(...)`.
+> - Los overlays de rangos se registran con `DevBridge.registerOverlay(...)`.
 
-## Tier 1 — Muy fácil (parámetros o < 20 líneas de código)
+**Principio:** el motor **no es un editor en tiempo real**. La fuente de verdad son los ficheros (código TS, `boot.json`, prefabs, `components.json`) y se editan en VS Code. El juego en ejecución solo se usa para **observar y verificar**. Por tanto el MCP no edita el mundo en vivo: arranca el juego, lo mira, lo controla y comprueba resultados. Cualquier cambio se hace en ficheros y se valida recargando.
 
----
+Ciclo de trabajo: *editar ficheros → `run_checks` → `launch`/`reload` → observar (logs, screenshot, estado) → controlar (input/comandos) → verificar (asserts) → repetir*.
 
-### 2. Presets de dificultad en el director
+**Arquitectura:** servidor MCP en Node (`tools/mcp/`, stdio, registrado en `.mcp.json`) que:
+- arranca/reutiliza el dev server de Vite,
+- abre Edge/Chrome con WebGPU mediante **Playwright** (ventana visible por defecto; headless si los drivers lo permiten),
+- habla con el juego con `page.evaluate()` contra una API de debug `window.__engine` que solo existe en `dev`.
 
-```
-Fácil:       maxAttackers=1, attackPaceMs=8000, aggressiveness=0.2
-Normal:      maxAttackers=1, attackPaceMs=5000, aggressiveness=0.5
-Difícil:     maxAttackers=2, attackPaceMs=300,  aggressiveness=0.75
-Muy difícil: maxAttackers=3, attackPaceMs=1500,  aggressiveness=1.0
-```
+No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, input real y evaluación de JS de serie.
 
-El director ya tiene todos estos parámetros. Solo hace falta un método `setDifficulty(level)`.
+### 0.1 Ciclo de vida y observación (imprescindible)
+- **`launch` / `close`** — arrancar Vite + navegador, esperar a que la escena esté cargada (señal `__engine.ready`). Opcional: escena/escenario inicial por query param.
+- **`reload`** — recargar tras editar ficheros y esperar a `ready`. Si Vite falla al compilar, devolver el error en lugar de quedarse colgado.
+- **`get_logs`** — consola (log/warn/error), excepciones no capturadas y errores de validación WebGPU, con stack traces; filtrable desde la última recarga.
+- **`screenshot`** — captura del canvas (opcional: tras N frames, con o sin overlay de debug).
+- **`get_status`** — FPS, escena cargada, game state actual, nº de entidades.
+- **`run_checks`** — `type-check` + `lint` con errores estructurados (fichero, línea, mensaje). No necesita el juego abierto.
 
----
+### 0.2 Validación de datos (sin ejecutar)
+- **`list_components`** — componentes registrados y sus campos/tipos (desde código + `components.json`), para escribir prefabs correctos a la primera.
+- **`list_prefabs`** — prefabs disponibles y qué componentes usan.
+- **`validate_data`** — comprobar `boot.json`, prefabs y JSONs de skills/encuentros contra esos esquemas: campos desconocidos, tipos erróneos, referencias a prefabs/assets inexistentes.
 
-### 3. Offsets aleatorios en posición deseada
+### 0.3 Inspección del juego en ejecución (solo lectura)
+- **`list_entities`** — entidades con nombre, id, componentes y posición (filtrable).
+- **`get_entity`** — volcado JSON de los componentes de una entidad.
+- **`eval`** — ejecutar una expresión JS en la página para preguntas puntuales (escape hatch de depuración, no para modificar contenido).
 
-> _"desiredPosition += RandomOffset()"_ — Naughty Dog / Santa Monica
+### 0.4 Control: tiempo, input y determinismo
+- **`pause` / `resume` / `step(frames)`** — avance determinista frame a frame.
+- **`set_time_scale`** — acelerar (p.ej. dejar que la IA juegue 10 turnos rápido).
+- **`simulate_input`** — click en posición de mundo (proyectada a pantalla) o de pantalla, teclas, rueda, arrastre. Input real de Playwright, así se prueba la misma ruta que usa el jugador.
+- **Semilla del RNG** — por query param al lanzar, para tiradas reproducibles.
 
-Añadir un pequeño ruido (0.2–0.8 m) a la posición objetivo de cada enemigo al calcularse.
-Resultado: la formación deja de parecer militar. Se implementa en un sitio: `CircleStrafeAction`.
+### 0.5 Herramientas específicas del juego táctico
+- **`get_combat_state`** — orden de turnos, personaje activo, acciones y movimiento restantes, vida y estado de todos.
+- **`game_command`** — acciones de alto nivel como las haría el jugador: `move(unit, pos)`, `attack(unit, target)`, `use_skill(unit, skill, target)`, `end_turn()`. Es la misma API que usa la IA enemiga.
+- **`query_path` / `query_los`** — camino en el navmesh (puntos, coste, alcanzable) y línea de visión entre dos puntos/entidades.
+- **`debug_draw`** — activar overlays (navmesh, caminos, rangos, LOS, colliders) antes de un screenshot.
+- **`run_scenario`** — lanzar el juego con un **escenario en fichero** (`public/data/scenarios/*.json`: posiciones de party y enemigos, semilla), ejecutar una secuencia de comandos y evaluar asserts (`unit X hp == 0`, `state == Victory`…). Los escenarios se versionan en git y sirven como tests de regresión del gameplay.
 
----
-
-### 4. Distancia preferida variable por enemigo
-
-```
-distancePreference = Random(1.8m, 3.2m)
-```
-
-Cada instancia de `CircleStrafeAction` elige su `preferredRange` dentro de un rango en lugar de un valor fijo.
-Unos se acercan demasiado, otros se quedan atrás. Orgánico sin código extra.
-
----
-
-### 5. Tiempo de compromiso en decisiones de dirección
-
-> _"commitmentTime = Random(1s, 3s)"_ — evita el efecto zigzag frame a frame
-
-Una vez que `CircleStrafeAction` elige una dirección de órbita, mantenerla durante `commitmentTime`
-antes de recalcular. Ya hay `K_STRAFE_DIR` y `K_STRAFE_FLIP` en el Blackboard — solo ajustar el intervalo.
+**Hecho cuando:** puedo editar un fichero, recargar, mover un personaje, hacer un screenshot y leer los errores sin que tengas que intervenir.
 
 ---
 
-## Tier 2 — Fácil (campo nuevo o método pequeño)
+## Fase 1 — Escenario y cámara
 
-### 6. Decisiones asíncronas (relojes mentales independientes)
+### 1. Escenario simple
+- Escena de prueba: suelo plano, unas paredes, cajas/columnas como obstáculos, algún desnivel (rampa/plataforma) para más adelante.
+- Iluminación sencilla (sol + ambient). Nada de streaming ni assets pesados.
+- **Hecho cuando:** carga desde `boot.json` en < 2 s y el navmesh se genera correctamente sobre ella.
 
-> _"EnemyA piensa cada 0.3 s, EnemyB cada 0.7 s, EnemyC cada 0.5 s"_
+### 2. Cámara táctica
+- Cámara orbital con *pivot* en el suelo (no atada al personaje), vista isométrica-ish con pitch fijo/limitado.
+- Modo "seguir" al personaje activo con transición suave al cambiar de turno.
+- **Hecho cuando:** la cámara enfoca a cualquier unidad con un lerp suave y nunca atraviesa el suelo.
 
-El BT ya corre cada frame. Añadir un `thinkInterval = Random(0.1s, 0.4s)` en `EnemyControllerComponent`
-que regule cada cuánto se evalúa el árbol completo. Elimina el efecto "todos deciden a la vez"
-que produce sincronización artificial.
-
-**Archivo:** `EnemyControllerComponent.update()` — throttle de `tree.step()`.
-
----
-
-### 7. Reserva de slot durante varios segundos
-
-> _"slotReservationDuration = 2-5 s"_ — el enemigo mantiene su ángulo aunque ya no sea ideal
-
-`CircleStrafeAction` recalcula el sector óptimo cada 0.6 s. Ampliar a 2-4 s aleatorios.
-Cuando el jugador se mueve bruscamente, los enemigos **no se reorganizan inmediatamente** —
-quedan mal colocados brevemente y se reajustan poco a poco. Mucho más natural. Y ademas puede intercambiar slots para que sea mas natural.
-
-**Archivo:** `CircleStrafeAction.ts` — cambiar `K_POS_TIME` interval.
+### 3. Controles de cámara
+- Pan: WASD / bordes de pantalla / arrastre con botón central.
+- Rotación: Q/E o arrastre con botón central + modificador.
+- Zoom: rueda, con límites y ajuste suave del pitch al hacer zoom (más cenital al alejar).
+- Tecla para recentrar en el personaje activo (Home / doble click en retrato).
+- **Hecho cuando:** se puede recorrer todo el mapa cómodamente sin perder la orientación.
 
 ---
 
-### 8. Latencia de reacción ante cambios bruscos del jugador
+## Fase 2 — Party y exploración
 
-> _"reactionDelay = Random(0.2f, 1.2f)"_ — la naturaleza tiene latencia
+### 4. Party (4 personajes)
+- `PartyComponent` / `PartyManager`: lista de 4 miembros, miembro seleccionado.
+- Selección por click en el personaje, por retrato o con teclas 1-4.
+- Indicador visual de selección (anillo/decal bajo los pies).
+- **Hecho cuando:** puedo seleccionar cada miembro y la cámara/UI responden.
 
-Cuando el jugador teletransporta, hace dash o cambia de posición más de N metros en un tick,
-los enemigos no actualizan `playerPosition` en su Blackboard inmediatamente — introducir
-un delay aleatorio antes de escribir la nueva posición.
+### 5. Selección y cursor contextual *(añadido)*
+- Raycast desde el ratón contra suelo y entidades: hover con highlight/outline.
+- El cursor cambia según lo que hay debajo: mover / atacar / no válido.
+- **Hecho cuando:** pasar el ratón sobre un enemigo, un aliado o el suelo da feedback distinto.
 
-**Archivo:** `PerceptionComponent.runChecks()` — delay en la escritura de `playerPosition` tras cambios grandes.
-
----
-
-### 9. Presupuesto de amenaza (Threat Budget)
-
-> _"Threat Budget = 100 | Golpe = 25, Carga = 40, Proyectil = 20, Especial = 60"_
-
-El director mantiene un pool de "amenaza activa". Cada tipo de ataque tiene un coste.
-Antes de conceder un token, el director comprueba si el coste cabe en el presupuesto restante.
-Cuando el ataque termina, el coste se devuelve al pool.
-
-Esto limita automáticamente las combinaciones peligrosas sin reglas hardcoded:
-`60 + 60 = 120 > 100` → bloqueado. `25 + 25 + 20 = 70 ≤ 100` → permitido.
-
-**Archivos:** `CombatDirectorComponent.ts` (campo `threatBudget`, coste por tipo),
-`EnemyControllerComponent.ts` (`getAttackThreatCost(): number` override en subclases).
+### 6. Movimiento en exploración (tiempo real) *(añadido)*
+- Click en el suelo → el seleccionado va por el navmesh. Los demás le siguen en formación (encadenados como en BG3).
+- Desencadenar/encadenar miembros del grupo (opcional, simple).
+- **Hecho cuando:** la party se mueve junta sin atascarse entre ellos.
 
 ---
 
-## Tier 3 — Medio (sistema nuevo, ~100-200 líneas)
+## Fase 3 — Núcleo del combate por turnos
+
+### 7. Máquina de estados de juego *(añadido)*
+- Estados: `Exploration` ↔ `Combat` (+ `Victory` / `Defeat`), integrada con `gamestates.json`.
+- Entrada a combate: un enemigo detecta a la party (radio/LOS) o el jugador ataca primero.
+- Salida: todos los enemigos muertos → volver a exploración; toda la party caída → derrota.
+- **Hecho cuando:** acercarse a un enemigo inicia el combate y matarlo lo termina.
+
+### 8. Turnos
+- Orden de iniciativa (tirada d20 simple con RNG sembrado, sin stats).
+- Rondas: cuando todos han actuado, nueva ronda.
+- Economía de acciones por turno — el esqueleto de BG3 sin números: **1 Acción, 1 Acción adicional, X metros de movimiento**. Se resetean al empezar el turno.
+- Fin de turno manual (botón / Espacio) y automático si no quedan recursos.
+- Los participantes que entran tarde se insertan en el orden.
+- **Hecho cuando:** el combate rota correctamente entre party y enemigos durante varias rondas.
+
+### 9. Movimiento en combate
+- Movimiento limitado por los metros restantes del turno.
+- **Preview de camino** al hacer hover: línea del recorrido, coste en metros, color distinto si excede el alcance.
+- Visualización del área alcanzable (opcional: anillo de alcance aproximado).
+- **Hecho cuando:** no se puede mover más allá del presupuesto y el preview coincide con el camino real.
+
+### 10. Movimiento con obstáculos
+- Navmesh con obstáculos estáticos (ya existe) + **unidades como obstáculos** (no atravesar aliados/enemigos; cortar el navmesh o penalizar en A*).
+- Re-cálculo si el destino queda bloqueado. Destino inválido → cursor de "no válido".
+- **Hecho cuando:** los caminos rodean cajas y unidades y nunca terminan dentro de otra.
+
+### 11. Enemigo dummy
+- Prefab de enemigo con vida, que entra en la iniciativa y simplemente pasa turno.
+- **Hecho cuando:** un combate 4 vs 2 dummies funciona de principio a fin.
+
+### 12. Ataque
+- Ataque cuerpo a cuerpo (requiere estar adyacente; si no, ofrecer "moverse y atacar") y a distancia (requiere LOS y rango).
+- Resolución esqueleto: tirada de impacto fija (p.ej. 70%) + daño fijo. Sin stats, pero con el punto de enganche para meterlas después.
+- Muestra el **% de impacto** antes de confirmar (muy BG3).
+- **Hecho cuando:** atacar consume la Acción, puede fallar/acertar y resta vida.
+
+### 13. Línea de visión y cobertura *(añadido)*
+- Raycast (Rapier) para LOS entre atacante y objetivo.
+- Ataques a distancia bloqueados si no hay visión.
+- **Hecho cuando:** esconderse detrás de una columna impide ser atacado a distancia.
+
+### 14. Muerte, derrota y victoria *(añadido)*
+- Vida a 0: enemigo muere (sale de la iniciativa); aliado queda "caído" (sale o salta turno).
+- Condiciones de fin de combate y transición de estado (ver 7).
+- **Hecho cuando:** ambos finales (victoria/derrota) se alcanzan y se puede reiniciar.
 
 ---
 
-### 14. Imperfección deliberada
+## Fase 4 — Habilidades y UI
 
-> _"La IA perfecta parece falsa"_
+### 15. Skills
+- Modelo de datos genérico (JSON/prefab): coste (Acción / Acción adicional), rango, tipo de targeting, efecto.
+- Tipos de targeting: **unidad**, **punto en el suelo**, **área (círculo/cono)**, **self**.
+- Efectos esqueleto: daño, curación, empujón (aprovecha `PushAbility`), teletransporte.
+- Preview del área y de quién queda afectado antes de confirmar.
+- Cooldowns por turno (en lugar de spell slots).
+- **Hecho cuando:** hay 3–4 skills distintas funcionando (bola de fuego en área, curación, empujón, dash).
 
-Introducir errores controlados
+### 16. Reacciones *(añadido)*
+- Ataque de oportunidad al salir del alcance cuerpo a cuerpo de un enemigo.
+- Es lo que hace que el posicionamiento importe; con una sola reacción ya se nota.
+- **Hecho cuando:** alejarse de un enemigo adyacente dispara su ataque.
 
-Nada de esto requiere lógica compleja — son rolls aleatorios en puntos clave del BT.
-
----
-
-## Tier 4 — Complejo (arquitectura nueva, > 200 líneas)
-
-### 15. Sistema de slots posicionales
-
-> _"Posición A = 78 | Posición B = 81 | Posición C = 75 → elige B"_
-
-En lugar de orbitar libremente, el director mantiene N slots numerados alrededor del jugador
-(por ejemplo, 8 posiciones a 45° de separación). Cada enemigo **reserva** un slot y navega
-hacia él. Los slots se recalculan cada 2-5 s.
-
-Beneficios: los enemigos no se solapan, el flanqueo es predecible y legible para el jugador,
-el director controla la geometría del combate.
-
-**Archivos nuevos:** `CombatSlotManager.ts`, integración en `CombatDirectorComponent`.
-
----
+### 17. UI
+- **Barra de iniciativa** (arriba): retratos en orden, el activo resaltado, hover → resalta la unidad en el mundo.
+- **Retratos de party** (izquierda) con barra de vida; click para seleccionar.
+- **Hotbar** (abajo): ataque, skills, fin de turno; teclas numéricas; estado deshabilitado si no hay recurso.
+- **Indicadores de recursos**: Acción / Acción adicional / movimiento restante.
+- **Tooltips** de skills y del objetivo (vida, % impacto).
+- **Texto flotante** de daño/fallo/curación sobre las unidades.
+- Banner de "Turno de X" / "Victoria" / "Derrota".
+- **Hecho cuando:** se puede jugar un combate entero sin overlays de debug.
 
 ---
 
-### 17. Presupuesto de presión continuo (Pressure Budget dinámico)
+## Fase 5 — IA enemiga
 
-> _"Cada segundo el director decide: ¿puedo gastar más presión?"_
-
-Evolución del Threat Budget (Tier 2): el presupuesto se regenera con el tiempo a una tasa
-función de la dificultad. Los ataques no devuelven su coste al terminar — se amortiza
-durante 2-3 s, produciendo rachas de alta presión seguidas de respiros naturales sin
-que el diseñador tenga que hardcodear la cadencia.
-
----
-
-## Principios generales (guían el diseño, no son código)
-
-| Regla                              | Valor orientativo                                                           |
-| ---------------------------------- | --------------------------------------------------------------------------- |
-| Máx. atacantes simultáneos         | 1-2 (normal), 3 (difícil)                                                   |
-| Cooldown global entre olas         | 1.5–3 s                                                                     |
-| Cooldown individual por enemigo    | 3–6 s (varía por tipo)                                                      |
-| Proporción presión activa / órbita | 30% atacando, 70% rodeando/esperando                                        |
-| Tiempo entre amenazas relevantes   | 1.5–3 s (ataque, carga, proyectil…)                                         |
-| Latencia de reacción de enemigos   | 1.0–2.5 s ante cambios grandes del jugador                                  |
-| Objetivo de diseño                 | El jugador nunca está seguro, pero casi siempre tiene una respuesta posible |
+### 18. Enemy AI
+- Behavior Tree (reutilizando `src/ai`) que decide **en el turno** usando las mismas `game_command` que el jugador.
+- Scoring simple de acciones: para cada objetivo candidato → ¿alcanzable este turno? ¿% de impacto? ¿daño esperado? Elegir la mejor.
+- Comportamientos base: melee (acercarse y pegar), ranged (buscar posición con LOS y distancia), retirarse si está bajo de vida.
+- Pausas/ritmo para que el jugador entienda lo que hace la IA (la cámara la sigue).
+- **Hecho cuando:** un combate contra 3 enemigos variados es un reto mínimamente creíble y no se atasca nunca.
 
 ---
 
----
+## Fase 6 — Pulido del esqueleto (si sobra tiempo)
 
-# Weather System — Roadmap de implementación
-
-Sistema de clima dinámico que orquesta en tiempo real los sistemas existentes del motor
-(niebla, nubes volumétricas, viento, iluminación direccional, partículas) bajo una capa
-unificada de estados y transiciones suaves.
-
-No introduce un nuevo renderer ni un nuevo lenguaje de shaders. Su valor es la **coordinación**
-de sistemas ya funcionando y la adición de los efectos visuales que faltan (lluvia, nieve,
-rayos, superficies mojadas).
+- **Interacción con el entorno**: objetos empujables/explosivos (barriles), superficies (fuego/charco) que aplican efectos al entrar.
+- **Ventaja por altura**: bonus de impacto desde arriba; daño por caída al ser empujado.
+- **Saltar**: acción que salta obstáculos/huecos consumiendo movimiento.
+- **Animaciones básicas**: idle, andar, atacar, recibir golpe, morir (usar el sistema de animación existente).
+- **Feedback**: cámara que encuadra al atacante y objetivo, hit-stop, partículas de impacto (ya existen piezas).
+- **Encuentros definidos en datos**: un JSON por encuentro (enemigos, posiciones, trigger).
+- **Guardar/cargar** el estado de la party y el combate.
 
 ---
 
-## Arquitectura general
+## Fuera de alcance (a propósito)
 
-```
-WeatherSystem (singleton)
-├── Estado actual: WeatherState  { clear | cloudy | overcast | rain | heavyRain | storm | fog | snow }
-├── Estado objetivo: WeatherState
-├── Progreso de transición: t ∈ [0,1]
-├── Duración de transición: transitionDuration (seg)
-└── Tick(dt): interpolación de todos los parámetros hacia el estado objetivo
-
-WeatherComponent (camera component, prefab "main_camera.prefab")
-├── load(data)         — conecta WeatherSystem con los sistemas de render
-├── update(dt)         — tick del sistema, aplica valores interpolados a cada subsistema
-└── renderInMenu()     — controles en editor: estado actual, intensidad, transición manual
-
-Sistemas controlados:
-├── FogScatterComponent       — density, heightFalloff
-├── ModuleEnvironmentManager  — cloudCoverage, windSpeed, windAngle
-├── DirectionalLightComponent — intensity, color (tinte nublado)
-├── RainSystem                — intensidad de partículas, velocidad, dirección
-├── SnowSystem                — ídem
-├── ThunderSystem             — frecuencia, flash de luz, audio
-└── WetSurfaceManager         — factor de humedad global → roughness/reflectivity en materiales
-```
-
-Cada `WeatherState` es un objeto que define los valores **objetivo** de todos los parámetros.
-`WeatherSystem.tick()` interpola linealmente (o con curvas configurables) desde el estado actual
-hacia el objetivo. Todos los subsistemas reciben el valor interpolado, no el target directo.
+Estadísticas, clases, niveles, inventario, equipamiento, diálogos, misiones, multijugador, generación de contenido.
 
 ---
 
-## Phase 1 — Estado y transiciones (núcleo del sistema)
-
-**Archivos nuevos:**
-
-- `src/systems/weather/WeatherSystem.ts`
-- `src/systems/weather/WeatherState.ts`
-- `src/components/game/WeatherComponent.ts`
-- `src/types/WeatherComponentData.type.ts`
-
-### WeatherState
-
-```typescript
-interface WeatherStateParams {
-  // Niebla
-  fogDensity: number; // 0.0 – 0.003
-  fogHeightFalloff: number; // 0.02 – 0.15
-
-  // Nubes
-  cloudCoverage: number; // 0.0 – 1.0
-  cloudThickness: number; // 0.0 – 1.0
-
-  // Viento
-  windSpeed: number; // 0.0 – 0.15 (m/s normalizado)
-  windAngle: number; // 0 – 360 grados
-
-  // Sol
-  sunIntensityScale: number; // 0.1 (tormenta) – 1.0 (despejado)
-  sunColorTint: [number, number, number]; // RGB multiplicativo
-
-  // Precipitación
-  rainIntensity: number; // 0.0 – 1.0
-  snowIntensity: number; // 0.0 – 1.0
-
-  // Tormenta
-  thunderFrequency: number; // relámpagos por minuto (0 = ninguno)
-
-  // Humedad superficial
-  wetness: number; // 0.0 – 1.0
-}
-```
-
-**Presets de estado** (valores de referencia iniciales, ajustables en prefab):
-
-| Estado    | fog    | clouds | wind | sun  | rain | snow | thunder | wet  |
-| --------- | ------ | ------ | ---- | ---- | ---- | ---- | ------- | ---- |
-| Clear     | 0.0003 | 0.1    | 0.02 | 1.0  | 0.0  | 0.0  | 0       | 0.0  |
-| Cloudy    | 0.0005 | 0.45   | 0.04 | 0.75 | 0.0  | 0.0  | 0       | 0.0  |
-| Overcast  | 0.001  | 0.75   | 0.05 | 0.45 | 0.0  | 0.0  | 0       | 0.05 |
-| Rain      | 0.0015 | 0.85   | 0.07 | 0.30 | 0.5  | 0.0  | 0       | 0.5  |
-| HeavyRain | 0.002  | 0.95   | 0.10 | 0.20 | 1.0  | 0.0  | 0       | 1.0  |
-| Storm     | 0.002  | 1.0    | 0.15 | 0.15 | 1.0  | 0.0  | 8       | 1.0  |
-| Snow      | 0.0008 | 0.70   | 0.03 | 0.55 | 0.0  | 1.0  | 0       | 0.0  |
-| Fog       | 0.003  | 0.20   | 0.01 | 0.60 | 0.0  | 0.0  | 0       | 0.2  |
-
-### WeatherSystem
-
-```typescript
-class WeatherSystem {
-  static getInstance(): WeatherSystem;
-
-  // Cambio de estado con transición suave
-  transitionTo(state: WeatherStateKey, durationSecs: number): void;
-  setImmediate(state: WeatherStateKey): void;
-
-  // Estado interpolado actual (lo que reciben los subsistemas)
-  getCurrentParams(): WeatherStateParams;
-
-  tick(dt: number): void; // interpolación frame a frame
-  isTransitioning(): boolean;
-  getTransitionProgress(): number; // 0–1
-}
-```
-
-La interpolación usa `lerp` simple por defecto. El `windAngle` usa interpolación angular
-(camino más corto entre ángulos). El `thunderFrequency` se interpola también y se trata
-como probabilidad en el sistema de rayos.
-
-### WeatherComponent
-
-Componente de cámara que:
-
-1. Obtiene `WeatherSystem.getCurrentParams()` cada frame
-2. Aplica los valores a cada subsistema (niebla, nubes, sol, viento)
-3. Activa/desactiva RainSystem y SnowSystem según intensidad > umbral
-4. Expone en `renderInMenu()` los controles del weather
-
-**Conexión con sistemas existentes:**
-
-- `FogScatterComponent` — `comp.density = params.fogDensity`, `comp.heightFalloff = params.fogHeightFalloff`
-- `ModuleEnvironmentManager` — `env.setCloudCoverage(params.cloudCoverage)`, `env.setWindSpeed(params.windSpeed)`
-- `DirectionalLightComponent` — `light.setIntensityScale(params.sunIntensityScale)`, `light.setColorTint(params.sunColorTint)`
-
-**Archivos a modificar:**
-
-- `src/core/loaders/Loader.ts` — registrar `"weather" → WeatherComponent`
-- `public/assets/prefabs/cameras/main_camera.prefab` — añadir bloque `"weather": { "initialState": "clear", ... }`
-- `src/modules/core/ModuleEnvironmentManager.ts` — exponer setters públicos `setCloudCoverage()`, `setWindSpeed()` si no existen
-
----
-
-## Phase 2 — Sistema de lluvia
-
-**Archivos nuevos:**
-
-- `src/systems/weather/RainSystem.ts`
-- `public/assets/shaders/particles/rain_particle.vs` / `.fs`
-- `public/assets/prefabs/vfx/rain_emitter.prefab`
-
-### Partículas de lluvia
-
-La lluvia se implementa como un **volumen de partículas billboard centrado en la cámara**
-(no en el mundo), de forma que siempre cubre el área visible sin gestión de streaming.
-
-```
-RainSystem
-├── Emitter en world space pero reposicionado a cameraPos + (0, roofOffset, 0) cada frame
-├── Pool fijo de N partículas (N = 2000 lluvia ligera, 8000 lluvia intensa)
-├── Cada partícula: posición aleatoria en caja [-halfExtent, +halfExtent] × [0, height]
-├── Velocidad = windDir × windSpeed + vec3(0, -fallSpeed, 0)
-├── Cuando y < cameraPos.y - groundOffset → reciclar (nueva posición arriba)
-├── Forma: línea elongada en dirección de velocidad (billboard orientado a velocidad)
-└── Alpha = intensidad × depthFade (desvanece en superficies cercanas)
-```
-
-**Shader de partícula:**
-
-- VS: transforma posición + estira el quad en dirección de velocidad (longitud = speed × stretchFactor)
-- FS: gradiente alfa a lo largo del eje largo (más opaco en centro, transparente en extremos)
-- Sin sombras, sin iluminación — solo tinting por `scatterColor` de niebla para integración visual
-
-### Splash / impacto en superficies
-
-Efecto secundario simple: cuando una gota llega a `y = groundLevel`, se emite un splash
-procedural (billboard circular que se expande en 0.1 s y desaparece). No requiere ray cast;
-el `groundLevel` se pasa como uniform (configurable, default 0).
-
-El splash usa la misma textura que las ondas de agua de lluvia (circle ripple). Se puede
-reutilizar un atlas de partículas existente.
-
----
-
-## Phase 3 — Sistema de nieve
-
-**Archivos nuevos:**
-
-- `src/systems/weather/SnowSystem.ts`
-
-Arquitectura idéntica a `RainSystem` con diferencias:
-
-- Partículas más lentas (`fallSpeed` = 1-3 m/s vs 8-15 m/s de lluvia)
-- Forma: copo esférico (billboard circular con textura de copo) o quad giratorio
-- Movimiento añadido: oscilación senoidal en XZ (flutter) con fase aleatoria por partícula
-- Sin splash; en su lugar, ligero "ground accumulation" (ver Phase 5)
-- El `windAngle` tiene más influencia visual en nieve que en lluvia (copos lentos)
-
----
-
-## Phase 4 — Sistema de relámpagos
-
-**Archivos nuevos:**
-
-- `src/systems/weather/ThunderSystem.ts`
-
-Un relámpago es un evento en tres capas:
-
-**Capa 1 — Flash de luz (inmediato)**
-Al dispararse el evento, `ThunderSystem` aumenta temporalmente la intensidad del
-`DirectionalLightComponent` en un factor grande (×8-15) durante 2-3 frames (≈50 ms),
-luego vuelve al valor base. El color vira a azul-blanco (tinte `[0.9, 0.95, 1.0]`).
-
-**Capa 2 — Flash de pantalla (post-process)**
-Simultáneamente se activa un fullscreen flash: un quad blanco-semitransparente con
-alpha 0.3-0.5 que decae en 3-5 frames. Se renderiza como pass adicional en el pipeline
-de post-process, antes del tone mapping.
-
-```typescript
-// ThunderFlashComponent (simple, en el mismo fichero ThunderSystem.ts)
-// Se activa con triggerFlash(intensity, decaySecs)
-// Su pass escribe en el RT de accLight antes de TSR
-```
-
-**Capa 3 — Audio (diferido)**
-El trueno (sonido) se dispara con un delay = `distancia / 340` ms después del flash.
-`distancia` es aleatoria en un rango [200, 2000] m según el estado (tormenta cerca/lejos).
-Se integra con el sistema de audio existente si hay uno, o se deja como hook vacío.
-
-**Lógica de frecuencia:**
-
-```typescript
-// En ThunderSystem.tick(dt):
-this.timer += dt;
-const interval = 60.0 / params.thunderFrequency; // segundos entre rayos
-if (this.timer >= interval + Random(-interval * 0.4, interval * 0.4)) {
-  this.triggerLightning();
-  this.timer = 0;
-}
-```
-
----
-
-## Phase 5 — Superficies mojadas (WetSurfaceManager)
-
-**Archivos nuevos:**
-
-- `src/systems/weather/WetSurfaceManager.ts`
-
-**Archivos a modificar:**
-
-- Shader PBR de materiales (`public/assets/shaders/lighting/`) — añadir uniform `wetness`
-
-### Efecto visual
-
-Las superficies mojadas tienen:
-
-- **Roughness reducida** → más reflectividad especular (suelo brilla como espejo bajo lluvia)
-- **Reflectividad base aumentada** → el layer de agua tiene F0 de agua (~0.02)
-- **Micro-ondulaciones (ripple normals)** → normal map animado que simula lluvia cayendo en charcos
-
-```wgsl
-// En el shader PBR, tras leer las propiedades del material:
-let wet = wetness;  // uniform global 0-1
-let waterRoughness  = mix(material.roughness, 0.05, wet * saturate(1.0 - material.roughness));
-let waterReflective = mix(material.reflectivity, 0.02, wet * 0.6);
-// Solo en superficies horizontales (normal.y > umbral):
-let rippleNormal = sampleRippleNormal(worldPos.xz, time);
-let finalNormal  = normalize(mix(material.normal, rippleNormal, wet * horizontalFactor));
-```
-
-`WetSurfaceManager` simplemente mantiene el valor `wetness` global interpolado por
-`WeatherSystem` y lo sube a un uniform buffer pequeño (16 bytes) que el shader PBR lee.
-
-### Charcos procedurales
-
-Charcos visibles en zonas planas: se pueden implementar con una máscara basada en la
-normal del mundo (`worldNormal.y > 0.85`) y el factor `wetness`. No requiere geometría nueva —
-es un blending en el shader PBR entre el material base y un material de agua.
-
----
-
-## Phase 6 — API de scripting y cinemáticas
-
-**Archivos a modificar:**
-
-- `WeatherSystem.ts` — añadir `onTransitionComplete` callback
-- `WeatherComponent.ts` — exponer `triggerWeatherSequence(steps: WeatherSequenceStep[])`
-
-### WeatherSequence
-
-Permite que el código de juego o el sistema de cinemáticas programe secuencias de clima:
-
-```typescript
-interface WeatherSequenceStep {
-  state: WeatherStateKey;
-  holdSecs: number; // cuánto tiempo mantener este estado
-  transitionSecs: number; // duración de la transición HACIA este estado
-}
-
-// Ejemplo de secuencia de tormenta cinemática:
-WeatherSystem.getInstance().playSequence([
-  { state: 'cloudy', transitionSecs: 30, holdSecs: 60 },
-  { state: 'overcast', transitionSecs: 20, holdSecs: 30 },
-  { state: 'storm', transitionSecs: 15, holdSecs: 120 },
-  { state: 'rain', transitionSecs: 60, holdSecs: 0 },
-  { state: 'clear', transitionSecs: 90, holdSecs: 0 },
-]);
-```
-
----
-
-## Resumen de archivos
-
-| Acción    | Archivo                                                                           |
-| --------- | --------------------------------------------------------------------------------- |
-| Crear     | `src/systems/weather/WeatherSystem.ts`                                            |
-| Crear     | `src/systems/weather/WeatherState.ts`                                             |
-| Crear     | `src/components/game/WeatherComponent.ts`                                         |
-| Crear     | `src/types/WeatherComponentData.type.ts`                                          |
-| Crear     | `src/systems/weather/RainSystem.ts`                                               |
-| Crear     | `src/systems/weather/SnowSystem.ts`                                               |
-| Crear     | `src/systems/weather/ThunderSystem.ts`                                            |
-| Crear     | `src/systems/weather/WetSurfaceManager.ts`                                        |
-| Crear     | `public/assets/shaders/particles/rain_particle.vs`                                |
-| Crear     | `public/assets/shaders/particles/rain_particle.fs`                                |
-| Modificar | `src/core/loaders/Loader.ts` — registrar WeatherComponent                         |
-| Modificar | `public/assets/prefabs/cameras/main_camera.prefab` — bloque weather               |
-| Modificar | `src/modules/core/ModuleEnvironmentManager.ts` — setters públicos cloud/wind      |
-| Modificar | `public/assets/shaders/lighting/tiled_lighting.fs` (o PBR base) — uniform wetness |
-
----
-
-## Orden de implementación recomendado
-
-```
-Phase 1 (núcleo)
-  → WeatherState + WeatherSystem (tick + interpolación)
-  → WeatherComponent (conexión con fog + nubes + sol + viento existentes)
-  → renderInMenu con selector de estado y slider de transición
-  → Verificar que los 8 estados transicionan visualmente de forma correcta
-
-Phase 2 (lluvia)
-  → RainSystem con pool de partículas centrado en cámara
-  → Shader mínimo (línea elongada, alpha fade)
-  → Splash de impacto (opcional, segunda iteración)
-
-Phase 4 (relámpagos)
-  → ThunderSystem con flash de luz direccional
-  → Flash de pantalla (fullscreen quad)
-  → Audio hook (dejar preparado aunque no haya audio aún)
-
-Phase 5 (superficies mojadas)
-  → WetSurfaceManager → uniform buffer
-  → Roughness/reflectivity en shader PBR
-  → Ripple normals (segunda iteración)
-
-Phase 3 (nieve)
-  → SnowSystem basado en RainSystem con ajustes de velocidad/flutter
-
-Phase 6 (scripting)
-  → WeatherSequence API
-  → Integración con sistema de cinemáticas si existe
-```
-
-**El checkpoint más importante es al final de Phase 1**: si los 8 estados transicionan
-correctamente y los sistemas existentes (niebla, nubes, viento) responden, el núcleo del
-weather system está completo. Las phases siguientes añaden efectos pero no bloquean el uso
-del sistema para scripting y diseño de niveles.
+## Orden sugerido
+
+1. **0.1 + 0.2 + 0.3** del MCP (ciclo de vida, validación de datos, inspección).
+2. Escenario → cámara → controles.
+3. Party + selección + movimiento en exploración.
+4. **0.4 + 0.5** del MCP (control, comandos de juego y escenarios de test).
+5. Estados de juego → turnos → movimiento en combate → obstáculos → dummy → ataque → LOS → fin de combate.
+6. Skills → reacciones → UI.
+7. IA enemiga.
+8. Pulido.
+
+Hito jugable mínimo (*vertical slice*): **fin del paso 5** — 4 personajes vs 2 dummies, por turnos, con movimiento y ataque. A partir de ahí todo es añadir capas.

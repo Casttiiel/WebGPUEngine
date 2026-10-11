@@ -8,6 +8,10 @@ import { RenderManagerV2 } from './renderer/core/managers/RenderManagerV2';
 (window as any).RenderManager = RenderManagerV2;
 import { ProfilerOverlay } from './core/debug/ProfilerOverlay';
 import { Profiler } from './core/debug/Profiler';
+import { DevBridge } from './core/debug/DevBridge';
+
+// API de depuración para el MCP (window.__engine). No-op fuera de `npm run dev`.
+DevBridge.install();
 
 // Esperar a que el motor cargue
 try {
@@ -34,7 +38,10 @@ try {
 
         // Solo ejecutar update/render si el engine no está reiniciando
         if (!Engine.isEngineRestarting()) {
-          Engine.update(scaledDeltaTime);
+          // DevBridge puede pausar, avanzar frame a frame o fijar el delta (MCP)
+          const simDeltaTime = DevBridge.filterDelta(scaledDeltaTime);
+          if (simDeltaTime !== null) Engine.update(simDeltaTime);
+          DevBridge.beforeRender();
           Engine.render();
         }
         Time.updateFPSDisplay(deltaTime);
@@ -51,6 +58,7 @@ try {
       requestAnimationFrame(frame);
     } catch (error) {
       console.error('Error starting engine:', error);
+      DevBridge.setFatalError(error);
       // LoadingStatus.showError ya fue llamado en Engine.start()
     }
   })();

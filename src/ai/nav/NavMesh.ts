@@ -52,6 +52,11 @@ export class NavMesh {
     return this._query;
   }
 
+  /** Returns the underlying Detour navmesh (used by the dev bridge to draw it). */
+  public getRecastNavMesh(): RecastNavMesh | null {
+    return this._navMesh;
+  }
+
   /** Returns a copy of every triangle centroid. Used by ProbeAutoPlacement. */
   public getCentroids(): vec3[] {
     return this._centroids.map((c) => vec3.clone(c));
