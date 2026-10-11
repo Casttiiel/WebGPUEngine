@@ -565,7 +565,7 @@
     "components": {
       "name": "Enemy3",
       "transform": {
-        "position": [12, 0, -11]
+        "position": [12, 1.5, -11]
       }
     }
   }

@@ -20,7 +20,8 @@
     "dev:check": "npm run check && vite",
     "mcp": "tsx tools/mcp/server.ts",
     "mcp:call": "tsx tools/mcp/call.ts",
-    "mcp:check": "tsc -p tools/mcp/tsconfig.json"
+    "mcp:check": "tsc -p tools/mcp/tsconfig.json",
+    "test:scenarios": "tsx tools/mcp/test-scenarios.ts"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

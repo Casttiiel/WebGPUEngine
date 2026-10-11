@@ -5,9 +5,38 @@ import { Engine } from '../../../core/engine/Engine';
 import { TransformComponent } from '../../core/TransformComponent';
 import { AnimatorComponent } from '../../render/AnimatorComponent';
 import { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
+import { HealthComponent } from '../HealthComponent';
 import { groundHeightAt } from './TacticalQueries';
 
 export type UnitFaction = 'party' | 'enemy' | 'neutral';
+
+/** Un ataque de la unidad (arma). Sin stats: alcance y daño fijos. */
+export interface UnitAttack {
+  /** Identificador ('melee', 'ranged'…). */
+  id: string;
+  /** Nombre visible (hotbar, tooltips). */
+  name: string;
+  /** Cuerpo a cuerpo (se puede acercar y atacar) o a distancia (requiere línea de visión). */
+  kind: 'melee' | 'ranged';
+  /** Alcance en metros, de borde a borde de las cápsulas. */
+  range: number;
+  damage: number;
+  /** Recurso que consume. Default 'action'. */
+  cost?: 'action' | 'bonusAction';
+  /** Animación (clip) al atacar. */
+  clip?: string;
+}
+
+const DEFAULT_ATTACKS: UnitAttack[] = [
+  {
+    id: 'melee',
+    name: 'Golpe',
+    kind: 'melee',
+    range: 1.5,
+    damage: 10,
+    clip: 'Sword_Attack_Standing',
+  },
+];
 
 export type UnitComponentDataType = Readonly<{
   /** Bando de la unidad. Default: 'neutral'. */
@@ -20,6 +49,8 @@ export type UnitComponentDataType = Readonly<{
   movement?: number;
   /** Distancia a la que detecta a unidades enemigas (m). 0 = no detecta. Default: 8 enemigos, 0 resto. */
   sightRange?: number;
+  /** Ataques (orden de la hotbar; el primero es el de por defecto). Default: un golpe cuerpo a cuerpo. */
+  attacks?: UnitAttack[];
 }>;
 
 const UP = vec3.fromValues(0, 1, 0);
@@ -28,8 +59,9 @@ const UP = vec3.fromValues(0, 1, 0);
  * UnitComponent — unidad del juego táctico (miembro de la party, enemigo o neutral).
  *
  * Sabe moverse a lo largo de un camino (cuerpo kinematic + orientación + animación de
- * andar) y dónde tiene los pies. Las reglas (quién puede moverse, cuánto) las pone
- * EncounterComponent; aquí solo está la ejecución.
+ * andar), dónde tiene los pies, qué ataques tiene y cómo se ve al atacar, recibir un golpe
+ * o caer. La vida es su HealthComponent. Las reglas (quién puede moverse o atacar, cuánto)
+ * las pone EncounterComponent; aquí solo está la ejecución.
  */
 export class UnitComponent extends Component {
   private faction: UnitFaction = 'neutral';
@@ -37,6 +69,12 @@ export class UnitComponent extends Component {
   private moveSpeed = 4;
   private movement = 9;
   private sightRange = 0;
+  private attacks: UnitAttack[] = DEFAULT_ATTACKS;
+  private down = false;
+  /** Segundos que le quedan a la acción en curso (animación de ataque). */
+  private actionTimer = 0;
+  /** Dónde empezó (para reiniciar el encuentro). */
+  private spawn: { position: vec3; rotation: quat } | null = null;
 
   /** Distancia vertical del centro de la cápsula (pivote) a los pies. */
   private feetOffset: number | null = null;
@@ -56,10 +94,13 @@ export class UnitComponent extends Component {
     this.moveSpeed = data.moveSpeed ?? this.moveSpeed;
     this.movement = data.movement ?? this.movement;
     this.sightRange = data.sightRange ?? (this.faction === 'enemy' ? 8 : 0);
+    this.attacks = data.attacks?.length ? data.attacks.map((a) => ({ ...a })) : DEFAULT_ATTACKS;
   }
 
   public update(dt: number): void {
     if (this.feetOffset === null) this.computeFeetOffset();
+    if (!this.spawn) this.saveSpawn();
+    if (this.actionTimer > 0) this.actionTimer = Math.max(0, this.actionTimer - dt);
 
     if (this.path.length === 0) return;
 
@@ -91,6 +132,38 @@ export class UnitComponent extends Component {
 
   public isMoving(): boolean {
     return this.path.length > 0;
+  }
+
+  /** Moviéndose o en mitad de una acción (animación de ataque). */
+  public isBusy(): boolean {
+    return this.isMoving() || this.actionTimer > 0;
+  }
+
+  public getAttacks(): readonly UnitAttack[] {
+    return this.attacks;
+  }
+
+  /** Ataque por id (sin id: el de por defecto, el primero). */
+  public getAttack(id?: string | null): UnitAttack | null {
+    if (!id) return this.attacks[0] ?? null;
+    return this.attacks.find((a) => a.id === id) ?? null;
+  }
+
+  public getHealth(): HealthComponent | null {
+    return this.getOwner().getComponent('health') as HealthComponent | null;
+  }
+
+  public getHp(): number {
+    return this.getHealth()?.getHp() ?? 0;
+  }
+
+  public getMaxHp(): number {
+    return this.getHealth()?.getMaxHp() ?? 0;
+  }
+
+  /** Los enemigos a 0 PV mueren; los de la party quedan caídos. En ambos casos: no viva. */
+  public isAlive(): boolean {
+    return !this.down;
   }
 
   public getCapsuleRadius(): number {
@@ -139,7 +212,70 @@ export class UnitComponent extends Component {
     done?.();
   }
 
+  /** Mira hacia un punto (solo giro en el plano). */
+  public faceTowards(point: vec3): void {
+    this.getPosition(this.tmp);
+    vec3.sub(this.tmpDir, point, this.tmp);
+    this.faceDirection(this.tmpDir);
+  }
+
+  /**
+   * Reproduce una animación de acción (ataque, golpe recibido) encima de la actual. Durante
+   * `busyTime` segundos la unidad cuenta como ocupada (el turno no acaba a mitad).
+   */
+  public playAction(clip: string | undefined, busyTime = 0): void {
+    this.actionTimer = Math.max(this.actionTimer, busyTime);
+    const animator = this.getAnimator();
+    if (!clip || !animator?.hasClip(clip)) return;
+    animator.addLayer(clip, { loop: false, blendInTime: 0.12 });
+  }
+
+  /**
+   * Cae (0 PV) o se levanta. Caída: animación de muerte y sin colisión, así no tapa el
+   * picking ni los caminos. Al levantarse recupera `hp` PV (default: toda la vida).
+   */
+  public setDown(down: boolean, hp?: number): void {
+    if (down === this.down) return;
+    this.down = down;
+    this.stop();
+    this.actionTimer = 0;
+    const capsule = this.getOwner().getComponent(
+      'capsule_collider',
+    ) as CapsuleColliderComponent | null;
+    capsule?.getCollider()?.setEnabled(!down);
+    const animator = this.getAnimator();
+    animator?.setParameter('dead', down);
+    if (!down) {
+      this.getHealth()?.restore(hp);
+      animator?.play(); // el clip de muerte (sin loop) había parado el animator
+    }
+  }
+
+  /** Vuelve al punto de partida con toda la vida (reiniciar el encuentro). */
+  public resetToSpawn(): void {
+    this.stop();
+    this.setDown(false);
+    this.getHealth()?.restore();
+    this.actionTimer = 0;
+    if (!this.spawn) return;
+    const feet = vec3.clone(this.spawn.position);
+    feet[1] = feet[1]! - (this.feetOffset ?? 0.9);
+    this.setFeetPosition(feet);
+    const transform = this.getOwner().getComponent('transform') as TransformComponent | null;
+    transform?.getTransform().setLocalPosition(this.spawn.position);
+    transform?.getTransform().setLocalRotation(this.spawn.rotation);
+  }
+
   // ── Interno ──────────────────────────────────────────────────────────────
+
+  private saveSpawn(): void {
+    const transform = this.getOwner().getComponent('transform') as TransformComponent | null;
+    if (!transform) return;
+    this.spawn = {
+      position: this.getPosition(vec3.create()),
+      rotation: quat.clone(transform.getTransform().getLocalRotation()),
+    };
+  }
 
   private advanceAlongPath(dt: number): void {
     const feet = this.movingFeet;
@@ -194,7 +330,7 @@ export class UnitComponent extends Component {
     this.feetOffset = ground !== null ? pos[1]! - ground : 0.9;
   }
 
-  private getAnimator(): AnimatorComponent | null {
+  public getAnimator(): AnimatorComponent | null {
     const find = (e: Entity): AnimatorComponent | null =>
       (e.getComponent('animator') as AnimatorComponent | null) ??
       e

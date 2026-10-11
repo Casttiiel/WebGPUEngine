@@ -46,12 +46,21 @@ export class PathPreview {
   }
 
   public hide(): void {
-    if (this.lastKey !== '') {
-      this.lastKey = '';
-      for (const d of this.okDots) d.hide();
-      for (const d of this.farDots) d.hide();
-    }
+    this.hideDots();
     this.showLabel(null);
+  }
+
+  /** Solo la etiqueta junto al cursor, sin camino (p.ej. tooltip de un objetivo). */
+  public showLabelOnly(label: string): void {
+    this.hideDots();
+    this.showLabel(label);
+  }
+
+  private hideDots(): void {
+    if (this.lastKey === '') return;
+    this.lastKey = '';
+    for (const d of this.okDots) d.hide();
+    for (const d of this.farDots) d.hide();
   }
 
   public destroy(): void {

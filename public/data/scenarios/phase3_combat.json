@@ -1,0 +1,285 @@
+{
+  "description": "Fase 3 (puntos 11-15): 4 héroes contra 2 enemigos dummy de principio a fin. Línea de visión (columna), ataque a distancia por sorpresa, moverse y atacar con click, muerte y salida de la iniciativa, victoria, aliados caídos que pierden el turno, derrota y reinicio con R. Todo con el HUD de combate.",
+  "seed": 7,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__log = []; Engine.getEntities().getObjectManagerByName('encounter').getList()[0].onEvent((e, d) => window.__log.push({ e, u: d.unit ? d.unit.getName() : null, amount: d.amount ?? null }))"
+    },
+    {
+      "eval": "window.__autoTurn = () => { const enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; const s = __engine.getCombatState(); if (s.state !== 'combat') return true; if (!s.playerTurn || s.busy) return false; const me = Engine.getEntities().getEntityByName(s.activeUnit); if (me.getComponent('unit').isBusy()) return false; if (s.resources.action > 0) { for (const c of s.turnOrder.filter(c => c.faction === 'enemy' && c.alive)) { const t = Engine.getEntities().getEntityByName(c.name); for (const a of ['melee', 'ranged']) { if (enc.planAttack(me, t, a).canAttack) { enc.requestAttack(me, t, a); return false; } } } } enc.endTurn(); return false; }"
+    },
+
+    { "log": "Punto 11: los enemigos dummy tienen vida" },
+    { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 20 } },
+    { "assert": { "entity": "Enemy2", "path": "health.getHp", "value": 20 } },
+    { "assert": { "entity": "Hero1", "path": "health.getHp", "value": 30 } },
+
+    { "log": "Punto 13: detrás de la columna no hay línea de visión" },
+    { "command": "move", "args": { "unit": "Hero1", "to": [-5, 0, 12] } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "combat": true,
+        "path": "state",
+        "value": "exploration",
+        "message": "escondido: nadie le ve"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Enemy1', attack: 'ranged' }).then(r => [r.inRange, r.lineOfSight, r.canAttack, r.reason])",
+        "value": [true, false, false, "no line of sight"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Enemy1', attack: 'melee' }).then(r => r.canAttack && r.approach > 0)",
+        "value": true,
+        "message": "cuerpo a cuerpo no necesita visión: se acercaría"
+      }
+    },
+
+    { "log": "Punto 15: la hotbar arma el ataque a distancia; el cursor sobre el enemigo dice que no se puede" },
+    { "input": { "type": "click", "widget": "hotbar_2" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": "ranged" } },
+    {
+      "assert": {
+        "entity": "Hero1",
+        "path": "unit.isMoving",
+        "value": false,
+        "message": "el click en la hotbar no llega al mundo"
+      }
+    },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn(Engine.getEntities().getEntityByName('Enemy1'), false)"
+    },
+    { "wait_frames": 60 },
+    { "input": { "type": "move", "entity": "Enemy1" } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "enemy" } },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "invalid" } },
+    { "assert": { "expr": "__engine.getWidgetRect('cursor_label').visible", "value": true } },
+    { "screenshot": "01-no-line-of-sight" },
+
+    { "log": "Punto 7 + 13: un paso al lado hay visión; atacar primero empieza el combate" },
+    { "command": "move", "args": { "unit": "Hero1", "to": [-2.5, 0, 13] } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 300
+    },
+    { "input": { "type": "move", "entity": "Enemy1" } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "attack" } },
+    { "input": { "type": "click", "entity": "Enemy1" } },
+    { "wait_frames": 40 },
+    {
+      "assert": {
+        "entity": "Enemy1",
+        "path": "health.getHp",
+        "value": 14,
+        "message": "disparo: 6 de daño"
+      }
+    },
+    { "assert": { "combat": true, "path": "state", "value": "combat" } },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().turnOrder.filter(c => c.faction === 'enemy').map(c => c.name).sort()",
+        "value": ["Enemy1", "Enemy2"],
+        "message": "4 contra 2"
+      }
+    },
+    {
+      "assert": {
+        "entity": "Party",
+        "path": "tactical_pointer.getArmedAttack",
+        "value": null,
+        "message": "tras atacar vuelve el ataque por defecto"
+      }
+    },
+    {
+      "assert": {
+        "expr": "[1, 2, 3, 4, 5, 6, 7, 8].some(i => __engine.getWidgetRect('float_' + i).visible)",
+        "value": true,
+        "message": "texto flotante del daño"
+      }
+    },
+    {
+      "assert": {
+        "expr": "[1, 2, 3, 4, 5, 6].filter(i => __engine.getWidgetRect('init_' + i).visible).length",
+        "value": 6,
+        "message": "barra de iniciativa con los 6 participantes"
+      }
+    },
+    { "screenshot": "02-first-strike" },
+
+    { "log": "Punto 12: en el turno de Hero1, click en el enemigo → se acerca y ataca cuerpo a cuerpo" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero1') return true; if (s.playerTurn) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 900,
+      "check_every": 5
+    },
+    { "wait_frames": 30 },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn(Engine.getEntities().getEntityByName('Enemy1'), false)"
+    },
+    { "wait_frames": 60 },
+    { "input": { "type": "move", "entity": "Enemy1" } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "attack" } },
+    {
+      "assert": {
+        "expr": "Engine.getEntities().getAllEntities().filter(e => e.getName() === 'PathDot' && e.getComponent('render').isVisible()).length",
+        "op": ">",
+        "value": 3,
+        "message": "preview del camino hasta el enemigo"
+      }
+    },
+    { "screenshot": "03-melee-preview" },
+    { "input": { "type": "click", "entity": "Enemy1" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Hero1", "path": "unit.isMoving", "value": true } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isBusy", "value": false },
+      "timeout_frames": 600
+    },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 4 } },
+    { "assert": { "combat": true, "path": "resources.action", "value": 0 } },
+    { "assert": { "combat": true, "path": "resources.movement", "op": "<", "value": 9 } },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Enemy1' }).then(r => [r.inRange, r.canAttack, r.reason])",
+        "value": [true, false, "no action left"]
+      }
+    },
+    { "screenshot": "04-melee-hit" },
+
+    { "log": "Puntos 11 + 14: se juega el combate hasta el final; los muertos salen de la iniciativa" },
+    {
+      "wait_until": { "expr": "window.__autoTurn()", "value": true },
+      "timeout_frames": 4000,
+      "check_every": 5
+    },
+    { "assert": { "combat": true, "path": "state", "value": "victory" } },
+    { "screenshot": "05-victory" },
+    {
+      "assert": {
+        "expr": "['Enemy1', 'Enemy2'].map(n => __engine.readPath(n, 'unit.isAlive'))",
+        "value": [false, false]
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const l = window.__log; return ['Enemy1', 'Enemy2'].every(n => { const d = l.findIndex(x => x.e === 'death' && x.u === n); return d >= 0 && !l.slice(d).some(x => x.e === 'turn' && x.u === n); }); })()",
+        "value": true,
+        "message": "un enemigo muerto no vuelve a tener turno"
+      }
+    },
+    { "wait_seconds": 2.2 },
+    { "assert": { "combat": true, "path": "state", "value": "exploration" } },
+    {
+      "assert": {
+        "expr": "__engine.getWidgetRect('restart_hint').visible",
+        "value": false,
+        "message": "queda Enemy3: no se ofrece reiniciar"
+      }
+    },
+
+    { "log": "Punto 14: derrota — Enemy3 detecta a Hero1, la party cae (daño de debug: aún no hay IA)" },
+    { "command": "move", "args": { "unit": "Hero1", "to": [8, 0, -6] } },
+    { "wait_until": { "combat": true, "path": "state", "value": "combat" }, "timeout_frames": 900 },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().turnOrder.filter(c => c.faction === 'enemy').map(c => c.name)",
+        "value": ["Enemy3"]
+      }
+    },
+    { "command": "damage", "args": { "unit": "Hero2", "amount": 100 } },
+    { "assert": { "entity": "Hero2", "path": "unit.isAlive", "value": false } },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().turnOrder.some(c => c.name === 'Hero2' && !c.alive)",
+        "value": true,
+        "message": "un aliado caído sigue en la iniciativa"
+      }
+    },
+    { "eval": "window.__round0 = __engine.getCombatState().round" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.round >= window.__round0 + 2) return true; if (s.playerTurn) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 1500,
+      "check_every": 5
+    },
+    {
+      "assert": {
+        "expr": "(() => { const l = window.__log; const d = l.findIndex(x => x.e === 'downed' && x.u === 'Hero2'); return d >= 0 && !l.slice(d).some(x => x.e === 'turn' && x.u === 'Hero2'); })()",
+        "value": true,
+        "message": "y pierde sus turnos"
+      }
+    },
+    { "command": "damage", "args": { "unit": "Hero1", "amount": 100 } },
+    { "command": "damage", "args": { "unit": "Hero3", "amount": 100 } },
+    { "assert": { "combat": true, "path": "state", "value": "combat" } },
+    { "command": "damage", "args": { "unit": "Hero4", "amount": 100 } },
+    { "assert": { "combat": true, "path": "state", "value": "defeat" } },
+    { "wait_frames": 30 },
+    { "assert": { "expr": "__engine.getWidgetRect('restart_hint').visible", "value": true } },
+    { "assert": { "expr": "__engine.getWidgetRect('combat_banner').visible", "value": true } },
+    { "screenshot": "06-defeat" },
+
+    { "log": "Punto 14: R reinicia el encuentro" },
+    { "input": { "type": "key", "key": "KeyR" } },
+    { "wait_frames": 3 },
+    { "assert": { "combat": true, "path": "state", "value": "exploration" } },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().units.every(u => u.alive && u.hp === u.maxHp)",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "entity": "Hero1",
+        "path": "position",
+        "op": "approx",
+        "value": [-4, 0.9, -6],
+        "tolerance": 0.05
+      }
+    },
+    {
+      "assert": {
+        "entity": "Enemy1",
+        "path": "position",
+        "op": "approx",
+        "value": [5, 0.9, 6],
+        "tolerance": 0.05
+      }
+    },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero1" } },
+    { "wait_frames": 30 },
+    { "assert": { "combat": true, "path": "state", "value": "exploration" } },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_move', { unit: 'Hero1', to: [5, 0, 6] }).then(r => r.reachable)",
+        "value": false,
+        "message": "los enemigos revividos vuelven a ser obstáculos"
+      }
+    },
+    { "screenshot": "07-restart" },
+    { "assert": { "no_errors": true } }
+  ]
+}

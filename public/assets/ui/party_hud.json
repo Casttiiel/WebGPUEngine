@@ -58,6 +58,34 @@
           "color": [1, 1, 1, 1],
           "align": "center"
         }
+      },
+      {
+        "name": "portrait_1_hp_bg",
+        "alias": "portrait_1_hp_bg",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        }
+      },
+      {
+        "name": "portrait_1_hp",
+        "alias": "portrait_1_hp",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.25, 0.8, 0.3, 1]
+        }
       }
     ]
   },
@@ -119,6 +147,34 @@
           "size": [30, 30],
           "color": [1, 1, 1, 1],
           "align": "center"
+        }
+      },
+      {
+        "name": "portrait_2_hp_bg",
+        "alias": "portrait_2_hp_bg",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        }
+      },
+      {
+        "name": "portrait_2_hp",
+        "alias": "portrait_2_hp",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.25, 0.8, 0.3, 1]
         }
       }
     ]
@@ -182,6 +238,34 @@
           "color": [1, 1, 1, 1],
           "align": "center"
         }
+      },
+      {
+        "name": "portrait_3_hp_bg",
+        "alias": "portrait_3_hp_bg",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        }
+      },
+      {
+        "name": "portrait_3_hp",
+        "alias": "portrait_3_hp",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.25, 0.8, 0.3, 1]
+        }
       }
     ]
   },
@@ -243,6 +327,34 @@
           "size": [30, 30],
           "color": [1, 1, 1, 1],
           "align": "center"
+        }
+      },
+      {
+        "name": "portrait_4_hp_bg",
+        "alias": "portrait_4_hp_bg",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        }
+      },
+      {
+        "name": "portrait_4_hp",
+        "alias": "portrait_4_hp",
+        "type": "image",
+        "x": 0,
+        "y": 100,
+        "width": 96,
+        "height": 10,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 10],
+          "color": [0.25, 0.8, 0.3, 1]
         }
       }
     ]

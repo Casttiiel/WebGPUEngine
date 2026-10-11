@@ -107,6 +107,12 @@ export class HealthComponent extends Component {
     this.getOwner().sendMsg(Msg.onHealed({ amount: actual, currentHp: this.currentHp }));
   }
 
+  /** Devuelve la vida a `hp` (default: máxima), aunque esté muerto (revivir / reiniciar). */
+  public restore(hp: number = this.maxHp): void {
+    this.currentHp = Math.max(0, Math.min(hp, this.maxHp));
+    this.invincibilityTimer = 0;
+  }
+
   public isDead(): boolean {
     return this.currentHp <= 0;
   }

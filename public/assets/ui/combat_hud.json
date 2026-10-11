@@ -3,8 +3,6 @@
     "name": "combat_banner",
     "alias": "combat_banner",
     "type": "text",
-    "anchor": "center",
-    "visible": false,
     "x": -700,
     "y": -280,
     "width": 1400,
@@ -15,83 +13,1421 @@
       "color": [1, 0.85, 0.4, 1],
       "align": "center"
     },
-    "blocksInput": false
+    "blocksInput": false,
+    "anchor": "center",
+    "visible": false
+  },
+  {
+    "name": "restart_hint",
+    "alias": "restart_hint",
+    "type": "text",
+    "x": -700,
+    "y": -140,
+    "width": 1400,
+    "height": 56,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 0.9],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "anchor": "center",
+    "visible": false
   },
   {
     "name": "combat_round",
     "alias": "combat_round",
     "type": "text",
-    "anchor": "top-center",
-    "visible": false,
-    "x": -700,
-    "y": 24,
-    "width": 1400,
-    "height": 50,
+    "x": -300,
+    "y": 14,
+    "width": 600,
+    "height": 40,
     "textParams": {
       "text": "",
-      "size": [46, 46],
+      "size": [36, 36],
       "color": [1, 1, 1, 1],
       "align": "center"
     },
-    "blocksInput": false
+    "blocksInput": false,
+    "anchor": "top-center",
+    "visible": false
   },
   {
-    "name": "combat_order",
-    "alias": "combat_order",
+    "name": "turn_banner",
+    "alias": "turn_banner",
     "type": "text",
-    "anchor": "top-center",
-    "visible": false,
-    "x": -940,
-    "y": 76,
-    "width": 1880,
-    "height": 36,
+    "x": -700,
+    "y": 158,
+    "width": 1400,
+    "height": 64,
     "textParams": {
       "text": "",
-      "size": [32, 32],
-      "color": [0.85, 0.9, 1, 1],
+      "size": [56, 56],
+      "color": [1, 0.92, 0.7, 1],
       "align": "center"
     },
-    "blocksInput": false
+    "blocksInput": false,
+    "anchor": "top-center",
+    "visible": false
+  },
+  {
+    "name": "init_1",
+    "alias": "init_1",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_1_face",
+        "alias": "init_1_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_1_name",
+        "alias": "init_1_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_1_hp_bg",
+        "alias": "init_1_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_1_hp",
+        "alias": "init_1_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_2",
+    "alias": "init_2",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_2_face",
+        "alias": "init_2_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_2_name",
+        "alias": "init_2_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_2_hp_bg",
+        "alias": "init_2_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_2_hp",
+        "alias": "init_2_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_3",
+    "alias": "init_3",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_3_face",
+        "alias": "init_3_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_3_name",
+        "alias": "init_3_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_3_hp_bg",
+        "alias": "init_3_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_3_hp",
+        "alias": "init_3_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_4",
+    "alias": "init_4",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_4_face",
+        "alias": "init_4_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_4_name",
+        "alias": "init_4_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_4_hp_bg",
+        "alias": "init_4_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_4_hp",
+        "alias": "init_4_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_5",
+    "alias": "init_5",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_5_face",
+        "alias": "init_5_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_5_name",
+        "alias": "init_5_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_5_hp_bg",
+        "alias": "init_5_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_5_hp",
+        "alias": "init_5_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_6",
+    "alias": "init_6",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_6_face",
+        "alias": "init_6_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_6_name",
+        "alias": "init_6_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_6_hp_bg",
+        "alias": "init_6_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_6_hp",
+        "alias": "init_6_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_7",
+    "alias": "init_7",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_7_face",
+        "alias": "init_7_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_7_name",
+        "alias": "init_7_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_7_hp_bg",
+        "alias": "init_7_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_7_hp",
+        "alias": "init_7_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_8",
+    "alias": "init_8",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_8_face",
+        "alias": "init_8_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_8_name",
+        "alias": "init_8_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_8_hp_bg",
+        "alias": "init_8_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_8_hp",
+        "alias": "init_8_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_9",
+    "alias": "init_9",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_9_face",
+        "alias": "init_9_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_9_name",
+        "alias": "init_9_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_9_hp_bg",
+        "alias": "init_9_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_9_hp",
+        "alias": "init_9_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_10",
+    "alias": "init_10",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_10_face",
+        "alias": "init_10_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_10_name",
+        "alias": "init_10_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_10_hp_bg",
+        "alias": "init_10_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_10_hp",
+        "alias": "init_10_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_11",
+    "alias": "init_11",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_11_face",
+        "alias": "init_11_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_11_name",
+        "alias": "init_11_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_11_hp_bg",
+        "alias": "init_11_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_11_hp",
+        "alias": "init_11_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_12",
+    "alias": "init_12",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.08, 0.08, 0.1, 0.85]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_12_face",
+        "alias": "init_12_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.13, 0.27, 0.6, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_12_name",
+        "alias": "init_12_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [28, 28],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_12_hp_bg",
+        "alias": "init_12_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_12_hp",
+        "alias": "init_12_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.25, 0.8, 0.3, 1]
+        },
+        "blocksInput": false
+      }
+    ]
   },
   {
     "name": "combat_resources",
     "alias": "combat_resources",
     "type": "image",
-    "anchor": "bottom-center",
-    "visible": false,
-    "x": -460,
-    "y": -112,
-    "width": 920,
-    "height": 60,
+    "x": -380,
+    "y": -196,
+    "width": 760,
+    "height": 54,
     "imageParams": {
       "texture": "white.png",
-      "size": [920, 60],
-      "color": [0.05, 0.05, 0.08, 0.75]
+      "size": [760, 54],
+      "color": [0.05, 0.05, 0.08, 0.8]
     },
+    "anchor": "bottom-center",
+    "visible": false,
+    "blocksInput": false,
     "children": [
       {
-        "name": "combat_resources_text",
-        "alias": "combat_resources_text",
+        "name": "res_action",
+        "alias": "res_action",
+        "type": "image",
+        "x": 18,
+        "y": 13,
+        "width": 28,
+        "height": 28,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [28, 28],
+          "color": [0.3, 0.85, 0.35, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "res_action_label",
+        "alias": "res_action_label",
         "type": "text",
-        "x": 0,
-        "y": 0,
-        "width": 920,
-        "height": 60,
+        "x": 54,
+        "y": 7,
+        "width": 110,
+        "height": 40,
         "textParams": {
           "text": "",
-          "size": [36, 36],
+          "size": [32, 32],
           "color": [1, 1, 1, 1],
-          "align": "center"
-        }
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "res_bonus",
+        "alias": "res_bonus",
+        "type": "image",
+        "x": 176,
+        "y": 13,
+        "width": 28,
+        "height": 28,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [28, 28],
+          "color": [1, 0.6, 0.15, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "res_bonus_label",
+        "alias": "res_bonus_label",
+        "type": "text",
+        "x": 212,
+        "y": 7,
+        "width": 140,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [32, 32],
+          "color": [1, 1, 1, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "res_move_bg",
+        "alias": "res_move_bg",
+        "type": "image",
+        "x": 372,
+        "y": 19,
+        "width": 220,
+        "height": 16,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [220, 16],
+          "color": [0.02, 0.02, 0.02, 0.9]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "res_move_fill",
+        "alias": "res_move_fill",
+        "type": "image",
+        "x": 372,
+        "y": 19,
+        "width": 220,
+        "height": 16,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [220, 16],
+          "color": [0.95, 0.85, 0.3, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "res_move_text",
+        "alias": "res_move_text",
+        "type": "text",
+        "x": 600,
+        "y": 7,
+        "width": 150,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [32, 32],
+          "color": [1, 1, 1, 1],
+          "align": "left"
+        },
+        "blocksInput": false
       }
     ]
+  },
+  {
+    "name": "hotbar_1",
+    "alias": "hotbar_1",
+    "type": "image",
+    "x": 0,
+    "y": -130,
+    "width": 104,
+    "height": 104,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [104, 104],
+      "color": [0.08, 0.08, 0.1, 0.9]
+    },
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_1_icon",
+        "alias": "hotbar_1_icon",
+        "type": "image",
+        "x": 6,
+        "y": 6,
+        "width": 92,
+        "height": 92,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [92, 92],
+          "color": [0.5, 0.15, 0.1, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_1_key",
+        "alias": "hotbar_1_key",
+        "type": "text",
+        "x": 10,
+        "y": 6,
+        "width": 30,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_1_name",
+        "alias": "hotbar_1_name",
+        "type": "text",
+        "x": 2,
+        "y": 62,
+        "width": 100,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "hotbar_2",
+    "alias": "hotbar_2",
+    "type": "image",
+    "x": 0,
+    "y": -130,
+    "width": 104,
+    "height": 104,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [104, 104],
+      "color": [0.08, 0.08, 0.1, 0.9]
+    },
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_2_icon",
+        "alias": "hotbar_2_icon",
+        "type": "image",
+        "x": 6,
+        "y": 6,
+        "width": 92,
+        "height": 92,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [92, 92],
+          "color": [0.5, 0.15, 0.1, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_2_key",
+        "alias": "hotbar_2_key",
+        "type": "text",
+        "x": 10,
+        "y": 6,
+        "width": 30,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_2_name",
+        "alias": "hotbar_2_name",
+        "type": "text",
+        "x": 2,
+        "y": 62,
+        "width": 100,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "hotbar_3",
+    "alias": "hotbar_3",
+    "type": "image",
+    "x": 0,
+    "y": -130,
+    "width": 104,
+    "height": 104,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [104, 104],
+      "color": [0.08, 0.08, 0.1, 0.9]
+    },
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_3_icon",
+        "alias": "hotbar_3_icon",
+        "type": "image",
+        "x": 6,
+        "y": 6,
+        "width": 92,
+        "height": 92,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [92, 92],
+          "color": [0.5, 0.15, 0.1, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_3_key",
+        "alias": "hotbar_3_key",
+        "type": "text",
+        "x": 10,
+        "y": 6,
+        "width": 30,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_3_name",
+        "alias": "hotbar_3_name",
+        "type": "text",
+        "x": 2,
+        "y": 62,
+        "width": 100,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "hotbar_4",
+    "alias": "hotbar_4",
+    "type": "image",
+    "x": 0,
+    "y": -130,
+    "width": 104,
+    "height": 104,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [104, 104],
+      "color": [0.08, 0.08, 0.1, 0.9]
+    },
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_4_icon",
+        "alias": "hotbar_4_icon",
+        "type": "image",
+        "x": 6,
+        "y": 6,
+        "width": 92,
+        "height": 92,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [92, 92],
+          "color": [0.5, 0.15, 0.1, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_4_key",
+        "alias": "hotbar_4_key",
+        "type": "text",
+        "x": 10,
+        "y": 6,
+        "width": 30,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_4_name",
+        "alias": "hotbar_4_name",
+        "type": "text",
+        "x": 2,
+        "y": 62,
+        "width": 100,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "hotbar_tooltip",
+    "alias": "hotbar_tooltip",
+    "type": "text",
+    "x": -700,
+    "y": -256,
+    "width": 1400,
+    "height": 44,
+    "textParams": {
+      "text": "",
+      "size": [34, 34],
+      "color": [1, 0.95, 0.8, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "anchor": "bottom-center",
+    "visible": false
   },
   {
     "name": "end_turn_button",
     "alias": "end_turn_button",
     "type": "image",
-    "anchor": "bottom-right",
-    "visible": false,
     "x": -320,
     "y": -128,
     "width": 280,
@@ -101,6 +1437,8 @@
       "size": [280, 88],
       "color": [0.35, 0.25, 0.08, 0.9]
     },
+    "anchor": "bottom-right",
+    "visible": false,
     "children": [
       {
         "name": "end_turn_label",
@@ -115,7 +1453,8 @@
           "size": [40, 40],
           "color": [1, 0.9, 0.6, 1],
           "align": "center"
-        }
+        },
+        "blocksInput": false
       },
       {
         "name": "end_turn_hint",
@@ -130,15 +1469,151 @@
           "size": [26, 26],
           "color": [1, 1, 1, 0.7],
           "align": "center"
-        }
+        },
+        "blocksInput": false
       }
     ]
+  },
+  {
+    "name": "float_1",
+    "alias": "float_1",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "float_2",
+    "alias": "float_2",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "float_3",
+    "alias": "float_3",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "float_4",
+    "alias": "float_4",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "float_5",
+    "alias": "float_5",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "float_6",
+    "alias": "float_6",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "float_7",
+    "alias": "float_7",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
+  },
+  {
+    "name": "float_8",
+    "alias": "float_8",
+    "type": "text",
+    "x": 0,
+    "y": 0,
+    "width": 240,
+    "height": 48,
+    "textParams": {
+      "text": "",
+      "size": [44, 44],
+      "color": [1, 1, 1, 1],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "visible": false
   },
   {
     "name": "cursor_label",
     "alias": "cursor_label",
     "type": "text",
-    "visible": false,
     "x": 0,
     "y": 0,
     "width": 160,
@@ -149,6 +1624,7 @@
       "color": [1, 1, 1, 1],
       "align": "left"
     },
-    "blocksInput": false
+    "blocksInput": false,
+    "visible": false
   }
 ]

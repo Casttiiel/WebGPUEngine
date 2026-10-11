@@ -25,10 +25,33 @@
               "name": "Walk",
               "clip": "Jog_Fwd_Loop",
               "loop": true
+            },
+            {
+              "name": "Dead",
+              "clip": "Death01",
+              "loop": false
             }
           ],
           "default": "Idle",
           "transitions": [
+            {
+              "from": "Idle",
+              "to": "Dead",
+              "condition": "dead",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Walk",
+              "to": "Dead",
+              "condition": "dead",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Dead",
+              "to": "Idle",
+              "conditionFalse": "dead",
+              "blendTime": 0.3
+            },
             {
               "from": "Idle",
               "to": "Walk",
@@ -68,7 +91,28 @@
     "unit": {
       "faction": "party",
       "moveSpeed": 4,
-      "movement": 9
+      "movement": 9,
+      "attacks": [
+        {
+          "id": "melee",
+          "name": "Espada",
+          "kind": "melee",
+          "range": 1.5,
+          "damage": 10,
+          "clip": "Sword_Attack_Standing"
+        },
+        {
+          "id": "ranged",
+          "name": "Disparo",
+          "kind": "ranged",
+          "range": 18,
+          "damage": 6,
+          "clip": "Spell_Simple_Shoot"
+        }
+      ]
+    },
+    "health": {
+      "maxHp": 30
     }
   }
 }

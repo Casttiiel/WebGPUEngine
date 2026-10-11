@@ -33,6 +33,7 @@ export class PartyComponent extends Component {
   private members: Entity[] = [];
   private selected: Entity | null = null;
   private initialized = false;
+  private numberKeys = true;
   private ring: GroundMarker | null = null;
   private listeners: ((selected: Entity | null, source: SelectionSource) => void)[] = [];
   private readonly tmpPos = vec3.create();
@@ -51,9 +52,11 @@ export class PartyComponent extends Component {
     if (!this.initialized) this.initialize();
 
     const input = Engine.getInput();
-    SELECT_KEYS.forEach((key, i) => {
-      if (input.isKeyJustPressed(key)) this.select(i, 'key');
-    });
+    if (this.numberKeys) {
+      SELECT_KEYS.forEach((key, i) => {
+        if (input.isKeyJustPressed(key)) this.select(i, 'key');
+      });
+    }
     if (input.isKeyJustPressed(KeyCode.TAB) && this.members.length) {
       const shift =
         input.isKeyPressed(KeyCode.SHIFT) || input.isKeyPressed('shiftright' as KeyCode);
@@ -109,6 +112,11 @@ export class PartyComponent extends Component {
     // La cámara sigue siempre al personaje controlado (transición suave).
     this.getCamera()?.setActiveUnit(entity, true);
     if (changed) for (const l of this.listeners) l(entity, source);
+  }
+
+  /** Teclas 1-4 para seleccionar. En combate se apagan: son las de la hotbar. */
+  public setNumberKeysEnabled(enabled: boolean): void {
+    this.numberKeys = enabled;
   }
 
   public onSelectionChanged(

@@ -15,7 +15,7 @@ const MOVE_THRESHOLD = 0.05;
 /**
  * UnitObstacles — las unidades como obstáculos del navmesh (TileCache de Detour).
  *
- * Cada unidad tiene un cilindro que corta el navmesh, así los caminos las rodean y nadie
+ * Cada unidad viva tiene un cilindro que corta el navmesh, así los caminos las rodean y nadie
  * puede terminar un movimiento dentro de otra. La unidad que actúa (la que planifica y
  * se mueve) no tiene el suyo: si no, su propio cilindro le bloquearía el camino.
  */
@@ -43,7 +43,8 @@ export class UnitObstacles {
     const units = UnitComponent.getAll();
     for (const unit of units) {
       const entry = this.entries.get(unit);
-      const wanted = unit.getOwner() !== acting && !unit.isMoving();
+      // Los caídos no bloquean (se puede pasar por encima de un cadáver).
+      const wanted = unit.getOwner() !== acting && !unit.isMoving() && unit.isAlive();
       if (!wanted) {
         if (entry) {
           navMesh.removeObstacle(entry.obstacle);

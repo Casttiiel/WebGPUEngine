@@ -146,6 +146,15 @@ export class UIInputManager {
     return this.lastHoveredWidget;
   }
 
+  /** Primer widget visible que captura el ratón en `mousePhysPos` (sin esperar al update). */
+  public findWidgetAt(widgets: Widget[], mousePhysPos: vec2): Widget | null {
+    for (const widget of widgets) {
+      if (!widget.isVisible() || !widget.blocksInput()) continue;
+      if (this.checkHover(widget, mousePhysPos)) return widget;
+    }
+    return null;
+  }
+
   /**
    * Get last mouse position in UI space.
    */

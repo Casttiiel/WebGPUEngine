@@ -154,9 +154,9 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ### 12. Ataque
 - Ataque cuerpo a cuerpo (requiere estar adyacente; si no, ofrecer "moverse y atacar") y a distancia (requiere LOS y rango).
-- Resolución esqueleto: tirada de impacto fija (p.ej. 70%) + daño fijo. Sin stats, pero con el punto de enganche para meterlas después.
-- Muestra el **% de impacto** antes de confirmar (muy BG3).
-- **Hecho cuando:** atacar consume la Acción, puede fallar/acertar y resta vida.
+- Resolución esqueleto: tirada de impacto fija 100% + daño fijo. Sin stats, pero con el punto de enganche para meterlas después.
+- **Hecho cuando:** atacar consume la Acción, acertar y resta vida.
+
 
 ### 13. Línea de visión y cobertura *(añadido)*
 - Raycast (Rapier) para LOS entre atacante y objetivo.
@@ -168,24 +168,7 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 - Condiciones de fin de combate y transición de estado (ver 7).
 - **Hecho cuando:** ambos finales (victoria/derrota) se alcanzan y se puede reiniciar.
 
----
-
-## Fase 4 — Habilidades y UI
-
-### 15. Skills
-- Modelo de datos genérico (JSON/prefab): coste (Acción / Acción adicional), rango, tipo de targeting, efecto.
-- Tipos de targeting: **unidad**, **punto en el suelo**, **área (círculo/cono)**, **self**.
-- Efectos esqueleto: daño, curación, empujón (aprovecha `PushAbility`), teletransporte.
-- Preview del área y de quién queda afectado antes de confirmar.
-- Cooldowns por turno (en lugar de spell slots).
-- **Hecho cuando:** hay 3–4 skills distintas funcionando (bola de fuego en área, curación, empujón, dash).
-
-### 16. Reacciones *(añadido)*
-- Ataque de oportunidad al salir del alcance cuerpo a cuerpo de un enemigo.
-- Es lo que hace que el posicionamiento importe; con una sola reacción ya se nota.
-- **Hecho cuando:** alejarse de un enemigo adyacente dispara su ataque.
-
-### 17. UI
+### 15. UI
 - **Barra de iniciativa** (arriba): retratos en orden, el activo resaltado, hover → resalta la unidad en el mundo.
 - **Retratos de party** (izquierda) con barra de vida; click para seleccionar.
 - **Hotbar** (abajo): ataque, skills, fin de turno; teclas numéricas; estado deshabilitado si no hay recurso.
@@ -197,27 +180,42 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ---
 
-## Fase 5 — IA enemiga
+## Fase 4 — IA enemiga
 
-### 18. Enemy AI
+### 16. Enemy AI
 - Behavior Tree (reutilizando `src/ai`) que decide **en el turno** usando las mismas `game_command` que el jugador.
 - Scoring simple de acciones: para cada objetivo candidato → ¿alcanzable este turno? ¿% de impacto? ¿daño esperado? Elegir la mejor.
 - Comportamientos base: melee (acercarse y pegar), ranged (buscar posición con LOS y distancia), retirarse si está bajo de vida.
 - Pausas/ritmo para que el jugador entienda lo que hace la IA (la cámara la sigue).
 - **Hecho cuando:** un combate contra 3 enemigos variados es un reto mínimamente creíble y no se atasca nunca.
 
+## Fase 5 — Habilidades
+
+### 17. Skills
+- Modelo de datos genérico (JSON/prefab): coste (Acción / Acción adicional), rango, tipo de targeting, efecto.
+- Tipos de targeting: **unidad**, **punto en el suelo**, **área (círculo/cono)**, **self**.
+- Efectos esqueleto: daño, curación, empujón (aprovecha `PushAbility`), teletransporte.
+- Preview del área y de quién queda afectado antes de confirmar.
+- Cooldowns por turno (en lugar de spell slots).
+- **Hecho cuando:** hay 3–4 skills distintas funcionando (bola de fuego en área, curación, empujón, dash).
+
+### 18. Reacciones *(añadido)*
+- Ataque de oportunidad al salir del alcance cuerpo a cuerpo de un enemigo.
+- Es lo que hace que el posicionamiento importe; con una sola reacción ya se nota.
+- **Hecho cuando:** alejarse de un enemigo adyacente dispara su ataque.
+
 ---
 
 ## Fase 6 — Pulido del esqueleto (si sobra tiempo)
 
+- **Saltar**: acción que salta obstáculos/huecos consumiendo movimiento.
+- **Muros que tapan la cámara**: hacer transparentes o recortar los muros entre la cámara y el pivot, como en BG3. Hoy se evita limitando el pivot (`bounds`) al interior del mapa.
+- **Feedback**: cámara que encuadra al atacante y objetivo, hit-stop, partículas de impacto (ya existen piezas).
+- **Animaciones básicas**: idle, andar, atacar, recibir golpe, morir (usar el sistema de animación existente).
+- **Guardar/cargar** el estado de la party y el combate.
 - **Interacción con el entorno**: objetos empujables/explosivos (barriles), superficies (fuego/charco) que aplican efectos al entrar.
 - **Ventaja por altura**: bonus de impacto desde arriba; daño por caída al ser empujado.
-- **Saltar**: acción que salta obstáculos/huecos consumiendo movimiento.
-- **Animaciones básicas**: idle, andar, atacar, recibir golpe, morir (usar el sistema de animación existente).
-- **Feedback**: cámara que encuadra al atacante y objetivo, hit-stop, partículas de impacto (ya existen piezas).
-- **Muros que tapan la cámara**: hacer transparentes o recortar los muros entre la cámara y el pivot, como en BG3. Hoy se evita limitando el pivot (`bounds`) al interior del mapa.
 - **Encuentros definidos en datos**: un JSON por encuentro (enemigos, posiciones, trigger).
-- **Guardar/cargar** el estado de la party y el combate.
 
 ---
 

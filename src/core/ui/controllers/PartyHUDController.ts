@@ -3,22 +3,30 @@ import { ModuleUI } from '../../../modules/core/ModuleUI';
 import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
 import { TextWidget } from '../../../components/ui/widgets/TextWidget';
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
+import type { UnitComponent } from '../../../components/game/tactical/UnitComponent';
 
 const SLOTS = 4;
 const FRAME_NORMAL = [0.08, 0.08, 0.1, 0.85] as const;
 const FRAME_HOVER = [0.55, 0.7, 0.9, 1] as const;
 const FRAME_SELECTED = [1, 0.8, 0.3, 1] as const;
+const FACE_NORMAL = [0.13, 0.27, 0.6, 1] as const;
+const FACE_DOWN = [0.22, 0.22, 0.22, 1] as const;
+const HP_WIDTH = 96;
+const HP_HEIGHT = 10;
 
 interface PortraitSlot {
   frame: ImageWidget;
+  face: ImageWidget | null;
   name: TextWidget | null;
+  hp: ImageWidget | null;
   hovered: boolean;
 }
 
 /**
  * PartyHUDController — retratos de la party (assets/ui/party_hud.json).
- * Muestra nombre y tecla de cada miembro, resalta el seleccionado y el retrato bajo el
- * cursor, y al hacer click selecciona a ese miembro (la cámara lo centra y lo sigue).
+ * Muestra nombre, tecla y vida de cada miembro (gris si está caído), resalta el
+ * seleccionado y el retrato bajo el cursor, y al hacer click selecciona a ese miembro (la
+ * cámara lo centra y lo sigue).
  */
 export class PartyHUDController extends WidgetController {
   private slots: (PortraitSlot | null)[] = [];
@@ -39,10 +47,16 @@ export class PartyHUDController extends WidgetController {
       const member = members[i];
       slot.frame.setVisible(member !== undefined);
       if (!member) return;
-      slot.name?.setText(member.getName());
+      const unit = member.getComponent('unit') as UnitComponent | null;
+      slot.name?.setText(unit?.getDisplayName() ?? member.getName());
       const color =
         member === selected ? FRAME_SELECTED : slot.hovered ? FRAME_HOVER : FRAME_NORMAL;
       slot.frame.setColor(color[0], color[1], color[2], color[3]);
+      const face = unit && !unit.isAlive() ? FACE_DOWN : FACE_NORMAL;
+      slot.face?.setColor(face[0], face[1], face[2], face[3]);
+      const max = unit?.getMaxHp() ?? 0;
+      const ratio = max > 0 ? Math.max(0, unit!.getHp() / max) : 0;
+      slot.hp?.setSize(HP_WIDTH * ratio, HP_HEIGHT);
     });
   }
 
@@ -50,15 +64,18 @@ export class PartyHUDController extends WidgetController {
     const ui = ModuleUI.getInstance();
     if (!ui) return;
     this.resolved = true;
+    const get = <T>(alias: string) => (ui.getWidgetByAlias(alias) as T | undefined) ?? null;
     for (let i = 0; i < SLOTS; i++) {
-      const frame = ui.getWidgetByAlias(`portrait_${i + 1}`) as ImageWidget | undefined;
+      const frame = get<ImageWidget>(`portrait_${i + 1}`);
       if (!frame) {
         this.slots.push(null);
         continue;
       }
       const slot: PortraitSlot = {
         frame,
-        name: (ui.getWidgetByAlias(`portrait_${i + 1}_name`) as TextWidget | undefined) ?? null,
+        face: get<ImageWidget>(`portrait_${i + 1}_face`),
+        name: get<TextWidget>(`portrait_${i + 1}_name`),
+        hp: get<ImageWidget>(`portrait_${i + 1}_hp`),
         hovered: false,
       };
       frame.setOnMouseEnter(() => (slot.hovered = true));

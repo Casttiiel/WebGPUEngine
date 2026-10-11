@@ -153,6 +153,21 @@ export class ModuleUI extends Module {
     this.updateLerps(dt);
   }
 
+  /**
+   * Widget bajo el ratón ahora mismo. A diferencia de getHoveredWidget() no depende de que
+   * la UI ya se haya actualizado este frame: un click sobre la UI nunca llega al mundo.
+   */
+  public getWidgetUnderMouse(): Widget | null {
+    const input = Engine.getInput();
+    if (!input) return null;
+    const mousePos = input.getMousePosition();
+    const dpr = window.devicePixelRatio || 1;
+    return this.inputManager.findWidgetAt(
+      this.activeWidgets,
+      vec2.fromValues(mousePos.x * dpr, mousePos.y * dpr),
+    );
+  }
+
   private updateInput(): void {
     const input = Engine.getInput();
     if (!input) return;
