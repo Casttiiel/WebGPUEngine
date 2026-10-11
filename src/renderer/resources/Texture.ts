@@ -348,7 +348,11 @@ export class Texture extends GPUResource {
     // TextureStreamingManager replaces it with the full-res version when the
     // owning entity comes within range.
     const STREAM_SKIP = new Set(['white.png', 'black.png', 'no-normal.jpg']);
-    const useStreaming = !STREAM_SKIP.has(this.path) && Math.max(fullWidth, fullHeight) >= 128;
+    // Las texturas de UI (textures/ui/...) no pertenecen a ninguna entidad del mundo, así que
+    // TextureStreamingManager nunca las subiría a resolución completa: se cargan enteras.
+    const isUiTexture = this.path.startsWith('ui/');
+    const useStreaming =
+      !STREAM_SKIP.has(this.path) && !isUiTexture && Math.max(fullWidth, fullHeight) >= 128;
 
     if (useStreaming) {
       const INITIAL_MAX_DIM = 64;

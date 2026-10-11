@@ -356,7 +356,7 @@
         "meshes": [
           {
             "mesh": "unit_cube.obj",
-            "material": "metal.mat"
+            "material": "tactical_crate.mat"
           }
         ]
       }
@@ -380,7 +380,7 @@
         "meshes": [
           {
             "mesh": "unit_cube.obj",
-            "material": "metal.mat"
+            "material": "tactical_crate.mat"
           }
         ]
       }
@@ -404,7 +404,7 @@
         "meshes": [
           {
             "mesh": "unit_cube.obj",
-            "material": "metal.mat"
+            "material": "tactical_crate.mat"
           }
         ]
       }
@@ -428,7 +428,7 @@
         "meshes": [
           {
             "mesh": "unit_cube.obj",
-            "material": "metal.mat"
+            "material": "tactical_crate.mat"
           }
         ]
       }
@@ -452,7 +452,7 @@
         "meshes": [
           {
             "mesh": "unit_cube.obj",
-            "material": "metal.mat"
+            "material": "tactical_crate.mat"
           }
         ]
       }

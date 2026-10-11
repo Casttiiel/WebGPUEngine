@@ -6,12 +6,12 @@
     "anchor": "center",
     "visible": false,
     "x": -700,
-    "y": -260,
+    "y": -280,
     "width": 1400,
-    "height": 90,
+    "height": 130,
     "textParams": {
       "text": "",
-      "size": [72, 72],
+      "size": [120, 120],
       "color": [1, 0.85, 0.4, 1],
       "align": "center"
     },
@@ -26,10 +26,10 @@
     "x": -700,
     "y": 24,
     "width": 1400,
-    "height": 40,
+    "height": 50,
     "textParams": {
       "text": "",
-      "size": [30, 30],
+      "size": [46, 46],
       "color": [1, 1, 1, 1],
       "align": "center"
     },
@@ -42,12 +42,12 @@
     "anchor": "top-center",
     "visible": false,
     "x": -940,
-    "y": 74,
+    "y": 76,
     "width": 1880,
-    "height": 30,
+    "height": 36,
     "textParams": {
       "text": "",
-      "size": [20, 20],
+      "size": [32, 32],
       "color": [0.85, 0.9, 1, 1],
       "align": "center"
     },
@@ -79,7 +79,7 @@
         "height": 60,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [36, 36],
           "color": [1, 1, 1, 1],
           "align": "center"
         }
@@ -107,12 +107,12 @@
         "alias": "end_turn_label",
         "type": "text",
         "x": 0,
-        "y": 10,
+        "y": 8,
         "width": 280,
-        "height": 40,
+        "height": 44,
         "textParams": {
-          "text": "FIN DE TURNO",
-          "size": [26, 26],
+          "text": "Fin de turno",
+          "size": [40, 40],
           "color": [1, 0.9, 0.6, 1],
           "align": "center"
         }
@@ -122,12 +122,12 @@
         "alias": "end_turn_hint",
         "type": "text",
         "x": 0,
-        "y": 50,
+        "y": 52,
         "width": 280,
-        "height": 28,
+        "height": 30,
         "textParams": {
-          "text": "(ESPACIO)",
-          "size": [16, 16],
+          "text": "(Espacio)",
+          "size": [26, 26],
           "color": [1, 1, 1, 0.7],
           "align": "center"
         }
@@ -142,10 +142,10 @@
     "x": 0,
     "y": 0,
     "width": 160,
-    "height": 30,
+    "height": 40,
     "textParams": {
       "text": "",
-      "size": [22, 22],
+      "size": [36, 36],
       "color": [1, 1, 1, 1],
       "align": "left"
     },

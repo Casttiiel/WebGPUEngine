@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d';
 import type { Collider } from '@dimforge/rapier3d';
 import { Engine } from '../../../core/engine/Engine';
-import type { vec3 } from 'gl-matrix';
+import { vec3 } from 'gl-matrix';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { AStar } from '../../../ai/nav/AStar';
 
@@ -108,4 +108,32 @@ export function hasLineOfSight(a: vec3, b: vec3): boolean {
     isStaticSolid,
   );
   return hit === null;
+}
+
+/**
+ * Recorta un camino a `maxLength` metros: mismo recorrido, terminando en el punto más
+ * lejano alcanzable. Los puntos intermedios de un camino de Detour están sobre el navmesh.
+ */
+export function truncatePath(points: vec3[], maxLength: number): PathPlan {
+  const out: vec3[] = [];
+  let length = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]!;
+    if (i === 0) {
+      out.push(vec3.clone(p));
+      continue;
+    }
+    const prev = points[i - 1]!;
+    const segment = vec3.distance(prev, p);
+    if (length + segment <= maxLength) {
+      out.push(vec3.clone(p));
+      length += segment;
+      continue;
+    }
+    const t = (maxLength - length) / segment;
+    if (t > 1e-3) out.push(vec3.lerp(vec3.create(), prev, p, t));
+    length = maxLength;
+    break;
+  }
+  return { points: out, length, reachable: out.length >= 2 };
 }

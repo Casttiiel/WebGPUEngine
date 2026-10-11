@@ -636,9 +636,12 @@ export class Material extends GPUResource {
       appearanceBlend: original.appearanceBlend,
       surfaceBlend: original.surfaceBlend,
       pomScale: original.pomScale,
-      castsShadows: false,
+      // El clon (tinte por instancia) proyecta sombra igual que el original. Comparte técnica,
+      // así que también su material de sombra.
+      castsShadows: original.castsShadows && original.shadowsMaterial !== undefined,
       shadows: original.shadows,
     });
+    if (original.shadowsMaterial) clone.shadowsMaterial = original.shadowsMaterial;
 
     const slots = original.technique.getMaterialSlots();
 

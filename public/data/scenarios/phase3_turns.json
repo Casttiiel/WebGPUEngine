@@ -139,18 +139,27 @@
       }
     },
 
-    { "log": "Punto 9: fuera de alcance → camino en rojo, cursor no válido y no se mueve" },
+    {
+      "log": "Punto 9: fuera de alcance → camino con tramo rojo; el click avanzaría hasta donde llegue"
+    },
     {
       "assert": {
-        "expr": "__engine.gameCommand('plan_move', { unit: 'Hero1', to: [7, 0, -6] }).then(r => r.reachable && !r.affordable)",
+        "expr": "__engine.gameCommand('plan_move', { unit: 'Hero1', to: [7, 0, -6] }).then(r => r.reachable && !r.affordable && r.canMove && Math.abs(r.walkLength - 9) < 0.01)",
         "value": true,
-        "message": "hay camino pero excede los 9 m"
+        "message": "hay camino que excede los 9 m: se recorrerían exactamente 9"
       }
     },
     { "input": { "type": "move", "world": [7, 0, -6] } },
     { "wait_frames": 2 },
     {
-      "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "invalid" }
+      "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "ground" }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_move', { unit: 'Hero1', to: [7, 0, -6] }).then(r => { const far = Engine.getEntities().getAllEntities().filter(e => e.getName() === 'PathDot' && e.getComponent('render').isVisible() && e.getComponent('render').getParts()[0].material.path.includes('far')).length; return r.length - 9 > 0.6 ? far > 0 : true; })",
+        "value": true,
+        "message": "el tramo que excede el movimiento se pinta en rojo"
+      }
     },
     {
       "assert": {
@@ -160,16 +169,6 @@
       }
     },
     { "screenshot": "02-preview-too-far" },
-    { "input": { "type": "click", "world": [7, 0, -6] } },
-    { "wait_frames": 2 },
-    {
-      "assert": {
-        "entity": "Hero1",
-        "path": "unit.isMoving",
-        "value": false,
-        "message": "no se mueve más allá del presupuesto"
-      }
-    },
 
     { "log": "Punto 9: dentro de alcance → cursor de mover, puntos y metros junto al cursor" },
     {
@@ -222,6 +221,40 @@
     },
     { "assert": { "combat": true, "path": "activeUnit", "value": "Hero1" } },
     { "screenshot": "04-late-join" },
+
+    {
+      "log": "Punto 9: click en un destino que no alcanza → avanza por el mismo camino hasta agotar los metros"
+    },
+    {
+      "eval": "window.__far = null; __engine.gameCommand('plan_move', { unit: 'Hero1', to: [7, 0, -6] }).then(r => (window.__far = r))"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('move', { unit: 'Hero1', to: [7, 0, -6] }).then(r => r.ok && r.walked < r.length)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 400
+    },
+    {
+      "assert": {
+        "combat": true,
+        "path": "resources.movement",
+        "op": "approx",
+        "value": 0,
+        "tolerance": 0.01
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const p = __engine.readPath('Hero1', 'position'); const d = Math.hypot(p[0] - 7, p[2] + 6); return d > 0.5 && d <= window.__far.length - window.__far.walkLength + 0.2; })()",
+        "value": true,
+        "message": "se para en el camino, a la distancia que le faltaba del destino"
+      }
+    },
+    { "screenshot": "05-partial-move" },
 
     { "log": "Fin de turno con Espacio" },
     { "input": { "type": "key", "key": "Space" } },

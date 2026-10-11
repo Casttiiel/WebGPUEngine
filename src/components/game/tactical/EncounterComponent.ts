@@ -9,7 +9,7 @@ import { UnitComponent } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import { UnitObstacles } from './UnitObstacles';
-import { hasLineOfSight, planPath, type PathPlan } from './TacticalQueries';
+import { hasLineOfSight, planPath, truncatePath, type PathPlan } from './TacticalQueries';
 
 export type EncounterState = 'exploration' | 'combat' | 'victory' | 'defeat';
 
@@ -43,8 +43,15 @@ export interface MovePlan {
   budget: number;
   /** La unidad puede moverse ahora mismo (es su turno / está seleccionada, no se está moviendo). */
   allowed: boolean;
-  /** El camino cabe en el presupuesto de movimiento. */
+  /** El camino completo cabe en el presupuesto de movimiento. */
   affordable: boolean;
+  /**
+   * Lo que se recorrería de verdad: el camino completo si cabe; si no, el mismo camino
+   * recortado al presupuesto (se avanza hasta el punto más lejano alcanzable).
+   */
+  walk: PathPlan;
+  /** Se puede ejecutar: permitido y hay algo que recorrer. */
+  canMove: boolean;
   reason?: string;
 }
 
@@ -193,8 +200,17 @@ export class EncounterComponent extends Component {
   public planMove(entity: Entity, destination: vec3): MovePlan {
     const unit = entity.getComponent('unit') as UnitComponent | null;
     const empty: PathPlan = { points: [], length: 0, reachable: false };
-    if (!unit)
-      return { plan: empty, budget: 0, allowed: false, affordable: false, reason: 'not a unit' };
+    if (!unit) {
+      return {
+        plan: empty,
+        walk: empty,
+        budget: 0,
+        allowed: false,
+        affordable: false,
+        canMove: false,
+        reason: 'not a unit',
+      };
+    }
 
     let allowed = !unit.isMoving();
     let reason: string | undefined = allowed ? undefined : 'unit is already moving';
@@ -217,10 +233,24 @@ export class EncounterComponent extends Component {
 
     const plan = planPath(unit.getFeetPosition(this.tmpA), destination);
     const affordable = plan.reachable && plan.length <= budget + EPS;
+    // Destino demasiado lejos: se recorre el mismo camino hasta donde llegue el movimiento.
+    const walk = affordable
+      ? plan
+      : plan.reachable && budget > EPS
+        ? truncatePath(plan.points, budget)
+        : empty;
+    const canMove = allowed && walk.points.length >= 2;
     if (allowed && !plan.reachable) reason = 'destination not reachable';
-    else if (allowed && !affordable)
-      reason = `path ${plan.length.toFixed(1)} m > ${budget.toFixed(1)} m left`;
-    return { plan, budget, allowed, affordable, ...(reason !== undefined && { reason }) };
+    else if (allowed && !canMove) reason = 'no movement left';
+    return {
+      plan,
+      walk,
+      budget,
+      allowed,
+      affordable,
+      canMove,
+      ...(reason !== undefined && { reason }),
+    };
   }
 
   /** Mueve la unidad si las reglas lo permiten. En combate descuenta los metros recorridos. */
@@ -228,13 +258,13 @@ export class EncounterComponent extends Component {
     // Asegura que la planificación ve los obstáculos actuales (y no el de la propia unidad).
     UnitObstacles.sync(this.getActingUnit());
     const move = this.planMove(entity, destination);
-    const ok = move.allowed && move.plan.reachable && move.affordable;
+    const ok = move.canMove;
     if (ok) {
       if (this.state === 'combat') {
-        this.resources.movement = Math.max(0, this.resources.movement - move.plan.length);
+        this.resources.movement = Math.max(0, this.resources.movement - move.walk.length);
       }
       const unit = entity.getComponent('unit') as UnitComponent;
-      void unit.moveAlong(move.plan.points);
+      void unit.moveAlong(move.walk.points);
       this.emit('move');
     }
     return { ...move, ok };
@@ -447,6 +477,7 @@ export class EncounterComponent extends Component {
               ok: result.ok,
               reason: result.reason ?? null,
               length: result.plan.length,
+              walked: result.walk.length,
               budget: result.budget,
             };
           }
@@ -458,6 +489,8 @@ export class EncounterComponent extends Component {
               length: r.plan.length,
               allowed: r.allowed,
               affordable: r.affordable,
+              canMove: r.canMove,
+              walkLength: r.walk.length,
               reason: r.reason ?? null,
               points: r.plan.points.map((p) => Array.from(p)),
             };

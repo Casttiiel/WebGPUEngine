@@ -16,7 +16,6 @@ const BUTTON_HOVER = [0.55, 0.4, 0.12, 1] as const;
  * CombatHUDController — HUD del combate por turnos (assets/ui/combat_hud.json):
  * ronda y turno, orden de iniciativa, recursos del turno, botón de fin de turno y
  * rótulos de estado (COMBATE / VICTORIA / DERROTA).
- * La fuente bitmap solo tiene mayúsculas y ASCII básico: sin tildes.
  */
 export class CombatHUDController extends WidgetController {
   private banner: TextWidget | null = null;
@@ -61,20 +60,20 @@ export class CombatHUDController extends WidgetController {
     if (!inCombat) return;
 
     const active = encounter.getActiveUnitName() ?? '';
-    this.round?.setText(`RONDA ${encounter.getRound()} - TURNO DE ${active}`);
+    this.round?.setText(`Ronda ${encounter.getRound()} · Turno de ${active}`);
     this.order?.setText(
       encounter
         .getTurnOrder()
         .map((name) => (name === active ? `[${name}]` : name))
-        .join('  >  '),
+        .join('   »   '),
     );
     if (playerTurn) {
       const r = encounter.getResources();
       this.resourcesText?.setText(
-        `ACCION ${r.action}    ADICIONAL ${r.bonusAction}    MOVIMIENTO ${r.movement.toFixed(1)} M`,
+        `Acción ${r.action}     Adicional ${r.bonusAction}     Movimiento ${r.movement.toFixed(1)} m`,
       );
     } else {
-      this.resourcesText?.setText(`TURNO DEL ENEMIGO: ${active}`);
+      this.resourcesText?.setText(`Turno del enemigo: ${active}`);
     }
     const c = this.endTurnHovered ? BUTTON_HOVER : BUTTON_NORMAL;
     this.endTurn?.setColor(c[0], c[1], c[2], c[3]);

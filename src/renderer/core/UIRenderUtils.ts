@@ -396,58 +396,114 @@ export class UIRenderUtils {
     });
   }
 
-  /** Atlas de la fuente bitmap (ui/fonts/font.png): 8x8 celdas, ASCII 32 (' ') a 95 ('_'). */
-  private static readonly FONT_GRID = 8;
-  private static readonly FONT_FIRST_CHAR = 32;
-  private static readonly FONT_LAST_CHAR = 95;
+  // ── Texto bitmap ─────────────────────────────────────────────────────────
+  //
+  // Dos formatos de atlas:
+  //  - Con métricas (<fuente>.json, generado por scripts/generate-ui-font.mjs): rejilla de
+  //    celdas cuadradas con los códigos 0-255 (Latin-1) y avance proporcional por carácter.
+  //  - Sin métricas (ui/fonts/font.png antiguo): 8x8 celdas, ASCII 32-95, solo mayúsculas,
+  //    avance fijo.
 
-  /** Ancho que ocupa un texto con renderText (px físicos). */
-  public static measureText(text: string, charWidth: number, spacing = 0.8): number {
-    return text.length > 0 ? (text.length - 1) * charWidth * spacing + charWidth : 0;
+  private static fontMetrics = new Map<string, BitmapFontMetrics | null>();
+  private static fontMetricsLoading = new Set<string>();
+
+  /**
+   * Métricas de una fuente: null = fuente sin métricas (formato antiguo), undefined = aún
+   * cargando (la primera llamada lanza la carga).
+   */
+  public static getFontMetrics(fontTexturePath: string): BitmapFontMetrics | null | undefined {
+    if (this.fontMetrics.has(fontTexturePath)) return this.fontMetrics.get(fontTexturePath);
+    if (!this.fontMetricsLoading.has(fontTexturePath)) {
+      this.fontMetricsLoading.add(fontTexturePath);
+      const url = `${import.meta.env.BASE_URL}assets/textures/${fontTexturePath.replace(/.[^.]+$/, '.json')}`;
+      fetch(url)
+        .then((r) => (r.ok ? (r.json() as Promise<BitmapFontMetrics>) : null))
+        .catch(() => null)
+        .then((m) => this.fontMetrics.set(fontTexturePath, m));
+    }
+    return undefined;
+  }
+
+  /** Ancho (px físicos) que ocupa un texto de altura `height` px. */
+  public static measureText(
+    text: string,
+    height: number,
+    metrics: BitmapFontMetrics | null,
+  ): number {
+    if (!metrics) {
+      return text.length > 0 ? (text.length - 1) * height * LEGACY_SPACING + height : 0;
+    }
+    const scale = height / metrics.cell;
+    let width = 0;
+    for (let i = 0; i < text.length; i++) {
+      width += (metrics.advances[text.charCodeAt(i)] ?? metrics.cell * 0.5) * scale;
+    }
+    return width;
   }
 
   /**
-   * Dibuja texto con la fuente bitmap. Solo mayúsculas: las minúsculas se convierten y los
-   * caracteres fuera del atlas se dejan como espacio.
-   * @param origin  Esquina superior izquierda del texto en px físicos
-   * @param charSize Tamaño de cada carácter en px físicos [ancho, alto]
-   * @param spacing Avance entre caracteres como fracción del ancho (los glifos tienen margen)
+   * Dibuja una línea de texto.
+   * @param origin  Esquina superior izquierda en px físicos
+   * @param height  Altura de la línea en px físicos (= tamaño de celda en pantalla)
+   * @param metrics Métricas de la fuente (null: atlas antiguo de 8x8 en mayúsculas)
    */
   public static renderText(
     pass: GPURenderPassEncoder,
     text: string,
     fontTexture: Texture,
     origin: vec2,
-    charSize: vec2,
-    tint: vec4 = vec4.fromValues(1, 1, 1, 1),
-    spacing = 0.8,
+    height: number,
+    tint: vec4,
+    metrics: BitmapFontMetrics | null,
   ): void {
     if (!this.initialized) {
       console.error('UIRenderUtils: Not initialized, call initialize() first');
       return;
     }
 
-    const grid = this.FONT_GRID;
+    const grid = metrics?.grid ?? LEGACY_GRID;
     const cell = 1 / grid;
-    const [w, h] = [charSize[0]!, charSize[1]!];
+    const scale = metrics ? height / metrics.cell : 1;
     const transform = mat4.create();
     const uvMin = vec2.create();
     const uvMax = vec2.create();
-    const upper = text.toUpperCase();
+    const str = metrics ? text : text.toUpperCase();
+    // Las celdas tienen margen a la izquierda del glifo: se compensa para alinear en origin.
+    let x = origin[0]! - (metrics ? metrics.padX * scale : 0);
 
-    for (let i = 0; i < upper.length; i++) {
-      const code = upper.charCodeAt(i);
-      if (code <= this.FONT_FIRST_CHAR || code > this.FONT_LAST_CHAR) continue; // espacio / fuera del atlas
-      const index = code - this.FONT_FIRST_CHAR;
-      const col = index % grid;
-      const row = Math.floor(index / grid);
-      vec2.set(uvMin, col * cell, row * cell);
-      vec2.set(uvMax, (col + 1) * cell, (row + 1) * cell);
-
-      // El quad unitario está centrado en el origen: trasladar al centro de la celda.
-      mat4.fromTranslation(transform, [origin[0]! + i * w * spacing + w / 2, origin[1]! + h / 2, 0]);
-      mat4.scale(transform, transform, [w, h, 1]);
-      this.renderBitmap(pass, fontTexture, transform, tint, uvMin, uvMax);
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      const index = metrics ? code : code - LEGACY_FIRST_CHAR;
+      const visible = metrics
+        ? code > 32 && code < 256 && metrics.advances[code] !== undefined
+        : code > LEGACY_FIRST_CHAR && code <= LEGACY_LAST_CHAR;
+      if (visible) {
+        const col = index % grid;
+        const row = Math.floor(index / grid);
+        vec2.set(uvMin, col * cell, row * cell);
+        vec2.set(uvMax, (col + 1) * cell, (row + 1) * cell);
+        // El quad unitario está centrado en el origen: trasladar al centro de la celda.
+        mat4.fromTranslation(transform, [x + height / 2, origin[1]! + height / 2, 0]);
+        mat4.scale(transform, transform, [height, height, 1]);
+        this.renderBitmap(pass, fontTexture, transform, tint, uvMin, uvMax);
+      }
+      x += metrics
+        ? (metrics.advances[code] ?? metrics.cell * 0.5) * scale
+        : height * LEGACY_SPACING;
     }
   }
 }
+
+/** Métricas de un atlas de fuente generado por scripts/generate-ui-font.mjs. */
+export interface BitmapFontMetrics {
+  cell: number;
+  grid: number;
+  padX: number;
+  /** Avance horizontal por código de carácter (px de celda). */
+  advances: Record<number, number>;
+}
+
+const LEGACY_GRID = 8;
+const LEGACY_FIRST_CHAR = 32;
+const LEGACY_LAST_CHAR = 95;
+const LEGACY_SPACING = 0.8;

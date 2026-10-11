@@ -34,13 +34,14 @@
         "alias": "portrait_1_key",
         "type": "text",
         "x": 6,
-        "y": 6,
-        "width": 26,
-        "height": 26,
+        "y": 2,
+        "width": 30,
+        "height": 34,
         "textParams": {
           "text": "1",
-          "size": [24, 24],
-          "color": [1, 1, 1, 0.9]
+          "size": [34, 34],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
         }
       },
       {
@@ -48,12 +49,12 @@
         "alias": "portrait_1_name",
         "type": "text",
         "x": 4,
-        "y": 62,
+        "y": 60,
         "width": 88,
-        "height": 28,
+        "height": 30,
         "textParams": {
           "text": "",
-          "size": [19, 19],
+          "size": [30, 30],
           "color": [1, 1, 1, 1],
           "align": "center"
         }
@@ -95,13 +96,14 @@
         "alias": "portrait_2_key",
         "type": "text",
         "x": 6,
-        "y": 6,
-        "width": 26,
-        "height": 26,
+        "y": 2,
+        "width": 30,
+        "height": 34,
         "textParams": {
           "text": "2",
-          "size": [24, 24],
-          "color": [1, 1, 1, 0.9]
+          "size": [34, 34],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
         }
       },
       {
@@ -109,12 +111,12 @@
         "alias": "portrait_2_name",
         "type": "text",
         "x": 4,
-        "y": 62,
+        "y": 60,
         "width": 88,
-        "height": 28,
+        "height": 30,
         "textParams": {
           "text": "",
-          "size": [19, 19],
+          "size": [30, 30],
           "color": [1, 1, 1, 1],
           "align": "center"
         }
@@ -156,13 +158,14 @@
         "alias": "portrait_3_key",
         "type": "text",
         "x": 6,
-        "y": 6,
-        "width": 26,
-        "height": 26,
+        "y": 2,
+        "width": 30,
+        "height": 34,
         "textParams": {
           "text": "3",
-          "size": [24, 24],
-          "color": [1, 1, 1, 0.9]
+          "size": [34, 34],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
         }
       },
       {
@@ -170,12 +173,12 @@
         "alias": "portrait_3_name",
         "type": "text",
         "x": 4,
-        "y": 62,
+        "y": 60,
         "width": 88,
-        "height": 28,
+        "height": 30,
         "textParams": {
           "text": "",
-          "size": [19, 19],
+          "size": [30, 30],
           "color": [1, 1, 1, 1],
           "align": "center"
         }
@@ -217,13 +220,14 @@
         "alias": "portrait_4_key",
         "type": "text",
         "x": 6,
-        "y": 6,
-        "width": 26,
-        "height": 26,
+        "y": 2,
+        "width": 30,
+        "height": 34,
         "textParams": {
           "text": "4",
-          "size": [24, 24],
-          "color": [1, 1, 1, 0.9]
+          "size": [34, 34],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
         }
       },
       {
@@ -231,12 +235,12 @@
         "alias": "portrait_4_name",
         "type": "text",
         "x": 4,
-        "y": 62,
+        "y": 60,
         "width": 88,
-        "height": 28,
+        "height": 30,
         "textParams": {
           "text": "",
-          "size": [19, 19],
+          "size": [30, 30],
           "color": [1, 1, 1, 1],
           "align": "center"
         }

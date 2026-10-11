@@ -6,11 +6,12 @@ import { vec2, vec4 } from 'gl-matrix';
 import { Texture } from '../../../renderer/resources/Texture';
 import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
 
-const DEFAULT_FONT = 'ui/fonts/font.png';
+/** Fuente por defecto: atlas Latin-1 con métricas (scripts/generate-ui-font.mjs). */
+const DEFAULT_FONT = 'ui/fonts/ui_font.png';
 
 /**
- * TextWidget - Renders text using bitmap fonts.
- * Replicates C++ CText widget with character-by-character rendering from 8x8 grid.
+ * TextWidget - Una línea de texto con fuente bitmap (atlas + métricas proporcionales).
+ * textParams.size.y = altura de línea en px de referencia; align: left | center.
  */
 export class TextWidget extends Widget {
   protected textParams: TextParams;
@@ -46,25 +47,27 @@ export class TextWidget extends Widget {
         })
         .catch((error) => console.error(`Failed to load font texture: ${fontPath}`, error));
     }
-    if (!this.cachedFont) return;
+    const metrics = UIRenderUtils.getFontMetrics(fontPath);
+    if (!this.cachedFont || metrics === undefined) return;
 
     // Mismo factor de escala que usa Widget para su tamaño (px de referencia → px físicos).
+    // size.y = altura de línea; size.x solo se usa con el atlas antiguo (monoespaciado).
     const gs = this.scaleWithScreen ? UIRenderUtils.getGlobalScale() : window.devicePixelRatio || 1;
-    const charW = this.textParams.size.x * gs;
-    const charH = this.textParams.size.y * gs;
+    const lineH = this.textParams.size.y * gs;
     let x = this.originX;
     if (this.textParams.align === 'center') {
-      x += (this.getWidth() * gs - UIRenderUtils.measureText(text, charW)) / 2;
+      x += (this.getWidth() * gs - UIRenderUtils.measureText(text, lineH, metrics)) / 2;
     }
-    const y = this.originY + Math.max(0, (this.getHeight() * gs - charH) / 2);
+    const y = this.originY + Math.max(0, (this.getHeight() * gs - lineH) / 2);
     const c = this.textParams.color ?? { r: 1, g: 1, b: 1, a: 1 };
     UIRenderUtils.renderText(
       renderPass,
       text,
       this.cachedFont,
       vec2.fromValues(x, y),
-      vec2.fromValues(charW, charH),
+      lineH,
       vec4.fromValues(c.r, c.g, c.b, c.a),
+      metrics,
     );
   }
 

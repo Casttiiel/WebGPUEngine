@@ -167,7 +167,8 @@ export class TacticalPointerComponent extends Component {
     vec3.scaleAndAdd(this.hoverPoint, ray.origin, ray.direction, result.hit.timeOfImpact);
     this.movePlan = this.planMoveTo(this.hoverPoint);
     const m = this.movePlan;
-    this.hoverKind = m && m.allowed && m.plan.reachable && m.affordable ? 'ground' : 'invalid';
+    // Válido si se puede avanzar, aunque sea solo parte del camino (se para donde llegue).
+    this.hoverKind = m && m.canMove ? 'ground' : 'invalid';
   }
 
   // Caché del plan: el camino solo se recalcula si cambia el punto, quién actúa, el
@@ -224,8 +225,8 @@ export class TacticalPointerComponent extends Component {
       this.enemyRing.hide();
     }
 
-    // Vista previa del camino: solo si la unidad puede moverse y hay camino (aunque no llegue
-    // el presupuesto: el tramo que sobra se pinta en rojo).
+    // Vista previa del camino completo: el tramo hasta donde llega el movimiento en claro,
+    // el resto en rojo. Si no llega, la etiqueta dice cuánto se recorrerá de verdad.
     const m = this.movePlan;
     const showPath =
       (this.hoverKind === 'ground' || this.hoverKind === 'invalid') &&
@@ -234,11 +235,10 @@ export class TacticalPointerComponent extends Component {
       m.plan.reachable;
     if (showPath) {
       const inCombat = EncounterComponent.find()?.isInCombat() ?? false;
-      this.preview?.show(
-        m.plan.points,
-        m.budget,
-        inCombat ? `${m.plan.length.toFixed(1)} M` : null,
-      );
+      const label = m.affordable
+        ? `${m.plan.length.toFixed(1)} m`
+        : `${m.walk.length.toFixed(1)} / ${m.plan.length.toFixed(1)} m`;
+      this.preview?.show(m.plan.points, m.budget, inCombat ? label : null);
     } else {
       this.preview?.hide();
     }
