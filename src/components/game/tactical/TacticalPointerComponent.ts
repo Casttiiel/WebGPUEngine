@@ -10,7 +10,15 @@ import { SkeletalMeshComponent } from '../../render/SkeletalMeshComponent';
 import { UnitComponent } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { GroundMarker } from './GroundMarker';
-import { EncounterComponent, type AttackPlan, type MovePlan } from './EncounterComponent';
+import {
+  EncounterComponent,
+  type AttackPlan,
+  type JumpPlan,
+  type MovePlan,
+  type PushPlan,
+} from './EncounterComponent';
+import { PropComponent } from './PropComponent';
+import { hotbarEntries, isAbilityId } from './Hotbar';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { PathPreview } from './PathPreview';
 import { KeyCode } from '../../../types/KeyCode.enum';
@@ -19,7 +27,7 @@ import { KeyCode } from '../../../types/KeyCode.enum';
 export type HoverKind = 'none' | 'ui' | 'ally' | 'enemy' | 'neutral' | 'ground' | 'invalid';
 
 /** Cursor mostrado para cada tipo de hover. */
-export type CursorKind = 'default' | 'select' | 'move' | 'attack' | 'invalid';
+export type CursorKind = 'default' | 'select' | 'move' | 'attack' | 'interact' | 'invalid';
 
 export type TacticalPointerComponentDataType = Readonly<{
   /** Cuánto se aclara el personaje bajo el cursor (0-1). Default 0.35. */
@@ -48,6 +56,7 @@ const CURSORS: Record<CursorKind, string> = {
     16,
     'crosshair',
   ),
+  interact: 'grab',
   invalid: 'not-allowed',
 };
 
@@ -71,7 +80,18 @@ const REASON_TEXT: Record<string, string> = {
   'not this unit’s turn': 'no es su turno',
   'unit is busy': 'ocupado',
   'unit is down': 'caído',
+  'too far to jump': 'demasiado lejos',
+  'too high to jump': 'demasiado alto',
+  'obstacle too high': 'obstáculo demasiado alto',
+  'cannot land there': 'no se puede aterrizar ahí',
+  'too close': 'demasiado cerca',
+  'not enough movement': 'sin movimiento suficiente',
+  'too far to push': 'hay que estar al lado',
+  'push blocked': 'bloqueado',
 };
+
+const reasonText = (reason: string | undefined): string =>
+  reason ? (REASON_TEXT[reason] ?? reason) : '';
 
 const HOTBAR_KEYS = [
   KeyCode.NUM_1,
@@ -90,9 +110,11 @@ const HOTBAR_KEYS = [
  *  - vista previa del camino al suelo bajo el cursor (y metros en combate),
  *  - tooltip del objetivo (vida, % de impacto, daño o por qué no se puede atacar),
  *  - click en un miembro de la party → seleccionarlo; en el suelo → moverse; en un enemigo
- *    → atacar con el ataque armado (si es cuerpo a cuerpo y no llega, se acerca y ataca).
- * Ataque armado: el primero de la unidad por defecto; la hotbar (teclas 1-6 en combate)
- * arma otro; Esc o click derecho vuelven al de por defecto.
+ *    → atacar con el ataque armado (si es cuerpo a cuerpo y no llega, se acerca y ataca);
+ *    en un objeto (barril, caja) → empujarlo (acción adicional) o, con un ataque armado,
+ *    atacarlo (un barril explosivo explota).
+ * Acción armada (hotbar, teclas 1-6 en combate): otro ataque, Saltar (click en el suelo:
+ * salta allí, gasta movimiento) o Empujar. Esc o click derecho vuelven a lo de por defecto.
  * Las reglas (quién se mueve o ataca, cuánto) son de EncounterComponent.
  */
 export class TacticalPointerComponent extends Component {
@@ -107,6 +129,8 @@ export class TacticalPointerComponent extends Component {
   private armedAttack: string | null = null;
   private armedFor: Entity | null = null;
   private attackPlan: AttackPlan | null = null;
+  private jumpPlan: JumpPlan | null = null;
+  private pushPlan: PushPlan | null = null;
 
   private allyRing = new GroundMarker('tactical/ring_hover_ally.prefab');
   private enemyRing = new GroundMarker('tactical/ring_hover_enemy.prefab');
@@ -182,6 +206,22 @@ export class TacticalPointerComponent extends Component {
     return this.attackPlan;
   }
 
+  /** Último plan de salto bajo el cursor (con Saltar armado). */
+  public getJumpPlan(): JumpPlan | null {
+    return this.jumpPlan;
+  }
+
+  /** Último plan de empujar el objeto bajo el cursor. */
+  public getPushPlan(): PushPlan | null {
+    return this.pushPlan;
+  }
+
+  /** El ataque armado explícitamente (null si no hay o si lo armado es Saltar / Empujar). */
+  private getArmedAttackId(): string | null {
+    const armed = this.getArmedAttack();
+    return isAbilityId(armed) ? null : armed;
+  }
+
   // ── Interno ──────────────────────────────────────────────────────────────
 
   /** El ataque armado es del seleccionado: al cambiar de unidad (o de turno) se desarma. */
@@ -207,10 +247,10 @@ export class TacticalPointerComponent extends Component {
       | UnitComponent
       | null
       | undefined;
-    const attacks = unit?.getAttacks() ?? [];
+    const entries = unit ? hotbarEntries(unit) : [];
     HOTBAR_KEYS.forEach((key, i) => {
-      const attack = attacks[i];
-      if (attack && input.isKeyJustPressed(key)) this.armAttack(attack.id);
+      const entry = entries[i];
+      if (entry && input.isKeyJustPressed(key)) this.armAttack(entry.id);
     });
   }
 
@@ -218,6 +258,8 @@ export class TacticalPointerComponent extends Component {
     this.hoveredUnit = null;
     this.movePlan = null;
     this.attackPlan = null;
+    this.jumpPlan = null;
+    this.pushPlan = null;
     const input = Engine.getInput();
     if (!inGameplay || !input.isMouseInWindow()) {
       this.hoverKind = 'none';
@@ -246,11 +288,23 @@ export class TacticalPointerComponent extends Component {
           : party?.isMember(unit.getOwner()) || unit.getFaction() === 'party'
             ? 'ally'
             : 'neutral';
-      if (this.hoverKind === 'enemy') this.attackPlan = this.planAttackOn(unit.getOwner());
+      const armed = this.getArmedAttack();
+      if (this.hoverKind === 'enemy' && !isAbilityId(armed)) {
+        this.attackPlan = this.planAttackOn(unit.getOwner());
+      } else if (this.hoverKind === 'neutral' && PropComponent.of(unit.getOwner())) {
+        // Objeto: con un ataque armado se ataca; si no, se empuja.
+        if (this.getArmedAttackId()) this.attackPlan = this.planAttackOn(unit.getOwner());
+        else if (armed !== 'jump') this.pushPlan = this.planPushOn(unit.getOwner());
+      }
       return;
     }
 
     vec3.scaleAndAdd(this.hoverPoint, ray.origin, ray.direction, result.hit.timeOfImpact);
+    if (this.getArmedAttack() === 'jump') {
+      this.jumpPlan = this.planJumpTo(this.hoverPoint);
+      this.hoverKind = this.jumpPlan?.canJump ? 'ground' : 'invalid';
+      return;
+    }
     this.movePlan = this.planMoveTo(this.hoverPoint);
     const m = this.movePlan;
     // Válido si se puede avanzar, aunque sea solo parte del camino (se para donde llegue).
@@ -279,6 +333,34 @@ export class TacticalPointerComponent extends Component {
     return c.plan;
   }
 
+  private jumpCache = {
+    point: vec3.fromValues(Infinity, 0, 0),
+    key: '',
+    plan: null as JumpPlan | null,
+  };
+
+  /** Plan de salto del seleccionado hasta `point` (cacheado como el de movimiento). */
+  private planJumpTo(point: vec3): JumpPlan | null {
+    const encounter = EncounterComponent.find();
+    const selected = PartyComponent.find()?.getSelected() ?? null;
+    if (!encounter || !selected) return null;
+    const key = `${selected.id}|${encounter.getState()}|${encounter.getActiveUnitName()}|${encounter.getResources().movement.toFixed(2)}|${NavMesh.getInstance().getVersion()}`;
+    const c = this.jumpCache;
+    if (c.key === key && vec3.squaredDistance(c.point, point) < 0.05 * 0.05) return c.plan;
+    vec3.copy(c.point, point);
+    c.key = key;
+    c.plan = encounter.planJump(selected, point);
+    return c.plan;
+  }
+
+  /** Plan de empujar `target` con el seleccionado. */
+  private planPushOn(target: Entity): PushPlan | null {
+    const encounter = EncounterComponent.find();
+    const selected = PartyComponent.find()?.getSelected() ?? null;
+    if (!encounter || !selected) return null;
+    return encounter.planPush(selected, target);
+  }
+
   private attackCache = { key: '', plan: null as AttackPlan | null };
 
   /** Plan de ataque del seleccionado contra `target` con el ataque armado (cacheado). */
@@ -304,7 +386,7 @@ export class TacticalPointerComponent extends Component {
     ].join('|');
     if (this.attackCache.key !== key) {
       this.attackCache.key = key;
-      this.attackCache.plan = encounter.planAttack(selected, target, this.getArmedAttack());
+      this.attackCache.plan = encounter.planAttack(selected, target, this.getArmedAttackId());
     }
     return this.attackCache.plan;
   }
@@ -312,10 +394,15 @@ export class TacticalPointerComponent extends Component {
   private lastHighlighted: Entity | null = null;
 
   private applyFeedback(): void {
-    // Cursor: sobre un enemigo, atacar solo si se puede.
+    // Cursor: sobre un enemigo, atacar solo si se puede; sobre un objeto, empujar o atacar.
     let cursor = CURSOR_FOR_HOVER[this.hoverKind];
-    if (this.hoverKind === 'enemy' && this.attackPlan && !this.attackPlan.canAttack) {
-      cursor = 'invalid';
+    if (this.hoverKind === 'enemy' && !this.attackPlan?.canAttack) cursor = 'invalid';
+    if (this.hoverKind === 'neutral' && this.hoveredUnit && PropComponent.of(this.hoveredUnit)) {
+      cursor = this.pushPlan?.canPush
+        ? 'interact'
+        : this.attackPlan?.canAttack
+          ? 'attack'
+          : 'invalid';
     }
     if (cursor !== this.cursor) {
       this.cursor = cursor;
@@ -354,6 +441,19 @@ export class TacticalPointerComponent extends Component {
       return;
     }
 
+    // Saltar armado: la trayectoria (sobre el suelo) y los metros, o por qué no se puede.
+    const jump = this.jumpPlan;
+    if (jump && (this.hoverKind === 'ground' || this.hoverKind === 'invalid')) {
+      if (jump.canJump) {
+        this.preview?.show(jump.points, Infinity, `Saltar ${jump.distance.toFixed(1)} m`);
+      } else if (jump.allowed) {
+        this.preview?.showLabelOnly(`Saltar: ${reasonText(jump.reason)}`);
+      } else {
+        this.preview?.hide();
+      }
+      return;
+    }
+
     // Vista previa del camino completo: el tramo hasta donde llega el movimiento en claro,
     // el resto en rojo. Si no llega, la etiqueta dice cuánto se recorrerá de verdad.
     const m = this.movePlan;
@@ -383,7 +483,16 @@ export class TacticalPointerComponent extends Component {
         parts.push(`${plan.attack.name} ${Math.round(plan.hitChance * 100)} %`);
         parts.push(`${plan.damage} daño`);
       }
-      if (!plan.canAttack && plan.reason) parts.push(REASON_TEXT[plan.reason] ?? plan.reason);
+      if (!plan.canAttack && plan.reason) parts.push(reasonText(plan.reason));
+    } else if (this.hoverKind === 'neutral' && plan?.attack) {
+      parts.push(plan.canAttack ? plan.attack.name : reasonText(plan.reason));
+    } else if (this.pushPlan) {
+      const push = this.pushPlan;
+      parts.push(
+        push.canPush
+          ? `Empujar ${push.pushLength.toFixed(1)} m (acción adicional)`
+          : `Empujar: ${reasonText(push.reason)}`,
+      );
     }
     return parts.join(' · ');
   }
@@ -393,12 +502,27 @@ export class TacticalPointerComponent extends Component {
     const selected = PartyComponent.find()?.getSelected();
     if (this.hoverKind === 'ally' && this.hoveredUnit) {
       PartyComponent.find()?.select(this.hoveredUnit, 'world');
+    } else if (this.hoverKind === 'ground' && this.getArmedAttack() === 'jump') {
+      const result = selected ? encounter?.requestJump(selected, this.hoverPoint) : null;
+      if (result?.ok) this.armedAttack = null;
+      this.jumpCache.key = '';
+      this.planCache.key = '';
     } else if (this.hoverKind === 'ground') {
       if (selected) encounter?.requestMove(selected, this.hoverPoint);
       this.planCache.key = ''; // el presupuesto ha cambiado
     } else if (this.hoverKind === 'enemy' && this.hoveredUnit && selected) {
       const result = encounter?.requestAttack(selected, this.hoveredUnit, this.getArmedAttack());
       if (result?.ok) this.armedAttack = null; // como en BG3: tras atacar vuelve el de por defecto
+      this.attackCache.key = '';
+      this.planCache.key = '';
+    } else if (this.hoverKind === 'neutral' && this.hoveredUnit && selected) {
+      if (this.attackPlan?.canAttack) {
+        const r = encounter?.requestAttack(selected, this.hoveredUnit, this.getArmedAttackId());
+        if (r?.ok) this.armedAttack = null;
+      } else if (this.pushPlan?.canPush) {
+        const r = encounter?.requestPush(selected, this.hoveredUnit);
+        if (r?.ok && this.armedAttack === 'push') this.armedAttack = null;
+      }
       this.attackCache.key = '';
       this.planCache.key = '';
     }

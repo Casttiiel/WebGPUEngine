@@ -18,6 +18,9 @@ import {
   unitDistance,
   unitLineOfSight,
 } from './CombatRules';
+import { PropComponent, type PropExplosion } from './PropComponent';
+import { Surfaces } from './Surfaces';
+import { jumpArc, pushDistance } from './EnvironmentRules';
 
 export type EncounterState = 'exploration' | 'combat' | 'victory' | 'defeat';
 
@@ -46,6 +49,34 @@ export interface EncounterEventData {
   source?: Entity | null;
   amount?: number;
   hit?: boolean;
+  /** Origen del daño (texto flotante). */
+  cause?: DamageCause;
+}
+
+export type DamageCause = 'attack' | 'fire' | 'explosion' | 'debug';
+
+export interface JumpPlan {
+  /** La unidad puede actuar ahora (su turno, no está ocupada). */
+  allowed: boolean;
+  /** Trayectoria de los pies (vacía si no se puede). */
+  points: vec3[];
+  /** Distancia horizontal: los metros de movimiento que cuesta. */
+  distance: number;
+  canJump: boolean;
+  reason?: string;
+}
+
+export interface PushPlan {
+  /** La unidad puede actuar ahora (su turno, le queda la acción adicional). */
+  allowed: boolean;
+  /** Distancia de borde a borde al objeto (m). */
+  distance: number;
+  inReach: boolean;
+  /** Dónde acabará el objeto (pies) y cuánto se desplaza. */
+  destination: vec3 | null;
+  pushLength: number;
+  canPush: boolean;
+  reason?: string;
 }
 
 interface Combatant {
@@ -110,6 +141,15 @@ const AI_TURN_TIMEOUT = 20;
 /** Al acercarse para atacar cuerpo a cuerpo se queda a esta fracción del alcance. */
 const APPROACH_FRACTION = 0.6;
 const APPROACH_CANDIDATES = 16;
+/** Daño al entrar en fuego o empezar el turno dentro. */
+const FIRE_DAMAGE = 5;
+const JUMP_SPEED = 7;
+const JUMP_CLIP = 'Jump_Loop';
+/** Alcance para empujar un objeto (de borde a borde, m). */
+const PUSH_REACH = 1.5;
+const PUSH_SPEED = 5;
+const PUSH_TIME = 0.6;
+const PUSH_CLIP = 'Push_Enter';
 
 /**
  * EncounterComponent — máquina de estados del juego táctico y combate por turnos.
@@ -127,7 +167,11 @@ const APPROACH_CANDIDATES = 16;
  * (pierde sus turnos; se levanta con 1 PV al ganar). Sin enemigos vivos → victoria; toda
  * la party caída → derrota. R reinicia el encuentro (derrota o mapa despejado).
  *
- * Es quien aplica las reglas (planMove / requestMove / planAttack / requestAttack) para que
+ * Entorno: saltar (gasta metros de movimiento) por encima de cajas y muros bajos; empujar
+ * objetos (gasta la acción adicional); barriles que explotan al destruirse (daño en área y
+ * fuego); fuego que quema al entrar o al empezar el turno dentro; aceite que prende.
+ *
+ * Es quien aplica las reglas (planMove / planAttack / planJump / planPush y sus request*) para que
  * la UI, el MCP y la futura IA usen exactamente la misma lógica.
  */
 export class EncounterComponent extends Component {
@@ -157,6 +201,9 @@ export class EncounterComponent extends Component {
   private pendingHits: PendingHit[] = [];
   /** Enemigos de combates terminados por comando (end_combat): no vuelven a detectar. */
   private disengaged = new Set<UnitComponent>();
+  private surfaces = new Surfaces();
+  /** Unidades que estaban dentro de un fuego el frame anterior (quemar solo al entrar). */
+  private inFire = new Set<UnitComponent>();
   private initialized = false;
 
   private readonly tmpA = vec3.create();
@@ -176,6 +223,7 @@ export class EncounterComponent extends Component {
       this.initialized = true;
       this.registerDevCommands();
     }
+    this.surfaces.init();
 
     this.updateAttacks(dt);
 
@@ -198,6 +246,9 @@ export class EncounterComponent extends Component {
       case 'defeat':
         break;
     }
+
+    this.surfaces.update(dt, this.state === 'combat');
+    this.updateFire();
 
     if (this.canRestart() && Engine.getInput().isKeyJustPressed(KeyCode.R)) this.restart();
 
@@ -444,6 +495,106 @@ export class EncounterComponent extends Component {
     return { ...plan, ok: true };
   }
 
+  // ── Entorno: saltar y empujar (reglas compartidas por jugador, MCP e IA) ──
+
+  /** ¿Puede `entity` saltar hasta `destination` (punto del suelo)? Cuesta los metros saltados. */
+  public planJump(entity: Entity, destination: vec3): JumpPlan {
+    const unit = entity.getComponent('unit') as UnitComponent | null;
+    const result: JumpPlan = { allowed: false, points: [], distance: 0, canJump: false };
+    const fail = (reason: string): JumpPlan => ({ ...result, reason });
+    if (!unit) return fail('not a unit');
+    if (!unit.hasAbility('jump')) return fail('cannot jump');
+    const permission = this.canAct(unit, null);
+    result.allowed = permission === null;
+    if (permission !== null) return fail(permission);
+    const arc = jumpArc(unit.getFeetPosition(this.tmpA), destination);
+    if ('reason' in arc) return fail(arc.reason);
+    result.points = arc.points;
+    result.distance = arc.distance;
+    if (this.state === 'combat' && arc.distance > this.resources.movement + EPS) {
+      return fail('not enough movement');
+    }
+    result.canJump = true;
+    return result;
+  }
+
+  public requestJump(entity: Entity, destination: vec3): JumpPlan & { ok: boolean } {
+    UnitObstacles.sync(this.getActingUnit());
+    const plan = this.planJump(entity, destination);
+    if (!plan.canJump) return { ...plan, ok: false };
+    if (this.state === 'combat') {
+      this.resources.movement = Math.max(0, this.resources.movement - plan.distance);
+    }
+    this.pendingAttack = null;
+    const unit = entity.getComponent('unit') as UnitComponent;
+    const last = plan.points[plan.points.length - 1]!;
+    unit.faceTowards(vec3.fromValues(last[0]!, unit.getPosition(this.tmpA)[1]!, last[2]!));
+    unit.playAction(JUMP_CLIP);
+    void unit.moveAlong(plan.points, { speed: JUMP_SPEED, walk: false, face: false });
+    this.emit('jump', { unit: entity });
+    return { ...plan, ok: true };
+  }
+
+  /** ¿Puede `entity` empujar el objeto `target`? Cuesta la acción adicional. */
+  public planPush(entity: Entity, target: Entity): PushPlan {
+    const unit = entity.getComponent('unit') as UnitComponent | null;
+    const prop = target.getComponent('unit') as UnitComponent | null;
+    const result: PushPlan = {
+      allowed: false,
+      distance: Infinity,
+      inReach: false,
+      destination: null,
+      pushLength: 0,
+      canPush: false,
+    };
+    const fail = (reason: string): PushPlan => ({ ...result, reason });
+    if (!unit || !prop) return fail('not a unit');
+    if (!unit.hasAbility('push')) return fail('cannot push');
+    const data = PropComponent.of(target);
+    if (!data?.isPushable() || !prop.isAlive()) return fail('not pushable');
+    result.distance = unitDistance(unit, prop);
+    result.inReach = result.distance <= PUSH_REACH + EPS;
+    const permission = this.canAct(unit, 'bonusAction');
+    result.allowed = permission === null;
+    if (permission !== null) return fail(permission);
+    if (!result.inReach) return fail('too far to push');
+
+    const from = unit.getPosition(this.tmpA);
+    const to = prop.getPosition(this.tmpB);
+    const dir = vec3.fromValues(to[0]! - from[0]!, 0, to[2]! - from[2]!);
+    if (vec3.length(dir) < 1e-4) return fail('too far to push');
+    vec3.normalize(dir, dir);
+    const length = pushDistance(prop, dir, data.getPushDistance());
+    if (length < 0.3) return fail('push blocked');
+    result.pushLength = length;
+    result.destination = vec3.scaleAndAdd(vec3.create(), prop.getFeetPosition(), dir, length);
+    result.canPush = true;
+    return result;
+  }
+
+  public requestPush(entity: Entity, target: Entity): PushPlan & { ok: boolean } {
+    const plan = this.planPush(entity, target);
+    if (!plan.canPush || !plan.destination) return { ...plan, ok: false };
+    if (this.state === 'combat') {
+      this.resources.bonusAction = Math.max(0, this.resources.bonusAction - 1);
+    }
+    const unit = entity.getComponent('unit') as UnitComponent;
+    const prop = target.getComponent('unit') as UnitComponent;
+    unit.faceTowards(prop.getPosition(this.tmpA));
+    unit.playAction(PUSH_CLIP, PUSH_TIME);
+    void prop.moveAlong([prop.getFeetPosition(), plan.destination], {
+      speed: PUSH_SPEED,
+      walk: false,
+      face: false,
+    });
+    this.emit('push', { unit: target, source: entity });
+    return { ...plan, ok: true };
+  }
+
+  public getSurfaces(): Surfaces {
+    return this.surfaces;
+  }
+
   // ── Combate ──────────────────────────────────────────────────────────────
 
   /** Empieza un combate (normalmente al detectar a la party; también vía MCP). Sin enemigos cerca, no. */
@@ -528,6 +679,8 @@ export class EncounterComponent extends Component {
     this.round = 0;
     this.turnIndex = 0;
     for (const unit of UnitComponent.getAll()) unit.resetToSpawn();
+    this.surfaces.reset();
+    this.inFire.clear();
     this.detectionTimer = DETECTION_INTERVAL;
     this.setState('exploration');
     PartyComponent.find()?.select(0, 'code');
@@ -541,20 +694,21 @@ export class EncounterComponent extends Component {
   public applyDamage(entity: Entity, amount: number, source: Entity | null = null): boolean {
     const target = entity.getComponent('unit') as UnitComponent | null;
     if (!target?.isAlive() || !target.getHealth()) return false;
-    this.applyHit(source?.getComponent('unit') as UnitComponent | null, target, true, amount);
+    const attacker = source?.getComponent('unit') as UnitComponent | null;
+    this.applyHit(attacker, target, true, amount, 'debug');
     return true;
   }
 
   // ── Interno ──────────────────────────────────────────────────────────────
 
-  /** null si la unidad puede actuar ahora gastando `cost`; si no, el motivo. */
-  private canAct(unit: UnitComponent, cost: 'action' | 'bonusAction'): string | null {
+  /** null si la unidad puede actuar ahora gastando `cost` (null: sin coste); si no, el motivo. */
+  private canAct(unit: UnitComponent, cost: 'action' | 'bonusAction' | null): string | null {
     if (!unit.isAlive()) return 'unit is down';
     if (unit.isBusy() || this.pendingAttack) return 'unit is busy';
     const entity = unit.getOwner();
     if (this.state === 'combat') {
       if (entity !== this.getActiveUnit()) return 'not this unit’s turn';
-      if (this.resources[cost] <= 0)
+      if (cost && this.resources[cost] <= 0)
         return cost === 'action' ? 'no action left' : 'no bonus action left';
       return null;
     }
@@ -636,7 +790,7 @@ export class EncounterComponent extends Component {
       due.push(h);
       return false;
     });
-    for (const h of due) this.applyHit(h.attacker, h.target, h.hit, h.damage);
+    for (const h of due) this.applyHit(h.attacker, h.target, h.hit, h.damage, 'attack');
   }
 
   private applyHit(
@@ -644,6 +798,7 @@ export class EncounterComponent extends Component {
     target: UnitComponent,
     hit: boolean,
     damage: number,
+    cause: DamageCause,
   ): void {
     if (!target.isAlive()) return;
     const health = target.getHealth();
@@ -655,9 +810,10 @@ export class EncounterComponent extends Component {
       source: attacker?.getOwner() ?? null,
       amount: dealt,
       hit,
+      cause,
     });
 
-    if (health && health.getHp() <= 0) this.onUnitDown(target);
+    if (health && health.getHp() <= 0) this.onUnitDown(target, attacker);
     else if (hit) target.playAction(HIT_CLIP);
 
     // La party ataca primero: empieza el combate (si quedan enemigos cerca).
@@ -670,11 +826,51 @@ export class EncounterComponent extends Component {
     }
   }
 
-  /** Vida a 0: el enemigo muere y sale de la iniciativa; el aliado queda caído. */
-  private onUnitDown(unit: UnitComponent): void {
+  /**
+   * Vida a 0: el enemigo muere y sale de la iniciativa; el aliado queda caído; un objeto se
+   * destruye (y si es explosivo, explota). `instigator`: quien lo causó (también en cadena).
+   */
+  private onUnitDown(unit: UnitComponent, instigator: UnitComponent | null = null): void {
     unit.setDown(true);
+    this.inFire.delete(unit);
+    const prop = PropComponent.of(unit.getOwner());
+    if (prop) {
+      this.emit('destroyed', { unit: unit.getOwner() });
+      const explosion = prop.getExplosion();
+      if (explosion) this.explode(unit, explosion, instigator);
+      return;
+    }
     const isParty = PartyComponent.find()?.isMember(unit.getOwner()) === true;
     this.emit(isParty ? 'downed' : 'death', { unit: unit.getOwner() });
+    this.checkCombatEnd(unit, isParty);
+  }
+
+  /** Daño en área alrededor de un objeto explosivo (en cadena) y la superficie que deja. */
+  private explode(
+    prop: UnitComponent,
+    explosion: PropExplosion,
+    instigator: UnitComponent | null,
+  ): void {
+    const center = prop.getFeetPosition(vec3.create());
+    this.surfaces.spawnExplosion(center);
+    this.emit('explosion', { unit: prop.getOwner(), source: instigator?.getOwner() ?? null });
+    const p = vec3.create();
+    for (const u of UnitComponent.getAll()) {
+      if (u === prop || !u.isAlive()) continue;
+      u.getFeetPosition(p);
+      const d = Math.hypot(p[0]! - center[0]!, p[2]! - center[2]!) - u.getCapsuleRadius();
+      if (d <= explosion.radius && Math.abs(p[1]! - center[1]!) < 2) {
+        this.applyHit(instigator, u, true, explosion.damage, 'explosion');
+      }
+    }
+    if (explosion.surface) {
+      this.surfaces.add(explosion.surface, center, explosion.surfaceRadius ?? explosion.radius);
+    }
+    this.surfaces.igniteAround(center, explosion.radius);
+  }
+
+  /** Tras una baja: fin del combate (victoria / derrota) o pasar el turno si era el activo. */
+  private checkCombatEnd(unit: UnitComponent, isParty: boolean): void {
     if (this.state !== 'combat') return;
 
     const index = this.combatants.findIndex((c) => c.unit === unit);
@@ -752,10 +948,37 @@ export class EncounterComponent extends Component {
     return unit.getOwner().getComponent('tactical_ai') as TacticalAIComponent | null;
   }
 
-  /** ¿Le queda algo que hacer? Metros, o una acción / acción adicional que algún ataque use. */
+  /**
+   * ¿Le queda algo que hacer? Metros, una acción / acción adicional que algún ataque use, o
+   * la acción adicional para empujar un objeto que tenga al alcance.
+   */
   private hasUsableResources(unit: UnitComponent): boolean {
     if (this.resources.movement >= EPS) return true;
-    return unit.getAttacks().some((a) => this.resources[a.cost ?? 'action'] > 0);
+    if (unit.getAttacks().some((a) => this.resources[a.cost ?? 'action'] > 0)) return true;
+    return (
+      this.resources.bonusAction > 0 &&
+      unit.hasAbility('push') &&
+      UnitComponent.getAll().some((u) => this.planPush(unit.getOwner(), u.getOwner()).canPush)
+    );
+  }
+
+  /** Fuego: quema a quien entra (también a los objetos: un barril explota). */
+  private updateFire(): void {
+    const p = vec3.create();
+    for (const u of UnitComponent.getAll()) {
+      const inside =
+        u.isAlive() && this.surfaces.fireAt(u.getFeetPosition(p), u.getCapsuleRadius());
+      if (inside && !this.inFire.has(u)) {
+        this.inFire.add(u);
+        this.burn(u);
+      } else if (!inside) {
+        this.inFire.delete(u);
+      }
+    }
+  }
+
+  private burn(unit: UnitComponent): void {
+    if (unit.isAlive() && unit.getHealth()) this.applyHit(null, unit, true, FIRE_DAMAGE, 'fire');
   }
 
   /** Avanza al siguiente de la iniciativa (nueva ronda al dar la vuelta). */
@@ -764,6 +987,7 @@ export class EncounterComponent extends Component {
     if (this.turnIndex >= this.combatants.length) {
       this.turnIndex = 0;
       this.round++;
+      this.surfaces.onRound();
       this.emit('round', {});
     }
   }
@@ -789,6 +1013,9 @@ export class EncounterComponent extends Component {
       this.getCamera()?.focusOn(entity, true);
     }
     this.emit('turn', { unit: entity });
+    // Empezar el turno dentro del fuego quema.
+    const feet = active.unit.getFeetPosition(this.tmpA);
+    if (this.surfaces.fireAt(feet, active.unit.getCapsuleRadius())) this.burn(active.unit);
   }
 
   /** Un enemigo que entra a mitad de combate se coloca por su iniciativa. */
@@ -866,6 +1093,12 @@ export class EncounterComponent extends Component {
         selected: PartyComponent.find()?.getSelectedName() ?? null,
         busy: this.isResolving(),
         aiTimeouts: this.aiTimeouts,
+        surfaces: this.surfaces.getAll().map((sf) => ({
+          type: sf.type,
+          center: Array.from(sf.center).map((v) => Math.round(v * 100) / 100),
+          radius: sf.radius,
+          rounds: Number.isFinite(sf.rounds) ? sf.rounds : null,
+        })),
         aiPlans: UnitComponent.getAll()
           .map((u) => ({ unit: u, plan: this.getAI(u)?.getLastPlan() ?? null }))
           .filter((p) => p.plan)
@@ -969,6 +1202,41 @@ export class EncounterComponent extends Component {
               (args.result as 'victory' | 'defeat' | 'exploration' | undefined) ?? 'victory',
             );
             return { state: this.state };
+          case 'jump':
+          case 'plan_jump': {
+            const to = args.to as [number, number, number] | undefined;
+            if (!Array.isArray(to)) throw new Error(`${name} needs args.to = [x, y, z]`);
+            const dest = vec3.fromValues(to[0], to[1], to[2]);
+            const r =
+              name === 'jump'
+                ? this.requestJump(unitArg(), dest)
+                : { ...this.planJump(unitArg(), dest), ok: null };
+            return {
+              ok: r.ok,
+              canJump: r.canJump,
+              allowed: r.allowed,
+              distance: r.distance,
+              apex: r.points.length ? Math.max(...r.points.map((q) => q[1]!)) : null,
+              reason: r.reason ?? null,
+            };
+          }
+          case 'push':
+          case 'plan_push': {
+            const r =
+              name === 'push'
+                ? this.requestPush(unitArg(), unitArg('target'))
+                : { ...this.planPush(unitArg(), unitArg('target')), ok: null };
+            return {
+              ok: r.ok,
+              canPush: r.canPush,
+              allowed: r.allowed,
+              inReach: r.inReach,
+              distance: r.distance,
+              pushLength: r.pushLength,
+              destination: r.destination ? Array.from(r.destination) : null,
+              reason: r.reason ?? null,
+            };
+          }
           case 'restart':
             this.restart();
             return { state: this.state };
@@ -977,7 +1245,7 @@ export class EncounterComponent extends Component {
             return { selected: PartyComponent.find()?.getSelectedName() ?? null };
           default:
             throw new Error(
-              `Unknown command '${name}'. Available: move, plan_move, attack, plan_attack, damage, end_turn, start_combat, end_combat, restart, select`,
+              `Unknown command '${name}'. Available: move, plan_move, attack, plan_attack, jump, plan_jump, push, plan_push, damage, end_turn, start_combat, end_combat, restart, select`,
             );
         }
       },

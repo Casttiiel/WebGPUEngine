@@ -109,7 +109,8 @@
           "damage": 6,
           "clip": "Spell_Simple_Shoot"
         }
-      ]
+      ],
+      "abilities": ["jump", "push"]
     },
     "health": {
       "maxHp": 30

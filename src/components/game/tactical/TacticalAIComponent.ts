@@ -89,8 +89,7 @@ export class TacticalAIComponent extends Component {
   public getProfile(): AIProfile {
     const unit = this.getUnit();
     return {
-      role:
-        this.role ?? (unit?.getAttacks().some((a) => a.kind === 'ranged') ? 'ranged' : 'melee'),
+      role: this.role ?? (unit?.getAttacks().some((a) => a.kind === 'ranged') ? 'ranged' : 'melee'),
       retreatHp: this.retreatHp,
       preferredDistance: this.preferredDistance,
     };

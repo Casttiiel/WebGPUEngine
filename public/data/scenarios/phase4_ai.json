@@ -1,5 +1,6 @@
 {
   "description": "Fase 4 (punto 16): IA enemiga. Tres enemigos variados (Bruto cuerpo a cuerpo, Arquero a distancia, Hostigador rápido) deciden su turno con un Behavior Tree y las mismas reglas que el jugador. El combate termina sin atascarse; el arquero dispara guardando distancia y se retira con poca vida.",
+  "scenes": ["tactical.json", "tactical_enemies.json"],
   "seed": 3,
   "steps": [
     {

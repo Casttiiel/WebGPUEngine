@@ -1,0 +1,16 @@
+{
+  "technique": "gbuffer/gbuffer_dither.tech",
+  "textures": {
+    "txAlbedo": "wood_0034_color_1k.jpg",
+    "txNormal": "stone_normal.png",
+    "txMetallic": "wood_0034_metallic_1k.jpg",
+    "txRoughness": "wood_0034_roughness_1k.jpg",
+    "txEmissive": "black.png"
+  },
+  "baseColorFactor": [1, 1, 1, 0.3],
+  "uvXScale": 1,
+  "uvYScale": 1,
+  "casts_shadows": false,
+  "category": "solids",
+  "shadows": false
+}

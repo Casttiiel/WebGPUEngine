@@ -24,7 +24,9 @@ export class ParticleSystemComponent extends Component {
   private particleBuffer!: GPUBuffer;
   private indirectDrawBuffer!: GPUBuffer;
   private renderBindGroup!: GPUBindGroup;
-  private renderComponent!: RenderComponent;
+  private renderComponent: RenderComponent | null = null;
+  /** dispose() ya llamado: si la carga asíncrona termina después, no se registra. */
+  private disposed = false;
 
   // Compute shader resources (update particles)
   private updatePipeline!: GPUComputePipeline;
@@ -278,6 +280,12 @@ export class ParticleSystemComponent extends Component {
 
       // Escribir gravedad inicial al buffer de simulación (creado en createComputePipeline)
       this.writeGravityToSimBuffer(device);
+
+      // Destruido mientras cargaba (p.ej. un efecto de corta vida): liberar y no registrar.
+      if (this.disposed) {
+        this.destroyBuffers();
+        return;
+      }
 
       // 8. Registrar la key instanciada en el RenderManagerV2
       this.renderComponent = new RenderComponent();
@@ -621,7 +629,15 @@ export class ParticleSystemComponent extends Component {
   }
 
   public dispose(): void {
-    // Cleanup GPU resources
+    this.disposed = true;
+    // Primero dejar de dibujarlo: si no, el siguiente frame usa buffers destruidos y la
+    // GPU rechaza el submit entero (pantalla en negro).
+    if (this.renderComponent) RenderManagerV2.getInstance().delKeys(this.renderComponent);
+    this.renderComponent = null;
+    this.destroyBuffers();
+  }
+
+  private destroyBuffers(): void {
     this.particleBuffer?.destroy();
     this.indirectDrawBuffer?.destroy();
     this.simulationParamsBuffer?.destroy();

@@ -1407,6 +1407,136 @@
     ]
   },
   {
+    "name": "hotbar_5",
+    "alias": "hotbar_5",
+    "type": "image",
+    "x": 0,
+    "y": -130,
+    "width": 104,
+    "height": 104,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [104, 104],
+      "color": [0.08, 0.08, 0.1, 0.9]
+    },
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_5_icon",
+        "alias": "hotbar_5_icon",
+        "type": "image",
+        "x": 6,
+        "y": 6,
+        "width": 92,
+        "height": 92,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [92, 92],
+          "color": [0.5, 0.15, 0.1, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_5_key",
+        "alias": "hotbar_5_key",
+        "type": "text",
+        "x": 10,
+        "y": 6,
+        "width": 30,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_5_name",
+        "alias": "hotbar_5_name",
+        "type": "text",
+        "x": 2,
+        "y": 62,
+        "width": 100,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "hotbar_6",
+    "alias": "hotbar_6",
+    "type": "image",
+    "x": 0,
+    "y": -130,
+    "width": 104,
+    "height": 104,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [104, 104],
+      "color": [0.08, 0.08, 0.1, 0.9]
+    },
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_6_icon",
+        "alias": "hotbar_6_icon",
+        "type": "image",
+        "x": 6,
+        "y": 6,
+        "width": 92,
+        "height": 92,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [92, 92],
+          "color": [0.5, 0.15, 0.1, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_6_key",
+        "alias": "hotbar_6_key",
+        "type": "text",
+        "x": 10,
+        "y": 6,
+        "width": 30,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 1, 1, 0.9],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_6_name",
+        "alias": "hotbar_6_name",
+        "type": "text",
+        "x": 2,
+        "y": 62,
+        "width": 100,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 1, 1, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
     "name": "hotbar_tooltip",
     "alias": "hotbar_tooltip",
     "type": "text",

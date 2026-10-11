@@ -1,0 +1,257 @@
+{
+  "description": "Fase 5 (punto 17): saltar por encima de muros bajos (gasta movimiento), empujar objetos (gasta la acción adicional), barril explosivo que prende un charco de aceite, fuego que quema al entrar y al empezar el turno y se apaga a las 3 rondas, muros y columnas que se atenúan al tapar la vista, y reinicio del entorno.",
+  "scenes": ["tactical.json", "tactical_props.json", "tactical_dummies.json"],
+  "seed": 11,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__log = []; Engine.getEntities().getObjectManagerByName('encounter').getList()[0].onEvent((e, d) => window.__log.push({ e, u: d.unit ? d.unit.getName() : null, cause: d.cause ?? null, amount: d.amount ?? null }))"
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().surfaces.map(s => s.type)",
+        "value": ["oil"],
+        "message": "charco de aceite de la escena"
+      }
+    },
+
+    { "log": "Empujar en exploración: hay que estar al lado; la caja se desplaza" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_push', { unit: 'Hero1', target: 'Crate' }).then(r => r.reason)",
+        "value": "too far to push"
+      }
+    },
+    { "command": "move", "args": { "unit": "Hero1", "to": [-2.6, 0, -5.2] } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 300
+    },
+    { "input": { "type": "move", "entity": "Crate" } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "interact" } },
+    { "input": { "type": "click", "entity": "Crate" } },
+    { "wait_frames": 60 },
+    {
+      "assert": {
+        "entity": "Crate",
+        "path": "position",
+        "op": "approx",
+        "value": [0.72, 0.375, -2.18],
+        "tolerance": 0.1,
+        "message": "3 m en la dirección del empujón"
+      }
+    },
+    { "assert": { "combat": true, "path": "state", "value": "exploration" } },
+
+    { "log": "Saltar: armar Saltar en la hotbar y click al otro lado del muro bajo" },
+    { "command": "move", "args": { "unit": "Hero1", "to": [-5, 0, 0.3] } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 400
+    },
+    {
+      "assert": {
+        "expr": "Promise.all([__engine.gameCommand('plan_move', { unit: 'Hero1', to: [-5, 0, 3.6] }), __engine.gameCommand('plan_jump', { unit: 'Hero1', to: [-5, 0, 3.6] })]).then(([w, j]) => j.canJump && j.distance < 3.5 && w.length > j.distance + 2)",
+        "value": true,
+        "message": "saltar el muro es mucho más corto que rodearlo"
+      }
+    },
+    { "input": { "type": "click", "widget": "hotbar_3" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": "jump" } },
+    { "input": { "type": "move", "world": [-5, 0, 3.6] } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "move" } },
+    { "assert": { "expr": "__engine.getWidgetRect('cursor_label').visible", "value": true } },
+    { "screenshot": "01-jump-preview" },
+    { "input": { "type": "click", "world": [-5, 0, 3.6] } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Hero1", "path": "unit.isMoving", "value": true } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 200
+    },
+    {
+      "assert": {
+        "entity": "Hero1",
+        "path": "position",
+        "op": "approx",
+        "value": [-5, 0.9, 3.6],
+        "tolerance": 0.15
+      }
+    },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": null } },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_jump', { unit: 'Hero1', to: [-5, 0, 0.3] }).then(r => r.canJump)",
+        "value": true,
+        "message": "y volver"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_jump', { unit: 'Hero2', to: [-2.5, 0, -4] }).then(r => r.reason)",
+        "value": "only the selected party member acts in exploration"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_jump', { unit: 'Hero1', to: [-5, 0, 9] }).then(r => r.reason)",
+        "value": "too far to jump"
+      }
+    },
+
+    { "log": "Barril explosivo: dispararle desde lejos → explosión, el aceite prende, empieza el combate" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Barrel1', attack: 'ranged' }).then(r => r.canAttack)",
+        "value": true
+      }
+    },
+    { "input": { "type": "click", "widget": "hotbar_2" } },
+    { "wait_frames": 2 },
+    { "input": { "type": "move", "entity": "Barrel1" } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "attack" } },
+    { "input": { "type": "click", "entity": "Barrel1" } },
+    { "wait_frames": 45 },
+    { "assert": { "entity": "Barrel1", "path": "unit.isAlive", "value": false } },
+    {
+      "assert": {
+        "expr": "window.__log.filter(x => x.u === 'Enemy1' && x.e === 'damage').map(x => [x.cause, x.amount])",
+        "value": [
+          ["explosion", 12],
+          ["fire", 5]
+        ],
+        "message": "explosión y, al prender el aceite bajo sus pies, fuego"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().surfaces.map(s => s.type)",
+        "value": ["fire", "fire"],
+        "message": "fuego del barril + aceite prendido"
+      }
+    },
+    { "assert": { "combat": true, "path": "state", "value": "combat" } },
+    { "assert": { "entity": "Barrel2", "path": "unit.isAlive", "value": true, "message": "el otro barril, lejos, sigue" } },
+    { "screenshot": "02-explosion" },
+
+    { "log": "Empujar en combate gasta la acción adicional (no la acción)" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.playerTurn && !s.busy) return true; return false; })()",
+        "value": true
+      },
+      "timeout_frames": 900,
+      "check_every": 5
+    },
+    { "eval": "window.__pusher = __engine.getCombatState().activeUnit" },
+    {
+      "eval": "__engine.gameCommand('move', { unit: window.__pusher, to: [-0.3, 0, -3.2] })"
+    },
+    {
+      "wait_until": { "expr": "__engine.readPath(window.__pusher, 'unit.isMoving')", "value": false },
+      "timeout_frames": 400
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('push', { unit: window.__pusher, target: 'Crate' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    { "assert": { "combat": true, "path": "resources.bonusAction", "value": 0 } },
+    { "assert": { "combat": true, "path": "resources.action", "value": 1 } },
+    { "wait_frames": 60 },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_push', { unit: window.__pusher, target: 'Crate' }).then(r => r.reason)",
+        "op": "includes",
+        "value": "no bonus action left"
+      }
+    },
+
+    { "log": "Fuego: empezar el turno dentro quema; se apaga a las 3 rondas" },
+    { "eval": "window.__round0 = __engine.getCombatState().round" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.state !== 'combat' || s.surfaces.every(x => x.type !== 'fire')) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 3000,
+      "check_every": 5
+    },
+    {
+      "assert": {
+        "expr": "window.__log.some(x => x.e === 'death' && x.u === 'Enemy1')",
+        "value": true,
+        "message": "Enemy1 (3 PV) empieza su turno en el fuego y muere"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().surfaces.length",
+        "value": 0,
+        "message": "el fuego se ha apagado"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().state === 'exploration' || __engine.getCombatState().round - window.__round0 >= 2",
+        "value": true
+      }
+    },
+
+    { "log": "Reinicio: barriles, aceite y caja vuelven" },
+    { "command": "restart" },
+    { "wait_frames": 10 },
+    { "assert": { "entity": "Barrel1", "path": "unit.isAlive", "value": true } },
+    { "assert": { "entity": "Barrel1", "path": "render.isVisible", "value": true } },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().surfaces.map(s => s.type)",
+        "value": ["oil"]
+      }
+    },
+    {
+      "assert": {
+        "entity": "Crate",
+        "path": "position",
+        "op": "approx",
+        "value": [-1.5, 0.375, -4.2],
+        "tolerance": 0.05
+      }
+    },
+
+    { "log": "Muros y columnas que tapan la vista se atenúan" },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([0, 0, -16], false)"
+    },
+    { "wait_frames": 60 },
+    {
+      "assert": {
+        "expr": "Engine.getEntities().getObjectManagerByName('camera_occluder').getList().filter(o => o.isFadedOut()).map(o => o.getOwner().getName())",
+        "op": "includes",
+        "value": "Column4"
+      }
+    },
+    { "screenshot": "03-occluder" },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([0, 0, 0], false)"
+    },
+    { "wait_frames": 60 },
+    {
+      "assert": {
+        "expr": "Engine.getEntities().getObjectManagerByName('camera_occluder').getList().filter(o => o.isFadedOut()).length",
+        "value": 0,
+        "message": "y vuelven a ser opacos"
+      }
+    },
+    { "assert": { "no_errors": true } }
+  ]
+}

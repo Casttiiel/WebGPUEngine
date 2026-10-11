@@ -6,6 +6,7 @@ import { TransformComponent } from '../../core/TransformComponent';
 import { AnimatorComponent } from '../../render/AnimatorComponent';
 import { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
 import { HealthComponent } from '../HealthComponent';
+import { RenderComponent } from '../../render/RenderComponent';
 import { groundHeightAt } from './TacticalQueries';
 
 export type UnitFaction = 'party' | 'enemy' | 'neutral';
@@ -51,7 +52,23 @@ export type UnitComponentDataType = Readonly<{
   sightRange?: number;
   /** Ataques (orden de la hotbar; el primero es el de por defecto). Default: un golpe cuerpo a cuerpo. */
   attacks?: UnitAttack[];
+  /** Acciones de la hotbar además de los ataques: saltar, empujar objetos. Default: ninguna. */
+  abilities?: UnitAbility[];
+  /** Al caer desaparece (objetos destruidos, p.ej. un barril que explota). Default false. */
+  hideWhenDown?: boolean;
 }>;
+
+/** Acciones que no son ataques: saltar (gasta movimiento) y empujar un objeto (acción adicional). */
+export type UnitAbility = 'jump' | 'push';
+
+export interface MoveOptions {
+  /** Velocidad (m/s). Default: la de la unidad. */
+  speed?: number;
+  /** Animación de andar. Default true (false: saltos, objetos empujados). */
+  walk?: boolean;
+  /** Girarse hacia donde avanza. Default true. */
+  face?: boolean;
+}
 
 const UP = vec3.fromValues(0, 1, 0);
 
@@ -71,6 +88,10 @@ export class UnitComponent extends Component {
   private sightRange = 0;
   private attacks: UnitAttack[] = DEFAULT_ATTACKS;
   private down = false;
+  private abilities: UnitAbility[] = [];
+  private hideWhenDown = false;
+  private pathSpeed = 4;
+  private pathTurns = true;
   /** Segundos que le quedan a la acción en curso (animación de ataque). */
   private actionTimer = 0;
   /** Dónde empezó (para reiniciar el encuentro). */
@@ -94,7 +115,9 @@ export class UnitComponent extends Component {
     this.moveSpeed = data.moveSpeed ?? this.moveSpeed;
     this.movement = data.movement ?? this.movement;
     this.sightRange = data.sightRange ?? (this.faction === 'enemy' ? 8 : 0);
-    this.attacks = data.attacks?.length ? data.attacks.map((a) => ({ ...a })) : DEFAULT_ATTACKS;
+    this.attacks = data.attacks ? data.attacks.map((a) => ({ ...a })) : DEFAULT_ATTACKS;
+    this.abilities = [...(data.abilities ?? [])];
+    this.hideWhenDown = data.hideWhenDown ?? false;
   }
 
   public update(dt: number): void {
@@ -137,6 +160,14 @@ export class UnitComponent extends Component {
   /** Moviéndose o en mitad de una acción (animación de ataque). */
   public isBusy(): boolean {
     return this.isMoving() || this.actionTimer > 0;
+  }
+
+  public getAbilities(): readonly UnitAbility[] {
+    return this.abilities;
+  }
+
+  public hasAbility(ability: UnitAbility): boolean {
+    return this.abilities.includes(ability);
   }
 
   public getAttacks(): readonly UnitAttack[] {
@@ -198,13 +229,15 @@ export class UnitComponent extends Component {
    * Recorre un camino (puntos en el suelo, p.ej. de AStar.findPath). Devuelve una promesa
    * que se resuelve al llegar (o al interrumpirse con stop()).
    */
-  public moveAlong(path: vec3[]): Promise<void> {
+  public moveAlong(path: vec3[], options: MoveOptions = {}): Promise<void> {
     this.stop();
     if (path.length < 2) return Promise.resolve();
     this.path = path.map((p) => vec3.clone(p));
     this.pathIndex = 1;
+    this.pathSpeed = options.speed ?? this.moveSpeed;
+    this.pathTurns = options.face ?? true;
     this.getFeetPosition(this.movingFeet);
-    this.getAnimator()?.setParameter('moving', true);
+    if (options.walk ?? true) this.getAnimator()?.setParameter('moving', true);
     return new Promise((resolve) => (this.onArrive = resolve));
   }
 
@@ -250,6 +283,7 @@ export class UnitComponent extends Component {
     capsule?.getCollider()?.setEnabled(!down);
     const animator = this.getAnimator();
     animator?.setParameter('dead', down);
+    if (this.hideWhenDown) setRenderVisible(this.getOwner(), !down);
     if (!down) {
       this.getHealth()?.restore(hp);
       animator?.play(); // el clip de muerte (sin loop) había parado el animator
@@ -284,7 +318,7 @@ export class UnitComponent extends Component {
 
   private advanceAlongPath(dt: number): void {
     const feet = this.movingFeet;
-    let budget = this.moveSpeed * dt;
+    let budget = this.pathSpeed * dt;
 
     while (budget > 0 && this.pathIndex < this.path.length) {
       const target = this.path[this.pathIndex]!;
@@ -298,7 +332,7 @@ export class UnitComponent extends Component {
         vec3.scaleAndAdd(feet, feet, this.tmpDir, budget / dist);
         budget = 0;
       }
-      this.faceDirection(this.tmpDir);
+      if (this.pathTurns) this.faceDirection(this.tmpDir);
     }
 
     this.setFeetPosition(feet);
@@ -353,4 +387,10 @@ export class UnitComponent extends Component {
     const order: Record<UnitFaction, number> = { party: 0, enemy: 1, neutral: 2 };
     return [...list].sort((a, b) => order[a.faction] - order[b.faction]);
   }
+}
+
+/** Muestra u oculta todos los RenderComponent de una entidad y sus hijos. */
+function setRenderVisible(entity: Entity, visible: boolean): void {
+  (entity.getComponent('render') as RenderComponent | null)?.setVisible(visible);
+  entity.getChildren().forEach((c) => setRenderVisible(c, visible));
 }

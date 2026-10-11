@@ -73,7 +73,9 @@ export function planTurn(
   const self = me.getOwner();
   const foes = encounter
     .getCombatantUnits()
-    .filter((u) => u.isAlive() && u.getFaction() !== me.getFaction() && u.getFaction() !== 'neutral');
+    .filter(
+      (u) => u.isAlive() && u.getFaction() !== me.getFaction() && u.getFaction() !== 'neutral',
+    );
   const wait: TurnPlan = {
     kind: 'wait',
     move: null,
@@ -83,7 +85,8 @@ export function planTurn(
   };
   if (foes.length === 0) return wait;
 
-  const low = profile.retreatHp > 0 && me.getMaxHp() > 0 && me.getHp() / me.getMaxHp() < profile.retreatHp;
+  const low =
+    profile.retreatHp > 0 && me.getMaxHp() > 0 && me.getHp() / me.getMaxHp() < profile.retreatHp;
   const resources = encounter.getResources();
   const candidates: TurnPlan[] = [wait];
   const here = me.getFeetPosition(vec3.create());

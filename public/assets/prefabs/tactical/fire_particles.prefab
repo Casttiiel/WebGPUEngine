@@ -1,0 +1,26 @@
+{
+  "children": [],
+  "components": {
+    "name": "FireParticles",
+    "transform": {
+      "position": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    "particle_system": {
+      "worldSpace": true,
+      "maxParticles": 300,
+      "emissionRate": 70,
+      "spawnRadius": [1, 0.05, 1],
+      "baseVelocity": [0, 1.6, 0],
+      "velocitySpread": 0.35,
+      "gravity": [0, 0.6, 0],
+      "startSize": 0.35,
+      "endSize": 0.05,
+      "particleLife": 0.9,
+      "particleLifeVarianceMin": -0.3,
+      "particleLifeVarianceMax": 0.3,
+      "startColor": [1, 0.7, 0.2, 0.9],
+      "endColor": [0.8, 0.1, 0.02, 0]
+    }
+  }
+}

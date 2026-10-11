@@ -180,7 +180,13 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ---
 
-## Fase 4 — IA enemiga
+## Fase 4 — IA enemiga ✅
+
+> **Estado: implementada.** Test: `run_scenario phase4_ai`.
+> - **`tactical_ai`:** Behavior Tree por unidad (`src/ai` + nodo nuevo `Wait`): pensar → planificar → moverse → atacar → pasar, con pausas para que se entienda. Usa `requestMove` / `requestAttack`, las mismas reglas que el jugador y el MCP.
+> - **`TacticalPlanner`:** puntúa atacar desde aquí, acercarse y golpear, moverse para disparar (alcance + línea de visión, guardando distancia), retirarse y esconderse con poca vida, o avanzar hacia el más cercano.
+> - **Enemigos:** Bruto (cuerpo a cuerpo, mucha vida), Arquero (a distancia, se retira) y Hostigador (rápido, se une a mitad de combate), en `tactical_enemies.json`. Los dummies de la Fase 3 siguen en `tactical_dummies.json` para sus tests.
+> - **Nunca se atasca:** un vigilante corta cualquier turno de la IA que pase de 20 s (`aiTimeouts` en `get_combat_state`).
 
 ### 16. Enemy AI
 - Behavior Tree (reutilizando `src/ai`) que decide **en el turno** usando las mismas `game_command` que el jugador.
@@ -191,10 +197,20 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 
 ## Fase 5 — Habilidades
 
-### 17. Improvements
+### 17. Improvements ✅
 - **Saltar**: acción que salta obstáculos/huecos consumiendo movimiento.
 - **Muros que tapan la cámara**: hacer transparentes o recortar los muros entre la cámara y el pivot, como en BG3. Hoy se evita limitando el pivot (`bounds`) al interior del mapa.
-- **Interacción con el entorno**: objetos empujables/explosivos (barriles), superficies (fuego/charco) que aplican efectos al entrar.
+- **Interacción con el entorno**: objetos empujables/explosivos (barriles), superficies (fuego/charco) que aplican efectos al entrar. Gasta la **acción adicional**.
+- **Hecho cuando:** se salta un muro bajo, un barril empujado o disparado cambia el combate y ningún muro tapa a las unidades.
+
+> **Estado: implementado.** Test: `run_scenario phase5_environment`.
+> - **Saltar** (hotbar): hasta 4.5 m, gasta los metros saltados. Pasa por encima de cajas y muros bajos, sube a la plataforma; columnas y muros altos no. Vista previa con los metros.
+> - **Empujar** (hotbar, o click en un objeto): gasta la acción adicional (en exploración es gratis). Hay que estar al lado; el objeto se desliza hasta 3 m y se para contra paredes, unidades o desniveles.
+> - **Objetos** (`tactical_prop`): son unidades neutrales con vida, así que se apuntan, bloquean caminos y se atacan con las mismas reglas. El barril explosivo hace 12 de daño en 2.5 m, deja fuego y explota en cadena. Atacar un objeto requiere armar un ataque en la hotbar; el click normal empuja.
+> - **Superficies** (`tactical_surface`): el fuego quema 5 al entrar y al empezar el turno dentro, y dura 3 rondas. El aceite prende con el fuego o una explosión. Las de la escena vuelven al reiniciar.
+> - **Oclusores** (`camera_occluder` en muros y columnas): cuando tapan a una unidad o al pivote de la cámara cambian a un material con tramado semitransparente. No se instancian.
+> - **Escena:** los objetos están en `tactical_props.json` (dos barriles, aceite y una caja), que `boot.json` carga y los tests de las fases 2-4 no.
+> - **Motor:** al destruir un `particle_system` en runtime, el render seguía usando sus buffers y la pantalla se quedaba en negro. Ahora se da de baja al destruirse.
 
 ### 18. Skills
 - Modelo de datos genérico (JSON/prefab): coste (Acción / Acción adicional), rango, tipo de targeting, efecto.

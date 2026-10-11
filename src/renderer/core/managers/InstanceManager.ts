@@ -138,6 +138,10 @@ export class InstanceManager {
       'palette_quantize',
       'antialiasing',
       'ambient_occlusion',
+      // Tácticos: cambian su render por separado (ocultar al destruirse, material atenuado).
+      'unit',
+      'tactical_prop',
+      'camera_occluder',
     ];
 
     for (const comp of uniqueComponents) {

@@ -13,7 +13,13 @@ import {
   type EncounterEventData,
   type EncounterState,
 } from '../../../components/game/tactical/EncounterComponent';
-import type { UnitAttack, UnitComponent } from '../../../components/game/tactical/UnitComponent';
+import type { UnitComponent } from '../../../components/game/tactical/UnitComponent';
+import {
+  hotbarEntries,
+  hotbarTooltip,
+  type HotbarEntry,
+  type HotbarKind,
+} from '../../../components/game/tactical/Hotbar';
 import { TacticalPointerComponent } from '../../../components/game/tactical/TacticalPointerComponent';
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
 import { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
@@ -37,12 +43,23 @@ const FACE_DOWN: RGBA = [0.22, 0.22, 0.22, 1];
 const HP_PARTY: RGBA = [0.25, 0.8, 0.3, 1];
 const HP_ENEMY: RGBA = [0.9, 0.25, 0.2, 1];
 
-const HOTBAR_SLOTS = 4;
+const HOTBAR_SLOTS = 6;
 const HOTBAR_WIDTH = 104;
 const HOTBAR_GAP = 10;
-const ICON_MELEE: RGBA = [0.55, 0.2, 0.12, 1];
-const ICON_RANGED: RGBA = [0.15, 0.4, 0.62, 1];
+const ICON: Record<HotbarKind, RGBA> = {
+  melee: [0.55, 0.2, 0.12, 1],
+  ranged: [0.15, 0.4, 0.62, 1],
+  jump: [0.2, 0.5, 0.3, 1],
+  push: [0.6, 0.45, 0.12, 1],
+};
 const ICON_DISABLED: RGBA = [0.2, 0.2, 0.2, 1];
+/** Qué hacer con cada acción armada (tooltip mientras está armada). */
+const ARMED_HINT: Record<HotbarKind, string> = {
+  melee: 'elige un enemigo',
+  ranged: 'elige un enemigo o un barril',
+  jump: 'elige dónde aterrizar',
+  push: 'elige un barril o una caja a tu lado',
+};
 
 const ACTION_ON: RGBA = [0.3, 0.85, 0.35, 1];
 const BONUS_ON: RGBA = [1, 0.6, 0.15, 1];
@@ -57,6 +74,7 @@ const FLOAT_DAMAGE: RGBA = [1, 0.35, 0.25, 1];
 const FLOAT_MISS: RGBA = [0.85, 0.85, 0.85, 1];
 const FLOAT_HEAL: RGBA = [0.4, 1, 0.45, 1];
 const FLOAT_DOWN: RGBA = [0.7, 0.7, 0.75, 1];
+const FLOAT_FIRE: RGBA = [1, 0.6, 0.15, 1];
 
 interface InitiativeSlot {
   frame: ImageWidget;
@@ -72,7 +90,7 @@ interface HotbarSlot {
   icon: ImageWidget | null;
   key: TextWidget | null;
   name: TextWidget | null;
-  attack: UnitAttack | null;
+  entry: HotbarEntry | null;
   hovered: boolean;
 }
 
@@ -187,9 +205,15 @@ export class CombatHUDController extends WidgetController {
           this.turnBannerTimer = TURN_BANNER_TIME;
         }
         break;
-      case 'damage':
-        if (data.hit) this.spawnFloat(unit, `-${Math.round(data.amount ?? 0)}`, FLOAT_DAMAGE);
-        else this.spawnFloat(unit, 'Fallo', FLOAT_MISS);
+      case 'damage': {
+        const amount = `-${Math.round(data.amount ?? 0)}`;
+        if (!data.hit) this.spawnFloat(unit, 'Fallo', FLOAT_MISS);
+        else if (data.cause === 'fire') this.spawnFloat(unit, `${amount} fuego`, FLOAT_FIRE);
+        else this.spawnFloat(unit, amount, FLOAT_DAMAGE);
+        break;
+      }
+      case 'explosion':
+        this.spawnFloat(unit, '¡BUM!', FLOAT_FIRE);
         break;
       case 'downed':
         this.spawnFloat(unit, 'Caído', FLOAT_DOWN);
@@ -303,40 +327,38 @@ export class CombatHUDController extends WidgetController {
         ? (PartyComponent.find()?.getSelected() ?? null)
         : null;
     const unit = owner?.getComponent('unit') as UnitComponent | null | undefined;
-    const attacks = unit?.isAlive() ? unit.getAttacks().slice(0, HOTBAR_SLOTS) : [];
+    const entries = unit?.isAlive() ? hotbarEntries(unit).slice(0, HOTBAR_SLOTS) : [];
     const pointer = TacticalPointerComponent.find();
     const armed = pointer?.getArmedAttack() ?? null;
     const resources = exploring
       ? { action: 1, bonusAction: 1, movement: Infinity }
       : encounter.getResources();
-    const total = attacks.length * HOTBAR_WIDTH + Math.max(0, attacks.length - 1) * HOTBAR_GAP;
+    const total = entries.length * HOTBAR_WIDTH + Math.max(0, entries.length - 1) * HOTBAR_GAP;
     let tooltip: string | null = null;
 
     this.hotbar.forEach((slot, i) => {
-      const attack = attacks[i] ?? null;
-      slot.attack = attack;
-      slot.frame.setVisible(attack !== null);
-      if (!attack) {
+      const entry = entries[i] ?? null;
+      slot.entry = entry;
+      slot.frame.setVisible(entry !== null);
+      if (!entry) {
         slot.hovered = false;
         return;
       }
       slot.frame.setPosition(-total / 2 + i * (HOTBAR_WIDTH + HOTBAR_GAP), slot.frame.getY());
-      const cost = attack.cost ?? 'action';
-      const enabled = resources[cost] > 0;
+      const enabled = resources[entry.cost] > 0.05;
       const frame =
-        attack.id === armed ? FRAME_ACTIVE : slot.hovered && enabled ? FRAME_HOVER : FRAME_NORMAL;
+        entry.id === armed ? FRAME_ACTIVE : slot.hovered && enabled ? FRAME_HOVER : FRAME_NORMAL;
       slot.frame.setColor(...frame);
-      const icon = !enabled ? ICON_DISABLED : attack.kind === 'ranged' ? ICON_RANGED : ICON_MELEE;
-      slot.icon?.setColor(...icon);
+      slot.icon?.setColor(...(enabled ? ICON[entry.kind] : ICON_DISABLED));
       slot.key?.setText(exploring ? '' : String(i + 1));
-      slot.name?.setText(attack.name);
+      slot.name?.setText(entry.name);
       slot.name?.setColor(1, 1, 1, enabled ? 1 : 0.45);
-      if (slot.hovered) tooltip = attackTooltip(attack, enabled);
+      if (slot.hovered) tooltip = hotbarTooltip(entry, enabled);
     });
 
-    if (!tooltip && armed && unit) {
-      const attack = unit.getAttack(armed);
-      if (attack) tooltip = `${attack.name}: elige un enemigo (Esc para cancelar)`;
+    const armedEntry = entries.find((e) => e.id === armed);
+    if (!tooltip && armedEntry) {
+      tooltip = `${armedEntry.name}: ${ARMED_HINT[armedEntry.kind]} (Esc para cancelar)`;
     }
     this.tooltip?.setVisible(tooltip !== null);
     if (tooltip) this.tooltip?.setText(tooltip);
@@ -487,13 +509,13 @@ export class CombatHUDController extends WidgetController {
         icon: get<ImageWidget>(`hotbar_${i}_icon`),
         key: get<TextWidget>(`hotbar_${i}_key`),
         name: get<TextWidget>(`hotbar_${i}_name`),
-        attack: null,
+        entry: null,
         hovered: false,
       };
       frame.setOnMouseEnter(() => (slot.hovered = true));
       frame.setOnMouseLeave(() => (slot.hovered = false));
       frame.setOnClick(() => {
-        if (slot.attack) TacticalPointerComponent.find()?.armAttack(slot.attack.id);
+        if (slot.entry) TacticalPointerComponent.find()?.armAttack(slot.entry.id);
       });
       this.hotbar.push(slot);
     }
@@ -503,15 +525,6 @@ export class CombatHUDController extends WidgetController {
       if (w) this.freeFloats.push(w);
     }
   }
-}
-
-/** "Espada · Acción · cuerpo a cuerpo · alcance 1.5 m · 10 daño" (+ "sin acción"). */
-function attackTooltip(attack: UnitAttack, enabled: boolean): string {
-  const cost = (attack.cost ?? 'action') === 'action' ? 'Acción' : 'Acción adicional';
-  const kind = attack.kind === 'melee' ? 'cuerpo a cuerpo' : 'a distancia, requiere visión';
-  const parts = [attack.name, cost, kind, `alcance ${attack.range} m`, `${attack.damage} daño`];
-  if (!enabled) parts.push(`sin ${cost.toLowerCase()}`);
-  return parts.join(' · ');
 }
 
 function findCamera(): TacticalCameraControllerComponent | null {
