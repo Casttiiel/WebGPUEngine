@@ -44,13 +44,14 @@ const HP_PARTY: RGBA = [0.25, 0.8, 0.3, 1];
 const HP_ENEMY: RGBA = [0.9, 0.25, 0.2, 1];
 
 const HOTBAR_SLOTS = 6;
-const HOTBAR_WIDTH = 104;
+const HOTBAR_WIDTH = 150;
 const HOTBAR_GAP = 10;
 const ICON: Record<HotbarKind, RGBA> = {
   melee: [0.55, 0.2, 0.12, 1],
   ranged: [0.15, 0.4, 0.62, 1],
   jump: [0.2, 0.5, 0.3, 1],
   push: [0.6, 0.45, 0.12, 1],
+  skill: [0.45, 0.22, 0.6, 1],
 };
 const ICON_DISABLED: RGBA = [0.2, 0.2, 0.2, 1];
 /** Qué hacer con cada acción armada (tooltip mientras está armada). */
@@ -59,6 +60,7 @@ const ARMED_HINT: Record<HotbarKind, string> = {
   ranged: 'elige un enemigo o un barril',
   jump: 'elige dónde aterrizar',
   push: 'elige un barril o una caja a tu lado',
+  skill: 'elige un objetivo',
 };
 
 const ACTION_ON: RGBA = [0.3, 0.85, 0.35, 1];
@@ -221,6 +223,10 @@ export class CombatHUDController extends WidgetController {
       case 'death':
         this.spawnFloat(unit, 'Muerto', FLOAT_DOWN);
         break;
+      case 'heal':
+        if ((data.amount ?? 0) > 0)
+          this.spawnFloat(unit, `+${Math.round(data.amount ?? 0)}`, FLOAT_HEAL);
+        break;
       case 'revive':
         this.spawnFloat(unit, 'En pie', FLOAT_HEAL);
         break;
@@ -345,20 +351,28 @@ export class CombatHUDController extends WidgetController {
         return;
       }
       slot.frame.setPosition(-total / 2 + i * (HOTBAR_WIDTH + HOTBAR_GAP), slot.frame.getY());
-      const enabled = resources[entry.cost] > 0.05;
+      const cooldown = exploring || !unit ? 0 : unit.getCooldown(entry.id);
+      const enabled = resources[entry.cost] > 0.05 && cooldown === 0;
       const frame =
         entry.id === armed ? FRAME_ACTIVE : slot.hovered && enabled ? FRAME_HOVER : FRAME_NORMAL;
       slot.frame.setColor(...frame);
       slot.icon?.setColor(...(enabled ? ICON[entry.kind] : ICON_DISABLED));
       slot.key?.setText(exploring ? '' : String(i + 1));
-      slot.name?.setText(entry.name);
+      slot.name?.setText(cooldown > 0 ? `${cooldown} turno${cooldown > 1 ? 's' : ''}` : entry.name);
       slot.name?.setColor(1, 1, 1, enabled ? 1 : 0.45);
-      if (slot.hovered) tooltip = hotbarTooltip(entry, enabled);
+      if (slot.hovered) tooltip = hotbarTooltip(entry, enabled, cooldown);
     });
 
     const armedEntry = entries.find((e) => e.id === armed);
     if (!tooltip && armedEntry) {
-      tooltip = `${armedEntry.name}: ${ARMED_HINT[armedEntry.kind]} (Esc para cancelar)`;
+      const target = armedEntry.skill?.target;
+      const hint =
+        target === 'point'
+          ? 'elige dónde'
+          : target === 'cone'
+            ? 'elige la dirección'
+            : ARMED_HINT[armedEntry.kind];
+      tooltip = `${armedEntry.name}: ${hint} (Esc para cancelar)`;
     }
     this.tooltip?.setVisible(tooltip !== null);
     if (tooltip) this.tooltip?.setText(tooltip);

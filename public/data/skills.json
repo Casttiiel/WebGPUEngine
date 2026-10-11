@@ -1,0 +1,66 @@
+{
+  "fireball": {
+    "name": "Bola de fuego",
+    "cost": "action",
+    "cooldown": 3,
+    "target": "point",
+    "range": 14,
+    "radius": 2.5,
+    "affects": "all",
+    "effects": [
+      { "type": "damage", "amount": 10 },
+      { "type": "surface", "surface": "fire", "radius": 1.5 }
+    ],
+    "clip": "Spell_Simple_Shoot"
+  },
+  "thunderwave": {
+    "name": "Onda atronadora",
+    "cost": "action",
+    "cooldown": 2,
+    "target": "cone",
+    "length": 4.5,
+    "angle": 70,
+    "affects": "all",
+    "effects": [
+      { "type": "damage", "amount": 6 },
+      { "type": "push", "distance": 2.5 }
+    ],
+    "clip": "Spell_Simple_Shoot"
+  },
+  "heal": {
+    "name": "Palabra curativa",
+    "cost": "bonusAction",
+    "cooldown": 2,
+    "target": "unit",
+    "range": 12,
+    "targets": "ally",
+    "effects": [{ "type": "heal", "amount": 10 }],
+    "clip": "Spell_Simple_Shoot"
+  },
+  "second_wind": {
+    "name": "Segundo aliento",
+    "cost": "bonusAction",
+    "cooldown": 3,
+    "target": "self",
+    "effects": [{ "type": "heal", "amount": 8 }]
+  },
+  "shove": {
+    "name": "Empellón",
+    "cost": "bonusAction",
+    "cooldown": 0,
+    "target": "unit",
+    "range": 1.5,
+    "targets": "enemy",
+    "lineOfSight": false,
+    "effects": [{ "type": "push", "distance": 3 }],
+    "clip": "Push_Enter"
+  },
+  "dash": {
+    "name": "Embestida",
+    "cost": "bonusAction",
+    "cooldown": 2,
+    "target": "point",
+    "range": 6,
+    "effects": [{ "type": "teleport" }]
+  }
+}

@@ -212,13 +212,22 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 > - **Escena:** los objetos están en `tactical_props.json` (dos barriles, aceite y una caja), que `boot.json` carga y los tests de las fases 2-4 no.
 > - **Motor:** al destruir un `particle_system` en runtime, el render seguía usando sus buffers y la pantalla se quedaba en negro. Ahora se da de baja al destruirse.
 
-### 18. Skills
+### 18. Skills ✅
 - Modelo de datos genérico (JSON/prefab): coste (Acción / Acción adicional), rango, tipo de targeting, efecto.
 - Tipos de targeting: **unidad**, **punto en el suelo**, **área (círculo/cono)**, **self**.
 - Efectos esqueleto: daño, curación, empujón (aprovecha `PushAbility`), teletransporte.
 - Preview del área y de quién queda afectado antes de confirmar.
 - Cooldowns por turno (en lugar de spell slots).
 - **Hecho cuando:** hay 3–4 skills distintas funcionando (bola de fuego en área, curación, empujón, dash).
+
+> **Estado: implementado.** Test: `run_scenario phase5_skills`.
+> - **Datos:** catálogo en `public/data/skills.json`. Cada habilidad define coste (`action` / `bonusAction`), `cooldown` en turnos, targeting (`unit` / `point` / `cone` / `self`), alcance, radio o cono, a quién afecta y una lista de efectos (`damage`, `heal`, `push`, `teleport`, `surface`). Las unidades las referencian por id (`unit.skills`).
+> - **Seis habilidades:** Bola de fuego (punto + área, daña a todos y deja fuego), Onda atronadora (cono, daño + empujón), Palabra curativa (aliado; levanta a un caído), Segundo aliento (self), Empellón (enemigo adyacente, empujón) y Embestida (punto, en línea recta sin gastar movimiento).
+> - **Héroes:** Hero1 Empellón + Segundo aliento, Hero2 Bola de fuego + Onda atronadora, Hero3 Palabra curativa + Embestida, Hero4 Embestida + Empellón (en `tactical.json`).
+> - **UI:** van en la hotbar tras los ataques, con su coste y los turnos de recarga. Al armar una se ve el contorno del área (o la línea de la embestida), se resaltan los afectados (los aliados se marcan) y una etiqueta resume el efecto o por qué no se puede. Las de self se lanzan al pulsarlas.
+> - **Reglas:** `planSkill` / `requestSkill`, igual que ataques, saltos y empujones (MCP: `skill`, `plan_skill`). Fuera de combate no gastan recursos ni tienen cooldown. Una habilidad hostil contra un enemigo empieza el combate. Los cooldowns avanzan al empezar el turno del lanzador y se reinician al acabar el combate.
+> - **Empujón:** usa las reglas de empuje del punto 17 (`pushDistance`), no `PushAbility`, que es un esbozo vacío del modo FPS (impulso físico).
+> - **Pendiente:** la IA enemiga aún no usa habilidades.
 
 ### 19. Reacciones *(añadido)*
 - Ataque de oportunidad al salir del alcance cuerpo a cuerpo de un enemigo.

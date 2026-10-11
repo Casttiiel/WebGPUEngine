@@ -10,7 +10,13 @@ import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import { UnitObstacles } from './UnitObstacles';
 import type { TacticalAIComponent } from './TacticalAIComponent';
-import { hasLineOfSight, planPath, truncatePath, type PathPlan } from './TacticalQueries';
+import {
+  hasLineOfSight,
+  isOnNavMesh,
+  planPath,
+  truncatePath,
+  type PathPlan,
+} from './TacticalQueries';
 import {
   EYE_HEIGHT,
   previewAttack,
@@ -21,6 +27,15 @@ import {
 import { PropComponent, type PropExplosion } from './PropComponent';
 import { Surfaces } from './Surfaces';
 import { jumpArc, pushDistance } from './EnvironmentRules';
+import {
+  SkillCatalog,
+  coneDirection,
+  hasEffect,
+  isHostile,
+  unitsInCircle,
+  unitsInCone,
+  type SkillDef,
+} from './Skills';
 
 export type EncounterState = 'exploration' | 'combat' | 'victory' | 'defeat';
 
@@ -53,7 +68,29 @@ export interface EncounterEventData {
   cause?: DamageCause;
 }
 
-export type DamageCause = 'attack' | 'fire' | 'explosion' | 'debug';
+export type DamageCause = 'attack' | 'skill' | 'fire' | 'explosion' | 'debug';
+
+/** Objetivo de una habilidad: una unidad o un punto (según su targeting). */
+export interface SkillTarget {
+  unit?: Entity | null;
+  point?: vec3 | null;
+}
+
+export interface SkillPlan {
+  skill: SkillDef | null;
+  /** La unidad puede actuar ahora (su turno, le queda el recurso, no está ocupada). */
+  allowed: boolean;
+  inRange: boolean;
+  lineOfSight: boolean;
+  /** Centro del efecto: el punto, la unidad objetivo o el lanzador (cono / self). */
+  origin: vec3 | null;
+  /** Cono: dirección (horizontal, normalizada). */
+  direction: vec3 | null;
+  /** Quién recibe los efectos (vista previa: se resaltan antes de confirmar). */
+  affected: UnitComponent[];
+  canCast: boolean;
+  reason?: string;
+}
 
 export interface JumpPlan {
   /** La unidad puede actuar ahora (su turno, no está ocupada). */
@@ -150,6 +187,15 @@ const PUSH_REACH = 1.5;
 const PUSH_SPEED = 5;
 const PUSH_TIME = 0.6;
 const PUSH_CLIP = 'Push_Enter';
+/** Duración de lanzar una habilidad (la unidad está ocupada) y momento del efecto. */
+const SKILL_TIME = 0.9;
+const SKILL_DELAY = 0.45;
+/** Altura sobre un punto del suelo a la que se comprueba la línea de visión (se ve la zona). */
+const POINT_AIM_HEIGHT = 1;
+const DASH_SPEED = 16;
+const SHOVE_SPEED = 8;
+/** Altura (sobre los pies) a la que se comprueba que el camino de una embestida está libre. */
+const DASH_CLEARANCE = 1;
 
 /**
  * EncounterComponent — máquina de estados del juego táctico y combate por turnos.
@@ -199,6 +245,8 @@ export class EncounterComponent extends Component {
     attackId: string;
   } | null = null;
   private pendingHits: PendingHit[] = [];
+  /** Habilidades lanzadas cuyo efecto aún no ha llegado (sincronizado con la animación). */
+  private pendingSkills: { timer: number; caster: UnitComponent; plan: SkillPlan }[] = [];
   /** Enemigos de combates terminados por comando (end_combat): no vuelven a detectar. */
   private disengaged = new Set<UnitComponent>();
   private surfaces = new Surfaces();
@@ -209,13 +257,14 @@ export class EncounterComponent extends Component {
   private readonly tmpA = vec3.create();
   private readonly tmpB = vec3.create();
 
-  public load(data: EncounterComponentDataType): void {
+  public async load(data: EncounterComponentDataType): Promise<void> {
     this.joinRadius = data.joinRadius ?? this.joinRadius;
     this.enemyTurnDelay = data.enemyTurnDelay ?? this.enemyTurnDelay;
     this.victoryTime = data.victoryTime ?? this.victoryTime;
     if (!ModuleGameController.gameplayHuds.includes('COMBAT_HUD')) {
       ModuleGameController.gameplayHuds.push('COMBAT_HUD');
     }
+    await SkillCatalog.load();
   }
 
   public update(dt: number): void {
@@ -318,7 +367,9 @@ export class EncounterComponent extends Component {
   /** ¿Se puede reiniciar el encuentro con R? En derrota, o con todos los enemigos muertos. */
   /** Hay un ataque en marcha (acercándose para atacar o un golpe por resolver). */
   public isResolving(): boolean {
-    return this.pendingAttack !== null || this.pendingHits.length > 0;
+    return (
+      this.pendingAttack !== null || this.pendingHits.length > 0 || this.pendingSkills.length > 0
+    );
   }
 
   public canRestart(): boolean {
@@ -595,6 +646,206 @@ export class EncounterComponent extends Component {
     return this.surfaces;
   }
 
+  // ── Habilidades (reglas compartidas por jugador, MCP e IA) ────────────────
+
+  /**
+   * ¿Puede `entity` lanzar la habilidad `skillId` sobre `target`? Calcula también el área y
+   * quién queda afectado, aunque no se pueda lanzar (vista previa).
+   */
+  public planSkill(entity: Entity, skillId: string, target: SkillTarget = {}): SkillPlan {
+    const unit = entity.getComponent('unit') as UnitComponent | null;
+    const skill = SkillCatalog.get(skillId);
+    const result: SkillPlan = {
+      skill,
+      allowed: false,
+      inRange: false,
+      lineOfSight: false,
+      origin: null,
+      direction: null,
+      affected: [],
+      canCast: false,
+    };
+    const fail = (reason: string): SkillPlan => ({ ...result, canCast: false, reason });
+    if (!unit) return fail('not a unit');
+    if (!skill || !unit.hasSkill(skillId)) return fail(`unknown skill '${skillId}'`);
+
+    const feet = unit.getFeetPosition(vec3.create());
+    const targetUnit = (target.unit?.getComponent('unit') as UnitComponent | null) ?? null;
+    switch (skill.target) {
+      case 'self':
+        result.origin = feet;
+        result.inRange = result.lineOfSight = true;
+        result.affected =
+          skill.radius > 0 ? unitsInCircle(skill, unit, feet, skill.radius) : [unit];
+        break;
+      case 'unit': {
+        if (!targetUnit) return fail('no target');
+        result.origin = targetUnit.getFeetPosition(vec3.create());
+        const ally = targetUnit.getFaction() === unit.getFaction();
+        if (skill.targets === 'ally' && !ally) return fail('target must be an ally');
+        if (skill.targets === 'enemy' && ally) return fail('target must be an enemy');
+        const revive = ally && hasEffect(skill, 'heal');
+        if (!targetUnit.isAlive() && !revive) return fail('target is down');
+        const self = targetUnit === unit;
+        result.inRange = self || unitDistance(unit, targetUnit) <= skill.range + EPS;
+        result.lineOfSight = self || !skill.lineOfSight || unitLineOfSight(unit, targetUnit);
+        result.affected =
+          skill.radius > 0 ? unitsInCircle(skill, unit, result.origin, skill.radius) : [targetUnit];
+        break;
+      }
+      case 'point': {
+        const point = target.point ?? targetUnit?.getFeetPosition(vec3.create()) ?? null;
+        if (!point) return fail('no target');
+        result.origin = vec3.clone(point);
+        const center = unit.getPosition(this.tmpA);
+        result.inRange =
+          Math.hypot(point[0]! - center[0]!, point[2]! - center[2]!) <= skill.range + EPS;
+        const eye = vec3.fromValues(center[0]!, center[1]! + EYE_HEIGHT, center[2]!);
+        const aim = vec3.fromValues(point[0]!, point[1]! + POINT_AIM_HEIGHT, point[2]!);
+        result.lineOfSight = !skill.lineOfSight || hasLineOfSight(eye, aim);
+        result.affected = skill.radius > 0 ? unitsInCircle(skill, unit, point, skill.radius) : [];
+        if (hasEffect(skill, 'teleport')) {
+          result.affected = [unit];
+          if (!isOnNavMesh(point[0]!, point[1]!, point[2]!, 0.3)) return fail('cannot land there');
+          const a = vec3.fromValues(feet[0]!, feet[1]! + DASH_CLEARANCE, feet[2]!);
+          const b = vec3.fromValues(point[0]!, point[1]! + DASH_CLEARANCE, point[2]!);
+          if (!hasLineOfSight(a, b)) return fail('path blocked');
+        }
+        break;
+      }
+      case 'cone': {
+        const point = target.point ?? targetUnit?.getFeetPosition(vec3.create()) ?? null;
+        if (!point) return fail('no target');
+        result.origin = feet;
+        result.direction = coneDirection(feet, point);
+        result.inRange = result.lineOfSight = true;
+        result.affected = unitsInCone(skill, unit, point);
+        break;
+      }
+    }
+
+    if (!result.inRange) return fail('target out of range');
+    if (!result.lineOfSight) return fail('no line of sight');
+    const permission = this.canAct(unit, skill.cost);
+    result.allowed = permission === null;
+    if (permission !== null) return fail(permission);
+    if (this.state === 'combat' && unit.getCooldown(skill.id) > 0) return fail('on cooldown');
+    result.canCast = true;
+    return result;
+  }
+
+  /** Lanza la habilidad si las reglas lo permiten (gasta su recurso y empieza su cooldown). */
+  public requestSkill(
+    entity: Entity,
+    skillId: string,
+    target: SkillTarget = {},
+  ): SkillPlan & { ok: boolean } {
+    UnitObstacles.sync(this.getActingUnit());
+    const plan = this.planSkill(entity, skillId, target);
+    if (!plan.canCast || !plan.skill || !plan.origin) return { ...plan, ok: false };
+    const skill = plan.skill;
+    const unit = entity.getComponent('unit') as UnitComponent;
+    if (this.state === 'combat') {
+      this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
+      unit.setCooldown(skill.id, skill.cooldown);
+    }
+    this.pendingAttack = null;
+    this.emit('skill', { unit: entity });
+
+    if (hasEffect(skill, 'teleport')) {
+      // Embestida: en línea recta, muy rápido; no gasta movimiento.
+      unit.faceTowards(plan.origin);
+      void unit.moveAlong([unit.getFeetPosition(), plan.origin], {
+        speed: DASH_SPEED,
+        walk: false,
+      });
+      return { ...plan, ok: true };
+    }
+
+    if (skill.target === 'cone' && plan.direction) {
+      const p = unit.getPosition(this.tmpA);
+      unit.faceTowards(vec3.scaleAndAdd(this.tmpB, p, plan.direction, 1));
+    } else if (skill.target !== 'self') {
+      unit.faceTowards(plan.origin);
+    }
+    unit.playAction(skill.clip, SKILL_TIME);
+    this.pendingSkills.push({ timer: SKILL_DELAY, caster: unit, plan });
+    return { ...plan, ok: true };
+  }
+
+  /** Efectos de una habilidad al llegar el momento del impacto. */
+  private applySkill(caster: UnitComponent, plan: SkillPlan): void {
+    const skill = plan.skill!;
+    const origin = plan.origin!;
+    const affected = () => plan.affected.filter((u) => u.isAlive() || hasEffect(skill, 'heal'));
+    for (const effect of skill.effects) {
+      switch (effect.type) {
+        case 'damage':
+          for (const u of affected()) {
+            if (u.isAlive()) this.applyHit(caster, u, true, effect.amount, 'skill');
+          }
+          break;
+        case 'heal':
+          for (const u of affected()) this.healUnit(u, effect.amount);
+          break;
+        case 'push': {
+          // Lejos del lanzador (cono, unidad) o del centro del área (punto).
+          const from = skill.target === 'point' ? origin : caster.getFeetPosition(vec3.create());
+          for (const u of affected()) {
+            if (u === caster || !u.isAlive()) continue;
+            const feet = u.getFeetPosition(vec3.create());
+            const dir = coneDirection(from, feet);
+            if (Math.hypot(feet[0]! - from[0]!, feet[2]! - from[2]!) < 1e-3 && plan.direction) {
+              vec3.copy(dir, plan.direction);
+            }
+            const length = pushDistance(u, dir, effect.distance);
+            if (length < 0.1) continue;
+            u.stop();
+            void u.moveAlong([feet, vec3.scaleAndAdd(vec3.create(), feet, dir, length)], {
+              speed: SHOVE_SPEED,
+              walk: false,
+              face: false,
+            });
+            this.emit('pushed', { unit: u.getOwner(), source: caster.getOwner() });
+          }
+          break;
+        }
+        case 'surface':
+          this.surfaces.add(effect.surface, origin, effect.radius);
+          break;
+        case 'teleport':
+          break; // se resuelve al lanzar
+      }
+    }
+
+    // Una habilidad hostil contra un enemigo empieza el combate (también si solo empuja).
+    const enemy = plan.affected.find((u) => u.getFaction() === 'enemy' && u.isAlive());
+    if (
+      this.state === 'exploration' &&
+      caster.getFaction() === 'party' &&
+      isHostile(skill) &&
+      enemy
+    ) {
+      this.startCombat(enemy.getOwner());
+    }
+  }
+
+  /** Cura (y levanta a un aliado caído). */
+  private healUnit(unit: UnitComponent, amount: number): void {
+    const health = unit.getHealth();
+    if (!health) return;
+    if (!unit.isAlive()) {
+      if (!PartyComponent.find()?.isMember(unit.getOwner())) return;
+      unit.setDown(false, amount);
+      this.emit('revive', { unit: unit.getOwner() });
+      this.emit('heal', { unit: unit.getOwner(), amount: unit.getHp() });
+      return;
+    }
+    const before = health.getHp();
+    health.heal(amount);
+    this.emit('heal', { unit: unit.getOwner(), amount: health.getHp() - before });
+  }
+
   // ── Combate ──────────────────────────────────────────────────────────────
 
   /** Empieza un combate (normalmente al detectar a la party; también vía MCP). Sin enemigos cerca, no. */
@@ -655,6 +906,7 @@ export class EncounterComponent extends Component {
     this.pendingAttack = null;
     this.round = 0;
     this.turnIndex = 0;
+    for (const u of UnitComponent.getAll()) u.clearCooldowns();
     if (result === 'victory') {
       // Como en BG3: los caídos se levantan al terminar el combate.
       for (const m of PartyComponent.find()?.getMembers() ?? []) {
@@ -675,6 +927,7 @@ export class EncounterComponent extends Component {
     this.combatants = [];
     this.pendingAttack = null;
     this.pendingHits = [];
+    this.pendingSkills = [];
     this.disengaged.clear();
     this.round = 0;
     this.turnIndex = 0;
@@ -780,6 +1033,12 @@ export class EncounterComponent extends Component {
       if (plan.canAttack && !plan.approach && plan.attack) {
         this.executeAttack(pending.attacker, pending.target, plan.attack);
       }
+    }
+
+    if (this.pendingSkills.length) {
+      const ready = this.pendingSkills.filter((p) => (p.timer -= dt) <= 0);
+      this.pendingSkills = this.pendingSkills.filter((p) => p.timer > 0);
+      for (const p of ready) this.applySkill(p.caster, p.plan);
     }
 
     if (this.pendingHits.length === 0) return;
@@ -955,6 +1214,14 @@ export class EncounterComponent extends Component {
   private hasUsableResources(unit: UnitComponent): boolean {
     if (this.resources.movement >= EPS) return true;
     if (unit.getAttacks().some((a) => this.resources[a.cost ?? 'action'] > 0)) return true;
+    // Habilidades sobre uno mismo: siempre tienen objetivo.
+    const selfSkill = unit.getSkillIds().some((id) => {
+      const skill = SkillCatalog.get(id);
+      return (
+        skill?.target === 'self' && this.resources[skill.cost] > 0 && unit.getCooldown(id) === 0
+      );
+    });
+    if (selfSkill) return true;
     return (
       this.resources.bonusAction > 0 &&
       unit.hasAbility('push') &&
@@ -1003,6 +1270,7 @@ export class EncounterComponent extends Component {
     this.resources = { action: 1, bonusAction: 1, movement: active.unit.getMovement() };
     this.turnTimer = this.enemyTurnDelay;
     this.aiTurnTime = 0;
+    active.unit.tickCooldowns();
     this.getAI(active.unit)?.beginTurn(this);
 
     const entity = active.unit.getOwner();
@@ -1114,6 +1382,12 @@ export class EncounterComponent extends Component {
           hp: u.getHp(),
           maxHp: u.getMaxHp(),
           alive: u.isAlive(),
+          cooldowns: Object.fromEntries(
+            u
+              .getSkillIds()
+              .map((id) => [id, u.getCooldown(id)])
+              .filter(([, cd]) => cd),
+          ),
         })),
       }),
       command: (name, args) => {
@@ -1237,6 +1511,28 @@ export class EncounterComponent extends Component {
               reason: r.reason ?? null,
             };
           }
+          case 'skill':
+          case 'plan_skill': {
+            const skillId = String(args.skill ?? '');
+            const to = args.to as [number, number, number] | undefined;
+            const target: SkillTarget = {
+              unit: typeof args.target === 'string' ? unitArg('target') : null,
+              point: Array.isArray(to) ? vec3.fromValues(to[0], to[1], to[2]) : null,
+            };
+            const r =
+              name === 'skill'
+                ? this.requestSkill(unitArg(), skillId, target)
+                : { ...this.planSkill(unitArg(), skillId, target), ok: null };
+            return {
+              ok: r.ok,
+              canCast: r.canCast,
+              allowed: r.allowed,
+              inRange: r.inRange,
+              lineOfSight: r.lineOfSight,
+              affected: r.affected.map((u) => u.getOwner().getName()),
+              reason: r.reason ?? null,
+            };
+          }
           case 'restart':
             this.restart();
             return { state: this.state };
@@ -1245,7 +1541,7 @@ export class EncounterComponent extends Component {
             return { selected: PartyComponent.find()?.getSelectedName() ?? null };
           default:
             throw new Error(
-              `Unknown command '${name}'. Available: move, plan_move, attack, plan_attack, jump, plan_jump, push, plan_push, damage, end_turn, start_combat, end_combat, restart, select`,
+              `Unknown command '${name}'. Available: move, plan_move, attack, plan_attack, jump, plan_jump, push, plan_push, skill, plan_skill, damage, end_turn, start_combat, end_combat, restart, select`,
             );
         }
       },

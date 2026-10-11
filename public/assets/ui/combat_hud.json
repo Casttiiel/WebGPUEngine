@@ -1152,11 +1152,11 @@
     "type": "image",
     "x": 0,
     "y": -130,
-    "width": 104,
+    "width": 150,
     "height": 104,
     "imageParams": {
       "texture": "white.png",
-      "size": [104, 104],
+      "size": [150, 104],
       "color": [0.08, 0.08, 0.1, 0.9]
     },
     "anchor": "bottom-center",
@@ -1168,11 +1168,11 @@
         "type": "image",
         "x": 6,
         "y": 6,
-        "width": 92,
+        "width": 138,
         "height": 92,
         "imageParams": {
           "texture": "white.png",
-          "size": [92, 92],
+          "size": [138, 92],
           "color": [0.5, 0.15, 0.1, 1]
         },
         "blocksInput": false
@@ -1199,11 +1199,11 @@
         "type": "text",
         "x": 2,
         "y": 62,
-        "width": 100,
+        "width": 146,
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [26, 26],
+          "size": [24, 24],
           "color": [1, 1, 1, 1],
           "align": "center"
         },
@@ -1217,11 +1217,11 @@
     "type": "image",
     "x": 0,
     "y": -130,
-    "width": 104,
+    "width": 150,
     "height": 104,
     "imageParams": {
       "texture": "white.png",
-      "size": [104, 104],
+      "size": [150, 104],
       "color": [0.08, 0.08, 0.1, 0.9]
     },
     "anchor": "bottom-center",
@@ -1233,11 +1233,11 @@
         "type": "image",
         "x": 6,
         "y": 6,
-        "width": 92,
+        "width": 138,
         "height": 92,
         "imageParams": {
           "texture": "white.png",
-          "size": [92, 92],
+          "size": [138, 92],
           "color": [0.5, 0.15, 0.1, 1]
         },
         "blocksInput": false
@@ -1264,11 +1264,11 @@
         "type": "text",
         "x": 2,
         "y": 62,
-        "width": 100,
+        "width": 146,
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [26, 26],
+          "size": [24, 24],
           "color": [1, 1, 1, 1],
           "align": "center"
         },
@@ -1282,11 +1282,11 @@
     "type": "image",
     "x": 0,
     "y": -130,
-    "width": 104,
+    "width": 150,
     "height": 104,
     "imageParams": {
       "texture": "white.png",
-      "size": [104, 104],
+      "size": [150, 104],
       "color": [0.08, 0.08, 0.1, 0.9]
     },
     "anchor": "bottom-center",
@@ -1298,11 +1298,11 @@
         "type": "image",
         "x": 6,
         "y": 6,
-        "width": 92,
+        "width": 138,
         "height": 92,
         "imageParams": {
           "texture": "white.png",
-          "size": [92, 92],
+          "size": [138, 92],
           "color": [0.5, 0.15, 0.1, 1]
         },
         "blocksInput": false
@@ -1329,11 +1329,11 @@
         "type": "text",
         "x": 2,
         "y": 62,
-        "width": 100,
+        "width": 146,
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [26, 26],
+          "size": [24, 24],
           "color": [1, 1, 1, 1],
           "align": "center"
         },
@@ -1347,11 +1347,11 @@
     "type": "image",
     "x": 0,
     "y": -130,
-    "width": 104,
+    "width": 150,
     "height": 104,
     "imageParams": {
       "texture": "white.png",
-      "size": [104, 104],
+      "size": [150, 104],
       "color": [0.08, 0.08, 0.1, 0.9]
     },
     "anchor": "bottom-center",
@@ -1363,11 +1363,11 @@
         "type": "image",
         "x": 6,
         "y": 6,
-        "width": 92,
+        "width": 138,
         "height": 92,
         "imageParams": {
           "texture": "white.png",
-          "size": [92, 92],
+          "size": [138, 92],
           "color": [0.5, 0.15, 0.1, 1]
         },
         "blocksInput": false
@@ -1394,11 +1394,11 @@
         "type": "text",
         "x": 2,
         "y": 62,
-        "width": 100,
+        "width": 146,
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [26, 26],
+          "size": [24, 24],
           "color": [1, 1, 1, 1],
           "align": "center"
         },
@@ -1412,11 +1412,11 @@
     "type": "image",
     "x": 0,
     "y": -130,
-    "width": 104,
+    "width": 150,
     "height": 104,
     "imageParams": {
       "texture": "white.png",
-      "size": [104, 104],
+      "size": [150, 104],
       "color": [0.08, 0.08, 0.1, 0.9]
     },
     "anchor": "bottom-center",
@@ -1428,11 +1428,11 @@
         "type": "image",
         "x": 6,
         "y": 6,
-        "width": 92,
+        "width": 138,
         "height": 92,
         "imageParams": {
           "texture": "white.png",
-          "size": [92, 92],
+          "size": [138, 92],
           "color": [0.5, 0.15, 0.1, 1]
         },
         "blocksInput": false
@@ -1459,11 +1459,11 @@
         "type": "text",
         "x": 2,
         "y": 62,
-        "width": 100,
+        "width": 146,
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [26, 26],
+          "size": [24, 24],
           "color": [1, 1, 1, 1],
           "align": "center"
         },
@@ -1477,11 +1477,11 @@
     "type": "image",
     "x": 0,
     "y": -130,
-    "width": 104,
+    "width": 150,
     "height": 104,
     "imageParams": {
       "texture": "white.png",
-      "size": [104, 104],
+      "size": [150, 104],
       "color": [0.08, 0.08, 0.1, 0.9]
     },
     "anchor": "bottom-center",
@@ -1493,11 +1493,11 @@
         "type": "image",
         "x": 6,
         "y": 6,
-        "width": 92,
+        "width": 138,
         "height": 92,
         "imageParams": {
           "texture": "white.png",
-          "size": [92, 92],
+          "size": [138, 92],
           "color": [0.5, 0.15, 0.1, 1]
         },
         "blocksInput": false
@@ -1524,11 +1524,11 @@
         "type": "text",
         "x": 2,
         "y": 62,
-        "width": 100,
+        "width": 146,
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [26, 26],
+          "size": [24, 24],
           "color": [1, 1, 1, 1],
           "align": "center"
         },

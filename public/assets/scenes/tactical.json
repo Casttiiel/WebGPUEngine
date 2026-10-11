@@ -518,6 +518,7 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero1",
+      "unit": { "skills": ["shove", "second_wind"] },
       "transform": {
         "position": [-4, 0, -6]
       }
@@ -527,6 +528,7 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero2",
+      "unit": { "skills": ["fireball", "thunderwave"] },
       "transform": {
         "position": [-2.5, 0, -7.2]
       }
@@ -536,6 +538,7 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero3",
+      "unit": { "skills": ["heal", "dash"] },
       "transform": {
         "position": [-5.5, 0, -7.6]
       }
@@ -545,6 +548,7 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero4",
+      "unit": { "skills": ["dash", "shove"] },
       "transform": {
         "position": [-3.5, 0, -8.8]
       }

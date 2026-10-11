@@ -56,6 +56,8 @@ export type UnitComponentDataType = Readonly<{
   abilities?: UnitAbility[];
   /** Al caer desaparece (objetos destruidos, p.ej. un barril que explota). Default false. */
   hideWhenDown?: boolean;
+  /** Habilidades (ids de data/skills.json), en el orden de la hotbar. Default: ninguna. */
+  skills?: string[];
 }>;
 
 /** Acciones que no son ataques: saltar (gasta movimiento) y empujar un objeto (acción adicional). */
@@ -90,6 +92,9 @@ export class UnitComponent extends Component {
   private down = false;
   private abilities: UnitAbility[] = [];
   private hideWhenDown = false;
+  private skills: string[] = [];
+  /** Turnos que le quedan a cada habilidad para volver a estar disponible. */
+  private cooldowns = new Map<string, number>();
   private pathSpeed = 4;
   private pathTurns = true;
   /** Segundos que le quedan a la acción en curso (animación de ataque). */
@@ -118,6 +123,7 @@ export class UnitComponent extends Component {
     this.attacks = data.attacks ? data.attacks.map((a) => ({ ...a })) : DEFAULT_ATTACKS;
     this.abilities = [...(data.abilities ?? [])];
     this.hideWhenDown = data.hideWhenDown ?? false;
+    this.skills = [...(data.skills ?? [])];
   }
 
   public update(dt: number): void {
@@ -168,6 +174,33 @@ export class UnitComponent extends Component {
 
   public hasAbility(ability: UnitAbility): boolean {
     return this.abilities.includes(ability);
+  }
+
+  public getSkillIds(): readonly string[] {
+    return this.skills;
+  }
+
+  public hasSkill(id: string): boolean {
+    return this.skills.includes(id);
+  }
+
+  /** Turnos que faltan para poder usar la habilidad (0 = disponible). */
+  public getCooldown(id: string): number {
+    return this.cooldowns.get(id) ?? 0;
+  }
+
+  public setCooldown(id: string, turns: number): void {
+    if (turns > 0) this.cooldowns.set(id, turns);
+    else this.cooldowns.delete(id);
+  }
+
+  /** Empieza un turno de la unidad: los cooldowns avanzan uno. */
+  public tickCooldowns(): void {
+    for (const [id, turns] of this.cooldowns) this.setCooldown(id, turns - 1);
+  }
+
+  public clearCooldowns(): void {
+    this.cooldowns.clear();
   }
 
   public getAttacks(): readonly UnitAttack[] {
@@ -293,6 +326,7 @@ export class UnitComponent extends Component {
   /** Vuelve al punto de partida con toda la vida (reiniciar el encuentro). */
   public resetToSpawn(): void {
     this.stop();
+    this.clearCooldowns();
     this.setDown(false);
     this.getHealth()?.restore();
     this.actionTimer = 0;

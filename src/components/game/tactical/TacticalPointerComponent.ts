@@ -18,7 +18,9 @@ import {
   type PushPlan,
 } from './EncounterComponent';
 import { PropComponent } from './PropComponent';
-import { hotbarEntries, isAbilityId } from './Hotbar';
+import { hotbarEntries, isAbilityId, unitSkill } from './Hotbar';
+import { circleOutline, coneOutline, isHostile, type SkillDef } from './Skills';
+import type { SkillPlan } from './EncounterComponent';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { PathPreview } from './PathPreview';
 import { KeyCode } from '../../../types/KeyCode.enum';
@@ -88,6 +90,12 @@ const REASON_TEXT: Record<string, string> = {
   'not enough movement': 'sin movimiento suficiente',
   'too far to push': 'hay que estar al lado',
   'push blocked': 'bloqueado',
+  'on cooldown': 'recargando',
+  'target must be an ally': 'solo aliados',
+  'target must be an enemy': 'solo enemigos',
+  'target is down': 'caído',
+  'path blocked': 'camino bloqueado',
+  'no target': 'elige un objetivo',
 };
 
 const reasonText = (reason: string | undefined): string =>
@@ -114,7 +122,9 @@ const HOTBAR_KEYS = [
  *    en un objeto (barril, caja) → empujarlo (acción adicional) o, con un ataque armado,
  *    atacarlo (un barril explosivo explota).
  * Acción armada (hotbar, teclas 1-6 en combate): otro ataque, Saltar (click en el suelo:
- * salta allí, gasta movimiento) o Empujar. Esc o click derecho vuelven a lo de por defecto.
+ * salta allí, gasta movimiento), Empujar o una habilidad. Con una habilidad armada se ve su
+ * área y se resaltan los afectados antes de confirmar con click; las de "self" se lanzan al
+ * pulsarlas. Esc o click derecho vuelven a lo de por defecto.
  * Las reglas (quién se mueve o ataca, cuánto) son de EncounterComponent.
  */
 export class TacticalPointerComponent extends Component {
@@ -131,6 +141,9 @@ export class TacticalPointerComponent extends Component {
   private attackPlan: AttackPlan | null = null;
   private jumpPlan: JumpPlan | null = null;
   private pushPlan: PushPlan | null = null;
+  private skillPlan: SkillPlan | null = null;
+  /** Unidades resaltadas como afectadas por la habilidad armada. */
+  private skillHighlights: Entity[] = [];
 
   private allyRing = new GroundMarker('tactical/ring_hover_ally.prefab');
   private enemyRing = new GroundMarker('tactical/ring_hover_enemy.prefab');
@@ -153,7 +166,8 @@ export class TacticalPointerComponent extends Component {
 
     const inGameplay = Engine.getModules().getCurrentGamestate() === 'gs_gameplay';
     if (inGameplay) this.handleHotbarInput();
-    this.pick(inGameplay);
+    this.pickWorld(inGameplay);
+    this.skillPlan = this.planArmedSkill();
     this.applyFeedback();
 
     if (inGameplay && Engine.getInput().isMouseButtonJustPressed(MouseButton.LEFT)) {
@@ -193,7 +207,26 @@ export class TacticalPointerComponent extends Component {
   /** Arma un ataque para el próximo click en un enemigo (hotbar). Repetir lo desarma. */
   public armAttack(id: string | null): void {
     this.syncArmedOwner();
+    // Habilidades sobre uno mismo: no hay que elegir objetivo, se lanzan ya.
+    const selected = PartyComponent.find()?.getSelected() ?? null;
+    const skill = unitSkill(selected?.getComponent('unit') as UnitComponent | null, id);
+    if (skill?.target === 'self' && selected) {
+      EncounterComponent.find()?.requestSkill(selected, skill.id);
+      this.armedAttack = null;
+      return;
+    }
     this.armedAttack = id === this.armedAttack ? null : id;
+  }
+
+  /** Último plan de la habilidad armada bajo el cursor (área y afectados). */
+  public getSkillPlan(): SkillPlan | null {
+    return this.skillPlan;
+  }
+
+  /** La habilidad armada (null si lo armado es un ataque, Saltar o Empujar). */
+  private getArmedSkill(): SkillDef | null {
+    const selected = PartyComponent.find()?.getSelected() ?? null;
+    return unitSkill(selected?.getComponent('unit') as UnitComponent | null, this.getArmedAttack());
   }
 
   /** Resalta en el mundo una unidad señalada desde la UI (null: ninguna). */
@@ -219,7 +252,7 @@ export class TacticalPointerComponent extends Component {
   /** El ataque armado explícitamente (null si no hay o si lo armado es Saltar / Empujar). */
   private getArmedAttackId(): string | null {
     const armed = this.getArmedAttack();
-    return isAbilityId(armed) ? null : armed;
+    return isAbilityId(armed) || this.getArmedSkill() ? null : armed;
   }
 
   // ── Interno ──────────────────────────────────────────────────────────────
@@ -254,7 +287,7 @@ export class TacticalPointerComponent extends Component {
     });
   }
 
-  private pick(inGameplay: boolean): void {
+  private pickWorld(inGameplay: boolean): void {
     this.hoveredUnit = null;
     this.movePlan = null;
     this.attackPlan = null;
@@ -289,7 +322,9 @@ export class TacticalPointerComponent extends Component {
             ? 'ally'
             : 'neutral';
       const armed = this.getArmedAttack();
-      if (this.hoverKind === 'enemy' && !isAbilityId(armed)) {
+      if (this.getArmedSkill()) {
+        // La habilidad se planifica aparte (planArmedSkill).
+      } else if (this.hoverKind === 'enemy' && !isAbilityId(armed)) {
         this.attackPlan = this.planAttackOn(unit.getOwner());
       } else if (this.hoverKind === 'neutral' && PropComponent.of(unit.getOwner())) {
         // Objeto: con un ataque armado se ataca; si no, se empuja.
@@ -391,6 +426,63 @@ export class TacticalPointerComponent extends Component {
     return this.attackCache.plan;
   }
 
+  /** Plan de la habilidad armada contra lo que hay bajo el cursor (unidad o suelo). */
+  private planArmedSkill(): SkillPlan | null {
+    const skill = this.getArmedSkill();
+    const encounter = EncounterComponent.find();
+    const selected = PartyComponent.find()?.getSelected() ?? null;
+    if (!skill || !encounter || !selected) return null;
+    const unit = this.hoveredUnit?.getComponent('unit') as UnitComponent | null | undefined;
+    if (skill.target === 'unit') {
+      return this.hoveredUnit
+        ? encounter.planSkill(selected, skill.id, { unit: this.hoveredUnit })
+        : null;
+    }
+    if (unit) return encounter.planSkill(selected, skill.id, { unit: this.hoveredUnit });
+    if (this.hoverKind !== 'ground' && this.hoverKind !== 'invalid') return null;
+    return encounter.planSkill(selected, skill.id, { point: this.hoverPoint });
+  }
+
+  /** Vista previa de la habilidad: contorno del área, afectados resaltados y etiqueta. */
+  private showSkillPreview(plan: SkillPlan): void {
+    const skill = plan.skill!;
+    this.highlightAffected(plan.affected.map((u) => u.getOwner()));
+    const names = plan.affected.map((u) => {
+      const ally = u.getFaction() === 'party' && isHostile(skill) ? ' (aliado)' : '';
+      return `${u.getDisplayName()}${ally}`;
+    });
+    let label = skill.name;
+    if (!plan.canCast && plan.reason) label += ` · ${reasonText(plan.reason)}`;
+    else if (skill.target === 'unit' && plan.affected[0]) {
+      const t = plan.affected[0];
+      label += ` → ${t.getDisplayName()} ${Math.ceil(t.getHp())}/${t.getMaxHp()} PV`;
+    } else if (!skill.effects.some((e) => e.type === 'teleport')) {
+      label += names.length ? ` · afecta a: ${names.join(', ')}` : ' · no afecta a nadie';
+    }
+
+    const origin = plan.origin;
+    let outline: vec3[] | null = null;
+    if (origin && skill.target === 'cone' && plan.direction) {
+      outline = coneOutline(origin, plan.direction, skill.length, skill.angle);
+    } else if (origin && skill.radius > 0) {
+      outline = circleOutline(origin, skill.radius);
+    } else if (origin && skill.effects.some((e) => e.type === 'teleport')) {
+      const selected = PartyComponent.find()?.getSelected();
+      const from = (selected?.getComponent('unit') as UnitComponent | null)?.getFeetPosition();
+      if (from) outline = [from, origin];
+    }
+    if (outline) this.preview?.show(outline, Infinity, label);
+    else this.preview?.showLabelOnly(label);
+  }
+
+  private highlightAffected(entities: Entity[]): void {
+    for (const e of this.skillHighlights) {
+      if (!entities.includes(e) && e !== this.lastHighlighted) setUnitHighlight(e, 0);
+    }
+    for (const e of entities) setUnitHighlight(e, this.hoverHighlight);
+    this.skillHighlights = entities;
+  }
+
   private lastHighlighted: Entity | null = null;
 
   private applyFeedback(): void {
@@ -404,6 +496,12 @@ export class TacticalPointerComponent extends Component {
           ? 'attack'
           : 'invalid';
     }
+    const skillPlan = this.skillPlan;
+    if (skillPlan?.skill) {
+      cursor = skillPlan.canCast ? (isHostile(skillPlan.skill) ? 'attack' : 'interact') : 'invalid';
+    } else if (this.getArmedSkill()) {
+      cursor = 'invalid';
+    }
     if (cursor !== this.cursor) {
       this.cursor = cursor;
       Render.getInstance().getCanvas().style.cursor = CURSORS[cursor];
@@ -412,7 +510,9 @@ export class TacticalPointerComponent extends Component {
     // Resaltado del personaje bajo el cursor (o señalado desde la UI)
     const focus = this.hoveredUnit ?? (this.hoverKind === 'ui' ? this.uiHoverUnit : null);
     if (focus !== this.lastHighlighted) {
-      if (this.lastHighlighted) setUnitHighlight(this.lastHighlighted, 0);
+      if (this.lastHighlighted && !this.skillHighlights.includes(this.lastHighlighted)) {
+        setUnitHighlight(this.lastHighlighted, 0);
+      }
       if (focus) setUnitHighlight(focus, this.hoverHighlight);
       this.lastHighlighted = focus;
     }
@@ -430,6 +530,17 @@ export class TacticalPointerComponent extends Component {
     } else {
       this.allyRing.hide();
       this.enemyRing.hide();
+    }
+
+    // Habilidad armada: su área, los afectados y qué hará (o por qué no se puede).
+    if (skillPlan?.skill) {
+      this.showSkillPreview(skillPlan);
+      return;
+    }
+    this.highlightAffected([]);
+    if (this.getArmedSkill()) {
+      this.preview?.hide();
+      return;
     }
 
     // Unidad bajo el cursor: tooltip (y, si hay que acercarse para atacar, el camino).
@@ -500,6 +611,21 @@ export class TacticalPointerComponent extends Component {
   private handleClick(): void {
     const encounter = EncounterComponent.find();
     const selected = PartyComponent.find()?.getSelected();
+    // Con una habilidad armada, el click la lanza (también sobre un aliado: curar).
+    const skill = this.getArmedSkill();
+    if (skill) {
+      const plan = this.skillPlan;
+      if (selected && plan?.canCast) {
+        const target =
+          skill.target === 'unit' || this.hoveredUnit
+            ? { unit: this.hoveredUnit }
+            : { point: this.hoverPoint };
+        const result = encounter?.requestSkill(selected, skill.id, target);
+        if (result?.ok) this.armedAttack = null;
+        this.planCache.key = '';
+      }
+      return;
+    }
     if (this.hoverKind === 'ally' && this.hoveredUnit) {
       PartyComponent.find()?.select(this.hoveredUnit, 'world');
     } else if (this.hoverKind === 'ground' && this.getArmedAttack() === 'jump') {
@@ -533,6 +659,7 @@ export class TacticalPointerComponent extends Component {
     this.enemyRing.destroy();
     this.preview?.destroy();
     if (this.lastHighlighted) setUnitHighlight(this.lastHighlighted, 0);
+    for (const e of this.skillHighlights) setUnitHighlight(e, 0);
     Render.getInstance().getCanvas().style.cursor = 'default';
   }
 

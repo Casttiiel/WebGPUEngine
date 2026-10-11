@@ -62,6 +62,24 @@
       "timeout_frames": 600
     },
 
+    { "log": "Hero4 se acerca a la plataforma: el Hostigador lo ve y se une a mitad de combate" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero4' && !s.busy) return true; window.__autoTurn(true); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 1500,
+      "check_every": 5
+    },
+    { "command": "move", "args": { "unit": "Hero4", "to": [4, 0, -9] } },
+    {
+      "wait_until": { "entity": "Hero4", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 400
+    },
+    {
+      "wait_until": { "expr": "window.__log.some(x => x.e === 'join' && x.u === 'Skirmisher')", "value": true },
+      "timeout_frames": 60
+    },
     { "log": "Se juega el combate entero (la party ataca con un bot simple)" },
     {
       "wait_until": { "expr": "window.__autoTurn(false)", "value": true },

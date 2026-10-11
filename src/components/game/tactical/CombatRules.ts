@@ -46,7 +46,11 @@ export function unitDistanceFrom(unit: UnitComponent, feet: vec3, target: UnitCo
 }
 
 /** Como unitLineOfSight, pero con `unit` colocada con los pies en `feet`. */
-export function unitLineOfSightFrom(unit: UnitComponent, feet: vec3, target: UnitComponent): boolean {
+export function unitLineOfSightFrom(
+  unit: UnitComponent,
+  feet: vec3,
+  target: UnitComponent,
+): boolean {
   const eye = vec3.copy(tmpA, feet);
   eye[1] = eye[1]! + unit.getFeetOffset() + EYE_HEIGHT;
   const aim = target.getPosition(tmpB);
