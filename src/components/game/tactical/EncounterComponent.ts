@@ -199,7 +199,9 @@ const APPROACH_CANDIDATES = 16;
 /** A distancia: anillos (fracciones del alcance) donde buscar sitio con visión. */
 const RANGED_RINGS = [0.85, 0.6, 0.35];
 /** Saltar: anillos (fracciones del salto máximo) donde buscar el punto de despegue. */
-const JUMP_RINGS = [0.85, 0.6, 0.35];
+const JUMP_RINGS = [0.97, 0.85, 0.6, 0.35];
+/** Saltar: diferencia de altura (m) para considerar que un despegue está en el mismo nivel. */
+const SAME_LEVEL = 0.4;
 /** Daño al entrar en fuego o empezar el turno dentro. */
 const FIRE_DAMAGE = 5;
 const JUMP_SPEED = 7;
@@ -637,17 +639,23 @@ export class EncounterComponent extends Component {
     if (reason === 'cannot land there' || reason === 'too close') return fail(reason);
 
     // Andar hasta un punto de despegue desde el que llegue; andar + saltar cabe en los metros.
+    // Primero al nivel en el que está (desde el suelo se salta desde el suelo junto al
+    // saliente, no subiendo por la rampa para dar un saltito); si no hay, a cualquier nivel.
     const jumpFrom = (feet: vec3) => {
       const a = jumpArc(feet, destination);
       return 'reason' in a ? null : a;
     };
-    result.approach = this.planApproachTo(
-      entity,
-      destination,
-      JUMP_RINGS.map((k) => MAX_JUMP * k),
-      (feet) => jumpFrom(feet) !== null,
-      (feet) => jumpFrom(feet)?.distance ?? Infinity,
-    );
+    const level = unit.getFeetPosition(this.tmpA)[1]!;
+    const findTakeoff = (sameLevel: boolean) =>
+      this.planApproachTo(
+        entity,
+        destination,
+        JUMP_RINGS.map((k) => MAX_JUMP * k),
+        (feet) =>
+          (!sameLevel || Math.abs(feet[1]! - level) < SAME_LEVEL) && jumpFrom(feet) !== null,
+        (feet) => jumpFrom(feet)?.distance ?? Infinity,
+      );
+    result.approach = findTakeoff(true) ?? findTakeoff(false);
     if (!result.approach) return fail(reason);
     const walkEnd = result.approach.walk.points[result.approach.walk.points.length - 1]!;
     const from = jumpFrom(walkEnd);
@@ -1265,7 +1273,10 @@ export class EncounterComponent extends Component {
       if (!fits(c.point)) continue;
       const move = this.planMove(entity, c.point);
       if (!move.canMove || !move.affordable) continue;
-      const cost = move.plan.length + extraCost(c.point);
+      // Donde acaba el camino de verdad (el navmesh puede dejarlo unos cm más adentro).
+      const end = move.walk.points[move.walk.points.length - 1]!;
+      if (!fits(end)) continue;
+      const cost = move.plan.length + extraCost(end);
       if (cost > budget + EPS || cost >= bestCost) continue;
       best = move;
       bestCost = cost;

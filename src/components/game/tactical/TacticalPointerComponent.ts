@@ -478,10 +478,11 @@ export class TacticalPointerComponent extends Component {
       const from = (selected?.getComponent('unit') as UnitComponent | null)?.getFeetPosition();
       if (from) outline = [from, origin];
     }
-    // Si tiene que acercarse, primero el camino y después el área.
+    // Si tiene que acercarse, primero el camino (solo en combate) y después el área.
     const approach = plan.canCast ? plan.approach : null;
     if (approach) label += ` · se acerca ${approach.plan.length.toFixed(1)} m`;
-    const points = [...(approach?.plan.points ?? []), ...(outline ?? [])];
+    const walk = approach && this.showWalkPaths() ? approach.plan.points : [];
+    const points = [...walk, ...(outline ?? [])];
     if (points.length) this.preview?.show(points, Infinity, label);
     else this.preview?.showLabelOnly(label);
   }
@@ -563,8 +564,11 @@ export class TacticalPointerComponent extends Component {
         : this.attackPlan?.canAttack
           ? this.attackPlan.approach
           : null;
-      if (approach) this.preview?.show(approach.plan.points, approach.budget, tooltip);
-      else this.preview?.showLabelOnly(tooltip);
+      if (approach && this.showWalkPaths()) {
+        this.preview?.show(approach.plan.points, approach.budget, tooltip);
+      } else {
+        this.preview?.showLabelOnly(tooltip);
+      }
       return;
     }
 
@@ -577,7 +581,8 @@ export class TacticalPointerComponent extends Component {
         const label = walk
           ? `Saltar ${jump.distance.toFixed(1)} m (+${walk.length.toFixed(1)} m andando)`
           : `Saltar ${jump.distance.toFixed(1)} m`;
-        this.preview?.show([...(walk?.points ?? []), ...jump.points], Infinity, label);
+        const walkPoints = walk && this.showWalkPaths() ? walk.points : [];
+        this.preview?.show([...walkPoints, ...jump.points], Infinity, label);
       } else if (jump.allowed) {
         this.preview?.showLabelOnly(`Saltar: ${reasonText(jump.reason)}`);
       } else {
@@ -590,19 +595,24 @@ export class TacticalPointerComponent extends Component {
     // el resto en rojo. Si no llega, la etiqueta dice cuánto se recorrerá de verdad.
     const m = this.movePlan;
     const showPath =
+      this.showWalkPaths() &&
       (this.hoverKind === 'ground' || this.hoverKind === 'invalid') &&
       m &&
       m.allowed &&
       m.plan.reachable;
     if (showPath) {
-      const inCombat = EncounterComponent.find()?.isInCombat() ?? false;
       const label = m.affordable
         ? `${m.plan.length.toFixed(1)} m`
         : `${m.walk.length.toFixed(1)} / ${m.plan.length.toFixed(1)} m`;
-      this.preview?.show(m.plan.points, m.budget, inCombat ? label : null);
+      this.preview?.show(m.plan.points, m.budget, label);
     } else {
       this.preview?.hide();
     }
+  }
+
+  /** Los puntos del recorrido andando solo se ven en combate (en exploración no hacen falta). */
+  private showWalkPaths(): boolean {
+    return EncounterComponent.find()?.isInCombat() ?? false;
   }
 
   /** "Enemy1 · 12/20 PV · Espada 100 % · 10 daño · crítico 25 %" (o el motivo por el que no se puede). */

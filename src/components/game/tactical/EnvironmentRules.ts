@@ -40,7 +40,10 @@ export function jumpArc(from: vec3, to: vec3): JumpArc | { reason: string } {
   if (to[1]! - from[1]! > MAX_RISE) return { reason: 'too high to jump' };
   if (!isOnNavMesh(to[0]!, to[1]!, to[2]!, 0.3)) return { reason: 'cannot land there' };
 
-  // Altura del arco: la mínima que pasa por encima de todo lo que hay debajo.
+  // Altura del arco: la mínima que pasa por encima de todo lo que hay debajo. La holgura es
+  // completa a mitad de salto y se reduce a cero en el despegue y el aterrizaje (4t(1-t)):
+  // al subir a una plataforma, los últimos centímetros van sobre ella misma y no tiene que
+  // haber 30 cm de aire bajo los pies justo al tocar el suelo.
   const y0 = from[1]!;
   const y1 = to[1]!;
   let arc = MIN_ARC;
@@ -48,8 +51,9 @@ export function jumpArc(from: vec3, to: vec3): JumpArc | { reason: string } {
     const t = i / ARC_SAMPLES;
     const top = groundHeightAt(from[0]! + dx * t, from[2]! + dz * t);
     if (top === null) continue;
-    const need = top + CLEARANCE - (y0 + (y1 - y0) * t);
-    if (need > 0) arc = Math.max(arc, need / (4 * t * (1 - t)));
+    const bump = 4 * t * (1 - t);
+    const need = top + CLEARANCE * bump - (y0 + (y1 - y0) * t);
+    if (need > 0) arc = Math.max(arc, need / bump);
   }
   if (arc > MAX_ARC) return { reason: 'obstacle too high' };
 

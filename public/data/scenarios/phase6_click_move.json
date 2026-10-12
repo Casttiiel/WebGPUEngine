@@ -60,6 +60,11 @@
     },
     { "assert": { "combat": true, "path": "state", "value": "exploration" } },
 
+    { "log": "En exploración no se dibujan los puntos del recorrido" },
+    { "input": { "type": "move", "world": [-7, 0, -2] } },
+    { "wait_frames": 5 },
+    { "assert": { "expr": "Engine.getEntities().getAllEntities().filter(e => e.getName() === 'PathDot' && e.getComponent('render').isVisible()).length", "value": 0 } },
+
     { "log": "En combate un movimiento en curso no se cambia" },
     { "command": "start_combat" },
     {
@@ -72,6 +77,12 @@
     {
       "eval": "window.__active = __engine.getCombatState().activeUnit; window.__start = __feet(window.__active)"
     },
+    { "log": "En combate sí: el recorrido con puntos" },
+    { "input": { "type": "move", "world": [-7, 0, -2] } },
+    { "wait_frames": 5 },
+    { "input": { "type": "move", "world": [-6, 0, -1] } },
+    { "wait_frames": 5 },
+    { "assert": { "expr": "Engine.getEntities().getAllEntities().filter(e => e.getName() === 'PathDot' && e.getComponent('render').isVisible()).length > 0", "value": true } },
     {
       "assert": {
         "expr": "__engine.gameCommand('move', { unit: window.__active, to: [window.__start[0] + 3, 0, window.__start[2]] }).then(r => r.ok)",
