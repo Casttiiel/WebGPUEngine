@@ -61,9 +61,13 @@ export class PartyComponent extends Component {
     this.follow = data.follow ?? true;
     // El HUD táctico sustituye al HUD FPS por defecto (lo activa ModuleGameController).
     const hud = data.hud ?? 'PARTY_HUD';
+    // La ficha del personaje (tecla C) va con el HUD de la party.
     ModuleGameController.gameplayHuds = [
       hud,
-      ...ModuleGameController.gameplayHuds.filter((h) => h !== 'HUD' && h !== hud),
+      'CHARACTER_SHEET',
+      ...ModuleGameController.gameplayHuds.filter(
+        (h) => h !== 'HUD' && h !== hud && h !== 'CHARACTER_SHEET',
+      ),
     ];
   }
 

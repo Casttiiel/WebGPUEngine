@@ -20,6 +20,9 @@
     "prefab": "tactical/action_camera.prefab"
   },
   {
+    "prefab": "tactical/sheet_camera.prefab"
+  },
+  {
     "prefab": "lighting/directional_light.prefab"
   },
   {
@@ -514,6 +517,7 @@
     "components": {
       "name": "Hero1",
       "unit": {
+        "role": "Guerrero",
         "skills": ["shove", "second_wind", "fear"],
         "attacks": [
           {
@@ -536,6 +540,7 @@
     "components": {
       "name": "Hero2",
       "unit": {
+        "role": "Hechicero",
         "skills": ["fireball", "thunderwave"],
         "attacks": [
           {
@@ -558,6 +563,7 @@
     "components": {
       "name": "Hero3",
       "unit": {
+        "role": "Clérigo",
         "skills": ["heal", "dash"],
         "attacks": [
           {
@@ -580,6 +586,7 @@
     "components": {
       "name": "Hero4",
       "unit": {
+        "role": "Explorador",
         "skills": ["dash", "shove"],
         "attacks": [
           {

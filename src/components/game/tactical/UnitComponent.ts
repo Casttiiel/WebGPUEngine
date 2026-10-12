@@ -45,6 +45,8 @@ export type UnitComponentDataType = Readonly<{
   faction?: UnitFaction;
   /** Nombre visible (UI). Default: nombre de la entidad. */
   displayName?: string;
+  /** Oficio que enseña la ficha del personaje (Guerrero, Clérigo…). */
+  role?: string;
   /** Velocidad al andar (m/s). Default 4. */
   moveSpeed?: number;
   /** Metros de movimiento por turno en combate. Default 9 (como en BG3). */
@@ -101,6 +103,7 @@ const UP = vec3.fromValues(0, 1, 0);
 export class UnitComponent extends Component {
   private faction: UnitFaction = 'neutral';
   private displayName: string | null = null;
+  private role: string | null = null;
   private moveSpeed = 4;
   private movement = 9;
   private sightRange = 0;
@@ -142,6 +145,7 @@ export class UnitComponent extends Component {
   public load(data: UnitComponentDataType): void {
     this.faction = data.faction ?? 'neutral';
     this.displayName = data.displayName ?? null;
+    this.role = data.role ?? null;
     this.moveSpeed = data.moveSpeed ?? this.moveSpeed;
     this.movement = data.movement ?? this.movement;
     this.sightRange = data.sightRange ?? (this.faction === 'enemy' ? 8 : 0);
@@ -172,6 +176,20 @@ export class UnitComponent extends Component {
 
   public getDisplayName(): string {
     return this.displayName ?? this.getOwner().getName();
+  }
+
+  public getRole(): string | null {
+    return this.role;
+  }
+
+  /** Hacia dónde mira (horizontal, normalizado). */
+  public getFacing(out: vec3 = vec3.create()): vec3 {
+    const transform = this.getOwner().getComponent('transform') as TransformComponent | null;
+    const rot = transform?.getTransform().getLocalRotation();
+    vec3.set(out, 0, 0, 1);
+    if (rot) vec3.transformQuat(out, out, rot);
+    out[1] = 0;
+    return vec3.length(out) > 1e-4 ? vec3.normalize(out, out) : vec3.set(out, 0, 0, 1);
   }
 
   public getMoveSpeed(): number {

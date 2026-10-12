@@ -9,6 +9,7 @@ import { UIRenderUtils } from '../../renderer/core/UIRenderUtils';
 import { HUDController } from '../../core/ui/controllers/HUDController';
 import { PartyHUDController } from '../../core/ui/controllers/PartyHUDController';
 import { CombatHUDController } from '../../core/ui/controllers/CombatHUDController';
+import { CharacterSheetController } from '../../core/ui/controllers/CharacterSheetController';
 import { Render } from '../../renderer/core/pipeline/Render';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
@@ -67,7 +68,18 @@ export class ModuleUI extends Module {
 
     // HUD táctico: retratos de la party
     await this.registerWidgetClass('PARTY_HUD', 'party_hud.json', parser, new PartyHUDController());
-    await this.registerWidgetClass('COMBAT_HUD', 'combat_hud.json', parser, new CombatHUDController());
+    await this.registerWidgetClass(
+      'COMBAT_HUD',
+      'combat_hud.json',
+      parser,
+      new CombatHUDController(),
+    );
+    await this.registerWidgetClass(
+      'CHARACTER_SHEET',
+      'character_sheet.json',
+      parser,
+      new CharacterSheetController(),
+    );
 
     // Pause menu
     await this.registerWidgetClass('PAUSE_MENU', 'pause_menu.json', parser);
@@ -364,6 +376,21 @@ export class ModuleUI extends Module {
       return widget;
     }
     return undefined;
+  }
+
+  /** Dibuja (y prueba el ratón) una clase activa por encima de las demás. */
+  public bringWidgetClassToFront(name: string): void {
+    const widgetClass = this.widgetStructureMap.get(name);
+    if (!widgetClass?.enabled) return;
+    const names = widgetClass.names ?? [widgetClass.name];
+    for (const wname of names) {
+      const w = this.getWidgetByName(wname);
+      const idx = w ? this.activeWidgets.indexOf(w) : -1;
+      if (w && idx >= 0) {
+        this.activeWidgets.splice(idx, 1);
+        this.activeWidgets.push(w);
+      }
+    }
   }
 
   public deactivateWidgetClass(name: string): void {

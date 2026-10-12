@@ -8,10 +8,18 @@
     "radius": 2.5,
     "affects": "all",
     "effects": [
-      { "type": "damage", "amount": 10 },
-      { "type": "surface", "surface": "fire", "radius": 1.5 }
+      {
+        "type": "damage",
+        "amount": 10
+      },
+      {
+        "type": "surface",
+        "surface": "fire",
+        "radius": 1.5
+      }
     ],
-    "clip": "Spell_Simple_Shoot"
+    "clip": "Spell_Simple_Shoot",
+    "description": "Una esfera de llamas que estalla en el punto elegido. Quema a todos los que pilla, aliados incluidos, y deja el suelo ardiendo."
   },
   "thunderwave": {
     "name": "Onda atronadora",
@@ -22,10 +30,17 @@
     "angle": 70,
     "affects": "all",
     "effects": [
-      { "type": "damage", "amount": 6 },
-      { "type": "push", "distance": 2.5 }
+      {
+        "type": "damage",
+        "amount": 6
+      },
+      {
+        "type": "push",
+        "distance": 2.5
+      }
     ],
-    "clip": "Spell_Simple_Shoot"
+    "clip": "Spell_Simple_Shoot",
+    "description": "Una onda de fuerza sale de tus manos y derriba hacia atrás a todo lo que tienes delante."
   },
   "heal": {
     "name": "Palabra curativa",
@@ -34,15 +49,27 @@
     "target": "unit",
     "range": 12,
     "targets": "ally",
-    "effects": [{ "type": "heal", "amount": 10 }],
-    "clip": "Spell_Simple_Shoot"
+    "effects": [
+      {
+        "type": "heal",
+        "amount": 10
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Unas palabras de ánimo devuelven la vida a un aliado; basta para levantar a uno caído."
   },
   "second_wind": {
     "name": "Segundo aliento",
     "cost": "bonusAction",
     "cooldown": 3,
     "target": "self",
-    "effects": [{ "type": "heal", "amount": 8 }]
+    "effects": [
+      {
+        "type": "heal",
+        "amount": 8
+      }
+    ],
+    "description": "Un respiro en mitad de la pelea para recuperar fuerzas."
   },
   "fear": {
     "name": "Miedo",
@@ -51,8 +78,15 @@
     "target": "unit",
     "range": 9,
     "targets": "enemy",
-    "effects": [{ "type": "status", "status": "fear", "turns": 1 }],
-    "clip": "Spell_Simple_Shoot"
+    "effects": [
+      {
+        "type": "status",
+        "status": "fear",
+        "turns": 1
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Llena de pavor a un enemigo: no podrá atacar y huirá de ti en su turno."
   },
   "shove": {
     "name": "Empellón",
@@ -62,8 +96,14 @@
     "range": 1.5,
     "targets": "enemy",
     "lineOfSight": false,
-    "effects": [{ "type": "push", "distance": 3 }],
-    "clip": "Push_Enter"
+    "effects": [
+      {
+        "type": "push",
+        "distance": 3
+      }
+    ],
+    "clip": "Push_Enter",
+    "description": "Un empujón seco que aparta a un enemigo pegado a ti."
   },
   "dash": {
     "name": "Embestida",
@@ -71,6 +111,11 @@
     "cooldown": 2,
     "target": "point",
     "range": 6,
-    "effects": [{ "type": "teleport" }]
+    "effects": [
+      {
+        "type": "teleport"
+      }
+    ],
+    "description": "Cargas en línea recta hasta el punto elegido sin gastar movimiento."
   }
 }

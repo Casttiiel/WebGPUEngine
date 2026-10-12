@@ -36,6 +36,7 @@ export class ModuleInput extends Module {
   // Contador monótono de pulsaciones por botón: para módulos que se actualizan después
   // de ModuleInput (p.ej. la UI) y no pueden usar isMouseButtonJustPressed.
   private mouseButtonPressCount: Map<MouseButton, number> = new Map();
+  private keyPressCount: Map<KeyCode, number> = new Map();
 
   // Valores observables para Tweakpane
   private debugValues = {
@@ -154,7 +155,10 @@ export class ModuleInput extends Module {
     event.preventDefault();
     event.stopPropagation();
     const key = event.code.toLowerCase() as KeyCode;
-    if (!event.repeat) this.keysPressedThisFrame.add(key);
+    if (!event.repeat) {
+      this.keysPressedThisFrame.add(key);
+      this.keyPressCount.set(key, (this.keyPressCount.get(key) ?? 0) + 1);
+    }
     this.keys.set(key, true);
   }
 
@@ -293,8 +297,14 @@ export class ModuleInput extends Module {
   public isMouseButtonJustPressed(button: MouseButton): boolean {
     return (
       this.mouseButtonsPressedThisFrame.has(button) ||
-      ((this.mouseButtons.get(button) || false) && !(this.mouseButtonsLastFrame.get(button) || false))
+      ((this.mouseButtons.get(button) || false) &&
+        !(this.mouseButtonsLastFrame.get(button) || false))
     );
+  }
+
+  /** Como getMouseButtonPressCount, para teclas (módulos que se actualizan después de este). */
+  public getKeyPressCount(key: KeyCode): number {
+    return this.keyPressCount.get(key) ?? 0;
   }
 
   public getMouseButtonPressCount(button: MouseButton): number {

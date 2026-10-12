@@ -53,6 +53,8 @@ export interface SkillDef {
   effects: SkillEffect[];
   /** Animación del lanzador. */
   clip?: string;
+  /** Texto para la ficha del personaje (sin él se resume a partir de los efectos). */
+  description?: string;
 }
 
 type SkillJson = Partial<Omit<SkillDef, 'id' | 'effects'>> &
@@ -99,6 +101,7 @@ function normalize(id: string, s: SkillJson): SkillDef {
     lineOfSight: s.lineOfSight ?? !area,
     effects: s.effects,
     ...(s.clip !== undefined && { clip: s.clip }),
+    ...(s.description !== undefined && { description: s.description }),
   };
 }
 

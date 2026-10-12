@@ -9,6 +9,7 @@ import { CameraComponent } from '../../render/CameraComponent';
 import { UnitComponent } from './UnitComponent';
 import type { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import { groundHeightAt, hasLineOfSight } from './TacticalQueries';
+import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 
 export type ActionCameraComponentDataType = Readonly<{
   /** Grados que se abre el plano respecto a la línea atacante→objetivo (por encima del hombro). */
@@ -136,7 +137,13 @@ export class ActionCameraComponent extends Component {
    * suavemente y lo alarga.
    */
   public frameAction(source: Entity, targets: (Entity | vec3)[], hold: number): number {
-    if (!this.shotsEnabled || Engine.getModules().getCurrentGamestate() !== 'gs_gameplay') return 0;
+    if (
+      !this.shotsEnabled ||
+      Engine.getModules().getCurrentGamestate() !== 'gs_gameplay' ||
+      CharacterSheetController.isOpen()
+    ) {
+      return 0;
+    }
     const yaw = this.chooseYaw(source, targets);
     if (yaw === null || !this.compose(source, targets, yaw)) return 0;
 

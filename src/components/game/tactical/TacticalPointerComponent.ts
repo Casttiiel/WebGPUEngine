@@ -23,6 +23,7 @@ import { circleOutline, coneOutline, isHostile, type SkillDef } from './Skills';
 import type { SkillPlan } from './EncounterComponent';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { PathPreview } from './PathPreview';
+import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 import { KeyCode } from '../../../types/KeyCode.enum';
 
 /** Qué hay bajo el cursor. */
@@ -167,7 +168,10 @@ export class TacticalPointerComponent extends Component {
       this.preview = new PathPreview();
     }
 
-    const inGameplay = Engine.getModules().getCurrentGamestate() === 'gs_gameplay';
+    // Con la ficha del personaje abierta el puntero no actúa sobre el mundo.
+    const inGameplay =
+      Engine.getModules().getCurrentGamestate() === 'gs_gameplay' &&
+      !CharacterSheetController.isOpen();
     if (inGameplay) this.handleHotbarInput();
     this.pickWorld(inGameplay);
     this.skillPlan = this.planArmedSkill();

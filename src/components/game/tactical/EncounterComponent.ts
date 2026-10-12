@@ -10,6 +10,7 @@ import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import type { ActionCameraComponent } from './ActionCameraComponent';
 import { UnitObstacles } from './UnitObstacles';
+import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 import type { TacticalAIComponent } from './TacticalAIComponent';
 import {
   groundHeightAt,
@@ -1476,7 +1477,8 @@ export class EncounterComponent extends Component {
     if (active.unit.isBusy() || this.isResolving()) return;
 
     if (this.isPlayerTurn()) {
-      if (Engine.getInput().isKeyJustPressed(KeyCode.SPACE)) {
+      const input = Engine.getInput();
+      if (input.isKeyJustPressed(KeyCode.SPACE) && !CharacterSheetController.isOpen()) {
         this.endTurn();
       } else if (!this.hasUsableResources(active.unit)) {
         this.endTurn(); // sin recursos

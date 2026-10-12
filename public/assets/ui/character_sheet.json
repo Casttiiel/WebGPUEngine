@@ -1,0 +1,1389 @@
+[
+  {
+    "name": "sheet_blocker",
+    "alias": "sheet_blocker",
+    "type": "image",
+    "x": 0,
+    "y": 0,
+    "width": 4000,
+    "height": 3000,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [
+        4000,
+        3000
+      ],
+      "color": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "anchor": "top-left",
+    "visible": false
+  },
+  {
+    "name": "sheet_panel",
+    "alias": "sheet_panel",
+    "type": "image",
+    "x": -908,
+    "y": 56,
+    "width": 868,
+    "height": 968,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [
+        868,
+        968
+      ],
+      "color": [
+        0.75,
+        0.6,
+        0.3,
+        0.9
+      ]
+    },
+    "anchor": "top-right",
+    "visible": false,
+    "children": [
+      {
+        "name": "sheet_bg",
+        "alias": "sheet_bg",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 860,
+        "height": 960,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            860,
+            960
+          ],
+          "color": [
+            0.05,
+            0.05,
+            0.07,
+            0.94
+          ]
+        }
+      },
+      {
+        "name": "sheet_name",
+        "alias": "sheet_name",
+        "type": "text",
+        "x": 44,
+        "y": 30,
+        "width": 780,
+        "height": 64,
+        "textParams": {
+          "text": "",
+          "size": [
+            56,
+            56
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_role",
+        "alias": "sheet_role",
+        "type": "text",
+        "x": 44,
+        "y": 96,
+        "width": 780,
+        "height": 36,
+        "textParams": {
+          "text": "",
+          "size": [
+            28,
+            28
+          ],
+          "color": [
+            0.72,
+            0.72,
+            0.78,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_hp_bg",
+        "alias": "sheet_hp_bg",
+        "type": "image",
+        "x": 44,
+        "y": 144,
+        "width": 780,
+        "height": 28,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            780,
+            28
+          ],
+          "color": [
+            0.02,
+            0.02,
+            0.02,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_hp",
+        "alias": "sheet_hp",
+        "type": "image",
+        "x": 44,
+        "y": 144,
+        "width": 780,
+        "height": 28,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            780,
+            28
+          ],
+          "color": [
+            0.25,
+            0.75,
+            0.3,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_hp_text",
+        "alias": "sheet_hp_text",
+        "type": "text",
+        "x": 44,
+        "y": 140,
+        "width": 780,
+        "height": 36,
+        "textParams": {
+          "text": "",
+          "size": [
+            26,
+            26
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_1_box",
+        "alias": "sheet_stat_1_box",
+        "type": "image",
+        "x": 44,
+        "y": 192,
+        "width": 252,
+        "height": 108,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            252,
+            108
+          ],
+          "color": [
+            0.1,
+            0.1,
+            0.13,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_1_label",
+        "alias": "sheet_stat_1_label",
+        "type": "text",
+        "x": 44,
+        "y": 200,
+        "width": 252,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            0.72,
+            0.72,
+            0.78,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_1_value",
+        "alias": "sheet_stat_1_value",
+        "type": "text",
+        "x": 44,
+        "y": 236,
+        "width": 252,
+        "height": 56,
+        "textParams": {
+          "text": "",
+          "size": [
+            44,
+            44
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_2_box",
+        "alias": "sheet_stat_2_box",
+        "type": "image",
+        "x": 308,
+        "y": 192,
+        "width": 252,
+        "height": 108,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            252,
+            108
+          ],
+          "color": [
+            0.1,
+            0.1,
+            0.13,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_2_label",
+        "alias": "sheet_stat_2_label",
+        "type": "text",
+        "x": 308,
+        "y": 200,
+        "width": 252,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            0.72,
+            0.72,
+            0.78,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_2_value",
+        "alias": "sheet_stat_2_value",
+        "type": "text",
+        "x": 308,
+        "y": 236,
+        "width": 252,
+        "height": 56,
+        "textParams": {
+          "text": "",
+          "size": [
+            44,
+            44
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_3_box",
+        "alias": "sheet_stat_3_box",
+        "type": "image",
+        "x": 572,
+        "y": 192,
+        "width": 252,
+        "height": 108,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            252,
+            108
+          ],
+          "color": [
+            0.1,
+            0.1,
+            0.13,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_3_label",
+        "alias": "sheet_stat_3_label",
+        "type": "text",
+        "x": 572,
+        "y": 200,
+        "width": 252,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            0.72,
+            0.72,
+            0.78,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_stat_3_value",
+        "alias": "sheet_stat_3_value",
+        "type": "text",
+        "x": 572,
+        "y": 236,
+        "width": 252,
+        "height": 56,
+        "textParams": {
+          "text": "",
+          "size": [
+            44,
+            44
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_1",
+        "alias": "sheet_line_1",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_2",
+        "alias": "sheet_line_2",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_3",
+        "alias": "sheet_line_3",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_4",
+        "alias": "sheet_line_4",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_5",
+        "alias": "sheet_line_5",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_6",
+        "alias": "sheet_line_6",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_7",
+        "alias": "sheet_line_7",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_8",
+        "alias": "sheet_line_8",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_9",
+        "alias": "sheet_line_9",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_10",
+        "alias": "sheet_line_10",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_11",
+        "alias": "sheet_line_11",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_12",
+        "alias": "sheet_line_12",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_13",
+        "alias": "sheet_line_13",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_14",
+        "alias": "sheet_line_14",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_15",
+        "alias": "sheet_line_15",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_16",
+        "alias": "sheet_line_16",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_17",
+        "alias": "sheet_line_17",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_18",
+        "alias": "sheet_line_18",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_19",
+        "alias": "sheet_line_19",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_20",
+        "alias": "sheet_line_20",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_21",
+        "alias": "sheet_line_21",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_22",
+        "alias": "sheet_line_22",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_23",
+        "alias": "sheet_line_23",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_24",
+        "alias": "sheet_line_24",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_25",
+        "alias": "sheet_line_25",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_26",
+        "alias": "sheet_line_26",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_27",
+        "alias": "sheet_line_27",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_28",
+        "alias": "sheet_line_28",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_29",
+        "alias": "sheet_line_29",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_30",
+        "alias": "sheet_line_30",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_31",
+        "alias": "sheet_line_31",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_32",
+        "alias": "sheet_line_32",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_33",
+        "alias": "sheet_line_33",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_34",
+        "alias": "sheet_line_34",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_35",
+        "alias": "sheet_line_35",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_36",
+        "alias": "sheet_line_36",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_37",
+        "alias": "sheet_line_37",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_38",
+        "alias": "sheet_line_38",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_39",
+        "alias": "sheet_line_39",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_line_40",
+        "alias": "sheet_line_40",
+        "type": "text",
+        "x": 44,
+        "y": 0,
+        "width": 780,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [
+            24,
+            24
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_hint",
+        "alias": "sheet_hint",
+        "type": "text",
+        "x": 44,
+        "y": 916,
+        "width": 780,
+        "height": 32,
+        "textParams": {
+          "text": "",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            0.72,
+            0.72,
+            0.78,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  }
+]
