@@ -114,6 +114,8 @@ export class UnitComponent extends Component {
   private critMisses = 0;
   private pathSpeed = 4;
   private pathTurns = true;
+  /** El movimiento en curso es andar (no un salto, empujón o embestida): se puede cortar. */
+  private pathWalk = true;
   /** Segundos que le quedan a la acción en curso (animación de ataque). */
   private actionTimer = 0;
   /** Dónde empezó (para reiniciar el encuentro). */
@@ -179,6 +181,11 @@ export class UnitComponent extends Component {
 
   public isMoving(): boolean {
     return this.path.length > 0;
+  }
+
+  /** Andando (no saltando, empujado ni embistiendo): en exploración un nuevo destino lo corta. */
+  public isWalking(): boolean {
+    return this.isMoving() && this.pathWalk && this.actionTimer <= 0;
   }
 
   /** Moviéndose o en mitad de una acción (animación de ataque). */
@@ -360,8 +367,9 @@ export class UnitComponent extends Component {
     this.pathIndex = 1;
     this.pathSpeed = options.speed ?? this.moveSpeed;
     this.pathTurns = options.face ?? true;
+    this.pathWalk = options.walk ?? true;
     this.getFeetPosition(this.movingFeet);
-    if (options.walk ?? true) this.getAnimator()?.setParameter('moving', true);
+    if (this.pathWalk) this.getAnimator()?.setParameter('moving', true);
     return new Promise((resolve) => (this.onArrive = resolve));
   }
 

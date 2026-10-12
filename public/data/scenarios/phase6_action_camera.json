@@ -86,15 +86,35 @@
       }
     },
     { "assert": { "expr": "__ac.isInShot()", "value": true } },
-    { "wait_frames": 35 },
+    { "wait_frames": 20 },
+    {
+      "assert": {
+        "entity": "Enemy1",
+        "path": "health.getHp",
+        "value": 4,
+        "message": "el golpe espera a que la cámara esté colocada"
+      }
+    },
+    { "assert": { "expr": "__engine.getCombatState().busy", "value": true } },
+    {
+      "wait_until": { "entity": "Enemy1", "path": "health.getHp", "value": 0 },
+      "timeout_frames": 120
+    },
+    {
+      "assert": {
+        "expr": "__camDist('ActionCamera') < 0.05",
+        "value": true,
+        "message": "cuando llega el golpe ya se ve solo la cámara de acción"
+      }
+    },
+    { "wait_frames": 10 },
     { "screenshot": "02-attack" },
-    { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 0 } },
     { "wait_frames": 50 },
     {
       "assert": {
         "expr": "__ac.isInShot()",
         "value": true,
-        "message": "la muerte alarga el plano (sin ella habría acabado a los 66 frames)"
+        "message": "la muerte alarga el plano (sin ella habría acabado a los 42 frames del golpe)"
       }
     },
     { "screenshot": "03-kill" },

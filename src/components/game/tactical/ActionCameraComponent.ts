@@ -27,6 +27,10 @@ export type ActionCameraComponentDataType = Readonly<{
   /** Segundos de la mezcla con la cámara de juego al entrar y al salir. */
   blendIn?: number;
   blendOut?: number;
+  /** Segundos de pausa con la cámara ya colocada antes de que empiece la acción. */
+  settle?: number;
+  /** Segundos para reencuadrar si ya hay un plano en curso (acciones encadenadas). */
+  reframe?: number;
   /** Cámara a la que se vuelve al acabar. Default 'PlayerCamera' (la del rig táctico). */
   gameplayCamera?: string;
   enabled?: boolean;
@@ -60,8 +64,10 @@ export class ActionCameraComponent extends Component {
   private margin = 1.2;
   private lookHeight = 1.0;
   private push = 0.12;
-  private blendIn = 0.35;
+  private blendIn = 0.45;
   private blendOut = 0.6;
+  private settle = 0.2;
+  private reframe = 0.35;
   private gameplayCamera = 'PlayerCamera';
   private shotsEnabled = true;
 
@@ -93,6 +99,8 @@ export class ActionCameraComponent extends Component {
     this.push = data.push ?? this.push;
     this.blendIn = data.blendIn ?? this.blendIn;
     this.blendOut = data.blendOut ?? this.blendOut;
+    this.settle = data.settle ?? this.settle;
+    this.reframe = data.reframe ?? this.reframe;
     this.gameplayCamera = data.gameplayCamera ?? this.gameplayCamera;
     this.shotsEnabled = data.enabled ?? this.shotsEnabled;
   }
@@ -122,14 +130,15 @@ export class ActionCameraComponent extends Component {
   // ── API ──────────────────────────────────────────────────────────────────
 
   /**
-   * Encuadra a `source` y a sus objetivos (unidades o puntos del suelo) durante `hold`
-   * segundos. Si ya hay un plano en curso, cambia de encuadre suavemente y lo alarga.
+   * Encuadra a `source` y a sus objetivos (unidades o puntos del suelo). Devuelve los segundos
+   * que tarda la cámara en estar colocada (0 si no hay plano): la acción debe empezar entonces.
+   * El plano dura `hold` segundos desde ese momento. Si ya hay uno en curso, reencuadra
+   * suavemente y lo alarga.
    */
-  public frameAction(source: Entity, targets: (Entity | vec3)[], hold: number): boolean {
-    if (!this.shotsEnabled || Engine.getModules().getCurrentGamestate() !== 'gs_gameplay')
-      return false;
+  public frameAction(source: Entity, targets: (Entity | vec3)[], hold: number): number {
+    if (!this.shotsEnabled || Engine.getModules().getCurrentGamestate() !== 'gs_gameplay') return 0;
     const yaw = this.chooseYaw(source, targets);
-    if (yaw === null || !this.compose(source, targets, yaw)) return false;
+    if (yaw === null || !this.compose(source, targets, yaw)) return 0;
 
     if (!this.shot) {
       // Entra con un corte de encuadre: el mixer se encarga de que no se note.
@@ -137,20 +146,21 @@ export class ActionCameraComponent extends Component {
       this.targetYaw = yaw;
       vec3.copy(this.center, this.targetCenter);
       this.distance = this.targetDistance;
-      this.shot = { source, targets, hold, elapsed: 0 };
+      const ready = this.blendIn + this.settle;
+      this.shot = { source, targets, hold: ready + hold, elapsed: 0 };
       this.apply(0);
       Engine.getCameraMixer().blendCamera(
         this.getOwner(),
         this.blendIn,
         new SmoothStepInterpolator(),
       );
-    } else {
-      this.targetYaw = this.yaw + shortestAngle(this.yaw, yaw);
-      this.shot.source = source;
-      this.shot.targets = targets;
-      this.shot.hold = Math.max(this.shot.hold, this.shot.elapsed + hold);
+      return ready;
     }
-    return true;
+    this.targetYaw = this.yaw + shortestAngle(this.yaw, yaw);
+    this.shot.source = source;
+    this.shot.targets = targets;
+    this.shot.hold = Math.max(this.shot.hold, this.shot.elapsed + this.reframe + hold);
+    return this.reframe;
   }
 
   /** Alarga el plano en curso hasta `seconds` desde ahora (p.ej. para ver caer al objetivo). */

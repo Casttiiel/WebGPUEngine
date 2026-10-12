@@ -258,6 +258,11 @@ export class EncounterComponent extends Component {
   private pendingHits: PendingHit[] = [];
   /** Habilidades lanzadas cuyo efecto aún no ha llegado (sincronizado con la animación). */
   private pendingSkills: { timer: number; caster: UnitComponent; plan: SkillPlan }[] = [];
+  /**
+   * Ataques y habilidades ya pagados que esperan a que la cámara de acción esté colocada
+   * para empezar la animación (si no, el golpe llega mientras la cámara aún se mueve).
+   */
+  private windups: { timer: number; unit: UnitComponent; start: () => void }[] = [];
   /** Enemigos de combates terminados por comando (end_combat): no vuelven a detectar. */
   private disengaged = new Set<UnitComponent>();
   private surfaces = new Surfaces();
@@ -379,7 +384,10 @@ export class EncounterComponent extends Component {
   /** Hay un ataque en marcha (acercándose para atacar o un golpe por resolver). */
   public isResolving(): boolean {
     return (
-      this.pendingAttack !== null || this.pendingHits.length > 0 || this.pendingSkills.length > 0
+      this.pendingAttack !== null ||
+      this.windups.length > 0 ||
+      this.pendingHits.length > 0 ||
+      this.pendingSkills.length > 0
     );
   }
 
@@ -414,7 +422,7 @@ export class EncounterComponent extends Component {
       };
     }
 
-    let allowed = !unit.isBusy() && unit.isAlive();
+    let allowed = !this.isOccupied(unit) && unit.isAlive();
     let reason: string | undefined = !unit.isAlive()
       ? 'unit is down'
       : allowed
@@ -460,7 +468,11 @@ export class EncounterComponent extends Component {
   }
 
   /** Mueve la unidad si las reglas lo permiten. En combate descuenta los metros recorridos. */
-  public requestMove(entity: Entity, destination: vec3): MovePlan & { ok: boolean } {
+  /**
+   * Mueve la unidad si las reglas lo permiten. En exploración, si es el seleccionado, el resto
+   * de la party le sigue (`follow` = false para moverlo solo).
+   */
+  public requestMove(entity: Entity, destination: vec3, follow = true): MovePlan & { ok: boolean } {
     // Asegura que la planificación ve los obstáculos actuales (y no el de la propia unidad).
     UnitObstacles.sync(this.getActingUnit());
     const move = this.planMove(entity, destination);
@@ -472,6 +484,10 @@ export class EncounterComponent extends Component {
       this.pendingAttack = null;
       const unit = entity.getComponent('unit') as UnitComponent;
       void unit.moveAlong(move.walk.points);
+      const party = PartyComponent.find();
+      if (follow && this.state === 'exploration' && party?.getSelected() === entity) {
+        party.followLeader(entity, move.walk.points);
+      }
       this.emit('move', { unit: entity });
     }
     return { ...move, ok };
@@ -645,6 +661,7 @@ export class EncounterComponent extends Component {
     }
     const unit = entity.getComponent('unit') as UnitComponent;
     const prop = target.getComponent('unit') as UnitComponent;
+    unit.stop(); // exploración: puede venir andando
     unit.faceTowards(prop.getPosition(this.tmpA));
     unit.playAction(PUSH_CLIP, PUSH_TIME);
     void prop.moveAlong([prop.getFeetPosition(), plan.destination], {
@@ -765,6 +782,7 @@ export class EncounterComponent extends Component {
       unit.setCooldown(skill.id, skill.cooldown);
     }
     this.pendingAttack = null;
+    unit.stop(); // exploración: puede venir andando
     this.emit('skill', { unit: entity });
 
     if (hasEffect(skill, 'teleport')) {
@@ -783,19 +801,32 @@ export class EncounterComponent extends Component {
     } else if (skill.target !== 'self') {
       unit.faceTowards(plan.origin);
     }
-    unit.playAction(skill.clip, SKILL_TIME);
-    this.frameSkill(unit, plan);
-    this.pendingSkills.push({ timer: SKILL_DELAY, caster: unit, plan });
+    this.windUp(unit, this.frameSkill(unit, plan), () => {
+      unit.playAction(skill.clip, SKILL_TIME);
+      this.pendingSkills.push({ timer: SKILL_DELAY, caster: unit, plan });
+    });
     return { ...plan, ok: true };
   }
 
   /** Plano de acción de una habilidad: el lanzador, los afectados y el centro del área. */
-  private frameSkill(caster: UnitComponent, plan: SkillPlan): void {
+  private frameSkill(caster: UnitComponent, plan: SkillPlan): number {
     const targets: (Entity | vec3)[] = plan.affected
       .filter((u) => u !== caster)
       .map((u) => u.getOwner());
     if (plan.skill?.target === 'point' && plan.origin) targets.push(plan.origin);
-    this.getActionCamera()?.frameAction(caster.getOwner(), targets, SKILL_DELAY + SHOT_AFTER_HIT);
+    return (
+      this.getActionCamera()?.frameAction(
+        caster.getOwner(),
+        targets,
+        SKILL_DELAY + SHOT_AFTER_HIT,
+      ) ?? 0
+    );
+  }
+
+  /** Empieza la acción cuando la cámara esté colocada (`delay` s), o ya si no hay plano. */
+  private windUp(unit: UnitComponent, delay: number, start: () => void): void {
+    if (delay <= 0) start();
+    else this.windups.push({ timer: delay, unit, start });
   }
 
   /** Efectos de una habilidad al llegar el momento del impacto. */
@@ -925,7 +956,13 @@ export class EncounterComponent extends Component {
   public endTurn(): boolean {
     if (this.state !== 'combat') return false;
     const active = this.combatants[this.turnIndex];
-    if (active?.unit.isBusy() || this.pendingAttack || this.pendingHits.length) return false;
+    if (
+      active?.unit.isBusy() ||
+      this.pendingAttack ||
+      this.windups.length ||
+      this.pendingHits.length
+    )
+      return false;
     for (const status of active?.unit.tickStatuses() ?? []) {
       this.emit('status-end', { unit: active!.unit.getOwner(), status });
     }
@@ -974,6 +1011,7 @@ export class EncounterComponent extends Component {
     this.pendingAttack = null;
     this.pendingHits = [];
     this.pendingSkills = [];
+    this.windups = [];
     this.disengaged.clear();
     this.round = 0;
     this.turnIndex = 0;
@@ -1001,9 +1039,21 @@ export class EncounterComponent extends Component {
   // ── Interno ──────────────────────────────────────────────────────────────
 
   /** null si la unidad puede actuar ahora gastando `cost` (null: sin coste); si no, el motivo. */
+  /**
+   * ¿Está ocupada para empezar otra cosa? Atacando, saltando o esperando a la cámara de acción.
+   * Andar solo la ocupa en combate: en exploración un nuevo click corta el movimiento.
+   */
+  private isOccupied(unit: UnitComponent): boolean {
+    if (this.windups.some((w) => w.unit === unit)) return true;
+    if (this.state === 'exploration' && unit.isWalking()) return false;
+    return unit.isBusy();
+  }
+
   private canAct(unit: UnitComponent, cost: 'action' | 'bonusAction' | null): string | null {
     if (!unit.isAlive()) return 'unit is down';
-    if (unit.isBusy() || this.pendingAttack) return 'unit is busy';
+    if (this.isOccupied(unit) || (this.pendingAttack && this.state === 'combat')) {
+      return 'unit is busy';
+    }
     const entity = unit.getOwner();
     if (this.state === 'combat') {
       if (entity !== this.getActiveUnit()) return 'not this unit’s turn';
@@ -1054,20 +1104,25 @@ export class EncounterComponent extends Component {
   }
 
   private executeAttack(unit: UnitComponent, target: UnitComponent, attack: UnitAttack): void {
+    unit.stop(); // exploración: puede venir andando
     if (this.state === 'combat') {
       const cost = attack.cost ?? 'action';
       this.resources[cost] = Math.max(0, this.resources[cost] - 1);
     }
     unit.faceTowards(target.getPosition(this.tmpA));
-    unit.playAction(attack.clip, ATTACK_TIME);
-    this.getActionCamera()?.frameAction(
-      unit.getOwner(),
-      [target.getOwner()],
-      HIT_DELAY + SHOT_AFTER_HIT,
-    );
-    const roll = rollAttack(unit, target, attack);
-    this.pendingHits.push({ timer: HIT_DELAY, attacker: unit, target, ...roll });
-    this.emit('attack', { unit: target.getOwner(), source: unit.getOwner() });
+    const delay =
+      this.getActionCamera()?.frameAction(
+        unit.getOwner(),
+        [target.getOwner()],
+        HIT_DELAY + SHOT_AFTER_HIT,
+      ) ?? 0;
+    this.windUp(unit, delay, () => {
+      unit.faceTowards(target.getPosition(this.tmpA));
+      unit.playAction(attack.clip, ATTACK_TIME);
+      const roll = rollAttack(unit, target, attack);
+      this.pendingHits.push({ timer: HIT_DELAY, attacker: unit, target, ...roll });
+      this.emit('attack', { unit: target.getOwner(), source: unit.getOwner() });
+    });
   }
 
   /** Ataques en curso: el que espera a terminar de acercarse y los impactos pendientes. */
@@ -1084,6 +1139,12 @@ export class EncounterComponent extends Component {
       if (plan.canAttack && !plan.approach && plan.attack) {
         this.executeAttack(pending.attacker, pending.target, plan.attack);
       }
+    }
+
+    if (this.windups.length) {
+      const ready = this.windups.filter((w) => (w.timer -= dt) <= 0);
+      this.windups = this.windups.filter((w) => w.timer > 0);
+      for (const w of ready) w.start();
     }
 
     if (this.pendingSkills.length) {
@@ -1235,6 +1296,7 @@ export class EncounterComponent extends Component {
         this.aiTimeouts++;
         active.unit.stop();
         this.pendingAttack = null;
+        this.windups = [];
         this.pendingHits = [];
         this.endTurn();
         return;
@@ -1487,7 +1549,11 @@ export class EncounterComponent extends Component {
           case 'move': {
             const to = args.to as [number, number, number] | undefined;
             if (!Array.isArray(to)) throw new Error('move needs args.to = [x, y, z]');
-            const result = this.requestMove(unitArg(), vec3.fromValues(to[0], to[1], to[2]));
+            const result = this.requestMove(
+              unitArg(),
+              vec3.fromValues(to[0], to[1], to[2]),
+              args.follow !== false,
+            );
             return {
               ok: result.ok,
               reason: result.reason ?? null,

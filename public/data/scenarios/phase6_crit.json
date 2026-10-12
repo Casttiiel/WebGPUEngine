@@ -61,12 +61,12 @@
 
     { "log": "Un ataque con el crítico asegurado: doble daño y texto flotante" },
     { "command": "select", "args": { "unit": "Hero2" } },
-    { "command": "move", "args": { "unit": "Hero2", "to": [-5, 0, 12] } },
+    { "command": "move", "args": { "unit": "Hero2", "to": [-5, 0, 12], "follow": false } },
     {
       "wait_until": { "entity": "Hero2", "path": "unit.isMoving", "value": false },
       "timeout_frames": 900
     },
-    { "command": "move", "args": { "unit": "Hero2", "to": [-2.5, 0, 13] } },
+    { "command": "move", "args": { "unit": "Hero2", "to": [-2.5, 0, 13], "follow": false } },
     {
       "wait_until": { "entity": "Hero2", "path": "unit.isMoving", "value": false },
       "timeout_frames": 300
@@ -85,7 +85,10 @@
         "value": true
       }
     },
-    { "wait_frames": 40 },
+    {
+      "wait_until": { "expr": "__engine.getCombatState().busy", "value": false },
+      "timeout_frames": 300
+    },
     { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 8, "message": "6 × 2" } },
     {
       "assert": {
@@ -127,7 +130,10 @@
         "value": true
       }
     },
-    { "wait_frames": 60 },
+    {
+      "wait_until": { "expr": "__engine.getCombatState().busy", "value": false },
+      "timeout_frames": 300
+    },
     {
       "assert": {
         "expr": "window.__log.filter(l => l.cause === 'skill').length > 0 && window.__log.filter(l => l.cause === 'skill').every(l => !l.crit)",
