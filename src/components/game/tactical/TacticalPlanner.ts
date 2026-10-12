@@ -1,8 +1,9 @@
 import { vec3 } from 'gl-matrix';
 import type { Entity } from '../../../core/ecs/Entity';
-import type { EncounterComponent } from './EncounterComponent';
+import type { EncounterComponent, SkillPlan, SkillTarget } from './EncounterComponent';
 import type { UnitAttack, UnitComponent } from './UnitComponent';
 import { previewAttack, unitDistanceFrom, unitLineOfSightFrom } from './CombatRules';
+import { SkillCatalog, hasEffect, type SkillDef } from './Skills';
 
 export type AIRole = 'melee' | 'ranged';
 
@@ -15,7 +16,7 @@ export interface AIProfile {
   preferredDistance: number;
 }
 
-export type TurnPlanKind = 'attack' | 'reposition' | 'retreat' | 'advance' | 'wait';
+export type TurnPlanKind = 'attack' | 'skill' | 'reposition' | 'retreat' | 'advance' | 'wait';
 
 /** Lo que la IA hará este turno: moverse (opcional) y después atacar (opcional). */
 export interface TurnPlan {
@@ -24,6 +25,8 @@ export interface TurnPlan {
   move: vec3 | null;
   /** Después, atacar (requestAttack: el cuerpo a cuerpo se acerca solo si hace falta). */
   attack: { target: Entity; attackId: string } | null;
+  /** O lanzar una habilidad (requestSkill: también se acerca sola si hace falta). */
+  skill?: { id: string; target: SkillTarget } | null;
   score: number;
   /** Explicación legible (debug / MCP). */
   reason: string;
@@ -44,6 +47,16 @@ const ADVANCE_BASE = -20;
 const FLEE_DISTANCE = 1.5; // por metro de separación de quien le asustó
 const FLEE_HIDDEN = 4; // y si no le ve
 const MELEE_REACH = 2; // de borde a borde: "le pueden pegar" si está más cerca
+// Habilidades: mismo baremo que los ataques (≈ puntos de daño).
+const SKILL_BASE = 8;
+const HEAL_WEIGHT = 1.2; // por punto de vida que de verdad recupera
+const REVIVE_BONUS = 15; // levantar a un aliado caído
+const FRIENDLY_FIRE = 1.5; // por punto de daño a un aliado (se resta)
+const PUSH_VALUE = 2; // por enemigo empujado
+const STATUS_VALUE = 9; // por enemigo asustado (pierde su turno de ataque)
+const SURFACE_VALUE = 2; // deja fuego donde hay enemigos
+/** La acción adicional solo se usa si la habilidad vale al menos esto (no gastarla por gastar). */
+const BONUS_MIN_VALUE = SKILL_BASE + 3;
 
 const RING_STEP = 1.5;
 const RING_ANGLES = 12;
@@ -139,6 +152,26 @@ export function planTurn(
         reason: `${attack.name} → ${foe.getDisplayName()}${walk ? ` (acercándose ${walk.length.toFixed(1)} m)` : ''}`,
       });
     }
+  }
+
+  // 1b) Habilidades de acción: las mismas reglas que el jugador (planSkill, que también se
+  // acerca sola). Las de acción adicional van aparte, después (planBonusSkill).
+  for (const option of skillOptions(encounter, me, foes)) {
+    if (option.skill.cost !== 'action') continue;
+    const walk = option.plan.approach?.walk;
+    const end = walk ? walk.points[walk.points.length - 1]! : here;
+    const approach = walk ? ` (acercándose ${walk.length.toFixed(1)} m)` : '';
+    // Con poca vida, como con los ataques: mejor ponerse a salvo (salvo para curarse).
+    const value =
+      low && !hasEffect(option.skill, 'heal') ? option.value * LOW_HP_ATTACK_FACTOR : option.value;
+    candidates.push({
+      kind: 'skill',
+      move: null,
+      attack: null,
+      skill: { id: option.skill.id, target: option.target },
+      score: value - (walk?.length ?? 0) * MOVE_COST + positionValue(end),
+      reason: `${option.skill.name} → ${option.label}${approach}`,
+    });
   }
 
   // 2) Moverse a otro sitio: para disparar desde allí o para retirarse.
@@ -289,4 +322,132 @@ function closestApproach(
     if (!best || move.plan.length < best.length) best = { feet: point, length: move.plan.length };
   }
   return best;
+}
+
+/**
+ * Acción adicional tras actuar: la mejor habilidad de acción adicional que merezca la pena
+ * (si le quedan metros, también acercándose). null si no hay ninguna.
+ */
+export function planBonusSkill(encounter: EncounterComponent, me: UnitComponent): TurnPlan | null {
+  if (me.hasStatus('fear') || encounter.getResources().bonusAction <= 0) return null;
+  const foes = encounter
+    .getCombatantUnits()
+    .filter(
+      (u) => u.isAlive() && u.getFaction() !== me.getFaction() && u.getFaction() !== 'neutral',
+    );
+  let best: TurnPlan | null = null;
+  for (const option of skillOptions(encounter, me, foes)) {
+    if (option.skill.cost !== 'bonusAction') continue;
+    const walk = option.plan.approach?.walk;
+    const score = option.value - (walk?.length ?? 0) * MOVE_COST;
+    if (score < BONUS_MIN_VALUE || (best && score <= best.score)) continue;
+    const approach = walk ? ` (acercándose ${walk.length.toFixed(1)} m)` : '';
+    best = {
+      kind: 'skill',
+      move: null,
+      attack: null,
+      skill: { id: option.skill.id, target: option.target },
+      score,
+      reason: `${option.skill.name} → ${option.label}${approach} (acción adicional)`,
+    };
+  }
+  return best;
+}
+
+interface SkillOption {
+  skill: SkillDef;
+  target: SkillTarget;
+  plan: SkillPlan;
+  value: number;
+  label: string;
+}
+
+/** Cada habilidad de la unidad sobre cada objetivo razonable, con su valor (las inútiles no). */
+function skillOptions(
+  encounter: EncounterComponent,
+  me: UnitComponent,
+  foes: UnitComponent[],
+): SkillOption[] {
+  const self = me.getOwner();
+  const allies = encounter.getCombatantUnits().filter((u) => u.getFaction() === me.getFaction());
+  const out: SkillOption[] = [];
+  for (const id of me.getSkillIds()) {
+    const skill = SkillCatalog.get(id);
+    // La embestida es movimiento, no un efecto: la IA no la usa (todavía).
+    if (!skill || hasEffect(skill, 'teleport')) continue;
+    const targets: { target: SkillTarget; label: string }[] = [];
+    if (skill.target === 'self') {
+      targets.push({ target: {}, label: 'sí mismo' });
+    } else if (skill.target === 'unit') {
+      const pool = skill.targets === 'ally' ? allies : foes;
+      for (const u of pool) {
+        targets.push({ target: { unit: u.getOwner() }, label: u.getDisplayName() });
+      }
+    } else {
+      // Punto o cono: hacia cada enemigo.
+      for (const u of foes) {
+        targets.push({
+          target: { point: u.getFeetPosition(vec3.create()) },
+          label: `zona de ${u.getDisplayName()}`,
+        });
+      }
+    }
+    for (const { target, label } of targets) {
+      const plan = encounter.planSkill(self, id, target);
+      if (!plan.canCast) continue;
+      const value = skillValue(me, skill, plan);
+      if (value !== null) out.push({ skill, target, plan, value, label });
+    }
+  }
+  return out;
+}
+
+/** Lo que vale lanzar la habilidad con ese plan (quién queda afectado). null = inútil. */
+function skillValue(me: UnitComponent, skill: SkillDef, plan: SkillPlan): number | null {
+  const isFoe = (u: UnitComponent) =>
+    u.getFaction() !== me.getFaction() && u.getFaction() !== 'neutral';
+  const isAlly = (u: UnitComponent) => u.getFaction() === me.getFaction();
+  let value = 0;
+  let useful = false;
+  for (const effect of skill.effects) {
+    switch (effect.type) {
+      case 'damage':
+        for (const u of plan.affected) {
+          if (!u.isAlive()) continue;
+          const dealt = Math.min(effect.amount, u.getHp());
+          if (isFoe(u)) {
+            value += dealt + (effect.amount >= u.getHp() ? KILL_BONUS : 0);
+            useful = true;
+          } else if (isAlly(u)) {
+            value -= dealt * FRIENDLY_FIRE;
+          }
+        }
+        break;
+      case 'heal':
+        for (const u of plan.affected) {
+          if (!isAlly(u)) continue;
+          const healed = Math.min(effect.amount, u.getMaxHp() - Math.max(0, u.getHp()));
+          if (healed < 1) continue;
+          value += healed * HEAL_WEIGHT + (u.isAlive() ? 0 : REVIVE_BONUS);
+          useful = true;
+        }
+        break;
+      case 'push':
+        value += plan.affected.filter((u) => isFoe(u) && u.isAlive()).length * PUSH_VALUE;
+        break;
+      case 'status':
+        for (const u of plan.affected) {
+          if (!isFoe(u) || !u.isAlive() || u.hasStatus(effect.status)) continue;
+          value += STATUS_VALUE;
+          useful = true;
+        }
+        break;
+      case 'surface':
+        if (plan.affected.some(isFoe)) value += SURFACE_VALUE;
+        break;
+      case 'teleport':
+        return null;
+    }
+  }
+  return useful && value > 0 ? SKILL_BASE + value : null;
 }

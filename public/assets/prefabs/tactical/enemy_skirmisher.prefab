@@ -90,6 +90,7 @@
     },
     "unit": {
       "faction": "enemy",
+      "skills": ["thunderwave"],
       "critChance": 10,
       "moveSpeed": 5,
       "movement": 12,

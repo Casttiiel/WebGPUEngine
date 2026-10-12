@@ -1153,6 +1153,7 @@ export class EncounterComponent extends Component {
       u.clearCooldowns();
       u.clearStatuses();
       u.resetCritChance();
+      this.getAI(u)?.clearPlan();
     }
     if (result === 'victory') {
       // Como en BG3: los caídos se levantan al terminar el combate.
@@ -1179,7 +1180,10 @@ export class EncounterComponent extends Component {
     this.disengaged.clear();
     this.round = 0;
     this.turnIndex = 0;
-    for (const unit of UnitComponent.getAll()) unit.resetToSpawn();
+    for (const unit of UnitComponent.getAll()) {
+      unit.resetToSpawn();
+      this.getAI(unit)?.clearPlan();
+    }
     this.surfaces.reset();
     this.inFire.clear();
     this.detectionTimer = DETECTION_INTERVAL;
@@ -1681,6 +1685,7 @@ export class EncounterComponent extends Component {
             kind: p.plan!.kind,
             reason: p.plan!.reason,
             score: Math.round(p.plan!.score * 10) / 10,
+            bonus: this.getAI(p.unit)?.getLastBonus()?.reason ?? null,
           })),
         units: UnitComponent.getAll().map((u) => ({
           name: u.getOwner().getName(),

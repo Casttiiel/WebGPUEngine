@@ -15,11 +15,11 @@
       "eval": "window.__plans = []; window.__collect = () => { for (const p of __engine.getCombatState().aiPlans) { const k = p.unit + '|' + p.kind + '|' + p.reason; if (!window.__plans.includes(k)) window.__plans.push(k); } }"
     },
     {
-      "eval": "window.__autoTurn = (passive) => { window.__collect(); const enc = window.__enc; const s = __engine.getCombatState(); if (s.state !== 'combat') return true; if (!s.playerTurn || s.busy) return false; const me = Engine.getEntities().getEntityByName(s.activeUnit); if (me.getComponent('unit').isBusy()) return false; if (!passive && s.resources.action > 0) { for (const c of s.turnOrder.filter(c => c.faction === 'enemy' && c.alive)) { const t = Engine.getEntities().getEntityByName(c.name); for (const a of ['melee', 'ranged']) { if (enc.planAttack(me, t, a).canAttack) { enc.requestAttack(me, t, a); return false; } } } } enc.endTurn(); return false; }"
+      "eval": "window.__autoTurn = (passive) => { window.__collect(); const enc = window.__enc; const s = __engine.getCombatState(); if (s.state !== 'combat') return true; if (!s.playerTurn || s.busy) return false; const me = Engine.getEntities().getEntityByName(s.activeUnit); if (me.getComponent('unit').isBusy()) return false; if (!passive && s.resources.action > 0) { for (const c of s.turnOrder.filter(c => c.faction === 'enemy' && c.alive)) { const t = Engine.getEntities().getEntityByName(c.name); for (const a of ['melee', 'ranged']) { if (enc.planAttack(me, t, a).canAttack) { enc.requestAttack(me, t, a); return false; } } } } if (!passive && s.resources.movement > 0.5) { const mine = me.getComponent('unit').getFeetPosition(new Float32Array(3)); let best = null; for (const c of s.turnOrder.filter(c => c.faction === 'enemy' && c.alive)) { const f = Engine.getEntities().getEntityByName(c.name).getComponent('unit').getFeetPosition(new Float32Array(3)); const d = Math.hypot(f[0] - mine[0], f[2] - mine[2]); if (!best || d < best.d) best = { f, d }; } if (best && best.d > 2) { const k = 1.6 / best.d; const dest = new Float32Array([best.f[0] + (mine[0] - best.f[0]) * k, best.f[1], best.f[2] + (mine[2] - best.f[2]) * k]); if (enc.requestMove(me, dest).ok) return false; } } enc.endTurn(); return false; }"
     },
 
     { "log": "Acercarse: el Bruto y el Arquero detectan a la party" },
-    { "command": "move", "args": { "unit": "Hero1", "to": [1, 0, 0] } },
+    { "command": "move", "args": { "unit": "Hero1", "to": [1, 0, 0], "follow": false } },
     { "wait_until": { "combat": true, "path": "state", "value": "combat" }, "timeout_frames": 600 },
     {
       "assert": {
@@ -119,7 +119,7 @@
     },
     {
       "assert": {
-        "expr": "window.__plans.some(p => p.startsWith('Archer|') && p.includes('Arco'))",
+        "expr": "window.__plans.some(p => p.startsWith('Archer|') && (p.includes('Arco') || p.includes('Bola de fuego')))",
         "value": true,
         "message": "a distancia: dispara"
       }
@@ -136,7 +136,7 @@
     { "command": "restart" },
     { "wait_frames": 5 },
     { "eval": "window.__log = []; window.__plans = []" },
-    { "command": "move", "args": { "unit": "Hero1", "to": [1, 0, 0] } },
+    { "command": "move", "args": { "unit": "Hero1", "to": [1, 0, 0], "follow": false } },
     { "wait_until": { "combat": true, "path": "state", "value": "combat" }, "timeout_frames": 600 },
     { "command": "damage", "args": { "unit": "Archer", "amount": 15 } },
     { "eval": "window.__near = () => Math.min(...['Hero1', 'Hero2', 'Hero3', 'Hero4'].map(h => { const a = __engine.readPath('Archer', 'position'); const b = __engine.readPath(h, 'position'); return Math.hypot(a[0] - b[0], a[2] - b[2]); })); window.__before = window.__near()" },

@@ -90,6 +90,7 @@
     },
     "unit": {
       "faction": "enemy",
+      "skills": ["fireball"],
       "critChance": 10,
       "moveSpeed": 4,
       "movement": 9,

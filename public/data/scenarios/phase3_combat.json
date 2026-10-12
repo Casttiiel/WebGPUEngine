@@ -1,5 +1,5 @@
 {
-  "description": "Fase 3 (puntos 11-15): 4 héroes contra 2 enemigos dummy de principio a fin. Línea de visión (columna), ataque a distancia por sorpresa, moverse y atacar con click, muerte y salida de la iniciativa, victoria, aliados caídos que pierden el turno, derrota y reinicio con R. Todo con el HUD de combate.",
+  "description": "Fase 3 (puntos 11-15): 4 héroes contra 2 enemigos dummy de principio a fin. Línea de visión (columna; sin visión el ataque a distancia se acercaría), ataque a distancia por sorpresa (Hero2), moverse y atacar con click, muerte y salida de la iniciativa, victoria, aliados caídos que pierden el turno, derrota y reinicio con R. Todo con el HUD de combate.",
   "scenes": ["tactical.json", "tactical_dummies.json"],
   "seed": 7,
   "steps": [
@@ -15,15 +15,31 @@
       "eval": "window.__autoTurn = () => { const enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; const s = __engine.getCombatState(); if (s.state !== 'combat') return true; if (!s.playerTurn || s.busy) return false; const me = Engine.getEntities().getEntityByName(s.activeUnit); if (me.getComponent('unit').isBusy()) return false; if (s.resources.action > 0) { for (const c of s.turnOrder.filter(c => c.faction === 'enemy' && c.alive)) { const t = Engine.getEntities().getEntityByName(c.name); for (const a of ['melee', 'ranged']) { if (enc.planAttack(me, t, a).canAttack) { enc.requestAttack(me, t, a); return false; } } } } enc.endTurn(); return false; }"
     },
 
+    { "log": "Sin críticos: aquí se prueba el flujo del combate con daños exactos (los críticos: phase6_crit)" },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('unit').getList().forEach(u => u.critChance = 0)"
+    },
+
     { "log": "Punto 11: los enemigos dummy tienen vida" },
     { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 20 } },
     { "assert": { "entity": "Enemy2", "path": "health.getHp", "value": 20 } },
     { "assert": { "entity": "Hero1", "path": "health.getHp", "value": 30 } },
 
-    { "log": "Punto 13: detrás de la columna no hay línea de visión" },
-    { "command": "move", "args": { "unit": "Hero1", "to": [-5, 0, 12] } },
+    { "log": "Colocación a escondidas (cada uno solo): Hero1 cerca, Hero2 detrás de la columna" },
+    { "command": "move", "args": { "unit": "Hero1", "to": [-5, 0, 12], "follow": false } },
     {
       "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 600
+    },
+    { "command": "move", "args": { "unit": "Hero1", "to": [-2.5, 0, 13], "follow": false } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 300
+    },
+    { "command": "select", "args": { "unit": "Hero2" } },
+    { "command": "move", "args": { "unit": "Hero2", "to": [-5, 0, 12], "follow": false } },
+    {
+      "wait_until": { "entity": "Hero2", "path": "unit.isMoving", "value": false },
       "timeout_frames": 600
     },
     {
@@ -31,30 +47,32 @@
         "combat": true,
         "path": "state",
         "value": "exploration",
-        "message": "escondido: nadie le ve"
-      }
-    },
-    {
-      "assert": {
-        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Enemy1', attack: 'ranged' }).then(r => [r.inRange, r.lineOfSight, r.canAttack, r.reason])",
-        "value": [true, false, false, "no line of sight"]
-      }
-    },
-    {
-      "assert": {
-        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Enemy1', attack: 'melee' }).then(r => r.canAttack && r.approach > 0)",
-        "value": true,
-        "message": "cuerpo a cuerpo no necesita visión: se acercaría"
+        "message": "escondidos: nadie les ve"
       }
     },
 
-    { "log": "Punto 15: la hotbar arma el ataque a distancia; el cursor sobre el enemigo dice que no se puede" },
-    { "input": { "type": "click", "widget": "hotbar_2" } },
+    { "log": "Punto 13: detrás de la columna no hay línea de visión (se acercaría a un sitio con visión)" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Enemy1', attack: 'ranged' }).then(r => [r.inRange, r.lineOfSight, r.canAttack, r.approach > 0])",
+        "value": [true, false, true, true]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Enemy1', attack: 'melee' }).then(r => [r.canAttack, r.reason])",
+        "value": [false, "unknown attack 'melee'"],
+        "message": "Hero2 solo ataca a distancia"
+      }
+    },
+
+    { "log": "Punto 15: la hotbar arma el ataque a distancia; sobre el enemigo el cursor es de atacar" },
+    { "input": { "type": "click", "widget": "hotbar_1" } },
     { "wait_frames": 2 },
     { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": "ranged" } },
     {
       "assert": {
-        "entity": "Hero1",
+        "entity": "Hero2",
         "path": "unit.isMoving",
         "value": false,
         "message": "el click en la hotbar no llega al mundo"
@@ -67,21 +85,33 @@
     { "input": { "type": "move", "entity": "Enemy1" } },
     { "wait_frames": 3 },
     { "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "enemy" } },
-    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "invalid" } },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "attack" } },
     { "assert": { "expr": "__engine.getWidgetRect('cursor_label').visible", "value": true } },
     { "screenshot": "01-no-line-of-sight" },
 
     { "log": "Punto 7 + 13: un paso al lado hay visión; atacar primero empieza el combate" },
-    { "command": "move", "args": { "unit": "Hero1", "to": [-2.5, 0, 13] } },
+    { "command": "move", "args": { "unit": "Hero2", "to": [-1, 0, 14], "follow": false } },
     {
-      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "wait_until": { "entity": "Hero2", "path": "unit.isMoving", "value": false },
       "timeout_frames": 300
+    },
+    { "assert": { "combat": true, "path": "state", "value": "exploration" } },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Enemy1', attack: 'ranged' }).then(r => [r.lineOfSight, r.canAttack, r.approach])",
+        "value": [true, true, null],
+        "message": "desde aquí dispara sin moverse"
+      }
     },
     { "input": { "type": "move", "entity": "Enemy1" } },
     { "wait_frames": 3 },
     { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "attack" } },
     { "input": { "type": "click", "entity": "Enemy1" } },
-    { "wait_frames": 40 },
+    { "wait_frames": 5 },
+    {
+      "wait_until": { "expr": "__engine.getCombatState().busy", "value": false },
+      "timeout_frames": 300
+    },
     {
       "assert": {
         "entity": "Enemy1",
@@ -125,7 +155,7 @@
     { "log": "Punto 12: en el turno de Hero1, click en el enemigo → se acerca y ataca cuerpo a cuerpo" },
     {
       "wait_until": {
-        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero1') return true; if (s.playerTurn) __engine.gameCommand('end_turn', {}); return false; })()",
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero1' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
         "value": true
       },
       "timeout_frames": 900,
@@ -144,7 +174,7 @@
         "expr": "Engine.getEntities().getAllEntities().filter(e => e.getName() === 'PathDot' && e.getComponent('render').isVisible()).length",
         "op": ">",
         "value": 3,
-        "message": "preview del camino hasta el enemigo"
+        "message": "preview del camino hasta el enemigo (en combate)"
       }
     },
     { "screenshot": "03-melee-preview" },
@@ -152,10 +182,12 @@
     { "wait_frames": 2 },
     { "assert": { "entity": "Hero1", "path": "unit.isMoving", "value": true } },
     {
-      "wait_until": { "entity": "Hero1", "path": "unit.isBusy", "value": false },
+      "wait_until": {
+        "expr": "!__engine.getCombatState().busy && !Engine.getEntities().getEntityByName('Hero1').getComponent('unit').isBusy()",
+        "value": true
+      },
       "timeout_frames": 600
     },
-    { "wait_frames": 2 },
     { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 4 } },
     { "assert": { "combat": true, "path": "resources.action", "value": 0 } },
     { "assert": { "combat": true, "path": "resources.movement", "op": "<", "value": 9 } },
@@ -199,7 +231,8 @@
     },
 
     { "log": "Punto 14: derrota — Enemy3 detecta a Hero1, la party cae (daño de debug: aún no hay IA)" },
-    { "command": "move", "args": { "unit": "Hero1", "to": [8, 0, -6] } },
+    { "command": "select", "args": { "unit": "Hero1" } },
+    { "command": "move", "args": { "unit": "Hero1", "to": [8, 0, -6], "follow": false } },
     { "wait_until": { "combat": true, "path": "state", "value": "combat" }, "timeout_frames": 900 },
     {
       "assert": {

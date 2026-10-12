@@ -8,7 +8,13 @@ import { AlwaysSucceed } from '../../../ai/nodes/Decorators';
 import { Wait } from '../../../ai/nodes/Wait';
 import type { EncounterComponent } from './EncounterComponent';
 import type { UnitComponent } from './UnitComponent';
-import { planTurn, type AIProfile, type AIRole, type TurnPlan } from './TacticalPlanner';
+import {
+  planBonusSkill,
+  planTurn,
+  type AIProfile,
+  type AIRole,
+  type TurnPlan,
+} from './TacticalPlanner';
 
 export type TacticalAIComponentDataType = Readonly<{
   /** melee: acercarse y pegar. ranged: buscar alcance y línea de visión, guardando distancia. Default: ranged si tiene algún ataque a distancia. */
@@ -33,10 +39,11 @@ export type TacticalAIComponentDataType = Readonly<{
  * (src/ai) que se ejecuta a lo largo de varios frames:
  *
  *   pensar (pausa) → planificar (TacticalPlanner) → moverse → esperar a llegar → pausa
- *     → atacar → esperar al golpe → pausa → fin de turno
+ *     → atacar o lanzar una habilidad → esperar al golpe → acción adicional (si una habilidad
+ *     de acción adicional merece la pena) → pausa → fin de turno
  *
  * Actúa con las mismas reglas y la misma API que el jugador y el MCP (requestMove /
- * requestAttack de EncounterComponent). Las pausas son para que el jugador entienda qué
+ * requestAttack / requestSkill de EncounterComponent). Las pausas son para que el jugador entienda qué
  * hace la IA; la cámara sigue a la unidad activa.
  */
 export class TacticalAIComponent extends Component {
@@ -51,6 +58,8 @@ export class TacticalAIComponent extends Component {
   private readonly bb = new Blackboard();
   private encounter: EncounterComponent | null = null;
   private lastPlan: TurnPlan | null = null;
+  /** Habilidad de acción adicional del turno actual (debug / MCP). */
+  private lastBonus: TurnPlan | null = null;
 
   public load(data: TacticalAIComponentDataType): void {
     this.role = data.role ?? null;
@@ -72,6 +81,7 @@ export class TacticalAIComponent extends Component {
     this.tree.reset();
     this.bb.clear();
     this.lastPlan = null;
+    this.lastBonus = null;
   }
 
   /** Avanza el turno un frame. true = ha terminado (el encuentro pasa el turno). */
@@ -84,6 +94,17 @@ export class TacticalAIComponent extends Component {
   /** Plan del turno actual o del último (debug / MCP). */
   public getLastPlan(): TurnPlan | null {
     return this.lastPlan;
+  }
+
+  /** Olvida el último plan (al acabar el combate o reiniciar: el MCP no debe ver uno viejo). */
+  public clearPlan(): void {
+    this.lastPlan = null;
+    this.lastBonus = null;
+  }
+
+  /** Habilidad de acción adicional del turno (si la usó). */
+  public getLastBonus(): TurnPlan | null {
+    return this.lastBonus;
   }
 
   public getProfile(): AIProfile {
@@ -127,9 +148,18 @@ export class TacticalAIComponent extends Component {
         new AlwaysSucceed(
           new Sequence(
             [
-              new Action('attack', () => {
+              new Action('act', () => {
                 const p = plan();
-                if (!p?.attack || !this.encounter) return Status.FAILURE;
+                if (!p || !this.encounter) return Status.FAILURE;
+                if (p.skill) {
+                  const r = this.encounter.requestSkill(
+                    this.getOwner(),
+                    p.skill.id,
+                    p.skill.target,
+                  );
+                  return r.ok ? Status.SUCCESS : Status.FAILURE;
+                }
+                if (!p.attack) return Status.FAILURE;
                 const r = this.encounter.requestAttack(
                   this.getOwner(),
                   p.attack.target,
@@ -139,7 +169,31 @@ export class TacticalAIComponent extends Component {
               }),
               this.waitIdle('resolve'),
             ],
-            { label: 'Attack' },
+            { label: 'Act' },
+          ),
+        ),
+        // Acción adicional: una habilidad que merezca la pena desde donde ha quedado.
+        new AlwaysSucceed(
+          new Sequence(
+            [
+              new Action('bonus', () => {
+                const unit = this.getUnit();
+                if (!unit || !this.encounter) return Status.FAILURE;
+                const bonus = planBonusSkill(this.encounter, unit);
+                if (!bonus?.skill) return Status.FAILURE;
+                const r = this.encounter.requestSkill(
+                  this.getOwner(),
+                  bonus.skill.id,
+                  bonus.skill.target,
+                );
+                if (!r.ok) return Status.FAILURE;
+                this.lastBonus = bonus;
+                return Status.SUCCESS;
+              }),
+              new Wait('pause', () => this.pauseTime),
+              this.waitIdle('resolve-bonus'),
+            ],
+            { label: 'Bonus' },
           ),
         ),
         new Wait('end', () => this.endTime),
