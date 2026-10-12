@@ -59,7 +59,6 @@
     "tactical_ai",
     "tactical_prop",
     "tactical_surface",
-    "camera_occluder",
     "encounter",
     "party",
     "tactical_pointer",

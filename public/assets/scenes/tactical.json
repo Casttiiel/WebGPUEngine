@@ -80,7 +80,6 @@
   {
     "components": {
       "name": "WallNorth",
-      "camera_occluder": { "fadedMaterial": "tactical_wall_faded.mat" },
       "transform": {
         "position": [0, 1.5, 18.5],
         "rotation": [0, 0, 0],
@@ -105,7 +104,6 @@
   {
     "components": {
       "name": "WallSouth",
-      "camera_occluder": { "fadedMaterial": "tactical_wall_faded.mat" },
       "transform": {
         "position": [0, 1.5, -18.5],
         "rotation": [0, 0, 0],
@@ -130,7 +128,6 @@
   {
     "components": {
       "name": "WallEast",
-      "camera_occluder": { "fadedMaterial": "tactical_wall_faded.mat" },
       "transform": {
         "position": [18.5, 1.5, 0],
         "rotation": [0, 0, 0],
@@ -155,7 +152,6 @@
   {
     "components": {
       "name": "WallWest",
-      "camera_occluder": { "fadedMaterial": "tactical_wall_faded.mat" },
       "transform": {
         "position": [-18.5, 1.5, 0],
         "rotation": [0, 0, 0],
@@ -252,7 +248,6 @@
   {
     "components": {
       "name": "Column1",
-      "camera_occluder": { "fadedMaterial": "tactical_column_faded.mat" },
       "transform": {
         "position": [-10, 2, -8],
         "rotation": [0, 0, 0],
@@ -277,7 +272,6 @@
   {
     "components": {
       "name": "Column2",
-      "camera_occluder": { "fadedMaterial": "tactical_column_faded.mat" },
       "transform": {
         "position": [10, 2, 8],
         "rotation": [0, 0, 0],
@@ -302,7 +296,6 @@
   {
     "components": {
       "name": "Column3",
-      "camera_occluder": { "fadedMaterial": "tactical_column_faded.mat" },
       "transform": {
         "position": [0, 2, 9],
         "rotation": [0, 0, 0],
@@ -327,7 +320,6 @@
   {
     "components": {
       "name": "Column4",
-      "camera_occluder": { "fadedMaterial": "tactical_column_faded.mat" },
       "transform": {
         "position": [-2, 2, -12],
         "rotation": [0, 0, 0],

@@ -249,11 +249,6 @@ export class ActionCameraComponent extends Component {
     return out;
   }
 
-  /** Punto al que mira el plano en curso (los oclusores lo dejan a la vista). null fuera de un plano. */
-  public getLookPoint(): vec3 | null {
-    return this.shot ? this.tmpLook : null;
-  }
-
   /** Centro y distancia que encuadran a todos con la vista `yaw` → targetCenter/targetDistance. */
   private compose(source: Entity, targets: (Entity | vec3)[], yaw: number): boolean {
     const points = this.collect(source, targets);

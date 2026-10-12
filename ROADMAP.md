@@ -208,7 +208,7 @@ No hace falta bridge WebSocket: Playwright da consola, errores, screenshots, inp
 > - **Empujar** (hotbar, o click en un objeto): gasta la acción adicional (en exploración es gratis). Hay que estar al lado; el objeto se desliza hasta 3 m y se para contra paredes, unidades o desniveles.
 > - **Objetos** (`tactical_prop`): son unidades neutrales con vida, así que se apuntan, bloquean caminos y se atacan con las mismas reglas. El barril explosivo hace 12 de daño en 2.5 m, deja fuego y explota en cadena. Atacar un objeto requiere armar un ataque en la hotbar; el click normal empuja.
 > - **Superficies** (`tactical_surface`): el fuego quema 5 al entrar y al empezar el turno dentro, y dura 3 rondas. El aceite prende con el fuego o una explosión. Las de la escena vuelven al reiniciar.
-> - **Oclusores** (`camera_occluder` en muros y columnas): cuando tapan a una unidad o al pivote de la cámara cambian a un material con tramado semitransparente. No se instancian.
+> - **Siluetas** (sustituye a los oclusores semitransparentes): los personajes tapados por la escena dibujan su silueta, verde aliado y roja enemigo, solo en las partes tapadas. Es una segunda pasada del `skeletal_mesh` (`utility/silhouette_skinned.tech`) que compara su profundidad con la del G-buffer. Los caídos no tienen. Test: `run_scenario phase6_silhouette`.
 > - **Escena:** los objetos están en `tactical_props.json` (dos barriles, aceite y una caja), que `boot.json` carga y los tests de las fases 2-4 no.
 > - **Motor:** al destruir un `particle_system` en runtime, el render seguía usando sus buffers y la pantalla se quedaba en negro. Ahora se da de baja al destruirse.
 

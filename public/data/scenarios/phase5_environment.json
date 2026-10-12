@@ -228,30 +228,6 @@
       }
     },
 
-    { "log": "Muros y columnas que tapan la vista se atenúan" },
-    {
-      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([0, 0, -16], false)"
-    },
-    { "wait_frames": 60 },
-    {
-      "assert": {
-        "expr": "Engine.getEntities().getObjectManagerByName('camera_occluder').getList().filter(o => o.isFadedOut()).map(o => o.getOwner().getName())",
-        "op": "includes",
-        "value": "Column4"
-      }
-    },
-    { "screenshot": "03-occluder" },
-    {
-      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([0, 0, 0], false)"
-    },
-    { "wait_frames": 60 },
-    {
-      "assert": {
-        "expr": "Engine.getEntities().getObjectManagerByName('camera_occluder').getList().filter(o => o.isFadedOut()).length",
-        "value": 0,
-        "message": "y vuelven a ser opacos"
-      }
-    },
     { "assert": { "no_errors": true } }
   ]
 }

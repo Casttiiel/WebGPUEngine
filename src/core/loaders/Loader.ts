@@ -88,7 +88,6 @@ import { EncounterComponent } from '../../components/game/tactical/EncounterComp
 import { TacticalAIComponent } from '../../components/game/tactical/TacticalAIComponent';
 import { PropComponent } from '../../components/game/tactical/PropComponent';
 import { SurfaceComponent } from '../../components/game/tactical/Surfaces';
-import { CameraOccluderComponent } from '../../components/game/tactical/CameraOccluderComponent';
 import { BloodZoneComponent } from '../../components/game/combat/BloodZoneComponent';
 import { BloodBallProjectileComponent } from '../../components/game/combat/BloodBallProjectileComponent';
 import { BloodExplosiveProjectileComponent } from '../../components/game/combat/BloodExplosiveProjectileComponent';
@@ -533,8 +532,6 @@ export class Loader {
         return new PropComponent();
       case 'tactical_surface':
         return new SurfaceComponent();
-      case 'camera_occluder':
-        return new CameraOccluderComponent();
       case 'tactical_ai':
         return new TacticalAIComponent();
       case 'encounter':

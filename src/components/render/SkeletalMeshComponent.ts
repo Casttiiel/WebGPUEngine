@@ -45,6 +45,35 @@ export class SkeletalMeshComponent extends Component {
   private materialOverride: Material | null = null;
   private baseColorFactor: number[] | null = null;
   private highlight = 0;
+  // Silueta cuando algo lo tapa: segunda pasada con su propio "owner" para poder quitarla sola.
+  private silhouettePath: string | null = null;
+  private silhouetteRequest = 0;
+  private readonly silhouetteOwner = {};
+  private loaded = false;
+
+  /**
+   * Silueta de color plano en las partes del personaje que tapa la escena (material con
+   * utility/silhouette_skinned.tech). null la quita.
+   */
+  public setSilhouette(materialPath: string | null): void {
+    if (materialPath === this.silhouettePath) return;
+    this.silhouettePath = materialPath;
+    if (this.loaded) void this.applySilhouette();
+  }
+
+  private async applySilhouette(): Promise<void> {
+    const request = ++this.silhouetteRequest;
+    const renderManager = RenderManagerV2.getInstance();
+    renderManager.delKeys(this.silhouetteOwner as any);
+    if (!this.silhouettePath) return;
+    const material = await Material.get(this.silhouettePath);
+    // Otra petición (o dispose) mientras cargaba: esa manda.
+    if (request !== this.silhouetteRequest || !this.loaded) return;
+    const transform = this.getOwner().getComponent('transform') as TransformComponent;
+    for (const sm of this.asset.skinnedMeshes) {
+      renderManager.addKey(this.silhouetteOwner as any, sm as any, material, transform, false, 1, undefined, this.skinBindGroup);
+    }
+  }
 
   /**
    * Aclara el color base hacia blanco (0 = color original, 1 = blanco). Usado para el
@@ -132,6 +161,8 @@ export class SkeletalMeshComponent extends Component {
     for (const sm of this.asset.skinnedMeshes) {
       renderManager.addKey(this as any, sm as any, material, transform, false, 1, undefined, this.skinBindGroup);
     }
+    this.loaded = true;
+    if (this.silhouettePath) void this.applySilhouette();
 
     // Register textures with TextureStreamingManager so MIP levels are upgraded
     // when this character comes within range of the camera.
@@ -169,6 +200,9 @@ export class SkeletalMeshComponent extends Component {
 
   public override dispose(): void {
     RenderManagerV2.getInstance().delKeys(this as any);
+    RenderManagerV2.getInstance().delKeys(this.silhouetteOwner as any);
+    this.loaded = false;
+    this.silhouetteRequest++;
     this.jointMatrixBuffer?.destroy();
     this.previousJointMatrixBuffer?.destroy();
     if (this.streamingPosGetter) {

@@ -7,6 +7,7 @@ import { AnimatorComponent } from '../../render/AnimatorComponent';
 import { CapsuleColliderComponent } from '../../physics/CapsuleColliderComponent';
 import { HealthComponent } from '../HealthComponent';
 import { RenderComponent } from '../../render/RenderComponent';
+import type { SkeletalMeshComponent } from '../../render/SkeletalMeshComponent';
 import { groundHeightAt } from './TacticalQueries';
 
 export type UnitFaction = 'party' | 'enemy' | 'neutral';
@@ -56,6 +57,8 @@ export type UnitComponentDataType = Readonly<{
   abilities?: UnitAbility[];
   /** Al caer desaparece (objetos destruidos, p.ej. un barril que explota). Default false. */
   hideWhenDown?: boolean;
+  /** Silueta (verde aliado, roja enemigo) en las partes que tape la escena. Default true. */
+  silhouette?: boolean;
   /** Habilidades (ids de data/skills.json), en el orden de la hotbar. Default: ninguna. */
   skills?: string[];
   /** % de golpe crítico de los ataques (cuerpo a cuerpo y a distancia). Default 0. */
@@ -110,6 +113,9 @@ export class UnitComponent extends Component {
   private cooldowns = new Map<string, number>();
   private statuses = new Map<UnitStatusId, UnitStatus>();
   private critChance = 0;
+  private silhouette = true;
+  /** Material de silueta aplicado ahora (undefined = aún no se ha decidido). */
+  private silhouetteShown: string | null | undefined = undefined;
   /** Ataques que han impactado sin crítico desde el último (PRD). */
   private critMisses = 0;
   private pathSpeed = 4;
@@ -144,12 +150,14 @@ export class UnitComponent extends Component {
     this.hideWhenDown = data.hideWhenDown ?? false;
     this.skills = [...(data.skills ?? [])];
     this.critChance = data.critChance ?? 0;
+    this.silhouette = data.silhouette ?? true;
   }
 
   public update(dt: number): void {
     if (this.feetOffset === null) this.computeFeetOffset();
     if (!this.spawn) this.saveSpawn();
     if (this.actionTimer > 0) this.actionTimer = Math.max(0, this.actionTimer - dt);
+    this.updateSilhouette();
 
     if (this.path.length === 0) return;
 
@@ -505,6 +513,25 @@ export class UnitComponent extends Component {
     this.feetOffset = ground !== null ? pos[1]! - ground : 0.9;
   }
 
+  /** Silueta según el bando; los caídos no tienen. */
+  private updateSilhouette(): void {
+    const wanted = this.silhouette && !this.down ? (SILHOUETTES[this.faction] ?? null) : null;
+    if (wanted === this.silhouetteShown) return;
+    this.silhouetteShown = wanted;
+    this.getSkeletalMesh()?.setSilhouette(wanted);
+  }
+
+  private getSkeletalMesh(): SkeletalMeshComponent | null {
+    const find = (e: Entity): SkeletalMeshComponent | null =>
+      (e.getComponent('skeletal_mesh') as SkeletalMeshComponent | null) ??
+      e
+        .getChildren()
+        .map(find)
+        .find((m) => m !== null) ??
+      null;
+    return find(this.getOwner());
+  }
+
   public getAnimator(): AnimatorComponent | null {
     const find = (e: Entity): AnimatorComponent | null =>
       (e.getComponent('animator') as AnimatorComponent | null) ??
@@ -557,6 +584,12 @@ export function prdConstant(p: number): number {
   prdConstants.set(p, c);
   return c;
 }
+
+/** Materiales de silueta por bando (los neutrales, como los objetos, no tienen). */
+const SILHOUETTES: Partial<Record<UnitFaction, string>> = {
+  party: 'tactical_silhouette_ally.mat',
+  enemy: 'tactical_silhouette_enemy.mat',
+};
 
 /** Muestra u oculta todos los RenderComponent de una entidad y sus hijos. */
 function setRenderVisible(entity: Entity, visible: boolean): void {
