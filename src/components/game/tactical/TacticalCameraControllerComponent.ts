@@ -102,6 +102,8 @@ export class TacticalCameraControllerComponent extends Component {
   private activeUnit: Entity | null = null;
   private active = true;
   private initialized = false;
+  /** El jugador ha movido la cámara este frame (corta el plano de acción). */
+  private userInput = false;
 
   private cameraEntity: Entity | null = null;
 
@@ -158,6 +160,7 @@ export class TacticalCameraControllerComponent extends Component {
     }
     if (!this.initialized) this.initialize();
 
+    this.userInput = false;
     if (this.active) this.handleInput(dt);
 
     // Seguimiento: el pivot objetivo va pegado a la unidad mientras esté activo.
@@ -255,6 +258,11 @@ export class TacticalCameraControllerComponent extends Component {
     return this.pitchForDistance(this.distance);
   }
 
+  /** ¿El jugador ha movido la cámara (pan, rotar, zoom, Home/F) este frame? */
+  public hadUserInput(): boolean {
+    return this.userInput;
+  }
+
   // ── Interno ────────────────────────────────────────────────────────────────
 
   private initialize(): void {
@@ -306,6 +314,7 @@ export class TacticalCameraControllerComponent extends Component {
     }
 
     if (moveF !== 0 || moveR !== 0) {
+      this.userInput = true;
       const len = Math.hypot(moveF, moveR);
       const speed = this.panSpeed * this.distance * dt;
       vec3.scaleAndAdd(this.targetPivot, this.targetPivot, this.tmpForward, (moveF / len) * speed);
@@ -316,6 +325,7 @@ export class TacticalCameraControllerComponent extends Component {
     // ── Botón central: pan agarrando el suelo, o rotar con modificador ─────
     if (middle) {
       const delta = input.getMouseDelta();
+      if (delta.x !== 0 || delta.y !== 0) this.userInput = true;
       if (shift || alt) {
         this.targetYaw -= delta.x * this.dragRotateSensitivity;
       } else if (delta.x !== 0 || delta.y !== 0) {
@@ -345,12 +355,14 @@ export class TacticalCameraControllerComponent extends Component {
     }
 
     // ── Rotación con Q/E ───────────────────────────────────────────────────
+    if (input.isKeyPressed(KeyCode.Q) || input.isKeyPressed(KeyCode.E)) this.userInput = true;
     if (input.isKeyPressed(KeyCode.Q)) this.targetYaw += this.rotateSpeed * dt;
     if (input.isKeyPressed(KeyCode.E)) this.targetYaw -= this.rotateSpeed * dt;
 
     // ── Zoom ───────────────────────────────────────────────────────────────
     const wheel = input.getMouseWheelDelta();
     if (wheel !== 0) {
+      this.userInput = true;
       this.targetDistance = clamp(
         this.targetDistance * Math.exp(wheel * this.zoomSensitivity),
         this.minDistance,
@@ -359,6 +371,9 @@ export class TacticalCameraControllerComponent extends Component {
     }
 
     // ── Seguimiento / unidad activa ────────────────────────────────────────
+    if (input.isKeyJustPressed(KeyCode.HOME) || input.isKeyJustPressed(KeyCode.F)) {
+      this.userInput = true;
+    }
     if (input.isKeyJustPressed(KeyCode.HOME) && this.activeUnit)
       this.focusOn(this.activeUnit, true);
     if (input.isKeyJustPressed(KeyCode.F)) this.setFollowEnabled(!this.isFollowing());

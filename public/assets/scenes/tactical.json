@@ -17,6 +17,9 @@
     }
   },
   {
+    "prefab": "tactical/action_camera.prefab"
+  },
+  {
     "prefab": "lighting/directional_light.prefab"
   },
   {
@@ -518,7 +521,19 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero1",
-      "unit": { "skills": ["shove", "second_wind", "fear"] },
+      "unit": {
+        "skills": ["shove", "second_wind", "fear"],
+        "attacks": [
+          {
+            "id": "melee",
+            "name": "Espada",
+            "kind": "melee",
+            "range": 1.5,
+            "damage": 10,
+            "clip": "Sword_Attack_Standing"
+          }
+        ]
+      },
       "transform": {
         "position": [-4, 0, -6]
       }
@@ -528,7 +543,19 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero2",
-      "unit": { "skills": ["fireball", "thunderwave"] },
+      "unit": {
+        "skills": ["fireball", "thunderwave"],
+        "attacks": [
+          {
+            "id": "ranged",
+            "name": "Disparo",
+            "kind": "ranged",
+            "range": 18,
+            "damage": 6,
+            "clip": "Spell_Simple_Shoot"
+          }
+        ]
+      },
       "transform": {
         "position": [-2.5, 0, -7.2]
       }
@@ -538,7 +565,19 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero3",
-      "unit": { "skills": ["heal", "dash"] },
+      "unit": {
+        "skills": ["heal", "dash"],
+        "attacks": [
+          {
+            "id": "ranged",
+            "name": "Disparo",
+            "kind": "ranged",
+            "range": 18,
+            "damage": 6,
+            "clip": "Spell_Simple_Shoot"
+          }
+        ]
+      },
       "transform": {
         "position": [-5.5, 0, -7.6]
       }
@@ -548,7 +587,19 @@
     "prefab": "tactical/hero.prefab",
     "components": {
       "name": "Hero4",
-      "unit": { "skills": ["dash", "shove"] },
+      "unit": {
+        "skills": ["dash", "shove"],
+        "attacks": [
+          {
+            "id": "melee",
+            "name": "Espada",
+            "kind": "melee",
+            "range": 1.5,
+            "damage": 10,
+            "clip": "Sword_Attack_Standing"
+          }
+        ]
+      },
       "transform": {
         "position": [-3.5, 0, -8.8]
       }

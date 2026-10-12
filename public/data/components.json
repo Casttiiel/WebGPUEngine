@@ -64,6 +64,7 @@
     "party",
     "tactical_pointer",
     "tactical_camera_controller",
+    "action_camera",
     "scene_navmesh",
     "head_bob",
     "head_tilt",

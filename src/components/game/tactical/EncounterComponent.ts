@@ -8,6 +8,7 @@ import { ModuleGameController } from '../../../modules/game/ModuleGameController
 import { UnitComponent, type UnitAttack, type UnitStatusId } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
+import type { ActionCameraComponent } from './ActionCameraComponent';
 import { UnitObstacles } from './UnitObstacles';
 import type { TacticalAIComponent } from './TacticalAIComponent';
 import {
@@ -198,6 +199,9 @@ const DASH_SPEED = 16;
 const SHOVE_SPEED = 8;
 /** Altura (sobre los pies) a la que se comprueba que el camino de una embestida está libre. */
 const DASH_CLEARANCE = 1;
+/** Plano de acción: segundos que se mantiene tras el impacto, y tras una muerte. */
+const SHOT_AFTER_HIT = 0.7;
+const SHOT_AFTER_KILL = 1.3;
 
 /**
  * EncounterComponent — máquina de estados del juego táctico y combate por turnos.
@@ -773,8 +777,18 @@ export class EncounterComponent extends Component {
       unit.faceTowards(plan.origin);
     }
     unit.playAction(skill.clip, SKILL_TIME);
+    this.frameSkill(unit, plan);
     this.pendingSkills.push({ timer: SKILL_DELAY, caster: unit, plan });
     return { ...plan, ok: true };
+  }
+
+  /** Plano de acción de una habilidad: el lanzador, los afectados y el centro del área. */
+  private frameSkill(caster: UnitComponent, plan: SkillPlan): void {
+    const targets: (Entity | vec3)[] = plan.affected
+      .filter((u) => u !== caster)
+      .map((u) => u.getOwner());
+    if (plan.skill?.target === 'point' && plan.origin) targets.push(plan.origin);
+    this.getActionCamera()?.frameAction(caster.getOwner(), targets, SKILL_DELAY + SHOT_AFTER_HIT);
   }
 
   /** Efectos de una habilidad al llegar el momento del impacto. */
@@ -1036,6 +1050,11 @@ export class EncounterComponent extends Component {
     }
     unit.faceTowards(target.getPosition(this.tmpA));
     unit.playAction(attack.clip, ATTACK_TIME);
+    this.getActionCamera()?.frameAction(
+      unit.getOwner(),
+      [target.getOwner()],
+      HIT_DELAY + SHOT_AFTER_HIT,
+    );
     const roll = rollAttack(unit, target, attack);
     this.pendingHits.push({ timer: HIT_DELAY, attacker: unit, target, ...roll });
     this.emit('attack', { unit: target.getOwner(), source: unit.getOwner() });
@@ -1094,8 +1113,11 @@ export class EncounterComponent extends Component {
       cause,
     });
 
-    if (health && health.getHp() <= 0) this.onUnitDown(target, attacker);
-    else if (hit) target.playAction(HIT_CLIP);
+    if (health && health.getHp() <= 0) {
+      // Ver caer al objetivo antes de volver a la cámara de juego.
+      if (attacker) this.getActionCamera()?.holdShot(SHOT_AFTER_KILL);
+      this.onUnitDown(target, attacker);
+    } else if (hit) target.playAction(HIT_CLIP);
 
     // La party ataca primero: empieza el combate (si quedan enemigos cerca).
     if (
@@ -1368,6 +1390,11 @@ export class EncounterComponent extends Component {
       .getObjectManagerByName('tactical_camera_controller')
       ?.getList();
     return (list?.[0] as TacticalCameraControllerComponent | undefined) ?? null;
+  }
+
+  private getActionCamera(): ActionCameraComponent | null {
+    const list = Engine.getEntities().getObjectManagerByName('action_camera')?.getList();
+    return (list?.[0] as ActionCameraComponent | undefined) ?? null;
   }
 
   /** get_combat_state / game_command del MCP. */
