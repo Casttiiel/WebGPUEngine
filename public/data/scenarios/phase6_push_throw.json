@@ -1,0 +1,175 @@
+{
+  "description": "Roadmap 8 (estilo Marvel's Midnight Suns): empujar un objeto en la dirección elegida (en línea recta; se para contra lo primero que pilla) y lanzarlo en arco a una unidad o a un punto. Vista previa de la trayectoria, de dónde acaba y de a quién golpea (resaltado y barra de vida). El golpe hace daño de impacto a la unidad y al objeto (un barril lanzado explota al caer).",
+  "scenes": ["tactical.json", "tactical_props.json", "tactical_dummies.json"],
+  "seed": 1,
+  "entities": [
+    {
+      "prefab": "tactical/crate_pushable.prefab",
+      "components": { "name": "TestCrate", "transform": { "position": [-4, 0, -3.4] } }
+    },
+    {
+      "prefab": "tactical/barrel_explosive.prefab",
+      "components": { "name": "TestBarrel", "transform": { "position": [-6, 0, -5] } }
+    },
+    {
+      "prefab": "tactical/enemy.prefab",
+      "components": {
+        "name": "Target",
+        "transform": { "position": [-4, 0, 0] },
+        "unit": { "sightRange": 0 }
+      }
+    }
+  ],
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__log = []; Engine.getEntities().getObjectManagerByName('encounter').getList()[0].onEvent((e, d) => window.__log.push([e, d.unit ? d.unit.getName() : null, d.cause ?? null])); window.__u = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__feet = (n) => Array.from(__u(n).getFeetPosition(new Float32Array(3))); window.__ui = Engine.getModules().getModule('ui'); window.__w = (a) => __ui.getWidgetByAlias(a); window.__bars = () => [1, 2, 3, 4, 5, 6].filter(i => __w('dmg_bar_' + i).isVisible()).map(i => __w('dmg_bar_' + i + '_text').getText()); window.__pointer = Engine.getEntities().getObjectManagerByName('tactical_pointer').getList()[0]"
+    },
+
+    { "log": "Reglas: empujar hacia una unidad la golpea; sin dirección, lo aleja de quien empuja" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_push', { unit: 'Hero1', target: 'TestCrate', direction: [0, 1] }).then(r => [r.canPush, r.hit, r.minDamage, r.maxDamage, r.pushLength < 3])",
+        "value": [true, "Target", 3, 8, true],
+        "message": "la caja se para contra Target y le hace 1d6+2"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_push', { unit: 'Hero1', target: 'TestCrate', direction: [1, 0] }).then(r => [r.canPush, r.hit, r.approach > 0])",
+        "value": [true, null, true],
+        "message": "de lado: se pone al otro lado (se acerca) y no golpea a nadie"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_throw', { unit: 'Hero1', object: 'TestBarrel', target: 'Target' }).then(r => [r.canThrow, r.hit, r.apex > 1])",
+        "value": [true, "Target", true],
+        "message": "lanzar en arco a una unidad"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_throw', { unit: 'Hero1', object: 'TestBarrel', to: [-6, 0, 12] }).then(r => r.reason)",
+        "value": "too far to throw"
+      }
+    },
+
+    { "log": "UI: Lanzar armado → click en el barril → apuntar a Target (arco, resaltado, barra de vida)" },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([-5, 0, -2.5], false)"
+    },
+    { "wait_frames": 60 },
+    { "input": { "type": "click", "widget": "hotbar_4" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": "throw" } },
+    { "input": { "type": "move", "entity": "Target" } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "invalid" } },
+    { "input": { "type": "move", "entity": "TestBarrel" } },
+    { "wait_frames": 3 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "interact" } },
+    { "input": { "type": "click", "entity": "TestBarrel" } },
+    { "wait_frames": 2 },
+    { "assert": { "expr": "__pointer.getHeldObject()?.getName()", "value": "TestBarrel" } },
+    { "input": { "type": "move", "entity": "Target" } },
+    { "wait_frames": 3 },
+    {
+      "assert": {
+        "expr": "[__pointer.getThrowPlan()?.canThrow, __pointer.getThrowPlan()?.hit?.getOwner().getName(), __pointer.getCursor()]",
+        "value": [true, "Target", "attack"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__bars().sort()",
+        "value": ["3~8 daño", "3~8 daño · muere"],
+        "message": "Target y el barril (1 PV: explota)"
+      }
+    },
+    { "screenshot": "01-throw-preview" },
+
+    { "log": "Esc suelta el objeto; otro Esc desarma" },
+    { "input": { "type": "key", "key": "Escape" } },
+    { "wait_frames": 2 },
+    {
+      "assert": {
+        "expr": "[__pointer.getHeldObject(), __pointer.getArmedAttack()]",
+        "value": [null, "throw"]
+      }
+    },
+    { "input": { "type": "key", "key": "Escape" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": null } },
+
+    { "log": "UI: Empujar armado → click en la caja → apuntar hacia Target (línea recta)" },
+    { "input": { "type": "click", "widget": "hotbar_3" } },
+    { "wait_frames": 2 },
+    { "input": { "type": "click", "entity": "TestCrate" } },
+    { "wait_frames": 2 },
+    { "input": { "type": "move", "entity": "Target" } },
+    { "wait_frames": 3 },
+    {
+      "assert": {
+        "expr": "[__pointer.getPushPlan()?.canPush, __pointer.getPushPlan()?.hit?.getOwner().getName(), __bars().sort()]",
+        "value": [true, "Target", ["3~8 daño", "3~8 daño"]]
+      }
+    },
+    { "screenshot": "02-push-preview" },
+
+    { "log": "Empujar: la caja choca con Target → daño de impacto a los dos y empieza el combate" },
+    { "eval": "window.__hp = [__u('Target').getHp(), __u('TestCrate').getHp()]" },
+    { "input": { "type": "click", "entity": "Target" } },
+    {
+      "wait_until": {
+        "expr": "__log.some(l => l[0] === 'damage' && l[1] === 'Target' && l[2] === 'impact')",
+        "value": true
+      },
+      "timeout_frames": 400
+    },
+    {
+      "assert": {
+        "expr": "(() => { const t = __hp[0] - __u('Target').getHp(); const c = __hp[1] - __u('TestCrate').getHp(); return [t >= 3 && t <= 8, t === c]; })()",
+        "value": [true, true],
+        "message": "la misma tirada de 1d6+2 para la unidad y el objeto"
+      }
+    },
+    { "assert": { "expr": "Math.hypot(__feet('TestCrate')[0] + 4, __feet('TestCrate')[2]) < 1.5", "value": true } },
+    { "wait_frames": 5 },
+    { "assert": { "combat": true, "path": "state", "value": "combat" } },
+    { "screenshot": "03-push-hit" },
+
+    { "log": "En combate (turno de Hero1): lanzar el barril a Target gasta la acción. La caja que quedó delante está en medio: el barril la golpea, explota al caer y la explosión alcanza a Target" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero1' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 2000,
+      "check_every": 5
+    },
+    { "eval": "window.__log = []; window.__hp = __u('Target').getHp()" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('throw', { unit: 'Hero1', object: 'TestBarrel', target: 'Target' }).then(r => [r.ok, r.hit])",
+        "value": [true, "TestCrate"]
+      }
+    },
+    {
+      "wait_until": { "expr": "!__engine.getCombatState().busy && !__u('Hero1').isMoving()", "value": true },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__engine.getCombatState().resources.action, __log.some(l => l[0] === 'damage' && l[1] === 'TestCrate' && l[2] === 'impact'), __log.some(l => l[0] === 'explosion' && l[1] === 'TestBarrel'), __u('TestBarrel').isAlive(), __log.some(l => l[0] === 'damage' && l[1] === 'Target' && l[2] === 'explosion')]",
+        "value": [0, true, true, false, true]
+      }
+    },
+    { "screenshot": "04-throw-explosion" },
+    { "assert": { "no_errors": true } }
+  ]
+}

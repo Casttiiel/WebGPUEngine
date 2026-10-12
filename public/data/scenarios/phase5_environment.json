@@ -19,11 +19,11 @@
       }
     },
 
-    { "log": "Empujar en exploración: hay que estar al lado; la caja se desplaza" },
+    { "log": "Empujar en exploración: desde lejos se acercaría; al lado, la caja se desplaza" },
     {
       "assert": {
-        "expr": "__engine.gameCommand('plan_push', { unit: 'Hero1', target: 'Crate' }).then(r => r.reason)",
-        "value": "too far to push"
+        "expr": "__engine.gameCommand('plan_push', { unit: 'Hero1', target: 'Crate' }).then(r => [r.canPush, r.inReach, r.approach > 0])",
+        "value": [true, false, true]
       }
     },
     { "command": "move", "args": { "unit": "Hero1", "to": [-2.6, 0, -5.2] } },
@@ -61,7 +61,7 @@
         "message": "saltar el muro es mucho más corto que rodearlo"
       }
     },
-    { "input": { "type": "click", "widget": "hotbar_3" } },
+    { "input": { "type": "click", "widget": "hotbar_2" } },
     { "wait_frames": 2 },
     { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": "jump" } },
     { "input": { "type": "move", "world": [-5, 0, 3.6] } },
@@ -101,25 +101,35 @@
     },
     {
       "assert": {
-        "expr": "__engine.gameCommand('plan_jump', { unit: 'Hero1', to: [-5, 0, 9] }).then(r => r.reason)",
-        "value": "too far to jump"
+        "expr": "__engine.gameCommand('plan_jump', { unit: 'Hero1', to: [-5, 0, 9] }).then(r => [r.canJump, r.approach > 0])",
+        "value": [true, true],
+        "message": "lejos: anda hasta un punto de despegue y salta"
       }
     },
 
-    { "log": "Barril explosivo: dispararle desde lejos → explosión, el aceite prende, empieza el combate" },
+    { "log": "Barril explosivo: Hero2 (a distancia) le dispara desde lejos → explosión, el aceite prende, empieza el combate" },
+    { "command": "select", "args": { "unit": "Hero2" } },
     {
       "assert": {
-        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Barrel1', attack: 'ranged' }).then(r => r.canAttack)",
-        "value": true
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Barrel1', attack: 'ranged' }).then(r => [r.canAttack, r.approach])",
+        "value": [true, null]
       }
     },
-    { "input": { "type": "click", "widget": "hotbar_2" } },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn(Engine.getEntities().getEntityByName('Barrel1'), false)"
+    },
+    { "wait_frames": 60 },
+    { "input": { "type": "click", "widget": "hotbar_1" } },
     { "wait_frames": 2 },
     { "input": { "type": "move", "entity": "Barrel1" } },
     { "wait_frames": 3 },
     { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "attack" } },
     { "input": { "type": "click", "entity": "Barrel1" } },
-    { "wait_frames": 45 },
+    {
+      "wait_until": { "entity": "Barrel1", "path": "unit.isAlive", "value": false },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
     { "assert": { "entity": "Barrel1", "path": "unit.isAlive", "value": false } },
     {
       "assert": {
@@ -152,6 +162,10 @@
       "check_every": 5
     },
     { "eval": "window.__pusher = __engine.getCombatState().activeUnit" },
+    {
+      "wait_until": { "expr": "__engine.readPath(window.__pusher, 'unit.isBusy')", "value": false },
+      "timeout_frames": 200
+    },
     {
       "eval": "__engine.gameCommand('move', { unit: window.__pusher, to: [-0.3, 0, -3.2] })"
     },

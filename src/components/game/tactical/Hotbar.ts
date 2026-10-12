@@ -1,14 +1,14 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
 import { SkillCatalog, type SkillDef } from './Skills';
 import { COST_NAME, attackSummary, fmt, skillMechanics, turns } from './ActionText';
-import { MAX_JUMP } from './EnvironmentRules';
+import { MAX_JUMP, THROW_RANGE } from './EnvironmentRules';
 
-export type HotbarKind = 'melee' | 'ranged' | 'jump' | 'push' | 'skill';
+export type HotbarKind = 'melee' | 'ranged' | 'jump' | 'push' | 'throw' | 'skill';
 export type HotbarCost = 'action' | 'bonusAction' | 'movement';
 
 /** Una entrada de la hotbar: un ataque, una acción de entorno o una habilidad. */
 export interface HotbarEntry {
-  /** Id que se arma en el puntero: el del ataque, 'jump', 'push' o el de la habilidad. */
+  /** Id que se arma en el puntero: el del ataque, 'jump', 'push', 'throw' o el de la habilidad. */
   id: string;
   name: string;
   kind: HotbarKind;
@@ -17,9 +17,12 @@ export interface HotbarEntry {
   skill: SkillDef | null;
 }
 
-const ABILITIES: Record<'jump' | 'push', Omit<HotbarEntry, 'attack' | 'skill'>> = {
+export type AbilityId = 'jump' | 'push' | 'throw';
+
+const ABILITIES: Record<AbilityId, Omit<HotbarEntry, 'attack' | 'skill'>> = {
   jump: { id: 'jump', name: 'Saltar', kind: 'jump', cost: 'movement' },
   push: { id: 'push', name: 'Empujar', kind: 'push', cost: 'bonusAction' },
+  throw: { id: 'throw', name: 'Lanzar', kind: 'throw', cost: 'action' },
 };
 
 /** Ataques de la unidad (en su orden), sus acciones de entorno y sus habilidades. */
@@ -55,8 +58,8 @@ export function hotbarEntries(unit: UnitComponent): HotbarEntry[] {
   ];
 }
 
-export function isAbilityId(id: string | null): id is 'jump' | 'push' {
-  return id === 'jump' || id === 'push';
+export function isAbilityId(id: string | null): id is AbilityId {
+  return id === 'jump' || id === 'push' || id === 'throw';
 }
 
 /** La habilidad con ese id, si `unit` la tiene. */
@@ -98,9 +101,14 @@ export function hotbarTooltip(
   } else if (entry.kind === 'jump') {
     info(`Movimiento · hasta ${fmt(MAX_JUMP)} m, gasta los metros saltados`);
     lines.push({ text: 'Por encima de cajas y muros bajos.', style: 'description' });
-  } else {
-    info(`${COST_NAME.bonusAction} · aleja un objeto que tengas al lado`);
+  } else if (entry.kind === 'push') {
+    info(`${COST_NAME.bonusAction} · elige un objeto y hacia dónde: sale en línea recta`);
+    info('Daño de impacto a quien pille (el objeto también lo recibe)');
     lines.push({ text: 'Desliza una caja o un barril.', style: 'description' });
+  } else {
+    info(`${COST_NAME.action} · elige un objeto y dónde lanzarlo (hasta ${fmt(THROW_RANGE)} m)`);
+    info('Vuela en arco; daño de impacto a quien golpee y al objeto al caer');
+    lines.push({ text: 'Un barril lanzado explota al caer.', style: 'description' });
   }
   if (cooldown > 0) {
     lines.push({ text: `Disponible en ${turns(cooldown)}`, style: 'warning' });

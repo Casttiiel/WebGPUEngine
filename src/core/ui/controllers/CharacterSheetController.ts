@@ -20,7 +20,7 @@ import {
   turns,
 } from '../../../components/game/tactical/ActionText';
 import { SkillCatalog, type SkillDef } from '../../../components/game/tactical/Skills';
-import { MAX_JUMP } from '../../../components/game/tactical/EnvironmentRules';
+import { MAX_JUMP, THROW_RANGE } from '../../../components/game/tactical/EnvironmentRules';
 import type { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
 import type { ActionCameraComponent } from '../../../components/game/tactical/ActionCameraComponent';
 
@@ -276,7 +276,13 @@ export class CharacterSheetController extends WidgetController {
         add(`Saltar · hasta ${fmt(MAX_JUMP)} m, gasta movimiento`, 'title');
       }
       if (abilities.includes('push')) {
-        add('Empujar · aleja un objeto · Acción adicional', 'title');
+        add('Empujar · objeto en línea recta, daño de impacto · Acción adicional', 'title');
+      }
+      if (abilities.includes('throw')) {
+        add(
+          `Lanzar · objeto en arco hasta ${fmt(THROW_RANGE)} m, daño de impacto · Acción`,
+          'title',
+        );
       }
     }
 

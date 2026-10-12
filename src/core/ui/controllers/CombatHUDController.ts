@@ -56,6 +56,7 @@ const ICON: Record<HotbarKind, RGBA> = {
   ranged: [0.15, 0.4, 0.62, 1],
   jump: [0.2, 0.5, 0.3, 1],
   push: [0.6, 0.45, 0.12, 1],
+  throw: [0.62, 0.32, 0.1, 1],
   skill: [0.45, 0.22, 0.6, 1],
 };
 const ICON_DISABLED: RGBA = [0.2, 0.2, 0.2, 1];
@@ -64,7 +65,8 @@ const ARMED_HINT: Record<HotbarKind, string> = {
   melee: 'elige un enemigo',
   ranged: 'elige un enemigo o un barril',
   jump: 'elige dónde aterrizar',
-  push: 'elige un barril o una caja a tu lado',
+  push: 'elige un barril o una caja y hacia dónde',
+  throw: 'elige un barril o una caja y dónde lanzarlo',
   skill: 'elige un objetivo',
 };
 
@@ -264,6 +266,7 @@ export class CombatHUDController extends WidgetController {
         const amount = `-${Math.round(data.amount ?? 0)}`;
         if (!data.hit) this.spawnFloat(unit, 'Fallo', FLOAT_MISS);
         else if (data.cause === 'fire') this.spawnFloat(unit, `${amount} fuego`, FLOAT_FIRE);
+        else if (data.cause === 'impact') this.spawnFloat(unit, `${amount} golpe`, FLOAT_DAMAGE);
         else if (data.crit) this.spawnFloat(unit, `¡Crítico! ${amount}`, FLOAT_CRIT);
         else this.spawnFloat(unit, amount, FLOAT_DAMAGE);
         break;

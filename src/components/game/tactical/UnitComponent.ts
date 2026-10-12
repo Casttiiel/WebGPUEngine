@@ -81,7 +81,7 @@ export interface UnitStatus {
 }
 
 /** Acciones que no son ataques: saltar (gasta movimiento) y empujar un objeto (acción adicional). */
-export type UnitAbility = 'jump' | 'push';
+export type UnitAbility = 'jump' | 'push' | 'throw';
 
 export interface MoveOptions {
   /** Velocidad (m/s). Default: la de la unidad. */

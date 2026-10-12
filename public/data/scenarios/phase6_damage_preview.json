@@ -72,7 +72,7 @@
       "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([6.2, 0, 5], false)"
     },
     { "wait_frames": 60 },
-    { "input": { "type": "click", "widget": "hotbar_4" } },
+    { "input": { "type": "click", "widget": "hotbar_5" } },
     { "wait_frames": 3 },
     { "input": { "type": "move", "world": [6.2, 0, 5] } },
     { "wait_frames": 3 },

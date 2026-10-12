@@ -31,8 +31,16 @@ import {
 } from './CombatRules';
 import { PropComponent, type PropExplosion } from './PropComponent';
 import { Surfaces } from './Surfaces';
-import { MAX_JUMP, jumpArc, pushDistance } from './EnvironmentRules';
-import { rollDamage } from './Dice';
+import {
+  MAX_JUMP,
+  THROW_RANGE,
+  flightHit,
+  jumpArc,
+  pushDistance,
+  pushPath,
+  throwArc,
+} from './EnvironmentRules';
+import { damageRange, rollDamage, type DamageValue } from './Dice';
 import {
   SkillCatalog,
   coneDirection,
@@ -78,7 +86,7 @@ export interface EncounterEventData {
   status?: UnitStatusId;
 }
 
-export type DamageCause = 'attack' | 'skill' | 'fire' | 'explosion' | 'debug';
+export type DamageCause = 'attack' | 'skill' | 'fire' | 'explosion' | 'impact' | 'debug';
 
 /** Objetivo de una habilidad: una unidad o un punto (según su targeting). */
 export interface SkillTarget {
@@ -128,8 +136,43 @@ export interface PushPlan {
   /** Dónde acabará el objeto (pies) y cuánto se desplaza. */
   destination: vec3 | null;
   pushLength: number;
+  /** Hacia dónde sale (horizontal, normalizada): la elegida o, si no, alejándolo. */
+  direction: vec3 | null;
+  /** Contra quién choca (recibe el impacto; el objeto también). */
+  hit: UnitComponent | null;
+  /** Daño del impacto (sin crítico): 0 si no choca con nadie. */
+  minDamage: number;
+  maxDamage: number;
   canPush: boolean;
   reason?: string;
+}
+
+export interface ThrowPlan {
+  /** La unidad puede actuar ahora (su turno, le queda la acción). */
+  allowed: boolean;
+  /** Lejos del objeto o del destino: andar hasta aquí antes de lanzar. */
+  approach: MovePlan | null;
+  /** Trayectoria del objeto (sus pies), hasta donde cae. */
+  points: vec3[];
+  landing: vec3 | null;
+  /** A quién golpea (el objetivo o lo primero que pille en medio). */
+  hit: UnitComponent | null;
+  /** Daño del impacto (sin crítico); el objeto recibe lo mismo al caer. */
+  minDamage: number;
+  maxDamage: number;
+  canThrow: boolean;
+  reason?: string;
+}
+
+/** Un objeto empujado o lanzado que golpea al llegar (a quien pille y a sí mismo). */
+interface PendingImpact {
+  timer: number;
+  source: UnitComponent;
+  prop: UnitComponent;
+  hit: UnitComponent | null;
+  damage: DamageValue;
+  /** El objeto se golpea aunque no pille a nadie (lanzado: cae al suelo). */
+  always: boolean;
 }
 
 interface Combatant {
@@ -215,6 +258,15 @@ const PUSH_REACH = 1.5;
 const PUSH_SPEED = 5;
 const PUSH_TIME = 0.6;
 const PUSH_CLIP = 'Push_Enter';
+/** Empujar en una dirección elegida: desvío máximo entre esa dirección y "alejarlo" (cos 60°). */
+const PUSH_ALIGN = 0.5;
+const THROW_SPEED = 9;
+const THROW_TIME = 0.8;
+const THROW_CLIP = 'Spell_Simple_Shoot';
+/** Al lanzar contra una unidad cae a su lado, a esta distancia de su borde (m). */
+const THROW_GAP = 0.1;
+/** Lados de la unidad apuntada donde probar a que caiga (rad, desde el lado del que viene). */
+const THROW_SIDES = [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.2, -2.2, Math.PI];
 /** Duración de lanzar una habilidad (la unidad está ocupada) y momento del efecto. */
 const SKILL_TIME = 0.9;
 const SKILL_DELAY = 0.45;
@@ -245,7 +297,8 @@ const SHOT_AFTER_KILL = 1.3;
  * la party caída → derrota. R reinicia el encuentro (derrota o mapa despejado).
  *
  * Entorno: saltar (gasta metros de movimiento) por encima de cajas y muros bajos; empujar
- * objetos (gasta la acción adicional); barriles que explotan al destruirse (daño en área y
+ * objetos en línea recta (acción adicional) y lanzarlos en arco (acción), con daño de impacto
+ * a quien pillen; barriles que explotan al destruirse (daño en área y
  * fuego); fuego que quema al entrar o al empezar el turno dentro; aceite que prende.
  *
  * Es quien aplica las reglas (planMove / planAttack / planJump / planPush y sus request*) para que
@@ -277,6 +330,8 @@ export class EncounterComponent extends Component {
   private pendingHits: PendingHit[] = [];
   /** Habilidades lanzadas cuyo efecto aún no ha llegado (sincronizado con la animación). */
   private pendingSkills: { timer: number; caster: UnitComponent; plan: SkillPlan }[] = [];
+  /** Objetos empujados o lanzados que aún no han llegado (el impacto es al llegar). */
+  private pendingImpacts: PendingImpact[] = [];
   /**
    * Ataques y habilidades ya pagados que esperan a que la cámara de acción esté colocada
    * para empezar la animación (si no, el golpe llega mientras la cámara aún se mueve).
@@ -406,7 +461,8 @@ export class EncounterComponent extends Component {
       this.pendingAction !== null ||
       this.windups.length > 0 ||
       this.pendingHits.length > 0 ||
-      this.pendingSkills.length > 0
+      this.pendingSkills.length > 0 ||
+      this.pendingImpacts.length > 0
     );
   }
 
@@ -702,8 +758,13 @@ export class EncounterComponent extends Component {
     return { ...plan, ok: true };
   }
 
-  /** ¿Puede `entity` empujar el objeto `target`? Cuesta la acción adicional. */
-  public planPush(entity: Entity, target: Entity): PushPlan {
+  /**
+   * ¿Puede `entity` empujar el objeto `target`? Cuesta la acción adicional. Sin `direction`
+   * lo aleja de sí; con ella (horizontal) se pone al otro lado para empujarlo hacia allí. Sale
+   * en línea recta y se para contra lo primero que pille: si es una unidad, le hace daño de
+   * impacto (y el objeto recibe lo mismo: un barril explota).
+   */
+  public planPush(entity: Entity, target: Entity, direction: vec3 | null = null): PushPlan {
     const unit = entity.getComponent('unit') as UnitComponent | null;
     const prop = target.getComponent('unit') as UnitComponent | null;
     const result: PushPlan = {
@@ -712,6 +773,10 @@ export class EncounterComponent extends Component {
       inReach: false,
       destination: null,
       pushLength: 0,
+      direction: null,
+      hit: null,
+      minDamage: 0,
+      maxDamage: 0,
       approach: null,
       canPush: false,
     };
@@ -725,25 +790,32 @@ export class EncounterComponent extends Component {
     const permission = this.canAct(unit, 'bonusAction');
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
+    const wanted = direction ? horizontalDirection(direction) : null;
 
-    // Hacia dónde iría empujándolo desde `feet` (se empuja en línea recta, alejándolo).
-    const pushFrom = (feet: vec3): { length: number; destination: vec3 } | null => {
-      const to = prop.getFeetPosition(vec3.create());
-      const dir = vec3.fromValues(to[0]! - feet[0]!, 0, to[2]! - feet[2]!);
-      if (vec3.length(dir) < 1e-4) return null;
-      vec3.normalize(dir, dir);
-      const length = pushDistance(prop, dir, data.getPushDistance());
-      if (length < 0.3) return null;
-      return { length, destination: vec3.scaleAndAdd(vec3.create(), to, dir, length) };
+    // Cómo sale empujándolo desde `feet`: alejándolo, o hacia `wanted` si se empuja desde
+    // el lado contrario.
+    const center = prop.getFeetPosition(vec3.create());
+    const awayFrom = (feet: vec3) =>
+      horizontalDirection(vec3.fromValues(center[0]! - feet[0]!, 0, center[2]! - feet[2]!));
+    const pushFrom = (feet: vec3) => {
+      const away = awayFrom(feet);
+      if (!away || (wanted && vec3.dot(away, wanted) < PUSH_ALIGN)) return null;
+      const dir = wanted ?? away;
+      const path = pushPath(prop, dir, data.getPushDistance(), unit);
+      if (path.length < 0.3 && !path.hit) return null;
+      const destination = vec3.scaleAndAdd(vec3.create(), center, dir, path.length);
+      return { ...path, dir, destination };
     };
     const here = unit.getFeetPosition(vec3.create());
     let push = result.inReach ? pushFrom(here) : null;
     if (!push) {
       result.approach = this.planApproachTo(
         entity,
-        prop.getFeetPosition(vec3.create()),
+        center,
         [unit.getCapsuleRadius() + prop.getCapsuleRadius() + PUSH_REACH * APPROACH_FRACTION],
         (feet) => unitDistanceFrom(unit, feet, prop) <= PUSH_REACH + EPS && !!pushFrom(feet),
+        // Con dirección: mejor justo detrás que de refilón.
+        (feet) => (wanted ? (1 - vec3.dot(awayFrom(feet) ?? wanted, wanted)) * 2 : 0),
       );
       if (!result.approach) return fail(result.inReach ? 'push blocked' : 'too far to push');
       const points = result.approach.walk.points;
@@ -752,35 +824,225 @@ export class EncounterComponent extends Component {
     }
     result.pushLength = push.length;
     result.destination = push.destination;
+    result.direction = push.dir;
+    result.hit = push.hit;
+    if (push.hit) {
+      const range = damageRange(data.getImpactDamage());
+      result.minDamage = range.min;
+      result.maxDamage = range.max;
+    }
     result.canPush = true;
     return result;
   }
 
-  public requestPush(entity: Entity, target: Entity, approach = true): PushPlan & { ok: boolean } {
+  public requestPush(
+    entity: Entity,
+    target: Entity,
+    direction: vec3 | null = null,
+    approach = true,
+  ): PushPlan & { ok: boolean } {
     UnitObstacles.sync(this.getActingUnit());
-    const plan = this.planPush(entity, target);
+    const plan = this.planPush(entity, target, direction);
     if (!plan.canPush || !plan.destination) return { ...plan, ok: false };
     if (plan.approach) {
+      const dir = direction ? vec3.clone(direction) : null;
       const moved =
         approach &&
-        this.approachThen(entity, plan.approach, () => this.requestPush(entity, target, false));
+        this.approachThen(entity, plan.approach, () =>
+          this.requestPush(entity, target, dir, false),
+        );
       return moved ? { ...plan, ok: true } : { ...plan, ok: false, reason: 'cannot approach' };
     }
     if (this.state === 'combat') {
       this.resources.bonusAction = Math.max(0, this.resources.bonusAction - 1);
     }
+    this.pendingAction = null;
     const unit = entity.getComponent('unit') as UnitComponent;
     const prop = target.getComponent('unit') as UnitComponent;
     unit.stop(); // exploración: puede venir andando
     unit.faceTowards(prop.getPosition(this.tmpA));
     unit.playAction(PUSH_CLIP, PUSH_TIME);
-    void prop.moveAlong([prop.getFeetPosition(), plan.destination], {
-      speed: PUSH_SPEED,
-      walk: false,
-      face: false,
-    });
+    if (plan.pushLength > 0.05) {
+      void prop.moveAlong([prop.getFeetPosition(), plan.destination], {
+        speed: PUSH_SPEED,
+        walk: false,
+        face: false,
+      });
+    }
+    if (plan.hit) {
+      this.pendingImpacts.push({
+        timer: 0.15,
+        source: unit,
+        prop,
+        hit: plan.hit,
+        damage: PropComponent.of(target)!.getImpactDamage(),
+        always: false,
+      });
+    }
     this.emit('push', { unit: target, source: entity });
     return { ...plan, ok: true };
+  }
+
+  /**
+   * ¿Puede `entity` lanzar el objeto `target` a `aim` (una unidad o un punto)? Cuesta la
+   * acción. Hay que estar al lado del objeto y el destino a THROW_RANGE como mucho de quien lo
+   * lanza (si no, se acerca primero). Vuela en arco por encima de lo que haya en medio y golpea
+   * a la unidad apuntada (cae a su lado) o a la primera que pille en el camino; al caer, el
+   * objeto también recibe el impacto.
+   */
+  public planThrow(entity: Entity, target: Entity, aim: SkillTarget = {}): ThrowPlan {
+    const unit = entity.getComponent('unit') as UnitComponent | null;
+    const prop = target.getComponent('unit') as UnitComponent | null;
+    const result: ThrowPlan = {
+      allowed: false,
+      approach: null,
+      points: [],
+      landing: null,
+      hit: null,
+      minDamage: 0,
+      maxDamage: 0,
+      canThrow: false,
+    };
+    const fail = (reason: string): ThrowPlan => ({ ...result, reason });
+    if (!unit || !prop) return fail('not a unit');
+    if (!unit.hasAbility('throw')) return fail('cannot throw');
+    const data = PropComponent.of(target);
+    if (!data?.isThrowable() || !prop.isAlive()) return fail('not throwable');
+    const aimUnit = (aim.unit?.getComponent('unit') as UnitComponent | null) ?? null;
+    if (aimUnit === prop || aimUnit === unit) return fail('no target');
+    if (!aimUnit && !aim.point) return fail('no target');
+    const permission = this.canAct(unit, 'action');
+    result.allowed = permission === null;
+    if (permission !== null) return fail(permission);
+
+    // Dónde cae: en el punto, o al lado de la unidad apuntada: del lado del que viene o, si ahí
+    // no cabe (otra unidad, un objeto, un muro), del más cercano a ese que sí.
+    const from = prop.getFeetPosition(vec3.create());
+    let arc: ReturnType<typeof throwArc>;
+    if (aimUnit) {
+      const t = aimUnit.getFeetPosition(vec3.create());
+      const back =
+        horizontalDirection(vec3.fromValues(from[0]! - t[0]!, 0, from[2]! - t[2]!)) ??
+        vec3.fromValues(1, 0, 0);
+      const gap = aimUnit.getCapsuleRadius() + prop.getCapsuleRadius() + THROW_GAP;
+      const base = Math.atan2(back[2]!, back[0]!);
+      arc = { reason: 'cannot land there' };
+      for (const offset of THROW_SIDES) {
+        const angle = base + offset;
+        const to = vec3.fromValues(
+          t[0]! + Math.cos(angle) * gap,
+          t[1]!,
+          t[2]! + Math.sin(angle) * gap,
+        );
+        to[1] = groundHeightAt(to[0]!, to[2]!, t[1]! + 0.5) ?? t[1]!;
+        const candidate = throwArc(from, to);
+        if (!('reason' in candidate)) {
+          arc = candidate;
+          break;
+        }
+        // El motivo del lado preferido es el que se cuenta si no cabe en ninguno.
+        if (offset === 0) arc = candidate;
+      }
+    } else {
+      arc = throwArc(from, aim.point!);
+    }
+    if ('reason' in arc) return fail(arc.reason);
+    const to = arc.points[arc.points.length - 1]!;
+    const flight = flightHit(prop, arc.points, unit);
+    result.points = flight.points;
+    result.landing = flight.points[flight.points.length - 1]!;
+    result.hit = flight.hit ?? aimUnit;
+    const range = damageRange(data.getImpactDamage());
+    result.minDamage = range.min;
+    result.maxDamage = range.max;
+
+    // Al lado del objeto y con el destino a tiro; si no, acercarse.
+    const fits = (feet: vec3) =>
+      unitDistanceFrom(unit, feet, prop) <= PUSH_REACH + EPS &&
+      Math.hypot(to[0]! - feet[0]!, to[2]! - feet[2]!) <= THROW_RANGE + EPS;
+    if (!fits(unit.getFeetPosition(vec3.create()))) {
+      result.approach = this.planApproachTo(
+        entity,
+        from,
+        [unit.getCapsuleRadius() + prop.getCapsuleRadius() + PUSH_REACH * APPROACH_FRACTION],
+        fits,
+      );
+      if (!result.approach) {
+        const near = unitDistance(unit, prop) <= PUSH_REACH + EPS;
+        return fail(near ? 'too far to throw' : 'too far to pick up');
+      }
+    }
+    result.canThrow = true;
+    return result;
+  }
+
+  public requestThrow(
+    entity: Entity,
+    target: Entity,
+    aim: SkillTarget = {},
+    approach = true,
+  ): ThrowPlan & { ok: boolean } {
+    UnitObstacles.sync(this.getActingUnit());
+    const plan = this.planThrow(entity, target, aim);
+    if (!plan.canThrow || !plan.landing) return { ...plan, ok: false };
+    if (plan.approach) {
+      const saved: SkillTarget = {
+        unit: aim.unit ?? null,
+        point: aim.point ? vec3.clone(aim.point) : null,
+      };
+      const moved =
+        approach &&
+        this.approachThen(entity, plan.approach, () =>
+          this.requestThrow(entity, target, saved, false),
+        );
+      return moved ? { ...plan, ok: true } : { ...plan, ok: false, reason: 'cannot approach' };
+    }
+    if (this.state === 'combat') {
+      this.resources.action = Math.max(0, this.resources.action - 1);
+    }
+    this.pendingAction = null;
+    const unit = entity.getComponent('unit') as UnitComponent;
+    const prop = target.getComponent('unit') as UnitComponent;
+    const damage = PropComponent.of(target)!.getImpactDamage();
+    unit.stop(); // exploración: puede venir andando
+    unit.faceTowards(plan.landing);
+    // Plano de acción si golpea a alguien (como un ataque).
+    const delay = plan.hit
+      ? (this.getActionCamera()?.frameAction(
+          unit.getOwner(),
+          [plan.hit.getOwner(), prop.getOwner()],
+          THROW_TIME + SHOT_AFTER_HIT,
+        ) ?? 0)
+      : 0;
+    // Se resuelve ya (no al acabar el plano): mientras, nadie puede actuar (isResolving).
+    this.pendingImpacts.push({
+      timer: Infinity,
+      source: unit,
+      prop,
+      hit: plan.hit,
+      damage,
+      always: true,
+    });
+    const impact = this.pendingImpacts[this.pendingImpacts.length - 1]!;
+    const points = plan.points.map((p) => vec3.clone(p));
+    this.windUp(unit, delay, () => {
+      unit.playAction(THROW_CLIP, THROW_TIME);
+      void prop.moveAlong(points, { speed: THROW_SPEED, walk: false, face: false });
+      impact.timer = 0.15;
+    });
+    this.emit('throw', { unit: target, source: entity });
+    return { ...plan, ok: true };
+  }
+
+  /** Un objeto empujado o lanzado ha llegado: golpea a quien pilla y se golpea él. */
+  private applyImpact(impact: PendingImpact): void {
+    const amount = rollDamage(impact.damage);
+    if (impact.hit?.isAlive()) {
+      this.applyHit(impact.source, impact.hit, true, amount, 'impact');
+    }
+    if ((impact.hit || impact.always) && impact.prop.isAlive()) {
+      this.applyHit(impact.source, impact.prop, true, amount, 'impact');
+    }
   }
 
   public getSurfaces(): Surfaces {
@@ -1344,6 +1606,14 @@ export class EncounterComponent extends Component {
       for (const w of ready) w.start();
     }
 
+    if (this.pendingImpacts.length) {
+      // Al llegar: el objeto ya no se mueve (y ha pasado un instante, por si no se ha movido).
+      const landed = (i: PendingImpact) => (i.timer -= dt) <= 0 && !i.prop.isMoving();
+      const ready = this.pendingImpacts.filter(landed);
+      this.pendingImpacts = this.pendingImpacts.filter((i) => !ready.includes(i));
+      for (const i of ready) this.applyImpact(i);
+    }
+
     if (this.pendingSkills.length) {
       const ready = this.pendingSkills.filter((p) => (p.timer -= dt) <= 0);
       this.pendingSkills = this.pendingSkills.filter((p) => p.timer > 0);
@@ -1495,6 +1765,7 @@ export class EncounterComponent extends Component {
         this.pendingAction = null;
         this.windups = [];
         this.pendingHits = [];
+        this.pendingImpacts = [];
         this.endTurn();
         return;
       }
@@ -1833,10 +2104,13 @@ export class EncounterComponent extends Component {
           }
           case 'push':
           case 'plan_push': {
+            // args.direction = [x, z] (opcional): hacia dónde empujarlo.
+            const d = args.direction as [number, number] | undefined;
+            const dir = Array.isArray(d) ? vec3.fromValues(d[0], 0, d[1]) : null;
             const r =
               name === 'push'
-                ? this.requestPush(unitArg(), unitArg('target'))
-                : { ...this.planPush(unitArg(), unitArg('target')), ok: null };
+                ? this.requestPush(unitArg(), unitArg('target'), dir)
+                : { ...this.planPush(unitArg(), unitArg('target'), dir), ok: null };
             return {
               ok: r.ok,
               canPush: r.canPush,
@@ -1845,6 +2119,34 @@ export class EncounterComponent extends Component {
               distance: r.distance,
               pushLength: r.pushLength,
               destination: r.destination ? Array.from(r.destination) : null,
+              hit: r.hit?.getOwner().getName() ?? null,
+              minDamage: r.minDamage,
+              maxDamage: r.maxDamage,
+              approach: r.approach ? r.approach.plan.length : null,
+              reason: r.reason ?? null,
+            };
+          }
+          case 'throw':
+          case 'plan_throw': {
+            // args.object: el objeto; args.target (unidad) o args.to = [x, y, z] (punto).
+            const to = args.to as [number, number, number] | undefined;
+            const aim: SkillTarget = {
+              unit: typeof args.target === 'string' ? unitArg('target') : null,
+              point: Array.isArray(to) ? vec3.fromValues(to[0], to[1], to[2]) : null,
+            };
+            const r =
+              name === 'throw'
+                ? this.requestThrow(unitArg(), unitArg('object'), aim)
+                : { ...this.planThrow(unitArg(), unitArg('object'), aim), ok: null };
+            return {
+              ok: r.ok,
+              canThrow: r.canThrow,
+              allowed: r.allowed,
+              landing: r.landing ? Array.from(r.landing) : null,
+              apex: r.points.length ? Math.max(...r.points.map((q) => q[1]!)) : null,
+              hit: r.hit?.getOwner().getName() ?? null,
+              minDamage: r.minDamage,
+              maxDamage: r.maxDamage,
               approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };
@@ -1880,7 +2182,7 @@ export class EncounterComponent extends Component {
             return { selected: PartyComponent.find()?.getSelectedName() ?? null };
           default:
             throw new Error(
-              `Unknown command '${name}'. Available: move, plan_move, attack, plan_attack, jump, plan_jump, push, plan_push, skill, plan_skill, damage, end_turn, start_combat, end_combat, restart, select`,
+              `Unknown command '${name}'. Available: move, plan_move, attack, plan_attack, jump, plan_jump, push, plan_push, throw, plan_throw, skill, plan_skill, damage, end_turn, start_combat, end_combat, restart, select`,
             );
         }
       },
@@ -1900,6 +2202,12 @@ export class EncounterComponent extends Component {
 }
 
 /** Mayor iniciativa primero; desempate aleatorio. */
+/** `v` en horizontal y normalizado (null si no tiene componente horizontal). */
+function horizontalDirection(v: vec3): vec3 | null {
+  const length = Math.hypot(v[0]!, v[2]!);
+  return length < 1e-4 ? null : vec3.fromValues(v[0]! / length, 0, v[2]! / length);
+}
+
 function compareInitiative(a: Combatant, b: Combatant): number {
   return b.initiative - a.initiative || b.tiebreak - a.tiebreak;
 }
