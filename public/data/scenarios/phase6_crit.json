@@ -1,5 +1,5 @@
 {
-  "description": "Fase 6: golpe crítico con distribución pseudoaleatoria (PRD, como Warcraft III / Dota 2). El N-ésimo ataque desde el último crítico tiene P(N) = C·N; C se elige para que de media salga el % de la estadística (20 % → C ≈ 0.0557, seguro al 18.º). Doble daño. Cada unidad lleva su cuenta, que se reinicia al salir el crítico y al empezar o acabar un combate. Las habilidades no critican.",
+  "description": "Fase 6: golpe crítico con distribución pseudoaleatoria (PRD, como Warcraft III / Dota 2). El N-ésimo ataque desde el último crítico tiene P(N) = C·N; C se elige para que de media salga el % de la estadística (20 % → C ≈ 0.0557, seguro al 18.º). El crítico tira el doble de dados. Cada unidad lleva su cuenta, que se reinicia al salir el crítico y al empezar o acabar un combate. Las habilidades no critican.",
   "scenes": ["tactical.json", "tactical_dummies.json"],
   "seed": 7,
   "steps": [
@@ -59,7 +59,7 @@
       }
     },
 
-    { "log": "Un ataque con el crítico asegurado: doble daño y texto flotante" },
+    { "log": "Un ataque con el crítico asegurado: el doble de dados y texto flotante" },
     { "command": "select", "args": { "unit": "Hero2" } },
     { "command": "move", "args": { "unit": "Hero2", "to": [-5, 0, 12], "follow": false } },
     {
@@ -75,8 +75,8 @@
     { "eval": "__unit('Hero2').critMisses = 17" },
     {
       "assert": {
-        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Enemy1' }).then(r => [r.attack, r.damage, r.critChance])",
-        "value": ["ranged", 6, 1]
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Enemy1' }).then(r => [r.attack, r.minDamage, r.maxDamage, r.critChance])",
+        "value": ["ranged", 4, 9, 1]
       }
     },
     {
@@ -89,11 +89,17 @@
       "wait_until": { "expr": "__engine.getCombatState().busy", "value": false },
       "timeout_frames": 300
     },
-    { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 8, "message": "6 × 2" } },
     {
       "assert": {
-        "expr": "window.__log.filter(l => l.u === 'Enemy1').map(l => [l.amount, l.crit])",
-        "value": [[12, true]]
+        "expr": "(() => { const d = window.__log.find(l => l.u === 'Enemy1'); return d.crit && d.amount >= 5 && d.amount <= 15 && __unit('Enemy1').getHp() === 20 - d.amount; })()",
+        "value": true,
+        "message": "crítico de 1d6+3: se tiran el doble de dados (2d6+3, de 5 a 15)"
+      }
+    },
+    {
+      "assert": {
+        "expr": "window.__log.filter(l => l.u === 'Enemy1').length",
+        "value": 1
       }
     },
     {

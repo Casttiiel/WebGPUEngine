@@ -32,6 +32,7 @@ import {
 import { PropComponent, type PropExplosion } from './PropComponent';
 import { Surfaces } from './Surfaces';
 import { MAX_JUMP, jumpArc, pushDistance } from './EnvironmentRules';
+import { rollDamage } from './Dice';
 import {
   SkillCatalog,
   coneDirection,
@@ -170,7 +171,10 @@ export interface AttackPlan {
   /** Se puede ejecutar (directamente o acercándose primero). */
   canAttack: boolean;
   hitChance: number;
+  /** Daño medio, mínimo y máximo si impacta (sin crítico). */
   damage: number;
+  minDamage: number;
+  maxDamage: number;
   /** Probabilidad (0-1) de crítico si impacta en el próximo ataque del atacante (PRD). */
   critChance: number;
   reason?: string;
@@ -528,6 +532,8 @@ export class EncounterComponent extends Component {
       canAttack: false,
       hitChance: 0,
       damage: 0,
+      minDamage: 0,
+      maxDamage: 0,
       critChance: 0,
     };
     const fail = (reason: string): AttackPlan => ({ ...result, reason });
@@ -545,6 +551,8 @@ export class EncounterComponent extends Component {
     const roll = previewAttack(unit, target, attack);
     result.hitChance = roll.hitChance;
     result.damage = roll.damage;
+    result.minDamage = roll.minDamage;
+    result.maxDamage = roll.maxDamage;
     result.critChance = roll.critChance;
 
     const permission = this.canAct(unit, attack.cost ?? 'action');
@@ -1000,11 +1008,14 @@ export class EncounterComponent extends Component {
     const affected = () => plan.affected.filter((u) => u.isAlive() || hasEffect(skill, 'heal'));
     for (const effect of skill.effects) {
       switch (effect.type) {
-        case 'damage':
+        case 'damage': {
+          // Una tirada por lanzamiento, la misma para todos los afectados (como en BG3).
+          const amount = rollDamage(effect.amount);
           for (const u of affected()) {
-            if (u.isAlive()) this.applyHit(caster, u, true, effect.amount, 'skill');
+            if (u.isAlive()) this.applyHit(caster, u, true, amount, 'skill');
           }
           break;
+        }
         case 'heal':
           for (const u of affected()) this.healUnit(u, effect.amount);
           break;
@@ -1730,6 +1741,8 @@ export class EncounterComponent extends Component {
           approach: r.approach ? r.approach.plan.length : null,
           hitChance: r.hitChance,
           damage: r.damage,
+          minDamage: r.minDamage,
+          maxDamage: r.maxDamage,
           critChance: r.critChance,
           reason: r.reason ?? null,
         });

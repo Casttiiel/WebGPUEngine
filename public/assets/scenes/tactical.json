@@ -525,7 +525,7 @@
             "name": "Espada",
             "kind": "melee",
             "range": 1.5,
-            "damage": 10,
+            "damage": "1d8+5",
             "clip": "Sword_Attack_Standing"
           }
         ]
@@ -548,7 +548,7 @@
             "name": "Disparo",
             "kind": "ranged",
             "range": 18,
-            "damage": 6,
+            "damage": "1d6+3",
             "clip": "Spell_Simple_Shoot"
           }
         ]
@@ -571,7 +571,7 @@
             "name": "Disparo",
             "kind": "ranged",
             "range": 18,
-            "damage": 6,
+            "damage": "1d6+3",
             "clip": "Spell_Simple_Shoot"
           }
         ]
@@ -594,7 +594,7 @@
             "name": "Espada",
             "kind": "melee",
             "range": 1.5,
-            "damage": 10,
+            "damage": "1d8+5",
             "clip": "Sword_Attack_Standing"
           }
         ]

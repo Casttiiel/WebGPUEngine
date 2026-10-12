@@ -101,7 +101,7 @@
           "name": "Mazazo",
           "kind": "melee",
           "range": 1.5,
-          "damage": 10,
+          "damage": "1d10+5",
           "clip": "Sword_Attack_Standing"
         }
       ],

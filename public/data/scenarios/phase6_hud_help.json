@@ -19,7 +19,7 @@
     { "assert": { "expr": "__w('hotbar_tip_title').getText()", "value": "Espada" } },
     {
       "assert": {
-        "expr": "__tipText().includes('Cuerpo a cuerpo · alcance 1.5 m · 10 de daño · Acción')",
+        "expr": "__tipText().includes('Cuerpo a cuerpo · alcance 1.5 m · 1d8+5 (6~13) de daño · Acción')",
         "value": true
       }
     },

@@ -1,6 +1,7 @@
 import { vec3 } from 'gl-matrix';
 import { UnitComponent, type UnitAttack } from './UnitComponent';
 import { hasLineOfSight } from './TacticalQueries';
+import { averageDamage, damageRange, rollDamage } from './Dice';
 
 /**
  * Reglas del combate que no dependen del turno: distancias, línea de visión y resolución
@@ -9,8 +10,6 @@ import { hasLineOfSight } from './TacticalQueries';
 
 /** Altura de los ojos sobre el centro de la cápsula. */
 export const EYE_HEIGHT = 0.7;
-/** Multiplicador del daño de un golpe crítico. */
-export const CRIT_MULTIPLIER = 2;
 
 const tmpA = vec3.create();
 const tmpB = vec3.create();
@@ -65,8 +64,11 @@ export function unitLineOfSightFrom(
 export interface AttackRoll {
   /** Probabilidad de impacto (0-1). */
   hitChance: number;
-  /** Daño si impacta (sin crítico). */
+  /** Daño medio si impacta (sin crítico): para comparar opciones. */
   damage: number;
+  /** Daño mínimo y máximo si impacta (sin crítico): la vista previa en la barra de vida. */
+  minDamage: number;
+  maxDamage: number;
   /** Probabilidad (0-1) de que sea crítico si impacta: la de su próximo ataque (PRD). */
   critChance: number;
 }
@@ -80,7 +82,14 @@ export function previewAttack(
   _target: UnitComponent,
   attack: UnitAttack,
 ): AttackRoll {
-  return { hitChance: 1, damage: attack.damage, critChance: attacker.getNextCritChance() };
+  const { min, max } = damageRange(attack.damage);
+  return {
+    hitChance: 1,
+    damage: averageDamage(attack.damage),
+    minDamage: min,
+    maxDamage: max,
+    critChance: attacker.getNextCritChance(),
+  };
 }
 
 /**
@@ -95,6 +104,7 @@ export function rollAttack(
   const roll = previewAttack(attacker, target, attack);
   const hit = roll.hitChance >= 1 || Math.random() < roll.hitChance;
   if (!hit) return { hit, crit: false, damage: 0 };
+  // Se tiran los dados; el crítico tira el doble de dados (el modificador no se duplica).
   const crit = attacker.rollCrit();
-  return { hit, crit, damage: crit ? Math.round(roll.damage * CRIT_MULTIPLIER) : roll.damage };
+  return { hit, crit, damage: rollDamage(attack.damage, crit) };
 }

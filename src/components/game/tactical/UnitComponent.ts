@@ -9,6 +9,7 @@ import { HealthComponent } from '../HealthComponent';
 import { RenderComponent } from '../../render/RenderComponent';
 import type { SkeletalMeshComponent } from '../../render/SkeletalMeshComponent';
 import { groundHeightAt } from './TacticalQueries';
+import type { DamageValue } from './Dice';
 
 export type UnitFaction = 'party' | 'enemy' | 'neutral';
 
@@ -22,7 +23,8 @@ export interface UnitAttack {
   kind: 'melee' | 'ranged';
   /** Alcance en metros, de borde a borde de las cápsulas. */
   range: number;
-  damage: number;
+  /** Daño: dados ("1d8+3", como en BG3) o un número fijo. */
+  damage: DamageValue;
   /** Recurso que consume. Default 'action'. */
   cost?: 'action' | 'bonusAction';
   /** Animación (clip) al atacar. */

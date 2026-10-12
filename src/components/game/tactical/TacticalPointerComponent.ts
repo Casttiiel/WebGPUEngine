@@ -23,6 +23,7 @@ import { circleOutline, coneOutline, isHostile, type SkillDef } from './Skills';
 import type { SkillPlan } from './EncounterComponent';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { PathPreview } from './PathPreview';
+import { damageRange } from './Dice';
 import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 import { KeyCode } from '../../../types/KeyCode.enum';
 
@@ -183,6 +184,33 @@ export class TacticalPointerComponent extends Component {
   }
 
   // ── API (asserts del MCP, UI, fases siguientes) ──────────────────────────
+
+  /**
+   * A quién dañaría lo que se está apuntando y entre cuánto y cuánto (sin crítico): el ataque
+   * sobre la unidad bajo el cursor, o la habilidad armada sobre todos los afectados (aliados
+   * incluidos). Vacío si no se puede o si no hace daño. La vista previa de la barra de vida.
+   */
+  public getDamagePreview(): { unit: UnitComponent; min: number; max: number }[] {
+    const skill = this.skillPlan;
+    if (skill?.skill) {
+      if (!skill.canCast) return [];
+      let min = 0;
+      let max = 0;
+      for (const effect of skill.skill.effects) {
+        if (effect.type !== 'damage') continue;
+        const range = damageRange(effect.amount);
+        min += range.min;
+        max += range.max;
+      }
+      if (max <= 0) return [];
+      return skill.affected.filter((u) => u.isAlive()).map((unit) => ({ unit, min, max }));
+    }
+    if (this.getArmedSkill() || this.pushPlan?.canPush) return [];
+    const target = this.hoveredUnit?.getComponent('unit') as UnitComponent | null | undefined;
+    const attack = this.attackPlan;
+    if (!target?.isAlive() || !attack?.canAttack || attack.maxDamage <= 0) return [];
+    return [{ unit: target, min: attack.minDamage, max: attack.maxDamage }];
+  }
 
   public getHoverKind(): HoverKind {
     return this.hoverKind;
@@ -625,7 +653,7 @@ export class TacticalPointerComponent extends Component {
     if (this.hoverKind === 'enemy' && plan?.attack) {
       if (plan.canAttack || plan.allowed) {
         parts.push(`${plan.attack.name} ${Math.round(plan.hitChance * 100)} %`);
-        parts.push(`${plan.damage} daño`);
+        parts.push(`${plan.minDamage}~${plan.maxDamage} daño`);
         if (plan.critChance > 0) parts.push(`crítico ${Math.round(plan.critChance * 100)} %`);
       }
       if (!plan.canAttack && plan.reason) parts.push(reasonText(plan.reason));

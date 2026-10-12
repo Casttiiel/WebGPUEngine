@@ -10,7 +10,7 @@
     "effects": [
       {
         "type": "damage",
-        "amount": 10
+        "amount": "2d6+3"
       },
       {
         "type": "surface",
@@ -32,7 +32,7 @@
     "effects": [
       {
         "type": "damage",
-        "amount": 6
+        "amount": "1d8+2"
       },
       {
         "type": "push",

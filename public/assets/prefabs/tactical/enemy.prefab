@@ -100,7 +100,7 @@
           "name": "Puñetazo",
           "kind": "melee",
           "range": 1.5,
-          "damage": 8,
+          "damage": "1d6+5",
           "clip": "Punch_Cross"
         }
       ]

@@ -99,6 +99,16 @@ const FLOAT_DOWN: RGBA = [0.7, 0.7, 0.75, 1];
 const FLOAT_FIRE: RGBA = [1, 0.6, 0.15, 1];
 const FLOAT_FEAR: RGBA = [0.8, 0.6, 1, 1];
 
+/** Vista previa del daño: barra de vida sobre la cabeza de quien lo recibiría. */
+const DAMAGE_BARS = 6;
+const DAMAGE_BAR_WIDTH = 160;
+const DAMAGE_BAR_INNER = DAMAGE_BAR_WIDTH - 4;
+const DAMAGE_BAR_HEIGHT = 12;
+/** Altura de la barra sobre el centro de la unidad (m). */
+const DAMAGE_BAR_LIFT = 1.35;
+const HP_LEFT_PARTY: RGBA = [0.3, 0.75, 0.3, 1];
+const HP_LEFT_ENEMY: RGBA = [0.75, 0.2, 0.18, 1];
+
 const STATUS_ICONS = 8;
 const STATUS_SIZE = 64;
 /** Altura del icono de estado sobre el centro de la unidad (m): encima de la cabeza. */
@@ -120,6 +130,14 @@ interface HotbarSlot {
   name: TextWidget | null;
   entry: HotbarEntry | null;
   hovered: boolean;
+}
+
+interface DamageBar {
+  root: ImageWidget;
+  hp: ImageWidget | null;
+  maybe: ImageWidget | null;
+  sure: ImageWidget | null;
+  text: TextWidget | null;
 }
 
 interface FloatingText {
@@ -166,6 +184,7 @@ export class CombatHUDController extends WidgetController {
   private freeFloats: TextWidget[] = [];
   /** Iconos de estado (miedo) sobre la cabeza de las unidades afectadas. */
   private statusIcons: ImageWidget[] = [];
+  private damageBars: DamageBar[] = [];
   private resolved = false;
 
   private subscribed: EncounterComponent | null = null;
@@ -202,6 +221,7 @@ export class CombatHUDController extends WidgetController {
     this.updateRestartHint(encounter);
     this.updateFloats(dt);
     this.updateStatusIcons();
+    this.updateDamagePreview();
 
     const inCombat = state === 'combat';
     const playerTurn = inCombat && encounter.isPlayerTurn();
@@ -508,6 +528,48 @@ export class CombatHUDController extends WidgetController {
     f.widget.setVisible(true);
   }
 
+  /**
+   * Al apuntar un ataque o una habilidad: sobre cada unidad que recibiría daño, su barra de
+   * vida con la parte que perdería seguro (daño mínimo, sólida), la que podría perder (hasta
+   * el máximo, translúcida) y el rango, avisando si muere o puede morir. Sin crítico.
+   */
+  private updateDamagePreview(): void {
+    const preview = this.subscribed
+      ? (TacticalPointerComponent.find()?.getDamagePreview() ?? [])
+      : [];
+    this.damageBars.forEach((bar, i) => {
+      const entry = preview[i];
+      const max = entry?.unit.getMaxHp() ?? 0;
+      if (!entry || max <= 0) {
+        bar.root.setVisible(false);
+        return;
+      }
+      const p = entry.unit.getPosition(this.tmpPos);
+      p[1] = p[1]! + DAMAGE_BAR_LIFT;
+      const screen = this.worldToUI(p);
+      if (!screen) {
+        bar.root.setVisible(false);
+        return;
+      }
+      const hp = Math.max(0, entry.unit.getHp());
+      const afterMin = Math.max(0, hp - entry.min);
+      const afterMax = Math.max(0, hp - entry.max);
+      const px = (v: number) => (DAMAGE_BAR_INNER * v) / max;
+      const left = entry.unit.getFaction() === 'party' ? HP_LEFT_PARTY : HP_LEFT_ENEMY;
+      bar.hp?.setColor(...left);
+      bar.hp?.setSize(px(afterMax), DAMAGE_BAR_HEIGHT);
+      bar.maybe?.setPosition(2 + px(afterMax), 2);
+      bar.maybe?.setSize(px(afterMin - afterMax), DAMAGE_BAR_HEIGHT);
+      bar.sure?.setPosition(2 + px(afterMin), 2);
+      bar.sure?.setSize(px(hp - afterMin), DAMAGE_BAR_HEIGHT);
+      const range = entry.min === entry.max ? `${entry.min}` : `${entry.min}~${entry.max}`;
+      const fate = entry.min >= hp ? ' · muere' : entry.max >= hp ? ' · puede morir' : '';
+      bar.text?.setText(`${range} daño${fate}`);
+      bar.root.setPosition(screen[0] - DAMAGE_BAR_WIDTH / 2, screen[1]);
+      bar.root.setVisible(true);
+    });
+  }
+
   /** Un icono sobre la cabeza de cada unidad viva con miedo, mientras dure. */
   private updateStatusIcons(): void {
     const feared = this.subscribed
@@ -565,6 +627,7 @@ export class CombatHUDController extends WidgetController {
       ...this.initiative.map((s) => s.frame),
       ...this.hotbar.map((s) => s.frame),
       ...this.statusIcons,
+      ...this.damageBars.map((b) => b.root),
     ];
     for (const w of all) w?.setVisible(false);
     this.clearFloats();
@@ -645,6 +708,17 @@ export class CombatHUDController extends WidgetController {
     for (let i = 1; i <= 8; i++) {
       const w = get<TextWidget>(`float_${i}`);
       if (w) this.freeFloats.push(w);
+    }
+    for (let i = 1; i <= DAMAGE_BARS; i++) {
+      const root = get<ImageWidget>(`dmg_bar_${i}`);
+      if (!root) continue;
+      this.damageBars.push({
+        root,
+        hp: get<ImageWidget>(`dmg_bar_${i}_hp`),
+        maybe: get<ImageWidget>(`dmg_bar_${i}_maybe`),
+        sure: get<ImageWidget>(`dmg_bar_${i}_sure`),
+        text: get<TextWidget>(`dmg_bar_${i}_text`),
+      });
     }
     for (let i = 1; i <= STATUS_ICONS; i++) {
       const w = get<ImageWidget>(`status_${i}`);

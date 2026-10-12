@@ -2127,5 +2127,479 @@
         "blocksInput": false
       }
     ]
+  },
+  {
+    "name": "dmg_bar_1",
+    "alias": "dmg_bar_1",
+    "type": "image",
+    "x": 0,
+    "y": 0,
+    "width": 160,
+    "height": 16,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [160, 16],
+      "color": [0.03, 0.03, 0.04, 0.9]
+    },
+    "blocksInput": false,
+    "visible": false,
+    "children": [
+      {
+        "name": "dmg_bar_1_hp",
+        "alias": "dmg_bar_1_hp",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 156,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [156, 12],
+          "color": [0.3, 0.75, 0.3, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_1_maybe",
+        "alias": "dmg_bar_1_maybe",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 0.45]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_1_sure",
+        "alias": "dmg_bar_1_sure",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_1_text",
+        "alias": "dmg_bar_1_text",
+        "type": "text",
+        "x": -60,
+        "y": -32,
+        "width": 280,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [24, 24],
+          "color": [1, 0.92, 0.7, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "dmg_bar_2",
+    "alias": "dmg_bar_2",
+    "type": "image",
+    "x": 0,
+    "y": 0,
+    "width": 160,
+    "height": 16,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [160, 16],
+      "color": [0.03, 0.03, 0.04, 0.9]
+    },
+    "blocksInput": false,
+    "visible": false,
+    "children": [
+      {
+        "name": "dmg_bar_2_hp",
+        "alias": "dmg_bar_2_hp",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 156,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [156, 12],
+          "color": [0.3, 0.75, 0.3, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_2_maybe",
+        "alias": "dmg_bar_2_maybe",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 0.45]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_2_sure",
+        "alias": "dmg_bar_2_sure",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_2_text",
+        "alias": "dmg_bar_2_text",
+        "type": "text",
+        "x": -60,
+        "y": -32,
+        "width": 280,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [24, 24],
+          "color": [1, 0.92, 0.7, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "dmg_bar_3",
+    "alias": "dmg_bar_3",
+    "type": "image",
+    "x": 0,
+    "y": 0,
+    "width": 160,
+    "height": 16,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [160, 16],
+      "color": [0.03, 0.03, 0.04, 0.9]
+    },
+    "blocksInput": false,
+    "visible": false,
+    "children": [
+      {
+        "name": "dmg_bar_3_hp",
+        "alias": "dmg_bar_3_hp",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 156,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [156, 12],
+          "color": [0.3, 0.75, 0.3, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_3_maybe",
+        "alias": "dmg_bar_3_maybe",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 0.45]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_3_sure",
+        "alias": "dmg_bar_3_sure",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_3_text",
+        "alias": "dmg_bar_3_text",
+        "type": "text",
+        "x": -60,
+        "y": -32,
+        "width": 280,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [24, 24],
+          "color": [1, 0.92, 0.7, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "dmg_bar_4",
+    "alias": "dmg_bar_4",
+    "type": "image",
+    "x": 0,
+    "y": 0,
+    "width": 160,
+    "height": 16,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [160, 16],
+      "color": [0.03, 0.03, 0.04, 0.9]
+    },
+    "blocksInput": false,
+    "visible": false,
+    "children": [
+      {
+        "name": "dmg_bar_4_hp",
+        "alias": "dmg_bar_4_hp",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 156,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [156, 12],
+          "color": [0.3, 0.75, 0.3, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_4_maybe",
+        "alias": "dmg_bar_4_maybe",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 0.45]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_4_sure",
+        "alias": "dmg_bar_4_sure",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_4_text",
+        "alias": "dmg_bar_4_text",
+        "type": "text",
+        "x": -60,
+        "y": -32,
+        "width": 280,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [24, 24],
+          "color": [1, 0.92, 0.7, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "dmg_bar_5",
+    "alias": "dmg_bar_5",
+    "type": "image",
+    "x": 0,
+    "y": 0,
+    "width": 160,
+    "height": 16,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [160, 16],
+      "color": [0.03, 0.03, 0.04, 0.9]
+    },
+    "blocksInput": false,
+    "visible": false,
+    "children": [
+      {
+        "name": "dmg_bar_5_hp",
+        "alias": "dmg_bar_5_hp",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 156,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [156, 12],
+          "color": [0.3, 0.75, 0.3, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_5_maybe",
+        "alias": "dmg_bar_5_maybe",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 0.45]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_5_sure",
+        "alias": "dmg_bar_5_sure",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_5_text",
+        "alias": "dmg_bar_5_text",
+        "type": "text",
+        "x": -60,
+        "y": -32,
+        "width": 280,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [24, 24],
+          "color": [1, 0.92, 0.7, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "dmg_bar_6",
+    "alias": "dmg_bar_6",
+    "type": "image",
+    "x": 0,
+    "y": 0,
+    "width": 160,
+    "height": 16,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [160, 16],
+      "color": [0.03, 0.03, 0.04, 0.9]
+    },
+    "blocksInput": false,
+    "visible": false,
+    "children": [
+      {
+        "name": "dmg_bar_6_hp",
+        "alias": "dmg_bar_6_hp",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 156,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [156, 12],
+          "color": [0.3, 0.75, 0.3, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_6_maybe",
+        "alias": "dmg_bar_6_maybe",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 0.45]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_6_sure",
+        "alias": "dmg_bar_6_sure",
+        "type": "image",
+        "x": 2,
+        "y": 2,
+        "width": 0,
+        "height": 12,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [0, 12],
+          "color": [1, 0.85, 0.35, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "dmg_bar_6_text",
+        "alias": "dmg_bar_6_text",
+        "type": "text",
+        "x": -60,
+        "y": -32,
+        "width": 280,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [24, 24],
+          "color": [1, 0.92, 0.7, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      }
+    ]
   }
 ]

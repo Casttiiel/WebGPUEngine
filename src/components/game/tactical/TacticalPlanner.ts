@@ -4,6 +4,7 @@ import type { EncounterComponent, SkillPlan, SkillTarget } from './EncounterComp
 import type { UnitAttack, UnitComponent } from './UnitComponent';
 import { previewAttack, unitDistanceFrom, unitLineOfSightFrom } from './CombatRules';
 import { SkillCatalog, hasEffect, type SkillDef } from './Skills';
+import { averageDamage } from './Dice';
 
 export type AIRole = 'melee' | 'ranged';
 
@@ -414,9 +415,10 @@ function skillValue(me: UnitComponent, skill: SkillDef, plan: SkillPlan): number
       case 'damage':
         for (const u of plan.affected) {
           if (!u.isAlive()) continue;
-          const dealt = Math.min(effect.amount, u.getHp());
+          const expected = averageDamage(effect.amount);
+          const dealt = Math.min(expected, u.getHp());
           if (isFoe(u)) {
-            value += dealt + (effect.amount >= u.getHp() ? KILL_BONUS : 0);
+            value += dealt + (expected >= u.getHp() ? KILL_BONUS : 0);
             useful = true;
           } else if (isAlly(u)) {
             value -= dealt * FRIENDLY_FIRE;

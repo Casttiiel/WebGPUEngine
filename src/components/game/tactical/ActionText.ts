@@ -1,5 +1,6 @@
 import type { UnitAttack } from './UnitComponent';
 import type { SkillDef } from './Skills';
+import { damageText } from './Dice';
 
 /**
  * Textos de ataques y habilidades para la UI (ficha del personaje, tooltips de la hotbar),
@@ -17,7 +18,7 @@ export const STATUS_NAME: Record<string, string> = { fear: 'Asustado' };
 export function attackSummary(attack: UnitAttack): string {
   const kind = attack.kind === 'melee' ? 'Cuerpo a cuerpo' : 'A distancia';
   const cost = COST_NAME[attack.cost ?? 'action'];
-  return `${kind} · alcance ${fmt(attack.range)} m · ${attack.damage} de daño · ${cost}`;
+  return `${kind} · alcance ${fmt(attack.range)} m · ${damageText(attack.damage)} de daño · ${cost}`;
 }
 
 /** Qué hace una habilidad, a partir de sus datos ("Un punto a 14 m (área de 2.5 m): 10 de daño…"). */
@@ -32,7 +33,7 @@ export function skillMechanics(skill: SkillDef): string {
   const effects = skill.effects.map((e) => {
     switch (e.type) {
       case 'damage':
-        return `${e.amount} de daño`;
+        return `${damageText(e.amount)} de daño`;
       case 'heal':
         return `cura ${e.amount}`;
       case 'push':

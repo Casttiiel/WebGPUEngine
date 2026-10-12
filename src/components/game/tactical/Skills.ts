@@ -3,6 +3,7 @@ import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { UnitComponent } from './UnitComponent';
 import type { SurfaceType } from './Surfaces';
 import type { UnitStatusId } from './UnitComponent';
+import type { DamageValue } from './Dice';
 
 /**
  * Habilidades: modelo de datos genérico (public/data/skills.json) y geometría de sus áreas.
@@ -19,7 +20,8 @@ import type { UnitStatusId } from './UnitComponent';
 export type SkillTargeting = 'unit' | 'point' | 'cone' | 'self';
 
 export type SkillEffect =
-  | { type: 'damage'; amount: number }
+  /** Daño: dados ("2d6+3") o fijo; se tira una vez por lanzamiento (igual para todos). */
+  | { type: 'damage'; amount: DamageValue }
   | { type: 'heal'; amount: number }
   /** Aleja a los afectados del lanzador (o del centro del área). */
   | { type: 'push'; distance: number }

@@ -101,7 +101,7 @@
           "name": "Cuchillas",
           "kind": "melee",
           "range": 1.5,
-          "damage": 8,
+          "damage": "2d4+3",
           "clip": "Punch_Cross"
         }
       ],
