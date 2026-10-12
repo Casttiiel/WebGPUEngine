@@ -474,7 +474,11 @@ export class TacticalPointerComponent extends Component {
       const from = (selected?.getComponent('unit') as UnitComponent | null)?.getFeetPosition();
       if (from) outline = [from, origin];
     }
-    if (outline) this.preview?.show(outline, Infinity, label);
+    // Si tiene que acercarse, primero el camino y después el área.
+    const approach = plan.canCast ? plan.approach : null;
+    if (approach) label += ` · se acerca ${approach.plan.length.toFixed(1)} m`;
+    const points = [...(approach?.plan.points ?? []), ...(outline ?? [])];
+    if (points.length) this.preview?.show(points, Infinity, label);
     else this.preview?.showLabelOnly(label);
   }
 
@@ -549,7 +553,12 @@ export class TacticalPointerComponent extends Component {
     // Unidad bajo el cursor: tooltip (y, si hay que acercarse para atacar, el camino).
     if (this.hoveredUnit && unit) {
       const tooltip = this.unitTooltip(unit);
-      const approach = this.attackPlan?.canAttack ? this.attackPlan.approach : null;
+      // Si hay que acercarse (para atacar o, en un objeto, para empujarlo), el camino.
+      const approach = this.pushPlan?.canPush
+        ? this.pushPlan.approach
+        : this.attackPlan?.canAttack
+          ? this.attackPlan.approach
+          : null;
       if (approach) this.preview?.show(approach.plan.points, approach.budget, tooltip);
       else this.preview?.showLabelOnly(tooltip);
       return;
@@ -559,7 +568,12 @@ export class TacticalPointerComponent extends Component {
     const jump = this.jumpPlan;
     if (jump && (this.hoverKind === 'ground' || this.hoverKind === 'invalid')) {
       if (jump.canJump) {
-        this.preview?.show(jump.points, Infinity, `Saltar ${jump.distance.toFixed(1)} m`);
+        // Si no llega desde aquí: anda hasta el despegue y salta (los metros se suman).
+        const walk = jump.approach?.plan;
+        const label = walk
+          ? `Saltar ${jump.distance.toFixed(1)} m (+${walk.length.toFixed(1)} m andando)`
+          : `Saltar ${jump.distance.toFixed(1)} m`;
+        this.preview?.show([...(walk?.points ?? []), ...jump.points], Infinity, label);
       } else if (jump.allowed) {
         this.preview?.showLabelOnly(`Saltar: ${reasonText(jump.reason)}`);
       } else {

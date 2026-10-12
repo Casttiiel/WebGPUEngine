@@ -12,6 +12,7 @@ import type { ActionCameraComponent } from './ActionCameraComponent';
 import { UnitObstacles } from './UnitObstacles';
 import type { TacticalAIComponent } from './TacticalAIComponent';
 import {
+  groundHeightAt,
   hasLineOfSight,
   isOnNavMesh,
   planPath,
@@ -23,11 +24,13 @@ import {
   previewAttack,
   rollAttack,
   unitDistance,
+  unitDistanceFrom,
   unitLineOfSight,
+  unitLineOfSightFrom,
 } from './CombatRules';
 import { PropComponent, type PropExplosion } from './PropComponent';
 import { Surfaces } from './Surfaces';
-import { jumpArc, pushDistance } from './EnvironmentRules';
+import { MAX_JUMP, jumpArc, pushDistance } from './EnvironmentRules';
 import {
   SkillCatalog,
   coneDirection,
@@ -93,6 +96,8 @@ export interface SkillPlan {
   direction: vec3 | null;
   /** Quién recibe los efectos (vista previa: se resaltan antes de confirmar). */
   affected: UnitComponent[];
+  /** Fuera de alcance o sin visión: andar hasta aquí antes de lanzarla. */
+  approach: MovePlan | null;
   canCast: boolean;
   reason?: string;
 }
@@ -104,6 +109,8 @@ export interface JumpPlan {
   points: vec3[];
   /** Distancia horizontal: los metros de movimiento que cuesta. */
   distance: number;
+  /** Desde aquí no llega: andar hasta este punto de despegue (los metros se suman al salto). */
+  approach: MovePlan | null;
   canJump: boolean;
   reason?: string;
 }
@@ -111,6 +118,8 @@ export interface JumpPlan {
 export interface PushPlan {
   /** La unidad puede actuar ahora (su turno, le queda la acción adicional). */
   allowed: boolean;
+  /** Fuera de alcance: andar hasta aquí antes de empujar. */
+  approach: MovePlan | null;
   /** Distancia de borde a borde al objeto (m). */
   distance: number;
   inReach: boolean;
@@ -186,6 +195,10 @@ const AI_TURN_TIMEOUT = 20;
 /** Al acercarse para atacar cuerpo a cuerpo se queda a esta fracción del alcance. */
 const APPROACH_FRACTION = 0.6;
 const APPROACH_CANDIDATES = 16;
+/** A distancia: anillos (fracciones del alcance) donde buscar sitio con visión. */
+const RANGED_RINGS = [0.85, 0.6, 0.35];
+/** Saltar: anillos (fracciones del salto máximo) donde buscar el punto de despegue. */
+const JUMP_RINGS = [0.85, 0.6, 0.35];
 /** Daño al entrar en fuego o empezar el turno dentro. */
 const FIRE_DAMAGE = 5;
 const JUMP_SPEED = 7;
@@ -249,12 +262,11 @@ export class EncounterComponent extends Component {
   private stateTimer = 0;
   private detectionTimer = 0;
   private listeners: ((event: string, data: EncounterEventData) => void)[] = [];
-  /** Ataque cuerpo a cuerpo que espera a que la unidad termine de acercarse. */
-  private pendingAttack: {
-    attacker: UnitComponent;
-    target: UnitComponent;
-    attackId: string;
-  } | null = null;
+  /**
+   * Acción (ataque, salto, empujón, habilidad) que espera a que la unidad termine de
+   * acercarse. Al llegar se vuelve a pedir, ya sin acercarse: si algo ha cambiado, se cancela.
+   */
+  private pendingAction: { unit: UnitComponent; run: () => void } | null = null;
   private pendingHits: PendingHit[] = [];
   /** Habilidades lanzadas cuyo efecto aún no ha llegado (sincronizado con la animación). */
   private pendingSkills: { timer: number; caster: UnitComponent; plan: SkillPlan }[] = [];
@@ -384,7 +396,7 @@ export class EncounterComponent extends Component {
   /** Hay un ataque en marcha (acercándose para atacar o un golpe por resolver). */
   public isResolving(): boolean {
     return (
-      this.pendingAttack !== null ||
+      this.pendingAction !== null ||
       this.windups.length > 0 ||
       this.pendingHits.length > 0 ||
       this.pendingSkills.length > 0
@@ -481,7 +493,7 @@ export class EncounterComponent extends Component {
       if (this.state === 'combat') {
         this.resources.movement = Math.max(0, this.resources.movement - move.walk.length);
       }
-      this.pendingAttack = null;
+      this.pendingAction = null;
       const unit = entity.getComponent('unit') as UnitComponent;
       void unit.moveAlong(move.walk.points);
       const party = PartyComponent.find();
@@ -540,23 +552,38 @@ export class EncounterComponent extends Component {
       result.canAttack = true;
       return result;
     }
-    if (attack.kind === 'ranged') {
+    // No llega o no ve: buscar desde dónde sí (cuerpo a cuerpo, pegado; a distancia, a tiro).
+    const melee = attack.kind === 'melee';
+    const fractions = melee ? [APPROACH_FRACTION] : RANGED_RINGS;
+    const radii = fractions.map(
+      (k) => unit.getCapsuleRadius() + target.getCapsuleRadius() + attack.range * k,
+    );
+    result.approach = this.planApproachTo(
+      entity,
+      target.getFeetPosition(vec3.create()),
+      radii,
+      (feet) =>
+        unitDistanceFrom(unit, feet, target) <= attack.range + EPS &&
+        (melee || unitLineOfSightFrom(unit, feet, target)),
+    );
+    if (!result.approach) {
+      if (melee) return fail('target out of reach');
       return fail(result.inRange ? 'no line of sight' : 'target out of range');
     }
-    result.approach = this.planApproach(entity, unit, target, attack);
-    if (!result.approach) return fail('target out of reach');
     result.canAttack = true;
     return result;
   }
 
   /**
-   * Ataca si las reglas lo permiten. Cuerpo a cuerpo fuera de alcance: se acerca (gasta
+   * Ataca si las reglas lo permiten. Fuera de alcance (o sin visión) se acerca primero (gasta
    * metros) y ataca al llegar. Fuera de combate, atacar a un enemigo empieza el combate.
+   * `approach` = false: solo si ya llega (lo usa la acción pendiente al llegar).
    */
   public requestAttack(
     entity: Entity,
     targetEntity: Entity,
     attackId?: string | null,
+    approach = true,
   ): AttackPlan & { ok: boolean } {
     UnitObstacles.sync(this.getActingUnit());
     const plan = this.planAttack(entity, targetEntity, attackId);
@@ -565,11 +592,13 @@ export class EncounterComponent extends Component {
     const target = targetEntity.getComponent('unit') as UnitComponent;
 
     if (plan.approach) {
-      const points = plan.approach.walk.points;
-      const move = this.requestMove(entity, points[points.length - 1]!);
-      if (!move.ok) return { ...plan, ok: false, reason: move.reason ?? 'cannot approach' };
-      this.pendingAttack = { attacker: unit, target, attackId: plan.attack.id };
-      return { ...plan, ok: true };
+      const id = plan.attack.id;
+      const moved =
+        approach &&
+        this.approachThen(entity, plan.approach, () =>
+          this.requestAttack(entity, targetEntity, id, false),
+        );
+      return moved ? { ...plan, ok: true } : { ...plan, ok: false, reason: 'cannot approach' };
     }
 
     this.executeAttack(unit, target, plan.attack);
@@ -581,32 +610,72 @@ export class EncounterComponent extends Component {
   /** ¿Puede `entity` saltar hasta `destination` (punto del suelo)? Cuesta los metros saltados. */
   public planJump(entity: Entity, destination: vec3): JumpPlan {
     const unit = entity.getComponent('unit') as UnitComponent | null;
-    const result: JumpPlan = { allowed: false, points: [], distance: 0, canJump: false };
+    const result: JumpPlan = {
+      allowed: false,
+      points: [],
+      distance: 0,
+      approach: null,
+      canJump: false,
+    };
     const fail = (reason: string): JumpPlan => ({ ...result, reason });
     if (!unit) return fail('not a unit');
     if (!unit.hasAbility('jump')) return fail('cannot jump');
     const permission = this.canAct(unit, null);
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
+    const budget = this.state === 'combat' ? this.resources.movement : Infinity;
     const arc = jumpArc(unit.getFeetPosition(this.tmpA), destination);
-    if ('reason' in arc) return fail(arc.reason);
-    result.points = arc.points;
-    result.distance = arc.distance;
-    if (this.state === 'combat' && arc.distance > this.resources.movement + EPS) {
-      return fail('not enough movement');
+    if (!('reason' in arc) && arc.distance <= budget + EPS) {
+      result.points = arc.points;
+      result.distance = arc.distance;
+      result.canJump = true;
+      return result;
     }
+    const reason = 'reason' in arc ? arc.reason : 'not enough movement';
+    // Andar no arregla un aterrizaje imposible ni un salto demasiado corto.
+    if (reason === 'cannot land there' || reason === 'too close') return fail(reason);
+
+    // Andar hasta un punto de despegue desde el que llegue; andar + saltar cabe en los metros.
+    const jumpFrom = (feet: vec3) => {
+      const a = jumpArc(feet, destination);
+      return 'reason' in a ? null : a;
+    };
+    result.approach = this.planApproachTo(
+      entity,
+      destination,
+      JUMP_RINGS.map((k) => MAX_JUMP * k),
+      (feet) => jumpFrom(feet) !== null,
+      (feet) => jumpFrom(feet)?.distance ?? Infinity,
+    );
+    if (!result.approach) return fail(reason);
+    const walkEnd = result.approach.walk.points[result.approach.walk.points.length - 1]!;
+    const from = jumpFrom(walkEnd);
+    if (!from) return fail(reason);
+    result.points = from.points;
+    result.distance = from.distance;
     result.canJump = true;
     return result;
   }
 
-  public requestJump(entity: Entity, destination: vec3): JumpPlan & { ok: boolean } {
+  public requestJump(
+    entity: Entity,
+    destination: vec3,
+    approach = true,
+  ): JumpPlan & { ok: boolean } {
     UnitObstacles.sync(this.getActingUnit());
     const plan = this.planJump(entity, destination);
     if (!plan.canJump) return { ...plan, ok: false };
+    if (plan.approach) {
+      const dest = vec3.clone(destination);
+      const moved =
+        approach &&
+        this.approachThen(entity, plan.approach, () => this.requestJump(entity, dest, false));
+      return moved ? { ...plan, ok: true } : { ...plan, ok: false, reason: 'cannot approach' };
+    }
     if (this.state === 'combat') {
       this.resources.movement = Math.max(0, this.resources.movement - plan.distance);
     }
-    this.pendingAttack = null;
+    this.pendingAction = null;
     const unit = entity.getComponent('unit') as UnitComponent;
     const last = plan.points[plan.points.length - 1]!;
     unit.faceTowards(vec3.fromValues(last[0]!, unit.getPosition(this.tmpA)[1]!, last[2]!));
@@ -626,6 +695,7 @@ export class EncounterComponent extends Component {
       inReach: false,
       destination: null,
       pushLength: 0,
+      approach: null,
       canPush: false,
     };
     const fail = (reason: string): PushPlan => ({ ...result, reason });
@@ -638,24 +708,47 @@ export class EncounterComponent extends Component {
     const permission = this.canAct(unit, 'bonusAction');
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
-    if (!result.inReach) return fail('too far to push');
 
-    const from = unit.getPosition(this.tmpA);
-    const to = prop.getPosition(this.tmpB);
-    const dir = vec3.fromValues(to[0]! - from[0]!, 0, to[2]! - from[2]!);
-    if (vec3.length(dir) < 1e-4) return fail('too far to push');
-    vec3.normalize(dir, dir);
-    const length = pushDistance(prop, dir, data.getPushDistance());
-    if (length < 0.3) return fail('push blocked');
-    result.pushLength = length;
-    result.destination = vec3.scaleAndAdd(vec3.create(), prop.getFeetPosition(), dir, length);
+    // Hacia dónde iría empujándolo desde `feet` (se empuja en línea recta, alejándolo).
+    const pushFrom = (feet: vec3): { length: number; destination: vec3 } | null => {
+      const to = prop.getFeetPosition(vec3.create());
+      const dir = vec3.fromValues(to[0]! - feet[0]!, 0, to[2]! - feet[2]!);
+      if (vec3.length(dir) < 1e-4) return null;
+      vec3.normalize(dir, dir);
+      const length = pushDistance(prop, dir, data.getPushDistance());
+      if (length < 0.3) return null;
+      return { length, destination: vec3.scaleAndAdd(vec3.create(), to, dir, length) };
+    };
+    const here = unit.getFeetPosition(vec3.create());
+    let push = result.inReach ? pushFrom(here) : null;
+    if (!push) {
+      result.approach = this.planApproachTo(
+        entity,
+        prop.getFeetPosition(vec3.create()),
+        [unit.getCapsuleRadius() + prop.getCapsuleRadius() + PUSH_REACH * APPROACH_FRACTION],
+        (feet) => unitDistanceFrom(unit, feet, prop) <= PUSH_REACH + EPS && !!pushFrom(feet),
+      );
+      if (!result.approach) return fail(result.inReach ? 'push blocked' : 'too far to push');
+      const points = result.approach.walk.points;
+      push = pushFrom(points[points.length - 1]!);
+      if (!push) return fail('push blocked');
+    }
+    result.pushLength = push.length;
+    result.destination = push.destination;
     result.canPush = true;
     return result;
   }
 
-  public requestPush(entity: Entity, target: Entity): PushPlan & { ok: boolean } {
+  public requestPush(entity: Entity, target: Entity, approach = true): PushPlan & { ok: boolean } {
+    UnitObstacles.sync(this.getActingUnit());
     const plan = this.planPush(entity, target);
     if (!plan.canPush || !plan.destination) return { ...plan, ok: false };
+    if (plan.approach) {
+      const moved =
+        approach &&
+        this.approachThen(entity, plan.approach, () => this.requestPush(entity, target, false));
+      return moved ? { ...plan, ok: true } : { ...plan, ok: false, reason: 'cannot approach' };
+    }
     if (this.state === 'combat') {
       this.resources.bonusAction = Math.max(0, this.resources.bonusAction - 1);
     }
@@ -694,6 +787,7 @@ export class EncounterComponent extends Component {
       origin: null,
       direction: null,
       affected: [],
+      approach: null,
       canCast: false,
     };
     const fail = (reason: string): SkillPlan => ({ ...result, canCast: false, reason });
@@ -755,15 +849,63 @@ export class EncounterComponent extends Component {
       }
     }
 
-    if (!result.inRange) return fail('target out of range');
-    if (!result.lineOfSight) return fail('no line of sight');
     if (unit.hasStatus('fear') && isHostile(skill)) return fail('frightened');
     const permission = this.canAct(unit, skill.cost);
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
     if (this.state === 'combat' && unit.getCooldown(skill.id) > 0) return fail('on cooldown');
+    if (!result.inRange || !result.lineOfSight) {
+      // No llega o no ve: buscar desde dónde sí (unidad o punto; cono y self no se mueven).
+      result.approach = this.planSkillApproach(entity, unit, skill, targetUnit, result.origin);
+      if (!result.approach) {
+        return fail(result.inRange ? 'no line of sight' : 'target out of range');
+      }
+    }
     result.canCast = true;
     return result;
+  }
+
+  /** Dónde ponerse para que una habilidad sobre una unidad o un punto llegue y vea. */
+  private planSkillApproach(
+    entity: Entity,
+    unit: UnitComponent,
+    skill: SkillDef,
+    targetUnit: UnitComponent | null,
+    origin: vec3 | null,
+  ): MovePlan | null {
+    if (skill.target === 'unit' && targetUnit && targetUnit !== unit) {
+      return this.planApproachTo(
+        entity,
+        targetUnit.getFeetPosition(vec3.create()),
+        RANGED_RINGS.map(
+          (k) => unit.getCapsuleRadius() + targetUnit.getCapsuleRadius() + skill.range * k,
+        ),
+        (feet) =>
+          unitDistanceFrom(unit, feet, targetUnit) <= skill.range + EPS &&
+          (!skill.lineOfSight || unitLineOfSightFrom(unit, feet, targetUnit)),
+      );
+    }
+    if (skill.target !== 'point' || !origin) return null;
+    const point = origin;
+    const dash = hasEffect(skill, 'teleport');
+    return this.planApproachTo(
+      entity,
+      point,
+      RANGED_RINGS.map((k) => skill.range * k),
+      (feet) => {
+        if (Math.hypot(point[0]! - feet[0]!, point[2]! - feet[2]!) > skill.range + EPS) {
+          return false;
+        }
+        const eyeY = feet[1]! + unit.getFeetOffset() + EYE_HEIGHT;
+        const eye = vec3.fromValues(feet[0]!, eyeY, feet[2]!);
+        const aim = vec3.fromValues(point[0]!, point[1]! + POINT_AIM_HEIGHT, point[2]!);
+        if (skill.lineOfSight && !hasLineOfSight(eye, aim)) return false;
+        if (!dash) return true;
+        const a = vec3.fromValues(feet[0]!, feet[1]! + DASH_CLEARANCE, feet[2]!);
+        const b = vec3.fromValues(point[0]!, point[1]! + DASH_CLEARANCE, point[2]!);
+        return hasLineOfSight(a, b);
+      },
+    );
   }
 
   /** Lanza la habilidad si las reglas lo permiten (gasta su recurso y empieza su cooldown). */
@@ -771,17 +913,30 @@ export class EncounterComponent extends Component {
     entity: Entity,
     skillId: string,
     target: SkillTarget = {},
+    approach = true,
   ): SkillPlan & { ok: boolean } {
     UnitObstacles.sync(this.getActingUnit());
     const plan = this.planSkill(entity, skillId, target);
     if (!plan.canCast || !plan.skill || !plan.origin) return { ...plan, ok: false };
+    if (plan.approach) {
+      const saved: SkillTarget = {
+        unit: target.unit ?? null,
+        point: target.point ? vec3.clone(target.point) : null,
+      };
+      const moved =
+        approach &&
+        this.approachThen(entity, plan.approach, () =>
+          this.requestSkill(entity, skillId, saved, false),
+        );
+      return moved ? { ...plan, ok: true } : { ...plan, ok: false, reason: 'cannot approach' };
+    }
     const skill = plan.skill;
     const unit = entity.getComponent('unit') as UnitComponent;
     if (this.state === 'combat') {
       this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
       unit.setCooldown(skill.id, skill.cooldown);
     }
-    this.pendingAttack = null;
+    this.pendingAction = null;
     unit.stop(); // exploración: puede venir andando
     this.emit('skill', { unit: entity });
 
@@ -944,7 +1099,7 @@ export class EncounterComponent extends Component {
     for (const c of this.combatants) c.unit.resetCritChance();
 
     for (const c of this.combatants) c.unit.stop();
-    this.pendingAttack = null;
+    this.pendingAction = null;
     this.round = 1;
     this.turnIndex = 0;
     this.setState('combat');
@@ -958,7 +1113,7 @@ export class EncounterComponent extends Component {
     const active = this.combatants[this.turnIndex];
     if (
       active?.unit.isBusy() ||
-      this.pendingAttack ||
+      this.pendingAction ||
       this.windups.length ||
       this.pendingHits.length
     )
@@ -982,7 +1137,7 @@ export class EncounterComponent extends Component {
       if (c.unit.getFaction() === 'enemy' && c.unit.isAlive()) this.disengaged.add(c.unit);
     }
     this.combatants = [];
-    this.pendingAttack = null;
+    this.pendingAction = null;
     this.round = 0;
     this.turnIndex = 0;
     for (const u of UnitComponent.getAll()) {
@@ -1008,7 +1163,7 @@ export class EncounterComponent extends Component {
   public restart(): void {
     for (const c of this.combatants) c.unit.stop();
     this.combatants = [];
-    this.pendingAttack = null;
+    this.pendingAction = null;
     this.pendingHits = [];
     this.pendingSkills = [];
     this.windups = [];
@@ -1051,7 +1206,7 @@ export class EncounterComponent extends Component {
 
   private canAct(unit: UnitComponent, cost: 'action' | 'bonusAction' | null): string | null {
     if (!unit.isAlive()) return 'unit is down';
-    if (this.isOccupied(unit) || (this.pendingAttack && this.state === 'combat')) {
+    if (this.isOccupied(unit) || (this.pendingAction && this.state === 'combat')) {
       return 'unit is busy';
     }
     const entity = unit.getOwner();
@@ -1070,37 +1225,60 @@ export class EncounterComponent extends Component {
   }
 
   /** Mejor punto (camino más corto, dentro del presupuesto) desde el que atacar cuerpo a cuerpo. */
-  private planApproach(
+  /**
+   * Dónde ponerse para hacer algo que desde aquí no llega (atacar, saltar, empujar, una
+   * habilidad). Candidatos en anillos de `radii` metros alrededor de `center`; vale el que
+   * cumpla `fits` (las reglas de la acción desde ese sitio) y cuyo camino, más `extraCost`
+   * (p.ej. los metros del salto), quepa en el movimiento que queda. El más corto.
+   */
+  private planApproachTo(
     entity: Entity,
-    unit: UnitComponent,
-    target: UnitComponent,
-    attack: UnitAttack,
+    center: vec3,
+    radii: number[],
+    fits: (feet: vec3) => boolean,
+    extraCost: (feet: vec3) => number = () => 0,
   ): MovePlan | null {
-    const reach =
-      unit.getCapsuleRadius() + target.getCapsuleRadius() + attack.range * APPROACH_FRACTION;
-    const center = target.getFeetPosition(this.tmpA);
-    const from = unit.getFeetPosition(this.tmpB);
+    const unit = entity.getComponent('unit') as UnitComponent | null;
+    if (!unit) return null;
+    const from = unit.getFeetPosition(vec3.create());
+    const budget = this.state === 'combat' ? this.resources.movement : Infinity;
     const candidates: { point: vec3; straight: number }[] = [];
-    for (let i = 0; i < APPROACH_CANDIDATES; i++) {
-      const angle = (i / APPROACH_CANDIDATES) * Math.PI * 2;
-      const point = vec3.fromValues(
-        center[0]! + Math.cos(angle) * reach,
-        center[1]!,
-        center[2]! + Math.sin(angle) * reach,
-      );
-      candidates.push({ point, straight: vec3.distance(point, from) });
+    for (const radius of radii) {
+      for (let i = 0; i < APPROACH_CANDIDATES; i++) {
+        const angle = (i / APPROACH_CANDIDATES) * Math.PI * 2;
+        const x = center[0]! + Math.cos(angle) * radius;
+        const z = center[2]! + Math.sin(angle) * radius;
+        const y = groundHeightAt(x, z, center[1]! + 1.5) ?? center[1]!;
+        const straight = Math.hypot(x - from[0]!, z - from[2]!);
+        if (straight > budget + EPS) continue; // ningún camino es más corto que la recta
+        candidates.push({ point: vec3.fromValues(x, y, z), straight });
+      }
     }
-    candidates.sort((a, b) => a.straight - b.straight);
+    candidates.sort((p, q) => p.straight - q.straight);
 
     let best: MovePlan | null = null;
+    let bestCost = Infinity;
     for (const c of candidates) {
-      // Ningún camino es más corto que la línea recta.
-      if (best && c.straight >= best.plan.length) break;
+      if (c.straight >= bestCost) break;
+      // Las reglas primero (rayos, barato); el camino solo si desde ahí se podría.
+      if (!fits(c.point)) continue;
       const move = this.planMove(entity, c.point);
       if (!move.canMove || !move.affordable) continue;
-      if (!best || move.plan.length < best.plan.length) best = move;
+      const cost = move.plan.length + extraCost(c.point);
+      if (cost > budget + EPS || cost >= bestCost) continue;
+      best = move;
+      bestCost = cost;
     }
     return best;
+  }
+
+  /** Anda hasta el final de `approach` y, al llegar, `then` (vuelve a pedir la acción). */
+  private approachThen(entity: Entity, approach: MovePlan, then: () => void): boolean {
+    const points = approach.walk.points;
+    const move = this.requestMove(entity, points[points.length - 1]!);
+    if (!move.ok) return false;
+    this.pendingAction = { unit: entity.getComponent('unit') as UnitComponent, run: then };
+    return true;
   }
 
   private executeAttack(unit: UnitComponent, target: UnitComponent, attack: UnitAttack): void {
@@ -1125,20 +1303,12 @@ export class EncounterComponent extends Component {
     });
   }
 
-  /** Ataques en curso: el que espera a terminar de acercarse y los impactos pendientes. */
+  /** Acciones en curso: la que espera a terminar de acercarse y los impactos pendientes. */
   private updateAttacks(dt: number): void {
-    const pending = this.pendingAttack;
-    if (pending && !pending.attacker.isMoving()) {
-      this.pendingAttack = null;
-      const plan = this.planAttack(
-        pending.attacker.getOwner(),
-        pending.target.getOwner(),
-        pending.attackId,
-      );
-      // Se ha interrumpido (p.ej. empezó el combate y no es su turno): se cancela.
-      if (plan.canAttack && !plan.approach && plan.attack) {
-        this.executeAttack(pending.attacker, pending.target, plan.attack);
-      }
+    const pending = this.pendingAction;
+    if (pending && !pending.unit.isMoving()) {
+      this.pendingAction = null;
+      pending.run();
     }
 
     if (this.windups.length) {
@@ -1295,7 +1465,7 @@ export class EncounterComponent extends Component {
         console.warn(`[Encounter] AI turn of ${active.unit.getOwner().getName()} timed out`);
         this.aiTimeouts++;
         active.unit.stop();
-        this.pendingAttack = null;
+        this.pendingAction = null;
         this.windups = [];
         this.pendingHits = [];
         this.endTurn();
@@ -1626,6 +1796,7 @@ export class EncounterComponent extends Component {
               allowed: r.allowed,
               distance: r.distance,
               apex: r.points.length ? Math.max(...r.points.map((q) => q[1]!)) : null,
+              approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };
           }
@@ -1643,6 +1814,7 @@ export class EncounterComponent extends Component {
               distance: r.distance,
               pushLength: r.pushLength,
               destination: r.destination ? Array.from(r.destination) : null,
+              approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };
           }
@@ -1665,6 +1837,7 @@ export class EncounterComponent extends Component {
               inRange: r.inRange,
               lineOfSight: r.lineOfSight,
               affected: r.affected.map((u) => u.getOwner().getName()),
+              approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };
           }
