@@ -5,12 +5,20 @@ import { Engine } from '../../engine/Engine';
 import { KeyCode } from '../../../types/KeyCode.enum';
 import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
 import { TextWidget } from '../../../components/ui/widgets/TextWidget';
-import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
+import { wrapText } from '../textWrap';
 import { SmoothStepInterpolator } from '../../math/Interpolators';
 import type { CameraComponent } from '../../../components/render/CameraComponent';
 import type { Entity } from '../../ecs/Entity';
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
-import type { UnitComponent, UnitAttack } from '../../../components/game/tactical/UnitComponent';
+import type { UnitComponent } from '../../../components/game/tactical/UnitComponent';
+import {
+  COST_NAME,
+  STATUS_NAME,
+  attackSummary,
+  fmt,
+  skillMechanics,
+  turns,
+} from '../../../components/game/tactical/ActionText';
 import { SkillCatalog, type SkillDef } from '../../../components/game/tactical/Skills';
 import { MAX_JUMP } from '../../../components/game/tactical/EnvironmentRules';
 import type { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
@@ -36,7 +44,6 @@ const LINES_BOTTOM = 912;
 const LINE_WIDTH = 788;
 const HP_WIDTH = 788;
 const HP_HEIGHT = 28;
-const FONT = 'ui/fonts/ui_font.png';
 
 const SHEET_CAMERA = 'SheetCamera';
 const GAMEPLAY_CAMERA = 'PlayerCamera';
@@ -52,9 +59,6 @@ const ORBIT_SPEED = 90;
 const CAMERA_SMOOTHING = 10;
 const UP = vec3.fromValues(0, 1, 0);
 const DEG = Math.PI / 180;
-
-const COST_NAME: Record<string, string> = { action: 'Acción', bonusAction: 'Acción adicional' };
-const STATUS_NAME: Record<string, string> = { fear: 'Asustado' };
 
 /**
  * CharacterSheetController — ficha del personaje (assets/ui/character_sheet.json), tecla C.
@@ -287,13 +291,12 @@ export class CharacterSheetController extends WidgetController {
 
   /** Coloca las líneas una debajo de otra, partiendo las largas; lo que no cabe se corta. */
   private layout(content: { text: string; style: LineStyle; color?: RGBA }[]): void {
-    const metrics = UIRenderUtils.getFontMetrics(FONT) ?? null;
     let y = LINES_TOP;
     let index = 0;
     let full = false;
     for (const item of content) {
       const style = STYLES[item.style];
-      const wrapped = wrap(item.text, style.size, LINE_WIDTH, metrics);
+      const wrapped = wrapText(item.text, style.size, LINE_WIDTH);
       for (let i = 0; i < wrapped.length; i++) {
         const top = y + (i === 0 && index > 0 ? style.gap : 0);
         const line = this.lines[index];
@@ -348,70 +351,4 @@ export class CharacterSheetController extends WidgetController {
     const list = Engine.getEntities().getObjectManagerByName(manager)?.getList();
     return (list?.[0] as T | undefined) ?? null;
   }
-}
-
-/** "Cuerpo a cuerpo · alcance 1.5 m · 10 de daño · Acción". */
-function attackSummary(attack: UnitAttack): string {
-  const kind = attack.kind === 'melee' ? 'Cuerpo a cuerpo' : 'A distancia';
-  const cost = COST_NAME[attack.cost ?? 'action'];
-  return `${kind} · alcance ${fmt(attack.range)} m · ${attack.damage} de daño · ${cost}`;
-}
-
-/** Qué hace una habilidad, a partir de sus datos ("En un punto a 14 m, 2.5 m: 10 de daño…"). */
-function skillMechanics(skill: SkillDef): string {
-  const area = skill.radius > 0 ? ` (área de ${fmt(skill.radius)} m)` : '';
-  const target = {
-    unit: `${skill.targets === 'ally' ? 'Un aliado' : skill.targets === 'enemy' ? 'Un enemigo' : 'Una unidad'} a ${fmt(skill.range)} m${area}`,
-    point: `Un punto a ${fmt(skill.range)} m${area}`,
-    cone: `Cono de ${fmt(skill.length)} m`,
-    self: `Uno mismo${area}`,
-  }[skill.target];
-  const effects = skill.effects.map((e) => {
-    switch (e.type) {
-      case 'damage':
-        return `${e.amount} de daño`;
-      case 'heal':
-        return `cura ${e.amount}`;
-      case 'push':
-        return `empuja ${fmt(e.distance)} m`;
-      case 'teleport':
-        return 'carga hasta allí';
-      case 'surface':
-        return e.surface === 'fire' ? 'deja fuego' : `deja ${e.surface}`;
-      case 'status':
-        return `${(STATUS_NAME[e.status] ?? e.status).toLowerCase()} ${turns(e.turns)}`;
-    }
-  });
-  return `${target}: ${effects.join(', ')}`;
-}
-
-/** Parte un texto en líneas que quepan en `width` px de referencia. */
-function wrap(
-  text: string,
-  size: number,
-  width: number,
-  metrics: Parameters<typeof UIRenderUtils.measureText>[2],
-): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let current = '';
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (current && UIRenderUtils.measureText(candidate, size, metrics) > width) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
-function turns(n: number): string {
-  return `${n} turno${n === 1 ? '' : 's'}`;
-}
-
-function fmt(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }

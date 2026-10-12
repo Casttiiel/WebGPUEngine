@@ -65,8 +65,9 @@ export class PartyComponent extends Component {
     ModuleGameController.gameplayHuds = [
       hud,
       'CHARACTER_SHEET',
+      'CONTROLS_HELP',
       ...ModuleGameController.gameplayHuds.filter(
-        (h) => h !== 'HUD' && h !== hud && h !== 'CHARACTER_SHEET',
+        (h) => h !== 'HUD' && h !== hud && h !== 'CHARACTER_SHEET' && h !== 'CONTROLS_HELP',
       ),
     ];
   }

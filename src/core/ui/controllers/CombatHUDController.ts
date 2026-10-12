@@ -21,11 +21,13 @@ import {
   hotbarEntries,
   hotbarTooltip,
   type HotbarEntry,
+  type TooltipLine,
   type HotbarKind,
 } from '../../../components/game/tactical/Hotbar';
 import { TacticalPointerComponent } from '../../../components/game/tactical/TacticalPointerComponent';
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
 import { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
+import { wrapText } from '../textWrap';
 
 type RGBA = readonly [number, number, number, number];
 
@@ -65,6 +67,20 @@ const ARMED_HINT: Record<HotbarKind, string> = {
   push: 'elige un barril o una caja a tu lado',
   skill: 'elige un objetivo',
 };
+
+/** Tooltip de la hotbar (panel encima del hueco), en px de referencia. */
+const TIP_WIDTH = 640;
+const TIP_PAD = 22;
+const TIP_TITLE_HEIGHT = 50;
+const TIP_LINE_HEIGHT = 28;
+const TIP_LINE_SIZE = 22;
+const TIP_GAP = 14;
+const TIP_COLOR: Record<TooltipLine['style'], RGBA> = {
+  info: [0.75, 0.75, 0.8, 1],
+  description: [0.92, 0.9, 0.85, 1],
+  warning: [1, 0.45, 0.4, 1],
+};
+const HOTBAR_TOP = -130;
 
 const ACTION_ON: RGBA = [0.3, 0.85, 0.35, 1];
 const BONUS_ON: RGBA = [1, 0.6, 0.15, 1];
@@ -138,6 +154,10 @@ export class CombatHUDController extends WidgetController {
   private resMoveFill: ImageWidget | null = null;
   private resMoveText: TextWidget | null = null;
   private tooltip: TextWidget | null = null;
+  private tip: ImageWidget | null = null;
+  private tipBg: ImageWidget | null = null;
+  private tipTitle: TextWidget | null = null;
+  private tipLines: TextWidget[] = [];
   private endTurn: ImageWidget | null = null;
   private endTurnHovered = false;
   private initiative: InitiativeSlot[] = [];
@@ -358,6 +378,8 @@ export class CombatHUDController extends WidgetController {
       : encounter.getResources();
     const total = entries.length * HOTBAR_WIDTH + Math.max(0, entries.length - 1) * HOTBAR_GAP;
     let tooltip: string | null = null;
+    let hovered: { entry: HotbarEntry; x: number; enabled: boolean; cooldown: number } | null =
+      null;
 
     this.hotbar.forEach((slot, i) => {
       const entry = entries[i] ?? null;
@@ -367,7 +389,8 @@ export class CombatHUDController extends WidgetController {
         slot.hovered = false;
         return;
       }
-      slot.frame.setPosition(-total / 2 + i * (HOTBAR_WIDTH + HOTBAR_GAP), slot.frame.getY());
+      const x = -total / 2 + i * (HOTBAR_WIDTH + HOTBAR_GAP);
+      slot.frame.setPosition(x, slot.frame.getY());
       const cooldown = exploring || !unit ? 0 : unit.getCooldown(entry.id);
       const enabled = resources[entry.cost] > 0.05 && cooldown === 0;
       const frame =
@@ -377,11 +400,12 @@ export class CombatHUDController extends WidgetController {
       slot.key?.setText(exploring ? '' : String(i + 1));
       slot.name?.setText(cooldown > 0 ? `${cooldown} turno${cooldown > 1 ? 's' : ''}` : entry.name);
       slot.name?.setColor(1, 1, 1, enabled ? 1 : 0.45);
-      if (slot.hovered) tooltip = hotbarTooltip(entry, enabled, cooldown);
+      if (slot.hovered) hovered = { entry, x, enabled, cooldown };
     });
+    this.showTip(hovered);
 
     const armedEntry = entries.find((e) => e.id === armed);
-    if (!tooltip && armedEntry) {
+    if (!hovered && armedEntry) {
       const target = armedEntry.skill?.target;
       const hint =
         target === 'point'
@@ -393,6 +417,44 @@ export class CombatHUDController extends WidgetController {
     }
     this.tooltip?.setVisible(tooltip !== null);
     if (tooltip) this.tooltip?.setText(tooltip);
+  }
+
+  /** Panel con el nombre, el coste, qué hace y la descripción, encima del hueco. */
+  private showTip(
+    hovered: { entry: HotbarEntry; x: number; enabled: boolean; cooldown: number } | null,
+  ): void {
+    if (!this.tip) return;
+    if (!hovered) {
+      this.tip.setVisible(false);
+      return;
+    }
+    const { title, lines } = hotbarTooltip(hovered.entry, hovered.enabled, hovered.cooldown);
+    this.tipTitle?.setText(title);
+    let index = 0;
+    for (const line of lines) {
+      for (const text of wrapText(line.text, TIP_LINE_SIZE, TIP_WIDTH - 2 * TIP_PAD)) {
+        const widget = this.tipLines[index];
+        if (!widget) break;
+        widget.setText(text);
+        widget.setColor(...TIP_COLOR[line.style]);
+        widget.setPosition(TIP_PAD, TIP_TITLE_HEIGHT + index * TIP_LINE_HEIGHT);
+        widget.setVisible(true);
+        index++;
+      }
+    }
+    for (let i = index; i < this.tipLines.length; i++) this.tipLines[i]!.setVisible(false);
+
+    const height = TIP_TITLE_HEIGHT + index * TIP_LINE_HEIGHT + TIP_PAD;
+    this.tip.setSize(TIP_WIDTH, height);
+    this.tipBg?.setSize(TIP_WIDTH - 6, height - 6);
+    // Centrado sobre el hueco, sin salirse de la pantalla (ancla abajo-centro).
+    const half = UIRenderUtils.REFERENCE_WIDTH / 2;
+    const x = Math.min(
+      Math.max(hovered.x + HOTBAR_WIDTH / 2 - TIP_WIDTH / 2, -half + 10),
+      half - TIP_WIDTH - 10,
+    );
+    this.tip.setPosition(x, HOTBAR_TOP - TIP_GAP - height);
+    this.tip.setVisible(true);
   }
 
   // ── Texto flotante ───────────────────────────────────────────────────────
@@ -498,6 +560,7 @@ export class CombatHUDController extends WidgetController {
       this.turnBanner,
       this.resources,
       this.tooltip,
+      this.tip,
       this.endTurn,
       ...this.initiative.map((s) => s.frame),
       ...this.hotbar.map((s) => s.frame),
@@ -525,6 +588,13 @@ export class CombatHUDController extends WidgetController {
     this.resMoveFill = get<ImageWidget>('res_move_fill');
     this.resMoveText = get<TextWidget>('res_move_text');
     this.tooltip = get<TextWidget>('hotbar_tooltip');
+    this.tip = get<ImageWidget>('hotbar_tip');
+    this.tipBg = get<ImageWidget>('hotbar_tip_bg');
+    this.tipTitle = get<TextWidget>('hotbar_tip_title');
+    for (let i = 1; i <= 8; i++) {
+      const line = get<TextWidget>(`hotbar_tip_line_${i}`);
+      if (line) this.tipLines.push(line);
+    }
 
     this.endTurn = get<ImageWidget>('end_turn_button');
     this.endTurn?.setOnMouseEnter(() => (this.endTurnHovered = true));

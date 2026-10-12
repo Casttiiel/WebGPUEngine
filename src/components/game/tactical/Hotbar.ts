@@ -1,5 +1,7 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
 import { SkillCatalog, type SkillDef } from './Skills';
+import { COST_NAME, attackSummary, fmt, skillMechanics, turns } from './ActionText';
+import { MAX_JUMP } from './EnvironmentRules';
 
 export type HotbarKind = 'melee' | 'ranged' | 'jump' | 'push' | 'skill';
 export type HotbarCost = 'action' | 'bonusAction' | 'movement';
@@ -66,69 +68,44 @@ export function unitSkill(
   return SkillCatalog.get(id);
 }
 
-const COST_TEXT: Record<HotbarCost, string> = {
-  action: 'Acción',
-  bonusAction: 'Acción adicional',
-  movement: 'Movimiento',
-};
-
-/** Texto de los efectos de una habilidad: "10 daño en 2.5 m, fuego". */
-function skillEffects(skill: SkillDef): string {
-  const parts = skill.effects.map((e) => {
-    switch (e.type) {
-      case 'damage':
-        return `${e.amount} daño`;
-      case 'heal':
-        return `cura ${e.amount}`;
-      case 'push':
-        return `empuja ${e.distance} m`;
-      case 'teleport':
-        return 'se lanza en línea recta';
-      case 'surface':
-        return e.surface === 'fire' ? 'deja fuego' : 'deja aceite';
-      case 'status':
-        return `asusta ${e.turns} turno${e.turns > 1 ? 's' : ''}: huye y no puede atacar`;
-    }
-  });
-  const area =
-    skill.target === 'cone'
-      ? `cono de ${skill.length} m`
-      : skill.radius > 0
-        ? `área de ${skill.radius} m`
-        : skill.target === 'self'
-          ? 'a uno mismo'
-          : null;
-  return [area, ...parts].filter(Boolean).join(', ');
+/** Una línea del tooltip: datos (gris), descripción (gris claro) o por qué no se puede (rojo). */
+export interface TooltipLine {
+  text: string;
+  style: 'info' | 'description' | 'warning';
 }
 
 /**
- * Texto del tooltip de la hotbar (con lo que falta si no se puede usar).
- * `cooldown`: turnos que le quedan a una habilidad.
+ * Tooltip de un hueco de la hotbar: el nombre y las líneas (coste, recarga, qué hace, la
+ * descripción y lo que falta si no se puede usar). Los mismos textos que la ficha del
+ * personaje (ActionText). `cooldown`: turnos que le quedan a una habilidad.
  */
-export function hotbarTooltip(entry: HotbarEntry, enabled: boolean, cooldown = 0): string {
-  const cost = COST_TEXT[entry.cost];
-  let parts: string[];
+export function hotbarTooltip(
+  entry: HotbarEntry,
+  enabled: boolean,
+  cooldown = 0,
+): { title: string; lines: TooltipLine[] } {
+  const lines: TooltipLine[] = [];
+  const info = (text: string) => lines.push({ text, style: 'info' });
   if (entry.attack) {
-    const kind = entry.kind === 'melee' ? 'cuerpo a cuerpo' : 'a distancia, requiere visión';
-    parts = [
-      entry.name,
-      cost,
-      kind,
-      `alcance ${entry.attack.range} m`,
-      `${entry.attack.damage} daño`,
-    ];
+    info(attackSummary(entry.attack));
+    if (entry.kind === 'ranged') info('Necesita línea de visión.');
   } else if (entry.skill) {
     const s = entry.skill;
-    parts = [entry.name, cost];
-    if (s.range > 0) parts.push(`alcance ${s.range} m`);
-    parts.push(skillEffects(s));
-    if (s.cooldown > 0) parts.push(`recarga ${s.cooldown} turnos`);
+    const recharge = s.cooldown > 0 ? ` · recarga ${turns(s.cooldown)}` : '';
+    info(`${COST_NAME[s.cost]}${recharge}`);
+    info(skillMechanics(s));
+    if (s.description) lines.push({ text: s.description, style: 'description' });
   } else if (entry.kind === 'jump') {
-    parts = [entry.name, 'gasta los metros saltados', 'por encima de cajas y muros bajos'];
+    info(`Movimiento · hasta ${fmt(MAX_JUMP)} m, gasta los metros saltados`);
+    lines.push({ text: 'Por encima de cajas y muros bajos.', style: 'description' });
   } else {
-    parts = [entry.name, cost, 'aparta un barril o una caja adyacente'];
+    info(`${COST_NAME.bonusAction} · aleja un objeto que tengas al lado`);
+    lines.push({ text: 'Desliza una caja o un barril.', style: 'description' });
   }
-  if (cooldown > 0) parts.push(`disponible en ${cooldown} turno${cooldown > 1 ? 's' : ''}`);
-  else if (!enabled) parts.push(`sin ${cost.toLowerCase()}`);
-  return parts.join(' · ');
+  if (cooldown > 0) {
+    lines.push({ text: `Disponible en ${turns(cooldown)}`, style: 'warning' });
+  } else if (!enabled) {
+    lines.push({ text: `Sin ${COST_NAME[entry.cost]!.toLowerCase()}`, style: 'warning' });
+  }
+  return { title: entry.name, lines };
 }

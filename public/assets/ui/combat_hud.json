@@ -1949,5 +1949,183 @@
     },
     "blocksInput": false,
     "visible": false
+  },
+  {
+    "name": "hotbar_tip",
+    "alias": "hotbar_tip",
+    "type": "image",
+    "x": -320,
+    "y": -370,
+    "width": 640,
+    "height": 220,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [640, 220],
+      "color": [0.75, 0.6, 0.3, 0.9]
+    },
+    "blocksInput": false,
+    "anchor": "bottom-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "hotbar_tip_bg",
+        "alias": "hotbar_tip_bg",
+        "type": "image",
+        "x": 3,
+        "y": 3,
+        "width": 634,
+        "height": 214,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [634, 214],
+          "color": [0.05, 0.05, 0.07, 0.95]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_title",
+        "alias": "hotbar_tip_title",
+        "type": "text",
+        "x": 22,
+        "y": 12,
+        "width": 596,
+        "height": 38,
+        "textParams": {
+          "text": "",
+          "size": [30, 30],
+          "color": [1, 0.84, 0.5, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_1",
+        "alias": "hotbar_tip_line_1",
+        "type": "text",
+        "x": 22,
+        "y": 56,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_2",
+        "alias": "hotbar_tip_line_2",
+        "type": "text",
+        "x": 22,
+        "y": 84,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_3",
+        "alias": "hotbar_tip_line_3",
+        "type": "text",
+        "x": 22,
+        "y": 112,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_4",
+        "alias": "hotbar_tip_line_4",
+        "type": "text",
+        "x": 22,
+        "y": 140,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_5",
+        "alias": "hotbar_tip_line_5",
+        "type": "text",
+        "x": 22,
+        "y": 168,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_6",
+        "alias": "hotbar_tip_line_6",
+        "type": "text",
+        "x": 22,
+        "y": 196,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_7",
+        "alias": "hotbar_tip_line_7",
+        "type": "text",
+        "x": 22,
+        "y": 224,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "hotbar_tip_line_8",
+        "alias": "hotbar_tip_line_8",
+        "type": "text",
+        "x": 22,
+        "y": 252,
+        "width": 596,
+        "height": 28,
+        "textParams": {
+          "text": "",
+          "size": [22, 22],
+          "color": [0.75, 0.75, 0.8, 1],
+          "align": "left"
+        },
+        "blocksInput": false
+      }
+    ]
   }
 ]

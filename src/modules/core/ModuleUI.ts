@@ -10,6 +10,7 @@ import { HUDController } from '../../core/ui/controllers/HUDController';
 import { PartyHUDController } from '../../core/ui/controllers/PartyHUDController';
 import { CombatHUDController } from '../../core/ui/controllers/CombatHUDController';
 import { CharacterSheetController } from '../../core/ui/controllers/CharacterSheetController';
+import { ControlsHelpController } from '../../core/ui/controllers/ControlsHelpController';
 import { Render } from '../../renderer/core/pipeline/Render';
 import type { WidgetClass, WidgetToLerp, WidgetController, Widget } from '../../types/WidgetTypes';
 
@@ -79,6 +80,12 @@ export class ModuleUI extends Module {
       'character_sheet.json',
       parser,
       new CharacterSheetController(),
+    );
+    await this.registerWidgetClass(
+      'CONTROLS_HELP',
+      'controls_help.json',
+      parser,
+      new ControlsHelpController(),
     );
 
     // Pause menu

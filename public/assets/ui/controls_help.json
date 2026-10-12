@@ -1,0 +1,726 @@
+[
+  {
+    "name": "help_hint",
+    "alias": "help_hint",
+    "type": "text",
+    "x": -260,
+    "y": 16,
+    "width": 240,
+    "height": 30,
+    "textParams": {
+      "text": "H: controles",
+      "size": [
+        22,
+        22
+      ],
+      "color": [
+        0.75,
+        0.75,
+        0.8,
+        1
+      ],
+      "align": "center"
+    },
+    "blocksInput": false,
+    "anchor": "top-right",
+    "visible": true
+  },
+  {
+    "name": "help_panel",
+    "alias": "help_panel",
+    "type": "image",
+    "x": -580,
+    "y": 56,
+    "width": 560,
+    "height": 528,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [
+        560,
+        528
+      ],
+      "color": [
+        0.75,
+        0.6,
+        0.3,
+        0.9
+      ]
+    },
+    "blocksInput": false,
+    "anchor": "top-right",
+    "visible": false,
+    "children": [
+      {
+        "name": "help_bg",
+        "alias": "help_bg",
+        "type": "image",
+        "x": 3,
+        "y": 3,
+        "width": 554,
+        "height": 522,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            554,
+            522
+          ],
+          "color": [
+            0.05,
+            0.05,
+            0.07,
+            0.92
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_title",
+        "alias": "help_title",
+        "type": "text",
+        "x": 22,
+        "y": 16,
+        "width": 516,
+        "height": 40,
+        "textParams": {
+          "text": "Controles",
+          "size": [
+            30,
+            30
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_0",
+        "alias": "help_key_0",
+        "type": "text",
+        "x": 22,
+        "y": 66,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "Click izquierdo",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_0",
+        "alias": "help_action_0",
+        "type": "text",
+        "x": 232,
+        "y": 66,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Mover, atacar o interactuar",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_1",
+        "alias": "help_key_1",
+        "type": "text",
+        "x": 22,
+        "y": 98,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "Click derecho / Esc",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_1",
+        "alias": "help_action_1",
+        "type": "text",
+        "x": 232,
+        "y": 98,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Cancelar la acción armada",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_2",
+        "alias": "help_key_2",
+        "type": "text",
+        "x": 22,
+        "y": 130,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "1-4 / Tab",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_2",
+        "alias": "help_action_2",
+        "type": "text",
+        "x": 232,
+        "y": 130,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Elegir personaje (exploración)",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_3",
+        "alias": "help_key_3",
+        "type": "text",
+        "x": 22,
+        "y": 162,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "1-7",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_3",
+        "alias": "help_action_3",
+        "type": "text",
+        "x": 232,
+        "y": 162,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Hotbar (combate)",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_4",
+        "alias": "help_key_4",
+        "type": "text",
+        "x": 22,
+        "y": 194,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "Espacio",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_4",
+        "alias": "help_action_4",
+        "type": "text",
+        "x": 232,
+        "y": 194,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Terminar el turno",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_6",
+        "alias": "help_key_6",
+        "type": "text",
+        "x": 22,
+        "y": 238,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "WASD / bordes",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_6",
+        "alias": "help_action_6",
+        "type": "text",
+        "x": 232,
+        "y": 238,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Mover la cámara",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_7",
+        "alias": "help_key_7",
+        "type": "text",
+        "x": 22,
+        "y": 270,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "Q / E",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_7",
+        "alias": "help_action_7",
+        "type": "text",
+        "x": 232,
+        "y": 270,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Girar la cámara",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_8",
+        "alias": "help_key_8",
+        "type": "text",
+        "x": 22,
+        "y": 302,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "Rueda",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_8",
+        "alias": "help_action_8",
+        "type": "text",
+        "x": 232,
+        "y": 302,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Zoom",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_9",
+        "alias": "help_key_9",
+        "type": "text",
+        "x": 22,
+        "y": 334,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "Botón central",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_9",
+        "alias": "help_action_9",
+        "type": "text",
+        "x": 232,
+        "y": 334,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Arrastrar (con Shift: girar)",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_10",
+        "alias": "help_key_10",
+        "type": "text",
+        "x": 22,
+        "y": 366,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "F / Inicio",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_10",
+        "alias": "help_action_10",
+        "type": "text",
+        "x": 232,
+        "y": 366,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Seguir / centrar al personaje",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_12",
+        "alias": "help_key_12",
+        "type": "text",
+        "x": 22,
+        "y": 410,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "C",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_12",
+        "alias": "help_action_12",
+        "type": "text",
+        "x": 232,
+        "y": 410,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Ficha del personaje",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_13",
+        "alias": "help_key_13",
+        "type": "text",
+        "x": 22,
+        "y": 442,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "R",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_13",
+        "alias": "help_action_13",
+        "type": "text",
+        "x": 232,
+        "y": 442,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Reiniciar el encuentro",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_key_14",
+        "alias": "help_key_14",
+        "type": "text",
+        "x": 22,
+        "y": 474,
+        "width": 210,
+        "height": 32,
+        "textParams": {
+          "text": "H",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "help_action_14",
+        "alias": "help_action_14",
+        "type": "text",
+        "x": 232,
+        "y": 474,
+        "width": 306,
+        "height": 32,
+        "textParams": {
+          "text": "Mostrar / ocultar esta ayuda",
+          "size": [
+            22,
+            22
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "left"
+        },
+        "blocksInput": false
+      }
+    ]
+  }
+]
