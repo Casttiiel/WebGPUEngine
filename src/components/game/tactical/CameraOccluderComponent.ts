@@ -8,6 +8,7 @@ import { RenderComponent } from '../../render/RenderComponent';
 import { UnitComponent } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import type { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
+import type { ActionCameraComponent } from './ActionCameraComponent';
 
 export type CameraOccluderComponentDataType = Readonly<{
   /** Material que se usa mientras tapa la vista (p.ej. uno con tramado semitransparente). */
@@ -24,7 +25,8 @@ const PIVOT_HEIGHT = 0.5;
  * cuando se interpone entre la cámara y lo que hay que ver: la party, los enemigos vivos y
  * el punto al que mira la cámara (su pivote), como en BG3.
  *
- * Cada frame lanza rayos de la cámara a esas unidades contra su propio collider. Mientras
+ * Cada frame lanza rayos de la cámara a esas unidades (y al punto que mira el plano de acción,
+ * si hay uno) contra su propio collider. Mientras
  * tapa, sus partes usan `fadedMaterial`; después vuelven a su material. Estas entidades
  * no se instancian (InstanceManager), así cada una cambia de material por separado.
  */
@@ -93,10 +95,18 @@ function viewRays(): { ray: RAPIER.Ray; length: number }[] {
     p[1] = p[1]! + AIM_HEIGHT;
     targets.push(p);
   }
+  // Durante un plano de acción se mira a su punto, no al pivote del rig táctico.
+  const shotLook = (
+    Engine.getEntities().getObjectManagerByName('action_camera')?.getList()[0] as
+      | ActionCameraComponent
+      | undefined
+  )?.getLookPoint();
   const rig = Engine.getEntities()
     .getObjectManagerByName('tactical_camera_controller')
     ?.getList()[0] as TacticalCameraControllerComponent | undefined;
-  if (rig) {
+  if (shotLook) {
+    targets.push(vec3.clone(shotLook));
+  } else if (rig) {
     const pivot = vec3.clone(rig.getPivot());
     pivot[1] = pivot[1]! + PIVOT_HEIGHT;
     targets.push(pivot);

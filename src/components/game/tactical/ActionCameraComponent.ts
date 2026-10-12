@@ -8,7 +8,7 @@ import { PhysicsDebugDrawer } from '../../../renderer/debug/PhysicsDebugDrawer';
 import { CameraComponent } from '../../render/CameraComponent';
 import { UnitComponent } from './UnitComponent';
 import type { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
-import { groundHeightAt } from './TacticalQueries';
+import { groundHeightAt, hasLineOfSight } from './TacticalQueries';
 
 export type ActionCameraComponentDataType = Readonly<{
   /** Grados que se abre el plano respecto a la línea atacante→objetivo (por encima del hombro). */
@@ -38,6 +38,8 @@ const UP = vec3.fromValues(0, 1, 0);
 const TRACK_SMOOTHING = 5;
 /** Distancia mínima del ojo al suelo que tiene debajo. */
 const MIN_EYE_CLEARANCE = 0.75;
+/** Altura (sobre el centro de la cápsula) a la que se comprueba que se ve a cada unidad. */
+const AIM_HEIGHT = 0.5;
 
 /**
  * ActionCameraComponent — plano de acción para ataques y habilidades.
@@ -78,6 +80,8 @@ export class ActionCameraComponent extends Component {
 
   private readonly tmpEye = vec3.create();
   private readonly tmpLook = vec3.create();
+  private readonly tmpTestEye = vec3.create();
+  private readonly tmpAim = vec3.create();
 
   public load(data: ActionCameraComponentDataType): void {
     this.angle = data.angle ?? this.angle;
@@ -180,8 +184,9 @@ export class ActionCameraComponent extends Component {
   // ── Interno ──────────────────────────────────────────────────────────────
 
   /**
-   * Mirando de atacante a objetivos, abierto `angle` grados hacia el lado más cercano a la
-   * vista actual (el cambio de plano se lee mejor). null si no hay dirección.
+   * Mirando de atacante a objetivos, abierto `angle` grados hacia un lado: el que deje ver a
+   * más unidades (sin muros ni columnas delante) y, a igualdad, el más cercano a la vista
+   * actual (el cambio de plano se lee mejor). null si no hay dirección.
    */
   private chooseYaw(source: Entity, targets: (Entity | vec3)[]): number | null {
     const points = this.collect(source, targets);
@@ -196,9 +201,47 @@ export class ActionCameraComponent extends Component {
     if (Math.hypot(dx, dz) < 0.3) return null;
     const along = Math.atan2(dx, dz) / DEG;
     const current = this.shot ? this.yaw : (this.getTactical()?.getYaw() ?? along);
-    const left = shortestAngle(current, along + this.angle);
-    const right = shortestAngle(current, along - this.angle);
-    return current + (Math.abs(left) < Math.abs(right) ? left : right);
+    const sides = [along + this.angle, along - this.angle]
+      .map((yaw) => current + shortestAngle(current, yaw))
+      .sort((a, b) => Math.abs(a - current) - Math.abs(b - current));
+    let best = sides[0]!;
+    let bestBlocked = Infinity;
+    for (const yaw of sides) {
+      if (!this.compose(source, targets, yaw)) continue;
+      const eye = this.eyeFor(this.targetCenter, this.targetDistance, yaw, this.tmpTestEye);
+      const blocked = points.filter((p) => {
+        const aim = vec3.set(this.tmpAim, p[0]!, p[1]! + AIM_HEIGHT, p[2]!);
+        return !hasLineOfSight(eye, aim);
+      }).length;
+      if (blocked < bestBlocked) {
+        best = yaw;
+        bestBlocked = blocked;
+      }
+    }
+    return best;
+  }
+
+  /** Posición del ojo para un encuadre (centro en el suelo, distancia, yaw en grados). */
+  private eyeFor(center: vec3, distance: number, yawDeg: number, out: vec3): vec3 {
+    const pitch = this.pitch * DEG;
+    const yaw = yawDeg * DEG;
+    const lookY = center[1]! + this.lookHeight;
+    vec3.set(
+      out,
+      center[0]! - Math.sin(yaw) * Math.cos(pitch) * distance,
+      lookY + Math.sin(pitch) * distance,
+      center[2]! - Math.cos(yaw) * Math.cos(pitch) * distance,
+    );
+    const ground = groundHeightAt(out[0]!, out[2]!);
+    if (ground !== null && out[1]! < ground + MIN_EYE_CLEARANCE) {
+      out[1] = ground + MIN_EYE_CLEARANCE;
+    }
+    return out;
+  }
+
+  /** Punto al que mira el plano en curso (los oclusores lo dejan a la vista). null fuera de un plano. */
+  public getLookPoint(): vec3 | null {
+    return this.shot ? this.tmpLook : null;
   }
 
   /** Centro y distancia que encuadran a todos con la vista `yaw` → targetCenter/targetDistance. */
@@ -225,16 +268,26 @@ export class ActionCameraComponent extends Component {
     const midF = (minF + maxF) / 2;
     vec3.set(this.targetCenter, -fz * midR + fx * midF, minY, fx * midR + fz * midF);
 
+    // Distancia para que cada punto quepa en pantalla a su propia profundidad: el atacante
+    // está más cerca de la cámara que el centro, así que con perspectiva ocupa más.
     const camera = (this.getOwner().getComponent('camera') as CameraComponent).getCamera();
     const tanV = Math.tan(camera.getFov() / 2);
     const tanH = tanV * camera.getAspectRatio();
-    const halfWidth = (maxR - minR) / 2 + this.margin;
-    const halfDepth = ((maxF - minF) / 2) * Math.sin(this.pitch * DEG) + this.margin;
-    this.targetDistance = clamp(
-      Math.max(halfWidth / tanH, halfDepth / tanV),
-      this.minDistance,
-      this.maxDistance,
-    );
+    const sinP = Math.sin(this.pitch * DEG);
+    const cosP = Math.cos(this.pitch * DEG);
+    let needed = 0;
+    for (const p of points) {
+      const r = Math.abs(-fz * p[0]! + fx * p[2]! - midR) + this.margin;
+      const f = fx * p[0]! + fz * p[2]! - midF;
+      const depthOffset = f * cosP; // + más lejos que el centro
+      needed = Math.max(
+        needed,
+        r / tanH - depthOffset,
+        (Math.abs(f) * sinP + this.margin) / tanV - depthOffset,
+      );
+    }
+    // El travelling acerca la cámara al final del plano: que sigan cabiendo.
+    this.targetDistance = clamp(needed / (1 - this.push), this.minDistance, this.maxDistance);
     return true;
   }
 
@@ -256,21 +309,10 @@ export class ActionCameraComponent extends Component {
 
   /** Coloca la cámara. `t` (0..1): progreso del plano, para el travelling hacia dentro. */
   private apply(t: number): void {
-    const pitch = this.pitch * DEG;
-    const yaw = this.yaw * DEG;
     const ease = t * t * (3 - 2 * t);
     const distance = this.distance * (1 - this.push * ease);
     vec3.set(this.tmpLook, this.center[0]!, this.center[1]! + this.lookHeight, this.center[2]!);
-    vec3.set(
-      this.tmpEye,
-      this.tmpLook[0]! - Math.sin(yaw) * Math.cos(pitch) * distance,
-      this.tmpLook[1]! + Math.sin(pitch) * distance,
-      this.tmpLook[2]! - Math.cos(yaw) * Math.cos(pitch) * distance,
-    );
-    const ground = groundHeightAt(this.tmpEye[0]!, this.tmpEye[2]!);
-    if (ground !== null && this.tmpEye[1]! < ground + MIN_EYE_CLEARANCE) {
-      this.tmpEye[1] = ground + MIN_EYE_CLEARANCE;
-    }
+    this.eyeFor(this.center, distance, this.yaw, this.tmpEye);
     const camera = (this.getOwner().getComponent('camera') as CameraComponent).getCamera();
     camera.lookAt(this.tmpEye, this.tmpLook, UP);
   }

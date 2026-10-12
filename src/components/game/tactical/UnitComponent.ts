@@ -58,6 +58,8 @@ export type UnitComponentDataType = Readonly<{
   hideWhenDown?: boolean;
   /** Habilidades (ids de data/skills.json), en el orden de la hotbar. Default: ninguna. */
   skills?: string[];
+  /** % de golpe crítico de los ataques (cuerpo a cuerpo y a distancia). Default 0. */
+  critChance?: number;
 }>;
 
 /** Estado alterado (miedo…). Dura `turns` turnos de la unidad afectada. */
@@ -107,6 +109,9 @@ export class UnitComponent extends Component {
   /** Turnos que le quedan a cada habilidad para volver a estar disponible. */
   private cooldowns = new Map<string, number>();
   private statuses = new Map<UnitStatusId, UnitStatus>();
+  private critChance = 0;
+  /** Ataques que han impactado sin crítico desde el último (PRD). */
+  private critMisses = 0;
   private pathSpeed = 4;
   private pathTurns = true;
   /** Segundos que le quedan a la acción en curso (animación de ataque). */
@@ -136,6 +141,7 @@ export class UnitComponent extends Component {
     this.abilities = [...(data.abilities ?? [])];
     this.hideWhenDown = data.hideWhenDown ?? false;
     this.skills = [...(data.skills ?? [])];
+    this.critChance = data.critChance ?? 0;
   }
 
   public update(dt: number): void {
@@ -213,6 +219,40 @@ export class UnitComponent extends Component {
 
   public clearCooldowns(): void {
     this.cooldowns.clear();
+  }
+
+  // ── Críticos ─────────────────────────────────────────────────────────────
+  //
+  // Distribución pseudoaleatoria (PRD) de Warcraft III / Dota 2 en vez de una tirada
+  // independiente: el N-ésimo ataque desde el último crítico tiene P(N) = C·N. Cada ataque sin
+  // crítico sube la probabilidad, el crítico la reinicia, y antes o después es seguro (P = 1).
+  // C se elige para que de media salga el % de la estadística: con un 20 %, C ≈ 0.0557 (5.6 %,
+  // 11 %, 17 %… seguro al 18.º). Se reinicia también al empezar o acabar un combate. Cada
+  // unidad lleva su cuenta.
+
+  /** % de crítico (la estadística: la media a la larga). */
+  public getCritChance(): number {
+    return this.critChance;
+  }
+
+  /** Probabilidad (0-1) de que el próximo ataque que impacte sea crítico. */
+  public getNextCritChance(): number {
+    if (this.critChance <= 0) return 0;
+    return Math.min(1, prdConstant(this.critChance / 100) * (this.critMisses + 1));
+  }
+
+  /** Tira el crítico de un ataque que ha impactado. */
+  public rollCrit(): boolean {
+    const chance = this.getNextCritChance();
+    if (chance <= 0) return false;
+    const crit = chance >= 1 || Math.random() < chance;
+    this.critMisses = crit ? 0 : this.critMisses + 1;
+    return crit;
+  }
+
+  /** Vuelve a la probabilidad inicial (al salir un crítico, empezar o acabar un combate). */
+  public resetCritChance(): void {
+    this.critMisses = 0;
   }
 
   // ── Estados ──────────────────────────────────────────────────────────────
@@ -380,6 +420,7 @@ export class UnitComponent extends Component {
     this.stop();
     this.clearCooldowns();
     this.clearStatuses();
+    this.resetCritChance();
     this.setDown(false);
     this.getHealth()?.restore();
     this.actionTimer = 0;
@@ -474,6 +515,39 @@ export class UnitComponent extends Component {
     const order: Record<UnitFaction, number> = { party: 0, enemy: 1, neutral: 2 };
     return [...list].sort((a, b) => order[a.faction] - order[b.faction]);
   }
+}
+
+const prdConstants = new Map<number, number>();
+
+/**
+ * Constante C de la PRD para una probabilidad media `p` (0-1). No tiene fórmula cerrada: se
+ * busca (bisección) la C cuya media de ataques hasta el crítico sea 1/p.
+ */
+export function prdConstant(p: number): number {
+  if (p >= 1) return 1;
+  const cached = prdConstants.get(p);
+  if (cached !== undefined) return cached;
+  // Probabilidad media con una C dada: 1 / (ataques esperados hasta el crítico).
+  const average = (c: number): number => {
+    let expected = 0;
+    let noCritYet = 1;
+    for (let n = 1; noCritYet > 0; n++) {
+      const chance = Math.min(1, c * n);
+      expected += n * chance * noCritYet;
+      noCritYet *= 1 - chance;
+    }
+    return 1 / expected;
+  };
+  let lo = 0;
+  let hi = p;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if (average(mid) < p) lo = mid;
+    else hi = mid;
+  }
+  const c = (lo + hi) / 2;
+  prdConstants.set(p, c);
+  return c;
 }
 
 /** Muestra u oculta todos los RenderComponent de una entidad y sus hijos. */

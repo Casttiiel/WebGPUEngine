@@ -76,6 +76,7 @@ const FLOAT_RISE = 0.8; // m/s
 const FLOAT_HEIGHT = 1.3; // m sobre el centro de la unidad
 const FLOAT_WIDTH = 240;
 const FLOAT_DAMAGE: RGBA = [1, 0.35, 0.25, 1];
+const FLOAT_CRIT: RGBA = [1, 0.85, 0.2, 1];
 const FLOAT_MISS: RGBA = [0.85, 0.85, 0.85, 1];
 const FLOAT_HEAL: RGBA = [0.4, 1, 0.45, 1];
 const FLOAT_DOWN: RGBA = [0.7, 0.7, 0.75, 1];
@@ -223,6 +224,7 @@ export class CombatHUDController extends WidgetController {
         const amount = `-${Math.round(data.amount ?? 0)}`;
         if (!data.hit) this.spawnFloat(unit, 'Fallo', FLOAT_MISS);
         else if (data.cause === 'fire') this.spawnFloat(unit, `${amount} fuego`, FLOAT_FIRE);
+        else if (data.crit) this.spawnFloat(unit, `¡Crítico! ${amount}`, FLOAT_CRIT);
         else this.spawnFloat(unit, amount, FLOAT_DAMAGE);
         break;
       }

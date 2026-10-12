@@ -587,7 +587,7 @@ export class TacticalPointerComponent extends Component {
     }
   }
 
-  /** "Enemy1 · 12/20 PV · Espada 100 % · 10 daño" (o el motivo por el que no se puede). */
+  /** "Enemy1 · 12/20 PV · Espada 100 % · 10 daño · crítico 25 %" (o el motivo por el que no se puede). */
   private unitTooltip(unit: UnitComponent): string {
     const parts = [unit.getDisplayName()];
     if (unit.getMaxHp() > 0) parts.push(`${Math.ceil(unit.getHp())}/${unit.getMaxHp()} PV`);
@@ -598,6 +598,7 @@ export class TacticalPointerComponent extends Component {
       if (plan.canAttack || plan.allowed) {
         parts.push(`${plan.attack.name} ${Math.round(plan.hitChance * 100)} %`);
         parts.push(`${plan.damage} daño`);
+        if (plan.critChance > 0) parts.push(`crítico ${Math.round(plan.critChance * 100)} %`);
       }
       if (!plan.canAttack && plan.reason) parts.push(reasonText(plan.reason));
     } else if (this.hoverKind === 'neutral' && plan?.attack) {

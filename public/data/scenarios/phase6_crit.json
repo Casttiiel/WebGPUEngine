@@ -1,0 +1,151 @@
+{
+  "description": "Fase 6: golpe crítico con distribución pseudoaleatoria (PRD, como Warcraft III / Dota 2). El N-ésimo ataque desde el último crítico tiene P(N) = C·N; C se elige para que de media salga el % de la estadística (20 % → C ≈ 0.0557, seguro al 18.º). Doble daño. Cada unidad lleva su cuenta, que se reinicia al salir el crítico y al empezar o acabar un combate. Las habilidades no critican.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 7,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__log = []; Engine.getEntities().getObjectManagerByName('encounter').getList()[0].onEvent((e, d) => { if (e === 'damage') window.__log.push({ u: d.unit.getName(), amount: d.amount, crit: !!d.crit, cause: d.cause }); })"
+    },
+
+    { "log": "La estadística (media a la larga): héroes 20 %, enemigos 10 %" },
+    { "assert": { "entity": "Hero1", "path": "unit.getCritChance", "value": 20 } },
+    { "assert": { "entity": "Enemy1", "path": "unit.getCritChance", "value": 10 } },
+    {
+      "assert": {
+        "expr": "['Hero1', 'Enemy1'].map(n => (__unit(n).getNextCritChance() * 100).toFixed(2))",
+        "value": ["5.57", "1.47"],
+        "message": "PRD: el primer ataque tiene C (20 % → 5.57 %, 10 % → 1.47 %; los valores de la tabla de Dota 2)"
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const u = __unit('Hero1'); const c = u.getNextCritChance(); return [1, 2, 3, 17].map(k => { u.critMisses = k; return Math.abs(u.getNextCritChance() - Math.min(1, c * (k + 1))) < 1e-12; }).concat([u.getNextCritChance() === 1]); })()",
+        "value": [true, true, true, true, true],
+        "message": "P(N) = C·N: sube con cada ataque sin crítico y al 18.º es seguro"
+      }
+    },
+
+    { "log": "De media sale el % de la estadística y nunca pasan más de 18 ataques sin crítico" },
+    {
+      "assert": {
+        "expr": "(() => { const u = __unit('Hero1'); u.resetCritChance(); let crits = 0; let since = 0; let maxGap = 0; for (let i = 0; i < 20000; i++) { since++; if (u.rollCrit()) { crits++; maxGap = Math.max(maxGap, since); since = 0; } } return [crits / 20000 > 0.19 && crits / 20000 < 0.21, maxGap <= 18]; })()",
+        "value": [true, true]
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const u = __unit('Enemy1'); u.resetCritChance(); let crits = 0; for (let i = 0; i < 20000; i++) if (u.rollCrit()) crits++; return crits / 20000 > 0.09 && crits / 20000 < 0.11; })()",
+        "value": true,
+        "message": "10 % de media"
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const u = __unit('Hero1'); u.critMisses = 17; const crit = u.rollCrit(); return [crit, u.critMisses]; })()",
+        "value": [true, 0],
+        "message": "el crítico reinicia la probabilidad"
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const a = __unit('Hero1'); const b = __unit('Hero2'); a.critMisses = 3; b.resetCritChance(); return [a.getNextCritChance() > b.getNextCritChance(), b.critMisses]; })()",
+        "value": [true, 0],
+        "message": "cada unidad lleva su cuenta"
+      }
+    },
+
+    { "log": "Un ataque con el crítico asegurado: doble daño y texto flotante" },
+    { "command": "select", "args": { "unit": "Hero2" } },
+    { "command": "move", "args": { "unit": "Hero2", "to": [-5, 0, 12] } },
+    {
+      "wait_until": { "entity": "Hero2", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 900
+    },
+    { "command": "move", "args": { "unit": "Hero2", "to": [-2.5, 0, 13] } },
+    {
+      "wait_until": { "entity": "Hero2", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 300
+    },
+    { "assert": { "combat": true, "path": "state", "value": "exploration" } },
+    { "eval": "__unit('Hero2').critMisses = 17" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Enemy1' }).then(r => [r.attack, r.damage, r.critChance])",
+        "value": ["ranged", 6, 1]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('attack', { unit: 'Hero2', target: 'Enemy1' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    { "wait_frames": 40 },
+    { "assert": { "entity": "Enemy1", "path": "health.getHp", "value": 8, "message": "6 × 2" } },
+    {
+      "assert": {
+        "expr": "window.__log.filter(l => l.u === 'Enemy1').map(l => [l.amount, l.crit])",
+        "value": [[12, true]]
+      }
+    },
+    {
+      "assert": {
+        "expr": "[1, 2, 3, 4, 5, 6, 7, 8].some(i => __engine.getWidgetRect('float_' + i).visible)",
+        "value": true,
+        "message": "texto flotante del crítico"
+      }
+    },
+    { "screenshot": "01-crit" },
+
+    { "log": "Atacar primero empieza el combate: la probabilidad de todos vuelve a la inicial" },
+    { "assert": { "combat": true, "path": "state", "value": "combat" } },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().units.every(u => __unit(u.name).critMisses === 0)",
+        "value": true
+      }
+    },
+
+    { "log": "Las habilidades no critican" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero2' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "value": true
+      },
+      "timeout_frames": 1500,
+      "check_every": 5
+    },
+    { "eval": "__unit('Hero2').critMisses = 17; window.__log = []" },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Hero2', skill: 'fireball', to: [6, 0, 5.5] }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    { "wait_frames": 60 },
+    {
+      "assert": {
+        "expr": "window.__log.filter(l => l.cause === 'skill').length > 0 && window.__log.filter(l => l.cause === 'skill').every(l => !l.crit)",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "entity": "Hero2",
+        "path": "unit.getNextCritChance",
+        "value": 1,
+        "message": "la habilidad no tira crítico"
+      }
+    },
+
+    { "log": "Al acabar el combate la probabilidad vuelve a la inicial" },
+    { "command": "end_combat" },
+    { "assert": { "expr": "__unit('Hero2').critMisses", "value": 0 } },
+    { "assert": { "no_errors": true } }
+  ]
+}

@@ -90,6 +90,7 @@
     },
     "unit": {
       "faction": "enemy",
+      "critChance": 10,
       "moveSpeed": 3.5,
       "movement": 7,
       "sightRange": 8,

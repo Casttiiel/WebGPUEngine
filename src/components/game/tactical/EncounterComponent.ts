@@ -65,6 +65,8 @@ export interface EncounterEventData {
   source?: Entity | null;
   amount?: number;
   hit?: boolean;
+  /** Golpe crítico (evento damage). */
+  crit?: boolean;
   /** Origen del daño (texto flotante). */
   cause?: DamageCause;
   /** Estado aplicado o expirado (eventos status / status-end). */
@@ -159,6 +161,8 @@ export interface AttackPlan {
   canAttack: boolean;
   hitChance: number;
   damage: number;
+  /** Probabilidad (0-1) de crítico si impacta en el próximo ataque del atacante (PRD). */
+  critChance: number;
   reason?: string;
 }
 
@@ -167,6 +171,7 @@ interface PendingHit {
   attacker: UnitComponent;
   target: UnitComponent;
   hit: boolean;
+  crit: boolean;
   damage: number;
 }
 
@@ -492,6 +497,7 @@ export class EncounterComponent extends Component {
       canAttack: false,
       hitChance: 0,
       damage: 0,
+      critChance: 0,
     };
     const fail = (reason: string): AttackPlan => ({ ...result, reason });
     if (!unit || !target) return fail('not a unit');
@@ -508,6 +514,7 @@ export class EncounterComponent extends Component {
     const roll = previewAttack(unit, target, attack);
     result.hitChance = roll.hitChance;
     result.damage = roll.damage;
+    result.critChance = roll.critChance;
 
     const permission = this.canAct(unit, attack.cost ?? 'action');
     result.allowed = permission === null;
@@ -902,6 +909,8 @@ export class EncounterComponent extends Component {
       this.combatants.push(this.rollInitiative(m.getComponent('unit') as UnitComponent));
     for (const e of enemies) this.combatants.push(this.rollInitiative(e));
     this.combatants.sort(compareInitiative);
+    // La probabilidad de crítico vuelve a la inicial al empezar el combate.
+    for (const c of this.combatants) c.unit.resetCritChance();
 
     for (const c of this.combatants) c.unit.stop();
     this.pendingAttack = null;
@@ -942,6 +951,7 @@ export class EncounterComponent extends Component {
     for (const u of UnitComponent.getAll()) {
       u.clearCooldowns();
       u.clearStatuses();
+      u.resetCritChance();
     }
     if (result === 'victory') {
       // Como en BG3: los caídos se levantan al terminar el combate.
@@ -1090,7 +1100,7 @@ export class EncounterComponent extends Component {
       due.push(h);
       return false;
     });
-    for (const h of due) this.applyHit(h.attacker, h.target, h.hit, h.damage, 'attack');
+    for (const h of due) this.applyHit(h.attacker, h.target, h.hit, h.damage, 'attack', h.crit);
   }
 
   private applyHit(
@@ -1099,6 +1109,7 @@ export class EncounterComponent extends Component {
     hit: boolean,
     damage: number,
     cause: DamageCause,
+    crit = false,
   ): void {
     if (!target.isAlive()) return;
     const health = target.getHealth();
@@ -1110,6 +1121,7 @@ export class EncounterComponent extends Component {
       source: attacker?.getOwner() ?? null,
       amount: dealt,
       hit,
+      crit: hit && crit,
       cause,
     });
 
@@ -1431,6 +1443,8 @@ export class EncounterComponent extends Component {
           hp: u.getHp(),
           maxHp: u.getMaxHp(),
           alive: u.isAlive(),
+          critChance: u.getCritChance(),
+          nextCritChance: u.getNextCritChance(),
           statuses: u.getStatuses().map((st) => ({
             id: st.id,
             turns: st.turns,
@@ -1466,6 +1480,7 @@ export class EncounterComponent extends Component {
           approach: r.approach ? r.approach.plan.length : null,
           hitChance: r.hitChance,
           damage: r.damage,
+          critChance: r.critChance,
           reason: r.reason ?? null,
         });
         switch (name) {

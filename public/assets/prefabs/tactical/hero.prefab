@@ -90,6 +90,7 @@
     },
     "unit": {
       "faction": "party",
+      "critChance": 20,
       "moveSpeed": 4,
       "movement": 9,
       "attacks": [

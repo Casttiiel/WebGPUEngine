@@ -9,6 +9,8 @@ import { hasLineOfSight } from './TacticalQueries';
 
 /** Altura de los ojos sobre el centro de la cápsula. */
 export const EYE_HEIGHT = 0.7;
+/** Multiplicador del daño de un golpe crítico. */
+export const CRIT_MULTIPLIER = 2;
 
 const tmpA = vec3.create();
 const tmpB = vec3.create();
@@ -63,29 +65,36 @@ export function unitLineOfSightFrom(
 export interface AttackRoll {
   /** Probabilidad de impacto (0-1). */
   hitChance: number;
-  /** Daño si impacta. */
+  /** Daño si impacta (sin crítico). */
   damage: number;
+  /** Probabilidad (0-1) de que sea crítico si impacta: la de su próximo ataque (PRD). */
+  critChance: number;
 }
 
 /**
- * Probabilidad de impacto y daño de un ataque. Hoy: 100 % y daño fijo del arma.
+ * Probabilidad de impacto, daño y crítico de un ataque. Hoy: 100 % y daño fijo del arma.
  * Punto de enganche para stats (atributos, armadura, ventaja por altura, cobertura…).
  */
 export function previewAttack(
-  _attacker: UnitComponent,
+  attacker: UnitComponent,
   _target: UnitComponent,
   attack: UnitAttack,
 ): AttackRoll {
-  return { hitChance: 1, damage: attack.damage };
+  return { hitChance: 1, damage: attack.damage, critChance: attacker.getNextCritChance() };
 }
 
-/** Tira el ataque. Con 100 % de impacto no consume números del RNG. */
+/**
+ * Tira el ataque. Con 100 % de impacto no consume números del RNG para el impacto; si impacta
+ * tira el crítico con la PRD del atacante (UnitComponent.rollCrit).
+ */
 export function rollAttack(
   attacker: UnitComponent,
   target: UnitComponent,
   attack: UnitAttack,
-): { hit: boolean; damage: number } {
+): { hit: boolean; crit: boolean; damage: number } {
   const roll = previewAttack(attacker, target, attack);
   const hit = roll.hitChance >= 1 || Math.random() < roll.hitChance;
-  return { hit, damage: hit ? roll.damage : 0 };
+  if (!hit) return { hit, crit: false, damage: 0 };
+  const crit = attacker.rollCrit();
+  return { hit, crit, damage: crit ? Math.round(roll.damage * CRIT_MULTIPLIER) : roll.damage };
 }
