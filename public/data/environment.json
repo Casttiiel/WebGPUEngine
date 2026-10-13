@@ -8,5 +8,15 @@
   "skybox": "qwantani_mid_morning_puresky_1k.hdr",
   "skyboxType": "procedural",
   "timeOfDay": 0.4,
+  "clouds": {
+    "type": "flat",
+    "volumetric": {
+      "coverage": 0.58
+    },
+    "flat": {
+      "opacity": 1.0,
+      "coverage": 0.3
+    }
+  },
   "ssrEnvironment": "ReflectionProbe_cubemap_T.png"
 }

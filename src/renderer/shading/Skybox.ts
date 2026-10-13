@@ -139,7 +139,7 @@ export class Skybox {
     uniformData[8] = this.windOffset; // windOffset      | byte 32
     uniformData[9] = envManager.cloudScale; // cloudScale      | byte 36
     uniformData[10] = envManager.cloudCoverage; // cloudCoverage  | byte 40
-    uniformData[11] = envManager.cloudOpacity; // cloudOpacity    | byte 44
+    uniformData[11] = envManager.getFlatCloudOpacity(); // cloudOpacity (0 unless clouds.type = flat) | byte 44
     uniformData[12] = envManager.cloudLayers; // cloudLayers     | byte 48
     uniformData[13] = envManager.cloudColor[0]; // cloudColorR | byte 52
     uniformData[14] = envManager.cloudColor[1]; // cloudColorG | byte 56

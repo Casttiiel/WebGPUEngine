@@ -197,7 +197,9 @@ fn render_clouds(
     night_factor: f32,
     sun_height: f32,
 ) -> vec3<f32> {
-    if (world_dir.y <= 0.001) {
+    // Clouds disabled (opacity 0 — clouds.type != "flat"): skip the whole domain-warped FBM.
+    // cloudOpacity is a uniform, so the branch is coherent and costs nothing.
+    if (u_procedural.cloudOpacity <= 0.0 || world_dir.y <= 0.001) {
         return sky_color;
     }
 

@@ -67,6 +67,16 @@ export class ModuleEnvironmentManager extends Module {
   public cloudOpacity: number = 0.0; // max cloud opacity (0 = hidden)
   public cloudColor: [number, number, number] = [1, 1, 1]; // normalized 0-1 (white = no tint)
 
+  /**
+   * Which cloud system is active (environment.json → "clouds.type"):
+   *  - 'volumetric': ray-marched VolumetricClouds (default)
+   *  - 'flat':       2D FBM clouds painted by the procedural sky (cloud* fields above)
+   *  - 'none':       no clouds
+   */
+  public cloudsType: CloudsType = 'volumetric';
+  /** Volumetric cloud settings from environment.json ("clouds.volumetric"), applied on load. */
+  private volumetricCloudSettings: VolumetricCloudSettings = {};
+
   constructor(name: string) {
     super(name);
   }
@@ -84,6 +94,7 @@ export class ModuleEnvironmentManager extends Module {
     const jsonData = await response.json();
 
     this.skyboxType = jsonData.skyboxType || 'cubemap';
+    this.loadCloudSettings(jsonData.clouds);
     this.timeOfDay = jsonData.timeOfDay ?? 0.5;
 
     // Derive scene name from the first entry in boot.json for probe naming/file scoping
@@ -662,6 +673,50 @@ export class ModuleEnvironmentManager extends Module {
       });
   }
 
+  /**
+   * Parses the optional "clouds" block of environment.json:
+   *   "clouds": {
+   *     "type": "volumetric" | "flat" | "none",
+   *     "flat":       { "opacity", "coverage", "scale", "thickness", "layers", "distanceFade", "color" },
+   *     "volumetric": { "base", "top", "coverage", "density", "absorption", "scatterStrength",
+   *                     "frequency", "stepCount", "lightSteps", "fadeRadius", "resolutionDivisor" }
+   *   }
+   * Every field is optional; omitted ones keep their defaults.
+   */
+  private loadCloudSettings(clouds: CloudsJson | undefined): void {
+    if (!clouds) return;
+    if (clouds.type === 'volumetric' || clouds.type === 'flat' || clouds.type === 'none') {
+      this.cloudsType = clouds.type;
+    } else if (clouds.type !== undefined) {
+      console.warn(`[Environment] Unknown clouds.type "${clouds.type}" — using "volumetric"`);
+    }
+
+    const flat = clouds.flat ?? {};
+    // Flat clouds are hidden by default (opacity 0): make them visible when selected
+    this.cloudOpacity = flat.opacity ?? (this.cloudsType === 'flat' ? 1.0 : this.cloudOpacity);
+    if (flat.coverage !== undefined) this.cloudCoverage = flat.coverage;
+    if (flat.scale !== undefined) this.cloudScale = flat.scale;
+    if (flat.thickness !== undefined) this.cloudThickness = flat.thickness;
+    if (flat.layers !== undefined) this.cloudLayers = flat.layers;
+    if (flat.distanceFade !== undefined) this.cloudDistanceFade = flat.distanceFade;
+    if (flat.color !== undefined) this.cloudColor = flat.color;
+
+    this.volumetricCloudSettings = clouds.volumetric ?? {};
+  }
+
+  public getCloudsType(): CloudsType {
+    return this.cloudsType;
+  }
+
+  public getVolumetricCloudSettings(): Readonly<VolumetricCloudSettings> {
+    return this.volumetricCloudSettings;
+  }
+
+  /** Opacity of the sky's 2D clouds — zero unless the flat cloud system is selected. */
+  public getFlatCloudOpacity(): number {
+    return this.cloudsType === 'flat' ? this.cloudOpacity : 0.0;
+  }
+
   public override renderInMenu(): void {
     const gui = Engine.getGUI();
     if (!gui.getIsVisible()) return;
@@ -705,6 +760,9 @@ export class ModuleEnvironmentManager extends Module {
 
     // Time of Day slider with .listen() for automatic updates
     folder.add(this, 'timeOfDay', 0.0, 1.0).name('Time of Day').listen();
+
+    // ── Clouds ──
+    folder.add(this, 'cloudsType', ['volumetric', 'flat', 'none']).name('Clouds').listen();
 
     // ── Wind ──
     folder.add(Wind, 'speed', 0.0, 0.5).name('Wind Speed').listen();
@@ -754,4 +812,35 @@ export class ModuleEnvironmentManager extends Module {
   public getSunDirection(): vec3 {
     return this.sunDir;
   }
+}
+
+export type CloudsType = 'volumetric' | 'flat' | 'none';
+
+/** Overrides for VolumetricClouds (environment.json → "clouds.volumetric"). */
+export interface VolumetricCloudSettings {
+  base?: number; // world-Y of the cloud bottom (m)
+  top?: number; // world-Y of the cloud top (m)
+  coverage?: number; // 0 = sparse … 1 = overcast
+  density?: number;
+  absorption?: number;
+  scatterStrength?: number;
+  frequency?: number;
+  stepCount?: number;
+  lightSteps?: number;
+  fadeRadius?: number; // m
+  resolutionDivisor?: number; // render at 1/N resolution
+}
+
+interface CloudsJson {
+  type?: string;
+  flat?: {
+    opacity?: number;
+    coverage?: number;
+    scale?: number;
+    thickness?: number;
+    layers?: number;
+    distanceFade?: number;
+    color?: [number, number, number];
+  };
+  volumetric?: VolumetricCloudSettings;
 }
