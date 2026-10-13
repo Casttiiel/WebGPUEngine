@@ -48,10 +48,6 @@
     "vignette": {
       "intensity": 0.3,
       "smoothness": 0.2
-    },
-    "chromatic_aberration": {
-      "intensity": 0.5,
-      "startOffset": 0
     }
   }
 }

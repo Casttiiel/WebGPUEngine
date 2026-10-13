@@ -15,16 +15,23 @@ struct SMAAParams {
 @group(1) @binding(2) var<uniform> params: SMAAParams;
 
 
+// Input is linear (gamma is applied in presentation.fs). SMAA edge detection must run
+// on gamma-encoded color so the threshold behaves perceptually (dark edges detected).
+// Neighborhood blending stays in linear space, as the SMAA reference recommends.
+fn toGamma(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
+}
+
 // Edge detection function
 fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
-    let c = textureSample(colorTex, colorSampler, uv).rgb;
+    let c = toGamma(textureSample(colorTex, colorSampler, uv).rgb);
 
     // Neighbors
-    let cL = textureSample(colorTex, colorSampler, offset[0].xy).rgb;
+    let cL = toGamma(textureSample(colorTex, colorSampler, offset[0].xy).rgb);
     var t = abs(c - cL);
     let deltaX = max(max(t.r, t.g), t.b);
 
-    let cT = textureSample(colorTex, colorSampler, offset[0].zw).rgb;
+    let cT = toGamma(textureSample(colorTex, colorSampler, offset[0].zw).rgb);
     t = abs(c - cT);
     let deltaY = max(max(t.r, t.g), t.b);
 
@@ -35,11 +42,11 @@ fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
         return vec2<f32>(0.0);
     }
 
-    let cR = textureSampleLevel(colorTex, colorSampler, offset[1].xy, 0.0).rgb;
+    let cR = toGamma(textureSampleLevel(colorTex, colorSampler, offset[1].xy, 0.0).rgb);
     t = abs(c - cR);
     var deltaZ = max(max(t.r, t.g), t.b);
 
-    let cB = textureSampleLevel(colorTex, colorSampler, offset[1].zw, 0.0).rgb;
+    let cB = toGamma(textureSampleLevel(colorTex, colorSampler, offset[1].zw, 0.0).rgb);
     t = abs(c - cB);
     var deltaW = max(max(t.r, t.g), t.b);
 
@@ -47,11 +54,11 @@ fn colorEdgeDetection(uv: vec2<f32>, offset: array<vec4<f32>, 3>) -> vec2<f32> {
     var maxDelta = max(vec2<f32>(deltaX, deltaY), vec2<f32>(deltaZ, deltaW));
 
     // Calculate left-left and top-top deltas:
-    let cLL = textureSampleLevel(colorTex, colorSampler, offset[2].xy, 0.0).rgb;
+    let cLL = toGamma(textureSampleLevel(colorTex, colorSampler, offset[2].xy, 0.0).rgb);
     t = abs(c - cLL);
     deltaZ = max(max(t.r, t.g), t.b);
 
-    let cTT = textureSampleLevel(colorTex, colorSampler, offset[2].zw, 0.0).rgb;
+    let cTT = toGamma(textureSampleLevel(colorTex, colorSampler, offset[2].zw, 0.0).rgb);
     t = abs(c - cTT);
     deltaW = max(max(t.r, t.g), t.b);
 

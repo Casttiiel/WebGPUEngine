@@ -17,8 +17,12 @@ const QUALITY: array<f32, 12> = array<f32, 12>(
     4.0, 8.0
 );
 
+// Input is linear (gamma is applied in presentation.fs). FXAA thresholds are tuned
+// for perceptual luma, so encode to gamma for edge detection only — the final
+// blend still samples the linear texture.
 fn luma(c: vec3<f32>) -> f32 {
-    return dot(c, vec3<f32>(0.299, 0.587, 0.114));
+    let g = pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
+    return dot(g, vec3<f32>(0.299, 0.587, 0.114));
 }
 
 fn sampleLuma(uv: vec2<f32>) -> f32 {

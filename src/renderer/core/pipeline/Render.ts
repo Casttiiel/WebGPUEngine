@@ -47,8 +47,8 @@ export class Render {
 
     // Configurar tamaño del canvas considerando la densidad de píxeles del dispositivo
     const dpr = window.devicePixelRatio || 1;
-    const width = Math.floor(Math.max(1, canvas.clientWidth * dpr));
-    const height = Math.floor(Math.max(1, canvas.clientHeight * dpr));
+    const width = Math.round(Math.max(1, canvas.clientWidth * dpr));
+    const height = Math.round(Math.max(1, canvas.clientHeight * dpr));
 
     canvas.width = width;
     canvas.height = height;
@@ -200,13 +200,33 @@ export class Render {
   }
 
   private setupResizeObserver(): void {
+    // Track the exact physical pixel size of the canvas. clientWidth * dpr is
+    // inexact with fractional DPR (1.25, 1.5...), which makes the browser resample
+    // the backbuffer when compositing and adds visible aliasing.
+    let devicePixelSize: { width: number; height: number } | null = null;
+    const exactObserver = new ResizeObserver((entries) => {
+      const box = entries[0]?.devicePixelContentBoxSize?.[0];
+      if (box) devicePixelSize = { width: box.inlineSize, height: box.blockSize };
+    });
+    try {
+      exactObserver.observe(this.canvas, { box: 'device-pixel-content-box' });
+    } catch {
+      // Not supported (Safari) — fall back to clientWidth * dpr below
+    }
+
     setupResizeEvents(
       this.canvas,
       () => {},
       () => {
         const dpr = window.devicePixelRatio || 1;
-        const width = Math.floor(Math.max(1, this.canvas.clientWidth * dpr));
-        const height = Math.floor(Math.max(1, this.canvas.clientHeight * dpr));
+        const width = Math.max(
+          1,
+          devicePixelSize?.width ?? Math.round(this.canvas.clientWidth * dpr),
+        );
+        const height = Math.max(
+          1,
+          devicePixelSize?.height ?? Math.round(this.canvas.clientHeight * dpr),
+        );
 
         this.resizeAndNotify(width, height);
       },

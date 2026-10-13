@@ -39,8 +39,7 @@ NewSponza_Curtains_glTF/
 
 VISUAL-GUIDE.md
 old/
+examples/
 bin/
-proceduralSkyShader-main/
-UnrealRetroShaders-master/
 # MCP outputs (screenshots, scenario captures)
 .mcp-out/
