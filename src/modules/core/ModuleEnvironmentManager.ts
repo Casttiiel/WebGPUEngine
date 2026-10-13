@@ -47,6 +47,7 @@ interface EnvironmentBlendState {
 
 export class ModuleEnvironmentManager extends Module {
   private ssrEnvironmentTexture!: Cubemap;
+  private environmentSH: Float32Array | null = null;
   private skyboxTexture!: HDRTexture;
   private ambientLightData!: AmbientEnvironmentData;
   private skyboxType: string = 'cubemap';
@@ -90,22 +91,39 @@ export class ModuleEnvironmentManager extends Module {
       'rgba16float', // HDR texture format
     ]);
 
-    const response = await ResourceManager.fetch(`/data/environment.json`);
+    // boot.json puede elegir el fichero de entorno ("environment"); por defecto environment.json.
+    // Derive scene name from the first entry in boot.json for probe naming/file scoping
+    let environmentFile = 'environment.json';
+    try {
+      const bootResp = await ResourceManager.fetch('data/boot.json');
+      const bootData = (await bootResp.json()) as {
+        scenes_to_load?: string[];
+        environment?: string;
+      };
+      const first = bootData.scenes_to_load?.[0] ?? 'scene.json';
+      this.sceneName = first.replace(/\.json$/i, '');
+      if (bootData.environment) environmentFile = bootData.environment;
+    } catch {
+      this.sceneName = 'scene';
+    }
+
+    // Dev: un scenario (`?scenario=nombre`) puede traer su propio "environment" (un fichero
+    // de data/) que sustituye al de boot.json.
+    if (import.meta.env.DEV) {
+      const scenarioName = new URLSearchParams(window.location.search).get('scenario');
+      if (scenarioName) {
+        const scenarioResp = await ResourceManager.fetch(`data/scenarios/${scenarioName}.json`);
+        const scenario = (await scenarioResp.json()) as { environment?: string };
+        if (scenario.environment) environmentFile = scenario.environment;
+      }
+    }
+
+    const response = await ResourceManager.fetch(`/data/${environmentFile}`);
     const jsonData = await response.json();
 
     this.skyboxType = jsonData.skyboxType || 'cubemap';
     this.loadCloudSettings(jsonData.clouds);
     this.timeOfDay = jsonData.timeOfDay ?? 0.5;
-
-    // Derive scene name from the first entry in boot.json for probe naming/file scoping
-    try {
-      const bootResp = await ResourceManager.fetch('data/boot.json');
-      const bootData = (await bootResp.json()) as { scenes_to_load?: string[] };
-      const first = bootData.scenes_to_load?.[0] ?? 'scene.json';
-      this.sceneName = first.replace(/\.json$/i, '');
-    } catch {
-      this.sceneName = 'scene';
-    }
 
     const [skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
       HDRTexture.getAsync(jsonData.skybox),
@@ -116,9 +134,11 @@ export class ModuleEnvironmentManager extends Module {
       globalFactor: jsonData.ambient.globalFactor,
       diffuseFactor: jsonData.ambient.diffuseFactor,
       reflectionFactor: jsonData.ambient.reflectionFactor,
+      environmentIntensity: jsonData.ambient.environmentIntensity ?? 1.0,
     };
     this.skyboxTexture = skyboxTexture;
     this.ssrEnvironmentTexture = ssrEnvironmentTexture;
+    this.environmentSH = await this.projectEnvironmentSH(ssrEnvironmentTexture);
 
     return true;
   }
@@ -147,6 +167,9 @@ export class ModuleEnvironmentManager extends Module {
         reflectionFactor:
           this.blendState.startData.reflectionFactor * (1.0 - ratio) +
           this.blendState.targetData.reflectionFactor * ratio,
+        environmentIntensity:
+          this.blendState.startData.environmentIntensity * (1.0 - ratio) +
+          this.blendState.targetData.environmentIntensity * ratio,
       };
 
       if (this.blendState.blendedWeight >= 1.0) {
@@ -758,6 +781,11 @@ export class ModuleEnvironmentManager extends Module {
         Engine.getRender().getDeferredRenderer().resetAmbientLightResources();
       });
 
+    folder
+      .add(this.ambientLightData, 'environmentIntensity', 0.0, 5.0)
+      .name('Env Reflection Intensity')
+      .listen();
+
     // Time of Day slider with .listen() for automatic updates
     folder.add(this, 'timeOfDay', 0.0, 1.0).name('Time of Day').listen();
 
@@ -785,6 +813,23 @@ export class ModuleEnvironmentManager extends Module {
 
   public getSSREnvironmentTexture(): Cubemap {
     return this.ssrEnvironmentTexture;
+  }
+
+  /** SH L2 irradiance of the global environment (HDR sources only), used when no probe covers a point. */
+  public getEnvironmentSH(): Float32Array | null {
+    return this.environmentSH;
+  }
+
+  /**
+   * Projects an HDR (rgba16float) environment cubemap into SH irradiance, so the diffuse ambient
+   * comes from the same environment as the specular. LDR cubemaps return null (no diffuse IBL).
+   */
+  private async projectEnvironmentSH(cubemap: Cubemap): Promise<Float32Array | null> {
+    const texture = cubemap.getTexture();
+    if (!texture || texture.format !== 'rgba16float') return null;
+    // A low mip is plenty for L2 SH and keeps the CPU projection cheap
+    const mip = Math.min(2, texture.mipLevelCount - 1);
+    return SHProjector.projectFromGPUTexture(texture, texture.width, mip);
   }
 
   public getSkyboxType(): string {

@@ -113,12 +113,20 @@ export class Entity {
       titleEl.addEventListener('mouseleave', () => Entity._onGuiHover?.(null));
     }
 
-    for (const component of this.components.values()) {
-      component.renderInEntityPanel(this._editorFolder);
-    }
-
-    for (const child of this.children) {
-      child.renderInMenu(this._editorFolder);
-    }
+    // Build the contents lazily on first open: with thousands of entities, eagerly creating
+    // every component panel adds tens of thousands of controllers, and each `.listen()` one
+    // runs its own requestAnimationFrame loop even inside closed folders.
+    const folder = this._editorFolder;
+    let built = false;
+    folder.onOpenClose((changed: any) => {
+      if (built || changed !== folder || changed._closed) return;
+      built = true;
+      for (const component of this.components.values()) {
+        component.renderInEntityPanel(folder);
+      }
+      for (const child of this.children) {
+        child.renderInMenu(folder);
+      }
+    });
   }
 }

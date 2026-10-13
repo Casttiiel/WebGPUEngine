@@ -14,7 +14,7 @@ import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import type { AmbientLight } from './AmbientLight';
 
 // Must match SSRTraceParams in ssr_common.wgsl: 4 × mat4 + 28 × f32
-const TRACE_PARAMS_FLOATS = 4 * 16 + 28;
+const TRACE_PARAMS_FLOATS = 4 * 16 + 32;
 // Same max prefiltered mip as ambient_specular.fs
 const ENV_MAX_MIP = 7;
 
@@ -453,7 +453,9 @@ export class ScreenSpaceReflections {
     d[o++] = p.smoothDisocclusions ? 1 : 0;
     d[o++] = p.adaptiveTrust;
     d[o++] = p.multiBounce ? 1 : 0;
-    d[o++] = Engine.getEnvironmentManager().getAmbientLightData().reflectionFactor;
+    const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
+    d[o++] = ambientData.reflectionFactor;
+    d[o++] = ambientData.environmentIntensity;
     GPUUtils.writeBuffer(this.traceParamsBuffer, 0, d);
   }
 

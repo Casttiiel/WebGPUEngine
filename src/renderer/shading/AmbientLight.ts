@@ -269,9 +269,9 @@ export class AmbientLight {
 
     const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
     const blend = ProbeManager.getInstance().getBlendedProbes();
-    // hasProbeA is 1 only when SH coefficients are actually loaded — otherwise fall back to
-    // the global irradiance cubemap so there's no black frame during async JSON load.
-    const shCoefA = blend.probeA?.getSHCoefficients() ?? null;
+    // hasProbeA is 1 only when SH coefficients are available (probe, else the HDR environment's)
+    // — otherwise the shader uses its hemisphere fallback so there's no black frame during load.
+    const shCoefA = this._getSHA(blend);
     const hasProbeA = shCoefA !== null ? 1.0 : 0.0;
 
     this.ambientDiffuseUniformArray[0] = ambientData.globalFactor;
@@ -283,7 +283,7 @@ export class AmbientLight {
     GPUUtils.writeBuffer(this.ambientDiffuseUniformBuffer, 0, this.ambientDiffuseUniformArray);
 
     this.ambientSpecularUniformArray[0] = ambientData.globalFactor;
-    this.ambientSpecularUniformArray[1] = 0.0;
+    this.ambientSpecularUniformArray[1] = ambientData.environmentIntensity;
     this.ambientSpecularUniformArray[2] = 0.0;
     this.ambientSpecularUniformArray[3] = 0.0;
     this.ambientSpecularUniformArray[4] = 0.0;
@@ -341,8 +341,12 @@ export class AmbientLight {
    * When no probe is active, writes zeros so hasProbeA=0 causes the shader to fall back
    * to the global irradiance cubemap.
    */
+  private _getSHA(blend: ReturnType<typeof ProbeManager.prototype.getBlendedProbes>): Float32Array | null {
+    return blend.probeA?.getSHCoefficients() ?? Engine.getEnvironmentManager().getEnvironmentSH();
+  }
+
   private _writeSHUniforms(blend: ReturnType<typeof ProbeManager.prototype.getBlendedProbes>): void {
-    const shA = blend.probeA?.getSHCoefficients() ?? null;
+    const shA = this._getSHA(blend);
     const shB = blend.probeB?.getSHCoefficients() ?? shA; // fall back to A when no B
 
     const writeSH = (coefs: Float32Array | null, base: number): void => {

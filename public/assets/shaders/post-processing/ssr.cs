@@ -70,7 +70,7 @@ fn sampleEnvironment(worldPos: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<
     let hasA = pccData.probeAPos.w > 0.5;
     let hasB = pccData.probeBPos.w > 0.5;
     let envBlended = mix(envA, envB, pccData.blendWeight);
-    return select(select(envGlobal, envA, hasA), envBlended, hasA && hasB);
+    return select(select(envGlobal, envA, hasA), envBlended, hasA && hasB) * params.environmentIntensity;
 }
 
 // Indirect specular the hit surface reflects toward the ray origin, from last frame's
@@ -91,12 +91,12 @@ fn multiBounce(hitUv: vec2<f32>, hitWorldPosition: vec3<f32>) -> vec3<f32> {
     let V  = normalize(camera.cameraPosition.xyz - hitWorldPosition);
     let NoV = clamp(dot(N, V), 0.0, 1.0);
     let brdf = textureSampleLevel(brdfLUT, linearSampler, vec2<f32>(NoV, 1.0 - r), 0.0).rg;
-    let F    = F0 + (max(vec3<f32>(1.0 - r), F0) - F0) * pow(1.0 - NoV, 5.0);
-    // Kulla-Conty multi-scattering compensation, as in ambient_specular.fs
+    // Split-sum with multi-scattering compensation, as in ambient_specular.fs
+    let FssEss = F0 * brdf.x + brdf.y;
     let Ems  = 1.0 - (brdf.x + brdf.y);
     let Favg = F0 + (1.0 - F0) / 21.0;
-    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
-    let splitSum = F * brdf.x + brdf.y + Fms;
+    let Fms  = FssEss * Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+    let splitSum = FssEss + Fms;
 
     return history.rgb * splitSum * params.specularBoost * (1.0 - history.a);
 }
@@ -165,7 +165,14 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     let d0 = uv * resolution;
     let d1 = ssrScreenFromClip(camera.projectionMatrix * vec4<f32>(d1viewPosition, 1.0)) * resolution;
     let rayVec = d1 - d0;
-    let rayLen = max(max(abs(rayVec.x), abs(rayVec.y)), 1.0);
+    // Clip the march to the screen: s ∈ [0, sMax]. Otherwise the coarse far steps jump
+    // off-screen and the loop exits before testing the surface the ray actually crosses.
+    var sMax = 1.0;
+    if (rayVec.x > 0.0) { sMax = min(sMax, (resolution.x - d0.x) / rayVec.x); }
+    if (rayVec.x < 0.0) { sMax = min(sMax, -d0.x / rayVec.x); }
+    if (rayVec.y > 0.0) { sMax = min(sMax, (resolution.y - d0.y) / rayVec.y); }
+    if (rayVec.y < 0.0) { sMax = min(sMax, -d0.y / rayVec.y); }
+    let rayLen = max(max(abs(rayVec.x), abs(rayVec.y)) * sMax, 1.0);
 
     let totalStep = i32(max(clamp(params.quality, 0.0, 1.0) * MAX_STEPS, 1.0));
     let invResolution = 1.0 / resolution;
@@ -179,21 +186,39 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     var hitUv    = vec2<f32>(0.0);
     var hitDepth = 0.0;
 
+    var sPrev = 0.0;
     for (var i = 1; i < totalStep; i++) {
         // Exponential remap concentrating samples near the origin, floored to ≥ 1 texel/step;
         // the jitter (noise.z) dissolves banding.
         let fi = f32(i);
-        let s  = max(pow((fi + Xi.z - 0.5) / f32(totalStep), params.stepExponent), fi / rayLen);
-        let xy = d0 + rayVec * s;
+        let sStep = sMax * max(pow((fi + Xi.z - 0.5) / f32(totalStep), params.stepExponent), fi / rayLen);
+        let xy = d0 + rayVec * sStep;
         if (xy.x < 0.0 || xy.x > resolution.x || xy.y < 0.0 || xy.y > resolution.y) { break; }
 
-        let uvS = xy * invResolution;
-        let d   = ssrSampleDepth(uvS);
-        let vZ  = -d * camera.cameraFar;
-        let rayZ = 1.0 / (recipVPZ + s * (recipD1VPZ - recipVPZ));
+        var uvS  = xy * invResolution;
+        var d    = ssrSampleDepth(uvS);
+        let rayZ = 1.0 / (recipVPZ + sStep * (recipD1VPZ - recipVPZ));
 
-        if (rayZ <= vZ) {
-            // Depth crossing: gate by thickness so an occluder gap doesn't stop the march.
+        if (rayZ <= -d * camera.cameraFar) {
+            // Depth crossing somewhere in (sPrev, sStep]. The far steps span many pixels, so
+            // bisect to the actual crossing before the thickness test — otherwise the sample
+            // lands well past the surface and the test rejects real hits.
+            var lo = sPrev;
+            var hi = sStep;
+            for (var j = 0; j < 6; j++) {
+                let sMid  = 0.5 * (lo + hi);
+                let uvMid = (d0 + rayVec * sMid) * invResolution;
+                let dMid  = ssrSampleDepth(uvMid);
+                if (1.0 / (recipVPZ + sMid * (recipD1VPZ - recipVPZ)) <= -dMid * camera.cameraFar) {
+                    hi = sMid;
+                    uvS = uvMid;
+                    d = dMid;
+                } else {
+                    lo = sMid;
+                }
+            }
+
+            // Gate by thickness so an occluder gap doesn't stop the march.
             let vP   = ssrViewPosition(uvS, d);
             let away = pointToLineDistance(vP, viewPosition, d1viewPosition);
             let vPNeighbor   = ssrViewPosition(uvS + vec2<f32>(invResolution.x, 0.0), d);
@@ -205,6 +230,7 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
                 break;
             }
         }
+        sPrev = sStep;
     }
 
     // ── Shade ────────────────────────────────────────────────────────────────

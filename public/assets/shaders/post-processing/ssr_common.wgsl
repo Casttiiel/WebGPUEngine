@@ -50,6 +50,10 @@ struct SSRTraceParams {
     // Multi-bounce (previous denoised result folded in at the hit point)
     multiBounce:        f32,
     specularBoost:      f32,
+    environmentIntensity: f32, // scale of the environment on misses (as the IBL)
+    _pad0:              f32,
+    _pad1:              f32,
+    _pad2:              f32,
 }
 
 fn ssrLuminance(c: vec3<f32>) -> f32 {

@@ -76,7 +76,7 @@ fn calculateIBL(g: GBuffer, ao: f32) -> vec3<f32> {
     let E    = g.specularColor * brdf.x + brdf.y;
     let Ems  = 1.0 - (brdf.x + brdf.y);
     let Favg = g.specularColor + (1.0 - g.specularColor) / 21.0;
-    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+    let Fms  = E * Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
     let kD   = (1.0 - E - Fms) * (1.0 - g.metallic);
 
     let diffuse = kD * Diffuse(g.albedo) * irradiance;

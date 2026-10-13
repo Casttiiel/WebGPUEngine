@@ -5,6 +5,7 @@ import { ResourceType } from '../../types/ResourceType.enum';
 import { GPUUtils } from '../core/utils/GPUUtils';
 import { MipmapGenerator } from '../core/processing/MipmapGenerator';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
+import { HDRTexture } from './HDRTexture';
 
 export interface CubemapOptions extends IGPUResourceOptions {
   magFilter?: GPUFilterMode;
@@ -33,6 +34,7 @@ export class Cubemap extends GPUResource {
   }
 
   public static get(path: string, options: Partial<CubemapOptions> = {}): Cubemap {
+    path = Cubemap.resourceKey(path);
     try {
       return ResourceManager.getResource<Cubemap>(path);
     } catch {
@@ -56,6 +58,7 @@ export class Cubemap extends GPUResource {
     path: string,
     options: Partial<CubemapOptions> = {},
   ): Promise<Cubemap> {
+    path = Cubemap.resourceKey(path);
     try {
       return ResourceManager.getResource<Cubemap>(path);
     } catch {
@@ -79,7 +82,19 @@ export class Cubemap extends GPUResource {
     }
   }
 
+  // An .hdr source is also registered as an HDRTexture under its own path (e.g. as the skybox),
+  // and ResourceManager keys by path alone — so the cubemap built from it gets its own key.
+  private static readonly HDR_SUFFIX = '#cube';
+
+  private static resourceKey(path: string): string {
+    return path.toLowerCase().endsWith('.hdr') ? path + Cubemap.HDR_SUFFIX : path;
+  }
+
   public async loadAsync(): Promise<void> {
+    if (this.path.endsWith(Cubemap.HDR_SUFFIX)) {
+      await this.loadFromEquirectHDR();
+      return;
+    }
     try {
       const image = await createImageBitmap(
         await ResourceManager.fetch(`${this.baseFolder}/${this.path}`).then((r) => r.blob()),
@@ -160,11 +175,124 @@ export class Cubemap extends GPUResource {
     }
   }
 
+  /**
+   * Builds the cubemap from an equirectangular .hdr (same mapping as skybox.fs, so reflections
+   * line up with the visible sky). Faces are rgba16float at EQUIRECT_FACE_SIZE — the size of the
+   * baked PNG cubemaps — so the roughness → mip mapping of the IBL/SSR lookups is unchanged.
+   */
+  private async loadFromEquirectHDR(): Promise<void> {
+    const hdr = await HDRTexture.getAsync(this.path.slice(0, -Cubemap.HDR_SUFFIX.length));
+    const faceSize = Cubemap.EQUIRECT_FACE_SIZE;
+    const mipLevelCount = Math.floor(Math.log2(faceSize)) + 1;
+    const format: GPUTextureFormat = 'rgba16float';
+
+    this.gpuTexture = GPUUtils.createCubemapTexture(
+      `${this.label}_texture`,
+      faceSize,
+      format,
+      GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_SRC | // read back for the SH projection
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.STORAGE_BINDING,
+      mipLevelCount,
+    );
+
+    const module = this.device.createShaderModule({
+      label: 'equirect_to_cubemap',
+      code: Cubemap.EQUIRECT_TO_CUBE_WGSL,
+    });
+    const pipeline = await this.device.createComputePipelineAsync({
+      label: 'equirect_to_cubemap',
+      layout: 'auto',
+      compute: { module, entryPoint: 'main' },
+    });
+    const bindGroup = this.device.createBindGroup({
+      label: `${this.label}_equirect_bg`,
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: hdr.getTextureView()! },
+        { binding: 1, resource: hdr.getSampler()! },
+        {
+          binding: 2,
+          resource: this.gpuTexture.createView({
+            dimension: '2d-array',
+            baseMipLevel: 0,
+            mipLevelCount: 1,
+          }),
+        },
+      ],
+    });
+
+    const encoder = this.device.createCommandEncoder({ label: 'equirect_to_cubemap' });
+    const pass = encoder.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.dispatchWorkgroups(Math.ceil(faceSize / 8), Math.ceil(faceSize / 8), 6);
+    pass.end();
+    this.device.queue.submit([encoder.finish()]);
+
+    const mipmapGenerator = MipmapGenerator.getInstance();
+    await mipmapGenerator.initialize();
+    await mipmapGenerator.generateMipmapsForCubemap(this.gpuTexture, mipLevelCount);
+
+    this.gpuTextureView = this.gpuTexture.createView({
+      label: `${this.label}_textureView`,
+      dimension: 'cube',
+      baseMipLevel: 0,
+      mipLevelCount,
+    });
+    this.gpuSampler = SamplerLibrary.environmentCubemap;
+    this.setHasData();
+  }
+
+  private static readonly EQUIRECT_FACE_SIZE = 512;
+
+  // Face directions follow the WebGPU cube convention (+X, -X, +Y, -Y, +Z, -Z), so sampling the
+  // cube with a world direction returns the equirect texel skybox.fs shows in that direction.
+  // Radiance is clamped to 16 like skybox.fs so the sun doesn't bleed through every box-filtered mip.
+  private static readonly EQUIRECT_TO_CUBE_WGSL = /* wgsl */ `
+const PI: f32 = 3.14159265359;
+
+@group(0) @binding(0) var equirect: texture_2d<f32>;
+@group(0) @binding(1) var equirectSampler: sampler;
+@group(0) @binding(2) var outFaces: texture_storage_2d_array<rgba16float, write>;
+
+fn faceDirection(face: u32, uv: vec2<f32>) -> vec3<f32> {
+    let a = uv.x * 2.0 - 1.0;
+    let b = uv.y * 2.0 - 1.0;
+    switch face {
+        case 0u: { return vec3<f32>( 1.0, -b, -a); }
+        case 1u: { return vec3<f32>(-1.0, -b,  a); }
+        case 2u: { return vec3<f32>( a,  1.0,  b); }
+        case 3u: { return vec3<f32>( a, -1.0, -b); }
+        case 4u: { return vec3<f32>( a, -b,  1.0); }
+        default: { return vec3<f32>(-a, -b, -1.0); }
+    }
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let size = textureDimensions(outFaces);
+    if (gid.x >= size.x || gid.y >= size.y) { return; }
+    let uv  = (vec2<f32>(gid.xy) + 0.5) / vec2<f32>(size);
+    let dir = normalize(faceDirection(gid.z, uv));
+    // Same mapping as direction_to_equirect_uv (common/math/coordinates.wgsl)
+    let eq = vec2<f32>((atan2(dir.x, dir.z) + PI) / (2.0 * PI), acos(clamp(dir.y, -1.0, 1.0)) / PI);
+    let c  = textureSampleLevel(equirect, equirectSampler, eq, 0.0).rgb;
+    textureStore(outFaces, vec2<i32>(gid.xy), i32(gid.z), vec4<f32>(min(c, vec3<f32>(16.0)), 1.0));
+}
+`;
+
   public override load(): void {
     // Síncrono: inicia la carga sin await
     this.loadAsync().catch((error) => {
       console.error(`Error loading cubemap ${this.path}:`, error);
     });
+  }
+
+  public getTexture(): GPUTexture | undefined {
+    return this.gpuTexture;
   }
 
   public getTextureView(): GPUTextureView | undefined {
