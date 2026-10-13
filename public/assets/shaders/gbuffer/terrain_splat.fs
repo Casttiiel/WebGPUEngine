@@ -118,8 +118,8 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     // ── Albedo blend ──────────────────────────────────────────────────────────
     let albedoBlended = alb0.rgb * bw0 + alb1.rgb * bw1 + alb2.rgb * bw2;
 
-    // Linearise sRGB before applying the colour factor.
-    let albedoLinear  = pow(abs(albedoBlended), vec3<f32>(2.2));
+    // Layer albedos are bound through sRGB views (already linear), so the blend is linear too.
+    let albedoLinear  = albedoBlended;
     let albedoFinal   = albedoLinear * factors.baseColorFactor.rgb;
 
     // ── Detail normal blend ───────────────────────────────────────────────────

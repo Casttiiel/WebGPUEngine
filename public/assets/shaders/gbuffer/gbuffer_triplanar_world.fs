@@ -115,8 +115,8 @@ fn fs(input: VertexOutput) -> FragmentOutput {
 
     var output: FragmentOutput;
 
-    // Linearize sRGB albedo before applying factor (same as gbuffer.fs)
-    let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
+    // Albedo is bound through an sRGB view: the hardware already decoded it to linear.
+    let albedo_linear = albedo_color.rgb;
     output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
     output.albedo.a = metallic_value * factors.metallicFactor;
 

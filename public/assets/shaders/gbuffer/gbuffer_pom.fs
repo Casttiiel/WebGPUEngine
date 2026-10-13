@@ -197,7 +197,8 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     // ── GBuffer packing ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     var output: FragmentOutput;
 
-    let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
+    // Albedo is bound through an sRGB view: the hardware already decoded it to linear.
+    let albedo_linear = albedo_color.rgb;
     output.albedo     = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, metallic_raw * factors.metallicFactor);
     output.normal     = vec4<f32>(normalToOctahedral01(N), roughness * factors.roughnessFactor, emissive_raw * factors.emissiveFactor);
 

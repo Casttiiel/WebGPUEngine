@@ -147,6 +147,7 @@ export class GPUUtils {
     usage: GPUTextureUsageFlags,
     mipLevelCount: number,
     depthOrArrayLayers = 1,
+    viewFormats: GPUTextureFormat[] = [],
   ): GPUTexture {
     return this.device.createTexture({
       label,
@@ -158,6 +159,7 @@ export class GPUUtils {
       format,
       usage,
       mipLevelCount,
+      viewFormats,
     });
   }
 

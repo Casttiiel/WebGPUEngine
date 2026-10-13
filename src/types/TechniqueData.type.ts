@@ -23,6 +23,8 @@ export interface TechniqueMaterialSlot {
    *   any other string  → Texture.getAsync(path)
    */
   defaultValue?: string;
+  /** Texture slots only: bind through the sRGB view (hardware sRGB→linear decode). */
+  srgb?: boolean;
 }
 
 export type TechniqueDataType = Readonly<{

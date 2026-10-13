@@ -10,9 +10,9 @@ export class MipmapGenerator {
   private device!: GPUDevice;
   private baseShaderCode!: string;
   private normalMapShaderCode!: string;
-  private pipelines: Map<GPUTextureFormat, GPUComputePipeline> = new Map();
-  private pipelinePromises: Map<GPUTextureFormat, Promise<GPUComputePipeline>> = new Map();
-  private bindGroupLayouts: Map<GPUTextureFormat, GPUBindGroupLayout> = new Map();
+  private pipelines: Map<string, GPUComputePipeline> = new Map();
+  private pipelinePromises: Map<string, Promise<GPUComputePipeline>> = new Map();
+  private bindGroupLayouts: Map<string, GPUBindGroupLayout> = new Map();
   private normalMapPipelines: Map<GPUTextureFormat, GPUComputePipeline> = new Map();
   private normalMapPipelinePromises: Map<GPUTextureFormat, Promise<GPUComputePipeline>> = new Map();
   private normalMapBindGroupLayouts: Map<GPUTextureFormat, GPUBindGroupLayout> = new Map();
@@ -62,9 +62,25 @@ export class MipmapGenerator {
     return this.initPromise;
   }
 
-  private createShaderForFormat(format: GPUTextureFormat): string {
+  private createShaderForFormat(format: GPUTextureFormat, srgb = false): string {
     // Replace the hardcoded format in the shader with the actual format
-    return this.baseShaderCode.replace('rgba16float', format);
+    const code = this.baseShaderCode.replace('rgba16float', format);
+    if (!srgb) return code;
+    // sRGB variant: the source is read through an sRGB view (decoded to linear by the
+    // hardware), averaged in linear, then re-encoded before storing into the unorm mip.
+    return (
+      code.replace(
+        'textureStore(outputTexture, coord, color);',
+        'textureStore(outputTexture, coord, vec4<f32>(linearToSrgb(color.rgb), color.a));',
+      ) +
+      `
+fn linearToSrgb(c: vec3<f32>) -> vec3<f32> {
+    let lo = c * 12.92;
+    let hi = 1.055 * pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.4)) - 0.055;
+    return select(hi, lo, c <= vec3<f32>(0.0031308));
+}
+`
+    );
   }
 
   private createNormalMapShaderForFormat(format: GPUTextureFormat): string {
@@ -80,16 +96,20 @@ export class MipmapGenerator {
     await Promise.all(formats.map((f) => this.getOrCreatePipeline(f)));
   }
 
-  private async getOrCreatePipeline(format: GPUTextureFormat): Promise<{
+  private async getOrCreatePipeline(
+    format: GPUTextureFormat,
+    srgb = false,
+  ): Promise<{
     pipeline: GPUComputePipeline;
     bindGroupLayout: GPUBindGroupLayout;
   }> {
-    if (!this.pipelines.has(format)) {
+    const key = srgb ? `${format}-srgb-encode` : format;
+    if (!this.pipelines.has(key)) {
       // Deduplicate concurrent compile requests for the same format
-      if (!this.pipelinePromises.has(format)) {
-        const shaderCode = this.createShaderForFormat(format);
+      if (!this.pipelinePromises.has(key)) {
+        const shaderCode = this.createShaderForFormat(format, srgb);
         const shaderModule = this.device.createShaderModule({
-          label: `Mipmap Generation Compute Shader ${format}`,
+          label: `Mipmap Generation Compute Shader ${key}`,
           code: shaderCode,
         });
 
@@ -105,12 +125,12 @@ export class MipmapGenerator {
             storageTexture: { access: 'write-only', format, viewDimension: '2d' },
           },
         ]);
-        this.bindGroupLayouts.set(format, bindGroupLayout);
+        this.bindGroupLayouts.set(key, bindGroupLayout);
 
         const computeConfig: ComputePipelineConfig = {
-          label: `Mipmap Generation Pipeline ${format}`,
+          label: `Mipmap Generation Pipeline ${key}`,
           layout: PipelineFactory.createPipelineLayout(
-            `mipmap_generation_pipeline_layout_${format}`,
+            `mipmap_generation_pipeline_layout_${key}`,
             [bindGroupLayout],
           ),
           compute: { module: shaderModule, entryPoint: 'main' },
@@ -118,17 +138,17 @@ export class MipmapGenerator {
 
         // Async compile — does not block the main thread
         const promise = this.device.createComputePipelineAsync(computeConfig).then((pipeline) => {
-          this.pipelines.set(format, pipeline);
+          this.pipelines.set(key, pipeline);
           return pipeline;
         });
-        this.pipelinePromises.set(format, promise);
+        this.pipelinePromises.set(key, promise);
       }
-      await this.pipelinePromises.get(format)!;
+      await this.pipelinePromises.get(key)!;
     }
 
     return {
-      pipeline: this.pipelines.get(format)!,
-      bindGroupLayout: this.bindGroupLayouts.get(format)!,
+      pipeline: this.pipelines.get(key)!,
+      bindGroupLayout: this.bindGroupLayouts.get(key)!,
     };
   }
 
@@ -209,7 +229,16 @@ export class MipmapGenerator {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
-  public async generateMipmapsFor2D(texture: GPUTexture, mipLevelCount: number): Promise<void> {
+  /**
+   * @param srgbViewFormat When set, mips are averaged in linear space: the source mip is
+   *                       read through this sRGB view (must be in the texture's viewFormats)
+   *                       and the result is re-encoded to sRGB before storing.
+   */
+  public async generateMipmapsFor2D(
+    texture: GPUTexture,
+    mipLevelCount: number,
+    srgbViewFormat: GPUTextureFormat | null = null,
+  ): Promise<void> {
     // Ensure we have a valid device before proceeding
     await this.ensureValidDevice();
 
@@ -218,7 +247,10 @@ export class MipmapGenerator {
     }
 
     // Get pipeline and bind group layout for this texture format
-    const { pipeline, bindGroupLayout } = await this.getOrCreatePipeline(texture.format);
+    const { pipeline, bindGroupLayout } = await this.getOrCreatePipeline(
+      texture.format,
+      srgbViewFormat !== null,
+    );
 
     const commandEncoder = this.device.createCommandEncoder({
       label: '2D Texture Mipmap Generation Command Encoder',
@@ -227,7 +259,8 @@ export class MipmapGenerator {
     // Generate mipmaps for each mip level
     for (let mipLevel = 1; mipLevel < mipLevelCount; mipLevel++) {
       // Calculate dimensions for this mip level
-      const currentSize = Math.max(1, texture.width >> mipLevel);
+      const currentWidth = Math.max(1, texture.width >> mipLevel);
+      const currentHeight = Math.max(1, texture.height >> mipLevel);
 
       // Create views for source (previous mip level) and destination (current mip level)
       const sourceView = texture.createView({
@@ -235,6 +268,10 @@ export class MipmapGenerator {
         dimension: '2d',
         baseMipLevel: mipLevel - 1,
         mipLevelCount: 1,
+        // sRGB views must drop STORAGE_BINDING (unsupported by sRGB formats).
+        ...(srgbViewFormat
+          ? { format: srgbViewFormat, usage: GPUTextureUsage.TEXTURE_BINDING }
+          : {}),
       });
 
       const destView = texture.createView({
@@ -269,8 +306,8 @@ export class MipmapGenerator {
       computePass.setBindGroup(0, bindGroup);
 
       // Calculate workgroup dispatch size
-      const workgroupsX = Math.ceil(currentSize / 8);
-      const workgroupsY = Math.ceil(currentSize / 8);
+      const workgroupsX = Math.ceil(currentWidth / 8);
+      const workgroupsY = Math.ceil(currentHeight / 8);
       computePass.dispatchWorkgroups(workgroupsX, workgroupsY);
 
       computePass.end();

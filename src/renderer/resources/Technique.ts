@@ -35,6 +35,24 @@ export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'
 
 export type TechniqueOptions = TechniqueCreateOptions & IGPUResourceOptions;
 
+/**
+ * Fragment shaders that expect the PBR albedo slot (binding 0) to be bound through an
+ * sRGB view, so the hardware decodes to linear before filtering (mips/anisotropy are
+ * then blended in linear space, matching three.js). Shaders not listed here receive
+ * the raw unorm view and keep their current look.
+ */
+const SRGB_ALBEDO_SHADERS: ReadonlySet<string> = new Set([
+  'gbuffer/gbuffer.fs',
+  'gbuffer/gbuffer_dither.fs',
+  'gbuffer/gbuffer_mask.fs',
+  'gbuffer/gbuffer_pom.fs',
+  'gbuffer/gbuffer_triplanar_local.fs',
+  'gbuffer/gbuffer_triplanar_world.fs',
+  'gbuffer/decal_flat.fs',
+  'utility/stone.fs',
+  'viewmodel/viewmodel.fs',
+]);
+
 export class Technique extends GPUResource {
   // Prevents duplicate registration when multiple parallel loaders request the
   // same technique before any of them has finished registering it.
@@ -63,6 +81,7 @@ export class Technique extends GPUResource {
   private readonly materialSlots: ReadonlyArray<TechniqueMaterialSlot> | undefined;
   private readonly isSkinned: boolean;
   private readonly _skipDepthPrepass: boolean;
+  private readonly srgbAlbedo: boolean;
 
   constructor(options: TechniqueOptions) {
     super({
@@ -84,6 +103,7 @@ export class Technique extends GPUResource {
     this.materialSlots = options.materialSlots;
     this.isSkinned = options.skinned ?? false;
     this._skipDepthPrepass = options.skipDepthPrepass ?? false;
+    this.srgbAlbedo = options.fs !== undefined && SRGB_ALBEDO_SHADERS.has(options.fs);
   }
 
   public static async getAsync(
@@ -561,14 +581,29 @@ export class Technique extends GPUResource {
     return this.isSkinned;
   }
 
+  /** Returns true if the PBR albedo slot must be bound through the texture's sRGB view. */
+  public getSrgbAlbedo(): boolean {
+    return this.srgbAlbedo;
+  }
+
   /** Returns true if objects using this technique should be skipped in the depth prepass. */
   public getSkipDepthPrepass(): boolean {
     return this._skipDepthPrepass;
   }
 
-  public getVsFile(): string { return this.vsFile; }
-  public getFsFile(): string | undefined { return this.fsFile; }
-  public getBlendMode(): BlendModes { return this.blendMode; }
-  public getDepthTest(): DepthModes { return this.depthTest; }
-  public getRasterizationMode(): RasterizationMode { return this.rasterizationMode; }
+  public getVsFile(): string {
+    return this.vsFile;
+  }
+  public getFsFile(): string | undefined {
+    return this.fsFile;
+  }
+  public getBlendMode(): BlendModes {
+    return this.blendMode;
+  }
+  public getDepthTest(): DepthModes {
+    return this.depthTest;
+  }
+  public getRasterizationMode(): RasterizationMode {
+    return this.rasterizationMode;
+  }
 }

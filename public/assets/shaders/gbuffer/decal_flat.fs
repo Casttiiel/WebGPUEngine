@@ -42,8 +42,8 @@ fn fs(input: VertexOutput) -> DecalFlatOutput {
     // Discard invisible pixels early to avoid unnecessary GBuffer reads
     if (alpha < 0.01) { discard; }
 
-    // Linearize sRGB albedo and apply baseColorFactor in linear space
-    let decal_albedo    = pow(abs(albedo_srgb.rgb), vec3<f32>(2.2)) * factors.baseColorFactor.rgb;
+    // Albedo is bound through an sRGB view (already linear); apply baseColorFactor in linear space
+    let decal_albedo    = albedo_srgb.rgb * factors.baseColorFactor.rgb;
     let decal_metallic  = textureSample(txMetallic,  samplerState, uv).b * factors.metallicFactor;
     let decal_rough_raw = textureSample(txRoughness, samplerState, uv).g * factors.roughnessFactor;
     let decal_emissive  = textureSample(txEmissive,  samplerState, uv).x  * factors.emissiveFactor;

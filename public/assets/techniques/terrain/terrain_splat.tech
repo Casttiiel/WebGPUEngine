@@ -20,7 +20,8 @@
       "name": "txLayer0Alb",
       "binding": 1,
       "type": "texture2d",
-      "defaultValue": "white.png"
+      "defaultValue": "white.png",
+      "srgb": true
     },
     {
       "name": "txLayer0Nrm",
@@ -32,7 +33,8 @@
       "name": "txLayer1Alb",
       "binding": 3,
       "type": "texture2d",
-      "defaultValue": "white.png"
+      "defaultValue": "white.png",
+      "srgb": true
     },
     {
       "name": "txLayer1Nrm",
@@ -44,7 +46,8 @@
       "name": "txLayer2Alb",
       "binding": 5,
       "type": "texture2d",
-      "defaultValue": "white.png"
+      "defaultValue": "white.png",
+      "srgb": true
     },
     {
       "name": "txLayer2Nrm",

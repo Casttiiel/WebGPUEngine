@@ -289,7 +289,7 @@ export class Material extends GPUResource {
       if (!value) continue;
       if (!value.startsWith('@engine:') && !value.startsWith('@sampler:')) {
         fileLoadPromises.push(
-          Texture.getAsync(value, false).then((tex) => {
+          Texture.getAsync(value, false, slot.srgb ?? false).then((tex) => {
             this.customSlotTextures.set(slot.name, tex);
           }),
         );
@@ -371,7 +371,7 @@ export class Material extends GPUResource {
       } else {
         const tex = this.customSlotTextures.get(slot.name);
         if (!tex) return;
-        const view = tex.getTextureView();
+        const view = slot.srgb ? tex.getSRGBTextureView() : tex.getTextureView();
         if (!view) return;
         entries.push({ binding: slot.binding, resource: view });
       }
@@ -406,7 +406,7 @@ export class Material extends GPUResource {
         throw new Error(`Missing texture: ${type}`);
       }
 
-      const view = texture.getTextureView();
+      const view = Material.getSlotView(texture, type, this.technique);
       const sampler = texture.getSampler();
 
       if (!view || !sampler) {
@@ -465,11 +465,26 @@ export class Material extends GPUResource {
   protected loadTexture(type: string, path: string): Promise<void> {
     // Normal maps must use the normalise-after-average mipmap generator to avoid
     // shimmering at distance caused by box-filtering encoded normal vectors.
-    return Texture.getAsync(path, type === 'normal').then((texture) => {
+    const isSRGB = type === 'albedo' && (this.technique?.getSrgbAlbedo() ?? false);
+    return Texture.getAsync(path, type === 'normal', isSRGB).then((texture) => {
       this.textures.set(type, texture);
       // Subscribe so the bind group is rebuilt after a streaming upgrade.
       this.textureViewUnsubs.push(texture.addViewListener(() => void this.createBindGroup()));
     });
+  }
+
+  /**
+   * View to bind for a PBR texture slot: the albedo goes through the sRGB view (hardware
+   * decode before filtering) when the technique's shader expects linear albedo.
+   */
+  protected static getSlotView(
+    texture: Texture,
+    type: string,
+    technique: Technique | undefined,
+  ): GPUTextureView | undefined {
+    return type === 'albedo' && technique?.getSrgbAlbedo()
+      ? texture.getSRGBTextureView()
+      : texture.getTextureView();
   }
 
   /**
@@ -696,7 +711,10 @@ export class Material extends GPUResource {
       const entries: GPUBindGroupEntry[] = [];
       let idx = 0;
       for (const type of textureTypes) {
-        entries.push({ binding: idx++, resource: clone.textures.get(type)!.getTextureView()! });
+        entries.push({
+          binding: idx++,
+          resource: Material.getSlotView(clone.textures.get(type)!, type, clone.technique)!,
+        });
       }
       entries.push({ binding: idx++, resource: clone.textures.get('albedo')!.getSampler()! });
       entries.push({ binding: 6, resource: { buffer: clone.uniformBuffer } });

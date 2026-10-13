@@ -118,7 +118,8 @@ fn fs(input: StoneVertexOutput) -> FragmentOutput {
     let brushDirection = abs(dot(Nw, normalize(vec3<f32>(0.3, 1.0, 0.2))));
     let directionalMask = mix(brushMask * 0.6, brushMask, brushDirection);
 
-    let baseColor = pow(abs(albedo_color.rgb), vec3<f32>(2.2)) * factors.baseColorFactor.rgb;
+    // Albedo is bound through an sRGB view: the hardware already decoded it to linear.
+    let baseColor = albedo_color.rgb * factors.baseColorFactor.rgb;
 
     // Variación pictórica de valor
     let paintedColor = mix(

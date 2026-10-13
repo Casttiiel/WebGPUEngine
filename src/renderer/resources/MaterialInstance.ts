@@ -125,7 +125,8 @@ export class MaterialInstance extends Material {
     if (overrides.textures) {
       await Promise.all(
         Object.entries(overrides.textures).map(async ([name, texPath]) => {
-          const tex = await Texture.getAsync(texPath, false);
+          const isSRGB = slots.find((s) => s.name === name)?.srgb ?? false;
+          const tex = await Texture.getAsync(texPath, false, isSRGB);
           this.customSlotTextures.set(name, tex);
           this.rawTextures[name] = texPath;
           this.textureViewUnsubs.push(
@@ -191,7 +192,9 @@ export class MaterialInstance extends Material {
         Object.entries(overrides.textures).map(async ([slotName, texPath]) => {
           const internalKey = PBR_SLOT_MAP[slotName] ?? slotName;
           const isNormal = internalKey === 'normal';
-          const tex = await Texture.getAsync(texPath, isNormal);
+          const isSRGB =
+            internalKey === 'albedo' && (parent.getTechnique()?.getSrgbAlbedo() ?? false);
+          const tex = await Texture.getAsync(texPath, isNormal, isSRGB);
           this.textures.set(internalKey, tex);
           this.textureViewUnsubs.push(
             tex.addViewListener(() => void this.rebuildPBRBindGroup()),
@@ -226,7 +229,7 @@ export class MaterialInstance extends Material {
     for (const type of ['albedo', 'normal', 'metallic', 'roughness', 'emissive']) {
       const tex = this.textures.get(type);
       if (!tex) return;
-      const view = tex.getTextureView();
+      const view = Material.getSlotView(tex, type, this.instanceParent.getTechnique());
       if (!view) return;
       entries.push({ binding: idx++, resource: view });
     }

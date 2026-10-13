@@ -28,9 +28,9 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     
     var output: FragmentOutput;
 
-    // Linearize sRGB albedo before applying the factor so the factor scales linear energy,
-    // not sRGB-encoded values. Sketchfab / glTF reference: pow(sRGB, 2.2) * linearFactor.
-    let albedo_linear = pow(abs(albedo_color.rgb), vec3<f32>(2.2));
+    // Albedo is bound through an sRGB view: the hardware decodes to linear before filtering,
+    // so the factor scales linear energy (glTF reference: linear(sRGB) * linearFactor).
+    let albedo_linear = albedo_color.rgb;
     output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
     output.albedo.a = textureSampleBias(txMetallic, samplerState, uvUnjittered, camera.mipBias).b * factors.metallicFactor;
 

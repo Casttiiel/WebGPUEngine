@@ -19,7 +19,8 @@ fn fs(input: VertexOutput) -> ViewModelOutput {
     let uv = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
 
     let albedo = textureSample(txAlbedo, samplerState, uv);
-    let albedo_linear = pow(abs(albedo.rgb), vec3<f32>(2.2)) * factors.baseColorFactor.rgb;
+    // Albedo is bound through an sRGB view: the hardware already decoded it to linear.
+    let albedo_linear = albedo.rgb * factors.baseColorFactor.rgb;
 
     // Normal in viewmodel camera space (viewmodel camera has identity view,
     // so viewmodel-world == main camera-space).

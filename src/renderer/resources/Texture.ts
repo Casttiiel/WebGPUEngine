@@ -12,16 +12,27 @@ export interface TextureOptions extends IGPUResourceOptions {
   format?: GPUTextureFormat;
   usage?: GPUTextureUsageFlags;
   isNormalMap?: boolean;
+  /** Color data authored in sRGB: mipmaps are averaged in linear space. */
+  isSRGB?: boolean;
 }
+
+/** sRGB view format for each unorm color format that has one. */
+const SRGB_VIEW_FORMATS: Partial<Record<GPUTextureFormat, GPUTextureFormat>> = {
+  rgba8unorm: 'rgba8unorm-srgb',
+  bgra8unorm: 'bgra8unorm-srgb',
+};
 
 export class Texture extends GPUResource {
   private texture?: GPUTexture;
   private textureView?: GPUTextureView;
+  /** Same texels decoded sRGB→linear by the hardware (null when the format has no sRGB variant). */
+  private srgbTextureView: GPUTextureView | undefined;
   private sampler?: GPUSampler;
   private genMipmaps: boolean;
   private format: GPUTextureFormat;
   private usage: GPUTextureUsageFlags;
   private isNormalMap: boolean;
+  private isSRGB: boolean;
   private static mipmapGenerator: MipmapGenerator | null = null;
 
   // Prevents returning a registered-but-not-yet-loaded texture to concurrent callers.
@@ -72,6 +83,7 @@ export class Texture extends GPUResource {
     });
     this.genMipmaps = options.genMipmaps ?? true;
     this.isNormalMap = options.isNormalMap ?? false;
+    this.isSRGB = options.isSRGB ?? false;
 
     // Use quality settings for texture format if not explicitly specified
     if (options.format) {
@@ -85,6 +97,38 @@ export class Texture extends GPUResource {
         GPUTextureUsage.COPY_DST |
         GPUTextureUsage.RENDER_ATTACHMENT |
         GPUTextureUsage.STORAGE_BINDING;
+  }
+
+  /** sRGB view format for this texture, or null (normal maps and formats without a variant). */
+  private getSRGBViewFormat(): GPUTextureFormat | null {
+    if (this.isNormalMap) return null;
+    return SRGB_VIEW_FORMATS[this.format] ?? null;
+  }
+
+  private getViewFormats(): GPUTextureFormat[] {
+    const srgb = this.getSRGBViewFormat();
+    return srgb ? [srgb] : [];
+  }
+
+  /** Creates the unorm and sRGB views over the whole mip chain of `texture`. */
+  private installViews(texture: GPUTexture, mipLevelCount: number): void {
+    this.textureView = texture.createView({
+      label: `${this.label}_textureView`,
+      baseMipLevel: 0,
+      mipLevelCount,
+    });
+    const srgbFormat = this.getSRGBViewFormat();
+    this.srgbTextureView = srgbFormat
+      ? texture.createView({
+          label: `${this.label}_srgbTextureView`,
+          format: srgbFormat,
+          // sRGB formats don't support STORAGE_BINDING; a view inherits all the texture's
+          // usages by default, so restrict it explicitly.
+          usage: GPUTextureUsage.TEXTURE_BINDING,
+          baseMipLevel: 0,
+          mipLevelCount,
+        })
+      : undefined;
   }
 
   /**
@@ -131,6 +175,8 @@ export class Texture extends GPUResource {
         this.format,
         this.usage,
         mipLevelCount,
+        1,
+        this.getViewFormats(),
       );
 
       this.device.queue.copyExternalImageToTexture(
@@ -156,12 +202,8 @@ export class Texture extends GPUResource {
         throw err;
       }
 
-      // Install the new full-res view.
-      this.textureView = newGPUTexture.createView({
-        label: `${this.label}_textureView`,
-        baseMipLevel: 0,
-        mipLevelCount,
-      });
+      // Install the new full-res views.
+      this.installViews(newGPUTexture, mipLevelCount);
 
       this.streamingState.isFullyLoaded = true;
 
@@ -250,6 +292,7 @@ export class Texture extends GPUResource {
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
       mipLevelCount: 1,
+      viewFormats: this.getViewFormats(),
     });
 
     this.device.queue.writeTexture(
@@ -259,17 +302,22 @@ export class Texture extends GPUResource {
       { width, height, depthOrArrayLayers: 1 },
     );
 
-    this.textureView = this.texture.createView({
-      label: `${this.label}_textureView`,
-      baseMipLevel: 0,
-      mipLevelCount: 1,
-    });
+    this.installViews(this.texture, 1);
 
     this.sampler = SamplerLibrary.anisotropic16x;
     this.setHasData();
   }
 
-  public static async getAsync(path: string, isNormalMap = false): Promise<Texture> {
+  /**
+   * @param isSRGB Color data authored in sRGB (albedo). Only affects mipmap generation
+   *               (linear-space averaging) and only on first load — the sRGB view is
+   *               always available via getSRGBTextureView() regardless.
+   */
+  public static async getAsync(
+    path: string,
+    isNormalMap = false,
+    isSRGB = false,
+  ): Promise<Texture> {
     // 1. Fully loaded and registered — return immediately.
     try {
       const t = ResourceManager.getResource<Texture>(path);
@@ -284,7 +332,7 @@ export class Texture extends GPUResource {
     if (existing) return existing;
 
     // 3. First caller: create, register, and store the in-flight promise before any await.
-    const texture = new Texture({ path, type: ResourceType.TEXTURE, isNormalMap });
+    const texture = new Texture({ path, type: ResourceType.TEXTURE, isNormalMap, isSRGB });
     ResourceManager.registerResource(texture);
 
     const promise = texture.loadAsync().then(() => {
@@ -376,6 +424,8 @@ export class Texture extends GPUResource {
         this.format,
         this.usage,
         initMipCount,
+        1,
+        this.getViewFormats(),
       );
 
       this.device.queue.copyExternalImageToTexture(
@@ -390,11 +440,7 @@ export class Texture extends GPUResource {
 
       smallBitmap.close();
 
-      this.textureView = this.texture.createView({
-        label: `${this.label}_textureView`,
-        baseMipLevel: 0,
-        mipLevelCount: initMipCount,
-      });
+      this.installViews(this.texture, initMipCount);
 
       const useNearest =
         QualitySettings.getInstance().getSettings().meshTextureFilter === 'nearest';
@@ -419,6 +465,8 @@ export class Texture extends GPUResource {
       this.format,
       this.usage,
       mipLevelCount,
+      1,
+      this.getViewFormats(),
     );
 
     // Copy image data
@@ -435,12 +483,8 @@ export class Texture extends GPUResource {
 
     imageBitmap.close();
 
-    // Create view and sampler
-    this.textureView = this.texture.createView({
-      label: `${this.label}_textureView`,
-      baseMipLevel: 0,
-      mipLevelCount,
-    });
+    // Create views and sampler
+    this.installViews(this.texture, mipLevelCount);
 
     const useNearest = QualitySettings.getInstance().getSettings().meshTextureFilter === 'nearest';
     this.sampler = useNearest ? SamplerLibrary.nearestRepeat : SamplerLibrary.anisotropic16x;
@@ -513,6 +557,14 @@ export class Texture extends GPUResource {
     return this.textureView;
   }
 
+  /**
+   * View that decodes sRGB→linear in hardware, so filtering/anisotropy happen in linear
+   * space. Falls back to the unorm view for formats without an sRGB variant (e.g. KTX2).
+   */
+  public getSRGBTextureView(): GPUTextureView | undefined {
+    return this.srgbTextureView ?? this.textureView;
+  }
+
   public getTexture(): GPUTexture | undefined {
     return this.texture;
   }
@@ -537,7 +589,8 @@ export class Texture extends GPUResource {
     if (this.isNormalMap) {
       await Texture.mipmapGenerator.generateMipmapsFor2DNormal(this.texture, mipLevelCount);
     } else {
-      await Texture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount);
+      const srgbFormat = this.isSRGB ? this.getSRGBViewFormat() : null;
+      await Texture.mipmapGenerator.generateMipmapsFor2D(this.texture, mipLevelCount, srgbFormat);
     }
   }
 
