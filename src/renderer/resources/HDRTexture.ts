@@ -21,6 +21,7 @@ export class HDRTexture extends GPUResource {
   private textureView?: GPUTextureView;
   private sampler?: GPUSampler;
   private static mipmapGenerator: MipmapGenerator | null = null;
+  private loadPromise?: Promise<void>;
 
   constructor(options: HDRTextureOptions) {
     super({
@@ -53,10 +54,11 @@ export class HDRTexture extends GPUResource {
     path: string,
     options: Partial<HDRTextureOptions> = {},
   ): Promise<HDRTexture> {
+    let texture: HDRTexture;
     try {
-      return ResourceManager.getResource<HDRTexture>(path);
+      texture = ResourceManager.getResource<HDRTexture>(path);
     } catch {
-      const texture = new HDRTexture({
+      texture = new HDRTexture({
         path,
         type: ResourceType.TEXTURE,
         ...options,
@@ -64,19 +66,21 @@ export class HDRTexture extends GPUResource {
 
       // Register first to prevent race conditions
       ResourceManager.registerResource(texture);
-
-      await texture.loadAsync();
-      return texture;
     }
+    // A registered texture may still be loading (e.g. the skybox and the SSR environment
+    // request the same .hdr in parallel) — wait for the shared load either way.
+    await texture.loadAsync();
+    return texture;
   }
 
   public async loadAsync(): Promise<void> {
-    await this.createTexture();
+    this.loadPromise ??= this.createTexture();
+    await this.loadPromise;
   }
 
   public override load(): void {
     // Síncrono: inicia la carga sin await
-    this.createTexture().catch((error) => {
+    this.loadAsync().catch((error) => {
       console.error(`Error loading HDR texture ${this.path}:`, error);
     });
   }

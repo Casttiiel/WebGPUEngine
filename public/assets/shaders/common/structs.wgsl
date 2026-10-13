@@ -58,7 +58,7 @@ struct MaterialFactors {
 
 struct SSRUniforms {
     globalAmbientBoost: f32,
-    stepSize: f32,
+    environmentIntensity: f32, // scale of the reflected environment (IBL path)
     maxSteps: f32,
     maxDistance: f32,
     thickness: f32,

@@ -83,13 +83,13 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let brdfCoords = vec2<f32>(clamp(NoV, 0.0, 1.0), 1.0 - clamp(g.roughness, 0.0, 1.0));
     let brdf  = textureSampleLevel(brdfLUT, texSampler, brdfCoords, 0.0).rg;
     let F0    = g.specularColor;
-    let F     = Fresnel_Schlick_Roughness(NoV, F0, g.roughness);
-    // Kulla-Conty multi-scattering energy compensation (Turquin 2019)
-    let E    = brdf.x + brdf.y;
-    let Ems  = 1.0 - E;
+    // The LUT already integrates Fresnel over the lobe: single scatter = F0·A + B (Karis).
+    let FssEss = F0 * brdf.x + brdf.y;
+    // Multi-scattering energy compensation (Fdez-Agüera 2019, as in three.js)
+    let Ems  = 1.0 - (brdf.x + brdf.y);
     let Favg = F0 + (1.0 - F0) / 21.0;
-    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
-    let splitSum = F * brdf.x + brdf.y + Fms;
+    let Fms  = FssEss * Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+    let splitSum = FssEss + Fms;
 
     // ── IBL: per-probe prefiltered env with PCC, blended, fallback to global ──
     let maxMipLevel = 7.0;
@@ -105,7 +105,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let envBlended  = mix(envA, envB, pccData.blendWeight);
     let envRadiance = select(select(envGlobal, envA, hasA), envBlended, hasA && hasB);
 
-    let iblSpecular = envRadiance * splitSum;
+    let iblSpecular = envRadiance * ssrParams.environmentIntensity * splitSum;
 
     // ── SSR: reflected radiance × same split-sum BRDF (same energy space as IBL) ─
     // The stochastic SSR resolves screen misses and edge fades to this same prefiltered
@@ -116,9 +116,10 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     let finalSpecular = select(iblSpecular, ssrSpecular, ssrParams.enabled > 0.5) * ssrParams.specularBoost;
 
-    // Alpha = average specular energy × specular occlusion.
-    // With additive_by_src_alpha: dst += finalSpecular * alpha
-    // → rough=1 or occluded surfaces contribute nothing, metals/glossy contribute fully.
-    let specularEnergy = dot(splitSum, vec3<f32>(0.333));
-    return vec4<f32>(finalSpecular, specularEnergy * so);
+    // The BRDF is already in finalSpecular — weighting alpha by it again would apply it twice.
+    // With additive_by_src_alpha: dst += finalSpecular * alpha.
+    // Specular occlusion only stands in for the local geometry the cubemap can't see; SSR
+    // traces that geometry (its hits are already occluded), so it isn't darkened twice.
+    let occlusion = select(so, 1.0, ssrParams.enabled > 0.5);
+    return vec4<f32>(finalSpecular, occlusion);
 }

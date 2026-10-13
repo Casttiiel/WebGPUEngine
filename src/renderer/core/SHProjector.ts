@@ -14,8 +14,10 @@ export class SHProjector {
   public static async projectFromGPUTexture(
     texture: GPUTexture,
     faceSize: number,
+    mipLevel = 0,
   ): Promise<Float32Array> {
     const device = GPUUtils.getDevice();
+    faceSize = Math.max(1, faceSize >> mipLevel);
     const bytesPerRow = faceSize * 8; // rgba16float = 8 bytes/pixel
     const faceBytes = bytesPerRow * faceSize;
 
@@ -30,7 +32,7 @@ export class SHProjector {
 
       const encoder = device.createCommandEncoder();
       encoder.copyTextureToBuffer(
-        { texture, origin: { x: 0, y: 0, z: face } },
+        { texture, mipLevel, origin: { x: 0, y: 0, z: face } },
         { buffer: readBuf, bytesPerRow },
         { width: faceSize, height: faceSize, depthOrArrayLayers: 1 },
       );

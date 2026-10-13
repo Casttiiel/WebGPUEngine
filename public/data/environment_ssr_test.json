@@ -1,12 +1,13 @@
 {
   "ambient": {
-    "globalFactor": 8.0,
+    "globalFactor": 1.0,
     "diffuseFactor": 1.0,
     "reflectionFactor": 1.0,
+    "environmentIntensity": 3.14159,
     "irradianceCubemap": "ReflectionProbe_irradiance_cubemap_T.png"
   },
   "skybox": "quarry_01_1k.hdr",
   "skyboxType": "skybox",
   "clouds": { "type": "none" },
-  "ssrEnvironment": "ReflectionProbe_cubemap_T.png"
+  "ssrEnvironment": "quarry_01_1k.hdr"
 }
