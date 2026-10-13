@@ -12,7 +12,7 @@ struct ContactShadowParams {
     intensity:   f32,        // shadow strength [0, 1]
     stepLength:  f32,        // world-space ray step size (meters)
     maxDistance: f32,        // max ray travel distance (meters)
-    thickness:   f32,        // linearDepth tolerance for occlusion detection
+    thickness:   f32,        // max depth (metres) a ray may be behind the depth buffer to count as a hit
     enabled:     f32,        // 0 = disabled
 }
 
@@ -110,11 +110,13 @@ fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
     let actualStep = params.maxDistance / f32(numSteps);
 
     // ── Self-shadowing bias ───────────────────────────────────────────────────
-    // Per-pixel jitter (IGN + golden-ratio temporal shift) randomises the starting
-    // offset of each ray so adjacent pixels and adjacent frames never share the same
-    // discrete sample pattern.  Breaks banding stripes and lets TAA accumulate a
-    // clean result over multiple frames.
-    let jitter = fract(interleavedGradientNoise(fragCoord.xy) + camera.frameIndex * 0.6180339887);
+    // Per-pixel jitter (IGN) randomises the starting offset of each ray so adjacent
+    // pixels never share the same discrete sample pattern, breaking banding stripes.
+    // The golden-ratio temporal shift is only applied while a temporal AA pass
+    // (TAA / TSR / SMAA T2x) is resolving it — camera jitter active ⇔ mipBias < 0.
+    // Without one, animating the pattern would make shadow edges shimmer every frame.
+    let temporalShift = select(0.0, camera.frameIndex * 0.6180339887, camera.mipBias < 0.0);
+    let jitter = fract(interleavedGradientNoise(fragCoord.xy) + temporalShift);
     // Offset the first sample into [0, actualStep) so the ray starts slightly ahead
     // of the surface.  The depth-proportional term prevents acne at large view depths.
     let startBias = actualStep * jitter + g.zlinear * camera.cameraFar * 0.001;
@@ -140,11 +142,17 @@ fn fs(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
             continue;
         }
 
-        let sceneZ = textureSampleLevel(gLinearDepth, samplerGBuffer, rayUV, 0.0).x;
+        // Nearest texel: bilinear filtering would blend depths across silhouettes
+        // and create false hits / halos at object edges.
+        let depthDims  = vec2<i32>(textureDimensions(gLinearDepth));
+        let depthCoord = clamp(vec2<i32>(floor(rayUV * vec2<f32>(depthDims))),
+                               vec2<i32>(0), depthDims - vec2<i32>(1));
+        let sceneZ = textureLoad(gLinearDepth, depthCoord, 0).x;
         let rayZ   = worldToLinearDepth(rayPos);
 
-        // Ray is behind geometry and within the thickness band → occluded
-        let delta = rayZ - sceneZ;
+        // Ray is behind geometry and within the thickness band → occluded.
+        // Compared in metres (view depth) so the tolerance is independent of cameraFar.
+        let delta = (rayZ - sceneZ) * camera.cameraFar;
         if (delta > 0.0 && delta < params.thickness) {
             let fade = 1.0 - t / params.maxDistance;
             // Contact shadow is binary (occluder present or not) — do NOT scale by

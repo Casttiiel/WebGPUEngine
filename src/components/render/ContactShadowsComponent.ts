@@ -27,7 +27,7 @@ import { MsgType } from '../../types/MsgType.enum';
  *   [3]   intensity   f32        shadow opacity  (0–1)
  *   [4]   stepLength  f32        world-space step size in metres
  *   [5]   maxDistance f32        max ray travel distance in metres
- *   [6]   thickness   f32        linearDepth tolerance for hit detection
+ *   [6]   thickness   f32        max depth (metres) behind the depth buffer counted as a hit
  *   [7]   enabled     f32        1 = on, 0 = off
  */
 export class ContactShadowsComponent extends Component {
@@ -49,8 +49,11 @@ export class ContactShadowsComponent extends Component {
   public stepLength: number = 0.025;
   /** Maximum ray travel distance in metres. Larger = wider shadow coverage. */
   public maxDistance: number = 0.1;
-  /** LinearDepth hit-detection tolerance. Tune to avoid false shadows on thin faces. */
-  public thickness: number = 0.0001;
+  /**
+   * Hit-detection tolerance in metres: how far behind the depth buffer a ray sample may be
+   * to count as occluded. Too large → false shadows behind thin objects; too small → gaps.
+   */
+  public thickness: number = 0.1;
 
   private loaded = false;
 
@@ -192,7 +195,7 @@ export class ContactShadowsComponent extends Component {
     this._editorFolder.add(this, 'intensity', 0.0, 1.0).name('Intensity').listen();
     this._editorFolder.add(this, 'stepLength', 0.005, 0.1).name('Step Length').listen();
     this._editorFolder.add(this, 'maxDistance', 0.005, 0.5).name('Max Distance').listen();
-    this._editorFolder.add(this, 'thickness', 0.0001, 0.01).name('Thickness').listen();
+    this._editorFolder.add(this, 'thickness', 0.005, 0.5).name('Thickness (m)').listen();
   }
 
   public renderDebug(): void {}
