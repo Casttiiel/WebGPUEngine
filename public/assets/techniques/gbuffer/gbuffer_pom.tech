@@ -13,7 +13,8 @@
       "binding": 0,
       "name": "txAlbedo",
       "type": "texture2d",
-      "defaultValue": "white.png"
+      "defaultValue": "white.png",
+      "srgb": true
     },
     {
       "binding": 1,
