@@ -1,4 +1,3 @@
 {
-  "scenes_to_load": ["ssr_test.json"],
-  "environment": "environment_ssr_test.json"
+  "scenes_to_load": ["tactical.json", "tactical_props.json", "tactical_enemies.json"]
 }

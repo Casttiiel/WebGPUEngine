@@ -107,8 +107,8 @@ export class ModuleEnvironmentManager extends Module {
       this.sceneName = 'scene';
     }
 
-    // Dev: un scenario (`?scenario=nombre`) puede traer su propio "environment" (p.ej.
-    // "environment_ssr_test.json") que sustituye al de boot.json.
+    // Dev: un scenario (`?scenario=nombre`) puede traer su propio "environment" (un fichero
+    // de data/) que sustituye al de boot.json.
     if (import.meta.env.DEV) {
       const scenarioName = new URLSearchParams(window.location.search).get('scenario');
       if (scenarioName) {
