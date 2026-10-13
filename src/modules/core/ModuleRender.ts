@@ -305,6 +305,11 @@ export class ModuleRender extends Module {
 
       // Advance to next jitter offset if jittering is active
       if (needsJitter) {
+        // TSR outputs at canvas resolution: bias textures by the upscale ratio as well
+        const upscaleRatio = mainCameraEntity?.hasComponent('tsr')
+          ? Render.width / Render.canvasSize.width
+          : 1.0;
+        camera.setTemporalMipBias(upscaleRatio);
         camera.nextJitter();
       }
 
@@ -319,18 +324,6 @@ export class ModuleRender extends Module {
       Profiler.getInstance().cpu.end();
 
       RenderManager.getInstance().setCamera(camera);
-
-      // Inform SSR whether a temporal component is active so it can halve its step count.
-      // TAA/TSR accumulate SSR hits across frames, giving equivalent quality at half steps.
-      const taaActive =
-        (mainCameraEntity?.hasComponent('taa') &&
-          (mainCameraEntity.getComponent('taa') as TAAComponent).hasLoaded()) ??
-        false;
-      const tsrActive =
-        (mainCameraEntity?.hasComponent('tsr') &&
-          (mainCameraEntity.getComponent('tsr') as TSRComponent).hasLoaded()) ??
-        false;
-      this.deferred.setSSRTemporalMode(!!(taaActive || tsrActive));
 
       Profiler.getInstance().cpu.begin('Deferred');
       result = this.deferred.render(mainCameraEntity);
@@ -484,12 +477,12 @@ export class ModuleRender extends Module {
       if (mainCameraEntity?.hasComponent('tsr')) {
         const tsr = mainCameraEntity.getComponent('tsr') as TSRComponent;
         if (tsr.hasLoaded()) {
-          result = tsr.apply(result, this.deferred.getLinearDepthView());
+          result = tsr.apply(result, this.deferred.getLinearDepthTarget());
         }
       } else if (mainCameraEntity?.hasComponent('taa')) {
         const taa = mainCameraEntity.getComponent('taa') as TAAComponent;
         if (taa.hasLoaded()) {
-          result = taa.apply(result, this.deferred.getLinearDepthView());
+          result = taa.apply(result, this.deferred.getLinearDepthTarget());
         }
       }
 
@@ -644,6 +637,7 @@ export class ModuleRender extends Module {
     const encoder = render.getCommandEncoder();
     const renderPass = encoder.beginRenderPass({
       label: 'ui_overlay_pass',
+      ...((ts) => (ts ? { timestampWrites: ts } : {}))(GPUProfiler.getInstance().getTimestampWrites('UI Overlay')),
       colorAttachments: [
         {
           view: resultView,
@@ -699,11 +693,12 @@ export class ModuleRender extends Module {
       'store',
       { r: 0, g: 0, b: 0, a: 1 },
     );
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor('main presentation render pass', [colorAttachment]),
-      );
+    const presentDesc = GPUUtils.createRenderPassDescriptor('main presentation render pass', [
+      colorAttachment,
+    ]);
+    const presentTs = GPUProfiler.getInstance().getTimestampWrites('Present');
+    if (presentTs) presentDesc.timestampWrites = presentTs;
+    const pass = render.getCommandEncoder().beginRenderPass(presentDesc);
 
     // Render result to screen
     this.presentationTechnique.activatePipeline(pass);

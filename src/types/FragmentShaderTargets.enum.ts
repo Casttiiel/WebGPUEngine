@@ -7,4 +7,5 @@ export enum FragmentShaderTargets {
   SINGLE_CHANNEL = 'single_channel',
   OIT_GATHER = 'oit_gather',
   MASK = 'mask',
+  MASK_HDR = 'mask_hdr',
 }

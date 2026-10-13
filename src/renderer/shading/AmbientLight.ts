@@ -26,6 +26,8 @@ export class AmbientLight {
   //         [3] probeBlendWeight  [4] hasProbeA  [5..7] padding
   private ambientDiffuseUniformArray = new Float32Array(8);
   private ambientSpecularUniformArray = new Float32Array(12);
+  /** When true, ambient_specular.fs takes the specular radiance from SSR instead of the IBL. */
+  private ssrActive = false;
 
   // SH L2 irradiance: probeA(9×vec4) + probeB(9×vec4) = 72 floats / 288 bytes.
   // Each vec4 = (R, G, B, 0_padding). Layout: coefA[0..8] then coefB[0..8].
@@ -41,6 +43,8 @@ export class AmbientLight {
 
   /** Cached probe env views for specular bind-group invalidation. */
   private lastProbeEnvAView: GPUTextureView | null = null;
+  /** Specular bind groups keyed by SSR view (cleared when probes change / on destroy). */
+  private specularBindGroupCache = new Map<GPUTextureView, GPUBindGroup>();
   private lastProbeEnvBView: GPUTextureView | null = null;
 
   /** When true, the ambient diffuse shader uses white irradiance instead of sampled cubemaps. */
@@ -142,14 +146,21 @@ export class AmbientLight {
     if (!this.pccSpecularUniformBuffer || !this.ambientSpecularUniformBuffer) return;
     const envViews = this._getProbeEnvViews();
     if (
-      !this.ambientSpecularBindGroup ||
       envViews.envA !== this.lastProbeEnvAView ||
       envViews.envB !== this.lastProbeEnvBView
     ) {
-      this.createAmbientSpecularBindGroup(ssr, ao, envViews.envA, envViews.envB);
+      this.specularBindGroupCache.clear();
       this.lastProbeEnvAView = envViews.envA;
       this.lastProbeEnvBView = envViews.envB;
     }
+    // SSR ping-pongs its output between two textures: keep one bind group per SSR view.
+    let specularBG = this.specularBindGroupCache.get(ssr);
+    if (!specularBG) {
+      this.createAmbientSpecularBindGroup(ssr, ao, envViews.envA, envViews.envB);
+      specularBG = this.ambientSpecularBindGroup;
+      this.specularBindGroupCache.set(ssr, specularBG);
+    }
+    this.ambientSpecularBindGroup = specularBG;
     const render = Render.getInstance();
 
     const colorAttachment = GPUUtils.createColorAttachment(accLights, 'load', 'store');
@@ -276,7 +287,7 @@ export class AmbientLight {
     this.ambientSpecularUniformArray[2] = 0.0;
     this.ambientSpecularUniformArray[3] = 0.0;
     this.ambientSpecularUniformArray[4] = 0.0;
-    this.ambientSpecularUniformArray[5] = 0.0;
+    this.ambientSpecularUniformArray[5] = this.ssrActive ? 1.0 : 0.0; // SSRUniforms.enabled
     this.ambientSpecularUniformArray[6] = ambientData.reflectionFactor;
     this.ambientSpecularUniformArray[7] = ambientData.diffuseFactor;
     this.ambientSpecularUniformArray[8] = 0.0;
@@ -352,8 +363,33 @@ export class AmbientLight {
   public destroy(): void {
     this.ambientDiffuseBindGroupCache.clear();
     this.ambientSpecularBindGroup = null!;
+    this.specularBindGroupCache.clear();
     this.lastProbeEnvAView = null;
     this.lastProbeEnvBView = null;
+  }
+
+  /** PCC data of the two dominant probes (also read by the SSR trace for env fallbacks). */
+  public getPCCSpecularBuffer(): GPUBuffer {
+    return this.pccSpecularUniformBuffer;
+  }
+
+  /** Env cubemap views of the two dominant probes (global env when none). */
+  public getProbeEnvViews(): { envA: GPUTextureView; envB: GPUTextureView } {
+    return this._getProbeEnvViews();
+  }
+
+  /**
+   * Tells ambient_specular.fs whether this frame's SSR result replaces the IBL radiance.
+   * Uploaded immediately so it applies to the frame being recorded.
+   */
+  public setSSRActive(active: boolean): void {
+    if (active === this.ssrActive || !this.ambientSpecularUniformBuffer) {
+      this.ssrActive = active;
+      return;
+    }
+    this.ssrActive = active;
+    this.ambientSpecularUniformArray[5] = active ? 1.0 : 0.0;
+    GPUUtils.writeBuffer(this.ambientSpecularUniformBuffer, 0, this.ambientSpecularUniformArray);
   }
 
   /**

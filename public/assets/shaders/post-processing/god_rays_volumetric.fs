@@ -3,41 +3,43 @@
 
 // ─── Volumetric God Rays ──────────────────────────────────────────────────────
 //
-// Per-pixel view-ray march through CSM shadow maps.
-// Produces physically-based light shafts that work from ANY camera angle —
-// no screen-space sun-position dependency.
+// Per-pixel view-ray march through CSM shadow maps, at half resolution.
 //
-// Algorithm: for each pixel, reconstruct the world-space view ray, march from
-// the camera toward the pixel (up to its geometry depth), and accumulate
-// in-scattered light at each step where the CSM shadow factor is non-zero.
-// Beer-Lambert transmittance + Henyey-Greenstein phase function.
+// The march is bounded so every sample lands where shafts can actually exist:
+//   tEnd = min(geometry hit, CSM shadow range, maxDistance)
+// Step size is in world units (clamped by maxSteps), so thin occluders aren't
+// skipped the way they would be with a fixed step count over the full view.
+// Samples fade out near the end of the shadow range so the cut-off is invisible.
+//
+// Output (rgba16float):
+//   r = in-scattered light (unclamped, phase-weighted)
+//   g = normalized linear depth of this texel — used by the bilateral blur and
+//       the joint-bilateral upsample in the composite pass.
 //
 // Bind-group layout:
-//   group(0)  CameraUniforms       — invProjection, invView, cameraPosition, cameraFar
-//   group(1)  GBufferUniforms      — gLinearDepth (binding 2) used for march termination
+//   group(0)  CameraUniforms       — invProjection, invView, cameraPosition, cameraFar, frameIndex
+//   group(1)  GBufferUniforms      — gLinearDepth (binding 2)
 //   group(2)  GodRaysVolumetricCSM — DirectionalLightCSMUniforms + 3 shadow maps + sampler
 //   group(3)  GodRaysUniforms      — VolumetricGodRaysParams uniform buffer
 
 // ─── Volumetric params ────────────────────────────────────────────────────────
 // 8 × f32 = 32 bytes — matches GodRaysUniforms (single uniform buffer).
 struct VolumetricGodRaysParams {
-    density:    f32,  // σs: scattering coefficient (inscattering strength)
-    extinction: f32,  // σt: extinction = σs + σa (opacity per unit distance)
-    intensity:  f32,  // final brightness multiplier applied to accumulated light
-    enabled:    f32,  // 0.0 = skip pass, 1.0 = compute volumetric shafts
-    stepCount:  f32,  // number of raymarch steps (stored as f32)
-    _pad0:      f32,
-    _pad1:      f32,
-    _pad2:      f32,
+    density:     f32,  // σs: scattering coefficient per world unit
+    extinction:  f32,  // σt: extinction per world unit (fog transmittance along the view ray)
+    anisotropy:  f32,  // Henyey-Greenstein g (0 = isotropic, >0 = forward scattering)
+    enabled:     f32,  // 0.0 = skip pass, 1.0 = compute volumetric shafts
+    maxSteps:    f32,  // upper bound on raymarch steps
+    stepSize:    f32,  // target step length in world units
+    maxDistance: f32,  // max march distance from the camera (world units)
+    _pad0:       f32,
 }
 
 // ─── Bind groups ─────────────────────────────────────────────────────────────
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
-// Only gLinearDepth (binding 2) and its sampler (binding 3) are accessed.
-// Bindings 0 and 1 (gAlbedo, gNormals) are in the bound group but unused here.
+// Only gLinearDepth (binding 2) is accessed.
 @group(1) @binding(2) var gLinearDepth: texture_2d<f32>;
-@group(1) @binding(3) var gSampler: sampler;
 
 // CSM directional light + shadow maps
 @group(2) @binding(0) var<uniform> csmLight: DirectionalLightCSMUniforms;
@@ -48,10 +50,12 @@ struct VolumetricGodRaysParams {
 
 @group(3) @binding(0) var<uniform> params: VolumetricGodRaysParams;
 
+const PI: f32 = 3.14159265;
+
 // ─── Shadow sampling ──────────────────────────────────────────────────────────
-// Select the cascade that covers this view-space distance and sample it.
-fn sampleVolumetricShadow(worldPos: vec3<f32>, viewDist: f32) -> f32 {
-    let cascadeIdx = selectCascadeCSM(viewDist, csmLight.cascadeSplits);
+// Select the cascade that covers this view-space depth and sample it.
+fn sampleVolumetricShadow(worldPos: vec3<f32>, viewDepth: f32) -> f32 {
+    let cascadeIdx = selectCascadeCSM(viewDepth, csmLight.cascadeSplits);
     if (cascadeIdx == 0) {
         return getShadowFactorForCascade(worldPos, csmLight.viewProjOffset0,
             csmLight.shadowParams.x, shadowMap0, shadowSampler);
@@ -64,11 +68,18 @@ fn sampleVolumetricShadow(worldPos: vec3<f32>, viewDist: f32) -> f32 {
 }
 
 // ─── Henyey-Greenstein phase ─────────────────────────────────────────────────
-// g = 0 → isotropic,  g > 0 → forward scattering (sun glow effect).
-fn phaseHG(cosTheta: f32, g: f32) -> f32 {
+// Normalized so that isotropic scattering (g = 0) returns 1.0 — keeps `density`
+// meaningful independently of the anisotropy setting.
+fn phaseHGRelative(cosTheta: f32, g: f32) -> f32 {
     let g2 = g * g;
     let denom = max(1.0 + g2 - 2.0 * g * cosTheta, 0.001);
-    return (1.0 - g2) / (4.0 * 3.14159265 * pow(denom, 1.5));
+    return (1.0 - g2) / pow(denom, 1.5);
+}
+
+// Interleaved gradient noise, animated per frame so TAA/TSR resolves it.
+fn temporalIGN(p: vec2<f32>, frame: f32) -> f32 {
+    let q = p + 5.588238 * (frame % 64.0);
+    return fract(52.9829189 * fract(dot(q, vec2<f32>(0.06711056, 0.00583715))));
 }
 
 // ─── Fragment entry ───────────────────────────────────────────────────────────
@@ -77,61 +88,72 @@ fn fs(
     @builtin(position) fragCoord: vec4<f32>,
     @location(0) uv: vec2<f32>,
 ) -> @location(0) vec4<f32> {
+    // ── Pick one full-res depth texel for this half-res texel ────────────────
+    // Point-loading (instead of bilinear) avoids averaging depths across edges,
+    // and the ray is built through that same texel so depth and ray agree.
+    let depthDims = vec2<i32>(textureDimensions(gLinearDepth));
+    let depthCoord = clamp(vec2<i32>(uv * vec2<f32>(depthDims)), vec2<i32>(0), depthDims - 1);
+    let linearDepth = textureLoad(gLinearDepth, depthCoord, 0).r;
+
     if (params.enabled < 0.5) {
-        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        return vec4<f32>(0.0, linearDepth, 0.0, 1.0);
     }
 
-    // ── Depth termination ────────────────────────────────────────────────────
-    // linearDepth is in [0, 1] where 1.0 = sky (clear value = no geometry).
-    let linearDepth = textureSample(gLinearDepth, gSampler, uv).r;
-    // Don't march into the sky; cap slightly below 1.0 to exclude the far plane.
-    let maxWorldDist = min(linearDepth, 0.9999) * camera.cameraFar;
+    let texelUV = (vec2<f32>(depthCoord) + 0.5) / vec2<f32>(depthDims);
 
     // ── Reconstruct world-space view ray ─────────────────────────────────────
-    // NDC: x ∈ [-1,1], y ∈ [-1,1] (WebGPU y-up convention, UV y-down → flip)
-    let ndc = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
-    let clipDir = vec4<f32>(ndc, 1.0, 1.0);
-    let viewDir4 = camera.invProjection * clipDir;
+    let ndc = vec2<f32>(texelUV.x * 2.0 - 1.0, (1.0 - texelUV.y) * 2.0 - 1.0);
+    let viewDir4 = camera.invProjection * vec4<f32>(ndc, 1.0, 1.0);
     let viewDir = normalize(viewDir4.xyz / viewDir4.w);
     let worldRayDir = normalize((camera.invView * vec4<f32>(viewDir, 0.0)).xyz);
 
-    // ── Phase function setup ─────────────────────────────────────────────────
-    // csmLight.position holds the world-space direction *toward* the light.
-    let lightDir = normalize(csmLight.position);
-    let cosTheta = dot(worldRayDir, lightDir);
-    let phase = phaseHG(cosTheta, 0.3); // mild forward scattering
+    // View-space depth per unit of ray length (cosine to the view axis).
+    let depthPerT = max(abs(viewDir.z), 1e-3);
 
-    // ── Interleaved gradient noise dithering ─────────────────────────────────
-    // Offsets the first sample per pixel to reduce low-frequency banding.
-    let p = fragCoord.xy;
-    let dither = fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))));
+    // ── Ray bounds ───────────────────────────────────────────────────────────
+    // Geometry hit (linear depth is view-space depth / far; 1.0 = sky).
+    let isSky = linearDepth >= 0.9999;
+    let tGeometry = select(linearDepth * camera.cameraFar / depthPerT, 1e9, isSky);
 
-    // ── Raymarch ─────────────────────────────────────────────────────────────
-    let numSteps = i32(params.stepCount);
-    let stepSize = maxWorldDist / f32(numSteps);
+    // CSM coverage: beyond the last cascade split there is no shadow data, so any
+    // light accumulated there would be a flat, contrast-less haze.
+    let cascadeCount = clamp(i32(csmLight.cascadeSplits.w), 1, 3);
+    let shadowRange = csmLight.cascadeSplits[cascadeCount - 1];
+    let tShadow = shadowRange / depthPerT;
 
-    var accumLight = 0.0;
-    var transmittance = 1.0;
-
-    for (var i = 0i; i < numSteps; i++) {
-        let t = (f32(i) + dither) * stepSize;
-        if (t >= maxWorldDist) { break; }
-
-        let worldPos = camera.cameraPosition.xyz + worldRayDir * t;
-
-        // t ≈ view-space distance (valid approximation for perspective cameras).
-        let shadow = sampleVolumetricShadow(worldPos, t);
-
-        // In-scatter: σs × phase × shadow × T × Δt
-        accumLight += params.density * phase * shadow * transmittance * stepSize;
-
-        // Beer-Lambert: T *= exp(-σt × Δt)
-        transmittance *= exp(-params.extinction * stepSize);
-
-        // Early exit once fully absorbed.
-        if (transmittance < 0.005) { break; }
+    let tEnd = min(tGeometry, min(tShadow, params.maxDistance));
+    if (tEnd <= 0.0) {
+        return vec4<f32>(0.0, linearDepth, 0.0, 1.0);
     }
 
-    let result = clamp(accumLight * params.intensity, 0.0, 1.0);
-    return vec4<f32>(result, result, result, 1.0);
+    // ── Step count from world-space step size ────────────────────────────────
+    let numSteps = clamp(ceil(tEnd / max(params.stepSize, 0.01)), 4.0, max(params.maxSteps, 4.0));
+    let dt = tEnd / numSteps;
+    let jitter = temporalIGN(fragCoord.xy, camera.frameIndex);
+
+    // Fade samples over the last 15% of the shadow range / max distance.
+    let fadeEnd = min(tShadow, params.maxDistance);
+    let fadeStart = fadeEnd * 0.85;
+
+    // ── Raymarch ─────────────────────────────────────────────────────────────
+    var scatter = 0.0;
+    let steps = i32(numSteps);
+    for (var i = 0i; i < steps; i++) {
+        let t = (f32(i) + jitter) * dt;
+        let worldPos = camera.cameraPosition.xyz + worldRayDir * t;
+
+        let shadow = sampleVolumetricShadow(worldPos, t * depthPerT);
+        let fade = 1.0 - smoothstep(fadeStart, fadeEnd, t);
+        let transmittance = exp(-params.extinction * t);
+
+        scatter += shadow * fade * transmittance;
+    }
+    scatter *= params.density * dt;
+
+    // Directional light: the phase angle is constant along the ray.
+    // csmLight.position holds the world-space direction *toward* the light.
+    let cosTheta = dot(worldRayDir, normalize(csmLight.position));
+    scatter *= phaseHGRelative(cosTheta, params.anisotropy);
+
+    return vec4<f32>(scatter, linearDepth, 0.0, 1.0);
 }

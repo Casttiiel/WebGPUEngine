@@ -1,4 +1,5 @@
 import { GPUUtils } from '../utils/GPUUtils';
+import { PerfRecorder } from '../../../core/debug/PerfRecorder';
 
 export interface ComputePipelineConfig {
   label: string;
@@ -55,7 +56,11 @@ export class PipelineFactory {
       descriptor.multisample = config.multisample;
     }
 
-    return device.createRenderPipeline(descriptor);
+    const t0 = performance.now();
+    const pipeline = device.createRenderPipeline(descriptor);
+    PerfRecorder.count('pipelineSync');
+    PerfRecorder.addPipelineTime(performance.now() - t0);
+    return pipeline;
   }
 
   /**
@@ -83,6 +88,7 @@ export class PipelineFactory {
       descriptor.multisample = config.multisample;
     }
 
+    PerfRecorder.count('pipelineAsync');
     return device.createRenderPipelineAsync(descriptor);
   }
 
@@ -98,7 +104,11 @@ export class PipelineFactory {
       compute: config.compute,
     };
 
-    return device.createComputePipeline(descriptor);
+    const t0 = performance.now();
+    const pipeline = device.createComputePipeline(descriptor);
+    PerfRecorder.count('pipelineSync');
+    PerfRecorder.addPipelineTime(performance.now() - t0);
+    return pipeline;
   }
   /**
    * Creates a custom pipeline layout with the specified bind group layouts

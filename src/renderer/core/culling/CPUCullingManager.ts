@@ -4,7 +4,7 @@ import { Engine } from '../../../core/engine/Engine';
 import { AABB } from '../../../core/math/AABB';
 import { Camera } from '../../../core/math/Camera';
 import { RenderKey } from '../managers/RenderKeyManager';
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4 } from 'gl-matrix';
 
 /**
  * Simple CPU-based Culling Manager
@@ -168,9 +168,14 @@ export class CPUCullingManager {
     }
   }
 
+  /** Scratch world matrix (Transform.getWorldMatrix() allocates a new mat4 per call). */
+  private readonly _cullMatrix = mat4.create();
+
   /**
    * Test if an object's bounding box is visible in the frustum
-   * Uses the same algorithm as the GPU shader: center + half extents method
+   * Uses the same algorithm as the GPU shader: center + half extents method.
+   * Allocation-free: the world AABB comes from Arvo's method (|M|·halfExtents), which gives
+   * the same box as transforming the 8 corners, without temporaries.
    */
   private isVisibleInFrustum(key: RenderKey, frustumPlanes: Float32Array[]): boolean {
     // If no AABB, assume visible (safety fallback)
@@ -178,119 +183,63 @@ export class CPUCullingManager {
       return true;
     }
 
-    // Transform AABB to world space using the object's model matrix
-    const modelMatrix = key.transform.getTransform().getWorldMatrix();
-    const worldAABB = this.transformAABBToWorldSpace(key.aabb, modelMatrix);
+    const t = key.transform.getTransform();
+    const m = mat4.fromRotationTranslationScale(
+      this._cullMatrix,
+      t.getWorldRotation(),
+      t.getWorldPosition(),
+      t.getWorldScale(),
+    );
+    const a = key.aabb;
+    const lcx = (a.min[0]! + a.max[0]!) * 0.5;
+    const lcy = (a.min[1]! + a.max[1]!) * 0.5;
+    const lcz = (a.min[2]! + a.max[2]!) * 0.5;
+    const lhx = (a.max[0]! - a.min[0]!) * 0.5;
+    const lhy = (a.max[1]! - a.min[1]!) * 0.5;
+    const lhz = (a.max[2]! - a.min[2]!) * 0.5;
 
-    // Calculate AABB center and half extents (like GPU shader)
-    const aabbCenter = vec3.create();
-    const aabbHalf = vec3.create();
+    const cx = m[0]! * lcx + m[4]! * lcy + m[8]! * lcz + m[12]!;
+    const cy = m[1]! * lcx + m[5]! * lcy + m[9]! * lcz + m[13]!;
+    const cz = m[2]! * lcx + m[6]! * lcy + m[10]! * lcz + m[14]!;
+    const hx = Math.abs(m[0]!) * lhx + Math.abs(m[4]!) * lhy + Math.abs(m[8]!) * lhz;
+    const hy = Math.abs(m[1]!) * lhx + Math.abs(m[5]!) * lhy + Math.abs(m[9]!) * lhz;
+    const hz = Math.abs(m[2]!) * lhx + Math.abs(m[6]!) * lhy + Math.abs(m[10]!) * lhz;
 
-    vec3.add(aabbCenter, worldAABB.min, worldAABB.max);
-    vec3.scale(aabbCenter, aabbCenter, 0.5);
-
-    vec3.subtract(aabbHalf, worldAABB.max, worldAABB.min);
-    vec3.scale(aabbHalf, aabbHalf, 0.5);
-
-    // Test against each frustum plane using GPU shader algorithm
-    for (const plane of frustumPlanes) {
-      const planeNormal = vec3.fromValues(plane[0]!, plane[1]!, plane[2]!);
-      const planeDistance = plane[3]!;
-
-      // GPU shader algorithm:
-      // const float r = dot( abs( plane.xyz ), instance.aabb_half );
-      // const float c = dot( plane.xyz, instance.aabb_center ) + plane.w;
-      // if( c < -r ) return false;
-
-      const absNormal = vec3.fromValues(
-        Math.abs(planeNormal[0]),
-        Math.abs(planeNormal[1]),
-        Math.abs(planeNormal[2]),
-      );
-      const r = vec3.dot(absNormal, aabbHalf);
-      const c = vec3.dot(planeNormal, aabbCenter) + planeDistance;
-
-      if (c < -r) {
-        return false; // AABB is completely outside this plane
-      }
-    }
-
-    // AABB intersects or is inside all planes
-    return true;
+    return this.boxInFrustum(cx, cy, cz, hx, hy, hz, frustumPlanes);
   }
 
   private isLightVisibleInFrustum(aabb: AABB, frustumPlanes: Float32Array[]): boolean {
-    const worldAABB = aabb;
-
-    // Calculate AABB center and half extents (like GPU shader)
-    const aabbCenter = vec3.create();
-    const aabbHalf = vec3.create();
-
-    vec3.add(aabbCenter, worldAABB.min, worldAABB.max);
-    vec3.scale(aabbCenter, aabbCenter, 0.5);
-
-    vec3.subtract(aabbHalf, worldAABB.max, worldAABB.min);
-    vec3.scale(aabbHalf, aabbHalf, 0.5);
-
-    // Test against each frustum plane using GPU shader algorithm
-    for (const plane of frustumPlanes) {
-      const planeNormal = vec3.fromValues(plane[0]!, plane[1]!, plane[2]!);
-      const planeDistance = plane[3]!;
-
-      // GPU shader algorithm:
-      // const float r = dot( abs( plane.xyz ), instance.aabb_half );
-      // const float c = dot( plane.xyz, instance.aabb_center ) + plane.w;
-      // if( c < -r ) return false;
-
-      const absNormal = vec3.fromValues(
-        Math.abs(planeNormal[0]),
-        Math.abs(planeNormal[1]),
-        Math.abs(planeNormal[2]),
-      );
-      const r = vec3.dot(absNormal, aabbHalf);
-      const c = vec3.dot(planeNormal, aabbCenter) + planeDistance;
-
-      if (c < -r) {
-        return false; // AABB is completely outside this plane
-      }
-    }
-
-    // AABB intersects or is inside all planes
-    return true;
+    const cx = (aabb.min[0]! + aabb.max[0]!) * 0.5;
+    const cy = (aabb.min[1]! + aabb.max[1]!) * 0.5;
+    const cz = (aabb.min[2]! + aabb.max[2]!) * 0.5;
+    const hx = (aabb.max[0]! - aabb.min[0]!) * 0.5;
+    const hy = (aabb.max[1]! - aabb.min[1]!) * 0.5;
+    const hz = (aabb.max[2]! - aabb.min[2]!) * 0.5;
+    return this.boxInFrustum(cx, cy, cz, hx, hy, hz, frustumPlanes);
   }
 
   /**
-   * Transform AABB to world space by transforming all 8 corners
-   * This matches the GPU shader transformAABB function
+   * GPU shader algorithm:
+   *   r = dot(abs(plane.xyz), half);  c = dot(plane.xyz, center) + plane.w;  outside if c < -r
    */
-  private transformAABBToWorldSpace(
-    aabb: { min: number[]; max: number[] },
-    modelMatrix: mat4,
-  ): { min: vec3; max: vec3 } {
-    const minCorner = vec3.fromValues(1e30, 1e30, 1e30);
-    const maxCorner = vec3.fromValues(-1e30, -1e30, -1e30);
-
-    // Transform all 8 corners and find new min/max (matches GPU shader logic)
-    for (let i = 0; i < 8; i++) {
-      const corner = vec3.fromValues(
-        (i & 1) !== 0 ? aabb.max[0]! : aabb.min[0]!,
-        (i & 2) !== 0 ? aabb.max[1]! : aabb.min[1]!,
-        (i & 4) !== 0 ? aabb.max[2]! : aabb.min[2]!,
-      );
-
-      // Transform corner to world space
-      const worldCorner = vec3.create();
-      vec3.transformMat4(worldCorner, corner, modelMatrix);
-
-      // Update min/max
-      vec3.min(minCorner, minCorner, worldCorner);
-      vec3.max(maxCorner, maxCorner, worldCorner);
+  private boxInFrustum(
+    cx: number,
+    cy: number,
+    cz: number,
+    hx: number,
+    hy: number,
+    hz: number,
+    frustumPlanes: Float32Array[],
+  ): boolean {
+    for (const plane of frustumPlanes) {
+      const px = plane[0]!,
+        py = plane[1]!,
+        pz = plane[2]!;
+      const r = Math.abs(px) * hx + Math.abs(py) * hy + Math.abs(pz) * hz;
+      const c = px * cx + py * cy + pz * cz + plane[3]!;
+      if (c < -r) return false; // AABB is completely outside this plane
     }
-
-    return {
-      min: minCorner,
-      max: maxCorner,
-    };
+    return true;
   }
 
   /**

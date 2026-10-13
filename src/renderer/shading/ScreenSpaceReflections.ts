@@ -1,3 +1,4 @@
+import { mat4 } from 'gl-matrix';
 import { Logger } from '../../core/debug/Logger';
 import { Engine } from '../../core/engine/Engine';
 import { QualitySettings } from '../../core/engine/QualitySettings';
@@ -10,101 +11,135 @@ import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { RenderTarget } from '../resources/RenderTarget';
 import { Texture } from '../resources/Texture';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
+import type { AmbientLight } from './AmbientLight';
 
+// Must match SSRTraceParams in ssr_common.wgsl: 4 × mat4 + 28 × f32
+const TRACE_PARAMS_FLOATS = 4 * 16 + 28;
+// Same max prefiltered mip as ambient_specular.fs
+const ENV_MAX_MIP = 7;
+
+/**
+ * Stochastic screen-space reflections, ported from three.js webgpu_postprocessing_ssr_denoise
+ * (SSRNode stochastic + TemporalReprojectNode + RecurrentDenoiseNode).
+ *
+ * Pipeline (all compute, SSR resolution = render resolution × ssrScale):
+ *   1. ssr.cs          — one GGX ray per pixel → raw radiance + ray length,
+ *                        multi-bounce from last frame's denoised result
+ *   2. ssr_temporal.cs — surface + hit-point reprojection of the history, variance clipping
+ *   3. ssr_denoise.cs  — REBLUR-style spatial filter + Karis temporal blend
+ *   4. copies          — denoised result / depth / normals become next frame's history
+ *
+ * Misses and screen-edge fades resolve to the same prefiltered environment as the IBL
+ * (global env + PCC probes), so ambient_specular.fs uses the SSR result as the full
+ * specular radiance whenever SSR is enabled.
+ */
 export class ScreenSpaceReflections {
-  private isInitialized: boolean = false;
+  private isInitialized = false;
   private _editorFolder: any = null;
 
-  // ── SSR ray-march compute ────────────────────────────────────────────────
-  private ssrComputePipeline: GPUComputePipeline | null = null;
-  private ssrParamsLayout: GPUBindGroupLayout | null = null;
-  private ssrOutputLayout: GPUBindGroupLayout | null = null;
+  // ── Pipelines / layouts ────────────────────────────────────────────────────
+  private tracePipeline: GPUComputePipeline | null = null;
+  private temporalPipeline: GPUComputePipeline | null = null;
+  private denoisePipeline: GPUComputePipeline | null = null;
+  private traceInputLayout!: GPUBindGroupLayout;
+  private temporalInputLayout!: GPUBindGroupLayout;
+  private denoiseInputLayout!: GPUBindGroupLayout;
+  private outputLayout!: GPUBindGroupLayout;
 
-  // ── Hi-Z depth pyramid ────────────────────────────────────────────────────
-  // hizTex has HIZ_LEVELS mip levels at half-render-resolution base size.
-  // Level 0 of the pyramid = gLinearDepth (read directly in the shader).
-  // hizTex mip k = full-pyramid level (k+1), built by min-pooling each frame.
-  private static readonly HIZ_LEVELS = 4;
-  private hizTexture: GPUTexture | null = null;
-  private hizReadView: GPUTextureView | null = null;   // all mip levels — bound in SSR
-  private hizMipViews: GPUTextureView[] = [];           // one per mip level — build passes
-  private hizBuildPipelineL0: GPUComputePipeline | null = null; // src: filterable (gLinearDepth)
-  private hizBuildPipelineL1: GPUComputePipeline | null = null; // src: unfilterable (hizTex)
-  private hizBuildL0BG: GPUBindGroup | null = null;    // gLinearDepth → hizTex mip 0
-  private hizBuildL1BGs: GPUBindGroup[] = [];           // hizTex mip k → mip k+1 (3 groups)
-  private lastHiZDepthView: GPUTextureView | null = null; // cache key for L0 bind group
+  // ── Render targets (SSR resolution) ────────────────────────────────────────
+  /** Raw stochastic trace: rgb = radiance, a = ray length */
+  private ssrRaw!: RenderTarget;
+  /** Reprojected + clipped history: rgb = radiance, a = 1 / frames */
+  private ssrReprojected!: RenderTarget;
+  /** Denoised result: rgb = radiance, a = 1 / frames. Read by ambient_specular. */
+  /**
+   * Ping-pong pair for the denoised result: frame N writes ssrTargets[parity] (read by
+   * ambient_specular) and reads ssrTargets[1 - parity] as history (temporal + multi-bounce).
+   * Swapping replaces a full-target copy per frame.
+   */
+  private ssrTargets: [RenderTarget, RenderTarget] = [new RenderTarget(), new RenderTarget()];
+  private parity = 0;
+  // Previous frame's G-buffer (render resolution), for history confidence
+  private prevLinearDepth!: RenderTarget;
+  private prevNormals!: RenderTarget;
+  private width = 0;
+  private height = 0;
 
-  // ── Blur compute ─────────────────────────────────────────────────────────
-  private blurPipeline: GPUComputePipeline | null = null;
-  private blurInputLayout: GPUBindGroupLayout | null = null;
-  private blurGBufferLayout: GPUBindGroupLayout | null = null;
-  private blurOutputLayout: GPUBindGroupLayout | null = null;
-  private blurInputBindGroup: GPUBindGroup | null = null;
-  private blurGBufferBindGroup: GPUBindGroup | null = null;
-  private blurOutputBindGroup: GPUBindGroup | null = null;
-  // Cached GBuffer views used for blur — invalidate when they change
-  private lastBlurNormalsView: GPUTextureView | null = null;
-  private lastBlurDepthView: GPUTextureView | null = null;
-
-  // ── Render targets ───────────────────────────────────────────────────────
-  /** Raw march output — written by ssr.cs, read by ssr_blur.cs */
-  private ssrResult!: RenderTarget;
-  /** Blurred output — read by ambient_specular.fs */
-  private ssrBlurred!: RenderTarget;
-
-  // ── Bind groups ──────────────────────────────────────────────────────────
-  private ssrBindGroup: GPUBindGroup | null = null;
-  private ssrOutputBindGroup: GPUBindGroup | null = null;
+  // ── Bind groups (lazily rebuilt) ───────────────────────────────────────────
   private cameraComputeBindGroup: GPUBindGroup | null = null;
   private lastCameraBuffer: GPUBuffer | null = null;
-  /** Tracks which texture view is bound as the SSR color source.
-   *  When it changes (e.g. switch between accLight and TAA history after resize
-   *  or on first valid history frame) the bind group must be rebuilt. */
-  private lastAccLightsView: GPUTextureView | null = null;
+  // Bind groups that reference the ping-pong pair are cached per parity
+  private traceInputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
+  private traceInputKeys: [GPUTextureView[], GPUTextureView[]] = [[], []];
+  private temporalInputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
+  private denoiseInputBindGroup: GPUBindGroup | null = null;
+  private rawOutputBindGroup: GPUBindGroup | null = null;
+  private reprojectedOutputBindGroup: GPUBindGroup | null = null;
+  private accumOutputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
 
-  // ── Buffers / textures ────────────────────────────────────────────────────
-  private ssrUniformBuffer!: GPUBuffer;
+  // ── Buffers ─────────────────────────────────────────────────────────────────
+  private traceParamsBuffer!: GPUBuffer;
+  private traceParamsData = new Float32Array(TRACE_PARAMS_FLOATS);
   private brdfLUT!: Texture;
-  private blueNoiseTexture!: Texture;
-  /** Incremented every frame — drives blue-noise temporal animation in ssr.cs */
-  private frameIndex: number = 0;
 
-  // ── Debug-tweakable parameters (exposed in renderInMenu) ─────────────────
-  private debugParams = {
-    stepSize: 0.3,
-    maxSteps: 48,
-    maxDistance: 300.0,
-    thickness: 0.03,
-    metallicMin: 0.4,
-    roughnessMax: 0.6,
-    enabled: 1.0,
-    temporalMode: 0.0, // set externally by DeferredRenderer when TAA is active
+  // ── Temporal state ──────────────────────────────────────────────────────────
+  private noiseIndex = 0;
+  private historyValid = false;
+  private prevView = mat4.create();
+  private prevProjection = mat4.create();
+  private prevInvProjection = mat4.create();
+  private prevInvView = mat4.create();
+
+  // ── Tunables (three.js example defaults; distances rescaled from its 0.1-scale
+  //    dungeon to this engine's metre-scale scenes) ─────────────────────────────
+  private params = {
+    enabled: true,
+    // SSR
+    quality: 0.5,
+    mirrorBias: 0.5,
+    maxDistance: 10,
+    intensity: 1,
+    thickness: 0.15,
+    maxLuminance: 35,
+    stepExponent: 3,
+    screenEdgeFade: 0.2,
+    // Temporal reprojection
+    maxFrames: 16,
+    clampIntensity: 0.25,
+    flickerSuppression: 1,
+    hitPointReprojection: true,
+    multiBounce: true,
+    // Recurrent denoise
+    denoiseEnabled: true,
+    lumaPhi: 0.75,
+    depthPhi: 20,
+    normalPhi: 0.3,
+    roughnessPhi: 100,
+    denoiseRadius: 1.5,
+    alphaPhi: 5,
+    strength: 0.725,
+    adapt: 0.5,
+    smoothDisocclusions: true,
+    adaptiveTrust: 1,
   };
 
   constructor() {}
 
   public async load(): Promise<void> {
     try {
-      this.isInitialized = true;
       this.brdfLUT = await Texture.getAsync('brdfLUT.png');
-      this.blueNoiseTexture = await Texture.getAsync('bluenoise64.png');
 
-      this.createRenderTarget();
-
-      const qs2 = QualitySettings.getInstance().getSettings();
-      this.debugParams.stepSize = qs2.ssrStepSize;
-      this.debugParams.maxSteps = qs2.ssrMaxSteps;
-
-      this.ssrUniformBuffer = GPUUtils.createBuffer(
-        'ssr uniform buffer',
-        48,
+      this.traceParamsBuffer = GPUUtils.createBuffer(
+        'ssr trace params',
+        TRACE_PARAMS_FLOATS * 4,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
 
-      await this.createComputePipeline();
-      await this.createBlurPipeline();
-      await this.createHiZBuildPipelines();
+      this.createRenderTargets();
+      this.createLayouts();
+      await this.createPipelines();
 
+      this.isInitialized = true;
       Logger.info('RENDER', 'SSR ready');
     } catch (error) {
       console.warn('Failed to load SSR, disabling feature:', error);
@@ -112,282 +147,146 @@ export class ScreenSpaceReflections {
     }
   }
 
-  private createRenderTarget(): void {
+  // ─── Setup ──────────────────────────────────────────────────────────────────
+
+  private createRenderTargets(): void {
     const qs = QualitySettings.getInstance().getSettings();
-    const w = Math.floor(Render.width * qs.ssrScale);
-    const h = Math.floor(Render.height * qs.ssrScale);
-    const fmt = qs.hdrTexture as GPUTextureFormat;
+    this.width = Math.max(1, Math.floor(Render.width * qs.ssrScale));
+    this.height = Math.max(1, Math.floor(Render.height * qs.ssrScale));
+    const fmt: GPUTextureFormat = 'rgba16float';
 
-    if (!this.ssrResult) this.ssrResult = new RenderTarget();
-    if (!this.ssrBlurred) this.ssrBlurred = new RenderTarget();
+    this.ssrRaw ??= new RenderTarget();
+    this.ssrReprojected ??= new RenderTarget();
+    this.prevLinearDepth ??= new RenderTarget();
+    this.prevNormals ??= new RenderTarget();
 
-    // Raw march output — needs STORAGE_BINDING (written by compute) + TEXTURE_BINDING (read by blur)
-    this.ssrResult.createRT('ssr_result.dds', w, h, fmt, GPUTextureUsage.STORAGE_BINDING);
-    // Blurred output — also STORAGE_BINDING (blur writes) + TEXTURE_BINDING (ambient_specular reads)
-    this.ssrBlurred.createRT('ssr_blurred.dds', w, h, fmt, GPUTextureUsage.STORAGE_BINDING);
+    const storage = GPUTextureUsage.STORAGE_BINDING;
+    this.ssrRaw.createRT('ssr_raw', this.width, this.height, fmt, storage);
+    this.ssrReprojected.createRT('ssr_reprojected', this.width, this.height, fmt, storage);
+    this.ssrTargets.forEach((rt, i) => rt.createRT(`ssr_accum_${i}`, this.width, this.height, fmt, storage));
+    this.prevLinearDepth.createRT(
+      'ssr_prev_linear_depth',
+      Render.width,
+      Render.height,
+      qs.linearDepthTexture,
+      GPUTextureUsage.COPY_DST,
+    );
+    this.prevNormals.createRT(
+      'ssr_prev_normals',
+      Render.width,
+      Render.height,
+      qs.normalTexture,
+      GPUTextureUsage.COPY_DST,
+    );
 
-    // Invalidate all bind groups that reference these textures
-    this.ssrOutputBindGroup = null;
-    this.blurInputBindGroup = null;
-    this.blurOutputBindGroup = null;
-
-    // Hi-Z pyramid is built from gLinearDepth (render resolution, not SSR scale).
-    // Base size = half render resolution; HIZ_LEVELS mip levels give 1/2 → 1/16 res pyramid.
-    this.createHiZTexture(Render.width, Render.height);
+    this.traceInputBindGroups = [null, null];
+    this.traceInputKeys = [[], []];
+    this.temporalInputBindGroups = [null, null];
+    this.denoiseInputBindGroup = null;
+    this.rawOutputBindGroup = null;
+    this.reprojectedOutputBindGroup = null;
+    this.accumOutputBindGroups = [null, null];
+    this.historyValid = false;
   }
 
-  private createHiZTexture(renderW: number, renderH: number): void {
-    if (this.hizTexture) {
-      this.hizTexture.destroy();
-      this.hizTexture = null;
-    }
-
-    const device = GPUUtils.getDevice();
-    const baseW = Math.max(1, Math.ceil(renderW / 2));
-    const baseH = Math.max(1, Math.ceil(renderH / 2));
-
-    this.hizTexture = device.createTexture({
-      label: 'hiz_texture',
-      size: [baseW, baseH, 1],
-      mipLevelCount: ScreenSpaceReflections.HIZ_LEVELS,
-      format: 'r32float',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-    });
-
-    // Full read view (all mip levels) — bound as hizTex in the SSR march shader
-    this.hizReadView = this.hizTexture.createView({ label: 'hiz_read_all' });
-
-    // Per-mip views (single level each) — used as src/dst in the build passes.
-    // Each view exposes only one mip so WebGPU sees no read/write overlap in a single pass.
-    this.hizMipViews = [];
-    for (let k = 0; k < ScreenSpaceReflections.HIZ_LEVELS; k++) {
-      this.hizMipViews.push(
-        this.hizTexture.createView({
-          label: `hiz_mip_${k}`,
-          baseMipLevel: k,
-          mipLevelCount: 1,
-        }),
-      );
-    }
-
-    // Pre-build the inter-level bind groups (mip k → mip k+1).
-    // These don't depend on gLinearDepth so they can be created immediately.
-    this.hizBuildL1BGs = [];
-    const unfilterLayout = BindGroupFactory.getHiZBuildFromUnfilterableLayout();
-    for (let k = 0; k < ScreenSpaceReflections.HIZ_LEVELS - 1; k++) {
-      this.hizBuildL1BGs.push(
-        BindGroupFactory.createBindGroup(`hiz_build_l${k + 1}_bg`, unfilterLayout, [
-          { binding: 0, resource: this.hizMipViews[k]! },     // src: mip k (read)
-          { binding: 1, resource: this.hizMipViews[k + 1]! }, // dst: mip k+1 (write)
-        ]),
-      );
-    }
-
-    // Level-0 bind group depends on gLinearDepth — lazily created in executeHiZBuildPasses
-    this.hizBuildL0BG = null;
-    this.lastHiZDepthView = null;
-
-    // SSR main bind group must be rebuilt (hizReadView changed)
-    this.ssrBindGroup = null;
-    this.lastAccLightsView = null;
+  private createLayouts(): void {
+    const C = GPUShaderStage.COMPUTE;
+    this.traceInputLayout = BindGroupFactory.getLayout('ssr_trace_inputs', [
+      { binding: 0, visibility: C, texture: { sampleType: 'float' } }, // accLight
+      { binding: 1, visibility: C, buffer: { type: 'uniform' } }, // SSRTraceParams
+      { binding: 2, visibility: C, texture: { sampleType: 'float', viewDimension: 'cube' } },
+      { binding: 3, visibility: C, texture: { sampleType: 'float', viewDimension: 'cube' } },
+      { binding: 4, visibility: C, texture: { sampleType: 'float', viewDimension: 'cube' } },
+      { binding: 5, visibility: C, sampler: { type: 'filtering' } },
+      { binding: 6, visibility: C, buffer: { type: 'uniform' } }, // PCC data
+      { binding: 7, visibility: C, texture: { sampleType: 'float' } }, // history (multi-bounce)
+      { binding: 8, visibility: C, texture: { sampleType: 'float' } }, // BRDF LUT
+      { binding: 9, visibility: C, sampler: { type: 'filtering' } },
+    ]);
+    this.temporalInputLayout = BindGroupFactory.getLayout('ssr_temporal_inputs', [
+      { binding: 0, visibility: C, texture: { sampleType: 'float' } }, // ssrRaw
+      { binding: 1, visibility: C, buffer: { type: 'uniform' } }, // SSRTraceParams
+      { binding: 2, visibility: C, texture: { sampleType: 'float' } }, // history
+      { binding: 3, visibility: C, texture: { sampleType: 'float' } }, // prev linear depth
+      { binding: 4, visibility: C, texture: { sampleType: 'float' } }, // prev normals
+    ]);
+    this.denoiseInputLayout = BindGroupFactory.getLayout('ssr_denoise_inputs', [
+      { binding: 0, visibility: C, texture: { sampleType: 'float' } }, // reprojected history
+      { binding: 1, visibility: C, buffer: { type: 'uniform' } }, // SSRTraceParams
+      { binding: 2, visibility: C, texture: { sampleType: 'float' } }, // ssrRaw
+      { binding: 3, visibility: C, sampler: { type: 'filtering' } },
+    ]);
+    this.outputLayout = BindGroupFactory.getSSROutputLayout();
   }
 
-  private async createHiZBuildPipelines(): Promise<void> {
+  private async createPipelines(): Promise<void> {
     const device = GPUUtils.getDevice();
-    const shaderCode = await ResourceManager.loadShader('post-processing/hiz_build.cs');
-    const module = device.createShaderModule({ label: 'hiz_build_cs', code: shaderCode });
-
-    const l0Layout = BindGroupFactory.getHiZBuildFromFilterableLayout();
-    const l1Layout = BindGroupFactory.getHiZBuildFromUnfilterableLayout();
-
-    const l0Config: ComputePipelineConfig = {
-      label: 'Hi-Z Build L0 Pipeline',
-      layout: PipelineFactory.createPipelineLayout('hiz_build_l0_layout', [l0Layout]),
-      compute: { module, entryPoint: 'cs' },
-    };
-    this.hizBuildPipelineL0 = PipelineFactory.createComputePipeline(l0Config);
-
-    const l1Config: ComputePipelineConfig = {
-      label: 'Hi-Z Build L1+ Pipeline',
-      layout: PipelineFactory.createPipelineLayout('hiz_build_l1_layout', [l1Layout]),
-      compute: { module, entryPoint: 'cs' },
-    };
-    this.hizBuildPipelineL1 = PipelineFactory.createComputePipeline(l1Config);
-  }
-
-  // ─── Compute pipeline setup ────────────────────────────────────────────────
-
-  private async createBlurPipeline(): Promise<void> {
-    const device = GPUUtils.getDevice();
-    this.blurInputLayout = BindGroupFactory.getSSRBlurInputLayout();
-    this.blurGBufferLayout = BindGroupFactory.getSSRBlurGBufferLayout();
-    this.blurOutputLayout = BindGroupFactory.getSSRBlurOutputLayout();
-
-    const shaderCode = await ResourceManager.loadShader('post-processing/ssr_blur.cs');
-    const module = device.createShaderModule({ label: 'ssr_blur_cs', code: shaderCode });
-    const config: ComputePipelineConfig = {
-      label: 'SSR Blur Pipeline',
-      layout: PipelineFactory.createPipelineLayout('ssr_blur_pipeline_layout', [
-        this.blurInputLayout,
-        this.blurGBufferLayout,
-        this.blurOutputLayout,
-      ]),
-      compute: { module, entryPoint: 'cs' },
-    };
-    this.blurPipeline = PipelineFactory.createComputePipeline(config);
-  }
-
-  private async createComputePipeline(): Promise<void> {
-    const device = GPUUtils.getDevice();
-
-    // Layouts
     const cameraLayout = BindGroupFactory.getCameraComputeLayout();
     const gbufferLayout = BindGroupFactory.getGBufferComputeLayout();
-    this.ssrParamsLayout = BindGroupFactory.getSSRUniformsComputeLayout();
-    this.ssrOutputLayout = BindGroupFactory.getSSROutputLayout();
 
-    // Shader
-    const shaderCode = await ResourceManager.loadShader('post-processing/ssr.cs');
-    const shaderModule = device.createShaderModule({ label: 'ssr_cs', code: shaderCode });
+    const [traceCode, temporalCode, denoiseCode] = await Promise.all([
+      ResourceManager.loadShader('post-processing/ssr.cs'),
+      ResourceManager.loadShader('post-processing/ssr_temporal.cs'),
+      ResourceManager.loadShader('post-processing/ssr_denoise.cs'),
+    ]);
 
-    const config: ComputePipelineConfig = {
-      label: 'SSR Compute Pipeline',
-      layout: PipelineFactory.createPipelineLayout('ssr_compute_pipeline_layout', [
-        cameraLayout,
-        gbufferLayout,
-        this.ssrParamsLayout,
-        this.ssrOutputLayout,
-      ]),
-      compute: { module: shaderModule, entryPoint: 'cs' },
+    const make = (label: string, code: string, inputs: GPUBindGroupLayout) => {
+      const config: ComputePipelineConfig = {
+        label,
+        layout: PipelineFactory.createPipelineLayout(`${label}_layout`, [
+          cameraLayout,
+          gbufferLayout,
+          inputs,
+          this.outputLayout,
+        ]),
+        compute: { module: device.createShaderModule({ label, code }), entryPoint: 'cs' },
+      };
+      return PipelineFactory.createComputePipeline(config);
     };
 
-    this.ssrComputePipeline = PipelineFactory.createComputePipeline(config);
+    this.tracePipeline = make('ssr_trace', traceCode, this.traceInputLayout);
+    this.temporalPipeline = make('ssr_temporal', temporalCode, this.temporalInputLayout);
+    this.denoisePipeline = make('ssr_denoise', denoiseCode, this.denoiseInputLayout);
   }
 
-  private renderDisabledSSR(): GPUTextureView {
-    const commandEncoder = Render.getInstance().getCommandEncoder();
-    // Clear the blurred RT — this is the texture ambient_specular.fs reads.
-    const renderPass = commandEncoder.beginRenderPass({
-      label: 'Clear SSR (disabled)',
-      colorAttachments: [
-        {
-          view: this.ssrBlurred.getView(),
-          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-      ],
-    });
-    renderPass.end();
-    return this.ssrBlurred.getView();
+  // ─── Per-frame ──────────────────────────────────────────────────────────────
+
+  /** True when SSR runs this frame (ambient_specular then uses it instead of the IBL). */
+  public isActive(): boolean {
+    return (
+      this.isInitialized &&
+      this.params.enabled &&
+      QualitySettings.getInstance().getSettings().ssrEnabled
+    );
   }
 
+  /**
+   * Traces, reprojects and denoises SSR; returns the view read by ambient_specular.fs.
+   * The returned view is stable between resizes (AmbientLight caches its bind group).
+   */
   public generateSSR(
     accLights: GPUTextureView,
-    ao: GPUTextureView,
-    gBufferBindGroup: GPUBindGroup,
-    gNormalsView: GPUTextureView,
-    gDepthView: GPUTextureView,
+    gBufferComputeBindGroup: GPUBindGroup,
+    gNormals: RenderTarget,
+    gLinearDepth: RenderTarget,
+    ambientLight: AmbientLight,
   ): GPUTextureView {
-    if (!QualitySettings.getInstance().getSettings().ssrEnabled) {
-      return this.renderDisabledSSR();
-    }
-
-    // Rebuild bind group whenever the color source changes (first valid TAA
-    // history frame, resize, or TAA toggled on/off).
-    if (accLights !== this.lastAccLightsView) {
-      this.ssrBindGroup = null;
-      this.lastAccLightsView = accLights;
-    }
-    if (!this.ssrBindGroup) {
-      this.createSSRBindGroup(accLights, ao);
-    }
-
-    this.executeSSRPass(gBufferBindGroup, gDepthView);
-    this.executeBlurPass(gNormalsView, gDepthView);
-
-    return this.ssrBlurred.getView();
-  }
-
-  private executeBlurPass(gNormalsView: GPUTextureView, gDepthView: GPUTextureView): void {
     if (
-      !this.blurPipeline ||
-      !this.blurInputLayout ||
-      !this.blurGBufferLayout ||
-      !this.blurOutputLayout
-    )
-      return;
-
-    // Input bind group: raw SSR result
-    if (!this.blurInputBindGroup) {
-      this.blurInputBindGroup = BindGroupFactory.createBindGroup(
-        'ssr_blur_input_bg',
-        this.blurInputLayout,
-        [
-          { binding: 0, resource: this.ssrResult.getView() },
-          { binding: 1, resource: SamplerLibrary.simpleSampler! },
-        ],
-      );
-    }
-
-    // GBuffer bind group: rebuilt if views change (e.g. after resize)
-    if (
-      !this.blurGBufferBindGroup ||
-      this.lastBlurNormalsView !== gNormalsView ||
-      this.lastBlurDepthView !== gDepthView
+      !this.isActive() ||
+      !this.tracePipeline ||
+      !this.temporalPipeline ||
+      !this.denoisePipeline
     ) {
-      this.lastBlurNormalsView = gNormalsView;
-      this.lastBlurDepthView = gDepthView;
-      this.blurGBufferBindGroup = BindGroupFactory.createBindGroup(
-        'ssr_blur_gbuffer_bg',
-        this.blurGBufferLayout,
-        [
-          { binding: 0, resource: gNormalsView },
-          { binding: 1, resource: gDepthView },
-          { binding: 2, resource: SamplerLibrary.nonFilteringSampler! },
-        ],
-      );
+      this.historyValid = false;
+      return this.ssrTargets[this.parity]!.getView();
     }
 
-    // Output bind group: blurred result storage texture
-    if (!this.blurOutputBindGroup) {
-      this.blurOutputBindGroup = BindGroupFactory.createBindGroup(
-        'ssr_blur_output_bg',
-        this.blurOutputLayout,
-        [{ binding: 0, resource: this.ssrBlurred.getStorageView() }],
-      );
-    }
-
-    const qs = QualitySettings.getInstance().getSettings();
-    const ssrW = Math.floor(Render.width * qs.ssrScale);
-    const ssrH = Math.floor(Render.height * qs.ssrScale);
-    const encoder = Render.getInstance().getCommandEncoder();
-    const ssrBlurTs = GPUProfiler.getInstance().getTimestampWrites('SSR Blur');
-    const pass = encoder.beginComputePass({
-      label: 'SSR Blur',
-      ...(ssrBlurTs ? { timestampWrites: ssrBlurTs } : {}),
-    });
-    pass.setPipeline(this.blurPipeline);
-    pass.setBindGroup(0, this.blurInputBindGroup);
-    pass.setBindGroup(1, this.blurGBufferBindGroup);
-    pass.setBindGroup(2, this.blurOutputBindGroup);
-    pass.dispatchWorkgroups(Math.ceil(ssrW / 8), Math.ceil(ssrH / 8), 1);
-    pass.end();
-  }
-
-  public executeSSRPass(gBufferBindGroup: GPUBindGroup, gDepthView: GPUTextureView): void {
-    if (!this.isInitialized || !this.ssrComputePipeline) return;
-
-    // ── Hi-Z pyramid build (4 passes, cheap ~0.1 ms) ─────────────────────────
-    this.executeHiZBuildPasses(gDepthView);
-
-    const qs = QualitySettings.getInstance().getSettings();
-    const ssrW = Math.floor(Render.width * qs.ssrScale);
-    const ssrH = Math.floor(Render.height * qs.ssrScale);
-
-    // ── Camera compute bind group (lazily created / refreshed) ───────────────
-    const cameraBuffer = Engine.getRender().getMainCamera().getUniformBuffer();
-    if (!cameraBuffer) return;
+    const camera = Engine.getRender().getMainCamera();
+    const cameraBuffer = camera.getUniformBuffer();
+    if (!cameraBuffer) return this.ssrTargets[this.parity]!.getView();
+    const p = this.parity;
+    const accum = this.ssrTargets[p]!;
+    const history = this.ssrTargets[1 - p]!;
     if (!this.cameraComputeBindGroup || cameraBuffer !== this.lastCameraBuffer) {
       this.lastCameraBuffer = cameraBuffer;
       this.cameraComputeBindGroup = BindGroupFactory.createBindGroup(
@@ -397,104 +296,172 @@ export class ScreenSpaceReflections {
       );
     }
 
-    // ── Output bind group (lazily created / invalidated on resize) ────────────
-    if (!this.ssrOutputBindGroup) {
-      this.ssrOutputBindGroup = BindGroupFactory.createBindGroup(
-        'ssr_output_bindgroup',
-        this.ssrOutputLayout!,
-        [{ binding: 0, resource: this.ssrResult.getStorageView() }],
-      );
-    }
+    this.writeTraceParams(camera.getNear());
 
-    // ── Dispatch ──────────────────────────────────────────────────────────────
-    const encoder = Render.getInstance().getCommandEncoder();
-    const ssrTs = GPUProfiler.getInstance().getTimestampWrites('SSR Compute');
-    const pass = encoder.beginComputePass({
-      label: 'SSR Compute',
-      ...(ssrTs ? { timestampWrites: ssrTs } : {}),
-    });
-
-    pass.setPipeline(this.ssrComputePipeline);
-    pass.setBindGroup(0, this.cameraComputeBindGroup);
-    pass.setBindGroup(1, gBufferBindGroup);
-    pass.setBindGroup(2, this.ssrBindGroup!);
-    pass.setBindGroup(3, this.ssrOutputBindGroup);
-
-    pass.dispatchWorkgroups(Math.ceil(ssrW / 8), Math.ceil(ssrH / 8), 1);
-    pass.end();
-  }
-
-  private executeHiZBuildPasses(gDepthView: GPUTextureView): void {
-    if (!this.hizBuildPipelineL0 || !this.hizBuildPipelineL1 || !this.hizTexture) return;
-
-    // Lazily create the level-0 bind group (depends on gLinearDepth view pointer)
-    if (!this.hizBuildL0BG || this.lastHiZDepthView !== gDepthView) {
-      this.lastHiZDepthView = gDepthView;
-      this.hizBuildL0BG = BindGroupFactory.createBindGroup(
-        'hiz_build_l0_bg',
-        BindGroupFactory.getHiZBuildFromFilterableLayout(),
+    // Trace inputs depend on accLight and on which env/probe cubemaps are active
+    const env = Engine.getEnvironmentManager().getSSREnvironmentTexture();
+    const probes = ambientLight.getProbeEnvViews();
+    const envView = env.getTextureView()!;
+    const key = [accLights, envView, probes.envA, probes.envB];
+    if (!this.traceInputBindGroups[p] || key.some((v, i) => v !== this.traceInputKeys[p]![i])) {
+      this.traceInputKeys[p] = key;
+      this.traceInputBindGroups[p] = BindGroupFactory.createBindGroup(
+        `ssr_trace_inputs_bg_${p}`,
+        this.traceInputLayout,
         [
-          { binding: 0, resource: gDepthView },            // src: gLinearDepth (full res)
-          { binding: 1, resource: this.hizMipViews[0]! },   // dst: hizTex mip 0 (half res)
+          { binding: 0, resource: accLights },
+          { binding: 1, resource: { buffer: this.traceParamsBuffer } },
+          { binding: 2, resource: envView },
+          { binding: 3, resource: probes.envA },
+          { binding: 4, resource: probes.envB },
+          { binding: 5, resource: env.getSampler()! },
+          { binding: 6, resource: { buffer: ambientLight.getPCCSpecularBuffer() } },
+          { binding: 7, resource: history.getView() },
+          { binding: 8, resource: this.brdfLUT.getTextureView()! },
+          { binding: 9, resource: SamplerLibrary.simpleSampler },
         ],
       );
     }
+    this.temporalInputBindGroups[p] ??= BindGroupFactory.createBindGroup(
+      `ssr_temporal_inputs_bg_${p}`,
+      this.temporalInputLayout,
+      [
+        { binding: 0, resource: this.ssrRaw.getView() },
+        { binding: 1, resource: { buffer: this.traceParamsBuffer } },
+        { binding: 2, resource: history.getView() },
+        { binding: 3, resource: this.prevLinearDepth.getView() },
+        { binding: 4, resource: this.prevNormals.getView() },
+      ],
+    );
+    this.denoiseInputBindGroup ??= BindGroupFactory.createBindGroup(
+      'ssr_denoise_inputs_bg',
+      this.denoiseInputLayout,
+      [
+        { binding: 0, resource: this.ssrReprojected.getView() },
+        { binding: 1, resource: { buffer: this.traceParamsBuffer } },
+        { binding: 2, resource: this.ssrRaw.getView() },
+        { binding: 3, resource: SamplerLibrary.simpleSampler },
+      ],
+    );
+    this.reprojectedOutputBindGroup ??= BindGroupFactory.createBindGroup(
+      'ssr_reprojected_output_bg',
+      this.outputLayout,
+      [{ binding: 0, resource: this.ssrReprojected.getStorageView() }],
+    );
+    this.rawOutputBindGroup ??= BindGroupFactory.createBindGroup(
+      'ssr_raw_output_bg',
+      this.outputLayout,
+      [{ binding: 0, resource: this.ssrRaw.getStorageView() }],
+    );
+    this.accumOutputBindGroups[p] ??= BindGroupFactory.createBindGroup(
+      `ssr_accum_output_bg_${p}`,
+      this.outputLayout,
+      [{ binding: 0, resource: accum.getStorageView() }],
+    );
 
     const encoder = Render.getInstance().getCommandEncoder();
-    const baseW = this.hizTexture.width;
-    const baseH = this.hizTexture.height;
+    const wx = Math.ceil(this.width / 8);
+    const wy = Math.ceil(this.height / 8);
+    const profiler = GPUProfiler.getInstance();
 
-    // Pass 0: gLinearDepth (render res) → hizTex mip 0 (half res)
-    {
-      const pass = encoder.beginComputePass({ label: 'Hi-Z Build L0' });
-      pass.setPipeline(this.hizBuildPipelineL0);
-      pass.setBindGroup(0, this.hizBuildL0BG);
-      pass.dispatchWorkgroups(Math.ceil(baseW / 8), Math.ceil(baseH / 8), 1);
+    const dispatch = (
+      label: string,
+      pipeline: GPUComputePipeline,
+      inputs: GPUBindGroup,
+      output: GPUBindGroup,
+    ) => {
+      const ts = profiler.getTimestampWrites(label);
+      const pass = encoder.beginComputePass({ label, ...(ts ? { timestampWrites: ts } : {}) });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, this.cameraComputeBindGroup!);
+      pass.setBindGroup(1, gBufferComputeBindGroup);
+      pass.setBindGroup(2, inputs);
+      pass.setBindGroup(3, output);
+      pass.dispatchWorkgroups(wx, wy, 1);
       pass.end();
-    }
+    };
 
-    // Passes 1-3: hizTex mip k → mip k+1
-    for (let k = 0; k < ScreenSpaceReflections.HIZ_LEVELS - 1; k++) {
-      const mipW = Math.max(1, baseW >> k);
-      const mipH = Math.max(1, baseH >> k);
-      const dstW = Math.max(1, Math.ceil(mipW / 2));
-      const dstH = Math.max(1, Math.ceil(mipH / 2));
-      const pass = encoder.beginComputePass({ label: `Hi-Z Build L${k + 1}` });
-      pass.setPipeline(this.hizBuildPipelineL1);
-      pass.setBindGroup(0, this.hizBuildL1BGs[k]);
-      pass.dispatchWorkgroups(Math.ceil(dstW / 8), Math.ceil(dstH / 8), 1);
-      pass.end();
-    }
+    dispatch('SSR Trace', this.tracePipeline, this.traceInputBindGroups[p]!, this.rawOutputBindGroup);
+    dispatch(
+      'SSR Temporal',
+      this.temporalPipeline,
+      this.temporalInputBindGroups[p]!,
+      this.reprojectedOutputBindGroup,
+    );
+    dispatch(
+      'SSR Denoise',
+      this.denoisePipeline,
+      this.denoiseInputBindGroup,
+      this.accumOutputBindGroups[p]!,
+    );
+
+    // ── History for the next frame ─────────────────────────────────────────────
+    // The denoised result becomes the history by swapping parity (no copy); depth and
+    // normals still need a copy since the G-buffer is overwritten next frame.
+    const copy = (src: RenderTarget, dst: RenderTarget) =>
+      encoder.copyTextureToTexture(
+        { texture: src.getTexture() },
+        { texture: dst.getTexture() },
+        { width: dst.getWidth(), height: dst.getHeight(), depthOrArrayLayers: 1 },
+      );
+    copy(gLinearDepth, this.prevLinearDepth);
+    copy(gNormals, this.prevNormals);
+
+    mat4.copy(this.prevView, camera.getView());
+    mat4.copy(this.prevProjection, camera.getProjection());
+    mat4.copy(this.prevInvProjection, camera.getInvProjectionMatrix());
+    mat4.invert(this.prevInvView, this.prevView);
+    this.historyValid = true;
+    this.noiseIndex = (this.noiseIndex + 1) % 0x7fffffff;
+    this.parity = 1 - p;
+
+    return accum.getView();
   }
 
-  public composeSSR(): void {
-    if (!this.isInitialized) return;
-  }
-
-  /**
-   * Tell SSR whether TAA is currently active.
-   * When active, the ray marcher uses half the normal step count because TAA
-   * accumulates hits from previous frames — effective quality stays equivalent.
-   * Call this every frame (or whenever TAA state changes) from DeferredRenderer.
-   * SSR has no direct import of TAAComponent — the flag is purely a numeric hint.
-   */
-  public setTemporalMode(active: boolean): void {
-    this.debugParams.temporalMode = active ? 1.0 : 0.0;
+  private writeTraceParams(cameraNear: number): void {
+    const d = this.traceParamsData;
+    const p = this.params;
+    d.set(this.prevView, 0);
+    d.set(this.prevProjection, 16);
+    d.set(this.prevInvProjection, 32);
+    d.set(this.prevInvView, 48);
+    let o = 64;
+    d[o++] = p.quality;
+    d[o++] = p.mirrorBias;
+    d[o++] = p.maxDistance;
+    d[o++] = p.thickness;
+    d[o++] = p.intensity;
+    d[o++] = p.maxLuminance;
+    d[o++] = p.screenEdgeFade;
+    d[o++] = p.stepExponent;
+    d[o++] = this.noiseIndex;
+    d[o++] = cameraNear;
+    d[o++] = ENV_MAX_MIP;
+    d[o++] = p.maxFrames;
+    d[o++] = p.clampIntensity;
+    d[o++] = p.flickerSuppression;
+    d[o++] = p.hitPointReprojection ? 1 : 0;
+    d[o++] = this.historyValid ? 1 : 0;
+    d[o++] = p.lumaPhi;
+    d[o++] = p.depthPhi;
+    d[o++] = p.normalPhi;
+    d[o++] = p.roughnessPhi;
+    d[o++] = p.denoiseEnabled ? p.denoiseRadius : 0; // radius 0 = temporal only
+    d[o++] = p.alphaPhi;
+    d[o++] = p.strength;
+    d[o++] = p.adapt;
+    d[o++] = p.smoothDisocclusions ? 1 : 0;
+    d[o++] = p.adaptiveTrust;
+    d[o++] = p.multiBounce ? 1 : 0;
+    d[o++] = Engine.getEnvironmentManager().getAmbientLightData().reflectionFactor;
+    GPUUtils.writeBuffer(this.traceParamsBuffer, 0, d);
   }
 
   public getBRDFLUT(): Texture {
     return this.brdfLUT;
   }
 
-  private createSSRBindGroup(accLights: GPUTextureView, _ao: GPUTextureView) {
-    this.ssrBindGroup = BindGroupFactory.createBindGroup('ssr_bindgroup', this.ssrParamsLayout!, [
-      { binding: 0, resource: accLights },
-      { binding: 1, resource: { buffer: this.ssrUniformBuffer } },
-      { binding: 2, resource: this.blueNoiseTexture.getTextureView()! },
-      // Hi-Z min-depth pyramid — always valid (created in createHiZTexture)
-      { binding: 3, resource: this.hizReadView! },
-    ]);
-  }
+  // ─── Editor ─────────────────────────────────────────────────────────────────
 
   public renderInMenu(folder?: any): void {
     if (!folder) return;
@@ -502,74 +469,46 @@ export class ScreenSpaceReflections {
     this._editorFolder = folder.addFolder('SSR');
     this._editorFolder.close();
 
-    const p = this.debugParams;
-    this._editorFolder.add(p, 'stepSize', 0.01, 2.0).name('Step Size').listen();
-    this._editorFolder.add(p, 'maxSteps', 8, 128, 1).name('Max Steps').listen();
-    this._editorFolder.add(p, 'maxDistance', 5.0, 300.0).name('Max Distance').listen();
-    this._editorFolder.add(p, 'thickness', 0.001, 0.2).name('Thickness').listen();
-    this._editorFolder.add(p, 'metallicMin', 0.0, 1.0).name('Metallic Min').listen();
-    this._editorFolder.add(p, 'roughnessMax', 0.0, 1.0).name('Roughness Max').listen();
-    const enabledProxy = {
-      get enabled() {
-        return p.enabled > 0.5;
-      },
-      set enabled(v: boolean) {
-        p.enabled = v ? 1.0 : 0.0;
-      },
-    };
-    this._editorFolder.add(enabledProxy, 'enabled').name('Enabled').listen();
+    const p = this.params;
+    const f = this._editorFolder;
+    f.add(p, 'enabled').name('Enabled').listen();
+    f.add(p, 'quality', 0, 1).name('Quality').listen();
+    f.add(p, 'mirrorBias', 0, 1).name('Mirror Bias').listen();
+    f.add(p, 'maxDistance', 0.05, 50).name('Max Distance').listen();
+    f.add(p, 'thickness', 0.001, 1).name('Thickness').listen();
+    f.add(p, 'intensity', 0, 2).name('Intensity').listen();
+    f.add(p, 'maxLuminance', 1, 100).name('Max Luminance').listen();
+    f.add(p, 'stepExponent', 1, 5, 1).name('Step Exponent').listen();
+    f.add(p, 'screenEdgeFade', 0, 0.5).name('Screen Edge Fade').listen();
+    f.add(p, 'maxFrames', 1, 64, 1).name('Temporal Max Frames').listen();
+    f.add(p, 'clampIntensity', 0, 1).name('Temporal Clamp').listen();
+    f.add(p, 'flickerSuppression', 0, 2).name('Flicker Suppression').listen();
+    f.add(p, 'hitPointReprojection').name('Hit-Point Reprojection').listen();
+    f.add(p, 'multiBounce').name('Multi-Bounce').listen();
+    f.add(p, 'denoiseEnabled').name('Denoise').listen();
+    f.add(p, 'denoiseRadius', 0, 5).name('Denoise Radius').listen();
+    f.add(p, 'lumaPhi', 0, 5).name('Denoise Luma Phi').listen();
+    f.add(p, 'depthPhi', 0, 50).name('Denoise Depth Phi').listen();
+    f.add(p, 'normalPhi', 0, 1).name('Denoise Normal Phi').listen();
+    f.add(p, 'roughnessPhi', 0, 200).name('Denoise Roughness Phi').listen();
+    f.add(p, 'alphaPhi', 0, 20).name('Denoise Hit Dist Phi').listen();
+    f.add(p, 'strength', 0, 1).name('Denoise Strength').listen();
+    f.add(p, 'adapt', 0, 1).name('Denoise Adapt').listen();
+    f.add(p, 'smoothDisocclusions').name('Smooth Disocclusions').listen();
+    f.add(p, 'adaptiveTrust', 0, 1).name('Adaptive Trust').listen();
   }
 
-  public update(_dt: number): void {
-    const ambientData = Engine.getEnvironmentManager().getAmbientLightData();
-
-    GPUUtils.writeBuffer(
-      this.ssrUniformBuffer,
-      0,
-      new Float32Array([
-        ambientData.globalFactor,
-        this.debugParams.stepSize,
-        this.debugParams.maxSteps,
-        this.debugParams.maxDistance,
-        this.debugParams.thickness,
-        this.debugParams.enabled,
-        ambientData.reflectionFactor,
-        ambientData.diffuseFactor,
-        this.debugParams.metallicMin,
-        this.debugParams.roughnessMax,
-        this.debugParams.temporalMode, // 1.0 when TAA active → halve march steps
-        this.frameIndex, // drives blue-noise tile animation in ssr.cs
-      ]),
-    );
-    // Only animate blue-noise when TAA is accumulating; without temporal
-    // accumulation each frame would show a different ray offset → flickering.
-    if (this.debugParams.temporalMode > 0.0) {
-      this.frameIndex = (this.frameIndex + 1) % 8192;
-    }
-  }
-
+  /** Called on resize: recreates the targets and restarts the temporal history. */
   public dispose(): void {
-    this.ssrBindGroup = null;
-    this.ssrOutputBindGroup = null;
     this.cameraComputeBindGroup = null;
     this.lastCameraBuffer = null;
-    this.lastAccLightsView = null;
-    this.blurInputBindGroup = null;
-    this.blurGBufferBindGroup = null;
-    this.blurOutputBindGroup = null;
-    this.lastBlurNormalsView = null;
-    this.lastBlurDepthView = null;
-    this.hizBuildL0BG = null;
-    this.hizBuildL1BGs = [];
-    this.hizMipViews = [];
-    this.hizReadView = null;
-    this.lastHiZDepthView = null;
-    if (this.hizTexture) {
-      this.hizTexture.destroy();
-      this.hizTexture = null;
+    if (this.ssrRaw) {
+      this.ssrRaw.destroy();
+      this.ssrReprojected.destroy();
+      this.ssrTargets.forEach((rt) => rt.destroy());
+      this.prevLinearDepth.destroy();
+      this.prevNormals.destroy();
     }
-    this.ssrResult = null as any;
-    this.ssrBlurred = null as any;
-    this.createRenderTarget();
+    this.createRenderTargets();
   }
 }

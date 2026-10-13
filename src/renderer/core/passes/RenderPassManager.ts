@@ -24,7 +24,7 @@ import {
   ContactShadowsRenderPass,
   GodRaysOcclusionRenderPass,
   GodRaysRadialRenderPass,
-  GodRaysKawaseRenderPass,
+  GodRaysBlurRenderPass,
   GodRaysCompositeRenderPass,
   GodRaysVolumetricRenderPass,
   LensFlareOcclusionRenderPass,
@@ -448,7 +448,7 @@ export class RenderPassManager {
 
   /**
    * Execute the volumetric god rays pass (replaces occlusion + radial blur).
-   * Per-pixel view-ray march through CSM shadow maps at quarter resolution.
+   * Per-pixel view-ray march through CSM shadow maps at half resolution.
    * group(1) = GBuffer (linearDepth), group(2) = CSM shadow maps, group(3) = params.
    */
   public executeGodRaysVolumetricPass(
@@ -532,24 +532,23 @@ export class RenderPassManager {
   }
 
   /**
-   * Execute one Kawase blur pass (Step 3).
-   * Call 5× in ping-pong with pre-written offset bind groups (k = 0,1,2,2,3).
-   * group(1) = ping-pong input, group(2) = KawaseParams (offset).
+   * Execute one separable bilateral blur pass of the god rays buffer.
+   * group(1) = input texture, group(2) = BlurParams (direction + depth sigma).
    */
-  public executeGodRaysKawasePass(
+  public executeGodRaysBlurPass(
     mesh: Mesh,
     technique: Technique,
     inputBindGroup: GPUBindGroup,
     paramsBindGroup: GPUBindGroup,
     result: RenderTarget,
-    passLabel: string = 'God Rays Kawase',
+    passLabel: string = 'God Rays Blur',
   ): void {
     const passConfig = RenderPassFactory.createPostProcessPassConfig(
       result,
       { width: result.getWidth(), height: result.getHeight() },
       passLabel,
     );
-    const pass = new GodRaysKawaseRenderPass(
+    const pass = new GodRaysBlurRenderPass(
       passConfig,
       mesh,
       technique,
@@ -560,15 +559,16 @@ export class RenderPassManager {
   }
 
   /**
-   * Execute the god rays composite pass (Step 4).
+   * Execute the god rays composite pass.
    * Renders additively onto the existing HDR view (loadOp: 'load' + ONE+ONE blend).
    * No new RT needed — the god rays contribution is blended directly in-place.
-   * group(1) = Kawase output (quarter-res), group(2) = composite params.
+   * group(0) = GBuffer, group(1) = blurred shafts (half-res), group(2) = composite params.
    */
   public executeGodRaysCompositePass(
     mesh: Mesh,
     technique: Technique,
     hdrView: GPUTextureView,
+    gBufferBindGroup: GPUBindGroup,
     inputBindGroup: GPUBindGroup,
     paramsBindGroup: GPUBindGroup,
     exposureBindGroup: GPUBindGroup,
@@ -582,6 +582,7 @@ export class RenderPassManager {
       passConfig,
       mesh,
       technique,
+      gBufferBindGroup,
       inputBindGroup,
       paramsBindGroup,
       exposureBindGroup,

@@ -206,7 +206,7 @@ export class ProceduralSkyCubemap {
     data[8] = this.windOffset;
     data[9] = envManager.cloudScale;
     data[10] = envManager.cloudCoverage;
-    data[11] = envManager.cloudOpacity;
+    data[11] = envManager.getFlatCloudOpacity(); // 0 unless clouds.type = flat
     data[12] = envManager.cloudLayers;
     data[13] = envManager.cloudColor[0];
     data[14] = envManager.cloudColor[1];

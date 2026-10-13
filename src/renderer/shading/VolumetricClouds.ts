@@ -116,7 +116,30 @@ export class VolumetricClouds {
     });
   }
 
+  /** environment.json "clouds.volumetric" overrides are applied once, on the first render. */
+  private settingsApplied = false;
+
+  private applyEnvironmentSettings(): void {
+    const s = Engine.getEnvironmentManager().getVolumetricCloudSettings();
+    if (s.base !== undefined) this.cloudBase = s.base;
+    if (s.top !== undefined) this.cloudTop = s.top;
+    if (s.coverage !== undefined) this.coverage = s.coverage;
+    if (s.density !== undefined) this.density = s.density;
+    if (s.absorption !== undefined) this.absorption = s.absorption;
+    if (s.scatterStrength !== undefined) this.scatterStrength = s.scatterStrength;
+    if (s.frequency !== undefined) this.cloudFrequency = s.frequency;
+    if (s.stepCount !== undefined) this.stepCount = s.stepCount;
+    if (s.lightSteps !== undefined) this.lightSteps = s.lightSteps;
+    if (s.fadeRadius !== undefined) this.fadeRadius = s.fadeRadius;
+    if (s.resolutionDivisor !== undefined) this.resolutionDivisor = s.resolutionDivisor;
+    this.settingsApplied = true;
+  }
+
   public render(rtAccLight: GPUTextureView, depthStencilView: GPUTextureView): void {
+    // Only when environment.json selects volumetric clouds (switchable at runtime)
+    if (Engine.getEnvironmentManager().getCloudsType() !== 'volumetric') return;
+    if (!this.settingsApplied) this.applyEnvironmentSettings();
+
     this.uploadCloudUniforms();
 
     const div = Math.max(1, Math.round(this.resolutionDivisor));
@@ -241,6 +264,8 @@ export class VolumetricClouds {
       colorAttachments: [temporalColorAtt],
     };
 
+    const temporalTs = GPUProfiler.getInstance().getTimestampWrites('VolumetricClouds Temporal');
+    if (temporalTs) temporalDesc.timestampWrites = temporalTs;
     const temporalPass = render.getCommandEncoder().beginRenderPass(temporalDesc);
     GPUUtils.configureViewportAndScissor(temporalPass, fullW, fullH);
     this.temporalTechnique.activatePipeline(temporalPass);
@@ -263,6 +288,8 @@ export class VolumetricClouds {
       compositeDepthAtt,
     );
 
+    const compositeTs = GPUProfiler.getInstance().getTimestampWrites('VolumetricClouds Composite');
+    if (compositeTs) compositeDesc.timestampWrites = compositeTs;
     const compositePass = render.getCommandEncoder().beginRenderPass(compositeDesc);
     GPUUtils.configureViewportAndScissor(compositePass);
     this.compositeTechnique.activatePipeline(compositePass);

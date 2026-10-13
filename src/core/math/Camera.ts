@@ -55,30 +55,30 @@ export class Camera {
   private frameIndex: number = 0;
   private readonly TIME_RESET_INTERVAL = 3600.0; // Reset every hour to avoid float precision loss
 
-  // Jitter patterns
-  // Halton(2,3) 16-point sequence — indexed from 1, centred around 0.5.
-  // 16 points instead of 8: the longer period reduces perceptible periodic patterns
-  // at sub-pixel features (1-pixel cracks, thin geometry edges) where a short 8-frame
-  // cycle causes visible temporal shimmer at each full repetition.
-  private static readonly HALTON_8: [number, number][] = [
-    // base-2,         base-3           index
-    [0.5, 1.0 / 3.0], // 1
-    [0.25, 2.0 / 3.0], // 2
-    [0.75, 1.0 / 9.0], // 3
-    [0.125, 4.0 / 9.0], // 4
-    [0.625, 7.0 / 9.0], // 5
-    [0.375, 2.0 / 9.0], // 6
-    [0.875, 5.0 / 9.0], // 7
-    [0.0625, 8.0 / 9.0], // 8
-    [0.5625, 1.0 / 27.0], // 9
-    [0.3125, 10.0 / 27.0], // 10
-    [0.8125, 19.0 / 27.0], // 11
-    [0.1875, 4.0 / 27.0], // 12
-    [0.6875, 13.0 / 27.0], // 13
-    [0.4375, 22.0 / 27.0], // 14
-    [0.9375, 7.0 / 27.0], // 15
-    [0.03125, 16.0 / 27.0], // 16
-  ];
+  // Jitter pattern: Halton(2,3) 32-point sequence (indexed from 1), as three.js TRAA/TAAU.
+  // A long period avoids perceptible repetition on sub-pixel features (thin edges, cracks).
+  private static readonly HALTON: [number, number][] = Array.from({ length: 32 }, (_, i) => [
+    Camera.halton(i + 1, 2),
+    Camera.halton(i + 1, 3),
+  ]);
+
+  private static halton(index: number, base: number): number {
+    let fraction = 1;
+    let result = 0;
+    while (index > 0) {
+      fraction /= base;
+      result += fraction * (index % base);
+      index = Math.floor(index / base);
+    }
+    return result;
+  }
+
+  /**
+   * Texture mip bias applied while jitter is active (camera.mipBias in shaders). Temporal
+   * AA integrates sub-pixel jitter, so textures can be sampled sharper than the render
+   * resolution alone suggests: log2(renderRes / outputRes) - 0.5 (see setTemporalMipBias).
+   */
+  private temporalMipBias: number = -0.5;
 
   // Viewport
   private viewport = {
@@ -106,22 +106,15 @@ export class Camera {
     this.calculateInvViewProjectionMatrix();
   }
 
+  // Inverses are written in place (callers read them immediately, nobody keeps the reference)
   private calculateInvViewMatrix(): void {
-    const invView = mat4.create();
-    mat4.invert(invView, this.view);
-
-    // Store the inverse view-projection matrix as invViewProjection
-    this.invView = invView;
+    mat4.invert(this.invView, this.view);
   }
 
   private calculateInvViewProjectionMatrix(): void {
     // Create inverse view-projection matrix for world position reconstruction
     // This matrix transforms from NDC space (-1 to 1) to world space
-    const invViewProjection = mat4.create();
-    mat4.invert(invViewProjection, this.viewProjection);
-
-    // Store the inverse view-projection matrix as invViewProjection
-    this.invViewProjection = invViewProjection;
+    mat4.invert(this.invViewProjection, this.viewProjection);
   }
 
   private updateProjection(): void {
@@ -173,10 +166,7 @@ export class Camera {
   }
 
   private calculateInvProjectionMatrix(): void {
-    const invProjection = mat4.create();
-    mat4.invert(invProjection, this.projection);
-
-    this.invProjection = invProjection;
+    mat4.invert(this.invProjection, this.projection);
   }
 
   public setUseReverseZ(value: boolean): void {
@@ -386,10 +376,10 @@ export class Camera {
     // Used by TAA to remove jitter contribution from motion vectors of static geometry.
     this.uniformData[94] = this.prevJitterOffsetX;
     this.uniformData[95] = this.prevJitterOffsetY;
-    // mipBias (offset 96 = 384 bytes): -0.5 when jitter is active (TAA), 0.0 otherwise.
-    // GBuffer shaders use this to request a half-mip-level sharper sample each frame;
-    // TAA accumulation then recovers the expected detail without perceptual blur.
-    this.uniformData[96] = this.jitterEnabled ? -0.5 : 0.0;
+    // mipBias (offset 96 = 384 bytes): temporalMipBias when jitter is active, 0.0 otherwise.
+    // GBuffer shaders request sharper mips; TAA/TSR accumulation then recovers the detail
+    // without aliasing. Always < 0 while jittering (contact shadows rely on that).
+    this.uniformData[96] = this.jitterEnabled ? this.temporalMipBias : 0.0;
     this.uniformData[97] = 0.0; // _pad_mip
     // unjitteredProjectionMatrix (offset 98-113 = 392-455 bytes) mat4x4
     // Used by SSR viewToScreen() to project view-space hit positions without jitter.
@@ -575,6 +565,14 @@ export class Camera {
     this.updateProjection();
   }
 
+  /**
+   * Sets the jitter-time texture mip bias from the temporal upscale ratio:
+   * log2(renderWidth / outputWidth) - 0.5 → -0.5 at native res (TAA), -1.5 at 50% (TSR).
+   */
+  public setTemporalMipBias(renderToOutputRatio: number): void {
+    this.temporalMipBias = Math.log2(Math.max(renderToOutputRatio, 1e-3)) - 0.5;
+  }
+
   public isJitterEnabled(): boolean {
     return this.jitterEnabled;
   }
@@ -586,9 +584,9 @@ export class Camera {
     this.prevJitterOffsetX = this.jitterOffsetX / 2.0;
     this.prevJitterOffsetY = this.jitterOffsetY / 2.0;
 
-    // Get next jitter offset from Halton(2,3) 8-point sequence
-    const pattern = Camera.HALTON_8[this.jitterIndex];
-    this.jitterIndex = (this.jitterIndex + 1) % Camera.HALTON_8.length;
+    // Get next jitter offset from the Halton(2,3) sequence
+    const pattern = Camera.HALTON[this.jitterIndex]!;
+    this.jitterIndex = (this.jitterIndex + 1) % Camera.HALTON.length;
 
     // NDC offset: jitter = (halton - 0.5) * 2.0 / screenSize
     // Stored as UV-space first (divide by size), then *2 for projection matrix column offsets.

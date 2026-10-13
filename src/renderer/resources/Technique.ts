@@ -341,6 +341,8 @@ export class Technique extends GPUResource {
         return this.createSingleChannelTarget();
       case FragmentShaderTargets.MASK:
         return this.createMaskTarget();
+      case FragmentShaderTargets.MASK_HDR:
+        return [{ format: 'rgba16float' }];
       case FragmentShaderTargets.SCREEN:
         return this.createScreenTarget();
       case FragmentShaderTargets.DEPTH_ONLY:

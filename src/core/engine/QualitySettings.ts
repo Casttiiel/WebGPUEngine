@@ -9,10 +9,8 @@ export interface GraphicsQualitySettings {
   enableAO: boolean;
   aoScale: number;
   aoTexture: GPUTextureFormat;
+  /** AO samples (three.js GTAO/SSAO `samples`, 4..32). */
   aoSampleCount: number;
-  aoRadius: number;
-  aoStrength: number;
-  aoSliceCount: number;
   albedoTexture: GPUTextureFormat;
   normalTexture: GPUTextureFormat;
   linearDepthTexture: GPUTextureFormat;
@@ -20,8 +18,6 @@ export interface GraphicsQualitySettings {
   hdrTexture: GPUTextureFormat;
   ssrEnabled: boolean;
   ssrScale: number;
-  ssrStepSize: number;
-  ssrMaxSteps: number;
   directionalShadowMapResolution: number;
   useKTX2: boolean;
   meshTextureFilter: 'trilinear' | 'nearest';
@@ -45,10 +41,7 @@ export class QualitySettings {
       enableAO: false,
       aoScale: 0.25,
       aoTexture: 'r16float',
-      aoSampleCount: 2.0,
-      aoRadius: 5.0,
-      aoStrength: 1.0,
-      aoSliceCount: 2.0,
+      aoSampleCount: 8,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -56,8 +49,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: false,
       ssrScale: 0.4,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 256,
 
       enableMotionBlur: false,
@@ -76,10 +67,7 @@ export class QualitySettings {
       enableAO: true,
       aoScale: 0.25,
       aoTexture: 'r16float',
-      aoSampleCount: 4.0,
-      aoRadius: 5.0,
-      aoStrength: 1.0,
-      aoSliceCount: 2.0,
+      aoSampleCount: 8,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -87,8 +75,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.4,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 512,
 
       enableMotionBlur: true,
@@ -107,10 +93,7 @@ export class QualitySettings {
       enableAO: true,
       aoScale: 0.5,
       aoTexture: 'r16float',
-      aoSampleCount: 8.0,
-      aoRadius: 5.0,
-      aoStrength: 1.0,
-      aoSliceCount: 3.0,
+      aoSampleCount: 16,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -118,8 +101,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 1024,
 
       enableMotionBlur: true,
@@ -138,10 +119,7 @@ export class QualitySettings {
       enableAO: true,
       aoScale: 0.5,
       aoTexture: 'r16float',
-      aoSampleCount: 8.0,
-      aoRadius: 1.5,
-      aoStrength: 1.0,
-      aoSliceCount: 4.0,
+      aoSampleCount: 16,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -149,8 +127,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 2048,
 
       enableMotionBlur: true,
@@ -184,9 +160,6 @@ export class QualitySettings {
       aoScale: 0.5,
       aoTexture: 'r16float',
       aoSampleCount: 16,
-      aoRadius: 0.1,
-      aoStrength: 3.0,
-      aoSliceCount: 0.01,
 
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
@@ -195,8 +168,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.75,
-      ssrStepSize: 0.05,
-      ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
       enableMotionBlur: true,
       useKTX2: false,

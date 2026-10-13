@@ -170,9 +170,10 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
         dispUv = mix(baseUv, pomUv, finalFade);
     }
 
-    // ── UV unjittering (same as gbuffer.fs) ───────────────────────────────────
-    let jitter_px   = camera.jitterOffset * camera.screenSize;
-    let uvFinal     = dispUv - dpdx(dispUv) * jitter_px.x - dpdy(dispUv) * jitter_px.y;
+    // Texture UVs keep the camera jitter on purpose: TAA/TSR integrate the sub-pixel
+    // offsets over frames, which is what anti-aliases texture detail. (camera.mipBias
+    // compensates the extra blur of that integration.)
+    let uvFinal = dispUv;
 
     // ── Texture sampling ──────────────────────────────────────────────────────
     let albedo_color  = textureSampleBias(txAlbedo,    samplerState, uvFinal, camera.mipBias);

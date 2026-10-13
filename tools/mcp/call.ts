@@ -27,6 +27,10 @@ await client.connect(
       path.join(ROOT, 'tools', 'mcp', 'server.ts'),
     ],
     cwd: ROOT,
+    // The SDK only forwards a safe subset of env vars by default; pass ENGINE_* through.
+    env: Object.fromEntries(
+      Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined),
+    ),
     stderr: 'inherit',
   }),
 );

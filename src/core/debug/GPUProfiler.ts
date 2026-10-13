@@ -25,7 +25,8 @@ type SlotState = 'idle' | 'recorded' | 'mapping';
 export class GPUProfiler {
   private static _instance: GPUProfiler | null = null;
 
-  private static readonly MAX_PASSES = 64;
+  /** Timestamp pairs per frame (a label used N times in a frame takes N pairs). */
+  private static readonly MAX_PASSES = 256;
   private static readonly RING_SIZE = 3;
 
   private _supported = false;
@@ -35,14 +36,40 @@ export class GPUProfiler {
   private resolveBuffers: GPUBuffer[] = [];
   private readbackBuffers: GPUBuffer[] = [];
 
-  private passNames: string[] = [];
-  private passMap = new Map<string, number>();
-  private passCount = 0;
+  /**
+   * Query pairs are handed out per CALL within a frame, so a label used several times
+   * (one shadow pass per point-light face, per spot light…) gets one pair per use and
+   * the readback SUMS them. A single pair per label would be overwritten by every reuse
+   * and only the last pass would be measured.
+   */
+  private frameLabels: string[] = []; // label of each pair used this frame
+  private slotLabels: string[][] = [[], [], []]; // snapshot per ring slot
 
+  /** Exponential moving average of each pass's GPU time (ms), over the passes run last frame. */
   private results = new Map<string, number>();
+  /**
+   * Weight of the newest frame in the moving average. Browsers quantize timestamps (Chrome:
+   * 100 µs unless chrome://flags/#enable-webgpu-developer-features is on), so a pass shorter
+   * than that reads 0 one frame and 0.1 ms the next; averaging recovers its real mean cost.
+   */
+  private static readonly SMOOTHING = 0.1;
+  /** Raw per-pass times of the most recent readback (for PerfRecorder). */
+  private lastFrameRaw: { frame: number; results: ReadonlyMap<string, number> } | null = null;
+  private readbackCount = 0;
+  private lastFrameSpanMs = 0;
+  private lastFrameGaps: ReadonlyMap<string, number> = new Map();
+
+  /** Idle/unprofiled GPU time between consecutive passes of the last read-back frame. */
+  public getLastFrameGaps(): ReadonlyMap<string, number> {
+    return this.lastFrameGaps;
+  }
+
+  /** GPU wall-clock span of the last read-back frame (first → last profiled pass). */
+  public getLastFrameSpanMs(): number {
+    return this.lastFrameSpanMs;
+  }
 
   private slotState: SlotState[] = ['idle', 'idle', 'idle'];
-  private slotPassCount: number[] = [0, 0, 0];
   private frameIndex = 0;
 
   private constructor() {}
@@ -92,8 +119,7 @@ export class GPUProfiler {
     this.resolveBuffers = [];
     this.readbackBuffers = [];
     this.results.clear();
-    this.passMap.clear();
-    this.passCount = 0;
+    this.frameLabels = [];
     this.frameIndex = 0;
     this.slotState = ['idle', 'idle', 'idle'];
     GPUProfiler._instance = null;
@@ -103,19 +129,15 @@ export class GPUProfiler {
 
   /**
    * Returns `timestampWrites` for a render or compute pass descriptor.
-   * Lazily registers the pass name on first call.
-   * Returns `undefined` when profiling is inactive.
+   * Every call gets its own query pair for this frame; results are summed per label.
+   * Returns `undefined` when profiling is inactive or the frame's pairs are exhausted.
    */
   public getTimestampWrites(passName: string): GPUComputePassTimestampWrites | undefined {
     if (!this._supported || !this._enabled) return undefined;
+    if (this.frameLabels.length >= GPUProfiler.MAX_PASSES) return undefined;
 
-    let idx = this.passMap.get(passName);
-    if (idx === undefined) {
-      if (this.passCount >= GPUProfiler.MAX_PASSES) return undefined;
-      idx = this.passCount++;
-      this.passMap.set(passName, idx);
-      this.passNames[idx] = passName;
-    }
+    const idx = this.frameLabels.length;
+    this.frameLabels.push(passName);
 
     return {
       querySet: this.querySet,
@@ -132,19 +154,23 @@ export class GPUProfiler {
    * to the matching CPU-readable readback buffer.
    */
   public resolve(encoder: GPUCommandEncoder): void {
-    if (!this._supported || !this._enabled || this.passCount === 0) return;
+    const count = this.frameLabels.length;
+    if (!this._supported || !this._enabled || count === 0) {
+      this.frameLabels = [];
+      return;
+    }
 
     const slot = this.frameIndex % GPUProfiler.RING_SIZE;
-    if (this.slotState[slot] !== 'idle') return; // Slot still being read, skip frame
-
-    const resolveBuffer = this.resolveBuffers[slot]!;
-    const readbackBuffer = this.readbackBuffers[slot]!;
-
-    encoder.resolveQuerySet(this.querySet, 0, this.passCount * 2, resolveBuffer, 0);
-    encoder.copyBufferToBuffer(resolveBuffer, 0, readbackBuffer, 0, this.passCount * 2 * 8);
-
-    this.slotState[slot] = 'recorded';
-    this.slotPassCount[slot] = this.passCount;
+    if (this.slotState[slot] === 'idle') {
+      const resolveBuffer = this.resolveBuffers[slot]!;
+      const readbackBuffer = this.readbackBuffers[slot]!;
+      encoder.resolveQuerySet(this.querySet, 0, count * 2, resolveBuffer, 0);
+      encoder.copyBufferToBuffer(resolveBuffer, 0, readbackBuffer, 0, count * 2 * 8);
+      this.slotState[slot] = 'recorded';
+      this.slotLabels[slot] = this.frameLabels;
+    }
+    // Otherwise the slot is still being read back: skip measuring this frame.
+    this.frameLabels = [];
   }
 
   /**
@@ -153,7 +179,7 @@ export class GPUProfiler {
    * then advances the internal frame counter.
    */
   public tick(): void {
-    if (this._supported && this._enabled && this.passCount > 0) {
+    if (this._supported && this._enabled) {
       // (frameIndex + 1) % RING_SIZE is the slot written exactly 2 frames ago.
       // Proof: current slot = frameIndex % 3.  2-frames-ago slot = (frameIndex - 2 + 3) % 3
       //        = (frameIndex + 1) % 3.  Never overlaps current slot because
@@ -162,7 +188,8 @@ export class GPUProfiler {
 
       if (this.slotState[readSlot] === 'recorded') {
         this.slotState[readSlot] = 'mapping';
-        const countSnap = this.slotPassCount[readSlot] ?? 0;
+        const labels = this.slotLabels[readSlot] ?? [];
+        const countSnap = labels.length;
         const buf = this.readbackBuffers[readSlot];
         if (!buf) {
           this.slotState[readSlot] = 'idle';
@@ -174,14 +201,53 @@ export class GPUProfiler {
           .mapAsync(GPUMapMode.READ)
           .then(() => {
             const data = new BigInt64Array(buf.getMappedRange(0, countSnap * 2 * 8));
+            // Sum this frame's pairs per label. A pass that ran always counts, even when
+            // quantization makes it read 0 (or end < begin) — it must not vanish.
+            const frameResults = new Map<string, number>();
+            let first = 0n;
+            let last = 0n;
             for (let i = 0; i < countSnap; i++) {
               const begin = data[i * 2] ?? 0n;
               const end = data[i * 2 + 1] ?? 0n;
-              const name = this.passNames[i];
-              if (end > begin && name !== undefined) {
-                this.results.set(name, Number(end - begin) / 1_000_000);
+              const name = labels[i]!;
+              const ms = end > begin ? Number(end - begin) / 1_000_000 : 0;
+              frameResults.set(name, (frameResults.get(name) ?? 0) + ms);
+              if (begin > 0n && (first === 0n || begin < first)) first = begin;
+              if (end > last) last = end;
+            }
+            // Wall-clock GPU span of the frame (first pass start → last pass end). The
+            // difference with the sum of passes is GPU work without timestamps (copies,
+            // mip generation, unprofiled passes) plus idle gaps between submissions.
+            this.lastFrameSpanMs = last > first ? Number(last - first) / 1_000_000 : 0;
+
+            // Where does the unprofiled time go? Sort passes by start and attribute each
+            // idle gap to the pass that precedes it ("gap after X" = copies / unprofiled
+            // passes recorded right after X). Exposed for PerfRecorder only.
+            const spans: Array<[bigint, bigint, string]> = [];
+            for (let i = 0; i < countSnap; i++) {
+              const begin = data[i * 2] ?? 0n;
+              const end = data[i * 2 + 1] ?? 0n;
+              if (begin > 0n && end >= begin) spans.push([begin, end, labels[i]!]);
+            }
+            spans.sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+            const gaps = new Map<string, number>();
+            for (let i = 1; i < spans.length; i++) {
+              const gap = spans[i]![0] - spans[i - 1]![1];
+              if (gap > 0n) {
+                const key = `gap after ${spans[i - 1]![2]}`;
+                gaps.set(key, (gaps.get(key) ?? 0) + Number(gap) / 1_000_000);
               }
             }
+            this.lastFrameGaps = gaps;
+            // Smooth passes that keep running; drop passes that stopped running.
+            const a = GPUProfiler.SMOOTHING;
+            const smoothed = new Map<string, number>();
+            for (const [name, ms] of frameResults) {
+              const prev = this.results.get(name);
+              smoothed.set(name, prev === undefined ? ms : prev + (ms - prev) * a);
+            }
+            this.results = smoothed;
+            this.lastFrameRaw = { frame: this.readbackCount++, results: frameResults };
             buf.unmap();
             this.slotState[readSlot] = 'idle';
           })
@@ -199,6 +265,11 @@ export class GPUProfiler {
 
   public getMs(passName: string): number {
     return this.results.get(passName) ?? 0;
+  }
+
+  /** Unsmoothed pass times of the latest readback; `frame` increments per readback. */
+  public getLastFrameRaw(): { frame: number; results: ReadonlyMap<string, number> } | null {
+    return this.lastFrameRaw;
   }
 
   public getAllResults(): ReadonlyMap<string, number> {

@@ -17,14 +17,11 @@
 fn fs(input: VertexOutput) -> FragmentOutput {
     let Uv = input.Uv * vec2<f32>(factors.uvXScale,factors.uvYScale);
 
-    // UV unjittering: TAA jitters the camera projection each frame by a sub-pixel offset,
-    // which shifts the interpolated mesh UVs and causes mip-selection variance → texture blur.
-    // Subtract the jitter displacement (estimated via screen-space derivatives) to restore
-    // the UV the pixel would have had without jitter.
-    let jitter_px = camera.jitterOffset * camera.screenSize;
-    let uvUnjittered = Uv - dpdx(Uv) * jitter_px.x - dpdy(Uv) * jitter_px.y;
+    // Texture UVs keep the camera jitter on purpose: TAA/TSR integrate the sub-pixel
+    // offsets over frames, which is what anti-aliases texture detail. (camera.mipBias
+    // compensates the extra blur of that integration.)
 
-    let albedo_color = textureSampleBias(txAlbedo, samplerState, uvUnjittered, camera.mipBias);
+    let albedo_color = textureSampleBias(txAlbedo, samplerState, Uv, camera.mipBias);
     
     var output: FragmentOutput;
 
@@ -32,16 +29,16 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     // so the factor scales linear energy (glTF reference: linear(sRGB) * linearFactor).
     let albedo_linear = albedo_color.rgb;
     output.albedo = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, albedo_color.a);
-    output.albedo.a = textureSampleBias(txMetallic, samplerState, uvUnjittered, camera.mipBias).b * factors.metallicFactor;
+    output.albedo.a = textureSampleBias(txMetallic, samplerState, Uv, camera.mipBias).b * factors.metallicFactor;
 
     // Obtener la normal del normal map
-    let N_tangent_space = textureSampleBias(txNormal, samplerState, uvUnjittered, camera.mipBias) * 2.0 - 1.0;
+    let N_tangent_space = textureSampleBias(txNormal, samplerState, Uv, camera.mipBias) * 2.0 - 1.0;
     
     // Calcular TBN y transformar la normal
     let TBN = computeTBN(normalize(input.N), input.T);
     let N = normalize(TBN * N_tangent_space.xyz);    
     
-    let roughness_raw = textureSampleBias(txRoughness, samplerState, uvUnjittered, camera.mipBias).g * factors.roughnessFactor;
+    let roughness_raw = textureSampleBias(txRoughness, samplerState, Uv, camera.mipBias).g * factors.roughnessFactor;
 
     // ── Specular Anti-Aliasing (Toksvigs / Kanis 2013) ───────────────────────
     // High-frequency normal maps introduce specular variance that is not captured
@@ -62,7 +59,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     // ─────────────────────────────────────────────────────────────────────────
     let encodedNormal = normalToOctahedral01(N);
 
-    let emissive = textureSampleBias(txEmissive, samplerState, uvUnjittered, camera.mipBias).x * factors.emissiveFactor;
+    let emissive = textureSampleBias(txEmissive, samplerState, Uv, camera.mipBias).x * factors.emissiveFactor;
 
     // Pack octahedral normal + roughness en RGBA8
     output.normal = vec4<f32>(

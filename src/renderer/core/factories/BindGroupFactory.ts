@@ -1,6 +1,7 @@
 import { GPUUtils } from '../utils/GPUUtils';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { TechniqueMaterialSlot } from '../../../types/TechniqueData.type';
+import { PerfRecorder } from '../../../core/debug/PerfRecorder';
 
 export interface BindGroupEntry {
   binding: number;
@@ -44,6 +45,7 @@ export class BindGroupFactory {
     layout: GPUBindGroupLayout,
     entries: BindGroupEntry[],
   ): GPUBindGroup {
+    PerfRecorder.count('bindGroups');
     return GPUUtils.getDevice().createBindGroup({
       label,
       layout,
@@ -302,91 +304,9 @@ export class BindGroupFactory {
     ]);
   }
 
-  /** Same as getSSRUniformsLayout() but with COMPUTE visibility — used by ssr.cs. */
-  public static getSSRUniformsComputeLayout(): GPUBindGroupLayout {
-    return this.getLayout('ssr_uniforms_compute', [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      // binding 2: blue-noise 64×64 tiling texture for step dithering + ray jitter
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      // binding 3: Hi-Z min-depth pyramid (r32float = unfilterable-float, 4 mip levels)
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
-    ]);
-  }
-
-  /**
-   * Hi-Z build pass — level 0: src = gLinearDepth (r16float, filterable).
-   * Both bindings are @group(0): binding 0 = srcTex, binding 1 = dstTex (r32float storage).
-   */
-  public static getHiZBuildFromFilterableLayout(): GPUBindGroupLayout {
-    return this.getLayout('hiz_build_filterable', [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '2d' },
-      },
-    ]);
-  }
-
-  /**
-   * Hi-Z build pass — levels 1-3: src = hizTex mip k (r32float, unfilterable).
-   * Both bindings are @group(0): binding 0 = srcTex, binding 1 = dstTex (r32float storage).
-   */
-  public static getHiZBuildFromUnfilterableLayout(): GPUBindGroupLayout {
-    return this.getLayout('hiz_build_unfilterable', [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'r32float', viewDimension: '2d' },
-      },
-    ]);
-  }
-
   /** Write-only rgba16float storage texture output for the SSR compute pass (group 3). */
   public static getSSROutputLayout(): GPUBindGroupLayout {
     return this.getLayout('ssr_output_storage', [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '2d' },
-      },
-    ]);
-  }
-
-  /**
-   * Group 0 for ssr_blur.cs: raw SSR texture (read) + linear sampler.
-   * group(0) @binding(0) = ssrRaw (texture_2d<f32>)
-   * group(0) @binding(1) = samplerLinear
-   */
-  public static getSSRBlurInputLayout(): GPUBindGroupLayout {
-    return this.getLayout('ssr_blur_input', [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
-    ]);
-  }
-
-  /**
-   * Group 1 for ssr_blur.cs: GBuffer normals + linear depth for bilateral weights.
-   * group(1) @binding(0) = gNormals      (texture_2d<f32>)
-   * group(1) @binding(1) = gLinearDepth  (texture_2d<f32>)
-   * group(1) @binding(2) = samplerPoint
-   */
-  public static getSSRBlurGBufferLayout(): GPUBindGroupLayout {
-    return this.getLayout('ssr_blur_gbuffer', [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
-    ]);
-  }
-
-  /**
-   * Group 2 for ssr_blur.cs: blurred SSR storage output.
-   * group(2) @binding(0) = outputBlurred (texture_storage_2d<rgba16float, write>)
-   */
-  public static getSSRBlurOutputLayout(): GPUBindGroupLayout {
-    return this.getLayout('ssr_blur_output', [
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
@@ -1712,8 +1632,8 @@ export class BindGroupFactory {
   }
 
   /**
-   * Kawase blur step params layout (group 2).
-   * binding 0: KawaseParams uniform (16 bytes — offset f32 + 3× padding)
+   * Small 16-byte params uniform layout (group 2) — god rays bilateral blur params.
+   * binding 0: BlurParams uniform (16 bytes — dirX, dirY, depthSigma, pad)
    */
   public static getKawaseUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('kawase_uniforms', [

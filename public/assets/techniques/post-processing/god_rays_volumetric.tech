@@ -1,7 +1,7 @@
 {
   "vs": "utility/presentation.vs",
   "fs": "post-processing/god_rays_volumetric.fs",
-  "writesOn": "mask",
+  "writesOn": "mask_hdr",
   "z": "disable_all",
   "uniforms": [
     "CameraUniforms",

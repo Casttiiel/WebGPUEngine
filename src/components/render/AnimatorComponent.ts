@@ -166,6 +166,14 @@ export class AnimatorComponent extends Component {
   private tempR: Float32Array[] = [];
   private tempS: Float32Array[] = [];
   private globalMats: mat4[] = [];
+  // Per-frame scratch (allocation-free evaluation: this runs for every joint every frame)
+  private readonly _localScratch = mat4.create();
+  private readonly _paletteScratch = mat4.create();
+  private readonly _quatScratch = quat.create();
+  private readonly _rmCurT = new Float32Array(3);
+  private readonly _rmPrevT = new Float32Array(3);
+  /** Views into skeleton.inverseBindMatrices, built once instead of subarray() per frame. */
+  private _ibmViews: mat4[] | null = null;
   /** Snapshot of globalMats taken after animation eval but before IK — used by foot IK. */
   private baseAnimGlobalMats: mat4[] = [];
   private jointPalette: Float32Array = new Float32Array(MAX_JOINTS * 16);
@@ -720,9 +728,19 @@ export class AnimatorComponent extends Component {
     const bp = this.skeleton.bindPoseLocal;
     for (let i = 0; i < this.jointCount; i++) {
       const off = i * 10;
-      outT[i]!.set([bp[off]!, bp[off + 1]!, bp[off + 2]!]);
-      outR[i]!.set([bp[off + 3]!, bp[off + 4]!, bp[off + 5]!, bp[off + 6]!]);
-      outS[i]!.set([bp[off + 7]!, bp[off + 8]!, bp[off + 9]!]);
+      const t = outT[i]!,
+        r = outR[i]!,
+        sc = outS[i]!;
+      t[0] = bp[off]!;
+      t[1] = bp[off + 1]!;
+      t[2] = bp[off + 2]!;
+      r[0] = bp[off + 3]!;
+      r[1] = bp[off + 4]!;
+      r[2] = bp[off + 5]!;
+      r[3] = bp[off + 6]!;
+      sc[0] = bp[off + 7]!;
+      sc[1] = bp[off + 8]!;
+      sc[2] = bp[off + 9]!;
     }
     const clip = this.clips[clipIndex];
     if (!clip) return;
@@ -799,13 +817,10 @@ export class AnimatorComponent extends Component {
       for (const [idx, addQ] of this.additiveRotations) {
         if (idx >= this.jointCount) continue;
         const lr = this.localR[idx]!;
-        const result = quat.mul(
-          quat.create() as any,
-          lr as any,
-          addQ as any,
-        ) as unknown as Float32Array;
-        quat.normalize(result as any, result as any);
-        lr.set(result);
+        const result = this._quatScratch;
+        quat.mul(result, lr as any, addQ as any);
+        quat.normalize(result, result);
+        lr.set(result as Float32Array);
       }
     }
 
@@ -846,7 +861,10 @@ export class AnimatorComponent extends Component {
       // Zero root joint in all cases (extraction or linger).
       const bp = this.skeleton.bindPoseLocal;
       const bpOff = this.rootJointIndex * 10;
-      this.localT[this.rootJointIndex]!.set([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
+      const rootLocalT = this.localT[this.rootJointIndex]!;
+      rootLocalT[0] = bp[bpOff]!;
+      rootLocalT[1] = bp[bpOff + 1]!;
+      rootLocalT[2] = bp[bpOff + 2]!;
 
       // 'apply' mode: sample the root channel DIRECTLY from the clip with LINEAR
       // interpolation, bypassing whatever interpolation the animation exported with.
@@ -870,8 +888,11 @@ export class AnimatorComponent extends Component {
           );
 
           if (rootCh) {
-            const curT = new Float32Array([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
-            const prevT = new Float32Array([bp[bpOff]!, bp[bpOff + 1]!, bp[bpOff + 2]!]);
+            const curT = this._rmCurT;
+            const prevT = this._rmPrevT;
+            curT[0] = prevT[0] = bp[bpOff]!;
+            curT[1] = prevT[1] = bp[bpOff + 1]!;
+            curT[2] = prevT[2] = bp[bpOff + 2]!;
             sampleVec3(rootCh.times, rootCh.values, layer!.time, 'LINEAR', curT);
             sampleVec3(rootCh.times, rootCh.values, this._rmPrevLayerTime, 'LINEAR', prevT);
             this._rmPrevLayerTime = layer!.time;
@@ -906,17 +927,15 @@ export class AnimatorComponent extends Component {
 
     for (const i of this.evalOrder) {
       const local = mat4.fromRotationTranslationScale(
-        mat4.create(),
+        this._localScratch,
         this.localR[i] as any,
         this.localT[i] as any,
         this.localS[i] as any,
       );
       const parentIdx = parents[i]!;
-      if (parentIdx < 0) {
-        this.globalMats[i] = mat4.mul(mat4.create(), rootPre, local);
-      } else {
-        this.globalMats[i] = mat4.mul(mat4.create(), this.globalMats[parentIdx]!, local);
-      }
+      // In place: consumers (getJointModelMatrix) read the matrix immediately, never keep it
+      const out = (this.globalMats[i] ??= mat4.create());
+      mat4.mul(out, parentIdx < 0 ? rootPre : this.globalMats[parentIdx]!, local);
     }
 
     // Snapshot base-anim pose before IK so foot IK (and other systems) can read
@@ -931,9 +950,15 @@ export class AnimatorComponent extends Component {
 
     // Step 7: joint palette
     const ibm = this.skeleton.inverseBindMatrices;
+    if (!this._ibmViews || this._ibmViews.length !== this.jointCount) {
+      this._ibmViews = Array.from(
+        { length: this.jointCount },
+        (_, i) => ibm.subarray(i * 16, i * 16 + 16) as unknown as mat4,
+      );
+    }
     for (let i = 0; i < this.jointCount; i++) {
-      const ibmSlice = ibm.subarray(i * 16, i * 16 + 16) as unknown as mat4;
-      this.jointPalette.set(mat4.mul(mat4.create(), this.globalMats[i]!, ibmSlice), i * 16);
+      mat4.mul(this._paletteScratch, this.globalMats[i]!, this._ibmViews[i]!);
+      this.jointPalette.set(this._paletteScratch as Float32Array, i * 16);
     }
   }
 
@@ -987,16 +1012,13 @@ export class AnimatorComponent extends Component {
       const parentIdx = parents[i]!;
       if (parentIdx >= 0 && !this._ikFrozenJoints.has(parentIdx)) continue;
       const local = mat4.fromRotationTranslationScale(
-        mat4.create(),
+        this._localScratch,
         this.localR[i] as any,
         this.localT[i] as any,
         this.localS[i] as any,
       );
-      if (parentIdx < 0) {
-        this.globalMats[i] = mat4.mul(mat4.create(), rootPre, local);
-      } else {
-        this.globalMats[i] = mat4.mul(mat4.create(), this.globalMats[parentIdx]!, local);
-      }
+      const out = (this.globalMats[i] ??= mat4.create());
+      mat4.mul(out, parentIdx < 0 ? rootPre : this.globalMats[parentIdx]!, local);
       this._ikFrozenJoints.add(i);
     }
   }
@@ -1295,6 +1317,44 @@ export class AnimatorComponent extends Component {
 
 // ─── Animation sampling helpers ───────────────────────────────────────────────
 
+function copyVec(src: Float32Array, offset: number, out: Float32Array, n: number): void {
+  for (let k = 0; k < n; k++) out[k] = src[offset + k]!;
+}
+
+/** Quaternion slerp between src[ia..ia+3] and src[ib..ib+3] into out (gl-matrix quat.slerp, no allocations). */
+function slerpInto(src: Float32Array, ia: number, ib: number, t: number, out: Float32Array): void {
+  const ax = src[ia]!,
+    ay = src[ia + 1]!,
+    az = src[ia + 2]!,
+    aw = src[ia + 3]!;
+  let bx = src[ib]!,
+    by = src[ib + 1]!,
+    bz = src[ib + 2]!,
+    bw = src[ib + 3]!;
+  let cosom = ax * bx + ay * by + az * bz + aw * bw;
+  if (cosom < 0) {
+    cosom = -cosom;
+    bx = -bx;
+    by = -by;
+    bz = -bz;
+    bw = -bw;
+  }
+  let scale0: number, scale1: number;
+  if (1 - cosom > 0.000001) {
+    const omega = Math.acos(cosom);
+    const sinom = Math.sin(omega);
+    scale0 = Math.sin((1 - t) * omega) / sinom;
+    scale1 = Math.sin(t * omega) / sinom;
+  } else {
+    scale0 = 1 - t;
+    scale1 = t;
+  }
+  out[0] = scale0 * ax + scale1 * bx;
+  out[1] = scale0 * ay + scale1 * by;
+  out[2] = scale0 * az + scale1 * bz;
+  out[3] = scale0 * aw + scale1 * bw;
+}
+
 function findKeyframe(times: Float32Array, t: number): number {
   let lo = 0,
     hi = times.length - 2;
@@ -1316,11 +1376,11 @@ function sampleVec3(
   const n = times.length;
   if (n === 0) return;
   if (t <= times[0]!) {
-    out.set(values.subarray(0, 3));
+    copyVec(values, 0, out, 3);
     return;
   }
   if (t >= times[n - 1]!) {
-    out.set(values.subarray((n - 1) * 3, n * 3));
+    copyVec(values, (n - 1) * 3, out, 3);
     return;
   }
   const i = findKeyframe(times, t);
@@ -1328,7 +1388,7 @@ function sampleVec3(
     t1 = times[i + 1]!;
   const alpha = (t - t0) / (t1 - t0);
   if (interp === 'STEP') {
-    out.set(values.subarray(i * 3, i * 3 + 3));
+    copyVec(values, i * 3, out, 3);
   } else {
     const stride = interp === 'CUBICSPLINE' ? 3 : 1;
     const base = interp === 'CUBICSPLINE' ? 1 : 0;
@@ -1350,11 +1410,11 @@ function sampleQuat(
   const n = times.length;
   if (n === 0) return;
   if (t <= times[0]!) {
-    out.set(values.subarray(0, 4));
+    copyVec(values, 0, out, 4);
     return;
   }
   if (t >= times[n - 1]!) {
-    out.set(values.subarray((n - 1) * 4, n * 4));
+    copyVec(values, (n - 1) * 4, out, 4);
     return;
   }
   const i = findKeyframe(times, t);
@@ -1362,14 +1422,10 @@ function sampleQuat(
     t1 = times[i + 1]!;
   const alpha = (t - t0) / (t1 - t0);
   if (interp === 'STEP') {
-    out.set(values.subarray(i * 4, i * 4 + 4));
+    copyVec(values, i * 4, out, 4);
   } else {
     const stride = interp === 'CUBICSPLINE' ? 3 : 1;
     const base = interp === 'CUBICSPLINE' ? 1 : 0;
-    const i0 = (i * stride + base) * 4;
-    const i1 = ((i + 1) * stride + base) * 4;
-    const qa = values.subarray(i0, i0 + 4) as any;
-    const qb = values.subarray(i1, i1 + 4) as any;
-    out.set(quat.slerp(quat.create(), qa, qb, alpha));
+    slerpInto(values, (i * stride + base) * 4, ((i + 1) * stride + base) * 4, alpha, out);
   }
 }
