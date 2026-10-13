@@ -1,6 +1,7 @@
 import { GPUUtils } from '../utils/GPUUtils';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { TechniqueMaterialSlot } from '../../../types/TechniqueData.type';
+import { PerfRecorder } from '../../../core/debug/PerfRecorder';
 
 export interface BindGroupEntry {
   binding: number;
@@ -44,6 +45,7 @@ export class BindGroupFactory {
     layout: GPUBindGroupLayout,
     entries: BindGroupEntry[],
   ): GPUBindGroup {
+    PerfRecorder.count('bindGroups');
     return GPUUtils.getDevice().createBindGroup({
       label,
       layout,

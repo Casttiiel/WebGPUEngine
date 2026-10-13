@@ -1,4 +1,5 @@
 import { Render } from '../pipeline/Render';
+import { PerfRecorder } from '../../../core/debug/PerfRecorder';
 
 /**
  * Utility class for common GPU operations and configurations
@@ -195,6 +196,7 @@ export class GPUUtils {
     offset: number,
     data: ArrayBuffer | ArrayBufferView,
   ): void {
+    PerfRecorder.addBufferWrite(data.byteLength);
     this.device.queue.writeBuffer(buffer, offset, data);
   }
 

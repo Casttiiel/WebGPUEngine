@@ -9,6 +9,7 @@ import { GPUUtils } from '../utils/GPUUtils';
 import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { Logger } from '../../../core/debug/Logger';
 import { GPUProfiler } from '../../../core/debug/GPUProfiler';
+import { PerfRecorder } from '../../../core/debug/PerfRecorder';
 
 export class Render {
   private static instance: Render;
@@ -33,6 +34,29 @@ export class Render {
   private static renderHeight: number = 600;
 
   private canvas!: HTMLCanvasElement;
+
+  /**
+   * Frame latency limiter. The CPU records a frame every rAF; if the GPU (plus the
+   * browser compositor) falls behind, submitted frames pile up in the queue and what is
+   * on screen lags several frames behind input even at ~60 fps. The main loop skips a
+   * frame while `maxFramesInFlight` frames are still executing on the GPU (cf. DXGI
+   * "maximum frame latency"). 2 keeps the GPU fed while bounding latency to ~2 frames.
+   */
+  private framesInFlight = 0;
+  private static maxFramesInFlight = 2;
+
+  public static setMaxFramesInFlight(n: number): void {
+    Render.maxFramesInFlight = Math.max(1, Math.floor(n));
+  }
+
+  public static getMaxFramesInFlight(): number {
+    return Render.maxFramesInFlight;
+  }
+
+  /** False while the GPU still has `maxFramesInFlight` frames to finish. */
+  public canStartFrame(): boolean {
+    return this.framesInFlight < Render.maxFramesInFlight;
+  }
 
   private constructor() {
     // Constructor privado para patrón singleton
@@ -196,6 +220,11 @@ export class Render {
     GPUProfiler.getInstance().resolve(this.currentCommandEncoder);
     const commandBuffer = this.currentCommandEncoder.finish();
     this.device.queue.submit([commandBuffer]);
+    this.framesInFlight++;
+    this.device.queue.onSubmittedWorkDone().then(() => {
+      this.framesInFlight--;
+    });
+    PerfRecorder.onSubmit(this.device);
     GPUProfiler.getInstance().tick();
   }
 

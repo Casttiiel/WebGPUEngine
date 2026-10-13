@@ -16,7 +16,13 @@ export interface ReadyResult {
   failure?: string;
 }
 
-const VIEWPORT = { width: 1280, height: 720 };
+// Canvas size of the test browser. Override with ENGINE_VIEWPORT=1920x1080 (and
+// ENGINE_DPR=1.5) to reproduce performance at the resolution the game is really played at.
+const VIEWPORT = (() => {
+  const m = /^(\d+)x(\d+)$/.exec(process.env.ENGINE_VIEWPORT ?? '');
+  return m ? { width: Number(m[1]), height: Number(m[2]) } : { width: 1280, height: 720 };
+})();
+const DEVICE_SCALE = Number(process.env.ENGINE_DPR ?? '') > 0 ? Number(process.env.ENGINE_DPR) : 1;
 
 /**
  * Sesión de navegador controlada por Playwright. Usa un Chromium instalado en el sistema
@@ -95,7 +101,7 @@ export class BrowserSession {
     }
 
     if (!this.context) {
-      this.context = await this.browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+      this.context = await this.browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: DEVICE_SCALE });
     }
     if (!this.page || this.page.isClosed()) {
       this.page = await this.context.newPage();

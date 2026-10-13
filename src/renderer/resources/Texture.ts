@@ -6,6 +6,7 @@ import { GPUUtils } from '../core/utils/GPUUtils';
 import { MipmapGenerator } from '../core/processing/MipmapGenerator';
 import { SamplerLibrary } from '../core/utils/SamplerLibrary';
 import { KTX2Loader, KTX2TextureData } from './KTX2Loader';
+import { PerfRecorder } from '../../core/debug/PerfRecorder';
 
 export interface TextureOptions extends IGPUResourceOptions {
   genMipmaps?: boolean;
@@ -113,6 +114,7 @@ export class Texture extends GPUResource {
   public async streamFullResolution(): Promise<void> {
     if (!this.streamingState || this.streamingState.isFullyLoaded || this.upgradePending) return;
     this.upgradePending = true;
+    PerfRecorder.count('textureStreams');
     try {
       const { fullWidth, fullHeight } = this.streamingState;
 
@@ -308,6 +310,7 @@ export class Texture extends GPUResource {
   }
 
   private async createTexture(): Promise<void> {
+    PerfRecorder.count('textureLoads');
     // ── Try KTX2 compressed format first ─────────────────────────────────────
     // ktx2PathFor() swaps the extension, e.g. "diffuse.png" / "diffuse.webp" → "diffuse.ktx2".
     // ResourceManager.fetch throws on 404, so we catch silently and fall through

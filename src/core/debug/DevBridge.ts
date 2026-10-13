@@ -11,6 +11,8 @@ import { NavMesh } from '../../ai/nav/NavMesh';
 import { PhysicsDebugDrawer } from '../../renderer/debug/PhysicsDebugDrawer';
 import { TransformComponent } from '../../components/core/TransformComponent';
 import { ModuleUI } from '../../modules/core/ModuleUI';
+import { PerfRecorder } from './PerfRecorder';
+import { Render } from '../../renderer/core/pipeline/Render';
 
 /**
  * DevBridge — API de depuración expuesta como `window.__engine` (solo en `npm run dev`).
@@ -202,6 +204,15 @@ export class DevBridge {
     return {
       isReady: () => this.isReady(),
       getStatus: () => this.getStatus(),
+
+      // Frame-by-frame performance capture (stutter diagnosis)
+      perfStart: () => PerfRecorder.start(),
+      perfStop: () => PerfRecorder.stop(),
+      perfCapture: (seconds?: number) => PerfRecorder.capture(seconds ?? 5),
+      setMaxFramesInFlight: (n: number) => {
+        Render.setMaxFramesInFlight(n);
+        return Render.getMaxFramesInFlight();
+      },
 
       listEntities: (opts?: {
         name?: string;

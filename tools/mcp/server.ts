@@ -497,6 +497,27 @@ server.registerTool(
   safe(async (a) => json(await evalInPage(session, a.code))),
 );
 
+server.registerTool(
+  'perf_capture',
+  {
+    description:
+      'Record frame-by-frame performance for N seconds of real time (game keeps running) and report: fps, frame-interval percentiles and hitches, CPU update/render and scopes, raw GPU time per frame and per pass, submit→GPU-done latency, GC events, long tasks, pipeline compiles / bind groups / buffer uploads / texture loads, the 10 worst frames with what they did, and a plain-language diagnosis. Use it to find the cause of stutter that an average FPS hides.',
+    inputSchema: {
+      seconds: z.number().min(0.5).max(60).optional().describe('Capture length (default 5)'),
+      warmupSeconds: z
+        .number()
+        .min(0)
+        .max(60)
+        .optional()
+        .describe('Wait before recording so loading/streaming does not pollute the capture (default 0)'),
+    },
+  },
+  safe(async (a) => {
+    if (a.warmupSeconds) await new Promise((r) => setTimeout(r, a.warmupSeconds! * 1000));
+    return json(await session.call('perfCapture', a.seconds ?? 5));
+  }),
+);
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 0.4 Control: tiempo, input y determinismo
 // ═══════════════════════════════════════════════════════════════════════════
