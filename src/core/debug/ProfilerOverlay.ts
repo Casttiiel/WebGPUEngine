@@ -5,12 +5,13 @@ const OVERLAY_ID = 'profiler-overlay';
 
 const CPU_SCOPES = ['Entities', 'Shadows', 'Deferred', 'Post-Process'] as const;
 
-// Grouped GPU passes — order matches render pipeline execution order
+// Grouped GPU passes — order matches render pipeline execution order.
+// Any measured pass not listed here is still shown, under "Other".
 const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
   {
     label: 'Geometry',
     color: '#89dceb',
-    passes: ['Depth Prepass', 'G-Buffer Pass', 'Decal Pass'],
+    passes: ['hzb_build_copy', 'Depth Prepass', 'G-Buffer Pass', 'Decal Pass'],
   },
   {
     label: 'Shadows',
@@ -24,36 +25,34 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
     ],
   },
   {
+    label: 'Screen-space (AO / SSR / contact)',
+    color: '#cba6f7',
+    passes: [
+      'GTAO Compute',
+      'SSAO Compute',
+      'AO Blur Horizontal',
+      'AO Blur Vertical',
+      'Contact Shadows',
+      'SSR Trace',
+      'SSR Temporal',
+      'SSR Denoise',
+    ],
+  },
+  {
     label: 'Lighting',
     color: '#fab387',
     passes: [
+      'Tiled Light Cull',
+      'Ambient Diffuse',
       'Directional Light',
+      'Area Light',
       'Point Lights Render Pass',
       'Point Lights with Shadows',
       'Spot Lights Render Pass',
       'Spot Lights with Shadows',
-      'Ambient Diffuse',
       'Ambient Specular',
       'Skybox',
-    ],
-  },
-  {
-    label: 'Transparency',
-    color: '#a6e3a1',
-    passes: ['Transparent Pass', 'OIT Gather Pass', 'OIT Compose Pass'],
-  },
-  {
-    label: 'Compute FX',
-    color: '#cba6f7',
-    passes: [
-      'GTAO Compute',
-      'AO Bilateral Horizontal',
-      'AO Bilateral Vertical',
-      'SSR Compute',
-      'SSR Blur',
-      'hzb_build_copy',
-      'AE Luminance',
-      'AE Adapt',
+      'VolumetricClouds',
     ],
   },
   {
@@ -61,6 +60,7 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
     color: '#89b4fa',
     passes: [
       'froxel_density_compute',
+      'froxel_self_occlusion_compute',
       'froxel_directional_light_injection_compute',
       'froxel_point_light_injection_compute',
       'froxel_spot_light_injection_compute',
@@ -69,17 +69,25 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
     ],
   },
   {
+    label: 'Transparency',
+    color: '#a6e3a1',
+    passes: ['Transparent Pass', 'OIT Gather Pass', 'OIT Compose Pass'],
+  },
+  {
     label: 'Post-Process',
     color: '#f9e2af',
     passes: [
-      'Tone Mapping',
-      'Contact Shadows',
       'Height Fog',
-      'AO Pass',
-      'AO Bilateral Filter',
       'Bloom',
       'Bloom Combine Pass',
       'Motion Blur',
+      'DOF Pass',
+      'AE Luminance',
+      'AE Adapt',
+      'TAA Resolve',
+      'TSR Resolve',
+      'Tone Mapping',
+      'Palette Quantize',
       'FSR EASU',
       'FSR RCAS',
       'FXAA',
@@ -90,15 +98,12 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
       'SMAA T2x Blending Weights',
       'SMAA T2x Neighborhood Blending',
       'SMAA T2x Temporal Resolve',
-      'Palette Quantize',
       'Speed Lines',
-      'DOF Pass',
     ],
   },
 ];
 
-// Flat list for the snapshot loop
-const GPU_PASSES = GPU_GROUPS.flatMap((g) => g.passes) as readonly string[];
+const KNOWN_GPU_PASSES = new Set(GPU_GROUPS.flatMap((g) => g.passes));
 
 /**
  * Lightweight HTML overlay for real-time CPU + GPU profiling data.
@@ -152,9 +157,8 @@ export class ProfilerOverlay {
     for (const s of CPU_SCOPES) {
       ProfilerOverlay.cpuMs[s] = cpu.getMs(s);
     }
-    for (const p of GPU_PASSES) {
-      ProfilerOverlay.gpuMs[p] = gpu.getMs(p);
-    }
+    // Every pass measured last frame (known groups + anything new, shown under "Other")
+    ProfilerOverlay.gpuMs = Object.fromEntries(gpu.getAllResults());
 
     ProfilerOverlay.el.innerHTML = ProfilerOverlay.buildHTML(gpu.supported);
   }
@@ -178,7 +182,7 @@ export class ProfilerOverlay {
 
     // ── Totals ────────────────────────────────────────────────────────────────
     const cpuTotal = CPU_SCOPES.reduce((s, k) => s + (ProfilerOverlay.cpuMs[k] ?? 0), 0);
-    const gpuTotal = GPU_PASSES.reduce((s, k) => s + (ProfilerOverlay.gpuMs[k] ?? 0), 0);
+    const gpuTotal = Object.values(ProfilerOverlay.gpuMs).reduce((s, v) => s + v, 0);
 
     let html = `<b style="color:#cba6f7">PROFILER</b>  <span style="color:#6c7086;font-size:10px">[F1 to hide]</span>\n`;
     html += SEP;
@@ -204,9 +208,14 @@ export class ProfilerOverlay {
       return html;
     }
 
-    for (const group of GPU_GROUPS) {
-      // Only show groups that have at least one active pass
-      const activePasses = group.passes.filter((p) => (ProfilerOverlay.gpuMs[p] ?? 0) > 0);
+    const otherPasses = Object.keys(ProfilerOverlay.gpuMs).filter((p) => !KNOWN_GPU_PASSES.has(p));
+    const groups = otherPasses.length > 0
+      ? [...GPU_GROUPS, { label: 'Other', color: '#a6adc8', passes: otherPasses }]
+      : GPU_GROUPS;
+
+    for (const group of groups) {
+      // Show every pass that ran (present in the results), even if it averages ~0 ms
+      const activePasses = group.passes.filter((p) => ProfilerOverlay.gpuMs[p] !== undefined);
       if (activePasses.length === 0) continue;
 
       const groupTotal = activePasses.reduce((s, p) => s + (ProfilerOverlay.gpuMs[p] ?? 0), 0);

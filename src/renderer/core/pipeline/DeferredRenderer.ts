@@ -738,7 +738,11 @@ export class DeferredRenderer {
 
     // Update the procedural sky cubemap before the main skybox draw so the
     // fog pass (post-processing) can sample it with correct frame-N sky colours.
-    this.proceduralSkyCubemap?.render();
+    // Its only consumer is AtmosphericFogComponent: skip the 6 face renders + mip chain
+    // every frame when that component is not on the camera.
+    if (Engine.getEntities().getEntityByName('MainCamera')?.hasComponent('atmospheric_fog')) {
+      this.proceduralSkyCubemap?.render();
+    }
 
     const prepassDepthView = this.depthPrepass.getDepthTextureView();
     this.skybox.render(this.rtAccLight.getView(), prepassDepthView);

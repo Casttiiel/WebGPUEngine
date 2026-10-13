@@ -3,7 +3,7 @@
     "name": "MainCamera",
     "camera": {},
     "tsr": {
-      "renderScale": 0.75
+      "renderScale": 1
     },
     "tone_mapping": {},
     "contact_shadows": {},

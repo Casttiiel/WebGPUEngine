@@ -9,7 +9,7 @@
   "skyboxType": "procedural",
   "timeOfDay": 0.4,
   "clouds": {
-    "type": "flat",
+    "type": "volumetric",
     "volumetric": {
       "coverage": 0.58
     },
