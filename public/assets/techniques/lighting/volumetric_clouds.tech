@@ -6,6 +6,6 @@
     "blend": "combinative",
     "uniforms": [
         "CameraUniforms",
-        "BufferUniform"
+        "CloudRaymarchUniforms"
     ]
 }

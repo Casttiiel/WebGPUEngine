@@ -195,6 +195,25 @@ export class BindGroupFactory {
     ]);
   }
 
+  /** Cloud ray-march: uniforms + baked shape (3D), detail (3D) and weather (2D) noise + repeat sampler. */
+  public static getCloudRaymarchLayout(): GPUBindGroupLayout {
+    return this.getLayout('cloud_raymarch', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+    ]);
+  }
+
   public static getSingleTextureLayout(): GPUBindGroupLayout {
     return this.getLayout('single_texture', [
       {
@@ -1955,6 +1974,8 @@ export class BindGroupFactory {
         return this.getGrassUniformsLayout();
       case PipelineBindGroupLayouts.CLOUD_TEMPORAL_UNIFORMS:
         return this.getCloudTemporalLayout();
+      case PipelineBindGroupLayouts.CLOUD_RAYMARCH_UNIFORMS:
+        return this.getCloudRaymarchLayout();
       case PipelineBindGroupLayouts.FOG_SCATTER_RAYMARCH_UNIFORMS:
         return this.getFogScatterRaymarchUniformsLayout();
       case PipelineBindGroupLayouts.FOG_SCATTER_SCENE_TEXTURES:

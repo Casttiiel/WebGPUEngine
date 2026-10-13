@@ -7,21 +7,29 @@ import { BindGroupFactory } from '../core/factories/BindGroupFactory';
 import { GPUProfiler } from '../../core/debug/GPUProfiler';
 import { Wind } from '../../core/engine/Wind';
 import { CameraComponent } from '../../components/render/CameraComponent';
+import { ResourceManager } from '../../core/engine/ResourceManager';
 
 /**
  * VolumetricClouds — ray-marched cloud layer with temporal accumulation.
  *
+ * Noise: all procedural noise is baked once at load by a compute shader into
+ * tileable textures (128³ shape, 32³ detail, 512² weather) sampled with 'repeat'.
+ * The clouds move because the ray-march offsets the sample coordinates by the
+ * accumulated wind — the textures themselves never change.
+ *
  * Three-pass approach:
- *   Pass 1 (1/N res): ray-march clouds into cloudCurrentTex.
- *   Pass 2 (full res): temporal resolve — bicubic-upsample currentTex, reproject
- *           previous-frame world positions via prevViewProj, variance-clamp history,
- *           blend and write to cloudHistoryTex[current].
+ *   Pass 1 (1/N res): ray-march clouds into cloudCurrentTex.  The ray of each
+ *           low-res texel is jittered per frame (Halton) so that, over N² frames,
+ *           every full-res sub-pixel gets ray-marched.
+ *   Pass 2 (full res): temporal resolve — un-jitter currentTex, reproject
+ *           previous-frame world positions via prevViewProj, clamp history to the
+ *           neighbourhood, blend (weighted by distance to this frame's sample) and
+ *           write to cloudHistoryTex[current].
  *   Pass 3 (full res): composite — copy cloudHistoryTex[current] onto rtAccLight
  *           using depth-equal so only sky pixels are touched.
  *
- * Result: quality equivalent to rendering at 1-2× resolution while spending only
- * 1/N² fragment work per frame.  Flickering and aliasing are smoothed by the
- * 93 % history weight.
+ * Result: close to full-resolution detail on stable regions while spending only
+ * 1/N² fragment work per frame.
  */
 export class VolumetricClouds {
   private technique!: Technique;
@@ -38,6 +46,15 @@ export class VolumetricClouds {
 
   // ── Samplers ──────────────────────────────────────────────────────────────
   private cloudSampler!: GPUSampler;
+  private noiseSampler!: GPUSampler;
+
+  // ── Baked noise (generated once in load()) ────────────────────────────────
+  private shapeNoiseTex!: GPUTexture; // 128³ rgba8: perlin fBm + 3 worley fBm
+  private detailNoiseTex!: GPUTexture; // 32³ rgba8: 3 worley fBm (edge erosion)
+  private weatherTex!: GPUTexture; // 512² rgba8: regional coverage + column top height
+  private static readonly SHAPE_SIZE = 128;
+  private static readonly DETAIL_SIZE = 32;
+  private static readonly WEATHER_SIZE = 512;
 
   // ── Low-res ray-march output (recreated on resize or divisor change) ──────
   private cloudCurrentTex: GPUTexture | null = null;
@@ -73,16 +90,26 @@ export class VolumetricClouds {
   public lightSteps: number = 5;
   public warpStrength: number = 0.35;
   public worleyWeight: number = 0.35;
+  public detailStrength: number = 0.6;
+  public detailFrequency: number = 16;
   public fadeRadius: number = 11000;
-  public resolutionDivisor: number = 6;
+  public resolutionDivisor: number = 4;
   // Temporal
   public blendFactor: number = 0.07;
+
+  // Sub-pixel jitter of the current frame (low-res pixels, [-0.5, 0.5])
+  private jitterX: number = 0;
+  private jitterY: number = 0;
+
+  // Reused upload scratch (no per-frame allocations)
+  private readonly cloudData = new Float32Array(VolumetricClouds.UNIFORM_SIZE / 4);
+  private readonly temporalData = new Float32Array(VolumetricClouds.TEMPORAL_SIZE / 4);
 
   // Wind state
   private windOffset: number = 0;
   private lastTime: number = 0;
 
-  private static readonly UNIFORM_SIZE = 112; // cloud ray-march uniforms: 28 × f32
+  private static readonly UNIFORM_SIZE = 128; // cloud ray-march uniforms: 32 × f32
   private static readonly TEMPORAL_SIZE = 80; // temporal uniforms: mat4(64) + 4×f32(16)
 
   public async load(): Promise<void> {
@@ -103,17 +130,128 @@ export class VolumetricClouds {
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
 
-    this.bindGroup = BindGroupFactory.createBindGroup(
-      'volumetric_clouds_bindgroup',
-      this.technique.getPipeline().getBindGroupLayout(1)!,
-      [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
-    );
-
     this.cloudSampler = GPUUtils.getDevice().createSampler({
       label: 'cloud_sampler',
       magFilter: 'linear',
       minFilter: 'linear',
     });
+
+    this.noiseSampler = GPUUtils.getDevice().createSampler({
+      label: 'cloud_noise_sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      addressModeU: 'repeat',
+      addressModeV: 'repeat',
+      addressModeW: 'repeat',
+    });
+
+    await this.bakeNoise();
+
+    this.bindGroup = BindGroupFactory.createBindGroup(
+      'volumetric_clouds_bindgroup',
+      this.technique.getPipeline().getBindGroupLayout(1)!,
+      [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: this.shapeNoiseTex.createView({ dimension: '3d' }) },
+        { binding: 2, resource: this.detailNoiseTex.createView({ dimension: '3d' }) },
+        { binding: 3, resource: this.weatherTex.createView() },
+        { binding: 4, resource: this.noiseSampler },
+      ],
+    );
+  }
+
+  /** Bakes the tileable cloud noise textures with a one-off compute dispatch. */
+  private async bakeNoise(): Promise<void> {
+    const device = GPUUtils.getDevice();
+    const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
+    const S = VolumetricClouds.SHAPE_SIZE;
+    const D = VolumetricClouds.DETAIL_SIZE;
+    const W = VolumetricClouds.WEATHER_SIZE;
+
+    this.shapeNoiseTex = device.createTexture({
+      label: 'cloud_shape_noise',
+      size: [S, S, S],
+      dimension: '3d',
+      format: 'rgba8unorm',
+      usage,
+    });
+    this.detailNoiseTex = device.createTexture({
+      label: 'cloud_detail_noise',
+      size: [D, D, D],
+      dimension: '3d',
+      format: 'rgba8unorm',
+      usage,
+    });
+    this.weatherTex = device.createTexture({
+      label: 'cloud_weather',
+      size: [W, W],
+      format: 'rgba8unorm',
+      usage,
+    });
+
+    const code = await ResourceManager.loadShader('lighting/volumetric_clouds_noise.compute.wgsl');
+    const module = device.createShaderModule({ label: 'cloud_noise_bake', code });
+    const storage3d: GPUStorageTextureBindingLayout = {
+      access: 'write-only',
+      format: 'rgba8unorm',
+      viewDimension: '3d',
+    };
+    const layout = device.createBindGroupLayout({
+      label: 'cloud_noise_bake_layout',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, storageTexture: storage3d },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, storageTexture: storage3d },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: { access: 'write-only', format: 'rgba8unorm', viewDimension: '2d' },
+        },
+      ],
+    });
+    const pipelineLayout = device.createPipelineLayout({
+      label: 'cloud_noise_bake_pipeline_layout',
+      bindGroupLayouts: [layout],
+    });
+    const makePipeline = (entryPoint: string): GPUComputePipeline =>
+      device.createComputePipeline({
+        label: `cloud_noise_${entryPoint}`,
+        layout: pipelineLayout,
+        compute: { module, entryPoint },
+      });
+    const bindGroup = device.createBindGroup({
+      label: 'cloud_noise_bake_bg',
+      layout,
+      entries: [
+        { binding: 0, resource: this.shapeNoiseTex.createView({ dimension: '3d' }) },
+        { binding: 1, resource: this.detailNoiseTex.createView({ dimension: '3d' }) },
+        { binding: 2, resource: this.weatherTex.createView() },
+      ],
+    });
+
+    const encoder = device.createCommandEncoder({ label: 'cloud_noise_bake' });
+    const pass = encoder.beginComputePass({ label: 'cloud noise bake' });
+    pass.setBindGroup(0, bindGroup);
+    pass.setPipeline(makePipeline('bakeShape'));
+    pass.dispatchWorkgroups(S / 4, S / 4, S / 4);
+    pass.setPipeline(makePipeline('bakeDetail'));
+    pass.dispatchWorkgroups(D / 4, D / 4, D / 4);
+    pass.setPipeline(makePipeline('bakeWeather'));
+    pass.dispatchWorkgroups(W / 8, W / 8, 1);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  }
+
+  /** Halton low-discrepancy sequence, base b, 1-based index. */
+  private static halton(index: number, base: number): number {
+    let f = 1;
+    let r = 0;
+    let i = index;
+    while (i > 0) {
+      f /= base;
+      r += f * (i % base);
+      i = Math.floor(i / base);
+    }
+    return r;
   }
 
   /** environment.json "clouds.volumetric" overrides are applied once, on the first render. */
@@ -140,13 +278,19 @@ export class VolumetricClouds {
     if (Engine.getEnvironmentManager().getCloudsType() !== 'volumetric') return;
     if (!this.settingsApplied) this.applyEnvironmentSettings();
 
-    this.uploadCloudUniforms();
-
     const div = Math.max(1, Math.round(this.resolutionDivisor));
     const halfW = Math.max(1, Math.floor(Render.width / div));
     const halfH = Math.max(1, Math.floor(Render.height / div));
     const fullW = Render.width;
     const fullH = Render.height;
+
+    // Jitter cycle long enough to visit every full-res sub-pixel of a low-res texel.
+    const cycle = Math.min(64, Math.max(4, div * div));
+    const hIdx = (this.frameIndex % cycle) + 1;
+    this.jitterX = div > 1 ? VolumetricClouds.halton(hIdx, 2) - 0.5 : 0;
+    this.jitterY = div > 1 ? VolumetricClouds.halton(hIdx, 3) - 0.5 : 0;
+
+    this.uploadCloudUniforms(halfW, halfH);
 
     // ── Recreate low-res current texture when size changes ───────────────────
     if (halfW !== this.lastHalfW || halfH !== this.lastHalfH || !this.cloudCurrentTex) {
@@ -306,7 +450,7 @@ export class VolumetricClouds {
 
   // ── Uniform uploads ────────────────────────────────────────────────────────
 
-  private uploadCloudUniforms(): void {
+  private uploadCloudUniforms(lowResW: number, lowResH: number): void {
     const env = Engine.getEnvironmentManager();
     const sunDir = env.getSunDirection();
     const sunH = sunDir[1];
@@ -335,7 +479,7 @@ export class VolumetricClouds {
     }
     this.lastTime = now;
 
-    const d = new Float32Array(28);
+    const d = this.cloudData;
     d[0] = sunDir[0];
     d[1] = sunDir[1];
     d[2] = sunDir[2];
@@ -361,12 +505,19 @@ export class VolumetricClouds {
     d[22] = this.warpStrength;
     d[23] = this.worleyWeight;
     d[24] = this.fadeRadius;
+    d[25] = this.frameIndex % 4096;
+    d[26] = this.jitterX;
+    d[27] = this.jitterY;
+    d[28] = lowResW;
+    d[29] = lowResH;
+    d[30] = this.detailStrength;
+    d[31] = this.detailFrequency;
 
     GPUUtils.getDevice().queue.writeBuffer(this.uniformBuffer, 0, d);
   }
 
   private uploadTemporalUniforms(): void {
-    const d = new Float32Array(20); // 80 bytes
+    const d = this.temporalData; // 80 bytes
 
     // prevViewProj: 16 floats at offset 0
     d.set(this.prevViewProj, 0);
@@ -374,7 +525,8 @@ export class VolumetricClouds {
     // blendFactor and cloudMid at offsets 16 and 17
     d[16] = this.blendFactor;
     d[17] = (this.cloudBase + this.cloudTop) * 0.5;
-    // d[18], d[19] = padding (zero by default)
+    d[18] = this.jitterX;
+    d[19] = this.jitterY;
 
     GPUUtils.getDevice().queue.writeBuffer(this.temporalUniformBuffer, 0, d);
   }
@@ -399,6 +551,8 @@ export class VolumetricClouds {
     f.add(this, 'cloudFrequency', 0.00001, 0.001, 0.00001).name('Frequency');
     f.add(this, 'warpStrength', 0, 1, 0.01).name('Warp strength');
     f.add(this, 'worleyWeight', 0, 1, 0.01).name('Worley weight');
+    f.add(this, 'detailStrength', 0, 1, 0.01).name('Detail erosion');
+    f.add(this, 'detailFrequency', 2, 40, 1).name('Detail frequency');
     f.add(this, 'density', 0.1, 5, 0.1).name('Density');
     f.add(this, 'absorption', 0.01, 1, 0.01).name('Absorption');
     f.add(this, 'scatterStrength', 0.1, 50, 0.1).name('Scatter');
@@ -415,5 +569,8 @@ export class VolumetricClouds {
     this.cloudCurrentTex?.destroy();
     this.historyTex[0]?.destroy();
     this.historyTex[1]?.destroy();
+    this.shapeNoiseTex?.destroy();
+    this.detailNoiseTex?.destroy();
+    this.weatherTex?.destroy();
   }
 }

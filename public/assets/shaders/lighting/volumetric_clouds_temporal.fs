@@ -1,4 +1,5 @@
 #include "common/uniforms"
+#include "common/math/coordinates"
 
 // ── Bindings ──────────────────────────────────────────────────────────────────
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -12,8 +13,7 @@ struct CloudTemporalUniforms {
     prevViewProj: mat4x4f,  // previous frame view-projection (64 bytes)
     blendFactor:  f32,       // fraction of current frame to blend in (0.05–0.15)
     cloudMid:     f32,       // mid-altitude of cloud slab for ray-plane reprojection
-    _pad0:        f32,
-    _pad1:        f32,
+    jitter:       vec2f,     // sub-pixel offset of the current ray-march frame (low-res pixels)
 }
 
 struct FsIn {
@@ -82,25 +82,27 @@ fn sampleHistoryCatmullRom(uv: vec2f) -> vec4f {
 fn fs(in: FsIn) -> @location(0) vec4f {
     let uv = vec2f(in.position_clip.x * 0.5 + 0.5, 0.5 - in.position_clip.y * 0.5);
 
-    // ── 1. Current frame (bicubic upsample from 1/N res) ──────────────────────
-    let current = sampleCurrentBicubic(uv);
+    // ── 1. Current frame, un-jittered ────────────────────────────────────────
+    // Low-res texel i was ray-marched at (i + 0.5 + jitter) / dims, so this
+    // full-res pixel's ray lands at texel coordinate uv·dims − jitter.
+    let cDims    = vec2f(textureDimensions(currentTex));
+    let cTexSz   = 1.0 / cDims;
+    let uvCur    = uv - temporal.jitter * cTexSz;
+    let current  = textureSampleLevel(currentTex, cloudSampler, uvCur, 0.0);
+
+    // Distance (in low-res texels) from this pixel to the closest real sample:
+    // pixels that a sample hit exactly this frame take more of the new value.
+    let tc         = uvCur * cDims;
+    let dSample    = length(tc - (floor(tc) + 0.5));
+    let sampleW    = exp(-4.0 * dSample * dSample);   // 1 on the sample, ≈0.14 at the corner
 
     // ── 2. Camera reprojection via cloud mid-plane intersection ──────────────
-    // Reconstruct the world-space ray for this pixel using the current frame's
-    // inverse VP matrix.  Intersect with the horizontal cloud mid-plane (Y=cloudMid).
-    // That world hit is then projected with the previous frame's VP to find the
-    // history UV.  Works well for clouds because they are far and translational
-    // parallax error (translation / cloudDist ≈ 0.1 %) is negligible.
-    let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    let wNear4 = camera.invViewProjection * vec4f(ndc, 0.0, 1.0);
-    let wFar4  = camera.invViewProjection * vec4f(ndc, 1.0, 1.0);
-    let wNear  = wNear4.xyz / wNear4.w;
-    let wFar   = wFar4.xyz  / wFar4.w;
-    let rayDir = normalize(wFar - wNear);
+    // Same ray reconstruction as the ray-march pass (projection-matrix based,
+    // valid with reverse-Z / infinite far plane).  The world hit is projected
+    // with the previous frame's VP to find the history UV.
+    let rayDir = normalize(get_world_dir(get_view_dir(in.position_clip, camera), camera));
     let rayOri = camera.cameraPosition.xyz;
 
-    // Only reproject if the ray and plane are not parallel (|dy| > ε) and the
-    // intersection is in front of the camera (t > 0).
     let dy = rayDir.y;
     let t  = (temporal.cloudMid - rayOri.y) / dy;
 
@@ -110,52 +112,47 @@ fn fs(in: FsIn) -> @location(0) vec4f {
     if (abs(dy) > 0.0005 && t > 0.5) {
         let cloudHit = rayOri + rayDir * t;
 
-        // Project hit into previous clip space
         let prevClip = temporal.prevViewProj * vec4f(cloudHit, 1.0);
-        var prevNDC  = prevClip.xy / prevClip.w;
-        var prevUV   = prevNDC * 0.5 + 0.5;
-        prevUV.y     = 1.0 - prevUV.y;
+        if (prevClip.w > 0.0) {
+            var prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
+            prevUV.y   = 1.0 - prevUV.y;
 
-        if (prevUV.x >= 0.001 && prevUV.x <= 0.999 &&
-            prevUV.y >= 0.001 && prevUV.y <= 0.999) {
-            historyColor = sampleHistoryCatmullRom(prevUV);
-            // Treat history as valid only if it has any cloud data.
-            validHistory = historyColor.a > 0.0002;
+            if (prevUV.x >= 0.001 && prevUV.x <= 0.999 &&
+                prevUV.y >= 0.001 && prevUV.y <= 0.999) {
+                historyColor = sampleHistoryCatmullRom(prevUV);
+                validHistory = true;
+            }
         }
     }
 
     if (!validHistory) {
-        // No history available (first frame, disocclusion, or looking straight down).
-        return current;
+        // No history (first frame, off-screen, looking along the plane):
+        // smooth B-spline upsample hides the low-res grid.
+        return sampleCurrentBicubic(uvCur);
     }
 
-    // ── 3. Neighbourhood variance clamp ──────────────────────────────────────
-    // Sample the 3×3 neighbourhood in the low-res current texture.
-    // Using low-res texel size so the kernel covers the equivalent 3 cloud texels
-    // (= 3 × resolutionDivisor full-res pixels).  This gives enough neighbourhood
-    // context to represent the local cloud colour range without over-expanding.
+    // ── 3. Neighbourhood clamp (3×3 low-res texels around the un-jittered UV) ─
     var colorMin = vec4f( 1e9);
     var colorMax = vec4f(-1e9);
-    let cDims   = vec2f(textureDimensions(currentTex));
-    let cTexSz  = 1.0 / cDims;
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
             let s = textureSampleLevel(currentTex, cloudSampler,
-                        uv + vec2f(f32(x), f32(y)) * cTexSz, 0.0);
+                        uvCur + vec2f(f32(x), f32(y)) * cTexSz, 0.0);
             colorMin = min(colorMin, s);
             colorMax = max(colorMax, s);
         }
     }
-    // Slightly relax bounds to avoid over-clamping on cloud silhouette edges
-    // where the neighbourhood mix of cloud/sky causes tight bounds.
+    // Slightly relax bounds to avoid over-clamping on silhouettes.
     let slack  = (colorMax - colorMin) * 0.12;
     colorMin  -= slack;
     colorMax  += slack;
 
-    let clampedHistory = clamp(historyColor, colorMin, colorMax);
+    let clampedHistory = clamp(max(historyColor, vec4f(0.0)), colorMin, colorMax);
 
     // ── 4. Temporal blend ─────────────────────────────────────────────────────
-    // blendFactor ≈ 0.07 → 93 % history, 7 % current per frame.
-    // At 60 fps a static cloud region converges fully in ~2 s.
-    return mix(clampedHistory, current, temporal.blendFactor);
+    // blendFactor is the average weight; pixels right on this frame's sample
+    // get up to 2.25×, pixels between samples ≈0.5× — sub-pixel detail from the
+    // jitter pattern accumulates instead of being smeared by the upsample.
+    let alpha = saturate(temporal.blendFactor * (0.25 + 2.0 * sampleW));
+    return mix(clampedHistory, current, alpha);
 }
