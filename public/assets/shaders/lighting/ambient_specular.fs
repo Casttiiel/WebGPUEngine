@@ -107,12 +107,14 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
 
     let iblSpecular = envRadiance * splitSum;
 
-    // ── SSR: raw hit radiance × same split-sum BRDF (same energy space as IBL) ─
+    // ── SSR: reflected radiance × same split-sum BRDF (same energy space as IBL) ─
+    // The stochastic SSR resolves screen misses and edge fades to this same prefiltered
+    // environment, so when enabled it fully replaces the IBL radiance. Its alpha holds the
+    // temporal accumulation speed, not a hit mask.
     let ssrColor    = textureSample(ssrTexture, ssrSampler, uv);
-    let ssrAlpha    = ssrColor.a;
     let ssrSpecular = ssrColor.rgb * splitSum;
 
-    let finalSpecular = mix(iblSpecular, ssrSpecular, ssrAlpha) * ssrParams.specularBoost;
+    let finalSpecular = select(iblSpecular, ssrSpecular, ssrParams.enabled > 0.5) * ssrParams.specularBoost;
 
     // Alpha = average specular energy × specular occlusion.
     // With additive_by_src_alpha: dst += finalSpecular * alpha

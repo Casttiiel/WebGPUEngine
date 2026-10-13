@@ -320,18 +320,6 @@ export class ModuleRender extends Module {
 
       RenderManager.getInstance().setCamera(camera);
 
-      // Inform SSR whether a temporal component is active so it can halve its step count.
-      // TAA/TSR accumulate SSR hits across frames, giving equivalent quality at half steps.
-      const taaActive =
-        (mainCameraEntity?.hasComponent('taa') &&
-          (mainCameraEntity.getComponent('taa') as TAAComponent).hasLoaded()) ??
-        false;
-      const tsrActive =
-        (mainCameraEntity?.hasComponent('tsr') &&
-          (mainCameraEntity.getComponent('tsr') as TSRComponent).hasLoaded()) ??
-        false;
-      this.deferred.setSSRTemporalMode(!!(taaActive || tsrActive));
-
       Profiler.getInstance().cpu.begin('Deferred');
       result = this.deferred.render(mainCameraEntity);
       Profiler.getInstance().cpu.end();

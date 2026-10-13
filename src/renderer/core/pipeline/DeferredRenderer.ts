@@ -601,11 +601,12 @@ export class DeferredRenderer {
     const gBufferRTs = this.gBufferPass.getRenderTargets();
     const ssr = this.ssr.generateSSR(
       this.rtAccLight.getView(),
-      this.aoResult,
       this.gBufferComputeBindGroup,
-      gBufferRTs.normals.getView()!,
-      gBufferRTs.linearDepth.getView()!,
+      gBufferRTs.normals,
+      gBufferRTs.linearDepth,
+      this.ambientLight,
     );
+    this.ambientLight.setSSRActive(this.ssr.isActive());
     this.ambientLight.renderSpecular(
       this.rtAccLight.getView(),
       ssr,
@@ -757,7 +758,6 @@ export class DeferredRenderer {
     }
 
     this.ambientLight.update(_dt);
-    this.ssr.update(_dt);
   }
 
   public renderAtmosphereInMenu(folder: any): void {
@@ -773,14 +773,6 @@ export class DeferredRenderer {
     this.ssr.dispose();
     this.ssr = new ScreenSpaceReflections();
     this.ssr.load();
-  }
-
-  /**
-   * Inform SSR whether TAA is currently active so it can adapt its step count.
-   * Called every frame from ModuleRender before rendering.
-   */
-  public setSSRTemporalMode(active: boolean): void {
-    this.ssr.setTemporalMode(active);
   }
 
   public resetAmbientLightResources(): void {

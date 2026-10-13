@@ -1,298 +1,234 @@
-// Screen-Space Reflections — Hi-Z compute shader
+// ---------------------------------------------------------------------------
+// Stochastic Screen-Space Reflections — compute shader
+// Port of three.js SSRNode with `stochastic: true` (examples/jsm/tsl/display/SSRNode.js):
+//   • one GGX bounded-VNDF reflection ray per pixel (mirror-biased), every surface
+//   • fixed step count (quality · 64) with exponential distribution + jitter
+//   • view-space thickness test (point-to-line distance, ≥ ~3 px)
+//   • screen-edge fade and misses resolve to the environment
+//   • multi-bounce: the previous frame's denoised SSR is folded in at the hit point
 //
-// Improvements over the previous view-space linear march:
-//   • Screen-space DDA: advances a constant number of PIXELS per step (not world units),
-//     giving uniform sampling density at all depths and view angles.
-//   • Hi-Z pyramid skip: at coarse mip levels each iteration covers 2/4/8/16 pixels;
-//     empty screen regions are traversed in far fewer iterations than with fixed steps.
-//   • Binary-search refinement (8 iters) retained for sub-pixel hit accuracy.
+// Environment: instead of three.js' importance-sampled equirect HDR, misses and edge
+// fades use the same prefiltered cubemaps as ambient_specular.fs (global env + the two
+// dominant PCC reflection probes), so SSR on/off stays energy-consistent with the IBL.
 //
-// Bind-group layout (unchanged from previous version):
-//   group(0)  Camera uniforms         (CameraUniforms UBO)
-//   group(1)  G-Buffer                (albedo, normals, linearDepth, sampler)
-//   group(2)  SSR params + inputs     (accLight, SSRUniforms UBO, blueNoise, hizTex)
-//   group(3)  Output storage tex      (rgba16float write-only)
+// Output (rgba16float): rgb = incoming radiance along the reflection,
+//                       a   = world-space ray length (ENV_RAY_LENGTH on misses).
+// The radiance is NOT weighted by the BRDF: ambient_specular.fs multiplies it by the
+// split-sum term, exactly like the IBL radiance it replaces.
+// ---------------------------------------------------------------------------
 
 #include "common/uniforms"
-#include "common/structs"
 #include "common/octahedral"
-#include "common/gbuffer"
+#include "common/pcc"
+#include "post-processing/ssr_common"
 
-// ── Group 0: camera ───────────────────────────────────────────────────────────
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
-// ── Group 1: G-Buffer ─────────────────────────────────────────────────────────
 @group(1) @binding(0) var gAlbedo:        texture_2d<f32>;
 @group(1) @binding(1) var gNormals:       texture_2d<f32>;
 @group(1) @binding(2) var gLinearDepth:   texture_2d<f32>;
 @group(1) @binding(3) var samplerGBuffer: sampler;
 
-// ── Group 2: SSR params ───────────────────────────────────────────────────────
-@group(2) @binding(0) var accLight:           texture_2d<f32>;
-@group(2) @binding(1) var<uniform> ssrParams: SSRUniforms;
-@group(2) @binding(2) var txBlueNoise:        texture_2d<f32>;
-// Hi-Z min-depth pyramid (r32float, 4 mip levels = half/quarter/eighth/sixteenth res).
-// Built from gLinearDepth each frame before the SSR dispatch.
-// hizTex mip k corresponds to full-pyramid level (k+1); full-pyramid level 0 = gLinearDepth.
-@group(2) @binding(3) var hizTex: texture_2d<f32>;
+struct PCCSpecularUniforms {
+    probeAPos: vec4<f32>,   // xyz = world pos, w: 0 = none, 1 = outdoor, 2 = indoor (PCC)
+    probeAMin: vec4<f32>,
+    probeAMax: vec4<f32>,
+    probeBPos: vec4<f32>,
+    probeBMin: vec4<f32>,
+    probeBMax: vec4<f32>,
+    blendWeight: f32, _pad0: f32, _pad1: f32, _pad2: f32,
+}
 
-// ── Group 3: output ───────────────────────────────────────────────────────────
+@group(2) @binding(0) var accLight:            texture_2d<f32>;
+@group(2) @binding(1) var<uniform> params:     SSRTraceParams;
+@group(2) @binding(2) var txEnvironment:       texture_cube<f32>;
+@group(2) @binding(3) var probeEnvA:           texture_cube<f32>;
+@group(2) @binding(4) var probeEnvB:           texture_cube<f32>;
+@group(2) @binding(5) var envSampler:          sampler;
+@group(2) @binding(6) var<uniform> pccData:    PCCSpecularUniforms;
+@group(2) @binding(7) var historyTex:          texture_2d<f32>; // last frame's denoised SSR
+@group(2) @binding(8) var brdfLUT:             texture_2d<f32>;
+@group(2) @binding(9) var linearSampler:       sampler;
+
 @group(3) @binding(0) var outputSSR: texture_storage_2d<rgba16float, write>;
 
-// ─────────────────────────────────────────────────────────────────────────────
+const MAX_STEPS: f32 = 64.0;
 
-// Max pyramid level used during traversal.
-// Level 0 = gLinearDepth (full res), level 1-4 = hizTex mips 0-3.
-const MAX_HIZ: i32 = 4;
-
-// ── Blue-noise helpers ───────────────────────────────────────────────────────
-fn sampleBlueNoise(coord: vec2<u32>) -> vec2<f32> {
-    let frame = u32(ssrParams.frameIndex);
-    let nc    = vec2<i32>(
-        i32((coord.x + frame * 17u) & 63u),
-        i32((coord.y + frame * 11u) & 63u),
-    );
-    return textureLoad(txBlueNoise, nc, 0).rg;
+// Prefiltered environment radiance along the mirror direction — identical to the IBL
+// lookup in ambient_specular.fs (probe blend + parallax correction).
+fn sampleEnvironment(worldPos: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let R_a = select(R, parallaxCorrectDir(worldPos, R, pccData.probeAPos.xyz,
+                                           pccData.probeAMin.xyz, pccData.probeAMax.xyz),
+                     pccData.probeAPos.w > 1.5);
+    let R_b = select(R, parallaxCorrectDir(worldPos, R, pccData.probeBPos.xyz,
+                                           pccData.probeBMin.xyz, pccData.probeBMax.xyz),
+                     pccData.probeBPos.w > 1.5);
+    let mip = roughness * params.envMaxMip;
+    let envGlobal = textureSampleLevel(txEnvironment, envSampler, R,   mip).rgb;
+    let envA      = textureSampleLevel(probeEnvA,     envSampler, R_a, mip).rgb;
+    let envB      = textureSampleLevel(probeEnvB,     envSampler, R_b, mip).rgb;
+    let hasA = pccData.probeAPos.w > 0.5;
+    let hasB = pccData.probeBPos.w > 0.5;
+    let envBlended = mix(envA, envB, pccData.blendWeight);
+    return select(select(envGlobal, envA, hasA), envBlended, hasA && hasB);
 }
 
-fn calculateEdgeFade(uv: vec2<f32>) -> f32 {
-    let fade = min(uv, vec2<f32>(1.0) - uv) / 0.1;
-    return saturate(fade.x) * saturate(fade.y);
+// Indirect specular the hit surface reflects toward the ray origin, from last frame's
+// denoised SSR (reprojected to the hit point). accLight lacks indirect specular — it is
+// added by ambient_specular.fs after SSR — so this supplies the second bounce. Weighted by
+// the hit surface's split-sum BRDF (same as ambient_specular.fs) and faded by (1 - a),
+// where a = 1 / frames, so freshly disoccluded history does not feed back.
+fn multiBounce(hitUv: vec2<f32>, hitWorldPosition: vec3<f32>) -> vec3<f32> {
+    let historyUV = ssrProjectToPrevUV(hitWorldPosition);
+    if (params.historyValid < 0.5 || !ssrUvInside(historyUV)) { return vec3<f32>(0.0); }
+    let history = max(textureSampleLevel(historyTex, linearSampler, historyUV, 0.0), vec4<f32>(0.0));
+
+    let nData   = textureLoad(gNormals, ssrGBufferCoord(gNormals, hitUv), 0);
+    let albedo  = textureLoad(gAlbedo, ssrGBufferCoord(gAlbedo, hitUv), 0);
+    let N  = octahedral01ToNormal(nData.xy);
+    let r  = max(nData.z, 0.045);
+    let F0 = mix(vec3<f32>(0.04), albedo.rgb, albedo.a);
+    let V  = normalize(camera.cameraPosition.xyz - hitWorldPosition);
+    let NoV = clamp(dot(N, V), 0.0, 1.0);
+    let brdf = textureSampleLevel(brdfLUT, linearSampler, vec2<f32>(NoV, 1.0 - r), 0.0).rg;
+    let F    = F0 + (max(vec3<f32>(1.0 - r), F0) - F0) * pow(1.0 - NoV, 5.0);
+    // Kulla-Conty multi-scattering compensation, as in ambient_specular.fs
+    let Ems  = 1.0 - (brdf.x + brdf.y);
+    let Favg = F0 + (1.0 - F0) / 21.0;
+    let Fms  = Favg * Ems / max(1.0 - Favg * Ems, vec3<f32>(0.001));
+    let splitSum = F * brdf.x + brdf.y + Fms;
+
+    return history.rgb * splitSum * params.specularBoost * (1.0 - history.a);
 }
 
-// ── View↔screen helpers ──────────────────────────────────────────────────────
-
-// View-space position → (screenUV, normalised linear depth [0,1])
-fn viewToScreen(viewPos: vec3<f32>) -> vec3<f32> {
-    let clip  = camera.projectionMatrix * vec4<f32>(viewPos, 1.0);
-    let ndc   = clip.xyz / clip.w;
-    var uv    = ndc.xy * 0.5 + 0.5;
-    uv.y      = 1.0 - uv.y;
-    let depth = -viewPos.z / camera.cameraFar;
-    return vec3<f32>(uv, depth);
+fn pointToLineDistance(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>) -> f32 {
+    return length(cross(p - a, p - b)) / length(b - a);
 }
 
-// (screenUV, normalised linear depth) → view-space position
-fn screenToView(uv: vec2<f32>, linearDepth: f32) -> vec3<f32> {
-    let ndc   = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
-    let viewZ = -linearDepth * camera.cameraFar;
-    let viewX = ndc.x * (-viewZ) / camera.projectionMatrix[0][0];
-    let viewY = ndc.y * (-viewZ) / camera.projectionMatrix[1][1];
-    return vec3<f32>(viewX, viewY, viewZ);
-}
-
-// ── Hi-Z hierarchy sampler ───────────────────────────────────────────────────
-// level 0  → gLinearDepth (full res);  sky depth=0 remapped to 1.0.
-// level 1-4 → hizTex mip (level-1);   already sky-remapped during build.
-fn sampleHiZ(uv: vec2<f32>, level: i32) -> f32 {
-    if (level <= 0) {
-        let dims  = vec2<i32>(textureDimensions(gLinearDepth));
-        let coord = clamp(vec2<i32>(uv * vec2<f32>(dims)),
-                          vec2<i32>(0), dims - vec2<i32>(1));
-        let d = textureLoad(gLinearDepth, coord, 0).r;
-        return select(1.0, d, d > 0.0001);
-    }
-    let hizLvl  = clamp(level - 1, 0, MAX_HIZ - 1);
-    let baseDims = vec2<i32>(textureDimensions(hizTex));           // mip-0 dims of hizTex
-    let mipDims  = max(vec2<i32>(1), baseDims >> vec2<u32>(u32(hizLvl)));
-    let coord    = clamp(vec2<i32>(uv * vec2<f32>(mipDims)),
-                         vec2<i32>(0), mipDims - vec2<i32>(1));
-    return textureLoad(hizTex, coord, hizLvl).r;
-}
-
-// ── Binary-search refinement (view space) ───────────────────────────────────
-fn binarySearchRefine(loVP: vec3<f32>, hiVP: vec3<f32>) -> vec3<f32> {
-    var lo = loVP;
-    var hi = hiVP;
-    for (var j: i32 = 0; j < 8; j++) {
-        let midVP  = (lo + hi) * 0.5;
-        let midScr = viewToScreen(midVP);
-        if (midScr.x < 0.0 || midScr.x > 1.0 || midScr.y < 0.0 || midScr.y > 1.0) { break; }
-        let sceneDep      = textureLoad(gLinearDepth,
-                                        clamp(vec2<i32>(midScr.xy * vec2<f32>(textureDimensions(gLinearDepth))),
-                                              vec2<i32>(0),
-                                              vec2<i32>(textureDimensions(gLinearDepth)) - vec2<i32>(1)),
-                                        0).r;
-        let midThickness  = ssrParams.thickness * (1.0 + sceneDep * 2.0);
-        if (midScr.z > sceneDep && (midScr.z - sceneDep) < midThickness) {
-            hi = midVP;
-        } else {
-            lo = midVP;
-        }
-    }
-    return hi;
-}
-
-// ── Screen-space Hi-Z ray march ───────────────────────────────────────────────
-//
-// The ray is parameterised in SCREEN SPACE (UV + linear depth), stepping by a
-// fixed number of PIXELS per iteration in the dominant screen axis.  The Hi-Z
-// hierarchy allows coarse iterations (up to 16 px/step) over empty regions and
-// automatically narrows to 1 px/step near a potential hit.
-//
-// After a confirmed hit the position is refined in VIEW SPACE via binary search
-// (carried over from the previous shader) for sub-step accuracy.
-fn performSSRHiZMarch(
-    worldPos:     vec3<f32>,
-    reflWorld:    vec3<f32>,
-    roughness:    f32,
-    ditherOffset: f32,
-    ssrDims:      vec2<f32>,
-) -> vec4<f32> {
-    // Transform to view space
-    let viewStartRaw = (camera.viewMatrix * vec4<f32>(worldPos, 1.0)).xyz;
-    let viewDir      = normalize((camera.viewMatrix * vec4<f32>(reflWorld, 0.0)).xyz);
-    if (viewDir.z > 0.0) { return vec4<f32>(0.0); }
-
-    let rayStartDepth = -viewStartRaw.z / camera.cameraFar;
-
-    // Small self-intersection offset + blue-noise dither within [0, stepSize)
-    let viewStart = viewStartRaw + viewDir * (0.05 + ditherOffset);
-
-    // Screen-space start and end of the ray
-    let startScr = viewToScreen(viewStart);
-    let endVP    = viewStart + viewDir * ssrParams.maxDistance;
-    let endScr   = viewToScreen(endVP);
-
-    if (startScr.x < 0.0 || startScr.x > 1.0 ||
-        startScr.y < 0.0 || startScr.y > 1.0) {
-        return vec4<f32>(0.0);
-    }
-
-    // Screen-space delta, normalised so one step = 1 pixel in dominant axis
-    let scrDelta  = endScr.xy - startScr.xy;
-    let pxDelta   = scrDelta * ssrDims;
-    let pxLen     = max(abs(pxDelta.x), abs(pxDelta.y));
-    if (pxLen < 1.0) { return vec4<f32>(0.0); }
-
-    // Budget: up to ssrParams.maxSteps * 16 screen pixels, capped at screen width
-    let maxPx     = min(ssrParams.maxSteps * 16.0, ssrDims.x * 0.9);
-    let stepUV    = scrDelta / pxLen;         // UV advance per 1 pixel step
-    let stepDepth = (endScr.z - startScr.z) / pxLen; // depth advance per 1 pixel step
-
-    // Apply blue-noise sub-pixel offset to the starting position
-    let noiseShift = ditherOffset * 4.0;
-    var pos        = startScr.xy + stepUV    * noiseShift;
-    var depth      = startScr.z  + stepDepth * noiseShift;
-    var prevPos    = pos;
-    var prevDepth  = depth;
-
-    var mip        = MAX_HIZ;       // start at coarsest level
-    var pixelsTrav = 0.0;           // total screen pixels traversed
-
-    // Safety cap on loop iterations: coarse steps rarely need more than maxSteps * 6
-    let maxIter = i32(ssrParams.maxSteps) * 6;
-
-    for (var i = 0; i < maxIter; i++) {
-        if (pixelsTrav >= maxPx)                                    { break; }
-        if (pos.x < 0.0 || pos.x > 1.0 ||
-            pos.y < 0.0 || pos.y > 1.0)                            { break; }
-        if (depth <= 0.0 || depth >= 1.0)                          { break; }
-
-        let hiZ = sampleHiZ(pos, mip);
-
-        if (depth > hiZ) {
-            // ── Ray is below the min-depth of this Hi-Z cell → potential hit ──
-            if (mip <= 0) {
-                // Finest level: confirm with full thickness/depth checks
-                let adaptiveThickness = ssrParams.thickness * (1.0 + hiZ * 2.0);
-                if ((depth - hiZ) < adaptiveThickness && hiZ > rayStartDepth) {
-                    // Real hit — refine in view space then sample
-                    let loVP       = screenToView(prevPos, prevDepth);
-                    let hiVP       = screenToView(pos,     depth);
-                    let refinedVP  = binarySearchRefine(loVP, hiVP);
-                    let refinedScr = viewToScreen(refinedVP);
-                    if (refinedScr.x < 0.0 || refinedScr.x > 1.0 ||
-                        refinedScr.y < 0.0 || refinedScr.y > 1.0) {
-                        return vec4<f32>(0.0);
-                    }
-                    let hitColor  = textureSampleLevel(accLight, samplerGBuffer, refinedScr.xy, 0.0);
-                    let edgeFade  = calculateEdgeFade(refinedScr.xy);
-                    let roughFade = 1.0 - smoothstep(0.0, 0.4, roughness);
-                    return vec4<f32>(hitColor.rgb, edgeFade * roughFade);
-                }
-                // False positive (too thick, or hit object behind reflector).
-                // Advance one fine step and try a slightly coarser level to escape.
-                prevPos = pos; prevDepth = depth;
-                pos       += stepUV;
-                depth     += stepDepth;
-                pixelsTrav += 1.0;
-                mip = min(mip + 1, MAX_HIZ);
-            } else {
-                // Go finer to localise the hit — do NOT advance position
-                mip -= 1;
-            }
-        } else {
-            // ── No hit in this Hi-Z cell → advance one full cell ──
-            let cellPx = f32(1 << u32(mip));  // 1, 2, 4, 8, or 16 pixels
-            prevPos = pos; prevDepth = depth;
-            pos       += stepUV    * cellPx;
-            depth     += stepDepth * cellPx;
-            pixelsTrav += cellPx;
-            // Bump mip up: if the next cell is also empty we'll skip even faster
-            mip = min(mip + 1, MAX_HIZ);
-        }
-    }
-
-    return vec4<f32>(0.0);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main compute entry — workgroup 8×8, one thread per output pixel
-// ─────────────────────────────────────────────────────────────────────────────
 @compute @workgroup_size(8, 8, 1)
 fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     let dims   = vec2<i32>(textureDimensions(outputSSR));
     let coords = vec2<i32>(gid.xy);
     if (coords.x >= dims.x || coords.y >= dims.y) { return; }
 
-    let uv = (vec2<f32>(coords) + 0.5) / vec2<f32>(dims);
+    let resolution = vec2<f32>(dims);
+    let uv = (vec2<f32>(coords) + 0.5) / resolution;
 
-    // Cheap sky / disabled early exit
-    let rawDepth = textureLoad(gLinearDepth,
-                               clamp(vec2<i32>(uv * vec2<f32>(textureDimensions(gLinearDepth))),
-                                     vec2<i32>(0),
-                                     vec2<i32>(textureDimensions(gLinearDepth)) - vec2<i32>(1)),
-                               0).r;
-    if (ssrParams.enabled < 0.5 || rawDepth < 0.0001) {
-        textureStore(outputSSR, coords, vec4<f32>(0.0));
+    let depth = ssrSampleDepth(uv);
+    if (depth >= 1.0 || depth <= 0.0001) {
+        textureStore(outputSSR, coords, vec4<f32>(0.0, 0.0, 0.0, ENV_RAY_LENGTH)); // background
         return;
     }
 
-    let g = decodeGBuffer(uv);
+    // ── Surface ───────────────────────────────────────────────────────────────
+    let gCoord     = ssrGBufferCoord(gNormals, uv);
+    let normalData = textureLoad(gNormals, gCoord, 0);
+    let worldNormal = octahedral01ToNormal(normalData.xy);
+    let roughness  = max(normalData.z, 0.045); // same clamp as decodeGBuffer
 
-    let metallicFade = saturate((g.metallic - 0.1) / 0.3);
-    if (g.metallic < ssrParams.metallicMin || g.roughness > ssrParams.roughnessMax) {
-        textureStore(outputSSR, coords, vec4<f32>(0.0));
-        return;
+    let viewPosition  = ssrViewPosition(uv, depth);
+    let worldPosition = (camera.invView * vec4<f32>(viewPosition, 1.0)).xyz;
+    let viewNormal    = normalize((camera.viewMatrix * vec4<f32>(worldNormal, 0.0)).xyz);
+    let viewIncidentDir = normalize(viewPosition);
+    let V = -viewIncidentDir;
+
+    // Mirror direction (world) for the prefiltered environment fallback
+    let worldIncident = normalize(worldPosition - camera.cameraPosition.xyz);
+    let worldMirrorR  = normalize(reflect(worldIncident, worldNormal));
+    let envColor = sampleEnvironment(worldPosition, worldMirrorR, roughness);
+
+    // ── Stochastic GGX ray ────────────────────────────────────────────────────
+    var Xi = ssrAnalyticNoise(uv * resolution, i32(params.noiseIndex), 47.0);
+    // Mirror bias: pull Xi.y toward the cap top to tighten the lobe (less mid-roughness noise).
+    Xi.y = mix(Xi.y, 0.0, params.mirrorBias * sqrt(Xi.w));
+
+    var viewReflectDir = ssrGGXReflectionDir(viewNormal, V, roughness, Xi);
+    // The GGX sample can face away from the surface — re-sample once.
+    if (dot(viewReflectDir, viewNormal) < 0.0) {
+        viewReflectDir = ssrGGXReflectionDir(viewNormal, V, roughness, fract(Xi * 8.0));
     }
 
-    // Mip-smoothed normal to suppress high-frequency normal-map noise
-    let smoothMip     = clamp(1.0 + g.roughness * 3.0, 1.0, 5.0);
-    let smoothNData   = textureSampleLevel(gNormals, samplerGBuffer, uv, smoothMip);
-    let smoothN       = normalize(octahedral01ToNormal(smoothNData.xy));
-    let incidentDir   = normalize(g.worldPos - camera.cameraPosition.xyz);
-    let smoothReflDir = normalize(reflect(incidentDir, smoothN));
+    let NoV = max(dot(viewNormal, V), 0.0);
+    let specDominantFactor = ssrSpecularDominantFactor(NoV, roughness);
+    let glossiness     = 1.0 - min(roughness / 0.25, 1.0);
+    let hitBorderWidth = params.screenEdgeFade * glossiness;
 
-    // Blue-noise stochastic offsets (frame-animated for temporal accumulation)
-    let noise = sampleBlueNoise(vec2<u32>(gid.xy));
-
-    let ditherOffset = noise.x * ssrParams.stepSize;
-
-    let jitterRadius = min(g.roughness * g.roughness * 0.4, 0.15);
-    var jitteredDir  = smoothReflDir;
-    if jitterRadius > 0.001 {
-        let up        = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0),
-                               abs(smoothReflDir.y) < 0.99);
-        let tangent   = normalize(cross(up, smoothReflDir));
-        let bitangent = cross(smoothReflDir, tangent);
-        let angle     = noise.y * 6.28318530718;
-        jitteredDir   = normalize(smoothReflDir
-                                  + tangent   * cos(angle) * jitterRadius
-                                  + bitangent * sin(angle) * jitterRadius);
+    // ── Ray setup (screen space) ──────────────────────────────────────────────
+    let maxReflectRayLen = params.maxDistance / max(dot(-viewIncidentDir, viewNormal), 1e-3);
+    var d1viewPosition = viewPosition + viewReflectDir * maxReflectRayLen;
+    // Clamp the end point to the near plane
+    if (d1viewPosition.z > -params.cameraNear) {
+        let t = (-params.cameraNear - viewPosition.z) / viewReflectDir.z;
+        d1viewPosition = viewPosition + viewReflectDir * t;
     }
 
-    let ssrDims = vec2<f32>(dims);
-    let result  = performSSRHiZMarch(g.worldPos, jitteredDir, g.roughness, ditherOffset, ssrDims);
-    textureStore(outputSSR, coords, vec4<f32>(result.rgb, result.a * metallicFade));
+    let d0 = uv * resolution;
+    let d1 = ssrScreenFromClip(camera.projectionMatrix * vec4<f32>(d1viewPosition, 1.0)) * resolution;
+    let rayVec = d1 - d0;
+    let rayLen = max(max(abs(rayVec.x), abs(rayVec.y)), 1.0);
+
+    let totalStep = i32(max(clamp(params.quality, 0.0, 1.0) * MAX_STEPS, 1.0));
+    let invResolution = 1.0 / resolution;
+
+    // Reflected-ray view Z at parameter s ∈ [0,1] (linear in 1/z for perspective)
+    let recipVPZ   = 1.0 / viewPosition.z;
+    let recipD1VPZ = 1.0 / d1viewPosition.z;
+
+    // ── March ────────────────────────────────────────────────────────────────
+    var foundHit = false;
+    var hitUv    = vec2<f32>(0.0);
+    var hitDepth = 0.0;
+
+    for (var i = 1; i < totalStep; i++) {
+        // Exponential remap concentrating samples near the origin, floored to ≥ 1 texel/step;
+        // the jitter (noise.z) dissolves banding.
+        let fi = f32(i);
+        let s  = max(pow((fi + Xi.z - 0.5) / f32(totalStep), params.stepExponent), fi / rayLen);
+        let xy = d0 + rayVec * s;
+        if (xy.x < 0.0 || xy.x > resolution.x || xy.y < 0.0 || xy.y > resolution.y) { break; }
+
+        let uvS = xy * invResolution;
+        let d   = ssrSampleDepth(uvS);
+        let vZ  = -d * camera.cameraFar;
+        let rayZ = 1.0 / (recipVPZ + s * (recipD1VPZ - recipVPZ));
+
+        if (rayZ <= vZ) {
+            // Depth crossing: gate by thickness so an occluder gap doesn't stop the march.
+            let vP   = ssrViewPosition(uvS, d);
+            let away = pointToLineDistance(vP, viewPosition, d1viewPosition);
+            let vPNeighbor   = ssrViewPosition(uvS + vec2<f32>(invResolution.x, 0.0), d);
+            let minThickness = (vPNeighbor.x - vP.x) * 3.0;
+            if (away <= max(minThickness, params.thickness)) {
+                foundHit = true;
+                hitUv    = uvS;
+                hitDepth = d;
+                break;
+            }
+        }
+    }
+
+    // ── Shade ────────────────────────────────────────────────────────────────
+    var output = vec4<f32>(envColor, ENV_RAY_LENGTH);
+    if (foundHit) {
+        let vP = ssrViewPosition(hitUv, hitDepth);
+        let hitWorldPosition = (camera.invView * vec4<f32>(vP, 1.0)).xyz;
+        let worldDistance = distance(worldPosition, hitWorldPosition) * specDominantFactor;
+
+        var reflectColor = textureLoad(accLight, ssrGBufferCoord(accLight, hitUv), 0).rgb;
+        if (params.multiBounce > 0.5) {
+            reflectColor += multiBounce(hitUv, hitWorldPosition);
+        }
+        // Fade toward the environment as the hit approaches a screen border
+        let hitBorderFactor = ssrScreenBorderFactor(hitUv, hitBorderWidth);
+        if (hitBorderFactor < 1.0) {
+            reflectColor = mix(envColor, reflectColor, hitBorderFactor);
+        }
+        output = vec4<f32>(reflectColor, worldDistance);
+    }
+
+    // Firefly control: cap absolute luminance (hue preserved), then user intensity
+    let lum = max(ssrLuminance(output.rgb), 1e-4);
+    output = vec4<f32>(output.rgb * min(params.maxLuminance / lum, 1.0) * params.intensity, output.a);
+
+    textureStore(outputSSR, coords, max(output, vec4<f32>(0.0)));
 }

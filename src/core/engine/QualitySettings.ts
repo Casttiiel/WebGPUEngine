@@ -18,8 +18,6 @@ export interface GraphicsQualitySettings {
   hdrTexture: GPUTextureFormat;
   ssrEnabled: boolean;
   ssrScale: number;
-  ssrStepSize: number;
-  ssrMaxSteps: number;
   directionalShadowMapResolution: number;
   useKTX2: boolean;
   meshTextureFilter: 'trilinear' | 'nearest';
@@ -51,8 +49,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: false,
       ssrScale: 0.4,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 256,
 
       enableMotionBlur: false,
@@ -79,8 +75,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.4,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 512,
 
       enableMotionBlur: true,
@@ -107,8 +101,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 1024,
 
       enableMotionBlur: true,
@@ -135,8 +127,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.5,
-      ssrStepSize: 0.3,
-      ssrMaxSteps: 48.0,
       directionalShadowMapResolution: 2048,
 
       enableMotionBlur: true,
@@ -178,8 +168,6 @@ export class QualitySettings {
       hdrTexture: 'rgba16float',
       ssrEnabled: true,
       ssrScale: 0.75,
-      ssrStepSize: 0.05,
-      ssrMaxSteps: 640.0,
       directionalShadowMapResolution: 2048,
       enableMotionBlur: true,
       useKTX2: false,
