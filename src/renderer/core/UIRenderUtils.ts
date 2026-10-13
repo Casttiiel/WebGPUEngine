@@ -1,4 +1,4 @@
-import { mat4, vec2, vec4 } from 'gl-matrix';
+import { mat4, vec2, vec3, vec4 } from 'gl-matrix';
 import { Mesh } from '../resources/Mesh';
 import { Texture } from '../resources/Texture';
 import { Technique } from '../resources/Technique';
@@ -40,6 +40,15 @@ export class UIRenderUtils {
   private static uniformPoolIndex = 0;
   private static readonly UNIFORM_POOL_SIZE = 128;
   private static readonly reusableUniformData = new Float32Array(24); // 96 bytes scratch
+  // Per-draw scratch (renderBitmap/renderText run per glyph every frame: no allocations)
+  private static readonly finalTransformScratch = mat4.create();
+  private static readonly glyphTransform = mat4.create();
+  private static readonly glyphUvMin = vec2.create();
+  private static readonly glyphUvMax = vec2.create();
+  private static readonly glyphVec = vec3.create();
+  private static readonly WHITE: vec4 = vec4.fromValues(1, 1, 1, 1);
+  private static readonly UV_MIN: vec2 = vec2.fromValues(0, 0);
+  private static readonly UV_MAX: vec2 = vec2.fromValues(1, 1);
 
   // ── Texture bind group cache ─────────────────────────────────────────────
   // Keyed per technique to handle the (unlikely) case of layout differences.
@@ -226,9 +235,9 @@ export class UIRenderUtils {
     pass: GPURenderPassEncoder,
     texture: Texture,
     transform: mat4,
-    tint: vec4 = vec4.fromValues(1, 1, 1, 1),
-    minUV: vec2 = vec2.fromValues(0, 0),
-    maxUV: vec2 = vec2.fromValues(1, 1),
+    tint: vec4 = UIRenderUtils.WHITE,
+    minUV: vec2 = UIRenderUtils.UV_MIN,
+    maxUV: vec2 = UIRenderUtils.UV_MAX,
     additive: boolean = false,
   ): void {
     if (!this.initialized) {
@@ -242,8 +251,8 @@ export class UIRenderUtils {
     }
 
     // Project widget transform (physical px) into clip space
-    const finalTransform = mat4.create();
-    mat4.multiply(finalTransform, this.orthoProjection, transform);
+    // Scratch is safe: both uniform paths below copy it out before returning
+    const finalTransform = mat4.multiply(this.finalTransformScratch, this.orthoProjection, transform);
 
     // Select technique based on blend mode
     const technique = additive ? this.additiveTechnique : this.standardTechnique;
@@ -464,9 +473,10 @@ export class UIRenderUtils {
     const grid = metrics?.grid ?? LEGACY_GRID;
     const cell = 1 / grid;
     const scale = metrics ? height / metrics.cell : 1;
-    const transform = mat4.create();
-    const uvMin = vec2.create();
-    const uvMax = vec2.create();
+    const transform = this.glyphTransform;
+    const uvMin = this.glyphUvMin;
+    const uvMax = this.glyphUvMax;
+    const v = this.glyphVec;
     const str = metrics ? text : text.toUpperCase();
     // Las celdas tienen margen a la izquierda del glifo: se compensa para alinear en origin.
     let x = origin[0]! - (metrics ? metrics.padX * scale : 0);
@@ -483,8 +493,8 @@ export class UIRenderUtils {
         vec2.set(uvMin, col * cell, row * cell);
         vec2.set(uvMax, (col + 1) * cell, (row + 1) * cell);
         // El quad unitario está centrado en el origen: trasladar al centro de la celda.
-        mat4.fromTranslation(transform, [x + height / 2, origin[1]! + height / 2, 0]);
-        mat4.scale(transform, transform, [height, height, 1]);
+        mat4.fromTranslation(transform, vec3.set(v, x + height / 2, origin[1]! + height / 2, 0));
+        mat4.scale(transform, transform, vec3.set(v, height, height, 1));
         this.renderBitmap(pass, fontTexture, transform, tint, uvMin, uvMax);
       }
       x += metrics

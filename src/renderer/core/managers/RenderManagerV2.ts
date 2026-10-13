@@ -313,6 +313,9 @@ export class RenderManagerV2 {
     }
   }
 
+  /** Reused per-category draw lists (avoids a new array per pass per frame). */
+  private drawListScratch = new Map<RenderCategory, RenderKey[]>();
+
   public render(category: RenderCategory, pass: GPURenderPassEncoder): void {
     if (!this.camera) return;
 
@@ -330,9 +333,14 @@ export class RenderManagerV2 {
       }
     }
 
-    // ✅ Manual loop instead of filter() to avoid array allocation
+    // ✅ Manual loop instead of filter(), into a per-category list reused every frame
     const keys = this.camera.getCulledKeys();
-    const keysToDraw: RenderKey[] = [];
+    let keysToDraw = this.drawListScratch.get(category);
+    if (!keysToDraw) {
+      keysToDraw = [];
+      this.drawListScratch.set(category, keysToDraw);
+    }
+    keysToDraw.length = 0;
     for (let i = 0; i < keys.length; i++) {
       if (keys[i]!.material.getCategory() === category) {
         keysToDraw.push(keys[i]!);
@@ -401,6 +409,11 @@ export class RenderManagerV2 {
 
   public getAllKeys(): RenderKey[] {
     return this.keyManager.getAllKeys();
+  }
+
+  /** True when any object of this category is registered (lets passes be skipped). */
+  public hasKeysForCategory(category: RenderCategory): boolean {
+    return this.keyManager.hasCategory(category);
   }
 
   /**

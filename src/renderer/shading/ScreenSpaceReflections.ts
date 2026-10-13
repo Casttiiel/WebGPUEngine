@@ -52,9 +52,13 @@ export class ScreenSpaceReflections {
   /** Reprojected + clipped history: rgb = radiance, a = 1 / frames */
   private ssrReprojected!: RenderTarget;
   /** Denoised result: rgb = radiance, a = 1 / frames. Read by ambient_specular. */
-  private ssrAccum!: RenderTarget;
-  /** Previous frame's ssrAccum (temporal history + multi-bounce source) */
-  private ssrHistory!: RenderTarget;
+  /**
+   * Ping-pong pair for the denoised result: frame N writes ssrTargets[parity] (read by
+   * ambient_specular) and reads ssrTargets[1 - parity] as history (temporal + multi-bounce).
+   * Swapping replaces a full-target copy per frame.
+   */
+  private ssrTargets: [RenderTarget, RenderTarget] = [new RenderTarget(), new RenderTarget()];
+  private parity = 0;
   // Previous frame's G-buffer (render resolution), for history confidence
   private prevLinearDepth!: RenderTarget;
   private prevNormals!: RenderTarget;
@@ -64,13 +68,14 @@ export class ScreenSpaceReflections {
   // ── Bind groups (lazily rebuilt) ───────────────────────────────────────────
   private cameraComputeBindGroup: GPUBindGroup | null = null;
   private lastCameraBuffer: GPUBuffer | null = null;
-  private traceInputBindGroup: GPUBindGroup | null = null;
-  private traceInputKey: GPUTextureView[] = [];
-  private temporalInputBindGroup: GPUBindGroup | null = null;
+  // Bind groups that reference the ping-pong pair are cached per parity
+  private traceInputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
+  private traceInputKeys: [GPUTextureView[], GPUTextureView[]] = [[], []];
+  private temporalInputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
   private denoiseInputBindGroup: GPUBindGroup | null = null;
   private rawOutputBindGroup: GPUBindGroup | null = null;
   private reprojectedOutputBindGroup: GPUBindGroup | null = null;
-  private accumOutputBindGroup: GPUBindGroup | null = null;
+  private accumOutputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
 
   // ── Buffers ─────────────────────────────────────────────────────────────────
   private traceParamsBuffer!: GPUBuffer;
@@ -152,28 +157,13 @@ export class ScreenSpaceReflections {
 
     this.ssrRaw ??= new RenderTarget();
     this.ssrReprojected ??= new RenderTarget();
-    this.ssrAccum ??= new RenderTarget();
-    this.ssrHistory ??= new RenderTarget();
     this.prevLinearDepth ??= new RenderTarget();
     this.prevNormals ??= new RenderTarget();
 
     const storage = GPUTextureUsage.STORAGE_BINDING;
     this.ssrRaw.createRT('ssr_raw', this.width, this.height, fmt, storage);
     this.ssrReprojected.createRT('ssr_reprojected', this.width, this.height, fmt, storage);
-    this.ssrAccum.createRT(
-      'ssr_accum',
-      this.width,
-      this.height,
-      fmt,
-      storage | GPUTextureUsage.COPY_SRC,
-    );
-    this.ssrHistory.createRT(
-      'ssr_history',
-      this.width,
-      this.height,
-      fmt,
-      GPUTextureUsage.COPY_DST,
-    );
+    this.ssrTargets.forEach((rt, i) => rt.createRT(`ssr_accum_${i}`, this.width, this.height, fmt, storage));
     this.prevLinearDepth.createRT(
       'ssr_prev_linear_depth',
       Render.width,
@@ -189,13 +179,13 @@ export class ScreenSpaceReflections {
       GPUTextureUsage.COPY_DST,
     );
 
-    this.traceInputBindGroup = null;
-    this.traceInputKey = [];
-    this.temporalInputBindGroup = null;
+    this.traceInputBindGroups = [null, null];
+    this.traceInputKeys = [[], []];
+    this.temporalInputBindGroups = [null, null];
     this.denoiseInputBindGroup = null;
     this.rawOutputBindGroup = null;
     this.reprojectedOutputBindGroup = null;
-    this.accumOutputBindGroup = null;
+    this.accumOutputBindGroups = [null, null];
     this.historyValid = false;
   }
 
@@ -288,12 +278,15 @@ export class ScreenSpaceReflections {
       !this.denoisePipeline
     ) {
       this.historyValid = false;
-      return this.ssrAccum.getView();
+      return this.ssrTargets[this.parity]!.getView();
     }
 
     const camera = Engine.getRender().getMainCamera();
     const cameraBuffer = camera.getUniformBuffer();
-    if (!cameraBuffer) return this.ssrAccum.getView();
+    if (!cameraBuffer) return this.ssrTargets[this.parity]!.getView();
+    const p = this.parity;
+    const accum = this.ssrTargets[p]!;
+    const history = this.ssrTargets[1 - p]!;
     if (!this.cameraComputeBindGroup || cameraBuffer !== this.lastCameraBuffer) {
       this.lastCameraBuffer = cameraBuffer;
       this.cameraComputeBindGroup = BindGroupFactory.createBindGroup(
@@ -310,10 +303,10 @@ export class ScreenSpaceReflections {
     const probes = ambientLight.getProbeEnvViews();
     const envView = env.getTextureView()!;
     const key = [accLights, envView, probes.envA, probes.envB];
-    if (!this.traceInputBindGroup || key.some((v, i) => v !== this.traceInputKey[i])) {
-      this.traceInputKey = key;
-      this.traceInputBindGroup = BindGroupFactory.createBindGroup(
-        'ssr_trace_inputs_bg',
+    if (!this.traceInputBindGroups[p] || key.some((v, i) => v !== this.traceInputKeys[p]![i])) {
+      this.traceInputKeys[p] = key;
+      this.traceInputBindGroups[p] = BindGroupFactory.createBindGroup(
+        `ssr_trace_inputs_bg_${p}`,
         this.traceInputLayout,
         [
           { binding: 0, resource: accLights },
@@ -323,19 +316,19 @@ export class ScreenSpaceReflections {
           { binding: 4, resource: probes.envB },
           { binding: 5, resource: env.getSampler()! },
           { binding: 6, resource: { buffer: ambientLight.getPCCSpecularBuffer() } },
-          { binding: 7, resource: this.ssrHistory.getView() },
+          { binding: 7, resource: history.getView() },
           { binding: 8, resource: this.brdfLUT.getTextureView()! },
           { binding: 9, resource: SamplerLibrary.simpleSampler },
         ],
       );
     }
-    this.temporalInputBindGroup ??= BindGroupFactory.createBindGroup(
-      'ssr_temporal_inputs_bg',
+    this.temporalInputBindGroups[p] ??= BindGroupFactory.createBindGroup(
+      `ssr_temporal_inputs_bg_${p}`,
       this.temporalInputLayout,
       [
         { binding: 0, resource: this.ssrRaw.getView() },
         { binding: 1, resource: { buffer: this.traceParamsBuffer } },
-        { binding: 2, resource: this.ssrHistory.getView() },
+        { binding: 2, resource: history.getView() },
         { binding: 3, resource: this.prevLinearDepth.getView() },
         { binding: 4, resource: this.prevNormals.getView() },
       ],
@@ -360,10 +353,10 @@ export class ScreenSpaceReflections {
       this.outputLayout,
       [{ binding: 0, resource: this.ssrRaw.getStorageView() }],
     );
-    this.accumOutputBindGroup ??= BindGroupFactory.createBindGroup(
-      'ssr_accum_output_bg',
+    this.accumOutputBindGroups[p] ??= BindGroupFactory.createBindGroup(
+      `ssr_accum_output_bg_${p}`,
       this.outputLayout,
-      [{ binding: 0, resource: this.ssrAccum.getStorageView() }],
+      [{ binding: 0, resource: accum.getStorageView() }],
     );
 
     const encoder = Render.getInstance().getCommandEncoder();
@@ -388,28 +381,29 @@ export class ScreenSpaceReflections {
       pass.end();
     };
 
-    dispatch('SSR Trace', this.tracePipeline, this.traceInputBindGroup, this.rawOutputBindGroup);
+    dispatch('SSR Trace', this.tracePipeline, this.traceInputBindGroups[p]!, this.rawOutputBindGroup);
     dispatch(
       'SSR Temporal',
       this.temporalPipeline,
-      this.temporalInputBindGroup,
+      this.temporalInputBindGroups[p]!,
       this.reprojectedOutputBindGroup,
     );
     dispatch(
       'SSR Denoise',
       this.denoisePipeline,
       this.denoiseInputBindGroup,
-      this.accumOutputBindGroup,
+      this.accumOutputBindGroups[p]!,
     );
 
     // ── History for the next frame ─────────────────────────────────────────────
+    // The denoised result becomes the history by swapping parity (no copy); depth and
+    // normals still need a copy since the G-buffer is overwritten next frame.
     const copy = (src: RenderTarget, dst: RenderTarget) =>
       encoder.copyTextureToTexture(
         { texture: src.getTexture() },
         { texture: dst.getTexture() },
         { width: dst.getWidth(), height: dst.getHeight(), depthOrArrayLayers: 1 },
       );
-    copy(this.ssrAccum, this.ssrHistory);
     copy(gLinearDepth, this.prevLinearDepth);
     copy(gNormals, this.prevNormals);
 
@@ -419,8 +413,9 @@ export class ScreenSpaceReflections {
     mat4.invert(this.prevInvView, this.prevView);
     this.historyValid = true;
     this.noiseIndex = (this.noiseIndex + 1) % 0x7fffffff;
+    this.parity = 1 - p;
 
-    return this.ssrAccum.getView();
+    return accum.getView();
   }
 
   private writeTraceParams(cameraNear: number): void {
@@ -510,8 +505,7 @@ export class ScreenSpaceReflections {
     if (this.ssrRaw) {
       this.ssrRaw.destroy();
       this.ssrReprojected.destroy();
-      this.ssrAccum.destroy();
-      this.ssrHistory.destroy();
+      this.ssrTargets.forEach((rt) => rt.destroy());
       this.prevLinearDepth.destroy();
       this.prevNormals.destroy();
     }

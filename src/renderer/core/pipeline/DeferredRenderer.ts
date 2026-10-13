@@ -539,57 +539,64 @@ export class DeferredRenderer {
     this.renderAccLight();
 
     // 4. Water hybrid pass ───────────────────────────────────────────────────
-    // Snapshot lit scene (solids only) before water pixels are composited.
-    const encoderForWaterSnapshot = Render.getInstance().getCommandEncoder();
-    encoderForWaterSnapshot.copyTextureToTexture(
-      { texture: this.rtAccLight.getTexture() },
-      { texture: this.rtSceneBeforeWater.getTexture() },
-      {
-        width: this.rtSceneBeforeWater.getWidth(),
-        height: this.rtSceneBeforeWater.getHeight(),
-        depthOrArrayLayers: 1,
-      },
-    );
-    // Water writes its surface properties into the dedicated water GBuffer.
-    this.renderPassManager.executePass('waterGBuffer', RenderCategory.WATER);
-    // Run full deferred lighting (ambient + directional) on the water surface GBuffer,
-    // producing a lit surface color equivalent to what the main deferred path gives opaques.
-    this.renderWaterAccLight();
-    // Composite water over the scene using depth-based absorption + Fresnel.
-    this.ensureWaterCompositeBindGroup();
-    if (this.waterCompositeBindGroup) {
-      this.renderPassManager.updateWaterCompositeBindGroups(
-        Engine.getRender().getMainCameraBindGroup(),
-        this.waterCompositeBindGroup,
+    // Skipped entirely when the scene has no water: the accLight snapshot, water G-buffer,
+    // its full deferred lighting and the composite are pure cost otherwise.
+    if (renderManager.hasKeysForCategory(RenderCategory.WATER)) {
+      // Snapshot lit scene (solids only) before water pixels are composited.
+      const encoderForWaterSnapshot = Render.getInstance().getCommandEncoder();
+      encoderForWaterSnapshot.copyTextureToTexture(
+        { texture: this.rtAccLight.getTexture() },
+        { texture: this.rtSceneBeforeWater.getTexture() },
+        {
+          width: this.rtSceneBeforeWater.getWidth(),
+          height: this.rtSceneBeforeWater.getHeight(),
+          depthOrArrayLayers: 1,
+        },
       );
-      this.renderPassManager.executePass('waterComposite');
+      // Water writes its surface properties into the dedicated water GBuffer.
+      this.renderPassManager.executePass('waterGBuffer', RenderCategory.WATER);
+      // Run full deferred lighting (ambient + directional) on the water surface GBuffer,
+      // producing a lit surface color equivalent to what the main deferred path gives opaques.
+      this.renderWaterAccLight();
+      // Composite water over the scene using depth-based absorption + Fresnel.
+      this.ensureWaterCompositeBindGroup();
+      if (this.waterCompositeBindGroup) {
+        this.renderPassManager.updateWaterCompositeBindGroups(
+          Engine.getRender().getMainCameraBindGroup(),
+          this.waterCompositeBindGroup,
+        );
+        this.renderPassManager.executePass('waterComposite');
+      }
+      // ────────────────────────────────────────────────────────────────────────
     }
-    // ────────────────────────────────────────────────────────────────────────
 
     this.ensureEngineTextureRegistrations();
     this.renderPassManager.executePass('transparent', RenderCategory.TRANSPARENT);
 
-    // Snapshot accLight before glass so the glass shader can sample the undistorted scene
-    // (screen-space refraction: offset UVs → shows displaced background through glass)
-    const encoderForRefraction = Render.getInstance().getCommandEncoder();
-    encoderForRefraction.copyTextureToTexture(
-      { texture: this.rtAccLight.getTexture() },
-      { texture: this.rtGlassRefraction.getTexture() },
-      {
-        width: this.rtGlassRefraction.getWidth(),
-        height: this.rtGlassRefraction.getHeight(),
-        depthOrArrayLayers: 1,
-      },
-    );
+    // Glass (OIT): refraction snapshot + gather + full-screen compose — only with glass.
+    if (renderManager.hasKeysForCategory(RenderCategory.GLASS)) {
+      // Snapshot accLight before glass so the glass shader can sample the undistorted scene
+      // (screen-space refraction: offset UVs → shows displaced background through glass)
+      const encoderForRefraction = Render.getInstance().getCommandEncoder();
+      encoderForRefraction.copyTextureToTexture(
+        { texture: this.rtAccLight.getTexture() },
+        { texture: this.rtGlassRefraction.getTexture() },
+        {
+          width: this.rtGlassRefraction.getWidth(),
+          height: this.rtGlassRefraction.getHeight(),
+          depthOrArrayLayers: 1,
+        },
+      );
 
-    this.ensureOITGlassEnvBindGroup();
-    this.renderPassManager.executePass('oit_gather', RenderCategory.GLASS);
-    this.renderPassManager.executeOITComposePass(
-      this.oitComposeMesh,
-      this.oitComposeTechnique,
-      this.oitComposeBindGroup,
-      this.rtAccLight,
-    );
+      this.ensureOITGlassEnvBindGroup();
+      this.renderPassManager.executePass('oit_gather', RenderCategory.GLASS);
+      this.renderPassManager.executeOITComposePass(
+        this.oitComposeMesh,
+        this.oitComposeTechnique,
+        this.oitComposeBindGroup,
+        this.rtAccLight,
+      );
+    }
 
     // Si es para reflection probes, devolver aquí (sin SSR ni volumetrics)
     if (skipPostProcessing) {

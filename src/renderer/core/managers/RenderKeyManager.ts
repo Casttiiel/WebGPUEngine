@@ -34,6 +34,8 @@ export interface RenderKey {
 export class RenderKeyManager {
   private keys: RenderKey[] = [];
   private nextObjectId = 0;
+  /** Registered keys per category, so passes can be skipped without filtering every frame. */
+  private categoryCounts = new Map<RenderCategory, number>();
 
   /**
    * Adds a new render key
@@ -73,13 +75,25 @@ export class RenderKeyManager {
     };
 
     this.keys.push(key);
+    const category = material.getCategory();
+    this.categoryCounts.set(category, (this.categoryCounts.get(category) ?? 0) + 1);
   }
 
   /**
    * Removes all keys for a specific owner
    */
   public removeKeys(owner: RenderComponent): void {
-    this.keys = this.keys.filter((key) => key.owner !== owner);
+    this.keys = this.keys.filter((key) => {
+      if (key.owner !== owner) return true;
+      const category = key.material.getCategory();
+      this.categoryCounts.set(category, (this.categoryCounts.get(category) ?? 1) - 1);
+      return false;
+    });
+  }
+
+  /** True when at least one registered key uses this category (O(1)). */
+  public hasCategory(category: RenderCategory): boolean {
+    return (this.categoryCounts.get(category) ?? 0) > 0;
   }
 
   /**
@@ -112,25 +126,29 @@ export class RenderKeyManager {
       const tech2 = k2.material.getTechnique();
       if (!tech1 || !tech2) return 0;
 
+      // Plain code-unit comparison: only grouping matters here, and localeCompare is
+      // far slower (it runs O(n log n) times per pass, every frame).
       const techPath1 = tech1.path || '';
       const techPath2 = tech2.path || '';
       if (techPath1 !== techPath2) {
-        return techPath1.localeCompare(techPath2);
+        return techPath1 < techPath2 ? -1 : 1;
       }
 
       // 2. Sort by material to minimize bind group changes
       const mat1 = k1.material.getName();
       const mat2 = k2.material.getName();
       if (mat1 !== mat2) {
-        return mat1.localeCompare(mat2);
+        return mat1 < mat2 ? -1 : 1;
       }
 
       // 3. Sort by mesh to minimize vertex buffer changes
       const mesh1 = k1.mesh.getName();
       const mesh2 = k2.mesh.getName();
-      return mesh1.localeCompare(mesh2);
+      return mesh1 === mesh2 ? 0 : mesh1 < mesh2 ? -1 : 1;
     });
   }
+
+  private sortDistScratch = new Map<RenderKey, number>();
 
   /**
    * Sorts transparent objects by depth (back to front)
@@ -138,22 +156,15 @@ export class RenderKeyManager {
   private sortTransparentsByDepth(keys: RenderKey[], camera: Camera): void {
     const cameraPos = camera.getPosition();
 
-    keys.sort((k1, k2) => {
-      const worldMatrix1 = k1.transform.getTransform().getWorldMatrix();
-      const worldMatrix2 = k2.transform.getTransform().getWorldMatrix();
-
-      if (!worldMatrix1 || !worldMatrix2) return 0;
-
-      // Extract position from world matrix (last column)
-      const pos1 = vec3.fromValues(worldMatrix1[12], worldMatrix1[13], worldMatrix1[14]);
-      const pos2 = vec3.fromValues(worldMatrix2[12], worldMatrix2[13], worldMatrix2[14]);
-
-      // Calculate distances using vec3 operations
-      const dist1 = vec3.distance(cameraPos, pos1);
-      const dist2 = vec3.distance(cameraPos, pos2);
-
-      return dist2 - dist1; // Far to near
-    });
+    // Squared distance per key computed once (getWorldMatrix() allocates a new mat4 per
+    // call, and the comparator used to call it twice per comparison).
+    const dist = this.sortDistScratch;
+    dist.clear();
+    for (const key of keys) {
+      const p = key.transform.getTransform().getWorldPosition();
+      dist.set(key, vec3.squaredDistance(cameraPos, p));
+    }
+    keys.sort((k1, k2) => dist.get(k2)! - dist.get(k1)!); // Far to near
   }
 
   /**
@@ -161,6 +172,7 @@ export class RenderKeyManager {
    */
   public clear(): void {
     this.keys = [];
+    this.categoryCounts.clear();
     this.nextObjectId = 0;
   }
 }

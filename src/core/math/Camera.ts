@@ -106,22 +106,15 @@ export class Camera {
     this.calculateInvViewProjectionMatrix();
   }
 
+  // Inverses are written in place (callers read them immediately, nobody keeps the reference)
   private calculateInvViewMatrix(): void {
-    const invView = mat4.create();
-    mat4.invert(invView, this.view);
-
-    // Store the inverse view-projection matrix as invViewProjection
-    this.invView = invView;
+    mat4.invert(this.invView, this.view);
   }
 
   private calculateInvViewProjectionMatrix(): void {
     // Create inverse view-projection matrix for world position reconstruction
     // This matrix transforms from NDC space (-1 to 1) to world space
-    const invViewProjection = mat4.create();
-    mat4.invert(invViewProjection, this.viewProjection);
-
-    // Store the inverse view-projection matrix as invViewProjection
-    this.invViewProjection = invViewProjection;
+    mat4.invert(this.invViewProjection, this.viewProjection);
   }
 
   private updateProjection(): void {
@@ -173,10 +166,7 @@ export class Camera {
   }
 
   private calculateInvProjectionMatrix(): void {
-    const invProjection = mat4.create();
-    mat4.invert(invProjection, this.projection);
-
-    this.invProjection = invProjection;
+    mat4.invert(this.invProjection, this.projection);
   }
 
   public setUseReverseZ(value: boolean): void {

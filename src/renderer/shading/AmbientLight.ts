@@ -43,6 +43,8 @@ export class AmbientLight {
 
   /** Cached probe env views for specular bind-group invalidation. */
   private lastProbeEnvAView: GPUTextureView | null = null;
+  /** Specular bind groups keyed by SSR view (cleared when probes change / on destroy). */
+  private specularBindGroupCache = new Map<GPUTextureView, GPUBindGroup>();
   private lastProbeEnvBView: GPUTextureView | null = null;
 
   /** When true, the ambient diffuse shader uses white irradiance instead of sampled cubemaps. */
@@ -144,14 +146,21 @@ export class AmbientLight {
     if (!this.pccSpecularUniformBuffer || !this.ambientSpecularUniformBuffer) return;
     const envViews = this._getProbeEnvViews();
     if (
-      !this.ambientSpecularBindGroup ||
       envViews.envA !== this.lastProbeEnvAView ||
       envViews.envB !== this.lastProbeEnvBView
     ) {
-      this.createAmbientSpecularBindGroup(ssr, ao, envViews.envA, envViews.envB);
+      this.specularBindGroupCache.clear();
       this.lastProbeEnvAView = envViews.envA;
       this.lastProbeEnvBView = envViews.envB;
     }
+    // SSR ping-pongs its output between two textures: keep one bind group per SSR view.
+    let specularBG = this.specularBindGroupCache.get(ssr);
+    if (!specularBG) {
+      this.createAmbientSpecularBindGroup(ssr, ao, envViews.envA, envViews.envB);
+      specularBG = this.ambientSpecularBindGroup;
+      this.specularBindGroupCache.set(ssr, specularBG);
+    }
+    this.ambientSpecularBindGroup = specularBG;
     const render = Render.getInstance();
 
     const colorAttachment = GPUUtils.createColorAttachment(accLights, 'load', 'store');
@@ -354,6 +363,7 @@ export class AmbientLight {
   public destroy(): void {
     this.ambientDiffuseBindGroupCache.clear();
     this.ambientSpecularBindGroup = null!;
+    this.specularBindGroupCache.clear();
     this.lastProbeEnvAView = null;
     this.lastProbeEnvBView = null;
   }

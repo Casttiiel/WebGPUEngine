@@ -637,6 +637,7 @@ export class ModuleRender extends Module {
     const encoder = render.getCommandEncoder();
     const renderPass = encoder.beginRenderPass({
       label: 'ui_overlay_pass',
+      ...((ts) => (ts ? { timestampWrites: ts } : {}))(GPUProfiler.getInstance().getTimestampWrites('UI Overlay')),
       colorAttachments: [
         {
           view: resultView,
@@ -692,11 +693,12 @@ export class ModuleRender extends Module {
       'store',
       { r: 0, g: 0, b: 0, a: 1 },
     );
-    const pass = render
-      .getCommandEncoder()
-      .beginRenderPass(
-        GPUUtils.createRenderPassDescriptor('main presentation render pass', [colorAttachment]),
-      );
+    const presentDesc = GPUUtils.createRenderPassDescriptor('main presentation render pass', [
+      colorAttachment,
+    ]);
+    const presentTs = GPUProfiler.getInstance().getTimestampWrites('Present');
+    if (presentTs) presentDesc.timestampWrites = presentTs;
+    const pass = render.getCommandEncoder().beginRenderPass(presentDesc);
 
     // Render result to screen
     this.presentationTechnique.activatePipeline(pass);

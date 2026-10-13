@@ -264,6 +264,8 @@ export class VolumetricClouds {
       colorAttachments: [temporalColorAtt],
     };
 
+    const temporalTs = GPUProfiler.getInstance().getTimestampWrites('VolumetricClouds Temporal');
+    if (temporalTs) temporalDesc.timestampWrites = temporalTs;
     const temporalPass = render.getCommandEncoder().beginRenderPass(temporalDesc);
     GPUUtils.configureViewportAndScissor(temporalPass, fullW, fullH);
     this.temporalTechnique.activatePipeline(temporalPass);
@@ -286,6 +288,8 @@ export class VolumetricClouds {
       compositeDepthAtt,
     );
 
+    const compositeTs = GPUProfiler.getInstance().getTimestampWrites('VolumetricClouds Composite');
+    if (compositeTs) compositeDesc.timestampWrites = compositeTs;
     const compositePass = render.getCommandEncoder().beginRenderPass(compositeDesc);
     GPUUtils.configureViewportAndScissor(compositePass);
     this.compositeTechnique.activatePipeline(compositePass);

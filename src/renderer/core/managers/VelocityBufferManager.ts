@@ -9,6 +9,7 @@ import { Engine } from '../../../core/engine/Engine';
 import { RenderKey } from './RenderKeyManager';
 import { PipelineBindGroupLayouts } from '../../../types/PipelineBindGroupLayouts.enum';
 import { SkeletalMeshComponent } from '../../../components/render/SkeletalMeshComponent';
+import { GPUProfiler } from '../../../core/debug/GPUProfiler';
 
 /**
  * VelocityBufferManager
@@ -233,6 +234,7 @@ export class VelocityBufferManager {
 
     const renderPass = encoder.beginRenderPass({
       label: 'velocity_generation_pass',
+      ...((ts) => (ts ? { timestampWrites: ts } : {}))(GPUProfiler.getInstance().getTimestampWrites('Velocity Buffer')),
       colorAttachments: [
         {
           view: this.velocityRT.getRenderView(),
@@ -291,6 +293,7 @@ export class VelocityBufferManager {
 
     const pass = encoder.beginRenderPass({
       label: 'velocity_per_object_pass',
+      ...((ts) => (ts ? { timestampWrites: ts } : {}))(GPUProfiler.getInstance().getTimestampWrites('Velocity Per-Object')),
       colorAttachments: [
         {
           view: this.velocityRT.getRenderView(),
@@ -355,6 +358,7 @@ export class VelocityBufferManager {
 
     const pass = encoder.beginRenderPass({
       label: 'velocity_skinned_pass',
+      ...((ts) => (ts ? { timestampWrites: ts } : {}))(GPUProfiler.getInstance().getTimestampWrites('Velocity Skinned')),
       colorAttachments: [
         {
           view: this.velocityRT.getRenderView(),

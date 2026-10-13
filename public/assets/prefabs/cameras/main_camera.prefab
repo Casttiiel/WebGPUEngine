@@ -8,7 +8,7 @@
     "tone_mapping": {},
     "contact_shadows": {},
     "ambient_occlusion": {
-      "mode": "GTAO"
+      "mode": "gtao"
     },
     "bloom": {},
     "auto_exposure": {},

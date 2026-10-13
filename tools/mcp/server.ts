@@ -518,6 +518,84 @@ server.registerTool(
   }),
 );
 
+server.registerTool(
+  'alloc_profile',
+  {
+    description:
+      'Sample JS heap allocations for N seconds while the game runs (Chrome DevTools HeapProfiler sampling) and list the functions that allocate the most memory, with source location. Use it to find the per-frame allocations behind garbage-collection churn.',
+    inputSchema: {
+      seconds: z.number().min(1).max(60).optional().describe('Sampling length (default 5)'),
+      top: z.number().int().min(5).max(100).optional().describe('Rows to return (default 25)'),
+    },
+  },
+  safe(async (a) => {
+    const seconds = a.seconds ?? 5;
+    const page = session.getPage();
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('HeapProfiler.enable');
+    // Small interval: per-frame allocations are many small objects
+    // Include objects already garbage-collected: per-frame garbage is what we are after
+    await cdp.send('HeapProfiler.startSampling', {
+      samplingInterval: 4096,
+      includeObjectsCollectedByMajorGC: true,
+      includeObjectsCollectedByMinorGC: true,
+    } as never);
+    await new Promise((r) => setTimeout(r, seconds * 1000));
+    const { profile } = (await cdp.send('HeapProfiler.stopSampling')) as {
+      profile: {
+        head: AllocNode;
+        samples: { size: number; nodeId: number }[];
+      };
+    };
+    await cdp.detach();
+
+    type AllocNode = {
+      id: number;
+      selfSize: number;
+      callFrame: { functionName: string; url: string; lineNumber: number; columnNumber: number };
+      children: AllocNode[];
+    };
+    // Aggregate self size per function (url:line), plus the immediate caller of the top sites
+    const bySite = new Map<string, { bytes: number; callers: Map<string, number> }>();
+    const short = (cf: AllocNode['callFrame']) =>
+      `${cf.functionName || '(anonymous)'} ${cf.url.replace(/^.*\/src\//, 'src/').replace(/\?.*$/, '')}:${cf.lineNumber + 1}`;
+    const walk = (node: AllocNode, parent: AllocNode | null) => {
+      if (node.selfSize > 0) {
+        const key = short(node.callFrame);
+        const entry = bySite.get(key) ?? { bytes: 0, callers: new Map() };
+        entry.bytes += node.selfSize;
+        if (parent) {
+          const pk = short(parent.callFrame);
+          entry.callers.set(pk, (entry.callers.get(pk) ?? 0) + node.selfSize);
+        }
+        bySite.set(key, entry);
+      }
+      for (const child of node.children) walk(child, node);
+    };
+    walk(profile.head, null);
+
+    const total = [...bySite.values()].reduce((sum, e) => sum + e.bytes, 0);
+    const rows = [...bySite.entries()]
+      .sort((x, y) => y[1].bytes - x[1].bytes)
+      .slice(0, a.top ?? 25)
+      .map(([site, e]) => {
+        const caller = [...e.callers.entries()].sort((x, y) => y[1] - x[1])[0];
+        return {
+          site,
+          MBperSec: Math.round((e.bytes / seconds / (1024 * 1024)) * 100) / 100,
+          pct: Math.round((e.bytes / Math.max(total, 1)) * 1000) / 10,
+          ...(caller ? { topCaller: caller[0] } : {}),
+        };
+      });
+    return json({
+      seconds,
+      sampledMBperSec: Math.round((total / seconds / (1024 * 1024)) * 100) / 100,
+      note: 'Sampled allocations (statistical): rates are estimates; relative ranking is what matters.',
+      rows,
+    });
+  }),
+);
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 0.4 Control: tiempo, input y determinismo
 // ═══════════════════════════════════════════════════════════════════════════

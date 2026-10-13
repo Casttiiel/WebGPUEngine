@@ -53,6 +53,8 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
       'Ambient Specular',
       'Skybox',
       'VolumetricClouds',
+      'VolumetricClouds Temporal',
+      'VolumetricClouds Composite',
     ],
   },
   {
@@ -77,6 +79,9 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
     label: 'Post-Process',
     color: '#f9e2af',
     passes: [
+      'Velocity Buffer',
+      'Velocity Per-Object',
+      'Velocity Skinned',
       'Height Fog',
       'Bloom',
       'Bloom Combine Pass',
@@ -99,6 +104,8 @@ const GPU_GROUPS: { label: string; color: string; passes: string[] }[] = [
       'SMAA T2x Neighborhood Blending',
       'SMAA T2x Temporal Resolve',
       'Speed Lines',
+      'UI Overlay',
+      'Present',
     ],
   },
 ];

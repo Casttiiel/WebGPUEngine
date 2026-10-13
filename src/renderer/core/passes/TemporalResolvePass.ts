@@ -29,8 +29,8 @@ export interface TemporalResolveSettings {
 
 /**
  * Shared machinery of the TAA / TSR compute resolves (taa.cs, tsr.cs):
- * output + history targets, previous-frame linear depth and camera matrices for
- * disocclusion, params upload, dispatch and history copy.
+ * ping-ponged output/history targets (no per-frame history copy), previous-frame linear
+ * depth and camera matrices for disocclusion, params upload and dispatch.
  *
  * Output size: render resolution (TAA) or canvas resolution (TSR), via `getOutputSize`.
  */
@@ -39,8 +39,9 @@ export class TemporalResolvePass {
   private inputLayout!: GPUBindGroupLayout;
   private outputLayout!: GPUBindGroupLayout;
 
-  private outputRT!: RenderTarget;
-  private historyRT!: RenderTarget;
+  /** Ping-pong pair: frame N writes targets[parity] and reads targets[1 - parity] as history. */
+  private targets: [RenderTarget, RenderTarget] = [new RenderTarget(), new RenderTarget()];
+  private parity = 0;
   private prevDepthRT!: RenderTarget;
 
   private paramsBuffer!: GPUBuffer;
@@ -51,9 +52,10 @@ export class TemporalResolvePass {
 
   private cameraBindGroup: GPUBindGroup | null = null;
   private lastCameraBuffer: GPUBuffer | null = null;
-  private inputBindGroup: GPUBindGroup | null = null;
-  private inputKey: GPUTextureView[] = [];
-  private outputBindGroup: GPUBindGroup | null = null;
+  // One bind group set per parity (history / output swap every frame)
+  private inputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
+  private inputKeys: [GPUTextureView[], GPUTextureView[]] = [[], []];
+  private outputBindGroups: [GPUBindGroup | null, GPUBindGroup | null] = [null, null];
 
   constructor(
     private readonly label: string,
@@ -94,8 +96,6 @@ export class TemporalResolvePass {
       PARAMS_FLOATS * 4,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
-    this.outputRT = new RenderTarget();
-    this.historyRT = new RenderTarget();
     this.prevDepthRT = new RenderTarget();
     this.createTargets();
   }
@@ -104,14 +104,9 @@ export class TemporalResolvePass {
   public createTargets(): void {
     const { width, height } = this.getOutputSize();
     const fmt: GPUTextureFormat = 'rgba16float';
-    this.outputRT.createRT(
-      `${this.label}_output`,
-      width,
-      height,
-      fmt,
-      GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
+    this.targets.forEach((rt, i) =>
+      rt.createRT(`${this.label}_target_${i}`, width, height, fmt, GPUTextureUsage.STORAGE_BINDING),
     );
-    this.historyRT.createRT(`${this.label}_history`, width, height, fmt, GPUTextureUsage.COPY_DST);
     this.prevDepthRT.createRT(
       `${this.label}_prev_linear_depth`,
       Render.width,
@@ -119,9 +114,9 @@ export class TemporalResolvePass {
       QualitySettings.getInstance().getSettings().linearDepthTexture,
       GPUTextureUsage.COPY_DST,
     );
-    this.inputBindGroup = null;
-    this.inputKey = [];
-    this.outputBindGroup = null;
+    this.inputBindGroups = [null, null];
+    this.inputKeys = [[], []];
+    this.outputBindGroups = [null, null];
     this.historyValid = false;
   }
 
@@ -133,8 +128,9 @@ export class TemporalResolvePass {
     return this.historyValid;
   }
 
+  /** Last resolved frame (the history the next frame will read). */
   public getHistoryView(): GPUTextureView {
-    return this.historyRT.getView();
+    return this.targets[1 - this.parity]!.getView();
   }
 
   /**
@@ -169,14 +165,18 @@ export class TemporalResolvePass {
     d[37] = this.historyValid ? 1 : 0;
     GPUUtils.writeBuffer(this.paramsBuffer, 0, d);
 
+    const p = this.parity;
+    const output = this.targets[p]!;
+    const history = this.targets[1 - p]!;
+
     const velocity = VelocityBufferManager.getInstance().getVelocityTextureView();
     const depthView = linearDepth.getView();
     const key = [current, velocity, depthView];
-    if (!this.inputBindGroup || key.some((v, i) => v !== this.inputKey[i])) {
-      this.inputKey = key;
-      this.inputBindGroup = BindGroupFactory.createBindGroup(`${this.label}_inputs_bg`, this.inputLayout, [
+    if (!this.inputBindGroups[p] || key.some((v, i) => v !== this.inputKeys[p]![i])) {
+      this.inputKeys[p] = key;
+      this.inputBindGroups[p] = BindGroupFactory.createBindGroup(`${this.label}_inputs_bg_${p}`, this.inputLayout, [
         { binding: 0, resource: current },
-        { binding: 1, resource: this.historyRT.getView() },
+        { binding: 1, resource: history.getView() },
         { binding: 2, resource: velocity },
         { binding: 3, resource: depthView },
         { binding: 4, resource: this.prevDepthRT.getView() },
@@ -184,10 +184,10 @@ export class TemporalResolvePass {
         { binding: 6, resource: { buffer: this.paramsBuffer } },
       ]);
     }
-    this.outputBindGroup ??= BindGroupFactory.createBindGroup(
-      `${this.label}_output_bg`,
+    this.outputBindGroups[p] ??= BindGroupFactory.createBindGroup(
+      `${this.label}_output_bg_${p}`,
       this.outputLayout,
-      [{ binding: 0, resource: this.outputRT.getStorageView() }],
+      [{ binding: 0, resource: output.getStorageView() }],
     );
 
     const encoder = Render.getInstance().getCommandEncoder();
@@ -195,34 +195,28 @@ export class TemporalResolvePass {
     const pass = encoder.beginComputePass({ label: this.label, ...(ts ? { timestampWrites: ts } : {}) });
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.cameraBindGroup!);
-    pass.setBindGroup(1, this.inputBindGroup);
-    pass.setBindGroup(2, this.outputBindGroup);
-    pass.dispatchWorkgroups(
-      Math.ceil(this.outputRT.getWidth() / 8),
-      Math.ceil(this.outputRT.getHeight() / 8),
-      1,
-    );
+    pass.setBindGroup(1, this.inputBindGroups[p]!);
+    pass.setBindGroup(2, this.outputBindGroups[p]!);
+    pass.dispatchWorkgroups(Math.ceil(output.getWidth() / 8), Math.ceil(output.getHeight() / 8), 1);
     pass.end();
 
-    // History for the next frame: resolved colour, this frame's depth and camera
-    const copy = (src: RenderTarget, dst: RenderTarget) =>
-      encoder.copyTextureToTexture(
-        { texture: src.getTexture() },
-        { texture: dst.getTexture() },
-        { width: dst.getWidth(), height: dst.getHeight(), depthOrArrayLayers: 1 },
-      );
-    copy(this.outputRT, this.historyRT);
-    copy(linearDepth, this.prevDepthRT);
+    // History for the next frame: this output becomes the history by swapping parity (no
+    // colour copy); this frame's depth and camera are kept for disocclusion.
+    encoder.copyTextureToTexture(
+      { texture: linearDepth.getTexture() },
+      { texture: this.prevDepthRT.getTexture() },
+      { width: this.prevDepthRT.getWidth(), height: this.prevDepthRT.getHeight(), depthOrArrayLayers: 1 },
+    );
     mat4.copy(this.prevInvProjection, camera.getInvProjectionMatrix());
     mat4.invert(this.prevInvView, camera.getView());
     this.historyValid = true;
+    this.parity = 1 - p;
 
-    return this.outputRT.getView();
+    return output.getView();
   }
 
   public destroy(): void {
-    this.outputRT?.destroy();
-    this.historyRT?.destroy();
+    this.targets.forEach((rt) => rt.destroy());
     this.prevDepthRT?.destroy();
     this.paramsBuffer?.destroy();
   }

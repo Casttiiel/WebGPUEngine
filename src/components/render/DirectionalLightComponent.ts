@@ -228,13 +228,20 @@ export class DirectionalLightComponent extends Component {
    * Extrae los 8 corners de un frustum entre near y far en world space.
    * CORRECTO: Construye corners directamente en view space con nearDist/farDist.
    */
+  // Per-frame scratch for the cascade setup (runs every frame per cascade: no allocations)
+  private readonly _frustumCorners: vec3[] = Array.from({ length: 8 }, () => vec3.create());
+  private readonly _invView = mat4.create();
+  private readonly _worldCenter = vec3.create();
+  private readonly _lightPos = vec3.create();
+  private readonly _lightView = mat4.create();
+  private readonly _lightUp = vec3.create();
+
   private extractFrustumCorners(camera: Camera, nearDist: number, farDist: number): vec3[] {
-    const corners: vec3[] = [];
+    const corners = this._frustumCorners;
 
     // Obtener matriz inversa de view
     const viewMatrix = camera.getView();
-    const invView = mat4.create();
-    mat4.invert(invView, viewMatrix);
+    const invView = mat4.invert(this._invView, viewMatrix);
 
     // Calcular corners en view space directamente con nearDist/farDist
     // IMPORTANTE: camera.getFov() devuelve FOV en RADIANES (no grados)
@@ -250,25 +257,23 @@ export class DirectionalLightComponent extends Component {
     const farHeight = 2.0 * tanHalfFov * farDist;
     const farWidth = farHeight * aspect;
 
-    // 8 corners en view space (cámara mira hacia -Z)
-    const viewCorners = [
-      // Near plane
-      vec3.fromValues(-nearWidth * 0.5, -nearHeight * 0.5, -nearDist),
-      vec3.fromValues(nearWidth * 0.5, -nearHeight * 0.5, -nearDist),
-      vec3.fromValues(nearWidth * 0.5, nearHeight * 0.5, -nearDist),
-      vec3.fromValues(-nearWidth * 0.5, nearHeight * 0.5, -nearDist),
-      // Far plane
-      vec3.fromValues(-farWidth * 0.5, -farHeight * 0.5, -farDist),
-      vec3.fromValues(farWidth * 0.5, -farHeight * 0.5, -farDist),
-      vec3.fromValues(farWidth * 0.5, farHeight * 0.5, -farDist),
-      vec3.fromValues(-farWidth * 0.5, farHeight * 0.5, -farDist),
+    // 8 corners en view space (cámara mira hacia -Z): near plane 0-3, far plane 4-7,
+    // transformados a world space en los vectores reutilizables.
+    const hw = [nearWidth * 0.5, farWidth * 0.5];
+    const hh = [nearHeight * 0.5, farHeight * 0.5];
+    const dist = [nearDist, farDist];
+    const signs = [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
     ];
-
-    // Transformar de view space a world space
-    for (const viewCorner of viewCorners) {
-      const worldCorner = vec3.create();
-      vec3.transformMat4(worldCorner, viewCorner, invView);
-      corners.push(worldCorner);
+    for (let plane = 0; plane < 2; plane++) {
+      for (let k = 0; k < 4; k++) {
+        const out = corners[plane * 4 + k]!;
+        vec3.set(out, signs[k]![0]! * hw[plane]!, signs[k]![1]! * hh[plane]!, -dist[plane]!);
+        vec3.transformMat4(out, out, invView);
+      }
     }
 
     return corners;
@@ -285,7 +290,9 @@ export class DirectionalLightComponent extends Component {
     }
 
     const lightUp =
-      Math.abs(this.lightDirection[2]) > 0.9 ? vec3.fromValues(0, 1, 0) : vec3.fromValues(0, 0, 1);
+      Math.abs(this.lightDirection[2]) > 0.9
+        ? vec3.set(this._lightUp, 0, 1, 0)
+        : vec3.set(this._lightUp, 0, 0, 1);
 
     let prevSplit = mainCamera.getNear();
 
@@ -308,22 +315,22 @@ export class DirectionalLightComponent extends Component {
 
       // 2. Calcular worldCenter del frustum slice (solo para orientar la cámara)
       const frustumCorners = this.extractFrustumCorners(mainCamera, prevSplit, currentSplit);
-      const worldCenter = vec3.create();
+      const worldCenter = vec3.set(this._worldCenter, 0, 0, 0);
       for (const corner of frustumCorners) {
         vec3.add(worldCenter, worldCenter, corner);
       }
       vec3.scale(worldCenter, worldCenter, 1.0 / frustumCorners.length);
 
       // 3. Construir lightView desde worldCenter
-      const lightPos = vec3.create();
+      const lightPos = this._lightPos;
       vec3.scaleAndAdd(
         lightPos,
         worldCenter,
         this.lightDirection,
         -DirectionalLightComponent.LIGHT_DISTANCE,
       );
-      const lightView = mat4.create();
-      mat4.lookAt(lightView, lightPos, worldCenter, lightUp);
+      // setViewMatrix() copies, so one scratch matrix serves every cascade
+      const lightView = mat4.lookAt(this._lightView, lightPos, worldCenter, lightUp);
 
       // 4. SNAP: modificar directamente los elementos de traslación de lightView
       // lightView[12] y [13] ya están en light space — no hay que transformar nada
@@ -334,22 +341,19 @@ export class DirectionalLightComponent extends Component {
 
       // 5. Calcular near/far Z desde los corners + extensión para shadow casters
       const Z_EXTENSION = this.maxShadowDistance * 0.5;
-      const allCorners = [
-        ...frustumCorners,
-        ...frustumCorners.map((c) => {
-          const ext = vec3.create();
-          vec3.scaleAndAdd(ext, c, this.lightDirection, -Z_EXTENSION);
-          return ext;
-        }),
-      ];
+      // Light-space Z of each corner and of the corner pushed Z_EXTENSION toward the light
+      // (only the view-space Z row of lightView is needed — no temporaries).
+      const m = lightView;
+      const dirZ =
+        m[2] * this.lightDirection[0] + m[6] * this.lightDirection[1] + m[10] * this.lightDirection[2];
 
       let minZ = Infinity;
       let maxZ = -Infinity;
-      for (const corner of allCorners) {
-        const lsc = vec3.create();
-        vec3.transformMat4(lsc, corner, lightView);
-        minZ = Math.min(minZ, lsc[2]);
-        maxZ = Math.max(maxZ, lsc[2]);
+      for (const corner of frustumCorners) {
+        const z = m[2] * corner[0] + m[6] * corner[1] + m[10] * corner[2] + m[14];
+        const zExt = z - Z_EXTENSION * dirZ;
+        minZ = Math.min(minZ, z, zExt);
+        maxZ = Math.max(maxZ, z, zExt);
       }
 
       // 6. Configurar shadow camera
@@ -404,82 +408,59 @@ export class DirectionalLightComponent extends Component {
     return Math.max(cornerDist, nearCornerDist);
   }
 
-  private updateLightUniforms(): void {
-    // color (vec4) - bytes 0-15
-    GPUUtils.writeBuffer(
-      this.uniformBuffer,
-      0,
-      new Float32Array([this.color[0], this.color[1], this.color[2], this.hasShadows ? 1.0 : 0.0]),
-    );
+  /** CPU copy of the 256-byte light uniform block, filled in place and written once per frame. */
+  private readonly _uniformData = new Float32Array(64);
+  private readonly _cascadeMtx = mat4.create();
+  /** UV remap applied to each cascade's view-projection: scale (0.5, -0.5, 1) then translate (0.5, 0.5, 0). */
+  private static readonly SHADOW_UV_OFFSET = mat4.fromValues(
+    0.5, 0, 0, 0,
+    0, -0.5, 0, 0,
+    0, 0, 1, 0,
+    0.5, 0.5, 0, 1,
+  );
 
-    // Para luz direccional: usar la dirección CONSTANTE calculada en load()
-    // this.lightDirection ya apunta hacia donde VA la luz (e.g., downward [0, -1, 0])
-    // En el shader necesitamos la dirección HACIA la fuente (upward [0, 1, 0])
-    const lightDirectionToSource = vec3.create();
-    vec3.negate(lightDirectionToSource, this.lightDirection);
+  private updateLightUniforms(): void {
+    const d = this._uniformData;
+
+    // color (vec4) - bytes 0-15
+    d[0] = this.color[0]!;
+    d[1] = this.color[1]!;
+    d[2] = this.color[2]!;
+    d[3] = this.hasShadows ? 1.0 : 0.0;
 
     // position (vec3) + intensity (f32) - bytes 16-31
-    GPUUtils.writeBuffer(
-      this.uniformBuffer,
-      16,
-      new Float32Array([
-        lightDirectionToSource[0],
-        lightDirectionToSource[1],
-        lightDirectionToSource[2],
-        this.intensity,
-      ]),
-    );
+    // this.lightDirection apunta hacia donde VA la luz; el shader necesita la dirección HACIA la fuente
+    d[4] = -this.lightDirection[0];
+    d[5] = -this.lightDirection[1];
+    d[6] = -this.lightDirection[2];
+    d[7] = this.intensity;
 
-    // Crear matrices de transformación para cada cascada (bytes 32-223)
-    const mtx_scale = mat4.create();
-    const mtx_translation = mat4.create();
-    const mtx_offset = mat4.create();
-
-    mat4.scale(mtx_scale, mat4.create(), [0.5, -0.5, 1.0]);
-    mat4.translate(mtx_translation, mat4.create(), [0.5, 0.5, 0.0]);
-    mat4.multiply(mtx_offset, mtx_translation, mtx_scale);
-
-    // Escribir matrices para 3 cascadas (aunque solo usemos 1-3)
+    // Matrices de las 3 cascadas (aunque solo usemos 1-3) - bytes 32-223
     for (let i = 0; i < 3; i++) {
-      const lightViewProjOffset = mat4.create();
       const cascadeIndex = Math.min(i, this.cascadeCount - 1);
       mat4.multiply(
-        lightViewProjOffset,
-        mtx_offset,
+        this._cascadeMtx,
+        DirectionalLightComponent.SHADOW_UV_OFFSET,
         this.shadowCameras[cascadeIndex].getViewProjection(),
       );
-      GPUUtils.writeBuffer(this.uniformBuffer, 32 + i * 64, new Float32Array(lightViewProjOffset));
+      d.set(this._cascadeMtx as Float32Array, 8 + i * 16);
     }
 
-    // cascadeSplits (vec4) - bytes 224-239
-    // Si una cascade no existe, usar el último split (far)
+    // cascadeSplits (vec4) - bytes 224-239. Si una cascade no existe, usar el último split (far)
     const lastSplit = this.cascadeSplits[this.cascadeCount - 1] || this.maxShadowDistance;
-    GPUUtils.writeBuffer(
-      this.uniformBuffer,
-      224,
-      new Float32Array([
-        this.cascadeSplits[0] || lastSplit,
-        this.cascadeSplits[1] || lastSplit,
-        this.cascadeSplits[2] || lastSplit,
-        this.cascadeCount,
-      ]),
-    );
+    d[56] = this.cascadeSplits[0] || lastSplit;
+    d[57] = this.cascadeSplits[1] || lastSplit;
+    d[58] = this.cascadeSplits[2] || lastSplit;
+    d[59] = this.cascadeCount;
 
     // Shadow parameters - bytes 240-255
-    // shadowParams: x = stepDivRes cascade0, y = stepDivRes cascade1,
-    //               z = stepDivRes cascade2, w = unused
-    // Each cascade may have a different resolution (C0=R, C1=R/2, C2=R/4),
-    // so the PCF kernel step is scaled accordingly.
-    GPUUtils.writeBuffer(
-      this.uniformBuffer,
-      240,
-      new Float32Array([
-        1.0 / this.getCascadeResolution(0),
-        1.0 / this.getCascadeResolution(Math.min(1, this.cascadeCount - 1)),
-        1.0 / this.getCascadeResolution(Math.min(2, this.cascadeCount - 1)),
-        0.0,
-      ]),
-    );
+    // x/y/z = stepDivRes per cascade (C0=R, C1=R/2, C2=R/4 → PCF step scaled accordingly), w = unused
+    d[60] = 1.0 / this.getCascadeResolution(0);
+    d[61] = 1.0 / this.getCascadeResolution(Math.min(1, this.cascadeCount - 1));
+    d[62] = 1.0 / this.getCascadeResolution(Math.min(2, this.cascadeCount - 1));
+    d[63] = 0.0;
+
+    GPUUtils.writeBuffer(this.uniformBuffer, 0, d);
   }
 
   public generateShadowMap(): void {
