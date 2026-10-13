@@ -1,0 +1,35 @@
+[
+  {
+    "components": {
+      "name": "Dungeon",
+      "transform": {}
+    },
+    "gltf": "dungeon_warkarma.gltf"
+  },
+  {
+    "prefab": "cameras/main_camera.prefab"
+  },
+  {
+    "components": {
+      "name": "PlayerCamera",
+      "camera": {
+        "controllable": true,
+        "fov": 35,
+        "near": 0.1,
+        "far": 200,
+        "position": [12.599, 5.391, -2.722],
+        "target": [10.259, 2.746, -10.816]
+      }
+    }
+  },
+  {
+    "prefab": "lighting/directional_light.prefab",
+    "components": {
+      "directional_light": {
+        "position": [-10.9, 2.2, 10.75],
+        "target": [0, 0, 0],
+        "maxShadowDistance": 80
+      }
+    }
+  }
+]

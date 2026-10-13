@@ -138,8 +138,17 @@ export class Transform {
   public fromMatrix(matrix: mat4): void {
     const scaleVec = vec3.create();
     mat4.getScaling(scaleVec, matrix);
+    // mat4.getRotation (gl-matrix 3.4) divides by the scale per row instead of per column,
+    // so it returns a wrong quaternion under non-uniform scale. Normalize the columns first.
+    const rotationMatrix = mat4.clone(matrix);
+    for (let c = 0; c < 3; c++) {
+      const inv = scaleVec[c]! !== 0 ? 1 / scaleVec[c]! : 0;
+      rotationMatrix[c * 4] = rotationMatrix[c * 4]! * inv;
+      rotationMatrix[c * 4 + 1] = rotationMatrix[c * 4 + 1]! * inv;
+      rotationMatrix[c * 4 + 2] = rotationMatrix[c * 4 + 2]! * inv;
+    }
     const rotationQuat = quat.create();
-    mat4.getRotation(rotationQuat, matrix);
+    mat4.getRotation(rotationQuat, rotationMatrix);
     const positionVec = vec3.create();
     mat4.getTranslation(positionVec, matrix);
 

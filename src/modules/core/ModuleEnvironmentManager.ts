@@ -90,22 +90,39 @@ export class ModuleEnvironmentManager extends Module {
       'rgba16float', // HDR texture format
     ]);
 
-    const response = await ResourceManager.fetch(`/data/environment.json`);
+    // boot.json puede elegir el fichero de entorno ("environment"); por defecto environment.json.
+    // Derive scene name from the first entry in boot.json for probe naming/file scoping
+    let environmentFile = 'environment.json';
+    try {
+      const bootResp = await ResourceManager.fetch('data/boot.json');
+      const bootData = (await bootResp.json()) as {
+        scenes_to_load?: string[];
+        environment?: string;
+      };
+      const first = bootData.scenes_to_load?.[0] ?? 'scene.json';
+      this.sceneName = first.replace(/\.json$/i, '');
+      if (bootData.environment) environmentFile = bootData.environment;
+    } catch {
+      this.sceneName = 'scene';
+    }
+
+    // Dev: un scenario (`?scenario=nombre`) puede traer su propio "environment" (p.ej.
+    // "environment_ssr_test.json") que sustituye al de boot.json.
+    if (import.meta.env.DEV) {
+      const scenarioName = new URLSearchParams(window.location.search).get('scenario');
+      if (scenarioName) {
+        const scenarioResp = await ResourceManager.fetch(`data/scenarios/${scenarioName}.json`);
+        const scenario = (await scenarioResp.json()) as { environment?: string };
+        if (scenario.environment) environmentFile = scenario.environment;
+      }
+    }
+
+    const response = await ResourceManager.fetch(`/data/${environmentFile}`);
     const jsonData = await response.json();
 
     this.skyboxType = jsonData.skyboxType || 'cubemap';
     this.loadCloudSettings(jsonData.clouds);
     this.timeOfDay = jsonData.timeOfDay ?? 0.5;
-
-    // Derive scene name from the first entry in boot.json for probe naming/file scoping
-    try {
-      const bootResp = await ResourceManager.fetch('data/boot.json');
-      const bootData = (await bootResp.json()) as { scenes_to_load?: string[] };
-      const first = bootData.scenes_to_load?.[0] ?? 'scene.json';
-      this.sceneName = first.replace(/\.json$/i, '');
-    } catch {
-      this.sceneName = 'scene';
-    }
 
     const [skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
       HDRTexture.getAsync(jsonData.skybox),

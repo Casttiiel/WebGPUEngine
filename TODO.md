@@ -1,87 +1,30 @@
-## Pending
+Revisión de la luz ambiente (difuso + especular) con el SSR nuevo
+El SSR en sí está bien planteado, pero cómo se compone el especular ambiente no es físicamente correcto. Hay un error grave y otros dos que hacen que no cuadren las energías.
 
-1. Quality settings selection
+Lo que está bien
+Difuso SH: la proyección multiplica por π, 2π/3 y π/4 (SHProjector.ts:77) y el shader divide por π (albedo/π · E). Es correcto.
+SSR: ssr.cs devuelve la radiancia sin pesar por la BRDF, muestreada con GGX VNDF. Promediarla equivale a la radiancia prefiltrada del lóbulo, así que después hay que multiplicarla por el split-sum, que es lo que se hace. Es el mismo espacio de energía que la IBL.
+Rayos que no impactan: usan el env prefiltrado en la dirección espejo, con el mip según la rugosidad y el mismo PCC que la IBL. Así, activar o desactivar el SSR no cambia la energía.
+En el punto de impacto, accLight ya incluye el difuso ambiente, la luz directa y el emisivo. Es lo que debe reflejarse.
+El AO solo afecta al difuso, y la oclusión especular (fórmula de Lagarde) se deriva de él. Correcto.
+Errores
 
-## Gameplay
+1. La BRDF se aplica dos veces (grave). En ambient_specular.fs el shader devuelve rgb = radiancia × splitSum y alpha = media(splitSum) × so. El blend additive_by_src_alpha hace dst += rgb × alpha, así que el resultado final es radiancia × splitSum × splitSum × so.
 
-1. Push Attack
-2. Lift Attack
-3. Mantle
-4. Wall Run https://www.instagram.com/p/DZQLXm1MSUq/
-   Ground Combos (Light and Heavy) + input buffer
-   Block Movement during combos
-   Roll animation + movement
-   Air combos
-   Slash effect
+En un dieléctrico pulido visto de frente, el split-sum vale ≈ 0.04, así que la reflexión sale ≈ 0.0016 en vez de 0.04: unas 25 veces más débil.
+En ángulos rasantes el error casi desaparece, y en metales es solo ×0.8.
+Por eso los suelos brillantes apenas reflejan salvo de lado, aunque el SSR funcione bien.
+La solución es devolver vec4(especular × so, 1) o poner alpha = so. 2. El Fresnel se cuenta dos veces. Ahora se calcula F_Schlick_Roughness(NoV) × A + B, pero la LUT ya integra el Fresnel. Lo correcto, según Karis, es F0 × A + B. Además, el difuso (ambient.fs) ya usa F0·A+B para restar energía, así que en ángulos rasantes la suma de difuso y especular supera 1.
 
-## Character & Animation
+3. La fórmula multi-scatter (Fms) está mal. El término correcto (Fdez-Agüera, el mismo que usa three.js) es FssEss·Favg·Ems / (1 − Favg·Ems). Al código le falta el factor FssEss. En dieléctricos rugosos eso suma un ~+0.04 de especular que no debería existir, es decir, aproximadamente duplica su especular y quedan algo "lechosos". El mismo error está en ambient.fs, ambient_specular.fs y en el multiBounce de ssr.cs.
 
-1. Character animator
-2. Motion Warping
-   Root motion warping al objetivo — el ataque actual usa lunge con velocidad fija. Con warping, la animación se estira/comprime para que la espada llegue exactamente al enemigo en su posición real, sin importar si está 1.2m o 2.8m. Elimina el floating que se ve cuando el lunge se queda corto o se pasa.
-3. Motion Matching
-   Concatenación de ataques — ahora el combo es un clip único. Con MM podrías tener 30 variantes de ataque y el sistema elige cuál encadena mejor desde la posición de los pies y momentum actuales. Lo que hace DMC para que ningún combo se vea igual.
+Problemas medios 4. Orden de pases. El especular ambiente se suma después del agua, los transparentes y el vidrio, y usa el G-buffer opaco (DeferredRenderer.ts:609-620). Resultado: el reflejo del suelo que hay detrás de un cristal, el agua o las partículas se pinta encima de ellos sin atenuarse. Habría que mover el SSR y el especular a justo después de renderAccLight().
 
-## AI
+5. Oclusión especular sobre los impactos del SSR. La oclusión especular existe porque el cubemap no conoce la geometría local. Un impacto del SSR ya incluye esa oclusión, así que se oscurece dos veces. Solo debería aplicarse a la parte que viene del env (los rayos sin impacto).
 
-1. Reposicionarse y cambiar slots si el jugador se mueve y tiene sentido
-2. Diferentes distancias de orbitar
-3. Enemy AI https://www.instagram.com/shanethehippogames/
-4. Enemy AI https://www.instagram.com/p/DZRu7etAJW8/
+6. globalAmbientBoost se aplica al difuso pero no al especular. No es coherente si lo usas para oscurecer escenas.
 
-## Renderer
-
-1. Irradiance Volumes (Generador de probes)(Async)(Cambio de iluminacion)
-2. Review SSR
-3. [Blender] GLTF Exporter unifies metallic and roughness? In right channel?
-4. Procedural materials
-
-## Engine
-
-1. World Partition / Scene Streaming
-
-## VFX
-
-1. VFX Sangre https://www.youtube.com/watch?v=GEN6yFIXeW4&list=WL&index=8
-2. Particle VFX https://www.instagram.com/p/DVZGqmUjD3b/
-3. Electricity https://www.instagram.com/p/DYFjvXbh3xR/
-4. Electricity https://www.instagram.com/p/DW6L8iGDCNj/
-5. Grass Influence Map / Chunks
-6. Simple foliage https://www.instagram.com/p/DUdZLU8jqjz/
-7. Dirt mask https://www.instagram.com/p/DWT5KKFSutR/
-8. Trees Generator https://www.youtube.com/watch?v=GOfttJQ-FGw&list=WL&index=13
-9. Dynamic Fire https://www.youtube.com/watch?v=Y1ZBzIiP-v4
-10. Water Shader Reflections + Better Foam https://www.youtube.com/watch?v=sxWJqMJdL04&list=WL&index=10&t=37s
-11. Single Layer Water https://www.youtube.com/watch?v=KLl3PZeupFM&list=WL&index=4
-12. Projectiles VFX https://www.youtube.com/watch?v=74XywaLGO5Q&list=WL&index=18&t=11s
-
-## UI & Audio
-
-1. Start Screen
-2. Game Loading Screen
-
-## References & Inspiration
-
-### Combat Feel
-
-- 10 Ways to Make Combat Feel Better https://www.youtube.com/watch?v=xkSDw6Z4PKk&list=WL&index=21&t=5s
-- The SECRET To Better COMBAT https://www.youtube.com/watch?v=wM6DzywtTMI&list=WL&index=20&t=58s
-- Recreating Batman Arkham's Freeflow Combat https://www.youtube.com/watch?v=GFOpKcpKGKQ&list=WL&index=17
-- Control resonant Inspiration https://www.youtube.com/watch?v=Xc62H7K3RYo&list=WL&index=19
-- Making a Game About Weak Points Inspiration https://www.youtube.com/watch?v=-HFs-ZwfDos&list=WL&index=22&t=206s
-- Fix your bland game with these… https://www.youtube.com/watch?v=ibbwutlkWp4&list=WL&index=12&t=9s
-
-### Movement & Platformer
-
-- The Secret to Great Platformer Movement https://www.youtube.com/watch?v=-QOEPdDS5Qw&list=WL&index=16
-
-### Foliage & Environment
-
-- How I made better foliage than 99% of games https://www.youtube.com/watch?v=GOfttJQ-FGw&list=WL&index=13
-- Create Grass Fast Blender Tutorial https://www.youtube.com/watch?v=Hf8s1Ckycdo&list=WL&index=15&t=208s
-
-### Tools & Assets
-
-- How to Generate 3D Elements from Image in Blender! https://www.youtube.com/watch?v=Jdz1I223oFw&list=WL&index=14
-- How to make First Person Weapon Animations https://www.youtube.com/watch?v=ad6ZQPrfcec&list=WL&index=6&t=760s
-- The Easiest Way to Make 2D Sprites for Your Retro FPS Game! https://www.youtube.com/watch?v=VVxK3_UTymA&list=WL&index=5
+Menores
+multiBounce calcula la BRDF del punto de impacto con V hacia la cámara, cuando debería ir hacia el píxel que refleja. Es una aproximación aceptable.
+El tope de luminancia (maxLuminance) quita energía a los reflejos del sol y de los emisivos. Es una decisión estética.
+mip = rugosidad × 7 solo es correcto si los cubemaps se prefiltraron con rugosidad = mip/7. No he podido comprobarlo porque se hornean fuera del motor.

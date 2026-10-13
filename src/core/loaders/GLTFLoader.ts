@@ -332,8 +332,9 @@ export class GLTFLoader {
             : 'black.png',
       },
       baseColorFactor: materialData.getBaseColorFactor() || [1, 1, 1, 1],
-      metallicFactor: materialData.getMetallicFactor() || 1,
-      roughnessFactor: materialData.getRoughnessFactor() || 1,
+      // `??`, not `||`: an explicit 0 (dielectric / mirror) is a valid factor
+      metallicFactor: materialData.getMetallicFactor() ?? 1,
+      roughnessFactor: materialData.getRoughnessFactor() ?? 1,
       emissiveFactor: hasEmissive ? 5 : 0,
     };
 

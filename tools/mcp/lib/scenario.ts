@@ -96,6 +96,10 @@ export const ScenarioSchema = z
     description: z.string().optional(),
     scenes: z.array(z.string()).optional().describe('Replaces boot.json scenes_to_load'),
     entities: z.array(z.unknown()).optional().describe('Extra entities (same format as a scene)'),
+    environment: z
+      .string()
+      .optional()
+      .describe('File in public/data/ that replaces environment.json (skybox, ambient...)'),
     seed: z.number().int().optional(),
     fixedDelta: z.number().positive().optional(),
     loadTimeoutSeconds: z.number().positive().optional(),
