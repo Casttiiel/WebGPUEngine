@@ -305,6 +305,11 @@ export class ModuleRender extends Module {
 
       // Advance to next jitter offset if jittering is active
       if (needsJitter) {
+        // TSR outputs at canvas resolution: bias textures by the upscale ratio as well
+        const upscaleRatio = mainCameraEntity?.hasComponent('tsr')
+          ? Render.width / Render.canvasSize.width
+          : 1.0;
+        camera.setTemporalMipBias(upscaleRatio);
         camera.nextJitter();
       }
 
@@ -472,12 +477,12 @@ export class ModuleRender extends Module {
       if (mainCameraEntity?.hasComponent('tsr')) {
         const tsr = mainCameraEntity.getComponent('tsr') as TSRComponent;
         if (tsr.hasLoaded()) {
-          result = tsr.apply(result, this.deferred.getLinearDepthView());
+          result = tsr.apply(result, this.deferred.getLinearDepthTarget());
         }
       } else if (mainCameraEntity?.hasComponent('taa')) {
         const taa = mainCameraEntity.getComponent('taa') as TAAComponent;
         if (taa.hasLoaded()) {
-          result = taa.apply(result, this.deferred.getLinearDepthView());
+          result = taa.apply(result, this.deferred.getLinearDepthTarget());
         }
       }
 

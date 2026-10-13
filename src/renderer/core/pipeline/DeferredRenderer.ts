@@ -969,6 +969,11 @@ export class DeferredRenderer {
     return this.gBufferPass.getRenderTargets().linearDepth.getView()!;
   }
 
+  /** G-buffer linear depth target (TAA/TSR copy it as next frame's history depth). */
+  public getLinearDepthTarget(): RenderTarget {
+    return this.gBufferPass.getRenderTargets().linearDepth;
+  }
+
   public getGBufferBindGroup(): GPUBindGroup {
     return this.gBufferBindGroup;
   }

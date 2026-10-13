@@ -30,10 +30,10 @@ struct DecalFlatOutput {
 @fragment
 fn fs(input: VertexOutput) -> DecalFlatOutput {
     let uvScaled = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
-    // UV unjittering: remove per-frame jitter displacement so texture samples
-    // are stable across frames (jitter should only shift vertex positions, not UVs).
-    let jitter_px = camera.jitterOffset * camera.screenSize;
-    let uv = uvScaled - dpdx(uvScaled) * jitter_px.x - dpdy(uvScaled) * jitter_px.y;
+    // Texture UVs keep the camera jitter on purpose: TAA/TSR integrate the sub-pixel
+    // offsets over frames, which is what anti-aliases texture detail. (camera.mipBias
+    // compensates the extra blur of that integration.)
+    let uv = uvScaled;
 
     // ── Sample decal textures ────────────────────────────────────────────────
     let albedo_srgb     = textureSample(txAlbedo,    samplerState, uv);

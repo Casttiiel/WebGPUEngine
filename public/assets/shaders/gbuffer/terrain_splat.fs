@@ -67,11 +67,10 @@ fn fs(input: VertexOutput) -> FragmentOutput {
     // Tiled UV — used for repeating layer textures.
     let uvTiled = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
 
-    // UV unjittering: TAA jitters the projection sub-pixel every frame, shifting
-    // interpolated UVs and causing mip selection variance → texture shimmer.
-    // Remove the jitter from the tiled UV before sampling high-frequency textures.
-    let jitter_px = camera.jitterOffset * camera.screenSize;
-    let uvTiledU  = uvTiled - dpdx(uvTiled) * jitter_px.x - dpdy(uvTiled) * jitter_px.y;
+    // Texture UVs keep the camera jitter on purpose: TAA/TSR integrate the sub-pixel
+    // offsets over frames, which is what anti-aliases texture detail. (camera.mipBias
+    // compensates the extra blur of that integration.)
+    let uvTiledU  = uvTiled;
 
     // ── Splat weights ─────────────────────────────────────────────────────────
     // R = ground/grass, G = rock, B = snow.  Pre-normalised in TerrainSplatGenerator.
