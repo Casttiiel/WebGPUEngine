@@ -4,7 +4,9 @@
     "camera": {},
     "tone_mapping": {},
     "contact_shadows": {},
-    "ambient_occlusion": {},
+    "ambient_occlusion": {
+      "mode": "ssao"
+    },
     "bloom": {},
     "auto_exposure": {},
     "lens_flare": {},

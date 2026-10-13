@@ -9,10 +9,8 @@ export interface GraphicsQualitySettings {
   enableAO: boolean;
   aoScale: number;
   aoTexture: GPUTextureFormat;
+  /** AO samples (three.js GTAO/SSAO `samples`, 4..32). */
   aoSampleCount: number;
-  aoRadius: number;
-  aoStrength: number;
-  aoSliceCount: number;
   albedoTexture: GPUTextureFormat;
   normalTexture: GPUTextureFormat;
   linearDepthTexture: GPUTextureFormat;
@@ -45,10 +43,7 @@ export class QualitySettings {
       enableAO: false,
       aoScale: 0.25,
       aoTexture: 'r16float',
-      aoSampleCount: 2.0,
-      aoRadius: 5.0,
-      aoStrength: 1.0,
-      aoSliceCount: 2.0,
+      aoSampleCount: 8,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -76,10 +71,7 @@ export class QualitySettings {
       enableAO: true,
       aoScale: 0.25,
       aoTexture: 'r16float',
-      aoSampleCount: 4.0,
-      aoRadius: 5.0,
-      aoStrength: 1.0,
-      aoSliceCount: 2.0,
+      aoSampleCount: 8,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -107,10 +99,7 @@ export class QualitySettings {
       enableAO: true,
       aoScale: 0.5,
       aoTexture: 'r16float',
-      aoSampleCount: 8.0,
-      aoRadius: 5.0,
-      aoStrength: 1.0,
-      aoSliceCount: 3.0,
+      aoSampleCount: 16,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -138,10 +127,7 @@ export class QualitySettings {
       enableAO: true,
       aoScale: 0.5,
       aoTexture: 'r16float',
-      aoSampleCount: 8.0,
-      aoRadius: 1.5,
-      aoStrength: 1.0,
-      aoSliceCount: 4.0,
+      aoSampleCount: 16,
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba16float',
       linearDepthTexture: 'r16float',
@@ -184,9 +170,6 @@ export class QualitySettings {
       aoScale: 0.5,
       aoTexture: 'r16float',
       aoSampleCount: 16,
-      aoRadius: 0.1,
-      aoStrength: 3.0,
-      aoSliceCount: 0.01,
 
       albedoTexture: 'rgba8unorm',
       normalTexture: 'rgba8unorm',
