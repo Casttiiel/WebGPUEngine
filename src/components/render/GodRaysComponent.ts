@@ -16,35 +16,35 @@ import { GodRaysComponentData } from '../../types/GodRaysComponentData.type';
 /**
  * GodRaysComponent — Volumetric god rays via per-pixel shadow-map raymarch.
  *
- * Unlike the legacy screen-space Crytek approach, this implementation marches
- * along each pixel's world-space view ray and samples the CSM shadow maps at
- * every step, accumulating in-scattered directional light.  The result is
- * physically-based light shafts that are visible from ANY camera angle, not
- * just when looking toward the sun.
+ * Marches along each pixel's world-space view ray and samples the CSM shadow
+ * maps at every step, accumulating in-scattered directional light.  Visible
+ * from ANY camera angle, not just when looking toward the sun.
  *
- * Pipeline (3 steps):
- *   Step 1 — Volumetric march: per-pixel CSM shadow sampling at quarter-res.
- *   Step 2 — Kawase blur:      5 ping-pong passes to smooth the noisy output.
- *   Step 3 — Composite:        additive blend of blurred shafts onto HDR frame,
- *                               tinted by the DirectionalLight sun colour.
+ * Pipeline (all intermediate buffers are half-res rgba16float, r = scatter, g = depth):
+ *   Step 1 — Volumetric march: ray bounded to min(geometry, CSM range, maxDistance),
+ *                               world-space step size, per-frame IGN jitter (TAA resolves it).
+ *   Step 2 — Bilateral blur:   separable depth-aware Gaussian (H then V).
+ *   Step 3 — Composite:        joint-bilateral upsample + additive blend onto HDR,
+ *                               tinted by the DirectionalLight colour.
  *
  * VolumetricGodRaysParams layout (32 bytes — 8 × f32):
- *   [0] density     — σs: scattering coefficient (in-scatter strength)
- *   [1] extinction  — σt: extinction = σs + σa (opacity per world unit)
- *   [2] intensity   — final brightness multiplier
+ *   [0] density     — σs per world unit
+ *   [1] extinction  — σt per world unit
+ *   [2] anisotropy  — Henyey-Greenstein g
  *   [3] enabled     — 0 = skip pass, 1 = compute shafts
- *   [4] stepCount   — number of raymarch steps (stored as f32)
- *   [5–7]           — padding
+ *   [4] maxSteps    — upper bound on raymarch steps
+ *   [5] stepSize    — target step length (world units)
+ *   [6] maxDistance — max march distance (world units)
+ *   [7]             — padding
  */
 export class GodRaysComponent extends Component {
   // ─── GPU resources ────────────────────────────────────────────────────────
   private volumetricTechnique!: Technique;
-  private kawaseTechnique!: Technique;
+  private blurTechnique!: Technique;
   private compositeTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
   private volumetricRT!: RenderTarget;
-  private kawasePingA!: RenderTarget;
-  private kawasePingB!: RenderTarget;
+  private blurRT!: RenderTarget;
   private renderPassManager!: RenderPassManager;
   private paramsBuffer!: GPUBuffer;
   private compositeParamsBuffer!: GPUBuffer;
@@ -60,23 +60,32 @@ export class GodRaysComponent extends Component {
   private csmBindGroup: GPUBindGroup | null = null;
   private cachedShadowView0: GPUTextureView | null = null;
 
-  private kawaseOutputBindGroupCache: Map<GPUTextureView, GPUBindGroup> = new Map();
-  // Kawase: 3 pre-built input BGs [volumetric, pingA, pingB]; 4 offset param BGs [k=0..3]
-  private kawaseInputBGs: GPUBindGroup[] = [];
-  private kawaseOffsetBuffers: GPUBuffer[] = [];
-  private kawaseOffsetBindGroups: GPUBindGroup[] = [];
+  // Blur: H pass reads volumetricRT → blurRT, V pass reads blurRT → volumetricRT.
+  // The composite then reads volumetricRT.
+  private volumetricInputBG!: GPUBindGroup;
+  private blurInputBG!: GPUBindGroup;
+  private blurParamsBuffers: GPUBuffer[] = [];
+  private blurParamsBindGroups: GPUBindGroup[] = [];
 
   // ─── Tuneable parameters ───────────────────────────────────────────────────
   public isEnabled: boolean = true;
-  /** Scattering coefficient σs — controls how strongly particles scatter light. */
-  public density: number = 0.3;
-  /** Extinction coefficient σt (≥ density) — higher = more opaque atmosphere. */
-  public extinction: number = 0.35;
-  /** Number of raymarch steps. More = less banding, more cost. */
-  public numSteps: number = 32;
+  /** Scattering coefficient σs per world unit — controls in-scatter strength. */
+  public density: number = 0.02;
+  /** Extinction coefficient σt per world unit — fog transmittance along the view ray. */
+  public extinction: number = 0.01;
+  /** Henyey-Greenstein anisotropy g — higher = stronger glow when looking toward the sun. */
+  public anisotropy: number = 0.4;
+  /** Target raymarch step length in world units. */
+  public stepSize: number = 1.0;
+  /** Upper bound on raymarch steps per pixel. */
+  public numSteps: number = 64;
+  /** Max march distance in world units (also capped by the CSM shadow range). */
+  public maxDistance: number = 80;
+  /** Relative depth tolerance of the bilateral blur. */
+  public blurDepthSigma: number = 0.05;
   /** Linear brightness multiplier applied to the accumulated volumetric light. */
   public intensity: number = 1.0;
-  /** Composite-pass scale applied on top of intensity (Step 3). */
+  /** Composite-pass scale applied on top of intensity. */
   public compositeScale: number = 1.0;
 
   private loaded = false;
@@ -84,6 +93,7 @@ export class GodRaysComponent extends Component {
   // ─── Reusable arrays to avoid hot-path allocations ────────────────────────
   private readonly paramsData = new Float32Array(8);
   private readonly compositeParamsData = new Float32Array(4);
+  private readonly blurParamsData = new Float32Array(4);
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -92,39 +102,21 @@ export class GodRaysComponent extends Component {
       if (data.enabled !== undefined) this.isEnabled = data.enabled;
       if (data.density !== undefined) this.density = data.density;
       if (data.extinction !== undefined) this.extinction = data.extinction;
+      if (data.anisotropy !== undefined) this.anisotropy = data.anisotropy;
+      if (data.stepSize !== undefined) this.stepSize = data.stepSize;
       if (data.numSteps !== undefined) this.numSteps = data.numSteps;
+      if (data.maxDistance !== undefined) this.maxDistance = data.maxDistance;
+      if (data.blurDepthSigma !== undefined) this.blurDepthSigma = data.blurDepthSigma;
       if (data.intensity !== undefined) this.intensity = data.intensity;
       if (data.compositeScale !== undefined) this.compositeScale = data.compositeScale;
     }
 
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.volumetricTechnique = await Technique.getAsync('post-processing/god_rays_volumetric.tech');
-    this.kawaseTechnique = await Technique.getAsync('post-processing/god_rays_kawase.tech');
+    this.blurTechnique = await Technique.getAsync('post-processing/god_rays_bilateral.tech');
     this.compositeTechnique = await Technique.getAsync('post-processing/god_rays_composite.tech');
 
-    this.volumetricRT = new RenderTarget();
-    this.volumetricRT.createRT(
-      'god_rays_volumetric.dds',
-      this.maskWidth(),
-      this.maskHeight(),
-      'rgba8unorm',
-    );
-
-    this.kawasePingA = new RenderTarget();
-    this.kawasePingA.createRT(
-      'god_rays_kawase_a.dds',
-      this.maskWidth(),
-      this.maskHeight(),
-      'rgba8unorm',
-    );
-
-    this.kawasePingB = new RenderTarget();
-    this.kawasePingB.createRT(
-      'god_rays_kawase_b.dds',
-      this.maskWidth(),
-      this.maskHeight(),
-      'rgba8unorm',
-    );
+    this.createRenderTargets();
 
     // 8 floats × 4 bytes = 32 bytes, matching VolumetricGodRaysParams in WGSL.
     this.paramsBuffer = GPUUtils.createBuffer(
@@ -165,27 +157,25 @@ export class GodRaysComponent extends Component {
       [{ binding: 0, resource: { buffer: this.defaultExposureBuffer } }],
     );
 
-    // Kawase: 4 pre-written offset buffers (k = 0..3) to avoid per-frame writes inside
-    // a single command encoder (writeBuffer is applied before submit, so a single buffer
-    // written 5× would only see the last value for all passes).
-    const kawaseParamsLayout = this.kawaseTechnique.getPipeline().getBindGroupLayout(2);
-    for (let k = 0; k < 4; k++) {
+    // Blur: one params buffer per direction (H, V). Separate buffers because
+    // writeBuffer is applied before submit — a single buffer written twice would
+    // only see the last value in both passes.
+    const blurParamsLayout = this.blurTechnique.getPipeline().getBindGroupLayout(2);
+    for (let i = 0; i < 2; i++) {
       const buf = GPUUtils.createBuffer(
-        `god_rays_kawase_offset_${k}`,
+        `god_rays_blur_params_${i}`,
         16,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
-      GPUUtils.writeBuffer(buf, 0, new Float32Array([k, 0, 0, 0]));
-      const bg = BindGroupFactory.createBindGroup(
-        `god_rays_kawase_params_bindgroup_${k}`,
-        kawaseParamsLayout,
-        [{ binding: 0, resource: { buffer: buf } }],
+      this.blurParamsBuffers.push(buf);
+      this.blurParamsBindGroups.push(
+        BindGroupFactory.createBindGroup(`god_rays_blur_params_bindgroup_${i}`, blurParamsLayout, [
+          { binding: 0, resource: { buffer: buf } },
+        ]),
       );
-      this.kawaseOffsetBuffers.push(buf);
-      this.kawaseOffsetBindGroups.push(bg);
     }
 
-    this.rebuildKawaseInputBindGroups();
+    this.rebuildInputBindGroups();
 
     this.renderPassManager = new RenderPassManager();
     this.loaded = true;
@@ -201,63 +191,33 @@ export class GodRaysComponent extends Component {
   public resize(): void {
     if (!this.loaded) return;
 
-    this.volumetricRT.destroy();
-    this.volumetricRT = new RenderTarget();
-    this.volumetricRT.createRT(
-      'god_rays_volumetric.dds',
-      this.maskWidth(),
-      this.maskHeight(),
-      'rgba8unorm',
-    );
+    this.createRenderTargets();
 
-    this.kawasePingA.destroy();
-    this.kawasePingA = new RenderTarget();
-    this.kawasePingA.createRT(
-      'god_rays_kawase_a.dds',
-      this.maskWidth(),
-      this.maskHeight(),
-      'rgba8unorm',
-    );
-
-    this.kawasePingB.destroy();
-    this.kawasePingB = new RenderTarget();
-    this.kawasePingB.createRT(
-      'god_rays_kawase_b.dds',
-      this.maskWidth(),
-      this.maskHeight(),
-      'rgba8unorm',
-    );
-
-    // Cached bind groups reference stale texture views after resize — clear them.
+    // Cached bind groups reference stale texture views after resize — rebuild them.
     this.csmBindGroup = null;
     this.cachedShadowView0 = null;
-    this.kawaseOutputBindGroupCache.clear();
-    this.rebuildKawaseInputBindGroups();
+    this.rebuildInputBindGroups();
   }
 
   // ─── Per-frame apply ──────────────────────────────────────────────────────
 
   /**
-   * Run the complete volumetric god rays pipeline (Steps 1–3) and return the
-   * same HDR texture with god rays additively blended in.
-   *
-   * Step 1 — Volumetric march:  per-pixel CSM shadow sampling at quarter-res.
-   * Step 2 — Kawase blur:       5 ping-pong passes (offsets 0,1,2,2,3).
-   * Step 3 — Composite:         additive blend of shafts onto HDR in-place.
+   * Run the complete volumetric god rays pipeline and return the same HDR
+   * texture with god rays additively blended in.
    *
    * Returns unmodified hdrTexture if no valid directional light with shadows
    * is found in the scene.
    */
   public apply(hdrTexture: GPUTextureView, gBufferBindGroup: GPUBindGroup): GPUTextureView {
-    if (!this.loaded) return hdrTexture;
-
-    this.updateParamsBuffer();
+    if (!this.loaded || !this.isEnabled) return hdrTexture;
 
     // CSM bind group — requires a directional light with shadow maps.
     const csmBG = this.getOrCreateCSMBindGroup();
     if (!csmBG) return hdrTexture;
 
-    // ── Step 1: volumetric light scatter ─────────────────────────────────────
+    this.updateParamsBuffers();
+
+    // ── Step 1: volumetric light scatter (half-res) ──────────────────────────
     this.renderPassManager.executeGodRaysVolumetricPass(
       this.fullscreenQuadMesh,
       this.volumetricTechnique,
@@ -267,38 +227,31 @@ export class GodRaysComponent extends Component {
       this.volumetricRT,
     );
 
-    // ── Step 2: Kawase blur — 5 ping-pong passes ─────────────────────────────
-    const PASS_INPUT_IDX = [0, 1, 2, 1, 2] as const;
-    const PASS_OFFSET_IDX = [0, 1, 2, 2, 3] as const;
-    const PASS_OUTPUT_RT: RenderTarget[] = [
-      this.kawasePingA,
-      this.kawasePingB,
-      this.kawasePingA,
-      this.kawasePingB,
-      this.kawasePingA,
-    ];
+    // ── Step 2: separable bilateral blur (H → blurRT, V → volumetricRT) ──────
+    this.renderPassManager.executeGodRaysBlurPass(
+      this.fullscreenQuadMesh,
+      this.blurTechnique,
+      this.volumetricInputBG,
+      this.blurParamsBindGroups[0]!,
+      this.blurRT,
+      'God Rays Blur H',
+    );
+    this.renderPassManager.executeGodRaysBlurPass(
+      this.fullscreenQuadMesh,
+      this.blurTechnique,
+      this.blurInputBG,
+      this.blurParamsBindGroups[1]!,
+      this.volumetricRT,
+      'God Rays Blur V',
+    );
 
-    for (let i = 0; i < 5; i++) {
-      const inputIdx = PASS_INPUT_IDX[i]!;
-      const offsetIdx = PASS_OFFSET_IDX[i]!;
-      const outputRT = PASS_OUTPUT_RT[i]!;
-      this.renderPassManager.executeGodRaysKawasePass(
-        this.fullscreenQuadMesh,
-        this.kawaseTechnique,
-        this.kawaseInputBGs[inputIdx]!,
-        this.kawaseOffsetBindGroups[offsetIdx]!,
-        outputRT,
-        `God Rays Kawase k=${offsetIdx}`,
-      );
-    }
-
-    // ── Step 3: composite — additive blend onto HDR in-place ──────────────────
-    const kawaseOutputBG = this.getOrCreateKawaseOutputBindGroup(this.kawasePingA.getView());
+    // ── Step 3: joint-bilateral upsample + additive blend onto HDR ───────────
     this.renderPassManager.executeGodRaysCompositePass(
       this.fullscreenQuadMesh,
       this.compositeTechnique,
       hdrTexture,
-      kawaseOutputBG,
+      gBufferBindGroup,
+      this.volumetricInputBG,
       this.compositeParamsBindGroup!,
       this.compositeExposureBindGroup,
     );
@@ -306,14 +259,9 @@ export class GodRaysComponent extends Component {
     return hdrTexture;
   }
 
-  /** Quarter-resolution volumetric scatter buffer (Step 1 output). */
+  /** Half-resolution blurred light shafts (r = scatter, g = depth). */
   public getVolumetricView(): GPUTextureView {
     return this.volumetricRT.getView();
-  }
-
-  /** Quarter-resolution Kawase-blurred light shafts (Step 2 output, input for Step 3). */
-  public getKawaseOutputView(): GPUTextureView {
-    return this.kawasePingA.getView();
   }
 
   public hasLoaded(): boolean {
@@ -322,16 +270,19 @@ export class GodRaysComponent extends Component {
 
   public override update(_dt: number): void {}
 
-
   public override renderInMenu(folder?: any): void {
     if (!folder) return;
     if (this._editorFolder) return;
-    this._editorFolder = folder.addFolder('Volumetric Scattering');
+    this._editorFolder = folder.addFolder('God Rays');
     this._editorFolder.close();
     this._editorFolder.add(this, 'isEnabled').name('Enable').listen();
-    this._editorFolder.add(this, 'density', 0.0, 2.0, 0.01).name('Density (σs)').listen();
-    this._editorFolder.add(this, 'extinction', 0.0, 2.0, 0.01).name('Extinction (σt)').listen();
-    this._editorFolder.add(this, 'numSteps', 8, 64, 1).name('Steps').listen();
+    this._editorFolder.add(this, 'density', 0.0, 0.2, 0.001).name('Density (σs)').listen();
+    this._editorFolder.add(this, 'extinction', 0.0, 0.1, 0.001).name('Extinction (σt)').listen();
+    this._editorFolder.add(this, 'anisotropy', 0.0, 0.95, 0.01).name('Anisotropy (g)').listen();
+    this._editorFolder.add(this, 'stepSize', 0.1, 5.0, 0.05).name('Step Size (m)').listen();
+    this._editorFolder.add(this, 'numSteps', 8, 128, 1).name('Max Steps').listen();
+    this._editorFolder.add(this, 'maxDistance', 5, 500, 1).name('Max Distance (m)').listen();
+    this._editorFolder.add(this, 'blurDepthSigma', 0.005, 0.5, 0.005).name('Blur Depth σ').listen();
     this._editorFolder.add(this, 'intensity', 0.0, 5.0, 0.05).name('Intensity').listen();
     this._editorFolder.add(this, 'compositeScale', 0.0, 4.0, 0.05).name('Composite Scale').listen();
   }
@@ -343,9 +294,8 @@ export class GodRaysComponent extends Component {
     this.compositeParamsBuffer?.destroy();
     this.defaultExposureBuffer?.destroy();
     this.volumetricRT?.destroy();
-    this.kawasePingA?.destroy();
-    this.kawasePingB?.destroy();
-    for (const buf of this.kawaseOffsetBuffers) buf?.destroy();
+    this.blurRT?.destroy();
+    for (const buf of this.blurParamsBuffers) buf?.destroy();
   }
 
   // ─── Internal helpers ─────────────────────────────────────────────────────
@@ -364,12 +314,17 @@ export class GodRaysComponent extends Component {
     );
   }
 
-  private maskWidth(): number {
-    return Math.max(1, Render.width >> 2);
-  }
+  private createRenderTargets(): void {
+    const w = Math.max(1, Render.width >> 1);
+    const h = Math.max(1, Render.height >> 1);
 
-  private maskHeight(): number {
-    return Math.max(1, Render.height >> 2);
+    this.volumetricRT?.destroy();
+    this.volumetricRT = new RenderTarget();
+    this.volumetricRT.createRT('god_rays_volumetric.dds', w, h, 'rgba16float');
+
+    this.blurRT?.destroy();
+    this.blurRT = new RenderTarget();
+    this.blurRT.createRT('god_rays_blur.dds', w, h, 'rgba16float');
   }
 
   /** Return the first DirectionalLightComponent found in the scene, or null. */
@@ -420,17 +375,25 @@ export class GodRaysComponent extends Component {
   }
 
   /**
-   * Write VolumetricGodRaysParams and composite params into their GPU buffers.
+   * Write volumetric, blur and composite params into their GPU buffers.
    * Also reads sun colour from the directional light for the composite tint.
    */
-  private updateParamsBuffer(): void {
+  private updateParamsBuffers(): void {
     this.paramsData[0] = this.density;
-    this.paramsData[1] = Math.max(this.density, this.extinction); // σt ≥ σs
-    this.paramsData[2] = this.intensity;
+    this.paramsData[1] = this.extinction;
+    this.paramsData[2] = this.anisotropy;
     this.paramsData[3] = this.isEnabled ? 1.0 : 0.0;
-    this.paramsData[4] = Math.max(1, this.numSteps);
-    // [5–7] padding — left as 0
+    this.paramsData[4] = Math.max(4, this.numSteps);
+    this.paramsData[5] = Math.max(0.01, this.stepSize);
+    this.paramsData[6] = Math.max(0.1, this.maxDistance);
+    // [7] padding — left as 0
     GPUUtils.writeBuffer(this.paramsBuffer, 0, this.paramsData);
+
+    const depthSigma = Math.max(0.001, this.blurDepthSigma);
+    this.blurParamsData.set([1, 0, depthSigma, 0]);
+    GPUUtils.writeBuffer(this.blurParamsBuffers[0]!, 0, this.blurParamsData);
+    this.blurParamsData.set([0, 1, depthSigma, 0]);
+    GPUUtils.writeBuffer(this.blurParamsBuffers[1]!, 0, this.blurParamsData);
 
     // Sun colour for the composite tint (falls back to white if no light found).
     let sunR = 1.0;
@@ -447,43 +410,24 @@ export class GodRaysComponent extends Component {
     this.compositeParamsData[0] = sunR;
     this.compositeParamsData[1] = sunG;
     this.compositeParamsData[2] = sunB;
-    this.compositeParamsData[3] = this.isEnabled ? this.compositeScale : 0.0;
+    this.compositeParamsData[3] = this.isEnabled ? this.intensity * this.compositeScale : 0.0;
     GPUUtils.writeBuffer(this.compositeParamsBuffer, 0, this.compositeParamsData);
   }
 
-  /** Get (or lazily create) the Kawase-output bind group for the composite pass. */
-  private getOrCreateKawaseOutputBindGroup(texture: GPUTextureView): GPUBindGroup {
-    let bindGroup = this.kawaseOutputBindGroupCache.get(texture);
-    if (!bindGroup) {
-      bindGroup = BindGroupFactory.createBindGroup(
-        'god_rays_kawase_output_bindgroup',
-        this.compositeTechnique.getPipeline().getBindGroupLayout(1),
-        [
-          { binding: 0, resource: texture },
-          { binding: 1, resource: SamplerLibrary.simpleSampler },
-        ],
-      );
-      this.kawaseOutputBindGroupCache.set(texture, bindGroup);
-    }
-    return bindGroup;
-  }
-
   /**
-   * (Re-)build the 3 Kawase ping-pong input bind groups.
+   * (Re-)build the input bind groups for the blur and composite passes.
    * Must be called after the RTs are (re-)created at load and resize time.
    */
-  private rebuildKawaseInputBindGroups(): void {
-    const layout = this.kawaseTechnique.getPipeline().getBindGroupLayout(1);
-    const views = [
-      this.volumetricRT.getView(), // index 0: Step 1 output → Kawase pass 0 input
-      this.kawasePingA.getView(), //  index 1: Kawase pingA
-      this.kawasePingB.getView(), //  index 2: Kawase pingB
-    ];
-    this.kawaseInputBGs = views.map((view, i) =>
-      BindGroupFactory.createBindGroup(`god_rays_kawase_input_${i}`, layout, [
-        { binding: 0, resource: view },
-        { binding: 1, resource: SamplerLibrary.simpleSampler },
-      ]),
-    );
+  private rebuildInputBindGroups(): void {
+    // Blur and composite both use the SingleTexture layout at group(1).
+    const layout = this.blurTechnique.getPipeline().getBindGroupLayout(1);
+    this.volumetricInputBG = BindGroupFactory.createBindGroup('god_rays_volumetric_input', layout, [
+      { binding: 0, resource: this.volumetricRT.getView() },
+      { binding: 1, resource: SamplerLibrary.simpleSampler },
+    ]);
+    this.blurInputBG = BindGroupFactory.createBindGroup('god_rays_blur_input', layout, [
+      { binding: 0, resource: this.blurRT.getView() },
+      { binding: 1, resource: SamplerLibrary.simpleSampler },
+    ]);
   }
 }

@@ -1632,8 +1632,8 @@ export class BindGroupFactory {
   }
 
   /**
-   * Kawase blur step params layout (group 2).
-   * binding 0: KawaseParams uniform (16 bytes — offset f32 + 3× padding)
+   * Small 16-byte params uniform layout (group 2) — god rays bilateral blur params.
+   * binding 0: BlurParams uniform (16 bytes — dirX, dirY, depthSigma, pad)
    */
   public static getKawaseUniformsLayout(): GPUBindGroupLayout {
     return this.getLayout('kawase_uniforms', [

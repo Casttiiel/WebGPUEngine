@@ -447,12 +447,11 @@ export class GodRaysRadialRenderPass extends PostProcessingRenderPass {
 }
 
 /**
- * God rays Kawase blur render pass (Step 3).
- * One ping-pong pass of the 4-tap diagonal Kawase kernel.
- * Run 5× with pre-written offset buffers: k ∈ {0, 1, 2, 2, 3}.
- * group(0) = CameraUniforms (auto), group(1) = ping-pong input, group(2) = KawaseParams.
+ * God rays bilateral blur render pass.
+ * One separable depth-aware blur pass (horizontal or vertical, set by params).
+ * group(0) = CameraUniforms (auto), group(1) = input texture, group(2) = BlurParams.
  */
-export class GodRaysKawaseRenderPass extends PostProcessingRenderPass {
+export class GodRaysBlurRenderPass extends PostProcessingRenderPass {
   private inputBindGroup: GPUBindGroup;
   private paramsBindGroup: GPUBindGroup;
 
@@ -476,12 +475,14 @@ export class GodRaysKawaseRenderPass extends PostProcessingRenderPass {
 }
 
 /**
- * God rays composite render pass (Step 4).
- * Additively blends the blurred light-shaft buffer onto the full-resolution
- * HDR frame in-place (loadOp: 'load' + ONE+ONE pipeline blend).
- * group(0) = CameraUniforms (auto), group(1) = Kawase output, group(2) = composite params.
+ * God rays composite render pass.
+ * Joint-bilateral upsamples the half-res shaft buffer and additively blends it
+ * onto the full-resolution HDR frame in-place (loadOp: 'load' + ONE+ONE blend).
+ * group(0) = GBuffer (linearDepth), group(1) = blurred shafts,
+ * group(2) = composite params, group(3) = exposure.
  */
 export class GodRaysCompositeRenderPass extends PostProcessingRenderPass {
+  private gBufferBindGroup: GPUBindGroup;
   private inputBindGroup: GPUBindGroup;
   private paramsBindGroup: GPUBindGroup;
   private exposureBindGroup: GPUBindGroup;
@@ -490,18 +491,20 @@ export class GodRaysCompositeRenderPass extends PostProcessingRenderPass {
     config: RenderPassConfig,
     mesh: Mesh,
     technique: Technique,
+    gBufferBindGroup: GPUBindGroup,
     inputBindGroup: GPUBindGroup,
     paramsBindGroup: GPUBindGroup,
     exposureBindGroup: GPUBindGroup,
   ) {
     super(config, mesh, technique);
+    this.gBufferBindGroup = gBufferBindGroup;
     this.inputBindGroup = inputBindGroup;
     this.paramsBindGroup = paramsBindGroup;
     this.exposureBindGroup = exposureBindGroup;
   }
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
-    pass.setBindGroup(0, Engine.getRender().getMainCameraBindGroup());
+    pass.setBindGroup(0, this.gBufferBindGroup);
     pass.setBindGroup(1, this.inputBindGroup);
     pass.setBindGroup(2, this.paramsBindGroup);
     pass.setBindGroup(3, this.exposureBindGroup);
