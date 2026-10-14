@@ -23,8 +23,15 @@ export type TacticalCameraControllerData = Readonly<{
   /** Inclinación (grados bajo la horizontal) con el zoom al mínimo y al máximo. */
   pitchNear?: number;
   pitchFar?: number;
+  /**
+   * Curva de la inclinación con el zoom (exponente sobre 0..1): 1 = lineal, < 1 sube deprisa al
+   * alejarse (el plano casi horizontal solo muy cerca). Default 1.
+   */
+  pitchCurve?: number;
   /** Altura sobre el suelo del punto al que se mira (centra a los personajes). */
   lookHeight?: number;
+  /** Altura del punto de mira con el zoom al mínimo (con inclinación 0 es la altura del ojo). Default: lookHeight. */
+  lookHeightNear?: number;
   /** Velocidad de pan con teclado/bordes, en fracciones de la distancia por segundo. */
   panSpeed?: number;
   edgePan?: boolean;
@@ -77,6 +84,8 @@ export class TacticalCameraControllerComponent extends Component {
   private pitchNear = 40;
   private pitchFar = 62;
   private lookHeight = 1.0;
+  private lookHeightNear: number | null = null;
+  private pitchCurve = 1;
   private panSpeed = 0.9;
   private edgePan = true;
   private edgePanMargin = 10;
@@ -127,6 +136,8 @@ export class TacticalCameraControllerComponent extends Component {
     this.pitchNear = data.pitchNear ?? this.pitchNear;
     this.pitchFar = data.pitchFar ?? this.pitchFar;
     this.lookHeight = data.lookHeight ?? this.lookHeight;
+    this.lookHeightNear = data.lookHeightNear ?? null;
+    this.pitchCurve = data.pitchCurve ?? this.pitchCurve;
     this.panSpeed = data.panSpeed ?? this.panSpeed;
     this.edgePan = data.edgePan ?? this.edgePan;
     this.edgePanMargin = data.edgePanMargin ?? this.edgePanMargin;
@@ -379,16 +390,27 @@ export class TacticalCameraControllerComponent extends Component {
     if (input.isKeyJustPressed(KeyCode.F)) this.setFollowEnabled(!this.isFollowing());
   }
 
-  private pitchForDistance(distance: number): number {
+  /** 0 con el zoom al mínimo, 1 al máximo (con la curva de inclinación aplicada). */
+  private zoomT(distance: number): number {
     const t = clamp((distance - this.minDistance) / (this.maxDistance - this.minDistance), 0, 1);
-    return this.pitchNear + (this.pitchFar - this.pitchNear) * t;
+    return Math.pow(t, this.pitchCurve);
+  }
+
+  private pitchForDistance(distance: number): number {
+    return this.pitchNear + (this.pitchFar - this.pitchNear) * this.zoomT(distance);
+  }
+
+  private lookHeightForDistance(distance: number): number {
+    const near = this.lookHeightNear ?? this.lookHeight;
+    return near + (this.lookHeight - near) * this.zoomT(distance);
   }
 
   private applyToCamera(): void {
     const pitch = this.pitchForDistance(this.distance) * DEG;
     const yaw = this.yaw * DEG;
 
-    vec3.set(this.tmpLook, this.pivot[0]!, this.pivot[1]! + this.lookHeight, this.pivot[2]!);
+    const lookHeight = this.lookHeightForDistance(this.distance);
+    vec3.set(this.tmpLook, this.pivot[0]!, this.pivot[1]! + lookHeight, this.pivot[2]!);
     // El ojo queda detrás del pivot (opuesto a la dirección de vista) y por encima.
     vec3.set(
       this.tmpEye,

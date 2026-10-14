@@ -17,7 +17,10 @@ import { TransformComponent } from '../core/TransformComponent';
  *   [9]     sigmaS            (density * scatteringCoeff)
  *   [10]    sigmaT            (sigmaS + density * absorptionCoeff)
  *   [11]    blendMode         (0 = add, 1 = override)
- *   [12..15] _pad             (padding to 64 bytes)
+ *   [12]    noiseAmount       (0 = uniforme, 1 = jirones con huecos finos, al 35 %)
+ *   [13]    noiseScale        (frecuencia del ruido, 1/m: 0.25 → bancos de ~4 m)
+ *   [14]    noiseSpeed        (velocidad de deriva y evolución, m/s)
+ *   [15]    edgeBreakup       (0..1: el borde superior ondula en vez de ser plano)
  */
 export class FogVolumeComponent extends Component {
   private shape: 'box' | 'sphere' = 'box';
@@ -28,6 +31,10 @@ export class FogVolumeComponent extends Component {
   private absorptionCoeff: number = 0.2;
   private falloff: number = 2.0;
   private blendMode: 'add' | 'override' = 'add';
+  private noiseAmount = 0;
+  private noiseScale = 0.25;
+  private noiseSpeed = 0.4;
+  private edgeBreakup = 0;
 
   /** Cached GPU data (16 floats), refreshed every update(). */
   private gpuData: Float32Array = new Float32Array(16);
@@ -42,6 +49,10 @@ export class FogVolumeComponent extends Component {
     if (d.absorptionCoeff !== undefined) this.absorptionCoeff = d.absorptionCoeff;
     if (d.falloff !== undefined) this.falloff = d.falloff;
     if (d.blendMode !== undefined) this.blendMode = d.blendMode;
+    if (d.noiseAmount !== undefined) this.noiseAmount = d.noiseAmount;
+    if (d.noiseScale !== undefined) this.noiseScale = d.noiseScale;
+    if (d.noiseSpeed !== undefined) this.noiseSpeed = d.noiseSpeed;
+    if (d.edgeBreakup !== undefined) this.edgeBreakup = d.edgeBreakup;
   }
 
   public update(_dt: number): void {
@@ -81,7 +92,11 @@ export class FogVolumeComponent extends Component {
     this.gpuData[10] = sigmaT;
     // blendMode
     this.gpuData[11] = blendFlag;
-    // padding [12..15] already zero from construction
+    // ruido
+    this.gpuData[12] = this.noiseAmount;
+    this.gpuData[13] = this.noiseScale;
+    this.gpuData[14] = this.noiseSpeed;
+    this.gpuData[15] = this.edgeBreakup;
   }
 
   /** Returns the packed 16-float GPU data for this volume. Valid after update(). */

@@ -51,6 +51,73 @@ fn sampleNoise3D(worldPos: vec3<f32>) -> f32 {
 }
 
 // -----------------------------------------------------------------------
+// Ruido 3D procedural de los volúmenes (bruma irregular, sin textura: no se repite)
+// -----------------------------------------------------------------------
+
+fn hash31(p: vec3<f32>) -> f32 {
+    var q = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
+    q += dot(q, q.yxz + 33.33);
+    return fract((q.x + q.y) * q.z);
+}
+
+/// Value noise 3D con interpolación quíntica (sin escalones), en [0, 1].
+fn valueNoise3(p: vec3<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    let a = hash31(i);
+    let b = hash31(i + vec3<f32>(1.0, 0.0, 0.0));
+    let c = hash31(i + vec3<f32>(0.0, 1.0, 0.0));
+    let d = hash31(i + vec3<f32>(1.0, 1.0, 0.0));
+    let e = hash31(i + vec3<f32>(0.0, 0.0, 1.0));
+    let g = hash31(i + vec3<f32>(1.0, 0.0, 1.0));
+    let h = hash31(i + vec3<f32>(0.0, 1.0, 1.0));
+    let k = hash31(i + vec3<f32>(1.0, 1.0, 1.0));
+    return mix(
+        mix(mix(a, b, u.x), mix(c, d, u.x), u.y),
+        mix(mix(e, g, u.x), mix(h, k, u.x), u.y),
+        u.z,
+    );
+}
+
+/// FBM de `octaves` octavas (cada una al doble de frecuencia y la mitad de peso), en [0, 1].
+fn fbm3(p: vec3<f32>, octaves: i32) -> f32 {
+    var sum = 0.0;
+    var amp = 0.5;
+    var norm = 0.0;
+    var q = p;
+    for (var o = 0; o < octaves; o++) {
+        sum += valueNoise3(q) * amp;
+        norm += amp;
+        // Rotación entre octavas para que no se alineen con los ejes.
+        q = vec3<f32>(q.x * 1.6 + q.z * 1.2, q.y * 2.0, -q.x * 1.2 + q.z * 1.6) + vec3<f32>(17.1, 3.7, 9.3);
+        amp *= 0.5;
+    }
+    return sum / norm;
+}
+
+/// Densidad relativa de la bruma en `worldPos` para un volumen con ruido `noise`
+/// (x=amount, y=scale, z=speed, w=edgeBreakup). Devuelve el valor FBM en [0, 1].
+fn mistNoise(worldPos: vec3<f32>, noise: vec4<f32>) -> f32 {
+    let t = camera.time;
+    // Deriva: un poco del viento del motor (XZ; pensado para nubes, aquí sería un vendaval)
+    // más una corriente propia lenta.
+    let wind = vec3<f32>(volumetricParams.windDir.x, 0.0, volumetricParams.windDir.z) * 0.25;
+    let drift = (wind + vec3<f32>(0.8, 0.0, 0.5) * noise.z) * t;
+    // Más ancha que alta: bancos y jirones tendidos, no bolas.
+    var q = (worldPos - drift) * noise.y * vec3<f32>(1.0, 1.8, 1.0);
+    // La forma evoluciona (no solo se desplaza).
+    q.y += t * noise.z * 0.15;
+    // Domain warping: deforma el espacio con otro ruido → remolinos y jirones.
+    let warp = vec3<f32>(
+        fbm3(q * 0.5 + vec3<f32>(1.7, 9.2, 4.3), 2),
+        fbm3(q * 0.5 + vec3<f32>(8.3, 2.8, 6.1), 2),
+        fbm3(q * 0.5 + vec3<f32>(3.1, 5.7, 7.3), 2),
+    ) - 0.5;
+    return fbm3(q + warp * 2.2, 4);
+}
+
+// -----------------------------------------------------------------------
 // Fog Volume SDF helpers
 // -----------------------------------------------------------------------
 
@@ -85,8 +152,23 @@ fn applyFogVolumes(worldPos: vec3<f32>, baseSigmaS: f32, baseSigmaT: f32) -> vec
             sdf = sdfBox(localPos, vol.halfExtents);
         }
 
+        // Ruido del volumen (solo cerca o dentro de él).
+        let hasNoise = vol.noise.x > 0.0 || vol.noise.w > 0.0;
+        var n = 0.5;
+        if (hasNoise && sdf < vol.falloff + vol.halfExtents.y * vol.noise.w) {
+            n = mistNoise(worldPos, vol.noise);
+            // Borde irregular: la superficie sube y baja con el ruido (cimas y valles).
+            sdf += (0.5 - n) * 2.0 * vol.noise.w * vol.halfExtents.y;
+        }
+
         // blend = 1 inside, smoothly falls to 0 over [0, falloff] outside the surface
-        let blend = saturate(smoothstep(0.0, vol.falloff, -sdf));
+        var blend = saturate(smoothstep(0.0, vol.falloff, -sdf));
+        // Jirones: huecos más finos donde el ruido es bajo (nunca vacíos del todo) y bancos
+        // densos donde es alto.
+        if (blend > 0.0 && vol.noise.x > 0.0) {
+            let patches = mix(0.35, 1.75, smoothstep(0.32, 0.72, n));
+            blend *= mix(1.0, patches, vol.noise.x);
+        }
 
         if (blend > 0.0) {
             if (vol.blendMode < 0.5) {
@@ -95,8 +177,8 @@ fn applyFogVolumes(worldPos: vec3<f32>, baseSigmaS: f32, baseSigmaT: f32) -> vec
                 outT += vol.sigmaT * blend;
             } else {
                 // "override" — lerp toward the volume's density (clears fog in interiors)
-                outS = mix(outS, vol.sigmaS, blend);
-                outT = mix(outT, vol.sigmaT, blend);
+                outS = mix(outS, vol.sigmaS, saturate(blend));
+                outT = mix(outT, vol.sigmaT, saturate(blend));
             }
         }
     }

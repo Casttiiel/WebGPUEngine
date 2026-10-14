@@ -21,8 +21,10 @@
       "distance": 16,
       "minDistance": 6,
       "maxDistance": 32,
-      "pitchNear": 40,
-      "pitchFar": 62
+      "pitchNear": 0,
+      "pitchFar": 52,
+      "pitchCurve": 0.5,
+      "lookHeightNear": 1.5
     }
   }
 }

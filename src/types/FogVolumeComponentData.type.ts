@@ -18,4 +18,12 @@ export interface FogVolumeComponentData {
    *   "override" — lerps toward the volume's density (clears fog in interiors)
    */
   blendMode?: 'add' | 'override';
+  /** Irregularidad (0 = uniforme, 1 = jirones con huecos finos, al 35 %). Default 0. */
+  noiseAmount?: number;
+  /** Frecuencia del ruido (1/m): 0.25 → bancos de unos 4 m. Default 0.25. */
+  noiseScale?: number;
+  /** Velocidad a la que deriva y evoluciona (m/s; se suma al viento del motor). Default 0.4. */
+  noiseSpeed?: number;
+  /** El borde superior ondula en vez de ser plano (0..1). Default 0. */
+  edgeBreakup?: number;
 }

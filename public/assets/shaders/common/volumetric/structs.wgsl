@@ -45,7 +45,7 @@ struct FogVolume {
   sigmaS:      f32,         // bytes 36-39
   sigmaT:      f32,         // bytes 40-43
   blendMode:   f32,         // bytes 44-47  — 0=add, 1=override
-  _pad:        vec4<f32>,   // bytes 48-63 (padding to 64-byte stride)
+  noise:       vec4<f32>,   // bytes 48-63 — x=amount, y=scale (1/m), z=speed (m/s), w=edgeBreakup
 }
 
 const MAX_FOG_VOLUMES: u32 = 16u;
