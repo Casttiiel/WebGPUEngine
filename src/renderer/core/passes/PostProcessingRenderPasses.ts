@@ -255,6 +255,7 @@ export class AOBilateralFilterRenderPass extends PostProcessingRenderPass {
 export class BloomCombineRenderPass extends PostProcessingRenderPass {
   private bloomCombineParamsBindGroup: GPUBindGroup;
   private bloomTexturesBindGroup: GPUBindGroup;
+  private lensDirtBindGroup: GPUBindGroup | null;
 
   constructor(
     config: RenderPassConfig,
@@ -262,16 +263,19 @@ export class BloomCombineRenderPass extends PostProcessingRenderPass {
     technique: Technique,
     bloomCombineParamsBindGroup: GPUBindGroup,
     bloomTexturesBindGroup: GPUBindGroup,
+    lensDirtBindGroup: GPUBindGroup | null = null,
   ) {
     super(config, mesh, technique);
     this.bloomCombineParamsBindGroup = bloomCombineParamsBindGroup;
     this.bloomTexturesBindGroup = bloomTexturesBindGroup;
+    this.lensDirtBindGroup = lensDirtBindGroup;
   }
 
   protected setBindGroups(pass: GPURenderPassEncoder): void {
     // Set all bind groups needed for the bloom combine shader
     pass.setBindGroup(0, this.bloomCombineParamsBindGroup);
     pass.setBindGroup(1, this.bloomTexturesBindGroup);
+    if (this.lensDirtBindGroup) pass.setBindGroup(2, this.lensDirtBindGroup);
   }
 }
 

@@ -5,5 +5,5 @@
     "writesOn": "texture",
     "z": "disable_all",
     "blend": "additive",
-    "uniforms":["BufferUniform", "SingleTexture"]
+    "uniforms":["BufferUniform", "SingleTexture", "SingleTexture"]
 }

@@ -13,6 +13,9 @@ import { SamplerLibrary } from '../../renderer/core/utils/SamplerLibrary';
 import { BlurKawaseComponent } from './BlurKawaseComponent';
 import { MsgDispatcher } from '../../core/ecs/MsgDispatcher';
 import { MsgType } from '../../types/MsgType.enum';
+import { BloomComponentData } from '../../types/BloomComponentData.type';
+
+const DEFAULT_LENS_DIRT_TEXTURE = 'lens_dirt.jpg';
 
 export class BloomComponent extends BlurKawaseComponent {
   private whiteTexture!: Texture;
@@ -25,6 +28,12 @@ export class BloomComponent extends BlurKawaseComponent {
   private thresholdMin: number = 12.0; // Más alto para evitar specular común
   private thresholdMax: number = 0.7; // Threshold más alto para HDR
   private emissiveFactor: number = 2.0;
+  private intensity: number = 1.0;
+
+  // Lens dirt: modulates the bloom layer only, so it shows where bright light hits the lens
+  private lensDirtIntensity: number = 0.0;
+  private lensDirtTexture!: Texture;
+  private lensDirtBindGroup: GPUBindGroup | null = null;
 
   // Additional bind groups for bloom combine operation
   private inputTextureBindGroup!: GPUBindGroup | null;
@@ -43,7 +52,13 @@ export class BloomComponent extends BlurKawaseComponent {
     this.renderPassManager = new RenderPassManager();
   }
 
-  public override async load(): Promise<void> {
+  public override async load(data: BloomComponentData = {}): Promise<void> {
+    if (data.thresholdMin !== undefined) this.thresholdMin = data.thresholdMin;
+    if (data.thresholdMax !== undefined) this.thresholdMax = data.thresholdMax;
+    if (data.emissiveFactor !== undefined) this.emissiveFactor = data.emissiveFactor;
+    if (data.intensity !== undefined) this.intensity = data.intensity;
+    if (data.lensDirtIntensity !== undefined) this.lensDirtIntensity = data.lensDirtIntensity;
+
     // Load parent blur component first
     await super.load();
 
@@ -51,6 +66,14 @@ export class BloomComponent extends BlurKawaseComponent {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
     this.technique = await Technique.getAsync('post-processing/bloom_filter.tech');
     this.combineTechnique = await Technique.getAsync('post-processing/bloom_combine_simple.tech');
+    this.lensDirtTexture = await Texture.getAsync(
+      data.lensDirtTexture ?? DEFAULT_LENS_DIRT_TEXTURE,
+      false,
+      true,
+    );
+    // Screen-space texture: not owned by any world entity, so TextureStreamingManager would
+    // never upgrade it past the 64px placeholder. Load full resolution up front.
+    await this.lensDirtTexture.streamFullResolution();
 
     const qualitySettings = QualitySettings.getInstance();
     const bloomFormat = qualitySettings.getSettings().bloomTexture;
@@ -112,7 +135,7 @@ export class BloomComponent extends BlurKawaseComponent {
 
   private updateBloomCombineParams(): void {
     // Update bloom combine parameters buffer
-    const paramsData = new Float32Array([1.0]);
+    const paramsData = new Float32Array([this.intensity, this.lensDirtIntensity, 0.0, 0.0]);
 
     GPUUtils.writeBuffer(this.bloomCombineParamsBuffer, 0, paramsData);
   }
@@ -154,6 +177,7 @@ export class BloomComponent extends BlurKawaseComponent {
       this.technique !== undefined &&
       this.combineTechnique !== undefined &&
       this.whiteTexture !== undefined &&
+      this.lensDirtTexture !== undefined &&
       this.fullscreenQuadMesh !== undefined &&
       this.result !== undefined
     );
@@ -173,6 +197,7 @@ export class BloomComponent extends BlurKawaseComponent {
       this.combineTechnique,
       this.bloomCombineParamsBindGroup!,
       this.bloomTexturesBindGroup!,
+      this.lensDirtBindGroup!,
     );
 
     // Execute the custom pass directly using RenderPassManager
@@ -198,7 +223,19 @@ export class BloomComponent extends BlurKawaseComponent {
 
   private setupCombineBindGroups(bloomTexture: GPUTextureView): void {
     // ✅ Skip if already created
-    if (this.bloomCombineParamsBindGroup && this.bloomTexturesBindGroup) return;
+    if (this.bloomCombineParamsBindGroup && this.bloomTexturesBindGroup && this.lensDirtBindGroup) {
+      return;
+    }
+
+    this.lensDirtBindGroup = BindGroupFactory.createBindGroup(
+      'bloom_lens_dirt_bindgroup',
+      this.combineTechnique.getPipeline().getBindGroupLayout(2),
+      [
+        // sRGB view: the dirt image is authored as a photo, decode to linear before modulating HDR bloom
+        { binding: 0, resource: this.lensDirtTexture.getSRGBTextureView()! },
+        { binding: 1, resource: SamplerLibrary.bloom },
+      ],
+    );
 
     this.bloomCombineParamsBindGroup = BindGroupFactory.createBindGroup(
       `bloom_combine_params_bindgroup`,
@@ -274,6 +311,8 @@ export class BloomComponent extends BlurKawaseComponent {
       thresholdMin: this.thresholdMin,
       thresholdMax: this.thresholdMax,
       emissiveFactor: this.emissiveFactor,
+      intensity: this.intensity,
+      lensDirtIntensity: this.lensDirtIntensity,
     };
 
     this._editorFolder.add(proxy, 'thresholdMin', 0, 30, 0.1).name('Threshold Min')
@@ -282,6 +321,10 @@ export class BloomComponent extends BlurKawaseComponent {
       .onChange((v: number) => { this.thresholdMax = v; this.updateBloomFilterParams(); });
     this._editorFolder.add(proxy, 'emissiveFactor', 0, 10, 0.1).name('Emissive Factor')
       .onChange((v: number) => { this.emissiveFactor = v; this.updateBloomFilterParams(); });
+    this._editorFolder.add(proxy, 'intensity', 0, 4, 0.05).name('Intensity')
+      .onChange((v: number) => { this.intensity = v; this.updateBloomCombineParams(); });
+    this._editorFolder.add(proxy, 'lensDirtIntensity', 0, 100, 0.5).name('Lens Dirt')
+      .onChange((v: number) => { this.lensDirtIntensity = v; this.updateBloomCombineParams(); });
   }
 
   public override renderDebug(): void {
