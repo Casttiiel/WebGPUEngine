@@ -19,6 +19,7 @@ export enum PipelineBindGroupLayouts {
   SSR_COMPOSE_UNIFORMS = 'SSRComposeUniforms',
   TEMPORAL_ACCUMULATION_UNIFORMS = 'TemporalAccumulationUniforms',
   FROXEL_UNIFORMS = 'FroxelUniforms',
+  FROXEL_RAYMARCH_SLICE = 'FroxelRaymarchSlice',
   PARTICLE_UNIFORMS = 'ParticleUniforms',
   PARTICLE_WORLDSPACE_UNIFORMS = 'ParticleWorldSpaceUniforms',
   INSTANCE_STORAGE = 'InstanceStorage',

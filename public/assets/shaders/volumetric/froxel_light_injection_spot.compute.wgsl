@@ -51,13 +51,14 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     }
 
     let coord = vec3<i32>(i32(globalId.x), i32(globalId.y), i32(globalId.z));
-    let existing = textureLoad(froxelLightTexture, coord, 0).rgb;
+    let existing = textureLoad(froxelLightTexture, coord, 0); // .a = sun factor, passed through
     
-    let froxelVS = froxelToViewSpace(
-        globalId,
+    // Jittered sample inside the froxel — the temporal pass integrates it.
+    let froxelVS = froxelCoordToViewSpace(
+        vec3<f32>(globalId) + froxelParams.jitter.xyz,
         froxelParams.dimensions.xyz,
-        froxelParams.nearPlane,
-        froxelParams.farPlane,
+        froxelParams.depthDistScale,
+        froxelParams.depthDistB,
         camera.invProjection
     );
     let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
@@ -66,7 +67,7 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     let screenPos = almostScreenPos.xyz / almostScreenPos.w;
     // if out of range, shadow_factor = 0
     if (screenPos.x < -1.0 || screenPos.x > 1.0 || screenPos.y < -1.0 || screenPos.y > 1.0 || screenPos.z < 0.0 || screenPos.z > 1.0) {
-        textureStore(froxelLightOutput, coord, vec4<f32>(existing, 1.0));
+        textureStore(froxelLightOutput, coord, existing);
         return;
     }
     var visibility = getShadowFactorSimple(froxelWorldPos.xyz, light.viewProjOffset, light.shadowStepDivResolution, shadowMap, shadowSampler, true);    
@@ -114,5 +115,5 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     // Esto da god rays claros cuando miras hacia la luz directional
     let contribution = light.color * light.intensity * visibility * phase * att * spotAttenuation;
     
-    textureStore(froxelLightOutput, coord, vec4<f32>(existing + contribution, 1.0));
+    textureStore(froxelLightOutput, coord, vec4<f32>(existing.rgb + contribution, existing.a));
 }

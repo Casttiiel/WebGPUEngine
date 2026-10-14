@@ -6,6 +6,8 @@
   "writesOn": "texture",
   "uniforms": [
     "FroxelUniforms",
-    "GBufferUniforms"
+    "GBufferUniforms",
+    "GodRaysVolumetricCSM",
+    "FroxelRaymarchSlice"
   ]
 }

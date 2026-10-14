@@ -56,6 +56,9 @@ export class FroxelVolumetricScattering {
   private spotLightInjectionShader!: GPUShaderModule;
   private spotLightInjectionPipeline!: GPUComputePipeline;
 
+  private temporalShader!: GPUShaderModule;
+  private temporalPipeline!: GPUComputePipeline;
+
   private rayMarchTechnique!: Technique;
   private fullscreenQuadMesh!: Mesh;
 
@@ -76,6 +79,27 @@ export class FroxelVolumetricScattering {
   private froxelSelfOcclusionTexture!: GPUTexture;
   private froxelSelfOcclusionTextureView!: GPUTextureView;
 
+  // Temporal accumulation of the injected light (ping-pong history)
+  private historyTextures: GPUTexture[] = [];
+  private historyViews: GPUTextureView[] = [];
+  private historyIndex = 0; // historyViews[historyIndex] = latest accumulated result
+  private historyValid = false;
+  private frameIndex = 0;
+  private prevViewProj = new Float32Array(16);
+  private temporalBindGroups: Map<string, GPUBindGroup> = new Map();
+
+  // Raymarch: exact per-pixel sun term for the partially covered last slice
+  private raymarchCSMBindGroup: GPUBindGroup | null = null;
+  private raymarchCSMShadowView: GPUTextureView | null = null;
+  private raymarchSliceBindGroups: GPUBindGroup[] = [];
+  private dummyCSMBindGroup: GPUBindGroup | null = null;
+  private dummyResources: (GPUTexture | GPUBuffer)[] = [];
+  private directionalLightShadowView: GPUTextureView | null = null;
+  private sunActive = false;
+
+  private clearLightPipeline!: GPUComputePipeline;
+  private clearLightBindGroup!: GPUBindGroup;
+
   // Static bind groups (textures only - uniforms are created dynamically)
   private densityTexturesBindGroup!: GPUBindGroup;
   private cameraBindGroup!: GPUBindGroup;
@@ -89,9 +113,16 @@ export class FroxelVolumetricScattering {
   private fogLayerHeight: number = 30.0; // Uniform fog layer thickness
   private fogFalloff: number = 0.08; // Exponential falloff above layer
   private ambientVolumetricIntensity: number = 0.0; // Ambient contribution to volumetric (keep low, 0.0-0.1)
-  private nearPlane: number = 0.1;
   private farPlane: number = 50.0;
+  // Slice distribution: depth(s) = (2^(s/S) - 1) / B. S = slices/2 gives slices
+  // ~0.35 m thick next to the camera and ~1.4 m at 50 m (64 slices).
+  private depthDistScale: number = 32.0;
+  // Weight of the reprojected history in the light volume (0 = no temporal filter).
+  private temporalBlend: number = 0.9;
   private gLightFactor: number = 0.33;
+  private debugView: boolean = false;
+  private loaded = false;
+  private resourcesCreated = false;
 
   // Uniform buffers
   private volumetricUniformBuffer!: GPUBuffer;
@@ -128,21 +159,20 @@ export class FroxelVolumetricScattering {
   private spotLightTexturesBindGroups: Map<SpotLightComponent, GPUBindGroup[]> = new Map();
   private spotLightDataBindGroups: Map<SpotLightComponent, GPUBindGroup> = new Map();
   private integrationBindGroups: GPUBindGroup[] = [];
-  private integrationDepthBindGroup!: GPUBindGroup;
 
   constructor() {
     this.device = GPUUtils.getDevice();
     this.volumetricUniformData = new Float32Array(16);
-    this.froxelUniformData = new Float32Array(16);
-    if (this.fogDensity <= 0.0) {
-      this.isEnabled = false;
-    }
+    // dimensions(4) + near/far/S/B(4) + jitter(4) + prevViewProj(16)
+    this.froxelUniformData = new Float32Array(28);
   }
 
+  /**
+   * Shaders and pipelines are always loaded (cheap) so fog can be switched on at
+   * runtime; the 3D textures are only allocated the first frame that actually
+   * has participating media (global fog or a FogVolume).
+   */
   public async load(): Promise<void> {
-    if (!this.isEnabled) {
-      return;
-    }
     this.noiseTexture = await Texture.getAsync('noiseRGBTileable.jpg');
     this.blueNoiseTexture = await Texture.getAsync('bluenoise64.png');
     await this.initializeComputeShaders();
@@ -151,8 +181,7 @@ export class FroxelVolumetricScattering {
     this.fullscreenQuadMesh = await Mesh.getAsync('fullscreenquad.obj');
 
     this.createUniformBuffers();
-
-    this.create();
+    this.loaded = true;
   }
 
   private async initializeComputeShaders(): Promise<void> {
@@ -208,6 +237,13 @@ export class FroxelVolumetricScattering {
       code: spotLightInjectionCode,
     });
 
+    const temporalCode = await ResourceManager.loadShader('volumetric/froxel_temporal.compute.wgsl');
+
+    this.temporalShader = this.device.createShaderModule({
+      label: 'Froxel Temporal Reprojection Compute Shader',
+      code: temporalCode,
+    });
+
     this.createComputePipelines();
   }
 
@@ -238,7 +274,7 @@ export class FroxelVolumetricScattering {
       [
         BindGroupFactory.getFroxelParametersLayout(),
         BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
-        BindGroupFactory.getIntegrationDepthLayout(),
+        BindGroupFactory.getCameraComputeLayout(),
       ],
     );
 
@@ -304,7 +340,7 @@ export class FroxelVolumetricScattering {
         BindGroupFactory.getCameraComputeLayout(),
         BindGroupFactory.getFroxelParametersLayout(),
         BindGroupFactory.getFroxelPointTexturesLayout(),
-        BindGroupFactory.getFroxelLightParametersLayout(),
+        BindGroupFactory.getFroxelPointLightDataLayout(),
       ],
     );
 
@@ -339,11 +375,48 @@ export class FroxelVolumetricScattering {
     };
 
     this.spotLightInjectionPipeline = PipelineFactory.createComputePipeline(spotLightConfig);
+
+    // Zero-fills the first light texture when there is no shadowed sun to write it
+    // (point / spot passes accumulate on top of it).
+    this.clearLightPipeline = PipelineFactory.createComputePipeline({
+      label: 'Froxel Clear Light Compute Pipeline',
+      layout: PipelineFactory.createPipelineLayout('froxel_clear_light_pipeline_layout', [
+        BindGroupFactory.getFroxelRGBA16StorageLayout(),
+      ]),
+      compute: {
+        module: this.device.createShaderModule({
+          label: 'Froxel Clear Light Compute Shader',
+          code: `
+@group(0) @binding(0) var target: texture_storage_3d<rgba16float, write>;
+@compute @workgroup_size(8, 8, 4)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  if (any(gid >= textureDimensions(target))) { return; }
+  textureStore(target, gid, vec4<f32>(0.0));
+}`,
+        }),
+        entryPoint: 'main',
+      },
+    });
+
+    this.temporalPipeline = PipelineFactory.createComputePipeline({
+      label: 'Froxel Temporal Reprojection Compute Pipeline',
+      layout: PipelineFactory.createPipelineLayout('froxel_temporal_pipeline_layout', [
+        BindGroupFactory.getCameraComputeLayout(),
+        BindGroupFactory.getFroxelParametersLayout(),
+        BindGroupFactory.getFroxelTemporalLayout(),
+      ]),
+      compute: {
+        module: this.temporalShader,
+        entryPoint: 'main',
+      },
+    });
   }
 
   public create(): void {
     this.createFroxelTextures();
     this.createBindGroups();
+    this.resourcesCreated = true;
+    this.historyValid = false;
   }
 
   private createFroxelTextures(): void {
@@ -402,6 +475,17 @@ export class FroxelVolumetricScattering {
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     });
     this.froxelSelfOcclusionTextureView = this.froxelSelfOcclusionTexture.createView();
+
+    this.historyTextures = [0, 1].map((i) =>
+      this.device.createTexture({
+        label: `froxel_light_history_${i}`,
+        size: [x, y, z],
+        dimension: '3d',
+        format: 'rgba16float',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+      }),
+    );
+    this.historyViews = this.historyTextures.map((t) => t.createView());
   }
 
   private createUniformBuffers(): void {
@@ -442,28 +526,25 @@ export class FroxelVolumetricScattering {
       ],
     );
 
-    this.integrationBindGroups = [
+    this.clearLightBindGroup = BindGroupFactory.createBindGroup(
+      'froxel_clear_light_bind_group',
+      BindGroupFactory.getFroxelRGBA16StorageLayout(),
+      [{ binding: 0, resource: this.froxelLightTextureViewA }],
+    );
+
+    // Integration reads the temporally filtered light (historyViews[i] = this frame's output).
+    this.integrationBindGroups = this.historyViews.map((historyView, i) =>
       BindGroupFactory.createBindGroup(
-        'froxel_integration_bind_group_0',
+        `froxel_integration_bind_group_${i}`,
         BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
         [
           { binding: 0, resource: this.froxelDensityTextureView },
-          { binding: 1, resource: this.froxelLightTextureViewA }, // lee de A
+          { binding: 1, resource: historyView },
           { binding: 2, resource: this.froxelIntegratedTextureView },
           { binding: 3, resource: SamplerLibrary.nonFilteringSampler },
         ],
       ),
-      BindGroupFactory.createBindGroup(
-        'froxel_integration_bind_group_1',
-        BindGroupFactory.getFroxelVolumetricIntegrationLayout(),
-        [
-          { binding: 0, resource: this.froxelDensityTextureView },
-          { binding: 1, resource: this.froxelLightTempTextureViewB }, // lee de B
-          { binding: 2, resource: this.froxelIntegratedTextureView },
-          { binding: 3, resource: SamplerLibrary.nonFilteringSampler },
-        ],
-      ),
-    ];
+    );
   }
 
   /**
@@ -474,12 +555,20 @@ export class FroxelVolumetricScattering {
     // After a resize GBufferPass destroys that texture, so we must drop them
     // so they get recreated with the new view on the next updateFroxelData call.
     this.noiseTextureBindGroup = null as any;
-    this.integrationDepthBindGroup = null as any;
+  }
+
+  private getFogVolumeCount(): number {
+    const list = Engine.getEntities().getObjectManagerByName('fog_volume')?.getList();
+    return list ? list.length : 0;
   }
 
   public updateFroxelData(linearDepth: RenderTarget): void {
-    if (!this.isEnabled || this.fogDensity === 0.0) {
+    if (!this.isVolumetricEnabled()) {
+      this.historyValid = false;
       return;
+    }
+    if (!this.resourcesCreated) {
+      this.create();
     }
 
     // Resetear ping-pong al inicio de cada frame para estado consistente
@@ -499,13 +588,17 @@ export class FroxelVolumetricScattering {
 
     this.executeSelfOcclusionPass(commandEncoder);
 
-    this.executeDirectionalLightInjectionPass(commandEncoder);
+    if (!this.executeDirectionalLightInjectionPass(commandEncoder)) {
+      this.executeClearLightPass(commandEncoder);
+    }
 
     this.executePointLightInjectionPass(commandEncoder);
 
     this.executeSpotLightInjectionPass(commandEncoder);
 
-    this.executeVolumetricIntegrationPass(commandEncoder, linearDepth);
+    this.executeTemporalPass(commandEncoder);
+
+    this.executeVolumetricIntegrationPass(commandEncoder);
     // No submit here — endFrame() submits everything together.
   }
 
@@ -522,6 +615,7 @@ export class FroxelVolumetricScattering {
 
     if (!this.cameraBindGroup || cameraBuffer !== this.lastCameraBuffer) {
       this.lastCameraBuffer = cameraBuffer;
+      this.raymarchSliceBindGroups = [];
 
       this.cameraBindGroup = BindGroupFactory.createBindGroup(
         'froxel_directional_light_camera_bind_group',
@@ -623,10 +717,45 @@ export class FroxelVolumetricScattering {
     computePass.end();
   }
 
-  private executeVolumetricIntegrationPass(
-    commandEncoder: GPUCommandEncoder,
-    linearDepth: RenderTarget,
-  ): void {
+  private executeTemporalPass(commandEncoder: GPUCommandEncoder): void {
+    const readHistory = this.historyIndex;
+    const writeHistory = 1 - this.historyIndex;
+    const currentIsA = this.froxelLightTextureView === this.froxelLightTextureViewA;
+    const key = `${currentIsA ? 'A' : 'B'}${writeHistory}`;
+
+    let bindGroup = this.temporalBindGroups.get(key);
+    if (!bindGroup) {
+      bindGroup = BindGroupFactory.createBindGroup(
+        `froxel_temporal_bind_group_${key}`,
+        BindGroupFactory.getFroxelTemporalLayout(),
+        [
+          { binding: 0, resource: this.froxelLightTextureView },
+          { binding: 1, resource: this.historyViews[readHistory]! },
+          { binding: 2, resource: SamplerLibrary.froxelRaymarchSampler },
+          { binding: 3, resource: this.historyViews[writeHistory]! },
+        ],
+      );
+      this.temporalBindGroups.set(key, bindGroup);
+    }
+
+    const ts = GPUProfiler.getInstance().getTimestampWrites('froxel_temporal_compute');
+    const computePass = commandEncoder.beginComputePass({
+      label: 'froxel_temporal_compute',
+      ...(ts ? { timestampWrites: ts } : {}),
+    });
+    computePass.setPipeline(this.temporalPipeline);
+    computePass.setBindGroup(0, this.cameraBindGroup);
+    computePass.setBindGroup(1, this.parametersBindGroup);
+    computePass.setBindGroup(2, bindGroup);
+    const { x, y, z } = this.froxelDimensions;
+    computePass.dispatchWorkgroups(Math.ceil(x / 8), Math.ceil(y / 8), Math.ceil(z / 4));
+    computePass.end();
+
+    this.historyIndex = writeHistory;
+    this.historyValid = true;
+  }
+
+  private executeVolumetricIntegrationPass(commandEncoder: GPUCommandEncoder): void {
     const integrationTs = GPUProfiler.getInstance().getTimestampWrites(
       'froxel_volumetrict_integration_compute',
     );
@@ -635,38 +764,45 @@ export class FroxelVolumetricScattering {
       ...(integrationTs ? { timestampWrites: integrationTs } : {}),
     });
 
-    const pingPongIdx = this.froxelLightTextureView === this.froxelLightTextureViewA ? 0 : 1;
-
-    if (!this.integrationDepthBindGroup) {
-      this.integrationDepthBindGroup = BindGroupFactory.createBindGroup(
-        'froxel_integration_depth_bind_group',
-        BindGroupFactory.getIntegrationDepthLayout(),
-        [{ binding: 0, resource: linearDepth.getView() }],
-      );
-    }
-
     computePass.setPipeline(this.volumetricIntegrationComputePipeline);
     computePass.setBindGroup(0, this.parametersBindGroup);
-    computePass.setBindGroup(1, this.integrationBindGroups[pingPongIdx]);
-    computePass.setBindGroup(2, this.integrationDepthBindGroup);
+    computePass.setBindGroup(1, this.integrationBindGroups[this.historyIndex]!);
+    computePass.setBindGroup(2, this.cameraBindGroup);
 
-    // Dispatch compute workgroups
-    const { x, y, z } = this.froxelDimensions;
-    const dispatchX = Math.ceil(x / 8); // Workgroup size: 8x8x4
-    const dispatchY = Math.ceil(y / 8);
-    const dispatchZ = Math.ceil(1);
-
-    computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
+    // One thread per froxel column
+    const { x, y } = this.froxelDimensions;
+    computePass.dispatchWorkgroups(Math.ceil(x / 8), Math.ceil(y / 8), 1);
     computePass.end();
   }
 
-  private executeDirectionalLightInjectionPass(commandEncoder: GPUCommandEncoder): void {
-    const directionalLightComponent = Engine.getEntities()
-      .getObjectManagerByName('directional_light')
-      ?.getList()[0] as DirectionalLightComponent;
+  private executeClearLightPass(commandEncoder: GPUCommandEncoder): void {
+    const computePass = commandEncoder.beginComputePass({ label: 'froxel_clear_light_compute' });
+    computePass.setPipeline(this.clearLightPipeline);
+    computePass.setBindGroup(0, this.clearLightBindGroup);
+    const { x, y, z } = this.froxelDimensions;
+    computePass.dispatchWorkgroups(Math.ceil(x / 8), Math.ceil(y / 8), Math.ceil(z / 4));
+    computePass.end();
+  }
 
-    if (!directionalLightComponent || !directionalLightComponent.getHasShadows()) {
-      return; // No directional light or no shadows
+  private getShadowedSun(): DirectionalLightComponent | null {
+    const sun = Engine.getEntities().getObjectManagerByName('directional_light')?.getList()[0] as
+      | DirectionalLightComponent
+      | undefined;
+    return sun && sun.getHasShadows() ? sun : null;
+  }
+
+  /** Returns false when there is no shadowed directional light (nothing written). */
+  private executeDirectionalLightInjectionPass(commandEncoder: GPUCommandEncoder): boolean {
+    const directionalLightComponent = this.getShadowedSun();
+    if (!directionalLightComponent) {
+      return false;
+    }
+
+    // Shadow maps can be recreated (resolution / cascade changes) — rebuild on change.
+    const shadowView0 = directionalLightComponent.getShadowDepthView(0);
+    if (shadowView0 !== this.directionalLightShadowView) {
+      this.directionalLightShadowView = shadowView0;
+      this.directionalLightDataBindGroup = null as any;
     }
 
     const dirLightTs = GPUProfiler.getInstance().getTimestampWrites(
@@ -747,6 +883,7 @@ export class FroxelVolumetricScattering {
 
     computePass.dispatchWorkgroups(dispatchX, dispatchY, dispatchZ);
     computePass.end();
+    return true;
   }
 
   private executePointLightInjectionPass(commandEncoder: GPUCommandEncoder): void {
@@ -809,8 +946,12 @@ export class FroxelVolumetricScattering {
           pointLightComponent,
           BindGroupFactory.createBindGroup(
             'froxel_point_light_data_bind_group',
-            BindGroupFactory.getFroxelLightParametersLayout(),
-            [{ binding: 0, resource: { buffer: pointLightComponent.getUniformBuffer() } }],
+            BindGroupFactory.getFroxelPointLightDataLayout(),
+            [
+              { binding: 0, resource: { buffer: pointLightComponent.getUniformBuffer() } },
+              { binding: 1, resource: pointLightComponent.getShadowDepthView() },
+              { binding: 2, resource: pointLightComponent.getShadowSampler() },
+            ],
           ),
         );
       }
@@ -927,6 +1068,7 @@ export class FroxelVolumetricScattering {
   }
 
   public renderVolumetrics(sceneTarget: GPUTextureView, gBufferBindGroup: GPUBindGroup): void {
+    if (!this.resourcesCreated || !this.isVolumetricEnabled()) return;
     const render = Render.getInstance();
     const commandEncoder = render.getCommandEncoder();
 
@@ -984,10 +1126,84 @@ export class FroxelVolumetricScattering {
 
     renderPass.setBindGroup(0, this.rayMarchBindGroup);
     renderPass.setBindGroup(1, gBufferBindGroup);
+    renderPass.setBindGroup(2, this.getRaymarchCSMBindGroup());
+    renderPass.setBindGroup(3, this.getRaymarchSliceBindGroup());
 
     this.fullscreenQuadMesh.renderGroup(renderPass);
 
     renderPass.end();
+  }
+
+  private getRaymarchCSMBindGroup(): GPUBindGroup {
+    const sun = this.getShadowedSun();
+    if (!sun) {
+      return this.getDummyCSMBindGroup();
+    }
+    const view0 = sun.getShadowDepthView(0);
+    if (!this.raymarchCSMBindGroup || view0 !== this.raymarchCSMShadowView) {
+      this.raymarchCSMShadowView = view0;
+      this.raymarchCSMBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_raymarch_csm_bind_group',
+        BindGroupFactory.getGodRaysVolumetricCSMLayout(),
+        [
+          { binding: 0, resource: { buffer: sun.getUniformBuffer() } },
+          { binding: 1, resource: view0 },
+          { binding: 2, resource: sun.getShadowDepthView(1) },
+          { binding: 3, resource: sun.getShadowDepthView(2) },
+          { binding: 4, resource: sun.getShadowSampler() },
+        ],
+      );
+    }
+    return this.raymarchCSMBindGroup;
+  }
+
+  /** Placeholder CSM bindings for scenes without a shadowed sun (sunPartial = 0, never sampled). */
+  private getDummyCSMBindGroup(): GPUBindGroup {
+    if (!this.dummyCSMBindGroup) {
+      const depth = this.device.createTexture({
+        label: 'froxel_dummy_shadow_depth',
+        size: [1, 1],
+        format: 'depth32float',
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+      });
+      const buffer = GPUUtils.createBuffer(
+        'froxel_dummy_csm_uniforms',
+        256,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+      this.dummyResources.push(depth, buffer);
+      const view = depth.createView();
+      this.dummyCSMBindGroup = BindGroupFactory.createBindGroup(
+        'froxel_raymarch_dummy_csm_bind_group',
+        BindGroupFactory.getGodRaysVolumetricCSMLayout(),
+        [
+          { binding: 0, resource: { buffer } },
+          { binding: 1, resource: view },
+          { binding: 2, resource: view },
+          { binding: 3, resource: view },
+          { binding: 4, resource: SamplerLibrary.shadows },
+        ],
+      );
+    }
+    return this.dummyCSMBindGroup;
+  }
+
+  private getRaymarchSliceBindGroup(): GPUBindGroup {
+    if (this.raymarchSliceBindGroups.length === 0) {
+      this.raymarchSliceBindGroups = this.historyViews.map((historyView, i) =>
+        BindGroupFactory.createBindGroup(
+          `froxel_raymarch_slice_bind_group_${i}`,
+          BindGroupFactory.getFroxelRaymarchSliceLayout(),
+          [
+            { binding: 0, resource: { buffer: this.lastCameraBuffer! } },
+            { binding: 1, resource: this.froxelDensityTextureView },
+            { binding: 2, resource: historyView },
+            { binding: 3, resource: this.froxelSelfOcclusionTextureView },
+          ],
+        ),
+      );
+    }
+    return this.raymarchSliceBindGroups[this.historyIndex]!;
   }
 
   private updateUniforms(): void {
@@ -1017,13 +1233,27 @@ export class FroxelVolumetricScattering {
     this.volumetricUniformData[offset++] = cameraTime; // windDir.w — temporal noise animation
 
     // Froxel grid parameters
+    const slices = this.froxelDimensions.z;
+    const depthDistScale = Math.max(this.depthDistScale, 1.0);
     offset = 0;
     this.froxelUniformData[offset++] = this.froxelDimensions.x;
     this.froxelUniformData[offset++] = this.froxelDimensions.y;
-    this.froxelUniformData[offset++] = this.froxelDimensions.z;
-    this.froxelUniformData[offset++] = 0.0; // Padding
-    this.froxelUniformData[offset++] = this.nearPlane;
+    this.froxelUniformData[offset++] = slices;
+    this.froxelUniformData[offset++] = typeof this.debugView === "number" ? this.debugView : this.debugView ? 1.0 : 0.0; // w: debug view (fog only)
+    this.sunActive = this.getShadowedSun() !== null;
+    this.froxelUniformData[offset++] = this.sunActive ? 1.0 : 0.0; // sunPartial
     this.froxelUniformData[offset++] = this.farPlane;
+    this.froxelUniformData[offset++] = depthDistScale;
+    this.froxelUniformData[offset++] = (Math.pow(2, slices / depthDistScale) - 1) / this.farPlane;
+    // Per-frame sample offset inside each froxel (Halton 2,3,5 — 16-frame cycle)
+    const jitterIndex = (this.frameIndex++ % 16) + 1;
+    this.froxelUniformData[offset++] = FroxelVolumetricScattering.halton(jitterIndex, 2);
+    this.froxelUniformData[offset++] = FroxelVolumetricScattering.halton(jitterIndex, 3);
+    this.froxelUniformData[offset++] = FroxelVolumetricScattering.halton(jitterIndex, 5);
+    this.froxelUniformData[offset++] = this.historyValid ? this.temporalBlend : 0.0;
+    // Previous frame view-projection for temporal reprojection, then remember this one.
+    this.froxelUniformData.set(this.prevViewProj, offset);
+    if (cam) this.prevViewProj.set(cam.getViewProjection());
 
     // Upload to GPU
     if (this.volumetricUniformBuffer) {
@@ -1087,9 +1317,6 @@ export class FroxelVolumetricScattering {
   }
 
   public renderInMenu(folder?: any): void {
-    if (!this.isEnabled) {
-      return;
-    }
     if (!folder) return;
     if (this._editorFolder) return;
     this._editorFolder = folder.addFolder('Volumetric Scattering');
@@ -1108,8 +1335,13 @@ export class FroxelVolumetricScattering {
       .name('Ambient Volumetric')
       .listen();
     this._editorFolder.add(this, 'gLightFactor', 0.0, 1.0).name('G Light Factor').listen();
-    this._editorFolder.add(this, 'nearPlane', 0.01, 1.0).name('Near Plane').listen();
     this._editorFolder.add(this, 'farPlane', 10.0, 200.0).name('Far Plane').listen();
+    this._editorFolder
+      .add(this, 'depthDistScale', 4.0, 128.0)
+      .name('Depth Distribution')
+      .listen();
+    this._editorFolder.add(this, 'temporalBlend', 0.0, 0.98).name('Temporal Blend').listen();
+    this._editorFolder.add(this, 'debugView').name('Debug: Fog Only').listen();
   }
 
   public dispose(): void {
@@ -1120,6 +1352,15 @@ export class FroxelVolumetricScattering {
     this.froxelLightTexture?.destroy();
     this.froxelLightTempTexture?.destroy();
     this.froxelSelfOcclusionTexture?.destroy();
+    for (const t of this.historyTextures) t.destroy();
+    this.historyTextures = [];
+    this.historyViews = [];
+    this.temporalBindGroups.clear();
+    this.raymarchSliceBindGroups = [];
+    for (const r of this.dummyResources) r.destroy();
+    this.dummyResources = [];
+    this.dummyCSMBindGroup = null;
+    this.resourcesCreated = false;
 
     this.pointLightTexturesBindGroups.clear();
     this.pointLightDataBindGroups.clear();
@@ -1128,6 +1369,20 @@ export class FroxelVolumetricScattering {
   }
 
   public isVolumetricEnabled(): boolean {
-    return this.isEnabled;
+    return (
+      this.isEnabled && this.loaded && (this.fogDensity > 0.0 || this.getFogVolumeCount() > 0)
+    );
+  }
+
+  private static halton(index: number, base: number): number {
+    let result = 0;
+    let f = 1 / base;
+    let i = index;
+    while (i > 0) {
+      result += f * (i % base);
+      i = Math.floor(i / base);
+      f /= base;
+    }
+    return result;
   }
 }

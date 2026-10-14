@@ -1,66 +1,68 @@
-// Froxel Coordinate Functions - Consolidated from 4 froxel shaders
-// This file eliminates duplication and ensures consistency
+// Froxel Coordinate Functions - shared by every froxel pass.
+//
+// DEPTH DISTRIBUTION
+// Slices follow an exponential curve that starts at depth 0 (camera) and ends at
+// farPlane (UE-style "linear near, exponential far"):
+//
+//   depth(s) = (exp2(s / S) - 1) / B          s ∈ [0, N]  (continuous slice coord)
+//   s(depth) = S * log2(1 + depth * B)
+//
+// S = depthDistScale (bigger → more linear), B = (exp2(N / S) - 1) / farPlane.
+// A pure log curve (near·(far/near)^t) wastes ~40% of the slices inside the first
+// metre and makes the far slices several metres thick — the main source of fog
+// leaking through walls. With S = N/2 the slice thickness only grows ~4x from near
+// to far.
+//
+// SLICE / TEXEL CONVENTION
+// Slice k spans [depth(k), depth(k+1)].
+// Per-froxel data (density, light) is evaluated inside slice k.
+// The integrated texture stores at texel k the result from the camera up to the
+// FAR boundary depth(k+1), so lookups at depth d use texel coordinate s(d) - 1.
 
-// ===========================
-// DEPTH CONVERSION FUNCTIONS
-// ===========================
-
-// Convert froxel Z coordinate to view space depth using logarithmic distribution
-fn froxelZToViewZLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z01 = (f32(z) + 0.5) / f32(slices);
-  return nearZ * pow(farZ / max(nearZ, 1e-6), z01);
+fn froxelSliceToDepth(s: f32, depthDistScale: f32, depthDistB: f32) -> f32 {
+  return (exp2(s / depthDistScale) - 1.0) / depthDistB;
 }
 
-// Calculate slice depth delta for logarithmic distribution
-fn sliceDzLog(z: u32, slices: u32, nearZ: f32, farZ: f32) -> f32 {
-  let z0 = froxelZToViewZLog(z, slices, nearZ, farZ);
-  // Extrapolar más allá del último slice en vez de clampear
-  let z1 = froxelZToViewZLog(z + 1u, slices, nearZ, farZ);
-  return max(z1 - z0, 1e-4);
+fn froxelDepthToSlice(depth: f32, depthDistScale: f32, depthDistB: f32) -> f32 {
+  return depthDistScale * log2(1.0 + max(depth, 0.0) * depthDistB);
 }
 
-// ===========================
-// COORDINATE TRANSFORMATION FUNCTIONS
-// ===========================
-
-// Compute view space ray direction from UV coordinates
+// Compute view space ray direction (z = -1 plane, NOT normalised) from UV coordinates.
 // Note: Assumes camera uniforms are available with invProjection matrix
 fn computeViewRayFromUV(uv: vec2<f32>, invProjection: mat4x4<f32>) -> vec3<f32> {
-    let ndc = vec4<f32>(uv * 2.0 - 1.0, 1.0, 1.0);
-    let rayH = invProjection * ndc;
-    return normalize(rayH.xyz / max(rayH.w, 1e-8));
+  let ndc = vec4<f32>(uv * 2.0 - 1.0, 1.0, 1.0);
+  let rayH = invProjection * ndc;
+  let ray = rayH.xyz / rayH.w;
+  // Scale so that ray.z == -1: multiplying by a view depth gives the position.
+  return ray / max(-ray.z, 1e-8);
 }
 
-// Convert froxel coordinates to view space position
-// Requires: FroxelUniforms (dimensions, nearPlane, farPlane)
-fn froxelToViewSpace(
-    froxel: vec3<u32>, 
-    froxelDimensions: vec3<f32>,
-    nearPlane: f32,
-    farPlane: f32,
-    invProjection: mat4x4<f32>
+// View-space position of a continuous froxel coordinate.
+// coord.xy in [0, dims.xy] (froxel centre = index + 0.5), coord.z in [0, dims.z].
+// froxel y = 0 is the TOP row of the screen.
+fn froxelCoordToViewSpace(
+  coord: vec3<f32>,
+  froxelDimensions: vec3<f32>,
+  depthDistScale: f32,
+  depthDistB: f32,
+  invProjection: mat4x4<f32>
 ) -> vec3<f32> {
-    let dimsU = vec3<u32>(froxelDimensions);
+  var uv = coord.xy / froxelDimensions.xy;
+  uv.y = 1.0 - uv.y;
+  let ray = computeViewRayFromUV(uv, invProjection);
+  let depth = froxelSliceToDepth(coord.z, depthDistScale, depthDistB);
+  return ray * depth;
+}
 
-    // UV at center of tile
-    var uv = (vec2<f32>(froxel.xy) + vec2<f32>(0.5)) / froxelDimensions.xy;
-    uv.y = 1.0 - uv.y;  // Flip Y coordinate
-    
-    // View ray direction
-    let rayVS = computeViewRayFromUV(uv, invProjection);
-
-    // View space depth (positive distance)
-    let viewDist = froxelZToViewZLog(froxel.z, dimsU.z, nearPlane, farPlane);
-
-    // Calculate distance along ray
-    let t = -viewDist / min(rayVS.z, -1e-6);
-
-    return rayVS * t;
+// Ratio between the distance travelled along the view ray and the view-depth
+// delta for the column through `uvTopDown` (1 at the screen centre, > 1 at edges).
+fn froxelRayLengthScale(uvTopDown: vec2<f32>, invProjection: mat4x4<f32>) -> f32 {
+  let ray = computeViewRayFromUV(vec2<f32>(uvTopDown.x, 1.0 - uvTopDown.y), invProjection);
+  return length(ray);
 }
 
 fn phaseHG(cosTheta: f32, g: f32) -> f32 {
-    let gg = g * g;
-    let denom = pow(1.0 + gg - 2.0 * g * cosTheta, 1.5);
-    // Normalización correcta con 4π
-    return (1.0 - gg) / (12.566370614 * max(denom, 1e-4)); // 4π ≈ 12.566370614
+  let gg = g * g;
+  let denom = pow(max(1.0 + gg - 2.0 * g * cosTheta, 1e-4), 1.5);
+  return (1.0 - gg) / (12.566370614 * denom); // 4π
 }

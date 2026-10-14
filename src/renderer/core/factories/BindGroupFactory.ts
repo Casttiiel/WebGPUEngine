@@ -1052,6 +1052,104 @@ export class BindGroupFactory {
   }
 
   /**
+   * Point light data for froxel injection (@group(3)):
+   *   binding 0 — LightUniforms buffer
+   *   binding 1 — shadow cube depth texture (dummy cube when the light has no shadows)
+   *   binding 2 — comparison sampler
+   */
+  public static getFroxelPointLightDataLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_point_light_data_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'depth', viewDimension: 'cube', multisampled: false },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'comparison' },
+      },
+    ]);
+  }
+
+  /**
+   * Froxel raymarch per-slice data (@group(3)) used to rebuild the partially
+   * covered last slice per pixel:
+   *   binding 0 — CameraUniforms
+   *   binding 1 — density (sigmaS, sigmaT), unfilterable 3D
+   *   binding 2 — temporally filtered light (.a = sun factor), filterable 3D
+   *   binding 3 — sun self-occlusion, unfilterable 3D
+   */
+  public static getFroxelRaymarchSliceLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_raymarch_slice_layout', [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'unfilterable-float', viewDimension: '3d' },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'unfilterable-float', viewDimension: '3d' },
+      },
+    ]);
+  }
+
+  /**
+   * Froxel temporal reprojection IO (@group(2)):
+   *   binding 0 — current injected light (read, 3D)
+   *   binding 1 — light history (read, filterable 3D)
+   *   binding 2 — linear clamp sampler for the history
+   *   binding 3 — new history (write, rgba16float storage 3D)
+   */
+  public static getFroxelTemporalLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_temporal_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'unfilterable-float', viewDimension: '3d', multisampled: false },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float', viewDimension: '3d', multisampled: false },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: { type: 'filtering' },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
+      },
+    ]);
+  }
+
+  /** Single write-only rgba16float 3D storage texture (froxel light clear pass). */
+  public static getFroxelRGBA16StorageLayout(): GPUBindGroupLayout {
+    return this.getLayout('froxel_rgba16_storage_layout', [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
+      },
+    ]);
+  }
+
+  /**
    * Create bind group layout for froxel density textures (group 1)
    */
   public static getFroxelDensityTexturesLayout(): GPUBindGroupLayout {
@@ -1962,6 +2060,8 @@ export class BindGroupFactory {
         return this.getGodRaysUniformsLayout();
       case PipelineBindGroupLayouts.GOD_RAYS_VOLUMETRIC_CSM:
         return this.getGodRaysVolumetricCSMLayout();
+      case PipelineBindGroupLayouts.FROXEL_RAYMARCH_SLICE:
+        return this.getFroxelRaymarchSliceLayout();
       case PipelineBindGroupLayouts.KAWASE_UNIFORMS:
         return this.getKawaseUniformsLayout();
       case PipelineBindGroupLayouts.WATER_COMPOSITE_UNIFORMS:

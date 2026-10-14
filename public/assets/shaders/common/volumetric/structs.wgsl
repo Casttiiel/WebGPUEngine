@@ -2,9 +2,13 @@
 // This file eliminates 800+ lines of duplicated code
 
 struct FroxelUniforms {
-  dimensions: vec4<f32>,   // Grid dimensions (160, 90, 64)
-  nearPlane: f32,
-  farPlane: f32
+  dimensions: vec4<f32>,      // xyz: grid dimensions, w: debug view (1 = fog only)
+  sunPartial: f32,            // 1 = raymarch resolves the last partial slice with an exact per-pixel sun shadow tap
+  farPlane: f32,              // depth covered by the grid (view-space metres)
+  depthDistScale: f32,        // S in depth(s) = (exp2(s/S) - 1) / B
+  depthDistB: f32,            // B
+  jitter: vec4<f32>,          // xyz: per-frame sample offset inside the froxel [0,1), w: history weight (0 = reset)
+  prevViewProj: mat4x4<f32>,  // previous frame view-projection (temporal reprojection)
 }
 
 struct VolumetricUniforms {

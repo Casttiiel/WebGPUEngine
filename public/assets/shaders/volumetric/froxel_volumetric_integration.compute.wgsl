@@ -1,3 +1,4 @@
+#include "common/uniforms"
 #include "common/volumetric/structs"
 #include "common/volumetric/froxel"
 
@@ -9,112 +10,62 @@
 @group(1) @binding(1) var froxelLightTexture: texture_3d<f32>;
 @group(1) @binding(2) var froxelIntegratedTexture: texture_storage_3d<rgba16float, write>;
 
-// G-Buffer linear depth (R = viewZ / cameraFar, 0 = sky/no geometry)
-@group(2) @binding(0) var linearDepth: texture_2d<f32>;
+@group(2) @binding(0) var<uniform> camera: CameraUniforms;
 
-const MAX_SLICES: u32 = 1024u;
-
+// Front-to-back integration, one thread per froxel column.
+//
+// Texel z of the output holds (in-scattered radiance, transmittance) from the
+// camera up to the FAR boundary of slice z. The raymarch pass looks up texel
+// s(depth) - 1 with trilinear filtering, which linearly interpolates inside the
+// slice that contains the surface — no fog from behind the surface is added.
+//
+// Geometry is deliberately NOT used here: the lookup depth already stops the
+// integral at the surface for every pixel. Truncating whole columns at a single
+// per-froxel depth sample created dark halos around silhouettes.
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let dims = froxelParams.dimensions;
 
-  // 1 hilo por columna (x,y)
   if (gid.x >= u32(dims.x) || gid.y >= u32(dims.y)) {
     return;
   }
 
   let slices = u32(dims.z);
 
-  // ── Depth-aware integration ───────────────────────────────────────────────
-  // Sample the G-Buffer linear depth once per column.  depth01 == 0 means sky
-  // (G-Buffer cleared to 0, no geometry rendered at that pixel), so we treat
-  // it as "no occluder → fog runs to the froxel far plane."
-  let froxelScreenUV = (vec2<f32>(gid.xy) + vec2<f32>(0.5)) / dims.xy;
-  let depthDims  = vec2<f32>(textureDimensions(linearDepth));
-  let depthPixel = clamp(vec2<i32>(froxelScreenUV * depthDims),
-                         vec2<i32>(0, 0),
-                         vec2<i32>(depthDims) - vec2<i32>(1, 1));
-  let rawDepth01    = textureLoad(linearDepth, depthPixel, 0).r;
-  let cameraFar     = volumetricSettings.windDir.y;  // packed by FroxelVolumetricScattering.ts
-  // rawDepth01 = 0 ↔ sky (clear value) → treat as full far-plane depth
-  let sceneViewDist = select(froxelParams.farPlane, rawDepth01 * cameraFar, rawDepth01 > 1e-5);
-  // ─────────────────────────────────────────────────────────────────────────
+  // View depth → distance travelled along this column's ray.
+  let columnUV = (vec2<f32>(gid.xy) + vec2<f32>(0.5)) / dims.xy;
+  let rayScale = froxelRayLengthScale(columnUV, camera.invProjection);
 
-  // Integración acumulada por columna
-  var T: f32 = 1.0;                 // transmittance acumulada
-  var S: vec3<f32> = vec3<f32>(0.0); // scattering acumulado (RGB)
+  var T: f32 = 1.0;                  // accumulated transmittance
+  var S: vec3<f32> = vec3<f32>(0.0); // accumulated in-scattering (RGB)
+  var depth0 = 0.0;                  // near boundary of the current slice
 
-  for (var z: u32 = 0u; z < MAX_SLICES; z = z + 1u) {
-    if (z >= slices) { break; }
-
-    // ── Geometry depth stop ───────────────────────────────────────────────
-    // Compute the front face of this froxel slice in view space.
-    // If it starts behind the scene geometry, fog cannot exist here.
-    // Fill remaining slices with the current accumulated value and exit.
-    let slicesF      = dims.z;  // f32
-    let sliceFrontVZ = froxelParams.nearPlane *
-                       pow(froxelParams.farPlane / froxelParams.nearPlane, f32(z) / slicesF);
-    if (sliceFrontVZ >= sceneViewDist) {
-      for (var zz = z; zz < slices; zz++) {
-        textureStore(froxelIntegratedTexture,
-                     vec3<i32>(i32(gid.x), i32(gid.y), i32(zz)),
-                     vec4<f32>(S, T));
-      }
-      break;
-    }
-    // ─────────────────────────────────────────────────────────────────────
-
-    if (T < 0.001) {
-        // Rellenar slices restantes con el valor actual
-        for (var zz = z; zz < slices; zz++) {
-            let c = vec3<i32>(i32(gid.x), i32(gid.y), i32(zz));
-            textureStore(froxelIntegratedTexture, c, vec4<f32>(S, 0.0));
-        }
-        break;
-    }
+  for (var z: u32 = 0u; z < slices; z = z + 1u) {
     let coord = vec3<i32>(i32(gid.x), i32(gid.y), i32(z));
 
-    // 5-tap XY box filter on density and light before integration.
-    // rg32float is not hardware-filterable, so we average 4 neighbours manually.
-    // This prevents abrupt XY density jumps from creating sharp integration
-    // discontinuities that trilinear on the final read can't recover.
-    let dimI = vec3<i32>(i32(dims.x), i32(dims.y), i32(dims.z));
-    let cXP  = vec3<i32>(min(coord.x + 1, dimI.x - 1), coord.y, coord.z);
-    let cXM  = vec3<i32>(max(coord.x - 1, 0),           coord.y, coord.z);
-    let cYP  = vec3<i32>(coord.x, min(coord.y + 1, dimI.y - 1), coord.z);
-    let cYM  = vec3<i32>(coord.x, max(coord.y - 1, 0),           coord.z);
+    let depth1 = froxelSliceToDepth(f32(z + 1u), froxelParams.depthDistScale, froxelParams.depthDistB);
+    let ds = (depth1 - depth0) * rayScale;
+    depth0 = depth1;
 
-    let sigma = (textureLoad(froxelMediaTexture, coord, 0) +
-                 textureLoad(froxelMediaTexture, cXP,   0) +
-                 textureLoad(froxelMediaTexture, cXM,   0) +
-                 textureLoad(froxelMediaTexture, cYP,   0) +
-                 textureLoad(froxelMediaTexture, cYM,   0)) * 0.2;
-    let sigmaS = max(sigma.r, 0.0);
-    let sigmaT = max(sigma.g, 0.0);
+    if (T > 1e-4) {
+      let sigma = textureLoad(froxelMediaTexture, coord, 0);
+      let sigmaS = max(sigma.r, 0.0);
+      let sigmaT = max(sigma.g, 0.0);
+      let L = textureLoad(froxelLightTexture, coord, 0).rgb;
 
-    let L = (textureLoad(froxelLightTexture, coord, 0).rgb +
-             textureLoad(froxelLightTexture, cXP,   0).rgb +
-             textureLoad(froxelLightTexture, cXM,   0).rgb +
-             textureLoad(froxelLightTexture, cYP,   0).rgb +
-             textureLoad(froxelLightTexture, cYM,   0).rgb) * 0.2;
+      // Multiple scattering approximation: full boost in thin media, fades out
+      // once the column becomes opaque.
+      let msBoost = mix(volumetricSettings.multipleScatteringBoost, 1.0, 1.0 - T);
+      let scatter = L * sigmaS * msBoost;
 
-    let dz = sliceDzLog(z, slices, froxelParams.nearPlane, froxelParams.farPlane);
+      // Energy-conserving analytic integration over the slice (Hillaire 2015):
+      // ∫0^ds scatter·e^(-σt·x) dx = scatter·(1 - e^(-σt·ds)) / σt
+      let sliceT = exp(-sigmaT * ds);
+      let integ = select(scatter * ds, scatter * (1.0 - sliceT) / max(sigmaT, 1e-7), sigmaT > 1e-5);
+      S += T * integ;
+      T *= sliceT;
+    }
 
-    // 1) In-scattering integration with multiple scattering boost:
-    // dS = T * (L * sigmaS) * dz * boost
-
-    // Cuando T es alto (zona poco densa): msBoost completo
-    // Cuando T es bajo (zona muy densa): msBoost se acerca a 1.0 (sin boost)
-    let msBoost = mix(volumetricSettings.multipleScatteringBoost, 1.0, 1.0 - T);
-    S += T * (L * sigmaS * msBoost) * dz;
-
-    // 2) Transmittance update:
-    // T *= exp(-sigmaT * dz)
-    T *= exp(-sigmaT * dz);
-
-    // Guardamos resultado integrado hasta este slice
-    // RGB = scattering integrado
-    // A   = transmittance
     textureStore(froxelIntegratedTexture, coord, vec4<f32>(S, T));
   }
 }

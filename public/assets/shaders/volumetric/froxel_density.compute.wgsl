@@ -115,11 +115,12 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     return;
   }
 
-  let froxelVS = froxelToViewSpace(
-    globalId, 
+  // Density is evaluated at the froxel centre (low-frequency field, not jittered).
+  let froxelVS = froxelCoordToViewSpace(
+    vec3<f32>(globalId) + vec3<f32>(0.5),
     froxelParams.dimensions.xyz,
-    froxelParams.nearPlane,
-    froxelParams.farPlane,
+    froxelParams.depthDistScale,
+    froxelParams.depthDistB,
     camera.invProjection
   );
   let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
@@ -170,7 +171,5 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
   let finalParams = applyFogVolumes(froxelWS, sigmaS, sigmaT);
 
   // Store density in 3D texture (rg32float: R=sigmaS, G=sigmaT)
-  // Depth-awareness is handled in the integration pass, which stops accumulation
-  // per-column when the froxel depth exceeds the scene geometry depth.
   textureStore(froxelDensityTexture, froxelCoord, vec4<f32>(finalParams.x, finalParams.y, 0.0, 0.0));
 }

@@ -85,34 +85,47 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     return mix(shadowFactor1, shadowFactor2, smoothstep(0.0, 1.0, blendFactor));
 }
 
+// Shadow sub-samples per froxel. Far froxels are long in Z (≈1.5 m at 50 m) and
+// ~8 px wide, so a single centre tap aliases into stair-steps on diagonal shafts.
+// Samples are stratified along the slice depth and spread in XY with an R2
+// sequence; froxelParams.jitter rotates the pattern every frame and the temporal
+// pass accumulates the result → effectively 4 × history-length samples.
+const SHADOW_SAMPLES: u32 = 4u;
+
 @compute @workgroup_size(8, 8, 4)
 fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     let froxelCoord = vec3<i32>(globalId);
-    
+
     // Bounds check
     if (froxelCoord.x >= i32(froxelParams.dimensions.x) ||
         froxelCoord.y >= i32(froxelParams.dimensions.y) ||
         froxelCoord.z >= i32(froxelParams.dimensions.z)) {
         return;
     }
-    
-    // Ambient light color e intensidad desde uniform
-    let ambientColor = ambientLight.color;
-    let ambientIntensity = ambientLight.intensity;
-    let ambientScattering = ambientColor * ambientIntensity * volumetricSettings.ambientVolumetricIntensity;
 
+    // Ambient light color e intensidad desde uniform
+    let ambientScattering = ambientLight.color * ambientLight.intensity * volumetricSettings.ambientVolumetricIntensity;
     let directionalScattering = directionalLight.color * directionalLight.intensity;
 
-    let froxelVS = froxelToViewSpace(
-        globalId,
-        froxelParams.dimensions.xyz,
-        froxelParams.nearPlane,
-        froxelParams.farPlane,
-        camera.invProjection
-    );
-    let tempFroxelWS = (camera.invView * vec4<f32>(froxelVS, 1.0));
-    let froxelWorldPos = tempFroxelWS.xyz / tempFroxelWS.w;
-    let visibility = getShadowFactorCSMBlended(froxelWorldPos.xyz, abs(froxelVS.z));
+    let dims = froxelParams.dimensions.xyz;
+    let base = vec3<f32>(globalId);
+    let jitter = froxelParams.jitter.xyz;
+
+    var visibility = 0.0;
+    for (var i: u32 = 0u; i < SHADOW_SAMPLES; i++) {
+        let fi = f32(i);
+        let xy = fract(jitter.xy + vec2<f32>(0.7548776662, 0.5698402910) * fi);
+        let z  = (fi + jitter.z) / f32(SHADOW_SAMPLES);
+        let sampleVS = froxelCoordToViewSpace(base + vec3<f32>(xy, z), dims,
+            froxelParams.depthDistScale, froxelParams.depthDistB, camera.invProjection);
+        let sampleWS = (camera.invView * vec4<f32>(sampleVS, 1.0)).xyz;
+        visibility += getShadowFactorCSM(sampleWS, -sampleVS.z);
+    }
+    visibility /= f32(SHADOW_SAMPLES);
+
+    let centreVS = froxelCoordToViewSpace(base + vec3<f32>(0.5), dims,
+        froxelParams.depthDistScale, froxelParams.depthDistB, camera.invProjection);
+    let froxelWorldPos = (camera.invView * vec4<f32>(centreVS, 1.0)).xyz;
 
     let V = normalize(camera.cameraPosition.xyz - froxelWorldPos);
     let Ldir = normalize(-directionalLight.position);
@@ -134,9 +147,12 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     // 1.0 = full light reaches here, 0.0 = fully occluded by the fog itself.
     let selfShadow = textureLoad(froxelSelfOcclusionTexture, froxelCoord, 0).r;
 
-    // Aplicar phase function directamente (sin mezclar con isotropic)
-    // Esto da god rays claros cuando miras hacia la luz directional
-    let scattering = ambientScattering + (directionalScattering * visibility * selfShadow * phase);
-    
-    textureStore(froxelLightTexture, froxelCoord, vec4<f32>(scattering, 0.0));
+    // alpha = scalar sun factor (visibility · self-shadow · phase), so that
+    // rgb = ambient + sunRadiance · alpha. The raymarch pass uses it to swap the
+    // froxel-averaged sun term for an exact per-pixel one in the last, partially
+    // covered slice (prevents light from behind surfaces leaking onto them).
+    let sunFactor = visibility * selfShadow * phase;
+    let scattering = ambientScattering + directionalScattering * sunFactor;
+
+    textureStore(froxelLightTexture, froxelCoord, vec4<f32>(scattering, sunFactor));
 }
