@@ -436,9 +436,7 @@ export class ModuleRender extends Module {
       }
 
       if (mainCameraEntity?.hasComponent('fog_scatter')) {
-        const fogMultiScatter = mainCameraEntity.getComponent(
-          'fog_scatter',
-        ) as FogScatterComponent;
+        const fogMultiScatter = mainCameraEntity.getComponent('fog_scatter') as FogScatterComponent;
         if (fogMultiScatter.hasLoaded() && fogMultiScatter.isEnabled()) {
           const dirLights =
             Engine.getEntities().getObjectManagerByName('directional_light')?.getList() ?? [];
@@ -637,7 +635,9 @@ export class ModuleRender extends Module {
     const encoder = render.getCommandEncoder();
     const renderPass = encoder.beginRenderPass({
       label: 'ui_overlay_pass',
-      ...((ts) => (ts ? { timestampWrites: ts } : {}))(GPUProfiler.getInstance().getTimestampWrites('UI Overlay')),
+      ...((ts) => (ts ? { timestampWrites: ts } : {}))(
+        GPUProfiler.getInstance().getTimestampWrites('UI Overlay'),
+      ),
       colorAttachments: [
         {
           view: resultView,
@@ -741,7 +741,15 @@ export class ModuleRender extends Module {
   }
 
   public update(dt: number): void {
-    // Actualizar valores de debug
+    // Debug values are only read by the lil-gui stats panel: building ~40 strings and
+    // filtered arrays every frame while it is hidden was pure garbage.
+    if (Engine.getGUI().getIsVisible()) this.updateDebugValues();
+
+    this.deferred.update(dt);
+    this.lastDt = dt;
+  }
+
+  private updateDebugValues(): void {
     const renderManager = RenderManager.getInstance();
     this.debugValues.drawCallsSolids.value = renderManager.getDrawCallsForCategory(
       RenderCategory.SOLIDS,
@@ -804,9 +812,6 @@ export class ModuleRender extends Module {
       const entry = this.profilerGPU[name];
       if (entry) entry.value = `${gpu.getMs(name).toFixed(2)} ms`;
     }
-
-    this.deferred.update(dt);
-    this.lastDt = dt;
   }
 
   public override renderInMenu(): void {

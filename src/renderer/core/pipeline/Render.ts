@@ -10,6 +10,7 @@ import { SamplerLibrary } from '../utils/SamplerLibrary';
 import { Logger } from '../../../core/debug/Logger';
 import { GPUProfiler } from '../../../core/debug/GPUProfiler';
 import { PerfRecorder } from '../../../core/debug/PerfRecorder';
+import { ProfilerOverlay } from '../../../core/debug/ProfilerOverlay';
 
 export class Render {
   private static instance: Render;
@@ -217,7 +218,12 @@ export class Render {
   public endFrame(): void {
     if (!this.device) return;
 
-    GPUProfiler.getInstance().resolve(this.currentCommandEncoder);
+    // Timestamp readback allocates every frame: run it only while something shows or
+    // records the timings (profiler overlay, debug GUI, PerfRecorder / MCP perf_capture).
+    const gpuProfiler = GPUProfiler.getInstance();
+    gpuProfiler.enabled =
+      ProfilerOverlay.isVisible() || PerfRecorder.isRecording() || Engine.getGUI().getIsVisible();
+    gpuProfiler.resolve(this.currentCommandEncoder);
     const commandBuffer = this.currentCommandEncoder.finish();
     this.device.queue.submit([commandBuffer]);
     this.framesInFlight++;
@@ -225,7 +231,7 @@ export class Render {
       this.framesInFlight--;
     });
     PerfRecorder.onSubmit(this.device);
-    GPUProfiler.getInstance().tick();
+    gpuProfiler.tick();
   }
 
   private setupResizeObserver(): void {

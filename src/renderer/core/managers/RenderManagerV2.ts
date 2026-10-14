@@ -377,10 +377,10 @@ export class RenderManagerV2 {
       const technique = key.material.getTechnique();
       if (!technique) continue;
 
-      this.stateManager.setPipeline(pass, technique.getPipeline()!, () =>
-        technique.activatePipeline(pass),
-      );
-      this.stateManager.setMeshBuffers(pass, key.mesh.getName(), () => key.mesh.activate(pass));
+      if (this.stateManager.setPipeline(technique.getPipeline()!)) {
+        technique.activatePipeline(pass);
+      }
+      if (this.stateManager.setMeshBuffers(key.mesh.getName())) key.mesh.activate(pass);
       this.stateManager.setMaterialBindings(
         pass,
         key.material.getName(),
@@ -596,8 +596,8 @@ export class RenderManagerV2 {
       const pipeline = technique.getPipeline()!;
 
       // Use state manager to minimize state changes
-      this.stateManager.setPipeline(pass, pipeline, () => technique.activatePipeline(pass));
-      this.stateManager.setMeshBuffers(pass, key.mesh.getName(), () => key.mesh.activate(pass));
+      if (this.stateManager.setPipeline(pipeline)) technique.activatePipeline(pass);
+      if (this.stateManager.setMeshBuffers(key.mesh.getName())) key.mesh.activate(pass);
 
       // When a technique override is active (depth prepass, shadows) and the material uses a
       // custom-slot layout, skip setting group 1: the override pipeline has the standard

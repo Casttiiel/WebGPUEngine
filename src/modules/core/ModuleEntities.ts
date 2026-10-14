@@ -87,7 +87,7 @@ export class ModuleEntities extends Module {
   public update(delta: number): void {
     if (delta <= 0) return;
     Profiler.getInstance().cpu.begin('Entities');
-    for (const [, om] of this.omToUpdate) {
+    for (const om of this.omToUpdate.values()) {
       om.updateAll(delta);
     }
     Profiler.getInstance().cpu.end();

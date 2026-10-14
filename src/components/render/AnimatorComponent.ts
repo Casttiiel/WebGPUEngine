@@ -211,6 +211,7 @@ export class AnimatorComponent extends Component {
   private _rmKCC: any = null;
   private _rmKCCSearched: boolean = false;
   private _rmVelocity: vec3 = vec3.create();
+  private readonly _rmDeltaScratch: vec3 = vec3.create();
   private _rmPrevLayerTime: number = 0;
   // Keeps root joint zeroed during layer fade-out even after mode='none',
   // preventing the accumulated root translation from snapping back into the mesh.
@@ -845,7 +846,7 @@ export class AnimatorComponent extends Component {
           const dx = rootT[0]! - this.prevRootLocalT[0]!;
           const dy = this.rootMotionIncludeY ? rootT[1]! - this.prevRootLocalT[1]! : 0;
           const dz = rootT[2]! - this.prevRootLocalT[2]!;
-          const delta = vec3.fromValues(dx, dy, dz);
+          const delta = vec3.set(this._rmDeltaScratch, dx, dy, dz);
           vec3.transformQuat(delta, delta, this.rootPreRotation as unknown as quat);
           const ownerTransform = (
             this.getOwner().getComponent('transform') as TransformComponent | null
@@ -879,13 +880,19 @@ export class AnimatorComponent extends Component {
         }
 
         if (this._rmKCC) {
-          const layer = this.animLayers.length > 0
-            ? this.animLayers[this.animLayers.length - 1]!
-            : null;
+          const layer =
+            this.animLayers.length > 0 ? this.animLayers[this.animLayers.length - 1]! : null;
           const clip = layer ? this.clips[layer.clipIndex] : null;
-          const rootCh = clip?.channels.find(
-            (ch) => ch.jointIndex === this.rootJointIndex && ch.path === 'translation',
-          );
+          // Manual search: a find() closure here allocated every frame per animator
+          let rootCh: AnimationChannel | undefined;
+          if (clip) {
+            for (const ch of clip.channels) {
+              if (ch.jointIndex === this.rootJointIndex && ch.path === 'translation') {
+                rootCh = ch;
+                break;
+              }
+            }
+          }
 
           if (rootCh) {
             const curT = this._rmCurT;
@@ -900,7 +907,7 @@ export class AnimatorComponent extends Component {
             const dx = curT[0]! - prevT[0]!;
             const dy = this.rootMotionIncludeY ? curT[1]! - prevT[1]! : 0;
             const dz = curT[2]! - prevT[2]!;
-            const delta = vec3.fromValues(dx, dy, dz);
+            const delta = vec3.set(this._rmDeltaScratch, dx, dy, dz);
             vec3.transformQuat(delta, delta, this.rootPreRotation as unknown as quat);
             const ownerTransform = (
               this.getOwner().getComponent('transform') as TransformComponent | null
@@ -989,9 +996,8 @@ export class AnimatorComponent extends Component {
       // Keep only the directly-offset joints frozen so the final repropagateMats
       // preserves them (torso follows pelvis down) while letting TwoBoneIK work
       // on the children and the final pass propagates feet from IK knees.
-      const preIkRoots = new Set<number>(this.preIkOffsets.keys());
       this._ikFrozenJoints.clear();
-      for (const idx of preIkRoots) this._ikFrozenJoints.add(idx);
+      for (const idx of this.preIkOffsets.keys()) this._ikFrozenJoints.add(idx);
       this.preIkOffsets.clear();
     }
 

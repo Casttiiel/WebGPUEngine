@@ -7,21 +7,25 @@ interface CPUSample {
 
 export class CPUProfiler {
   private samples = new Map<string, CPUSample>();
-  private stack: { name: string; t0: number }[] = [];
+  // Parallel stacks instead of one {name, t0} object per begin() (runs several times a frame)
+  private stackNames: string[] = [];
+  private stackT0: number[] = [];
 
   public begin(name: string): void {
-    this.stack.push({ name, t0: performance.now() });
+    this.stackNames.push(name);
+    this.stackT0.push(performance.now());
   }
 
   public end(): void {
-    const entry = this.stack.pop();
-    if (!entry) return;
+    const name = this.stackNames.pop();
+    const t0 = this.stackT0.pop();
+    if (name === undefined || t0 === undefined) return;
 
-    const ms = performance.now() - entry.t0;
-    let s = this.samples.get(entry.name);
+    const ms = performance.now() - t0;
+    let s = this.samples.get(name);
     if (!s) {
       s = { lastMs: 0, avgMs: 0, count: 0, accum: 0 };
-      this.samples.set(entry.name, s);
+      this.samples.set(name, s);
     }
     s.lastMs = ms;
     s.count++;
@@ -39,6 +43,7 @@ export class CPUProfiler {
 
   public reset(): void {
     this.samples.clear();
-    this.stack.length = 0;
+    this.stackNames.length = 0;
+    this.stackT0.length = 0;
   }
 }

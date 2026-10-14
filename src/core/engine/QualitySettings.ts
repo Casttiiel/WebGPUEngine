@@ -147,7 +147,12 @@ export class QualitySettings {
     return QualitySettings.instance;
   }
 
+  /** Merged defaults+settings, rebuilt only when settings change (read every frame). */
+  private mergedSettings: GraphicsQualitySettings | null = null;
+
+  /** Returns a shared, read-only object — do not mutate it. */
   public getSettings(): GraphicsQualitySettings {
+    if (this.mergedSettings) return this.mergedSettings;
     // Ensure all required fields are present for GraphicsQualitySettings
     const defaults: GraphicsQualitySettings = {
       renderResolution: 1.0,
@@ -174,7 +179,8 @@ export class QualitySettings {
       meshTextureFilter: 'trilinear',
       ditheringMode: 'off',
     };
-    return { ...defaults, ...this.settings };
+    this.mergedSettings = { ...defaults, ...this.settings };
+    return this.mergedSettings;
   }
 
   public getCurrentQualityName(): string {
@@ -199,6 +205,7 @@ export class QualitySettings {
   public applyPreset(presetName: keyof typeof QualitySettings.PRESETS): void {
     this.currentPreset = presetName;
     this.settings = { ...QualitySettings.PRESETS[presetName] };
+    this.mergedSettings = null;
     this.onSettingsChanged();
   }
 
@@ -211,6 +218,7 @@ export class QualitySettings {
     const clamped = Math.min(1.0, Math.max(0.1, value));
     if (this.settings) {
       this.settings.renderResolution = clamped;
+      this.mergedSettings = null;
     }
     this.currentPreset = 'CUSTOM' as any;
   }
@@ -218,6 +226,7 @@ export class QualitySettings {
   public setMeshTextureFilter(value: 'trilinear' | 'nearest'): void {
     if (this.settings) {
       this.settings.meshTextureFilter = value;
+      this.mergedSettings = null;
     }
   }
 

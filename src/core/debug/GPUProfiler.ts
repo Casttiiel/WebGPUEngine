@@ -57,7 +57,15 @@ export class GPUProfiler {
   private lastFrameRaw: { frame: number; results: ReadonlyMap<string, number> } | null = null;
   private readbackCount = 0;
   private lastFrameSpanMs = 0;
-  private lastFrameGaps: ReadonlyMap<string, number> = new Map();
+  private lastFrameGaps = new Map<string, number>();
+
+  // Readback scratch, reused every frame: the readback runs once per frame, so fresh
+  // Maps / tuples / BigInts here were one of the biggest per-frame GC sources.
+  private frameResults = new Map<string, number>();
+  private spanOrder: number[] = [];
+  private spanBegin = new Float64Array(GPUProfiler.MAX_PASSES);
+  private spanEnd = new Float64Array(GPUProfiler.MAX_PASSES);
+  private gapKeys = new Map<string, string>(); // label → "gap after <label>"
 
   /** Idle/unprofiled GPU time between consecutive passes of the last read-back frame. */
   public getLastFrameGaps(): ReadonlyMap<string, number> {
@@ -156,7 +164,7 @@ export class GPUProfiler {
   public resolve(encoder: GPUCommandEncoder): void {
     const count = this.frameLabels.length;
     if (!this._supported || !this._enabled || count === 0) {
-      this.frameLabels = [];
+      this.frameLabels.length = 0;
       return;
     }
 
@@ -167,10 +175,13 @@ export class GPUProfiler {
       encoder.resolveQuerySet(this.querySet, 0, count * 2, resolveBuffer, 0);
       encoder.copyBufferToBuffer(resolveBuffer, 0, readbackBuffer, 0, count * 2 * 8);
       this.slotState[slot] = 'recorded';
+      // Swap arrays: the slot was idle, so its previous label array is free to reuse.
+      const free = this.slotLabels[slot]!;
       this.slotLabels[slot] = this.frameLabels;
+      this.frameLabels = free;
     }
     // Otherwise the slot is still being read back: skip measuring this frame.
-    this.frameLabels = [];
+    this.frameLabels.length = 0;
   }
 
   /**
@@ -200,54 +211,83 @@ export class GPUProfiler {
         buf
           .mapAsync(GPUMapMode.READ)
           .then(() => {
-            const data = new BigInt64Array(buf.getMappedRange(0, countSnap * 2 * 8));
+            // Read each u64 timestamp as two u32 halves into a double: exact up to 2^53 ns
+            // (~104 days of uptime) and, unlike BigInt64Array, no heap BigInt per read.
+            const words = new Uint32Array(buf.getMappedRange(0, countSnap * 2 * 8));
+            const begins = this.spanBegin;
+            const ends = this.spanEnd;
             // Sum this frame's pairs per label. A pass that ran always counts, even when
             // quantization makes it read 0 (or end < begin) — it must not vanish.
-            const frameResults = new Map<string, number>();
-            let first = 0n;
-            let last = 0n;
+            const frameResults = this.frameResults;
+            frameResults.clear();
+            let first = 0;
+            let last = 0;
             for (let i = 0; i < countSnap; i++) {
-              const begin = data[i * 2] ?? 0n;
-              const end = data[i * 2 + 1] ?? 0n;
+              const begin = words[i * 4]! + words[i * 4 + 1]! * 4294967296;
+              const end = words[i * 4 + 2]! + words[i * 4 + 3]! * 4294967296;
+              begins[i] = begin;
+              ends[i] = end;
               const name = labels[i]!;
-              const ms = end > begin ? Number(end - begin) / 1_000_000 : 0;
+              const ms = end > begin ? (end - begin) / 1_000_000 : 0;
               frameResults.set(name, (frameResults.get(name) ?? 0) + ms);
-              if (begin > 0n && (first === 0n || begin < first)) first = begin;
+              if (begin > 0 && (first === 0 || begin < first)) first = begin;
               if (end > last) last = end;
             }
             // Wall-clock GPU span of the frame (first pass start → last pass end). The
             // difference with the sum of passes is GPU work without timestamps (copies,
             // mip generation, unprofiled passes) plus idle gaps between submissions.
-            this.lastFrameSpanMs = last > first ? Number(last - first) / 1_000_000 : 0;
+            this.lastFrameSpanMs = last > first ? (last - first) / 1_000_000 : 0;
 
             // Where does the unprofiled time go? Sort passes by start and attribute each
             // idle gap to the pass that precedes it ("gap after X" = copies / unprofiled
             // passes recorded right after X). Exposed for PerfRecorder only.
-            const spans: Array<[bigint, bigint, string]> = [];
+            const order = this.spanOrder;
+            order.length = 0;
             for (let i = 0; i < countSnap; i++) {
-              const begin = data[i * 2] ?? 0n;
-              const end = data[i * 2 + 1] ?? 0n;
-              if (begin > 0n && end >= begin) spans.push([begin, end, labels[i]!]);
+              if (begins[i]! > 0 && ends[i]! >= begins[i]!) order.push(i);
             }
-            spans.sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
-            const gaps = new Map<string, number>();
-            for (let i = 1; i < spans.length; i++) {
-              const gap = spans[i]![0] - spans[i - 1]![1];
-              if (gap > 0n) {
-                const key = `gap after ${spans[i - 1]![2]}`;
-                gaps.set(key, (gaps.get(key) ?? 0) + Number(gap) / 1_000_000);
+            // Insertion sort: passes are recorded almost in GPU order, so this is ~O(n)
+            // and, unlike Array.prototype.sort with a comparator, allocates nothing.
+            for (let i = 1; i < order.length; i++) {
+              const idx = order[i]!;
+              const b = begins[idx]!;
+              let j = i - 1;
+              while (j >= 0 && begins[order[j]!]! > b) {
+                order[j + 1] = order[j]!;
+                j--;
+              }
+              order[j + 1] = idx;
+            }
+            const gaps = this.lastFrameGaps;
+            gaps.clear();
+            for (let i = 1; i < order.length; i++) {
+              const prev = order[i - 1]!;
+              const gap = begins[order[i]!]! - ends[prev]!;
+              if (gap > 0) {
+                const label = labels[prev]!;
+                let key = this.gapKeys.get(label);
+                if (key === undefined) {
+                  key = `gap after ${label}`;
+                  this.gapKeys.set(label, key);
+                }
+                gaps.set(key, (gaps.get(key) ?? 0) + gap / 1_000_000);
               }
             }
-            this.lastFrameGaps = gaps;
             // Smooth passes that keep running; drop passes that stopped running.
             const a = GPUProfiler.SMOOTHING;
-            const smoothed = new Map<string, number>();
-            for (const [name, ms] of frameResults) {
-              const prev = this.results.get(name);
-              smoothed.set(name, prev === undefined ? ms : prev + (ms - prev) * a);
+            const results = this.results;
+            for (const name of results.keys()) {
+              if (!frameResults.has(name)) results.delete(name);
             }
-            this.results = smoothed;
-            this.lastFrameRaw = { frame: this.readbackCount++, results: frameResults };
+            for (const [name, ms] of frameResults) {
+              const prev = results.get(name);
+              results.set(name, prev === undefined ? ms : prev + (ms - prev) * a);
+            }
+            if (this.lastFrameRaw) {
+              this.lastFrameRaw.frame = this.readbackCount++;
+            } else {
+              this.lastFrameRaw = { frame: this.readbackCount++, results: frameResults };
+            }
             buf.unmap();
             this.slotState[readSlot] = 'idle';
           })

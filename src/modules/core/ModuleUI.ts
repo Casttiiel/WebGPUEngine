@@ -187,6 +187,8 @@ export class ModuleUI extends Module {
     );
   }
 
+  private mousePhysScratch = vec2.create();
+
   private updateInput(): void {
     const input = Engine.getInput();
     if (!input) return;
@@ -197,7 +199,7 @@ export class ModuleUI extends Module {
     // Get mouse position from ModuleInput (CSS pixels → physical pixels)
     const mousePos = input.getMousePosition();
     const dpr = window.devicePixelRatio || 1;
-    const mousePhysPos = vec2.fromValues(mousePos.x * dpr, mousePos.y * dpr);
+    const mousePhysPos = vec2.set(this.mousePhysScratch, mousePos.x * dpr, mousePos.y * dpr);
 
     // Click = ha habido una pulsación nueva desde el último update (no se pierden clicks
     // más cortos que un frame).

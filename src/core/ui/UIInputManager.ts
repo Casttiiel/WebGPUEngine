@@ -15,6 +15,7 @@ import type { Widget } from '../../components/ui/Widget';
 export class UIInputManager {
   private lastHoveredWidget: Widget | null = null;
   private lastMousePos: vec2 = vec2.create();
+  private sizeScratch: vec2 = vec2.create();
 
   /**
    * Convert window coordinates to UI space coordinates.
@@ -78,9 +79,12 @@ export class UIInputManager {
    * @returns true if mouse is over widget
    */
   public checkHover(widget: Widget, mousePhysPos: vec2): boolean {
-    const centre = this.getWidgetWorldPosition(widget);
-    const size = widget.getSize();
-    return this.pointInRectangle(mousePhysPos, centre, vec2.fromValues(size[0], size[1]));
+    // Runs for every widget every frame: test against the top-left/size box directly
+    // instead of building centre/size vec2s (same result as pointInRectangle).
+    const size = widget.getSize(this.sizeScratch);
+    const x = mousePhysPos[0] - widget.originX;
+    const y = mousePhysPos[1] - widget.originY;
+    return x >= 0 && x <= size[0] && y >= 0 && y <= size[1];
   }
 
   /**

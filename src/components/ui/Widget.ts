@@ -1,8 +1,11 @@
 ﻿// src/components/ui/Widget.ts
-import { mat4, vec2 } from 'gl-matrix';
+import { mat4, vec2, vec3 } from 'gl-matrix';
 import type { WidgetEffect, WidgetParams } from '../../types/WidgetTypes';
 import { AnchorType, UIAnchorSystem } from '../../core/ui/UIAnchorSystem.js';
 import { UIRenderUtils } from '../../renderer/core/UIRenderUtils.js';
+
+/** Scratch for computeAbsolute (avoids array literals per call). */
+const transformScratch = vec3.create();
 
 /**
  * Widget base class â€” reference-space (1920Ã—1080) coordinate system.
@@ -177,17 +180,19 @@ export class Widget {
     const offX = (0.5 - this.pivotX) * physW;
     const offY = (0.5 - this.pivotY) * physH;
 
+    // Shared scratch vec3 instead of array literals (runs every frame for animated widgets)
+    const v = transformScratch;
     mat4.identity(this.absolute);
-    mat4.translate(this.absolute, this.absolute, [pivX, pivY, 0]);
+    mat4.translate(this.absolute, this.absolute, vec3.set(v, pivX, pivY, 0));
     if (this.rotation !== 0) {
       mat4.rotateZ(this.absolute, this.absolute, this.rotation);
     }
-    mat4.translate(this.absolute, this.absolute, [offX, offY, 0]);
-    mat4.scale(this.absolute, this.absolute, [
-      physW * this.effectScaleX,
-      physH * this.effectScaleY,
-      1,
-    ]);
+    mat4.translate(this.absolute, this.absolute, vec3.set(v, offX, offY, 0));
+    mat4.scale(
+      this.absolute,
+      this.absolute,
+      vec3.set(v, physW * this.effectScaleX, physH * this.effectScaleY, 1),
+    );
   }
 
   // ============================================================================
@@ -372,9 +377,10 @@ export class Widget {
    * Size in physical pixels â€” used for AABB hit detection.
    * Subclasses can override if they manage their own size logic.
    */
-  public getSize(): vec2 {
+  /** Size in physical px; writes into `out` when given (allocation-free). */
+  public getSize(out?: vec2): vec2 {
     const gs = this.scaleWithScreen ? UIRenderUtils.getGlobalScale() : window.devicePixelRatio || 1;
-    return vec2.fromValues(this.width * gs, this.height * gs);
+    return vec2.set(out ?? vec2.create(), this.width * gs, this.height * gs);
   }
 
   // â”€â”€ Input callback setters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

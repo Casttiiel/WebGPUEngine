@@ -1,3 +1,4 @@
+import { mat4 } from 'gl-matrix';
 import { EntityDataType, SceneDataType } from '../../../types/SceneData.type';
 import { Entity } from '../../../core/ecs/Entity';
 import { RenderComponent } from '../../../components/render/RenderComponent';
@@ -26,6 +27,9 @@ interface InstanceGroup {
  * Gestiona el análisis y agrupación de entidades para instancing automático
  */
 export class InstanceManager {
+  /** Scratch for per-frame matrix uploads (writeBuffer copies it synchronously). */
+  private static matrixScratch = mat4.create();
+
   private static instanceGroups: Map<string, InstanceGroup> = new Map();
   private static device: GPUDevice;
   /**
@@ -408,11 +412,11 @@ export class InstanceManager {
       return;
     }
 
-    const worldMatrix = transformComponent.getTransform().getWorldMatrix();
-
     // 3. Actualizar solo la matriz correspondiente en el storage buffer
     // Cada matriz ocupa 16 floats (4x4), offset = entityIndex * 16 * 4 bytes
-    const matrixData = new Float32Array(worldMatrix);
+    const matrixData = transformComponent
+      .getTransform()
+      .getWorldMatrix(InstanceManager.matrixScratch) as Float32Array;
     const offset = entityIndex * 16 * 4; // 16 floats * 4 bytes per float
 
     this.device.queue.writeBuffer(
@@ -513,8 +517,9 @@ export class InstanceManager {
       for (const { entity, index } of updates) {
         const transformComponent = entity.getComponent('transform') as TransformComponent;
         if (transformComponent) {
-          const worldMatrix = transformComponent.getTransform().getWorldMatrix();
-          const matrixData = new Float32Array(worldMatrix);
+          const matrixData = transformComponent
+            .getTransform()
+            .getWorldMatrix(InstanceManager.matrixScratch) as Float32Array;
           const offset = index * 16 * 4;
 
           this.device.queue.writeBuffer(

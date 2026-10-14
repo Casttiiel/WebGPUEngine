@@ -8,15 +8,11 @@ export class RenderStateManager {
   private currentBindGroups: Map<number, GPUBindGroup> = new Map();
 
   /**
-   * Sets the render pipeline if it has changed
+   * Records the pipeline; returns true when it changed and the caller must activate it.
+   * (No activator callback: a closure per draw per pass was a top GC allocation site.)
    */
-  public setPipeline(
-    _pass: GPURenderPassEncoder,
-    pipeline: GPURenderPipeline,
-    techniqueActivator: () => void,
-  ): boolean {
+  public setPipeline(pipeline: GPURenderPipeline): boolean {
     if (this.currentPipeline !== pipeline) {
-      techniqueActivator();
       this.currentPipeline = pipeline;
       return true;
     }
@@ -24,15 +20,10 @@ export class RenderStateManager {
   }
 
   /**
-   * Sets mesh buffers if they have changed
+   * Records the mesh; returns true when it changed and the caller must bind its buffers.
    */
-  public setMeshBuffers(
-    _pass: GPURenderPassEncoder,
-    meshId: string,
-    meshActivator: () => void,
-  ): boolean {
+  public setMeshBuffers(meshId: string): boolean {
     if (this.currentMeshBuffers !== meshId) {
-      meshActivator();
       this.currentMeshBuffers = meshId;
       return true;
     }

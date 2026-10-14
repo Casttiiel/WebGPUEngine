@@ -91,8 +91,9 @@ export class Transform {
     return matrix;
   }
 
-  public getWorldMatrix(): mat4 {
-    const matrix = mat4.create();
+  /** Writes into `out` when given; otherwise allocates a new mat4 (avoid in per-frame code). */
+  public getWorldMatrix(out?: mat4): mat4 {
+    const matrix = out ?? mat4.create();
     mat4.fromRotationTranslationScale(
       matrix,
       this.worldRotation,

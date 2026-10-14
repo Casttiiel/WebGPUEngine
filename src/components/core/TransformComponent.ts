@@ -1,4 +1,4 @@
-import { vec3 } from 'gl-matrix';
+import { mat4, vec3 } from 'gl-matrix';
 import { Transform } from '../../core/math/Transform';
 import { Component } from '../../core/ecs/Component';
 import { TransformComponentDataType } from '../../types/TransformComponentData.type';
@@ -20,6 +20,7 @@ export class TransformComponent extends Component {
   private previousWorldMatrix: Float32Array = new Float32Array(16);
   // Reusable 128-byte staging array: [0..15]=current, [16..31]=previous (one GPU write)
   private readonly modelMatrixData: Float32Array = new Float32Array(32);
+  private readonly worldMatrixScratch = mat4.create();
   private isFirstModelUpdate = true;
   // True if the world matrix changed between the previous frame and this one.
   // Read by VelocityBufferManager to skip static objects in the per-object velocity pass.
@@ -113,9 +114,7 @@ export class TransformComponent extends Component {
     //
     // On the very first call both slots are initialised to the same matrix so
     // newly-spawned objects produce zero velocity (no TAA ghost on spawn).
-    const worldMatrix = new Float32Array(
-      this.transform.getWorldMatrix() as unknown as ArrayLike<number>,
-    );
+    const worldMatrix = this.transform.getWorldMatrix(this.worldMatrixScratch) as Float32Array;
     if (this.isFirstModelUpdate) {
       this.previousWorldMatrix.set(worldMatrix);
       this.isFirstModelUpdate = false;

@@ -120,6 +120,10 @@ const KNOWN_GPU_PASSES = new Set(GPU_GROUPS.flatMap((g) => g.passes));
  */
 export class ProfilerOverlay {
   private static visible = false;
+
+  public static isVisible(): boolean {
+    return ProfilerOverlay.visible;
+  }
   private static el: HTMLElement | null = null;
   private static accumDt = 0;
   private static readonly UPDATE_INTERVAL = 0.2; // seconds
@@ -216,9 +220,10 @@ export class ProfilerOverlay {
     }
 
     const otherPasses = Object.keys(ProfilerOverlay.gpuMs).filter((p) => !KNOWN_GPU_PASSES.has(p));
-    const groups = otherPasses.length > 0
-      ? [...GPU_GROUPS, { label: 'Other', color: '#a6adc8', passes: otherPasses }]
-      : GPU_GROUPS;
+    const groups =
+      otherPasses.length > 0
+        ? [...GPU_GROUPS, { label: 'Other', color: '#a6adc8', passes: otherPasses }]
+        : GPU_GROUPS;
 
     for (const group of groups) {
       // Show every pass that ran (present in the results), even if it averages ~0 ms

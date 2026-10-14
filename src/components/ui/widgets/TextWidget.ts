@@ -9,12 +9,17 @@ import { UIRenderUtils } from '../../../renderer/core/UIRenderUtils';
 /** Fuente por defecto: atlas Latin-1 con métricas (scripts/generate-ui-font.mjs). */
 const DEFAULT_FONT = 'ui/fonts/ui_font.png';
 
+// Shared per-draw scratch: renderText copies both into uniforms before returning.
+const originScratch = vec2.create();
+const tintScratch = vec4.create();
+
 /**
  * TextWidget - Una línea de texto con fuente bitmap (atlas + métricas proporcionales).
  * textParams.size.y = altura de línea en px de referencia; align: left | center.
  */
 export class TextWidget extends Widget {
   protected textParams: TextParams;
+  private ownsColor = false;
 
   constructor(name: string, alias: string, params: WidgetParams, textParams?: Partial<TextParams>) {
     super(name, alias, params);
@@ -59,20 +64,32 @@ export class TextWidget extends Widget {
       x += (this.getWidth() * gs - UIRenderUtils.measureText(text, lineH, metrics)) / 2;
     }
     const y = this.originY + Math.max(0, (this.getHeight() * gs - lineH) / 2);
-    const c = this.textParams.color ?? { r: 1, g: 1, b: 1, a: 1 };
+    const c = this.textParams.color;
+    if (c) vec4.set(tintScratch, c.r, c.g, c.b, c.a);
+    else vec4.set(tintScratch, 1, 1, 1, 1);
     UIRenderUtils.renderText(
       renderPass,
       text,
       this.cachedFont,
-      vec2.fromValues(x, y),
+      vec2.set(originScratch, x, y),
       lineH,
-      vec4.fromValues(c.r, c.g, c.b, c.a),
+      tintScratch,
       metrics,
     );
   }
 
   public setColor(r: number, g: number, b: number, a: number): void {
-    this.textParams.color = { r, g, b, a };
+    // Same as ImageWidget.setColor: reuse our own object (called every frame by the HUD).
+    const c = this.textParams.color;
+    if (!this.ownsColor || !c) {
+      this.textParams.color = { r, g, b, a };
+      this.ownsColor = true;
+      return;
+    }
+    c.r = r;
+    c.g = g;
+    c.b = b;
+    c.a = a;
   }
 
   // ============================================================================

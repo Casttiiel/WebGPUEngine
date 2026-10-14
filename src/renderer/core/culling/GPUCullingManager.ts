@@ -503,13 +503,15 @@ export class GPUCullingManager {
     }
   }
 
+  private readonly scratchMatrix = mat4.create();
+
   /** Writes the current world modelMatrix for each managed key (per-frame). */
   private writeModelMatrices(n: number): void {
     const f32 = this.cpuF32;
     for (let i = 0; i < n; i++) {
       const key = this.managedKeys[i]!;
       const b = (i * OBJECT_STRIDE) / 4;
-      const mat = key.transform.getTransform().getWorldMatrix() as Float32Array;
+      const mat = key.transform.getTransform().getWorldMatrix(this.scratchMatrix) as Float32Array;
       f32.set(mat, b + 8);
     }
   }
@@ -519,7 +521,7 @@ export class GPUCullingManager {
     for (let i = 0; i < n; i++) {
       const key = this.shadowKeys[i]!;
       const b = (i * OBJECT_STRIDE) / 4;
-      const mat = key.transform.getTransform().getWorldMatrix() as Float32Array;
+      const mat = key.transform.getTransform().getWorldMatrix(this.scratchMatrix) as Float32Array;
       f32.set(mat, b + 8);
     }
   }

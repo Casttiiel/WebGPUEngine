@@ -38,7 +38,9 @@ export class UIRenderUtils {
   private static uniformBufferPool: GPUBuffer[] = [];
   private static uniformBindGroupPool: GPUBindGroup[] = [];
   private static uniformPoolIndex = 0;
-  private static readonly UNIFORM_POOL_SIZE = 128;
+  // One slot per UI draw per frame (every text glyph is a draw): the HUD already uses
+  // ~120, and overflowing falls back to a new GPUBuffer + bind group per draw per frame.
+  private static readonly UNIFORM_POOL_SIZE = 512;
   private static readonly reusableUniformData = new Float32Array(24); // 96 bytes scratch
   // Per-draw scratch (renderBitmap/renderText run per glyph every frame: no allocations)
   private static readonly finalTransformScratch = mat4.create();
@@ -252,7 +254,11 @@ export class UIRenderUtils {
 
     // Project widget transform (physical px) into clip space
     // Scratch is safe: both uniform paths below copy it out before returning
-    const finalTransform = mat4.multiply(this.finalTransformScratch, this.orthoProjection, transform);
+    const finalTransform = mat4.multiply(
+      this.finalTransformScratch,
+      this.orthoProjection,
+      transform,
+    );
 
     // Select technique based on blend mode
     const technique = additive ? this.additiveTechnique : this.standardTechnique;
@@ -269,7 +275,7 @@ export class UIRenderUtils {
       this.uniformPoolIndex++;
       this.writeUniformData(uniformBuffer, finalTransform, tint, minUV, maxUV);
     } else {
-      // Pool exhausted (>128 UI draws this frame) — fall back to one-shot allocation
+      // Pool exhausted (>UNIFORM_POOL_SIZE UI draws this frame) — fall back to one-shot allocation
       uniformBuffer = this.createUniformBufferForDraw({
         transform: finalTransform,
         tint,

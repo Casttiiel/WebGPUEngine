@@ -10,7 +10,13 @@ import { Texture } from '../../../renderer/resources/Texture';
  * ImageWidget - Renders textures/sprites with full control over UV, color, and blending.
  * Replicates C++ CImage widget.
  */
+// Shared per-draw scratch: renderBitmap copies them into uniforms before returning.
+const tintScratch = vec4.create();
+const minUVScratch = vec2.create();
+const maxUVScratch = vec2.create();
+
 export class ImageWidget extends Widget {
+  private ownsColor = false;
   protected imageParams: ImageParams;
   private cachedTexture: Texture | null = null;
   private cachedTexturePath: string | null = null;
@@ -63,11 +69,11 @@ export class ImageWidget extends Widget {
 
     // Convert color to tint vec4
     const color = this.imageParams.color;
-    const tint = vec4.fromValues(color.r, color.g, color.b, color.a);
+    const tint = vec4.set(tintScratch, color.r, color.g, color.b, color.a);
 
     // Convert UV to vec2
-    const minUV = vec2.fromValues(this.imageParams.minUV.x, this.imageParams.minUV.y);
-    const maxUV = vec2.fromValues(this.imageParams.maxUV.x, this.imageParams.maxUV.y);
+    const minUV = vec2.set(minUVScratch, this.imageParams.minUV.x, this.imageParams.minUV.y);
+    const maxUV = vec2.set(maxUVScratch, this.imageParams.maxUV.x, this.imageParams.maxUV.y);
 
     UIRenderUtils.renderBitmap(
       renderPass,
@@ -102,7 +108,18 @@ export class ImageWidget extends Widget {
   }
 
   public setColor(r: number, g: number, b: number, a: number): void {
-    this.imageParams.color = { r, g, b, a };
+    // Called every frame by HUD controllers: mutate our own color object instead of
+    // allocating one (the initial object may be shared with the params it came from).
+    if (!this.ownsColor) {
+      this.imageParams.color = { r, g, b, a };
+      this.ownsColor = true;
+      return;
+    }
+    const c = this.imageParams.color;
+    c.r = r;
+    c.g = g;
+    c.b = b;
+    c.a = a;
   }
 
   public getColor(): { r: number; g: number; b: number; a: number } {
