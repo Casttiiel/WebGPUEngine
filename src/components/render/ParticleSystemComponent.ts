@@ -78,7 +78,15 @@ export class ParticleSystemComponent extends Component {
   private spawnParamsFloat32View!: Float32Array;
   private spawnParamsUint32View!: Uint32Array;
   private counterDataArray = new Uint32Array(1);
-  private particleRenderParamsArray = new Float32Array(12); // 48 bytes: startSize,endSize,pad,pad + startColor + endColor
+  // 64 bytes: startSize, endSize, spinSpeed, tumbleSpeed + startColor + endColor
+  //           + atlasCols, atlasRows, flutter, nearFade
+  private particleRenderParamsArray = new Float32Array(16);
+  // Aspecto de cada partícula (copos, hojas, ceniza): giro, volteo, variantes, aleteo.
+  private spinSpeed = 0;
+  private tumbleSpeed = 0;
+  private atlas: [number, number] = [1, 1];
+  private flutter = 0;
+  private nearFade = 0;
 
   constructor() {
     super();
@@ -92,8 +100,8 @@ export class ParticleSystemComponent extends Component {
     const a = this.particleRenderParamsArray;
     a[0] = this.startSize;
     a[1] = this.endSize;
-    a[2] = 0; // padding
-    a[3] = 0; // padding
+    a[2] = this.spinSpeed;
+    a[3] = this.tumbleSpeed;
     a[4] = this.startColor[0];
     a[5] = this.startColor[1];
     a[6] = this.startColor[2];
@@ -102,6 +110,10 @@ export class ParticleSystemComponent extends Component {
     a[9] = this.endColor[1];
     a[10] = this.endColor[2];
     a[11] = this.endColor[3];
+    a[12] = this.atlas[0];
+    a[13] = this.atlas[1];
+    a[14] = this.flutter;
+    a[15] = this.nearFade;
     device.queue.writeBuffer(this.particleRenderParamsBuffer, 0, a);
   }
 
@@ -145,6 +157,11 @@ export class ParticleSystemComponent extends Component {
       }
 
       // Parámetros visuales
+      this.spinSpeed = data?.spinSpeed ?? 0;
+      this.tumbleSpeed = data?.tumbleSpeed ?? 0;
+      this.atlas = data?.atlas ? [data.atlas[0] ?? 1, data.atlas[1] ?? 1] : [1, 1];
+      this.flutter = data?.flutter ?? 0;
+      this.nearFade = data?.nearFade ?? 0;
       this.startSize = data?.startSize ?? 0.1;
       this.endSize = data?.endSize ?? 0.1;
       this.startColor = data?.startColor ?? [1, 1, 1, 1];
@@ -239,10 +256,10 @@ export class ParticleSystemComponent extends Component {
       });
       device.queue.writeBuffer(this.freeListCountBuffer, 0, freeListCount);
 
-      // 5. Crear ParticleRenderParams buffer (48 bytes: startSize, endSize, pad, pad, startColor, endColor)
+      // 5. Crear ParticleRenderParams buffer (64 bytes; ver particleRenderParamsArray)
       this.particleRenderParamsBuffer = device.createBuffer({
         label: 'particle_render_params_buffer',
-        size: 48,
+        size: 64,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 

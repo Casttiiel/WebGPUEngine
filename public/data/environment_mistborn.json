@@ -8,10 +8,13 @@
   },
   "skybox": "qwantani_mid_morning_puresky_1k.hdr",
   "skyboxType": "procedural",
-  "timeOfDay": 0.285,
+  "timeOfDay": 0.3,
   "sun": {
     "tint": [1.0, 0.42, 0.26],
-    "intensityScale": 0.75
+    "intensityScale": 0.75,
+    "latitude": 42,
+    "declination": 8,
+    "northAzimuth": 35
   },
   "clouds": {
     "type": "volumetric",

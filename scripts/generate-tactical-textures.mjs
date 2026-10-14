@@ -8,6 +8,8 @@
  *   surface_oil.png   charco de aceite (marrón oscuro con brillo)
  *   status_fear.png   icono del estado "miedo" (sobre la cabeza de la unidad)
  *   ash_flake.png     copo de ceniza (partículas que caen del cielo, estilo Nacidos de la Bruma)
+ *   ash_flakes.png    atlas 2×2 (512 px) de copos de ceniza distintos: bordes dentados de papel
+ *                     quemado, más oscuros en el borde, con vetas (cada partícula usa uno)
  *   aim_*.png         indicador de empujar (flecha en el suelo): cuerpo, chevrones y punta en
  *                     dos colores (_ok: no golpea a nadie, _hit: golpea), hueco donde acaba el
  *                     objeto y marca de impacto. En la textura "adelante" es hacia abajo (+v).
@@ -132,6 +134,53 @@ textures['ash_flake.png'] = `
       </radialGradient>
     </defs>
     <path d="${blob(29, 110, 0.35, 9)}" fill="url(#g)"/>`;
+
+// Atlas de copos de ceniza (2×2 celdas de 256 px; se genera aparte, es de 512 px).
+function ashFlake(seed, cx, cy) {
+  let s = seed;
+  const rnd = () => {
+    s = (s * 16807) % 2147483647;
+    return s / 2147483647;
+  };
+  // Contorno dentado: radio irregular a baja frecuencia (forma) + dientes (borde quemado).
+  const n = 46;
+  const lobes = 2 + Math.floor(rnd() * 3);
+  const phase = rnd() * Math.PI * 2;
+  const stretch = 0.55 + rnd() * 0.35;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const r = 92 * (0.72 + 0.28 * Math.sin(a * lobes + phase)) * (0.82 + rnd() * 0.3);
+    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * stretch]);
+  }
+  const d = `M ${pts.map((p) => p.map((v) => v.toFixed(1)).join(' ')).join(' L ')} Z`;
+  // Vetas (fibras del papel/hoja quemada).
+  let veins = '';
+  for (let v = 0; v < 3; v++) {
+    const a = rnd() * Math.PI;
+    const len = 40 + rnd() * 40;
+    const x0 = cx - Math.cos(a) * len, y0 = cy - Math.sin(a) * len * stretch;
+    const x1 = cx + Math.cos(a) * len, y1 = cy + Math.sin(a) * len * stretch;
+    veins += `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} Q ${(cx + (rnd() - 0.5) * 30).toFixed(1)} ${(cy + (rnd() - 0.5) * 30).toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)}" stroke="#5a5450" stroke-width="${(2 + rnd() * 2).toFixed(1)}" fill="none" stroke-opacity="0.7"/>`;
+  }
+  const id = `g${seed}`;
+  return `
+    <defs>
+      <radialGradient id="${id}" cx="${cx}" cy="${cy}" r="96" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#b8b2ac"/>
+        <stop offset="65%" stop-color="#8f8882"/>
+        <stop offset="100%" stop-color="#3e3936"/>
+      </radialGradient>
+    </defs>
+    <path d="${d}" fill="url(#${id})" stroke="#2a2624" stroke-width="5" stroke-linejoin="round"/>
+    ${veins}`;
+}
+{
+  const body = [ashFlake(11, 128, 128), ashFlake(23, 384, 128), ashFlake(37, 128, 384), ashFlake(53, 384, 384)].join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512">${body}</svg>`;
+  await sharp(Buffer.from(svg)).png().toFile(path.join(OUT, 'ash_flakes.png'));
+  console.log(`✓ ${path.join(OUT, 'ash_flakes.png')}`);
+}
 
 for (const [name, body] of Object.entries(textures)) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}">${body}</svg>`;

@@ -56,6 +56,15 @@ export class ModuleEnvironmentManager extends Module {
   /** environment.json "sun": tinte del sol (p.ej. rojo) y escala de su intensidad. */
   private sunTint: vec3 = vec3.fromValues(1, 1, 1);
   private sunIntensityScale = 1.0;
+  /**
+   * environment.json "sun": recorrido del sol. latitude (grados; 0 = ecuador, el sol pasa por el
+   * cénit), declination (grados; la estación: +23 verano, -23 invierno en el hemisferio norte) y
+   * northAzimuth (grados: hacia dónde cae el norte respecto a la escena; el este por defecto es +X
+   * y el norte -Z). Todo a 0 = recorrido de este a oeste por el cénit.
+   */
+  private sunLatitude = 0;
+  private sunDeclination = 0;
+  private sunNorthAzimuth = 0;
   /** environment.json "ambient.dayScale": escala del ambiente de día ligado al cielo. */
   private ambientDayScale = 1.0;
 
@@ -134,6 +143,9 @@ export class ModuleEnvironmentManager extends Module {
     this.timeOfDay = jsonData.timeOfDay ?? 0.5;
     if (jsonData.sun?.tint) vec3.set(this.sunTint, ...(jsonData.sun.tint as [number, number, number]));
     this.sunIntensityScale = jsonData.sun?.intensityScale ?? 1.0;
+    this.sunLatitude = jsonData.sun?.latitude ?? 0;
+    this.sunDeclination = jsonData.sun?.declination ?? 0;
+    this.sunNorthAzimuth = jsonData.sun?.northAzimuth ?? 0;
     this.ambientDayScale = jsonData.ambient?.dayScale ?? 1.0;
 
     const [skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
@@ -247,7 +259,23 @@ export class ModuleEnvironmentManager extends Module {
     //  π    = atardecer (horizonte oeste)
     // 3π/2  = medianoche (debajo)
     const sunAngle = this.timeOfDay * 2.0 * Math.PI - Math.PI * 0.5;
-    this.sunDir = vec3.fromValues(Math.cos(sunAngle), Math.sin(sunAngle), 0.0);
+    // Posición astronómica (este, norte, arriba) a partir del ángulo horario (0 = mediodía), la
+    // latitud y la declinación. Con latitud y declinación 0 es el arco este → cénit → oeste.
+    const hourAngle = sunAngle - Math.PI * 0.5;
+    const lat = this.sunLatitude * (Math.PI / 180);
+    const dec = this.sunDeclination * (Math.PI / 180);
+    const east = -Math.cos(dec) * Math.sin(hourAngle);
+    const north = Math.cos(lat) * Math.sin(dec) - Math.sin(lat) * Math.cos(dec) * Math.cos(hourAngle);
+    const up = Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(hourAngle);
+    // A la escena: este = +X y norte = -Z, girados northAzimuth sobre la vertical.
+    const az = this.sunNorthAzimuth * (Math.PI / 180);
+    const x = east;
+    const z = -north;
+    this.sunDir = vec3.fromValues(
+      x * Math.cos(az) - z * Math.sin(az),
+      up,
+      x * Math.sin(az) + z * Math.cos(az),
+    );
     vec3.normalize(this.sunDir, this.sunDir);
 
     // FASE 1.2 — Dirección de la luna (opuesta al sol)

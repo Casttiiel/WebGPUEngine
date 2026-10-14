@@ -21,4 +21,18 @@ export interface ParticleSystemComponentData {
   burstCount?: number;
   /** Si false, el emisor no emite continuamente al inicio — usar burst() para activar. Por defecto true. */
   emitting?: boolean;
+  /**
+   * Aspecto por partícula (solo world space). Cada partícula tiene su propio azar: ángulo
+   * inicial, sentido y ritmo de giro, variante del atlas y fase del aleteo.
+   */
+  /** Giro en el plano de la pantalla (rad/s, máximo; cada partícula entre la mitad y esto). Default 0. */
+  spinSpeed?: number;
+  /** Volteo fingido en 3D (se achata en un eje como si girase sobre sí misma; rad/s). Default 0. */
+  tumbleSpeed?: number;
+  /** La textura es un atlas de [columnas, filas] variantes; cada partícula usa una al azar. Default [1, 1]. */
+  atlas?: [number, number];
+  /** Vaivén lateral al caer, como un papel (m de amplitud). Default 0. */
+  flutter?: number;
+  /** Se desvanece al acercarse a la cámara: transparente a la mitad de esta distancia (m). Default 0 (no). */
+  nearFade?: number;
 }

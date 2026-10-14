@@ -1,7 +1,7 @@
 {
   "technique": "particles/particle_ash.tech",
   "textures": {
-    "txAlbedo": "tactical/ash_flake.png"
+    "txAlbedo": "tactical/ash_flakes.png"
   },
   "casts_shadows": false,
   "category": "transparent",
