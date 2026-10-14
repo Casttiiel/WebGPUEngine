@@ -9,7 +9,7 @@
 //
 //   fogDensity  = heightFog(worldPos) * noiseFactor(worldPos)
 //
-//   litContrib  = fogDensity * scatterColor * sunColor * intensity * shadowVis
+//   litContrib  = fogDensity * scatterColor * sunColor * intensity * shadowVis * phase
 //   baseContrib = fogDensity * fogBaseColor * sunColor * intensity   ← unshadowed sun tint
 //
 //   accumScatter += (litContrib + baseContrib) * T * stepSize
@@ -17,12 +17,19 @@
 //
 // Compose pass uses:  scene * T  +  accumScatter    (A = T for depth-blur weight)
 //
-// Struct layout (80 bytes = 5 × 16):
+// Height model (layerHeight):
+//   0  → classic unbounded exponential height fog (density * exp(-h * heightFalloff)).
+//   >0 → bounded fog slab [.., heightBase + layerHeight] with pow(1 - h/layer, layerFalloff)
+//        profile. The ray is clipped to the slab first, so every step lands inside the
+//        fog (ray-slab trick from three.js webgpu_postprocessing_fog).
+//
+// Struct layout (96 bytes = 6 × 16):
 //   [0-3]  density, heightBase, heightFalloff, extinctionCoeff
 //   [4-7]  scatterColor.rgb (offset 16, align 16), numSteps
 //   [8-11] fogNear, fogFar, enabled, _pad1
 //   [12-15] noiseScale, noiseStrength, windOffsetX, windOffsetZ
 //   [16-19] fogBaseColor.rgb (offset 64, align 16), noiseThreshold
+//   [20-23] layerHeight, layerFalloff, anisotropy, noiseWarp
 
 struct FogScatterParams {
     density:         f32,
@@ -41,6 +48,10 @@ struct FogScatterParams {
     windOffsetZ:     f32,
     fogBaseColor:    vec3<f32>,  // unlit fog color (always present, like lerp fog)
     noiseThreshold:  f32,        // cuts noise below this value → distinct fog banks
+    layerHeight:     f32,        // >0 = bounded fog slab thickness above heightBase
+    layerFalloff:    f32,        // pow exponent of the slab density profile
+    anisotropy:      f32,        // Henyey-Greenstein g for the sun term (0 = isotropic)
+    noiseWarp:       f32,        // domain-warp strength of the 2nd noise octave
 }
 
 // ─── Bindings ─────────────────────────────────────────────────────────────────
@@ -88,6 +99,8 @@ struct SpotLightEntry {
 @group(3) @binding(3) var<uniform>       fogLightCounts: FogLightCounts;
 @group(3) @binding(4) var<storage, read> pointLights:    array<PointLightEntry>;
 @group(3) @binding(5) var<storage, read> spotLights:     array<SpotLightEntry>;
+@group(3) @binding(6) var txCloudNoise:                  texture_3d<f32>;
+@group(3) @binding(7) var samplerCloudNoise:             sampler;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,44 +124,38 @@ fn sampleFogShadow(worldPos: vec3<f32>, viewDist: f32) -> f32 {
 }
 
 fn evalHeightFog(worldPos: vec3<f32>) -> f32 {
-    let h = max(worldPos.y - fogParams.heightBase, 0.0);
-    return fogParams.density * exp(-h * fogParams.heightFalloff);
+    let h = worldPos.y - fogParams.heightBase;
+    if (fogParams.layerHeight > 0.0) {
+        let rel = saturate(1.0 - h / fogParams.layerHeight);
+        return fogParams.density * pow(rel, fogParams.layerFalloff);
+    }
+    return fogParams.density * exp(-max(h, 0.0) * fogParams.heightFalloff);
 }
 
-// ── Procedural 3D value noise ─────────────────────────────────────────────────
-// Works on any world coordinate (including negatives). No texture needed.
-
-fn hash31(p: vec3<f32>) -> f32 {
-    var h = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
-    h += dot(h, h.yzx + 33.33);
-    return fract((h.x + h.y) * h.z);
+// Henyey-Greenstein, scaled by 4π so g = 0 returns 1 (keeps the isotropic look unchanged).
+fn fogPhase(cosTheta: f32, g: f32) -> f32 {
+    let g2 = g * g;
+    let denom = max(1.0 + g2 - 2.0 * g * cosTheta, 1e-4);
+    return (1.0 - g2) / (denom * sqrt(denom));
 }
 
-fn valueNoise3D(p: vec3<f32>) -> f32 {
-    let i = floor(p);
-    let f = fract(p);
-    let u = f * f * (3.0 - 2.0 * f);
-    return mix(
-        mix(mix(hash31(i),                              hash31(i + vec3<f32>(1,0,0)), u.x),
-            mix(hash31(i + vec3<f32>(0,1,0)),          hash31(i + vec3<f32>(1,1,0)), u.x), u.y),
-        mix(mix(hash31(i + vec3<f32>(0,0,1)),          hash31(i + vec3<f32>(1,0,1)), u.x),
-            mix(hash31(i + vec3<f32>(0,1,1)),          hash31(i + vec3<f32>(1,1,1)), u.x), u.y),
-        u.z,
-    );
-}
-
-// Returns density modulator in [0..1].
-// XZ scaled by noiseScale; Y scaled 8× slower → banks are wide/horizontal, not columnar.
-// 2-octave FBM: coarse banks (oct 0) + fine tendrils (oct 1).
+// ── Cloud noise (tileable 3D tri-noise texture) ───────────────────────────────
+// Returns density modulator: 0 below noiseThreshold, grows above it → distinct banks.
+// Octave 2 is domain-warped by octave 1 and drifts against the wind (counter-current)
+// so the wisps deform instead of just sliding.
 fn noiseFactor(worldPos: vec3<f32>) -> f32 {
-    let p    = vec3<f32>(
-                   worldPos.x * fogParams.noiseScale + fogParams.windOffsetX,
-                   worldPos.y * fogParams.noiseScale * 0.12,
-                   worldPos.z * fogParams.noiseScale + fogParams.windOffsetZ,
-               );
-    let n0   = valueNoise3D(p);
-    let n1   = valueNoise3D(p * 2.17 + vec3<f32>(1.7, 9.2, 3.4)) * 0.5;
-    let raw  = n0 * 0.667 + n1 * 0.333;
+    // Wind offsets are wrapped to [0, 4) on the CPU; every multiplier below keeps
+    // that wrap an integer number of noise tiles, so the wrap is invisible.
+    let wind  = vec3<f32>(fogParams.windOffsetX, 0.0, fogParams.windOffsetZ);
+    let p     = worldPos * fogParams.noiseScale;
+
+    let n1 = textureSampleLevel(txCloudNoise, samplerCloudNoise, p + wind, 0.0).r;
+
+    let wind2 = vec3<f32>(-wind.x * 0.5, (wind.x + wind.z) * 0.25, wind.z * 0.5);
+    let p2    = p * 2.2 + vec3<f32>(1.7, 0.9, 2.5) + wind2 + n1 * fogParams.noiseWarp;
+    let n2    = textureSampleLevel(txCloudNoise, samplerCloudNoise, p2, 0.0).r * 0.5;
+
+    let raw   = n1 + n2;
     let above = max(raw - fogParams.noiseThreshold, 0.0)
               / max(1.0 - fogParams.noiseThreshold, 0.001);
     return mix(1.0, above, fogParams.noiseStrength);
@@ -165,19 +172,40 @@ fn fs(
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
+    let ndc      = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
+    let viewDir4 = camera.invProjection * vec4<f32>(ndc, 1.0, 1.0);
+    let viewDir  = normalize(viewDir4.xyz / viewDir4.w);
+    let rayDir   = normalize((camera.invView * vec4<f32>(viewDir, 0.0)).xyz);
+
+    // Linear depth is view-Z / far; convert to distance along the ray.
     let linearDepth    = textureSample(gLinearDepth, gSampler, uv).r;
-    let sceneWorldDist = min(linearDepth, 0.9999) * camera.cameraFar;
-    let marchFar       = min(sceneWorldDist, fogParams.fogFar);
-    let marchNear      = fogParams.fogNear;
+    let sceneWorldDist = min(linearDepth, 0.9999) * camera.cameraFar / max(abs(viewDir.z), 1e-4);
+    var marchFar       = min(sceneWorldDist, fogParams.fogFar);
+    var marchNear      = fogParams.fogNear;
+
+    // Ray-slab: clip the march to the part of the ray below the slab top
+    if (fogParams.layerHeight > 0.0) {
+        let camY = camera.cameraPosition.y;
+        let topY = fogParams.heightBase + fogParams.layerHeight;
+        let dirY = select(min(rayDir.y, -1e-5), max(rayDir.y, 1e-5), rayDir.y >= 0.0);
+        let tTop = (topY - camY) / dirY;
+        if (camY > topY) {
+            // Above the slab: only rays going down enter it
+            if (rayDir.y >= 0.0) { return vec4<f32>(0.0, 0.0, 0.0, 1.0); }
+            marchNear = max(marchNear, tTop);
+        } else if (rayDir.y > 0.0) {
+            // Inside the slab looking up: leave it at the top
+            marchFar = min(marchFar, tTop);
+        }
+    }
 
     if (marchFar <= marchNear) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
 
-    let ndc      = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
-    let viewDir4 = camera.invProjection * vec4<f32>(ndc, 1.0, 1.0);
-    let viewDir  = normalize(viewDir4.xyz / viewDir4.w);
-    let rayDir   = normalize((camera.invView * vec4<f32>(viewDir, 0.0)).xyz);
+    // Sun phase is constant along the ray (directional light)
+    let sunDir   = normalize(csmLight.position); // points towards the sun
+    let sunPhase = fogPhase(dot(rayDir, sunDir), clamp(fogParams.anisotropy, -0.95, 0.95));
 
     // Blue noise dither: offsets ray start per-pixel → removes banding
     let noiseUV = fract(fragCoord.xy / 64.0);
@@ -210,7 +238,7 @@ fn fs(
         let scatterWeight  = transmittance * (1.0 - extinctionStep);
 
         let shadowVis   = sampleFogShadow(worldPos, t);
-        let litContrib  = fogParams.scatterColor * csmLight.color * csmLight.intensity * shadowVis;
+        let litContrib  = fogParams.scatterColor * csmLight.color * csmLight.intensity * shadowVis * sunPhase;
         let baseContrib = fogParams.fogBaseColor  * csmLight.color * csmLight.intensity;
 
         accumScatter += (litContrib + baseContrib) * scatterWeight;

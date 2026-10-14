@@ -19,6 +19,14 @@ export type FogScatterComponentData = Readonly<{
   windAngle?: number;
   fogBaseColor?: [number, number, number];
   noiseThreshold?: number;
+  noiseWarp?: number;
+  // Bounded fog slab (layerHeight 0 = unbounded exponential height fog)
+  layerHeight?: number;
+  layerFalloff?: number;
+  // Sun phase function (Henyey-Greenstein g)
+  anisotropy?: number;
+  // JBU upsample of the half-res fog
+  upsampleDepthSensitivity?: number;
   // SSMS compose
   maxDensity?: number;
   energyLoss?: number;

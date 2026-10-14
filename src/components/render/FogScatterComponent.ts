@@ -14,6 +14,7 @@ import { Render } from '../../renderer/core/pipeline/Render';
 import { Engine } from '../../core/engine/Engine';
 import { PointLightComponent } from './PointLightComponent';
 import { SpotLightComponent } from './SpotLightComponent';
+import { CloudNoiseTexture3D } from '../../renderer/shading/CloudNoiseTexture3D';
 
 /**
  * FogScatterComponent — Screen-space volumetric fog with SSMS pyramid scatter.
@@ -27,16 +28,17 @@ import { SpotLightComponent } from './SpotLightComponent';
  *   Pass 10–13— scatter upsample      → scatterU[0..3]   (SSMS two-input combine)
  *   Pass 14   — fog_scatter_compose   → resultRT         (final frame)
  *
- * FogScatterParams layout (80 bytes = 5 × 16):
+ * FogScatterParams layout (96 bytes = 6 × 16):
  *   [0-3]   density, heightBase, heightFalloff, extinctionCoeff
  *   [4-7]   scatterColor.rgb (align 16), numSteps
  *   [8-11]  fogNear, fogFar, enabled, _pad1
  *   [12-15] noiseScale, noiseStrength, windOffsetX, windOffsetZ
  *   [16-19] fogBaseColor.rgb (align 16), noiseThreshold
+ *   [20-23] layerHeight, layerFalloff, anisotropy, noiseWarp
  *
  * FogScatterComposeParams layout (32 bytes = 2 × 16):
  *   [0] maxDensity  [1] energyLoss  [2] scatterIntensity  [3] scatterRadius
- *   [4] enabled     [5-7] padding
+ *   [4] enabled     [5] depthSensitivity (JBU upsample)  [6-7] padding
  *
  * ScatterPrefilterParams layout (32 bytes = 2 × 16):
  *   [0-2] blurTint.rgb  [3] fadeCurve
@@ -62,7 +64,7 @@ export class FogScatterComponent extends Component {
   private resultRT!: RenderTarget;
 
   // ─── Uniform buffers ──────────────────────────────────────────────────────────
-  private fogParamsBuffer!: GPUBuffer; // FogScatterParams (80 bytes)
+  private fogParamsBuffer!: GPUBuffer; // FogScatterParams (96 bytes)
   private composeParamsBuffer!: GPUBuffer; // FogScatterComposeParams (32 bytes)
   private fogBlurHBuffer!: GPUBuffer; // bilateral blur H (16 bytes)
   private fogBlurVBuffer!: GPUBuffer; // bilateral blur V (16 bytes)
@@ -73,7 +75,8 @@ export class FogScatterComponent extends Component {
   // ─── Bind groups ──────────────────────────────────────────────────────────────
   private fogParamsBindGroup: GPUBindGroup | null = null;
   private composeParamsBG: GPUBindGroup | null = null;
-  private fogComposeBG: GPUBindGroup | null = null; // fogHalfBlurred for compose + prefilter
+  private fogComposeBG: GPUBindGroup | null = null; // fogHalfBlurred + depth for compose + prefilter
+  private cachedComposeDepthView: GPUTextureView | null = null;
   private blurDepthBG: GPUBindGroup | null = null;
   private cachedDepthView: GPUTextureView | null = null;
   private fogBlurHBG!: GPUBindGroup;
@@ -103,13 +106,21 @@ export class FogScatterComponent extends Component {
   // Fog bilateral blur (removes blue noise from raymarch)
   public fogBlurRadius: number = 3.0;
   public fogDepthSigma: number = 50.0;
-  // Spatial density noise
-  public noiseScale: number = 0.1;
-  public noiseStrength: number = 0.5;
+  // JBU upsample of the half-res fog (relative depth sensitivity)
+  public upsampleDepthSensitivity: number = 30.0;
+  // Bounded fog slab (0 = classic unbounded exponential height fog)
+  public layerHeight: number = 6.0;
+  public layerFalloff: number = 1.2;
+  // Sun phase function (Henyey-Greenstein g; 0 = isotropic)
+  public anisotropy: number = 0.3;
+  // Cloud density noise (tileable 3D tri-noise; noiseScale = tiles per world unit)
+  public noiseScale: number = 0.02;
+  public noiseStrength: number = 1.0;
+  public noiseWarp: number = 0.5;
   public windSpeed: number = 0.02;
   public windAngle: number = 45.0;
   public fogBaseColor: [number, number, number] = [1.0, 1.0, 1.0];
-  public noiseThreshold: number = 0.3;
+  public noiseThreshold: number = 0.5;
 
   // ─── SSMS pyramid params ──────────────────────────────────────────────────────
   public maxDensity: number = 0.95; // max fog opacity
@@ -127,25 +138,24 @@ export class FogScatterComponent extends Component {
   private windZ: number = 0;
 
   private loaded = false;
-  private readonly fogParamsData = new Float32Array(20); // 80 bytes
+  private readonly fogParamsData = new Float32Array(24); // 96 bytes
   private readonly composeParamsData = new Float32Array(8); // 32 bytes
   private readonly blurParamsTemp = new Float32Array(4); // 16 bytes
   private readonly prefilterParamsData = new Float32Array(8); // 32 bytes
   private readonly kawaseData = new Float32Array(4); // 16 bytes
   private readonly upsampleParamsData = new Float32Array(4); // 16 bytes
 
-
   private static readonly NUM_PYRAMID = 5;
 
   // ─── Fog lights (point + spot, evaluated per raymarch step) ──────────────────
   private static readonly MAX_FOG_POINT_LIGHTS = 32;
-  private static readonly MAX_FOG_SPOT_LIGHTS  = 16;
+  private static readonly MAX_FOG_SPOT_LIGHTS = 16;
   private static readonly POINT_FLOATS = 12; // PointLightEntry = 3 × vec4
-  private static readonly SPOT_FLOATS  = 16; // SpotLightEntry  = 4 × vec4
+  private static readonly SPOT_FLOATS = 16; // SpotLightEntry  = 4 × vec4
 
   private fogLightCountBuffer!: GPUBuffer;
   private fogPointLightBuffer!: GPUBuffer;
-  private fogSpotLightBuffer!:  GPUBuffer;
+  private fogSpotLightBuffer!: GPUBuffer;
 
   private fogLightCountData = new Uint32Array(4);
   private readonly fogPointLightData = new Float32Array(
@@ -176,6 +186,12 @@ export class FogScatterComponent extends Component {
       if (data.windAngle !== undefined) this.windAngle = data.windAngle;
       if (data.fogBaseColor !== undefined) this.fogBaseColor = data.fogBaseColor;
       if (data.noiseThreshold !== undefined) this.noiseThreshold = data.noiseThreshold;
+      if (data.noiseWarp !== undefined) this.noiseWarp = data.noiseWarp;
+      if (data.layerHeight !== undefined) this.layerHeight = data.layerHeight;
+      if (data.layerFalloff !== undefined) this.layerFalloff = data.layerFalloff;
+      if (data.anisotropy !== undefined) this.anisotropy = data.anisotropy;
+      if (data.upsampleDepthSensitivity !== undefined)
+        this.upsampleDepthSensitivity = data.upsampleDepthSensitivity;
       if (data.maxDensity !== undefined) this.maxDensity = data.maxDensity;
       if (data.energyLoss !== undefined) this.energyLoss = data.energyLoss;
       if (data.blurTint !== undefined) this.blurTint = data.blurTint;
@@ -221,6 +237,7 @@ export class FogScatterComponent extends Component {
     this.blurDepthBG = null;
     this.cachedDepthView = null;
     this.fogComposeBG = null;
+    this.cachedComposeDepthView = null;
     this.singleTexBGCache.clear();
     this.createStaticBindGroups();
   }
@@ -245,6 +262,7 @@ export class FogScatterComponent extends Component {
 
     const cameraBG = Engine.getRender().getMainCameraBindGroup();
     const depthBG = this.getOrRebuildBlurDepthBG();
+    const fogComposeBG = this.getOrRebuildFogComposeBG();
 
     this.prepareFogLights();
 
@@ -273,7 +291,7 @@ export class FogScatterComponent extends Component {
     // Pass 4: SSMS prefilter → scatterPrefilterRT
     this.executePass('Scatter Prefilter', this.prefilterTech, this.scatterPrefilterRT, 0.0, false, [
       this.getOrCreateSingleTexBG(sceneView),
-      this.fogComposeBG!,
+      fogComposeBG,
       this.prefilterParamsBG!,
     ]);
 
@@ -304,7 +322,7 @@ export class FogScatterComponent extends Component {
     // Pass 14: Compose
     this.executePass('Fog Compose', this.composeTech, this.resultRT, 1.0, false, [
       this.getOrCreateSingleTexBG(sceneView), // group 0: scene
-      this.fogComposeBG!, // group 1: fogHalfBlurred
+      fogComposeBG, // group 1: fogHalfBlurred + depth (JBU)
       this.getOrCreateSingleTexBG(currentInput), // group 2: scatter U[0]
       this.composeParamsBG!, // group 3: compose params
     ]);
@@ -321,8 +339,10 @@ export class FogScatterComponent extends Component {
   public override update(dt: number): void {
     if (!this.loaded) return;
     const rad = this.windAngle * (Math.PI / 180.0);
-    this.windX += Math.cos(rad) * this.windSpeed * dt;
-    this.windZ += Math.sin(rad) * this.windSpeed * dt;
+    // Wrapped to (-4, 4): the shader's wind multipliers keep the wrap an integer number
+    // of noise tiles (seamless) and this avoids float precision loss in long sessions.
+    this.windX = (this.windX + Math.cos(rad) * this.windSpeed * dt) % 4.0;
+    this.windZ = (this.windZ + Math.sin(rad) * this.windSpeed * dt) % 4.0;
   }
   public override renderDebug(): void {}
 
@@ -338,12 +358,27 @@ export class FogScatterComponent extends Component {
 
     // Height
     this._editorFolder.add(this, 'heightBase', -50, 50, 0.5).name('Height Base').listen();
+    this._editorFolder
+      .add(this, 'layerHeight', 0.0, 50.0, 0.1)
+      .name('Layer Height (0 = exp)')
+      .listen();
+    this._editorFolder.add(this, 'layerFalloff', 0.2, 4.0, 0.1).name('Layer Falloff').listen();
     this._editorFolder.add(this, 'heightFalloff', 0.0, 0.5, 0.005).name('Height Falloff').listen();
 
-    // Noise
-    this._editorFolder.add(this, 'noiseScale', 0.01, 0.5, 0.01).name('Noise Scale').listen();
+    // Lighting
+    this._editorFolder.add(this, 'anisotropy', -0.9, 0.95, 0.01).name('Anisotropy (g)').listen();
+
+    // Cloud noise
+    this._editorFolder.add(this, 'noiseScale', 0.002, 0.2, 0.001).name('Noise Scale').listen();
     this._editorFolder.add(this, 'noiseStrength', 0.0, 1.0, 0.01).name('Noise Strength').listen();
-    this._editorFolder.add(this, 'noiseThreshold', 0.0, 0.9, 0.01).name('Noise Threshold').listen();
+    this._editorFolder.add(this, 'noiseThreshold', 0.0, 1.2, 0.01).name('Noise Threshold').listen();
+    this._editorFolder.add(this, 'noiseWarp', 0.0, 2.0, 0.01).name('Noise Warp').listen();
+    this._editorFolder.add(this, 'windSpeed', 0.0, 0.2, 0.001).name('Wind Speed').listen();
+    this._editorFolder.add(this, 'numSteps', 4, 64, 1).name('Steps').listen();
+    this._editorFolder
+      .add(this, 'upsampleDepthSensitivity', 1.0, 100.0, 1.0)
+      .name('Upsample Depth Sens.')
+      .listen();
 
     // Scatter blur — intensity, when it kicks in, spread
     this._editorFolder
@@ -428,7 +463,7 @@ export class FogScatterComponent extends Component {
   private createUniformBuffers(): void {
     this.fogParamsBuffer = GPUUtils.createBuffer(
       'fog_scatter_params',
-      80,
+      96,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.composeParamsBuffer = GPUUtils.createBuffer(
@@ -466,9 +501,21 @@ export class FogScatterComponent extends Component {
     const MS = FogScatterComponent.MAX_FOG_SPOT_LIGHTS;
     const PF = FogScatterComponent.POINT_FLOATS;
     const SF = FogScatterComponent.SPOT_FLOATS;
-    this.fogLightCountBuffer = GPUUtils.createBuffer('fog_light_counts', 16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-    this.fogPointLightBuffer = GPUUtils.createBuffer('fog_point_lights', MP * PF * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-    this.fogSpotLightBuffer  = GPUUtils.createBuffer('fog_spot_lights',  MS * SF * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+    this.fogLightCountBuffer = GPUUtils.createBuffer(
+      'fog_light_counts',
+      16,
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    );
+    this.fogPointLightBuffer = GPUUtils.createBuffer(
+      'fog_point_lights',
+      MP * PF * 4,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    );
+    this.fogSpotLightBuffer = GPUUtils.createBuffer(
+      'fog_spot_lights',
+      MS * SF * 4,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    );
   }
 
   private createStaticBindGroups(): void {
@@ -484,16 +531,8 @@ export class FogScatterComponent extends Component {
         { binding: 3, resource: { buffer: this.fogLightCountBuffer } },
         { binding: 4, resource: { buffer: this.fogPointLightBuffer } },
         { binding: 5, resource: { buffer: this.fogSpotLightBuffer } },
-      ],
-    );
-
-    // fogHalfBlurred bind group: shared by compose (group 1) and prefilter (group 1)
-    this.fogComposeBG = BindGroupFactory.createBindGroup(
-      'fog_compose_fog_bg',
-      BindGroupFactory.getFogScatterFogTexturesLayout(),
-      [
-        { binding: 0, resource: this.fogHalfBlurred.getView() },
-        { binding: 1, resource: SamplerLibrary.simpleSampler! },
+        { binding: 6, resource: CloudNoiseTexture3D.getView() },
+        { binding: 7, resource: CloudNoiseTexture3D.getSampler() },
       ],
     );
 
@@ -552,6 +591,10 @@ export class FogScatterComponent extends Component {
     d[17] = this.fogBaseColor[1];
     d[18] = this.fogBaseColor[2];
     d[19] = this.noiseThreshold;
+    d[20] = Math.max(0, this.layerHeight);
+    d[21] = this.layerFalloff;
+    d[22] = this.anisotropy;
+    d[23] = this.noiseWarp;
     GPUUtils.writeBuffer(this.fogParamsBuffer, 0, d);
   }
 
@@ -562,7 +605,7 @@ export class FogScatterComponent extends Component {
     d[2] = this.scatterIntensity;
     d[3] = this.scatterRadius;
     d[4] = this._enabled ? 1.0 : 0.0;
-    d[5] = 0;
+    d[5] = this.upsampleDepthSensitivity;
     d[6] = 0;
     d[7] = 0;
     GPUUtils.writeBuffer(this.composeParamsBuffer, 0, d);
@@ -642,6 +685,24 @@ export class FogScatterComponent extends Component {
     return this.blurDepthBG;
   }
 
+  // fogHalfBlurred + full-res linear depth: shared by compose (JBU guide) and prefilter (group 1)
+  private getOrRebuildFogComposeBG(): GPUBindGroup {
+    const depthView = Engine.getRender().getDeferredRenderer().getLinearDepthView();
+    if (depthView !== this.cachedComposeDepthView || !this.fogComposeBG) {
+      this.cachedComposeDepthView = depthView;
+      this.fogComposeBG = BindGroupFactory.createBindGroup(
+        'fog_compose_fog_bg',
+        BindGroupFactory.getFogScatterFogTexturesLayout(),
+        [
+          { binding: 0, resource: this.fogHalfBlurred.getView() },
+          { binding: 1, resource: SamplerLibrary.simpleSampler! },
+          { binding: 2, resource: depthView },
+        ],
+      );
+    }
+    return this.fogComposeBG;
+  }
+
   private getOrCreateSingleTexBG(view: GPUTextureView): GPUBindGroup {
     let bg = this.singleTexBGCache.get(view);
     if (!bg) {
@@ -666,16 +727,21 @@ export class FogScatterComponent extends Component {
     let pc = 0;
     let sc = 0;
 
-    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ?? []) {
+    for (const comp of Engine.getEntities().getObjectManagerByName('point_light')?.getList() ??
+      []) {
       const pl = comp as PointLightComponent;
       if (!pl.isVisible() || pc >= MP) continue;
       const o = pc * PF;
       const pos = pl.getWorldPosition();
       const col = pl.getColor();
-      this.fogPointLightData[o + 0] = col[0];  this.fogPointLightData[o + 1] = col[1];
-      this.fogPointLightData[o + 2] = col[2];  this.fogPointLightData[o + 3] = pl.getIntensity();
-      this.fogPointLightData[o + 4] = pos[0];  this.fogPointLightData[o + 5] = pos[1];
-      this.fogPointLightData[o + 6] = pos[2];  this.fogPointLightData[o + 7] = pl.getRadius();
+      this.fogPointLightData[o + 0] = col[0];
+      this.fogPointLightData[o + 1] = col[1];
+      this.fogPointLightData[o + 2] = col[2];
+      this.fogPointLightData[o + 3] = pl.getIntensity();
+      this.fogPointLightData[o + 4] = pos[0];
+      this.fogPointLightData[o + 5] = pos[1];
+      this.fogPointLightData[o + 6] = pos[2];
+      this.fogPointLightData[o + 7] = pl.getRadius();
       this.fogPointLightData[o + 8] = pl.getStartFalloff();
       pc++;
     }
@@ -688,14 +754,20 @@ export class FogScatterComponent extends Component {
       const pos = cam.getPosition();
       const dir = cam.getFront();
       const col = sl.getColor();
-      this.fogSpotLightData[o + 0]  = col[0]; this.fogSpotLightData[o + 1]  = col[1];
-      this.fogSpotLightData[o + 2]  = col[2]; this.fogSpotLightData[o + 3]  = sl.getIntensity();
-      this.fogSpotLightData[o + 4]  = pos[0]; this.fogSpotLightData[o + 5]  = pos[1];
-      this.fogSpotLightData[o + 6]  = pos[2]; this.fogSpotLightData[o + 7]  = sl.getRadius();
-      this.fogSpotLightData[o + 8]  = sl.getStartFalloff();
+      this.fogSpotLightData[o + 0] = col[0];
+      this.fogSpotLightData[o + 1] = col[1];
+      this.fogSpotLightData[o + 2] = col[2];
+      this.fogSpotLightData[o + 3] = sl.getIntensity();
+      this.fogSpotLightData[o + 4] = pos[0];
+      this.fogSpotLightData[o + 5] = pos[1];
+      this.fogSpotLightData[o + 6] = pos[2];
+      this.fogSpotLightData[o + 7] = sl.getRadius();
+      this.fogSpotLightData[o + 8] = sl.getStartFalloff();
       // o+9..o+11: pad (already zero)
-      this.fogSpotLightData[o + 12] = dir[0]; this.fogSpotLightData[o + 13] = dir[1];
-      this.fogSpotLightData[o + 14] = dir[2]; this.fogSpotLightData[o + 15] = Math.cos(cam.getFov() * 0.5);
+      this.fogSpotLightData[o + 12] = dir[0];
+      this.fogSpotLightData[o + 13] = dir[1];
+      this.fogSpotLightData[o + 14] = dir[2];
+      this.fogSpotLightData[o + 15] = Math.cos(cam.getFov() * 0.5);
       sc++;
     }
 
@@ -704,8 +776,14 @@ export class FogScatterComponent extends Component {
     this.fogLightCountData[2] = 0;
     this.fogLightCountData[3] = 0;
     GPUUtils.writeBuffer(this.fogLightCountBuffer, 0, this.fogLightCountData);
-    if (pc > 0) GPUUtils.writeBuffer(this.fogPointLightBuffer, 0, this.fogPointLightData.subarray(0, pc * PF));
-    if (sc > 0) GPUUtils.writeBuffer(this.fogSpotLightBuffer,  0, this.fogSpotLightData.subarray(0, sc * SF));
+    if (pc > 0)
+      GPUUtils.writeBuffer(
+        this.fogPointLightBuffer,
+        0,
+        this.fogPointLightData.subarray(0, pc * PF),
+      );
+    if (sc > 0)
+      GPUUtils.writeBuffer(this.fogSpotLightBuffer, 0, this.fogSpotLightData.subarray(0, sc * SF));
   }
 
   private executePass(

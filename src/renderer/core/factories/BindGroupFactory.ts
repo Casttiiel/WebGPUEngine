@@ -1997,6 +1997,13 @@ export class BindGroupFactory {
       { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
       { binding: 4, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
       { binding: 5, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      // Tileable 3D cloud noise (CloudNoiseTexture3D) + repeat/linear sampler
+      {
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float', viewDimension: '3d' },
+      },
+      { binding: 7, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
     ]);
   }
 
@@ -2013,6 +2020,12 @@ export class BindGroupFactory {
     return this.getLayout('fog_scatter_fog_textures', [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      // Full-res linear depth: guide for the joint bilateral upsample in compose
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'unfilterable-float' },
+      },
     ]);
   }
 
@@ -2020,7 +2033,11 @@ export class BindGroupFactory {
     return this.getLayout('shockwave_input', [
       { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
       { binding: 1, visibility: GPUShaderStage.COMPUTE, sampler: { type: 'filtering' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float' } },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'unfilterable-float' },
+      },
     ]);
   }
 
