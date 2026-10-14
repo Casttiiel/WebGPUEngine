@@ -108,7 +108,13 @@ fn fs(@location(0) uv: vec2<f32>, @builtin(position) fragPos: vec4<f32>) -> @loc
     if (light.hasShadows > 0.5) {
         // Get the smooth PCF value then threshold it with the Bayer matrix.
         // This gives hard-edged, stippled PSX-style shadow boundaries.
-        let pcf   = getShadowFactorCSMBlended(g.worldPos, viewSpaceDepth);
+        // Normal offset sized to the selected cascade's texels (see csmNormalOffset).
+        var cascadeMtx = light.viewProjOffset0;
+        var cascadeInvRes = light.shadowParams.x;
+        if (cascadeIndex == 1) { cascadeMtx = light.viewProjOffset1; cascadeInvRes = light.shadowParams.y; }
+        else if (cascadeIndex >= 2) { cascadeMtx = light.viewProjOffset2; cascadeInvRes = light.shadowParams.z; }
+        let receiverPos = g.worldPos + csmNormalOffset(g.normal, light_dir, csmTexelWorldSize(cascadeMtx, cascadeInvRes));
+        let pcf   = getShadowFactorCSMBlended(receiverPos, viewSpaceDepth);
         let bayer = bayer4(vec2<u32>(fragPos.xy));
         shadow_factor = select(0.0, 1.0, pcf > bayer);
     }

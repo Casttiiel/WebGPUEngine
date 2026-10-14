@@ -61,10 +61,18 @@ export class DirectionalLightComponent extends Component {
 
   private shadowFov: number = 0;
   private shadowAspect: number = 0;
-  private splitsInitialized: boolean = false;
+  /** Camera/settings the current splits were computed for (recomputed when any changes). */
+  private readonly splitsKey: number[] = [];
 
   // Shadow camera configuration
   private static readonly LIGHT_DISTANCE = 100.0; // Distancia fija CONSTANTE de la shadow camera
+  /**
+   * How far (world units) each cascade's depth range extends from the receivers
+   * toward the light. Casters further away than this are clipped and their
+   * shadows vanish (tall buildings, terrain, roofs high above a low camera).
+   * depth32float keeps plenty of precision over this range.
+   */
+  private static readonly CASTER_DEPTH_EXTENSION = 500.0;
 
   constructor() {
     super();
@@ -280,13 +288,32 @@ export class DirectionalLightComponent extends Component {
   }
 
   private updateShadowCameras(mainCamera: Camera): void {
-    if (!this.splitsInitialized) {
-      const near = mainCamera.getNear();
-      const far = Math.min(this.maxShadowDistance, mainCamera.getFar());
+    // Splits depend on the camera projection and the CSM settings. Recompute when
+    // any of them change — previously they were frozen on first use, so a
+    // reflection-probe capture (90° FOV, aspect 1) or a FOV change left the main
+    // camera with wrongly sized cascades.
+    const near = mainCamera.getNear();
+    const far = Math.min(this.maxShadowDistance, mainCamera.getFar());
+    const fov = mainCamera.getFov();
+    const aspect = mainCamera.getAspectRatio();
+    const key = this.splitsKey;
+    if (
+      key[0] !== near ||
+      key[1] !== far ||
+      key[2] !== fov ||
+      key[3] !== aspect ||
+      key[4] !== this.cascadeLambda ||
+      key[5] !== this.cascadeCount
+    ) {
       this.cascadeSplits = this.calculateCascadeSplits(near, far);
-      this.shadowFov = mainCamera.getFov();
-      this.shadowAspect = mainCamera.getAspectRatio();
-      this.splitsInitialized = true;
+      this.shadowFov = fov;
+      this.shadowAspect = aspect;
+      key[0] = near;
+      key[1] = far;
+      key[2] = fov;
+      key[3] = aspect;
+      key[4] = this.cascadeLambda;
+      key[5] = this.cascadeCount;
     }
 
     const lightUp =
@@ -340,7 +367,7 @@ export class DirectionalLightComponent extends Component {
       // lightView[14] no se snapea — es profundidad Z
 
       // 5. Calcular near/far Z desde los corners + extensión para shadow casters
-      const Z_EXTENSION = this.maxShadowDistance * 0.5;
+      const Z_EXTENSION = DirectionalLightComponent.CASTER_DEPTH_EXTENSION;
       // Light-space Z of each corner and of the corner pushed Z_EXTENSION toward the light
       // (only the view-space Z row of lightView is needed — no temporaries).
       const m = lightView;
@@ -587,7 +614,6 @@ export class DirectionalLightComponent extends Component {
    */
   public updateShadowsForCamera(camera: Camera): void {
     if (!this.hasShadows) return;
-    this.splitsInitialized = false; // Force recalculation for this camera's frustum
     this.updateShadowCameras(camera);
     this.updateLightUniforms();
   }

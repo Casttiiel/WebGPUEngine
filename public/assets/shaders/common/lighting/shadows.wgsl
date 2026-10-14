@@ -118,6 +118,27 @@ fn getShadowFactorCube(
     return shadow / 8.0;
 }
 
+// Receiver normal offset for a perspective (spot) shadow map.
+// The texel footprint grows with distance, so it is measured by projecting a
+// 1 m step perpendicular to the light direction: texelWorld = texelNDC / ndcPerMetre.
+fn spotShadowReceiverPos(
+    wPos: vec3<f32>,
+    normal: vec3<f32>,
+    toLight: vec3<f32>,
+    lightViewProj: mat4x4<f32>,
+    invResolution: f32,
+) -> vec3<f32> {
+    let helper = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(toLight.y) > 0.9);
+    let tangent = normalize(cross(toLight, helper));
+    let a = lightViewProj * vec4<f32>(wPos, 1.0);
+    let b = lightViewProj * vec4<f32>(wPos + tangent, 1.0);
+    let ndcPerMetre = length(b.xy / b.w - a.xy / a.w);
+    let texelWorld = (2.0 * invResolution) / max(ndcPerMetre, 1e-6);
+    let NdL = saturate(dot(normal, toLight));
+    let sinL = sqrt(saturate(1.0 - NdL * NdL));
+    return wPos + normal * texelWorld * (0.75 + 2.0 * sinL);
+}
+
 fn getShadowFactorSimple(wPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, lightShadowStepDivResolution: f32, shadowMap: texture_depth_2d, shadowSampler: sampler_comparison, adaptUVs: bool) -> f32 {
     let lightProjSpacePos = lightViewProjOffset * vec4<f32>(wPos, 1.0);
     var lightUVSpacePos = lightProjSpacePos.xyz / lightProjSpacePos.w;

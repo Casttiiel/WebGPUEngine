@@ -1,5 +1,5 @@
 {
-    "technique": "gbuffer_triplanar_world.tech",
+    "technique": "gbuffer/gbuffer_triplanar_world.tech",
     "textures":{
         "txAlbedo": "Asphalt01_Color.png",
         "txNormal": "Asphalt01_Normal.png",

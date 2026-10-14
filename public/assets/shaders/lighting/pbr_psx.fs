@@ -74,7 +74,8 @@ fn shade_psx(iPosition: vec2<f32>, fragPos: vec4<f32>, use_shadows: bool, fix_sh
     let light_dir = light_dir_full / distance_to_light;
 
     if (use_shadows) {
-        let pcf = getShadowFactorSpotPSX(g.worldPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler);
+        let receiverPos = spotShadowReceiverPos(g.worldPos, g.normal, light_dir, light.viewProjOffset, light.shadowStepDivResolution);
+        let pcf = getShadowFactorSpotPSX(receiverPos, light.viewProjOffset, light.shadowStepDivResolution, gShadowMap, gShadowSampler);
         // Bayer threshold: convert wide-gradient PCF to stippled binary shadow
         let bayer = bayer4(vec2<u32>(fragPos.xy));
         shadow_factor = select(0.0, 1.0, pcf > bayer);
