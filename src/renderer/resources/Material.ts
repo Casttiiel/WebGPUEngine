@@ -234,6 +234,24 @@ export class Material extends GPUResource {
           ? (() => {
               const isSkinnedTechnique = this.technique?.getIsSkinned();
               const isInstancedTechnique = this.technique?.path.includes('_instanced.tech');
+              // Alpha-tested (glTF MASK) materials need the cut-out in the shadow map too.
+              const isMaskTechnique =
+                this.technique?.getFsFile() === 'gbuffer/gbuffer_mask.fs' ||
+                this.technique?.path.includes('gbuffer_mask') === true;
+              if (isMaskTechnique && !isSkinnedTechnique) {
+                return Material.get({
+                  technique: isInstancedTechnique
+                    ? 'shadows/shadows_mask_instanced.tech'
+                    : 'shadows/shadows_mask.tech',
+                  textures: { txAlbedo: this.getTextureFiles()?.albedo ?? 'white.png' },
+                  uvXScale: this.uvXScale,
+                  uvYScale: this.uvYScale,
+                  category: 'shadows' as any,
+                  casts_shadows: false,
+                } as any).then((m) => {
+                  this.shadowsMaterial = m;
+                });
+              }
               if (isSkinnedTechnique) {
                 return Material.get({
                   technique: 'shadows/shadows_skinned.tech',

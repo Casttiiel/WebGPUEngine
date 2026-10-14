@@ -31,32 +31,51 @@ alias LightUniformsCSM = DirectionalLightCSMUniforms;
 @group(1) @binding(4) var gAOMicroShadow:       texture_2d<f32>;
 @group(1) @binding(5) var aoMicroShadowSampler: sampler;
 
-fn getShadowFactorCSM(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
-    let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
-    if (cascadeIndex == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.x, gShadowMap0, gShadowSampler, false); }
-    if (cascadeIndex == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.y, gShadowMap1, gShadowSampler, false); }
-    return getShadowFactor(worldPos, light.viewProjOffset2, light.shadowParams.z, gShadowMap2, gShadowSampler, false);
+fn cascadeMatrix(idx: i32) -> mat4x4<f32> {
+    if (idx == 0) { return light.viewProjOffset0; }
+    if (idx == 1) { return light.viewProjOffset1; }
+    return light.viewProjOffset2;
 }
 
-fn getShadowFactorForCascadeIndex(worldPos: vec3<f32>, idx: i32) -> f32 {
+fn cascadeInvResolution(idx: i32) -> f32 {
+    if (idx == 0) { return light.shadowParams.x; }
+    if (idx == 1) { return light.shadowParams.y; }
+    return light.shadowParams.z;
+}
+
+fn sampleCascade(worldPos: vec3<f32>, idx: i32) -> f32 {
     if (idx == 0) { return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.x, gShadowMap0, gShadowSampler, false); }
     if (idx == 1) { return getShadowFactor(worldPos, light.viewProjOffset1, light.shadowParams.y, gShadowMap1, gShadowSampler, false); }
     return getShadowFactor(worldPos, light.viewProjOffset2, light.shadowParams.z, gShadowMap2, gShadowSampler, false);
+}
+
+/** PCF lookup in cascade idx with a normal offset sized to that cascade's texels. */
+fn shadowForCascade(worldPos: vec3<f32>, normal: vec3<f32>, toLight: vec3<f32>, idx: i32) -> f32 {
+    let texelWorld = csmTexelWorldSize(cascadeMatrix(idx), cascadeInvResolution(idx));
+    return sampleCascade(worldPos + csmNormalOffset(normal, toLight, texelWorld), idx);
 }
 
 /**
  * Blended CSM.
  * Blend zone = 10% of each cascade distance (min 1 m), scales with far cascades.
  * Last cascade fades to fully lit (1.0) instead of hard-cutting.
+ * If the receiver (plus PCF kernel) falls outside its cascade — possible near the
+ * cascade borders — the next cascade is used instead of returning "lit".
  */
-fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
+fn getShadowFactorCSMBlended(worldPos: vec3<f32>, normal: vec3<f32>, toLight: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let cascadeCount = i32(light.cascadeSplits.w);
 
-    if (cascadeCount == 1) {
-        return getShadowFactor(worldPos, light.viewProjOffset0, light.shadowParams.x, gShadowMap0, gShadowSampler, false);
+    var cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
+    for (var i = 0; i < 2; i++) {
+        if (cascadeIndex >= cascadeCount - 1 ||
+            csmCovers(worldPos, cascadeMatrix(cascadeIndex), cascadeInvResolution(cascadeIndex) * 3.0)) {
+            break;
+        }
+        cascadeIndex += 1;
     }
 
-    let cascadeIndex = selectCascadeCSM(viewSpaceDepth, light.cascadeSplits);
+    let shadow1 = shadowForCascade(worldPos, normal, toLight, cascadeIndex);
+    if (cascadeCount == 1) { return shadow1; }
 
     var splitDist: f32;
     if      (cascadeIndex == 0) { splitDist = light.cascadeSplits.x; }
@@ -68,7 +87,6 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     let blendStart  = splitDist - blendZone;
     let blendFactor = saturate((viewSpaceDepth - blendStart) / blendZone);
 
-    let shadow1 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex);
     if (blendFactor < 0.01) { return shadow1; }
 
     // Beyond the last cascade fade to unshadowed (1.0) instead of repeating cascade N
@@ -76,7 +94,7 @@ fn getShadowFactorCSMBlended(worldPos: vec3<f32>, viewSpaceDepth: f32) -> f32 {
     if (cascadeIndex >= cascadeCount - 1) {
         shadow2 = 1.0;
     } else {
-        shadow2 = getShadowFactorForCascadeIndex(worldPos, cascadeIndex + 1);
+        shadow2 = shadowForCascade(worldPos, normal, toLight, cascadeIndex + 1);
     }
 
     return mix(shadow1, shadow2, smoothstep(0.0, 1.0, blendFactor));
@@ -108,7 +126,7 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let light_dir = normalize(light.position);
     
     if (light.hasShadows > 0.5) {
-        shadow_factor = getShadowFactorCSMBlended(g.worldPos, viewSpaceDepth);
+        shadow_factor = getShadowFactorCSMBlended(g.worldPos, g.normal, light_dir, viewSpaceDepth);
     }
     
     // PBR calculations

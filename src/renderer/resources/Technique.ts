@@ -317,7 +317,12 @@ export class Technique extends GPUResource {
         return 'none';
       }
       case RasterizationMode.SHADOWS: {
-        return 'front';
+        // Two-sided: the nearest surface to the light always lands in the map, so
+        // single-sided geometry (planes, vaults, cloth) casts shadows from both
+        // sides. Front-face culling only worked for closed meshes and leaked light
+        // through every open surface facing the light. Acne is handled by the
+        // slope-scaled depth bias below plus receiver normal offset.
+        return 'none';
       }
       default: {
         throw new Error(`${this.label}: Unknown Rasterization Mode`);
@@ -532,9 +537,11 @@ export class Technique extends GPUResource {
           format: 'depth32float',
           depthWriteEnabled: true,
           depthCompare: 'less', // shadow maps stay standard Z (near=0, far=1)
-          depthBias: 0,
-          depthBiasSlopeScale: 0,
-          depthBiasClamp: 0,
+          // Slope-scaled bias pushes sloped casters away from the light just enough
+          // to stop self-shadowing on receivers; the clamp bounds it at grazing angles.
+          depthBias: 1,
+          depthBiasSlopeScale: 1.5,
+          depthBiasClamp: 0.002,
         };
       }
       case DepthModes.ALWAYS: {

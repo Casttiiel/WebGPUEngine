@@ -45,6 +45,39 @@ fn selectCascadeCSM(viewSpaceDepth: f32, cascadeSplits: vec4<f32>) -> i32 {
 }
 
 // ===========================
+// RECEIVER HELPERS
+// ===========================
+
+/**
+ * World-space size of one shadow-map texel for an orthographic cascade.
+ * The cascade matrix maps world → [0,1] UV, so |row 0| = 1 / cascadeWidth.
+ */
+fn csmTexelWorldSize(lightViewProjOffset: mat4x4<f32>, invResolution: f32) -> f32 {
+    let rowX = vec3<f32>(lightViewProjOffset[0][0], lightViewProjOffset[1][0], lightViewProjOffset[2][0]);
+    return invResolution / max(length(rowX), 1e-8);
+}
+
+/**
+ * Normal offset for surface receivers: moves the lookup off the surface along
+ * its normal, proportionally to the texel footprint and to how grazing the light
+ * is. Together with the caster slope bias this removes acne without the light
+ * leaks / peter-panning of front-face culling.
+ */
+fn csmNormalOffset(normal: vec3<f32>, toLight: vec3<f32>, texelWorld: f32) -> vec3<f32> {
+    let NdL = saturate(dot(normal, toLight));
+    let sinL = sqrt(saturate(1.0 - NdL * NdL));
+    return normal * texelWorld * (0.75 + 2.0 * sinL);
+}
+
+/** True when worldPos (plus a kernel margin in UV units) is covered by the cascade. */
+fn csmCovers(worldPos: vec3<f32>, lightViewProjOffset: mat4x4<f32>, marginUV: f32) -> bool {
+    let p = lightViewProjOffset * vec4<f32>(worldPos, 1.0);
+    let c = p.xyz / p.w;
+    return all(c.xy >= vec2<f32>(marginUV)) && all(c.xy <= vec2<f32>(1.0 - marginUV)) &&
+           c.z >= 0.0 && c.z <= 1.0;
+}
+
+// ===========================
 // SHADOW SAMPLING (BASE)
 // ===========================
 
