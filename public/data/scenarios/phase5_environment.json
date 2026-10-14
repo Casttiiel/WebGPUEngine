@@ -34,16 +34,24 @@
     { "input": { "type": "move", "entity": "Crate" } },
     { "wait_frames": 3 },
     { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "interact" } },
+    { "log": "Dos pasos: click en la caja (se arma Empujar, se acerca, flecha) y click hacia dónde" },
     { "input": { "type": "click", "entity": "Crate" } },
-    { "wait_frames": 60 },
+    { "wait_frames": 30 },
     {
       "assert": {
-        "entity": "Crate",
-        "path": "position",
-        "op": "approx",
-        "value": [0.72, 0.375, -2.18],
-        "tolerance": 0.1,
-        "message": "3 m en la dirección del empujón"
+        "expr": "[__engine.readPath('Party', 'tactical_pointer.getArmedAttack'), Engine.getEntities().getObjectManagerByName('tactical_pointer').getList()[0].getHeldObject()?.getName(), Engine.getEntities().getObjectManagerByName('action_camera').getList()[0].isAiming()]",
+        "value": ["push", "Crate", true]
+      }
+    },
+    { "input": { "type": "move", "world": [0.72, 0, -2.18] } },
+    { "wait_frames": 3 },
+    { "input": { "type": "click", "world": [0.72, 0, -2.18] } },
+    { "wait_frames": 90 },
+    {
+      "assert": {
+        "expr": "(() => { const p = Engine.getEntities().getEntityByName('Crate').getComponent('transform').getTransform().getWorldPosition(); return Math.hypot(p[0] + 1.5, p[2] + 4.2) > 6; })()",
+        "value": true,
+        "message": "sale disparada lejos (hasta 10 m, o hasta chocar con algo)"
       }
     },
     { "assert": { "combat": true, "path": "state", "value": "exploration" } },
@@ -167,7 +175,7 @@
       "timeout_frames": 200
     },
     {
-      "eval": "__engine.gameCommand('move', { unit: window.__pusher, to: [-0.3, 0, -3.2] })"
+      "eval": "__engine.gameCommand('move', { unit: window.__pusher, to: [1.18, 0, -1.86] })"
     },
     {
       "wait_until": { "expr": "__engine.readPath(window.__pusher, 'unit.isMoving')", "value": false },
@@ -175,7 +183,7 @@
     },
     {
       "assert": {
-        "expr": "__engine.gameCommand('push', { unit: window.__pusher, target: 'Crate' }).then(r => r.ok)",
+        "expr": "Promise.all(['PushCrate4', 'PushCrate3', 'PushCrate2'].map(n => __engine.gameCommand('plan_push', { unit: window.__pusher, target: n }).then(r => [n, r.canPush]))).then(l => (l.find(x => x[1]) || [])[0]).then(n => n ? __engine.gameCommand('push', { unit: window.__pusher, target: n }).then(r => r.ok) : false)",
         "value": true
       }
     },
@@ -184,9 +192,8 @@
     { "wait_frames": 60 },
     {
       "assert": {
-        "expr": "__engine.gameCommand('plan_push', { unit: window.__pusher, target: 'Crate' }).then(r => r.reason)",
-        "op": "includes",
-        "value": "no bonus action left"
+        "expr": "Promise.all(['PushCrate2', 'PushCrate3', 'PushCrate4'].map(n => __engine.gameCommand('plan_push', { unit: window.__pusher, target: n }))).then(l => l.some(r => r.reason === 'no bonus action left'))",
+        "value": true
       }
     },
 

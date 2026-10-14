@@ -7,6 +7,9 @@
  *   surface_fire.png  mancha de brasas (naranja/rojo, borde irregular)
  *   surface_oil.png   charco de aceite (marrón oscuro con brillo)
  *   status_fear.png   icono del estado "miedo" (sobre la cabeza de la unidad)
+ *   aim_*.png         indicador de empujar (flecha en el suelo): cuerpo, chevrones y punta en
+ *                     dos colores (_ok: no golpea a nadie, _hit: golpea), hueco donde acaba el
+ *                     objeto y marca de impacto. En la textura "adelante" es hacia abajo (+v).
  *
  * Son SVG rasterizados con sharp (dependencia del proyecto). El borde irregular sale de una
  * semilla fija: las texturas son reproducibles.
@@ -75,6 +78,48 @@ const textures = {
     <path d="${blob(3, 116, 0.14)}" fill="url(#g)"/>
     <ellipse cx="105" cy="95" rx="34" ry="14" fill="#c8b27a" fill-opacity="0.25" transform="rotate(-25 105 95)"/>`,
 };
+
+// Indicador de empujar: claro (no golpea) o rojo (golpea a alguien), con borde oscuro.
+const AIM_COLORS = {
+  ok: { fill: '#fff6c8', edge: '#2a1c06' },
+  hit: { fill: '#ff5236', edge: '#3a0603' },
+};
+for (const [variant, { fill, edge }] of Object.entries(AIM_COLORS)) {
+  // Cuerpo: banda a lo largo (se estira con la longitud de la flecha).
+  textures[`aim_shaft_${variant}.png`] = `
+    <rect x="40" y="0" width="176" height="256" fill="${edge}" fill-opacity="0.8"/>
+    <rect x="62" y="0" width="132" height="256" fill="${fill}" fill-opacity="0.75"/>`;
+  // Chevrón (apunta hacia abajo = hacia donde sale el objeto).
+  textures[`aim_chevron_${variant}.png`] = `
+    <path d="M28 70 L128 170 L228 70" fill="none" stroke="${edge}" stroke-width="64" stroke-linejoin="miter" stroke-linecap="square"/>
+    <path d="M28 70 L128 170 L228 70" fill="none" stroke="${fill}" stroke-width="40" stroke-linejoin="miter" stroke-linecap="square"/>`;
+  // Punta.
+  textures[`aim_head_${variant}.png`] = `
+    <path d="M16 24 L240 24 L128 236 Z" fill="${edge}"/>
+    <path d="M44 40 L212 40 L128 202 Z" fill="${fill}"/>`;
+}
+// Dónde acaba el objeto: esquinas de un cuadrado.
+textures['aim_landing.png'] = ['M16 80 V16 H80', 'M176 16 H240 V80', 'M240 176 V240 H176', 'M80 240 H16 V176']
+  .map(
+    (d) => `
+    <path d="${d}" fill="none" stroke="#2a1c06" stroke-width="34" stroke-linecap="square"/>
+    <path d="${d}" fill="none" stroke="#fff0b0" stroke-width="18" stroke-linecap="square"/>`,
+  )
+  .join('');
+// Impacto: estrella roja en el punto del choque.
+{
+  const spikes = 10;
+  let d = '';
+  for (let i = 0; i < spikes * 2; i++) {
+    const a = (i / (spikes * 2)) * Math.PI * 2;
+    const r = i % 2 === 0 ? 122 : 62;
+    d += `${i === 0 ? 'M' : 'L'}${(128 + Math.cos(a) * r).toFixed(1)} ${(128 + Math.sin(a) * r).toFixed(1)} `;
+  }
+  textures['aim_impact.png'] = `
+    <path d="${d}Z" fill="#3a0603"/>
+    <path d="${d}Z" fill="#ff4a30" transform="translate(128 128) scale(0.8) translate(-128 -128)"/>
+    <circle cx="128" cy="128" r="30" fill="#ffd25a"/>`;
+}
 
 for (const [name, body] of Object.entries(textures)) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}">${body}</svg>`;

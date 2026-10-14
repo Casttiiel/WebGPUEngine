@@ -64,7 +64,7 @@
       "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([-5, 0, -2.5], false)"
     },
     { "wait_frames": 60 },
-    { "input": { "type": "click", "widget": "hotbar_4" } },
+    { "eval": "__pointer.armAttack('throw')" },
     { "wait_frames": 2 },
     { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": "throw" } },
     { "input": { "type": "move", "entity": "Target" } },
@@ -87,8 +87,8 @@
     {
       "assert": {
         "expr": "__bars().sort()",
-        "value": ["3~8 daño", "3~8 daño · muere"],
-        "message": "Target y el barril (1 PV: explota)"
+        "value": ["1 daño · muere", "3~8 daño"],
+        "message": "Target y el barril (se rompe al golpear: explota)"
       }
     },
     { "screenshot": "01-throw-preview" },
@@ -107,7 +107,7 @@
     { "assert": { "entity": "Party", "path": "tactical_pointer.getArmedAttack", "value": null } },
 
     { "log": "UI: Empujar armado → click en la caja → apuntar hacia Target (línea recta)" },
-    { "input": { "type": "click", "widget": "hotbar_3" } },
+    { "eval": "__pointer.armAttack('push')" },
     { "wait_frames": 2 },
     { "input": { "type": "click", "entity": "TestCrate" } },
     { "wait_frames": 2 },
@@ -116,12 +116,12 @@
     {
       "assert": {
         "expr": "[__pointer.getPushPlan()?.canPush, __pointer.getPushPlan()?.hit?.getOwner().getName(), __bars().sort()]",
-        "value": [true, "Target", ["3~8 daño", "3~8 daño"]]
+        "value": [true, "Target", ["30 daño · muere", "3~8 daño"]]
       }
     },
     { "screenshot": "02-push-preview" },
 
-    { "log": "Empujar: la caja choca con Target → daño de impacto a los dos y empieza el combate" },
+    { "log": "Empujar: la caja sale disparada, choca con Target (daño de impacto, retrocede), se rompe y empieza el combate" },
     { "eval": "window.__hp = [__u('Target').getHp(), __u('TestCrate').getHp()]" },
     { "input": { "type": "click", "entity": "Target" } },
     {
@@ -133,17 +133,20 @@
     },
     {
       "assert": {
-        "expr": "(() => { const t = __hp[0] - __u('Target').getHp(); const c = __hp[1] - __u('TestCrate').getHp(); return [t >= 3 && t <= 8, t === c]; })()",
-        "value": [true, true],
-        "message": "la misma tirada de 1d6+2 para la unidad y el objeto"
+        "expr": "(() => { const t = __hp[0] - __u('Target').getHp(); return [t >= 3 && t <= 8, __u('TestCrate').isAlive(), __log.some(l => l[0] === 'destroyed' && l[1] === 'TestCrate')]; })()",
+        "value": [true, false, true],
+        "message": "1d6+2 a Target; la caja se rompe al golpear"
       }
     },
-    { "assert": { "expr": "Math.hypot(__feet('TestCrate')[0] + 4, __feet('TestCrate')[2]) < 1.5", "value": true } },
+    {
+      "wait_until": { "expr": "!__u('Target').isMoving() && __feet('Target')[2] > 0.3", "value": true },
+      "timeout_frames": 120
+    },
     { "wait_frames": 5 },
     { "assert": { "combat": true, "path": "state", "value": "combat" } },
     { "screenshot": "03-push-hit" },
 
-    { "log": "En combate (turno de Hero1): lanzar el barril a Target gasta la acción. La caja que quedó delante está en medio: el barril la golpea, explota al caer y la explosión alcanza a Target" },
+    { "log": "En combate (turno de Hero1): lanzar el barril a Target gasta la acción. El barril golpea a Target, explota al caer y la explosión también le alcanza" },
     {
       "wait_until": {
         "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero1' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
@@ -156,7 +159,7 @@
     {
       "assert": {
         "expr": "__engine.gameCommand('throw', { unit: 'Hero1', object: 'TestBarrel', target: 'Target' }).then(r => [r.ok, r.hit])",
-        "value": [true, "TestCrate"]
+        "value": [true, "Target"]
       }
     },
     {
@@ -165,7 +168,7 @@
     },
     {
       "assert": {
-        "expr": "[__engine.getCombatState().resources.action, __log.some(l => l[0] === 'damage' && l[1] === 'TestCrate' && l[2] === 'impact'), __log.some(l => l[0] === 'explosion' && l[1] === 'TestBarrel'), __u('TestBarrel').isAlive(), __log.some(l => l[0] === 'damage' && l[1] === 'Target' && l[2] === 'explosion')]",
+        "expr": "[__engine.getCombatState().resources.action, __log.some(l => l[0] === 'damage' && l[1] === 'Target' && l[2] === 'impact'), __log.some(l => l[0] === 'explosion' && l[1] === 'TestBarrel'), __u('TestBarrel').isAlive(), __log.some(l => l[0] === 'damage' && l[1] === 'Target' && l[2] === 'explosion')]",
         "value": [0, true, true, false, true]
       }
     },

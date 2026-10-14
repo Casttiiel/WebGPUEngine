@@ -27,6 +27,7 @@ import {
 import { TacticalPointerComponent } from '../../../components/game/tactical/TacticalPointerComponent';
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
 import { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
+import { PropComponent } from '../../../components/game/tactical/PropComponent';
 import { wrapText } from '../textWrap';
 
 type RGBA = readonly [number, number, number, number];
@@ -276,6 +277,12 @@ export class CombatHUDController extends WidgetController {
         break;
       case 'explosion':
         this.spawnFloat(unit, '¡BUM!', FLOAT_FIRE);
+        break;
+      case 'destroyed':
+        // Los explosivos ya dicen ¡BUM!
+        if (unit && !PropComponent.of(unit)?.getExplosion()) {
+          this.spawnFloat(unit, '¡Crac!', FLOAT_DOWN);
+        }
         break;
       case 'downed':
         this.spawnFloat(unit, 'Caído', FLOAT_DOWN);

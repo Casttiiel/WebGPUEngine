@@ -90,7 +90,17 @@ export interface MoveOptions {
   walk?: boolean;
   /** Girarse hacia donde avanza. Default true. */
   face?: boolean;
+  /**
+   * Deslizar frenando (objetos empujados): sale a `speed` y frena como si fuera a pararse a
+   * `slide` m. Si el camino es más corto (choca con algo), llega aún rápido. Default 0 (no frena).
+   */
+  slide?: number;
+  /** Giro (rad, sobre la vertical) que da mientras recorre el camino. Default 0. */
+  spin?: number;
 }
+
+/** Deslizar: velocidad mínima al final, para que acabe de llegar (m/s). */
+const SLIDE_MIN_SPEED = 0.8;
 
 const UP = vec3.fromValues(0, 1, 0);
 
@@ -128,6 +138,12 @@ export class UnitComponent extends Component {
   private pathTurns = true;
   /** El movimiento en curso es andar (no un salto, empujón o embestida): se puede cortar. */
   private pathWalk = true;
+  /** Deslizar: frenada (m/s²; 0 = velocidad constante). */
+  private pathDecel = 0;
+  private pathTravelled = 0;
+  private pathLength = 0;
+  private pathSpin = 0;
+  private readonly spinStart = quat.create();
   /** Segundos que le quedan a la acción en curso (animación de ataque). */
   private actionTimer = 0;
   /** Dónde empezó (para reiniciar el encuentro). */
@@ -403,6 +419,16 @@ export class UnitComponent extends Component {
     this.pathSpeed = options.speed ?? this.moveSpeed;
     this.pathTurns = options.face ?? true;
     this.pathWalk = options.walk ?? true;
+    const slide = options.slide ?? 0;
+    this.pathDecel = slide > 0 ? (this.pathSpeed * this.pathSpeed) / (2 * slide) : 0;
+    this.pathTravelled = 0;
+    this.pathLength = 0;
+    for (let i = 1; i < this.path.length; i++) {
+      this.pathLength += vec3.distance(this.path[i - 1]!, this.path[i]!);
+    }
+    this.pathSpin = options.spin ?? 0;
+    const transform = this.getOwner().getComponent('transform') as TransformComponent | null;
+    if (transform) quat.copy(this.spinStart, transform.getTransform().getLocalRotation());
     this.getFeetPosition(this.movingFeet);
     if (this.pathWalk) this.getAnimator()?.setParameter('moving', true);
     return new Promise((resolve) => (this.onArrive = resolve));
@@ -489,7 +515,18 @@ export class UnitComponent extends Component {
 
   private advanceAlongPath(dt: number): void {
     const feet = this.movingFeet;
-    let budget = this.pathSpeed * dt;
+    // Deslizando: v² = v0² − 2·a·s (frenada constante).
+    const speed =
+      this.pathDecel > 0
+        ? Math.sqrt(
+            Math.max(
+              SLIDE_MIN_SPEED * SLIDE_MIN_SPEED,
+              this.pathSpeed * this.pathSpeed - 2 * this.pathDecel * this.pathTravelled,
+            ),
+          )
+        : this.pathSpeed;
+    let budget = speed * dt;
+    this.pathTravelled += budget;
 
     while (budget > 0 && this.pathIndex < this.path.length) {
       const target = this.path[this.pathIndex]!;
@@ -507,6 +544,13 @@ export class UnitComponent extends Component {
     }
 
     this.setFeetPosition(feet);
+    if (this.pathSpin !== 0 && this.pathLength > 0) {
+      const t = Math.min(1, this.pathTravelled / this.pathLength);
+      quat.setAxisAngle(this.tmpRot, UP, this.pathSpin * t);
+      quat.multiply(this.tmpRot, this.tmpRot, this.spinStart);
+      const transform = this.getOwner().getComponent('transform') as TransformComponent | null;
+      transform?.getTransform().setLocalRotation(this.tmpRot);
+    }
     if (this.pathIndex >= this.path.length) this.stop();
   }
 

@@ -8,7 +8,7 @@ import { ModuleGameController } from '../../../modules/game/ModuleGameController
 import { UnitComponent, type UnitAttack, type UnitStatusId } from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
-import type { ActionCameraComponent } from './ActionCameraComponent';
+import { ActionCameraComponent } from './ActionCameraComponent';
 import { UnitObstacles } from './UnitObstacles';
 import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 import type { TacticalAIComponent } from './TacticalAIComponent';
@@ -173,6 +173,8 @@ interface PendingImpact {
   damage: DamageValue;
   /** El objeto se golpea aunque no pille a nadie (lanzado: cae al suelo). */
   always: boolean;
+  /** Hacia dónde iba (horizontal): el golpeado sale despedido hacia allí. */
+  direction: vec3 | null;
 }
 
 interface Combatant {
@@ -255,9 +257,23 @@ const JUMP_SPEED = 7;
 const JUMP_CLIP = 'Jump_Loop';
 /** Alcance para empujar un objeto (de borde a borde, m). */
 const PUSH_REACH = 1.5;
-const PUSH_SPEED = 5;
-const PUSH_TIME = 0.6;
+/** Velocidad con la que sale el objeto empujado (m/s); frena hasta pararse a su pushDistance. */
+const PUSH_SPEED = 14;
+const PUSH_TIME = 0.7;
 const PUSH_CLIP = 'Push_Enter';
+/** Desde que empieza la animación de empujar hasta que las manos tocan el objeto (s). */
+const PUSH_CONTACT = 0.22;
+/** Giro máximo del objeto mientras resbala (rad). */
+const PUSH_SPIN = 0.5;
+/** El golpeado por un objeto sale despedido unos metros, deprisa. */
+const KNOCKBACK = 0.9;
+const KNOCKBACK_SPEED = 9;
+/** Sacudida de la cámara de acción (m): objeto que choca con alguien / contra una pared. */
+const SHAKE_HIT = 0.14;
+const SHAKE_THUD = 0.05;
+/** Astillas de un objeto que se rompe (sin explosión). */
+const DEBRIS_PREFAB = 'tactical/crate_debris.prefab';
+const DEBRIS_LIFETIME = 1.6;
 /** Empujar en una dirección elegida: desvío máximo entre esa dirección y "alejarlo" (cos 60°). */
 const PUSH_ALIGN = 0.5;
 const THROW_SPEED = 9;
@@ -859,26 +875,49 @@ export class EncounterComponent extends Component {
     this.pendingAction = null;
     const unit = entity.getComponent('unit') as UnitComponent;
     const prop = target.getComponent('unit') as UnitComponent;
+    const data = PropComponent.of(target)!;
     unit.stop(); // exploración: puede venir andando
     unit.faceTowards(prop.getPosition(this.tmpA));
-    unit.playAction(PUSH_CLIP, PUSH_TIME);
-    if (plan.pushLength > 0.05) {
-      void prop.moveAlong([prop.getFeetPosition(), plan.destination], {
-        speed: PUSH_SPEED,
-        walk: false,
-        face: false,
+    const from = prop.getFeetPosition(vec3.create());
+    const to = vec3.clone(plan.destination);
+    const dir = vec3.clone(plan.direction!);
+    // Plano de acción si golpea a alguien o si se estaba apuntando con la cámara.
+    const camera = this.getActionCamera();
+    const travel = slideTime(PUSH_SPEED, data.getPushDistance(), plan.pushLength);
+    const shotTargets: (Entity | vec3)[] = [target, to];
+    if (plan.hit) shotTargets.push(plan.hit.getOwner());
+    const delay =
+      plan.hit || camera?.isAiming()
+        ? (camera?.frameAction(entity, shotTargets, PUSH_CONTACT + travel + SHOT_AFTER_HIT) ?? 0)
+        : 0;
+    // Se resuelve ya (no al acabar el plano): mientras, nadie puede actuar (isResolving).
+    const impact: PendingImpact = {
+      timer: Infinity,
+      source: unit,
+      prop,
+      hit: plan.hit,
+      damage: data.getImpactDamage(),
+      always: false,
+      direction: dir,
+    };
+    this.pendingImpacts.push(impact);
+    // Anticipación: la animación empieza y el objeto sale cuando las manos lo tocan.
+    this.windUp(unit, delay, () => {
+      unit.faceTowards(prop.getPosition(this.tmpA));
+      unit.playAction(PUSH_CLIP, PUSH_TIME);
+      this.windUp(unit, PUSH_CONTACT, () => {
+        if (plan.pushLength > 0.05) {
+          void prop.moveAlong([from, to], {
+            speed: PUSH_SPEED,
+            slide: data.getPushDistance(),
+            spin: (Math.random() < 0.5 ? -1 : 1) * PUSH_SPIN * Math.min(1, plan.pushLength / 3),
+            walk: false,
+            face: false,
+          });
+        }
+        impact.timer = 0.05;
       });
-    }
-    if (plan.hit) {
-      this.pendingImpacts.push({
-        timer: 0.15,
-        source: unit,
-        prop,
-        hit: plan.hit,
-        damage: PropComponent.of(target)!.getImpactDamage(),
-        always: false,
-      });
-    }
+    });
     this.emit('push', { unit: target, source: entity });
     return { ...plan, ok: true };
   }
@@ -1022,6 +1061,9 @@ export class EncounterComponent extends Component {
       hit: plan.hit,
       damage,
       always: true,
+      direction: horizontalDirection(
+        vec3.sub(vec3.create(), plan.landing, prop.getFeetPosition(vec3.create())),
+      ),
     });
     const impact = this.pendingImpacts[this.pendingImpacts.length - 1]!;
     const points = plan.points.map((p) => vec3.clone(p));
@@ -1034,15 +1076,38 @@ export class EncounterComponent extends Component {
     return { ...plan, ok: true };
   }
 
-  /** Un objeto empujado o lanzado ha llegado: golpea a quien pilla y se golpea él. */
+  /**
+   * Un objeto empujado o lanzado ha llegado: golpea a quien pilla (que sale despedido) y se
+   * golpea él; si es de los que se rompen al chocar con alguien, se rompe.
+   */
   private applyImpact(impact: PendingImpact): void {
     const amount = rollDamage(impact.damage);
-    if (impact.hit?.isAlive()) {
-      this.applyHit(impact.source, impact.hit, true, amount, 'impact');
+    const { hit, prop } = impact;
+    this.getActionCamera()?.shake(hit ? SHAKE_HIT : SHAKE_THUD);
+    if (hit?.isAlive()) {
+      this.applyHit(impact.source, hit, true, amount, 'impact');
+      if (hit.isAlive() && impact.direction) this.knockBack(hit, impact.direction);
     }
-    if ((impact.hit || impact.always) && impact.prop.isAlive()) {
-      this.applyHit(impact.source, impact.prop, true, amount, 'impact');
+    if (!prop.isAlive()) return;
+    if (hit && PropComponent.of(prop.getOwner())?.breaksOnImpact()) {
+      this.onUnitDown(prop, impact.source);
+    } else if (hit || impact.always) {
+      this.applyHit(impact.source, prop, true, amount, 'impact');
     }
+  }
+
+  /** Empujón de un impacto: la unidad retrocede en `dir` (lo que deje el entorno). */
+  private knockBack(unit: UnitComponent, dir: vec3): void {
+    const length = pushDistance(unit, dir, KNOCKBACK);
+    if (length < 0.1) return;
+    const feet = unit.getFeetPosition(vec3.create());
+    void unit.moveAlong([feet, vec3.scaleAndAdd(vec3.create(), feet, dir, length)], {
+      speed: KNOCKBACK_SPEED,
+      slide: KNOCKBACK * 1.2,
+      walk: false,
+      face: false,
+    });
+    this.emit('pushed', { unit: unit.getOwner(), source: null });
   }
 
   public getSurfaces(): Surfaces {
@@ -1681,6 +1746,7 @@ export class EncounterComponent extends Component {
       this.emit('destroyed', { unit: unit.getOwner() });
       const explosion = prop.getExplosion();
       if (explosion) this.explode(unit, explosion, instigator);
+      else this.surfaces.spawnEffect(DEBRIS_PREFAB, unit.getFeetPosition(), DEBRIS_LIFETIME, 0.4);
       return;
     }
     const isParty = PartyComponent.find()?.isMember(unit.getOwner()) === true;
@@ -1936,8 +2002,7 @@ export class EncounterComponent extends Component {
   }
 
   private getActionCamera(): ActionCameraComponent | null {
-    const list = Engine.getEntities().getObjectManagerByName('action_camera')?.getList();
-    return (list?.[0] as ActionCameraComponent | undefined) ?? null;
+    return ActionCameraComponent.find();
   }
 
   /** get_combat_state / game_command del MCP. */
@@ -2203,6 +2268,17 @@ export class EncounterComponent extends Component {
 
 /** Mayor iniciativa primero; desempate aleatorio. */
 /** `v` en horizontal y normalizado (null si no tiene componente horizontal). */
+/**
+ * Segundos que tarda en recorrer `length` m algo que sale a `speed` y frena para pararse a
+ * `slide` m (UnitComponent.moveAlong con `slide`).
+ */
+function slideTime(speed: number, slide: number, length: number): number {
+  if (length <= 0) return 0;
+  const decel = (speed * speed) / (2 * Math.max(slide, length));
+  const end = Math.sqrt(Math.max(0, speed * speed - 2 * decel * length));
+  return (speed - end) / decel;
+}
+
 function horizontalDirection(v: vec3): vec3 | null {
   const length = Math.hypot(v[0]!, v[2]!);
   return length < 1e-4 ? null : vec3.fromValues(v[0]! / length, 0, v[2]! / length);

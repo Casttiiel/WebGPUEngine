@@ -166,11 +166,16 @@ export class Surfaces {
 
   /** Efecto visual de una explosión (partículas que se destruyen solas). */
   public spawnExplosion(center: vec3): void {
-    const effect = { entity: null as Entity | null, time: EXPLOSION_LIFETIME };
+    this.spawnEffect(EXPLOSION_PREFAB, center, EXPLOSION_LIFETIME);
+  }
+
+  /** Efecto de partículas de un solo uso (`prefab`) a `height` m sobre `point`, durante `lifetime` s. */
+  public spawnEffect(prefab: string, point: vec3, lifetime: number, height = 0.6): void {
+    const effect = { entity: null as Entity | null, time: lifetime };
     this.effects.push(effect);
     void spawn({
-      prefab: EXPLOSION_PREFAB,
-      components: { transform: { position: [center[0]!, center[1]! + 0.6, center[2]!] } },
+      prefab,
+      components: { transform: { position: [point[0]!, point[1]! + height, point[2]!] } },
     }).then((e) => (effect.entity = e));
   }
 

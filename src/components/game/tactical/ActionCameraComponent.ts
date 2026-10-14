@@ -45,6 +45,9 @@ const TRACK_SMOOTHING = 5;
 const MIN_EYE_CLEARANCE = 0.75;
 /** Altura (sobre el centro de la cápsula) a la que se comprueba que se ve a cada unidad. */
 const AIM_HEIGHT = 0.5;
+/** Temblor: frecuencia de la sacudida (Hz) y segundos que dura. */
+const SHAKE_FREQUENCY = 22;
+const SHAKE_TIME = 0.35;
 
 /**
  * ActionCameraComponent — plano de acción para ataques y habilidades.
@@ -53,6 +56,10 @@ const AIM_HEIGHT = 0.5;
  * mezcla encima de la cámara de juego: al atacar se coloca detrás y a un lado del atacante,
  * más baja que la vista táctica, encuadrando al atacante y a sus objetivos, se acerca
  * despacio mientras se resuelve el golpe y después se mezcla de vuelta a la cámara de juego.
+ *
+ * También hay un plano de apuntar (beginAim): al elegir un objeto para empujarlo o lanzarlo,
+ * encuadra a quien lo hace, el objeto y a quién puede golpear, y se queda ahí mientras se
+ * elige la dirección; al ejecutar la acción pasa a ser su plano de acción.
  *
  * La cámara táctica sigue funcionando por debajo (cambio de turno incluido), así que al
  * volver se ve lo que toque. Cualquier control de cámara del jugador corta el plano.
@@ -77,7 +84,12 @@ export class ActionCameraComponent extends Component {
     targets: (Entity | vec3)[];
     hold: number;
     elapsed: number;
+    /** Plano de apuntar: dura hasta endAim (o hasta que se ejecute la acción). */
+    aiming: boolean;
   } | null = null;
+  private shakeAmount = 0;
+  private shakeTime = 0;
+  private shakePhase = 0;
   private yaw = 0;
   private targetYaw = 0;
   private distance = 0;
@@ -125,7 +137,8 @@ export class ActionCameraComponent extends Component {
       vec3.lerp(this.center, this.center, this.targetCenter, k);
       this.distance += (this.targetDistance - this.distance) * k;
     }
-    this.apply(shot.elapsed / shot.hold);
+    if (this.shakeTime > 0) this.shakeTime = Math.max(0, this.shakeTime - dt);
+    this.apply(shot.aiming ? 0 : shot.elapsed / shot.hold);
   }
 
   // ── API ──────────────────────────────────────────────────────────────────
@@ -137,37 +150,60 @@ export class ActionCameraComponent extends Component {
    * suavemente y lo alarga.
    */
   public frameAction(source: Entity, targets: (Entity | vec3)[], hold: number): number {
-    if (
-      !this.shotsEnabled ||
-      Engine.getModules().getCurrentGamestate() !== 'gs_gameplay' ||
-      CharacterSheetController.isOpen()
-    ) {
-      return 0;
-    }
+    if (!this.canShoot()) return 0;
     const yaw = this.chooseYaw(source, targets);
     if (yaw === null || !this.compose(source, targets, yaw)) return 0;
 
     if (!this.shot) {
-      // Entra con un corte de encuadre: el mixer se encarga de que no se note.
-      this.yaw = yaw;
-      this.targetYaw = yaw;
-      vec3.copy(this.center, this.targetCenter);
-      this.distance = this.targetDistance;
       const ready = this.blendIn + this.settle;
-      this.shot = { source, targets, hold: ready + hold, elapsed: 0 };
-      this.apply(0);
-      Engine.getCameraMixer().blendCamera(
-        this.getOwner(),
-        this.blendIn,
-        new SmoothStepInterpolator(),
-      );
+      this.startShot(source, targets, yaw, ready + hold, false);
       return ready;
     }
     this.targetYaw = this.yaw + shortestAngle(this.yaw, yaw);
     this.shot.source = source;
     this.shot.targets = targets;
-    this.shot.hold = Math.max(this.shot.hold, this.shot.elapsed + this.reframe + hold);
+    // Desde el plano de apuntar: el plano de la acción empieza ahora.
+    const base = this.shot.aiming ? this.shot.elapsed : this.shot.hold;
+    this.shot.aiming = false;
+    this.shot.hold = Math.max(base, this.shot.elapsed + this.reframe + hold);
     return this.reframe;
+  }
+
+  /**
+   * Plano de apuntar: encuadra a `source` y a `targets` y se queda hasta endAim() o hasta que
+   * frameAction() lo convierta en el plano de la acción. false si no hay plano.
+   */
+  public beginAim(source: Entity, targets: (Entity | vec3)[]): boolean {
+    if (!this.canShoot()) return false;
+    const yaw = this.chooseYaw(source, targets);
+    if (yaw === null || !this.compose(source, targets, yaw)) return false;
+    if (!this.shot) {
+      this.startShot(source, targets, yaw, Infinity, true);
+      return true;
+    }
+    this.targetYaw = this.yaw + shortestAngle(this.yaw, yaw);
+    this.shot.source = source;
+    this.shot.targets = targets;
+    this.shot.hold = Infinity;
+    this.shot.aiming = true;
+    return true;
+  }
+
+  /** Termina el plano de apuntar (si lo hay; un plano de acción sigue su curso). */
+  public endAim(): void {
+    if (this.shot?.aiming) this.end();
+  }
+
+  public isAiming(): boolean {
+    return this.shot?.aiming === true;
+  }
+
+  /** Sacude la cámara (impactos). `amount`: amplitud en m. Solo durante un plano. */
+  public shake(amount: number): void {
+    if (!this.shot) return;
+    this.shakeAmount = Math.max(amount, this.shakeTime > 0 ? this.shakeAmount : 0);
+    this.shakeTime = SHAKE_TIME;
+    this.shakePhase = Math.random() * 100;
   }
 
   /** Alarga el plano en curso hasta `seconds` desde ahora (p.ej. para ver caer al objetivo). */
@@ -192,6 +228,7 @@ export class ActionCameraComponent extends Component {
   public end(): void {
     if (!this.shot) return;
     this.shot = null;
+    this.shakeTime = 0;
     const gameplay = Engine.getEntities().getEntityByName(this.gameplayCamera);
     if (gameplay && Engine.getModules().getCurrentGamestate() === 'gs_gameplay') {
       Engine.getCameraMixer().blendCamera(gameplay, this.blendOut, new SmoothStepInterpolator());
@@ -199,6 +236,35 @@ export class ActionCameraComponent extends Component {
   }
 
   // ── Interno ──────────────────────────────────────────────────────────────
+
+  private canShoot(): boolean {
+    return (
+      this.shotsEnabled &&
+      Engine.getModules().getCurrentGamestate() === 'gs_gameplay' &&
+      !CharacterSheetController.isOpen()
+    );
+  }
+
+  /** Entra con un corte de encuadre: el mixer se encarga de que no se note. */
+  private startShot(
+    source: Entity,
+    targets: (Entity | vec3)[],
+    yaw: number,
+    hold: number,
+    aiming: boolean,
+  ): void {
+    this.yaw = yaw;
+    this.targetYaw = yaw;
+    vec3.copy(this.center, this.targetCenter);
+    this.distance = this.targetDistance;
+    this.shot = { source, targets, hold, elapsed: 0, aiming };
+    this.apply(0);
+    Engine.getCameraMixer().blendCamera(
+      this.getOwner(),
+      this.blendIn,
+      new SmoothStepInterpolator(),
+    );
+  }
 
   /**
    * Mirando de atacante a objetivos, abierto `angle` grados hacia un lado: el que deje ver a
@@ -325,6 +391,17 @@ export class ActionCameraComponent extends Component {
     const distance = this.distance * (1 - this.push * ease);
     vec3.set(this.tmpLook, this.center[0]!, this.center[1]! + this.lookHeight, this.center[2]!);
     this.eyeFor(this.center, distance, this.yaw, this.tmpEye);
+    if (this.shakeTime > 0) {
+      // Sacudida que se apaga: senos desfasados en cada eje (ojo y punto de mira juntos).
+      const k = this.shakeTime / SHAKE_TIME;
+      const a = this.shakeAmount * k * k;
+      const w = (SHAKE_TIME - this.shakeTime) * SHAKE_FREQUENCY * Math.PI * 2 + this.shakePhase;
+      const ox = Math.sin(w) * a;
+      const oy = Math.sin(w * 1.31 + 1.7) * a * 0.8;
+      const oz = Math.sin(w * 0.87 + 4.1) * a;
+      vec3.add(this.tmpEye, this.tmpEye, vec3.set(this.tmpAim, ox, oy, oz));
+      vec3.add(this.tmpLook, this.tmpLook, this.tmpAim);
+    }
     const camera = (this.getOwner().getComponent('camera') as CameraComponent).getCamera();
     camera.lookAt(this.tmpEye, this.tmpLook, UP);
   }
@@ -352,6 +429,12 @@ export class ActionCameraComponent extends Component {
   }
 
   public override renderInMenu(): void {}
+
+  /** La cámara de acción de la escena (si hay). */
+  public static find(): ActionCameraComponent | null {
+    const list = Engine.getEntities().getObjectManagerByName('action_camera')?.getList();
+    return (list?.[0] as ActionCameraComponent | undefined) ?? null;
+  }
 }
 
 function clamp(v: number, min: number, max: number): number {

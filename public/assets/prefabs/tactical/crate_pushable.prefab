@@ -23,7 +23,7 @@
       "meshes": [
         {
           "mesh": "unit_cube.obj",
-          "material": "tactical_crate.mat"
+          "material": "tactical_crate_pushable.mat"
         }
       ]
     },
@@ -40,7 +40,8 @@
       "maxHp": 30
     },
     "tactical_prop": {
-      "pushable": true
+      "pushable": true,
+      "pushDistance": 10
     }
   }
 }

@@ -24,6 +24,9 @@ import { circleOutline, coneOutline, isHostile, type SkillDef } from './Skills';
 import type { SkillPlan } from './EncounterComponent';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { PathPreview } from './PathPreview';
+import { AimArrow } from './AimArrow';
+import { ActionCameraComponent } from './ActionCameraComponent';
+import { THROW_RANGE } from './EnvironmentRules';
 import { damageRange } from './Dice';
 import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 import { KeyCode } from '../../../types/KeyCode.enum';
@@ -134,7 +137,8 @@ const HOTBAR_KEYS = [
  *    atacarlo (un barril explosivo explota).
  * Acción armada (hotbar, teclas 1-8 en combate): otro ataque, Saltar (click en el suelo:
  * salta allí, gasta movimiento), Empujar / Lanzar (click en un objeto y después hacia dónde
- * empujarlo o dónde lanzarlo, viendo la trayectoria y a quién golpea) o una habilidad. Con una habilidad armada se ve su
+ * empujarlo o dónde lanzarlo, viendo la trayectoria y a quién golpea; al elegir el objeto, plano
+ * de cámara de apuntar, y al empujar una flecha en el suelo) o una habilidad. Con una habilidad armada se ve su
  * área y se resaltan los afectados antes de confirmar con click; las de "self" se lanzan al
  * pulsarlas. Esc o click derecho vuelven a lo de por defecto (con un objeto elegido, primero
  * lo sueltan).
@@ -157,6 +161,8 @@ export class TacticalPointerComponent extends Component {
   private throwPlan: ThrowPlan | null = null;
   /** Objeto elegido con Empujar / Lanzar armado: falta elegir hacia dónde (o adónde). */
   private heldObject: Entity | null = null;
+  /** Empujar se armó al hacer click en un objeto (no desde la hotbar): al soltarlo, se desarma. */
+  private autoArmed = false;
   private skillPlan: SkillPlan | null = null;
   /** Unidades resaltadas como afectadas por la habilidad armada. */
   private skillHighlights: Entity[] = [];
@@ -164,6 +170,9 @@ export class TacticalPointerComponent extends Component {
   private allyRing = new GroundMarker('tactical/ring_hover_ally.prefab');
   private enemyRing = new GroundMarker('tactical/ring_hover_enemy.prefab');
   private preview: PathPreview | null = null;
+  private arrow: AimArrow | null = null;
+  /** Objeto para el que está puesto el plano de cámara de apuntar (null: ninguno). */
+  private aimShotFor: Entity | null = null;
   private movePlan: MovePlan | null = null;
   private initialized = false;
   private readonly tmpPos = vec3.create();
@@ -178,6 +187,7 @@ export class TacticalPointerComponent extends Component {
       void this.allyRing.spawn();
       void this.enemyRing.spawn();
       this.preview = new PathPreview();
+      this.arrow = new AimArrow();
     }
 
     // Con la ficha del personaje abierta el puntero no actúa sobre el mundo.
@@ -188,6 +198,8 @@ export class TacticalPointerComponent extends Component {
     this.pickWorld(inGameplay);
     this.skillPlan = this.planArmedSkill();
     this.applyFeedback();
+    this.updateArrow();
+    this.syncAimCamera();
 
     if (inGameplay && Engine.getInput().isMouseButtonJustPressed(MouseButton.LEFT)) {
       this.handleClick();
@@ -229,8 +241,12 @@ export class TacticalPointerComponent extends Component {
       const out: { unit: UnitComponent; min: number; max: number }[] = [];
       const range = { min: plan.minDamage, max: plan.maxDamage };
       if (plan.hit?.isAlive()) out.push({ unit: plan.hit, ...range });
-      if (prop?.isAlive() && (plan.hit || thrown) && range.max > 0)
-        out.push({ unit: prop, ...range });
+      if (prop?.isAlive() && (plan.hit || thrown) && range.max > 0) {
+        // Si golpea a alguien y es de los que se rompen, se rompe entero.
+        const breaks = plan.hit && PropComponent.of(prop.getOwner())?.breaksOnImpact();
+        const hp = Math.ceil(prop.getHp());
+        out.push({ unit: prop, ...(breaks ? { min: hp, max: hp } : range) });
+      }
       return out;
     }
     if (this.isAimingObject()) return [];
@@ -280,6 +296,23 @@ export class TacticalPointerComponent extends Component {
     }
     this.armedAttack = id === this.armedAttack ? null : id;
     this.heldObject = null;
+    this.autoArmed = false;
+  }
+
+  /**
+   * Elige `entity` como el objeto de la acción armada. Al empujar, si no está al lado, anda
+   * hasta él (por el lado desde el que lo alejaría); mientras, ya se apunta.
+   */
+  private holdObject(entity: Entity): void {
+    this.heldObject = entity;
+    if (this.getArmedAttack() !== 'push') return;
+    const encounter = EncounterComponent.find();
+    const selected = PartyComponent.find()?.getSelected();
+    if (!encounter || !selected) return;
+    const plan = encounter.planPush(selected, entity);
+    const walk = plan.canPush ? plan.approach?.walk.points : null;
+    if (walk?.length) encounter.requestMove(selected, walk[walk.length - 1]!, false);
+    this.planCache.key = '';
   }
 
   /** Último plan de la habilidad armada bajo el cursor (área y afectados). */
@@ -373,7 +406,7 @@ export class TacticalPointerComponent extends Component {
       input.isKeyJustPressed(KeyCode.ESCAPE) ||
       input.isMouseButtonJustPressed(MouseButton.RIGHT)
     ) {
-      if (this.getHeldObject()) this.heldObject = null;
+      if (this.getHeldObject() && !this.autoArmed) this.heldObject = null;
       else this.armAttack(null);
     }
     const encounter = EncounterComponent.find();
@@ -753,8 +786,12 @@ export class TacticalPointerComponent extends Component {
         const label = walk
           ? `Saltar ${jump.distance.toFixed(1)} m (+${walk.length.toFixed(1)} m andando)`
           : `Saltar ${jump.distance.toFixed(1)} m`;
-        const walkPoints = walk && this.showWalkPaths() ? walk.points : [];
-        this.preview?.show([...walkPoints, ...jump.points], Infinity, label);
+        // Fuera de combate, como al andar, sin puntos: solo la etiqueta.
+        if (this.showWalkPaths()) {
+          this.preview?.show([...(walk?.points ?? []), ...jump.points], Infinity, label);
+        } else {
+          this.preview?.showLabelOnly(label);
+        }
       } else if (jump.allowed) {
         this.preview?.showLabelOnly(`Saltar: ${reasonText(jump.reason)}`);
       } else {
@@ -830,10 +867,66 @@ export class TacticalPointerComponent extends Component {
         : ' · no golpea a nadie';
     if (plan.approach) label += ` · se acerca ${plan.approach.plan.length.toFixed(1)} m`;
     const walk = plan.approach && this.showWalkPaths() ? plan.approach.plan.points : [];
-    const trajectory = throwing
-      ? this.throwPlan!.points
-      : [prop.getFeetPosition(vec3.create()), this.pushPlan!.destination!];
-    this.preview?.show([...walk, ...trajectory], Infinity, label);
+    // Empujar: la trayectoria es la flecha en el suelo (updateArrow).
+    const trajectory = throwing ? this.throwPlan!.points : [];
+    const points = [...walk, ...trajectory];
+    if (points.length) this.preview?.show(points, Infinity, label);
+    else this.preview?.showLabelOnly(label);
+  }
+
+  /** Flecha de empujar: con Empujar armado y un objeto elegido, o sobre un objeto empujable. */
+  private updateArrow(): void {
+    const push = this.pushPlan;
+    const target = this.pushTarget();
+    const prop = target?.getComponent('unit') as UnitComponent | null | undefined;
+    const aiming = this.isAimingObject() && this.heldObject !== null;
+    if (aiming && push?.canPush && push.direction && prop?.isAlive() && !prop.isMoving()) {
+      const from = prop.getFeetPosition(this.tmpPos);
+      this.arrow?.show(from, push.direction, push.pushLength, prop.getCapsuleRadius(), !!push.hit);
+    } else {
+      this.arrow?.hide();
+    }
+  }
+
+  /**
+   * Plano de cámara de apuntar (como el de los ataques): al elegir un objeto con Empujar o
+   * Lanzar encuadra a quien lo hace, el objeto y a quién podría golpear; al soltarlo vuelve a
+   * la cámara de juego (al ejecutar la acción, el plano pasa a ser el de la acción).
+   */
+  private syncAimCamera(): void {
+    const held = this.getHeldObject();
+    if (held === this.aimShotFor) return;
+    const camera = ActionCameraComponent.find();
+    if (this.aimShotFor) camera?.endAim();
+    this.aimShotFor = held;
+    const selected = PartyComponent.find()?.getSelected() ?? null;
+    if (held && selected) camera?.beginAim(selected, this.aimTargets(selected, held));
+  }
+
+  /** El objeto y las unidades que podría golpear (a tiro del empujón o del lanzamiento). */
+  private aimTargets(selected: Entity, held: Entity): (Entity | vec3)[] {
+    const prop = held.getComponent('unit') as UnitComponent;
+    const self = selected.getComponent('unit') as UnitComponent;
+    const throwing = this.getArmedAttack() === 'throw';
+    const center = (throwing ? self : prop).getFeetPosition(vec3.create());
+    const reach = throwing ? THROW_RANGE : (PropComponent.of(held)?.getPushDistance() ?? 3) + 1;
+    const p = vec3.create();
+    const targets: (Entity | vec3)[] = [held];
+    for (const u of UnitComponent.getAll()) {
+      if (u === prop || u === self || !u.isAlive() || u.getFaction() !== 'enemy') continue;
+      u.getFeetPosition(p);
+      if (Math.hypot(p[0]! - center[0]!, p[2]! - center[2]!) <= reach) targets.push(u.getOwner());
+    }
+    if (targets.length === 1) {
+      // Nadie a tiro: el objeto y hasta dónde llegaría alejándolo.
+      const from = self.getFeetPosition(vec3.create());
+      const away = vec3.fromValues(center[0]! - from[0]!, 0, center[2]! - from[2]!);
+      if (vec3.length(away) > 1e-3) {
+        vec3.normalize(away, away);
+        targets.push(vec3.scaleAndAdd(away, prop.getFeetPosition(vec3.create()), away, reach - 1));
+      }
+    }
+    return targets;
   }
 
   /** Los puntos del recorrido andando solo se ven en combate (en exploración no hacen falta). */
@@ -861,8 +954,7 @@ export class TacticalPointerComponent extends Component {
       const push = this.pushPlan;
       parts.push(
         push.canPush
-          ? `Empujar ${push.pushLength.toFixed(1)} m (acción adicional)` +
-              (push.hit ? ` · golpea a ${push.hit.getDisplayName()}` : '')
+          ? 'Empujar (acción adicional) · click para apuntar'
           : `Empujar: ${reasonText(push.reason)}`,
       );
     }
@@ -911,8 +1003,11 @@ export class TacticalPointerComponent extends Component {
         const r = encounter?.requestAttack(selected, this.hoveredUnit, this.getArmedAttackId());
         if (r?.ok) this.armedAttack = null;
       } else if (this.pushPlan?.canPush) {
-        const r = encounter?.requestPush(selected, this.hoveredUnit);
-        if (r?.ok && this.armedAttack === 'push') this.armedAttack = null;
+        // Primer paso: se acerca a la caja, entra la cámara y sale la flecha; el segundo
+        // click (hacia dónde) la empuja.
+        this.armedAttack = 'push';
+        this.autoArmed = true;
+        this.holdObject(this.hoveredUnit);
       }
       this.attackCache.key = '';
       this.planCache.key = '';
@@ -925,7 +1020,7 @@ export class TacticalPointerComponent extends Component {
     const encounter = EncounterComponent.find();
     const selected = PartyComponent.find()?.getSelected();
     if (!this.heldObject) {
-      if (this.canHold(this.hoveredUnit)) this.heldObject = this.hoveredUnit;
+      if (this.canHold(this.hoveredUnit)) this.holdObject(this.hoveredUnit);
       return;
     }
     if (!encounter || !selected) return;
@@ -940,6 +1035,7 @@ export class TacticalPointerComponent extends Component {
     if (ok) {
       this.armedAttack = null;
       this.heldObject = null;
+      this.autoArmed = false;
     }
     this.aimCache.key = '';
     this.planCache.key = '';
@@ -949,6 +1045,8 @@ export class TacticalPointerComponent extends Component {
     this.allyRing.destroy();
     this.enemyRing.destroy();
     this.preview?.destroy();
+    this.arrow?.destroy();
+    if (this.aimShotFor) ActionCameraComponent.find()?.endAim();
     if (this.lastHighlighted) setUnitHighlight(this.lastHighlighted, 0);
     for (const e of this.skillHighlights) setUnitHighlight(e, 0);
     Render.getInstance().getCanvas().style.cursor = 'default';

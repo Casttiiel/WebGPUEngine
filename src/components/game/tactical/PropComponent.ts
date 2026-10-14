@@ -21,6 +21,8 @@ export type PropComponentDataType = Readonly<{
   throwable?: boolean;
   /** Daño al golpear a una unidad (empujado o lanzado); el objeto recibe el mismo. Default "1d6+2". */
   impactDamage?: DamageValue;
+  /** Se rompe al golpear a una unidad (empujado o lanzado), tenga la vida que tenga. Default true. */
+  breakOnImpact?: boolean;
   /** Explota al destruirse (vida a 0: un ataque, el fuego, otra explosión). */
   explosive?: PropExplosion;
 }>;
@@ -38,6 +40,7 @@ export class PropComponent extends Component {
   private pushDistance = 3;
   private throwable = false;
   private impactDamage: DamageValue = '1d6+2';
+  private breakOnImpact = true;
   private explosive: PropExplosion | null = null;
 
   public load(data: PropComponentDataType): void {
@@ -45,6 +48,7 @@ export class PropComponent extends Component {
     this.pushDistance = data.pushDistance ?? this.pushDistance;
     this.throwable = data.throwable ?? this.pushable;
     this.impactDamage = data.impactDamage ?? this.impactDamage;
+    this.breakOnImpact = data.breakOnImpact ?? this.breakOnImpact;
     this.explosive = data.explosive ? { ...data.explosive } : null;
   }
 
@@ -64,6 +68,10 @@ export class PropComponent extends Component {
 
   public getImpactDamage(): DamageValue {
     return this.impactDamage;
+  }
+
+  public breaksOnImpact(): boolean {
+    return this.breakOnImpact;
   }
 
   public getExplosion(): PropExplosion | null {
