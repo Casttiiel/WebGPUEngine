@@ -564,6 +564,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 
   public updateFroxelData(linearDepth: RenderTarget): void {
+    this.applyEnvironmentSettings();
     if (!this.isVolumetricEnabled()) {
       this.historyValid = false;
       return;
@@ -1374,6 +1375,18 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     this.pointLightDataBindGroups.clear();
     this.spotLightTexturesBindGroups.clear();
     this.spotLightDataBindGroups.clear();
+  }
+
+  /** Ajustes de environment.json ("volumetrics"), una vez cargado el entorno. */
+  private environmentApplied = false;
+  private applyEnvironmentSettings(): void {
+    if (this.environmentApplied) return;
+    const env = Engine.getEnvironmentManager();
+    if (!env) return;
+    this.environmentApplied = true;
+    const s = env.getVolumetricFogSettings();
+    if (s.anisotropy !== undefined) this.anisotropy = s.anisotropy;
+    if (s.ambientIntensity !== undefined) this.ambientVolumetricIntensity = s.ambientIntensity;
   }
 
   public isVolumetricEnabled(): boolean {

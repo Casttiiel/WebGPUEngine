@@ -82,6 +82,8 @@ export class ModuleEnvironmentManager extends Module {
   public cloudsType: CloudsType = 'volumetric';
   /** Volumetric cloud settings from environment.json ("clouds.volumetric"), applied on load. */
   private volumetricCloudSettings: VolumetricCloudSettings = {};
+  /** Ajustes de la niebla volumétrica (froxels) de environment.json ("volumetrics"). */
+  private volumetricFogSettings: VolumetricFogSettings = {};
 
   constructor(name: string) {
     super(name);
@@ -128,6 +130,7 @@ export class ModuleEnvironmentManager extends Module {
 
     this.skyboxType = jsonData.skyboxType || 'cubemap';
     this.loadCloudSettings(jsonData.clouds);
+    this.volumetricFogSettings = jsonData.volumetrics ?? {};
     this.timeOfDay = jsonData.timeOfDay ?? 0.5;
     if (jsonData.sun?.tint) vec3.set(this.sunTint, ...(jsonData.sun.tint as [number, number, number]));
     this.sunIntensityScale = jsonData.sun?.intensityScale ?? 1.0;
@@ -744,6 +747,10 @@ export class ModuleEnvironmentManager extends Module {
     return this.volumetricCloudSettings;
   }
 
+  public getVolumetricFogSettings(): Readonly<VolumetricFogSettings> {
+    return this.volumetricFogSettings;
+  }
+
   /** Opacity of the sky's 2D clouds — zero unless the flat cloud system is selected. */
   public getFlatCloudOpacity(): number {
     return this.cloudsType === 'flat' ? this.cloudOpacity : 0.0;
@@ -871,6 +878,14 @@ export class ModuleEnvironmentManager extends Module {
 export type CloudsType = 'volumetric' | 'flat' | 'none';
 
 /** Overrides for VolumetricClouds (environment.json → "clouds.volumetric"). */
+/** environment.json "volumetrics": niebla volumétrica (froxels). Lo que falte, por defecto. */
+export interface VolumetricFogSettings {
+  /** Fase de Henyey-Greenstein: 0.9 = god rays (solo hacia el sol), ~0.2 = bruma que se ve desde cualquier lado. */
+  anisotropy?: number;
+  /** Luz ambiente que dispersa la niebla (sin ella solo se ve iluminada por luces). */
+  ambientIntensity?: number;
+}
+
 export interface VolumetricCloudSettings {
   base?: number; // world-Y of the cloud bottom (m)
   top?: number; // world-Y of the cloud top (m)

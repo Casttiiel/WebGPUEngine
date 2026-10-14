@@ -20,5 +20,9 @@
       "density": 1.4
     }
   },
-  "ssrEnvironment": "ReflectionProbe_cubemap_T.png"
+  "ssrEnvironment": "ReflectionProbe_cubemap_T.png",
+  "volumetrics": {
+    "anisotropy": 0.25,
+    "ambientIntensity": 0.3
+  }
 }
