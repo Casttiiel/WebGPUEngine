@@ -1,5 +1,5 @@
 {
-  "description": "Fase 6: golpe crítico con distribución pseudoaleatoria (PRD, como Warcraft III / Dota 2). El N-ésimo ataque desde el último crítico tiene P(N) = C·N; C se elige para que de media salga el % de la estadística (20 % → C ≈ 0.0557, seguro al 18.º). El crítico tira el doble de dados. Cada unidad lleva su cuenta, que se reinicia al salir el crítico y al empezar o acabar un combate. Las habilidades no critican.",
+  "description": "Fase 6: golpe crítico con bolsa de canicas (marble bag, de candlesan). La bolsa tiene el % de canicas de crítico (20 % → 2 de 10) y cada ataque que impacta saca una al azar sin devolverla: si es de crítico la bolsa se rellena, si no queda una normal menos y el siguiente tiene más probabilidad (20 %, 22 %, 25 %… seguro al 9.º). El crítico tira el doble de dados. Cada unidad lleva su bolsa, que se rellena también al empezar o acabar un combate. Las habilidades no critican.",
   "scenes": ["tactical.json", "tactical_dummies.json"],
   "seed": 7,
   "steps": [
@@ -9,53 +9,60 @@
     },
     { "wait_frames": 5 },
     {
-      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__log = []; Engine.getEntities().getObjectManagerByName('encounter').getList()[0].onEvent((e, d) => { if (e === 'damage') window.__log.push({ u: d.unit.getName(), amount: d.amount, crit: !!d.crit, cause: d.cause }); })"
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__log = []; Engine.getEntities().getObjectManagerByName('encounter').getList()[0].onEvent((e, d) => { if (e === 'damage') window.__log.push({ u: d.unit.getName(), amount: d.amount, crit: !!d.crit, cause: d.cause }); }); window.critBagOf = (p) => { const u = __unit('Hero1'); const c = u.critChance; u.critChance = p * 100; u.resetCritChance(); const r = [u.bagCrits, u.bagMarbles]; u.critChance = c; u.resetCritChance(); return r; }"
     },
 
-    { "log": "La estadística (media a la larga): héroes 20 %, enemigos 10 %" },
+    { "log": "La estadística (probabilidad con la bolsa llena): héroes 20 %, enemigos 10 %" },
     { "assert": { "entity": "Hero1", "path": "unit.getCritChance", "value": 20 } },
     { "assert": { "entity": "Enemy1", "path": "unit.getCritChance", "value": 10 } },
     {
       "assert": {
-        "expr": "['Hero1', 'Enemy1'].map(n => (__unit(n).getNextCritChance() * 100).toFixed(2))",
-        "value": ["5.57", "1.47"],
-        "message": "PRD: el primer ataque tiene C (20 % → 5.57 %, 10 % → 1.47 %; los valores de la tabla de Dota 2)"
+        "expr": "['Hero1', 'Enemy1'].map(n => { const u = __unit(n); u.resetCritChance(); return [u.bagCrits, u.bagMarbles, +u.getNextCritChance().toFixed(3)]; })",
+        "value": [[2, 10, 0.2], [1, 10, 0.1]],
+        "message": "bolsa: 20 % → 2 canicas de crítico de 10, 10 % → 1 de 10"
       }
     },
     {
       "assert": {
-        "expr": "(() => { const u = __unit('Hero1'); const c = u.getNextCritChance(); return [1, 2, 3, 17].map(k => { u.critMisses = k; return Math.abs(u.getNextCritChance() - Math.min(1, c * (k + 1))) < 1e-12; }).concat([u.getNextCritChance() === 1]); })()",
-        "value": [true, true, true, true, true],
-        "message": "P(N) = C·N: sube con cada ataque sin crítico y al 18.º es seguro"
+        "expr": "[0.2, 0.1, 0.15, 0.25, 0.33, 0.5, 0.01, 1].map(p => critBagOf(p).join('/'))",
+        "value": ["2/10", "1/10", "3/20", "5/20", "33/100", "5/10", "1/100", "10/10"],
+        "message": "diez canicas; si el % no cabe, las que hagan falta para que salga exacto"
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const u = __unit('Hero1'); u.resetCritChance(); const out = []; for (let i = 0; i < 9; i++) { out.push(u.getNextCritChance()); if (u.rollCrit()) break; } return out[out.length - 1] > 0 && out.every((c, i) => i === 0 || c > out[i - 1]); })()",
+        "value": true,
+        "message": "sin crítico la probabilidad sube (2/10, 2/9, 2/8…) hasta que sale"
       }
     },
 
-    { "log": "De media sale el % de la estadística y nunca pasan más de 18 ataques sin crítico" },
+    { "log": "Con 2 de 10 y relleno al criticar sale de media 3/11 (27 %) y nunca pasan más de 8 ataques sin crítico" },
     {
       "assert": {
-        "expr": "(() => { const u = __unit('Hero1'); u.resetCritChance(); let crits = 0; let since = 0; let maxGap = 0; for (let i = 0; i < 20000; i++) { since++; if (u.rollCrit()) { crits++; maxGap = Math.max(maxGap, since); since = 0; } } return [crits / 20000 > 0.19 && crits / 20000 < 0.21, maxGap <= 18]; })()",
+        "expr": "(() => { const u = __unit('Hero1'); u.resetCritChance(); let crits = 0; let since = 0; let maxGap = 0; for (let i = 0; i < 20000; i++) { since++; if (u.rollCrit()) { crits++; maxGap = Math.max(maxGap, since); since = 0; } } return [crits / 20000 > 0.26 && crits / 20000 < 0.285, maxGap <= 9]; })()",
         "value": [true, true]
       }
     },
     {
       "assert": {
-        "expr": "(() => { const u = __unit('Enemy1'); u.resetCritChance(); let crits = 0; for (let i = 0; i < 20000; i++) if (u.rollCrit()) crits++; return crits / 20000 > 0.09 && crits / 20000 < 0.11; })()",
+        "expr": "(() => { const u = __unit('Enemy1'); u.resetCritChance(); let crits = 0; for (let i = 0; i < 20000; i++) if (u.rollCrit()) crits++; return crits / 20000 > 0.17 && crits / 20000 < 0.195; })()",
         "value": true,
-        "message": "10 % de media"
+        "message": "1 de 10: de media 2/11 (18 %)"
       }
     },
     {
       "assert": {
-        "expr": "(() => { const u = __unit('Hero1'); u.critMisses = 17; const crit = u.rollCrit(); return [crit, u.critMisses]; })()",
-        "value": [true, 0],
-        "message": "el crítico reinicia la probabilidad"
+        "expr": "(() => { const u = __unit('Hero1'); u.bagCrits = 1; u.bagMarbles = 1; const crit = u.rollCrit(); return [crit, u.bagCrits, u.bagMarbles]; })()",
+        "value": [true, 2, 10],
+        "message": "el crítico rellena la bolsa"
       }
     },
     {
       "assert": {
-        "expr": "(() => { const a = __unit('Hero1'); const b = __unit('Hero2'); a.critMisses = 3; b.resetCritChance(); return [a.getNextCritChance() > b.getNextCritChance(), b.critMisses]; })()",
-        "value": [true, 0],
-        "message": "cada unidad lleva su cuenta"
+        "expr": "(() => { const a = __unit('Hero1'); const b = __unit('Hero2'); a.bagCrits = 1; a.bagMarbles = 2; b.resetCritChance(); return [a.getNextCritChance() > b.getNextCritChance(), b.bagMarbles]; })()",
+        "value": [true, 10],
+        "message": "cada unidad lleva su bolsa"
       }
     },
 
@@ -72,7 +79,7 @@
       "timeout_frames": 300
     },
     { "assert": { "combat": true, "path": "state", "value": "exploration" } },
-    { "eval": "__unit('Hero2').critMisses = 17" },
+    { "eval": "__unit('Hero2').bagCrits = 1; __unit('Hero2').bagMarbles = 1" },
     {
       "assert": {
         "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero2', target: 'Enemy1' }).then(r => [r.attack, r.minDamage, r.maxDamage, r.critChance])",
@@ -111,11 +118,11 @@
     },
     { "screenshot": "01-crit" },
 
-    { "log": "Atacar primero empieza el combate: la probabilidad de todos vuelve a la inicial" },
+    { "log": "Atacar primero empieza el combate: las bolsas de todos se rellenan" },
     { "assert": { "combat": true, "path": "state", "value": "combat" } },
     {
       "assert": {
-        "expr": "__engine.getCombatState().units.every(u => __unit(u.name).critMisses === 0)",
+        "expr": "__engine.getCombatState().units.every(u => { const x = __unit(u.name); return x.getCritChance() === 0 || x.bagMarbles === critBagOf(x.getCritChance() / 100)[1]; })",
         "value": true
       }
     },
@@ -123,13 +130,13 @@
     { "log": "Las habilidades no critican" },
     {
       "wait_until": {
-        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero2' && !s.busy) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
+        "expr": "(() => { const s = __engine.getCombatState(); if (s.activeUnit === 'Hero2' && !s.busy && !__unit('Hero2').isBusy()) return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; })()",
         "value": true
       },
       "timeout_frames": 1500,
       "check_every": 5
     },
-    { "eval": "__unit('Hero2').critMisses = 17; window.__log = []" },
+    { "eval": "__unit('Hero2').bagCrits = 1; __unit('Hero2').bagMarbles = 1; window.__log = []" },
     {
       "assert": {
         "expr": "__engine.gameCommand('skill', { unit: 'Hero2', skill: 'fireball', to: [6, 0, 5.5] }).then(r => r.ok)",
@@ -155,9 +162,9 @@
       }
     },
 
-    { "log": "Al acabar el combate la probabilidad vuelve a la inicial" },
+    { "log": "Al acabar el combate la bolsa se rellena" },
     { "command": "end_combat" },
-    { "assert": { "expr": "__unit('Hero2').critMisses", "value": 0 } },
+    { "assert": { "expr": "[__unit('Hero2').bagCrits, __unit('Hero2').bagMarbles]", "value": [2, 10] } },
     { "assert": { "no_errors": true } }
   ]
 }

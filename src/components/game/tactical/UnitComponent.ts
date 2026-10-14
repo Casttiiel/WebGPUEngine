@@ -121,8 +121,9 @@ export class UnitComponent extends Component {
   private silhouette = true;
   /** Material de silueta aplicado ahora (undefined = aún no se ha decidido). */
   private silhouetteShown: string | null | undefined = undefined;
-  /** Ataques que han impactado sin crítico desde el último (PRD). */
-  private critMisses = 0;
+  /** Bolsa de canicas del crítico: las que quedan y cuántas de ellas son crítico. */
+  private bagMarbles = 0;
+  private bagCrits = 0;
   private pathSpeed = 4;
   private pathTurns = true;
   /** El movimiento en curso es andar (no un salto, empujón o embestida): se puede cortar. */
@@ -258,14 +259,13 @@ export class UnitComponent extends Component {
 
   // ── Críticos ─────────────────────────────────────────────────────────────
   //
-  // Distribución pseudoaleatoria (PRD) de Warcraft III / Dota 2 en vez de una tirada
-  // independiente: el N-ésimo ataque desde el último crítico tiene P(N) = C·N. Cada ataque sin
-  // crítico sube la probabilidad, el crítico la reinicia, y antes o después es seguro (P = 1).
-  // C se elige para que de media salga el % de la estadística: con un 20 %, C ≈ 0.0557 (5.6 %,
-  // 11 %, 17 %… seguro al 18.º). Se reinicia también al empezar o acabar un combate. Cada
-  // unidad lleva su cuenta.
+  // Bolsa de canicas (marble bag, de candlesan) en vez de una tirada independiente: la bolsa
+  // tiene el % de canicas de crítico (20 % → 2 de 10, ver critBag) y cada ataque que impacta
+  // saca una al azar y no la devuelve. Si es de crítico, la bolsa se rellena; si no, queda
+  // una normal menos y el siguiente tiene más probabilidad (20 %, 22 %, 25 %… seguro al 9.º).
+  // Se rellena también al empezar o acabar un combate. Cada unidad lleva su bolsa.
 
-  /** % de crítico (la estadística: la media a la larga). */
+  /** % de crítico (la estadística: la probabilidad con la bolsa llena). */
   public getCritChance(): number {
     return this.critChance;
   }
@@ -273,21 +273,28 @@ export class UnitComponent extends Component {
   /** Probabilidad (0-1) de que el próximo ataque que impacte sea crítico. */
   public getNextCritChance(): number {
     if (this.critChance <= 0) return 0;
-    return Math.min(1, prdConstant(this.critChance / 100) * (this.critMisses + 1));
+    if (this.bagMarbles <= 0) this.refillCritBag();
+    return this.bagCrits / this.bagMarbles;
   }
 
-  /** Tira el crítico de un ataque que ha impactado. */
+  /** Saca una canica de la bolsa para un ataque que ha impactado. */
   public rollCrit(): boolean {
-    const chance = this.getNextCritChance();
-    if (chance <= 0) return false;
-    const crit = chance >= 1 || Math.random() < chance;
-    this.critMisses = crit ? 0 : this.critMisses + 1;
+    if (this.critChance <= 0) return false;
+    const crit = Math.random() < this.getNextCritChance();
+    if (crit) this.refillCritBag();
+    else this.bagMarbles--;
     return crit;
   }
 
-  /** Vuelve a la probabilidad inicial (al salir un crítico, empezar o acabar un combate). */
+  /** Rellena la bolsa (al salir un crítico, empezar o acabar un combate). */
   public resetCritChance(): void {
-    this.critMisses = 0;
+    this.refillCritBag();
+  }
+
+  private refillCritBag(): void {
+    const [crits, marbles] = critBag(this.critChance / 100);
+    this.bagCrits = crits;
+    this.bagMarbles = marbles;
   }
 
   // ── Estados ──────────────────────────────────────────────────────────────
@@ -572,37 +579,16 @@ export class UnitComponent extends Component {
   }
 }
 
-const prdConstants = new Map<number, number>();
-
 /**
- * Constante C de la PRD para una probabilidad media `p` (0-1). No tiene fórmula cerrada: se
- * busca (bisección) la C cuya media de ataques hasta el crítico sea 1/p.
+ * Bolsa de crítico para una probabilidad `p` (0-1): [canicas de crítico, canicas en total].
+ * Diez canicas con el % de crítico (20 % → 2 de 10); si el % no cabe en diez, las que hagan
+ * falta para que salga exacto (15 % → 3 de 20, 33 % → 33 de 100).
  */
-export function prdConstant(p: number): number {
-  if (p >= 1) return 1;
-  const cached = prdConstants.get(p);
-  if (cached !== undefined) return cached;
-  // Probabilidad media con una C dada: 1 / (ataques esperados hasta el crítico).
-  const average = (c: number): number => {
-    let expected = 0;
-    let noCritYet = 1;
-    for (let n = 1; noCritYet > 0; n++) {
-      const chance = Math.min(1, c * n);
-      expected += n * chance * noCritYet;
-      noCritYet *= 1 - chance;
-    }
-    return 1 / expected;
-  };
-  let lo = 0;
-  let hi = p;
-  for (let i = 0; i < 50; i++) {
-    const mid = (lo + hi) / 2;
-    if (average(mid) < p) lo = mid;
-    else hi = mid;
-  }
-  const c = (lo + hi) / 2;
-  prdConstants.set(p, c);
-  return c;
+export function critBag(p: number): [number, number] {
+  const percent = Math.round(Math.min(1, p) * 100);
+  let size = 10;
+  while ((percent * size) % 100 !== 0) size += 10;
+  return [(percent * size) / 100, size];
 }
 
 /** Materiales de silueta por bando (los neutrales, como los objetos, no tienen). */

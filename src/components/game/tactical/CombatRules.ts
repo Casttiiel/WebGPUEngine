@@ -69,7 +69,7 @@ export interface AttackRoll {
   /** Daño mínimo y máximo si impacta (sin crítico): la vista previa en la barra de vida. */
   minDamage: number;
   maxDamage: number;
-  /** Probabilidad (0-1) de que sea crítico si impacta: la de su próximo ataque (PRD). */
+  /** Probabilidad (0-1) de que sea crítico si impacta: sale de su bolsa de canicas. */
   critChance: number;
 }
 
@@ -94,7 +94,7 @@ export function previewAttack(
 
 /**
  * Tira el ataque. Con 100 % de impacto no consume números del RNG para el impacto; si impacta
- * tira el crítico con la PRD del atacante (UnitComponent.rollCrit).
+ * saca el crítico de la bolsa del atacante (UnitComponent.rollCrit).
  */
 export function rollAttack(
   attacker: UnitComponent,

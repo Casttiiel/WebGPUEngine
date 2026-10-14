@@ -12,7 +12,6 @@
     },
     "bloom": {},
     "auto_exposure": {},
-    "god_rays": {},
     "vignette": {
       "intensity": 0.3,
       "smoothness": 0.2

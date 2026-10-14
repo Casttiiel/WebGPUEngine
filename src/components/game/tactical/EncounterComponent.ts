@@ -218,7 +218,7 @@ export interface AttackPlan {
   damage: number;
   minDamage: number;
   maxDamage: number;
-  /** Probabilidad (0-1) de crítico si impacta en el próximo ataque del atacante (PRD). */
+  /** Probabilidad (0-1) de crítico si impacta en el próximo ataque del atacante (bolsa de canicas). */
   critChance: number;
   reason?: string;
 }
@@ -1377,7 +1377,7 @@ export class EncounterComponent extends Component {
       this.combatants.push(this.rollInitiative(m.getComponent('unit') as UnitComponent));
     for (const e of enemies) this.combatants.push(this.rollInitiative(e));
     this.combatants.sort(compareInitiative);
-    // La probabilidad de crítico vuelve a la inicial al empezar el combate.
+    // La bolsa de crítico se rellena al empezar el combate.
     for (const c of this.combatants) c.unit.resetCritChance();
 
     for (const c of this.combatants) c.unit.stop();
