@@ -21,7 +21,7 @@
     {
       "assert": {
         "expr": "[__text('sheet_name'), __text('sheet_role'), __text('sheet_hp_text'), __text('sheet_stat_1_value'), __text('sheet_stat_2_value')]",
-        "value": ["Hero1", "Guerrero · Aliado", "PV 30 / 30", "9 m", "20 %"]
+        "value": ["Ham", "Violento · Aliado", "PV 30 / 30", "9 m", "20 %"]
       }
     },
     {
@@ -48,7 +48,7 @@
     { "log": "Tab: otro personaje" },
     { "input": { "type": "key", "key": "Tab" } },
     { "wait_frames": 30 },
-    { "assert": { "expr": "[__text('sheet_name'), __text('sheet_role')]", "value": ["Hero2", "Hechicero · Aliado"] } },
+    { "assert": { "expr": "[__text('sheet_name'), __text('sheet_role')]", "value": ["Kelsier", "Nacido de la Bruma · Aliado"] } },
     { "screenshot": "02-hero2" },
 
     { "log": "Esc cierra y vuelve la cámara de juego" },
@@ -73,7 +73,7 @@
     { "assert": { "expr": "__sheet.constructor.isOpen()", "value": true } },
     {
       "assert": {
-        "expr": "__text('sheet_name') === window.__turn",
+        "expr": "__text('sheet_name') === Engine.getEntities().getEntityByName(window.__turn).getComponent('unit').getDisplayName()",
         "value": true,
         "message": "ficha del que tiene el turno"
       }

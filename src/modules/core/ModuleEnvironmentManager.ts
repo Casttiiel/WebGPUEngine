@@ -53,6 +53,11 @@ export class ModuleEnvironmentManager extends Module {
   private skyboxType: string = 'cubemap';
   private timeOfDay: number = 0.5; // 0.0 = midnight, 0.5 = noon, 1.0 = midnight (normalized)
   private sunDir: vec3 = vec3.fromValues(0, 1, 0); // ALWAYS the real sun direction (for sky scattering)
+  /** environment.json "sun": tinte del sol (p.ej. rojo) y escala de su intensidad. */
+  private sunTint: vec3 = vec3.fromValues(1, 1, 1);
+  private sunIntensityScale = 1.0;
+  /** environment.json "ambient.dayScale": escala del ambiente de día ligado al cielo. */
+  private ambientDayScale = 1.0;
 
   private blendState: EnvironmentBlendState | null = null;
 
@@ -124,6 +129,9 @@ export class ModuleEnvironmentManager extends Module {
     this.skyboxType = jsonData.skyboxType || 'cubemap';
     this.loadCloudSettings(jsonData.clouds);
     this.timeOfDay = jsonData.timeOfDay ?? 0.5;
+    if (jsonData.sun?.tint) vec3.set(this.sunTint, ...(jsonData.sun.tint as [number, number, number]));
+    this.sunIntensityScale = jsonData.sun?.intensityScale ?? 1.0;
+    this.ambientDayScale = jsonData.ambient?.dayScale ?? 1.0;
 
     const [skyboxTexture, ssrEnvironmentTexture] = await Promise.all([
       HDRTexture.getAsync(jsonData.skybox),
@@ -255,7 +263,8 @@ export class ModuleEnvironmentManager extends Module {
       lerp(0.5, 1.0, t), // G: 0.5 (naranja) → 1.0 (blanco)
       lerp(0.3, 0.98, t), // B: 0.3 (naranja) → 0.98 (blanco-azul)
     );
-    const sunIntensity = sunAbove * sunMaxIntensity;
+    vec3.multiply(sunColor, sunColor, this.sunTint);
+    const sunIntensity = sunAbove * sunMaxIntensity * this.sunIntensityScale;
 
     // FASE 2.2 — Valores de la luna (noche)
     const moonMaxIntensity = 0.2; // Mucho más débil
@@ -287,7 +296,7 @@ export class ModuleEnvironmentManager extends Module {
     }
 
     // FASE 4.1 — Ambient ligado al cielo
-    this.ambientLightData.globalFactor = lerp(0.08, 5.0, sunAbove);
+    this.ambientLightData.globalFactor = lerp(0.08, 5.0 * this.ambientDayScale, sunAbove);
   }
 
   /**

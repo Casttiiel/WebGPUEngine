@@ -1,0 +1,9 @@
+{
+  "technique": "particles/particle_worldspace.tech",
+  "textures": {
+    "txAlbedo": "tactical/ash_flake.png"
+  },
+  "casts_shadows": false,
+  "category": "transparent",
+  "shadows": false
+}

@@ -1,0 +1,23 @@
+{
+  "technique": "gbuffer/gbuffer_pom.tech",
+  "category": "solids",
+  "pomScale": 0.03,
+  "uvXScale": 16,
+  "uvYScale": 16,
+  "roughnessFactor": 1,
+  "metallicFactor": 0,
+  "baseColorFactor": [
+    0.42,
+    0.4,
+    0.4,
+    1
+  ],
+  "textures": {
+    "txAlbedo": "mistborn/cobblestone_floor_08_diff_1k.jpg",
+    "txNormal": "mistborn/cobblestone_floor_08_nor_gl_1k.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "mistborn/cobblestone_floor_08_rough_1k.jpg",
+    "txEmissive": "black.png",
+    "txHeight": "mistborn/cobblestone_floor_08_disp_1k.jpg"
+  }
+}

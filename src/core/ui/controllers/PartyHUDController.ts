@@ -6,11 +6,11 @@ import { PartyComponent } from '../../../components/game/tactical/PartyComponent
 import type { UnitComponent } from '../../../components/game/tactical/UnitComponent';
 
 const SLOTS = 4;
-const FRAME_NORMAL = [0.08, 0.08, 0.1, 0.85] as const;
-const FRAME_HOVER = [0.55, 0.7, 0.9, 1] as const;
-const FRAME_SELECTED = [1, 0.8, 0.3, 1] as const;
-const FACE_NORMAL = [0.13, 0.27, 0.6, 1] as const;
-const FACE_DOWN = [0.22, 0.22, 0.22, 1] as const;
+const FRAME_NORMAL = [0.07, 0.065, 0.06, 0.9] as const;
+const FRAME_HOVER = [0.62, 0.64, 0.66, 1] as const;
+const FRAME_SELECTED = [0.85, 0.66, 0.3, 1] as const;
+const FACE_NORMAL = [0.2, 0.27, 0.34, 1] as const;
+const FACE_DOWN = [0.17, 0.16, 0.15, 1] as const;
 const HP_WIDTH = 96;
 const HP_HEIGHT = 10;
 

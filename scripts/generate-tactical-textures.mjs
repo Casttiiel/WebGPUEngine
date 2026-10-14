@@ -7,6 +7,7 @@
  *   surface_fire.png  mancha de brasas (naranja/rojo, borde irregular)
  *   surface_oil.png   charco de aceite (marrón oscuro con brillo)
  *   status_fear.png   icono del estado "miedo" (sobre la cabeza de la unidad)
+ *   ash_flake.png     copo de ceniza (partículas que caen del cielo, estilo Nacidos de la Bruma)
  *   aim_*.png         indicador de empujar (flecha en el suelo): cuerpo, chevrones y punta en
  *                     dos colores (_ok: no golpea a nadie, _hit: golpea), hueco donde acaba el
  *                     objeto y marca de impacto. En la textura "adelante" es hacia abajo (+v).
@@ -120,6 +121,17 @@ textures['aim_landing.png'] = ['M16 80 V16 H80', 'M176 16 H240 V80', 'M240 176 V
     <path d="${d}Z" fill="#ff4a30" transform="translate(128 128) scale(0.8) translate(-128 -128)"/>
     <circle cx="128" cy="128" r="30" fill="#ffd25a"/>`;
 }
+
+// Copo de ceniza: mancha irregular de bordes suaves (el gris lo pone la partícula; se suman).
+textures['ash_flake.png'] = `
+    <defs>
+      <radialGradient id="g" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+        <stop offset="60%" stop-color="#ffffff" stop-opacity="0.85"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <path d="${blob(29, 110, 0.35, 9)}" fill="url(#g)"/>`;
 
 for (const [name, body] of Object.entries(textures)) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}">${body}</svg>`;

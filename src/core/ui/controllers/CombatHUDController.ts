@@ -34,33 +34,35 @@ type RGBA = readonly [number, number, number, number];
 
 const BANNER_TIME = 1.5;
 const TURN_BANNER_TIME = 1.3;
-const BUTTON_NORMAL: RGBA = [0.35, 0.25, 0.08, 0.9];
-const BUTTON_HOVER: RGBA = [0.55, 0.4, 0.12, 1];
+// Paleta de Nacidos de la Bruma: carbón y ceniza, bordes de latón, metales alománticos.
+const BUTTON_NORMAL: RGBA = [0.3, 0.2, 0.08, 0.92];
+const BUTTON_HOVER: RGBA = [0.62, 0.45, 0.16, 1];
 
 const INIT_SLOTS = 12;
 const INIT_WIDTH = 112;
 const INIT_GAP = 8;
-const FRAME_NORMAL: RGBA = [0.08, 0.08, 0.1, 0.85];
-const FRAME_HOVER: RGBA = [0.55, 0.7, 0.9, 1];
-const FRAME_ACTIVE: RGBA = [1, 0.8, 0.3, 1];
-const FACE_PARTY: RGBA = [0.13, 0.27, 0.6, 1];
-const FACE_ENEMY: RGBA = [0.6, 0.15, 0.12, 1];
-const FACE_DOWN: RGBA = [0.22, 0.22, 0.22, 1];
-const HP_PARTY: RGBA = [0.25, 0.8, 0.3, 1];
-const HP_ENEMY: RGBA = [0.9, 0.25, 0.2, 1];
+const FRAME_NORMAL: RGBA = [0.07, 0.065, 0.06, 0.9];
+const FRAME_HOVER: RGBA = [0.62, 0.64, 0.66, 1]; // peltre
+const FRAME_ACTIVE: RGBA = [0.85, 0.66, 0.3, 1]; // latón
+const FACE_PARTY: RGBA = [0.2, 0.27, 0.34, 1]; // acero
+const FACE_ENEMY: RGBA = [0.45, 0.08, 0.07, 1]; // carmesí del Ministerio
+const FACE_DOWN: RGBA = [0.17, 0.16, 0.15, 1]; // ceniza
+const HP_PARTY: RGBA = [0.5, 0.72, 0.38, 1];
+const HP_ENEMY: RGBA = [0.78, 0.16, 0.12, 1];
 
 const HOTBAR_SLOTS = 7;
 const HOTBAR_WIDTH = 150;
 const HOTBAR_GAP = 10;
 const ICON: Record<HotbarKind, RGBA> = {
-  melee: [0.55, 0.2, 0.12, 1],
-  ranged: [0.15, 0.4, 0.62, 1],
-  jump: [0.2, 0.5, 0.3, 1],
-  push: [0.6, 0.45, 0.12, 1],
-  throw: [0.62, 0.32, 0.1, 1],
-  skill: [0.45, 0.22, 0.6, 1],
+  // Cada acción, un metal: hierro oxidado, estaño, peltre, acero (empujar), cobre y bronce.
+  melee: [0.3, 0.12, 0.09, 1],
+  ranged: [0.27, 0.28, 0.3, 1],
+  jump: [0.22, 0.23, 0.22, 1],
+  push: [0.12, 0.24, 0.4, 1],
+  throw: [0.42, 0.2, 0.09, 1],
+  skill: [0.34, 0.24, 0.08, 1],
 };
-const ICON_DISABLED: RGBA = [0.2, 0.2, 0.2, 1];
+const ICON_DISABLED: RGBA = [0.15, 0.14, 0.13, 1];
 /** Qué hacer con cada acción armada (tooltip mientras está armada). */
 const ARMED_HINT: Record<HotbarKind, string> = {
   melee: 'elige un enemigo',
@@ -79,15 +81,15 @@ const TIP_LINE_HEIGHT = 28;
 const TIP_LINE_SIZE = 22;
 const TIP_GAP = 14;
 const TIP_COLOR: Record<TooltipLine['style'], RGBA> = {
-  info: [0.75, 0.75, 0.8, 1],
-  description: [0.92, 0.9, 0.85, 1],
+  info: [0.72, 0.68, 0.6, 1],
+  description: [0.93, 0.88, 0.77, 1],
   warning: [1, 0.45, 0.4, 1],
 };
 const HOTBAR_TOP = -130;
 
-const ACTION_ON: RGBA = [0.3, 0.85, 0.35, 1];
-const BONUS_ON: RGBA = [1, 0.6, 0.15, 1];
-const PIP_OFF: RGBA = [0.25, 0.25, 0.25, 1];
+const ACTION_ON: RGBA = [0.55, 0.78, 0.4, 1];
+const BONUS_ON: RGBA = [0.88, 0.62, 0.25, 1];
+const PIP_OFF: RGBA = [0.2, 0.19, 0.18, 1];
 const MOVE_BAR_WIDTH = 220;
 
 const FLOAT_TIME = 1.3;
@@ -109,8 +111,8 @@ const DAMAGE_BAR_INNER = DAMAGE_BAR_WIDTH - 4;
 const DAMAGE_BAR_HEIGHT = 12;
 /** Altura de la barra sobre el centro de la unidad (m). */
 const DAMAGE_BAR_LIFT = 1.35;
-const HP_LEFT_PARTY: RGBA = [0.3, 0.75, 0.3, 1];
-const HP_LEFT_ENEMY: RGBA = [0.75, 0.2, 0.18, 1];
+const HP_LEFT_PARTY: RGBA = [0.5, 0.72, 0.38, 1];
+const HP_LEFT_ENEMY: RGBA = [0.7, 0.15, 0.12, 1];
 
 const STATUS_ICONS = 8;
 const STATUS_SIZE = 64;

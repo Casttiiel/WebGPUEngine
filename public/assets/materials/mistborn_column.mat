@@ -1,0 +1,23 @@
+{
+  "technique": "gbuffer/gbuffer_triplanar_world.tech",
+  "textures": {
+    "txAlbedo": "mistborn/castle_brick_07_diff_1k.jpg",
+    "txNormal": "mistborn/castle_brick_07_nor_gl_1k.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "mistborn/castle_brick_07_rough_1k.jpg",
+    "txEmissive": "black.png"
+  },
+  "uvXScale": 0.5,
+  "uvYScale": 0.5,
+  "baseColorFactor": [
+    0.42,
+    0.4,
+    0.4,
+    1
+  ],
+  "roughnessFactor": 1.0,
+  "metallicFactor": 0,
+  "casts_shadows": true,
+  "category": "solids",
+  "shadows": false
+}

@@ -387,11 +387,11 @@ export class FroxelVolumetricScattering {
         module: this.device.createShaderModule({
           label: 'Froxel Clear Light Compute Shader',
           code: `
-@group(0) @binding(0) var target: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(0) var lightTex: texture_storage_3d<rgba16float, write>;
 @compute @workgroup_size(8, 8, 4)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  if (any(gid >= textureDimensions(target))) { return; }
-  textureStore(target, gid, vec4<f32>(0.0));
+  if (any(gid >= textureDimensions(lightTex))) { return; }
+  textureStore(lightTex, gid, vec4<f32>(0.0));
 }`,
         }),
         entryPoint: 'main',
