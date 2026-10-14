@@ -15,6 +15,8 @@
 // Self-occlusion transmittance computed by froxel_self_occlusion pass.
 // Value of 1.0 = full light, 0.0 = fully occluded by the medium itself.
 @group(2) @binding(2) var froxelSelfOcclusionTexture: texture_3d<f32>;
+// Scene linear depth (viewZ / cameraFar, sky = 1) — rejects samples behind geometry.
+@group(2) @binding(3) var sceneLinearDepth: texture_2d<f32>;
 
 @group(3) @binding(0) var<uniform> directionalLight: DirectionalLightCSMUniforms;
 @group(3) @binding(1) var shadowMap0: texture_depth_2d;
@@ -111,17 +113,38 @@ fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
     let base = vec3<f32>(globalId);
     let jitter = froxelParams.jitter.xyz;
 
+    // Depth-aware sampling: a froxel spans 8×8 pixels, and on surfaces seen at a
+    // grazing angle (vaults, floors) part of it lies BEHIND the geometry for some
+    // of those pixels — often in lit space on the other side of a wall or roof.
+    // No view ray crosses that space at that pixel, so samples there are skipped;
+    // otherwise their light leaks onto the surface, hugely amplified by the
+    // forward-scattering phase when looking toward the sun.
+    let depthDims = vec2<i32>(textureDimensions(sceneLinearDepth));
+    let cameraFar = volumetricSettings.windDir.y;
+
     var visibility = 0.0;
+    var validSamples = 0.0;
     for (var i: u32 = 0u; i < SHADOW_SAMPLES; i++) {
         let fi = f32(i);
         let xy = fract(jitter.xy + vec2<f32>(0.7548776662, 0.5698402910) * fi);
         let z  = (fi + jitter.z) / f32(SHADOW_SAMPLES);
         let sampleVS = froxelCoordToViewSpace(base + vec3<f32>(xy, z), dims,
             froxelParams.depthDistScale, froxelParams.depthDistB, camera.invProjection);
+
+        let samplePixel = clamp(vec2<i32>((base.xy + xy) / dims.xy * vec2<f32>(depthDims)),
+                                vec2<i32>(0), depthDims - vec2<i32>(1));
+        let sceneDepth = textureLoad(sceneLinearDepth, samplePixel, 0).r * cameraFar;
+        if (-sampleVS.z > sceneDepth) {
+            continue;
+        }
+
         let sampleWS = (camera.invView * vec4<f32>(sampleVS, 1.0)).xyz;
-        visibility += getShadowFactorCSM(sampleWS, -sampleVS.z);
+        visibility += getShadowFactorCSMBlended(sampleWS, -sampleVS.z);
+        validSamples += 1.0;
     }
-    visibility /= f32(SHADOW_SAMPLES);
+    // Froxels entirely behind geometry get no sun (only rays that end further away
+    // would use them, and their own samples are valid there).
+    visibility /= max(validSamples, 1.0);
 
     let centreVS = froxelCoordToViewSpace(base + vec3<f32>(0.5), dims,
         froxelParams.depthDistScale, froxelParams.depthDistB, camera.invProjection);

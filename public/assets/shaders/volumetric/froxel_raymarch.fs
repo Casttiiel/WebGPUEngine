@@ -76,40 +76,6 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let xy = uv * dimsF.xy + (noise.xy - vec2<f32>(0.5)) * 0.5;
 
   var result: vec4<f32>;
-  if (froxelParams.dimensions.w > 7.5 && froxelParams.dimensions.w < 8.5) { // DEBUG replicate injection
-    let sh = froxelDepthToSlice(viewZ * 0.5, froxelParams.depthDistScale, froxelParams.depthDistB);
-    let base3 = floor(vec3<f32>(uv * dimsF.xy, sh));
-    var vis = 0.0;
-    for (var i = 0u; i < 4u; i++) {
-      let fi = f32(i);
-      let jxy = fract(froxelParams.jitter.xy + vec2<f32>(0.7548776662, 0.5698402910) * fi);
-      let jz = (fi + froxelParams.jitter.z) / 4.0;
-      let pVS = froxelCoordToViewSpace(base3 + vec3<f32>(jxy, jz), dimsF, froxelParams.depthDistScale, froxelParams.depthDistB, camera.invProjection);
-      let pWS = (camera.invView * vec4<f32>(pVS, 1.0)).xyz;
-      vis += sunShadow(pWS, -pVS.z);
-    }
-    let stored = textureLoad(froxelLightTexture, vec3<i32>(base3), 0);
-    let selfS = textureLoad(froxelSelfOcclusionTexture, vec3<i32>(base3), 0).r;
-    let sampled = textureSampleLevel(froxelLightTexture, linearSampler, (base3 + vec3<f32>(0.5)) / dimsF, 0.0);
-    return vec4<f32>(vis * 0.25 * 100.0, stored.a * 20.0, 0.0, 0.0);
-  }
-  if (froxelParams.dimensions.w > 5.5 && froxelParams.dimensions.w < 6.5) { // DEBUG froxel light at 50% depth
-    let sh = froxelDepthToSlice(viewZ * 0.5, froxelParams.depthDistScale, froxelParams.depthDistB);
-    let Lh = textureSampleLevel(froxelLightTexture, linearSampler, vec3<f32>(uv, sh / dimsF.z), 0.0);
-    return vec4<f32>(vec3<f32>(Lh.a), 0.0);
-  }
-
-  if (froxelParams.dimensions.w > 6.5) { // DEBUG: sun visibility just in front of the surface
-    let r = computeViewRayFromUV(vec2<f32>(uv.x, 1.0 - uv.y), camera.invProjection);
-    let d = viewZ * fract(froxelParams.dimensions.w * 0.01) * 1.0 + select(0.0, 0.0, false);
-    let p = (camera.invView * vec4<f32>(r * d, 1.0)).xyz;
-    if (froxelParams.dimensions.w > 99.5) {
-      let c1 = getShadowFactorForCascade(p, directionalLight.viewProjOffset1, 0.0, shadowMap1, shadowSampler);
-      let c0 = getShadowFactorForCascade(p, directionalLight.viewProjOffset0, 0.0, shadowMap0, shadowSampler);
-      return vec4<f32>(c0, c1, f32(selectCascadeCSM(d, directionalLight.cascadeSplits)) * 0.5, 0.0);
-    }
-    return vec4<f32>(sunShadow(p, d) * 100.0, sunShadow(p, d), 0.0, 0.0);
-  }
 
   if (froxelParams.sunPartial < 0.5 || s >= dimsF.z) {
     // Plain lookup. Texel k holds the integral up to the far boundary of slice k,
@@ -164,9 +130,6 @@ fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
     let segT = exp(-sigmaT * ds);
     let integ = select(scatter * ds, scatter * (1.0 - segT) / max(sigmaT, 1e-7), sigmaT > 1e-5);
     result = vec4<f32>(base.rgb + base.a * integ, base.a * segT);
-    if (froxelParams.dimensions.w > 2.5 && froxelParams.dimensions.w < 3.5) { return vec4<f32>(base.rgb, 0.0); } // DEBUG
-    if (froxelParams.dimensions.w > 3.5 && froxelParams.dimensions.w < 4.5) { return vec4<f32>(base.a * integ, 0.0); } // DEBUG
-    if (froxelParams.dimensions.w > 4.5 && froxelParams.dimensions.w < 5.5) { return vec4<f32>(f32(k) / dimsF.z, s / dimsF.z, viewZ / 50.0, 0.0); } // DEBUG
   }
 
   if (froxelParams.dimensions.w > 0.5) { return vec4<f32>(result.rgb, 0.0); }

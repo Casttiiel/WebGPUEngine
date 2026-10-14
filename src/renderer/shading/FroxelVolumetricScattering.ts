@@ -482,7 +482,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         size: [x, y, z],
         dimension: '3d',
         format: 'rgba16float',
-        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }),
     );
     this.historyViews = this.historyTextures.map((t) => t.createView());
@@ -555,6 +555,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // After a resize GBufferPass destroys that texture, so we must drop them
     // so they get recreated with the new view on the next updateFroxelData call.
     this.noiseTextureBindGroup = null as any;
+    this.ambientBindGroup = null as any;
   }
 
   private getFogVolumeCount(): number {
@@ -588,7 +589,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     this.executeSelfOcclusionPass(commandEncoder);
 
-    if (!this.executeDirectionalLightInjectionPass(commandEncoder)) {
+    if (!this.executeDirectionalLightInjectionPass(commandEncoder, linearDepth)) {
       this.executeClearLightPass(commandEncoder);
     }
 
@@ -792,7 +793,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 
   /** Returns false when there is no shadowed directional light (nothing written). */
-  private executeDirectionalLightInjectionPass(commandEncoder: GPUCommandEncoder): boolean {
+  private executeDirectionalLightInjectionPass(
+    commandEncoder: GPUCommandEncoder,
+    linearDepth: RenderTarget,
+  ): boolean {
     const directionalLightComponent = this.getShadowedSun();
     if (!directionalLightComponent) {
       return false;
@@ -835,6 +839,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
           {
             binding: 2,
             resource: this.froxelSelfOcclusionTextureView,
+          },
+          {
+            binding: 3,
+            resource: linearDepth.getRenderView(), // depth-aware sample rejection
           },
         ],
       );
@@ -1239,7 +1247,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     this.froxelUniformData[offset++] = this.froxelDimensions.x;
     this.froxelUniformData[offset++] = this.froxelDimensions.y;
     this.froxelUniformData[offset++] = slices;
-    this.froxelUniformData[offset++] = typeof this.debugView === "number" ? this.debugView : this.debugView ? 1.0 : 0.0; // w: debug view (fog only)
+    this.froxelUniformData[offset++] = this.debugView ? 1.0 : 0.0; // w: debug view (fog only)
     this.sunActive = this.getShadowedSun() !== null;
     this.froxelUniformData[offset++] = this.sunActive ? 1.0 : 0.0; // sunPartial
     this.froxelUniformData[offset++] = this.farPlane;

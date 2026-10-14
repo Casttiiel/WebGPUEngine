@@ -888,6 +888,11 @@ export class BindGroupFactory {
           multisampled: false,
         },
       },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: { sampleType: 'float', viewDimension: '2d' }, // scene linear depth
+      },
     ]);
   }
 

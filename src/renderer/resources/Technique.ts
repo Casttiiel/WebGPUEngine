@@ -541,7 +541,7 @@ export class Technique extends GPUResource {
           // to stop self-shadowing on receivers; the clamp bounds it at grazing angles.
           depthBias: 1,
           depthBiasSlopeScale: 1.5,
-          depthBiasClamp: 0.002,
+          depthBiasClamp: 0.00002,
         };
       }
       case DepthModes.ALWAYS: {

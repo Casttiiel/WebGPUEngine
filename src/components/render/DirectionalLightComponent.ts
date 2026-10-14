@@ -321,7 +321,11 @@ export class DirectionalLightComponent extends Component {
         ? vec3.set(this._lightUp, 0, 1, 0)
         : vec3.set(this._lightUp, 0, 0, 1);
 
-    let prevSplit = mainCamera.getNear();
+    // Cascade 0 starts AT the camera, not at its near plane: volumetric samples
+    // (and anything between the eye and the near plane) must be covered too.
+    // Starting at near left the eye just outside cascade 0's depth range whenever
+    // the camera faced the light, so those lookups returned "lit".
+    let prevSplit = 0;
 
     for (let i = 0; i < this.cascadeCount; i++) {
       const currentSplit = this.cascadeSplits[i];
@@ -388,7 +392,9 @@ export class DirectionalLightComponent extends Component {
       if (!shadowCamera) continue;
 
       shadowCamera.setNearPlane(-maxZ);
-      shadowCamera.setFarPlane(-minZ);
+      // Small margin past the receiver farthest from the light (texel snapping and
+      // PCF footprints must not fall off the far end of the depth range).
+      shadowCamera.setFarPlane(-minZ + texelSize * 4.0 + 0.5);
       shadowCamera.setOrthoParams(true, 0, radius * 2.0, 0, radius * 2.0);
 
       // Usar setViewMatrix — NO lookAt, para preservar el snap
