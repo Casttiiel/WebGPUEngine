@@ -129,6 +129,10 @@ export default defineConfig({
   base: '/WebGPUEngine/', // Ajusta esto si cambias el nombre del repo
   plugins: [wgslIncludePlugin(), no404FallbackPlugin(), wasm(), topLevelAwait()],
   worker: {
+    // ES module workers: the default 'iife' format makes vite-plugin-top-level-await
+    // re-bundle the worker and crash on an undefined assetsDir. Every WebGPU-capable
+    // browser supports module workers anyway.
+    format: 'es',
     // Apply the same WASM and top-level-await plugins to worker bundles so that
     // recast-navigation's WASM module loads correctly inside NavMeshWorker.
     plugins: () => [wasm(), topLevelAwait()],
