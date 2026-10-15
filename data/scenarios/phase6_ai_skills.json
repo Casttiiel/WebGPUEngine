@@ -1,0 +1,79 @@
+{
+  "description": "Roadmap 2: la IA enemiga usa habilidades con las mismas reglas que el jugador (planSkill / requestSkill). Las puntúa por sus efectos reales (daño y remates, fuego amigo, curación de la vida que falta, empujones, miedo, superficies). La acción principal elige entre ataques y habilidades de acción; después, si merece la pena, una habilidad de acción adicional. Si hace falta, se acerca sola para lanzarlas (acercamiento automático).",
+  "scenes": ["tactical.json", "tactical_enemies.json"],
+  "seed": 1,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__trace = []; window.__enc.onEvent((e, d) => window.__trace.push([e, d.unit ? d.unit.getName() : null, d.source ? d.source.getName() : null, d.amount ?? null, d.cause ?? null])); window.__plans = []; window.__collect = () => { for (const p of __engine.getCombatState().aiPlans) { const k = p.unit + '|' + p.kind + '|' + p.reason + '|' + p.bonus; if (!window.__plans.includes(k)) window.__plans.push(k); } }; window.__passHeroes = () => { window.__collect(); const s = __engine.getCombatState(); if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return s; }"
+    },
+    { "log": "Sin críticos (daños exactos); todos los enemigos entran en el combate" },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('unit').getList().forEach(u => u.critChance = 0); window.__enc.joinRadius = 30"
+    },
+    { "command": "damage", "args": { "unit": "Brute", "amount": 12 } },
+    { "command": "start_combat" },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().turnOrder.filter(c => c.faction === 'enemy').map(c => c.name).sort()",
+        "value": ["Archer", "Brute", "Skirmisher"]
+      }
+    },
+
+    { "log": "El Arquero: la party, agrupada, está fuera del alcance de su Bola de fuego → se acerca y la lanza" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = window.__passHeroes(); return window.__trace.some(t => t[0] === 'skill' && t[1] === 'Archer') && !s.busy; })()",
+        "value": true
+      },
+      "timeout_frames": 3000,
+      "check_every": 5
+    },
+    {
+      "assert": {
+        "expr": "window.__plans.some(p => p.startsWith('Archer|skill|Bola de fuego') && p.includes('acercándose'))",
+        "value": true,
+        "message": "elige la habilidad y se acerca sola para lanzarla"
+      }
+    },
+    {
+      "assert": {
+        "expr": "new Set(window.__trace.filter(t => t[0] === 'damage' && t[2] === 'Archer' && t[4] === 'skill' && t[3] > 0).map(t => t[1])).size >= 2",
+        "value": true,
+        "message": "el área alcanza a varios héroes"
+      }
+    },
+    { "screenshot": "01-archer-fireball" },
+
+    { "log": "El Bruto, herido: avanza o pega y usa Segundo aliento como acción adicional" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = window.__passHeroes(); return window.__trace.some(t => t[0] === 'skill' && t[1] === 'Brute') && !s.busy; })()",
+        "value": true
+      },
+      "timeout_frames": 3000,
+      "check_every": 5
+    },
+    {
+      "assert": {
+        "expr": "window.__plans.some(p => p.startsWith('Brute|') && !p.startsWith('Brute|skill') && p.endsWith('(acción adicional)') && p.includes('Segundo aliento'))",
+        "value": true,
+        "message": "acción principal (no gasta el turno curándose) + acción adicional"
+      }
+    },
+    {
+      "assert": {
+        "expr": "window.__trace.some(t => t[0] === 'skill' && t[1] === 'Brute')",
+        "value": true
+      }
+    },
+
+    { "log": "Nadie se atasca y no hay errores" },
+    { "assert": { "combat": true, "path": "aiTimeouts", "value": 0 } },
+    { "assert": { "no_errors": true } }
+  ]
+}

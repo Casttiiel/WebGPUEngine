@@ -1,0 +1,15 @@
+{
+  "technique": "gbuffer/decal_cracks.tech",
+  "category": "decals",
+  "baseColorFactor": [
+    0,
+    0.35,
+    1,
+    1
+  ],
+  "emissiveFactor": 1,
+  "roughnessFactor": 1.5,
+  "metallicFactor": 2.5,
+  "uvXScale": 0.6,
+  "uvYScale": 0
+}

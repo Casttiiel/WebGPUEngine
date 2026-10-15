@@ -1,0 +1,15 @@
+{
+  "technique": "gbuffer/gbuffer.tech",
+  "textures": {
+    "txAlbedo": "white.png",
+    "txNormal": "no-normal.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "black.png",
+    "txEmissive": "black.png"
+  },
+  "casts_shadows": true,
+  "category": "solids",
+  "shadows": false,
+  "baseColorFactor": [0.2, 0.62, 0.18, 1],
+  "roughnessFactor": 0.55
+}

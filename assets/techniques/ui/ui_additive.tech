@@ -1,0 +1,9 @@
+{
+    "vs": "ui/ui.vs",
+    "fs": "ui/ui_additive.fs",
+    "writesOn": "texture",
+    "blend": "additive_by_src_alpha",
+    "z": "disable_all",
+    "rs": "double_sided",
+    "uniforms": ["BufferUniform", "SingleTexture"]
+}

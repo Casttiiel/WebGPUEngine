@@ -1,0 +1,10 @@
+{
+    "vs": "lighting/skybox.vs",
+    "fs": "lighting/skybox_scattering.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms": [
+        "CameraUniforms",
+        "BufferUniform"
+    ]
+}

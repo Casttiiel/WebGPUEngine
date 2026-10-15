@@ -1,0 +1,68 @@
+[
+  {
+    "prefab": "tactical/barrel_explosive.prefab",
+    "components": {
+      "name": "Barrel1",
+      "transform": {
+        "position": [3.4, 0, 7.6]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/barrel_explosive.prefab",
+    "components": {
+      "name": "Barrel2",
+      "transform": {
+        "position": [9, 0, 2.4]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_pushable.prefab",
+    "components": {
+      "name": "Crate",
+      "transform": {
+        "position": [-1.5, 0, -4.2]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_pushable.prefab",
+    "components": {
+      "name": "PushCrate2",
+      "transform": {
+        "position": [1.0, 0, 4.8]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_pushable.prefab",
+    "components": {
+      "name": "PushCrate3",
+      "transform": {
+        "position": [5.6, 0, 1.6]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_pushable.prefab",
+    "components": {
+      "name": "PushCrate4",
+      "transform": {
+        "position": [0.4, 0, 0.8]
+      }
+    }
+  },
+  {
+    "components": {
+      "name": "OilPuddle",
+      "transform": {
+        "position": [4.6, 0, 6.6]
+      },
+      "tactical_surface": {
+        "type": "oil",
+        "radius": 1.8
+      }
+    }
+  }
+]

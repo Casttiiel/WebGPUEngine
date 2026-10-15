@@ -1,0 +1,7 @@
+{
+    "vs": "utility/presentation.vs",
+    "fs": "height_fog.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "uniforms":["CameraUniforms","GBufferUniforms", "FogUniforms"]
+}

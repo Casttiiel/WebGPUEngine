@@ -1,0 +1,23 @@
+{
+  "technique": "gbuffer/gbuffer_triplanar_world.tech",
+  "textures": {
+    "txAlbedo": "mistborn/weathered_planks_diff_1k.jpg",
+    "txNormal": "mistborn/weathered_planks_nor_gl_1k.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "mistborn/weathered_planks_rough_1k.jpg",
+    "txEmissive": "black.png"
+  },
+  "uvXScale": 0.55,
+  "uvYScale": 0.55,
+  "baseColorFactor": [
+    0.55,
+    0.5,
+    0.45,
+    1
+  ],
+  "roughnessFactor": 1.0,
+  "metallicFactor": 0,
+  "casts_shadows": true,
+  "category": "solids",
+  "shadows": false
+}

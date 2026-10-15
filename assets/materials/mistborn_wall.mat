@@ -1,0 +1,23 @@
+{
+  "technique": "gbuffer/gbuffer_triplanar_world.tech",
+  "textures": {
+    "txAlbedo": "mistborn/medieval_blocks_02_diff_1k.jpg",
+    "txNormal": "mistborn/medieval_blocks_02_nor_gl_1k.jpg",
+    "txMetallic": "black.png",
+    "txRoughness": "mistborn/medieval_blocks_02_rough_1k.jpg",
+    "txEmissive": "black.png"
+  },
+  "uvXScale": 0.33,
+  "uvYScale": 0.33,
+  "baseColorFactor": [
+    0.5,
+    0.48,
+    0.47,
+    1
+  ],
+  "roughnessFactor": 1.0,
+  "metallicFactor": 0,
+  "casts_shadows": true,
+  "category": "solids",
+  "shadows": false
+}

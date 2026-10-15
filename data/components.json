@@ -1,0 +1,93 @@
+{
+  "update": [
+    "point_light",
+    "directional_light",
+    "area_light",
+    "particle_system",
+
+    "hit_stop",
+
+    "perception",
+    "flow",
+
+    "enemy_controller",
+    "passive_ranger_controller",
+    "aggressive_ranger_controller",
+    "fast_melee_controller",
+    "tank_melee_controller",
+    "heavy_mixed_controller",
+    "spider_controller",
+    "arcane_knight_controller",
+    "bloodmancer_controller",
+    "dummy_enemy_controller",
+    "alchemist_controller",
+
+    "player_controller",
+    "hack_and_slash_controller",
+    "player_attack",
+
+    "melee_attack",
+    "weapon",
+    "bullet_pool",
+    "projectile",
+    "dagger_projectile",
+    "spear_projectile",
+    "blood_explosive_projectile",
+    "homing_projectile",
+    "blood_ball_projectile",
+
+    "health",
+    "hit_reaction",
+    "motion_match_recovery",
+    "stamina",
+    "blood",
+    "blood_zone",
+    "kickable",
+    "grapple_target",
+    "charge_target",
+    "swing_bar",
+
+    "box_collider",
+    "capsule_collider",
+
+    "bone_attachment",
+    "transform",
+
+    "camera_shake",
+    "camera_arm",
+    "unit",
+    "tactical_ai",
+    "tactical_prop",
+    "tactical_surface",
+    "encounter",
+    "party",
+    "tactical_pointer",
+    "tactical_camera_controller",
+    "action_camera",
+    "scene_navmesh",
+    "head_bob",
+    "head_tilt",
+    "landing_camera",
+    "camera_crouch",
+    "camera_fov_modifier",
+    "fps_camera_controller",
+
+    "camera",
+
+    "skeletal_mesh",
+    "foot_ik",
+    "animator",
+    "view_model",
+    "trail_renderer",
+    "far_reach_tentacle",
+    "speed_lines_vfx",
+    "depth_of_field",
+    "shockwave",
+
+    "terrain",
+    "terrain_chunk",
+    "grass_volume",
+    "fog_volume"
+  ],
+  "render_debug": []
+}

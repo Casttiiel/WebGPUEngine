@@ -1,0 +1,7 @@
+{
+  "vs": "utility/presentation.vs",
+  "fs": "post-processing/fog_scatter_scatter_upsample.fs",
+  "writesOn": "texture",
+  "z": "disable_all",
+  "uniforms": ["SingleTexture", "SingleTexture", "BufferUniform"]
+}

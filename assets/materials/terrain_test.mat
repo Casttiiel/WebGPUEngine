@@ -1,0 +1,14 @@
+{
+  "technique": "terrain/terrain_test.tech",
+  "textures": {
+    "txAlbedo": "Asphalt01_Color.png",
+    "txNormal": "Asphalt01_Normal.png",
+    "txMetallic": "black.png",
+    "txRoughness": "Asphalt01_Roughness.png",
+    "txEmissive": "black.png"
+  },
+  "casts_shadows": false,
+  "uvXScale": 4,
+  "uvYScale": 4,
+  "category": "solids"
+}

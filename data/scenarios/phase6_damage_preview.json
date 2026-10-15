@@ -1,0 +1,92 @@
+{
+  "description": "Roadmap 3: daño con dados como en BG3 / D&D ('1d8+5' = de 6 a 13; cada ataque tira; el crítico tira el doble de dados) y vista previa en la barra de vida al apuntar: sobre cada unidad que recibiría daño, la parte que pierde seguro (mínimo), la que podría perder (hasta el máximo), el rango y si muere o puede morir.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 1,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 10 },
+    {
+      "eval": "return import('/WebGPUEngine/src/components/game/tactical/Dice.ts').then(m => { window.__dice = m; window.__ui = Engine.getModules().getModule('ui'); window.__w = (a) => __ui.getWidgetByAlias(a); window.__bars = () => [1, 2, 3, 4, 5, 6].filter(i => __w('dmg_bar_' + i).isVisible()).map(i => __w('dmg_bar_' + i + '_text').getText()); return true; })"
+    },
+
+    { "log": "Dados: rango, media, tiradas dentro del rango y crítico con el doble de dados" },
+    {
+      "assert": {
+        "expr": "[__dice.damageRange('1d8+5'), __dice.damageRange('2d6+3'), __dice.damageRange(12), __dice.averageDamage('1d8+5'), __dice.damageText('1d8+5')]",
+        "value": [{ "min": 6, "max": 13 }, { "min": 5, "max": 15 }, { "min": 12, "max": 12 }, 9.5, "1d8+5 (6~13)"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { const seen = new Set(); for (let i = 0; i < 3000; i++) seen.add(__dice.rollDamage('1d8+5')); const v = [...seen].sort((a, b) => a - b); return [v[0], v[v.length - 1], v.length]; })()",
+        "value": [6, 13, 8],
+        "message": "salen todos los valores de 6 a 13 y ninguno fuera"
+      }
+    },
+    {
+      "assert": {
+        "expr": "(() => { let lo = 99, hi = 0; for (let i = 0; i < 3000; i++) { const d = __dice.rollDamage('1d6+3', true); lo = Math.min(lo, d); hi = Math.max(hi, d); } return [lo, hi]; })()",
+        "value": [5, 15],
+        "message": "crítico de 1d6+3 = 2d6+3"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Hero1', target: 'Enemy1' }).then(r => [r.minDamage, r.maxDamage, r.damage])",
+        "value": [6, 13, 9.5]
+      }
+    },
+
+    { "log": "Vista previa: sobre el enemigo apuntado, el rango de daño" },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn(Engine.getEntities().getEntityByName('Enemy1'), false)"
+    },
+    { "wait_frames": 60 },
+    { "input": { "type": "move", "entity": "Enemy1" } },
+    { "wait_frames": 3 },
+    { "assert": { "expr": "__bars()", "value": ["6~13 daño"] } },
+    {
+      "assert": {
+        "expr": "[__w('dmg_bar_1_sure').getWidth(), __w('dmg_bar_1_maybe').getWidth(), __w('dmg_bar_1_hp').getWidth()].map(v => Math.round(v))",
+        "value": [47, 55, 55],
+        "message": "de 20 PV: 6 seguros, 7 posibles, quedan 7 en el peor caso (barra de 156 px)"
+      }
+    },
+    { "screenshot": "01-attack-preview" },
+
+    { "log": "Con poca vida dice si muere o puede morir" },
+    { "command": "damage", "args": { "unit": "Enemy1", "amount": 10 } },
+    { "wait_frames": 2 },
+    { "assert": { "expr": "__bars()", "value": ["6~13 daño · puede morir"] } },
+    { "command": "damage", "args": { "unit": "Enemy1", "amount": 5 } },
+    { "wait_frames": 2 },
+    { "assert": { "expr": "__bars()", "value": ["6~13 daño · muere"] } },
+    { "screenshot": "02-kill-preview" },
+
+    { "log": "Área: Bola de fuego sobre los dos enemigos → una barra sobre cada uno" },
+    { "command": "select", "args": { "unit": "Hero2" } },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([6.2, 0, 5], false)"
+    },
+    { "wait_frames": 60 },
+    { "input": { "type": "click", "widget": "hotbar_5" } },
+    { "wait_frames": 3 },
+    { "input": { "type": "move", "world": [6.2, 0, 5] } },
+    { "wait_frames": 3 },
+    {
+      "assert": {
+        "expr": "__bars().sort()",
+        "value": ["5~15 daño", "5~15 daño · muere"]
+      }
+    },
+    { "screenshot": "03-area-preview" },
+    { "input": { "type": "key", "key": "Escape" } },
+    { "input": { "type": "move", "x": 640, "y": 650 } },
+    { "wait_frames": 3 },
+    { "assert": { "expr": "__bars()", "value": [] } },
+    { "assert": { "no_errors": true } }
+  ]
+}

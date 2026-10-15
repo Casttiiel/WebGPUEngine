@@ -1,0 +1,118 @@
+{
+  "children": [
+    {
+      "children": [],
+      "components": {
+        "name": "UnitMesh",
+        "transform": {
+          "position": [0, -0.9, 0],
+          "rotation": [0, 0, 0],
+          "scale": [1, 1, 1]
+        },
+        "skeletal_mesh": {
+          "gltf": "character.gltf",
+          "baseColorFactor": [0.5, 0.2, 0.6, 1]
+        },
+        "animator": {
+          "extraAnimations": ["universal_animations.gltf"],
+          "states": [
+            {
+              "name": "Idle",
+              "clip": "Idle_Loop",
+              "loop": true
+            },
+            {
+              "name": "Walk",
+              "clip": "Jog_Fwd_Loop",
+              "loop": true
+            },
+            {
+              "name": "Dead",
+              "clip": "Death01",
+              "loop": false
+            }
+          ],
+          "default": "Idle",
+          "transitions": [
+            {
+              "from": "Idle",
+              "to": "Dead",
+              "condition": "dead",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Walk",
+              "to": "Dead",
+              "condition": "dead",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Dead",
+              "to": "Idle",
+              "conditionFalse": "dead",
+              "blendTime": 0.3
+            },
+            {
+              "from": "Idle",
+              "to": "Walk",
+              "condition": "moving",
+              "blendTime": 0.15
+            },
+            {
+              "from": "Walk",
+              "to": "Idle",
+              "conditionFalse": "moving",
+              "blendTime": 0.2
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "components": {
+    "name": "Unit",
+    "transform": {
+      "position": [0, 0.9, 0],
+      "scale": [1, 1, 1]
+    },
+    "capsule_collider": {
+      "height": 1.8,
+      "radius": 0.35,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 70,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "unit": {
+      "faction": "enemy",
+      "skills": ["thunderwave"],
+      "critChance": 10,
+      "moveSpeed": 5,
+      "movement": 12,
+      "sightRange": 14,
+      "attacks": [
+        {
+          "id": "melee",
+          "name": "Cuchillas",
+          "kind": "melee",
+          "range": 1.5,
+          "damage": "2d4+3",
+          "clip": "Punch_Cross"
+        }
+      ],
+      "displayName": "Hostigador"
+    },
+    "health": {
+      "maxHp": 24
+    },
+    "tactical_ai": {
+      "role": "melee",
+      "retreatHp": 0.4
+    }
+  }
+}

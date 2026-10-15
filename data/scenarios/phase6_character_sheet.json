@@ -1,0 +1,95 @@
+{
+  "description": "Fase 6: ficha del personaje (tecla C). A la izquierda el propio personaje con una cámara aparte (SheetCamera, mezclada por el ModuleCameraMixer); a la derecha vida, movimiento, crítico, ataques, habilidades, acciones y estados. Tab cambia de personaje, Q/E giran, C o Esc cierran. Mientras está abierta el mundo no recibe clicks ni se pasa turno con Espacio.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 1,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__ui = Engine.getModules().getModule('ui'); window.__sheet = __ui.activeControllers.find(c => c.getName() === 'character_sheet_controller'); window.__text = (a) => __ui.getWidgetByAlias(a).getText(); window.__camDist = (name) => { const a = Engine.getRender().getMainCamera().getPosition(); const b = Engine.getEntities().getEntityByName(name).getComponent('camera').getCamera().getPosition(); return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); }"
+    },
+    { "assert": { "expr": "__sheet.constructor.isOpen()", "value": false } },
+
+    { "log": "C abre la ficha del seleccionado" },
+    { "input": { "type": "key", "key": "KeyC" } },
+    { "wait_frames": 40 },
+    { "assert": { "expr": "__sheet.constructor.isOpen()", "value": true } },
+    { "assert": { "expr": "__ui.getWidgetByAlias('sheet_panel').isVisible()", "value": true } },
+    {
+      "assert": {
+        "expr": "[__text('sheet_name'), __text('sheet_role'), __text('sheet_hp_text'), __text('sheet_stat_1_value'), __text('sheet_stat_2_value')]",
+        "value": ["Ham", "Violento · Aliado", "PV 30 / 30", "9 m", "20 %"]
+      }
+    },
+    {
+      "assert": {
+        "expr": "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map(i => __ui.getWidgetByAlias('sheet_line_' + i)).filter(w => w.isVisible()).map(w => w.getText()).filter(t => ['ATAQUES', 'Espada', 'HABILIDADES', 'Empellón', 'Segundo aliento', 'Miedo', 'ESTADOS'].includes(t)).length",
+        "value": 7,
+        "message": "ataques, habilidades y estados a la vista"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__camDist('SheetCamera') < 0.05",
+        "value": true,
+        "message": "se ve la cámara de la ficha"
+      }
+    },
+    { "screenshot": "01-hero1" },
+
+    { "log": "Con la ficha abierta el mundo no recibe clicks" },
+    { "input": { "type": "click", "x": 200, "y": 500 } },
+    { "wait_frames": 5 },
+    { "assert": { "entity": "Hero1", "path": "unit.isMoving", "value": false } },
+
+    { "log": "Tab: otro personaje" },
+    { "input": { "type": "key", "key": "Tab" } },
+    { "wait_frames": 30 },
+    { "assert": { "expr": "[__text('sheet_name'), __text('sheet_role')]", "value": ["Kelsier", "Nacido de la Bruma · Aliado"] } },
+    { "screenshot": "02-hero2" },
+
+    { "log": "Esc cierra y vuelve la cámara de juego" },
+    { "input": { "type": "key", "key": "Escape" } },
+    { "wait_frames": 40 },
+    { "assert": { "expr": "__sheet.constructor.isOpen()", "value": false } },
+    { "assert": { "expr": "__ui.getWidgetByAlias('sheet_panel').isVisible()", "value": false } },
+    { "assert": { "expr": "__camDist('PlayerCamera') < 0.05", "value": true } },
+
+    { "log": "En combate: C abre, Espacio no pasa turno, C cierra" },
+    { "command": "start_combat" },
+    {
+      "wait_until": {
+        "expr": "(() => { const s = __engine.getCombatState(); return s.playerTurn && !s.busy; })()",
+        "value": true
+      },
+      "timeout_frames": 900
+    },
+    { "eval": "window.__turn = __engine.getCombatState().activeUnit" },
+    { "input": { "type": "key", "key": "KeyC" } },
+    { "wait_frames": 20 },
+    { "assert": { "expr": "__sheet.constructor.isOpen()", "value": true } },
+    {
+      "assert": {
+        "expr": "__text('sheet_name') === Engine.getEntities().getEntityByName(window.__turn).getComponent('unit').getDisplayName()",
+        "value": true,
+        "message": "ficha del que tiene el turno"
+      }
+    },
+    { "input": { "type": "key", "key": "Space" } },
+    { "wait_frames": 10 },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().activeUnit === window.__turn",
+        "value": true,
+        "message": "Espacio no pasa turno con la ficha abierta"
+      }
+    },
+    { "input": { "type": "key", "key": "KeyC" } },
+    { "wait_frames": 10 },
+    { "assert": { "expr": "__sheet.constructor.isOpen()", "value": false } },
+    { "assert": { "no_errors": true } }
+  ]
+}

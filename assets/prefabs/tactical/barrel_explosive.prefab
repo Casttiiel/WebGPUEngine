@@ -1,0 +1,52 @@
+{
+  "children": [],
+  "components": {
+    "name": "ExplosiveBarrel",
+    "transform": {
+      "position": [0, 0.5, 0],
+      "scale": [0.7, 1, 0.7]
+    },
+    "capsule_collider": {
+      "height": 1,
+      "radius": 0.35,
+      "bodyType": "kinematic",
+      "lockRotationX": true,
+      "lockRotationY": true,
+      "lockRotationZ": true,
+      "ignoreTransformScale": true,
+      "friction": 0,
+      "mass": 40,
+      "collisionGroups": "ENEMY",
+      "collisionMask": "ALL"
+    },
+    "render": {
+      "meshes": [
+        {
+          "mesh": "unit_cube.obj",
+          "material": "tactical_barrel.mat"
+        }
+      ]
+    },
+    "unit": {
+      "faction": "neutral",
+      "displayName": "Barril explosivo",
+      "movement": 0,
+      "moveSpeed": 6,
+      "sightRange": 0,
+      "attacks": [],
+      "hideWhenDown": true
+    },
+    "health": {
+      "maxHp": 1
+    },
+    "tactical_prop": {
+      "pushable": true,
+      "explosive": {
+        "radius": 2.5,
+        "damage": 12,
+        "surface": "fire",
+        "surfaceRadius": 1.6
+      }
+    }
+  }
+}

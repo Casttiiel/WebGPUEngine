@@ -1,0 +1,13 @@
+{
+    "vs": "shadows/shadows_skinned.vs",
+    "writesOn": "depth_only",
+    "skinned": true,
+    "uniforms": [
+        "CameraUniforms",
+        "MaterialTextures",
+        "ObjectUniforms",
+        "SkinMatrices"
+    ],
+    "rs": "shadows",
+    "z": "shadows"
+}

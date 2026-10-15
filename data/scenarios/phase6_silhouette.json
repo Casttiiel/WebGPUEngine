@@ -1,0 +1,77 @@
+{
+  "description": "Fase 6: los muros y columnas ya no se vuelven transparentes; en su lugar los personajes tapados dibujan su silueta (verde aliado, rojo enemigo) solo en las partes que tapa la escena. Segunda pasada del skeletal_mesh con utility/silhouette_skinned.tech, que compara su profundidad con la del G-buffer. Los caídos no tienen silueta.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 1,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 10 },
+    {
+      "eval": "window.__silKeys = (kind) => window.RenderManager.getInstance().keyManager.getAllKeys().filter(k => k.material.getName() === 'tactical_silhouette_' + kind + '.mat').length"
+    },
+
+    { "log": "Silueta según el bando" },
+    {
+      "assert": {
+        "expr": "['Hero1', 'Hero4', 'Enemy1', 'Enemy3'].map(n => Engine.getEntities().getEntityByName(n).getComponent('unit').silhouetteShown)",
+        "value": [
+          "tactical_silhouette_ally.mat",
+          "tactical_silhouette_ally.mat",
+          "tactical_silhouette_enemy.mat",
+          "tactical_silhouette_enemy.mat"
+        ]
+      }
+    },
+    {
+      "wait_until": { "expr": "__silKeys('ally') > 0 && __silKeys('enemy') > 0", "value": true },
+      "timeout_frames": 120
+    },
+    { "eval": "window.__allyKeys = __silKeys('ally'); window.__enemyKeys = __silKeys('enemy')" },
+    {
+      "assert": {
+        "expr": "[window.__allyKeys % 4, window.__enemyKeys % 3]",
+        "value": [0, 0],
+        "message": "una pasada por malla de cada personaje (4 héroes, 3 enemigos)"
+      }
+    },
+    {
+      "assert": {
+        "expr": "Engine.getEntities().getObjectManagerByName('camera_occluder')?.getList().length ?? 0",
+        "value": 0,
+        "message": "ya no hay oclusores que se vuelvan transparentes"
+      }
+    },
+
+    { "log": "Héroe detrás de una columna: silueta verde a través de ella" },
+    { "command": "move", "args": { "unit": "Hero1", "to": [-1.35, 0, -10.6], "follow": false } },
+    {
+      "wait_until": { "entity": "Hero1", "path": "unit.isMoving", "value": false },
+      "timeout_frames": 600
+    },
+    {
+      "eval": "Engine.getEntities().getObjectManagerByName('tactical_camera_controller').getList()[0].focusOn([-2, 0, -9], false)"
+    },
+    { "wait_frames": 60 },
+    { "screenshot": "01-ally-behind-column" },
+
+    { "log": "Un caído pierde la silueta" },
+    { "command": "damage", "args": { "unit": "Enemy1", "amount": 100 } },
+    { "wait_frames": 2 },
+    {
+      "assert": {
+        "entity": "Enemy1",
+        "path": "unit.silhouetteShown",
+        "value": null
+      }
+    },
+    {
+      "assert": {
+        "expr": "__silKeys('enemy') === window.__enemyKeys / 3 * 2",
+        "value": true
+      }
+    },
+    { "assert": { "no_errors": true } }
+  ]
+}

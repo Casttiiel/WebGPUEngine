@@ -1,0 +1,51 @@
+# Unit Frustum Mesh
+# Generated from C++ createCameraFrustumSolid function
+# 8 vertices, 12 triangles (6 faces)
+
+# Vertices (position)
+v -1.0 -1.0 0.0
+v 1.0 -1.0 0.0
+v -1.0 -1.0 1.0
+v 1.0 -1.0 1.0
+v -1.0 1.0 0.0
+v 1.0 1.0 0.0
+v -1.0 1.0 1.0
+v 1.0 1.0 1.0
+
+# Vertex normals (placeholder - will be computed if needed)
+vn 0.0 0.0 1.0
+
+# Texture coordinates (UV mapping for frustum faces)
+vt 0.0 0.0  # 1: Bottom-left
+vt 1.0 0.0  # 2: Bottom-right  
+vt 0.0 1.0  # 3: Top-left
+vt 1.0 1.0  # 4: Top-right
+vt 0.5 0.0  # 5: Center-bottom
+vt 0.5 1.0  # 6: Center-top
+vt 0.0 0.5  # 7: Left-center
+vt 1.0 0.5  # 8: Right-center
+
+# Faces (triangles) with proper UV mapping - INVERTED WINDING ORDER
+# Right face: addFace(5, 1, 3, 7) -> triangles (5,1,3) and (5,3,7) - INVERTED
+f 6/1/1 2/3/1 4/2/1
+f 6/1/1 4/2/1 8/4/1
+
+# Bottom face: addFace(1, 0, 2, 3) -> triangles (1,0,2) and (1,2,3) - INVERTED  
+f 2/3/1 1/1/1 3/4/1
+f 2/3/1 3/4/1 4/2/1
+
+# Left face: addFace(0, 4, 6, 2) -> triangles (0,4,6) and (0,6,2) - INVERTED
+f 1/1/1 5/3/1 7/4/1
+f 1/1/1 7/4/1 3/4/1
+
+# Top face: addFace(4, 5, 7, 6) -> triangles (4,5,7) and (4,7,6) - INVERTED
+f 5/3/1 6/1/1 8/4/1
+f 5/3/1 8/4/1 7/4/1
+
+# Near face: addFace(0, 1, 5, 4) -> triangles (0,1,5) and (0,5,4) - INVERTED
+f 1/1/1 2/3/1 6/1/1
+f 1/1/1 6/1/1 5/3/1
+
+# Far face: addFace(7, 3, 2, 6) -> triangles (7,3,2) and (7,2,6) - INVERTED
+f 8/4/1 4/2/1 3/4/1
+f 8/4/1 3/4/1 7/4/1

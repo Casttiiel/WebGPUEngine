@@ -1,0 +1,6 @@
+{
+    "vs": "utility/depth_prepass_skinned.vs",
+    "writesOn": "depth_only",
+    "skinned": true,
+    "uniforms": ["CameraUniforms", "MaterialTextures", "ObjectUniforms", "SkinMatrices"]
+}

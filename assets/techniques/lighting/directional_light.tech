@@ -1,0 +1,12 @@
+{    
+    "vs": "utility/presentation.vs",
+    "fs": "lighting/directional_light.fs",
+    "writesOn": "texture",
+    "z": "disable_all",
+    "blend": "additive",
+    "uniforms": [
+        "CameraUniforms",
+        "GBufferWithAOUniforms",
+        "DirectionalLightUniforms"
+    ]
+}

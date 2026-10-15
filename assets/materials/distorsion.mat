@@ -1,0 +1,7 @@
+{
+    "technique": "distorsion.tech",
+    "textures":{},
+    "casts_shadows": false,
+    "category": "distorsions",
+    "shadows": false
+}

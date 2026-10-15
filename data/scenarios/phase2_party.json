@@ -1,0 +1,146 @@
+{
+  "description": "Fase 2: party de 4 (selección por tecla, Tab, retrato y click), anillo de selección, hover y cursor contextual.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 1,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 10 },
+
+    { "log": "Party: 4 miembros, empieza seleccionado el primero y la cámara lo sigue" },
+    {
+      "assert": {
+        "entity": "Party",
+        "path": "party.getMemberNames",
+        "value": ["Hero1", "Hero2", "Hero3", "Hero4"]
+      }
+    },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero1" } },
+    {
+      "assert": {
+        "expr": "Engine.getEntities().getEntityByName('TacticalCameraRig').getComponent('tactical_camera_controller').getActiveUnit().getName()",
+        "value": "Hero1"
+      }
+    },
+    {
+      "assert": {
+        "expr": "Engine.getEntities().getAllEntities().filter(e => e.getName() === 'SelectionRing').length",
+        "value": 3,
+        "message": "anillo de selección + 2 de hover creados en runtime"
+      }
+    },
+    { "screenshot": "01-start" },
+
+    { "log": "Tecla 3 → Hero3, la cámara lo centra y lo sigue" },
+    { "input": { "type": "key", "key": "Digit3" } },
+    { "wait_frames": 90 },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero3" } },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.isFollowing",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot",
+        "op": "approx",
+        "value": [-5.5, 0, -7.6],
+        "tolerance": 0.1
+      }
+    },
+
+    { "log": "Tab → siguiente (Hero4); Shift+Tab → anterior (Hero3)" },
+    { "input": { "type": "key", "key": "Tab" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero4" } },
+    {
+      "input": [
+        { "type": "key", "key": "Shift", "action": "down" },
+        { "type": "key", "key": "Tab" }
+      ]
+    },
+    { "wait_frames": 1 },
+    { "input": { "type": "key", "key": "Shift", "action": "up" } },
+    { "wait_frames": 1 },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero3" } },
+    { "wait_frames": 60 },
+
+    { "log": "Hover enemigo → cursor de ataque + anillo rojo" },
+    { "input": { "type": "move", "entity": "Enemy1" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "enemy" } },
+    {
+      "assert": { "entity": "Party", "path": "tactical_pointer.getHoveredName", "value": "Enemy1" }
+    },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "attack" } },
+    {
+      "assert": {
+        "expr": "document.getElementById('gfx-canvas').style.cursor",
+        "op": "includes",
+        "value": "crosshair"
+      }
+    },
+    { "screenshot": "02-hover-enemy" },
+
+    { "log": "Hover aliado no seleccionado → cursor de selección + anillo azul" },
+    { "input": { "type": "move", "entity": "Hero1" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "ally" } },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "select" } },
+    { "screenshot": "03-hover-ally" },
+
+    { "log": "Click en el aliado → se selecciona" },
+    { "input": { "type": "click", "entity": "Hero1" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero1" } },
+
+    { "log": "Suelo transitable → cursor de mover" },
+    { "input": { "type": "move", "world": [0, 0, -3] } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "ground" } },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getCursor", "value": "move" } },
+
+    { "log": "Encima de una caja (fuera del navmesh) → cursor no válido" },
+    { "input": { "type": "move", "world": [-8, 1.2, -2] } },
+    { "wait_frames": 2 },
+    {
+      "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "invalid" }
+    },
+    {
+      "assert": {
+        "expr": "document.getElementById('gfx-canvas').style.cursor",
+        "value": "not-allowed"
+      }
+    },
+
+    { "log": "Un enemigo bajo el cursor no cambia la selección (click = atacar: ver phase3_combat)" },
+    { "input": { "type": "move", "entity": "Enemy1" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero1" } },
+
+    { "log": "Retratos: hover → la UI captura el ratón; click en el retrato 4 → Hero4" },
+    { "input": { "type": "move", "widget": "portrait_4" } },
+    { "wait_frames": 2 },
+    { "assert": { "entity": "Party", "path": "tactical_pointer.getHoverKind", "value": "ui" } },
+    { "input": { "type": "click", "widget": "portrait_4" } },
+    { "wait_frames": 90 },
+    { "assert": { "entity": "Party", "path": "party.getSelectedName", "value": "Hero4" } },
+    {
+      "assert": {
+        "entity": "TacticalCameraRig",
+        "path": "tactical_camera_controller.pivot",
+        "op": "approx",
+        "value": [-3.5, 0, -8.8],
+        "tolerance": 0.1
+      }
+    },
+    { "screenshot": "04-portrait-select" },
+
+    { "assert": { "no_errors": true } }
+  ]
+}
