@@ -125,6 +125,12 @@ export class HealthComponent extends Component {
     return this.maxHp;
   }
 
+  /** Cambia la vida máxima (p.ej. derivada de atributos) y llena la vida. */
+  public setMaxHp(maxHp: number): void {
+    this.maxHp = Math.max(1, maxHp);
+    this.currentHp = this.maxHp;
+  }
+
   /** Ratio 0..1 (útil para barras de vida). */
   public getHpRatio(): number {
     return this.currentHp / this.maxHp;

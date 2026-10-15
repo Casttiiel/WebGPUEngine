@@ -1,6 +1,7 @@
 {
   "fireball": {
     "name": "Bola de fuego",
+    "scale": "POT",
     "cost": "action",
     "cooldown": 3,
     "target": "point",
@@ -10,7 +11,7 @@
     "effects": [
       {
         "type": "damage",
-        "amount": "2d6+3"
+        "amount": 4
       },
       {
         "type": "surface",
@@ -23,6 +24,7 @@
   },
   "thunderwave": {
     "name": "Onda atronadora",
+    "scale": "POT",
     "cost": "action",
     "cooldown": 2,
     "target": "cone",
@@ -32,7 +34,7 @@
     "effects": [
       {
         "type": "damage",
-        "amount": "1d8+2"
+        "amount": 2
       },
       {
         "type": "push",

@@ -15,9 +15,9 @@
       "eval": "window.__autoTurn = () => { const enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; const s = __engine.getCombatState(); if (s.state !== 'combat') return true; if (!s.playerTurn || s.busy) return false; const me = Engine.getEntities().getEntityByName(s.activeUnit); if (me.getComponent('unit').isBusy()) return false; if (s.resources.action > 0) { for (const c of s.turnOrder.filter(c => c.faction === 'enemy' && c.alive)) { const t = Engine.getEntities().getEntityByName(c.name); for (const a of ['melee', 'ranged']) { if (enc.planAttack(me, t, a).canAttack) { enc.requestAttack(me, t, a); return false; } } } } enc.endTurn(); return false; }"
     },
 
-    { "log": "Sin críticos y con daño fijo: aquí se prueba el flujo del combate con daños exactos (dados: phase6_damage_preview; críticos: phase6_crit)" },
+    { "log": "Sin críticos, sin armadura y con vida, movimiento (9 m) y daño fijos (melee 10, distancia 6, contando la FUE): aquí se prueba el flujo del combate con daños exactos (armadura: phase7_armor; críticos: phase6_crit)" },
     {
-      "eval": "Engine.getEntities().getObjectManagerByName('unit').getList().forEach(u => { u.critChance = 0; u.getAttacks().forEach(at => { if (at.id === 'melee') at.damage = 10; if (at.id === 'ranged') at.damage = 6; }); })"
+      "eval": "Engine.getEntities().getObjectManagerByName('unit').getList().forEach(u => { if (!u.hasAttributes()) return; u.critChance = 0; u.setArmor(0); u.movement = 9; u.getHealth().setMaxHp(u.getFaction() === 'party' ? 30 : 20); u.getAttacks().forEach(at => { if (at.id === 'melee') at.damage = 10 - u.getAttribute('FUE'); if (at.id === 'ranged') at.damage = 6 - u.getAttribute('FUE'); }); })"
     },
 
     { "log": "Punto 11: los enemigos dummy tienen vida" },

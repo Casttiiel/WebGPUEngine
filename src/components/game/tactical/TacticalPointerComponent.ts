@@ -27,9 +27,19 @@ import { PathPreview } from './PathPreview';
 import { AimArrow } from './AimArrow';
 import { ActionCameraComponent } from './ActionCameraComponent';
 import { THROW_RANGE } from './EnvironmentRules';
-import { damageRange } from './Dice';
+import { hitRange, skillDamage } from './CombatRules';
+import { rangeText } from './Stats';
 import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 import { KeyCode } from '../../../types/KeyCode.enum';
+
+/** Daño que recibiría una unidad (la vista previa de su barra de vida). */
+export interface DamagePreview {
+  unit: UnitComponent;
+  min: number;
+  max: number;
+  /** Daño si es crítico (null: no puede critar, p.ej. habilidades e impactos). */
+  crit: number | null;
+}
 
 /** Qué hay bajo el cursor. */
 export type HoverKind = 'none' | 'ui' | 'ally' | 'enemy' | 'neutral' | 'ground' | 'invalid';
@@ -209,24 +219,24 @@ export class TacticalPointerComponent extends Component {
   // ── API (asserts del MCP, UI, fases siguientes) ──────────────────────────
 
   /**
-   * A quién dañaría lo que se está apuntando y entre cuánto y cuánto (sin crítico): el ataque
-   * sobre la unidad bajo el cursor, o la habilidad armada sobre todos los afectados (aliados
-   * incluidos). Vacío si no se puede o si no hace daño. La vista previa de la barra de vida.
+   * A quién dañaría lo que se está apuntando y entre cuánto y cuánto (con la armadura de cada
+   * uno): el ataque sobre la unidad bajo el cursor (con el daño de su crítico), o la
+   * habilidad armada sobre todos los afectados (aliados incluidos). Vacío si no se puede o
+   * si no hace daño. La vista previa de la barra de vida.
    */
-  public getDamagePreview(): { unit: UnitComponent; min: number; max: number }[] {
+  public getDamagePreview(): DamagePreview[] {
     const skill = this.skillPlan;
     if (skill?.skill) {
-      if (!skill.canCast) return [];
-      let min = 0;
-      let max = 0;
-      for (const effect of skill.skill.effects) {
-        if (effect.type !== 'damage') continue;
-        const range = damageRange(effect.amount);
-        min += range.min;
-        max += range.max;
-      }
-      if (max <= 0) return [];
-      return skill.affected.filter((u) => u.isAlive()).map((unit) => ({ unit, min, max }));
+      const caster = PartyComponent.find()?.getSelected()?.getComponent('unit') as
+        | UnitComponent
+        | null
+        | undefined;
+      if (!skill.canCast || !caster) return [];
+      const damage = skillDamage(caster, skill.skill);
+      if (damage <= 0) return [];
+      return skill.affected
+        .filter((u) => u.isAlive())
+        .map((unit) => ({ unit, ...hitRange(caster, unit, damage), crit: null }));
     }
     if (this.getArmedSkill()) return [];
     // Empujar / lanzar: quien recibe el golpe y el objeto (un barril que "muere" explota).
@@ -238,14 +248,19 @@ export class TacticalPointerComponent extends Component {
         | UnitComponent
         | null
         | undefined;
-      const out: { unit: UnitComponent; min: number; max: number }[] = [];
-      const range = { min: plan.minDamage, max: plan.maxDamage };
+      const out: DamagePreview[] = [];
+      const range = { min: plan.minDamage, max: plan.maxDamage, crit: null };
       if (plan.hit?.isAlive()) out.push({ unit: plan.hit, ...range });
-      if (prop?.isAlive() && (plan.hit || thrown) && range.max > 0) {
-        // Si golpea a alguien y es de los que se rompen, se rompe entero.
-        const breaks = plan.hit && PropComponent.of(prop.getOwner())?.breaksOnImpact();
+      const data = prop ? PropComponent.of(prop.getOwner()) : null;
+      if (prop?.isAlive() && data && (plan.hit || thrown) && range.max > 0) {
+        // Si golpea a alguien y es de los que se rompen, se rompe entero; si no, recibe el
+        // impacto con su propia armadura.
         const hp = Math.ceil(prop.getHp());
-        out.push({ unit: prop, ...(breaks ? { min: hp, max: hp } : range) });
+        const own =
+          plan.hit && data.breaksOnImpact()
+            ? { min: hp, max: hp }
+            : hitRange(null, prop, data.getImpactDamage());
+        out.push({ unit: prop, ...own, crit: null });
       }
       return out;
     }
@@ -253,7 +268,14 @@ export class TacticalPointerComponent extends Component {
     const target = this.hoveredUnit?.getComponent('unit') as UnitComponent | null | undefined;
     const attack = this.attackPlan;
     if (!target?.isAlive() || !attack?.canAttack || attack.maxDamage <= 0) return [];
-    return [{ unit: target, min: attack.minDamage, max: attack.maxDamage }];
+    return [
+      {
+        unit: target,
+        min: attack.minDamage,
+        max: attack.maxDamage,
+        crit: attack.critChance > 0 ? attack.critDamage : null,
+      },
+    ];
   }
 
   public getHoverKind(): HoverKind {
@@ -861,7 +883,7 @@ export class TacticalPointerComponent extends Component {
       ? `Lanzar ${prop.getDisplayName()}`
       : `Empujar ${this.pushPlan!.pushLength.toFixed(1)} m`;
     label += plan.hit
-      ? ` · golpea a ${plan.hit.getDisplayName()} (${plan.minDamage}~${plan.maxDamage})`
+      ? ` · golpea a ${plan.hit.getDisplayName()} (${rangeText({ min: plan.minDamage, max: plan.maxDamage })})`
       : throwing
         ? ' · cae al suelo'
         : ' · no golpea a nadie';
@@ -944,7 +966,9 @@ export class TacticalPointerComponent extends Component {
     if (this.hoverKind === 'enemy' && plan?.attack) {
       if (plan.canAttack || plan.allowed) {
         parts.push(`${plan.attack.name} ${Math.round(plan.hitChance * 100)} %`);
-        parts.push(`${plan.minDamage}~${plan.maxDamage} daño`);
+        const range = rangeText({ min: plan.minDamage, max: plan.maxDamage });
+        const crit = plan.critChance > 0 ? ` (crítico ${plan.critDamage})` : '';
+        parts.push(`${range}${crit} daño`);
         if (plan.critChance > 0) parts.push(`crítico ${Math.round(plan.critChance * 100)} %`);
       }
       if (!plan.canAttack && plan.reason) parts.push(reasonText(plan.reason));

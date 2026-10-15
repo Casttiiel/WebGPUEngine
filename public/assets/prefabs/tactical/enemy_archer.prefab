@@ -90,10 +90,10 @@
     },
     "unit": {
       "faction": "enemy",
+      "attributes": { "FUE": 2, "RES": 0, "POT": 2, "TEM": 0, "REF": 4, "AGU": 3 },
+      "armor": 0,
       "skills": ["fireball"],
-      "critChance": 10,
       "moveSpeed": 4,
-      "movement": 9,
       "sightRange": 8,
       "attacks": [
         {
@@ -101,7 +101,7 @@
           "name": "Arco",
           "kind": "ranged",
           "range": 14,
-          "damage": "1d8+4",
+          "damage": 5,
           "clip": "Spell_Simple_Shoot"
         },
         {
@@ -109,7 +109,7 @@
           "name": "Daga",
           "kind": "melee",
           "range": 1.5,
-          "damage": "1d4+2",
+          "damage": 2,
           "clip": "Punch_Cross"
         }
       ],

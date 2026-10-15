@@ -9,11 +9,21 @@ import { HealthComponent } from '../HealthComponent';
 import { RenderComponent } from '../../render/RenderComponent';
 import type { SkeletalMeshComponent } from '../../render/SkeletalMeshComponent';
 import { groundHeightAt } from './TacticalQueries';
-import type { DamageValue } from './Dice';
+import {
+  critChanceFor,
+  initiativeBaseFor,
+  makeAttributes,
+  maxHpFor,
+  movementFor,
+  penetrationFor,
+  statusBonusTurnsFor,
+  type AttributeId,
+  type Attributes,
+} from './Stats';
 
 export type UnitFaction = 'party' | 'enemy' | 'neutral';
 
-/** Un ataque de la unidad (arma). Sin stats: alcance y daño fijos. */
+/** Un ataque de la unidad (arma). Daño = arma + atributo de escala (FUE). */
 export interface UnitAttack {
   /** Identificador ('melee', 'ranged'…). */
   id: string;
@@ -23,8 +33,10 @@ export interface UnitAttack {
   kind: 'melee' | 'ranged';
   /** Alcance en metros, de borde a borde de las cápsulas. */
   range: number;
-  /** Daño: dados ("1d8+3", como en BG3) o un número fijo. */
-  damage: DamageValue;
+  /** Daño del arma; se le suma el atributo de escala. Sin dados (GDD §4). */
+  damage: number;
+  /** Atributo con el que escala el daño. Default 'FUE' (melee y a distancia). */
+  scale?: AttributeId;
   /** Recurso que consume. Default 'action'. */
   cost?: 'action' | 'bonusAction';
   /** Animación (clip) al atacar. */
@@ -49,9 +61,19 @@ export type UnitComponentDataType = Readonly<{
   displayName?: string;
   /** Oficio que enseña la ficha del personaje (Guerrero, Clérigo…). */
   role?: string;
+  /**
+   * Atributos (FUE, RES, POT, TEM, REF, AGU; los que falten valen 0). Con atributos, la vida,
+   * el movimiento y el crítico salen de ellos (Stats.ts) salvo que se den aquí a mano. Sin
+   * atributos (objetos) se usan los valores del prefab.
+   */
+  attributes?: Partial<Record<AttributeId, number>>;
+  /** Armadura (de momento del prefab; vendrá del equipo). Default 0. */
+  armor?: number;
+  /** Nivel (vida +5 por nivel). Default 1. */
+  level?: number;
   /** Velocidad al andar (m/s). Default 4. */
   moveSpeed?: number;
-  /** Metros de movimiento por turno en combate. Default 9 (como en BG3). */
+  /** Metros de movimiento por turno. Default: 6 + REF/2 con atributos; 9 sin ellos. */
   movement?: number;
   /** Distancia a la que detecta a unidades enemigas (m). 0 = no detecta. Default: 8 enemigos, 0 resto. */
   sightRange?: number;
@@ -65,7 +87,7 @@ export type UnitComponentDataType = Readonly<{
   silhouette?: boolean;
   /** Habilidades (ids de data/skills.json), en el orden de la hotbar. Default: ninguna. */
   skills?: string[];
-  /** % de golpe crítico de los ataques (cuerpo a cuerpo y a distancia). Default 0. */
+  /** % de crítico de los ataques. Default: 5 % · (1 + ⌊AGU/2⌋) con atributos; 0 sin ellos. */
   critChance?: number;
 }>;
 
@@ -128,6 +150,14 @@ export class UnitComponent extends Component {
   private cooldowns = new Map<string, number>();
   private statuses = new Map<UnitStatusId, UnitStatus>();
   private critChance = 0;
+  /** Atributos (null: objeto sin atributos; las fórmulas los toman como 0). */
+  private attributes: Attributes | null = null;
+  private armor = 0;
+  private level = 1;
+  /** Derivados, para get_entity del MCP (los usa el código a través de los getters). */
+  private stats: UnitStats | null = null;
+  /** Vida máxima de los atributos aún por aplicar al HealthComponent (se hace en el 1er update). */
+  private pendingMaxHp: number | null = null;
   private silhouette = true;
   /** Material de silueta aplicado ahora (undefined = aún no se ha decidido). */
   private silhouetteShown: string | null | undefined = undefined;
@@ -172,13 +202,21 @@ export class UnitComponent extends Component {
     this.abilities = [...(data.abilities ?? [])];
     this.hideWhenDown = data.hideWhenDown ?? false;
     this.skills = [...(data.skills ?? [])];
-    this.critChance = data.critChance ?? 0;
+    this.attributes = data.attributes ? makeAttributes(data.attributes) : null;
+    this.armor = data.armor ?? 0;
+    this.level = data.level ?? 1;
+    const a = this.attributes;
+    this.movement = data.movement ?? (a ? movementFor(a) : this.movement);
+    this.critChance = data.critChance ?? (a ? critChanceFor(a) : 0);
+    this.pendingMaxHp = a ? maxHpFor(a, this.level) : null;
     this.silhouette = data.silhouette ?? true;
+    this.stats = a ? this.computeStats() : null;
   }
 
   public update(dt: number): void {
     if (this.feetOffset === null) this.computeFeetOffset();
     if (!this.spawn) this.saveSpawn();
+    if (this.pendingMaxHp !== null) this.applyMaxHp();
     if (this.actionTimer > 0) this.actionTimer = Math.max(0, this.actionTimer - dt);
     this.updateSilhouette();
 
@@ -273,6 +311,82 @@ export class UnitComponent extends Component {
     this.cooldowns.clear();
   }
 
+  // ── Atributos ────────────────────────────────────────────────────────────
+
+  /** ¿Tiene atributos? (los objetos no: sus valores salen del prefab). */
+  public hasAttributes(): boolean {
+    return this.attributes !== null;
+  }
+
+  /** Atributos (todos a 0 si no tiene). */
+  public getAttributes(): Readonly<Attributes> {
+    return this.attributes ?? NO_ATTRIBUTES;
+  }
+
+  public getAttribute(id: AttributeId): number {
+    return this.getAttributes()[id];
+  }
+
+  public getArmor(): number {
+    return this.armor;
+  }
+
+  /** Para pruebas y, más adelante, el equipo. */
+  public setArmor(armor: number): void {
+    this.armor = Math.max(0, armor);
+    if (this.stats) this.stats = this.computeStats();
+  }
+
+  public getLevel(): number {
+    return this.level;
+  }
+
+  /** Penetración de armadura = ⌊AGU/2⌋. */
+  public getPenetration(): number {
+    return penetrationFor(this.getAttributes());
+  }
+
+  /** Turnos extra de los estados que aplica (POT 4 y POT 8). */
+  public getStatusBonusTurns(): number {
+    return statusBonusTurnsFor(this.getAttributes());
+  }
+
+  /** Parte fija de la iniciativa (2·REF; al empezar el combate se suma 1d4). */
+  public getInitiativeBase(): number {
+    return initiativeBaseFor(this.getAttributes());
+  }
+
+  /** Daño base (D, antes de armadura) de un ataque: arma + atributo de escala. */
+  public getAttackDamage(attack: UnitAttack): number {
+    return attack.damage + this.getAttribute(attack.scale ?? 'FUE');
+  }
+
+  /** Atributos y derivados (null sin atributos). */
+  public getStats(): Readonly<UnitStats> | null {
+    return this.stats;
+  }
+
+  private computeStats(): UnitStats {
+    const a = this.getAttributes();
+    return {
+      maxHp: this.pendingMaxHp ?? this.getMaxHp(),
+      movement: this.movement,
+      critChance: this.critChance,
+      penetration: penetrationFor(a),
+      initiative: initiativeBaseFor(a),
+      statusBonusTurns: statusBonusTurnsFor(a),
+      armor: this.armor,
+    };
+  }
+
+  /** La vida máxima sale de RES: se aplica al HealthComponent (que ya ha cargado su prefab). */
+  private applyMaxHp(): void {
+    const health = this.getHealth();
+    if (!health) return;
+    health.setMaxHp(this.pendingMaxHp!);
+    this.pendingMaxHp = null;
+  }
+
   // ── Críticos ─────────────────────────────────────────────────────────────
   //
   // Bolsa de canicas (marble bag, de candlesan) en vez de una tirada independiente: la bolsa
@@ -291,6 +405,13 @@ export class UnitComponent extends Component {
     if (this.critChance <= 0) return 0;
     if (this.bagMarbles <= 0) this.refillCritBag();
     return this.bagCrits / this.bagMarbles;
+  }
+
+  /** Para pruebas: fija el % de crítico (y rellena la bolsa). */
+  public setCritChance(percent: number): void {
+    this.critChance = Math.max(0, percent);
+    if (this.stats) this.stats = this.computeStats();
+    this.refillCritBag();
   }
 
   /** Saca una canica de la bolsa para un ataque que ha impactado. */
@@ -634,6 +755,22 @@ export function critBag(p: number): [number, number] {
   while ((percent * size) % 100 !== 0) size += 10;
   return [(percent * size) / 100, size];
 }
+
+/** Derivados de los atributos (GDD §3). */
+export interface UnitStats {
+  maxHp: number;
+  movement: number;
+  /** % de crítico con la bolsa llena. */
+  critChance: number;
+  penetration: number;
+  /** Parte fija de la iniciativa (2·REF), sin el 1d4. */
+  initiative: number;
+  /** Turnos extra de los estados que aplica. */
+  statusBonusTurns: number;
+  armor: number;
+}
+
+const NO_ATTRIBUTES: Readonly<Attributes> = makeAttributes();
 
 /** Materiales de silueta por bando (los neutrales, como los objetos, no tienen). */
 const SILHOUETTES: Partial<Record<UnitFaction, string>> = {

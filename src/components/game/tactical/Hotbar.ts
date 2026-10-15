@@ -80,23 +80,25 @@ export interface TooltipLine {
 /**
  * Tooltip de un hueco de la hotbar: el nombre y las líneas (coste, recarga, qué hace, la
  * descripción y lo que falta si no se puede usar). Los mismos textos que la ficha del
- * personaje (ActionText). `cooldown`: turnos que le quedan a una habilidad.
+ * personaje (ActionText). `cooldown`: turnos que le quedan a una habilidad. `unit`: quién
+ * la usa (los números salen de sus atributos).
  */
 export function hotbarTooltip(
   entry: HotbarEntry,
   enabled: boolean,
   cooldown = 0,
+  unit?: UnitComponent,
 ): { title: string; lines: TooltipLine[] } {
   const lines: TooltipLine[] = [];
   const info = (text: string) => lines.push({ text, style: 'info' });
   if (entry.attack) {
-    info(attackSummary(entry.attack));
+    info(attackSummary(entry.attack, unit));
     if (entry.kind === 'ranged') info('Necesita línea de visión.');
   } else if (entry.skill) {
     const s = entry.skill;
     const recharge = s.cooldown > 0 ? ` · recarga ${turns(s.cooldown)}` : '';
     info(`${COST_NAME[s.cost]}${recharge}`);
-    info(skillMechanics(s));
+    info(skillMechanics(s, unit));
     if (s.description) lines.push({ text: s.description, style: 'description' });
   } else if (entry.kind === 'jump') {
     info(`Movimiento · hasta ${fmt(MAX_JUMP)} m, gasta los metros saltados`);

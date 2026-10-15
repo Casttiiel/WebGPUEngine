@@ -90,10 +90,10 @@
     },
     "unit": {
       "faction": "enemy",
+      "attributes": { "FUE": 3, "RES": 1, "POT": 2, "TEM": 0, "REF": 7, "AGU": 3 },
+      "armor": 1,
       "skills": ["thunderwave"],
-      "critChance": 10,
       "moveSpeed": 5,
-      "movement": 12,
       "sightRange": 14,
       "attacks": [
         {
@@ -101,7 +101,7 @@
           "name": "Cuchillas",
           "kind": "melee",
           "range": 1.5,
-          "damage": "2d4+3",
+          "damage": 4,
           "clip": "Punch_Cross"
         }
       ],

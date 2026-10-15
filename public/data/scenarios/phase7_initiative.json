@@ -1,0 +1,79 @@
+{
+  "description": "Fase 7.3: iniciativa individual 2·REF + 1d4 (GDD §3) en lugar del d20. El orden respeta REF: con 2 puntos de REF de diferencia el 1d4 ya no puede darle la vuelta, y entre iguales decide el dado (a igualdad total, más REF y luego al azar). Fantasma REF 6, Ham y Kelsier REF 4, Brisa y Enemy1 REF 3.",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 11,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__units = ['Hero1', 'Hero2', 'Hero3', 'Hero4', 'Enemy1']; window.__rolls = []; window.__roll = async (n) => { for (let i = 0; i < n; i++) __rolls.push(await __engine.gameCommand('roll_initiative', { units: __units })); return __rolls.length; }"
+    },
+    {
+      "assert": {
+        "expr": "__units.map(n => Engine.getEntities().getEntityByName(n).getComponent('unit').getAttribute('REF'))",
+        "value": [4, 4, 3, 6, 3]
+      }
+    },
+
+    { "log": "Cada iniciativa es 2·REF más un d4, y salen las cuatro caras" },
+    { "assert": { "expr": "__roll(300)", "value": 300 } },
+    {
+      "assert": {
+        "expr": "__rolls.flat().every(c => c.initiative - 2 * c.ref >= 1 && c.initiative - 2 * c.ref <= 4)",
+        "value": true
+      }
+    },
+    {
+      "assert": {
+        "expr": "[...new Set(__rolls.flat().map(c => c.initiative - 2 * c.ref))].sort()",
+        "value": [1, 2, 3, 4]
+      }
+    },
+
+    { "log": "El orden respeta REF: 2 puntos de diferencia nunca se invierten" },
+    {
+      "assert": {
+        "expr": "__rolls.every(o => o.every((c, i) => o.slice(i + 1).every(d => d.ref <= c.ref + 1)))",
+        "value": true,
+        "message": "nadie con 2+ de REF menos va delante"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__rolls.every(o => o[0].name === 'Hero4')",
+        "value": true,
+        "message": "Fantasma (REF 6) siempre empieza"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__rolls.every(o => o.every((c, i) => i === 0 || o[i - 1].initiative > c.initiative || (o[i - 1].initiative === c.initiative && o[i - 1].ref >= c.ref)))",
+        "value": true,
+        "message": "ordenado por iniciativa; a igualdad, más REF primero"
+      }
+    },
+
+    { "log": "Entre iguales decide el d4: Ham y Kelsier (REF 4) se alternan" },
+    {
+      "assert": {
+        "expr": "(() => { const first = __rolls.map(o => o.findIndex(c => c.name === 'Hero1') < o.findIndex(c => c.name === 'Hero2')); return [first.some(x => x), first.some(x => !x)]; })()",
+        "value": [true, true]
+      }
+    },
+
+    { "log": "En un combate de verdad: el orden de la barra de iniciativa usa la misma regla" },
+    { "command": "start_combat" },
+    { "assert": { "combat": true, "path": "state", "value": "combat" } },
+    {
+      "assert": {
+        "expr": "(() => { const ref = n => Engine.getEntities().getEntityByName(n).getComponent('unit').getAttribute('REF'); const o = __engine.getCombatState().turnOrder; return o.every((c, i) => c.initiative - 2 * ref(c.name) >= 1 && c.initiative - 2 * ref(c.name) <= 4 && (i === 0 || o[i - 1].initiative >= c.initiative)); })()",
+        "value": true
+      }
+    },
+    { "assert": { "expr": "__engine.getCombatState().turnOrder[0].name", "value": "Hero4" } },
+    { "assert": { "no_errors": true } }
+  ]
+}

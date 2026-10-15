@@ -188,11 +188,437 @@
         "blocksInput": false
       },
       {
+        "name": "sheet_attr_1_box",
+        "alias": "sheet_attr_1_box",
+        "type": "image",
+        "x": 44,
+        "y": 192,
+        "width": 120,
+        "height": 72,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            120,
+            72
+          ],
+          "color": [
+            0.13,
+            0.11,
+            0.08,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_1_label",
+        "alias": "sheet_attr_1_label",
+        "type": "text",
+        "x": 44,
+        "y": 196,
+        "width": 120,
+        "height": 26,
+        "textParams": {
+          "text": "",
+          "size": [
+            20,
+            20
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_1_value",
+        "alias": "sheet_attr_1_value",
+        "type": "text",
+        "x": 44,
+        "y": 222,
+        "width": 120,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [
+            36,
+            36
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_2_box",
+        "alias": "sheet_attr_2_box",
+        "type": "image",
+        "x": 176,
+        "y": 192,
+        "width": 120,
+        "height": 72,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            120,
+            72
+          ],
+          "color": [
+            0.13,
+            0.11,
+            0.08,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_2_label",
+        "alias": "sheet_attr_2_label",
+        "type": "text",
+        "x": 176,
+        "y": 196,
+        "width": 120,
+        "height": 26,
+        "textParams": {
+          "text": "",
+          "size": [
+            20,
+            20
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_2_value",
+        "alias": "sheet_attr_2_value",
+        "type": "text",
+        "x": 176,
+        "y": 222,
+        "width": 120,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [
+            36,
+            36
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_3_box",
+        "alias": "sheet_attr_3_box",
+        "type": "image",
+        "x": 308,
+        "y": 192,
+        "width": 120,
+        "height": 72,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            120,
+            72
+          ],
+          "color": [
+            0.13,
+            0.11,
+            0.08,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_3_label",
+        "alias": "sheet_attr_3_label",
+        "type": "text",
+        "x": 308,
+        "y": 196,
+        "width": 120,
+        "height": 26,
+        "textParams": {
+          "text": "",
+          "size": [
+            20,
+            20
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_3_value",
+        "alias": "sheet_attr_3_value",
+        "type": "text",
+        "x": 308,
+        "y": 222,
+        "width": 120,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [
+            36,
+            36
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_4_box",
+        "alias": "sheet_attr_4_box",
+        "type": "image",
+        "x": 440,
+        "y": 192,
+        "width": 120,
+        "height": 72,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            120,
+            72
+          ],
+          "color": [
+            0.13,
+            0.11,
+            0.08,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_4_label",
+        "alias": "sheet_attr_4_label",
+        "type": "text",
+        "x": 440,
+        "y": 196,
+        "width": 120,
+        "height": 26,
+        "textParams": {
+          "text": "",
+          "size": [
+            20,
+            20
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_4_value",
+        "alias": "sheet_attr_4_value",
+        "type": "text",
+        "x": 440,
+        "y": 222,
+        "width": 120,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [
+            36,
+            36
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_5_box",
+        "alias": "sheet_attr_5_box",
+        "type": "image",
+        "x": 572,
+        "y": 192,
+        "width": 120,
+        "height": 72,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            120,
+            72
+          ],
+          "color": [
+            0.13,
+            0.11,
+            0.08,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_5_label",
+        "alias": "sheet_attr_5_label",
+        "type": "text",
+        "x": 572,
+        "y": 196,
+        "width": 120,
+        "height": 26,
+        "textParams": {
+          "text": "",
+          "size": [
+            20,
+            20
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_5_value",
+        "alias": "sheet_attr_5_value",
+        "type": "text",
+        "x": 572,
+        "y": 222,
+        "width": 120,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [
+            36,
+            36
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_6_box",
+        "alias": "sheet_attr_6_box",
+        "type": "image",
+        "x": 704,
+        "y": 192,
+        "width": 120,
+        "height": 72,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [
+            120,
+            72
+          ],
+          "color": [
+            0.13,
+            0.11,
+            0.08,
+            1
+          ]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_6_label",
+        "alias": "sheet_attr_6_label",
+        "type": "text",
+        "x": 704,
+        "y": 196,
+        "width": 120,
+        "height": 26,
+        "textParams": {
+          "text": "",
+          "size": [
+            20,
+            20
+          ],
+          "color": [
+            1,
+            0.84,
+            0.5,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "sheet_attr_6_value",
+        "alias": "sheet_attr_6_value",
+        "type": "text",
+        "x": 704,
+        "y": 222,
+        "width": 120,
+        "height": 40,
+        "textParams": {
+          "text": "",
+          "size": [
+            36,
+            36
+          ],
+          "color": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
         "name": "sheet_stat_1_box",
         "alias": "sheet_stat_1_box",
         "type": "image",
         "x": 44,
-        "y": 192,
+        "y": 276,
         "width": 252,
         "height": 108,
         "imageParams": {
@@ -215,7 +641,7 @@
         "alias": "sheet_stat_1_label",
         "type": "text",
         "x": 44,
-        "y": 200,
+        "y": 284,
         "width": 252,
         "height": 30,
         "textParams": {
@@ -239,7 +665,7 @@
         "alias": "sheet_stat_1_value",
         "type": "text",
         "x": 44,
-        "y": 236,
+        "y": 320,
         "width": 252,
         "height": 56,
         "textParams": {
@@ -263,7 +689,7 @@
         "alias": "sheet_stat_2_box",
         "type": "image",
         "x": 308,
-        "y": 192,
+        "y": 276,
         "width": 252,
         "height": 108,
         "imageParams": {
@@ -286,7 +712,7 @@
         "alias": "sheet_stat_2_label",
         "type": "text",
         "x": 308,
-        "y": 200,
+        "y": 284,
         "width": 252,
         "height": 30,
         "textParams": {
@@ -310,7 +736,7 @@
         "alias": "sheet_stat_2_value",
         "type": "text",
         "x": 308,
-        "y": 236,
+        "y": 320,
         "width": 252,
         "height": 56,
         "textParams": {
@@ -334,7 +760,7 @@
         "alias": "sheet_stat_3_box",
         "type": "image",
         "x": 572,
-        "y": 192,
+        "y": 276,
         "width": 252,
         "height": 108,
         "imageParams": {
@@ -357,7 +783,7 @@
         "alias": "sheet_stat_3_label",
         "type": "text",
         "x": 572,
-        "y": 200,
+        "y": 284,
         "width": 252,
         "height": 30,
         "textParams": {
@@ -381,7 +807,7 @@
         "alias": "sheet_stat_3_value",
         "type": "text",
         "x": 572,
-        "y": 236,
+        "y": 320,
         "width": 252,
         "height": 56,
         "textParams": {

@@ -19,6 +19,7 @@ import {
   skillMechanics,
   turns,
 } from '../../../components/game/tactical/ActionText';
+import { ATTRIBUTES } from '../../../components/game/tactical/Stats';
 import { SkillCatalog, type SkillDef } from '../../../components/game/tactical/Skills';
 import { MAX_JUMP, THROW_RANGE } from '../../../components/game/tactical/EnvironmentRules';
 import type { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
@@ -39,7 +40,7 @@ const STYLES: Record<LineStyle, { size: number; height: number; gap: number; col
 };
 const LINES = 40;
 /** Zona del panel donde van las líneas (y en px de referencia, relativas al panel). */
-const LINES_TOP = 316;
+const LINES_TOP = 400;
 const LINES_BOTTOM = 912;
 const LINE_WIDTH = 788;
 const HP_WIDTH = 788;
@@ -65,8 +66,9 @@ const DEG = Math.PI / 180;
  *
  * A la izquierda, el propio personaje: una cámara aparte (SheetCamera) que el mixer mezcla
  * encima de la de juego, de frente al personaje seleccionado y desplazada para que quede en
- * el tercio izquierdo (Q/E giran alrededor). A la derecha, el panel: vida, movimiento,
- * crítico, ataques, habilidades (con su descripción), acciones y estados. Tab / 1-4 cambian
+ * el tercio izquierdo (Q/E giran alrededor). A la derecha, el panel: vida, los seis
+ * atributos, sus derivados (movimiento, crítico, armadura, iniciativa, penetración…),
+ * ataques y habilidades con los números del personaje, acciones y estados. Tab / 1-4 cambian
  * de personaje. C o Esc la cierran.
  *
  * Mientras está abierta el mundo no recibe el ratón (bloqueador a pantalla completa), la
@@ -84,6 +86,7 @@ export class CharacterSheetController extends WidgetController {
   private hpText: TextWidget | null = null;
   private hint: TextWidget | null = null;
   private stats: { label: TextWidget | null; value: TextWidget | null }[] = [];
+  private attributes: { label: TextWidget | null; value: TextWidget | null }[] = [];
   private lines: TextWidget[] = [];
 
   private shown: Entity | null = null;
@@ -227,10 +230,16 @@ export class CharacterSheetController extends WidgetController {
     this.hp?.setSize(max > 0 ? HP_WIDTH * Math.min(1, hp / max) : 0, HP_HEIGHT);
     this.hpText?.setText(unit.isAlive() ? `PV ${hp} / ${max}` : `Caído · PV 0 / ${max}`);
 
+    const attributes = unit.getAttributes();
+    ATTRIBUTES.forEach((id, i) => {
+      this.attributes[i]?.label?.setText(id);
+      this.attributes[i]?.value?.setText(unit.hasAttributes() ? String(attributes[id]) : '-');
+    });
+
     const stats: [string, string][] = [
       ['Movimiento', `${fmt(unit.getMovement())} m`],
       ['Crítico', `${fmt(unit.getCritChance())} %`],
-      ['Próximo crítico', `${fmt(unit.getNextCritChance() * 100)} %`],
+      ['Armadura', `${fmt(unit.getArmor())}`],
     ];
     stats.forEach(([label, value], i) => {
       this.stats[i]?.label?.setText(label);
@@ -241,16 +250,27 @@ export class CharacterSheetController extends WidgetController {
     this.hint?.setText('C / Esc: cerrar   ·   Tab: otro personaje   ·   Q / E: girar');
   }
 
-  /** Las líneas de la ficha: ataques, habilidades, acciones y estados. */
+  /** Las líneas de la ficha: estadísticas, ataques, habilidades, estados y acciones. */
   private describe(unit: UnitComponent): { text: string; style: LineStyle; color?: RGBA }[] {
     const out: { text: string; style: LineStyle; color?: RGBA }[] = [];
     const add = (text: string, style: LineStyle, color?: RGBA) =>
       out.push({ text, style, ...(color && { color }) });
 
+    const bonus = unit.getStatusBonusTurns();
+    add(
+      [
+        `Iniciativa ${unit.getInitiativeBase()} + 1d4`,
+        `Penetración ${unit.getPenetration()}`,
+        `Estados aplicados ${bonus > 0 ? `+${turns(bonus)}` : '+0'}`,
+        `Próximo crítico ${fmt(unit.getNextCritChance() * 100)} %`,
+      ].join(' · '),
+      'body',
+    );
+
     add('ATAQUES', 'header');
     for (const attack of unit.getAttacks()) {
       add(attack.name, 'title');
-      add(attackSummary(attack), 'body');
+      add(attackSummary(attack, unit), 'body');
     }
 
     const skills = unit
@@ -264,9 +284,16 @@ export class CharacterSheetController extends WidgetController {
         add(skill.name, 'title');
         const recharge = skill.cooldown > 0 ? ` · recarga ${turns(skill.cooldown)}` : '';
         const ready = cooldown > 0 ? ` · disponible en ${turns(cooldown)}` : '';
-        add(`${COST_NAME[skill.cost]}${recharge}${ready} · ${skillMechanics(skill)}`, 'body');
+        add(`${COST_NAME[skill.cost]}${recharge}${ready} · ${skillMechanics(skill, unit)}`, 'body');
         if (skill.description) add(skill.description, 'body');
       }
+    }
+
+    add('ESTADOS', 'header');
+    const statuses = unit.getStatuses();
+    if (!statuses.length) add('Ninguno', 'body');
+    for (const status of statuses) {
+      add(`${STATUS_NAME[status.id] ?? status.id} (${turns(status.turns)})`, 'title', RED);
     }
 
     const abilities = unit.getAbilities();
@@ -284,13 +311,6 @@ export class CharacterSheetController extends WidgetController {
           'title',
         );
       }
-    }
-
-    add('ESTADOS', 'header');
-    const statuses = unit.getStatuses();
-    if (!statuses.length) add('Ninguno', 'body');
-    for (const status of statuses) {
-      add(`${STATUS_NAME[status.id] ?? status.id} (${turns(status.turns)})`, 'title', RED);
     }
     return out;
   }
@@ -343,6 +363,12 @@ export class CharacterSheetController extends WidgetController {
       this.stats.push({
         label: get<TextWidget>(`sheet_stat_${i}_label`),
         value: get<TextWidget>(`sheet_stat_${i}_value`),
+      });
+    }
+    for (let i = 1; i <= 6; i++) {
+      this.attributes.push({
+        label: get<TextWidget>(`sheet_attr_${i}_label`),
+        value: get<TextWidget>(`sheet_attr_${i}_value`),
       });
     }
     for (let i = 1; i <= LINES; i++) {

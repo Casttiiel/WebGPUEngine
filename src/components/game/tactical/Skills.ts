@@ -3,7 +3,7 @@ import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { UnitComponent } from './UnitComponent';
 import type { SurfaceType } from './Surfaces';
 import type { UnitStatusId } from './UnitComponent';
-import type { DamageValue } from './Dice';
+import type { AttributeId } from './Stats';
 
 /**
  * Habilidades: modelo de datos genérico (public/data/skills.json) y geometría de sus áreas.
@@ -20,8 +20,11 @@ import type { DamageValue } from './Dice';
 export type SkillTargeting = 'unit' | 'point' | 'cone' | 'self';
 
 export type SkillEffect =
-  /** Daño: dados ("2d6+3") o fijo; se tira una vez por lanzamiento (igual para todos). */
-  | { type: 'damage'; amount: DamageValue }
+  /**
+   * Daño base; se le suma el atributo de escala de la habilidad (`scale`). La tirada dentro
+   * del rango de la armadura es una por lanzamiento (la misma fracción para todos).
+   */
+  | { type: 'damage'; amount: number }
   | { type: 'heal'; amount: number }
   /** Aleja a los afectados del lanzador (o del centro del área). */
   | { type: 'push'; distance: number }
@@ -29,7 +32,7 @@ export type SkillEffect =
   | { type: 'teleport' }
   /** Deja una superficie en el punto (fuego…). */
   | { type: 'surface'; surface: SurfaceType; radius: number }
-  /** Aplica un estado alterado a los afectados durante `turns` turnos suyos. */
+  /** Aplica un estado alterado durante `turns` turnos suyos (+1 con POT 4 y otro con POT 8). */
   | { type: 'status'; status: UnitStatusId; turns: number };
 
 export interface SkillDef {
@@ -53,6 +56,8 @@ export interface SkillDef {
   /** Requiere línea de visión al objetivo. Default true salvo self y cone. */
   lineOfSight: boolean;
   effects: SkillEffect[];
+  /** Atributo del lanzador que se suma al daño (Escala: POT, FUE…). Sin él, daño fijo. */
+  scale?: AttributeId;
   /** Animación del lanzador. */
   clip?: string;
   /** Texto para la ficha del personaje (sin él se resume a partir de los efectos). */
@@ -102,6 +107,7 @@ function normalize(id: string, s: SkillJson): SkillDef {
     affects: s.affects ?? 'all',
     lineOfSight: s.lineOfSight ?? !area,
     effects: s.effects,
+    ...(s.scale !== undefined && { scale: s.scale }),
     ...(s.clip !== undefined && { clip: s.clip }),
     ...(s.description !== undefined && { description: s.description }),
   };

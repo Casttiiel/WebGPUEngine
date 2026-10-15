@@ -28,6 +28,7 @@ import { TacticalPointerComponent } from '../../../components/game/tactical/Tact
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
 import { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
 import { PropComponent } from '../../../components/game/tactical/PropComponent';
+import { rangeText } from '../../../components/game/tactical/Stats';
 import { wrapText } from '../textWrap';
 
 type RGBA = readonly [number, number, number, number];
@@ -434,7 +435,7 @@ export class CombatHUDController extends WidgetController {
       slot.name?.setColor(1, 1, 1, enabled ? 1 : 0.45);
       if (slot.hovered) hovered = { entry, x, enabled, cooldown };
     });
-    this.showTip(hovered);
+    this.showTip(hovered, unit ?? undefined);
 
     const armedEntry = entries.find((e) => e.id === armed);
     if (!hovered && armedEntry) {
@@ -454,13 +455,14 @@ export class CombatHUDController extends WidgetController {
   /** Panel con el nombre, el coste, qué hace y la descripción, encima del hueco. */
   private showTip(
     hovered: { entry: HotbarEntry; x: number; enabled: boolean; cooldown: number } | null,
+    unit?: UnitComponent,
   ): void {
     if (!this.tip) return;
     if (!hovered) {
       this.tip.setVisible(false);
       return;
     }
-    const { title, lines } = hotbarTooltip(hovered.entry, hovered.enabled, hovered.cooldown);
+    const { title, lines } = hotbarTooltip(hovered.entry, hovered.enabled, hovered.cooldown, unit);
     this.tipTitle?.setText(title);
     let index = 0;
     for (const line of lines) {
@@ -543,7 +545,8 @@ export class CombatHUDController extends WidgetController {
   /**
    * Al apuntar un ataque o una habilidad: sobre cada unidad que recibiría daño, su barra de
    * vida con la parte que perdería seguro (daño mínimo, sólida), la que podría perder (hasta
-   * el máximo, translúcida) y el rango, avisando si muere o puede morir. Sin crítico.
+   * el máximo, translúcida), el rango y el daño del crítico ("7~10 (crítico 15)"), avisando
+   * si muere o puede morir.
    */
   private updateDamagePreview(): void {
     const preview = this.subscribed
@@ -574,9 +577,10 @@ export class CombatHUDController extends WidgetController {
       bar.maybe?.setSize(px(afterMin - afterMax), DAMAGE_BAR_HEIGHT);
       bar.sure?.setPosition(2 + px(afterMin), 2);
       bar.sure?.setSize(px(hp - afterMin), DAMAGE_BAR_HEIGHT);
-      const range = entry.min === entry.max ? `${entry.min}` : `${entry.min}~${entry.max}`;
+      const range = rangeText(entry);
+      const crit = entry.crit !== null ? ` (crítico ${entry.crit})` : '';
       const fate = entry.min >= hp ? ' · muere' : entry.max >= hp ? ' · puede morir' : '';
-      bar.text?.setText(`${range} daño${fate}`);
+      bar.text?.setText(`${range}${crit} daño${fate}`);
       bar.root.setPosition(screen[0] - DAMAGE_BAR_WIDTH / 2, screen[1]);
       bar.root.setVisible(true);
     });

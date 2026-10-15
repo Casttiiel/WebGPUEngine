@@ -22,8 +22,11 @@ import {
 } from './TacticalQueries';
 import {
   EYE_HEIGHT,
+  hitRange,
   previewAttack,
   rollAttack,
+  skillDamage,
+  statusTurns,
   unitDistance,
   unitDistanceFrom,
   unitLineOfSight,
@@ -40,7 +43,7 @@ import {
   pushPath,
   throwArc,
 } from './EnvironmentRules';
-import { damageRange, rollDamage, type DamageValue } from './Dice';
+import { rollInitiative, rollRange } from './Stats';
 import {
   SkillCatalog,
   coneDirection,
@@ -140,7 +143,7 @@ export interface PushPlan {
   direction: vec3 | null;
   /** Contra quién choca (recibe el impacto; el objeto también). */
   hit: UnitComponent | null;
-  /** Daño del impacto (sin crítico): 0 si no choca con nadie. */
+  /** Daño del impacto contra la armadura del golpeado: 0 si no choca con nadie. */
   minDamage: number;
   maxDamage: number;
   canPush: boolean;
@@ -157,7 +160,7 @@ export interface ThrowPlan {
   landing: vec3 | null;
   /** A quién golpea (el objetivo o lo primero que pille en medio). */
   hit: UnitComponent | null;
-  /** Daño del impacto (sin crítico); el objeto recibe lo mismo al caer. */
+  /** Daño del impacto contra la armadura del golpeado (o el del objeto, si no golpea). */
   minDamage: number;
   maxDamage: number;
   canThrow: boolean;
@@ -170,7 +173,8 @@ interface PendingImpact {
   source: UnitComponent;
   prop: UnitComponent;
   hit: UnitComponent | null;
-  damage: DamageValue;
+  /** D del impacto (el golpeado lo recibe con su armadura). */
+  damage: number;
   /** El objeto se golpea aunque no pille a nadie (lanzado: cae al suelo). */
   always: boolean;
   /** Hacia dónde iba (horizontal): el golpeado sale despedido hacia allí. */
@@ -220,6 +224,8 @@ export interface AttackPlan {
   damage: number;
   minDamage: number;
   maxDamage: number;
+  /** Daño del crítico (máx × 1,5, ignora la armadura). */
+  critDamage: number;
   /** Probabilidad (0-1) de crítico si impacta en el próximo ataque del atacante (bolsa de canicas). */
   critChance: number;
   reason?: string;
@@ -606,6 +612,7 @@ export class EncounterComponent extends Component {
       damage: 0,
       minDamage: 0,
       maxDamage: 0,
+      critDamage: 0,
       critChance: 0,
     };
     const fail = (reason: string): AttackPlan => ({ ...result, reason });
@@ -625,6 +632,7 @@ export class EncounterComponent extends Component {
     result.damage = roll.damage;
     result.minDamage = roll.minDamage;
     result.maxDamage = roll.maxDamage;
+    result.critDamage = roll.critDamage;
     result.critChance = roll.critChance;
 
     const permission = this.canAct(unit, attack.cost ?? 'action');
@@ -843,7 +851,7 @@ export class EncounterComponent extends Component {
     result.direction = push.dir;
     result.hit = push.hit;
     if (push.hit) {
-      const range = damageRange(data.getImpactDamage());
+      const range = hitRange(null, push.hit, data.getImpactDamage());
       result.minDamage = range.min;
       result.maxDamage = range.max;
     }
@@ -991,7 +999,7 @@ export class EncounterComponent extends Component {
     result.points = flight.points;
     result.landing = flight.points[flight.points.length - 1]!;
     result.hit = flight.hit ?? aimUnit;
-    const range = damageRange(data.getImpactDamage());
+    const range = hitRange(null, result.hit ?? prop, data.getImpactDamage());
     result.minDamage = range.min;
     result.maxDamage = range.max;
 
@@ -1081,18 +1089,20 @@ export class EncounterComponent extends Component {
    * golpea él; si es de los que se rompen al chocar con alguien, se rompe.
    */
   private applyImpact(impact: PendingImpact): void {
-    const amount = rollDamage(impact.damage);
     const { hit, prop } = impact;
+    // Una tirada; cada uno la recibe con su armadura (el objeto, normalmente sin armadura).
+    const u = Math.random();
+    const amount = (unit: UnitComponent) => rollRange(hitRange(null, unit, impact.damage), u);
     this.getActionCamera()?.shake(hit ? SHAKE_HIT : SHAKE_THUD);
     if (hit?.isAlive()) {
-      this.applyHit(impact.source, hit, true, amount, 'impact');
+      this.applyHit(impact.source, hit, true, amount(hit), 'impact');
       if (hit.isAlive() && impact.direction) this.knockBack(hit, impact.direction);
     }
     if (!prop.isAlive()) return;
     if (hit && PropComponent.of(prop.getOwner())?.breaksOnImpact()) {
       this.onUnitDown(prop, impact.source);
     } else if (hit || impact.always) {
-      this.applyHit(impact.source, prop, true, amount, 'impact');
+      this.applyHit(impact.source, prop, true, amount(prop), 'impact');
     }
   }
 
@@ -1333,13 +1343,19 @@ export class EncounterComponent extends Component {
     const skill = plan.skill!;
     const origin = plan.origin!;
     const affected = () => plan.affected.filter((u) => u.isAlive() || hasEffect(skill, 'heal'));
+    // El daño (todos los efectos de daño + escala) se aplica una vez, con una sola tirada:
+    // la misma fracción del rango para todos, cada uno con su armadura. No critica.
+    const damage = skillDamage(caster, skill);
+    let damageDone = false;
     for (const effect of skill.effects) {
       switch (effect.type) {
         case 'damage': {
-          // Una tirada por lanzamiento, la misma para todos los afectados (como en BG3).
-          const amount = rollDamage(effect.amount);
+          if (damageDone) break;
+          damageDone = true;
+          const roll = Math.random();
           for (const u of affected()) {
-            if (u.isAlive()) this.applyHit(caster, u, true, amount, 'skill');
+            if (!u.isAlive()) continue;
+            this.applyHit(caster, u, true, rollRange(hitRange(caster, u, damage), roll), 'skill');
           }
           break;
         }
@@ -1374,7 +1390,7 @@ export class EncounterComponent extends Component {
         case 'status':
           for (const u of affected()) {
             if (!u.isAlive()) continue;
-            u.addStatus(effect.status, effect.turns, caster.getOwner());
+            u.addStatus(effect.status, statusTurns(caster, effect.turns), caster.getOwner());
             u.stop();
             this.emit('status', {
               unit: u.getOwner(),
@@ -1769,7 +1785,8 @@ export class EncounterComponent extends Component {
       u.getFeetPosition(p);
       const d = Math.hypot(p[0]! - center[0]!, p[2]! - center[2]!) - u.getCapsuleRadius();
       if (d <= explosion.radius && Math.abs(p[1]! - center[1]!) < 2) {
-        this.applyHit(instigator, u, true, explosion.damage, 'explosion');
+        const range = hitRange(null, u, explosion.damage);
+        this.applyHit(instigator, u, true, rollRange(range), 'explosion');
       }
     }
     if (explosion.surface) {
@@ -1950,8 +1967,9 @@ export class EncounterComponent extends Component {
     this.emit('join', { unit: unit.getOwner() });
   }
 
+  /** Iniciativa individual: 2·REF + 1d4 (GDD §3). */
   private rollInitiative(unit: UnitComponent): Combatant {
-    return { unit, initiative: 1 + Math.floor(Math.random() * 20), tiebreak: Math.random() };
+    return { unit, initiative: rollInitiative(unit.getAttributes()), tiebreak: Math.random() };
   }
 
   /** Primer enemigo vivo (fuera de `exclude`) que ve a algún miembro en pie de la party. */
@@ -2040,6 +2058,8 @@ export class EncounterComponent extends Component {
           hp: u.getHp(),
           maxHp: u.getMaxHp(),
           alive: u.isAlive(),
+          attributes: u.hasAttributes() ? { ...u.getAttributes() } : null,
+          armor: u.getArmor(),
           critChance: u.getCritChance(),
           nextCritChance: u.getNextCritChance(),
           statuses: u.getStatuses().map((st) => ({
@@ -2079,6 +2099,7 @@ export class EncounterComponent extends Component {
           damage: r.damage,
           minDamage: r.minDamage,
           maxDamage: r.maxDamage,
+          critDamage: r.critDamage,
           critChance: r.critChance,
           reason: r.reason ?? null,
         });
@@ -2143,6 +2164,30 @@ export class EncounterComponent extends Component {
               state: this.state,
               turnOrder: this.getTurnOrder(),
             };
+          case 'roll_attack': {
+            // Tira un ataque sin aplicarlo (saca canica de la bolsa): para probar el rango.
+            const unit = unitArg().getComponent('unit') as UnitComponent;
+            const target = unitArg('target').getComponent('unit') as UnitComponent;
+            const attack = unit.getAttack(args.attack as string | undefined);
+            if (!attack) throw new Error(`Unknown attack: ${String(args.attack)}`);
+            return rollAttack(unit, target, attack);
+          }
+          case 'roll_initiative': {
+            // Tira la iniciativa de esas unidades y las ordena como al empezar un combate.
+            const names = (args.units as string[] | undefined) ?? [];
+            const order = names
+              .map((n) => {
+                const unit = Engine.getEntities().getEntityByName(n)?.getComponent('unit');
+                if (!unit) throw new Error(`Unit not found: ${n}`);
+                return this.rollInitiative(unit as UnitComponent);
+              })
+              .sort(compareInitiative);
+            return order.map((c) => ({
+              name: c.unit.getOwner().getName(),
+              ref: c.unit.getAttribute('REF'),
+              initiative: c.initiative,
+            }));
+          }
           case 'end_combat':
             this.endCombat(
               (args.result as 'victory' | 'defeat' | 'exploration' | undefined) ?? 'victory',
@@ -2284,6 +2329,11 @@ function horizontalDirection(v: vec3): vec3 | null {
   return length < 1e-4 ? null : vec3.fromValues(v[0]! / length, 0, v[2]! / length);
 }
 
+/** Mayor iniciativa primero; a igualdad, más REF; si no, al azar. */
 function compareInitiative(a: Combatant, b: Combatant): number {
-  return b.initiative - a.initiative || b.tiebreak - a.tiebreak;
+  return (
+    b.initiative - a.initiative ||
+    b.unit.getAttribute('REF') - a.unit.getAttribute('REF') ||
+    b.tiebreak - a.tiebreak
+  );
 }

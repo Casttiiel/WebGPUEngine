@@ -90,9 +90,9 @@
     },
     "unit": {
       "faction": "enemy",
-      "critChance": 10,
+      "attributes": { "FUE": 3, "RES": 1, "POT": 0, "TEM": 0, "REF": 3, "AGU": 2 },
+      "armor": 2,
       "moveSpeed": 4,
-      "movement": 9,
       "sightRange": 8,
       "attacks": [
         {
@@ -100,7 +100,7 @@
           "name": "Puñetazo",
           "kind": "melee",
           "range": 1.5,
-          "damage": "1d6+5",
+          "damage": 5,
           "clip": "Punch_Cross"
         }
       ]

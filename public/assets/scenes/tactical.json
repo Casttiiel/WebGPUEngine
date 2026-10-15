@@ -581,6 +581,8 @@
       "name": "Hero1",
       "unit": {
         "displayName": "Ham",
+        "attributes": { "FUE": 6, "RES": 5, "POT": 3, "TEM": 3, "REF": 4, "AGU": 3 },
+        "armor": 3,
         "role": "Violento",
         "skills": ["shove", "second_wind", "fear"],
         "attacks": [
@@ -589,7 +591,7 @@
             "name": "Espada",
             "kind": "melee",
             "range": 1.5,
-            "damage": "1d8+5",
+            "damage": 6,
             "clip": "Sword_Attack_Standing"
           }
         ]
@@ -605,6 +607,8 @@
       "name": "Hero2",
       "unit": {
         "displayName": "Kelsier",
+        "attributes": { "FUE": 3, "RES": 3, "POT": 6, "TEM": 4, "REF": 4, "AGU": 4 },
+        "armor": 0,
         "role": "Nacido de la Bruma",
         "skills": ["fireball", "thunderwave"],
         "attacks": [
@@ -613,7 +617,7 @@
             "name": "Disparo",
             "kind": "ranged",
             "range": 18,
-            "damage": "1d6+3",
+            "damage": 3,
             "clip": "Spell_Simple_Shoot"
           }
         ]
@@ -629,6 +633,8 @@
       "name": "Hero3",
       "unit": {
         "displayName": "Brisa",
+        "attributes": { "FUE": 2, "RES": 3, "POT": 6, "TEM": 6, "REF": 3, "AGU": 4 },
+        "armor": 0,
         "role": "Aplacador",
         "skills": ["heal", "dash"],
         "attacks": [
@@ -637,7 +643,7 @@
             "name": "Disparo",
             "kind": "ranged",
             "range": 18,
-            "damage": "1d6+3",
+            "damage": 3,
             "clip": "Spell_Simple_Shoot"
           }
         ]
@@ -653,6 +659,8 @@
       "name": "Hero4",
       "unit": {
         "displayName": "Fantasma",
+        "attributes": { "FUE": 4, "RES": 3, "POT": 2, "TEM": 3, "REF": 6, "AGU": 6 },
+        "armor": 1,
         "role": "Ojo de Estaño",
         "skills": ["dash", "shove"],
         "attacks": [
@@ -661,7 +669,7 @@
             "name": "Espada",
             "kind": "melee",
             "range": 1.5,
-            "damage": "1d8+5",
+            "damage": 6,
             "clip": "Sword_Attack_Standing"
           }
         ]

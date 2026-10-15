@@ -2,9 +2,15 @@ import { vec3 } from 'gl-matrix';
 import type { Entity } from '../../../core/ecs/Entity';
 import type { EncounterComponent, SkillPlan, SkillTarget } from './EncounterComponent';
 import type { UnitAttack, UnitComponent } from './UnitComponent';
-import { previewAttack, unitDistanceFrom, unitLineOfSightFrom } from './CombatRules';
+import {
+  hitRange,
+  previewAttack,
+  skillDamage,
+  unitDistanceFrom,
+  unitLineOfSightFrom,
+} from './CombatRules';
 import { SkillCatalog, hasEffect, type SkillDef } from './Skills';
-import { averageDamage } from './Dice';
+import { averageOf } from './Stats';
 
 export type AIRole = 'melee' | 'ranged';
 
@@ -114,9 +120,11 @@ export function planTurn(
   const attackValue = (target: UnitComponent, attack: UnitAttack): number => {
     const roll = previewAttack(me, target, attack);
     const kill = roll.damage >= target.getHp();
+    // Daño esperado con el crítico de su bolsa (máx × 1,5 sin armadura).
+    const expected = roll.damage + roll.critChance * (roll.critDamage - roll.damage);
     let value =
       ATTACK_BASE +
-      roll.hitChance * roll.damage +
+      roll.hitChance * expected +
       (kill ? KILL_BONUS : 0) +
       (1 - target.getHp() / Math.max(1, target.getMaxHp())) * FOCUS_WOUNDED;
     if (low && !kill) value *= LOW_HP_ATTACK_FACTOR;
@@ -410,12 +418,17 @@ function skillValue(me: UnitComponent, skill: SkillDef, plan: SkillPlan): number
   const isAlly = (u: UnitComponent) => u.getFaction() === me.getFaction();
   let value = 0;
   let useful = false;
+  const damage = skillDamage(me, skill);
+  let damageCounted = false;
   for (const effect of skill.effects) {
     switch (effect.type) {
       case 'damage':
+        // Todos los efectos de daño se aplican juntos (CombatRules.skillDamage).
+        if (damageCounted) break;
+        damageCounted = true;
         for (const u of plan.affected) {
           if (!u.isAlive()) continue;
-          const expected = averageDamage(effect.amount);
+          const expected = averageOf(hitRange(me, u, damage));
           const dealt = Math.min(expected, u.getHp());
           if (isFoe(u)) {
             value += dealt + (expected >= u.getHp() ? KILL_BONUS : 0);

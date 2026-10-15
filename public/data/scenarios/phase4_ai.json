@@ -48,7 +48,7 @@
     },
     {
       "wait_until": {
-        "expr": "window.__log.some(x => x.e === 'attack' && x.src === window.__firstAI)",
+        "expr": "window.__log.some(x => (x.e === 'attack' && x.src === window.__firstAI) || (x.e === 'skill' && x.u === window.__firstAI))",
         "value": true
       },
       "timeout_frames": 900
@@ -138,7 +138,7 @@
     { "eval": "window.__log = []; window.__plans = []" },
     { "command": "move", "args": { "unit": "Hero1", "to": [1, 0, 0], "follow": false } },
     { "wait_until": { "combat": true, "path": "state", "value": "combat" }, "timeout_frames": 600 },
-    { "command": "damage", "args": { "unit": "Archer", "amount": 15 } },
+    { "command": "damage", "args": { "unit": "Archer", "amount": 19 } },
     { "eval": "window.__near = () => Math.min(...['Hero1', 'Hero2', 'Hero3', 'Hero4'].map(h => { const a = __engine.readPath('Archer', 'position'); const b = __engine.readPath(h, 'position'); return Math.hypot(a[0] - b[0], a[2] - b[2]); })); window.__before = window.__near()" },
     {
       "wait_until": {

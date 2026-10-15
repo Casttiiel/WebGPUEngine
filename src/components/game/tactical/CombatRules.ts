@@ -1,11 +1,12 @@
 import { vec3 } from 'gl-matrix';
 import { UnitComponent, type UnitAttack } from './UnitComponent';
 import { hasLineOfSight } from './TacticalQueries';
-import { averageDamage, damageRange, rollDamage } from './Dice';
+import type { SkillDef } from './Skills';
+import { averageOf, critDamageFor, mitigatedRange, rollRange, type DamageRange } from './Stats';
 
 /**
  * Reglas del combate que no dependen del turno: distancias, línea de visión y resolución
- * de ataques. Las usan EncounterComponent (jugador, MCP e IA) y la UI (tooltips).
+ * de ataques (daño fijo + armadura → rango, GDD §4; fórmulas en Stats.ts). Las usan EncounterComponent (jugador, MCP e IA) y la UI (tooltips).
  */
 
 /** Altura de los ojos sobre el centro de la cápsula. */
@@ -62,39 +63,54 @@ export function unitLineOfSightFrom(
 }
 
 export interface AttackRoll {
-  /** Probabilidad de impacto (0-1). */
+  /** Probabilidad de impacto (0-1). Siempre 1: se acierta siempre (GDD §4). */
   hitChance: number;
   /** Daño medio si impacta (sin crítico): para comparar opciones. */
   damage: number;
-  /** Daño mínimo y máximo si impacta (sin crítico): la vista previa en la barra de vida. */
+  /** Rango si impacta (sin crítico): D con la armadura del objetivo. La vista previa. */
   minDamage: number;
   maxDamage: number;
+  /** Daño del crítico: máx × 1,5, ignora la armadura. */
+  critDamage: number;
   /** Probabilidad (0-1) de que sea crítico si impacta: sale de su bolsa de canicas. */
   critChance: number;
 }
 
 /**
- * Probabilidad de impacto, daño y crítico de un ataque. Hoy: 100 % y daño fijo del arma.
- * Punto de enganche para stats (atributos, armadura, ventaja por altura, cobertura…).
+ * Lo que hace un golpe de `damage` (D) de `attacker` a `target`: el rango con la armadura
+ * del objetivo menos la penetración del atacante (sin atacante, p.ej. un objeto: sin
+ * penetración).
  */
+export function hitRange(
+  attacker: UnitComponent | null,
+  target: UnitComponent,
+  damage: number,
+): DamageRange {
+  return mitigatedRange(damage, target.getArmor(), attacker?.getPenetration() ?? 0);
+}
+
+/** Ataque con un arma: D = arma + FUE; rango por la armadura; crítico = máx × 1,5. */
 export function previewAttack(
   attacker: UnitComponent,
-  _target: UnitComponent,
+  target: UnitComponent,
   attack: UnitAttack,
 ): AttackRoll {
-  const { min, max } = damageRange(attack.damage);
+  const damage = attacker.getAttackDamage(attack);
+  const range = hitRange(attacker, target, damage);
   return {
     hitChance: 1,
-    damage: averageDamage(attack.damage),
-    minDamage: min,
-    maxDamage: max,
+    damage: averageOf(range),
+    minDamage: range.min,
+    maxDamage: range.max,
+    critDamage: critDamageFor(damage),
     critChance: attacker.getNextCritChance(),
   };
 }
 
 /**
  * Tira el ataque. Con 100 % de impacto no consume números del RNG para el impacto; si impacta
- * saca el crítico de la bolsa del atacante (UnitComponent.rollCrit).
+ * saca el crítico de la bolsa del atacante (UnitComponent.rollCrit): un crítico hace
+ * máx × 1,5 sin mirar la armadura; si no, un entero uniforme en el rango.
  */
 export function rollAttack(
   attacker: UnitComponent,
@@ -104,7 +120,25 @@ export function rollAttack(
   const roll = previewAttack(attacker, target, attack);
   const hit = roll.hitChance >= 1 || Math.random() < roll.hitChance;
   if (!hit) return { hit, crit: false, damage: 0 };
-  // Se tiran los dados; el crítico tira el doble de dados (el modificador no se duplica).
   const crit = attacker.rollCrit();
-  return { hit, crit, damage: rollDamage(attack.damage, crit) };
+  const damage = crit ? roll.critDamage : rollRange({ min: roll.minDamage, max: roll.maxDamage });
+  return { hit, crit, damage };
+}
+
+/** D de una habilidad: la suma de sus efectos de daño + el atributo de escala (una vez). */
+export function skillDamage(caster: UnitComponent, skill: SkillDef): number {
+  let base = 0;
+  let any = false;
+  for (const effect of skill.effects) {
+    if (effect.type !== 'damage') continue;
+    base += effect.amount;
+    any = true;
+  }
+  if (!any) return 0;
+  return base + (skill.scale ? caster.getAttribute(skill.scale) : 0);
+}
+
+/** Turnos de un estado que aplica `caster`: los del efecto + los de su POT. */
+export function statusTurns(caster: UnitComponent, turns: number): number {
+  return turns + caster.getStatusBonusTurns();
 }

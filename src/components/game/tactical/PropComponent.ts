@@ -1,7 +1,6 @@
 import { Component } from '../../../core/ecs/Component';
 import { Entity } from '../../../core/ecs/Entity';
 import type { SurfaceType } from './Surfaces';
-import type { DamageValue } from './Dice';
 
 export interface PropExplosion {
   /** Radio de la explosión (m, hasta el borde de cada unidad). */
@@ -19,8 +18,8 @@ export type PropComponentDataType = Readonly<{
   pushDistance?: number;
   /** Se puede lanzar (acción). Default: lo mismo que pushable. */
   throwable?: boolean;
-  /** Daño al golpear a una unidad (empujado o lanzado); el objeto recibe el mismo. Default "1d6+2". */
-  impactDamage?: DamageValue;
+  /** Daño (D) al golpear a una unidad (empujado o lanzado), contra su armadura; el objeto recibe el mismo. Default 6. */
+  impactDamage?: number;
   /** Se rompe al golpear a una unidad (empujado o lanzado), tenga la vida que tenga. Default true. */
   breakOnImpact?: boolean;
   /** Explota al destruirse (vida a 0: un ataque, el fuego, otra explosión). */
@@ -39,7 +38,7 @@ export class PropComponent extends Component {
   private pushable = false;
   private pushDistance = 3;
   private throwable = false;
-  private impactDamage: DamageValue = '1d6+2';
+  private impactDamage = 6;
   private breakOnImpact = true;
   private explosive: PropExplosion | null = null;
 
@@ -66,7 +65,7 @@ export class PropComponent extends Component {
     return this.throwable;
   }
 
-  public getImpactDamage(): DamageValue {
+  public getImpactDamage(): number {
     return this.impactDamage;
   }
 
