@@ -6,6 +6,7 @@ import { KeyCode } from '../../../types/KeyCode.enum';
 import { DevBridge } from '../../../core/debug/DevBridge';
 import { ModuleGameController } from '../../../modules/game/ModuleGameController';
 import { Zones, type TimeBubble } from './Zones';
+import { Cover, rayToProp } from './Cover';
 import {
   RHYTHM_MAX,
   UnitComponent,
@@ -455,6 +456,7 @@ export class EncounterComponent extends Component {
       this.registerDevCommands();
     }
     this.surfaces.init();
+    Cover.newFrame();
 
     this.updateAttacks(dt);
 
@@ -753,6 +755,7 @@ export class EncounterComponent extends Component {
       if (Zones.blocksProjectile(feet, target.getFeetPosition(vec3.create()))) {
         return fail('bubble border');
       }
+      if (Cover.isCovered(target, feet)) return fail('covered');
       return fail(result.inRange ? 'no line of sight' : 'target out of range');
     }
     result.canAttack = true;
@@ -1347,7 +1350,10 @@ export class EncounterComponent extends Component {
         const aim = vec3.fromValues(point[0]!, point[1]! + POINT_AIM_HEIGHT, point[2]!);
         // El borde de una burbuja de bendaleo desvía los proyectiles.
         result.lineOfSight =
-          !skill.lineOfSight || (hasLineOfSight(eye, aim) && !Zones.blocksProjectile(feet, point));
+          !skill.lineOfSight ||
+          (hasLineOfSight(eye, aim) &&
+            !Cover.propBlocks(eye, aim, [unit]) &&
+            !Zones.blocksProjectile(feet, point));
         result.affected = skill.radius > 0 ? unitsInCircle(skill, unit, point, skill.radius) : [];
         if (
           (hasEffect(skill, 'leap') || hasEffect(skill, 'teleport')) &&
@@ -1403,6 +1409,14 @@ export class EncounterComponent extends Component {
           result.direction,
           lineReach(unit, result.direction, skill.length),
         );
+        // Un prop alto (un carro) para la bala.
+        const chest = vec3.fromValues(feet[0]!, feet[1]! + 1.3, feet[2]!);
+        for (const p of Cover.tallProps()) {
+          result.reach = Math.min(
+            result.reach,
+            rayToProp(chest, result.direction, p, result.reach),
+          );
+        }
         result.inRange = result.lineOfSight = true;
         result.affected = unitsInLine(skill, unit, point, result.reach);
         break;
@@ -1418,6 +1432,9 @@ export class EncounterComponent extends Component {
       // No llega o no ve: buscar desde dónde sí (unidad o punto; cono y self no se mueven).
       result.approach = this.planSkillApproach(entity, unit, skill, targetUnit, result.origin);
       if (!result.approach) {
+        if (targetUnit && skill.target === 'unit' && Cover.isCovered(targetUnit, feet)) {
+          return fail('covered');
+        }
         return fail(result.inRange ? 'no line of sight' : 'target out of range');
       }
     }
@@ -2999,6 +3016,28 @@ export class EncounterComponent extends Component {
                 : null,
               approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
+            };
+          }
+          case 'cover': {
+            // args.to = [x, y, z]: el snap de la unidad ahí, sus caras y de quién está a cubierto.
+            const to = args.to as [number, number, number];
+            const unit = unitArg().getComponent('unit') as UnitComponent;
+            const snapped = Cover.snap(
+              vec3.fromValues(to[0], to[1], to[2]),
+              unit.getCapsuleRadius(),
+              unit,
+            );
+            const faces = Cover.faces(snapped, unit.getCapsuleRadius(), unit);
+            const round = (v: number) => Math.round(v * 100) / 100;
+            return {
+              snapped: Array.from(snapped).map(round),
+              faces: faces.map((f) => [round(f.dir[0]!), round(f.dir[2]!)]),
+              hiddenFrom: UnitComponent.getAll()
+                .filter((u) => u.isAlive() && u.getFaction() === 'enemy')
+                .filter((u) =>
+                  Cover.coveredAt(snapped, unit.getCapsuleRadius(), u.getFeetPosition(), unit),
+                )
+                .map((u) => u.getOwner().getName()),
             };
           }
           case 'restart':

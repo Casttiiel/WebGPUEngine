@@ -3494,5 +3494,133 @@
       "color": [1, 1, 1, 1]
     },
     "blocksInput": false
+  },
+  {
+    "name": "cover_1",
+    "alias": "cover_1",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "cover_2",
+    "alias": "cover_2",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "cover_3",
+    "alias": "cover_3",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "cover_4",
+    "alias": "cover_4",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "cover_5",
+    "alias": "cover_5",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "cover_6",
+    "alias": "cover_6",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "cover_7",
+    "alias": "cover_7",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "cover_8",
+    "alias": "cover_8",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 40,
+    "height": 40,
+    "imageParams": {
+      "texture": "tactical/cover_shield.png",
+      "size": [40, 40],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
   }
 ]

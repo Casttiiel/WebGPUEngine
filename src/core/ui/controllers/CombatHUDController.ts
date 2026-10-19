@@ -144,6 +144,12 @@ const HP_LEFT_PARTY: RGBA = [0.5, 0.72, 0.38, 1];
 const HP_LEFT_ENEMY: RGBA = [0.7, 0.15, 0.12, 1];
 
 const STATUS_ICONS = 24;
+/** Escudos de cobertura alrededor del destino al moverse. */
+const COVER_SHIELDS = 8;
+const COVER_SIZE = 40;
+/** A qué distancia del destino (m) y a qué altura se dibuja cada escudo. */
+const COVER_OFFSET = 0.75;
+const COVER_HEIGHT = 0.9;
 const STATUS_SIZE = 48;
 const STATUS_GAP = 4;
 /** Altura del icono de estado sobre el centro de la unidad (m): encima de la cabeza. */
@@ -231,6 +237,7 @@ export class CombatHUDController extends WidgetController {
   private freeFloats: TextWidget[] = [];
   /** Iconos de estado (miedo) sobre la cabeza de las unidades afectadas. */
   private statusIcons: ImageWidget[] = [];
+  private coverShields: ImageWidget[] = [];
   private damageBars: DamageBar[] = [];
   private resolved = false;
 
@@ -268,6 +275,7 @@ export class CombatHUDController extends WidgetController {
     this.updateRestartHint(encounter);
     this.updateFloats(dt);
     this.updateStatusIcons();
+    this.updateCoverShields();
     this.updateDamagePreview();
 
     const inCombat = state === 'combat';
@@ -784,6 +792,29 @@ export class CombatHUDController extends WidgetController {
     });
   }
 
+  /**
+   * Al elegir dónde moverse, un escudo por cada dirección en la que el destino queda a cubierto
+   * (las caras contiguas se agrupan en un solo escudo).
+   */
+  private updateCoverShields(): void {
+    const preview = this.subscribed ? TacticalPointerComponent.find()?.getCoverPreview() : null;
+    const dirs = preview ? groupDirections(preview.faces) : [];
+    this.coverShields.forEach((icon, i) => {
+      const dir = dirs[i];
+      if (!preview || !dir) {
+        icon.setVisible(false);
+        return;
+      }
+      const p = this.tmpPos;
+      p[0] = preview.point[0]! + dir[0]! * COVER_OFFSET;
+      p[1] = preview.point[1]! + COVER_HEIGHT;
+      p[2] = preview.point[2]! + dir[2]! * COVER_OFFSET;
+      const screen = this.worldToUI(p);
+      icon.setVisible(screen !== null);
+      if (screen) icon.setPosition(screen[0] - COVER_SIZE / 2, screen[1] - COVER_SIZE / 2);
+    });
+  }
+
   private clearFloats(): void {
     for (const f of this.floats) {
       f.widget.setVisible(false);
@@ -931,6 +962,10 @@ export class CombatHUDController extends WidgetController {
         text: get<TextWidget>(`dmg_bar_${i}_text`),
       });
     }
+    for (let i = 1; i <= COVER_SHIELDS; i++) {
+      const w = get<ImageWidget>(`cover_${i}`);
+      if (w) this.coverShields.push(w);
+    }
     for (let i = 1; i <= STATUS_ICONS; i++) {
       const w = get<ImageWidget>(`status_${i}`);
       if (w) this.statusIcons.push(w);
@@ -942,6 +977,35 @@ export class CombatHUDController extends WidgetController {
 export function multiplierText(power: number): string {
   const rounded = Math.round(power * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',');
+}
+
+/**
+ * Agrupa direcciones contiguas (las de las caras de cobertura vienen en pasos de 360/16°) y
+ * devuelve la media de cada grupo.
+ */
+function groupDirections(dirs: readonly vec3[]): vec3[] {
+  if (!dirs.length) return [];
+  const angles = dirs.map((d) => Math.atan2(d[2]!, d[0]!)).sort((a, b) => a - b);
+  const step = (Math.PI * 2) / 16 + 1e-3;
+  const groups: number[][] = [];
+  for (const a of angles) {
+    const last = groups[groups.length - 1];
+    if (last && a - last[last.length - 1]! <= step) last.push(a);
+    else groups.push([a]);
+  }
+  // El primer y el último grupo se tocan si dan la vuelta (−π / π).
+  if (groups.length > 1) {
+    const first = groups[0]!;
+    const last = groups[groups.length - 1]!;
+    if (first[0]! + Math.PI * 2 - last[last.length - 1]! <= step) {
+      groups[0] = [...last.map((a) => a - Math.PI * 2), ...first];
+      groups.pop();
+    }
+  }
+  return groups.map((g) => {
+    const mean = g.reduce((s, a) => s + a, 0) / g.length;
+    return vec3.fromValues(Math.cos(mean), 0, Math.sin(mean));
+  });
 }
 
 function findCamera(): TacticalCameraControllerComponent | null {

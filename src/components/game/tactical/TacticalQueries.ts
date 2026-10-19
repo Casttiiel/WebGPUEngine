@@ -137,3 +137,27 @@ export function truncatePath(points: vec3[], maxLength: number): PathPlan {
   }
   return { points: out, length, reachable: out.length >= 2 };
 }
+
+/**
+ * Distancia hasta la primera geometría estática desde `a` en `dir` (normalizada), como mucho
+ * `max` (si no hay nada, `max`).
+ */
+export function staticRayDistance(a: vec3, dir: vec3, max: number): number {
+  const world = Engine.getPhysics()?.getWorld();
+  if (!world) return max;
+  const ray = new RAPIER.Ray(
+    { x: a[0]!, y: a[1]!, z: a[2]! },
+    { x: dir[0]!, y: dir[1]!, z: dir[2]! },
+  );
+  const hit = world.castRay(
+    ray,
+    max,
+    true,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    isStaticSolid,
+  );
+  return hit ? hit.timeOfImpact : max;
+}

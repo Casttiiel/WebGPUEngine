@@ -124,14 +124,18 @@ El recurso principal sigue siendo el metal. Escenarios: `phase11_slider` y `phas
 
 ### Fase 12 — Cobertura (GDD §5): tapa o no tapa
 
-- [ ] **12.1 Los props Grandes cortan la línea de visión.** Hoy `hasLineOfSight` solo mira la
+Hecho en `Cover.ts` (escenario `phase12_cover`). Props altos nuevos: Carro (de hierro, se puede
+atraer y empujar) y Cajas apiladas (madera), de 1,9 m: por debajo de la altura de los ojos
+(~1,6 m) un prop no corta la línea de visión de quien está detrás.
+
+- [x] **12.1 Los props Grandes cortan la línea de visión.** Hoy `hasLineOfSight` solo mira la
       geometría estática: los props Grandes vivos también tapan; al romperse o moverse, dejan
       de tapar. Los Pequeños no.
-- [ ] **12.2 Caras de cobertura.** Para un punto del suelo, qué coberturas tiene pegadas (a
+- [x] **12.2 Caras de cobertura.** Para un punto del suelo, qué coberturas tiene pegadas (a
       menos de ~1 m) y hacia dónde mira cada una: rayos horizontales a la altura del pecho en 8–16
       direcciones contra el escenario estático y los props Grandes → lista de normales de cara.
       Lo bajo (por debajo de ~1,2 m) no cuenta.
-- [ ] **12.3 Regla.** Una unidad está a cubierto de un atacante si alguna de sus caras de
+- [x] **12.3 Regla.** Una unidad está a cubierto de un atacante si alguna de sus caras de
       cobertura lo tiene dentro de su arco (≈ 140°, configurable): entonces no hay línea de
       visión para ataques a distancia ni habilidades `unit` con `lineOfSight`. Si no, vale el
       rayo de siempre. No afecta al melee ni a las áreas.
@@ -139,14 +143,14 @@ El recurso principal sigue siendo el metal. Escenarios: `phase11_slider` y `phas
       puede apuntar (tampoco uno colocado casi en diagonal); el que flanquea sí; una bola de
       fuego le alcanza igual; al atraer el prop Grande tras el que se escondía, ya le pueden
       disparar.
-- [ ] **12.4 Snap al moverse.** Si el destino elegido está cerca de una cobertura, se ajusta al
+- [x] **12.4 Snap al moverse.** Si el destino elegido está cerca de una cobertura, se ajusta al
       punto pegado a ella (en combate y en exploración). En el destino, un escudo por cada
       dirección cubierta y qué enemigos dejarían de verle.
-- [ ] **12.5 Vista previa al apuntar**: "a cubierto" (no se puede elegir) en lugar de la barra
+- [x] **12.5 Vista previa al apuntar**: "a cubierto" (no se puede elegir) en lugar de la barra
       de daño.
-- [ ] **12.6 Lo empujado en línea recta choca con la cobertura**, no con quien se esconde
+- [x] **12.6 Lo empujado en línea recta choca con la cobertura**, no con quien se esconde
       detrás (IMPACTO contra ella).
-- [ ] **12.7 IA.** TacticalPlanner valora acabar a cubierto de las amenazas (usando el mismo
+- [x] **12.7 IA.** TacticalPlanner valora acabar a cubierto de las amenazas (usando el mismo
       snap), flanquear al que lo está y quitarle la cobertura (empujar o atraer el prop, áreas).
 
 ### Fase 13 — Voz (GDD §10.3)

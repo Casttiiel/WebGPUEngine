@@ -28,6 +28,15 @@ import { AimArrow } from './AimArrow';
 import { ActionCameraComponent } from './ActionCameraComponent';
 import { THROW_RANGE } from './EnvironmentRules';
 import { STATUS_NAME } from './ActionText';
+import { Cover } from './Cover';
+
+/** Cobertura del destino al moverse: dónde, hacia dónde tapa y de qué enemigos. */
+export interface CoverPreview {
+  point: vec3;
+  /** Direcciones (horizontales) de sus caras de cobertura. */
+  faces: vec3[];
+  hiddenFrom: UnitComponent[];
+}
 import { finisherDamage, hitRange, skillDamage } from './CombatRules';
 import { rangeText } from './Stats';
 import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
@@ -130,6 +139,7 @@ const REASON_TEXT: Record<string, string> = {
   'no destination': 'elige dónde cae',
   'bubble border': 'el borde de la burbuja lo desvía',
   bubble: 'no se puede salir de la burbuja',
+  covered: 'a cubierto',
 };
 
 const reasonText = (reason: string | undefined): string =>
@@ -203,6 +213,9 @@ export class TacticalPointerComponent extends Component {
   /** Objeto para el que está puesto el plano de cámara de apuntar (null: ninguno). */
   private aimShotFor: Entity | null = null;
   private movePlan: MovePlan | null = null;
+  /** Adonde se movería de verdad: el punto bajo el cursor ajustado a la cobertura (snap). */
+  private moveTarget = vec3.create();
+  private coverPreview: CoverPreview | null = null;
   private initialized = false;
   private readonly tmpPos = vec3.create();
 
@@ -546,9 +559,30 @@ export class TacticalPointerComponent extends Component {
     });
   }
 
+  /** Cobertura en el final del camino (si llega): caras y de qué enemigos queda a cubierto. */
+  private coverAt(unit: UnitComponent, move: MovePlan): CoverPreview | null {
+    const end = move.walk.points[move.walk.points.length - 1];
+    if (!end) return null;
+    const faces = Cover.faces(end, unit.getCapsuleRadius(), unit);
+    if (!faces.length) return null;
+    const hiddenFrom = UnitComponent.getAll().filter(
+      (u) =>
+        u.isAlive() &&
+        u.getFaction() === 'enemy' &&
+        Cover.coveredAt(end, unit.getCapsuleRadius(), u.getFeetPosition(vec3.create()), unit),
+    );
+    return { point: vec3.clone(end), faces: faces.map((f) => f.dir), hiddenFrom };
+  }
+
+  /** Cobertura del destino al mover (escudos del HUD), o null. */
+  public getCoverPreview(): CoverPreview | null {
+    return this.coverPreview;
+  }
+
   private pickWorld(inGameplay: boolean): void {
     this.hoveredUnit = null;
     this.movePlan = null;
+    this.coverPreview = null;
     this.attackPlan = null;
     this.jumpPlan = null;
     this.pushPlan = null;
@@ -615,7 +649,17 @@ export class TacticalPointerComponent extends Component {
       this.hoverKind = this.jumpPlan?.canJump ? 'ground' : 'invalid';
       return;
     }
-    this.movePlan = this.planMoveTo(this.hoverPoint);
+    // Snap: cerca de una cobertura, el destino se pega a ella (GDD §5).
+    const mover = PartyComponent.find()?.getSelected()?.getComponent('unit') as
+      | UnitComponent
+      | null
+      | undefined;
+    vec3.copy(
+      this.moveTarget,
+      mover ? Cover.snap(this.hoverPoint, mover.getCapsuleRadius(), mover) : this.hoverPoint,
+    );
+    this.movePlan = this.planMoveTo(this.moveTarget);
+    this.coverPreview = mover && this.movePlan?.canMove ? this.coverAt(mover, this.movePlan) : null;
     const m = this.movePlan;
     // Válido si se puede avanzar, aunque sea solo parte del camino (se para donde llegue).
     this.hoverKind = m && m.canMove ? 'ground' : 'invalid';
@@ -961,9 +1005,13 @@ export class TacticalPointerComponent extends Component {
       m.allowed &&
       m.plan.reachable;
     if (showPath) {
-      const label = m.affordable
+      let label = m.affordable
         ? `${m.plan.length.toFixed(1)} m`
         : `${m.walk.length.toFixed(1)} / ${m.plan.length.toFixed(1)} m`;
+      const cover = this.coverPreview;
+      if (cover?.hiddenFrom.length) {
+        label += ` · a cubierto de ${cover.hiddenFrom.map((u) => u.getDisplayName()).join(', ')}`;
+      }
       this.preview?.show(m.plan.points, m.budget, label);
     } else {
       this.preview?.hide();
@@ -1182,7 +1230,7 @@ export class TacticalPointerComponent extends Component {
       this.jumpCache.key = '';
       this.planCache.key = '';
     } else if (this.hoverKind === 'ground') {
-      if (selected) encounter?.requestMove(selected, this.hoverPoint);
+      if (selected) encounter?.requestMove(selected, this.moveTarget);
       this.planCache.key = ''; // el presupuesto ha cambiado
     } else if (this.hoverKind === 'enemy' && this.hoveredUnit && selected) {
       const result = encounter?.requestAttack(selected, this.hoveredUnit, this.getArmedAttack());

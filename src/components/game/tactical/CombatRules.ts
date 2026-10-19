@@ -4,6 +4,7 @@ import { hasLineOfSight } from './TacticalQueries';
 import type { SkillDef } from './Skills';
 import { PropComponent } from './PropComponent';
 import { Zones } from './Zones';
+import { Cover } from './Cover';
 import { averageOf, critDamageFor, mitigatedRange, rollRange, type DamageRange } from './Stats';
 
 /**
@@ -32,13 +33,20 @@ export function unitDistance(a: UnitComponent, b: UnitComponent): number {
 export function unitLineOfSight(from: UnitComponent, to: UnitComponent): boolean {
   // El borde de una burbuja de bendaleo desvía los proyectiles.
   if (Zones.blocksProjectile(from.getFeetPosition(tmpA), to.getFeetPosition(tmpB))) return false;
+  // Cobertura (GDD §5): a cubierto de quien está al otro lado de su cara de cobertura.
+  if (Cover.isCovered(to, from.getFeetPosition(tmpA))) return false;
   const eye = from.getPosition(tmpA);
   eye[1] = eye[1]! + EYE_HEIGHT;
   const target = to.getPosition(tmpB);
   target[1] = target[1]! + EYE_HEIGHT;
-  if (hasLineOfSight(eye, target)) return true;
+  if (clearRay(eye, target, from, to)) return true;
   target[1] = target[1]! - EYE_HEIGHT;
-  return hasLineOfSight(eye, target);
+  return clearRay(eye, target, from, to);
+}
+
+/** Rayo libre: ni geometría estática ni un prop alto (que no sea quien dispara ni su objetivo). */
+function clearRay(a: vec3, b: vec3, from: UnitComponent, to: UnitComponent): boolean {
+  return hasLineOfSight(a, b) && !Cover.propBlocks(a, b, [from, to]);
 }
 
 /**
@@ -58,13 +66,14 @@ export function unitLineOfSightFrom(
   target: UnitComponent,
 ): boolean {
   if (Zones.blocksProjectile(feet, target.getFeetPosition(tmpB))) return false;
+  if (Cover.isCovered(target, feet)) return false;
   const eye = vec3.copy(tmpA, feet);
   eye[1] = eye[1]! + unit.getFeetOffset() + EYE_HEIGHT;
   const aim = target.getPosition(tmpB);
   aim[1] = aim[1]! + EYE_HEIGHT;
-  if (hasLineOfSight(eye, aim)) return true;
+  if (clearRay(eye, aim, unit, target)) return true;
   aim[1] = aim[1]! - EYE_HEIGHT;
-  return hasLineOfSight(eye, aim);
+  return clearRay(eye, aim, unit, target);
 }
 
 export interface AttackRoll {

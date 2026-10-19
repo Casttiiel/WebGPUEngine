@@ -7,6 +7,7 @@
  *   surface_fire.png  mancha de brasas (naranja/rojo, borde irregular)
  *   surface_oil.png   charco de aceite (marrón oscuro con brillo)
  *   status_fear.png   icono del estado "miedo" (sobre la cabeza de la unidad)
+ *   cover_shield.png  escudo de cobertura (al moverse, por cada dirección cubierta)
  *   zone_bendalloy.png  burbuja de bendaleo (decal: círculo translúcido con borde)
  *   status_*.png      iconos del resto de estados: Seco, Aturdido, Derribado, Marcado, Burbuja
  *                     de acero y mente de hierro (Ligero / Pesado)
@@ -58,6 +59,10 @@ const statusIcon = (fill, ring, symbol) => `
     ${symbol}`;
 
 const textures = {
+  // Escudo de cobertura (destino al moverse): hacia dónde tapa.
+  'cover_shield.png': `
+    <path d="M128 28 L212 60 V124 C212 176 176 212 128 232 C80 212 44 176 44 124 V60 Z" fill="#3a6ea8" stroke="#0e1a28" stroke-width="16" stroke-linejoin="round"/>
+    <path d="M128 56 L186 78 V124 C186 162 160 188 128 204 Z" fill="#9cc4ee"/>`,
   // Burbuja de bendaleo: disco translúcido azulado con el borde marcado.
   'zone_bendalloy.png': `
     <circle cx="128" cy="128" r="118" fill="#9cc8ff" fill-opacity="0.16" stroke="#e2f0ff" stroke-width="7" stroke-opacity="0.9"/>

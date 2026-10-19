@@ -11,6 +11,7 @@ import {
 } from './CombatRules';
 import { SkillCatalog, hasEffect, isMetalAction, type SkillDef } from './Skills';
 import { averageOf } from './Stats';
+import { Cover } from './Cover';
 
 export type AIRole = 'melee' | 'ranged';
 
@@ -56,6 +57,8 @@ const ADVANCE_BASE = -20;
 const FLEE_DISTANCE = 1.5; // por metro de separación de quien le asustó
 const FLEE_HIDDEN = 4; // y si no le ve
 const MELEE_REACH = 2; // de borde a borde: "le pueden pegar" si está más cerca
+// Cobertura (GDD §5): acabar a cubierto de un enemigo vale esto (el doble con poca vida).
+const COVER_VALUE = 2.5;
 // Habilidades: mismo baremo que los ataques (≈ puntos de daño).
 const SKILL_BASE = 8;
 const HEAL_WEIGHT = 1.2; // por punto de vida que de verdad recupera
@@ -147,6 +150,12 @@ export function planTurn(
       value += Math.min(nearest, profile.preferredDistance) * RANGED_KEEP_DISTANCE;
       if (nearest < MELEE_REACH) value -= RANGED_IN_MELEE_PENALTY;
     }
+    // A cubierto de cuantos más enemigos, mejor (sobre todo con poca vida).
+    const radius = me.getCapsuleRadius();
+    const covered = foes.filter((f) =>
+      Cover.coveredAt(feet, radius, f.getFeetPosition(vec3.create()), me),
+    ).length;
+    value += covered * COVER_VALUE * (low ? 2 : 1);
     if (low) {
       value += nearest * RETREAT_DISTANCE;
       if (!foes.some((f) => unitLineOfSightFrom(me, feet, f))) value += RETREAT_HIDDEN;
@@ -305,11 +314,14 @@ function sampleReachable(
     for (let i = 0; i < RING_ANGLES; i++) {
       // Anillos alternos desfasados: cubren mejor el área.
       const angle = ((i + (r / RING_STEP) * 0.5) / RING_ANGLES) * Math.PI * 2;
-      const point = vec3.fromValues(
+      const raw = vec3.fromValues(
         here[0]! + Math.cos(angle) * r,
         here[1]!,
         here[2]! + Math.sin(angle) * r,
       );
+      // Como el jugador: cerca de una cobertura, el punto se pega a ella.
+      const unit = self.getComponent('unit') as UnitComponent | null;
+      const point = unit ? Cover.snap(raw, unit.getCapsuleRadius(), unit) : raw;
       const move = encounter.planMove(self, point);
       if (!move.canMove || !move.affordable) continue;
       const end = move.plan.points[move.plan.points.length - 1]!;
