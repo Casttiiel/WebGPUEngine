@@ -3,7 +3,8 @@ import { ModuleUI } from '../../../modules/core/ModuleUI';
 import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
 import { TextWidget } from '../../../components/ui/widgets/TextWidget';
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
-import type { UnitComponent } from '../../../components/game/tactical/UnitComponent';
+import type { UnitComponent, UnitStatus } from '../../../components/game/tactical/UnitComponent';
+import { STATUS_HELP, STATUS_NAME } from '../../../components/game/tactical/ActionText';
 import { METAL_BOOST, METAL_DRAINED, METAL_ON } from './CombatHUDController';
 
 const SLOTS = 4;
@@ -15,6 +16,15 @@ const FACE_DOWN = [0.17, 0.16, 0.15, 1] as const;
 const HP_WIDTH = 96;
 const HP_HEIGHT = 10;
 const METAL_HEIGHT = 8;
+/** Iconos de estado al lado de cada retrato. */
+const STATUS_SLOTS = 3;
+
+interface StatusSlot {
+  icon: ImageWidget;
+  status: UnitStatus | null;
+  texture: string | null;
+  hovered: boolean;
+}
 
 interface PortraitSlot {
   frame: ImageWidget;
@@ -22,19 +32,20 @@ interface PortraitSlot {
   name: TextWidget | null;
   hp: ImageWidget | null;
   metal: ImageWidget | null;
-  drained: TextWidget | null;
+  statuses: StatusSlot[];
   hovered: boolean;
 }
 
 /**
  * PartyHUDController — retratos de la party (assets/ui/party_hud.json).
- * Muestra nombre, tecla, vida y Reserva de metal de cada miembro (gris si está caído;
- * "Seco" mientras no puede usar alomancia), resalta el
+ * Muestra nombre, tecla, vida y Reserva de metal de cada miembro (gris si está caído) y sus
+ * estados (iconos al lado, con tooltip al pasar el ratón), resalta el
  * seleccionado y el retrato bajo el cursor, y al hacer click selecciona a ese miembro (la
  * cámara lo centra y lo sigue).
  */
 export class PartyHUDController extends WidgetController {
   private slots: (PortraitSlot | null)[] = [];
+  private tip: TextWidget | null = null;
   private resolved = false;
 
   constructor() {
@@ -46,6 +57,7 @@ export class PartyHUDController extends WidgetController {
     const party = PartyComponent.find();
     const members = party?.getMembers() ?? [];
     const selected = party?.getSelected() ?? null;
+    let tip: string | null = null;
 
     this.slots.forEach((slot, i) => {
       if (!slot) return;
@@ -71,8 +83,21 @@ export class PartyHUDController extends WidgetController {
       slot.metal?.setColor(
         ...(drained ? METAL_DRAINED : unit?.getMetalBoost() ? METAL_BOOST : METAL_ON),
       );
-      slot.drained?.setText(drained ? 'Seco' : '');
+      const statuses = unit?.isAlive() ? unit.getStatuses() : [];
+      slot.statuses.forEach((s, k) => {
+        s.status = statuses[k] ?? null;
+        s.icon.setVisible(s.status !== null);
+        if (!s.status) return;
+        const texture = `tactical/status_${s.status.id}.png`;
+        if (s.texture !== texture) {
+          s.icon.setTexture(texture);
+          s.texture = texture;
+        }
+        if (s.hovered) tip = statusTip(s.status);
+      });
     });
+    this.tip?.setVisible(tip !== null);
+    if (tip) this.tip?.setText(tip);
   }
 
   private resolveWidgets(): void {
@@ -92,13 +117,31 @@ export class PartyHUDController extends WidgetController {
         name: get<TextWidget>(`portrait_${i + 1}_name`),
         hp: get<ImageWidget>(`portrait_${i + 1}_hp`),
         metal: get<ImageWidget>(`portrait_${i + 1}_metal`),
-        drained: get<TextWidget>(`portrait_${i + 1}_drained`),
+        statuses: [],
         hovered: false,
       };
+      for (let k = 1; k <= STATUS_SLOTS; k++) {
+        const icon = get<ImageWidget>(`portrait_${i + 1}_status_${k}`);
+        if (!icon) continue;
+        const status: StatusSlot = { icon, status: null, texture: null, hovered: false };
+        icon.setOnMouseEnter(() => (status.hovered = true));
+        icon.setOnMouseLeave(() => (status.hovered = false));
+        slot.statuses.push(status);
+      }
       frame.setOnMouseEnter(() => (slot.hovered = true));
       frame.setOnMouseLeave(() => (slot.hovered = false));
       frame.setOnClick(() => PartyComponent.find()?.select(i, 'portrait'));
       this.slots.push(slot);
     }
+    this.tip = get<TextWidget>('party_status_tip');
   }
+}
+
+/** "Derribado: levantarse cuesta… (hasta su turno)". */
+function statusTip(status: UnitStatus): string {
+  const amount = status.amount ? ` +${status.amount} %` : '';
+  const time = Number.isFinite(status.turns)
+    ? `${status.turns} turno${status.turns > 1 ? 's' : ''}`
+    : 'hasta su turno';
+  return `${STATUS_NAME[status.id] ?? status.id}${amount}: ${STATUS_HELP[status.id] ?? ''} (${time})`;
 }

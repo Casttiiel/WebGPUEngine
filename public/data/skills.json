@@ -130,6 +130,141 @@
     ],
     "description": "Cargas en línea recta hasta el punto elegido sin gastar movimiento."
   },
+  "steel_jump": {
+    "name": "Salto de acero",
+    "scale": "POT",
+    "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
+    "target": "point",
+    "effects": [
+      {
+        "type": "leap"
+      }
+    ],
+    "description": "Empujas una moneda contra el suelo y sales despedido en arco. No gasta movimiento."
+  },
+  "steel_push": {
+    "name": "Empuje",
+    "scale": "POT",
+    "cost": "action",
+    "metal": 2,
+    "allomantic": true,
+    "target": "unit",
+    "range": 12,
+    "minRange": 3,
+    "targets": "any",
+    "effects": [
+      {
+        "type": "steelPush",
+        "aimAngle": 40
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Empujas un objeto o a alguien que lleve metal en línea recta, lejos de ti; puedes desviarlo un poco (±20°). Hay que estar al menos a 3 m. Lo que choca recibe el golpe."
+  },
+  "iron_pull": {
+    "name": "Tirón",
+    "scale": "POT",
+    "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
+    "target": "unit",
+    "range": 12,
+    "targets": "any",
+    "effects": [
+      {
+        "type": "ironPull"
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Atraes lo metálico hacia ti. Quien lleva armadura de metal llega al suelo; a quien solo lleva un arma de metal, se la quitas."
+  },
+  "pushed_bullet": {
+    "name": "Bala empujada",
+    "scale": "POT",
+    "cost": "action",
+    "metal": 3,
+    "allomantic": true,
+    "target": "line",
+    "length": 18,
+    "width": 0.6,
+    "affects": "enemies",
+    "effects": [
+      {
+        "type": "damage",
+        "amount": 6,
+        "penetration": 4
+      }
+    ],
+    "clip": "Spell_Simple_Shoot",
+    "description": "Empujas una moneda a tanta velocidad que atraviesa a todos los enemigos de la línea hasta la primera pared."
+  },
+  "hunter_mark": {
+    "name": "Marca del cazador",
+    "scale": "POT",
+    "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
+    "target": "unit",
+    "range": 18,
+    "targets": "enemy",
+    "effects": [
+      {
+        "type": "status",
+        "status": "marked",
+        "turns": 2,
+        "amount": 30,
+        "amountPerPoint": 5
+      }
+    ],
+    "description": "El estaño te enseña su punto débil: el siguiente golpe que reciba, de quien sea, hace más daño."
+  },
+  "steel_bubble": {
+    "name": "Burbuja de acero",
+    "cost": "bonusAction",
+    "metal": 2,
+    "allomantic": true,
+    "target": "self",
+    "effects": [
+      {
+        "type": "status",
+        "status": "steel_bubble",
+        "turns": 1,
+        "untilTurnStart": true
+      }
+    ],
+    "description": "Empujas en todas direcciones: hasta tu siguiente turno, los proyectiles contra ti tienen un 50 % de fallar."
+  },
+  "iron_light": {
+    "name": "Hierro: Ligero",
+    "cost": "free",
+    "charge": "iron",
+    "target": "self",
+    "effects": [
+      {
+        "type": "status",
+        "status": "iron_light",
+        "turns": 1
+      }
+    ],
+    "description": "Decantas peso de tu mente de hierro (sin gastar acción): este turno tus saltos llegan el doble de lejos."
+  },
+  "iron_heavy": {
+    "name": "Hierro: Pesado",
+    "cost": "free",
+    "charge": "iron",
+    "target": "self",
+    "effects": [
+      {
+        "type": "status",
+        "status": "iron_heavy",
+        "turns": 1,
+        "untilTurnStart": true
+      }
+    ],
+    "description": "Decantas peso (sin gastar acción): hasta tu siguiente turno no te pueden empujar, atraer ni derribar."
+  },
   "duralumin": {
     "name": "Duraluminio",
     "cost": "bonusAction",

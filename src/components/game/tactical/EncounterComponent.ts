@@ -5,7 +5,12 @@ import { Engine } from '../../../core/engine/Engine';
 import { KeyCode } from '../../../types/KeyCode.enum';
 import { DevBridge } from '../../../core/debug/DevBridge';
 import { ModuleGameController } from '../../../modules/game/ModuleGameController';
-import { UnitComponent, type UnitAttack, type UnitStatusId } from './UnitComponent';
+import {
+  UnitComponent,
+  type StatusOptions,
+  type UnitAttack,
+  type UnitStatusId,
+} from './UnitComponent';
 import { PartyComponent } from './PartyComponent';
 import { TacticalCameraControllerComponent } from './TacticalCameraControllerComponent';
 import { ActionCameraComponent } from './ActionCameraComponent';
@@ -22,18 +27,19 @@ import {
 } from './TacticalQueries';
 import {
   EYE_HEIGHT,
+  STEEL_BUBBLE_MISS,
   hitRange,
+  isMetallic,
   metalCost,
   previewAttack,
   rollAttack,
   skillDamage,
-  statusTurns,
   unitDistance,
   unitDistanceFrom,
   unitLineOfSight,
   unitLineOfSightFrom,
 } from './CombatRules';
-import { PropComponent, type PropExplosion } from './PropComponent';
+import { IMPACT_BASE, PropComponent, type PropExplosion } from './PropComponent';
 import { Surfaces } from './Surfaces';
 import {
   MAX_JUMP,
@@ -44,15 +50,17 @@ import {
   pushPath,
   throwArc,
 } from './EnvironmentRules';
-import { rollInitiative, rollRange } from './Stats';
+import { rollInitiative, rollRange, steelDistanceFor, steelJumpFor } from './Stats';
 import {
   SkillCatalog,
   coneDirection,
   hasEffect,
   isHostile,
   isMetalAction,
+  lineReach,
   unitsInCircle,
   unitsInCone,
+  unitsInLine,
   type SkillDef,
 } from './Skills';
 
@@ -93,10 +101,30 @@ export interface EncounterEventData {
 
 export type DamageCause = 'attack' | 'skill' | 'fire' | 'explosion' | 'impact' | 'debug';
 
+/**
+ * Lo que mueve una habilidad: el objetivo empujado o atraído (en línea recta), el lanzador
+ * saltando (en arco) o el arma que le quitan a alguien (desarme, sin movimiento).
+ */
+export interface SkillMotion {
+  kind: 'push' | 'pull' | 'leap' | 'disarm';
+  /** Lo que se mueve: el objetivo o, en un salto, el lanzador. */
+  body: UnitComponent;
+  /** Trayectoria de sus pies (vacía en un desarme). */
+  points: vec3[];
+  /** Contra quién choca al llegar (recibe el IMPACTO). */
+  hit: UnitComponent | null;
+  /** Se para contra una pared o un desnivel (una unidad recibe +50 %). */
+  wall: boolean;
+  /** D del impacto: base del tamaño (una unidad cuenta como Grande) + POT, por el multiplicador. */
+  damage: number;
+}
+
 /** Objetivo de una habilidad: una unidad o un punto (según su targeting). */
 export interface SkillTarget {
   unit?: Entity | null;
   point?: vec3 | null;
+  /** Empuje: hacia dónde (horizontal); se ajusta al ángulo que permite la habilidad. */
+  direction?: vec3 | null;
 }
 
 export interface SkillPlan {
@@ -111,6 +139,10 @@ export interface SkillPlan {
   direction: vec3 | null;
   /** Quién recibe los efectos (vista previa: se resaltan antes de confirmar). */
   affected: UnitComponent[];
+  /** Línea: hasta dónde llega (se corta en la primera pared). */
+  reach: number;
+  /** Empuje, tirón, desarme o salto: qué se mueve y por dónde (vista previa). */
+  motion: SkillMotion | null;
   /** Metal que gastaría de la Reserva (con duraluminio, nada). */
   metalCost: number;
   /** Multiplicador del efecto (duraluminio: ×(1 + quemado / máximo)). */
@@ -173,11 +205,15 @@ export interface ThrowPlan {
   reason?: string;
 }
 
-/** Un objeto empujado o lanzado que golpea al llegar (a quien pille y a sí mismo). */
+/**
+ * Un objeto (o una unidad) empujado, atraído o lanzado que golpea al llegar, a quien pille y a
+ * sí mismo (GDD §5).
+ */
 interface PendingImpact {
   timer: number;
   source: UnitComponent;
-  prop: UnitComponent;
+  /** Lo que se mueve: un objeto o una unidad. */
+  body: UnitComponent;
   hit: UnitComponent | null;
   /** D del impacto (el golpeado lo recibe con su armadura). */
   damage: number;
@@ -185,6 +221,10 @@ interface PendingImpact {
   always: boolean;
   /** Hacia dónde iba (horizontal): el golpeado sale despedido hacia allí. */
   direction: vec3 | null;
+  /** Lo que se mueve es una unidad: llega Derribada (y recibe daño si choca). */
+  unitBody: boolean;
+  /** Se ha parado contra una pared (una unidad recibe +50 %). */
+  wall: boolean;
 }
 
 interface Combatant {
@@ -304,6 +344,16 @@ const DASH_SPEED = 16;
 const SHOVE_SPEED = 8;
 /** Altura (sobre los pies) a la que se comprueba que el camino de una embestida está libre. */
 const DASH_CLEARANCE = 1;
+/** Empujar a mano (un objeto Grande): distancia (m). */
+const HAND_PUSH_DISTANCE = 3;
+/** Empuje y tirón de acero: velocidad con la que sale lo empujado o atraído (m/s). */
+const STEEL_SPEED = 16;
+/** Tirón: se para a esta distancia (de borde a borde) de quien tira. */
+const PULL_GAP = 0.15;
+/** Salto de acero: velocidad (más rápido que el salto normal). */
+const LEAP_SPEED = 13;
+/** Una unidad empujada contra una pared recibe +50 % (GDD §5). */
+const WALL_MULTIPLIER = 1.5;
 /** Plano de acción: segundos que se mantiene tras el impacto, y tras una muerte. */
 const SHOT_AFTER_HIT = 0.7;
 const SHOT_AFTER_KILL = 1.3;
@@ -504,7 +554,8 @@ export class EncounterComponent extends Component {
 
   /**
    * Eventos: state:<estado>, turn, round, join, move, attack, damage, death, downed, revive,
-   * restart, skill, status, status-end; metal (amount = gastado), duralumin,
+   * restart, skill, status, status-end, impact, pushed, pulled, disarm, jump; metal (amount =
+   * gastado), duralumin,
    * declare-drained y refill (la Reserva se llena al acabar el turno Seco).
    */
   public onEvent(listener: (event: string, data: EncounterEventData) => void): () => void {
@@ -725,7 +776,8 @@ export class EncounterComponent extends Component {
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
     const budget = this.state === 'combat' ? this.resources.movement : Infinity;
-    const arc = jumpArc(unit.getFeetPosition(this.tmpA), destination);
+    const maxJump = MAX_JUMP * (unit.hasStatus('iron_light') ? 2 : 1);
+    const arc = jumpArc(unit.getFeetPosition(this.tmpA), destination, maxJump);
     if (!('reason' in arc) && arc.distance <= budget + EPS) {
       result.points = arc.points;
       result.distance = arc.distance;
@@ -740,7 +792,7 @@ export class EncounterComponent extends Component {
     // Primero al nivel en el que está (desde el suelo se salta desde el suelo junto al
     // saliente, no subiendo por la rampa para dar un saltito); si no hay, a cualquier nivel.
     const jumpFrom = (feet: vec3) => {
-      const a = jumpArc(feet, destination);
+      const a = jumpArc(feet, destination, maxJump);
       return 'reason' in a ? null : a;
     };
     const level = unit.getFeetPosition(this.tmpA)[1]!;
@@ -748,7 +800,7 @@ export class EncounterComponent extends Component {
       this.planApproachTo(
         entity,
         destination,
-        JUMP_RINGS.map((k) => MAX_JUMP * k),
+        JUMP_RINGS.map((k) => maxJump * k),
         (feet) =>
           (!sameLevel || Math.abs(feet[1]! - level) < SAME_LEVEL) && jumpFrom(feet) !== null,
         (feet) => jumpFrom(feet)?.distance ?? Infinity,
@@ -818,7 +870,8 @@ export class EncounterComponent extends Component {
     if (!unit || !prop) return fail('not a unit');
     if (!unit.hasAbility('push')) return fail('cannot push');
     const data = PropComponent.of(target);
-    if (!data?.isPushable() || !prop.isAlive()) return fail('not pushable');
+    if (!data || data.isSmall() || !prop.isAlive()) return fail('not pushable');
+    const impactDamage = data.getImpactBase() + unit.getAttribute('FUE');
     result.distance = unitDistance(unit, prop);
     result.inReach = result.distance <= PUSH_REACH + EPS;
     const permission = this.canAct(unit, 'bonusAction');
@@ -835,7 +888,7 @@ export class EncounterComponent extends Component {
       const away = awayFrom(feet);
       if (!away || (wanted && vec3.dot(away, wanted) < PUSH_ALIGN)) return null;
       const dir = wanted ?? away;
-      const path = pushPath(prop, dir, data.getPushDistance(), unit);
+      const path = pushPath(prop, dir, HAND_PUSH_DISTANCE, unit);
       if (path.length < 0.3 && !path.hit) return null;
       const destination = vec3.scaleAndAdd(vec3.create(), center, dir, path.length);
       return { ...path, dir, destination };
@@ -861,7 +914,7 @@ export class EncounterComponent extends Component {
     result.direction = push.dir;
     result.hit = push.hit;
     if (push.hit) {
-      const range = hitRange(null, push.hit, data.getImpactDamage());
+      const range = hitRange(null, push.hit, impactDamage);
       result.minDamage = range.min;
       result.maxDamage = range.max;
     }
@@ -901,7 +954,7 @@ export class EncounterComponent extends Component {
     const dir = vec3.clone(plan.direction!);
     // Plano de acción si golpea a alguien o si se estaba apuntando con la cámara.
     const camera = this.getActionCamera();
-    const travel = slideTime(PUSH_SPEED, data.getPushDistance(), plan.pushLength);
+    const travel = slideTime(PUSH_SPEED, HAND_PUSH_DISTANCE, plan.pushLength);
     const shotTargets: (Entity | vec3)[] = [target, to];
     if (plan.hit) shotTargets.push(plan.hit.getOwner());
     const delay =
@@ -912,11 +965,13 @@ export class EncounterComponent extends Component {
     const impact: PendingImpact = {
       timer: Infinity,
       source: unit,
-      prop,
+      body: prop,
       hit: plan.hit,
-      damage: data.getImpactDamage(),
+      damage: data.getImpactBase() + unit.getAttribute('FUE'),
       always: false,
       direction: dir,
+      unitBody: false,
+      wall: false,
     };
     this.pendingImpacts.push(impact);
     // Anticipación: la animación empieza y el objeto sale cuando las manos lo tocan.
@@ -927,7 +982,7 @@ export class EncounterComponent extends Component {
         if (plan.pushLength > 0.05) {
           void prop.moveAlong([from, to], {
             speed: PUSH_SPEED,
-            slide: data.getPushDistance(),
+            slide: HAND_PUSH_DISTANCE,
             spin: (Math.random() < 0.5 ? -1 : 1) * PUSH_SPIN * Math.min(1, plan.pushLength / 3),
             walk: false,
             face: false,
@@ -964,7 +1019,8 @@ export class EncounterComponent extends Component {
     if (!unit || !prop) return fail('not a unit');
     if (!unit.hasAbility('throw')) return fail('cannot throw');
     const data = PropComponent.of(target);
-    if (!data?.isThrowable() || !prop.isAlive()) return fail('not throwable');
+    if (!data?.isSmall() || !prop.isAlive()) return fail('not throwable');
+    const impactDamage = data.getImpactBase() + unit.getAttribute('FUE');
     const aimUnit = (aim.unit?.getComponent('unit') as UnitComponent | null) ?? null;
     if (aimUnit === prop || aimUnit === unit) return fail('no target');
     if (!aimUnit && !aim.point) return fail('no target');
@@ -1009,7 +1065,7 @@ export class EncounterComponent extends Component {
     result.points = flight.points;
     result.landing = flight.points[flight.points.length - 1]!;
     result.hit = flight.hit ?? aimUnit;
-    const range = hitRange(null, result.hit ?? prop, data.getImpactDamage());
+    const range = hitRange(null, result.hit ?? prop, impactDamage);
     result.minDamage = range.min;
     result.maxDamage = range.max;
 
@@ -1060,7 +1116,7 @@ export class EncounterComponent extends Component {
     this.pendingAction = null;
     const unit = entity.getComponent('unit') as UnitComponent;
     const prop = target.getComponent('unit') as UnitComponent;
-    const damage = PropComponent.of(target)!.getImpactDamage();
+    const damage = PropComponent.of(target)!.getImpactBase() + unit.getAttribute('FUE');
     unit.stop(); // exploración: puede venir andando
     unit.faceTowards(plan.landing);
     // Plano de acción si golpea a alguien (como un ataque).
@@ -1075,13 +1131,15 @@ export class EncounterComponent extends Component {
     this.pendingImpacts.push({
       timer: Infinity,
       source: unit,
-      prop,
+      body: prop,
       hit: plan.hit,
       damage,
       always: true,
       direction: horizontalDirection(
         vec3.sub(vec3.create(), plan.landing, prop.getFeetPosition(vec3.create())),
       ),
+      unitBody: false,
+      wall: false,
     });
     const impact = this.pendingImpacts[this.pendingImpacts.length - 1]!;
     const points = plan.points.map((p) => vec3.clone(p));
@@ -1095,25 +1153,44 @@ export class EncounterComponent extends Component {
   }
 
   /**
-   * Un objeto empujado o lanzado ha llegado: golpea a quien pilla (que sale despedido) y se
-   * golpea él; si es de los que se rompen al chocar con alguien, se rompe.
+   * Algo empujado, atraído o lanzado ha llegado (GDD §5): golpea a quien pilla (que sale
+   * despedido; un objeto Grande lo deja Aturdido, una unidad lo deja Derribado) y se golpea
+   * él. Un objeto de los que se rompen al chocar con alguien se rompe (y si cae al suelo
+   * lanzado, recibe el golpe); los que no (cuchillos) ni se dañan; una unidad llega
+   * Derribada y, si ha chocado, recibe el golpe (+50 % contra una pared).
    */
   private applyImpact(impact: PendingImpact): void {
-    const { hit, prop } = impact;
+    const { hit, body } = impact;
     // Una tirada; cada uno la recibe con su armadura (el objeto, normalmente sin armadura).
     const u = Math.random();
-    const amount = (unit: UnitComponent) => rollRange(hitRange(null, unit, impact.damage), u);
+    const amount = (unit: UnitComponent, multiplier = 1) =>
+      rollRange(hitRange(null, unit, Math.round(impact.damage * multiplier)), u);
+    const prop = PropComponent.of(body.getOwner());
     this.getActionCamera()?.shake(hit ? SHAKE_HIT : SHAKE_THUD);
+    if (hit || impact.wall) {
+      this.emit('impact', { unit: (hit ?? body).getOwner(), source: impact.source.getOwner() });
+    }
     if (hit?.isAlive()) {
       this.applyHit(impact.source, hit, true, amount(hit), 'impact');
-      if (hit.isAlive() && impact.direction) this.knockBack(hit, impact.direction);
+      if (hit.isAlive()) {
+        if (impact.unitBody) this.applyStatus(hit, 'prone', impact.source);
+        else if (prop && !prop.isSmall()) this.applyStatus(hit, 'stunned', impact.source);
+        if (impact.direction) this.knockBack(hit, impact.direction);
+      }
     }
-    if (!prop.isAlive()) return;
-    if (hit && PropComponent.of(prop.getOwner())?.breaksOnImpact()) {
-      this.onUnitDown(prop, impact.source);
-    } else if (hit || impact.always) {
-      this.applyHit(impact.source, prop, true, amount(prop), 'impact');
+    if (!body.isAlive()) return;
+    if (impact.unitBody) {
+      if (hit) this.applyHit(impact.source, body, true, amount(body), 'impact');
+      else if (impact.wall) {
+        this.applyHit(impact.source, body, true, amount(body, WALL_MULTIPLIER), 'impact');
+      }
+      if (body.isAlive()) this.applyStatus(body, 'prone', impact.source);
+      return;
     }
+    // Los que no se rompen al chocar (cuchillos, clavos) son munición: tampoco se dañan.
+    if (!prop?.breaksOnImpact()) return;
+    if (hit) this.onUnitDown(body, impact.source);
+    else if (impact.always) this.applyHit(impact.source, body, true, amount(body), 'impact');
   }
 
   /** Empujón de un impacto: la unidad retrocede en `dir` (lo que deje el entorno). */
@@ -1151,6 +1228,8 @@ export class EncounterComponent extends Component {
       origin: null,
       direction: null,
       affected: [],
+      reach: 0,
+      motion: null,
       metalCost: 0,
       power: 1,
       approach: null,
@@ -1181,10 +1260,23 @@ export class EncounterComponent extends Component {
         const revive = ally && hasEffect(skill, 'heal');
         if (!targetUnit.isAlive() && !revive) return fail('target is down');
         const self = targetUnit === unit;
-        result.inRange = self || unitDistance(unit, targetUnit) <= skill.range + EPS;
+        const distance = unitDistance(unit, targetUnit);
+        result.inRange =
+          self || (distance <= skill.range + EPS && distance >= skill.minRange - EPS);
         result.lineOfSight = self || !skill.lineOfSight || unitLineOfSight(unit, targetUnit);
         result.affected =
           skill.radius > 0 ? unitsInCircle(skill, unit, result.origin, skill.radius) : [targetUnit];
+        if (hasEffect(skill, 'steelPush') || hasEffect(skill, 'ironPull')) {
+          const motion = this.planMetalMotion(
+            unit,
+            targetUnit,
+            skill,
+            cost.power,
+            target.direction ?? null,
+          );
+          if ('reason' in motion) return fail(motion.reason);
+          result.motion = motion;
+        }
         break;
       }
       case 'point': {
@@ -1198,6 +1290,21 @@ export class EncounterComponent extends Component {
         const aim = vec3.fromValues(point[0]!, point[1]! + POINT_AIM_HEIGHT, point[2]!);
         result.lineOfSight = !skill.lineOfSight || hasLineOfSight(eye, aim);
         result.affected = skill.radius > 0 ? unitsInCircle(skill, unit, point, skill.radius) : [];
+        if (hasEffect(skill, 'leap')) {
+          // Salto de acero: llega hasta donde dé el salto (no por el alcance de la habilidad).
+          const arc = jumpArc(feet, point, this.leapDistance(unit, cost.power));
+          if ('reason' in arc) return fail(arc.reason);
+          result.affected = [unit];
+          result.inRange = result.lineOfSight = true;
+          result.motion = {
+            kind: 'leap',
+            body: unit,
+            points: arc.points,
+            hit: null,
+            wall: false,
+            damage: 0,
+          };
+        }
         if (hasEffect(skill, 'teleport')) {
           result.affected = [unit];
           if (!isOnNavMesh(point[0]!, point[1]!, point[2]!, 0.3)) return fail('cannot land there');
@@ -1216,10 +1323,20 @@ export class EncounterComponent extends Component {
         result.affected = unitsInCone(skill, unit, point);
         break;
       }
+      case 'line': {
+        const point = target.point ?? targetUnit?.getFeetPosition(vec3.create()) ?? null;
+        if (!point) return fail('no target');
+        result.origin = feet;
+        result.direction = coneDirection(feet, point);
+        result.reach = lineReach(unit, result.direction, skill.length);
+        result.inRange = result.lineOfSight = true;
+        result.affected = unitsInLine(skill, unit, point, result.reach);
+        break;
+      }
     }
 
     if (unit.hasStatus('fear') && isHostile(skill)) return fail('frightened');
-    const permission = this.canAct(unit, skill.cost, skill);
+    const permission = this.canAct(unit, skill.cost === 'free' ? null : skill.cost, skill);
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
     if (this.state === 'combat' && unit.getCooldown(skill.id) > 0) return fail('on cooldown');
@@ -1232,6 +1349,53 @@ export class EncounterComponent extends Component {
     }
     result.canCast = true;
     return result;
+  }
+
+  /**
+   * Empuje o tirón de `caster` sobre `target` (GDD §5): solo lo metálico, en línea recta
+   * (alejándose o hacia él), `3 + POT/2` m por el multiplicador; el tirón se para al llegar a su
+   * lado. Lo que no es de metal pero lleva un arma de metal, con el tirón, se queda sin ella.
+   */
+  private planMetalMotion(
+    caster: UnitComponent,
+    target: UnitComponent,
+    skill: SkillDef,
+    power: number,
+    wanted: vec3 | null = null,
+  ): SkillMotion | { reason: string } {
+    if (target === caster) return { reason: 'no target' };
+    const pull = hasEffect(skill, 'ironPull');
+    if (!isMetallic(target)) {
+      if (pull && target.hasMetalWeapon()) {
+        return { kind: 'disarm', body: target, points: [], hit: null, wall: false, damage: 0 };
+      }
+      return { reason: 'not metallic' };
+    }
+    if (target.isImmovable()) return { reason: 'immovable' };
+    const from = target.getFeetPosition(vec3.create());
+    const casterFeet = caster.getFeetPosition(vec3.create());
+    const away =
+      horizontalDirection(vec3.sub(vec3.create(), from, casterFeet)) ?? caster.getFacing();
+    const dir = pull ? vec3.negate(vec3.create(), away) : aimWithin(away, wanted, skill);
+    let max = steelDistanceFor(caster.getAttributes()) * power;
+    if (pull) max = Math.min(max, Math.max(0, unitDistance(caster, target) - PULL_GAP));
+    const path = pushPath(target, dir, max, caster);
+    const prop = PropComponent.of(target.getOwner());
+    const base = prop ? prop.getImpactBase() : IMPACT_BASE.large;
+    return {
+      kind: pull ? 'pull' : 'push',
+      body: target,
+      points: [from, vec3.scaleAndAdd(vec3.create(), from, dir, path.length)],
+      hit: path.hit,
+      wall: path.blocked,
+      damage: Math.round((base + caster.getAttribute('POT')) * power),
+    };
+  }
+
+  /** Distancia del salto de acero: `6 + POT`, ×2 con la mente de hierro en Ligero. */
+  private leapDistance(unit: UnitComponent, power: number): number {
+    const light = unit.hasStatus('iron_light') ? 2 : 1;
+    return steelJumpFor(unit.getAttributes()) * light * power;
   }
 
   /** Dónde ponerse para que una habilidad sobre una unidad o un punto llegue y vea. */
@@ -1251,6 +1415,7 @@ export class EncounterComponent extends Component {
         ),
         (feet) =>
           unitDistanceFrom(unit, feet, targetUnit) <= skill.range + EPS &&
+          unitDistanceFrom(unit, feet, targetUnit) >= skill.minRange - EPS &&
           (!skill.lineOfSight || unitLineOfSightFrom(unit, feet, targetUnit)),
       );
     }
@@ -1291,6 +1456,7 @@ export class EncounterComponent extends Component {
       const saved: SkillTarget = {
         unit: target.unit ?? null,
         point: target.point ? vec3.clone(target.point) : null,
+        direction: target.direction ? vec3.clone(target.direction) : null,
       };
       const moved =
         approach &&
@@ -1302,7 +1468,9 @@ export class EncounterComponent extends Component {
     const skill = plan.skill;
     const unit = entity.getComponent('unit') as UnitComponent;
     if (this.state === 'combat') {
-      this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
+      if (skill.cost !== 'free') {
+        this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
+      }
       unit.setCooldown(skill.id, skill.cooldown);
       if (plan.metalCost > 0) {
         unit.spendMetal(plan.metalCost);
@@ -1310,6 +1478,7 @@ export class EncounterComponent extends Component {
       }
       // El duraluminio se gasta en esta (su multiplicador ya va en el plan).
       if (skill.allomantic) unit.setMetalBoost(null);
+      if (skill.charge) unit.spendCharge(skill.charge);
     }
     this.pendingAction = null;
     unit.stop(); // exploración: puede venir andando
@@ -1317,6 +1486,17 @@ export class EncounterComponent extends Component {
 
     if (isMetalAction(skill)) {
       this.applyMetalAction(unit, skill);
+      return { ...plan, ok: true };
+    }
+
+    if (plan.motion?.kind === 'leap') {
+      // Salto de acero: en arco, sin gastar movimiento.
+      const points = plan.motion.points.map((q) => vec3.clone(q));
+      const last = points[points.length - 1]!;
+      unit.faceTowards(vec3.fromValues(last[0]!, unit.getPosition(this.tmpA)[1]!, last[2]!));
+      unit.playAction(JUMP_CLIP);
+      void unit.moveAlong(points, { speed: LEAP_SPEED, walk: false, face: false });
+      this.emit('jump', { unit: entity });
       return { ...plan, ok: true };
     }
 
@@ -1330,7 +1510,7 @@ export class EncounterComponent extends Component {
       return { ...plan, ok: true };
     }
 
-    if (skill.target === 'cone' && plan.direction) {
+    if ((skill.target === 'cone' || skill.target === 'line') && plan.direction) {
       const p = unit.getPosition(this.tmpA);
       unit.faceTowards(vec3.scaleAndAdd(this.tmpB, p, plan.direction, 1));
     } else if (skill.target !== 'self') {
@@ -1412,6 +1592,10 @@ export class EncounterComponent extends Component {
     // El daño (todos los efectos de daño + escala) se aplica una vez, con una sola tirada:
     // la misma fracción del rango para todos, cada uno con su armadura. No critica.
     const damage = skillDamage(caster, skill, plan.power);
+    const penetration = Math.max(
+      0,
+      ...skill.effects.map((e) => (e.type === 'damage' ? (e.penetration ?? 0) : 0)),
+    );
     let damageDone = false;
     for (const effect of skill.effects) {
       switch (effect.type) {
@@ -1421,7 +1605,14 @@ export class EncounterComponent extends Component {
           const roll = Math.random();
           for (const u of affected()) {
             if (!u.isAlive()) continue;
-            this.applyHit(caster, u, true, rollRange(hitRange(caster, u, damage), roll), 'skill');
+            // Un proyectil (línea) contra la Burbuja de acero: 50 % de fallar.
+            const bubble = skill.target === 'line' && u.hasStatus('steel_bubble');
+            if (bubble && Math.random() < STEEL_BUBBLE_MISS) {
+              this.applyHit(caster, u, false, 0, 'skill');
+              continue;
+            }
+            const range = hitRange(caster, u, damage, penetration);
+            this.applyHit(caster, u, true, rollRange(range, roll), 'skill');
           }
           break;
         }
@@ -1453,19 +1644,24 @@ export class EncounterComponent extends Component {
         case 'surface':
           this.surfaces.add(effect.surface, origin, effect.radius);
           break;
-        case 'status':
-          for (const u of affected()) {
-            if (!u.isAlive()) continue;
-            u.addStatus(effect.status, statusTurns(caster, effect.turns), caster.getOwner());
-            u.stop();
-            this.emit('status', {
-              unit: u.getOwner(),
-              source: caster.getOwner(),
-              status: effect.status,
-            });
+        case 'status': {
+          // La magnitud escala con el atributo de la habilidad (Marca del cazador: 30 % + 5 %·POT).
+          const scale = skill.scale ? caster.getAttribute(skill.scale) : 0;
+          const options: StatusOptions = {};
+          if (effect.amount !== undefined) {
+            options.amount = effect.amount + (effect.amountPerPoint ?? 0) * scale;
           }
+          if (effect.untilTurnStart) options.untilTurnStart = true;
+          for (const u of affected())
+            this.applyStatus(u, effect.status, caster, effect.turns, options);
+          break;
+        }
+        case 'steelPush':
+        case 'ironPull':
+          if (plan.motion) this.launch(caster, plan.motion);
           break;
         case 'teleport':
+        case 'leap':
         case 'duralumin':
         case 'refill':
           break; // se resuelven al lanzar
@@ -1482,6 +1678,67 @@ export class EncounterComponent extends Component {
     ) {
       this.startCombat(enemy.getOwner());
     }
+  }
+
+  /**
+   * Empuje o tirón ya resuelto: lo que se mueve sale disparado por su trayectoria y, al
+   * llegar, el impacto (applyImpact). Un desarme no mueve nada: el objetivo se queda sin arma.
+   */
+  private launch(caster: UnitComponent, motion: SkillMotion): void {
+    const body = motion.body;
+    if (!body.isAlive()) return;
+    if (motion.kind === 'disarm') {
+      body.disarm();
+      this.emit('disarm', { unit: body.getOwner(), source: caster.getOwner() });
+      return;
+    }
+    const [from, to] = [motion.points[0]!, motion.points[motion.points.length - 1]!];
+    const length = vec3.distance(from, to);
+    body.stop();
+    if (length > 0.05) {
+      void body.moveAlong([vec3.clone(from), vec3.clone(to)], {
+        speed: STEEL_SPEED,
+        slide: length,
+        walk: false,
+        face: false,
+      });
+    }
+    this.pendingImpacts.push({
+      timer: 0.05,
+      source: caster,
+      body,
+      hit: motion.hit,
+      damage: motion.damage,
+      always: false,
+      direction: horizontalDirection(vec3.sub(vec3.create(), to, from)),
+      unitBody: !PropComponent.of(body.getOwner()),
+      wall: motion.wall,
+    });
+    this.emit(motion.kind === 'pull' ? 'pulled' : 'pushed', {
+      unit: body.getOwner(),
+      source: caster.getOwner(),
+    });
+  }
+
+  /**
+   * Aplica un estado (evento status). Derribado y Aturdido duran hasta que empiece su turno;
+   * la mente de hierro en Pesado hace inmune a Derribado. Los objetos no tienen estados.
+   */
+  private applyStatus(
+    unit: UnitComponent,
+    id: UnitStatusId,
+    source: UnitComponent | null,
+    turns = 1,
+    options: StatusOptions = {},
+  ): boolean {
+    // Los objetos (cajas, barriles) no tienen estados.
+    if (!unit.isAlive() || PropComponent.of(unit.getOwner())) return false;
+    if (id === 'prone' && unit.hasStatus('iron_heavy')) return false;
+    const untilTurnStart = options.untilTurnStart ?? (id === 'stunned' || id === 'prone');
+    unit.addStatus(id, turns, source?.getOwner() ?? null, { ...options, untilTurnStart });
+    if (source !== unit) unit.stop();
+    this.emit('status', { unit: unit.getOwner(), source: source?.getOwner() ?? null, status: id });
+    return true;
   }
 
   /** Cura (y levanta a un aliado caído). */
@@ -1530,6 +1787,7 @@ export class EncounterComponent extends Component {
     for (const c of this.combatants) {
       c.unit.resetCritChance();
       c.unit.refillMetal();
+      c.unit.resetForCombat();
     }
 
     for (const c of this.combatants) c.unit.stop();
@@ -1587,6 +1845,7 @@ export class EncounterComponent extends Component {
       u.clearCooldowns();
       u.clearStatuses();
       u.refillMetal();
+      u.resetForCombat();
       u.resetCritChance();
       this.getAI(u)?.clearPlan();
     }
@@ -1679,12 +1938,16 @@ export class EncounterComponent extends Component {
   }
 
   /**
-   * ¿Qué impide pagar la habilidad con la Reserva? (null: nada). Seco, no llega el metal o,
+   * ¿Qué impide pagar la habilidad? (null: nada). Sin cargas de su mente de metal, Seco, no llega el metal o,
    * para las acciones de metal, que ahora no tengan sentido. Fuera de
    * combate la alomancia no gasta metal y las acciones de metal no se usan. La hotbar lo usa
    * para desactivar lo que no se puede pagar.
    */
   public metalBlocker(unit: UnitComponent, skill: SkillDef): string | null {
+    // Mente de metal: una carga por combate, que no se recarga.
+    if (skill.charge && this.state === 'combat' && unit.getCharges(skill.charge) <= 0) {
+      return 'no charges';
+    }
     if (isMetalAction(skill)) {
       if (this.state !== 'combat') return 'only in combat';
       if (unit.isDrained()) return 'drained';
@@ -1802,7 +2065,7 @@ export class EncounterComponent extends Component {
 
     if (this.pendingImpacts.length) {
       // Al llegar: el objeto ya no se mueve (y ha pasado un instante, por si no se ha movido).
-      const landed = (i: PendingImpact) => (i.timer -= dt) <= 0 && !i.prop.isMoving();
+      const landed = (i: PendingImpact) => (i.timer -= dt) <= 0 && !i.body.isMoving();
       const ready = this.pendingImpacts.filter(landed);
       this.pendingImpacts = this.pendingImpacts.filter((i) => !ready.includes(i));
       for (const i of ready) this.applyImpact(i);
@@ -1838,6 +2101,11 @@ export class EncounterComponent extends Component {
     const before = health?.getHp() ?? 0;
     if (hit && health) health.takeDamage(damage, attacker?.getOwner() ?? null);
     const dealt = before - (health?.getHp() ?? 0);
+    // El Marcado se consume con el siguiente golpe (su +% ya iba en hitRange).
+    if (hit && dealt > 0 && cause !== 'fire' && cause !== 'debug' && target.hasStatus('marked')) {
+      target.removeStatus('marked');
+      this.emit('status-end', { unit: target.getOwner(), status: 'marked' });
+    }
     this.emit('damage', {
       unit: target.getOwner(),
       source: attacker?.getOwner() ?? null,
@@ -2004,6 +2272,7 @@ export class EncounterComponent extends Component {
       return (
         skill?.target === 'self' &&
         !isMetalAction(skill) &&
+        skill.cost !== 'free' &&
         this.resources[skill.cost] > 0 &&
         unit.getCooldown(id) === 0 &&
         this.metalBlocker(unit, skill) === null
@@ -2056,6 +2325,12 @@ export class EncounterComponent extends Component {
     const active = this.combatants[this.turnIndex];
     if (!active) return;
     this.resources = { action: 1, bonusAction: 1, movement: active.unit.getMovement() };
+    // Aturdido: pierde la Acción. Derribado: levantarse cuesta la mitad del movimiento.
+    if (active.unit.hasStatus('stunned')) this.resources.action = 0;
+    if (active.unit.hasStatus('prone')) this.resources.movement /= 2;
+    for (const status of active.unit.clearTurnStartStatuses()) {
+      this.emit('status-end', { unit: active.unit.getOwner(), status });
+    }
     this.turnTimer = this.enemyTurnDelay;
     this.aiTurnTime = 0;
     active.unit.tickCooldowns();
@@ -2081,6 +2356,7 @@ export class EncounterComponent extends Component {
     if (index < 0) index = this.combatants.length;
     this.combatants.splice(index, 0, combatant);
     unit.refillMetal();
+    unit.resetForCombat();
     // Si entra antes (o en) la posición actual, la unidad activa no cambia: juega la ronda siguiente.
     if (index <= this.turnIndex) this.turnIndex++;
     this.emit('join', { unit: unit.getOwner() });
@@ -2187,9 +2463,12 @@ export class EncounterComponent extends Component {
           drainPending: u.isDrainPending(),
           statuses: u.getStatuses().map((st) => ({
             id: st.id,
-            turns: st.turns,
+            turns: Number.isFinite(st.turns) ? st.turns : null,
             source: st.source?.getName() ?? null,
+            ...(st.amount !== undefined && { amount: st.amount }),
           })),
+          metallic: u.isMetallic(),
+          disarmed: u.isDisarmed(),
           cooldowns: Object.fromEntries(
             u
               .getSkillIds()
@@ -2388,9 +2667,12 @@ export class EncounterComponent extends Component {
           case 'plan_skill': {
             const skillId = String(args.skill ?? '');
             const to = args.to as [number, number, number] | undefined;
+            // args.direction = [x, z] (opcional): hacia dónde empujar.
+            const d = args.direction as [number, number] | undefined;
             const target: SkillTarget = {
               unit: typeof args.target === 'string' ? unitArg('target') : null,
               point: Array.isArray(to) ? vec3.fromValues(to[0], to[1], to[2]) : null,
+              direction: Array.isArray(d) ? vec3.fromValues(d[0], 0, d[1]) : null,
             };
             const r =
               name === 'skill'
@@ -2405,6 +2687,21 @@ export class EncounterComponent extends Component {
               affected: r.affected.map((u) => u.getOwner().getName()),
               metalCost: r.metalCost,
               power: r.power,
+              reach: r.reach,
+              motion: r.motion
+                ? {
+                    kind: r.motion.kind,
+                    body: r.motion.body.getOwner().getName(),
+                    to: r.motion.points.length
+                      ? Array.from(r.motion.points[r.motion.points.length - 1]!).map(
+                          (v) => Math.round(v * 100) / 100,
+                        )
+                      : null,
+                    hit: r.motion.hit?.getOwner().getName() ?? null,
+                    wall: r.motion.wall,
+                    damage: r.motion.damage,
+                  }
+                : null,
               approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };
@@ -2461,4 +2758,21 @@ function compareInitiative(a: Combatant, b: Combatant): number {
     b.unit.getAttribute('REF') - a.unit.getAttribute('REF') ||
     b.tiebreak - a.tiebreak
   );
+}
+
+/**
+ * Dirección del empuje: `away` (alejándolo del lanzador) girada hacia `wanted` como mucho la
+ * mitad del ángulo de apuntado de la habilidad. Sin `wanted`, `away`.
+ */
+function aimWithin(away: vec3, wanted: vec3 | null, skill: SkillDef): vec3 {
+  const want = wanted ? horizontalDirection(wanted) : null;
+  if (!want) return away;
+  const effect = skill.effects.find((e) => e.type === 'steelPush');
+  const half = (((effect?.type === 'steelPush' && effect.aimAngle) || 40) * Math.PI) / 360;
+  const cross = away[0]! * want[2]! - away[2]! * want[0]!;
+  const dot = away[0]! * want[0]! + away[2]! * want[2]!;
+  const angle = Math.max(-half, Math.min(half, Math.atan2(cross, dot)));
+  const c = Math.cos(angle);
+  const sn = Math.sin(angle);
+  return vec3.fromValues(away[0]! * c - away[2]! * sn, 0, away[0]! * sn + away[2]! * c);
 }

@@ -7,7 +7,7 @@ import { groundHeightAt, hasLineOfSight, isOnNavMesh } from './TacticalQueries';
  * llega un objeto empujado. Las usa EncounterComponent (jugador, MCP, IA).
  */
 
-/** Distancia horizontal máxima de un salto (m). */
+/** Distancia horizontal máxima de un salto normal (m). El salto de acero llega más (6 + POT). */
 export const MAX_JUMP = 4.5;
 /** Desnivel máximo hacia arriba (m): se puede subir a la plataforma, no a un muro. */
 const MAX_RISE = 1.6;
@@ -27,19 +27,31 @@ export interface JumpArc {
 }
 
 /**
- * Trayectoria de un salto de `from` a `to` (pies), o el motivo por el que no se puede:
- * demasiado lejos, demasiado alto, sin sitio donde aterrizar u obstáculo demasiado alto
- * en medio (columnas, muros). Las cajas y los muros bajos se saltan.
+ * Trayectoria de un salto de `from` a `to` (pies), como mucho `maxDistance` m, o el motivo por
+ * el que no se puede: demasiado lejos, demasiado alto, sin sitio donde aterrizar u obstáculo
+ * demasiado alto en medio (columnas, muros). Las cajas y los muros bajos se saltan. Los saltos
+ * largos (de acero) pueden subir más y hacer un arco más alto.
  */
-export function jumpArc(from: vec3, to: vec3): JumpArc | { reason: string } {
-  const arc = arcPath(from, to, MAX_JUMP, MAX_RISE, MAX_ARC);
+export function jumpArc(
+  from: vec3,
+  to: vec3,
+  maxDistance = MAX_JUMP,
+): JumpArc | { reason: string } {
+  const long = maxDistance > MAX_JUMP;
+  const arc = arcPath(
+    from,
+    to,
+    maxDistance,
+    long ? MAX_RISE * 2.5 : MAX_RISE,
+    long ? MAX_ARC * 2.5 : MAX_ARC,
+  );
   if ('reason' in arc && arc.reason === 'too far') return { reason: 'too far to jump' };
   if ('reason' in arc && arc.reason === 'too high') return { reason: 'too high to jump' };
   return arc;
 }
 
-/** Distancia máxima a la que se lanza un objeto (m, desde quien lo lanza). */
-export const THROW_RANGE = 8;
+/** Distancia máxima a la que se lanza un objeto Pequeño a mano (m, desde quien lo lanza). */
+export const THROW_RANGE = 6;
 /** Lo más lejos que vuela un objeto lanzado (m, desde donde estaba hasta donde cae). */
 const THROW_MAX_FLIGHT = 10;
 const THROW_MAX_RISE = 3;
@@ -124,15 +136,16 @@ export function pushDistance(prop: UnitComponent, dir: vec3, maxDistance: number
 
 /**
  * Como pushDistance, y además la unidad u objeto contra el que choca (null si se para contra
- * una pared, un desnivel o simplemente llega al final): el que recibe el impacto. `ignore`: quien
- * empuja (se pondrá detrás; donde está ahora no estorba).
+ * una pared, un desnivel o simplemente llega al final): el que recibe el impacto. `blocked`: se
+ * ha parado contra una pared o un desnivel. `ignore`: quien empuja (se pondrá detrás; donde está
+ * ahora no estorba).
  */
 export function pushPath(
   prop: UnitComponent,
   dir: vec3,
   maxDistance: number,
   ignore: UnitComponent | null = null,
-): { length: number; hit: UnitComponent | null } {
+): { length: number; hit: UnitComponent | null; blocked: boolean } {
   const start = prop.getFeetPosition(vec3.create());
   const radius = prop.getCapsuleRadius();
   const others = UnitComponent.getAll().filter((u) => u !== prop && u !== ignore && u.isAlive());
@@ -145,19 +158,21 @@ export function pushPath(
     vec3.scaleAndAdd(p, start, dir, s);
     // Paredes, cajas estáticas…: rayo desde el centro hasta el borde del objeto ya movido.
     vec3.scaleAndAdd(probe, from, dir, s + radius);
-    if (!hasLineOfSight(from, probe)) break;
+    if (!hasLineOfSight(from, probe)) return { length: reached, hit: null, blocked: true };
     // El suelo sigue al mismo nivel (ni bordillos ni caídas).
     const ground = groundHeightAt(p[0]!, p[2]!, start[1]! + 0.5);
-    if (ground === null || Math.abs(ground - start[1]!) > 0.15) break;
+    if (ground === null || Math.abs(ground - start[1]!) > 0.15) {
+      return { length: reached, hit: null, blocked: true };
+    }
     // Otras unidades y objetos.
     const blocker = others.find((u) => {
       const q = u.getPosition(tmp);
       return Math.hypot(q[0]! - p[0]!, q[2]! - p[2]!) < radius + u.getCapsuleRadius() + PUSH_GAP;
     });
-    if (blocker) return { length: reached, hit: blocker };
+    if (blocker) return { length: reached, hit: blocker, blocked: false };
     reached = s;
   }
-  return { length: reached, hit: null };
+  return { length: reached, hit: null, blocked: false };
 }
 
 /**

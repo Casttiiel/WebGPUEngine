@@ -112,7 +112,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -191,7 +191,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -270,7 +270,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -349,7 +349,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -428,7 +428,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -507,7 +507,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -586,7 +586,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -665,7 +665,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -744,7 +744,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -823,7 +823,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -902,7 +902,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -981,7 +981,7 @@
         "height": 34,
         "textParams": {
           "text": "",
-          "size": [28, 28],
+          "size": [21, 21],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1023,13 +1023,13 @@
     "name": "combat_resources",
     "alias": "combat_resources",
     "type": "image",
-    "x": -550,
+    "x": -710,
     "y": -196,
-    "width": 1100,
+    "width": 1420,
     "height": 54,
     "imageParams": {
       "texture": "white.png",
-      "size": [1100, 54],
+      "size": [1420, 54],
       "color": [0.06, 0.05, 0.045, 0.85]
     },
     "anchor": "bottom-center",
@@ -1205,6 +1205,70 @@
           "align": "left"
         },
         "blocksInput": false
+      },
+      {
+        "name": "res_duralumin",
+        "alias": "res_duralumin",
+        "type": "image",
+        "x": 1108,
+        "y": 7,
+        "width": 150,
+        "height": 40,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [150, 40],
+          "color": [0.3, 0.2, 0.08, 0.92]
+        },
+        "children": [
+          {
+            "name": "res_duralumin_text",
+            "alias": "res_duralumin_text",
+            "type": "text",
+            "x": 0,
+            "y": 4,
+            "width": 150,
+            "height": 34,
+            "textParams": {
+              "text": "Duraluminio",
+              "size": [24, 24],
+              "color": [0.93, 0.88, 0.77, 1],
+              "align": "center"
+            },
+            "blocksInput": false
+          }
+        ]
+      },
+      {
+        "name": "res_refill",
+        "alias": "res_refill",
+        "type": "image",
+        "x": 1264,
+        "y": 7,
+        "width": 150,
+        "height": 40,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [150, 40],
+          "color": [0.3, 0.2, 0.08, 0.92]
+        },
+        "children": [
+          {
+            "name": "res_refill_text",
+            "alias": "res_refill_text",
+            "type": "text",
+            "x": 0,
+            "y": 4,
+            "width": 150,
+            "height": 34,
+            "textParams": {
+              "text": "Recargar",
+              "size": [24, 24],
+              "color": [0.93, 0.88, 0.77, 1],
+              "align": "center"
+            },
+            "blocksInput": false
+          }
+        ]
       }
     ]
   },
@@ -1265,7 +1329,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1330,7 +1394,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1395,7 +1459,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1460,7 +1524,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1525,7 +1589,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1590,7 +1654,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1655,7 +1719,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1720,7 +1784,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1785,7 +1849,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1850,7 +1914,7 @@
         "height": 32,
         "textParams": {
           "text": "",
-          "size": [24, 24],
+          "size": [20, 20],
           "color": [0.93, 0.88, 0.77, 1],
           "align": "center"
         },
@@ -1925,134 +1989,6 @@
         "blocksInput": false
       }
     ]
-  },
-  {
-    "name": "status_1",
-    "alias": "status_1",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
-  },
-  {
-    "name": "status_2",
-    "alias": "status_2",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
-  },
-  {
-    "name": "status_3",
-    "alias": "status_3",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
-  },
-  {
-    "name": "status_4",
-    "alias": "status_4",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
-  },
-  {
-    "name": "status_5",
-    "alias": "status_5",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
-  },
-  {
-    "name": "status_6",
-    "alias": "status_6",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
-  },
-  {
-    "name": "status_7",
-    "alias": "status_7",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
-  },
-  {
-    "name": "status_8",
-    "alias": "status_8",
-    "type": "image",
-    "visible": false,
-    "x": 0,
-    "y": 0,
-    "width": 64,
-    "height": 64,
-    "imageParams": {
-      "texture": "tactical/status_fear.png",
-      "size": [64, 64],
-      "color": [1, 1, 1, 1]
-    },
-    "blocksInput": false
   },
   {
     "name": "float_1",
@@ -2858,5 +2794,389 @@
         "blocksInput": false
       }
     ]
+  },
+  {
+    "name": "status_1",
+    "alias": "status_1",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_2",
+    "alias": "status_2",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_3",
+    "alias": "status_3",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_4",
+    "alias": "status_4",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_5",
+    "alias": "status_5",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_6",
+    "alias": "status_6",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_7",
+    "alias": "status_7",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_8",
+    "alias": "status_8",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_9",
+    "alias": "status_9",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_10",
+    "alias": "status_10",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_11",
+    "alias": "status_11",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_12",
+    "alias": "status_12",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_13",
+    "alias": "status_13",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_14",
+    "alias": "status_14",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_15",
+    "alias": "status_15",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_16",
+    "alias": "status_16",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_17",
+    "alias": "status_17",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_18",
+    "alias": "status_18",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_19",
+    "alias": "status_19",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_20",
+    "alias": "status_20",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_21",
+    "alias": "status_21",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_22",
+    "alias": "status_22",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_23",
+    "alias": "status_23",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
+  },
+  {
+    "name": "status_24",
+    "alias": "status_24",
+    "type": "image",
+    "visible": false,
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "imageParams": {
+      "texture": "tactical/status_fear.png",
+      "size": [48, 48],
+      "color": [1, 1, 1, 1]
+    },
+    "blocksInput": false
   }
 ]

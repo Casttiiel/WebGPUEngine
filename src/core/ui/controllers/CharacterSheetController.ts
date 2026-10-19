@@ -260,14 +260,15 @@ export class CharacterSheetController extends WidgetController {
     const add = (text: string, style: LineStyle, color?: RGBA) =>
       out.push({ text, style, ...(color && { color }) });
 
-    const bonus = unit.getStatusBonusTurns();
+    const iron = unit.getMaxCharges('iron');
     add(
       [
         `Iniciativa ${unit.getInitiativeBase()} + 1d4`,
         `Penetración ${unit.getPenetration()}`,
-        `Estados aplicados ${bonus > 0 ? `+${turns(bonus)}` : '+0'}`,
         `Próximo crítico ${fmt(unit.getNextCritChance() * 100)} %`,
         ...(unit.hasReserve() ? [`Reserva ${unit.getMetal()} / ${unit.getMaxMetal()}`] : []),
+        ...(iron > 0 ? [`Mente de hierro ${unit.getCharges('iron')} / ${iron}`] : []),
+        ...(unit.isMetallic() ? ['Lleva metal'] : []),
       ].join(' · '),
       'body',
     );
@@ -295,7 +296,6 @@ export class CharacterSheetController extends WidgetController {
           `${COST_NAME[skill.cost]}${metal}${recharge}${ready} · ${skillMechanics(skill, unit)}`,
           'body',
         );
-        if (skill.description) add(skill.description, 'body');
       }
     }
 
@@ -303,7 +303,8 @@ export class CharacterSheetController extends WidgetController {
     const statuses = unit.getStatuses();
     if (!statuses.length) add('Ninguno', 'body');
     for (const status of statuses) {
-      add(`${STATUS_NAME[status.id] ?? status.id} (${turns(status.turns)})`, 'title', RED);
+      const time = Number.isFinite(status.turns) ? turns(status.turns) : 'hasta su turno';
+      add(`${STATUS_NAME[status.id] ?? status.id} (${time})`, 'title', RED);
     }
 
     const abilities = unit.getAbilities();
@@ -313,11 +314,11 @@ export class CharacterSheetController extends WidgetController {
         add(`Saltar · hasta ${fmt(MAX_JUMP)} m, gasta movimiento`, 'title');
       }
       if (abilities.includes('push')) {
-        add('Empujar · objeto en línea recta, daño de impacto · Acción adicional', 'title');
+        add('Empujar · objeto Grande en línea recta, daño de impacto · Acción adicional', 'title');
       }
       if (abilities.includes('throw')) {
         add(
-          `Lanzar · objeto en arco hasta ${fmt(THROW_RANGE)} m, daño de impacto · Acción`,
+          `Lanzar · objeto Pequeño en arco hasta ${fmt(THROW_RANGE)} m, daño de impacto · Acción`,
           'title',
         );
       }

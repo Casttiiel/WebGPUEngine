@@ -17,7 +17,6 @@ import {
   maxMetalFor,
   movementFor,
   penetrationFor,
-  statusBonusTurnsFor,
   type AttributeId,
   type Attributes,
 } from './Stats';
@@ -40,9 +39,21 @@ export interface UnitAttack {
   scale?: AttributeId;
   /** Recurso que consume. Default 'action'. */
   cost?: 'action' | 'bonusAction';
+  /** Arma de metal: el Tirón se la quita (desarme, GDD §10.1). Default false. */
+  metallic?: boolean;
   /** Animación (clip) al atacar. */
   clip?: string;
 }
+
+/** Lo que le queda a una unidad desarmada (GDD §10.1: "pasa a un ataque débil"). */
+const DISARMED_ATTACK: UnitAttack = {
+  id: 'fists',
+  name: 'Puños',
+  kind: 'melee',
+  range: 1.5,
+  damage: 2,
+  clip: 'Punch_Cross',
+};
 
 const DEFAULT_ATTACKS: UnitAttack[] = [
   {
@@ -90,14 +101,41 @@ export type UnitComponentDataType = Readonly<{
   skills?: string[];
   /** % de crítico de los ataques. Default: 5 % · (1 + ⌊AGU/2⌋) con atributos; 0 sin ellos. */
   critChance?: number;
+  /**
+   * Metal portado (armadura de placas o cota): el Empuje y el Tirón le afectan, y el Tirón
+   * lo trae Derribado (GDD §5). Default false.
+   */
+  metallic?: boolean;
+  /** Gigante (koloss): no se le puede empujar ni atraer. Default false. */
+  giant?: boolean;
+  /**
+   * Mentes de metal innatas: cargas por combate de cada una ({ iron: 1 }). Las gastan las
+   * habilidades con `charge` (skills.json). Se rellenan al empezar cada combate.
+   */
+  metalminds?: Record<string, number>;
 }>;
 
 /**
- * Estado alterado. Dura `turns` turnos de la unidad afectada.
- *   fear:    no ataca y huye de quien le asustó.
- *   drained: Seco (GDD §2): sin alomancia; al expirar, la Reserva se llena.
+ * Estado alterado (GDD §6) o efecto de una habilidad sobre uno mismo.
+ *   fear:         no ataca y huye de quien le asustó.
+ *   drained:      Seco (GDD §2): sin alomancia; al expirar, la Reserva se llena.
+ *   stunned:      Aturdido: pierde su próxima Acción.
+ *   prone:        Derribado: levantarse cuesta la mitad del movimiento; el melee contra él es
+ *                 crítico seguro.
+ *   marked:       Marcado: el siguiente golpe que recibe hace +`amount` % (se consume).
+ *   steel_bubble: Burbuja de acero: los proyectiles contra él tienen un 50 % de fallar.
+ *   iron_light:   Mente de hierro, Ligero: sus saltos llegan el doble.
+ *   iron_heavy:   Mente de hierro, Pesado: no le pueden empujar, atraer ni derribar.
  */
-export type UnitStatusId = 'fear' | 'drained';
+export type UnitStatusId =
+  | 'fear'
+  | 'drained'
+  | 'stunned'
+  | 'prone'
+  | 'marked'
+  | 'steel_bubble'
+  | 'iron_light'
+  | 'iron_heavy';
 
 /**
  * Acciones de metal (data/skills.json): las tiene toda unidad con Reserva, además de sus
@@ -113,10 +151,22 @@ export interface MetalBoost {
 
 export interface UnitStatus {
   id: UnitStatusId;
-  /** Turnos de la unidad que le quedan (se descuenta al acabar cada uno de sus turnos). */
+  /**
+   * Turnos de la unidad que le quedan (se descuenta al acabar cada uno de sus turnos).
+   * Infinity con `untilTurnStart`.
+   */
   turns: number;
   /** Quién lo causó (p.ej. de quién huye una unidad asustada). */
   source: Entity | null;
+  /** Magnitud (Marcado: % de daño extra). */
+  amount?: number;
+  /** Se acaba al empezar su siguiente turno (Derribado, Aturdido, burbuja, Pesado). */
+  untilTurnStart?: boolean;
+}
+
+export interface StatusOptions {
+  amount?: number;
+  untilTurnStart?: boolean;
 }
 
 /** Acciones que no son ataques: saltar (gasta movimiento) y empujar un objeto (acción adicional). */
@@ -159,6 +209,13 @@ export class UnitComponent extends Component {
   private movement = 9;
   private sightRange = 0;
   private attacks: UnitAttack[] = DEFAULT_ATTACKS;
+  /** Desarmado (Tirón): solo le queda DISARMED_ATTACK hasta que acabe el combate. */
+  private disarmed = false;
+  private metallic = false;
+  private giant = false;
+  /** Cargas por combate de cada mente de metal innata, y las que le quedan. */
+  private metalminds: Record<string, number> = {};
+  private charges = new Map<string, number>();
   private down = false;
   private abilities: UnitAbility[] = [];
   private hideWhenDown = false;
@@ -236,6 +293,10 @@ export class UnitComponent extends Component {
     this.maxMetal = a ? maxMetalFor(a) : 0;
     this.metal = this.maxMetal;
     this.silhouette = data.silhouette ?? true;
+    this.metallic = data.metallic ?? false;
+    this.giant = data.giant ?? false;
+    this.metalminds = { ...(data.metalminds ?? {}) };
+    this.refillCharges();
     this.stats = a ? this.computeStats() : null;
   }
 
@@ -400,6 +461,64 @@ export class UnitComponent extends Component {
     this.drainPending = pending;
   }
 
+  // ── Metal portado, desarme y mentes de metal ─────────────────────────────
+
+  /** Lleva metal (armadura o cota): el Empuje y el Tirón le afectan. */
+  public isMetallic(): boolean {
+    return this.metallic;
+  }
+
+  /** Para pruebas y, más adelante, el equipo. */
+  public setMetallic(metallic: boolean): void {
+    this.metallic = metallic;
+  }
+
+  public isGiant(): boolean {
+    return this.giant;
+  }
+
+  /** Arma de metal en la mano (y aún no se la han quitado). */
+  public hasMetalWeapon(): boolean {
+    return !this.disarmed && this.attacks.some((a) => a.metallic);
+  }
+
+  public isDisarmed(): boolean {
+    return this.disarmed;
+  }
+
+  /** Le quitan el arma: pasa a DISARMED_ATTACK hasta que acabe el combate. */
+  public disarm(): void {
+    this.disarmed = true;
+  }
+
+  public rearm(): void {
+    this.disarmed = false;
+  }
+
+  /** Cargas que le quedan de una mente de metal (0 si no la tiene). */
+  public getCharges(mind: string): number {
+    return this.charges.get(mind) ?? 0;
+  }
+
+  public getMaxCharges(mind: string): number {
+    return this.metalminds[mind] ?? 0;
+  }
+
+  public spendCharge(mind: string): void {
+    this.charges.set(mind, Math.max(0, this.getCharges(mind) - 1));
+  }
+
+  /** Al empezar un combate: todas las cargas. */
+  public refillCharges(): void {
+    this.charges = new Map(Object.entries(this.metalminds));
+  }
+
+  /** Al empezar y acabar un combate: rearmado y con las cargas de sus mentes de metal. */
+  public resetForCombat(): void {
+    this.rearm();
+    this.refillCharges();
+  }
+
   // ── Atributos ────────────────────────────────────────────────────────────
 
   /** ¿Tiene atributos? (los objetos no: sus valores salen del prefab). */
@@ -435,11 +554,6 @@ export class UnitComponent extends Component {
     return penetrationFor(this.getAttributes());
   }
 
-  /** Turnos extra de los estados que aplica (POT 4 y POT 8). */
-  public getStatusBonusTurns(): number {
-    return statusBonusTurnsFor(this.getAttributes());
-  }
-
   /** Parte fija de la iniciativa (2·REF; al empezar el combate se suma 1d4). */
   public getInitiativeBase(): number {
     return initiativeBaseFor(this.getAttributes());
@@ -463,7 +577,6 @@ export class UnitComponent extends Component {
       critChance: this.critChance,
       penetration: penetrationFor(a),
       initiative: initiativeBaseFor(a),
-      statusBonusTurns: statusBonusTurnsFor(a),
       armor: this.armor,
       maxMetal: this.maxMetal,
     };
@@ -538,10 +651,38 @@ export class UnitComponent extends Component {
     return [...this.statuses.values()];
   }
 
-  /** Aplica (o renueva, quedándose con la duración mayor) un estado. */
-  public addStatus(id: UnitStatusId, turns: number, source: Entity | null = null): void {
+  /**
+   * Aplica (o renueva, quedándose con la duración y la magnitud mayores) un estado. Con
+   * `untilTurnStart` dura hasta que empiece su siguiente turno (turns = Infinity).
+   */
+  public addStatus(
+    id: UnitStatusId,
+    turns: number,
+    source: Entity | null = null,
+    options: StatusOptions = {},
+  ): void {
     const current = this.statuses.get(id);
-    this.statuses.set(id, { id, turns: Math.max(turns, current?.turns ?? 0), source });
+    const status: UnitStatus = {
+      id,
+      turns: options.untilTurnStart ? Infinity : Math.max(turns, current?.turns ?? 0),
+      source,
+    };
+    const amount = Math.max(options.amount ?? 0, current?.amount ?? 0);
+    if (amount > 0) status.amount = amount;
+    if (options.untilTurnStart) status.untilTurnStart = true;
+    this.statuses.set(id, status);
+  }
+
+  /** Empieza su turno: se acaban los estados "hasta tu siguiente turno". Devuelve cuáles. */
+  public clearTurnStartStatuses(): UnitStatusId[] {
+    const ended = [...this.statuses.values()].filter((s) => s.untilTurnStart).map((s) => s.id);
+    for (const id of ended) this.statuses.delete(id);
+    return ended;
+  }
+
+  /** No le pueden empujar ni atraer (gigante, o mente de hierro en Pesado). */
+  public isImmovable(): boolean {
+    return this.giant || this.hasStatus('iron_heavy');
   }
 
   public removeStatus(id: UnitStatusId): void {
@@ -563,14 +704,16 @@ export class UnitComponent extends Component {
     this.statuses.clear();
   }
 
+  /** Sus ataques (desarmado: solo los puños). */
   public getAttacks(): readonly UnitAttack[] {
-    return this.attacks;
+    return this.disarmed ? [DISARMED_ATTACK] : this.attacks;
   }
 
   /** Ataque por id (sin id: el de por defecto, el primero). */
   public getAttack(id?: string | null): UnitAttack | null {
-    if (!id) return this.attacks[0] ?? null;
-    return this.attacks.find((a) => a.id === id) ?? null;
+    const attacks = this.getAttacks();
+    if (!id) return attacks[0] ?? null;
+    return attacks.find((a) => a.id === id) ?? null;
   }
 
   public getHealth(): HealthComponent | null {
@@ -705,6 +848,7 @@ export class UnitComponent extends Component {
     this.clearCooldowns();
     this.clearStatuses();
     this.refillMetal();
+    this.resetForCombat();
     this.resetCritChance();
     this.setDown(false);
     this.getHealth()?.restore();
@@ -860,8 +1004,6 @@ export interface UnitStats {
   penetration: number;
   /** Parte fija de la iniciativa (2·REF), sin el 1d4. */
   initiative: number;
-  /** Turnos extra de los estados que aplica. */
-  statusBonusTurns: number;
   armor: number;
   /** Reserva de metal máxima (6 + TEM). */
   maxMetal: number;

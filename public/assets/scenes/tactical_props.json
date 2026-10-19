@@ -27,7 +27,7 @@
     }
   },
   {
-    "prefab": "tactical/crate_pushable.prefab",
+    "prefab": "tactical/crate_metal.prefab",
     "components": {
       "name": "PushCrate2",
       "transform": {
@@ -36,7 +36,7 @@
     }
   },
   {
-    "prefab": "tactical/crate_pushable.prefab",
+    "prefab": "tactical/crate_metal.prefab",
     "components": {
       "name": "PushCrate3",
       "transform": {
@@ -50,6 +50,24 @@
       "name": "PushCrate4",
       "transform": {
         "position": [0.4, 0, 0.8]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/knives.prefab",
+    "components": {
+      "name": "Knives1",
+      "transform": {
+        "position": [2.6, 0, -2.2]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/knives.prefab",
+    "components": {
+      "name": "Knives2",
+      "transform": {
+        "position": [-0.6, 0, 2.4]
       }
     }
   },

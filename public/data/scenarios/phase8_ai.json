@@ -1,5 +1,5 @@
 {
-  "description": "Fase 8.8: la IA tiene en cuenta el metal. La Arquera (Bola de fuego: 4 + POT 2 = 6 de daño, 3 de metal; Reserva 6 + TEM 0 = 6) contra Kelsier solo, con el arco debilitado (2 de daño) para que la Bola de fuego compita. Con la Reserva llena la lanza; con 3 no, porque se quedaría Seca sin motivo; con 2 no le llega y se recarga (acción adicional); y si el duraluminio (×2) remata, lo usa.",
+  "description": "Fase 8.8: la IA tiene en cuenta el metal. La Arquera (Bola de fuego: 4 + POT 2 = 6 de daño, 3 de metal; Reserva 6 + TEM 0 = 6) contra la Artificiera sola, con el arco debilitado (2 de daño) para que la Bola de fuego compita. Con la Reserva llena la lanza; con 3 no, porque se quedaría Seca sin motivo; con 2 no le llega y se recarga (acción adicional); y si el duraluminio (×2) remata, lo usa.",
   "scenes": ["tactical.json", "tactical_enemies.json"],
   "seed": 8,
   "steps": [
@@ -16,19 +16,20 @@
     },
     { "command": "damage", "args": { "unit": "Brute", "amount": 1000 } },
     { "command": "damage", "args": { "unit": "Skirmisher", "amount": 1000 } },
-    { "command": "damage", "args": { "unit": "Hero1", "amount": 1000 } },
-    { "command": "damage", "args": { "unit": "Hero3", "amount": 1000 } },
-    { "command": "damage", "args": { "unit": "Hero4", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Lanzamonedas", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Voz", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Deslizador", "amount": 1000 } },
+    { "eval": "__mark()" },
     { "command": "start_combat" },
     {
       "assert": {
         "expr": "__engine.getCombatState().turnOrder.filter(c => c.alive).map(c => c.name).sort()",
-        "value": ["Archer", "Hero2"]
+        "value": ["Archer", "Artificiera"]
       }
     },
 
     { "log": "Reserva llena (6): Bola de fuego (3 de metal, 6 de daño) mejor que el arco" },
-    { "eval": "__mark()" },
+
     {
       "wait_until": { "expr": "__archerStarts()", "value": true },
       "timeout_frames": 3000,
@@ -50,7 +51,7 @@
       "timeout_frames": 3000,
       "check_every": 1
     },
-    { "eval": "__unit('Archer').setMetal(3); __unit('Hero2').getHealth().restore()" },
+    { "eval": "__unit('Archer').setMetal(3); __unit('Artificiera').getHealth().restore()" },
     { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
     {
       "assert": {
@@ -68,7 +69,7 @@
       "timeout_frames": 3000,
       "check_every": 1
     },
-    { "eval": "__unit('Archer').setMetal(2); __unit('Hero2').getHealth().restore()" },
+    { "eval": "__unit('Archer').setMetal(2); __unit('Artificiera').getHealth().restore()" },
     { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
     {
       "assert": {
@@ -84,7 +85,7 @@
       "timeout_frames": 3000,
       "check_every": 1
     },
-    { "eval": "__unit('Hero2').getHealth().restore()" },
+    { "eval": "__unit('Artificiera').getHealth().restore()" },
     { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
     {
       "assert": {
@@ -93,17 +94,17 @@
       }
     },
 
-    { "log": "Llena y Kelsier a 12: el duraluminio (×2 → 12) remata; la normal (6) no" },
+    { "log": "Llena y la Artificiera a 12: el duraluminio (×2 → 12) remata; la normal (6) no" },
     { "eval": "__mark()" },
     {
       "wait_until": { "expr": "__archerStarts()", "value": true },
       "timeout_frames": 3000,
       "check_every": 1
     },
-    { "eval": "__unit('Hero2').getHealth().restore(12); window.__from = __log.length" },
+    { "eval": "__unit('Artificiera').getHealth().restore(12); window.__from = __log.length" },
     {
       "wait_until": {
-        "expr": "(() => { const p = __engine.getCombatState().aiPlans.find(p => p.unit === 'Archer'); if (p) window.__lp = [p.kind, p.reason]; return __log.slice(__from).some(l => l[0] === 'damage' && l[1] === 'Hero2' && l[4] === 'skill'); })()",
+        "expr": "(() => { const p = __engine.getCombatState().aiPlans.find(p => p.unit === 'Archer'); if (p) window.__lp = [p.kind, p.reason]; return __log.slice(__from).some(l => l[0] === 'damage' && l[1] === 'Artificiera' && l[4] === 'skill'); })()",
         "value": true
       },
       "timeout_frames": 3000,
@@ -111,7 +112,7 @@
     },
     {
       "assert": {
-        "expr": "[__lp[0], __lp[1].startsWith('Bola de fuego (duraluminio)'), __archer('duralumin'), __log.slice(__from).filter(l => l[0] === 'damage' && l[1] === 'Hero2' && l[4] === 'skill').map(l => l[2])]",
+        "expr": "[__lp[0], __lp[1].startsWith('Bola de fuego (duraluminio)'), __archer('duralumin'), __log.slice(__from).filter(l => l[0] === 'damage' && l[1] === 'Artificiera' && l[4] === 'skill').map(l => l[2])]",
         "value": ["skill", true, [2], [12]]
       }
     },

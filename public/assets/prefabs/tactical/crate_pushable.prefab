@@ -40,8 +40,7 @@
       "maxHp": 30
     },
     "tactical_prop": {
-      "pushable": true,
-      "pushDistance": 10
+      "size": "large"
     }
   }
 }

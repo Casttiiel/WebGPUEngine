@@ -29,6 +29,7 @@ import { PartyComponent } from '../../../components/game/tactical/PartyComponent
 import { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
 import { PropComponent } from '../../../components/game/tactical/PropComponent';
 import { rangeText } from '../../../components/game/tactical/Stats';
+import { SkillCatalog } from '../../../components/game/tactical/Skills';
 import { wrapText } from '../textWrap';
 
 type RGBA = readonly [number, number, number, number];
@@ -112,6 +113,19 @@ const FLOAT_DOWN: RGBA = [0.7, 0.7, 0.75, 1];
 const FLOAT_FIRE: RGBA = [1, 0.6, 0.15, 1];
 const FLOAT_FEAR: RGBA = [0.8, 0.6, 1, 1];
 const FLOAT_METAL: RGBA = [0.7, 0.8, 0.95, 1];
+/** Texto flotante al aplicar un estado. */
+const STATUS_FLOAT: Partial<Record<string, string>> = {
+  stunned: '¡Aturdido!',
+  prone: '¡Derribado!',
+  marked: '¡Marcado!',
+  steel_bubble: 'Burbuja de acero',
+  iron_light: 'Ligero',
+  iron_heavy: 'Pesado',
+};
+/** Acciones de metal junto a la barra de metal (no en la hotbar). */
+const METAL_BUTTONS = ['duralumin', 'refill'] as const;
+/** Borde de arriba del panel de recursos (ancla abajo-centro). */
+const RESOURCES_TOP = -196;
 const FLOAT_DRAINED: RGBA = [1, 0.55, 0.35, 1];
 
 /** Vista previa del daño: barra de vida sobre la cabeza de quien lo recibiría. */
@@ -124,8 +138,9 @@ const DAMAGE_BAR_LIFT = 1.35;
 const HP_LEFT_PARTY: RGBA = [0.5, 0.72, 0.38, 1];
 const HP_LEFT_ENEMY: RGBA = [0.7, 0.15, 0.12, 1];
 
-const STATUS_ICONS = 8;
-const STATUS_SIZE = 64;
+const STATUS_ICONS = 24;
+const STATUS_SIZE = 48;
+const STATUS_GAP = 4;
 /** Altura del icono de estado sobre el centro de la unidad (m): encima de la cabeza. */
 const STATUS_HEIGHT = 1.2;
 
@@ -189,6 +204,15 @@ export class CombatHUDController extends WidgetController {
   private resMetalLabel: TextWidget | null = null;
   private resMetalFill: ImageWidget | null = null;
   private resMetalText: TextWidget | null = null;
+  /** Duraluminio y Recargar (botones del panel de recursos). */
+  private metalButtons: {
+    id: string;
+    frame: ImageWidget;
+    text: TextWidget | null;
+    hovered: boolean;
+  }[] = [];
+  /** Textura puesta en cada icono de estado (para no cambiarla cada frame). */
+  private statusTextures: string[] = [];
   private tooltip: TextWidget | null = null;
   private tip: ImageWidget | null = null;
   private tipBg: ImageWidget | null = null;
@@ -290,6 +314,12 @@ export class CombatHUDController extends WidgetController {
       case 'status':
         if (data.status === 'fear') this.spawnFloat(unit, '¡Miedo!', FLOAT_FEAR, 1.5);
         if (data.status === 'drained') this.spawnFloat(unit, '¡Seco!', FLOAT_DRAINED, 1.5);
+        if (data.status && STATUS_FLOAT[data.status]) {
+          this.spawnFloat(unit, STATUS_FLOAT[data.status]!, FLOAT_CRIT, 1.5);
+        }
+        break;
+      case 'disarm':
+        this.spawnFloat(unit, '¡Desarmado!', FLOAT_CRIT, 1.5);
         break;
       case 'refill':
         this.spawnFloat(unit, 'Reserva llena', FLOAT_METAL, 1.5);
@@ -409,6 +439,8 @@ export class CombatHUDController extends WidgetController {
     this.resMoveFill?.setSize(MOVE_BAR_WIDTH * Math.min(1, r.movement / max), 16);
     this.resMoveText?.setText(`${r.movement.toFixed(1)} m`);
 
+    this.updateMetalButtons(encounter, unit);
+
     // Reserva de metal: los puntos, ×N si hay duraluminio preparado, o Seco.
     const reserve = unit?.hasReserve() ? unit : null;
     this.resMetalLabel?.setText(reserve ? 'Metal' : '');
@@ -428,6 +460,46 @@ export class CombatHUDController extends WidgetController {
           ? `${reserve.getMetal()} ×${multiplierText(boost.power)}`
           : `${reserve.getMetal()}/${reserve.getMaxMetal()}`,
     );
+  }
+
+  /**
+   * Duraluminio y Recargar: activos si se pueden usar ahora (acción adicional y metalBlocker);
+   * click los lanza (son sobre uno mismo), hover enseña su tooltip encima del panel.
+   */
+  private updateMetalButtons(encounter: EncounterComponent, unit: UnitComponent | null): void {
+    const resources = encounter.getResources();
+    let hovered: {
+      entry: HotbarEntry;
+      x: number;
+      enabled: boolean;
+      blocker: string | null;
+    } | null = null;
+    for (const button of this.metalButtons) {
+      const skill = SkillCatalog.get(button.id);
+      const show = !!skill && !!unit?.hasReserve();
+      button.frame.setVisible(show);
+      if (!show || !skill || !unit) continue;
+      const blocker = encounter.metalBlocker(unit, skill);
+      const enabled = resources.bonusAction > 0 && blocker === null;
+      const color = enabled ? (button.hovered ? BUTTON_HOVER : BUTTON_NORMAL) : PIP_OFF;
+      button.frame.setColor(...color);
+      button.text?.setColor(1, 1, 1, enabled ? 1 : 0.45);
+      if (button.hovered) {
+        const entry: HotbarEntry = {
+          id: skill.id,
+          name: skill.name,
+          kind: 'skill',
+          cost: skill.cost,
+          attack: null,
+          skill,
+        };
+        const x = (this.resources?.getX() ?? 0) + button.frame.getX();
+        hovered = { entry, x, enabled, blocker };
+      }
+    }
+    if (hovered) {
+      this.showTip({ ...hovered, cooldown: 0 }, unit ?? undefined, RESOURCES_TOP);
+    }
   }
 
   /**
@@ -474,7 +546,8 @@ export class CombatHUDController extends WidgetController {
       const cooldown = exploring || !unit ? 0 : unit.getCooldown(entry.id);
       // Lo que no se puede pagar con la Reserva (o estando Seco), desactivado.
       const blocker = entry.skill && unit ? encounter.metalBlocker(unit, entry.skill) : null;
-      const enabled = resources[entry.cost] > 0.05 && cooldown === 0 && blocker === null;
+      const left = entry.cost === 'free' ? Infinity : resources[entry.cost];
+      const enabled = left > 0.05 && cooldown === 0 && blocker === null;
       const frame =
         entry.id === armed ? FRAME_ACTIVE : slot.hovered && enabled ? FRAME_HOVER : FRAME_NORMAL;
       slot.frame.setColor(...frame);
@@ -484,7 +557,9 @@ export class CombatHUDController extends WidgetController {
       slot.name?.setColor(1, 1, 1, enabled ? 1 : 0.45);
       if (slot.hovered) hovered = { entry, x, enabled, cooldown, blocker };
     });
-    this.showTip(hovered, unit ?? undefined);
+    if (hovered || !this.metalButtons.some((b) => b.hovered && b.frame.isVisible())) {
+      this.showTip(hovered, unit ?? undefined);
+    }
 
     const armedEntry = entries.find((e) => e.id === armed);
     if (!hovered && armedEntry) {
@@ -492,7 +567,7 @@ export class CombatHUDController extends WidgetController {
       const hint =
         target === 'point'
           ? 'elige dónde'
-          : target === 'cone'
+          : target === 'cone' || target === 'line'
             ? 'elige la dirección'
             : ARMED_HINT[armedEntry.kind];
       tooltip = `${armedEntry.name}: ${hint} (Esc para cancelar)`;
@@ -511,6 +586,7 @@ export class CombatHUDController extends WidgetController {
       blocker: string | null;
     } | null,
     unit?: UnitComponent,
+    top = HOTBAR_TOP,
   ): void {
     if (!this.tip) return;
     if (!hovered) {
@@ -548,7 +624,7 @@ export class CombatHUDController extends WidgetController {
       Math.max(hovered.x + HOTBAR_WIDTH / 2 - TIP_WIDTH / 2, -half + 10),
       half - TIP_WIDTH - 10,
     );
-    this.tip.setPosition(x, HOTBAR_TOP - TIP_GAP - height);
+    this.tip.setPosition(x, top - TIP_GAP - height);
     this.tip.setVisible(true);
   }
 
@@ -647,22 +723,40 @@ export class CombatHUDController extends WidgetController {
     });
   }
 
-  /** Un icono sobre la cabeza de cada unidad viva con miedo, mientras dure. */
+  /**
+   * Sobre la cabeza de cada unidad viva, una fila con un icono por cada estado que tiene
+   * (Aturdido, Derribado, Marcado, Seco, miedo, burbuja, mente de hierro), mientras dure.
+   */
   private updateStatusIcons(): void {
-    const feared = this.subscribed
-      ? UnitComponentRef.getAll().filter((u) => u.isAlive() && u.hasStatus('fear'))
-      : [];
+    const icons: { unit: UnitComponent; id: string; index: number; count: number }[] = [];
+    if (this.subscribed) {
+      for (const unit of UnitComponentRef.getAll()) {
+        if (!unit.isAlive()) continue;
+        const statuses = unit.getStatuses();
+        statuses.forEach((st, index) =>
+          icons.push({ unit, id: st.id, index, count: statuses.length }),
+        );
+      }
+    }
     this.statusIcons.forEach((icon, i) => {
-      const unit = feared[i];
-      if (!unit) {
+      const entry = icons[i];
+      if (!entry) {
         icon.setVisible(false);
         return;
       }
-      const p = unit.getPosition(this.tmpPos);
+      const texture = `tactical/status_${entry.id}.png`;
+      if (this.statusTextures[i] !== texture) {
+        icon.setTexture(texture);
+        this.statusTextures[i] = texture;
+      }
+      const p = entry.unit.getPosition(this.tmpPos);
       p[1] = p[1]! + STATUS_HEIGHT;
       const screen = this.worldToUI(p);
       icon.setVisible(screen !== null);
-      if (screen) icon.setPosition(screen[0] - STATUS_SIZE / 2, screen[1] - STATUS_SIZE / 2);
+      if (!screen) return;
+      const row = entry.count * STATUS_SIZE + (entry.count - 1) * STATUS_GAP;
+      const x = screen[0] - row / 2 + entry.index * (STATUS_SIZE + STATUS_GAP);
+      icon.setPosition(x, screen[1] - STATUS_SIZE / 2);
     });
   }
 
@@ -730,6 +824,19 @@ export class CombatHUDController extends WidgetController {
     this.resMetalLabel = get<TextWidget>('res_metal_label');
     this.resMetalFill = get<ImageWidget>('res_metal_fill');
     this.resMetalText = get<TextWidget>('res_metal_text');
+    for (const id of METAL_BUTTONS) {
+      const frame = get<ImageWidget>(`res_${id}`);
+      if (!frame) continue;
+      const button = { id, frame, text: get<TextWidget>(`res_${id}_text`), hovered: false };
+      frame.setOnMouseEnter(() => (button.hovered = true));
+      frame.setOnMouseLeave(() => (button.hovered = false));
+      frame.setOnClick(() => {
+        const encounter = EncounterComponent.find();
+        const active = encounter?.isPlayerTurn() ? encounter.getActiveUnit() : null;
+        if (active) encounter?.requestSkill(active, id);
+      });
+      this.metalButtons.push(button);
+    }
     this.tooltip = get<TextWidget>('hotbar_tooltip');
     this.tip = get<ImageWidget>('hotbar_tip');
     this.tipBg = get<ImageWidget>('hotbar_tip_bg');

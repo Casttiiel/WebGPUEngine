@@ -111,7 +111,7 @@
           "clip": "Spell_Simple_Shoot"
         }
       ],
-      "abilities": ["jump", "push", "throw"]
+      "abilities": ["jump"]
     },
     "health": {
       "maxHp": 30

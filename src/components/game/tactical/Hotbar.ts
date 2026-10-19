@@ -1,10 +1,10 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
-import { SkillCatalog, type SkillDef } from './Skills';
+import { SkillCatalog, isMetalAction, type SkillDef } from './Skills';
 import { COST_NAME, attackSummary, fmt, skillMechanics, turns } from './ActionText';
 import { MAX_JUMP, THROW_RANGE } from './EnvironmentRules';
 
 export type HotbarKind = 'melee' | 'ranged' | 'jump' | 'push' | 'throw' | 'skill';
-export type HotbarCost = 'action' | 'bonusAction' | 'movement';
+export type HotbarCost = 'action' | 'bonusAction' | 'movement' | 'free';
 
 /** Una entrada de la hotbar: un ataque, una acción de entorno o una habilidad. */
 export interface HotbarEntry {
@@ -25,12 +25,15 @@ const ABILITIES: Record<AbilityId, Omit<HotbarEntry, 'attack' | 'skill'>> = {
   throw: { id: 'throw', name: 'Lanzar', kind: 'throw', cost: 'action' },
 };
 
-/** Ataques de la unidad (en su orden), sus acciones de entorno y sus habilidades. */
+/**
+ * Ataques de la unidad (en su orden), sus acciones de entorno y sus habilidades. El
+ * duraluminio y recargar no: van junto a la barra de metal (CombatHUD).
+ */
 export function hotbarEntries(unit: UnitComponent): HotbarEntry[] {
   const skills = unit
     .getSkillIds()
     .map((id) => SkillCatalog.get(id))
-    .filter((s): s is SkillDef => s !== null);
+    .filter((s): s is SkillDef => s !== null && !isMetalAction(s));
   return [
     ...unit.getAttacks().map(
       (a): HotbarEntry => ({
@@ -80,6 +83,7 @@ export const METAL_BLOCKER_TEXT: Record<string, string> = {
   'already boosted': 'Ya hay una habilidad potenciada',
   'already drained': 'Ya te has declarado Seco',
   'only in combat': 'Solo en combate',
+  'no charges': 'No le quedan cargas',
 };
 
 /** Una línea del tooltip: datos (gris), descripción (gris claro) o por qué no se puede (rojo). */
@@ -110,7 +114,10 @@ export function hotbarTooltip(
     const s = entry.skill;
     const recharge = s.cooldown > 0 ? ` · recarga ${turns(s.cooldown)}` : '';
     const metal = s.metal > 0 ? ` · ${s.metal} de metal` : '';
-    info(`${COST_NAME[s.cost]}${metal}${recharge}${s.allomantic ? ' · alomancia' : ''}`);
+    const charge = s.charge
+      ? ` · 1 carga (quedan ${unit?.getCharges(s.charge) ?? 0} de ${unit?.getMaxCharges(s.charge) ?? 0})`
+      : '';
+    info(`${COST_NAME[s.cost]}${metal}${charge}${recharge}${s.allomantic ? ' · alomancia' : ''}`);
     info(skillMechanics(s, unit));
     if (s.description) lines.push({ text: s.description, style: 'description' });
   } else if (entry.kind === 'jump') {
@@ -119,11 +126,16 @@ export function hotbarTooltip(
   } else if (entry.kind === 'push') {
     info(`${COST_NAME.bonusAction} · elige un objeto y hacia dónde: sale en línea recta`);
     info('Daño de impacto a quien pille (el objeto también lo recibe)');
-    lines.push({ text: 'Desliza una caja o un barril.', style: 'description' });
+    lines.push({ text: 'Desliza un objeto Grande (una caja, un barril).', style: 'description' });
   } else {
-    info(`${COST_NAME.action} · elige un objeto y dónde lanzarlo (hasta ${fmt(THROW_RANGE)} m)`);
-    info('Vuela en arco; daño de impacto a quien golpee y al objeto al caer');
-    lines.push({ text: 'Un barril lanzado explota al caer.', style: 'description' });
+    info(
+      `${COST_NAME.action} · elige un objeto Pequeño y dónde lanzarlo (hasta ${fmt(THROW_RANGE)} m)`,
+    );
+    info('Vuela en arco; daño de impacto (6 + FUE) a quien golpee');
+    lines.push({
+      text: 'Cuchillos, clavos, monedas: lo que quepa en la mano.',
+      style: 'description',
+    });
   }
   if (cooldown > 0) {
     lines.push({ text: `Disponible en ${turns(cooldown)}`, style: 'warning' });

@@ -1,0 +1,221 @@
+{
+  "description": "Fase 10.11 y 9.2: los estados físicos con una aserción cada uno. Marcado (Marca del cazador: +30 % + 5 %·POT = +60 % con POT 6; el siguiente golpe hace 11 × 1,6 = 18 y la marca se consume), Derribado (el melee contra él es crítico seguro: 11 × 1,5 = 17; al empezar su turno se levanta con la mitad del movimiento: 8,5 → 4,25), Aturdido (pierde la Acción de su siguiente turno), los iconos sobre la unidad y en el retrato, y que las duraciones son fijas (POT no las alarga).",
+  "scenes": ["tactical.json", "tactical_dummies.json"],
+  "seed": 11,
+  "steps": [
+    {
+      "wait_until": {
+        "status": true,
+        "path": "navMeshBuilt",
+        "value": true
+      },
+      "timeout_frames": 300
+    },
+    {
+      "wait_frames": 5
+    },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__w = (a) => Engine.getModules().getModule('ui').getWidgetByAlias(a); window.__log = []; __enc.onEvent((e, d) => __log.push([e, d.unit ? d.unit.getName() : null, d.amount ?? null, d.status ?? null, d.cause ?? null])); window.__tp = (n, x, z) => __unit(n).setFeetPosition([x, 0, z]); window.__idle = () => !__engine.getCombatState().busy && Engine.getEntities().getObjectManagerByName('unit').getList().every(u => !u.isBusy()); window.__turns = (n) => __log.filter(l => l[0] === 'turn' && l[1] === n).length; window.__marks = {}; window.__mark = (n) => { __marks[n] = __turns(n); }; window.__turnOf = (n) => { const s = __engine.getCombatState(); if (__turns(n) > (__marks[n] ?? -1) && s.activeUnit === n && !s.busy) return true; if (s.playerTurn && !s.busy && s.activeUnit !== n) __engine.gameCommand('end_turn', {}); else if (s.playerTurn && !s.busy && __turns(n) <= (__marks[n] ?? -1)) __engine.gameCommand('end_turn', {}); return false; }; window.__st = (n) => __unit(n).getStatuses().map(s => s.id)"
+    },
+    {
+      "eval": "for (const u of Engine.getEntities().getObjectManagerByName('unit').getList()) { u.sightRange = 0; u.setCritChance(0); } for (const n of ['Enemy1', 'Enemy2', 'Enemy3']) { const h = __unit(n).getHealth(); h.setMaxHp(200); h.restore(); __unit(n).setArmor(0); } __enc.joinRadius = 60; __tp('Lanzamonedas', -12, -14); __tp('Enemy1', -8, -14); __tp('Deslizador', -7, -13); __tp('Voz', -13, -5); __tp('Artificiera', -13, -1)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "eval": "__mark('Lanzamonedas')"
+    },
+    {
+      "command": "start_combat"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf('Lanzamonedas')",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "log": "Marcado: Marca del cazador (Adicional, 1 de metal) → +60 % con POT 6, durante 2 turnos"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Lanzamonedas', skill: 'hunter_mark', target: 'Enemy1' }).then(r => [r.ok, r.metalCost])",
+        "value": [true, 1]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "(() => { const m = __unit('Enemy1').getStatus('marked'); return [m.amount, m.turns, __engine.getCombatState().resources.bonusAction]; })()",
+        "value": [60, 2, 0]
+      }
+    },
+    {
+      "assert": {
+        "expr": "[__w('status_1').isVisible(), __w('status_1').getTexture()]",
+        "value": [true, "tactical/status_marked.png"],
+        "message": "icono de Marcado sobre la cabeza"
+      }
+    },
+    {
+      "screenshot": "01-marked"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Lanzamonedas', target: 'Enemy1' }).then(r => [r.minDamage, r.maxDamage])",
+        "value": [18, 18],
+        "message": "revólver 7 + FUE 4 = 11, × 1,6"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('attack', { unit: 'Lanzamonedas', target: 'Enemy1' }).then(r => r.ok)",
+        "value": true
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "[__log.filter(l => l[0] === 'damage' && l[1] === 'Enemy1').map(l => l[2]), __st('Enemy1'), __log.some(l => l[0] === 'status-end' && l[3] === 'marked')]",
+        "value": [[18], [], true],
+        "message": "la marca se consume con el golpe"
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Lanzamonedas', target: 'Enemy1' }).then(r => r.maxDamage)",
+        "value": 11
+      }
+    },
+    {
+      "log": "Derribado: el melee contra él es crítico seguro (bastones 7 + FUE 4 = 11 → 17)"
+    },
+    {
+      "eval": "__unit('Enemy1').addStatus('prone', Infinity, null, { untilTurnStart: true })"
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Deslizador', target: 'Enemy1' }).then(r => [r.critChance, r.critDamage])",
+        "value": [1, 17]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('roll_attack', { unit: 'Deslizador', target: 'Enemy1' })",
+        "value": {
+          "hit": true,
+          "crit": true,
+          "damage": 17
+        }
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Lanzamonedas', target: 'Enemy1' }).then(r => r.critChance)",
+        "value": 0,
+        "message": "a distancia no"
+      }
+    },
+    {
+      "log": "Derribado: al empezar su turno se levanta con la mitad del movimiento (8,5 → 4,25)"
+    },
+    {
+      "eval": "__unit('Deslizador').addStatus('prone', Infinity, null, { untilTurnStart: true }); __mark('Deslizador')"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "[__w('portrait_2_status_1').isVisible(), __w('portrait_2_status_1').getTexture()]",
+        "value": [true, "tactical/status_prone.png"],
+        "message": "icono en el retrato"
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf('Deslizador')",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "assert": {
+        "expr": "[__engine.getCombatState().resources.movement, __st('Deslizador'), __engine.getCombatState().resources.action]",
+        "value": [4.25, [], 1]
+      }
+    },
+    {
+      "log": "Aturdido: pierde la Acción de su siguiente turno"
+    },
+    {
+      "eval": "__unit('Voz').addStatus('stunned', Infinity, null, { untilTurnStart: true }); __mark('Voz')"
+    },
+    {
+      "wait_until": {
+        "expr": "__turnOf('Voz')",
+        "value": true
+      },
+      "timeout_frames": 3000
+    },
+    {
+      "assert": {
+        "expr": "[__engine.getCombatState().resources.action, __engine.getCombatState().resources.bonusAction, __st('Voz')]",
+        "value": [0, 1, []]
+      }
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('plan_attack', { unit: 'Voz', target: 'Enemy1', attack: 'pistol' }).then(r => r.reason)",
+        "value": "no action left"
+      }
+    },
+    {
+      "log": "9.2: duraciones fijas: con POT 8 el Miedo sigue durando 1 turno"
+    },
+    {
+      "eval": "__unit('Voz').attributes.POT = 8; __enc.resources.action = 1; __tp('Enemy2', -10, -5)"
+    },
+    {
+      "wait_frames": 3
+    },
+    {
+      "assert": {
+        "expr": "__engine.gameCommand('skill', { unit: 'Voz', skill: 'fear', target: 'Enemy2' }).then(r => [r.ok, r.reason])",
+        "value": [true, null]
+      }
+    },
+    {
+      "wait_until": {
+        "expr": "__idle()",
+        "value": true
+      },
+      "timeout_frames": 600
+    },
+    {
+      "assert": {
+        "expr": "__unit('Enemy2').getStatus('fear').turns",
+        "value": 1
+      }
+    },
+    {
+      "assert": {
+        "no_errors": true
+      }
+    }
+  ]
+}

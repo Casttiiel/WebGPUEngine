@@ -59,7 +59,12 @@ export class ResourceManager {
 
     // Load and cache
     const response = await ResourceManager.fetch(`assets/prefabs/${prefabName}`);
-    const prefabData = await response.json();
+    let prefabData = (await response.json()) as EntityDataType;
+    // Herencia: un prefab con `prefab` parte de ese otro y sobreescribe lo que defina.
+    if (prefabData.prefab) {
+      const parent = structuredClone(await this.loadPrefab(prefabData.prefab));
+      prefabData = inheritPrefab(parent, prefabData);
+    }
     this.prefabCache.set(prefabName, prefabData);
     return prefabData;
   }
@@ -117,4 +122,25 @@ export class ResourceManager {
     this.resources = new Map();
     this.loadingResources = new Set(); // Clear loading resources as well
   }
+}
+
+/**
+ * Prefab que hereda de otro: los hijos del padre y luego los suyos; los componentes del padre
+ * con los suyos encima, campo a campo dentro de cada componente.
+ */
+function inheritPrefab(parent: EntityDataType, child: EntityDataType): EntityDataType {
+  const isObject = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null && !Array.isArray(v);
+  const components: Record<string, unknown> = { ...parent.components };
+  for (const [key, value] of Object.entries(child.components ?? {})) {
+    const base = components[key];
+    components[key] = isObject(base) && isObject(value) ? { ...base, ...value } : value;
+  }
+  const children = [...(parent.children ?? []), ...(child.children ?? [])];
+  const gltf = child.gltf ?? parent.gltf;
+  return {
+    components: components as EntityDataType['components'],
+    ...(children.length && { children }),
+    ...(gltf && { gltf }),
+  };
 }

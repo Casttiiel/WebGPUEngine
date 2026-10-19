@@ -11,62 +11,65 @@ export interface PropExplosion {
   surfaceRadius?: number;
 }
 
+/**
+ * Tamaño (GDD §5). Pequeño: cuchillos, clavos, monedas (munición del tirón y el empuje; se
+ * lanzan a mano). Grande: cajas, barriles, carros (solo con alomancia o la fuerza del peltre).
+ */
+export type PropSize = 'small' | 'large';
+
+/** Daño base del impacto según el tamaño; se le suma POT (alomancia) o FUE (a mano, peltre). */
+export const IMPACT_BASE: Record<PropSize, number> = { small: 6, large: 10 };
+
 export type PropComponentDataType = Readonly<{
-  /** Se puede empujar (acción adicional). Default false. */
-  pushable?: boolean;
-  /** Distancia máxima que recorre al empujarlo (m). Default 3. */
-  pushDistance?: number;
-  /** Se puede lanzar (acción). Default: lo mismo que pushable. */
-  throwable?: boolean;
-  /** Daño (D) al golpear a una unidad (empujado o lanzado), contra su armadura; el objeto recibe el mismo. Default 6. */
-  impactDamage?: number;
-  /** Se rompe al golpear a una unidad (empujado o lanzado), tenga la vida que tenga. Default true. */
+  /** Pequeño o Grande. Default 'large'. */
+  size?: PropSize;
+  /** De metal: se puede empujar y atraer con alomancia. Default false. */
+  metallic?: boolean;
+  /** Se rompe al golpear a una unidad, tenga la vida que tenga. Default true. */
   breakOnImpact?: boolean;
   /** Explota al destruirse (vida a 0: un ataque, el fuego, otra explosión). */
   explosive?: PropExplosion;
 }>;
 
 /**
- * PropComponent — objeto del entorno con el que se puede interactuar (barriles, cajas).
+ * PropComponent — objeto del entorno con el que se puede interactuar (barriles, cajas,
+ * cuchillos). No hay props anclados: lo que no se mueve es escenario estático.
  *
  * El objeto es además una unidad neutral (UnitComponent + HealthComponent): así se puede
  * apuntar, atacar, bloquea caminos y tiene vida, con las mismas reglas que todo lo demás.
- * Aquí solo están sus propiedades de objeto; las reglas (empujar, lanzar, impactos, explotar) las aplica
- * EncounterComponent.
+ * Aquí solo están sus propiedades de objeto; las reglas (empujar, lanzar, impactos, explotar)
+ * las aplica EncounterComponent.
  */
 export class PropComponent extends Component {
-  private pushable = false;
-  private pushDistance = 3;
-  private throwable = false;
-  private impactDamage = 6;
+  private size: PropSize = 'large';
+  private metallic = false;
   private breakOnImpact = true;
   private explosive: PropExplosion | null = null;
 
   public load(data: PropComponentDataType): void {
-    this.pushable = data.pushable ?? false;
-    this.pushDistance = data.pushDistance ?? this.pushDistance;
-    this.throwable = data.throwable ?? this.pushable;
-    this.impactDamage = data.impactDamage ?? this.impactDamage;
+    this.size = data.size ?? this.size;
+    this.metallic = data.metallic ?? false;
     this.breakOnImpact = data.breakOnImpact ?? this.breakOnImpact;
     this.explosive = data.explosive ? { ...data.explosive } : null;
   }
 
   public update(_dt: number): void {}
 
-  public isPushable(): boolean {
-    return this.pushable;
+  public getSize(): PropSize {
+    return this.size;
   }
 
-  public getPushDistance(): number {
-    return this.pushDistance;
+  public isSmall(): boolean {
+    return this.size === 'small';
   }
 
-  public isThrowable(): boolean {
-    return this.throwable;
+  public isMetallic(): boolean {
+    return this.metallic;
   }
 
-  public getImpactDamage(): number {
-    return this.impactDamage;
+  /** Daño base de su impacto (sin el atributo de quien lo lanza). */
+  public getImpactBase(): number {
+    return IMPACT_BASE[this.size];
   }
 
   public breaksOnImpact(): boolean {

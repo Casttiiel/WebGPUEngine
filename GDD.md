@@ -43,13 +43,13 @@ no apoya ninguna de estas cuatro, sobra.
 
 Partimos de lo que ya tiene el motor (estilo BG3) y añadimos la Reacción:
 
-| Recurso              | Por turno               | Para qué sirve                                      |
-| -------------------- | ----------------------- | --------------------------------------------------- |
-| **Movimiento**       | metros (según Reflejos) | Desplazarse. El salto de acero NO gasta movimiento  |
-| **Acción**           | 1                       | Ataques, habilidades principales                    |
-| **Acción adicional** | 1                       | Habilidades menores, beber vial, cambiar munición   |
-| **Reacción**         | 1 por **ronda**         | Asistencias/combos, contraataques, burbuja de acero |
-| **Reserva de metal** | barra (ver §2)          | Coste de toda la alomancia                          |
+| Recurso              | Por turno               | Para qué sirve                                     |
+| -------------------- | ----------------------- | -------------------------------------------------- |
+| **Movimiento**       | metros (según Reflejos) | Desplazarse. El salto de acero NO gasta movimiento |
+| **Acción**           | 1                       | Ataques, habilidades principales                   |
+| **Acción adicional** | 1                       | Habilidades menores, beber vial, cambiar munición  |
+| **Reacción**         | 1 por **ronda**         | Asistencias/combos y la Guardia del Deslizador     |
+| **Reserva de metal** | barra (ver §2)          | Coste de toda la alomancia                         |
 
 > ⚠️ **Lo de "número de acciones por turno" NO debería ser una estadística que suba de forma
 > continua.** La economía de acciones es la palanca más fuerte de un juego por turnos: una
@@ -66,8 +66,8 @@ Partimos de lo que ya tiene el motor (estilo BG3) y añadimos la Reacción:
 
 - Cada personaje tiene una **Reserva** con números pequeños (≈ 8–12 puntos). Que no sea de
   100: los enteros pequeños se leen de un vistazo (menos carga cognitiva) y cada punto pesa.
-- Las habilidades cuestan **1–4**. El autoataque y las acciones físicas (empellón, lanzar algo
-  ligero a mano) son **gratis**.
+- Las habilidades cuestan **1–4**. El autoataque y las acciones físicas (saltar, las
+  técnicas de peltre del Deslizador) no gastan metal.
 - **Al llegar a 0 → Seco.** En tu siguiente turno no puedes usar alomancia (te estás bebiendo
   el vial). **Al terminar ese turno, la Reserva se llena entera.**
 - **Recarga voluntaria:** con una Acción adicional te declaras Seco por tu cuenta (recargas al
@@ -123,21 +123,22 @@ que ya existe** (3ª ley) en vez de inventar un estado nuevo.
 | **Alomancia** | **Potencia** (POT)        | **Temple** (TEM)             |
 | **Instinto**  | **Reflejos** (REF): tempo | **Agudeza** (AGU): precisión |
 
-| Atributo        | En combate                                                                                                                   | Fuera del combate                                                                   |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| **Fuerza**      | Daño físico (melee **y** a distancia: armas, autoataque, técnicas de bastón)                                                 | Forzar, romper, levantar                                                            |
-| **Resistencia** | Vida y curación recibida                                                                                                     | Aguantar venenos, frío, ceniza, caídas                                              |
-| **Potencia**    | Daño de las habilidades alománticas, **distancia** de empuje, tirón y salto                                                  | Leer metales, alcance de los pulsos de bronce, influencia emocional en los diálogos |
-| **Temple**      | **Reserva máxima** y resistencia a los estados mentales (Enfurecido, Aplacado). En la Artificiera, también cargas de gadgets | Resistir interrogatorios, mentiras, alomancia emocional en los diálogos             |
-| **Reflejos**    | Movimiento, iniciativa, daño de asistencia                                                                                   | Sigilo, acrobacias, robar                                                           |
-| **Agudeza**     | % de crítico, penetración de armadura, **percepción en combate**                                                             | Trampas, cerraduras, pistas                                                         |
+| Atributo        | En combate                                                                                           | Fuera del combate                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Fuerza**      | Daño físico (melee **y** a distancia: armas, autoataque, técnicas de bastón)                         | Forzar, romper, levantar                                                            |
+| **Resistencia** | Vida y curación recibida                                                                             | Aguantar venenos, frío, ceniza, caídas                                              |
+| **Potencia**    | Daño de las habilidades alománticas, **distancia** de empuje, tirón y salto, **tamaño** de las áreas | Leer metales, alcance de los pulsos de bronce, influencia emocional en los diálogos |
+| **Temple**      | **Reserva máxima**                                                                                   | Resistir interrogatorios, mentiras, alomancia emocional en los diálogos             |
+| **Reflejos**    | Movimiento, iniciativa, daño de asistencia                                                           | Sigilo, acrobacias, robar                                                           |
+| **Agudeza**     | % de crítico, penetración de armadura, **percepción en combate**                                     | Trampas, cerraduras, pistas                                                         |
 
-----------------LA ARMADURA VIENE DE LOS ITEMS SOLO? O DE QUE ATRIBUTO?
----------------POTENCIA NO DEBERIA MEJORAR LOS TURNOS DE LOS BUFFS/DEBUFOS, PORQUE LOS DEBUFOS COMO EL FEAR SON MUY PODEROSOS SI DURAN VARIOS TURNOS NO? O COMO LO NIVELAMOS?
------------------SI LAS CARGAS DE GADGET SE MEJORAN CON EL TEMPLE, TIENE DOS RECURSOS LA ARTIFICIERA, ESO LO HACE MAS DIFICIL/LIMITADO? QUIZAS NO DEBERIA TENER CARGAS DE GADGETS?
 **Sobre tu propuesta de un atributo para toda la magia:** estoy de acuerdo con que Potencia
-mejore _todo lo que hace_ una habilidad (daño, duración y distancia), porque es lo que hace el
-"poder mágico" en cualquier RPG y se entiende enseguida. El problema era sumarle también la
+mejore _lo que hace_ una habilidad (daño, distancia y tamaño del área), porque es lo que hace el
+"poder mágico" en cualquier RPG y se entiende enseguida. **La duración no**: alargar el control
+(Aturdido, Miedo, Enfurecido) es la palanca más peligrosa de un juego por turnos, porque un
+enemigo que no actúa dos turnos seguidos es un enemigo muerto (el problema del _stunlock_). Las
+duraciones son **fijas en cada habilidad** (casi todo dura 1 turno) y solo las cambian los
+talentos, uno a uno. El problema era sumarle también la
 Reserva máxima: entonces Potencia te haría más fuerte **y** te dejaría lanzar más veces. Con la
 Reserva en Temple, Potencia es _intensidad_ y Temple es _volumen_. Es la decisión clásica de
 golpes fuertes frente a aguante: ¿pocas habilidades enormes o muchas normales?
@@ -150,25 +151,23 @@ de daño (el típico problema de los ARPG en los que todo el mundo acaba acumula
 
 ### Estadísticas derivadas (primera versión, para afinar jugando)
 
-| Estadística                         | Fórmula                                                                                       |
-| ----------------------------------- | --------------------------------------------------------------------------------------------- |
-| Daño físico                         | `arma + FUE`                                                                                  |
-| Vida                                | `25 + 6·RES + 5·(nivel−1)`                                                                    |
-| Curación recibida                   | `+5 % por punto de RES`                                                                       |
-| Daño de habilidad alomántica        | `base de la habilidad + POT`                                                                  |
-| Duración de los estados que aplicas | `base + 1 turno con POT 4 y otro con POT 8`                                                   |
-| Distancia de empuje/tirón           | `3 + POT/2` m                                                                                 |
-| Distancia del salto de acero        | `6 + POT` m                                                                                   |
-| Reserva máxima                      | `6 + TEM`                                                                                     |
-| Resistencia mental                  | Los estados mentales que recibes duran 1 turno menos con TEM 5 y 2 menos con TEM 9 (mínimo 1) |
-| Cargas de gadgets (Artificiera)     | `base + ⌊TEM/4⌋`                                                                              |
-| Movimiento                          | `6 + REF/2` m                                                                                 |
-| Iniciativa (individual)             | `2·REF + 1d4`                                                                                 |
-| Daño de asistencia                  | `50 % del autoataque + REF`                                                                   |
-| % de crítico                        | `5 % · (1 + ⌊AGU/2⌋)`, siempre múltiplo de 5 % (bolsa de 20 canicas como mucho)               |
-| Penetración                         | `⌊AGU/2⌋`                                                                                     |
+| Estadística                  | Fórmula                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------- |
+| Daño físico                  | `arma + FUE`                                                                    |
+| Vida                         | `25 + 6·RES + 5·(nivel−1)`                                                      |
+| Curación recibida            | `+5 % por punto de RES`                                                         |
+| Daño de habilidad alomántica | `base de la habilidad + POT`                                                    |
+| Distancia de empuje/tirón    | `3 + POT/2` m                                                                   |
+| Distancia del salto de acero | `6 + POT` m                                                                     |
+| Reserva máxima               | `6 + TEM`                                                                       |
+| Movimiento                   | `6 + REF/2` m                                                                   |
+| Iniciativa (individual)      | `2·REF + 1d4`                                                                   |
+| Daño de asistencia           | `50 % del autoataque + REF`                                                     |
+| % de crítico                 | `5 % · (1 + ⌊AGU/2⌋)`, siempre múltiplo de 5 % (bolsa de 20 canicas como mucho) |
+| Penetración                  | `⌊AGU/2⌋`                                                                       |
 
-La **armadura** sale solo del equipo, no de un atributo (ver §9).
+La **armadura** sale solo del equipo, no de un atributo (ver §9). La otra defensa contra los
+disparos es la **cobertura** (§5), que sale de dónde te pones, no de tus números.
 
 ### Cada habilidad dice con qué escala
 
@@ -176,7 +175,7 @@ Cada habilidad lleva una etiqueta **Escala: FUE / POT / AGU…**. Un mismo perso
 habilidades que escalan con atributos distintos, y eso es lo que hace posibles las builds:
 
 - Las **técnicas de bastón** y el **peltre** del Deslizador (Proyección, autoataque) escalan con **FUE**; sus
-  **burbujas de bendaleo**, con **POT** (duración y tamaño); y su **mente de oro**, con **RES**.
+  **burbujas de bendaleo**, con **POT** (tamaño); y su **mente de oro**, con **RES**.
   Un Deslizador puede ser virtuoso del golpe o casi inmortal según dónde ponga los puntos.
 - Las de **acero/hierro** y las **emocionales** escalan con **POT**.
 - El **autoataque** y las armas escalan con **FUE** (y con AGU para los críticos).
@@ -214,12 +213,12 @@ Cada personaje tiene un árbol de talentos con **dos ramas**. Son una dirección
 exclusivas: puedes coger talentos de las dos. Los talentos son **modificadores de habilidades
 que ya tienes** (§14), así que la barra de habilidades no crece.
 
-| Personaje        | Rama A                                                                  | Rama B                                                                                                                                               |
-| ---------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Lanzamonedas** | **Aviador** (POT, REF): saltos más largos, empujes de props, Meteoro    | **Artillero** (FUE, AGU): revólver, bala empujada, marca del cazador, críticos y penetración. Talento _Rebote_ (la bala empujada rebota en el metal) |
-| **Deslizador**   | **Virtuoso** (REF, AGU, FUE): Ritmo, Finta, Proyección, críticos        | **Inmortal** (RES, TEM): más cargas de oro, Guardia más frecuente, Pullas, burbujas más largas                                                       |
-| **Voz**          | **Titiritero** (POT, TEM): control de grupos, duraciones largas, oleada | **Duelista** (FUE, REF): estoque, réplica a los Enfurecidos, se puede elegir como objetivo de su propio Provocar                                     |
-| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, zonas, más cargas                   | **Tiradora** (AGU, FUE): munición especial, escopeta, detonación de asistencia                                                                       |
+| Personaje        | Rama A                                                           | Rama B                                                                                                                                               |
+| ---------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Lanzamonedas** | **Aviador** (POT, REF): saltos más largos, empujes de props,     | **Artillero** (FUE, AGU): revólver, bala empujada, marca del cazador, críticos y penetración. Talento _Rebote_ (la bala empujada rebota en el metal) |
+| **Deslizador**   | **Virtuoso** (REF, AGU, FUE): Ritmo, Finta, Proyección, críticos | **Inmortal** (RES, TEM): mente de oro más potente, Guardia más frecuente, Pullas, burbujas más largas                                                |
+| **Voz**          | **Titiritero** (POT, TEM): control de grupos, más objetivos      | **Duelista** (FUE, REF): estoque, réplica a los Enfurecidos, se puede elegir como objetivo de su propio Provocar                                     |
+| **Artificiera**  | **Ingeniera** (POT, TEM): burbujas, zonas, recargas más cortas   | **Tiradora** (AGU, FUE): munición especial, escopeta, detonación de asistencia                                                                       |
 
 **Ejemplo, la Voz Duelista:** usa _Provocar_ sobre un grupo eligiéndose a sí misma como objetivo
 del ataque. Con el talento _Réplica_, cada enemigo Enfurecido que la ataca recibe un
@@ -302,8 +301,14 @@ Sin masa. Reglas simples y fáciles de leer:
 - **Empuje y Tirón solo afectan a lo metálico**: props de metal y unidades con **metal
   portado** (armadura o arma metálica). Lo que no lleva metal no se puede mover con alomancia.
 - **Distancia** = `3 + POT/2` m. El Empuje va en línea recta alejándose de ti; el Tirón, hacia ti.
-- Los **props** tienen un tamaño: **Pequeño**, **Grande** o **Fijo** (anclado: farolas,
-  verjas, raíles). Lo Fijo no se mueve.
+- Los **props** son **Pequeños** o **Grandes**. No hay props anclados: lo que no se mueve
+  (columnas, paredes, farolas) es escenario estático.
+
+| Tamaño      | Ejemplos                                      | Se mueve con…                                                             | Al golpear deja | ¿Es cobertura? |
+| ----------- | --------------------------------------------- | ------------------------------------------------------------------------- | --------------- | -------------- |
+| **Pequeño** | Cuchillos, clavos, monedas sobre una encimera | Tirón y empuje (munición del hierro y el acero)                           | Solo daño       | No             |
+| **Grande**  | Cajas, barriles, carros                       | Empuje y tirón si es metálico, o la fuerza del peltre (Proyección, Bateo) | **Aturdido**    | Sí, si es alto |
+
 - Las unidades **Gigantes** (koloss) no se pueden empujar ni atraer.
 - El **salto de acero** es su propia habilidad: `6 + POT` m.
 
@@ -313,31 +318,78 @@ Sin masa. Reglas simples y fáciles de leer:
 Daño de impacto = base del prop (Pequeño 6, Grande 10) + atributo de quien lo lanza
 ```
 
-El atributo es **POT** si se lanza con un empuje y **FUE** si se lanza a mano o de un golpe (bateo).
+El atributo es **POT** si se lanza con alomancia (empuje, tirón) y **FUE** si se lanza con
+peltre (Proyección, Bateo). Los personajes no lanzan objetos a mano.
+
+**El Empuje** exige estar **al menos a 3 m** del objetivo (de borde a borde) y se puede
+**desviar un poco**: la dirección es "alejándolo de ti", girada como mucho **±20°** hacia donde
+apuntes. Al apuntarlo se elige primero el objetivo y después la dirección.
+
+**Los objetos no tienen estados**: una caja golpeada recibe el daño, pero no queda Aturdida.
 
 - Prop **Grande** → **Aturdido** (pierde su próxima Acción).
-- Prop **Pequeño** o unidad lanzada → **Derribado**.
-- Si una unidad lanzada **choca contra un muro**: +50 % de daño. Si choca contra otra unidad,
+- Prop **Pequeño** → solo daño.
+- Unidad empujada o lanzada → **Derribado**.
+- Si una unidad empujada **choca contra un muro**: +50 % de daño. Si choca contra otra unidad,
   las dos reciben daño.
 - Todo impacto es el disparador **IMPACTO** (§7).
+
+### Cobertura: tapa o no tapa
+
+El escenario estático y los props Grandes y altos son también **coberturas**. Como aquí se acierta
+siempre, la cobertura **no da porcentajes** (ni "media" ni "completa"): **o tapa o no tapa**.
+Si tapa, no te pueden apuntar con nada que necesite línea de visión (disparos y habilidades de
+un objetivo, estados incluidos).
+
+**Qué es cobertura**: lo que es más alto que una persona agachada: columnas, paredes, esquinas,
+cajas apiladas, carros. Lo bajo (un barril, un murete) no cuenta: por encima se dispara.
+
+**Te protege por dirección, no por milímetros.** Si estás **pegado** a una cobertura (a menos de
+~1 m), quedas a cubierto de **todo el que esté al otro lado**, dentro de un arco amplio (≈ 140°)
+centrado en la cara de la cobertura. No hace falta ponerse en el punto exacto para que un
+enemigo no te dé "de refilón": basta con estar detrás de la columna respecto a él. Como no
+hay cuadrícula (XCOM la tiene), la regla sale de la **cara** de la cobertura y no del rayo exacto:
+
+- **Al moverte, el destino se ajusta solo (snap)**: si el punto que eliges está cerca de una
+  cobertura, la unidad se queda pegada a ella. En el destino se ve un **escudo** por cada
+  dirección cubierta y qué enemigos dejarían de verte.
+- **Al apuntar**, la vista previa dice "a cubierto" y el objetivo no se puede elegir.
+- **Fuera del arco no protege**: si el enemigo está a tu lado de la columna, te ve.
+
+**Qué la anula** (y por eso moverse importa):
+
+- **Flanquear**: ponerse fuera del arco de la cobertura.
+- **El cuerpo a cuerpo** y **las áreas** (bola de fuego, granadas): la columna no protege de
+  una explosión a tu lado.
+- **Mover o romper la cobertura**: un prop Grande es cobertura hasta que el Lanzamonedas lo
+  atrae, lo empuja (o lo lanza contra quien se escondía detrás) o alguien lo destruye. El
+  escenario es arma y escudo a la vez: el pilar 2 en estado puro.
+- **El Rebote** del Lanzamonedas (talento de la Bala empujada): la bala rebota en un objeto
+  metálico y alcanza a quien se esconde detrás de una cobertura. Con la cobertura, el Rebote
+  pasa de curiosidad a herramienta.
+- Lo **empujado en línea recta** choca con la cobertura (IMPACTO contra ella), no contigo.
 
 ---
 
 ## 6. Estados (vocabulario de combate)
 
-Pocos y bien definidos. Cada palabra nueva es un coste cognitivo, así que el objetivo son unos
-8 como mucho, y todos se pueden aplicar en ambas direcciones (jugador ↔ enemigo).
+Pocos y bien definidos. Cada palabra nueva es un coste cognitivo, así que son **6**, cada uno
+con un papel distinto, y todos se pueden aplicar en ambas direcciones (jugador ↔ enemigo). Los objetos no tienen
+estados. Las
+duraciones son fijas en cada habilidad (POT no las alarga, §3).
 
-| Estado             | Efecto                                                                                                      | Lo aplica sobre todo                              |
-| ------------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| **Aturdido**       | Pierde su próxima Acción                                                                                    | Impacto de prop Grande, mente de peltre           |
-| **Derribado**      | Levantarse cuesta la mitad del movimiento; los ataques melee contra él son crítico garantizado              | Tirón de hierro, impacto ligero, Proyección       |
-| **Lanzado**        | En el aire hasta el final del turno; al caer recibe daño y queda Derribado                                  | Empuje hacia arriba, bateo                        |
-| **Desequilibrado** | El siguiente golpe que recibe hace +25 % y se consume                                                       | Muchas habilidades. Es la "preparación" universal |
-| **Marcado**        | El siguiente golpe de cualquier aliado hace +50 % e ignora el rango de armadura (se consume). Dura 2 turnos | Marca del cazador                                 |
-| **Enfurecido**     | Tiene que atacar al objetivo que elijas; +25 % al daño que hace y −3 de armadura                            | Encender (cinc)                                   |
-| **Aplacado**       | Sin Reacción y −25 % de daño                                                                                | Aplacar (latón)                                   |
-| **Seco**           | Sin alomancia este turno                                                                                    | Quedarse sin Reserva, cromo                       |
+| Estado         | Papel       | Efecto                                                                                          | Lo aplica sobre todo                         |
+| -------------- | ----------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Aturdido**   | Tempo       | Pierde su próxima Acción                                                                        | Impacto de prop Grande, mente de peltre      |
+| **Derribado**  | Física      | Levantarse cuesta la mitad del movimiento; los ataques melee contra él son crítico seguro       | Tirón de hierro, unidad empujada, Proyección |
+| **Marcado**    | Preparación | El siguiente golpe que recibe hace +50 % (+30 % + 5 %·POT con la Marca del cazador); se consume | Marca del cazador, Deslizar, Detonación      |
+| **Enfurecido** | Control     | Tiene que atacar al objetivo que elijas; +25 % al daño que hace y −3 de armadura                | Encender (cinc)                              |
+| **Aplacado**   | Control     | Sin Reacción y −25 % de daño                                                                    | Aplacar (latón)                              |
+| **Seco**       | Recurso     | Sin alomancia este turno                                                                        | Quedarse sin Reserva, cromo                  |
+
+> **Simplificado**: _Lanzado_ desaparece (un empuje ya acaba en IMPACTO y Derribado) y
+> _Desequilibrado_ se funde con **Marcado**, que pasa a ser la preparación universal. Antes
+> eran dos versiones del mismo "el siguiente golpe hace más" (+25 % y +50 %).
 
 ---
 
@@ -351,10 +403,9 @@ de Persona y el _break_ de Octopath. Lo que tienen en común:
 
 ### Reglas
 
-1. **Cinco disparadores**, ni uno más:
+1. **Cuatro disparadores**, ni uno más:
    - **IMPACTO**: un prop o una unidad choca contra algo.
-   - **LANZADO**: un enemigo sale volando.
-   - **DESEQUILIBRADO / DERRIBADO**: se aplica ese estado.
+   - **DERRIBADO**: se aplica ese estado.
    - **CRÍTICO**: un aliado hace un crítico.
    - **BAJA**: un aliado mata a un enemigo.
 2. Cada personaje **escucha uno o dos** disparadores (su "lectura" del combate).
@@ -373,21 +424,22 @@ de Persona y el _break_ de Octopath. Lo que tienen en común:
 
 ### La asistencia de cada personaje
 
-| Personaje        | Disparador                                               | Asistencia          | Efecto                                                                                                |
-| ---------------- | -------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Lanzamonedas** | LANZADO o DESEQUILIBRADO                                 | _Tiro al plato_     | Disparo con el daño de asistencia. Contra un objetivo Lanzado, +50 %                                  |
-| **Deslizador**   | DERRIBADO, o un enemigo que **llega empujado a su lado** | _Bateo_             | Golpe melee que además **redirige** al enemigo 3 m hacia donde tú elijas (provoca un nuevo IMPACTO)   |
-| **Voz**          | BAJA o CRÍTICO de un aliado                              | _Encender el ánimo_ | Ese aliado gana **1 Acción adicional** inmediata (cuesta 1 de metal)                                  |
-| **Artificiera**  | IMPACTO                                                  | _Detonación_        | Dispara al punto de impacto: daño en área de 2 m y Desequilibrado. Si el prop lleva ettmetal, explota |
+| Personaje        | Disparador                                    | Asistencia          | Efecto                                                                                              |
+| ---------------- | --------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| **Lanzamonedas** | DERRIBADO                                     | _Tiro al plato_     | Disparo con el daño de asistencia al enemigo que cae                                                |
+| **Deslizador**   | IMPACTO de un enemigo que **acaba a su lado** | _Bateo_             | Golpe melee que además **redirige** al enemigo 3 m hacia donde tú elijas (provoca un nuevo IMPACTO) |
+| **Voz**          | BAJA o CRÍTICO de un aliado                   | _Encender el ánimo_ | Ese aliado gana **1 Acción adicional** inmediata (cuesta 1 de metal)                                |
+| **Artificiera**  | IMPACTO                                       | _Detonación_        | Dispara al punto de impacto: daño en área de 2 m y Marcado. Si el prop lleva ettmetal, explota      |
 
 ### Ejemplo de cadena (es tu caso de la caja, ampliado)
 
 1. El **Lanzamonedas** empuja una caja metálica Grande contra un guardia → **IMPACTO** (daño,
    Aturdido).
 2. → La **Artificiera** reacciona con _Detonación_ en el punto de impacto: el guardia y su
-   compañero quedan **Desequilibrados**. (Eslabón 1, ×1,1)
-3. → El compañero Desequilibrado sale despedido junto al **Deslizador**, que reacciona con
-   _Bateo_ → **crítico**, y lo devuelve contra la caja (nuevo IMPACTO). (Eslabón 2, ×1,2)
+   compañero quedan **Marcados**. (Eslabón 1, ×1,1)
+3. → El compañero sale despedido y acaba junto al **Deslizador**, que reacciona con _Bateo_
+   (+50 % por la Marca) → **crítico**, y lo devuelve contra la caja (nuevo IMPACTO). (Eslabón 2,
+   ×1,2)
 4. → La **Voz** reacciona a ese crítico con _Encender_: el Deslizador gana una Acción adicional
    y la usa para _Deslizar_ a la espalda del guardia aturdido. (Eslabón 3, tope)
 
@@ -416,11 +468,11 @@ En la feruquimia de la Era 2, los tres metales "espirituales" guardan exactament
 
 ### Qué hace cada una (reutilizando sistemas existentes, 3ª ley)
 
-| Zona            | Efecto                                                                                                    | Sistema que reutiliza |
-| --------------- | --------------------------------------------------------------------------------------------------------- | --------------------- |
-| **Fortuna**     | Quien ataca desde dentro mete +2 canicas de crítico en su bolsa                                           | La bolsa de canicas   |
-| **Conexión**    | Un estado aplicado a una unidad que está dentro se copia a todas las de su bando que también estén dentro | Los estados           |
-| **Investidura** | Las habilidades que se usan desde dentro cuentan como **Avivadas gratis** (+50 %)                         | Avivar                |
+| Zona            | Efecto                                                                                                    | Sistema que reutiliza            |
+| --------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| **Fortuna**     | Quien ataca desde dentro mete +2 canicas de crítico en su bolsa                                           | La bolsa de canicas              |
+| **Conexión**    | Un estado aplicado a una unidad que está dentro se copia a todas las de su bando que también estén dentro | Los estados                      |
+| **Investidura** | Las habilidades que se usan desde dentro hacen **+50 % de efecto**                                        | El multiplicador del duraluminio |
 
 **Afectan a todos, también a los enemigos.** Eso es lo que las hace tácticas: una zona de
 Conexión con tres enemigos dentro es perfecta para meter un Enfurecido o un Aplacado... y
@@ -436,7 +488,7 @@ terrible si es tu party la que está dentro cuando el enemigo te aplica algo.
   estado puro: la zona entra en la física del acero sin ninguna regla nueva. Si se rompen,
   sueltan la zona de golpe durante una ronda.
 - **Habilidad de la Artificiera**: puede crear **una zona a la vez**, durante 3 turnos, con
-  cargas limitadas. Es su identidad.
+  recarga. Es su identidad.
 
 ### ¿Son demasiadas mecánicas? (presupuesto de complejidad)
 
@@ -445,15 +497,14 @@ asistencias, crítico, feruquimia equipable, duraluminio y zonas. Son 9. BG3 tie
 más; lo que importa no es el número, sino:
 
 - **Elegancia = profundidad / complejidad.** Las zonas pasan el filtro porque **no añaden
-  vocabulario**: hablan de canicas, estados y avivar, que ya existen.
+  vocabulario**: hablan de canicas, estados y el multiplicador del duraluminio, que ya existen.
 - **_Progressive disclosure_**: no lo enseñes todo a la vez. Orden recomendado:
   1. Acto 1, inicio: autoataque, Reserva/Seco, props.
   2. Acto 1, mitad: asistencias (cuando tengas los 4 personajes).
   3. Acto 1, final: feruquimia equipable y duraluminio.
   4. Acto 2: relicarios del escenario.
   5. Acto 2, mitad: la Artificiera aprende a crear zonas.
-- **Orden de recorte** si hay que quitar algo (del primero en caer al último): Avivar →
-  Investidura → Conexión → Fortuna → mentes de metal → asistencias. Las asistencias y los props
+- **Orden de recorte** si hay que quitar algo (del primero en caer al último): Investidura → Conexión → Fortuna → mentes de metal → asistencias. Las asistencias y los props
   son el corazón del juego; eso no se toca.
 
 ---
@@ -467,25 +518,27 @@ Es la justificación perfecta para la personalización.
 
 - **2 ranuras de mente de metal** por personaje (brazal y anillo).
 - **Mecánica de los libros = deuda temporal.** La feruquimia es "más débil ahora, más fuerte
-  después". Cada mente:
-  - empieza el combate **cargada una vez** (la llenaste mientras explorabas o en el campamento);
-  - **Almacenar** (Acción adicional): sufres la penalización este turno y ganas una carga más;
-  - **Decantar** (Acción adicional): gastas la carga y te llevas el beneficio.
-    Así se convierte en una decisión de tiempo, no en un "una vez por combate" plano.
+  después": la deuda se paga **fuera del combate**, al llenar la mente explorando o en el
+  campamento. Cada mente:
+  - empieza el combate con **una carga**;
+  - **decantar no gasta acción**: gastas la carga y te llevas el beneficio cuando quieras de tu
+    turno, así que se combina con el resto (Ligero + Salto de acero);
+  - **en combate no se almacena ni se recarga** (decidido, para todas las mentes): una carga
+    por combate. La decisión es _cuándo_ usarla.
 
-| Mente                        | Al almacenar (penalización) | Al decantar (beneficio)                                              |
-| ---------------------------- | --------------------------- | -------------------------------------------------------------------- |
-| **Oro** (salud)              | −25 % de vida actual        | Curación de 6/turno durante 3 turnos                                 |
-| **Peltre** (fuerza)          | −50 % de daño físico        | Siguiente golpe ×2 y Aturdido. _Tu "megaataque"_                     |
-| **Acero** (velocidad)        | Movimiento ×0,5             | Movimiento ×2 y +1 Acción adicional. _Tu "megavelocidad"_ (ver nota) |
-| **Hierro** (peso)            | —                           | Ligero: saltos ×2. Pesado: no te pueden empujar, atraer ni derribar  |
-| **Estaño** (sentidos)        | Ciego más allá de 5 m       | +2 canicas de crítico y ves a través de la bruma                     |
-| **Cinc** (velocidad mental)  | Último en la iniciativa     | Primero en la iniciativa y +1 Reacción                               |
-| **Bronce** (vigilia)         | —                           | Inmune a Aturdido 2 turnos                                           |
-| **Electrum** (determinación) | —                           | La próxima vez que caigas a 0, te quedas a 1                         |
-| **Cromo** (Fortuna)          | Pierdes canicas             | Mini zona de Fortuna personal                                        |
-| **Latón** (calor)            | —                           | Inmune a las superficies de fuego o hielo                            |
-| **Cobre** (memoria)          | —                           | Sobre todo fuera del combate (§11)                                   |
+| Mente                        | Al decantar (beneficio)                                              |
+| ---------------------------- | -------------------------------------------------------------------- |
+| **Oro** (salud)              | Curación de 6/turno durante 3 turnos                                 |
+| **Peltre** (fuerza)          | Siguiente golpe ×2 y Aturdido. _Tu "megaataque"_                     |
+| **Acero** (velocidad)        | Movimiento ×2 y +1 Acción adicional. _Tu "megavelocidad"_ (ver nota) |
+| **Hierro** (peso)            | Ligero: saltos ×2. Pesado: no te pueden empujar, atraer ni derribar  |
+| **Estaño** (sentidos)        | +2 canicas de crítico y ves a través de la bruma                     |
+| **Cinc** (velocidad mental)  | Primero en la iniciativa y +1 Reacción                               |
+| **Bronce** (vigilia)         | Inmune a Aturdido 2 turnos                                           |
+| **Electrum** (determinación) | La próxima vez que caigas a 0, te quedas a 1                         |
+| **Cromo** (Fortuna)          | Mini zona de Fortuna personal                                        |
+| **Latón** (calor)            | Inmune a las superficies de fuego o hielo                            |
+| **Cobre** (memoria)          | Sobre todo fuera del combate (§11)                                   |
 
 > **Corrección de lore**: en el TODO pusiste "electrum feruquímico = megavelocidad". En los
 > libros, la velocidad física es el **acero** feruquímico (los "corredores de acero"). El
@@ -543,14 +596,12 @@ ser autoprotección a ser **sinergia**.
 Tu duda era si darle todos los props al Lanzamonedas. **Mejor que los props sean un lenguaje
 compartido**, y que cada personaje los use con una **geometría distinta**:
 
-| Quién        | Cómo                        | Geometría                                                                                                                    |
-| ------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Cualquiera   | Empellón a mano (ya existe) | 1–3 m, props Pequeños                                                                                                        |
-| Lanzamonedas | Empuje / tirón              | **Línea recta** alejándose o acercándose a él. Distancia según POT                                                           |
-| Cualquiera   | Lanzar (Acción, escala FUE) | **Arco elegido**: un prop Pequeño a 6 m, por encima de la cobertura                                                          |
-| Deslizador   | Bateo y Proyección          | **Redirección y arco**: devuelve lo que le llega 3 m hacia donde elijas, o lanza en arco al enemigo con el que está peleando |
-| Artificiera  | Pulso del cubo              | **Radial**: todo lo metálico sale hacia fuera desde un punto                                                                 |
-| Voz          | No lanza props              | **Mueve a los enemigos hacia los props** (taunt, Enfurecido)                                                                 |
+| Quién        | Cómo               | Geometría                                                                                                                    |
+| ------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Lanzamonedas | Empuje / tirón     | **Línea recta** alejándose (±20°, a 3 m o más) o acercándose a él. Distancia según POT                                       |
+| Deslizador   | Bateo y Proyección | **Redirección y arco**: devuelve lo que le llega 3 m hacia donde elijas, o lanza en arco al enemigo con el que está peleando |
+| Artificiera  | Pulso del cubo     | **Radial**: todo lo metálico sale hacia fuera desde un punto                                                                 |
+| Voz          | No lanza props     | **Mueve a los enemigos hacia los props** (taunt, Enfurecido)                                                                 |
 
 ---
 
@@ -568,8 +619,8 @@ reglas que sigue cada personaje:
 3. **Las habilidades compiten por la Reserva.** El kit completo de un turno fuerte cuesta más de
    lo que hay en la Reserva. Ejemplo del Deslizador: Burbuja (3) + Avivar peltre (2) + Deslizar
    (1) = 6 de unas 9. Puede hacerlo, pero el turno siguiente casi seguro estará **Seco**.
-4. **Cada pico de poder tiene su resaca**: Arrastre de peltre, Seco, la vida que pierdes al
-   almacenar en la mente de oro, la recuperación de las técnicas.
+4. **Cada pico de poder tiene su resaca**: Arrastre de peltre, Seco, la única carga de la mente
+   de metal, la recuperación de las técnicas.
 5. **Las Reacciones también compiten**: la Guardia y la asistencia del Deslizador usan la misma
    Reacción.
 6. **Daño por ronda como vara de medir.** Se compara el **daño medio por ronda** de cada
@@ -594,23 +645,16 @@ extra consiguen los demás** (Encender, Provocar). Se mide así, no con su daño
 disparar. El **estaño** encaja con el tirador: sentidos afilados para ver el punto débil de
 lejos. Es la "marca del cazador" clásica del arquero de los RPG.
 
-| Habilidad                          | Coste        | Efecto                                                                                                                                             |
-| ---------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Autoataque: revólver_             | —            | Distancia larga                                                                                                                                    |
-| _Vista de estaño (pasiva)_         | —            | Ignora el límite de apuntado dentro de la bruma y ve a los enemigos ocultos en su línea de visión                                                  |
-| **Salto de acero**                 | Adicional, 1 | Salto de `6 + POT` m (empujas una moneda contra el suelo). No gasta movimiento. Desde arriba: +1 canica de crítico                                 |
-| **Empuje**                         | Acción, 2    | Empuja un prop o enemigo metálico en línea recta. Si el objetivo es Fijo, sales despedido tú (reposicionamiento)                                   |
-| **Tirón**                          | Adicional, 1 | Atrae algo metálico. Un enemigo con armadura metálica llega Derribado; un arma metálica = **Desarme** (el enemigo pasa a un ataque débil)          |
-| **Bala empujada**                  | Acción, 3    | Atraviesa a todos los enemigos en línea; +4 de penetración                                                                                         |
-| **Marca del cazador** (estaño)     | Adicional, 1 | El objetivo queda **Marcado** 2 turnos: el siguiente golpe de **cualquier aliado** hace +50 % e ignora el rango de armadura. Escala POT (duración) |
-| **Burbuja de acero**               | Reacción, 2  | Hasta tu siguiente turno, **los proyectiles contra ti o aliados a 3 m se desvían**. Determinista (ver nota)                                        |
-| **Mente de hierro** _(feruquimia)_ | carga        | Ligero: saltos ×2 este turno. Pesado: no te pueden empujar, atraer ni derribar                                                                     |
-| **Duraluminio: Meteoro**           | todo         | Decantas peso en pleno salto y caes encima: área de 4 m, Aturdido. O un empuje de duraluminio que arranca y lanza un prop **Fijo** (una farola)    |
-
-> **Nota de coherencia**: en el TODO pusiste "burbuja para % de esquivar balas" y "posibilidad
-> de esquivar melee" (estaño). **Las dos rompen tu regla de "aciertas siempre".** Las he
-> pasado a **efectos deterministas** (la burbuja desvía los proyectiles; la esquiva es ahora la
-> _Guardia_ del Deslizador, que esquiva el primer golpe). Así el jugador puede planificar contra ellas.
+| Habilidad                          | Coste                           | Efecto                                                                                                                                                      |
+| ---------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| _Autoataque: revólver_             | —                               | Distancia larga                                                                                                                                             |
+| **Salto de acero**                 | Adicional, 1                    | Salto de `6 + POT` m (empujas una moneda contra el suelo). No gasta movimiento.                                                                             |
+| **Empuje**                         | Acción, 2                       | Empuja un prop o enemigo metálico en línea recta, desviable ±20°. Hay que estar al menos a 3 m.                                                             |
+| **Tirón**                          | Adicional, 1                    | Atrae algo metálico. Un enemigo con armadura metálica llega Derribado; un arma metálica = **Desarme** (el enemigo pasa a un ataque débil)                   |
+| **Bala empujada**                  | Acción, 3                       | Atraviesa a todos los enemigos en línea; +4 de penetración                                                                                                  |
+| **Marca del cazador** (estaño)     | Adicional, 1                    | El objetivo queda **Marcado** 2 turnos: el siguiente golpe de **cualquier aliado** hace **+30 % + 5 % por punto de POT** (+60 % con POT 6) y quita la marca |
+| **Burbuja de acero**               | Adicional, 2                    | Hasta tu siguiente turno, **los proyectiles contra ti tienen un 50% de fallar**.                                                                            |
+| **Mente de hierro** _(feruquimia)_ | Sin acción, 1 carga por combate | Ligero: saltos ×2 este turno. Pesado: no te pueden empujar, atraer ni derribar                                                                              |     |
 
 ### 10.2 El Deslizador — _Bendaleo, peltre y oro feruquímico_ (el arquetipo de Wayne)
 
@@ -631,10 +675,9 @@ turno sin golpear.
 | **Proyección** (peltre)                | Acción, 1                         | Llave de judo: usas el impulso del enemigo para lanzarlo **en arco** hasta 4 m. Provoca un **IMPACTO** y queda **Derribado**. Es el "lanzar en el ángulo que elijas" del peltre, contado como técnica en vez de fuerza. Escala FUE                          |
 | **Avivar peltre**                      | Adicional, 2                      | 2 turnos: +2 m de movimiento, **inmune a Derribado y Aturdido**, +20 % de daño físico. **Al acabar: Arrastre de peltre** (−50 % de movimiento y de daño durante 1 turno). Es la furia de peltre, pero **sin regeneración**: de curarse ya se encarga el oro |
 | **Guardia** (técnica)                  | Adicional, gratis, recuperación 2 | Hasta tu siguiente turno **esquivas el primer ataque melee** y **contraatacas** al que lo intentó. **Gasta tu Reacción**, así que compite con tu asistencia (_Bateo_). Es el "contraataque instintivo" del estaño, contado como oficio del duelista         |
-| **Deslizar** (bendaleo)                | Adicional, 1                      | Una micro burbuja instantánea: te mueves 4 m sin provocar reacciones y puedes acabar a la espalda del enemigo (queda **Desequilibrado**)                                                                                                                    |
-| **Burbuja de duelo** (bendaleo)        | Acción, 3                         | Burbuja fija de 2,5 m durante 2 turnos. Dentro, el tiempo va **rápido**: **+1 Acción** por turno. Nadie puede disparar a través del borde. Si sales, se rompe. Duración y tamaño escalan con POT                                                            |
-| **Mente de oro** _(feruquimia innata)_ | Adicional                         | **Almacenar**: pierdes el 20 % de tu vida actual y ganas 1 carga (máximo 3). **Decantar**: te curas `10 + 3·RES` por carga gastada. Si bajas del 25 % de vida, puedes decantar como Reacción                                                                |
-| **Duraluminio: Mil golpes**            | todo                              | Dentro de una Burbuja de duelo: 4 autoataques seguidos al mismo objetivo, con el Ritmo al máximo                                                                                                                                                            |
+| **Deslizar** (bendaleo)                | Adicional, 1                      | Una micro burbuja instantánea: te mueves 4 m sin provocar reacciones y puedes acabar a la espalda del enemigo (queda **Marcado**)                                                                                                                           |
+| **Burbuja de duelo** (bendaleo)        | Acción, 3                         | Burbuja fija de 2,5 m durante 2 turnos. Dentro, el tiempo va **rápido**: **+1 Acción** por turno. Nadie puede disparar a través del borde. Si sales, se rompe. El tamaño escala con POT                                                                     |
+| **Mente de oro** _(feruquimia innata)_ | Sin acción, 1 carga por combate   | **Decantar**: te curas `10 + 3·RES`. La carga se llena fuera del combate                                                                                                                                                                                    |
 
 **Talentos** (modificadores, no ocupan barra): _Pullas_ (Guardia también obliga a un enemigo a
 6 m a atacarte), _Finta_ (el primer golpe tras Deslizar hace siempre el máximo), _Arrollar_
@@ -651,35 +694,34 @@ ataca a distancia.
 **Fantasía**: el titiritero emocional. Decide quién pega a quién.
 **Bucle**: leer intenciones → redirigir (Encender/Aplacar) → potenciar a los aliados.
 
-| Habilidad                                     | Coste        | Efecto                                                                                                                                                   |
-| --------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Autoataque: bastón-estoque o pistola ligera_ | —            | Distancia media                                                                                                                                          |
-| **Leer intenciones** (bronce)                 | Adicional, 1 | Revela la próxima acción de 1 enemigo (o de todos en 6 m si se aviva). Como el _telegraphing_ de Into the Breach: convierte la incertidumbre en un puzle |
-| **Encender: Provocar** (cinc)                 | Acción, 2    | Enemigo Enfurecido: ataca al objetivo que tú elijas (normalmente el Deslizador, con la Mente de oro cargada)                                             |
-| **Encender: Arenga** (cinc)                   | Adicional, 1 | Un aliado gana +2 m de movimiento y +20 % de daño este turno                                                                                             |
-| **Aplacar** (latón)                           | Acción, 2    | En un enemigo: Aplacado y pierde sus buffs. En un aliado: le quita los estados negativos                                                                 |
-| **Calma** (latón)                             | Acción, 3    | El enemigo no es hostil durante 1 turno (se rompe si le haces daño)                                                                                      |
-| **Nube de cobre**                             | Acción, 2    | Zona de 4 m durante 3 turnos: los aliados dentro son inmunes a efectos emocionales y no se les puede leer con bronce. Fuera del combate: sigilo          |
-| **Duraluminio: Oleada**                       | todo         | En los libros, duraluminio + latón es como Vin paró a los koloss. Aplica Enfurecido o Aplacado a **todos los enemigos en 8 m**                           |
+| Habilidad                                     | Coste        | Efecto                                                                                                                                          |
+| --------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| _Autoataque: bastón-estoque o pistola ligera_ | —            | Distancia media                                                                                                                                 |
+| **Leer intenciones** (bronce)                 | Adicional, 1 | Revela la próxima acción de 1 enemigo. Como el _telegraphing_ de Into the Breach: convierte la incertidumbre en un puzle                        |
+| **Encender: Provocar** (cinc)                 | Acción, 2    | Enemigo Enfurecido: ataca al objetivo que tú elijas (normalmente el Deslizador, con la Mente de oro cargada)                                    |
+| **Encender: Arenga** (cinc)                   | Adicional, 1 | Un aliado gana +2 m de movimiento y +20 % de daño este turno                                                                                    |
+| **Aplacar** (latón)                           | Acción, 2    | En un enemigo: Aplacado y pierde sus buffs. En un aliado: le quita los estados negativos                                                        |
+| **Calma** (latón)                             | Acción, 3    | El enemigo no es hostil durante 1 turno (se rompe si le haces daño)                                                                             |
+| **Nube de cobre**                             | Acción, 2    | Zona de 4 m durante 3 turnos: los aliados dentro son inmunes a efectos emocionales y no se les puede leer con bronce. Fuera del combate: sigilo |
 
 ### 10.4 La Artificiera — _ettmetal, cadmio y feruquimia espiritual_
 
 **Fantasía**: la científica de la Era 2. No es la más fuerte, pero rediseña el campo de batalla.
 **Bucle**: preparar el terreno (burbujas, zonas, cargas) → que los demás lo aprovechen.
 
-| Habilidad                          | Coste            | Efecto                                                                                                                                                                                             |
-| ---------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| _Autoataque: escopeta o ballesta_  | —                | Distancia media. **Munición cambiable** (Adicional): normal / **aluminio** (no se puede empujar: atraviesa burbujas de acero enemigas) / **dardo de cromo** (deja Seco al objetivo, 2 por combate) |
-| **Granada de cadmio**              | Acción, carga    | Burbuja de 3 m durante 2 turnos: dentro, el tiempo va **lento**: movimiento ×0,5 y actúan los últimos de la ronda. **Los proyectiles que cruzan el borde se desvían** (pasa en los libros)         |
-| **Pulso de ettmetal**              | Acción, carga    | Empuje radial desde un punto: todo lo metálico en 4 m sale despedido hacia fuera                                                                                                                   |
-| **Carga de ettmetal**              | Adicional, 1     | Pegas una carga a un prop: cuando ese prop sufre un IMPACTO, explota (Directo, 3 m). **En el agua, el ettmetal reacciona de forma violenta** (lore): combina con la superficie de agua             |
-| **Liberar mente espiritual**       | Acción, 3        | Crea una zona de Fortuna, Conexión o Investidura (§8). Una activa a la vez, 3 turnos                                                                                                               |
-| **Inyector de oro**                | Adicional, carga | Cura a un aliado adyacente 12 + Potencia. Es una mente de oro no sellada: la principal curación de la party                                                                                        |
-| **Duraluminio: Decantación total** | todo             | La zona activa duplica su radio y combina dos aspectos a la vez                                                                                                                                    |
+| Habilidad                         | Coste                   | Efecto                                                                                                                                                                                                     |
+| --------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _Autoataque: escopeta o ballesta_ | —                       | Distancia media. **Munición cambiable** (Adicional): normal / **aluminio** (no se puede empujar: atraviesa burbujas de acero enemigas) / **dardo de cromo** (deja Seco al objetivo, 2 de metal, recarga 3) |
+| **Granada de cadmio**             | Acción, 3, recarga 3    | Burbuja de 3 m durante 2 turnos: dentro, el tiempo va **lento**: movimiento ×0,5 y actúan los últimos de la ronda. **Los proyectiles que cruzan el borde se desvían** (pasa en los libros)                 |
+| **Pulso de ettmetal**             | Acción, 2, recarga 2    | Empuje radial desde un punto: todo lo metálico en 4 m sale despedido hacia fuera                                                                                                                           |
+| **Carga de ettmetal**             | Adicional, 1            | Pegas una carga a un prop: cuando ese prop sufre un IMPACTO, explota (Directo, 3 m). **En el agua, el ettmetal reacciona de forma violenta** (lore): combina con la superficie de agua                     |
+| **Liberar mente espiritual**      | Acción, 3               | Crea una zona de Fortuna, Conexión o Investidura (§8). Una activa a la vez, 3 turnos                                                                                                                       |
+| **Inyector de oro**               | Adicional, 2, recarga 2 | Cura a un aliado adyacente 12 + Potencia. Es una mente de oro no sellada: la principal curación de la party                                                                                                |
 
-> **Las cargas de la Artificiera** (granadas, inyector, cubos) son **por combate**, no de la
-> Reserva. Así su recurso es distinto del de los demás y su Seco duele menos. Eso compensa que
-> sea la más compleja.
+> **Los gadgets de la Artificiera** (granadas, pulso, inyector) **no tienen cargas por
+> combate**: gastan metal de la Reserva, como todo lo demás, y se limitan con **recarga**, el
+> mismo sistema que ya tienen todas las habilidades. Un solo recurso, como los otros tres
+> personajes: así no se le suma complejidad a la que ya es la más compleja.
 
 ---
 
@@ -700,10 +742,10 @@ Multiplicador = 1 + (Reserva consumida / Reserva máxima)
 Con la Reserva llena es ×2; con media, ×1,5. Ahora sí es una decisión de verdad: ¿quemo diez
 puntos ahora para un golpe enorme y me quedo Seco el turno que viene?
 
-Además, en lugar de "doble de lo mismo", **cada personaje tiene su variante de duraluminio**
-(ya están en las tablas de arriba). Siguen la misma regla, pero cada uno tiene su fantasía:
-los libros ya lo hacen así (duraluminio + acero = empuje imparable; duraluminio + cinc o
-latón = control de multitudes).
+**Sin variantes por personaje** (decidido): el duraluminio es igual para todos y solo potencia
+la siguiente habilidad alomántica (daño, curación y distancia de empuje, tirón o salto). La
+fantasía sale de con qué se combina: un Empuje que lanza la caja el doble de lejos, una Bala
+empujada que hace el doble a toda la fila.
 
 ---
 
@@ -742,7 +784,7 @@ Ya tienes la bruma volumétrica renderizada; aprovéchala en el gameplay:
 
 - Fuera del combate: de noche, la bruma limita la visión (sigilo). El estaño ve a través.
 - En combate: **dentro de la bruma no se puede apuntar más allá de `6 + AGU` m** (la Vista de estaño del
-  Lanzamonedas y la mente de estaño quitan el límite). Es una alternativa a la cobertura que no necesita % de acierto.
+  Lanzamonedas y la mente de estaño quitan el límite). Se suma a la cobertura (§5) y tampoco necesita % de acierto.
 
 ---
 
@@ -779,20 +821,25 @@ complique**. Si no, el jugador encuentra una estrategia dominante y la repite si
 
 ## 15. Orden de prototipado sugerido (sobre lo que ya hay en el motor)
 
-1. **Reserva + Seco + coste de metal** en `skills.json` (nuevo campo `metal: n`).
-2. **Empujes y props**: etiqueta _metálico_ y tamaño (Pequeño/Grande/Fijo) en los props → Empuje,
-   Tirón y Salto con distancia según POT.
-3. **Fórmula de armadura** y crítico que ignora la armadura (sobre la bolsa de canicas).
-4. **Reacción + 5 disparadores + previsualización de la cadena.** Este es el sistema
-   arriesgado: hay que probarlo pronto (_find the fun_).
-5. Lanzamonedas + Deslizador completos (empujes, props, burbujas y asistencias).
-6. Voz (estados emocionales sobre la IA táctica existente).
-7. Artificiera, burbujas temporales y zonas.
-8. Feruquimia equipable.
+1. **Reserva + Seco + coste de metal** y **fórmula de armadura** con el crítico que la ignora.
+   _(Hecho.)_
+2. **La base de la party**: los 4 personajes con sus atributos y autoataques.
+3. **Cada personaje con los sistemas que necesita**, siempre genéricos (efectos de datos que
+   los demás reutilizan):
+   - Lanzamonedas → props, empuje, tirón, desarme, impactos y los estados físicos.
+   - Deslizador → Ritmo, Proyección (reutiliza los impactos), peltre y mente de oro.
+   - Cobertura, en cuanto hay un tirador y props Grandes.
+   - Voz → estados emocionales sobre la IA táctica existente.
+   - Zonas genéricas → burbujas, nubes y lo que necesita la Artificiera.
+4. **Reacción, 4 disparadores, asistencias y previsualización de la cadena**, cuando ya están
+   los cuatro personajes: así se prueban las interacciones que se han diseñado, con todos los
+   disparadores, y no unas de prueba.
+5. Zonas espirituales y relicarios.
+6. Feruquimia equipable.
 
-Escenario de prueba ideal: **1 Lanzamonedas + 1 Deslizador contra 4 guardias (2 con placas y 1 con
-aluminio) en un patio con cajas, una farola y un charco**. Si ese combate es divertido con dos
-personajes, el sistema funciona.
+Escenario de prueba: **los 4 personajes contra un grupo de guardias (con placas y con
+aluminio) en un patio con cajas, columnas, cuchillos en una encimera, una farola y un
+charco**. Si ese combate es divertido, el sistema funciona.
 
 ---
 
@@ -801,7 +848,16 @@ personajes, el sistema funciona.
 - **Iniciativa individual**: `2·REF + 1d4`.
 - **La Reserva empieza llena** en cada combate. El desgaste entre combates va con los viales.
 - **Caído y reanimable** en combate, como en BG3.
-- **Sin regla de la masa**: solo "metálico o no" y el tamaño de los props (§5).
+- **Sin regla de la masa**: solo "metálico o no" y el tamaño de los props, Pequeño o Grande (§5).
+  **Sin props Fijos**: lo que no se mueve es escenario.
+- **Cobertura binaria** (§5): tapa o no tapa, sin porcentajes. Protege por dirección (arco
+  de la cara de la cobertura) y el destino se ajusta a ella al moverse. La anulan el flanqueo,
+  el melee, las áreas, el Rebote y mover o romper la cobertura.
+- **POT no alarga los estados** (§3): duraciones fijas por habilidad. TEM es solo la Reserva.
+- **6 estados** (§6): Lanzado y Desequilibrado desaparecen. 4 disparadores de asistencia (§7).
+- **La Artificiera sin cargas por combate**: sus gadgets gastan metal y tienen recarga (§10.4).
+- **Las zonas** (burbujas, nubes, zonas espirituales) se implementan con la Artificiera, después
+  del prototipo de dos personajes.
 - **Seis atributos libres** con coste creciente y dos builds por personaje (§3).
 - **El Deslizador (arquetipo de Wayne) sustituye al Violento.** Se queda el peltre (Proyección,
   Avivar peltre) y la Guardia (el contraataque del estaño). La **Marca del cazador** y la vista
@@ -813,5 +869,5 @@ personajes, el sistema funciona.
    el Deslizador con bendaleo y peltre, el Lanzamonedas con acero, hierro y estaño). Opciones: Nacidos de la Bruma que solo
    dominan parte de los metales, clavos hemalúrgicos (con su coste narrativo de Ruina) o
    medallones de la Era 2.
-2. **Nombres e historias de los 4 personajes.** Cuando los tengas, sus arcos personales pueden
-   desbloquear su versión de duraluminio, que funciona como la "ultimate" narrativa.
+2. **Historias de los 4 personajes.** De nombre se llaman como su clase: Lanzamonedas,
+   Deslizador, Voz y Artificiera.

@@ -7,6 +7,8 @@
  *   surface_fire.png  mancha de brasas (naranja/rojo, borde irregular)
  *   surface_oil.png   charco de aceite (marrón oscuro con brillo)
  *   status_fear.png   icono del estado "miedo" (sobre la cabeza de la unidad)
+ *   status_*.png      iconos del resto de estados: Seco, Aturdido, Derribado, Marcado, Burbuja
+ *                     de acero y mente de hierro (Ligero / Pesado)
  *   ash_flake.png     copo de ceniza (partículas que caen del cielo, estilo Nacidos de la Bruma)
  *   ash_flakes.png    atlas 2×2 (512 px) de copos de ceniza distintos: bordes dentados de papel
  *                     quemado, más oscuros en el borde, con vetas (cada partícula usa uno)
@@ -48,7 +50,61 @@ function blob(seed, radius, wobble, points = 28) {
   return `${d} Z`;
 }
 
+/** Icono de estado: disco de color con borde oscuro, aro claro y un símbolo encima. */
+const statusIcon = (fill, ring, symbol) => `
+    <circle cx="128" cy="128" r="112" fill="${fill}" stroke="#16081f" stroke-width="16"/>
+    <circle cx="128" cy="128" r="96" fill="none" stroke="${ring}" stroke-width="6" stroke-opacity="0.6"/>
+    ${symbol}`;
+
 const textures = {
+  // Seco: vial vacío.
+  'status_drained.png': statusIcon(
+    '#5a4a3c',
+    '#d8c3a8',
+    `<path d="M108 58 H148 M114 58 V100 L84 176 Q80 196 100 196 H156 Q176 196 172 176 L142 100 V58" fill="none" stroke="#ffffff" stroke-width="12" stroke-linejoin="round"/>`,
+  ),
+  // Aturdido: estrellas girando.
+  'status_stunned.png': statusIcon(
+    '#c9a020',
+    '#fff2b0',
+    `<path d="M128 56 L140 92 L178 92 L148 114 L160 150 L128 128 L96 150 L108 114 L78 92 L116 92 Z" fill="#ffffff"/>
+    <ellipse cx="128" cy="170" rx="64" ry="18" fill="none" stroke="#ffffff" stroke-width="10"/>`,
+  ),
+  // Derribado: flecha hacia el suelo.
+  'status_prone.png': statusIcon(
+    '#b0501c',
+    '#ffc8a0',
+    `<path d="M128 52 V150 M88 112 L128 152 L168 112" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M70 188 H186" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>`,
+  ),
+  // Marcado: mira.
+  'status_marked.png': statusIcon(
+    '#a8201c',
+    '#ffb0a8',
+    `<circle cx="128" cy="128" r="46" fill="none" stroke="#ffffff" stroke-width="12"/>
+    <path d="M128 50 V96 M128 160 V206 M50 128 H96 M160 128 H206" stroke="#ffffff" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="10" fill="#ffffff"/>`,
+  ),
+  // Burbuja de acero: arcos de una burbuja.
+  'status_steel_bubble.png': statusIcon(
+    '#2c5a8a',
+    '#b8dcff',
+    `<circle cx="128" cy="128" r="62" fill="#ffffff" fill-opacity="0.18" stroke="#ffffff" stroke-width="10"/>
+    <path d="M94 104 Q104 82 128 76" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>`,
+  ),
+  // Mente de hierro, Ligero: flecha hacia arriba.
+  'status_iron_light.png': statusIcon(
+    '#6f7780',
+    '#e4ecf4',
+    `<path d="M128 200 V84 M86 124 L128 80 L170 124" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ),
+  // Mente de hierro, Pesado: pesa.
+  'status_iron_heavy.png': statusIcon(
+    '#2e3238',
+    '#a8b0b8',
+    `<path d="M104 92 A24 24 0 1 1 152 92" fill="none" stroke="#ffffff" stroke-width="12"/>
+    <path d="M90 104 H166 L184 192 H72 Z" fill="#ffffff"/>`,
+  ),
   // Icono de estado "miedo" (sobre la cabeza de la unidad asustada).
   'status_fear.png': `
     <circle cx="128" cy="128" r="112" fill="#6a2c9c" stroke="#16081f" stroke-width="16"/>

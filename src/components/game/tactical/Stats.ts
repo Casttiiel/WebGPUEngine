@@ -61,9 +61,11 @@ export function rollInitiative(a: Attributes): number {
   return initiativeBaseFor(a) + rollDie(4);
 }
 
-/** Turnos extra de los estados que aplica: +1 con POT 4 y otro con POT 8. */
-export const statusBonusTurnsFor = (a: Attributes): number =>
-  (a.POT >= 4 ? 1 : 0) + (a.POT >= 8 ? 1 : 0);
+/** Distancia de empuje y tirón de acero y hierro (m) = 3 + POT/2. */
+export const steelDistanceFor = (a: Attributes): number => 3 + a.POT / 2;
+
+/** Distancia del salto de acero (m) = 6 + POT. */
+export const steelJumpFor = (a: Attributes): number => 6 + a.POT;
 
 /** Un dado de `sides` caras (RNG del juego). */
 export function rollDie(sides: number): number {

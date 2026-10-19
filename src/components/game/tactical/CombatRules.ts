@@ -2,6 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { UnitComponent, type UnitAttack } from './UnitComponent';
 import { hasLineOfSight } from './TacticalQueries';
 import type { SkillDef } from './Skills';
+import { PropComponent } from './PropComponent';
 import { averageOf, critDamageFor, mitigatedRange, rollRange, type DamageRange } from './Stats';
 
 /**
@@ -76,20 +77,44 @@ export interface AttackRoll {
   critChance: number;
 }
 
+/** Probabilidad de que un proyectil falle contra la Burbuja de acero (GDD §10.1). */
+export const STEEL_BUBBLE_MISS = 0.5;
+
+/**
+ * Multiplicador del daño que recibe `target` en el próximo golpe: Marcado, +`amount` % (se
+ * consume al recibirlo, EncounterComponent.applyHit).
+ */
+export function damageTakenMultiplier(target: UnitComponent): number {
+  const mark = target.getStatus('marked');
+  return mark ? 1 + (mark.amount ?? 50) / 100 : 1;
+}
+
 /**
  * Lo que hace un golpe de `damage` (D) de `attacker` a `target`: el rango con la armadura
  * del objetivo menos la penetración del atacante (sin atacante, p.ej. un objeto: sin
- * penetración).
+ * penetración) y la `extraPenetration` del golpe (Bala empujada). Marcado: D × (1 + %).
  */
 export function hitRange(
   attacker: UnitComponent | null,
   target: UnitComponent,
   damage: number,
+  extraPenetration = 0,
 ): DamageRange {
-  return mitigatedRange(damage, target.getArmor(), attacker?.getPenetration() ?? 0);
+  const penetration = (attacker?.getPenetration() ?? 0) + extraPenetration;
+  const marked = Math.round(damage * damageTakenMultiplier(target));
+  return mitigatedRange(marked, target.getArmor(), penetration);
 }
 
-/** Ataque con un arma: D = arma + FUE; rango por la armadura; crítico = máx × 1,5. */
+/** ¿Es de metal? (metal portado, o un objeto metálico): el acero y el hierro le afectan. */
+export function isMetallic(unit: UnitComponent): boolean {
+  return unit.isMetallic() || PropComponent.of(unit.getOwner())?.isMetallic() === true;
+}
+
+/**
+ * Ataque con un arma: D = arma + FUE; rango por la armadura; crítico = máx × 1,5 (con el
+ * Marcado también). Se acierta siempre salvo un proyectil contra la Burbuja de acero (50 %).
+ * El melee contra un Derribado es crítico seguro.
+ */
 export function previewAttack(
   attacker: UnitComponent,
   target: UnitComponent,
@@ -97,14 +122,20 @@ export function previewAttack(
 ): AttackRoll {
   const damage = attacker.getAttackDamage(attack);
   const range = hitRange(attacker, target, damage);
+  const bubble = attack.kind === 'ranged' && target.hasStatus('steel_bubble');
   return {
-    hitChance: 1,
+    hitChance: bubble ? 1 - STEEL_BUBBLE_MISS : 1,
     damage: averageOf(range),
     minDamage: range.min,
     maxDamage: range.max,
-    critDamage: critDamageFor(damage),
-    critChance: attacker.getNextCritChance(),
+    critDamage: critDamageFor(damage * damageTakenMultiplier(target)),
+    critChance: guaranteedCrit(target, attack) ? 1 : attacker.getNextCritChance(),
   };
+}
+
+/** El melee contra un Derribado es crítico seguro (GDD §6). */
+function guaranteedCrit(target: UnitComponent, attack: UnitAttack): boolean {
+  return attack.kind === 'melee' && target.hasStatus('prone');
 }
 
 /**
@@ -120,7 +151,7 @@ export function rollAttack(
   const roll = previewAttack(attacker, target, attack);
   const hit = roll.hitChance >= 1 || Math.random() < roll.hitChance;
   if (!hit) return { hit, crit: false, damage: 0 };
-  const crit = attacker.rollCrit();
+  const crit = guaranteedCrit(target, attack) || attacker.rollCrit();
   const damage = crit ? roll.critDamage : rollRange({ min: roll.minDamage, max: roll.maxDamage });
   return { hit, crit, damage };
 }
@@ -154,9 +185,4 @@ export function metalCost(
   const boost = caster.getMetalBoost();
   if (boost) return { metal: 0, power: boost.power };
   return { metal: skill.metal, power: 1 };
-}
-
-/** Turnos de un estado que aplica `caster`: los del efecto + los de su POT. */
-export function statusTurns(caster: UnitComponent, turns: number): number {
-  return turns + caster.getStatusBonusTurns();
 }

@@ -1,0 +1,28 @@
+{
+  "prefab": "tactical/hero.prefab",
+  "components": {
+    "name": "Deslizador",
+    "unit": {
+      "attributes": {
+        "FUE": 4,
+        "RES": 5,
+        "POT": 3,
+        "TEM": 3,
+        "REF": 5,
+        "AGU": 4
+      },
+      "armor": 2,
+      "attacks": [
+        {
+          "id": "staves",
+          "name": "Bastones",
+          "kind": "melee",
+          "range": 1.5,
+          "damage": 7,
+          "clip": "Sword_Attack_Standing"
+        }
+      ],
+      "skills": ["second_wind"]
+    }
+  }
+}

@@ -105,7 +105,7 @@
     "components": {
       "name": "Party",
       "party": {
-        "members": ["Hero1", "Hero2", "Hero3", "Hero4"]
+        "members": ["Lanzamonedas", "Deslizador", "Voz", "Artificiera"]
       },
       "tactical_pointer": {}
     }
@@ -576,106 +576,38 @@
     }
   },
   {
-    "prefab": "tactical/hero.prefab",
+    "prefab": "tactical/coinshot.prefab",
     "components": {
-      "name": "Hero1",
-      "unit": {
-        "displayName": "Ham",
-        "attributes": { "FUE": 6, "RES": 5, "POT": 3, "TEM": 3, "REF": 4, "AGU": 3 },
-        "armor": 3,
-        "role": "Violento",
-        "skills": ["shove", "second_wind", "fear"],
-        "attacks": [
-          {
-            "id": "melee",
-            "name": "Espada",
-            "kind": "melee",
-            "range": 1.5,
-            "damage": 6,
-            "clip": "Sword_Attack_Standing"
-          }
-        ]
-      },
+      "name": "Lanzamonedas",
       "transform": {
         "position": [-4, 0, -6]
       }
     }
   },
   {
-    "prefab": "tactical/hero.prefab",
+    "prefab": "tactical/slider.prefab",
     "components": {
-      "name": "Hero2",
-      "unit": {
-        "displayName": "Kelsier",
-        "attributes": { "FUE": 3, "RES": 3, "POT": 6, "TEM": 4, "REF": 4, "AGU": 4 },
-        "armor": 0,
-        "role": "Nacido de la Bruma",
-        "skills": ["fireball", "thunderwave"],
-        "attacks": [
-          {
-            "id": "ranged",
-            "name": "Disparo",
-            "kind": "ranged",
-            "range": 18,
-            "damage": 3,
-            "clip": "Spell_Simple_Shoot"
-          }
-        ]
-      },
+      "name": "Deslizador",
       "transform": {
-        "position": [-2.5, 0, -7.2]
+        "position": [-3.5, 0, -8.8]
       }
     }
   },
   {
-    "prefab": "tactical/hero.prefab",
+    "prefab": "tactical/voice.prefab",
     "components": {
-      "name": "Hero3",
-      "unit": {
-        "displayName": "Brisa",
-        "attributes": { "FUE": 2, "RES": 3, "POT": 6, "TEM": 6, "REF": 3, "AGU": 4 },
-        "armor": 0,
-        "role": "Aplacador",
-        "skills": ["heal", "dash"],
-        "attacks": [
-          {
-            "id": "ranged",
-            "name": "Disparo",
-            "kind": "ranged",
-            "range": 18,
-            "damage": 3,
-            "clip": "Spell_Simple_Shoot"
-          }
-        ]
-      },
+      "name": "Voz",
       "transform": {
         "position": [-5.5, 0, -7.6]
       }
     }
   },
   {
-    "prefab": "tactical/hero.prefab",
+    "prefab": "tactical/artificer.prefab",
     "components": {
-      "name": "Hero4",
-      "unit": {
-        "displayName": "Fantasma",
-        "attributes": { "FUE": 4, "RES": 3, "POT": 2, "TEM": 3, "REF": 6, "AGU": 6 },
-        "armor": 1,
-        "role": "Ojo de Estaño",
-        "skills": ["dash", "shove"],
-        "attacks": [
-          {
-            "id": "melee",
-            "name": "Espada",
-            "kind": "melee",
-            "range": 1.5,
-            "damage": 6,
-            "clip": "Sword_Attack_Standing"
-          }
-        ]
-      },
+      "name": "Artificiera",
       "transform": {
-        "position": [-3.5, 0, -8.8]
+        "position": [-2.5, 0, -7.2]
       }
     }
   }

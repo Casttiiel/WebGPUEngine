@@ -1,0 +1,29 @@
+{
+  "prefab": "tactical/hero.prefab",
+  "components": {
+    "name": "Artificiera",
+    "unit": {
+      "attributes": {
+        "FUE": 3,
+        "RES": 3,
+        "POT": 4,
+        "TEM": 5,
+        "REF": 4,
+        "AGU": 5
+      },
+      "armor": 0,
+      "attacks": [
+        {
+          "id": "shotgun",
+          "name": "Escopeta",
+          "kind": "ranged",
+          "range": 9,
+          "damage": 6,
+          "metallic": true,
+          "clip": "Spell_Simple_Shoot"
+        }
+      ],
+      "skills": ["fireball", "thunderwave", "heal"]
+    }
+  }
+}

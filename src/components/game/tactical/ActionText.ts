@@ -1,7 +1,7 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
 import type { SkillDef } from './Skills';
-import { skillDamage, statusTurns } from './CombatRules';
-import type { AttributeId } from './Stats';
+import { skillDamage } from './CombatRules';
+import { steelDistanceFor, steelJumpFor, type AttributeId } from './Stats';
 
 /**
  * Textos de ataques y habilidades para la UI (ficha del personaje, tooltips de la hotbar),
@@ -12,8 +12,30 @@ export const COST_NAME: Record<string, string> = {
   action: 'Acción',
   bonusAction: 'Acción adicional',
   movement: 'Movimiento',
+  free: 'Sin acción',
 };
-export const STATUS_NAME: Record<string, string> = { fear: 'Asustado', drained: 'Seco' };
+export const STATUS_NAME: Record<string, string> = {
+  fear: 'Asustado',
+  drained: 'Seco',
+  stunned: 'Aturdido',
+  prone: 'Derribado',
+  marked: 'Marcado',
+  steel_bubble: 'Burbuja de acero',
+  iron_light: 'Ligero',
+  iron_heavy: 'Pesado',
+};
+
+/** Qué hace cada estado (tooltips, ficha). */
+export const STATUS_HELP: Record<string, string> = {
+  fear: 'no ataca y huye',
+  drained: 'sin alomancia; al acabar el turno, la Reserva se llena',
+  stunned: 'pierde su próxima Acción',
+  prone: 'levantarse cuesta la mitad del movimiento; el melee contra él es crítico',
+  marked: 'el siguiente golpe que recibe hace más daño',
+  steel_bubble: 'los proyectiles contra él tienen un 50 % de fallar',
+  iron_light: 'sus saltos llegan el doble',
+  iron_heavy: 'no le pueden empujar, atraer ni derribar',
+};
 
 /**
  * "Cuerpo a cuerpo · alcance 1.5 m · 10 de daño (6 + FUE 4) · Acción". Sin `unit`, la
@@ -41,9 +63,12 @@ function scaledText(base: number, scale: AttributeId | undefined, unit?: UnitCom
 export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string {
   const area = skill.radius > 0 ? ` (área de ${fmt(skill.radius)} m)` : '';
   const target = {
-    unit: `${skill.targets === 'ally' ? 'Un aliado' : skill.targets === 'enemy' ? 'Un enemigo' : 'Una unidad'} a ${fmt(skill.range)} m${area}`,
-    point: `Un punto a ${fmt(skill.range)} m${area}`,
+    unit: `${skill.targets === 'ally' ? 'Un aliado' : skill.targets === 'enemy' ? 'Un enemigo' : 'Una unidad'} a ${skill.minRange > 0 ? `${fmt(skill.minRange)}–` : ''}${fmt(skill.range)} m${area}`,
+    point: skill.effects.some((e) => e.type === 'leap')
+      ? 'Un punto'
+      : `Un punto a ${fmt(skill.range)} m${area}`,
     cone: `Cono de ${fmt(skill.length)} m`,
+    line: `Línea de ${fmt(skill.length)} m`,
     self: `Uno mismo${area}`,
   }[skill.target];
   const effects = skill.effects.map((e) => {
@@ -55,7 +80,8 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
         const base = caster
           ? skillDamage(caster, skill) - (skill.scale ? caster.getAttribute(skill.scale) : 0)
           : e.amount;
-        return `${scaledText(base, skill.scale, caster)} de daño`;
+        const pen = e.penetration ? ` (+${e.penetration} de penetración)` : '';
+        return `${scaledText(base, skill.scale, caster)} de daño${pen}`;
       }
       case 'heal':
         return `cura ${e.amount}`;
@@ -65,8 +91,24 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
         return 'carga hasta allí';
       case 'surface':
         return e.surface === 'fire' ? 'deja fuego' : `deja ${e.surface}`;
-      case 'status':
-        return `${(STATUS_NAME[e.status] ?? e.status).toLowerCase()} ${turns(caster ? statusTurns(caster, e.turns) : e.turns)}`;
+      case 'status': {
+        const name = (STATUS_NAME[e.status] ?? e.status).toLowerCase();
+        const scale = skill.scale && caster?.hasAttributes() ? caster.getAttribute(skill.scale) : 0;
+        const amount =
+          e.amount !== undefined
+            ? caster?.hasAttributes() || !e.amountPerPoint
+              ? ` +${e.amount + (e.amountPerPoint ?? 0) * scale} %`
+              : ` +${e.amount} % + ${e.amountPerPoint} % por ${skill.scale}`
+            : '';
+        const time = e.untilTurnStart ? 'hasta tu siguiente turno' : turns(e.turns);
+        return `${name}${amount} ${time}`;
+      }
+      case 'steelPush':
+        return `lo metálico sale despedido ${distanceText(steelDistanceFor, caster)} (desviable ±${fmt((e.aimAngle ?? 40) / 2)}°)`;
+      case 'ironPull':
+        return `atrae lo metálico ${distanceText(steelDistanceFor, caster)} (llega Derribado; si solo lleva un arma de metal, le desarma)`;
+      case 'leap':
+        return `salta ${distanceText(steelJumpFor, caster)} sin gastar movimiento`;
       case 'duralumin':
         return 'quema toda la Reserva: la siguiente, gratis y ×(1 + quemado / máximo)';
       case 'refill':
@@ -74,6 +116,12 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
     }
   });
   return `${target}: ${effects.filter((x) => x !== null).join(', ')}`;
+}
+
+/** "4,5 m" con lanzador; la fórmula sin él. */
+function distanceText(formula: typeof steelDistanceFor, caster: UnitComponent | undefined): string {
+  if (caster?.hasAttributes()) return `${fmt(formula(caster.getAttributes()))} m`;
+  return formula === steelJumpFor ? '6 + POT m' : '3 + POT/2 m';
 }
 
 /** "1 turno", "3 turnos". */

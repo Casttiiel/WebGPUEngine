@@ -1,6 +1,8 @@
 import { vec3 } from 'gl-matrix';
 import { ResourceManager } from '../../../core/engine/ResourceManager';
 import { UnitComponent } from './UnitComponent';
+import { EYE_HEIGHT } from './CombatRules';
+import { hasLineOfSight } from './TacticalQueries';
 import type { SurfaceType } from './Surfaces';
 import type { UnitStatusId } from './UnitComponent';
 import type { AttributeId } from './Stats';
@@ -15,16 +17,18 @@ import type { AttributeId } from './Stats';
  * unit:  una unidad (filtrada por `targets`).
  * point: un punto del suelo; con `radius` > 0, un área circular alrededor.
  * cone:  un cono desde el lanzador hacia el punto (`length`, `angle`).
+ * line:  una línea recta desde el lanzador hacia el punto (`length`, `width`): atraviesa a
+ *        todos los que pille hasta la primera pared.
  * self:  el propio lanzador (sin elegir objetivo).
  */
-export type SkillTargeting = 'unit' | 'point' | 'cone' | 'self';
+export type SkillTargeting = 'unit' | 'point' | 'cone' | 'line' | 'self';
 
 export type SkillEffect =
   /**
    * Daño base; se le suma el atributo de escala de la habilidad (`scale`). La tirada dentro
    * del rango de la armadura es una por lanzamiento (la misma fracción para todos).
    */
-  | { type: 'damage'; amount: number }
+  | { type: 'damage'; amount: number; penetration?: number }
   | { type: 'heal'; amount: number }
   /** Aleja a los afectados del lanzador (o del centro del área). */
   | { type: 'push'; distance: number }
@@ -32,8 +36,32 @@ export type SkillEffect =
   | { type: 'teleport' }
   /** Deja una superficie en el punto (fuego…). */
   | { type: 'surface'; surface: SurfaceType; radius: number }
-  /** Aplica un estado alterado durante `turns` turnos suyos (+1 con POT 4 y otro con POT 8). */
-  | { type: 'status'; status: UnitStatusId; turns: number }
+  /**
+   * Aplica un estado durante `turns` turnos suyos (fijos: POT no los alarga, GDD §3), o hasta
+   * que empiece su siguiente turno (`untilTurnStart`). `amount` + `amountPerPoint` por punto
+   * del atributo de escala: la magnitud (Marcado: % de daño extra).
+   */
+  | {
+      type: 'status';
+      status: UnitStatusId;
+      turns: number;
+      amount?: number;
+      amountPerPoint?: number;
+      untilTurnStart?: boolean;
+    }
+  /**
+   * Empuje de acero: el objetivo metálico sale en línea recta alejándose del lanzador,
+   * `3 + POT/2` m (GDD §5). Lo que choca recibe un IMPACTO. Se puede apuntar dentro de un
+   * ángulo pequeño (`aimAngle`, grados en total; default 40: ±20° de "alejarlo de ti").
+   */
+  | { type: 'steelPush'; aimAngle?: number }
+  /**
+   * Tirón de hierro: el objetivo metálico viene hacia el lanzador, `3 + POT/2` m. Una unidad
+   * con metal portado llega Derribada; si solo lleva un arma de metal, se la quita (desarme).
+   */
+  | { type: 'ironPull' }
+  /** Salto de acero: hasta el punto, `6 + POT` m, sin gastar movimiento. */
+  | { type: 'leap' }
   /**
    * Acciones de metal (GDD §2, §11), sobre uno mismo y al momento:
    *   duralumin: quema toda la Reserva; la siguiente, ×(1 + quemado / máximo) y sin coste.
@@ -45,12 +73,15 @@ export type SkillEffect =
 export interface SkillDef {
   id: string;
   name: string;
-  cost: 'action' | 'bonusAction';
+  /** Recurso del turno que gasta. 'free': ninguno (decantar una mente de metal). */
+  cost: 'action' | 'bonusAction' | 'free';
   /** Turnos del lanzador que hay que esperar para volver a usarla (0 = sin cooldown). */
   cooldown: number;
   target: SkillTargeting;
   /** unit / point: alcance (m). Unidad: de borde a borde; punto: desde el lanzador. */
   range: number;
+  /** unit: distancia mínima al objetivo, de borde a borde (m). Default 0. */
+  minRange: number;
   /** point / self: radio del área (0 = solo el objetivo). */
   radius: number;
   /** cone: longitud (m) y apertura (grados). */
@@ -72,6 +103,10 @@ export interface SkillDef {
   allomantic: boolean;
   /** Atributo del lanzador que se suma al daño (Escala: POT, FUE…). Sin él, daño fijo. */
   scale?: AttributeId;
+  /** line: ancho de la línea (m). Default 0.6. */
+  width: number;
+  /** Mente de metal que gasta una carga (feruquimia innata, p.ej. 'iron'). */
+  charge?: string;
   /** Animación del lanzador. */
   clip?: string;
   /** Texto para la ficha del personaje (sin él se resume a partir de los efectos). */
@@ -106,7 +141,7 @@ export class SkillCatalog {
 }
 
 function normalize(id: string, s: SkillJson): SkillDef {
-  const area = s.target === 'self' || s.target === 'cone';
+  const area = s.target === 'self' || s.target === 'cone' || s.target === 'line';
   return {
     id,
     name: s.name,
@@ -114,13 +149,16 @@ function normalize(id: string, s: SkillJson): SkillDef {
     cooldown: s.cooldown ?? 0,
     target: s.target,
     range: s.range ?? 0,
+    minRange: s.minRange ?? 0,
     radius: s.radius ?? 0,
     length: s.length ?? 0,
     angle: s.angle ?? 60,
     targets: s.targets ?? 'any',
     affects: s.affects ?? 'all',
     lineOfSight: s.lineOfSight ?? !area,
+    width: s.width ?? 0.6,
     effects: s.effects,
+    ...(s.charge !== undefined && { charge: s.charge }),
     metal: s.metal ?? 0,
     allomantic: s.allomantic ?? (s.metal ?? 0) > 0,
     ...(s.scale !== undefined && { scale: s.scale }),
@@ -136,9 +174,14 @@ export const hasEffect = (skill: SkillDef, type: SkillEffect['type']): boolean =
 export const isMetalAction = (skill: SkillDef): boolean =>
   skill.effects.some((e) => e.type === 'duralumin' || e.type === 'refill');
 
-/** ¿Es hostil? (daña o empuja: el cursor es de ataque y empieza combates). */
+/** ¿Es hostil? (daña, empuja o atrae: el cursor es de ataque y empieza combates). */
 export const isHostile = (skill: SkillDef): boolean =>
-  hasEffect(skill, 'damage') || hasEffect(skill, 'push') || hasEffect(skill, 'status');
+  skill.target !== 'self' &&
+  (hasEffect(skill, 'damage') ||
+    hasEffect(skill, 'push') ||
+    hasEffect(skill, 'status') ||
+    hasEffect(skill, 'steelPush') ||
+    hasEffect(skill, 'ironPull'));
 
 /** ¿`unit` cuenta para el filtro del área (relativo al bando del lanzador)? */
 function passesAffects(skill: SkillDef, caster: UnitComponent, unit: UnitComponent): boolean {
@@ -183,6 +226,66 @@ export function unitsInCone(skill: SkillDef, caster: UnitComponent, toward: vec3
     const margin = Math.atan2(u.getCapsuleRadius(), dist);
     return Math.acos(Math.min(1, Math.max(-1, cos))) <= halfAngle + margin;
   });
+}
+
+/**
+ * Hasta dónde llega una línea desde el lanzador en `dir` (como mucho `length`): se corta en la
+ * primera pared (a la altura del pecho). Búsqueda binaria con rayos de línea de visión.
+ */
+export function lineReach(caster: UnitComponent, dir: vec3, length: number): number {
+  const eye = caster.getPosition(vec3.create());
+  eye[1] = eye[1]! + EYE_HEIGHT * 0.5;
+  const at = (d: number) => vec3.scaleAndAdd(vec3.create(), eye, dir, d);
+  if (hasLineOfSight(eye, at(length))) return length;
+  let lo = 0;
+  let hi = length;
+  for (let i = 0; i < 10; i++) {
+    const mid = (lo + hi) / 2;
+    if (hasLineOfSight(eye, at(mid))) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * Unidades vivas dentro de la línea del lanzador hacia `toward` (sin el lanzador), hasta
+ * `reach` m (el borde de cada una cuenta), ordenadas de la más cercana a la más lejana.
+ */
+export function unitsInLine(
+  skill: SkillDef,
+  caster: UnitComponent,
+  toward: vec3,
+  reach: number,
+): UnitComponent[] {
+  const origin = caster.getFeetPosition(vec3.create());
+  const dir = coneDirection(origin, toward);
+  const out: { u: UnitComponent; along: number }[] = [];
+  for (const u of UnitComponent.getAll()) {
+    if (u === caster || !u.isAlive() || !passesAffects(skill, caster, u)) continue;
+    const p = u.getFeetPosition(tmp);
+    const dx = p[0]! - origin[0]!;
+    const dz = p[2]! - origin[2]!;
+    const along = dx * dir[0]! + dz * dir[2]!;
+    const side = Math.abs(dx * dir[2]! - dz * dir[0]!);
+    if (along < 0 || along - u.getCapsuleRadius() > reach || Math.abs(p[1]! - origin[1]!) > 2) {
+      continue;
+    }
+    if (side <= skill.width / 2 + u.getCapsuleRadius()) out.push({ u, along });
+  }
+  return out.sort((a, b) => a.along - b.along).map((o) => o.u);
+}
+
+/** Contorno de una línea: rectángulo de `width` desde `origin` en `dir`, `length` m. */
+export function lineOutline(origin: vec3, dir: vec3, length: number, width: number): vec3[] {
+  const half = width / 2;
+  const side = vec3.fromValues(-dir[2]!, 0, dir[0]!);
+  const at = (d: number, s: number) =>
+    vec3.fromValues(
+      origin[0]! + dir[0]! * d + side[0]! * s,
+      origin[1]!,
+      origin[2]! + dir[2]! * d + side[2]! * s,
+    );
+  return [at(0, -half), at(length, -half), at(length, half), at(0, half), at(0, -half)];
 }
 
 /** Dirección horizontal normalizada de `from` hacia `to` (+Z si coinciden). */

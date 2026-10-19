@@ -40,7 +40,8 @@
       "maxHp": 1
     },
     "tactical_prop": {
-      "pushable": true,
+      "size": "large",
+      "metallic": true,
       "explosive": {
         "radius": 2.5,
         "damage": 12,
