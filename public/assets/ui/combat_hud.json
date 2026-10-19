@@ -1020,6 +1020,322 @@
     ]
   },
   {
+    "name": "init_13",
+    "alias": "init_13",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.07, 0.065, 0.06, 0.9]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_13_face",
+        "alias": "init_13_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.2, 0.27, 0.34, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_13_name",
+        "alias": "init_13_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [21, 21],
+          "color": [0.93, 0.88, 0.77, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_13_hp_bg",
+        "alias": "init_13_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_13_hp",
+        "alias": "init_13_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.5, 0.72, 0.38, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_14",
+    "alias": "init_14",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.07, 0.065, 0.06, 0.9]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_14_face",
+        "alias": "init_14_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.2, 0.27, 0.34, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_14_name",
+        "alias": "init_14_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [21, 21],
+          "color": [0.93, 0.88, 0.77, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_14_hp_bg",
+        "alias": "init_14_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_14_hp",
+        "alias": "init_14_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.5, 0.72, 0.38, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_15",
+    "alias": "init_15",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.07, 0.065, 0.06, 0.9]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_15_face",
+        "alias": "init_15_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.2, 0.27, 0.34, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_15_name",
+        "alias": "init_15_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [21, 21],
+          "color": [0.93, 0.88, 0.77, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_15_hp_bg",
+        "alias": "init_15_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_15_hp",
+        "alias": "init_15_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.5, 0.72, 0.38, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
+    "name": "init_16",
+    "alias": "init_16",
+    "type": "image",
+    "x": 0,
+    "y": 58,
+    "width": 112,
+    "height": 84,
+    "imageParams": {
+      "texture": "white.png",
+      "size": [112, 84],
+      "color": [0.07, 0.065, 0.06, 0.9]
+    },
+    "anchor": "top-center",
+    "visible": false,
+    "children": [
+      {
+        "name": "init_16_face",
+        "alias": "init_16_face",
+        "type": "image",
+        "x": 4,
+        "y": 4,
+        "width": 104,
+        "height": 54,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 54],
+          "color": [0.2, 0.27, 0.34, 1]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_16_name",
+        "alias": "init_16_name",
+        "type": "text",
+        "x": 4,
+        "y": 14,
+        "width": 104,
+        "height": 34,
+        "textParams": {
+          "text": "",
+          "size": [21, 21],
+          "color": [0.93, 0.88, 0.77, 1],
+          "align": "center"
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_16_hp_bg",
+        "alias": "init_16_hp_bg",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        },
+        "blocksInput": false
+      },
+      {
+        "name": "init_16_hp",
+        "alias": "init_16_hp",
+        "type": "image",
+        "x": 4,
+        "y": 64,
+        "width": 104,
+        "height": 14,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [104, 14],
+          "color": [0.5, 0.72, 0.38, 1]
+        },
+        "blocksInput": false
+      }
+    ]
+  },
+  {
     "name": "combat_resources",
     "alias": "combat_resources",
     "type": "image",

@@ -7,6 +7,7 @@
  *   surface_fire.png  mancha de brasas (naranja/rojo, borde irregular)
  *   surface_oil.png   charco de aceite (marrón oscuro con brillo)
  *   status_fear.png   icono del estado "miedo" (sobre la cabeza de la unidad)
+ *   zone_bendalloy.png  burbuja de bendaleo (decal: círculo translúcido con borde)
  *   status_*.png      iconos del resto de estados: Seco, Aturdido, Derribado, Marcado, Burbuja
  *                     de acero y mente de hierro (Ligero / Pesado)
  *   ash_flake.png     copo de ceniza (partículas que caen del cielo, estilo Nacidos de la Bruma)
@@ -57,6 +58,36 @@ const statusIcon = (fill, ring, symbol) => `
     ${symbol}`;
 
 const textures = {
+  // Burbuja de bendaleo: disco translúcido azulado con el borde marcado.
+  'zone_bendalloy.png': `
+    <circle cx="128" cy="128" r="118" fill="#9cc8ff" fill-opacity="0.16" stroke="#e2f0ff" stroke-width="7" stroke-opacity="0.9"/>
+    <circle cx="128" cy="128" r="104" fill="none" stroke="#b8d8ff" stroke-width="3" stroke-opacity="0.5" stroke-dasharray="10 12"/>`,
+  // Ritmo: tres marcas en racha.
+  'status_rhythm.png': statusIcon(
+    '#3c6e3a',
+    '#c8f0c0',
+    `<path d="M70 168 L98 88 M114 168 L142 88 M158 168 L186 88" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>`,
+  ),
+  // Peltre avivado: puño.
+  'status_pewter.png': statusIcon(
+    '#8a8f96',
+    '#f0f4f8',
+    `<rect x="78" y="84" width="100" height="74" rx="18" fill="#ffffff"/>
+    <path d="M78 112 H178 M112 84 V112 M145 84 V112" stroke="#8a8f96" stroke-width="8"/>
+    <rect x="96" y="150" width="64" height="40" rx="10" fill="#ffffff"/>`,
+  ),
+  // Arrastre de peltre: gota de cansancio.
+  'status_pewter_drag.png': statusIcon(
+    '#4a4e54',
+    '#a8adb4',
+    `<path d="M128 60 C 96 112 84 136 84 156 A44 44 0 0 0 172 156 C172 136 160 112 128 60 Z" fill="#ffffff"/>`,
+  ),
+  // Mente de oro: cruz de curación.
+  'status_gold_heal.png': statusIcon(
+    '#a8841c',
+    '#fff0b8',
+    `<path d="M128 64 V192 M64 128 H192" stroke="#ffffff" stroke-width="30" stroke-linecap="round"/>`,
+  ),
   // Seco: vial vacío.
   'status_drained.png': statusIcon(
     '#5a4a3c',

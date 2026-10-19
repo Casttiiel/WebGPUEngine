@@ -5,7 +5,9 @@ import { Engine } from '../../../core/engine/Engine';
 import { KeyCode } from '../../../types/KeyCode.enum';
 import { DevBridge } from '../../../core/debug/DevBridge';
 import { ModuleGameController } from '../../../modules/game/ModuleGameController';
+import { Zones, type TimeBubble } from './Zones';
 import {
+  RHYTHM_MAX,
   UnitComponent,
   type StatusOptions,
   type UnitAttack,
@@ -28,6 +30,8 @@ import {
 import {
   EYE_HEIGHT,
   STEEL_BUBBLE_MISS,
+  damageDealtMultiplier,
+  finisherDamage,
   hitRange,
   isMetallic,
   metalCost,
@@ -106,7 +110,7 @@ export type DamageCause = 'attack' | 'skill' | 'fire' | 'explosion' | 'impact' |
  * saltando (en arco) o el arma que le quitan a alguien (desarme, sin movimiento).
  */
 export interface SkillMotion {
-  kind: 'push' | 'pull' | 'leap' | 'disarm';
+  kind: 'push' | 'pull' | 'leap' | 'disarm' | 'hurl';
   /** Lo que se mueve: el objetivo o, en un salto, el lanzador. */
   body: UnitComponent;
   /** Trayectoria de sus pies (vacía en un desarme). */
@@ -125,6 +129,8 @@ export interface SkillTarget {
   point?: vec3 | null;
   /** Empuje: hacia dónde (horizontal); se ajusta al ángulo que permite la habilidad. */
   direction?: vec3 | null;
+  /** Lanzar: la unidad junto a la que cae (y a la que golpea); si no, en `point`. */
+  toUnit?: Entity | null;
 }
 
 export interface SkillPlan {
@@ -141,6 +147,8 @@ export interface SkillPlan {
   affected: UnitComponent[];
   /** Línea: hasta dónde llega (se corta en la primera pared). */
   reach: number;
+  /** Burbuja de bendaleo con la suya activa: lanzarla la cierra. */
+  closesBubble?: boolean;
   /** Empuje, tirón, desarme o salto: qué se mueve y por dónde (vista previa). */
   motion: SkillMotion | null;
   /** Metal que gastaría de la Reserva (con duraluminio, nada). */
@@ -352,6 +360,12 @@ const STEEL_SPEED = 16;
 const PULL_GAP = 0.15;
 /** Salto de acero: velocidad (más rápido que el salto normal). */
 const LEAP_SPEED = 13;
+/** Lanzar (peltre): daño base del impacto (una unidad o un objeto Grande) + FUE. */
+const HURL_BASE = 10;
+/** Peltre avivado: metros de movimiento extra por turno. */
+const PEWTER_MOVEMENT = 3;
+/** Deslizar: a esta distancia (de borde a borde) de la espalda de un enemigo, lo marca. */
+const FLANK_REACH = 0.9;
 /** Una unidad empujada contra una pared recibe +50 % (GDD §5). */
 const WALL_MULTIPLIER = 1.5;
 /** Plano de acción: segundos que se mantiene tras el impacto, y tras una muerte. */
@@ -466,6 +480,7 @@ export class EncounterComponent extends Component {
 
     this.surfaces.update(dt, this.state === 'combat');
     this.updateFire();
+    this.updateBubbles();
 
     if (this.canRestart() && Engine.getInput().isKeyJustPressed(KeyCode.R)) this.restart();
 
@@ -514,6 +529,16 @@ export class EncounterComponent extends Component {
       initiative: c.initiative,
       alive: c.unit.isAlive(),
     }));
+  }
+
+  /**
+   * ¿Le queda a `unit` un turno extra en esta ronda? (está dentro de una burbuja de bendaleo y
+   * aún no lo ha jugado): la barra de iniciativa lo enseña dos veces seguidas.
+   */
+  public hasPendingExtraTurn(unit: UnitComponent): boolean {
+    if (this.state !== 'combat' || !unit.isAlive()) return false;
+    const bubble = Zones.containing(unit);
+    return !!bubble && bubble.extraTurns.get(unit) !== this.round;
   }
 
   public getResources(): TurnResources {
@@ -604,6 +629,10 @@ export class EncounterComponent extends Component {
     }
 
     const plan = planPath(unit.getFeetPosition(this.tmpA), destination);
+    // Dentro de una burbuja de bendaleo no se puede salir andando: se para en el borde.
+    const bubble = this.state === 'combat' ? Zones.containing(unit) : null;
+    const inside = bubble ? Zones.lengthInside(bubble, plan.points) : Infinity;
+    if (inside < budget) budget = Math.max(0, inside);
     const affordable = plan.reachable && plan.length <= budget + EPS;
     // Destino demasiado lejos: se recorre el mismo camino hasta donde llegue el movimiento.
     const walk = affordable
@@ -613,7 +642,7 @@ export class EncounterComponent extends Component {
         : empty;
     const canMove = allowed && walk.points.length >= 2;
     if (allowed && !plan.reachable) reason = 'destination not reachable';
-    else if (allowed && !canMove) reason = 'no movement left';
+    else if (allowed && !canMove) reason = inside < Infinity ? 'bubble' : 'no movement left';
     return {
       plan,
       walk,
@@ -720,6 +749,10 @@ export class EncounterComponent extends Component {
     );
     if (!result.approach) {
       if (melee) return fail('target out of reach');
+      const feet = unit.getFeetPosition(vec3.create());
+      if (Zones.blocksProjectile(feet, target.getFeetPosition(vec3.create()))) {
+        return fail('bubble border');
+      }
       return fail(result.inRange ? 'no line of sight' : 'target out of range');
     }
     result.canAttack = true;
@@ -777,6 +810,7 @@ export class EncounterComponent extends Component {
     if (permission !== null) return fail(permission);
     const budget = this.state === 'combat' ? this.resources.movement : Infinity;
     const maxJump = MAX_JUMP * (unit.hasStatus('iron_light') ? 2 : 1);
+    if (this.leavesBubble(unit, destination)) return fail('bubble');
     const arc = jumpArc(unit.getFeetPosition(this.tmpA), destination, maxJump);
     if (!('reason' in arc) && arc.distance <= budget + EPS) {
       result.points = arc.points;
@@ -1180,9 +1214,11 @@ export class EncounterComponent extends Component {
     }
     if (!body.isAlive()) return;
     if (impact.unitBody) {
-      if (hit) this.applyHit(impact.source, body, true, amount(body), 'impact');
-      else if (impact.wall) {
+      if (impact.wall && !hit) {
         this.applyHit(impact.source, body, true, amount(body, WALL_MULTIPLIER), 'impact');
+      } else if (hit || impact.always) {
+        // Choca con alguien o, lanzada (Lanzar), cae al suelo: también recibe el golpe.
+        this.applyHit(impact.source, body, true, amount(body), 'impact');
       }
       if (body.isAlive()) this.applyStatus(body, 'prone', impact.source);
       return;
@@ -1229,6 +1265,7 @@ export class EncounterComponent extends Component {
       direction: null,
       affected: [],
       reach: 0,
+      closesBubble: false,
       motion: null,
       metalCost: 0,
       power: 1,
@@ -1238,6 +1275,18 @@ export class EncounterComponent extends Component {
     const fail = (reason: string): SkillPlan => ({ ...result, canCast: false, reason });
     if (!unit) return fail('not a unit');
     if (!skill || !unit.hasSkill(skillId)) return fail(`unknown skill '${skillId}'`);
+    // Con su burbuja activa, la habilidad la cierra (sin acción ni metal).
+    if (hasEffect(skill, 'bubble') && Zones.ownedBy(unit)) {
+      result.origin = unit.getFeetPosition(vec3.create());
+      result.inRange = result.lineOfSight = true;
+      result.affected = [unit];
+      result.closesBubble = true;
+      const permission = this.canAct(unit, null);
+      result.allowed = permission === null;
+      if (permission !== null) return fail(permission);
+      result.canCast = true;
+      return result;
+    }
     const cost = metalCost(unit, skill);
     result.metalCost = this.state === 'combat' ? cost.metal : 0;
     result.power = cost.power;
@@ -1245,12 +1294,14 @@ export class EncounterComponent extends Component {
     const feet = unit.getFeetPosition(vec3.create());
     const targetUnit = (target.unit?.getComponent('unit') as UnitComponent | null) ?? null;
     switch (skill.target) {
-      case 'self':
+      case 'self': {
         result.origin = feet;
         result.inRange = result.lineOfSight = true;
-        result.affected =
-          skill.radius > 0 ? unitsInCircle(skill, unit, feet, skill.radius) : [unit];
+        const bubble = skill.effects.find((e) => e.type === 'bubble');
+        const radius = bubble ? this.bubbleRadius(unit, skill) : skill.radius;
+        result.affected = radius > 0 ? unitsInCircle(skill, unit, feet, radius) : [unit];
         break;
+      }
       case 'unit': {
         if (!targetUnit) return fail('no target');
         result.origin = targetUnit.getFeetPosition(vec3.create());
@@ -1266,6 +1317,12 @@ export class EncounterComponent extends Component {
         result.lineOfSight = self || !skill.lineOfSight || unitLineOfSight(unit, targetUnit);
         result.affected =
           skill.radius > 0 ? unitsInCircle(skill, unit, result.origin, skill.radius) : [targetUnit];
+        if (hasEffect(skill, 'hurl')) {
+          const hurl = this.planHurl(unit, targetUnit, skill, target, cost.power);
+          if ('reason' in hurl) return fail(hurl.reason);
+          result.motion = hurl.motion;
+          if (hurl.motion?.hit) result.affected = [targetUnit, hurl.motion.hit];
+        }
         if (hasEffect(skill, 'steelPush') || hasEffect(skill, 'ironPull')) {
           const motion = this.planMetalMotion(
             unit,
@@ -1288,8 +1345,16 @@ export class EncounterComponent extends Component {
           Math.hypot(point[0]! - center[0]!, point[2]! - center[2]!) <= skill.range + EPS;
         const eye = vec3.fromValues(center[0]!, center[1]! + EYE_HEIGHT, center[2]!);
         const aim = vec3.fromValues(point[0]!, point[1]! + POINT_AIM_HEIGHT, point[2]!);
-        result.lineOfSight = !skill.lineOfSight || hasLineOfSight(eye, aim);
+        // El borde de una burbuja de bendaleo desvía los proyectiles.
+        result.lineOfSight =
+          !skill.lineOfSight || (hasLineOfSight(eye, aim) && !Zones.blocksProjectile(feet, point));
         result.affected = skill.radius > 0 ? unitsInCircle(skill, unit, point, skill.radius) : [];
+        if (
+          (hasEffect(skill, 'leap') || hasEffect(skill, 'teleport')) &&
+          this.leavesBubble(unit, point)
+        ) {
+          return fail('bubble');
+        }
         if (hasEffect(skill, 'leap')) {
           // Salto de acero: llega hasta donde dé el salto (no por el alcance de la habilidad).
           const arc = jumpArc(feet, point, this.leapDistance(unit, cost.power));
@@ -1311,6 +1376,11 @@ export class EncounterComponent extends Component {
           const a = vec3.fromValues(feet[0]!, feet[1]! + DASH_CLEARANCE, feet[2]!);
           const b = vec3.fromValues(point[0]!, point[1]! + DASH_CLEARANCE, point[2]!);
           if (!hasLineOfSight(a, b)) return fail('path blocked');
+          // Deslizar: el enemigo a cuya espalda acaba queda Marcado.
+          if (hasEffect(skill, 'flank')) {
+            const flanked = flankedEnemy(unit, point);
+            if (flanked) result.affected = [unit, flanked];
+          }
         }
         break;
       }
@@ -1328,7 +1398,11 @@ export class EncounterComponent extends Component {
         if (!point) return fail('no target');
         result.origin = feet;
         result.direction = coneDirection(feet, point);
-        result.reach = lineReach(unit, result.direction, skill.length);
+        result.reach = Zones.borderDistance(
+          feet,
+          result.direction,
+          lineReach(unit, result.direction, skill.length),
+        );
         result.inRange = result.lineOfSight = true;
         result.affected = unitsInLine(skill, unit, point, result.reach);
         break;
@@ -1349,6 +1423,86 @@ export class EncounterComponent extends Component {
     }
     result.canCast = true;
     return result;
+  }
+
+  /**
+   * Lanzar (peltre) `target` (pegado al lanzador: el alcance de la habilidad) en arco: al punto
+   * elegido o junto a la unidad elegida (y la golpea), como mucho la distancia del efecto desde
+   * donde está. Una unidad o un objeto Grande; los Pequeños y los inamovibles, no. Sin destino,
+   * sin trayectoria (primer paso al apuntar).
+   */
+  private planHurl(
+    caster: UnitComponent,
+    target: UnitComponent,
+    skill: SkillDef,
+    aim: SkillTarget,
+    power: number,
+  ): { motion: SkillMotion | null } | { reason: string } {
+    if (target === caster) return { reason: 'no target' };
+    const prop = PropComponent.of(target.getOwner());
+    if (prop?.isSmall()) return { reason: 'too small' };
+    if (target.isImmovable()) return { reason: 'immovable' };
+    const toUnit = (aim.toUnit?.getComponent('unit') as UnitComponent | null) ?? null;
+    if (!toUnit && !aim.point) return { motion: null };
+    if (toUnit === target || toUnit === caster) return { reason: 'no target' };
+    const effect = skill.effects.find((e) => e.type === 'hurl');
+    const distance = effect?.type === 'hurl' ? effect.distance : 10;
+    const from = target.getFeetPosition(vec3.create());
+    const arc = toUnit
+      ? this.arcBeside(from, toUnit, target.getCapsuleRadius(), distance)
+      : throwArc(from, aim.point!, distance);
+    if ('reason' in arc)
+      return { reason: arc.reason === 'too far to throw' ? 'too far' : arc.reason };
+    const flight = flightHit(target, arc.points, caster);
+    const damage = Math.round(
+      (HURL_BASE + caster.getAttribute('FUE')) * damageDealtMultiplier(caster) * power,
+    );
+    return {
+      motion: {
+        kind: 'hurl',
+        body: target,
+        points: flight.points,
+        hit: flight.hit ?? toUnit,
+        wall: false,
+        damage,
+      },
+    };
+  }
+
+  /** Arco de `from` a caer al lado de `unit` (por el lado del que viene o el más cercano libre). */
+  private arcBeside(
+    from: vec3,
+    unit: UnitComponent,
+    bodyRadius: number,
+    maxFlight: number,
+  ): ReturnType<typeof throwArc> {
+    const t = unit.getFeetPosition(vec3.create());
+    const back =
+      horizontalDirection(vec3.fromValues(from[0]! - t[0]!, 0, from[2]! - t[2]!)) ??
+      vec3.fromValues(1, 0, 0);
+    const gap = unit.getCapsuleRadius() + bodyRadius + THROW_GAP;
+    const base = Math.atan2(back[2]!, back[0]!);
+    let arc: ReturnType<typeof throwArc> = { reason: 'cannot land there' };
+    for (const offset of THROW_SIDES) {
+      const angle = base + offset;
+      const to = vec3.fromValues(
+        t[0]! + Math.cos(angle) * gap,
+        t[1]!,
+        t[2]! + Math.sin(angle) * gap,
+      );
+      to[1] = groundHeightAt(to[0]!, to[2]!, t[1]! + 0.5) ?? t[1]!;
+      const candidate = throwArc(from, to, maxFlight);
+      if (!('reason' in candidate)) return candidate;
+      if (offset === 0) arc = candidate;
+    }
+    return arc;
+  }
+
+  /** Radio de una burbuja de bendaleo: el del efecto + lo que sume por POT. */
+  private bubbleRadius(unit: UnitComponent, skill: SkillDef): number {
+    const e = skill.effects.find((x) => x.type === 'bubble');
+    if (e?.type !== 'bubble') return 0;
+    return e.radius + (e.radiusPerPoint ?? 0) * unit.getAttribute('POT');
   }
 
   /**
@@ -1467,6 +1621,15 @@ export class EncounterComponent extends Component {
     }
     const skill = plan.skill;
     const unit = entity.getComponent('unit') as UnitComponent;
+    if (plan.closesBubble) {
+      const bubble = Zones.ownedBy(unit);
+      if (bubble) this.endBubble(bubble);
+      return { ...plan, ok: true };
+    }
+    // Lanzar necesita destino (el segundo paso al apuntar).
+    if (hasEffect(skill, 'hurl') && !plan.motion) {
+      return { ...plan, ok: false, reason: 'no destination' };
+    }
     if (this.state === 'combat') {
       if (skill.cost !== 'free') {
         this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
@@ -1501,12 +1664,17 @@ export class EncounterComponent extends Component {
     }
 
     if (hasEffect(skill, 'teleport')) {
-      // Embestida: en línea recta, muy rápido; no gasta movimiento.
+      // Embestida / Deslizar: en línea recta, muy rápido; no gasta movimiento.
       unit.faceTowards(plan.origin);
-      void unit.moveAlong([unit.getFeetPosition(), plan.origin], {
-        speed: DASH_SPEED,
-        walk: false,
-      });
+      const flanked = hasEffect(skill, 'flank')
+        ? (plan.affected.find((u) => u !== unit) ?? null)
+        : null;
+      void unit
+        .moveAlong([unit.getFeetPosition(), plan.origin], { speed: DASH_SPEED, walk: false })
+        .then(() => {
+          // A su espalda: queda Marcado.
+          if (flanked?.isAlive()) this.applyStatus(flanked, 'marked', unit, 1);
+        });
       return { ...plan, ok: true };
     }
 
@@ -1660,8 +1828,29 @@ export class EncounterComponent extends Component {
         case 'ironPull':
           if (plan.motion) this.launch(caster, plan.motion);
           break;
+        case 'hurl':
+          if (plan.motion) this.launchArc(caster, plan.motion);
+          break;
+        case 'finisher':
+          for (const u of affected()) {
+            if (!u.isAlive()) continue;
+            const { damage: d, points } = finisherDamage(caster, u);
+            caster.removeStatus('rhythm');
+            this.emit('status-end', { unit: caster.getOwner(), status: 'rhythm' });
+            this.applyHit(caster, u, true, rollRange(hitRange(caster, u, d)), 'skill');
+            if (points >= RHYTHM_MAX && u.isAlive()) this.applyStatus(u, 'stunned', caster);
+          }
+          break;
+        case 'bubble': {
+          const center = caster.getFeetPosition(vec3.create());
+          const radius = this.bubbleRadius(caster, skill);
+          Zones.add(caster, center, radius, this.round + effect.rounds);
+          this.emit('bubble', { unit: caster.getOwner(), amount: radius });
+          break;
+        }
         case 'teleport':
         case 'leap':
+        case 'flank':
         case 'duralumin':
         case 'refill':
           break; // se resuelven al lanzar
@@ -1721,6 +1910,32 @@ export class EncounterComponent extends Component {
   }
 
   /**
+   * Lanzar (peltre): lo que se lanza vuela en arco y, al caer, IMPACTO: golpea a quien pille y
+   * se golpea él al caer (una unidad, además, queda Derribada).
+   */
+  private launchArc(caster: UnitComponent, motion: SkillMotion): void {
+    const body = motion.body;
+    if (!body.isAlive()) return;
+    const points = motion.points.map((q) => vec3.clone(q));
+    const from = points[0]!;
+    const to = points[points.length - 1]!;
+    body.stop();
+    void body.moveAlong(points, { speed: THROW_SPEED, walk: false, face: false });
+    this.pendingImpacts.push({
+      timer: 0.15,
+      source: caster,
+      body,
+      hit: motion.hit,
+      damage: motion.damage,
+      always: true,
+      direction: horizontalDirection(vec3.sub(vec3.create(), to, from)),
+      unitBody: !PropComponent.of(body.getOwner()),
+      wall: false,
+    });
+    this.emit('thrown', { unit: body.getOwner(), source: caster.getOwner() });
+  }
+
+  /**
    * Aplica un estado (evento status). Derribado y Aturdido duran hasta que empiece su turno;
    * la mente de hierro en Pesado hace inmune a Derribado. Los objetos no tienen estados.
    */
@@ -1734,9 +1949,22 @@ export class EncounterComponent extends Component {
     // Los objetos (cajas, barriles) no tienen estados.
     if (!unit.isAlive() || PropComponent.of(unit.getOwner())) return false;
     if (id === 'prone' && unit.hasStatus('iron_heavy')) return false;
+    // Peltre avivado: inmune a Derribado y Aturdido.
+    if ((id === 'prone' || id === 'stunned') && unit.hasStatus('pewter')) return false;
+    // Aturdido: se pierde el Ritmo.
+    if (id === 'stunned' && unit.hasStatus('rhythm')) {
+      unit.removeStatus('rhythm');
+      this.emit('status-end', { unit: unit.getOwner(), status: 'rhythm' });
+    }
     const untilTurnStart = options.untilTurnStart ?? (id === 'stunned' || id === 'prone');
     unit.addStatus(id, turns, source?.getOwner() ?? null, { ...options, untilTurnStart });
     if (source !== unit) unit.stop();
+    // Peltre avivado en su turno: los metros extra ya.
+    if (id === 'pewter' && unit.getOwner() === this.getActiveUnit()) {
+      this.resources.movement += PEWTER_MOVEMENT;
+    }
+    // Mente de oro: la primera curación, al decantar.
+    if (id === 'gold_heal' && options.amount) this.healUnit(unit, options.amount);
     this.emit('status', { unit: unit.getOwner(), source: source?.getOwner() ?? null, status: id });
     return true;
   }
@@ -1819,8 +2047,30 @@ export class EncounterComponent extends Component {
           unit.refillMetal();
           this.emit('refill', { unit: unit.getOwner(), amount: unit.getMetal() });
         }
+        // Se acaba el peltre avivado: Arrastre durante su siguiente turno.
+        if (status === 'pewter' && unit.isAlive()) {
+          unit.addStatus('pewter_drag', 1, unit.getOwner());
+          this.emit('status', {
+            unit: unit.getOwner(),
+            source: unit.getOwner(),
+            status: 'pewter_drag',
+          });
+        }
+      }
+      // Un turno sin golpear: se pierde el Ritmo.
+      if (unit.hasStatus('rhythm') && !unit.hasHitThisTurn()) {
+        unit.removeStatus('rhythm');
+        this.emit('status-end', { unit: unit.getOwner(), status: 'rhythm' });
       }
       this.settleMetal(unit);
+      // Burbuja de bendaleo: quien acaba su turno dentro juega otro seguido (uno por ronda).
+      const bubble = unit.isAlive() ? Zones.containing(unit) : null;
+      if (bubble && bubble.extraTurns.get(unit) !== this.round) {
+        bubble.extraTurns.set(unit, this.round);
+        this.emit('extra-turn', { unit: unit.getOwner() });
+        this.beginTurn();
+        return true;
+      }
     }
     this.nextIndex();
     this.beginTurn();
@@ -1841,6 +2091,7 @@ export class EncounterComponent extends Component {
     this.pendingAction = null;
     this.round = 0;
     this.turnIndex = 0;
+    Zones.clear();
     for (const u of UnitComponent.getAll()) {
       u.clearCooldowns();
       u.clearStatuses();
@@ -1879,6 +2130,7 @@ export class EncounterComponent extends Component {
       this.getAI(unit)?.clearPlan();
     }
     this.surfaces.reset();
+    Zones.clear();
     this.inFire.clear();
     this.detectionTimer = DETECTION_INTERVAL;
     this.setState('exploration');
@@ -1944,6 +2196,8 @@ export class EncounterComponent extends Component {
    * para desactivar lo que no se puede pagar.
    */
   public metalBlocker(unit: UnitComponent, skill: SkillDef): string | null {
+    // Cerrar la burbuja propia no cuesta nada.
+    if (hasEffect(skill, 'bubble') && Zones.ownedBy(unit)) return null;
     // Mente de metal: una carga por combate, que no se recarga.
     if (skill.charge && this.state === 'combat' && unit.getCharges(skill.charge) <= 0) {
       return 'no charges';
@@ -2101,6 +2355,11 @@ export class EncounterComponent extends Component {
     const before = health?.getHp() ?? 0;
     if (hit && health) health.takeDamage(damage, attacker?.getOwner() ?? null);
     const dealt = before - (health?.getHp() ?? 0);
+    // Ritmo: un golpe con el arma suma un punto (o empieza de nuevo si cambia de objetivo).
+    if (attacker?.hasRhythm() && cause === 'attack' && hit && target.isAlive()) {
+      const points = attacker.addRhythm(target);
+      this.emit('rhythm', { unit: attacker.getOwner(), amount: points });
+    }
     // El Marcado se consume con el siguiente golpe (su +% ya iba en hitRange).
     if (hit && dealt > 0 && cause !== 'fire' && cause !== 'debug' && target.hasStatus('marked')) {
       target.removeStatus('marked');
@@ -2286,6 +2545,25 @@ export class EncounterComponent extends Component {
     );
   }
 
+  /** ¿Saldría `unit` de la burbuja en la que está yendo a `destination`? (solo en combate) */
+  private leavesBubble(unit: UnitComponent, destination: vec3): boolean {
+    const bubble = this.state === 'combat' ? Zones.containing(unit) : null;
+    return !!bubble && !Zones.contains(bubble, destination);
+  }
+
+  /** Una burbuja de bendaleo se rompe si quien la creó sale de ella (o cae). */
+  private updateBubbles(): void {
+    for (const b of [...Zones.getAll()]) {
+      const feet = b.caster.getFeetPosition(this.tmpA);
+      if (!b.caster.isAlive() || !Zones.contains(b, feet)) this.endBubble(b);
+    }
+  }
+
+  private endBubble(bubble: TimeBubble): void {
+    Zones.remove(bubble);
+    this.emit('bubble-end', { unit: bubble.caster.getOwner() });
+  }
+
   /** Fuego: quema a quien entra (también a los objetos: un barril explota). */
   private updateFire(): void {
     const p = vec3.create();
@@ -2312,6 +2590,9 @@ export class EncounterComponent extends Component {
       this.turnIndex = 0;
       this.round++;
       this.surfaces.onRound();
+      for (const b of [...Zones.getAll()]) {
+        if (this.round >= b.untilRound) this.endBubble(b);
+      }
       this.emit('round', {});
     }
   }
@@ -2325,9 +2606,16 @@ export class EncounterComponent extends Component {
     const active = this.combatants[this.turnIndex];
     if (!active) return;
     this.resources = { action: 1, bonusAction: 1, movement: active.unit.getMovement() };
-    // Aturdido: pierde la Acción. Derribado: levantarse cuesta la mitad del movimiento.
+    // Peltre avivado: +3 m. Arrastre: la mitad. Aturdido: pierde la Acción. Derribado:
+    // levantarse cuesta la mitad del movimiento.
+    if (active.unit.hasStatus('pewter')) this.resources.movement += PEWTER_MOVEMENT;
+    if (active.unit.hasStatus('pewter_drag')) this.resources.movement /= 2;
     if (active.unit.hasStatus('stunned')) this.resources.action = 0;
     if (active.unit.hasStatus('prone')) this.resources.movement /= 2;
+    active.unit.setHitThisTurn(false);
+    // Mente de oro: se cura al empezar cada turno mientras dure.
+    const gold = active.unit.getStatus('gold_heal');
+    if (gold?.amount) this.healUnit(active.unit, gold.amount);
     for (const status of active.unit.clearTurnStartStatuses()) {
       this.emit('status-end', { unit: active.unit.getOwner(), status });
     }
@@ -2431,6 +2719,12 @@ export class EncounterComponent extends Component {
         selected: PartyComponent.find()?.getSelectedName() ?? null,
         busy: this.isResolving(),
         aiTimeouts: this.aiTimeouts,
+        bubbles: Zones.getAll().map((b) => ({
+          caster: b.caster.getOwner().getName(),
+          center: Array.from(b.center).map((v) => Math.round(v * 100) / 100),
+          radius: Math.round(b.radius * 100) / 100,
+          untilRound: b.untilRound,
+        })),
         surfaces: this.surfaces.getAll().map((sf) => ({
           type: sf.type,
           center: Array.from(sf.center).map((v) => Math.round(v * 100) / 100),
@@ -2673,6 +2967,7 @@ export class EncounterComponent extends Component {
               unit: typeof args.target === 'string' ? unitArg('target') : null,
               point: Array.isArray(to) ? vec3.fromValues(to[0], to[1], to[2]) : null,
               direction: Array.isArray(d) ? vec3.fromValues(d[0], 0, d[1]) : null,
+              toUnit: typeof args.toUnit === 'string' ? unitArg('toUnit') : null,
             };
             const r =
               name === 'skill'
@@ -2775,4 +3070,27 @@ function aimWithin(away: vec3, wanted: vec3 | null, skill: SkillDef): vec3 {
   const c = Math.cos(angle);
   const sn = Math.sin(angle);
   return vec3.fromValues(away[0]! * c - away[2]! * sn, 0, away[0]! * sn + away[2]! * c);
+}
+
+/**
+ * El enemigo a cuya espalda acabaría `unit` con los pies en `point`: pegado a él (de borde a
+ * borde, FLANK_REACH) y detrás de hacia donde mira.
+ */
+function flankedEnemy(unit: UnitComponent, point: vec3): UnitComponent | null {
+  const p = vec3.create();
+  for (const u of UnitComponent.getAll()) {
+    if (!u.isAlive() || u.getFaction() === unit.getFaction() || u.getFaction() === 'neutral') {
+      continue;
+    }
+    u.getFeetPosition(p);
+    const dx = point[0]! - p[0]!;
+    const dz = point[2]! - p[2]!;
+    const dist = Math.hypot(dx, dz);
+    if (dist - u.getCapsuleRadius() - unit.getCapsuleRadius() > FLANK_REACH || dist < 1e-3) {
+      continue;
+    }
+    const facing = u.getFacing();
+    if ((dx * facing[0]! + dz * facing[2]!) / dist < -0.3) return u;
+  }
+  return null;
 }

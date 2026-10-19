@@ -95,19 +95,32 @@ asistencias al final, cuando ya existen todos los disparadores; y el patio con l
 
 ### Fase 11 — Deslizador (GDD §10.2)
 
-- El recurso principal sigue siendo los metales.
-- [ ] Mecanica de Ritmo (0–3, +15 % cada punto; se pierde al cambiar de objetivo, al recibir
-      Aturdido o tras un turno sin golpear) y su indicador en el HUD (Pasiva, pero con icono con el % en el HUD).
-- [ ] Lanzar: lanza al enemigo/prop grande en arco hasta 10 m → IMPACTO y Derribado (10.6).
-- [ ] Avivar peltre: 2 turnos de +3 m de movimiento, inmunidad a Derribado y Aturdido y +20 % de
-      daño; después, Arrastre (−50 % de movimiento y daño durante 1 turno).
-- [ ] Deslizar: 4 m sin provocar reacciones; si acaba a la espalda, Marcado.
-- [ ] Remate (peltre) — Acción, 1 de metal. Gasta todo el Ritmo en un golpe: daño del arma
-      × (1 + 0,5 por punto de Ritmo); con 3 puntos, además deja Aturdido. Es el gastador del
-      Ritmo: ¿sigo acumulando o lo suelto ahora?
-- [ ] Mente de oro innata (sin acción, 1 carga por combate que no se recarga): decantar cura durante los proximos 3 turnos
-      `10 + 3·RES`.(cuantos turnos crees que deban ser?)
-- [ ] La **Burbuja de Bendaleo** es una zona: genera burbuja alrededor del personaje, personajes aliados y enemigos dentro hacen mas turnos por ronda (deberia incluir la misma ronda de casteo?) (deberian tener mas acciones/acciones adicionales? o directamente turnos seguidos antes de que les toque a los demas? Me entiendes?)
+El recurso principal sigue siendo el metal. Escenarios: `phase11_slider` y `phase11_bubble`.
+
+- [x] **Ritmo** (pasiva): cada golpe seguido al mismo objetivo +15 % (hasta 3 puntos); se
+      reinicia al cambiar de objetivo y se pierde al quedar Aturdido o tras un turno sin golpear.
+      Icono de estado (con el % en el tooltip) y un hueco pasivo en la hotbar ("Ritmo +N %").
+- [x] **Lanzar** (peltre) — Acción, 1 de metal. Pegado al objetivo (si no, se acerca): una unidad
+      o un prop Grande sale en arco hasta 10 m adonde elijas (o junto a una unidad, que recibe
+      el golpe). Al caer, IMPACTO de 10 + FUE; una unidad queda Derribada. Se apunta en dos
+      pasos, como el Empuje.
+- [x] **Avivar peltre** — Acción adicional, 2 de metal. 2 turnos: +3 m de movimiento (ya en el
+      turno en que se lanza), inmune a Derribado y Aturdido y +20 % de daño; después, Arrastre
+      (−50 % de movimiento y de daño durante 1 turno).
+- [x] **Deslizar** — Acción adicional, 1 de metal. 4 m en línea recta sin gastar movimiento; si
+      acaba a la espalda de un enemigo (pegado y detrás de hacia donde mira), queda Marcado.
+      "Sin provocar reacciones" se aplicará cuando existan (fase 16).
+- [x] **Remate** (peltre) — Acción, 1 de metal. Gasta todo el Ritmo contra el objetivo en un
+      golpe: daño del arma × (1 + 0,5 por punto); con 3 puntos, además deja Aturdido.
+- [x] **Mente de oro** innata — sin acción, 1 carga por combate que no se recarga: cura
+      `5 + RES` al decantar y al empezar sus dos turnos siguientes (3 curaciones).
+- [x] **Burbuja de bendaleo** — Acción, 3 de metal. Burbuja fija centrada en él, radio
+      `1,75 + POT/4` m, durante 2 rondas. Quien acaba su turno dentro (aliado o enemigo) juega
+      otro turno seguido, uno extra por ronda (también el turno en que se lanza); la barra de
+      iniciativa los enseña dos veces seguidas. Nadie sale andando (el camino se para en el
+      borde; saltos y Deslizar tampoco). Ningún proyectil cruza el borde. Con la burbuja
+      activa, el hueco pasa a "Cerrar burbuja" (sin acción ni metal). Se rompe si a él lo
+      sacan (empujado, lanzado) o cae.
 
 ### Fase 12 — Cobertura (GDD §5): tapa o no tapa
 
@@ -159,8 +172,8 @@ asistencias al final, cuando ya existen todos los disparadores; y el patio con l
       _Hecho cuando:_ una zona de prueba aplica un estado al entrar y se deshace al caducar.
 - [ ] **14.2 Bloqueo de proyectiles en el borde** de una zona (ataques a distancia y
       habilidades `unit` que cruzan el borde = desviados, sin daño). La vista previa lo enseña.
-- [ ] **14.3 Burbuja de duelo** del Deslizador: +1 Acción por turno dentro, borde que bloquea
-      proyectiles, se rompe si sale; el tamaño escala con POT.
+- [x] **14.3 Burbuja de bendaleo** del Deslizador: hecha en la fase 11 (`Zones`), con su borde
+      que bloquea proyectiles. Al hacer las zonas genéricas, que pase a usarlas.
 - [ ] **14.4 Nube de cobre** de la Voz: inmunidad a los estados mentales y ocultación frente al
       bronce.
 

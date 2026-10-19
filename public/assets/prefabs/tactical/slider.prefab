@@ -22,7 +22,18 @@
           "clip": "Sword_Attack_Standing"
         }
       ],
-      "skills": ["second_wind"]
+      "skills": [
+        "pewter_hurl",
+        "finisher",
+        "pewter_flare",
+        "slide",
+        "bendalloy_bubble",
+        "gold_mind"
+      ],
+      "metalminds": {
+        "gold": 1
+      },
+      "rhythm": true
     }
   }
 }

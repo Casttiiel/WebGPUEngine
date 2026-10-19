@@ -23,6 +23,10 @@ export const STATUS_NAME: Record<string, string> = {
   steel_bubble: 'Burbuja de acero',
   iron_light: 'Ligero',
   iron_heavy: 'Pesado',
+  rhythm: 'Ritmo',
+  pewter: 'Peltre avivado',
+  pewter_drag: 'Arrastre de peltre',
+  gold_heal: 'Mente de oro',
 };
 
 /** Qué hace cada estado (tooltips, ficha). */
@@ -35,6 +39,10 @@ export const STATUS_HELP: Record<string, string> = {
   steel_bubble: 'los proyectiles contra él tienen un 50 % de fallar',
   iron_light: 'sus saltos llegan el doble',
   iron_heavy: 'no le pueden empujar, atraer ni derribar',
+  rhythm: 'sus golpes contra el mismo objetivo hacen más daño',
+  pewter: '+3 m de movimiento, inmune a Derribado y Aturdido, +20 % de daño',
+  pewter_drag: '−50 % de movimiento y de daño',
+  gold_heal: 'se cura al empezar cada turno',
 };
 
 /**
@@ -109,6 +117,22 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
         return `atrae lo metálico ${distanceText(steelDistanceFor, caster)} (llega Derribado; si solo lleva un arma de metal, le desarma)`;
       case 'leap':
         return `salta ${distanceText(steelJumpFor, caster)} sin gastar movimiento`;
+      case 'hurl': {
+        const fue = caster?.hasAttributes() ? `${10 + caster.getAttribute('FUE')}` : '10 + FUE';
+        return `lo lanzas en arco hasta ${fmt(e.distance)} m: ${fue} de impacto; una unidad cae Derribada`;
+      }
+      case 'flank':
+        return 'si acabas a la espalda de un enemigo, queda Marcado';
+      case 'finisher':
+        return 'gasta el Ritmo: daño del arma × (1 + 0,5 por punto); con 3 puntos, Aturdido';
+      case 'bubble': {
+        const pot = caster?.hasAttributes() ? caster.getAttribute('POT') : null;
+        const r =
+          pot !== null
+            ? `${fmt(e.radius + (e.radiusPerPoint ?? 0) * pot)} m`
+            : `${fmt(e.radius)} m + ${fmt(e.radiusPerPoint ?? 0)} por POT`;
+        return `burbuja de ${r} durante ${turns(e.rounds).replace('turno', 'ronda')}: quien acaba su turno dentro juega otro seguido; ningún proyectil cruza el borde`;
+      }
       case 'duralumin':
         return 'quema toda la Reserva: la siguiente, gratis y ×(1 + quemado / máximo)';
       case 'refill':

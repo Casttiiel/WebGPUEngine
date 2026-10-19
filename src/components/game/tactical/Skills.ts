@@ -63,6 +63,24 @@ export type SkillEffect =
   /** Salto de acero: hasta el punto, `6 + POT` m, sin gastar movimiento. */
   | { type: 'leap' }
   /**
+   * Lanzar (peltre): el objetivo (una unidad o un objeto Grande, pegado al lanzador) sale en
+   * arco hasta `distance` m adonde se elija. IMPACTO al caer (10 + FUE); una unidad queda
+   * Derribada.
+   */
+  | { type: 'hurl'; distance: number }
+  /** Deslizar: si acaba a la espalda de un enemigo (a su lado), lo deja Marcado. */
+  | { type: 'flank' }
+  /**
+   * Remate: gasta todo el Ritmo contra el objetivo en un golpe del arma × (1 + 0,5 por punto);
+   * con el Ritmo al máximo, además lo deja Aturdido.
+   */
+  | { type: 'finisher' }
+  /**
+   * Burbuja de bendaleo centrada en el lanzador, `radius` + `radiusPerPoint`·POT m, durante
+   * `rounds` rondas (Zones).
+   */
+  | { type: 'bubble'; rounds: number; radius: number; radiusPerPoint?: number }
+  /**
    * Acciones de metal (GDD §2, §11), sobre uno mismo y al momento:
    *   duralumin: quema toda la Reserva; la siguiente, ×(1 + quemado / máximo) y sin coste.
    *   refill:    se declara Seco: el turno siguiente sin alomancia y, al acabarlo, Reserva llena.
@@ -181,7 +199,9 @@ export const isHostile = (skill: SkillDef): boolean =>
     hasEffect(skill, 'push') ||
     hasEffect(skill, 'status') ||
     hasEffect(skill, 'steelPush') ||
-    hasEffect(skill, 'ironPull'));
+    hasEffect(skill, 'ironPull') ||
+    hasEffect(skill, 'hurl') ||
+    hasEffect(skill, 'finisher'));
 
 /** ¿`unit` cuenta para el filtro del área (relativo al bando del lanzador)? */
 function passesAffects(skill: SkillDef, caster: UnitComponent, unit: UnitComponent): boolean {

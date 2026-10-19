@@ -19,16 +19,16 @@ import {
   type ThrowPlan,
 } from './EncounterComponent';
 import { PropComponent } from './PropComponent';
-import { hotbarEntries, isAbilityId, unitSkill } from './Hotbar';
+import { RHYTHM_ENTRY, hotbarEntries, isAbilityId, unitSkill } from './Hotbar';
 import { circleOutline, coneOutline, isHostile, lineOutline, type SkillDef } from './Skills';
-import type { SkillPlan } from './EncounterComponent';
+import type { SkillPlan, SkillTarget } from './EncounterComponent';
 import { NavMesh } from '../../../ai/nav/NavMesh';
 import { PathPreview } from './PathPreview';
 import { AimArrow } from './AimArrow';
 import { ActionCameraComponent } from './ActionCameraComponent';
 import { THROW_RANGE } from './EnvironmentRules';
 import { STATUS_NAME } from './ActionText';
-import { hitRange, skillDamage } from './CombatRules';
+import { finisherDamage, hitRange, skillDamage } from './CombatRules';
 import { rangeText } from './Stats';
 import { CharacterSheetController } from '../../../core/ui/controllers/CharacterSheetController';
 import { KeyCode } from '../../../types/KeyCode.enum';
@@ -125,6 +125,11 @@ const REASON_TEXT: Record<string, string> = {
   'not metallic': 'no es metálico',
   immovable: 'no se le puede mover',
   'no charges': 'sin cargas',
+  'too small': 'demasiado pequeño',
+  'too far': 'demasiado lejos',
+  'no destination': 'elige dónde cae',
+  'bubble border': 'el borde de la burbuja lo desvía',
+  bubble: 'no se puede salir de la burbuja',
 };
 
 const reasonText = (reason: string | undefined): string =>
@@ -247,6 +252,24 @@ export class TacticalPointerComponent extends Component {
         | undefined;
       if (!skill.canCast || !caster) return [];
       const motion = skill.motion;
+      if (skill.skill.effects.some((e) => e.type === 'finisher')) {
+        return skill.affected
+          .filter((u) => u.isAlive())
+          .map((unit) => ({
+            unit,
+            ...hitRange(caster, unit, finisherDamage(caster, unit).damage),
+            crit: null,
+          }));
+      }
+      if (motion?.kind === 'hurl') {
+        // Lanzar: a quien golpea y lo lanzado (siempre recibe el golpe al caer).
+        const out: DamagePreview[] = [];
+        if (motion.hit?.isAlive()) {
+          out.push({ unit: motion.hit, ...hitRange(null, motion.hit, motion.damage), crit: null });
+        }
+        out.push({ unit: motion.body, ...hitRange(null, motion.body, motion.damage), crit: null });
+        return out;
+      }
       if (motion && (motion.kind === 'push' || motion.kind === 'pull')) {
         // Contra quién choca y lo que se mueve (una unidad: también contra una pared, +50 %).
         const out: DamagePreview[] = [];
@@ -343,6 +366,7 @@ export class TacticalPointerComponent extends Component {
   /** Arma un ataque para el próximo click en un enemigo (hotbar). Repetir lo desarma. */
   public armAttack(id: string | null): void {
     this.syncArmedOwner();
+    if (id === RHYTHM_ENTRY) return; // la pasiva no se arma
     // Habilidades sobre uno mismo: no hay que elegir objetivo, se lanzan ya.
     const selected = PartyComponent.find()?.getSelected() ?? null;
     const skill = unitSkill(selected?.getComponent('unit') as UnitComponent | null, id);
@@ -363,9 +387,35 @@ export class TacticalPointerComponent extends Component {
     return this.skillHeld;
   }
 
-  /** ¿La habilidad se apunta en dos pasos (objetivo y después dirección)? El Empuje. */
+  /**
+   * ¿La habilidad se apunta en dos pasos? Primero el objetivo y después hacia dónde (Empuje) o
+   * dónde cae (Lanzar).
+   */
   private isAimedPush(skill: SkillDef | null): boolean {
-    return !!skill && skill.target === 'unit' && skill.effects.some((e) => e.type === 'steelPush');
+    return (
+      !!skill &&
+      skill.target === 'unit' &&
+      skill.effects.some((e) => e.type === 'steelPush' || e.type === 'hurl')
+    );
+  }
+
+  /** Con el objetivo ya elegido: el destino según lo que hay bajo el cursor. */
+  private heldAim(skill: SkillDef, held: Entity): SkillTarget {
+    const unit = this.hoveredUnit?.getComponent('unit') as UnitComponent | null | undefined;
+    if (this.hoverKind === 'ui' || this.hoverKind === 'none') return { unit: held };
+    const selected = PartyComponent.find()?.getSelected() ?? null;
+    const other = unit && unit.getOwner() !== held && unit.getOwner() !== selected ? unit : null;
+    if (skill.effects.some((e) => e.type === 'hurl')) {
+      // Lanzar: junto a la unidad bajo el cursor, o al punto del suelo.
+      return other
+        ? { unit: held, toUnit: other.getOwner() }
+        : { unit: held, point: this.hoverPoint };
+    }
+    // Empuje: hacia donde apunta el ratón (la regla lo ajusta al ángulo).
+    const from = (held.getComponent('unit') as UnitComponent).getFeetPosition(vec3.create());
+    const to = other ? other.getFeetPosition(vec3.create()) : this.hoverPoint;
+    const direction = vec3.fromValues(to[0]! - from[0]!, 0, to[2]! - from[2]!);
+    return { unit: held, direction: vec3.length(direction) > 0.2 ? direction : null };
   }
 
   /**
@@ -707,20 +757,7 @@ export class TacticalPointerComponent extends Component {
     if (!skill || !encounter || !selected) return null;
     const unit = this.hoveredUnit?.getComponent('unit') as UnitComponent | null | undefined;
     const held = this.getSkillHeld();
-    if (held) {
-      // Empuje con el objetivo elegido: hacia donde apunta el ratón (la regla lo ajusta al ángulo).
-      if (this.hoverKind === 'ui' || this.hoverKind === 'none') {
-        return encounter.planSkill(selected, skill.id, { unit: held });
-      }
-      const from = (held.getComponent('unit') as UnitComponent).getFeetPosition(vec3.create());
-      const to =
-        unit && unit.getOwner() !== held ? unit.getFeetPosition(vec3.create()) : this.hoverPoint;
-      const direction = vec3.fromValues(to[0]! - from[0]!, 0, to[2]! - from[2]!);
-      return encounter.planSkill(selected, skill.id, {
-        unit: held,
-        direction: vec3.length(direction) > 0.2 ? direction : null,
-      });
-    }
+    if (held) return encounter.planSkill(selected, skill.id, this.heldAim(skill, held));
     if (skill.target === 'unit') {
       return this.hoveredUnit
         ? encounter.planSkill(selected, skill.id, { unit: this.hoveredUnit })
@@ -746,7 +783,10 @@ export class TacticalPointerComponent extends Component {
     }
     if (!plan.canCast && plan.reason) label += ` · ${reasonText(plan.reason)}`;
     else if (motion?.kind === 'disarm') label += ` → desarma a ${motion.body.getDisplayName()}`;
-    else if (motion && motion.kind !== 'leap') {
+    else if (motion?.kind === 'hurl') {
+      label += ` → ${motion.body.getDisplayName()}`;
+      if (motion.hit) label += ` · golpea a ${motion.hit.getDisplayName()}`;
+    } else if (motion && motion.kind !== 'leap') {
       const length = vec3.distance(motion.points[0]!, motion.points[motion.points.length - 1]!);
       label += ` → ${motion.body.getDisplayName()} ${length.toFixed(1)} m`;
       if (motion.hit) label += ` · golpea a ${motion.hit.getDisplayName()}`;
@@ -772,7 +812,7 @@ export class TacticalPointerComponent extends Component {
       outline = coneOutline(origin, plan.direction, skill.length, skill.angle);
     } else if (origin && skill.target === 'line' && plan.direction) {
       outline = lineOutline(origin, plan.direction, plan.reach, skill.width);
-    } else if (motion?.kind === 'leap' && plan.canCast) {
+    } else if ((motion?.kind === 'leap' || motion?.kind === 'hurl') && plan.canCast) {
       outline = motion.points;
     } else if (origin && skill.radius > 0) {
       outline = circleOutline(origin, skill.radius);
@@ -1107,13 +1147,12 @@ export class TacticalPointerComponent extends Component {
         this.skillHeld = this.hoveredUnit;
         return;
       }
-      const from = plan.motion?.points[0];
-      const to = plan.motion?.points[plan.motion.points.length - 1];
-      const direction = from && to ? vec3.sub(vec3.create(), to, from) : null;
-      const result = encounter?.requestSkill(selected, skill.id, {
-        unit: this.skillHeld,
-        direction,
-      });
+      if (!plan.motion) return;
+      const result = encounter?.requestSkill(
+        selected,
+        skill.id,
+        this.heldAim(skill, this.skillHeld),
+      );
       if (result?.ok) this.armAttack(null);
       this.planCache.key = '';
       return;

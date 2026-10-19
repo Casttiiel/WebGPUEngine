@@ -40,7 +40,7 @@ const TURN_BANNER_TIME = 1.3;
 const BUTTON_NORMAL: RGBA = [0.3, 0.2, 0.08, 0.92];
 const BUTTON_HOVER: RGBA = [0.62, 0.45, 0.16, 1];
 
-const INIT_SLOTS = 12;
+const INIT_SLOTS = 16;
 const INIT_WIDTH = 112;
 const INIT_GAP = 8;
 const FRAME_NORMAL: RGBA = [0.07, 0.065, 0.06, 0.9];
@@ -65,6 +65,7 @@ const ICON: Record<HotbarKind, RGBA> = {
   push: [0.12, 0.24, 0.4, 1],
   throw: [0.42, 0.2, 0.09, 1],
   skill: [0.34, 0.24, 0.08, 1],
+  passive: [0.2, 0.32, 0.2, 1], // verdín: la pasiva (Ritmo)
 };
 const ICON_DISABLED: RGBA = [0.15, 0.14, 0.13, 1];
 /** Qué hacer con cada acción armada (tooltip mientras está armada). */
@@ -75,6 +76,7 @@ const ARMED_HINT: Record<HotbarKind, string> = {
   push: 'elige un barril o una caja y hacia dónde',
   throw: 'elige un barril o una caja y dónde lanzarlo',
   skill: 'elige un objetivo',
+  passive: '',
 };
 
 /** Tooltip de la hotbar (panel encima del hueco), en px de referencia. */
@@ -121,6 +123,9 @@ const STATUS_FLOAT: Partial<Record<string, string>> = {
   steel_bubble: 'Burbuja de acero',
   iron_light: 'Ligero',
   iron_heavy: 'Pesado',
+  pewter: '¡Peltre!',
+  pewter_drag: 'Arrastre',
+  gold_heal: 'Mente de oro',
 };
 /** Acciones de metal junto a la barra de metal (no en la hotbar). */
 const METAL_BUTTONS = ['duralumin', 'refill'] as const;
@@ -321,6 +326,15 @@ export class CombatHUDController extends WidgetController {
       case 'disarm':
         this.spawnFloat(unit, '¡Desarmado!', FLOAT_CRIT, 1.5);
         break;
+      case 'rhythm':
+        this.spawnFloat(unit, `Ritmo ${data.amount ?? 0}`, FLOAT_METAL, 1.5);
+        break;
+      case 'extra-turn':
+        this.spawnFloat(unit, 'Turno extra', FLOAT_METAL, 1.5);
+        break;
+      case 'bubble':
+        this.spawnFloat(unit, 'Burbuja de bendaleo', FLOAT_METAL, 1.5);
+        break;
       case 'refill':
         this.spawnFloat(unit, 'Reserva llena', FLOAT_METAL, 1.5);
         break;
@@ -391,8 +405,15 @@ export class CombatHUDController extends WidgetController {
   // ── Barra de iniciativa ──────────────────────────────────────────────────
 
   private updateInitiative(encounter: EncounterComponent, inCombat: boolean): void {
-    const units = inCombat ? encounter.getCombatantUnits().slice(0, INIT_SLOTS) : [];
+    // Quien tiene un turno extra en una burbuja de bendaleo sale dos veces seguidas.
+    const units = inCombat
+      ? encounter
+          .getCombatantUnits()
+          .flatMap((u) => (encounter.hasPendingExtraTurn(u) ? [u, u] : [u]))
+          .slice(0, INIT_SLOTS)
+      : [];
     const active = encounter.getActiveUnit();
+    let activeShown = false;
     const total = units.length * INIT_WIDTH + Math.max(0, units.length - 1) * INIT_GAP;
     let hovered: Entity | null = null;
 
@@ -408,7 +429,10 @@ export class CombatHUDController extends WidgetController {
       const entity = unit.getOwner();
       if (slot.hovered) hovered = entity;
 
-      const frame = entity === active ? FRAME_ACTIVE : slot.hovered ? FRAME_HOVER : FRAME_NORMAL;
+      // El turno en curso es el primero de los dos huecos de un turno doble.
+      const isActive = entity === active && !activeShown;
+      if (isActive) activeShown = true;
+      const frame = isActive ? FRAME_ACTIVE : slot.hovered ? FRAME_HOVER : FRAME_NORMAL;
       slot.frame.setColor(...frame);
       const face = !unit.isAlive()
         ? FACE_DOWN
@@ -552,7 +576,7 @@ export class CombatHUDController extends WidgetController {
         entry.id === armed ? FRAME_ACTIVE : slot.hovered && enabled ? FRAME_HOVER : FRAME_NORMAL;
       slot.frame.setColor(...frame);
       slot.icon?.setColor(...(enabled ? ICON[entry.kind] : ICON_DISABLED));
-      slot.key?.setText(exploring ? '' : String((i + 1) % 10));
+      slot.key?.setText(exploring || entry.kind === 'passive' ? '' : String((i + 1) % 10));
       slot.name?.setText(cooldown > 0 ? `${cooldown} turno${cooldown > 1 ? 's' : ''}` : entry.name);
       slot.name?.setColor(1, 1, 1, enabled ? 1 : 0.45);
       if (slot.hovered) hovered = { entry, x, enabled, cooldown, blocker };

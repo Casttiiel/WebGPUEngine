@@ -109,6 +109,11 @@ export type UnitComponentDataType = Readonly<{
   /** Gigante (koloss): no se le puede empujar ni atraer. Default false. */
   giant?: boolean;
   /**
+   * Ritmo (pasiva del Deslizador): cada golpe seguido al mismo objetivo suma un punto (+15 %,
+   * hasta 3). Se pierde al cambiar de objetivo, al quedar Aturdido o tras un turno sin golpear.
+   */
+  rhythm?: boolean;
+  /**
    * Mentes de metal innatas: cargas por combate de cada una ({ iron: 1 }). Las gastan las
    * habilidades con `charge` (skills.json). Se rellenan al empezar cada combate.
    */
@@ -126,6 +131,10 @@ export type UnitComponentDataType = Readonly<{
  *   steel_bubble: Burbuja de acero: los proyectiles contra él tienen un 50 % de fallar.
  *   iron_light:   Mente de hierro, Ligero: sus saltos llegan el doble.
  *   iron_heavy:   Mente de hierro, Pesado: no le pueden empujar, atraer ni derribar.
+ *   rhythm:       Ritmo (pasiva del Deslizador): +`amount` % a sus golpes contra `source`.
+ *   pewter:       Peltre avivado: +3 m, inmune a Derribado y Aturdido, +20 % de daño.
+ *   pewter_drag:  Arrastre de peltre: −50 % de movimiento y de daño.
+ *   gold_heal:    Mente de oro: se cura `amount` al decantar y al empezar sus turnos.
  */
 export type UnitStatusId =
   | 'fear'
@@ -135,7 +144,15 @@ export type UnitStatusId =
   | 'marked'
   | 'steel_bubble'
   | 'iron_light'
-  | 'iron_heavy';
+  | 'iron_heavy'
+  | 'rhythm'
+  | 'pewter'
+  | 'pewter_drag'
+  | 'gold_heal';
+
+/** Ritmo: % de daño por punto y máximo de puntos (GDD §10.2). */
+export const RHYTHM_STEP = 15;
+export const RHYTHM_MAX = 3;
 
 /**
  * Acciones de metal (data/skills.json): las tiene toda unidad con Reserva, además de sus
@@ -213,6 +230,9 @@ export class UnitComponent extends Component {
   private disarmed = false;
   private metallic = false;
   private giant = false;
+  private rhythm = false;
+  /** Ha golpeado en este turno (si no, pierde el Ritmo al acabarlo). */
+  private hitThisTurn = false;
   /** Cargas por combate de cada mente de metal innata, y las que le quedan. */
   private metalminds: Record<string, number> = {};
   private charges = new Map<string, number>();
@@ -295,6 +315,7 @@ export class UnitComponent extends Component {
     this.silhouette = data.silhouette ?? true;
     this.metallic = data.metallic ?? false;
     this.giant = data.giant ?? false;
+    this.rhythm = data.rhythm ?? false;
     this.metalminds = { ...(data.metalminds ?? {}) };
     this.refillCharges();
     this.stats = a ? this.computeStats() : null;
@@ -475,6 +496,42 @@ export class UnitComponent extends Component {
 
   public isGiant(): boolean {
     return this.giant;
+  }
+
+  // ── Ritmo (pasiva del Deslizador) ──────────────────────────────────────────
+
+  public hasRhythm(): boolean {
+    return this.rhythm;
+  }
+
+  /** Puntos de Ritmo contra `target` (0 si no tiene o si es contra otro). */
+  public getRhythmPoints(target?: UnitComponent | null): number {
+    const st = this.statuses.get('rhythm');
+    if (!st) return 0;
+    if (target && st.source !== target.getOwner()) return 0;
+    return Math.round((st.amount ?? 0) / RHYTHM_STEP);
+  }
+
+  /** Un golpe a `target`: un punto más si es el mismo objetivo; si no, empieza de nuevo. */
+  public addRhythm(target: UnitComponent): number {
+    const same = this.statuses.get('rhythm')?.source === target.getOwner();
+    const points = same ? Math.min(RHYTHM_MAX, this.getRhythmPoints() + 1) : 1;
+    this.statuses.set('rhythm', {
+      id: 'rhythm',
+      turns: Infinity,
+      source: target.getOwner(),
+      amount: points * RHYTHM_STEP,
+    });
+    this.hitThisTurn = true;
+    return points;
+  }
+
+  public hasHitThisTurn(): boolean {
+    return this.hitThisTurn;
+  }
+
+  public setHitThisTurn(hit: boolean): void {
+    this.hitThisTurn = hit;
   }
 
   /** Arma de metal en la mano (y aún no se la han quitado). */

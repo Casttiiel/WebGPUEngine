@@ -1,8 +1,9 @@
 import { vec3 } from 'gl-matrix';
-import { UnitComponent, type UnitAttack } from './UnitComponent';
+import { RHYTHM_STEP, UnitComponent, type UnitAttack } from './UnitComponent';
 import { hasLineOfSight } from './TacticalQueries';
 import type { SkillDef } from './Skills';
 import { PropComponent } from './PropComponent';
+import { Zones } from './Zones';
 import { averageOf, critDamageFor, mitigatedRange, rollRange, type DamageRange } from './Stats';
 
 /**
@@ -29,6 +30,8 @@ export function unitDistance(a: UnitComponent, b: UnitComponent): number {
  * la geometría estática. Un muro bajo no tapa (se ve la cabeza); una columna sí.
  */
 export function unitLineOfSight(from: UnitComponent, to: UnitComponent): boolean {
+  // El borde de una burbuja de bendaleo desvía los proyectiles.
+  if (Zones.blocksProjectile(from.getFeetPosition(tmpA), to.getFeetPosition(tmpB))) return false;
   const eye = from.getPosition(tmpA);
   eye[1] = eye[1]! + EYE_HEIGHT;
   const target = to.getPosition(tmpB);
@@ -54,6 +57,7 @@ export function unitLineOfSightFrom(
   feet: vec3,
   target: UnitComponent,
 ): boolean {
+  if (Zones.blocksProjectile(feet, target.getFeetPosition(tmpB))) return false;
   const eye = vec3.copy(tmpA, feet);
   eye[1] = eye[1]! + unit.getFeetOffset() + EYE_HEIGHT;
   const aim = target.getPosition(tmpB);
@@ -105,6 +109,38 @@ export function hitRange(
   return mitigatedRange(marked, target.getArmor(), penetration);
 }
 
+/**
+ * Multiplicador del daño físico que hace `attacker` (ataques y técnicas de peltre): Peltre
+ * avivado +20 %, Arrastre de peltre −50 % y, contra `target`, su Ritmo (+15 % por punto).
+ */
+export function damageDealtMultiplier(
+  attacker: UnitComponent,
+  target: UnitComponent | null = null,
+): number {
+  let m = 1;
+  if (attacker.hasStatus('pewter')) m *= 1.2;
+  if (attacker.hasStatus('pewter_drag')) m *= 0.5;
+  if (target) m *= 1 + (attacker.getRhythmPoints(target) * RHYTHM_STEP) / 100;
+  return m;
+}
+
+/**
+ * D del Remate contra `target`: el arma (+ FUE) × (1 + 0,5 por punto de Ritmo contra él), con
+ * el peltre o el Arrastre. Devuelve también los puntos (con el máximo, Aturdido).
+ */
+export function finisherDamage(
+  caster: UnitComponent,
+  target: UnitComponent,
+): { damage: number; points: number } {
+  const attack = caster.getAttack();
+  const points = caster.getRhythmPoints(target);
+  const base = attack ? caster.getAttackDamage(attack) : 0;
+  return {
+    damage: Math.round(base * (1 + 0.5 * points) * damageDealtMultiplier(caster)),
+    points,
+  };
+}
+
 /** ¿Es de metal? (metal portado, o un objeto metálico): el acero y el hierro le afectan. */
 export function isMetallic(unit: UnitComponent): boolean {
   return unit.isMetallic() || PropComponent.of(unit.getOwner())?.isMetallic() === true;
@@ -120,7 +156,9 @@ export function previewAttack(
   target: UnitComponent,
   attack: UnitAttack,
 ): AttackRoll {
-  const damage = attacker.getAttackDamage(attack);
+  const damage = Math.round(
+    attacker.getAttackDamage(attack) * damageDealtMultiplier(attacker, target),
+  );
   const range = hitRange(attacker, target, damage);
   const bubble = attack.kind === 'ranged' && target.hasStatus('steel_bubble');
   return {

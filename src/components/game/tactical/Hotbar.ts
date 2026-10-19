@@ -1,9 +1,11 @@
 import type { UnitAttack, UnitComponent } from './UnitComponent';
-import { SkillCatalog, isMetalAction, type SkillDef } from './Skills';
+import { SkillCatalog, hasEffect, isMetalAction, type SkillDef } from './Skills';
+import { RHYTHM_MAX, RHYTHM_STEP } from './UnitComponent';
+import { Zones } from './Zones';
 import { COST_NAME, attackSummary, fmt, skillMechanics, turns } from './ActionText';
 import { MAX_JUMP, THROW_RANGE } from './EnvironmentRules';
 
-export type HotbarKind = 'melee' | 'ranged' | 'jump' | 'push' | 'throw' | 'skill';
+export type HotbarKind = 'melee' | 'ranged' | 'jump' | 'push' | 'throw' | 'skill' | 'passive';
 export type HotbarCost = 'action' | 'bonusAction' | 'movement' | 'free';
 
 /** Una entrada de la hotbar: un ataque, una acción de entorno o una habilidad. */
@@ -15,7 +17,12 @@ export interface HotbarEntry {
   cost: HotbarCost;
   attack: UnitAttack | null;
   skill: SkillDef | null;
+  /** Burbuja de bendaleo con la suya activa: el hueco la cierra. */
+  closes?: boolean;
 }
+
+/** Id del hueco de la pasiva del Ritmo (no se arma ni se lanza). */
+export const RHYTHM_ENTRY = 'rhythm';
 
 export type AbilityId = 'jump' | 'push' | 'throw';
 
@@ -48,16 +55,32 @@ export function hotbarEntries(unit: UnitComponent): HotbarEntry[] {
     ...unit
       .getAbilities()
       .map((ability): HotbarEntry => ({ ...ABILITIES[ability], attack: null, skill: null })),
-    ...skills.map(
-      (s): HotbarEntry => ({
+    ...skills.map((s): HotbarEntry => {
+      // Con su burbuja activa, el hueco la cierra (sin acción).
+      const closes = hasEffect(s, 'bubble') && Zones.ownedBy(unit) !== null;
+      return {
         id: s.id,
-        name: s.name,
+        name: closes ? 'Cerrar burbuja' : s.name,
         kind: 'skill',
-        cost: s.cost,
+        cost: closes ? 'free' : s.cost,
         attack: null,
         skill: s,
-      }),
-    ),
+        ...(closes && { closes }),
+      };
+    }),
+    // La pasiva del Ritmo, con su % actual.
+    ...(unit.hasRhythm()
+      ? [
+          {
+            id: RHYTHM_ENTRY,
+            name: `Ritmo +${unit.getStatus('rhythm')?.amount ?? 0} %`,
+            kind: 'passive',
+            cost: 'free',
+            attack: null,
+            skill: null,
+          } satisfies HotbarEntry,
+        ]
+      : []),
   ];
 }
 
@@ -107,6 +130,20 @@ export function hotbarTooltip(
 ): { title: string; lines: TooltipLine[] } {
   const lines: TooltipLine[] = [];
   const info = (text: string) => lines.push({ text, style: 'info' });
+  if (entry.kind === 'passive') {
+    info(
+      `Pasiva · +${RHYTHM_STEP} % por golpe seguido al mismo objetivo (hasta +${RHYTHM_STEP * RHYTHM_MAX} %)`,
+    );
+    lines.push({
+      text: 'Se pierde al cambiar de objetivo, al quedar Aturdido o tras un turno sin golpear. El Remate lo gasta.',
+      style: 'description',
+    });
+    return { title: 'Ritmo', lines };
+  }
+  if (entry.closes) {
+    info('Sin acción · cierra tu burbuja de bendaleo ya');
+    return { title: entry.name, lines };
+  }
   if (entry.attack) {
     info(attackSummary(entry.attack, unit));
     if (entry.kind === 'ranged') info('Necesita línea de visión.');

@@ -65,10 +65,14 @@ const THROW_ARC_PER_METER = 0.25;
  * medio), o el motivo por el que no se puede: lejos, alto, sin sitio donde caer, o algo
  * demasiado alto en medio.
  */
-export function throwArc(from: vec3, to: vec3): JumpArc | { reason: string } {
+export function throwArc(
+  from: vec3,
+  to: vec3,
+  maxFlight = THROW_MAX_FLIGHT,
+): JumpArc | { reason: string } {
   const distance = Math.hypot(to[0]! - from[0]!, to[2]! - from[2]!);
   const minArc = Math.min(THROW_MAX_ARC, Math.max(THROW_MIN_ARC, distance * THROW_ARC_PER_METER));
-  const arc = arcPath(from, to, THROW_MAX_FLIGHT, THROW_MAX_RISE, THROW_MAX_ARC, minArc);
+  const arc = arcPath(from, to, maxFlight, THROW_MAX_RISE, THROW_MAX_ARC, minArc);
   if ('reason' in arc && arc.reason === 'too far') return { reason: 'too far to throw' };
   if ('reason' in arc && arc.reason === 'too high') return { reason: 'too high to throw' };
   return arc;

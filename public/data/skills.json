@@ -265,6 +265,108 @@
     ],
     "description": "Decantas peso (sin gastar acción): hasta tu siguiente turno no te pueden empujar, atraer ni derribar."
   },
+  "pewter_hurl": {
+    "name": "Lanzar",
+    "scale": "FUE",
+    "cost": "action",
+    "metal": 1,
+    "allomantic": true,
+    "target": "unit",
+    "range": 1.5,
+    "targets": "any",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "hurl",
+        "distance": 10
+      }
+    ],
+    "clip": "Push_Enter",
+    "description": "Con la fuerza del peltre agarras a quien tienes al lado (o un objeto Grande) y lo lanzas en arco hasta 10 m. Al caer, golpe; una unidad queda Derribada."
+  },
+  "pewter_flare": {
+    "name": "Avivar peltre",
+    "cost": "bonusAction",
+    "metal": 2,
+    "allomantic": true,
+    "target": "self",
+    "effects": [
+      {
+        "type": "status",
+        "status": "pewter",
+        "turns": 2
+      }
+    ],
+    "description": "Durante 2 turnos: +3 m de movimiento, inmune a Derribado y Aturdido y +20 % de daño. Después, un turno de Arrastre: la mitad de movimiento y de daño."
+  },
+  "slide": {
+    "name": "Deslizar",
+    "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
+    "target": "point",
+    "range": 4,
+    "effects": [
+      {
+        "type": "teleport"
+      },
+      {
+        "type": "flank"
+      }
+    ],
+    "description": "Una micro burbuja de bendaleo: te mueves 4 m en un instante sin gastar movimiento. Si acabas a la espalda de un enemigo, queda Marcado."
+  },
+  "finisher": {
+    "name": "Remate",
+    "scale": "FUE",
+    "cost": "action",
+    "metal": 1,
+    "allomantic": true,
+    "target": "unit",
+    "range": 1.5,
+    "targets": "enemy",
+    "lineOfSight": false,
+    "effects": [
+      {
+        "type": "finisher"
+      }
+    ],
+    "clip": "Sword_Attack_Standing",
+    "description": "Sueltas todo el Ritmo en un golpe. Con el Ritmo al máximo, además lo dejas Aturdido."
+  },
+  "gold_mind": {
+    "name": "Mente de oro",
+    "scale": "RES",
+    "cost": "free",
+    "charge": "gold",
+    "target": "self",
+    "effects": [
+      {
+        "type": "status",
+        "status": "gold_heal",
+        "turns": 3,
+        "amount": 5,
+        "amountPerPoint": 1
+      }
+    ],
+    "description": "Decantas salud de tu mente de oro (sin gastar acción): te curas ahora y al empezar tus dos turnos siguientes."
+  },
+  "bendalloy_bubble": {
+    "name": "Burbuja de bendaleo",
+    "cost": "action",
+    "metal": 3,
+    "allomantic": true,
+    "target": "self",
+    "effects": [
+      {
+        "type": "bubble",
+        "rounds": 2,
+        "radius": 1.75,
+        "radiusPerPoint": 0.25
+      }
+    ],
+    "description": "Una burbuja fija a tu alrededor durante 2 rondas: quien acaba su turno dentro, aliado o enemigo, juega otro seguido. Ningún proyectil cruza el borde. Si sales, se rompe."
+  },
   "duralumin": {
     "name": "Duraluminio",
     "cost": "bonusAction",
