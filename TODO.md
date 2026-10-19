@@ -17,49 +17,47 @@ genéricas, inventario/equipo, progresión, diálogos.
 
 ---
 
-## HITO 1 — Núcleo de reglas
-
-### Fase 8 — Reserva de metal, Seco y duraluminio (GDD §2, §11)
-
-- [ ] **8.1 Reserva.** Máximo `6 + TEM`, llena al empezar cada combate.
-- [ ] **8.2 Coste en metal.** Campo `metal: n` y etiqueta `allomantic: true` en `skills.json`.
-      `canAct` comprueba el coste; la hotbar desactiva lo que no se puede pagar.
-      _Hecho cuando:_ `phase8_metal`: no deja lanzar una habilidad de 3 con 2 en la Reserva.
-- [ ] **8.3 Estado Seco.** Al llegar a 0: el turno siguiente nada con `allomantic`; al acabar
-      ese turno, la Reserva se llena. El autoataque, los props, las mentes de metal y las
-      asistencias físicas siguen funcionando.
-      _Hecho cuando:_ ciclo completo quemar → Seco → lleno, comprobado por eventos.
-- [ ] **8.4 Recarga voluntaria** (Acción adicional): te declaras Seco.
-- [ ] **8.5 Avivar.** Interruptor al apuntar: +50 % de coste (redondeando hacia arriba) →
-      +50 % de efecto (daño, distancia o duración).
-- [ ] **8.6 Duraluminio.** Acción adicional: consume toda la Reserva; la siguiente habilidad
-      ×`(1 + consumido/máximo)`. Por ahora genérico; las variantes de cada personaje van en la fase 12.
-      _Hecho cuando:_ con la Reserva llena multiplica ×2 y con la mitad ×1,5.
-- [ ] **8.7 HUD.** Barra de metal en PartyHUD y CombatHUD, e indicador de Seco.
-- [ ] **8.8 IA.** TacticalPlanner tiene en cuenta el coste en metal, no se queda Seco sin
-      motivo y sabe usar el duraluminio.
-
-### Fase 9 — Estados (GDD §6)
-
-- [ ] **9.1 Ampliar `UnitStatusId`**: `stunned` (Aturdido), `prone` (Derribado), `airborne`
-      (Lanzado), `offbalance` (Desequilibrado), `marked` (Marcado), `enraged` (Enfurecido),
-      `soothed` (Aplacado), `drained` (Seco). Decidir si `fear` se queda o se sustituye por Calma.
-- [ ] **9.2 Reglas de cada estado:**
-  - [ ] Aturdido: pierde la próxima Acción.
-  - [ ] Derribado: levantarse cuesta la mitad del movimiento; los ataques melee contra él son crítico garantizado.
-  - [ ] Lanzado: en el aire hasta el final del turno; al caer, daño y Derribado.
-  - [ ] Desequilibrado: +25 % al siguiente golpe que reciba; se consume.
-  - [ ] Marcado: +50 % e ignora el rango de armadura; se consume; dura 2 turnos.
-  - [ ] Enfurecido: objetivo forzado (la IA tiene que respetarlo), +25 % de daño hecho, −3 de armadura.
-  - [ ] Aplacado: sin Reacción y −25 % de daño.
-        _Hecho cuando:_ `phase9_statuses` cubre cada estado con una aserción.
-- [ ] **9.3 Iconos de estado** sobre la unidad y en el retrato, con tooltip.
-- [ ] **9.4 IA**: evalúa los estados (no ataca a quien está protegido, aprovecha a los
-      Derribados, obedece al Enfurecido).
-
----
-
 ## HITO 2 — ¿Es divertido? (prototipo con 2 personajes)
+
+### Fase 12b — Lanzamonedas (GDD §10.1)
+
+- [ ] Salto de acero en su hotbar.
+- [ ] Empuje y Tirón (con Desarme) como habilidades con coste en metal.
+- [ ] Bala empujada: atraviesa a todos los de la línea y tiene +4 de penetración.
+- [ ] Marca del cazador → Marcado.
+- [ ] Burbuja de acero: Reacción; desvía los proyectiles contra él y contra aliados a 3 m hasta
+      su siguiente turno.
+- [ ] Mente de hierro innata: Ligero (saltos ×2) / Pesado (inmune a empuje, tirón y derribo).
+- [ ] Duraluminio: Meteoro, y empuje que arranca un prop Fijo.
+- [ ] Asistencia: Tiro al plato (Lanzado o Desequilibrado; +50 % contra Lanzado).
+
+### Fase 12c — Deslizador (GDD §10.2)
+
+- [ ] Recurso Ritmo (0–3, +15 % cada punto; se pierde al cambiar de objetivo, al recibir
+      Aturdido o tras un turno sin golpear) y su indicador en el HUD.
+- [ ] Proyección: lanza al enemigo en arco hasta 4 m → IMPACTO y Derribado.
+- [ ] Avivar peltre: 2 turnos de +2 m de movimiento, inmunidad a Derribado y Aturdido y +20 % de
+      daño; después, Arrastre (−50 % de movimiento y daño durante 1 turno).
+- [ ] Guardia: esquiva el primer melee y contraataca, gastando la Reacción; recuperación 2.
+- [ ] Deslizar: 4 m sin provocar reacciones; si acaba a la espalda, Desequilibrado.
+- [ ] Burbuja de duelo (zona 12.2): +1 Acción por turno dentro, borde que bloquea proyectiles,
+      se rompe si sale; tamaño y duración escalan con POT.
+- [ ] Mente de oro innata: almacenar (−20 % de vida → 1 carga, máximo 3), decantar
+      (`10 + 3·RES` por carga), decantar como Reacción por debajo del 25 %.
+- [ ] Duraluminio: Mil golpes (requiere estar en la burbuja).
+- [ ] Asistencia: Bateo (Derribado o llega empujado a su lado → golpe y redirección de 3 m).
+
+### Fase 12a — Party: base común
+
+- [ ] **12.1 Sustituir Hero1–4** por los 4 personajes: prefabs, nombres provisionales, reparto
+      inicial de atributos (GDD §3), autoataques (revólver, bastones, estoque o pistola ligera,
+      escopeta).
+- [ ] **12.2 Zonas genéricas** (requisito de las burbujas, la nube de cobre y las zonas
+      espirituales): círculo con duración y eventos al entrar, al salir, al empezar el turno dentro
+      y al cruzar el borde un proyectil. Ampliar `Surfaces` o crear `Zones` con código compartido.
+      _Hecho cuando:_ una zona de prueba aplica un estado al entrar y se deshace al caducar.
+- [ ] **12.3 Bloqueo de proyectiles en el borde** de una zona (ataques a distancia y
+      habilidades `unit` que cruzan el borde = desviados, sin daño). La vista previa lo enseña.
 
 ### Fase 10 — Empujes, props y metal (GDD §5)
 
@@ -110,47 +108,6 @@ genéricas, inventario/equipo, progresión, diálogos.
 - [ ] **11.9 IA**: los enemigos de élite pueden tener asistencias, y la IA intenta cortar las
       cadenas del jugador (Aplacar, matar al que remata).
 
-### Fase 12a — Party: base común
-
-- [ ] **12.1 Sustituir Hero1–4** por los 4 personajes: prefabs, nombres provisionales, reparto
-      inicial de atributos (GDD §3), autoataques (revólver, bastones, estoque o pistola ligera,
-      escopeta).
-- [ ] **12.2 Zonas genéricas** (requisito de las burbujas, la nube de cobre y las zonas
-      espirituales): círculo con duración y eventos al entrar, al salir, al empezar el turno dentro
-      y al cruzar el borde un proyectil. Ampliar `Surfaces` o crear `Zones` con código compartido.
-      _Hecho cuando:_ una zona de prueba aplica un estado al entrar y se deshace al caducar.
-- [ ] **12.3 Bloqueo de proyectiles en el borde** de una zona (ataques a distancia y
-      habilidades `unit` que cruzan el borde = desviados, sin daño). La vista previa lo enseña.
-
-### Fase 12b — Lanzamonedas (GDD §10.1)
-
-- [ ] Salto de acero (fase 10.7) en su hotbar, con +1 canica de crítico desde arriba.
-- [ ] Empuje y Tirón (con Desarme) como habilidades con coste en metal.
-- [ ] Bala empujada: atraviesa a todos los de la línea y tiene +4 de penetración.
-- [ ] Marca del cazador → Marcado.
-- [ ] Burbuja de acero: Reacción; desvía los proyectiles contra él y contra aliados a 3 m hasta
-      su siguiente turno.
-- [ ] Vista de estaño (pasiva): sin límite de apuntado en la bruma (depende de la fase 20.4).
-- [ ] Mente de hierro innata: Ligero (saltos ×2) / Pesado (inmune a empuje, tirón y derribo).
-- [ ] Duraluminio: Meteoro, y empuje que arranca un prop Fijo.
-- [ ] Asistencia: Tiro al plato (Lanzado o Desequilibrado; +50 % contra Lanzado).
-
-### Fase 12c — Deslizador (GDD §10.2)
-
-- [ ] Recurso Ritmo (0–3, +15 % cada punto; se pierde al cambiar de objetivo, al recibir
-      Aturdido o tras un turno sin golpear) y su indicador en el HUD.
-- [ ] Proyección: lanza al enemigo en arco hasta 4 m → IMPACTO y Derribado.
-- [ ] Avivar peltre: 2 turnos de +2 m de movimiento, inmunidad a Derribado y Aturdido y +20 % de
-      daño; después, Arrastre (−50 % de movimiento y daño durante 1 turno).
-- [ ] Guardia: esquiva el primer melee y contraataca, gastando la Reacción; recuperación 2.
-- [ ] Deslizar: 4 m sin provocar reacciones; si acaba a la espalda, Desequilibrado.
-- [ ] Burbuja de duelo (zona 12.2): +1 Acción por turno dentro, borde que bloquea proyectiles,
-      se rompe si sale; tamaño y duración escalan con POT.
-- [ ] Mente de oro innata: almacenar (−20 % de vida → 1 carga, máximo 3), decantar
-      (`10 + 3·RES` por carga), decantar como Reacción por debajo del 25 %.
-- [ ] Duraluminio: Mil golpes (requiere estar en la burbuja).
-- [ ] Asistencia: Bateo (Derribado o llega empujado a su lado → golpe y redirección de 3 m).
-
 ### 🎯 Escenario de validación del Hito 2
 
 - [ ] **`phase12_patio`**: Lanzamonedas + Deslizador contra 4 guardias (2 con placas, 1 con
@@ -158,6 +115,24 @@ genéricas, inventario/equipo, progresión, diálogos.
       _Hecho cuando:_ se juega entero sin errores. **Decisión de seguir o no:** si el combate no es
       divertido con dos personajes, se revisan el metal, los empujes y las asistencias antes de
       seguir.
+
+### Fase 9 — Estados (GDD §6)
+
+- [ ] **9.1 Ampliar `UnitStatusId`**: `stunned` (Aturdido), `prone` (Derribado), `airborne`
+      (Lanzado), `offbalance` (Desequilibrado), `marked` (Marcado), `enraged` (Enfurecido),
+      `soothed` (Aplacado), `drained` (Seco). Decidir si `fear` se queda o se sustituye por Calma.
+- [ ] **9.2 Reglas de cada estado:**
+  - [ ] Aturdido: pierde la próxima Acción.
+  - [ ] Derribado: levantarse cuesta la mitad del movimiento; los ataques melee contra él son crítico garantizado.
+  - [ ] Lanzado: en el aire hasta el final del turno; al caer, daño y Derribado.
+  - [ ] Desequilibrado: +25 % al siguiente golpe que reciba; se consume.
+  - [ ] Marcado: +50 % e ignora el rango de armadura; se consume; dura 2 turnos.
+  - [ ] Enfurecido: objetivo forzado (la IA tiene que respetarlo), +25 % de daño hecho, −3 de armadura.
+  - [ ] Aplacado: sin Reacción y −25 % de daño.
+        _Hecho cuando:_ `phase9_statuses` cubre cada estado con una aserción.
+- [ ] **9.3 Iconos de estado** sobre la unidad y en el retrato, con tooltip.
+- [ ] **9.4 IA**: evalúa los estados (no ataca a quien está protegido, aprovecha a los
+      Derribados, obedece al Enfurecido).
 
 ---
 

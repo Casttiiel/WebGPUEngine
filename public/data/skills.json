@@ -3,6 +3,8 @@
     "name": "Bola de fuego",
     "scale": "POT",
     "cost": "action",
+    "metal": 3,
+    "allomantic": true,
     "cooldown": 3,
     "target": "point",
     "range": 14,
@@ -26,6 +28,8 @@
     "name": "Onda atronadora",
     "scale": "POT",
     "cost": "action",
+    "metal": 2,
+    "allomantic": true,
     "cooldown": 2,
     "target": "cone",
     "length": 4.5,
@@ -47,6 +51,8 @@
   "heal": {
     "name": "Palabra curativa",
     "cost": "bonusAction",
+    "metal": 2,
+    "allomantic": true,
     "cooldown": 2,
     "target": "unit",
     "range": 12,
@@ -76,6 +82,8 @@
   "fear": {
     "name": "Miedo",
     "cost": "action",
+    "metal": 2,
+    "allomantic": true,
     "cooldown": 1,
     "target": "unit",
     "range": 9,
@@ -110,6 +118,8 @@
   "dash": {
     "name": "Embestida",
     "cost": "bonusAction",
+    "metal": 1,
+    "allomantic": true,
     "cooldown": 2,
     "target": "point",
     "range": 6,
@@ -119,5 +129,27 @@
       }
     ],
     "description": "Cargas en línea recta hasta el punto elegido sin gastar movimiento."
+  },
+  "duralumin": {
+    "name": "Duraluminio",
+    "cost": "bonusAction",
+    "target": "self",
+    "effects": [
+      {
+        "type": "duralumin"
+      }
+    ],
+    "description": "Quemas toda la Reserva de golpe: la siguiente habilidad alomántica de este turno no cuesta metal y se multiplica por 1 + lo quemado / el máximo (×2 con la Reserva llena). Después te quedas Seco."
+  },
+  "refill": {
+    "name": "Recargar",
+    "cost": "bonusAction",
+    "target": "self",
+    "effects": [
+      {
+        "type": "refill"
+      }
+    ],
+    "description": "Te bebes un vial: te declaras Seco. El turno que viene no puedes usar alomancia y, al acabarlo, la Reserva se llena."
   }
 }

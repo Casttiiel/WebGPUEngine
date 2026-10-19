@@ -86,6 +86,49 @@
           "size": [96, 10],
           "color": [0.5, 0.72, 0.38, 1]
         }
+      },
+      {
+        "name": "portrait_1_metal_bg",
+        "alias": "portrait_1_metal_bg",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        }
+      },
+      {
+        "name": "portrait_1_metal",
+        "alias": "portrait_1_metal",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.55, 0.62, 0.7, 1]
+        }
+      },
+      {
+        "name": "portrait_1_drained",
+        "alias": "portrait_1_drained",
+        "type": "text",
+        "x": 4,
+        "y": 24,
+        "width": 88,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 0.55, 0.35, 1],
+          "align": "center"
+        }
       }
     ]
   },
@@ -175,6 +218,49 @@
           "texture": "white.png",
           "size": [96, 10],
           "color": [0.5, 0.72, 0.38, 1]
+        }
+      },
+      {
+        "name": "portrait_2_metal_bg",
+        "alias": "portrait_2_metal_bg",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        }
+      },
+      {
+        "name": "portrait_2_metal",
+        "alias": "portrait_2_metal",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.55, 0.62, 0.7, 1]
+        }
+      },
+      {
+        "name": "portrait_2_drained",
+        "alias": "portrait_2_drained",
+        "type": "text",
+        "x": 4,
+        "y": 24,
+        "width": 88,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 0.55, 0.35, 1],
+          "align": "center"
         }
       }
     ]
@@ -266,6 +352,49 @@
           "size": [96, 10],
           "color": [0.5, 0.72, 0.38, 1]
         }
+      },
+      {
+        "name": "portrait_3_metal_bg",
+        "alias": "portrait_3_metal_bg",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        }
+      },
+      {
+        "name": "portrait_3_metal",
+        "alias": "portrait_3_metal",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.55, 0.62, 0.7, 1]
+        }
+      },
+      {
+        "name": "portrait_3_drained",
+        "alias": "portrait_3_drained",
+        "type": "text",
+        "x": 4,
+        "y": 24,
+        "width": 88,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 0.55, 0.35, 1],
+          "align": "center"
+        }
       }
     ]
   },
@@ -355,6 +484,49 @@
           "texture": "white.png",
           "size": [96, 10],
           "color": [0.5, 0.72, 0.38, 1]
+        }
+      },
+      {
+        "name": "portrait_4_metal_bg",
+        "alias": "portrait_4_metal_bg",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.03, 0.025, 0.02, 0.92]
+        }
+      },
+      {
+        "name": "portrait_4_metal",
+        "alias": "portrait_4_metal",
+        "type": "image",
+        "x": 0,
+        "y": 112,
+        "width": 96,
+        "height": 8,
+        "imageParams": {
+          "texture": "white.png",
+          "size": [96, 8],
+          "color": [0.55, 0.62, 0.7, 1]
+        }
+      },
+      {
+        "name": "portrait_4_drained",
+        "alias": "portrait_4_drained",
+        "type": "text",
+        "x": 4,
+        "y": 24,
+        "width": 88,
+        "height": 30,
+        "textParams": {
+          "text": "",
+          "size": [26, 26],
+          "color": [1, 0.55, 0.35, 1],
+          "align": "center"
         }
       }
     ]

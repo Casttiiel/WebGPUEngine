@@ -2,8 +2,8 @@
  * Ejecuta los escenarios de test (public/data/scenarios) y sale con código 1 si alguno falla.
  *
  *   npm run test:scenarios                         # todos
- *   npm run test:scenarios phase2_party            # uno
- *   npm run test:scenarios phase1_camera smoke     # varios
+ *   npm run test:scenarios phase8_metal            # uno
+ *   npm run test:scenarios phase8_metal phase8_ai # varios
  *
  * Usa el servidor MCP (Vite + navegador con WebGPU). Capturas en .mcp-out/scenarios/<nombre>/.
  */

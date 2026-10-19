@@ -47,6 +47,9 @@ export const movementFor = (a: Attributes): number => 6 + a.REF / 2;
 /** % de crítico = 5 % · (1 + ⌊AGU/2⌋): siempre múltiplo de 5 %. */
 export const critChanceFor = (a: Attributes): number => 5 * (1 + Math.floor(a.AGU / 2));
 
+/** Reserva de metal máxima = 6 + TEM (GDD §2). */
+export const maxMetalFor = (a: Attributes): number => 6 + a.TEM;
+
 /** Penetración de armadura = ⌊AGU/2⌋. */
 export const penetrationFor = (a: Attributes): number => Math.floor(a.AGU / 2);
 

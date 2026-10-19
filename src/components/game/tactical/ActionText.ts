@@ -13,7 +13,7 @@ export const COST_NAME: Record<string, string> = {
   bonusAction: 'Acción adicional',
   movement: 'Movimiento',
 };
-export const STATUS_NAME: Record<string, string> = { fear: 'Asustado' };
+export const STATUS_NAME: Record<string, string> = { fear: 'Asustado', drained: 'Seco' };
 
 /**
  * "Cuerpo a cuerpo · alcance 1.5 m · 10 de daño (6 + FUE 4) · Acción". Sin `unit`, la
@@ -67,6 +67,10 @@ export function skillMechanics(skill: SkillDef, caster?: UnitComponent): string 
         return e.surface === 'fire' ? 'deja fuego' : `deja ${e.surface}`;
       case 'status':
         return `${(STATUS_NAME[e.status] ?? e.status).toLowerCase()} ${turns(caster ? statusTurns(caster, e.turns) : e.turns)}`;
+      case 'duralumin':
+        return 'quema toda la Reserva: la siguiente, gratis y ×(1 + quemado / máximo)';
+      case 'refill':
+        return 'Seco el turno que viene; al acabarlo, la Reserva se llena';
     }
   });
   return `${target}: ${effects.filter((x) => x !== null).join(', ')}`;

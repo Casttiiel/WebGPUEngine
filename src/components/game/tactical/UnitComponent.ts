@@ -14,6 +14,7 @@ import {
   initiativeBaseFor,
   makeAttributes,
   maxHpFor,
+  maxMetalFor,
   movementFor,
   penetrationFor,
   statusBonusTurnsFor,
@@ -91,8 +92,24 @@ export type UnitComponentDataType = Readonly<{
   critChance?: number;
 }>;
 
-/** Estado alterado (miedo…). Dura `turns` turnos de la unidad afectada. */
-export type UnitStatusId = 'fear';
+/**
+ * Estado alterado. Dura `turns` turnos de la unidad afectada.
+ *   fear:    no ataca y huye de quien le asustó.
+ *   drained: Seco (GDD §2): sin alomancia; al expirar, la Reserva se llena.
+ */
+export type UnitStatusId = 'fear' | 'drained';
+
+/**
+ * Acciones de metal (data/skills.json): las tiene toda unidad con Reserva, además de sus
+ * habilidades. Duraluminio y recargar (te declaras Seco).
+ */
+export const METAL_ACTIONS: readonly string[] = ['duralumin', 'refill'];
+
+/** Duraluminio quemado: potencia la siguiente habilidad alomántica del turno. */
+export interface MetalBoost {
+  /** Multiplicador del efecto (daño, curación, distancia de empuje): 1 + quemado / máximo. */
+  power: number;
+}
 
 export interface UnitStatus {
   id: UnitStatusId;
@@ -154,6 +171,13 @@ export class UnitComponent extends Component {
   private attributes: Attributes | null = null;
   private armor = 0;
   private level = 1;
+  /** Reserva de metal (GDD §2): puntos que quedan y máximo (0 = sin Reserva: objetos). */
+  private metal = 0;
+  private maxMetal = 0;
+  /** Duraluminio preparado para la siguiente habilidad alomántica. */
+  private metalBoost: MetalBoost | null = null;
+  /** Se ha declarado Seco este turno (recargar): al acabarlo queda Seco. */
+  private drainPending = false;
   /** Derivados, para get_entity del MCP (los usa el código a través de los getters). */
   private stats: UnitStats | null = null;
   /** Vida máxima de los atributos aún por aplicar al HealthComponent (se hace en el 1er update). */
@@ -209,6 +233,8 @@ export class UnitComponent extends Component {
     this.movement = data.movement ?? (a ? movementFor(a) : this.movement);
     this.critChance = data.critChance ?? (a ? critChanceFor(a) : 0);
     this.pendingMaxHp = a ? maxHpFor(a, this.level) : null;
+    this.maxMetal = a ? maxMetalFor(a) : 0;
+    this.metal = this.maxMetal;
     this.silhouette = data.silhouette ?? true;
     this.stats = a ? this.computeStats() : null;
   }
@@ -284,12 +310,13 @@ export class UnitComponent extends Component {
     return this.abilities.includes(ability);
   }
 
+  /** Sus habilidades y, si tiene Reserva, las acciones de metal (en ese orden: la hotbar). */
   public getSkillIds(): readonly string[] {
-    return this.skills;
+    return this.hasReserve() ? [...this.skills, ...METAL_ACTIONS] : this.skills;
   }
 
   public hasSkill(id: string): boolean {
-    return this.skills.includes(id);
+    return this.skills.includes(id) || (this.hasReserve() && METAL_ACTIONS.includes(id));
   }
 
   /** Turnos que faltan para poder usar la habilidad (0 = disponible). */
@@ -309,6 +336,68 @@ export class UnitComponent extends Component {
 
   public clearCooldowns(): void {
     this.cooldowns.clear();
+  }
+
+  // ── Reserva de metal (GDD §2, §11) ───────────────────────────────────────
+  //
+  // Las habilidades alománticas gastan puntos de la Reserva (máximo 6 + TEM). Al llegar a 0
+  // (o al declararse Seco) la unidad queda Seca su turno siguiente: sin alomancia; al acabar
+  // ese turno, la Reserva se llena. Las reglas las aplica EncounterComponent.
+
+  public hasReserve(): boolean {
+    return this.maxMetal > 0;
+  }
+
+  public getMetal(): number {
+    return this.metal;
+  }
+
+  public getMaxMetal(): number {
+    return this.maxMetal;
+  }
+
+  /** Para pruebas (y la IA de los escenarios): fija los puntos de la Reserva. */
+  public setMetal(metal: number): void {
+    this.metal = Math.min(this.maxMetal, Math.max(0, Math.round(metal)));
+  }
+
+  public spendMetal(amount: number): void {
+    this.setMetal(this.metal - amount);
+  }
+
+  /** Quema toda la Reserva (duraluminio). Devuelve lo quemado. */
+  public burnAllMetal(): number {
+    const burnt = this.metal;
+    this.metal = 0;
+    return burnt;
+  }
+
+  /** Seco: sin alomancia hasta que acabe su turno siguiente. */
+  public isDrained(): boolean {
+    return this.hasStatus('drained');
+  }
+
+  /** Reserva llena, sin duraluminio preparado y sin declararse Seco. */
+  public refillMetal(): void {
+    this.metal = this.maxMetal;
+    this.metalBoost = null;
+    this.drainPending = false;
+  }
+
+  public getMetalBoost(): MetalBoost | null {
+    return this.metalBoost;
+  }
+
+  public setMetalBoost(boost: MetalBoost | null): void {
+    this.metalBoost = boost;
+  }
+
+  public isDrainPending(): boolean {
+    return this.drainPending;
+  }
+
+  public setDrainPending(pending: boolean): void {
+    this.drainPending = pending;
   }
 
   // ── Atributos ────────────────────────────────────────────────────────────
@@ -376,6 +465,7 @@ export class UnitComponent extends Component {
       initiative: initiativeBaseFor(a),
       statusBonusTurns: statusBonusTurnsFor(a),
       armor: this.armor,
+      maxMetal: this.maxMetal,
     };
   }
 
@@ -590,7 +680,11 @@ export class UnitComponent extends Component {
     if (down === this.down) return;
     this.down = down;
     this.stop();
-    if (down) this.clearStatuses();
+    if (down) {
+      this.clearStatuses();
+      this.metalBoost = null;
+      this.drainPending = false;
+    }
     this.actionTimer = 0;
     const capsule = this.getOwner().getComponent(
       'capsule_collider',
@@ -610,6 +704,7 @@ export class UnitComponent extends Component {
     this.stop();
     this.clearCooldowns();
     this.clearStatuses();
+    this.refillMetal();
     this.resetCritChance();
     this.setDown(false);
     this.getHealth()?.restore();
@@ -768,6 +863,8 @@ export interface UnitStats {
   /** Turnos extra de los estados que aplica. */
   statusBonusTurns: number;
   armor: number;
+  /** Reserva de metal máxima (6 + TEM). */
+  maxMetal: number;
 }
 
 const NO_ATTRIBUTES: Readonly<Attributes> = makeAttributes();

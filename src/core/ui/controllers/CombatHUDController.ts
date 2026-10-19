@@ -51,9 +51,11 @@ const FACE_DOWN: RGBA = [0.17, 0.16, 0.15, 1]; // ceniza
 const HP_PARTY: RGBA = [0.5, 0.72, 0.38, 1];
 const HP_ENEMY: RGBA = [0.78, 0.16, 0.12, 1];
 
-const HOTBAR_SLOTS = 7;
-const HOTBAR_WIDTH = 150;
-const HOTBAR_GAP = 10;
+const HOTBAR_SLOTS = 10;
+const HOTBAR_WIDTH = 146;
+const HOTBAR_GAP = 6;
+/** Borde derecho de la hotbar (desde el centro): no se mete bajo el botón de fin de turno. */
+const HOTBAR_RIGHT = 625;
 const ICON: Record<HotbarKind, RGBA> = {
   // Cada acción, un metal: hierro oxidado, estaño, peltre, acero (empujar), cobre y bronce.
   melee: [0.3, 0.12, 0.09, 1],
@@ -92,6 +94,11 @@ const ACTION_ON: RGBA = [0.55, 0.78, 0.4, 1];
 const BONUS_ON: RGBA = [0.88, 0.62, 0.25, 1];
 const PIP_OFF: RGBA = [0.2, 0.19, 0.18, 1];
 const MOVE_BAR_WIDTH = 220;
+const METAL_BAR_WIDTH = 140;
+/** Reserva de metal: estaño (normal), latón (duraluminio preparado) y ceniza (Seco). */
+export const METAL_ON: RGBA = [0.55, 0.62, 0.7, 1];
+export const METAL_BOOST: RGBA = [0.95, 0.75, 0.3, 1];
+export const METAL_DRAINED: RGBA = [0.3, 0.27, 0.25, 1];
 
 const FLOAT_TIME = 1.3;
 const FLOAT_RISE = 0.8; // m/s
@@ -104,6 +111,8 @@ const FLOAT_HEAL: RGBA = [0.4, 1, 0.45, 1];
 const FLOAT_DOWN: RGBA = [0.7, 0.7, 0.75, 1];
 const FLOAT_FIRE: RGBA = [1, 0.6, 0.15, 1];
 const FLOAT_FEAR: RGBA = [0.8, 0.6, 1, 1];
+const FLOAT_METAL: RGBA = [0.7, 0.8, 0.95, 1];
+const FLOAT_DRAINED: RGBA = [1, 0.55, 0.35, 1];
 
 /** Vista previa del daño: barra de vida sobre la cabeza de quien lo recibiría. */
 const DAMAGE_BARS = 6;
@@ -177,6 +186,9 @@ export class CombatHUDController extends WidgetController {
   private resBonusLabel: TextWidget | null = null;
   private resMoveFill: ImageWidget | null = null;
   private resMoveText: TextWidget | null = null;
+  private resMetalLabel: TextWidget | null = null;
+  private resMetalFill: ImageWidget | null = null;
+  private resMetalText: TextWidget | null = null;
   private tooltip: TextWidget | null = null;
   private tip: ImageWidget | null = null;
   private tipBg: ImageWidget | null = null;
@@ -277,6 +289,16 @@ export class CombatHUDController extends WidgetController {
       }
       case 'status':
         if (data.status === 'fear') this.spawnFloat(unit, '¡Miedo!', FLOAT_FEAR, 1.5);
+        if (data.status === 'drained') this.spawnFloat(unit, '¡Seco!', FLOAT_DRAINED, 1.5);
+        break;
+      case 'refill':
+        this.spawnFloat(unit, 'Reserva llena', FLOAT_METAL, 1.5);
+        break;
+      case 'duralumin':
+        this.spawnFloat(unit, `Duraluminio ×${multiplierText(data.amount ?? 1)}`, FLOAT_CRIT, 1.5);
+        break;
+      case 'declare-drained':
+        this.spawnFloat(unit, 'Bebe un vial', FLOAT_METAL, 1.5);
         break;
       case 'explosion':
         this.spawnFloat(unit, '¡BUM!', FLOAT_FIRE);
@@ -386,6 +408,26 @@ export class CombatHUDController extends WidgetController {
     const max = unit?.getMovement() ?? 9;
     this.resMoveFill?.setSize(MOVE_BAR_WIDTH * Math.min(1, r.movement / max), 16);
     this.resMoveText?.setText(`${r.movement.toFixed(1)} m`);
+
+    // Reserva de metal: los puntos, ×N si hay duraluminio preparado, o Seco.
+    const reserve = unit?.hasReserve() ? unit : null;
+    this.resMetalLabel?.setText(reserve ? 'Metal' : '');
+    this.resMetalFill?.setVisible(reserve !== null);
+    this.resMetalText?.setVisible(reserve !== null);
+    if (!reserve) return;
+    const boost = reserve.getMetalBoost();
+    const ratio = reserve.getMetal() / reserve.getMaxMetal();
+    this.resMetalFill?.setSize(METAL_BAR_WIDTH * ratio, 16);
+    this.resMetalFill?.setColor(
+      ...(reserve.isDrained() ? METAL_DRAINED : boost ? METAL_BOOST : METAL_ON),
+    );
+    this.resMetalText?.setText(
+      reserve.isDrained()
+        ? 'Seco'
+        : boost
+          ? `${reserve.getMetal()} ×${multiplierText(boost.power)}`
+          : `${reserve.getMetal()}/${reserve.getMaxMetal()}`,
+    );
   }
 
   /**
@@ -411,8 +453,13 @@ export class CombatHUDController extends WidgetController {
       : encounter.getResources();
     const total = entries.length * HOTBAR_WIDTH + Math.max(0, entries.length - 1) * HOTBAR_GAP;
     let tooltip: string | null = null;
-    let hovered: { entry: HotbarEntry; x: number; enabled: boolean; cooldown: number } | null =
-      null;
+    let hovered: {
+      entry: HotbarEntry;
+      x: number;
+      enabled: boolean;
+      cooldown: number;
+      blocker: string | null;
+    } | null = null;
 
     this.hotbar.forEach((slot, i) => {
       const entry = entries[i] ?? null;
@@ -422,18 +469,20 @@ export class CombatHUDController extends WidgetController {
         slot.hovered = false;
         return;
       }
-      const x = -total / 2 + i * (HOTBAR_WIDTH + HOTBAR_GAP);
+      const x = Math.min(-total / 2, HOTBAR_RIGHT - total) + i * (HOTBAR_WIDTH + HOTBAR_GAP);
       slot.frame.setPosition(x, slot.frame.getY());
       const cooldown = exploring || !unit ? 0 : unit.getCooldown(entry.id);
-      const enabled = resources[entry.cost] > 0.05 && cooldown === 0;
+      // Lo que no se puede pagar con la Reserva (o estando Seco), desactivado.
+      const blocker = entry.skill && unit ? encounter.metalBlocker(unit, entry.skill) : null;
+      const enabled = resources[entry.cost] > 0.05 && cooldown === 0 && blocker === null;
       const frame =
         entry.id === armed ? FRAME_ACTIVE : slot.hovered && enabled ? FRAME_HOVER : FRAME_NORMAL;
       slot.frame.setColor(...frame);
       slot.icon?.setColor(...(enabled ? ICON[entry.kind] : ICON_DISABLED));
-      slot.key?.setText(exploring ? '' : String(i + 1));
+      slot.key?.setText(exploring ? '' : String((i + 1) % 10));
       slot.name?.setText(cooldown > 0 ? `${cooldown} turno${cooldown > 1 ? 's' : ''}` : entry.name);
       slot.name?.setColor(1, 1, 1, enabled ? 1 : 0.45);
-      if (slot.hovered) hovered = { entry, x, enabled, cooldown };
+      if (slot.hovered) hovered = { entry, x, enabled, cooldown, blocker };
     });
     this.showTip(hovered, unit ?? undefined);
 
@@ -454,7 +503,13 @@ export class CombatHUDController extends WidgetController {
 
   /** Panel con el nombre, el coste, qué hace y la descripción, encima del hueco. */
   private showTip(
-    hovered: { entry: HotbarEntry; x: number; enabled: boolean; cooldown: number } | null,
+    hovered: {
+      entry: HotbarEntry;
+      x: number;
+      enabled: boolean;
+      cooldown: number;
+      blocker: string | null;
+    } | null,
     unit?: UnitComponent,
   ): void {
     if (!this.tip) return;
@@ -462,7 +517,13 @@ export class CombatHUDController extends WidgetController {
       this.tip.setVisible(false);
       return;
     }
-    const { title, lines } = hotbarTooltip(hovered.entry, hovered.enabled, hovered.cooldown, unit);
+    const { title, lines } = hotbarTooltip(
+      hovered.entry,
+      hovered.enabled,
+      hovered.cooldown,
+      unit,
+      hovered.blocker,
+    );
     this.tipTitle?.setText(title);
     let index = 0;
     for (const line of lines) {
@@ -666,6 +727,9 @@ export class CombatHUDController extends WidgetController {
     this.resBonusLabel = get<TextWidget>('res_bonus_label');
     this.resMoveFill = get<ImageWidget>('res_move_fill');
     this.resMoveText = get<TextWidget>('res_move_text');
+    this.resMetalLabel = get<TextWidget>('res_metal_label');
+    this.resMetalFill = get<ImageWidget>('res_metal_fill');
+    this.resMetalText = get<TextWidget>('res_metal_text');
     this.tooltip = get<TextWidget>('hotbar_tooltip');
     this.tip = get<ImageWidget>('hotbar_tip');
     this.tipBg = get<ImageWidget>('hotbar_tip_bg');
@@ -741,6 +805,12 @@ export class CombatHUDController extends WidgetController {
       if (w) this.statusIcons.push(w);
     }
   }
+}
+
+/** 2 → "2", 1.5 → "1,5", 1.333 → "1,3". */
+export function multiplierText(power: number): string {
+  const rounded = Math.round(power * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',');
 }
 
 function findCamera(): TacticalCameraControllerComponent | null {

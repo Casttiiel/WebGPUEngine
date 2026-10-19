@@ -20,7 +20,11 @@ import {
   turns,
 } from '../../../components/game/tactical/ActionText';
 import { ATTRIBUTES } from '../../../components/game/tactical/Stats';
-import { SkillCatalog, type SkillDef } from '../../../components/game/tactical/Skills';
+import {
+  SkillCatalog,
+  isMetalAction,
+  type SkillDef,
+} from '../../../components/game/tactical/Skills';
 import { MAX_JUMP, THROW_RANGE } from '../../../components/game/tactical/EnvironmentRules';
 import type { TacticalCameraControllerComponent } from '../../../components/game/tactical/TacticalCameraControllerComponent';
 import type { ActionCameraComponent } from '../../../components/game/tactical/ActionCameraComponent';
@@ -263,6 +267,7 @@ export class CharacterSheetController extends WidgetController {
         `Penetración ${unit.getPenetration()}`,
         `Estados aplicados ${bonus > 0 ? `+${turns(bonus)}` : '+0'}`,
         `Próximo crítico ${fmt(unit.getNextCritChance() * 100)} %`,
+        ...(unit.hasReserve() ? [`Reserva ${unit.getMetal()} / ${unit.getMaxMetal()}`] : []),
       ].join(' · '),
       'body',
     );
@@ -276,7 +281,8 @@ export class CharacterSheetController extends WidgetController {
     const skills = unit
       .getSkillIds()
       .map((id) => SkillCatalog.get(id))
-      .filter((s): s is SkillDef => s !== null);
+      // Duraluminio y recargar los tiene todo el mundo: solo en la hotbar.
+      .filter((s): s is SkillDef => s !== null && !isMetalAction(s));
     if (skills.length) {
       add('HABILIDADES', 'header');
       for (const skill of skills) {
@@ -284,7 +290,11 @@ export class CharacterSheetController extends WidgetController {
         add(skill.name, 'title');
         const recharge = skill.cooldown > 0 ? ` · recarga ${turns(skill.cooldown)}` : '';
         const ready = cooldown > 0 ? ` · disponible en ${turns(cooldown)}` : '';
-        add(`${COST_NAME[skill.cost]}${recharge}${ready} · ${skillMechanics(skill, unit)}`, 'body');
+        const metal = skill.metal > 0 ? ` · ${skill.metal} de metal` : '';
+        add(
+          `${COST_NAME[skill.cost]}${metal}${recharge}${ready} · ${skillMechanics(skill, unit)}`,
+          'body',
+        );
         if (skill.description) add(skill.description, 'body');
       }
     }

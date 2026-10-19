@@ -39,8 +39,8 @@ export type TacticalAIComponentDataType = Readonly<{
  * (src/ai) que se ejecuta a lo largo de varios frames:
  *
  *   pensar (pausa) → planificar (TacticalPlanner) → moverse → esperar a llegar → pausa
- *     → atacar o lanzar una habilidad → esperar al golpe → acción adicional (si una habilidad
- *     de acción adicional merece la pena) → pausa → fin de turno
+ *     → atacar o lanzar una habilidad (potenciada antes con duraluminio, si el plan lo pide) → esperar al golpe → acción adicional (si una habilidad de acción adicional
+ *     merece la pena, o recargar si no le llega el metal para nada) → pausa → fin de turno
  *
  * Actúa con las mismas reglas y la misma API que el jugador y el MCP (requestMove /
  * requestAttack / requestSkill de EncounterComponent). Las pausas son para que el jugador entienda qué
@@ -152,6 +152,8 @@ export class TacticalAIComponent extends Component {
                 const p = plan();
                 if (!p || !this.encounter) return Status.FAILURE;
                 if (p.skill) {
+                  // Duraluminio primero (acción adicional), si el plan lo pide.
+                  if (p.boost) this.encounter.requestSkill(this.getOwner(), 'duralumin');
                   const r = this.encounter.requestSkill(
                     this.getOwner(),
                     p.skill.id,

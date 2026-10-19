@@ -71,6 +71,17 @@ export function unitSkill(
   return SkillCatalog.get(id);
 }
 
+/** Por qué no se puede pagar una habilidad con la Reserva (EncounterComponent.metalBlocker). */
+export const METAL_BLOCKER_TEXT: Record<string, string> = {
+  drained: 'Seco: sin alomancia este turno',
+  'not enough metal': 'No llega el metal de la Reserva',
+  'no metal': 'La Reserva está vacía',
+  'reserve full': 'La Reserva está llena',
+  'already boosted': 'Ya hay una habilidad potenciada',
+  'already drained': 'Ya te has declarado Seco',
+  'only in combat': 'Solo en combate',
+};
+
 /** Una línea del tooltip: datos (gris), descripción (gris claro) o por qué no se puede (rojo). */
 export interface TooltipLine {
   text: string;
@@ -88,6 +99,7 @@ export function hotbarTooltip(
   enabled: boolean,
   cooldown = 0,
   unit?: UnitComponent,
+  blocker: string | null = null,
 ): { title: string; lines: TooltipLine[] } {
   const lines: TooltipLine[] = [];
   const info = (text: string) => lines.push({ text, style: 'info' });
@@ -97,7 +109,8 @@ export function hotbarTooltip(
   } else if (entry.skill) {
     const s = entry.skill;
     const recharge = s.cooldown > 0 ? ` · recarga ${turns(s.cooldown)}` : '';
-    info(`${COST_NAME[s.cost]}${recharge}`);
+    const metal = s.metal > 0 ? ` · ${s.metal} de metal` : '';
+    info(`${COST_NAME[s.cost]}${metal}${recharge}${s.allomantic ? ' · alomancia' : ''}`);
     info(skillMechanics(s, unit));
     if (s.description) lines.push({ text: s.description, style: 'description' });
   } else if (entry.kind === 'jump') {
@@ -114,6 +127,8 @@ export function hotbarTooltip(
   }
   if (cooldown > 0) {
     lines.push({ text: `Disponible en ${turns(cooldown)}`, style: 'warning' });
+  } else if (blocker) {
+    lines.push({ text: METAL_BLOCKER_TEXT[blocker] ?? blocker, style: 'warning' });
   } else if (!enabled) {
     lines.push({ text: `Sin ${COST_NAME[entry.cost]!.toLowerCase()}`, style: 'warning' });
   }

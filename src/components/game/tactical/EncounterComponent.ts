@@ -23,6 +23,7 @@ import {
 import {
   EYE_HEIGHT,
   hitRange,
+  metalCost,
   previewAttack,
   rollAttack,
   skillDamage,
@@ -49,6 +50,7 @@ import {
   coneDirection,
   hasEffect,
   isHostile,
+  isMetalAction,
   unitsInCircle,
   unitsInCone,
   type SkillDef,
@@ -109,6 +111,10 @@ export interface SkillPlan {
   direction: vec3 | null;
   /** Quién recibe los efectos (vista previa: se resaltan antes de confirmar). */
   affected: UnitComponent[];
+  /** Metal que gastaría de la Reserva (con duraluminio, nada). */
+  metalCost: number;
+  /** Multiplicador del efecto (duraluminio: ×(1 + quemado / máximo)). */
+  power: number;
   /** Fuera de alcance o sin visión: andar hasta aquí antes de lanzarla. */
   approach: MovePlan | null;
   canCast: boolean;
@@ -496,7 +502,11 @@ export class EncounterComponent extends Component {
     );
   }
 
-  /** Eventos: state:<estado>, turn, round, join, move, attack, damage, death, downed, revive, restart. */
+  /**
+   * Eventos: state:<estado>, turn, round, join, move, attack, damage, death, downed, revive,
+   * restart, skill, status, status-end; metal (amount = gastado), duralumin,
+   * declare-drained y refill (la Reserva se llena al acabar el turno Seco).
+   */
   public onEvent(listener: (event: string, data: EncounterEventData) => void): () => void {
     this.listeners.push(listener);
     return () => (this.listeners = this.listeners.filter((l) => l !== listener));
@@ -1141,12 +1151,17 @@ export class EncounterComponent extends Component {
       origin: null,
       direction: null,
       affected: [],
+      metalCost: 0,
+      power: 1,
       approach: null,
       canCast: false,
     };
     const fail = (reason: string): SkillPlan => ({ ...result, canCast: false, reason });
     if (!unit) return fail('not a unit');
     if (!skill || !unit.hasSkill(skillId)) return fail(`unknown skill '${skillId}'`);
+    const cost = metalCost(unit, skill);
+    result.metalCost = this.state === 'combat' ? cost.metal : 0;
+    result.power = cost.power;
 
     const feet = unit.getFeetPosition(vec3.create());
     const targetUnit = (target.unit?.getComponent('unit') as UnitComponent | null) ?? null;
@@ -1204,7 +1219,7 @@ export class EncounterComponent extends Component {
     }
 
     if (unit.hasStatus('fear') && isHostile(skill)) return fail('frightened');
-    const permission = this.canAct(unit, skill.cost);
+    const permission = this.canAct(unit, skill.cost, skill);
     result.allowed = permission === null;
     if (permission !== null) return fail(permission);
     if (this.state === 'combat' && unit.getCooldown(skill.id) > 0) return fail('on cooldown');
@@ -1289,10 +1304,21 @@ export class EncounterComponent extends Component {
     if (this.state === 'combat') {
       this.resources[skill.cost] = Math.max(0, this.resources[skill.cost] - 1);
       unit.setCooldown(skill.id, skill.cooldown);
+      if (plan.metalCost > 0) {
+        unit.spendMetal(plan.metalCost);
+        this.emit('metal', { unit: entity, amount: plan.metalCost });
+      }
+      // El duraluminio se gasta en esta (su multiplicador ya va en el plan).
+      if (skill.allomantic) unit.setMetalBoost(null);
     }
     this.pendingAction = null;
     unit.stop(); // exploración: puede venir andando
     this.emit('skill', { unit: entity });
+
+    if (isMetalAction(skill)) {
+      this.applyMetalAction(unit, skill);
+      return { ...plan, ok: true };
+    }
 
     if (hasEffect(skill, 'teleport')) {
       // Embestida: en línea recta, muy rápido; no gasta movimiento.
@@ -1338,6 +1364,46 @@ export class EncounterComponent extends Component {
     else this.windups.push({ timer: delay, unit, start });
   }
 
+  /**
+   * Duraluminio o recargar: al momento, sin animación ni cámara de acción.
+   * Eventos: duralumin (amount = ×; antes, metal con lo quemado) y declare-drained.
+   */
+  private applyMetalAction(unit: UnitComponent, skill: SkillDef): void {
+    const entity = unit.getOwner();
+    for (const effect of skill.effects) {
+      switch (effect.type) {
+        case 'duralumin': {
+          const burnt = unit.burnAllMetal();
+          const power = 1 + burnt / unit.getMaxMetal();
+          unit.setMetalBoost({ power });
+          this.emit('metal', { unit: entity, amount: burnt });
+          this.emit('duralumin', { unit: entity, amount: power });
+          break;
+        }
+        case 'refill':
+          unit.setDrainPending(true);
+          this.emit('declare-drained', { unit: entity });
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  /**
+   * Fin del turno de `unit` (después de descontar sus estados): el duraluminio sin usar se
+   * pierde y, si ha vaciado la Reserva o se ha declarado Seco, queda Seca su turno
+   * siguiente (al acabarlo expira el estado y la Reserva se llena: endTurn).
+   */
+  private settleMetal(unit: UnitComponent): void {
+    unit.setMetalBoost(null);
+    const empty = unit.getMetal() <= 0 || unit.isDrainPending();
+    unit.setDrainPending(false);
+    if (!unit.hasReserve() || !unit.isAlive() || unit.isDrained() || !empty) return;
+    unit.addStatus('drained', 1, unit.getOwner());
+    this.emit('status', { unit: unit.getOwner(), source: unit.getOwner(), status: 'drained' });
+  }
+
   /** Efectos de una habilidad al llegar el momento del impacto. */
   private applySkill(caster: UnitComponent, plan: SkillPlan): void {
     const skill = plan.skill!;
@@ -1345,7 +1411,7 @@ export class EncounterComponent extends Component {
     const affected = () => plan.affected.filter((u) => u.isAlive() || hasEffect(skill, 'heal'));
     // El daño (todos los efectos de daño + escala) se aplica una vez, con una sola tirada:
     // la misma fracción del rango para todos, cada uno con su armadura. No critica.
-    const damage = skillDamage(caster, skill);
+    const damage = skillDamage(caster, skill, plan.power);
     let damageDone = false;
     for (const effect of skill.effects) {
       switch (effect.type) {
@@ -1360,7 +1426,7 @@ export class EncounterComponent extends Component {
           break;
         }
         case 'heal':
-          for (const u of affected()) this.healUnit(u, effect.amount);
+          for (const u of affected()) this.healUnit(u, Math.round(effect.amount * plan.power));
           break;
         case 'push': {
           // Lejos del lanzador (cono, unidad) o del centro del área (punto).
@@ -1372,7 +1438,7 @@ export class EncounterComponent extends Component {
             if (Math.hypot(feet[0]! - from[0]!, feet[2]! - from[2]!) < 1e-3 && plan.direction) {
               vec3.copy(dir, plan.direction);
             }
-            const length = pushDistance(u, dir, effect.distance);
+            const length = pushDistance(u, dir, effect.distance * plan.power);
             if (length < 0.1) continue;
             u.stop();
             void u.moveAlong([feet, vec3.scaleAndAdd(vec3.create(), feet, dir, length)], {
@@ -1400,7 +1466,9 @@ export class EncounterComponent extends Component {
           }
           break;
         case 'teleport':
-          break; // se resuelve al lanzar
+        case 'duralumin':
+        case 'refill':
+          break; // se resuelven al lanzar
       }
     }
 
@@ -1458,8 +1526,11 @@ export class EncounterComponent extends Component {
       this.combatants.push(this.rollInitiative(m.getComponent('unit') as UnitComponent));
     for (const e of enemies) this.combatants.push(this.rollInitiative(e));
     this.combatants.sort(compareInitiative);
-    // La bolsa de crítico se rellena al empezar el combate.
-    for (const c of this.combatants) c.unit.resetCritChance();
+    // La bolsa de crítico y la Reserva de metal se llenan al empezar el combate.
+    for (const c of this.combatants) {
+      c.unit.resetCritChance();
+      c.unit.refillMetal();
+    }
 
     for (const c of this.combatants) c.unit.stop();
     this.pendingAction = null;
@@ -1481,8 +1552,17 @@ export class EncounterComponent extends Component {
       this.pendingHits.length
     )
       return false;
-    for (const status of active?.unit.tickStatuses() ?? []) {
-      this.emit('status-end', { unit: active!.unit.getOwner(), status });
+    if (active) {
+      const unit = active.unit;
+      for (const status of unit.tickStatuses()) {
+        this.emit('status-end', { unit: unit.getOwner(), status });
+        // Se acaba el turno Seco: se ha bebido el vial.
+        if (status === 'drained') {
+          unit.refillMetal();
+          this.emit('refill', { unit: unit.getOwner(), amount: unit.getMetal() });
+        }
+      }
+      this.settleMetal(unit);
     }
     this.nextIndex();
     this.beginTurn();
@@ -1506,6 +1586,7 @@ export class EncounterComponent extends Component {
     for (const u of UnitComponent.getAll()) {
       u.clearCooldowns();
       u.clearStatuses();
+      u.refillMetal();
       u.resetCritChance();
       this.getAI(u)?.clearPlan();
     }
@@ -1571,7 +1652,12 @@ export class EncounterComponent extends Component {
     return unit.isBusy();
   }
 
-  private canAct(unit: UnitComponent, cost: 'action' | 'bonusAction' | null): string | null {
+  /** `skill`: además, que pueda pagar su metal (metalBlocker). */
+  private canAct(
+    unit: UnitComponent,
+    cost: 'action' | 'bonusAction' | null,
+    skill: SkillDef | null = null,
+  ): string | null {
     if (!unit.isAlive()) return 'unit is down';
     if (this.isOccupied(unit) || (this.pendingAction && this.state === 'combat')) {
       return 'unit is busy';
@@ -1581,14 +1667,41 @@ export class EncounterComponent extends Component {
       if (entity !== this.getActiveUnit()) return 'not this unit’s turn';
       if (cost && this.resources[cost] <= 0)
         return cost === 'action' ? 'no action left' : 'no bonus action left';
-      return null;
+      return skill ? this.metalBlocker(unit, skill) : null;
     }
     if (this.state === 'exploration') {
-      return entity === PartyComponent.find()?.getSelected()
-        ? null
-        : 'only the selected party member acts in exploration';
+      if (entity !== PartyComponent.find()?.getSelected()) {
+        return 'only the selected party member acts in exploration';
+      }
+      return skill ? this.metalBlocker(unit, skill) : null;
     }
     return `cannot act during ${this.state}`;
+  }
+
+  /**
+   * ¿Qué impide pagar la habilidad con la Reserva? (null: nada). Seco, no llega el metal o,
+   * para las acciones de metal, que ahora no tengan sentido. Fuera de
+   * combate la alomancia no gasta metal y las acciones de metal no se usan. La hotbar lo usa
+   * para desactivar lo que no se puede pagar.
+   */
+  public metalBlocker(unit: UnitComponent, skill: SkillDef): string | null {
+    if (isMetalAction(skill)) {
+      if (this.state !== 'combat') return 'only in combat';
+      if (unit.isDrained()) return 'drained';
+      if (hasEffect(skill, 'refill')) {
+        if (unit.isDrainPending()) return 'already drained';
+        if (unit.getMetal() <= 0) return 'no metal';
+        return unit.getMetal() >= unit.getMaxMetal() ? 'reserve full' : null;
+      }
+      if (unit.getMetalBoost()) return 'already boosted';
+      return unit.getMetal() <= 0 ? 'no metal' : null;
+    }
+    if (!skill.allomantic) return null;
+    if (unit.isDrained()) return 'drained';
+    if (this.state === 'combat' && unit.getMetal() < metalCost(unit, skill).metal) {
+      return 'not enough metal';
+    }
+    return null;
   }
 
   /** Mejor punto (camino más corto, dentro del presupuesto) desde el que atacar cuerpo a cuerpo. */
@@ -1885,10 +1998,15 @@ export class EncounterComponent extends Component {
     if (this.resources.movement >= EPS) return true;
     if (unit.getAttacks().some((a) => this.resources[a.cost ?? 'action'] > 0)) return true;
     // Habilidades sobre uno mismo: siempre tienen objetivo.
+    // (Las acciones de metal no cuentan: sin nada más que hacer, no se espera por ellas.)
     const selfSkill = unit.getSkillIds().some((id) => {
       const skill = SkillCatalog.get(id);
       return (
-        skill?.target === 'self' && this.resources[skill.cost] > 0 && unit.getCooldown(id) === 0
+        skill?.target === 'self' &&
+        !isMetalAction(skill) &&
+        this.resources[skill.cost] > 0 &&
+        unit.getCooldown(id) === 0 &&
+        this.metalBlocker(unit, skill) === null
       );
     });
     if (selfSkill) return true;
@@ -1962,6 +2080,7 @@ export class EncounterComponent extends Component {
     let index = this.combatants.findIndex((c) => compareInitiative(combatant, c) < 0);
     if (index < 0) index = this.combatants.length;
     this.combatants.splice(index, 0, combatant);
+    unit.refillMetal();
     // Si entra antes (o en) la posición actual, la unidad activa no cambia: juega la ronda siguiente.
     if (index <= this.turnIndex) this.turnIndex++;
     this.emit('join', { unit: unit.getOwner() });
@@ -2062,6 +2181,10 @@ export class EncounterComponent extends Component {
           armor: u.getArmor(),
           critChance: u.getCritChance(),
           nextCritChance: u.getNextCritChance(),
+          metal: u.getMetal(),
+          maxMetal: u.getMaxMetal(),
+          metalBoost: u.getMetalBoost(),
+          drainPending: u.isDrainPending(),
           statuses: u.getStatuses().map((st) => ({
             id: st.id,
             turns: st.turns,
@@ -2280,6 +2403,8 @@ export class EncounterComponent extends Component {
               inRange: r.inRange,
               lineOfSight: r.lineOfSight,
               affected: r.affected.map((u) => u.getOwner().getName()),
+              metalCost: r.metalCost,
+              power: r.power,
               approach: r.approach ? r.approach.plan.length : null,
               reason: r.reason ?? null,
             };

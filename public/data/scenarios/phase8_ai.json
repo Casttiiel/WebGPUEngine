@@ -1,0 +1,123 @@
+{
+  "description": "Fase 8.8: la IA tiene en cuenta el metal. La Arquera (Bola de fuego: 4 + POT 2 = 6 de daño, 3 de metal; Reserva 6 + TEM 0 = 6) contra Kelsier solo, con el arco debilitado (2 de daño) para que la Bola de fuego compita. Con la Reserva llena la lanza; con 3 no, porque se quedaría Seca sin motivo; con 2 no le llega y se recarga (acción adicional); y si el duraluminio (×2) remata, lo usa.",
+  "scenes": ["tactical.json", "tactical_enemies.json"],
+  "seed": 8,
+  "steps": [
+    {
+      "wait_until": { "status": true, "path": "navMeshBuilt", "value": true },
+      "timeout_frames": 300
+    },
+    { "wait_frames": 5 },
+    {
+      "eval": "window.__unit = (n) => Engine.getEntities().getEntityByName(n).getComponent('unit'); window.__enc = Engine.getEntities().getObjectManagerByName('encounter').getList()[0]; window.__log = []; __enc.onEvent((e, d) => window.__log.push([e, d.unit ? d.unit.getName() : null, d.amount ?? null, d.status ?? null, d.cause ?? null])); window.__turns = () => __log.filter(l => l[0] === 'turn' && l[1] === 'Archer').length; window.__mark = () => { window.__m = __turns(); }; window.__archerStarts = () => { const s = __engine.getCombatState(); if (__turns() > __m && s.activeUnit === 'Archer') return true; if (s.playerTurn && !s.busy) __engine.gameCommand('end_turn', {}); return false; }; window.__archerDone = () => { const s = __engine.getCombatState(); return s.activeUnit !== 'Archer' && !s.busy; }; window.__plan = () => { const p = __engine.getCombatState().aiPlans.find(p => p.unit === 'Archer'); return [p.kind, p.reason, p.bonus]; }; window.__archer = (e) => __log.filter(l => l[1] === 'Archer' && l[0] === e).map(l => l[2])"
+    },
+    {
+      "eval": "__unit('Archer').getAttacks().forEach(a => a.damage = 0); Engine.getEntities().getObjectManagerByName('unit').getList().forEach(u => u.critChance = 0); __enc.joinRadius = 30"
+    },
+    { "command": "damage", "args": { "unit": "Brute", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Skirmisher", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Hero1", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Hero3", "amount": 1000 } },
+    { "command": "damage", "args": { "unit": "Hero4", "amount": 1000 } },
+    { "command": "start_combat" },
+    {
+      "assert": {
+        "expr": "__engine.getCombatState().turnOrder.filter(c => c.alive).map(c => c.name).sort()",
+        "value": ["Archer", "Hero2"]
+      }
+    },
+
+    { "log": "Reserva llena (6): Bola de fuego (3 de metal, 6 de daño) mejor que el arco" },
+    { "eval": "__mark()" },
+    {
+      "wait_until": { "expr": "__archerStarts()", "value": true },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    { "assert": { "expr": "__unit('Archer').getMetal()", "value": 6 } },
+    { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[__plan()[0], __plan()[1].startsWith('Bola de fuego →'), __archer('metal'), __unit('Archer').getMetal()]",
+        "value": ["skill", true, [3], 3]
+      }
+    },
+
+    { "log": "Con 3: la Bola de fuego la dejaría Seca por un golpe normal → el arco" },
+    { "eval": "__mark()" },
+    {
+      "wait_until": { "expr": "__archerStarts()", "value": true },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    { "eval": "__unit('Archer').setMetal(3); __unit('Hero2').getHealth().restore()" },
+    { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[['attack', 'reposition'].includes(__plan()[0]), __plan()[2], __unit('Archer').getMetal(), __unit('Archer').isDrained()]",
+        "value": [true, null, 3, false]
+      }
+    },
+
+    {
+      "log": "Con 2: no le llega para nada → arco y recarga con la acción adicional (Seca el turno siguiente)"
+    },
+    { "eval": "__mark()" },
+    {
+      "wait_until": { "expr": "__archerStarts()", "value": true },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    { "eval": "__unit('Archer').setMetal(2); __unit('Hero2').getHealth().restore()" },
+    { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[['attack', 'reposition'].includes(__plan()[0]), (__plan()[2] || '').startsWith('recargar'), __archer('declare-drained').length, __unit('Archer').isDrained()]",
+        "value": [true, true, 1, true]
+      }
+    },
+
+    { "log": "Seca: sin alomancia; al acabar el turno, la Reserva se llena" },
+    { "eval": "__mark()" },
+    {
+      "wait_until": { "expr": "__archerStarts()", "value": true },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    { "eval": "__unit('Hero2').getHealth().restore()" },
+    { "wait_until": { "expr": "__archerDone()", "value": true }, "timeout_frames": 3000 },
+    {
+      "assert": {
+        "expr": "[__plan()[0] !== 'skill', __archer('refill'), __unit('Archer').getMetal()]",
+        "value": [true, [6], 6]
+      }
+    },
+
+    { "log": "Llena y Kelsier a 12: el duraluminio (×2 → 12) remata; la normal (6) no" },
+    { "eval": "__mark()" },
+    {
+      "wait_until": { "expr": "__archerStarts()", "value": true },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    { "eval": "__unit('Hero2').getHealth().restore(12); window.__from = __log.length" },
+    {
+      "wait_until": {
+        "expr": "(() => { const p = __engine.getCombatState().aiPlans.find(p => p.unit === 'Archer'); if (p) window.__lp = [p.kind, p.reason]; return __log.slice(__from).some(l => l[0] === 'damage' && l[1] === 'Hero2' && l[4] === 'skill'); })()",
+        "value": true
+      },
+      "timeout_frames": 3000,
+      "check_every": 1
+    },
+    {
+      "assert": {
+        "expr": "[__lp[0], __lp[1].startsWith('Bola de fuego (duraluminio)'), __archer('duralumin'), __log.slice(__from).filter(l => l[0] === 'damage' && l[1] === 'Hero2' && l[4] === 'skill').map(l => l[2])]",
+        "value": ["skill", true, [2], [12]]
+      }
+    },
+    { "assert": { "expr": "__engine.getCombatState().aiTimeouts", "value": 0 } },
+    { "wait_frames": 60 },
+    { "assert": { "combat": true, "path": "state", "value": "defeat" } },
+    { "assert": { "no_errors": true } }
+  ]
+}

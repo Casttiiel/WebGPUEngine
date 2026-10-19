@@ -9,7 +9,7 @@ import {
   unitDistanceFrom,
   unitLineOfSightFrom,
 } from './CombatRules';
-import { SkillCatalog, hasEffect, type SkillDef } from './Skills';
+import { SkillCatalog, hasEffect, isMetalAction, type SkillDef } from './Skills';
 import { averageOf } from './Stats';
 
 export type AIRole = 'melee' | 'ranged';
@@ -34,6 +34,8 @@ export interface TurnPlan {
   attack: { target: Entity; attackId: string } | null;
   /** O lanzar una habilidad (requestSkill: también se acerca sola si hace falta). */
   skill?: { id: string; target: SkillTarget } | null;
+  /** Antes de la habilidad, quemar duraluminio con la acción adicional. */
+  boost?: boolean;
   score: number;
   /** Explicación legible (debug / MCP). */
   reason: string;
@@ -64,6 +66,12 @@ const STATUS_VALUE = 9; // por enemigo asustado (pierde su turno de ataque)
 const SURFACE_VALUE = 2; // deja fuego donde hay enemigos
 /** La acción adicional solo se usa si la habilidad vale al menos esto (no gastarla por gastar). */
 const BONUS_MIN_VALUE = SKILL_BASE + 3;
+// Reserva de metal (GDD §2): gastar cuesta un poco y quedarse Seco (un turno sin alomancia),
+// bastante: solo compensa por un golpe que lo merezca (rematar, pillar a varios).
+const METAL_WEIGHT = 0.5; // por punto de metal gastado
+const DRAINED_PENALTY = 8; // dejar la Reserva a 0
+/** Recargar (declararse Seco) cuando no le llega para ninguna habilidad alomántica. */
+const REFILL_VALUE = BONUS_MIN_VALUE + 1;
 
 const RING_STEP = 1.5;
 const RING_ANGLES = 12;
@@ -173,13 +181,15 @@ export function planTurn(
     // Con poca vida, como con los ataques: mejor ponerse a salvo (salvo para curarse).
     const value =
       low && !hasEffect(option.skill, 'heal') ? option.value * LOW_HP_ATTACK_FACTOR : option.value;
+    const boost = option.boost ? ' (duraluminio)' : '';
     candidates.push({
       kind: 'skill',
       move: null,
       attack: null,
       skill: { id: option.skill.id, target: option.target },
+      boost: option.boost,
       score: value - (walk?.length ?? 0) * MOVE_COST + positionValue(end),
-      reason: `${option.skill.name} → ${option.label}${approach}`,
+      reason: `${option.skill.name}${boost} → ${option.label}${approach}`,
     });
   }
 
@@ -346,7 +356,7 @@ export function planBonusSkill(encounter: EncounterComponent, me: UnitComponent)
     );
   let best: TurnPlan | null = null;
   for (const option of skillOptions(encounter, me, foes)) {
-    if (option.skill.cost !== 'bonusAction') continue;
+    if (option.skill.cost !== 'bonusAction' || option.boost) continue;
     const walk = option.plan.approach?.walk;
     const score = option.value - (walk?.length ?? 0) * MOVE_COST;
     if (score < BONUS_MIN_VALUE || (best && score <= best.score)) continue;
@@ -360,7 +370,31 @@ export function planBonusSkill(encounter: EncounterComponent, me: UnitComponent)
       reason: `${option.skill.name} → ${option.label}${approach} (acción adicional)`,
     };
   }
-  return best;
+  return best ?? planRefill(encounter, me);
+}
+
+/**
+ * Recargar (te declaras Seco) si no le llega el metal para ninguna de sus habilidades
+ * alománticas: el turno que viene es físico de todos modos, y así acaba con la Reserva llena.
+ * Si aún puede lanzar alguna, no (no se queda Seco sin motivo).
+ */
+function planRefill(encounter: EncounterComponent, me: UnitComponent): TurnPlan | null {
+  const self = me.getOwner();
+  if (!encounter.planSkill(self, 'refill').canCast) return null;
+  const costs = me
+    .getSkillIds()
+    .map((id) => SkillCatalog.get(id))
+    .filter((s): s is SkillDef => s !== null && s.allomantic && !isMetalAction(s))
+    .map((s) => s.metal);
+  if (costs.length === 0 || Math.min(...costs) <= me.getMetal()) return null;
+  return {
+    kind: 'skill',
+    move: null,
+    attack: null,
+    skill: { id: 'refill', target: {} },
+    score: REFILL_VALUE,
+    reason: `recargar: ${me.getMetal()} de metal no llega para nada (acción adicional)`,
+  };
 }
 
 interface SkillOption {
@@ -369,6 +403,8 @@ interface SkillOption {
   plan: SkillPlan;
   value: number;
   label: string;
+  /** Con duraluminio antes (acción adicional). */
+  boost: boolean;
 }
 
 /** Cada habilidad de la unidad sobre cada objetivo razonable, con su valor (las inútiles no). */
@@ -382,8 +418,9 @@ function skillOptions(
   const out: SkillOption[] = [];
   for (const id of me.getSkillIds()) {
     const skill = SkillCatalog.get(id);
-    // La embestida es movimiento, no un efecto: la IA no la usa (todavía).
-    if (!skill || hasEffect(skill, 'teleport')) continue;
+    // La embestida es movimiento, no un efecto: la IA no la usa (todavía). El duraluminio y
+    // recargar no valen por sí solos: van con otra habilidad (duraluminBoost, planRefill).
+    if (!skill || hasEffect(skill, 'teleport') || isMetalAction(skill)) continue;
     const targets: { target: SkillTarget; label: string }[] = [];
     if (skill.target === 'self') {
       targets.push({ target: {}, label: 'sí mismo' });
@@ -405,20 +442,62 @@ function skillOptions(
       const plan = encounter.planSkill(self, id, target);
       if (!plan.canCast) continue;
       const value = skillValue(me, skill, plan);
-      if (value !== null) out.push({ skill, target, plan, value, label });
+      if (value === null) continue;
+      const cost = metalPenalty(me, plan.metalCost, me.getMetal() - plan.metalCost);
+      out.push({ skill, target, plan, value: value - cost, label, boost: false });
+      const boost = duraluminBoost(encounter, me, skill);
+      const boosted = boost && skillValue(me, skill, plan, boost.power);
+      if (boost && boosted !== null) {
+        const penalty = metalPenalty(me, boost.metal, 0);
+        out.push({ skill, target, plan, value: boosted - penalty, label, boost: true });
+      }
     }
   }
   return out;
 }
 
-/** Lo que vale lanzar la habilidad con ese plan (quién queda afectado). null = inútil. */
-function skillValue(me: UnitComponent, skill: SkillDef, plan: SkillPlan): number | null {
+/**
+ * Gastar `metal` y quedarse con `left`: un poco por punto y, si deja la Reserva a 0, lo que
+ * cuesta un turno Seco. Sin Reserva (o si no gasta), nada.
+ */
+function metalPenalty(me: UnitComponent, metal: number, left: number): number {
+  if (!me.hasReserve() || metal <= 0) return 0;
+  return metal * METAL_WEIGHT + (left <= 0 ? DRAINED_PENALTY : 0);
+}
+
+/**
+ * Potenciar una habilidad alomántica de acción con duraluminio (acción adicional): quema toda
+ * la Reserva → ×(1 + quemado / máximo), y se queda Seca. null si no puede.
+ * `metal`: lo que quemaría.
+ */
+function duraluminBoost(
+  encounter: EncounterComponent,
+  me: UnitComponent,
+  skill: SkillDef,
+): { power: number; metal: number } | null {
+  if (!skill.allomantic || skill.cost !== 'action' || me.getMetalBoost()) return null;
+  if (encounter.getResources().bonusAction <= 0) return null;
+  if (!encounter.planSkill(me.getOwner(), 'duralumin').canCast) return null;
+  const metal = me.getMetal();
+  return { power: 1 + metal / me.getMaxMetal(), metal };
+}
+
+/**
+ * Lo que vale lanzar la habilidad con ese plan (quién queda afectado), con su efecto por
+ * `power` (duraluminio). null = inútil.
+ */
+function skillValue(
+  me: UnitComponent,
+  skill: SkillDef,
+  plan: SkillPlan,
+  power = plan.power,
+): number | null {
   const isFoe = (u: UnitComponent) =>
     u.getFaction() !== me.getFaction() && u.getFaction() !== 'neutral';
   const isAlly = (u: UnitComponent) => u.getFaction() === me.getFaction();
   let value = 0;
   let useful = false;
-  const damage = skillDamage(me, skill);
+  const damage = skillDamage(me, skill, power);
   let damageCounted = false;
   for (const effect of skill.effects) {
     switch (effect.type) {
@@ -441,7 +520,8 @@ function skillValue(me: UnitComponent, skill: SkillDef, plan: SkillPlan): number
       case 'heal':
         for (const u of plan.affected) {
           if (!isAlly(u)) continue;
-          const healed = Math.min(effect.amount, u.getMaxHp() - Math.max(0, u.getHp()));
+          const amount = Math.round(effect.amount * power);
+          const healed = Math.min(amount, u.getMaxHp() - Math.max(0, u.getHp()));
           if (healed < 1) continue;
           value += healed * HEAL_WEIGHT + (u.isAlive() ? 0 : REVIVE_BONUS);
           useful = true;
@@ -461,6 +541,8 @@ function skillValue(me: UnitComponent, skill: SkillDef, plan: SkillPlan): number
         if (plan.affected.some(isFoe)) value += SURFACE_VALUE;
         break;
       case 'teleport':
+      case 'duralumin':
+      case 'refill':
         return null;
     }
   }

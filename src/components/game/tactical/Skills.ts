@@ -33,7 +33,14 @@ export type SkillEffect =
   /** Deja una superficie en el punto (fuego…). */
   | { type: 'surface'; surface: SurfaceType; radius: number }
   /** Aplica un estado alterado durante `turns` turnos suyos (+1 con POT 4 y otro con POT 8). */
-  | { type: 'status'; status: UnitStatusId; turns: number };
+  | { type: 'status'; status: UnitStatusId; turns: number }
+  /**
+   * Acciones de metal (GDD §2, §11), sobre uno mismo y al momento:
+   *   duralumin: quema toda la Reserva; la siguiente, ×(1 + quemado / máximo) y sin coste.
+   *   refill:    se declara Seco: el turno siguiente sin alomancia y, al acabarlo, Reserva llena.
+   */
+  | { type: 'duralumin' }
+  | { type: 'refill' };
 
 export interface SkillDef {
   id: string;
@@ -56,6 +63,13 @@ export interface SkillDef {
   /** Requiere línea de visión al objetivo. Default true salvo self y cone. */
   lineOfSight: boolean;
   effects: SkillEffect[];
+  /** Coste en metal (puntos de la Reserva). Default 0. */
+  metal: number;
+  /**
+   * Alomancia: estando Seco no se puede usar, y el duraluminio la potencia.
+   * Default: true si cuesta metal.
+   */
+  allomantic: boolean;
   /** Atributo del lanzador que se suma al daño (Escala: POT, FUE…). Sin él, daño fijo. */
   scale?: AttributeId;
   /** Animación del lanzador. */
@@ -107,6 +121,8 @@ function normalize(id: string, s: SkillJson): SkillDef {
     affects: s.affects ?? 'all',
     lineOfSight: s.lineOfSight ?? !area,
     effects: s.effects,
+    metal: s.metal ?? 0,
+    allomantic: s.allomantic ?? (s.metal ?? 0) > 0,
     ...(s.scale !== undefined && { scale: s.scale }),
     ...(s.clip !== undefined && { clip: s.clip }),
     ...(s.description !== undefined && { description: s.description }),
@@ -115,6 +131,10 @@ function normalize(id: string, s: SkillJson): SkillDef {
 
 export const hasEffect = (skill: SkillDef, type: SkillEffect['type']): boolean =>
   skill.effects.some((e) => e.type === type);
+
+/** ¿Es una acción de metal (duraluminio, recargar)? */
+export const isMetalAction = (skill: SkillDef): boolean =>
+  skill.effects.some((e) => e.type === 'duralumin' || e.type === 'refill');
 
 /** ¿Es hostil? (daña o empuja: el cursor es de ataque y empieza combates). */
 export const isHostile = (skill: SkillDef): boolean =>

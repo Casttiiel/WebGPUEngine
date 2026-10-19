@@ -4,6 +4,7 @@ import { ImageWidget } from '../../../components/ui/widgets/ImageWidget';
 import { TextWidget } from '../../../components/ui/widgets/TextWidget';
 import { PartyComponent } from '../../../components/game/tactical/PartyComponent';
 import type { UnitComponent } from '../../../components/game/tactical/UnitComponent';
+import { METAL_BOOST, METAL_DRAINED, METAL_ON } from './CombatHUDController';
 
 const SLOTS = 4;
 const FRAME_NORMAL = [0.07, 0.065, 0.06, 0.9] as const;
@@ -13,18 +14,22 @@ const FACE_NORMAL = [0.2, 0.27, 0.34, 1] as const;
 const FACE_DOWN = [0.17, 0.16, 0.15, 1] as const;
 const HP_WIDTH = 96;
 const HP_HEIGHT = 10;
+const METAL_HEIGHT = 8;
 
 interface PortraitSlot {
   frame: ImageWidget;
   face: ImageWidget | null;
   name: TextWidget | null;
   hp: ImageWidget | null;
+  metal: ImageWidget | null;
+  drained: TextWidget | null;
   hovered: boolean;
 }
 
 /**
  * PartyHUDController — retratos de la party (assets/ui/party_hud.json).
- * Muestra nombre, tecla y vida de cada miembro (gris si está caído), resalta el
+ * Muestra nombre, tecla, vida y Reserva de metal de cada miembro (gris si está caído;
+ * "Seco" mientras no puede usar alomancia), resalta el
  * seleccionado y el retrato bajo el cursor, y al hacer click selecciona a ese miembro (la
  * cámara lo centra y lo sigue).
  */
@@ -57,6 +62,16 @@ export class PartyHUDController extends WidgetController {
       const max = unit?.getMaxHp() ?? 0;
       const ratio = max > 0 ? Math.max(0, unit!.getHp() / max) : 0;
       slot.hp?.setSize(HP_WIDTH * ratio, HP_HEIGHT);
+      const maxMetal = unit?.getMaxMetal() ?? 0;
+      const drained = unit?.isDrained() === true;
+      slot.metal?.setSize(
+        maxMetal > 0 ? (HP_WIDTH * unit!.getMetal()) / maxMetal : 0,
+        METAL_HEIGHT,
+      );
+      slot.metal?.setColor(
+        ...(drained ? METAL_DRAINED : unit?.getMetalBoost() ? METAL_BOOST : METAL_ON),
+      );
+      slot.drained?.setText(drained ? 'Seco' : '');
     });
   }
 
@@ -76,6 +91,8 @@ export class PartyHUDController extends WidgetController {
         face: get<ImageWidget>(`portrait_${i + 1}_face`),
         name: get<TextWidget>(`portrait_${i + 1}_name`),
         hp: get<ImageWidget>(`portrait_${i + 1}_hp`),
+        metal: get<ImageWidget>(`portrait_${i + 1}_metal`),
+        drained: get<TextWidget>(`portrait_${i + 1}_drained`),
         hovered: false,
       };
       frame.setOnMouseEnter(() => (slot.hovered = true));

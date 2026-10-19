@@ -118,6 +118,9 @@ const REASON_TEXT: Record<string, string> = {
   'path blocked': 'camino bloqueado',
   'no target': 'elige un objetivo',
   frightened: 'asustado',
+  drained: 'Seco',
+  'not enough metal': 'sin metal suficiente',
+  'no metal': 'Reserva vacía',
 };
 
 const reasonText = (reason: string | undefined): string =>
@@ -132,6 +135,8 @@ const HOTBAR_KEYS = [
   KeyCode.NUM_6,
   KeyCode.NUM_7,
   KeyCode.NUM_8,
+  KeyCode.NUM_9,
+  KeyCode.NUM_0,
 ];
 
 /**
@@ -232,7 +237,7 @@ export class TacticalPointerComponent extends Component {
         | null
         | undefined;
       if (!skill.canCast || !caster) return [];
-      const damage = skillDamage(caster, skill.skill);
+      const damage = skillDamage(caster, skill.skill, skill.power);
       if (damage <= 0) return [];
       return skill.affected
         .filter((u) => u.isAlive())

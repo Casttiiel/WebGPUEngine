@@ -125,8 +125,11 @@ export function rollAttack(
   return { hit, crit, damage };
 }
 
-/** D de una habilidad: la suma de sus efectos de daño + el atributo de escala (una vez). */
-export function skillDamage(caster: UnitComponent, skill: SkillDef): number {
+/**
+ * D de una habilidad: la suma de sus efectos de daño + el atributo de escala (una vez), por
+ * `power` (duraluminio: ×(1 + quemado / máximo)), redondeado.
+ */
+export function skillDamage(caster: UnitComponent, skill: SkillDef, power = 1): number {
   let base = 0;
   let any = false;
   for (const effect of skill.effects) {
@@ -135,7 +138,22 @@ export function skillDamage(caster: UnitComponent, skill: SkillDef): number {
     any = true;
   }
   if (!any) return 0;
-  return base + (skill.scale ? caster.getAttribute(skill.scale) : 0);
+  return Math.round((base + (skill.scale ? caster.getAttribute(skill.scale) : 0)) * power);
+}
+
+/**
+ * Lo que costaría ahora la habilidad de la Reserva de `caster` y cuánto la potencia: con
+ * duraluminio, gratis (ya está quemado) y ×(1 + quemado / máximo). Lo que no es alomántico ni
+ * cuesta ni se potencia.
+ */
+export function metalCost(
+  caster: UnitComponent,
+  skill: SkillDef,
+): { metal: number; power: number } {
+  if (!skill.allomantic) return { metal: 0, power: 1 };
+  const boost = caster.getMetalBoost();
+  if (boost) return { metal: 0, power: boost.power };
+  return { metal: skill.metal, power: 1 };
 }
 
 /** Turnos de un estado que aplica `caster`: los del efecto + los de su POT. */
