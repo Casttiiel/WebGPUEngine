@@ -4,7 +4,7 @@
 #include "common/octahedral"
 #include "gbuffer/pom_common"
 
-// ─── Parallax Occlusion Mapping (G-buffer) ───────────────────────────────────
+// ─── Parallax Occlusion Mapping (G-buffer) — the solid "master" surface ──────
 //
 // Permutations (material "features"):
 //   (none)      Mesh UVs + mesh TBN. pomScale = relief depth in UV units.
@@ -18,9 +18,19 @@
 //               without the discard would leave holes).
 //   POM_SHADOW  Soft self-shadow toward the sun, marched in the height field. Deferred
 //               lighting can't take it, so it darkens the albedo (pomShadow = strength).
+//   LAYER       Height blending: a second material (tx*2 slots) laid over the base where
+//               a world-space noise mask says so. The two heights are compared, so the
+//               base's high parts break through first (bricks through plaster) and the
+//               layer stays in the low ones (dirt between cobbles). The relief follows
+//               the blended height.
+//   ANTI_TILE   Breaks the repetition of the base textures: two copies with random
+//               offsets, switched by a low-frequency noise (Quílez, "texture repetition"),
+//               the transition following the height so it reads as part of the surface.
+//   DIRT        Grime: cavityDirt in the low parts of the relief, and (BOX) a noisy band
+//               baseDirtHeight metres high at the bottom of the box's sides.
 //
-// Height map: R, 1 = surface (the mesh), 0 = deepest. The relief is carved INTO the mesh,
-// so the geometric depth written below is the top of the relief and nothing pokes out.
+// Height maps: R, 1 = surface (the mesh), 0 = deepest. The relief is carved INTO the
+// mesh, so the geometric depth written below is the top of the relief.
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
@@ -32,12 +42,26 @@
 @group(1) @binding(5) var txHeight:    texture_2d<f32>;
 @group(1) @binding(6) var samplerState: sampler;
 @group(1) @binding(7) var<uniform> factors: PomFactors;
+#ifdef LAYER
+@group(1) @binding(8)  var txAlbedo2:    texture_2d<f32>;
+@group(1) @binding(9)  var txNormal2:    texture_2d<f32>;
+@group(1) @binding(10) var txRoughness2: texture_2d<f32>;
+@group(1) @binding(11) var txHeight2:    texture_2d<f32>;
+#endif
 
 const MIN_STEPS    = 6.0;
 const MAX_STEPS    = 48.0;
 const SHADOW_STEPS = 12;
 // Steepest view the march extrapolates (cos ≈ 0.1 → 84°): beyond it the ray length explodes.
 const MIN_VIEW_COS = 0.1;
+
+// Per-pixel state shared by the height lookups of the march (set once in fs()).
+var<private> gTileOffA:   vec2<f32>; // ANTI_TILE: offsets of the two copies…
+var<private> gTileOffB:   vec2<f32>;
+var<private> gTileBlend:  f32;       // …and how much of B
+var<private> gLayerRatio: f32;       // LAYER: layer uv = base uv × ratio
+var<private> gLayerLod:   f32;       // layer mip − base mip
+var<private> gLayerBias:  f32;       // mask: added to the layer's height
 
 // Texture-space frame of the shaded point.
 struct Surface {
@@ -90,8 +114,79 @@ fn boxSurface(input: POMVertexOutput) -> Surface {
     return s;
 }
 
-fn heightAt(uv: vec2<f32>, lod: f32) -> f32 {
+// ── Noise ────────────────────────────────────────────────────────────────────
+fn hash21(p: vec2<f32>) -> f32 {
+    return fract(sin(dot(p, vec2<f32>(127.1, 311.7))) * 43758.5453);
+}
+
+fn hash22(p: vec2<f32>) -> vec2<f32> {
+    return fract(sin(vec2<f32>(dot(p, vec2<f32>(127.1, 311.7)), dot(p, vec2<f32>(269.5, 183.3)))) * 43758.5453);
+}
+
+fn noise2(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2<f32>(1.0, 0.0)), u.x),
+               mix(hash21(i + vec2<f32>(0.0, 1.0)), hash21(i + vec2<f32>(1.0, 1.0)), u.x), u.y);
+}
+
+fn hash31(p: vec3<f32>) -> f32 {
+    return fract(sin(dot(p, vec3<f32>(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
+fn noise3(p: vec3<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(mix(hash31(i), hash31(i + vec3<f32>(1.0, 0.0, 0.0)), u.x),
+                mix(hash31(i + vec3<f32>(0.0, 1.0, 0.0)), hash31(i + vec3<f32>(1.0, 1.0, 0.0)), u.x), u.y);
+    let b = mix(mix(hash31(i + vec3<f32>(0.0, 0.0, 1.0)), hash31(i + vec3<f32>(1.0, 0.0, 1.0)), u.x),
+                mix(hash31(i + vec3<f32>(0.0, 1.0, 1.0)), hash31(i + vec3<f32>(1.0, 1.0, 1.0)), u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+fn fbm3(p: vec3<f32>) -> f32 {
+    return noise3(p) * 0.55 + noise3(p * 2.03 + 13.1) * 0.3 + noise3(p * 4.11 + 41.7) * 0.15;
+}
+
+// ── Height field (base, anti-tiling, layer) ──────────────────────────────────
+fn baseHeightAt(uv: vec2<f32>, lod: f32) -> f32 {
+#ifdef ANTI_TILE
+    let a = textureSampleLevel(txHeight, samplerState, uv + gTileOffA, lod).r;
+    let b = textureSampleLevel(txHeight, samplerState, uv + gTileOffB, lod).r;
+    return mix(a, b, gTileBlend);
+#else
     return textureSampleLevel(txHeight, samplerState, uv, lod).r;
+#endif
+}
+
+// x = blended height, y = layer weight.
+fn surfaceHeight(uv: vec2<f32>, lod: f32) -> vec2<f32> {
+    let hb = baseHeightAt(uv, lod);
+#ifdef LAYER
+    let raw = textureSampleLevel(txHeight2, samplerState, uv * gLayerRatio, lod + gLayerLod).r;
+    let hl  = saturate(raw + factors.layerHeightOffset + gLayerBias);
+    let s   = max(factors.layerSharpness, 1e-3);
+    let w   = smoothstep(-s, s, hl - hb);
+    return vec2<f32>(mix(hb, hl, w), w);
+#else
+    return vec2<f32>(hb, 0.0);
+#endif
+}
+
+fn heightAt(uv: vec2<f32>, lod: f32) -> f32 {
+    return surfaceHeight(uv, lod).x;
+}
+
+fn sampleBase(tex: texture_2d<f32>, uv: vec2<f32>, gx: vec2<f32>, gy: vec2<f32>) -> vec4<f32> {
+#ifdef ANTI_TILE
+    let a = textureSampleGrad(tex, samplerState, uv + gTileOffA, gx, gy);
+    let b = textureSampleGrad(tex, samplerState, uv + gTileOffB, gx, gy);
+    return mix(a, b, gTileBlend);
+#else
+    return textureSampleGrad(tex, samplerState, uv, gx, gy);
+#endif
 }
 
 fn insideBox(input: POMVertexOutput, p: vec3<f32>) -> bool {
@@ -186,6 +281,38 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     let footprint  = max(length(surf.duvdx * heightSize), length(surf.duvdy * heightSize));
     let lod        = max(log2(max(footprint, 1e-6)) + camera.mipBias, 0.0);
     let texelsPerUv = heightSize.x * exp2(-lod);
+
+    // ── Per-pixel variation state ─────────────────────────────────────────────
+    gTileOffA = vec2<f32>(0.0);
+    gTileOffB = vec2<f32>(0.0);
+    gTileBlend = 0.0;
+#ifdef ANTI_TILE
+    {
+        let k  = noise2(surf.uv * factors.antiTileScale) * 8.0;
+        let ia = floor(k);
+        gTileOffA = hash22(vec2<f32>(ia, 3.7));
+        gTileOffB = hash22(vec2<f32>(ia + 1.0, 3.7));
+        // Switch where the two copies' heights cross, not along a straight noise line.
+        let ha = textureSampleLevel(txHeight, samplerState, surf.uv + gTileOffA, lod).r;
+        let hb = textureSampleLevel(txHeight, samplerState, surf.uv + gTileOffB, lod).r;
+        gTileBlend = smoothstep(0.3, 0.7, fract(k) + (hb - ha) * 0.6);
+    }
+#endif
+    gLayerRatio = 1.0;
+    gLayerLod   = 0.0;
+    gLayerBias  = 0.0;
+#ifdef LAYER
+    {
+        gLayerRatio = select(1.0, factors.layerUvScale / max(factors.uvXScale, 1e-4), factors.layerUvScale > 0.0);
+        let layerSize = vec2<f32>(textureDimensions(txHeight2, 0));
+        gLayerLod = log2(max(gLayerRatio * layerSize.x / heightSize.x, 1e-4));
+        // World-space mask (continuous across faces and objects): coverage 0 → no layer,
+        // 1 → layer everywhere, 0.5 → decided by the two heights alone where the noise is 0.5.
+        let m = fbm3(input.WorldPos * factors.layerNoiseScale);
+        gLayerBias = (m - (1.0 - factors.layerCoverage)) * 2.0;
+    }
+#endif
+
     // Relief thinner than ~half a pixel is invisible: fade the depth (not the uv), skip.
     let reliefPx = factors.pomScale * surf.scale * texelsPerUv;
     let depthScale = factors.pomScale * smoothstep(0.35, 1.5, reliefPx);
@@ -193,8 +320,9 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     let V  = normalize(camera.cameraPosition.xyz - input.WorldPos);
     let vz = max(dot(V, surf.N), MIN_VIEW_COS);
 
-    var uvFinal = surf.uv;
-    var shadow  = 1.0;
+    var uvFinal  = surf.uv;
+    var hitDepth = 0.0;
+    var shadow   = 1.0;
     if (depthScale > 0.0) {
         let uvRay    = -vec2<f32>(dot(V, surf.dirU), dot(V, surf.dirV)) / vz * depthScale * surf.scale;
         let worldRay = -V / vz * depthScale;
@@ -205,7 +333,8 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
         if (hit.exited) {
             discard;
         }
-        uvFinal = hit.uv;
+        uvFinal  = hit.uv;
+        hitDepth = hit.depth * depthScale;
 
 #ifdef POM_SHADOW
         let S  = camera.sunDirection.xyz;
@@ -222,14 +351,52 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     // dpdx of the displaced uv jumps at relief steps and picks tiny mips there (sparkles
     // along every stone edge). Texture UVs keep the camera jitter on purpose: TAA/TSR
     // integrate the sub-pixel offsets; camera.mipBias compensates their blur.
-    let g    = exp2(camera.mipBias);
-    let gx   = surf.duvdx * g;
-    let gy   = surf.duvdy * g;
-    let albedo_color  = textureSampleGrad(txAlbedo,    samplerState, uvFinal, gx, gy);
-    let metallic_raw  = textureSampleGrad(txMetallic,  samplerState, uvFinal, gx, gy).b;
-    let roughness_raw = textureSampleGrad(txRoughness, samplerState, uvFinal, gx, gy).g;
-    let N_ts          = textureSampleGrad(txNormal,    samplerState, uvFinal, gx, gy).xyz * 2.0 - 1.0;
-    let emissive_raw  = textureSampleGrad(txEmissive,  samplerState, uvFinal, gx, gy).x;
+    let g  = exp2(camera.mipBias);
+    let gx = surf.duvdx * g;
+    let gy = surf.duvdy * g;
+    var albedo    = sampleBase(txAlbedo, uvFinal, gx, gy).rgb * factors.baseColorFactor.rgb;
+    var metallic  = sampleBase(txMetallic, uvFinal, gx, gy).b * factors.metallicFactor;
+    var roughRaw  = sampleBase(txRoughness, uvFinal, gx, gy).g;
+    var N_ts      = sampleBase(txNormal, uvFinal, gx, gy).xyz * 2.0 - 1.0;
+    let emissive  = sampleBase(txEmissive, uvFinal, gx, gy).x * factors.emissiveFactor;
+    let heightHit = surfaceHeight(uvFinal, lod);
+
+#ifdef LAYER
+    {
+        let w   = heightHit.y;
+        let uvL = uvFinal * gLayerRatio;
+        let gxL = gx * gLayerRatio;
+        let gyL = gy * gLayerRatio;
+        let tint = vec3<f32>(factors.layerTintR, factors.layerTintG, factors.layerTintB);
+        albedo   = mix(albedo, textureSampleGrad(txAlbedo2, samplerState, uvL, gxL, gyL).rgb * tint, w);
+        roughRaw = mix(roughRaw, textureSampleGrad(txRoughness2, samplerState, uvL, gxL, gyL).g, w);
+        N_ts     = mix(N_ts, textureSampleGrad(txNormal2, samplerState, uvL, gxL, gyL).xyz * 2.0 - 1.0, w);
+        metallic = mix(metallic, 0.0, w);
+    }
+#endif
+
+#ifdef DIRT
+    {
+        let dirtColor = vec3<f32>(factors.dirtColorR, factors.dirtColorG, factors.dirtColorB);
+        // Cavities: the lower the relief, the dirtier.
+        var dirt = factors.cavityDirt * (1.0 - smoothstep(0.1, 0.65, heightHit.x));
+#ifdef BOX
+        if (factors.baseDirtHeight > 0.0) {
+            // Height above the bottom of the box, at the displaced point; noisy border,
+            // and only on the sides (the top never touches the floor).
+            let p    = input.WorldPos - V / vz * hitDepth;
+            let up   = dot(p - input.BoxCenter, input.BoxAxisY) + input.BoxHalf.y;
+            let n    = fbm3(p * 3.0);
+            let band = 1.0 - smoothstep(0.0, factors.baseDirtHeight, up - (n - 0.5) * factors.baseDirtHeight);
+            let side = 1.0 - abs(dot(surf.N, input.BoxAxisY));
+            dirt = max(dirt, band * side * factors.baseDirtStrength);
+        }
+#endif
+        albedo   = mix(albedo, dirtColor * (0.7 + 0.6 * albedo), dirt);
+        roughRaw = mix(roughRaw, 1.0, dirt * 0.6);
+        metallic = mix(metallic, 0.0, dirt);
+    }
+#endif
 
     let N = normalize(surf.mapT * N_ts.x + surf.mapB * N_ts.y + surf.N * N_ts.z);
 
@@ -238,15 +405,13 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     let dndy         = dpdy(N);
     let variance     = dot(dndx, dndx) + dot(dndy, dndy);
     let kernelRough2 = min(2.0 * variance * 0.25, 0.18);
-    let rough2       = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
+    let rough2       = clamp(roughRaw * roughRaw + kernelRough2, 0.0, 1.0);
     let roughness    = sqrt(rough2);
 
     var output: FragmentOutput;
     // Albedo is bound through an sRGB view: the hardware already decoded it to linear.
-    output.albedo = vec4<f32>(albedo_color.rgb * factors.baseColorFactor.rgb * shadow,
-                              metallic_raw * factors.metallicFactor);
-    output.normal = vec4<f32>(normalToOctahedral01(N), roughness * factors.roughnessFactor,
-                              emissive_raw * factors.emissiveFactor);
+    output.albedo = vec4<f32>(albedo * shadow, metallic);
+    output.normal = vec4<f32>(normalToOctahedral01(N), roughness * factors.roughnessFactor, emissive);
 
     // Geometric depth = top of the relief (see header). Pushing it down to the hit would
     // make the shadow-map test see the mesh's own surface above every crack.

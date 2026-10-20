@@ -342,7 +342,7 @@ export class InstanceManager {
         appearanceBlend: material.getAppearanceBlend(),
         surfaceBlend: material.getSurfaceBlend(),
         pomScale: material.getPomScale(),
-        pomShadow: material.getPomShadow(),
+        ...material.getExtras(),
       };
 
       instancedMaterial = await Material.get(materialData);

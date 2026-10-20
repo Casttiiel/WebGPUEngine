@@ -3,7 +3,9 @@
   "features": [
     "BOX",
     "SILHOUETTE",
-    "POM_SHADOW"
+    "POM_SHADOW",
+    "LAYER",
+    "DIRT"
   ],
   "category": "solids",
   "textures": {
@@ -12,7 +14,11 @@
     "txMetallic": "black.png",
     "txRoughness": "mistborn/castle_brick_07_rough_1k.jpg",
     "txEmissive": "black.png",
-    "txHeight": "mistborn/castle_brick_07_disp_1k.jpg"
+    "txHeight": "mistborn/castle_brick_07_disp_1k.jpg",
+    "txAlbedo2": "mistborn/rough_plaster_broken_diff_1k.jpg",
+    "txNormal2": "mistborn/rough_plaster_broken_nor_gl_1k.jpg",
+    "txRoughness2": "mistborn/rough_plaster_broken_rough_1k.jpg",
+    "txHeight2": "mistborn/rough_plaster_broken_disp_1k.jpg"
   },
   "uvXScale": 0.5,
   "uvYScale": 0.5,
@@ -27,5 +33,17 @@
   "roughnessFactor": 1.0,
   "metallicFactor": 0,
   "casts_shadows": true,
-  "shadows": false
+  "shadows": false,
+  "layerCoverage": 0.5,
+  "layerNoiseScale": 0.4,
+  "layerSharpness": 0.07,
+  "layerUvScale": 0.5,
+  "layerTint": [
+    0.62,
+    0.6,
+    0.58
+  ],
+  "cavityDirt": 0.3,
+  "baseDirtHeight": 0.5,
+  "layerHeightOffset": 0.4
 }

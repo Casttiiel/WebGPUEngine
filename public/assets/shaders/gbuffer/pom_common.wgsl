@@ -14,7 +14,8 @@ struct POMVertexOutput {
     @location(8) @interpolate(flat) BoxHalf: vec3<f32>,
 }
 
-// MaterialFactors + the extras vec4 the material writes at offset 48 (Material.ts).
+// MaterialFactors + the extras block at offset 48 (renderer/resources/MaterialExtras.ts:
+// same order, vec3s unpacked as three floats so nothing gets padded).
 struct PomFactors {
     baseColorFactor: vec4<f32>,
     roughnessFactor: f32,
@@ -25,8 +26,21 @@ struct PomFactors {
     uvYScale: f32,
     surfaceBlend: f32,
     pomScale: f32,
+    // extras
     pomShadow: f32,
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
+    layerCoverage: f32,
+    layerNoiseScale: f32,
+    layerSharpness: f32,
+    layerUvScale: f32,
+    antiTileScale: f32,
+    cavityDirt: f32,
+    baseDirtHeight: f32,
+    dirtColorR: f32,
+    dirtColorG: f32,
+    dirtColorB: f32,
+    baseDirtStrength: f32,
+    layerTintR: f32,
+    layerTintG: f32,
+    layerTintB: f32,
+    layerHeightOffset: f32,
 }

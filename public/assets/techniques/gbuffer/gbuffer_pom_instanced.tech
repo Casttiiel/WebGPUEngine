@@ -15,6 +15,84 @@
     "SILHOUETTE": {
       "z": "greater_equal_write",
       "skipDepthPrepass": true
+    },
+    "LAYER": {
+      "materialSlots": [
+        {
+          "binding": 0,
+          "name": "txAlbedo",
+          "type": "texture2d",
+          "defaultValue": "white.png",
+          "srgb": true
+        },
+        {
+          "binding": 1,
+          "name": "txNormal",
+          "type": "texture2d",
+          "defaultValue": "no-normal.jpg"
+        },
+        {
+          "binding": 2,
+          "name": "txMetallic",
+          "type": "texture2d",
+          "defaultValue": "black.png"
+        },
+        {
+          "binding": 3,
+          "name": "txRoughness",
+          "type": "texture2d",
+          "defaultValue": "black.png"
+        },
+        {
+          "binding": 4,
+          "name": "txEmissive",
+          "type": "texture2d",
+          "defaultValue": "black.png"
+        },
+        {
+          "binding": 5,
+          "name": "txHeight",
+          "type": "texture2d",
+          "defaultValue": "white.png"
+        },
+        {
+          "binding": 6,
+          "name": "samplerState",
+          "type": "sampler",
+          "defaultValue": "@sampler:anisotropic16x"
+        },
+        {
+          "binding": 7,
+          "name": "factors",
+          "type": "uniform",
+          "defaultValue": null
+        },
+        {
+          "binding": 8,
+          "name": "txAlbedo2",
+          "type": "texture2d",
+          "defaultValue": "white.png",
+          "srgb": true
+        },
+        {
+          "binding": 9,
+          "name": "txNormal2",
+          "type": "texture2d",
+          "defaultValue": "no-normal.jpg"
+        },
+        {
+          "binding": 10,
+          "name": "txRoughness2",
+          "type": "texture2d",
+          "defaultValue": "white.png"
+        },
+        {
+          "binding": 11,
+          "name": "txHeight2",
+          "type": "texture2d",
+          "defaultValue": "white.png"
+        }
+      ]
     }
   },
   "materialSlots": [

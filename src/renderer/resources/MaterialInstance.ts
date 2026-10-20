@@ -1,6 +1,7 @@
 import { ResourceType } from '../../types/ResourceType.enum';
 import { TechniqueMaterialSlot } from '../../types/TechniqueData.type';
 import { Material, MaterialTexturesOptions, MATERIAL_FACTORS_SIZE } from './Material';
+import { MaterialExtrasData } from './MaterialExtras';
 import { Texture } from './Texture';
 import { Engine } from '../../core/engine/Engine';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
@@ -18,7 +19,7 @@ export type MaterialInstanceOverrides = {
   appearanceBlend?: number;
   surfaceBlend?: number;
   pomScale?: number;
-  pomShadow?: number;
+  extras?: MaterialExtrasData;
   /** Slot name → texture path overrides. For PBR: txAlbedo, txNormal, etc. */
   textures?: Record<string, string>;
 };
@@ -94,7 +95,7 @@ export class MaterialInstance extends Material {
     this.appearanceBlend = overrides.appearanceBlend ?? parent.getAppearanceBlend();
     this.surfaceBlend = overrides.surfaceBlend ?? parent.getSurfaceBlend();
     this.pomScale = overrides.pomScale ?? parent.getPomScale();
-    this.pomShadow = overrides.pomShadow ?? parent.getPomShadow();
+    this.extras = { ...parent.getExtras(), ...(overrides.extras ?? {}) };
 
     // Share the parent's shadow material (technique is identical).
     if (parent.getCastsShadows()) {
