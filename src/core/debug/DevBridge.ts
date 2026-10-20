@@ -525,7 +525,7 @@ export class DevBridge {
   private static worldToScreen(p: vec3): { x: number; y: number; visible: boolean } {
     const camera = Engine.getRender().getMainCamera();
     const clip = vec4.fromValues(p[0]!, p[1]!, p[2]!, 1);
-    vec4.transformMat4(clip, clip, camera.getViewProjection());
+    vec4.transformMat4(clip, clip, camera.getUnjitteredViewProjection());
     const w = clip[3]!;
     const size = this.getCanvasSize() ?? { width: window.innerWidth, height: window.innerHeight };
     if (w <= 1e-6) return { x: -1, y: -1, visible: false };

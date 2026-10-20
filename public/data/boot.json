@@ -1,4 +1,4 @@
 {
-  "scenes_to_load": ["tactical.json", "tactical_props.json", "tactical_enemies.json", "tactical_probes.json"],
+  "scenes_to_load": ["street.json", "street_props.json", "street_enemies.json"],
   "environment": "environment_mistborn.json"
 }

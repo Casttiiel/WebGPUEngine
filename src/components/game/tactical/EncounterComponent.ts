@@ -2138,12 +2138,30 @@ export class EncounterComponent extends Component {
       (m.getComponent('unit') as UnitComponent).getFeetPosition(vec3.create()),
     );
 
-    // Todos los enemigos vivos cerca de algún miembro de la party (más el que detectó).
-    const enemies = UnitComponent.getAll().filter((u) => {
-      if (u.getFaction() !== 'enemy' || !u.isAlive() || this.disengaged.has(u)) return false;
-      if (u.getOwner() === detector) return true;
+    // Los enemigos vivos cerca de algún miembro de la party (más el que detectó). Los que
+    // tienen grupo de encuentro entran con su grupo entero si se activa (lo activa el que
+    // detectó o, si no tiene grupo, cualquiera suyo que esté cerca) y si no, no entran.
+    const near = (u: UnitComponent) => {
       const p = u.getFeetPosition(this.tmpA);
       return memberPositions.some((m) => vec3.distance(m, p) <= this.joinRadius);
+    };
+    const candidates = UnitComponent.getAll().filter(
+      (u) => u.getFaction() === 'enemy' && u.isAlive() && !this.disengaged.has(u),
+    );
+    const detectorGroup =
+      (detector?.getComponent('unit') as UnitComponent | null)?.getEncounterGroup() ?? null;
+    const groups = new Set<string>();
+    if (detectorGroup) groups.add(detectorGroup);
+    else {
+      for (const u of candidates) {
+        const group = u.getEncounterGroup();
+        if (group && near(u)) groups.add(group);
+      }
+    }
+    const enemies = candidates.filter((u) => {
+      if (u.getOwner() === detector) return true;
+      const group = u.getEncounterGroup();
+      return group ? groups.has(group) : near(u);
     });
 
     if (enemies.length === 0) return false;

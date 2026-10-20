@@ -838,11 +838,15 @@ export class CombatHUDController extends WidgetController {
     this.floats = [];
   }
 
-  /** Punto del mundo → coordenadas de referencia de la UI (widget raíz sin ancla). */
+  /**
+   * Punto del mundo → coordenadas de referencia de la UI (widget raíz sin ancla).
+   * Sin jitter: la VP normal lleva el desplazamiento subpíxel del TSR, que cambia cada frame
+   * y hace temblar los widgets anclados al mundo.
+   */
   private worldToUI(p: vec3): [number, number] | null {
     const camera = Engine.getRender().getMainCamera();
     const clip = vec4.set(this.tmpClip, p[0]!, p[1]!, p[2]!, 1);
-    vec4.transformMat4(clip, clip, camera.getViewProjection());
+    vec4.transformMat4(clip, clip, camera.getUnjitteredViewProjection());
     const w = clip[3]!;
     if (w <= 1e-6) return null;
     const canvas = Render.getInstance().getCanvas();

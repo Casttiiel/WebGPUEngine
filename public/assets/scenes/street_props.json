@@ -1,0 +1,210 @@
+[
+  {
+    "prefab": "tactical/cart.prefab",
+    "components": {
+      "name": "PlazaCart",
+      "transform": {
+        "position": [
+          -13.5,
+          0,
+          9.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_stack.prefab",
+    "components": {
+      "name": "PlazaCrateStack",
+      "transform": {
+        "position": [
+          -23,
+          0,
+          9
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_metal.prefab",
+    "components": {
+      "name": "PlazaMetalCrate",
+      "transform": {
+        "position": [
+          -13,
+          0,
+          -4.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_pushable.prefab",
+    "components": {
+      "name": "PlazaCrate",
+      "transform": {
+        "position": [
+          -18.5,
+          0,
+          -9.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/barrel_explosive.prefab",
+    "components": {
+      "name": "PlazaBarrel",
+      "transform": {
+        "position": [
+          -9.5,
+          0,
+          4
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/knives.prefab",
+    "components": {
+      "name": "PlazaKnives",
+      "transform": {
+        "position": [
+          -10.5,
+          1.06,
+          6.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_pushable.prefab",
+    "components": {
+      "name": "StreetCrate",
+      "transform": {
+        "position": [
+          4,
+          0,
+          -6.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_metal.prefab",
+    "components": {
+      "name": "StreetMetalCrate",
+      "transform": {
+        "position": [
+          15,
+          0,
+          -6
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/barrel_explosive.prefab",
+    "components": {
+      "name": "StreetBarrel",
+      "transform": {
+        "position": [
+          7.5,
+          0,
+          1.6
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/cart.prefab",
+    "components": {
+      "name": "StreetCart",
+      "transform": {
+        "position": [
+          6,
+          0,
+          -2.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_stack.prefab",
+    "components": {
+      "name": "StreetCrateStack",
+      "transform": {
+        "position": [
+          20.5,
+          0,
+          -8
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_metal.prefab",
+    "components": {
+      "name": "TerraceMetalCrate1",
+      "transform": {
+        "position": [
+          6.5,
+          3.0,
+          5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/crate_metal.prefab",
+    "components": {
+      "name": "TerraceMetalCrate2",
+      "transform": {
+        "position": [
+          15.5,
+          3.0,
+          4.8
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/barrel_explosive.prefab",
+    "components": {
+      "name": "TerraceBarrel",
+      "transform": {
+        "position": [
+          14.6,
+          3.0,
+          5.6
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/cart.prefab",
+    "components": {
+      "name": "TerraceCart",
+      "transform": {
+        "position": [
+          3.5,
+          3.0,
+          12.5
+        ]
+      }
+    }
+  },
+  {
+    "prefab": "tactical/relic_fortune.prefab",
+    "components": {
+      "name": "TerraceRelic",
+      "transform": {
+        "position": [
+          12,
+          3.0,
+          7.5
+        ]
+      }
+    }
+  }
+]

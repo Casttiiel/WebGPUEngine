@@ -223,7 +223,7 @@ export class LensFlareComponent extends Component {
         const dl = dirLights[0] as DirectionalLightComponent;
         const dir = dl.getLightDirectionToSource();
         const camPos = cam.getPosition();
-        const vp = cam.getViewProjection();
+        const vp = cam.getUnjitteredViewProjection();
 
         const color = dl.getColor();
         sunR = color[0] ?? 1.0;

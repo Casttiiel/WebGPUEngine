@@ -89,6 +89,12 @@ export type UnitComponentDataType = Readonly<{
   movement?: number;
   /** Distancia a la que detecta a unidades enemigas (m). 0 = no detecta. Default: 8 enemigos, 0 resto. */
   sightRange?: number;
+  /**
+   * Grupo de encuentro: al empezar un combate que active el grupo (lo detecta uno suyo, o uno
+   * suyo está cerca de la party) entra entero, esté donde esté; y no entra en combates de otros
+   * grupos aunque esté cerca. Sin grupo: entra por cercanía (joinRadius del encounter).
+   */
+  encounterGroup?: string;
   /** Ataques (orden de la hotbar; el primero es el de por defecto). Default: un golpe cuerpo a cuerpo. */
   attacks?: UnitAttack[];
   /** Acciones de la hotbar además de los ataques: saltar, empujar objetos. Default: ninguna. */
@@ -225,6 +231,7 @@ export class UnitComponent extends Component {
   private moveSpeed = 4;
   private movement = 9;
   private sightRange = 0;
+  private encounterGroup: string | null = null;
   private attacks: UnitAttack[] = DEFAULT_ATTACKS;
   /** Desarmado (Tirón): solo le queda DISARMED_ATTACK hasta que acabe el combate. */
   private disarmed = false;
@@ -299,6 +306,7 @@ export class UnitComponent extends Component {
     this.moveSpeed = data.moveSpeed ?? this.moveSpeed;
     this.movement = data.movement ?? this.movement;
     this.sightRange = data.sightRange ?? (this.faction === 'enemy' ? 8 : 0);
+    this.encounterGroup = data.encounterGroup ?? null;
     this.attacks = data.attacks ? data.attacks.map((a) => ({ ...a })) : DEFAULT_ATTACKS;
     this.abilities = [...(data.abilities ?? [])];
     this.hideWhenDown = data.hideWhenDown ?? false;
@@ -368,6 +376,10 @@ export class UnitComponent extends Component {
 
   public getSightRange(): number {
     return this.sightRange;
+  }
+
+  public getEncounterGroup(): string | null {
+    return this.encounterGroup;
   }
 
   public isMoving(): boolean {
