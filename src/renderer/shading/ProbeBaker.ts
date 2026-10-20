@@ -17,9 +17,10 @@ interface ProbeCapture {
   sh: Float32Array;
 }
 
-// Cube faces in WebGPU order (+X −X +Y −Y +Z −Z): view direction and camera up. With this
-// engine's projection the captured texels land in the cube convention SHProjector and the
-// prefilter use (verified: sky in +Y, panorama continuous across faces).
+// Cube faces in WebGPU order (+X −X +Y −Y +Z −Z): view direction and camera up. The cube
+// convention (row 0 = +Y on the side faces, u mirrored vs a right-handed camera) is a mirror
+// of any lookAt render, so these ups get the columns right and the copy into the cube flips
+// the rows: row 0 of the render holds `up`, the cube wants −up there.
 const FACES: ReadonlyArray<[vec3, vec3]> = [
   [vec3.fromValues(1, 0, 0), vec3.fromValues(0, -1, 0)],
   [vec3.fromValues(-1, 0, 0), vec3.fromValues(0, -1, 0)],
@@ -124,12 +125,16 @@ export class ProbeBaker {
         renderer.render(cameraEntity, true);
         Render.getInstance().endFrame();
 
+        // Row by row, flipped: see FACES.
         const encoder = device.createCommandEncoder({ label: `probe_capture_face_${face}` });
-        encoder.copyTextureToTexture(
-          { texture: renderer.getAccLightRenderTarget().getTexture() },
-          { texture: cube, origin: { x: 0, y: 0, z: face } },
-          [size, size, 1],
-        );
+        const source = renderer.getAccLightRenderTarget().getTexture();
+        for (let row = 0; row < size; row++) {
+          encoder.copyTextureToTexture(
+            { texture: source, origin: { x: 0, y: row, z: 0 } },
+            { texture: cube, origin: { x: 0, y: size - 1 - row, z: face } },
+            [size, 1, 1],
+          );
+        }
         device.queue.submit([encoder.finish()]);
       }
     } finally {

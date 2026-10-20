@@ -1,4 +1,3 @@
-Props pequeños deben romperse cuando se usan/lanzan, no los pongas en el suelo, sino encima de lugares estaticos de media altura
 Probes/Reflejos mal?
 Rendimiento
 
