@@ -320,11 +320,15 @@ export class InstanceManager {
       const materialData = {
         technique: instancedTechniquePath,
         textures: {
-          txAlbedo: textureFiles.albedo,
-          txNormal: textureFiles.normal,
-          txMetallic: textureFiles.metallic,
-          txRoughness: textureFiles.roughness,
-          txEmissive: textureFiles.emissive,
+          // Custom-slot techniques (POM's txHeight…) only have their raw .mat map.
+          ...material.getRawTextures(),
+          ...(textureFiles && {
+            txAlbedo: textureFiles.albedo,
+            txNormal: textureFiles.normal,
+            txMetallic: textureFiles.metallic,
+            txRoughness: textureFiles.roughness,
+            txEmissive: textureFiles.emissive,
+          }),
         },
         category: material.getCategory(),
         casts_shadows: material.getCastsShadows(),
@@ -335,6 +339,10 @@ export class InstanceManager {
         emissiveFactor: material.getEmissiveFactor(),
         uvXScale: material.getUvXScale(),
         uvYScale: material.getUvYScale(),
+        appearanceBlend: material.getAppearanceBlend(),
+        surfaceBlend: material.getSurfaceBlend(),
+        pomScale: material.getPomScale(),
+        pomShadow: material.getPomShadow(),
       };
 
       instancedMaterial = await Material.get(materialData);
@@ -361,6 +369,9 @@ export class InstanceManager {
       true, // isInstanced
       instanceCount, // instanceCount
       instanceBindGroup, // instanceBindGroup
+      undefined,
+      undefined,
+      instancedMaterial.getTechnique()?.getSkipDepthPrepass() || undefined,
     );
 
     // f. Almacenar mapping en Map interno

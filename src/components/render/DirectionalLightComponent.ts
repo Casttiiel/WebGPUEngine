@@ -612,6 +612,9 @@ export class DirectionalLightComponent extends Component {
 
     // Actualizar uniforms con las nuevas posiciones
     this.updateLightUniforms();
+
+    const toSun = this.getLightDirectionToSource();
+    Camera.setSunDirection(toSun[0], toSun[1], toSun[2]);
   }
 
   /**

@@ -164,7 +164,8 @@
             "material": "mistborn_wall.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -188,7 +189,8 @@
             "material": "mistborn_wall.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -212,7 +214,8 @@
             "material": "mistborn_wall.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -236,7 +239,8 @@
             "material": "mistborn_wall.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -260,7 +264,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -284,7 +289,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -308,7 +314,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -332,7 +339,8 @@
             "material": "mistborn_column.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -356,7 +364,8 @@
             "material": "mistborn_column.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -380,7 +389,8 @@
             "material": "mistborn_column.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -404,7 +414,8 @@
             "material": "mistborn_column.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -428,7 +439,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -452,7 +464,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -476,7 +489,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -500,7 +514,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -524,7 +539,8 @@
             "material": "mistborn_wood.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_wood.mat" }
     }
   },
   {
@@ -548,7 +564,8 @@
             "material": "mistborn_column.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {
@@ -572,7 +589,8 @@
             "material": "mistborn_column.mat"
           }
         ]
-      }
+      },
+      "edge_decals": { "material": "edge_wear_stone.mat" }
     }
   },
   {

@@ -108,10 +108,13 @@ export class ResourceManager {
     }
   }
 
-  public static async loadShader(shaderPath: string): Promise<string> {
-    // Always use preprocessor to handle includes
+  public static async loadShader(
+    shaderPath: string,
+    defines: ReadonlyArray<string> = [],
+  ): Promise<string> {
+    // Always use preprocessor to handle includes (and #ifdef permutations)
     try {
-      return await ShaderPreprocessor.preprocessShader(shaderPath);
+      return await ShaderPreprocessor.preprocessShader(shaderPath, defines);
     } catch (error) {
       console.error(`Error loading shader ${shaderPath}:`, error);
       throw error;

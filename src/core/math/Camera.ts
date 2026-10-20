@@ -49,6 +49,20 @@ export class Camera {
 
   private uniformData = new Float32Array(128); // 512 bytes / 4 = 128 floats
 
+  /**
+   * Scene sun, shared by every camera: xyz = direction FROM surfaces TOWARD the sun,
+   * w = 1 when there is one. Set by DirectionalLightComponent; read by G-buffer shaders
+   * that shade toward the sun themselves (POM self-shadowing).
+   */
+  private static readonly sunDirection = new Float32Array([0, 1, 0, 0]);
+
+  public static setSunDirection(x: number, y: number, z: number): void {
+    Camera.sunDirection[0] = x;
+    Camera.sunDirection[1] = y;
+    Camera.sunDirection[2] = z;
+    Camera.sunDirection[3] = 1;
+  }
+
   // Time tracking for shader animations
   private time: number = 0;
   private deltaTime: number = 0;
@@ -387,6 +401,8 @@ export class Camera {
     // frameIndex (offset 114 = byte 456): monotonically increasing frame counter.
     // Stored as f32 — stays exact up to 2^24 (~16 million frames ≈ 77 hours @60fps).
     this.uniformData[114] = this.frameIndex++;
+    // sunDirection (offset 116 = byte 464) vec4
+    this.uniformData.set(Camera.sunDirection, 116);
 
     // Single GPU write instead of 7 separate writes
     GPUUtils.writeBuffer(this.uniformBuffer, 0, this.uniformData);

@@ -33,6 +33,8 @@ struct CameraUniforms {
     // Incremented by 1 each frame. Used with golden-ratio increment for
     // quasi-Monte Carlo temporal sample patterns (IGN, blue noise, etc.).
     frameIndex: f32,
+    // Scene sun (offset 116 = byte 464): xyz = direction toward the sun, w = 1 if present.
+    sunDirection: vec4<f32>,
 }
 
 struct OldCameraUniforms {

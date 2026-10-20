@@ -106,6 +106,7 @@ import { StaminaComponent } from '../../components/game/StaminaComponent';
 import { BloodComponent } from '../../components/game/BloodComponent';
 import { BloodDrainSourceComponent } from '../../components/game/BloodDrainSourceComponent';
 import { SkeletalMeshComponent } from '../../components/render/SkeletalMeshComponent';
+import { EdgeDecalComponent } from '../../components/render/EdgeDecalComponent';
 import { AnimatorComponent } from '../../components/render/AnimatorComponent';
 import { FootIKComponent } from '../../components/render/FootIKComponent';
 import { ViewModelComponent } from '../../components/render/ViewModelComponent';
@@ -354,6 +355,8 @@ export class Loader {
         return new RenderComponent();
       case 'skeletal_mesh':
         return new SkeletalMeshComponent();
+      case 'edge_decals':
+        return new EdgeDecalComponent();
       case 'animator':
         return new AnimatorComponent();
       case 'foot_ik':

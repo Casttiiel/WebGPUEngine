@@ -1,0 +1,13 @@
+{
+  "technique": "gbuffer/decal_edge.tech",
+  "category": "decals",
+  "casts_shadows": false,
+  "textures": {},
+  "baseColorFactor": [1.5, 1.35, 1.15, 0.9],
+  "roughnessFactor": 0.8,
+  "metallicFactor": 0,
+  "uvXScale": 0.05,
+  "uvYScale": 9,
+  "surfaceBlend": 0.025,
+  "appearanceBlend": 1
+}

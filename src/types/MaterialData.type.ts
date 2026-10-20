@@ -19,6 +19,13 @@ export type MaterialDataType = Readonly<{
   surfaceBlend?: number;
   /** Parallax Occlusion Mapping height scale. 0 = disabled (default). Typical range 0.01–0.1. */
   pomScale?: number;
+  /** POM self-shadow strength toward the sun (0 = off). Needs the POM_SHADOW feature. */
+  pomShadow?: number;
+  /**
+   * Shader features of this material's technique permutation, e.g. ["BOX", "SILHOUETTE"]:
+   * the technique is compiled with these #defines (and its `variants` for them).
+   */
+  features?: ReadonlyArray<string>;
   /**
    * PBR materials use the named keys (txAlbedo, txNormal, …).
    * Custom-slot materials use arbitrary keys that match their technique's materialSlots.

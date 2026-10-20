@@ -2,216 +2,255 @@
 #include "common/structs"
 #include "common/math/matrices"
 #include "common/octahedral"
+#include "gbuffer/pom_common"
 
-// ── Group 0: Camera ──────────────────────────────────────────────────────────
+// ─── Parallax Occlusion Mapping (G-buffer) ───────────────────────────────────
+//
+// Permutations (material "features"):
+//   (none)      Mesh UVs + mesh TBN. pomScale = relief depth in UV units.
+//   BOX         Axis-aligned box faces (unit cube × model matrix): texture coordinates
+//               are the world position projected on the face axes × uvXScale (tiles per
+//               metre, like triplanar_world, but following the box when it rotates).
+//               pomScale = relief depth in metres.
+//   SILHOUETTE  (needs BOX) a view ray that leaves the box before hitting the relief is
+//               discarded, so the relief also cuts the object's outline. The technique
+//               variant skips the depth prepass and writes depth itself (a prepass
+//               without the discard would leave holes).
+//   POM_SHADOW  Soft self-shadow toward the sun, marched in the height field. Deferred
+//               lighting can't take it, so it darkens the albedo (pomShadow = strength).
+//
+// Height map: R, 1 = surface (the mesh), 0 = deepest. The relief is carved INTO the mesh,
+// so the geometric depth written below is the top of the relief and nothing pokes out.
+
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
-// ── Group 1: Material textures (custom-slot path) ────────────────────────────
 @group(1) @binding(0) var txAlbedo:    texture_2d<f32>;
 @group(1) @binding(1) var txNormal:    texture_2d<f32>;
 @group(1) @binding(2) var txMetallic:  texture_2d<f32>;
 @group(1) @binding(3) var txRoughness: texture_2d<f32>;
 @group(1) @binding(4) var txEmissive:  texture_2d<f32>;
-@group(1) @binding(5) var txHeight:    texture_2d<f32>;   // R = height (0=low, 1=high)
+@group(1) @binding(5) var txHeight:    texture_2d<f32>;
 @group(1) @binding(6) var samplerState: sampler;
-@group(1) @binding(7) var<uniform> factors: MaterialFactors;
+@group(1) @binding(7) var<uniform> factors: PomFactors;
 
-// Reuse the same vertex output struct declared in the VS.
-struct POMVertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) @interpolate(perspective, centroid) N: vec3<f32>,
-    @location(1) @interpolate(perspective, centroid) Uv: vec2<f32>,
-    @location(2) @interpolate(perspective, centroid) WorldPos: vec3<f32>,
-    @location(3) @interpolate(perspective, centroid) T: vec4<f32>,
-    @location(4) @interpolate(perspective, centroid) ViewDirTS: vec3<f32>,
+const MIN_STEPS    = 6.0;
+const MAX_STEPS    = 48.0;
+const SHADOW_STEPS = 12;
+// Steepest view the march extrapolates (cos ≈ 0.1 → 84°): beyond it the ray length explodes.
+const MIN_VIEW_COS = 0.1;
+
+// Texture-space frame of the shaded point.
+struct Surface {
+    uv:    vec2<f32>,  // base texture coordinates
+    dirU:  vec3<f32>,  // world direction of +u
+    dirV:  vec3<f32>,  // world direction of +v
+    mapT:  vec3<f32>,  // world direction of the normal map's +X
+    mapB:  vec3<f32>,  // world direction of the normal map's +Y
+    N:     vec3<f32>,  // outward surface normal
+    scale: f32,        // uv units per unit of pomScale (1 for mesh UVs, uvXScale for BOX)
+    duvdx: vec2<f32>,
+    duvdy: vec2<f32>,
 }
 
-// ── Parallax Occlusion Mapping ───────────────────────────────────────────────
-//
-// Classic steep-POM + binary-search refinement (Policarpo & Fonseca 2005).
-// 1. March N steps along the view ray in tangent space.
-// 2. Find the first step where the ray dips below the height field.
-// 3. Binary-search between the last-above and first-below steps for precision.
-// 4. Return the displaced UV at that intersection.
-//
-
-// Computes the correct mip level for a UV + texture size pair.
-// Must be called BEFORE any non-uniform control flow (if/loop with break)
-// because dpdx/dpdy are undefined inside divergent flow.
-fn computeMipLevel(uv: vec2<f32>, texSize: vec2<f32>) -> f32 {
-    let dx = dpdx(uv * texSize);
-    let dy = dpdy(uv * texSize);
-    let deltaMax = max(dot(dx, dx), dot(dy, dy));
-    return 0.5 * log2(max(deltaMax, 1e-6));
+fn meshSurface(input: POMVertexOutput) -> Surface {
+    var s: Surface;
+    let TBN = computeTBN(normalize(input.N), input.T);
+    s.uv    = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
+    s.dirU  = TBN[0];
+    s.dirV  = TBN[1];
+    s.mapT  = TBN[0];
+    s.mapB  = TBN[1];
+    s.N     = TBN[2];
+    s.scale = 1.0;
+    return s;
 }
 
-fn parallaxOcclusionMapping(
-    uv:          vec2<f32>,
-    viewDirTS:   vec3<f32>,   // normalised, pointing toward camera
-    pomScale:    f32,
-    minSamples:  f32,
-    maxSamples:  f32,
-    mipLevel:    f32,         // pre-computed before non-uniform flow
-) -> vec2<f32> {
-    // Quadratic cosAngle: allocates more samples at grazing angles more aggressively
-    // than the linear version, reducing banding when the UV delta per step is large.
-    let cosAngle    = saturate(viewDirTS.z);  // dot(viewDir, tangent-space N = (0,0,1))
-    let numSamples  = mix(maxSamples, minSamples, cosAngle * cosAngle);
-    let numSamplesI = max(i32(numSamples), 1);
+fn boxSurface(input: POMVertexOutput) -> Surface {
+    var s: Surface;
+    let n = normalize(input.N);
+    let l = vec3<f32>(dot(n, input.BoxAxisX), dot(n, input.BoxAxisY), dot(n, input.BoxAxisZ));
+    let a = abs(l);
+    // Face = dominant box axis of the normal. "up" is the image's up on that face.
+    var N  = input.BoxAxisZ * sign(l.z);
+    var up = input.BoxAxisY;
+    if (a.y >= a.x && a.y >= a.z) {
+        N  = input.BoxAxisY * sign(l.y);
+        up = -input.BoxAxisZ * sign(l.y);
+    } else if (a.x >= a.z) {
+        N  = input.BoxAxisX * sign(l.x);
+    }
+    let T = cross(up, N); // image right, seen from outside
+    s.scale = factors.uvXScale;
+    s.uv    = vec2<f32>(dot(input.WorldPos, T), -dot(input.WorldPos, up)) * s.scale;
+    s.dirU  = T;
+    s.dirV  = -up;
+    s.mapT  = T;
+    s.mapB  = up;   // *_nor_gl maps: green = image up
+    s.N     = N;
+    return s;
+}
 
-    // Per-layer step sizes.
-    let layerDepth  = 1.0 / numSamples;
-    // UV shift per layer along the view ray projected onto the height field.
-    // viewDirTS.z is the component perpendicular to the surface — divide to
-    // un-project so the XY shift matches the geometric slope at any angle.
-    // Clamp z to 0.2 (~78° max from normal) — beyond this angle POM can't work
-    // reliably without tile-crossing artifacts, so we simply stop extrapolating further.
-    let uvDelta = (viewDirTS.xy / max(viewDirTS.z, 0.2)) * pomScale * layerDepth;
+fn heightAt(uv: vec2<f32>, lod: f32) -> f32 {
+    return textureSampleLevel(txHeight, samplerState, uv, lod).r;
+}
 
-    var currentLayerDepth: f32 = 0.0;
-    var currentUV         = uv;
-    var currentHeight     = 0.0;
+fn insideBox(input: POMVertexOutput, p: vec3<f32>) -> bool {
+    let d = p - input.BoxCenter;
+    let local = abs(vec3<f32>(dot(d, input.BoxAxisX), dot(d, input.BoxAxisY), dot(d, input.BoxAxisZ)));
+    return all(local <= input.BoxHalf + vec3<f32>(1e-4));
+}
 
-    // ── Step 1: Steep parallax — advance first, then check ───────────────────
-    // Advancing before sampling ensures the first iteration is never skipped
-    // when the height map starts at 0.0 (fully displaced surface).
-    for (var i = 0; i < numSamplesI; i++) {
-        currentUV           += uvDelta;
-        currentLayerDepth   += layerDepth;
-        currentHeight        = textureSampleLevel(txHeight, samplerState, currentUV, mipLevel).r;
-        if (currentLayerDepth >= currentHeight) {
+struct MarchHit {
+    uv:     vec2<f32>,
+    depth:  f32,   // fraction of the relief depth (0 = surface, 1 = deepest)
+    exited: bool,  // the ray left the box before hitting (SILHOUETTE)
+}
+
+// Steps down from the surface (depth 0) to the deepest layer (1); uvRay / worldRay are
+// the texture / world offsets of the view ray at depth 1. Linear refinement at the end.
+fn march(input: POMVertexOutput, uv0: vec2<f32>, uvRay: vec2<f32>, worldRay: vec3<f32>,
+         steps: f32, lod: f32) -> MarchHit {
+    var hit: MarchHit;
+    hit.exited = false;
+    let n = i32(steps);
+    let layer = 1.0 / steps;
+
+    var prevDepth   = 0.0;
+    var prevSurface = 1.0 - heightAt(uv0, lod);
+    var depth   = 0.0;
+    var surface = prevSurface;
+    if (surface <= 0.0) {
+        hit.uv = uv0;
+        hit.depth = 0.0;
+        return hit;
+    }
+    for (var i = 0; i < n; i++) {
+        prevDepth   = depth;
+        prevSurface = surface;
+        depth += layer;
+#ifdef SILHOUETTE
+        if (!insideBox(input, input.WorldPos + worldRay * depth)) {
+            hit.exited = true;
+            break;
+        }
+#endif
+        surface = 1.0 - heightAt(uv0 + uvRay * depth, lod);
+        if (depth >= surface) {
             break;
         }
     }
-
-    // ── Step 2: Linear refinement for sub-layer precision ─────────────────────
-    var prevUV    = currentUV - uvDelta;
-    var prevDepth = currentLayerDepth - layerDepth;
-
-    // Interpolation weight: how far the intersection is between prev and current.
-    let afterDepth  = currentHeight - currentLayerDepth;
-    let prevSample  = textureSampleLevel(txHeight, samplerState, prevUV, mipLevel).r;
-    let beforeDepth = prevSample - prevDepth;
-    let weight      = afterDepth / (afterDepth - beforeDepth);
-
-    return mix(currentUV, prevUV, weight);
+    // Intersection of the ray with the segment between the last two samples.
+    let before = prevSurface - prevDepth; // > 0: ray still above the relief
+    let after  = depth - surface;         // >= 0: ray below
+    let t = select(0.0, before / max(before + after, 1e-5), before + after > 0.0);
+    hit.depth = mix(prevDepth, depth, t);
+    hit.uv    = uv0 + uvRay * hit.depth;
+    return hit;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// 1 = lit, 0 = fully shadowed by the relief between the hit and the sun.
+fn reliefShadow(hit: MarchHit, sunUvRay: vec2<f32>, lod: f32) -> f32 {
+    if (hit.depth <= 0.0) { return 1.0; }
+    var occlusion = 0.0;
+    for (var i = 1; i <= SHADOW_STEPS; i++) {
+        let f = f32(i) / f32(SHADOW_STEPS);
+        let rayDepth = hit.depth * (1.0 - f);
+        let surface  = 1.0 - heightAt(hit.uv + sunUvRay * (hit.depth - rayDepth), lod);
+        // Relief above the ray, weighted down with distance → soft penumbra.
+        occlusion = max(occlusion, (rayDepth - surface) * (1.0 - f));
+    }
+    return 1.0 - saturate(occlusion * 12.0);
+}
 
 @fragment
 fn fs(input: POMVertexOutput) -> FragmentOutput {
-    let pomScale     = factors.pomScale;
-    let pomMinSamps  = 8.0;
-    // Scale max samples with pomScale: higher displacement needs more steps to avoid
-    // banding. Clamped to 64 for performance. pomScale=0.02→24, 0.05→60, 0.08→64.
-    let pomMaxSamps  = clamp(pomScale * 1200.0, 16.0, 64.0);
+    // Derivatives first, in uniform control flow.
+    let dPdx = dpdx(input.WorldPos);
+    let dPdy = dpdy(input.WorldPos);
+    let dUvdx = dpdx(input.Uv);
+    let dUvdy = dpdy(input.Uv);
 
-    // ── Parallax UV displacement ──────────────────────────────────────────────
-    let baseUv = input.Uv * vec2<f32>(factors.uvXScale, factors.uvYScale);
-    var dispUv = baseUv;
-    // Recompute ViewDirTS per-fragment using the same TBN path as normal mapping.
-    // This is essential: the VS-interpolated value uses per-vertex TBN which does
-    // not match the per-fragment TBN used below, producing radial artifacts.
-    let TBN_pom    = computeTBN(normalize(input.N), input.T);
-    let tbnInv     = transpose(TBN_pom);
-    let vdWS       = normalize(camera.cameraPosition.xyz - input.WorldPos);
-    let viewDirTS  = normalize(tbnInv * vdWS);
-    let viewDirNorm = viewDirTS;
+#ifdef BOX
+    var surf = boxSurface(input);
+    // From the position derivatives, not dpdx(uv): uv jumps where two faces share a quad.
+    surf.duvdx = vec2<f32>(dot(dPdx, surf.dirU), dot(dPdx, surf.dirV)) * surf.scale;
+    surf.duvdy = vec2<f32>(dot(dPdy, surf.dirU), dot(dPdy, surf.dirV)) * surf.scale;
+#else
+    var surf = meshSurface(input);
+    surf.duvdx = dUvdx * vec2<f32>(factors.uvXScale, factors.uvYScale);
+    surf.duvdy = dUvdy * vec2<f32>(factors.uvXScale, factors.uvYScale);
+#endif
 
-    // ── Mip level for heightmap ───────────────────────────────────────────────
-    // Computed HERE (uniform flow) because dpdx/dpdy are invalid inside the
-    // if-block below (non-uniform control flow). Using mip 0 throughout the
-    // march causes the heightmap to disagree with the mipped albedo/normal at
-    // distance, producing the "stones rise as you approach" artifact.
-    let heightTexSize = vec2<f32>(textureDimensions(txHeight, 0));
-    let heightMip     = max(computeMipLevel(baseUv, heightTexSize) + camera.mipBias, 0.0);
+    // ── LOD: height mip and how many pixels the relief spans there ────────────
+    let heightSize = vec2<f32>(textureDimensions(txHeight, 0));
+    let footprint  = max(length(surf.duvdx * heightSize), length(surf.duvdy * heightSize));
+    let lod        = max(log2(max(footprint, 1e-6)) + camera.mipBias, 0.0);
+    let texelsPerUv = heightSize.x * exp2(-lod);
+    // Relief thinner than ~half a pixel is invisible: fade the depth (not the uv), skip.
+    let reliefPx = factors.pomScale * surf.scale * texelsPerUv;
+    let depthScale = factors.pomScale * smoothstep(0.35, 1.5, reliefPx);
 
-    // Fade POM to zero at very grazing angles (viewDirTS.z → 0) to prevent UV explosions.
-    let grazingFade = smoothstep(0.02, 0.1, viewDirNorm.z);
+    let V  = normalize(camera.cameraPosition.xyz - input.WorldPos);
+    let vz = max(dot(V, surf.N), MIN_VIEW_COS);
 
-    // Distance LOD: fade POM out beyond ~8 m so the transition to normal-map-only
-    // is smooth and controlled instead of abruptly flat from mip blurring.
-    // At full distance (>20 m) normal maps still provide lighting variation.
-    let pixelDist  = length(camera.cameraPosition.xyz - input.WorldPos);
-    let distFade   = 1.0 - smoothstep(20.0, 100.0, pixelDist);
+    var uvFinal = surf.uv;
+    var shadow  = 1.0;
+    if (depthScale > 0.0) {
+        let uvRay    = -vec2<f32>(dot(V, surf.dirU), dot(V, surf.dirV)) / vz * depthScale * surf.scale;
+        let worldRay = -V / vz * depthScale;
+        let pxTravel = length(uvRay) * texelsPerUv;
+        let steps    = clamp(max(pxTravel, reliefPx) * 0.75 + MIN_STEPS, MIN_STEPS, MAX_STEPS);
 
-    let finalFade  = distFade;
-
-    if (pomScale > 0.0 && finalFade > 0.001) {
-        let pomUv = parallaxOcclusionMapping(
-            baseUv,
-            viewDirNorm,
-            pomScale,
-            pomMinSamps,
-            pomMaxSamps,
-            heightMip,
-        );
-
-        // ── Silhouette clipping ───────────────────────────────────────────────
-        // Must use pomUv (raw POM result) NOT dispUv.
-        // dispUv = mix(baseUv, pomUv, grazingFade): at grazing angles where the
-        // ray is most likely to exit the mesh, grazingFade → 0 and dispUv ≈ baseUv
-        // which is always in-bounds — the check would never fire.
-        // pomUv is the actual ray intersection: if it exits [0, meshMax] the
-        // view ray left the mesh, which means the fragment belongs to the silhouette
-        // zone and should be clipped if the heightmap shows solid geometry at the edge.
-        let meshMax = vec2<f32>(factors.uvXScale, factors.uvYScale);
-        if (any(pomUv < vec2<f32>(0.0)) || any(pomUv > meshMax)) {
-            // Clamp to the nearest in-bounds texel (repeat sampler fract()s this
-            // into [0,1] texture space automatically, landing near the tile edge).
-            let borderUV   = clamp(pomUv, vec2<f32>(0.001), meshMax - vec2<f32>(0.001));
-            let edgeHeight = textureSampleLevel(txHeight, samplerState, borderUV, 0.0).r;
-            if (edgeHeight > 0.05) {
-                discard;
-            }
+        let hit = march(input, surf.uv, uvRay, worldRay, steps, lod);
+        if (hit.exited) {
+            discard;
         }
+        uvFinal = hit.uv;
 
-        dispUv = mix(baseUv, pomUv, finalFade);
+#ifdef POM_SHADOW
+        let S  = camera.sunDirection.xyz;
+        let sz = dot(S, surf.N);
+        if (camera.sunDirection.w > 0.0 && factors.pomShadow > 0.0 && sz > 0.0) {
+            let sunUvRay = vec2<f32>(dot(S, surf.dirU), dot(S, surf.dirV)) / max(sz, MIN_VIEW_COS)
+                         * depthScale * surf.scale;
+            shadow = mix(1.0, reliefShadow(hit, sunUvRay, lod), factors.pomShadow);
+        }
+#endif
     }
 
-    // Texture UVs keep the camera jitter on purpose: TAA/TSR integrate the sub-pixel
-    // offsets over frames, which is what anti-aliases texture detail. (camera.mipBias
-    // compensates the extra blur of that integration.)
-    let uvFinal = dispUv;
+    // ── Texture sampling with the undisplaced gradients ───────────────────────
+    // dpdx of the displaced uv jumps at relief steps and picks tiny mips there (sparkles
+    // along every stone edge). Texture UVs keep the camera jitter on purpose: TAA/TSR
+    // integrate the sub-pixel offsets; camera.mipBias compensates their blur.
+    let g    = exp2(camera.mipBias);
+    let gx   = surf.duvdx * g;
+    let gy   = surf.duvdy * g;
+    let albedo_color  = textureSampleGrad(txAlbedo,    samplerState, uvFinal, gx, gy);
+    let metallic_raw  = textureSampleGrad(txMetallic,  samplerState, uvFinal, gx, gy).b;
+    let roughness_raw = textureSampleGrad(txRoughness, samplerState, uvFinal, gx, gy).g;
+    let N_ts          = textureSampleGrad(txNormal,    samplerState, uvFinal, gx, gy).xyz * 2.0 - 1.0;
+    let emissive_raw  = textureSampleGrad(txEmissive,  samplerState, uvFinal, gx, gy).x;
 
-    // ── Texture sampling ──────────────────────────────────────────────────────
-    let albedo_color  = textureSampleBias(txAlbedo,    samplerState, uvFinal, camera.mipBias);
-    let metallic_raw  = textureSampleBias(txMetallic,  samplerState, uvFinal, camera.mipBias).b;
-    let roughness_raw = textureSampleBias(txRoughness, samplerState, uvFinal, camera.mipBias).g;
-    let N_ts_raw      = textureSampleBias(txNormal,    samplerState, uvFinal, camera.mipBias) * 2.0 - 1.0;
-    let emissive_raw  = textureSampleBias(txEmissive,  samplerState, uvFinal, camera.mipBias).x;
+    let N = normalize(surf.mapT * N_ts.x + surf.mapB * N_ts.y + surf.N * N_ts.z);
 
-    // ── Normal mapping ────────────────────────────────────────────────────────
-    let TBN = computeTBN(normalize(input.N), input.T);
-    let N   = normalize(TBN * N_ts_raw.xyz);
+    // ── Specular anti-aliasing (same as gbuffer.fs) ───────────────────────────
+    let dndx         = dpdx(N);
+    let dndy         = dpdy(N);
+    let variance     = dot(dndx, dndx) + dot(dndy, dndy);
+    let kernelRough2 = min(2.0 * variance * 0.25, 0.18);
+    let rough2       = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
+    let roughness    = sqrt(rough2);
 
-    // ── Specular Anti-Aliasing (same as gbuffer.fs) ───────────────────────────
-    let dndx        = dpdx(N);
-    let dndy        = dpdy(N);
-    let variance    = dot(dndx, dndx) + dot(dndy, dndy);
-    let saaBias     = 0.25;
-    let kernelRough2 = min(2.0 * variance * saaBias, 0.18);
-    let rough2      = clamp(roughness_raw * roughness_raw + kernelRough2, 0.0, 1.0);
-    let roughness   = sqrt(rough2);
-
-    // ── GBuffer packing ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     var output: FragmentOutput;
-
     // Albedo is bound through an sRGB view: the hardware already decoded it to linear.
-    let albedo_linear = albedo_color.rgb;
-    output.albedo     = vec4<f32>(albedo_linear * factors.baseColorFactor.rgb, metallic_raw * factors.metallicFactor);
-    output.normal     = vec4<f32>(normalToOctahedral01(N), roughness * factors.roughnessFactor, emissive_raw * factors.emissiveFactor);
+    output.albedo = vec4<f32>(albedo_color.rgb * factors.baseColorFactor.rgb * shadow,
+                              metallic_raw * factors.metallicFactor);
+    output.normal = vec4<f32>(normalToOctahedral01(N), roughness * factors.roughnessFactor,
+                              emissive_raw * factors.emissiveFactor);
 
-    // ── GBuffer depth (geometric, no correction) ─────────────────────────────
-    // We use the geometric mesh position, NOT the displaced surface position.
-    // Correcting linear depth to the displaced position would push low-height
-    // pixels (mortar, cracks) behind the geometric surface.  The lighting pass
-    // reconstructs worldPos from this value and uses it for shadow map lookups;
-    // pushing it deeper makes the shadow test think those pixels are occluded by
-    // their own mesh → artificial dark self-shadowing on every mortar crack.
+    // Geometric depth = top of the relief (see header). Pushing it down to the hit would
+    // make the shadow-map test see the mesh's own surface above every crack.
     let camb2obj = input.WorldPos - camera.cameraPosition.xyz;
     output.depth = dot(camb2obj, camera.cameraFront.xyz) / camera.cameraFar;
-
     return output;
 }

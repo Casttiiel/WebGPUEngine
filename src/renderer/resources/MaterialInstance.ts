@@ -1,6 +1,6 @@
 import { ResourceType } from '../../types/ResourceType.enum';
 import { TechniqueMaterialSlot } from '../../types/TechniqueData.type';
-import { Material, MaterialTexturesOptions } from './Material';
+import { Material, MaterialTexturesOptions, MATERIAL_FACTORS_SIZE } from './Material';
 import { Texture } from './Texture';
 import { Engine } from '../../core/engine/Engine';
 import { BindGroupFactory } from '../core/factories/BindGroupFactory';
@@ -18,6 +18,7 @@ export type MaterialInstanceOverrides = {
   appearanceBlend?: number;
   surfaceBlend?: number;
   pomScale?: number;
+  pomShadow?: number;
   /** Slot name → texture path overrides. For PBR: txAlbedo, txNormal, etc. */
   textures?: Record<string, string>;
 };
@@ -93,6 +94,7 @@ export class MaterialInstance extends Material {
     this.appearanceBlend = overrides.appearanceBlend ?? parent.getAppearanceBlend();
     this.surfaceBlend = overrides.surfaceBlend ?? parent.getSurfaceBlend();
     this.pomScale = overrides.pomScale ?? parent.getPomScale();
+    this.pomShadow = overrides.pomShadow ?? parent.getPomShadow();
 
     // Share the parent's shadow material (technique is identical).
     if (parent.getCastsShadows()) {
@@ -148,7 +150,7 @@ export class MaterialInstance extends Material {
     // Own uniform buffer with merged factor values.
     this.customUniformBuffer = GPUUtils.createBuffer(
       `${this.path}_ub`,
-      48,
+      MATERIAL_FACTORS_SIZE,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.writeFactorsToGPU();
@@ -214,7 +216,7 @@ export class MaterialInstance extends Material {
     // Own uniform buffer with merged factor values.
     this.uniformBuffer = GPUUtils.createBuffer(
       `${this.path}_ub`,
-      48,
+      MATERIAL_FACTORS_SIZE,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.writeFactorsToGPU();

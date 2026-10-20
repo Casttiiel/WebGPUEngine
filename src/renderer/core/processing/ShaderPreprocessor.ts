@@ -107,9 +107,17 @@ export class ShaderPreprocessor {
     await Promise.all(childPaths.map((p) => this.prefetchIncludes(p, visited)));
   }
 
-  public static async preprocessShader(shaderPath: string): Promise<string> {
-    // Check cache first for the full processed shader
-    const cached = this.processedShaderCache.get(shaderPath);
+  /**
+   * Resolves includes and, with `defines`, the conditional blocks of a shader permutation:
+   * `#ifdef NAME`, `#ifndef NAME`, `#else`, `#endif` (nestable, on their own line). Dropped
+   * lines are blanked rather than removed so WGSL error line numbers still match the file.
+   */
+  public static async preprocessShader(
+    shaderPath: string,
+    defines: ReadonlyArray<string> = [],
+  ): Promise<string> {
+    const cacheKey = defines.length > 0 ? `${shaderPath}#${[...defines].sort().join(',')}` : shaderPath;
+    const cached = this.processedShaderCache.get(cacheKey);
     if (cached) {
       return cached;
     }
@@ -120,12 +128,47 @@ export class ShaderPreprocessor {
 
     // Load and process shader (all reads are now cache hits)
     const content = await this.readShaderFile(shaderPath);
-    const processedContent = await this.processIncludes(content, new Set(), new Set(), shaderPath);
+    const withIncludes = await this.processIncludes(content, new Set(), new Set(), shaderPath);
+    const processedContent = this.applyDefines(withIncludes, new Set(defines), shaderPath);
 
     // Cache the final processed shader
-    this.processedShaderCache.set(shaderPath, processedContent);
+    this.processedShaderCache.set(cacheKey, processedContent);
 
     return processedContent;
+  }
+
+  private static applyDefines(content: string, defines: ReadonlySet<string>, file: string): string {
+    const directive = /^\s*#(ifdef|ifndef|else|endif)(?:\s+(\w+))?\s*$/;
+    // One entry per open block: is this branch active, and was its parent active.
+    const stack: Array<{ active: boolean; parentActive: boolean }> = [];
+    let active = true;
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const m = directive.exec(lines[i]!);
+      if (m) {
+        const kind = m[1];
+        const name = m[2] ?? '';
+        if (kind === 'ifdef' || kind === 'ifndef') {
+          const cond = defines.has(name) === (kind === 'ifdef');
+          stack.push({ active: active && cond, parentActive: active });
+          active = active && cond;
+        } else if (kind === 'else') {
+          const top = stack[stack.length - 1];
+          if (!top) throw new Error(`${file}: #else without #ifdef`);
+          top.active = top.parentActive && !top.active;
+          active = top.active;
+        } else {
+          const top = stack.pop();
+          if (!top) throw new Error(`${file}: #endif without #ifdef`);
+          active = top.parentActive;
+        }
+        lines[i] = '';
+      } else if (!active) {
+        lines[i] = '';
+      }
+    }
+    if (stack.length > 0) throw new Error(`${file}: unterminated #ifdef`);
+    return lines.join('\n');
   }
 
   /**

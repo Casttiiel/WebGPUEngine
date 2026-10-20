@@ -1,14 +1,23 @@
 {
-  "technique": "gbuffer/gbuffer_triplanar_world.tech",
+  "technique": "gbuffer/gbuffer_pom.tech",
+  "features": [
+    "BOX",
+    "SILHOUETTE",
+    "POM_SHADOW"
+  ],
+  "category": "solids",
   "textures": {
     "txAlbedo": "mistborn/castle_brick_07_diff_1k.jpg",
     "txNormal": "mistborn/castle_brick_07_nor_gl_1k.jpg",
     "txMetallic": "black.png",
     "txRoughness": "mistborn/castle_brick_07_rough_1k.jpg",
-    "txEmissive": "black.png"
+    "txEmissive": "black.png",
+    "txHeight": "mistborn/castle_brick_07_disp_1k.jpg"
   },
   "uvXScale": 0.5,
   "uvYScale": 0.5,
+  "pomScale": 0.03,
+  "pomShadow": 0.85,
   "baseColorFactor": [
     0.42,
     0.4,
@@ -18,6 +27,5 @@
   "roughnessFactor": 1.0,
   "metallicFactor": 0,
   "casts_shadows": true,
-  "category": "solids",
   "shadows": false
 }

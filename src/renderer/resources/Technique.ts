@@ -31,6 +31,10 @@ export interface TechniqueCreateOptions extends Omit<IGPUResourceOptions, 'type'
   skinned?: boolean;
   /** Skip the depth prepass for this technique (use for vertex-animated geometry like grass wind). */
   skipDepthPrepass?: boolean;
+  /** Shader #defines of this permutation (passed to both stages). */
+  defines?: ReadonlyArray<string>;
+  /** Per-define overrides, applied by Technique.getAsync for the active defines. */
+  variants?: Readonly<Record<string, Partial<TechniqueCreateOptions>>>;
 }
 
 export type TechniqueOptions = TechniqueCreateOptions & IGPUResourceOptions;
@@ -82,6 +86,7 @@ export class Technique extends GPUResource {
   private readonly isSkinned: boolean;
   private readonly _skipDepthPrepass: boolean;
   private readonly srgbAlbedo: boolean;
+  private readonly defines: ReadonlyArray<string>;
 
   constructor(options: TechniqueOptions) {
     super({
@@ -104,6 +109,17 @@ export class Technique extends GPUResource {
     this.isSkinned = options.skinned ?? false;
     this._skipDepthPrepass = options.skipDepthPrepass ?? false;
     this.srgbAlbedo = options.fs !== undefined && SRGB_ALBEDO_SHADERS.has(options.fs);
+    this.defines = options.defines ?? [];
+  }
+
+  /**
+   * Resource path of a technique permutation: `file.tech#A,B` (defines sorted, so the same
+   * feature set always shares one pipeline). No defines → the plain file path.
+   */
+  public static permutationPath(file: string, defines: ReadonlyArray<string>): string {
+    const [base, existing] = file.split('#');
+    const all = new Set([...(existing ? existing.split(',') : []), ...defines].filter(Boolean));
+    return all.size > 0 ? `${base}#${[...all].sort().join(',')}` : base!;
   }
 
   public static async getAsync(
@@ -143,10 +159,18 @@ export class Technique extends GPUResource {
   private static async loadTechniqueData(
     pathOrData: string | Partial<TechniqueCreateOptions>,
   ): Promise<Partial<TechniqueCreateOptions>> {
-    if (typeof pathOrData === 'string') {
-      return await ResourceManager.loadTechniqueData(pathOrData);
+    if (typeof pathOrData !== 'string') return pathOrData;
+    // `file.tech#A,B` → the file's data with the permutation's defines and their variants.
+    const [file, suffix] = pathOrData.split('#');
+    const data = (await ResourceManager.loadTechniqueData(file!)) as Partial<TechniqueCreateOptions>;
+    const requested = suffix ? suffix.split(',').filter(Boolean) : [];
+    let merged: Partial<TechniqueCreateOptions> = { ...data };
+    for (const define of requested) {
+      const variant = data.variants?.[define];
+      if (variant) merged = { ...merged, ...variant };
     }
-    return pathOrData;
+    merged.defines = [...new Set([...(data.defines ?? []), ...requested])];
+    return merged;
   }
 
   private static createTechnique(
@@ -173,6 +197,7 @@ export class Technique extends GPUResource {
         ? { materialSlots: techniqueData.materialSlots }
         : {}),
       ...(techniqueData.skipDepthPrepass ? { skipDepthPrepass: true } : {}),
+      ...(techniqueData.defines?.length ? { defines: techniqueData.defines } : {}),
     };
 
     // Add optional properties only if they exist
@@ -194,7 +219,7 @@ export class Technique extends GPUResource {
 
   private async createShaderModules(): Promise<void> {
     // Load vertex shader; fragment shader is optional (depth-only passes)
-    const vsCode = await ResourceManager.loadShader(this.vsFile);
+    const vsCode = await ResourceManager.loadShader(this.vsFile, this.defines);
     if (!vsCode) throw new Error(`Failed to load vertex shader: ${this.vsFile}`);
 
     this.vsModule = this.device.createShaderModule({
@@ -203,7 +228,7 @@ export class Technique extends GPUResource {
     });
 
     if (this.fsFile) {
-      const fsCode = await ResourceManager.loadShader(this.fsFile);
+      const fsCode = await ResourceManager.loadShader(this.fsFile, this.defines);
       if (!fsCode) throw new Error(`Failed to load fragment shader: ${this.fsFile}`);
       this.fsModule = this.device.createShaderModule({
         label: `${this.label}_fs`,
@@ -598,6 +623,11 @@ export class Technique extends GPUResource {
   /** Returns true if objects using this technique should be skipped in the depth prepass. */
   public getSkipDepthPrepass(): boolean {
     return this._skipDepthPrepass;
+  }
+
+  /** Shader #defines of this permutation. */
+  public getDefines(): ReadonlyArray<string> {
+    return this.defines;
   }
 
   public getVsFile(): string {

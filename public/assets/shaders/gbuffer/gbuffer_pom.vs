@@ -1,47 +1,52 @@
 #include "common/uniforms"
 #include "common/structs"
 #include "common/math/matrices"
+#include "gbuffer/pom_common"
+
+// Vertex stage of the POM G-buffer techniques.
+//   INSTANCED  model matrix from the instance storage buffer (gbuffer_pom_instanced.tech)
+// The box frame (centre, axes, half extents of the unit cube scaled by the model matrix)
+// is always passed: the BOX / SILHOUETTE fragment paths project and clip with it.
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
+#ifdef INSTANCED
+@group(2) @binding(0) var<storage, read> instanceMatrices: array<mat4x4<f32>>;
+#else
 @group(2) @binding(0) var<uniform> object: ObjectUniforms;
-
-struct POMVertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) @interpolate(perspective, centroid) N: vec3<f32>,
-    @location(1) @interpolate(perspective, centroid) Uv: vec2<f32>,
-    @location(2) @interpolate(perspective, centroid) WorldPos: vec3<f32>,
-    @location(3) @interpolate(perspective, centroid) T: vec4<f32>,
-    // View direction in tangent space (from surface to camera).
-    // Computed per-vertex and interpolated so the fragment shader can
-    // perform the POM ray-march in tangent space without extra matrices.
-    @location(4) @interpolate(perspective, centroid) ViewDirTS: vec3<f32>,
-}
+#endif
 
 @vertex
 fn vs(
     @location(0) position: vec3<f32>,
     @location(1) normal:   vec3<f32>,
     @location(2) uv:       vec2<f32>,
-    @location(3) tangent:  vec4<f32>
+    @location(3) tangent:  vec4<f32>,
+    @builtin(instance_index) instanceIdx: u32,
 ) -> POMVertexOutput {
+#ifdef INSTANCED
+    let model = instanceMatrices[instanceIdx];
+#else
+    let model = object.modelMatrix;
+#endif
     var output: POMVertexOutput;
 
-    let worldPos4 = object.modelMatrix * vec4<f32>(position, 1.0);
-    let model3x3  = get3x3From4x4(object.modelMatrix);
+    let worldPos4 = model * vec4<f32>(position, 1.0);
+    let model3x3  = get3x3From4x4(model);
 
-    let N = normalize(model3x3 * normal);
-    let T = normalize(model3x3 * tangent.xyz);
-    let B = cross(N, T) * tangent.w;  // bitangent with handedness correction
-
-    output.N        = N;
-    output.T        = vec4<f32>(T, tangent.w);
+    output.N        = normalize(model3x3 * normal);
+    output.T        = vec4<f32>(normalize(model3x3 * tangent.xyz), tangent.w);
     output.WorldPos = worldPos4.xyz;
     output.Uv       = uv;
     output.position = camera.projectionMatrix * camera.viewMatrix * worldPos4;
 
-    // ViewDirTS is now computed per-fragment in the FS using the interpolated TBN.
-    // Setting it to zero here; the FS ignores this interpolated value.
-    output.ViewDirTS = vec3<f32>(0.0, 0.0, 0.0);
+    let ax = model[0].xyz;
+    let ay = model[1].xyz;
+    let az = model[2].xyz;
+    output.BoxCenter = model[3].xyz;
+    output.BoxAxisX  = normalize(ax);
+    output.BoxAxisY  = normalize(ay);
+    output.BoxAxisZ  = normalize(az);
+    output.BoxHalf   = 0.5 * vec3<f32>(length(ax), length(ay), length(az));
 
     return output;
 }

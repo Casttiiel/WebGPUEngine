@@ -39,6 +39,8 @@ export interface MaterialBaseOptions {
   surfaceBlend?: number;
   /** Parallax Occlusion Mapping height scale. 0 = disabled (default). Typical range 0.01–0.1. */
   pomScale?: number;
+  /** POM self-shadow strength (0 = off). Written after MaterialFactors (offset 48). */
+  pomShadow?: number;
   /** Raw texture map forwarded from .mat file, used by the custom-slot path. */
   rawTextures?: Record<string, string>;
 }
@@ -47,6 +49,12 @@ export type MaterialCreateOptions = MaterialBaseOptions & Omit<IGPUResourceOptio
 export type MaterialOptions = Required<Pick<MaterialBaseOptions, 'technique'>> &
   Omit<MaterialCreateOptions, 'technique'> &
   IGPUResourceOptions;
+
+/**
+ * Size of the material-factors uniform: MaterialFactors (48 bytes) + one vec4 of extras
+ * (pomShadow, …) that only the shaders needing them declare.
+ */
+export const MATERIAL_FACTORS_SIZE = 64;
 
 export class Material extends GPUResource {
   // Prevents duplicate registration for string-path materials under parallel load.
@@ -63,6 +71,7 @@ export class Material extends GPUResource {
   protected appearanceBlend!: number;
   protected surfaceBlend!: number;
   protected pomScale!: number;
+  protected pomShadow!: number;
   protected category: RenderCategory;
   protected castsShadows: boolean;
   protected shadows: boolean;
@@ -105,6 +114,7 @@ export class Material extends GPUResource {
     this.appearanceBlend = options.appearanceBlend ?? 1;
     this.surfaceBlend = options.surfaceBlend ?? 1;
     this.pomScale = (options as any).pomScale ?? 0;
+    this.pomShadow = options.pomShadow ?? 0;
   }
 
   public static async get(pathOrData: string | MaterialDataType): Promise<Material> {
@@ -159,6 +169,7 @@ export class Material extends GPUResource {
           appearanceBlend: materialData.appearanceBlend,
           surfaceBlend: materialData.surfaceBlend,
           pomScale: materialData.pomScale,
+          pomShadow: materialData.pomShadow,
           textures: materialData.textures as Record<string, string> | undefined,
         } as any,
         path,
@@ -169,7 +180,7 @@ export class Material extends GPUResource {
 
     const techniqueSource =
       materialData.technique !== undefined
-        ? materialData.technique
+        ? Technique.permutationPath(materialData.technique, materialData.features ?? [])
         : materialData.techniqueData !== undefined
           ? materialData.techniqueData
           : undefined;
@@ -211,6 +222,7 @@ export class Material extends GPUResource {
         materialData?.appearanceBlend !== undefined ? materialData.appearanceBlend : 1.0,
       surfaceBlend: materialData?.surfaceBlend !== undefined ? materialData.surfaceBlend : 1.0,
       pomScale: materialData?.pomScale !== undefined ? materialData.pomScale : 0.0,
+      pomShadow: materialData?.pomShadow ?? 0,
       castsShadows: materialData?.casts_shadows !== undefined ? materialData.casts_shadows : true,
       shadows: materialData?.shadows !== undefined ? materialData.shadows : false,
     });
@@ -327,7 +339,7 @@ export class Material extends GPUResource {
     // 2. Create the material-factors uniform buffer (used by 'uniform' slots).
     this.customUniformBuffer = GPUUtils.createBuffer(
       `${this.label}_custom_uniform`,
-      48,
+      MATERIAL_FACTORS_SIZE,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     );
     this.writeFactorsToGPU();
@@ -457,7 +469,7 @@ export class Material extends GPUResource {
     if (!this.uniformBuffer) {
       this.uniformBuffer = GPUUtils.createBuffer(
         'material uniform buffer',
-        48,
+        MATERIAL_FACTORS_SIZE,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
       this.writeFactorsToGPU();
@@ -586,12 +598,22 @@ export class Material extends GPUResource {
     return this.pomScale;
   }
 
+  public getPomShadow(): number {
+    return this.pomShadow;
+  }
+
+  /** Texture map as written in the .mat (custom slots included, e.g. txHeight). */
+  public getRawTextures(): Record<string, string> {
+    return this.rawTextures;
+  }
+
   /**
    * Update one or more material factors and immediately write them to the GPU uniform buffer.
    * Works for both the standard PBR path and the custom-slot path.
    */
   public setFactors(data: {
     pomScale?: number;
+    pomShadow?: number;
     roughnessFactor?: number;
     metallicFactor?: number;
     emissiveFactor?: number;
@@ -602,6 +624,7 @@ export class Material extends GPUResource {
     baseColorFactor?: number[];
   }): void {
     if (data.pomScale !== undefined) this.pomScale = data.pomScale;
+    if (data.pomShadow !== undefined) this.pomShadow = data.pomShadow;
     if (data.roughnessFactor !== undefined) this.roughnessFactor = data.roughnessFactor;
     if (data.metallicFactor !== undefined) this.metallicFactor = data.metallicFactor;
     if (data.emissiveFactor !== undefined) this.emissiveFactor = data.emissiveFactor;
@@ -633,6 +656,7 @@ export class Material extends GPUResource {
       32,
       new Float32Array([this.uvXScale, this.uvYScale, this.surfaceBlend, this.pomScale]),
     );
+    GPUUtils.writeBuffer(buf, 48, new Float32Array([this.pomShadow, 0, 0, 0]));
   }
 
   /**
@@ -669,6 +693,7 @@ export class Material extends GPUResource {
       appearanceBlend: original.appearanceBlend,
       surfaceBlend: original.surfaceBlend,
       pomScale: original.pomScale,
+      pomShadow: original.pomShadow,
       // El clon (tinte por instancia) proyecta sombra igual que el original. Comparte técnica,
       // así que también su material de sombra.
       castsShadows: original.castsShadows && original.shadowsMaterial !== undefined,
@@ -686,7 +711,7 @@ export class Material extends GPUResource {
       // Own uniform buffer with current factor values.
       clone.customUniformBuffer = GPUUtils.createBuffer(
         `${clone.path}_custom_ub`,
-        48,
+        MATERIAL_FACTORS_SIZE,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
       clone.writeFactorsToGPU();
@@ -720,7 +745,7 @@ export class Material extends GPUResource {
       // Own uniform buffer with current factor values.
       clone.uniformBuffer = GPUUtils.createBuffer(
         `${clone.path}_ub`,
-        48,
+        MATERIAL_FACTORS_SIZE,
         GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       );
       clone.writeFactorsToGPU();

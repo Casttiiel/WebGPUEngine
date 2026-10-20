@@ -38,21 +38,21 @@ fn triplanarNormal(
     smp: sampler,
     localPos: vec3<f32>,
     blend: vec3<f32>,
-    scale: f32
+    scale: f32,
+    geomN: vec3<f32>
 ) -> vec3<f32> {
     // Leer los 3 normales proyectados
     let nX = textureSampleBias(tex, smp, localPos.yz * scale, camera.mipBias).xyz * 2.0 - 1.0;
     let nY = textureSampleBias(tex, smp, localPos.xz * scale, camera.mipBias).xyz * 2.0 - 1.0;
     let nZ = textureSampleBias(tex, smp, localPos.xy * scale, camera.mipBias).xyz * 2.0 - 1.0;
 
-    // Asignar los ejes correctos (son "normales en espacio de proyección")
-    let nx = vec3<f32>(nX.z, nX.x, nX.y);
-    let ny = vec3<f32>(nY.x, nY.z, nY.y);
-    let nz = vec3<f32>(nZ.x, nZ.y, nZ.z);
-
-    // Combinar
-    let n = normalize(nx * blend.x + ny * blend.y + nz * blend.z);
-    return n;
+    // UDN: cada proyección aporta su perturbación tangente sobre la normal geométrica.
+    // (Usar el normal map tal cual como normal del eje la apuntaba siempre hacia +X/+Y/+Z:
+    // las caras -X/-Y/-Z se iluminaban como si miraran al lado contrario.)
+    let px = vec3<f32>(0.0, nX.x, nX.y);
+    let py = vec3<f32>(nY.x, 0.0, nY.y);
+    let pz = vec3<f32>(nZ.x, nZ.y, 0.0);
+    return normalize(geomN + px * blend.x + py * blend.y + pz * blend.z);
 }
 
 @fragment
@@ -129,7 +129,8 @@ fn fs(input: VertexOutput) -> FragmentOutput {
         samplerState,
         rotatedPos,
         blend,
-        scale
+        scale,
+        Nw
     );
 
     // === Empaquetado de normal + roughness ===

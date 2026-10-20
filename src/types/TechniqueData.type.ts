@@ -46,4 +46,12 @@ export type TechniqueDataType = Readonly<{
    * The technique must use z="less_equal" so the GBuffer pass writes correct depth.
    */
   skipDepthPrepass?: boolean;
+  /** Shader #defines always active for this technique (see ShaderPreprocessor). */
+  defines?: ReadonlyArray<string>;
+  /**
+   * Per-feature overrides: when a permutation enables a define listed here (path suffix
+   * `file.tech#A,B`, or a material's `features`), its fields replace the base ones.
+   * E.g. a feature that discards pixels needs its own depth mode and no depth prepass.
+   */
+  variants?: Readonly<Record<string, Partial<Omit<TechniqueDataType, 'variants'>>>>;
 }>;
