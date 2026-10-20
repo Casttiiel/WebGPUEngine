@@ -280,13 +280,15 @@ export class AutoExposureComponent extends Component {
   }
 
   /**
-   * Runs both compute passes in a single command encoder.
+   * Records both compute passes into the frame's command encoder.
    * WebGPU spec §25.4 guarantees that storage buffer writes from a compute pass
    * are visible to all subsequent passes within the same command buffer, so no
    * separate submit or explicit barrier is needed between luminance and adapt.
+   * A submit of its own here ran before the frame's (measuring the previous frame's HDR)
+   * and left the GPU idle ~1 ms afterwards, waiting for the CPU to finish recording.
    */
   private runPasses(hdrTexture: GPUTextureView): void {
-    const encoder = this.device.createCommandEncoder({ label: 'AutoExposure' });
+    const encoder = Render.getInstance().getCommandEncoder();
 
     // Pass 1 — sample HDR, accumulate log-luminance into accumulatorBuffer
     const lumTs = GPUProfiler.getInstance().getTimestampWrites('AE Luminance');
@@ -312,8 +314,6 @@ export class AutoExposureComponent extends Component {
     adapt.setBindGroup(2, this.adaptParamsBindGroup);
     adapt.dispatchWorkgroups(1, 1, 1);
     adapt.end();
-
-    this.device.queue.submit([encoder.finish()]);
   }
 
   // ── Unused Component interface stubs ──────────────────────────────────────

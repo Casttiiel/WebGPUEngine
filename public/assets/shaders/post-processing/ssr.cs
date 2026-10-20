@@ -42,6 +42,7 @@
 @group(3) @binding(0) var outputSSR: texture_storage_2d<rgba16float, write>;
 
 const MAX_STEPS: f32 = 64.0;
+const SSR_MAX_ROUGHNESS: f32 = 0.7;
 
 // Prefiltered environment radiance along the mirror direction — identical to the IBL
 // lookup in ambient_specular.fs (probe blend + parallax correction).
@@ -114,6 +115,15 @@ fn cs(@builtin(global_invocation_id) gid: vec3<u32>) {
     let worldIncident = normalize(worldPosition - camera.cameraPosition.xyz);
     let worldMirrorR  = normalize(reflect(worldIncident, worldNormal));
     let envColor = sampleEnvironment(worldPosition, worldMirrorR, roughness);
+
+    // Past this roughness the GGX lobe is so wide that the traced result converges on the
+    // prefiltered probe anyway: skip the march (a miss), as UE does with its 0.6 default.
+    if (roughness > SSR_MAX_ROUGHNESS) {
+        let lumEnv = max(ssrLuminance(envColor), 1e-4);
+        let env = envColor * min(params.maxLuminance / lumEnv, 1.0) * params.intensity;
+        textureStore(outputSSR, coords, vec4<f32>(max(env, vec3<f32>(0.0)), ENV_RAY_LENGTH));
+        return;
+    }
 
     // ── Stochastic GGX ray ────────────────────────────────────────────────────
     var Xi = ssrAnalyticNoise(uv * resolution, i32(params.noiseIndex), 47.0);

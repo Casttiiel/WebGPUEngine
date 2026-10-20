@@ -171,11 +171,16 @@ fn baseHeightAt(uv: vec2<f32>, lod: f32) -> f32 {
 #endif
 }
 
-// x = blended height, y = layer weight.
-fn surfaceHeight(uv: vec2<f32>, lod: f32) -> vec2<f32> {
+// The march and the relief shadow read the layer's height one mip coarser: the layer
+// (dirt, plaster) is low-frequency next to the base, and its fetch every step was
+// ~1.3 ms of G-buffer at 4K. The final shading keeps the full mip.
+const LAYER_MARCH_LOD_BIAS = 1.0;
+
+// x = blended height, y = layer weight. layerLodBias: extra mips for the layer height.
+fn surfaceHeight(uv: vec2<f32>, lod: f32, layerLodBias: f32) -> vec2<f32> {
     let hb = baseHeightAt(uv, lod);
 #ifdef LAYER
-    let raw = textureSampleLevel(txHeight2, samplerState, uv * gLayerRatio, lod + gLayerLod).r;
+    let raw = textureSampleLevel(txHeight2, samplerState, uv * gLayerRatio, lod + gLayerLod + layerLodBias).r;
     let hl  = saturate(raw + factors.layerHeightOffset + gLayerBias);
     let s   = max(factors.layerSharpness, 1e-3);
     let w   = smoothstep(-s, s, hl - hb);
@@ -187,9 +192,9 @@ fn surfaceHeight(uv: vec2<f32>, lod: f32) -> vec2<f32> {
 
 fn heightAt(uv: vec2<f32>, lod: f32) -> f32 {
 #ifdef ASH
-    return max(surfaceHeight(uv, lod).x, min(gAshLevel, 1.0));
+    return max(surfaceHeight(uv, lod, LAYER_MARCH_LOD_BIAS).x, min(gAshLevel, 1.0));
 #else
-    return surfaceHeight(uv, lod).x;
+    return surfaceHeight(uv, lod, LAYER_MARCH_LOD_BIAS).x;
 #endif
 }
 
@@ -354,7 +359,9 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
         let uvRay    = -vec2<f32>(dot(V, surf.dirU), dot(V, surf.dirV)) / vz * depthScale * surf.scale;
         let worldRay = -V / vz * depthScale;
         let pxTravel = length(uvRay) * texelsPerUv;
-        let steps    = clamp(max(pxTravel, reliefPx) * 0.75 + MIN_STEPS, MIN_STEPS, MAX_STEPS);
+        // 0.5 steps per texel of travel: the linear refinement at the end covers the rest,
+        // and at 4K 0.75 marched more steps than the relief can show.
+        let steps    = clamp(max(pxTravel, reliefPx) * 0.5 + MIN_STEPS, MIN_STEPS, MAX_STEPS);
 
         let hit = march(input, surf.uv, uvRay, worldRay, steps, lod);
         if (hit.exited) {
@@ -381,24 +388,48 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     let g  = exp2(camera.mipBias);
     let gx = surf.duvdx * g;
     let gy = surf.duvdy * g;
-    var albedo    = sampleBase(txAlbedo, uvFinal, gx, gy).rgb * factors.baseColorFactor.rgb;
-    var metallic  = sampleBase(txMetallic, uvFinal, gx, gy).b * factors.metallicFactor;
-    var roughRaw  = sampleBase(txRoughness, uvFinal, gx, gy).g;
-    var N_ts      = sampleBase(txNormal, uvFinal, gx, gy).xyz * 2.0 - 1.0;
-    let emissive  = sampleBase(txEmissive, uvFinal, gx, gy).x * factors.emissiveFactor;
-    let heightHit = surfaceHeight(uvFinal, lod);
+    // These anisotropic fetches (explicit gradients) are what this shader spends most on —
+    // not the march, whose SampleLevel reads skip anisotropy. So the cheap height lookup
+    // comes first and decides which maps can show at all: none under a full layer of ash,
+    // not the base under a full layer, not the layer where it has no weight. Each skip
+    // only drops a term the mixes below would multiply by 0.
+    let heightHit = surfaceHeight(uvFinal, lod, 0.0);
+    let wLayer    = heightHit.y;
+    var ashFilled = 0.0;
+#ifdef ASH
+    let ashEdge = max(factors.ashSharpness, 1e-3);
+    ashFilled = smoothstep(-ashEdge, ashEdge, gAshLevel - heightHit.x);
+#endif
+    let visible = ashFilled < 1.0;
+
+    var albedo   = vec3<f32>(0.0);
+    var metallic = 0.0;
+    var roughRaw = 1.0;
+    var N_ts     = vec3<f32>(0.0, 0.0, 1.0);
+    if (visible && wLayer < 1.0) {
+        albedo   = sampleBase(txAlbedo, uvFinal, gx, gy).rgb * factors.baseColorFactor.rgb;
+        roughRaw = sampleBase(txRoughness, uvFinal, gx, gy).g;
+        N_ts     = sampleBase(txNormal, uvFinal, gx, gy).xyz * 2.0 - 1.0;
+        // Uniform: most materials leave black.png with factor 0 here.
+        if (factors.metallicFactor != 0.0) {
+            metallic = sampleBase(txMetallic, uvFinal, gx, gy).b * factors.metallicFactor;
+        }
+    }
+    var emissive = 0.0;
+    if (factors.emissiveFactor != 0.0) {
+        emissive = sampleBase(txEmissive, uvFinal, gx, gy).x * factors.emissiveFactor;
+    }
 
 #ifdef LAYER
-    {
-        let w   = heightHit.y;
+    if (visible && wLayer > 0.0) {
         let uvL = uvFinal * gLayerRatio;
         let gxL = gx * gLayerRatio;
         let gyL = gy * gLayerRatio;
         let tint = vec3<f32>(factors.layerTintR, factors.layerTintG, factors.layerTintB);
-        albedo   = mix(albedo, textureSampleGrad(txAlbedo2, samplerState, uvL, gxL, gyL).rgb * tint, w);
-        roughRaw = mix(roughRaw, textureSampleGrad(txRoughness2, samplerState, uvL, gxL, gyL).g, w);
-        N_ts     = mix(N_ts, textureSampleGrad(txNormal2, samplerState, uvL, gxL, gyL).xyz * 2.0 - 1.0, w);
-        metallic = mix(metallic, 0.0, w);
+        albedo   = mix(albedo, textureSampleGrad(txAlbedo2, samplerState, uvL, gxL, gyL).rgb * tint, wLayer);
+        roughRaw = mix(roughRaw, textureSampleGrad(txRoughness2, samplerState, uvL, gxL, gyL).g, wLayer);
+        N_ts     = mix(N_ts, textureSampleGrad(txNormal2, samplerState, uvL, gxL, gyL).xyz * 2.0 - 1.0, wLayer);
+        metallic = mix(metallic, 0.0, wLayer);
     }
 #endif
 
@@ -429,8 +460,7 @@ fn fs(input: POMVertexOutput) -> FragmentOutput {
     {
         // Ash where its level is above the surface (with a soft rim), plus a thin dusting
         // on the exposed tops. The ash surface is flat: its normal is the face's.
-        let s = max(factors.ashSharpness, 1e-3);
-        let filled  = smoothstep(-s, s, gAshLevel - heightHit.x);
+        let filled  = ashFilled;
         let dusting = min(gAshLevel, 1.0) * 0.45;
         let ash     = max(filled, dusting);
         let ashColor = vec3<f32>(factors.ashColorR, factors.ashColorG, factors.ashColorB);
